@@ -235,15 +235,15 @@ public class SyntaxTests
     {
         // Lexer test: verifies all token kinds are recognized including legacy closers
         var source = @"
-§M{m001:Hello}
-    §F{f001:Main:pub}
+§M{Hello}
+    §F{Main:pub}
           §O{void}
           §E{cw}
           §C{Console.WriteLine}
             §A ""Hello from Calor v2!""
           §/C
-    §/F{f001}
-§/M{m001}
+    §/F
+§/M
 ";
         var tokens = Tokenize(source);
 
@@ -384,7 +384,7 @@ public class SyntaxTests
     public void Parser_ParsesModuleWithPositionalAttributes()
     {
         var diagnostics = new DiagnosticBag();
-        var source = "§M{m001:Hello}";
+        var source = "§M{Hello}";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
@@ -401,8 +401,8 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:MyFunc:pub}
+§M{Test}
+  §F{MyFunc:pub}
       §O{void}";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
@@ -421,8 +421,8 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
+§M{Test}
+  §F{Add:pub}
       §O{i32}
         §R 0";
         var lexer = new Lexer(source, diagnostics);
@@ -440,8 +440,8 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
+§M{Test}
+  §F{Add:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -463,8 +463,8 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Print:pub}
+§M{Test}
+  §F{Print:pub}
       §O{void}
       §E{cw}";
         var lexer = new Lexer(source, diagnostics);
@@ -484,8 +484,8 @@ public class SyntaxTests
         var diagnostics = new DiagnosticBag();
         // No §BODY/§END_BODY markers - implicit body
         var source = @"
-§M{m001:Test}
-  §F{f001:Print:pub}
+§M{Test}
+  §F{Print:pub}
       §O{void}
       §E{cw}
       §C{Console.WriteLine}
@@ -507,8 +507,8 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Print:pub}
+§M{Test}
+  §F{Print:pub}
       §O{void}
       §E{cw}
       §C{Console.WriteLine}
@@ -879,8 +879,8 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
+§M{Test}
+  §F{Add:pub}
       §O{i32}
         §R (+ 1 2)";
         var lexer = new Lexer(source, diagnostics);
@@ -903,8 +903,8 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Calc:pub}
+§M{Test}
+  §F{Calc:pub}
       §O{bool}
         §R (== (% i 15) 0)";
         var lexer = new Lexer(source, diagnostics);
@@ -930,8 +930,8 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §O{i32}
         §R (+ x 1)";
@@ -954,8 +954,8 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{BOOL:flag}
       §O{BOOL}
         §R (! flag)";
@@ -977,8 +977,8 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Calc:pub} () -> i32
+§M{Test}
+  §F{Calc:pub} () -> i32
         §R (+ §THIS.Value INT:1)";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
@@ -1004,8 +1004,8 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Calc:pub} () -> i32
+§M{Test}
+  §F{Calc:pub} () -> i32
         §R (+ §BASE.Value INT:1)";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
@@ -1052,8 +1052,8 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
         §P ""Hello World""";
         var lexer = new Lexer(source, diagnostics);
@@ -1074,8 +1074,8 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §I{i32:x}
       §O{void}
         §P (+ x 1)";
@@ -1099,11 +1099,11 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §I{BOOL:flag}
       §O{void}
-        §IF{i1} flag
+        §IF flag
           §P ""Yes""";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
@@ -1164,8 +1164,8 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
         §C{Console.WriteLine} ""Hello""";
         var lexer = new Lexer(source, diagnostics);
@@ -1186,8 +1186,8 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §I{i32:x}
       §O{void}
         §C{Console.WriteLine} (+ x 1)";

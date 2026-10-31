@@ -43,9 +43,9 @@ public class CompileCalorIntegrationTests : IDisposable
 
     // A minimal valid Calor module
     private const string ValidCalorSource = """
-        §M{m001:TestModule}
+        §M{TestModule}
 
-          §F{f001:Add:pub}
+          §F{Add:pub}
               §I{i32:a}
               §I{i32:b}
               §O{i32}
@@ -55,8 +55,8 @@ public class CompileCalorIntegrationTests : IDisposable
 
     // Source that will cause a compile error (unclosed paren)
     private const string InvalidCalorSource = """
-        §M{m001:TestModule}
-          §F{f001:Broken:pub}
+        §M{TestModule}
+          §F{Broken:pub}
               §I{i32:a}
               §O{i32}
               §R (+ a b
@@ -125,16 +125,16 @@ public class CompileCalorIntegrationTests : IDisposable
     public void CrossModuleVariance_WarmBuildRechecksChangedBaseContract()
     {
         const string baseSource = """
-            §M{m1:Shared}
-              §CL{c1:Base:pub}
-                §MT{mt1:Render:pub:virt} () -> void
+            §M{Shared}
+              §CL{Base:pub}
+                §MT{Render:pub:virt} () -> void
                   §E{cw}
             """;
         var basePath = CreateSourceFile("Base.calr", baseSource);
         var derivedPath = CreateSourceFile("Derived.calr", """
-            §M{m2:Shared}
-              §CL{c2:Derived:Base:pub}
-                §MT{mt2:Render:pub:over} () -> void
+            §M{Shared}
+              §CL{Derived:Base:pub}
+                §MT{Render:pub:over} () -> void
                   §E{cw}
             """);
         Assert.True(CreateTask(basePath, derivedPath).Execute());
@@ -159,10 +159,10 @@ public class CompileCalorIntegrationTests : IDisposable
         var source = CreateSourceFile("Routing.calr", ValidCalorSource);
         Assert.True(CreateTask(source).Execute());
         File.WriteAllText(source, """
-            §M{m1:Routing}
-              §F{f1:Probe:pub} () -> i32
+            §M{Routing}
+              §F{Probe:pub} () -> i32
                 §R 1
-              §F{f2:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §R 2
             """);
         var task = CreateTask(source);
@@ -182,8 +182,8 @@ public class CompileCalorIntegrationTests : IDisposable
     public void NullableReferenceTyping_AgreesWithTaskAndRejectsRemovedSyntaxAfterWarmBuild(bool typeOff, bool transpile)
     {
         const string safe = """
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} () -> ?str
+            §M{NullableTyping}
+              §F{Probe:pub} () -> ?str
                 §E{alloc}
                 §B{value:?str} "safe"
                 §R value
@@ -377,8 +377,8 @@ public class CompileCalorIntegrationTests : IDisposable
         var src = CreateSourceFile(
             "GeneratedError.calr",
             """
-            §M{m001:GeneratedError}
-              §F{f001:Main:pub} () -> void
+            §M{GeneratedError}
+              §F{Main:pub} () -> void
                 §B{x:i32} STR:"not an int"
             """);
         var task = CreateTask(src);
@@ -406,8 +406,8 @@ public class CompileCalorIntegrationTests : IDisposable
         File.WriteAllText(
             src,
             """
-            §M{m001:GeneratedError}
-              §F{f001:Main:pub} () -> void
+            §M{GeneratedError}
+              §F{Main:pub} () -> void
                 §B{x:i32} STR:"not an int"
             """);
         var failingTask = CreateTask(src);
@@ -427,8 +427,8 @@ public class CompileCalorIntegrationTests : IDisposable
         var calorSource = CreateSourceFile(
             "Consumer.calr",
             """
-            §M{m001:Consumer}
-              §CL{c001:Reader:pub}
+            §M{Consumer}
+              §CL{Reader:pub}
                 §CSHARP{
                   public int Read() => ProjectApi.Value;
                 }§/CSHARP
@@ -446,13 +446,13 @@ public class CompileCalorIntegrationTests : IDisposable
         var src = CreateSourceFile(
             "UnsafeBlock.calr",
             """
-            §M{m001:UnsafeBlock}
-              §CL{c001:Worker:pub}
-                §MT{m001:Run:pub} () -> void
+            §M{UnsafeBlock}
+              §CL{Worker:pub}
+                §MT{Run:pub} () -> void
                   §E{unsafe}
-                  §UNSAFE{u1}
+                  §UNSAFE
                     §B{~x:i32} INT:42
-                  §/UNSAFE{u1}
+                  §/UNSAFE
             """);
         var rejected = CreateTask(src);
         rejected.AllowUnsafeBlocks = false;
@@ -471,8 +471,8 @@ public class CompileCalorIntegrationTests : IDisposable
         var src = CreateSourceFile(
             "ImplicitUsings.calr",
             """
-            §M{m001:ImplicitUsings}
-              §CL{c001:Reader:pub}
+            §M{ImplicitUsings}
+              §CL{Reader:pub}
                 §CSHARP{public string Read() => File.ReadAllText("input.txt");}§/CSHARP
             """);
         var task = CreateTask(src);
@@ -492,8 +492,8 @@ public class CompileCalorIntegrationTests : IDisposable
         var src = CreateSourceFile(
             "Unsafe.calr",
             """
-            §M{m001:Unsafe}
-              §F{f001:Main:pub} () -> void
+            §M{Unsafe}
+              §F{Main:pub} () -> void
                 §B{x:i32} STR:"not an int"
             """);
         var task = CreateTask(src);
@@ -684,14 +684,14 @@ public class CompileCalorIntegrationTests : IDisposable
     public void CrossModuleEffect_CallerMissingEffect_Errors()
     {
         var callee = """
-            §M{m001:OrderService}
-              §F{f001:SaveOrder:pub}
+            §M{OrderService}
+              §F{SaveOrder:pub}
                   §O{void}
                   §E{db:w}
             """;
         var caller = """
-            §M{m002:Handler}
-              §F{f001:HandleRequest:pub}
+            §M{Handler}
+              §F{HandleRequest:pub}
                   §O{void}
                   §C{SaveOrder}
                   §/C
@@ -715,14 +715,14 @@ public class CompileCalorIntegrationTests : IDisposable
     public void CrossModuleEffect_CallerDeclaresEffect_Succeeds()
     {
         var callee = """
-            §M{m001:OrderService}
-              §F{f001:SaveOrder:pub}
+            §M{OrderService}
+              §F{SaveOrder:pub}
                   §O{void}
                   §E{db:w}
             """;
         var caller = """
-            §M{m002:Handler}
-              §F{f001:HandleRequest:pub}
+            §M{Handler}
+              §F{HandleRequest:pub}
                   §O{void}
                   §E{db:w}
                   §C{SaveOrder}
@@ -747,14 +747,14 @@ public class CompileCalorIntegrationTests : IDisposable
     public void CrossModuleEffect_WarmBuild_DetectsViolationAfterCalleeEdit()
     {
         var calleeOriginal = """
-            §M{m001:Repo}
-              §F{f001:Save:pub}
+            §M{Repo}
+              §F{Save:pub}
                   §O{void}
                   §E{db:w}
             """;
         var caller = """
-            §M{m002:App}
-              §F{f001:Run:pub}
+            §M{App}
+              §F{Run:pub}
                   §O{void}
                   §E{db:w}
                   §C{Save}
@@ -788,14 +788,14 @@ public class CompileCalorIntegrationTests : IDisposable
     public void CrossModuleEffect_WarmBuild_NoChanges_RunsFromCachedSummariesAndStaysClean()
     {
         var callee = """
-            §M{m001:Repo}
-              §F{f001:Save:pub}
+            §M{Repo}
+              §F{Save:pub}
                   §O{void}
                   §E{db:w}
             """;
         var caller = """
-            §M{m002:App}
-              §F{f001:Run:pub}
+            §M{App}
+              §F{Run:pub}
                   §O{void}
                   §E{db:w}
                   §C{Save}
@@ -1000,9 +1000,9 @@ public class CompileCalorIntegrationTests : IDisposable
     public void ElideProvenGuards_OptOutAfterDefaultBuild_RecompilesAndKeepsGuard()
     {
         var src = CreateSourceFile("ElideOptOut.calr", """
-            §M{m001:ElideOptOut}
-              §CL{c001:Calc:pub}
-                §MT{mt001:Square:pub}
+            §M{ElideOptOut}
+              §CL{Calc:pub}
+                §MT{Square:pub}
                   §I{i32:x}
                   §O{i32}
                   §Q (>= x 0)
@@ -1391,14 +1391,14 @@ public class CompileCalorIntegrationTests : IDisposable
         // #823 review M2 pin: MSBuild is the surface where csc consumes the
         // outputs — the task itself must produce qualified cross-module calls.
         var src1 = CreateSourceFile("Store.calr", """
-            §M{m001:Store}
-              §F{f001:SaveSnapshot:pub} (str:path) -> void
+            §M{Store}
+              §F{SaveSnapshot:pub} (str:path) -> void
                 §E{fs:w}
                 §C{File.WriteAllText} §A path §A "x" §/C
             """);
         var src2 = CreateSourceFile("Catalog.calr", """
-            §M{m002:Catalog}
-              §F{f001:Ping:pub} (str:path) -> void
+            §M{Catalog}
+              §F{Ping:pub} (str:path) -> void
                 §E{fs:w}
                 §C{SaveSnapshot} §A path §/C
             """);
@@ -1414,11 +1414,11 @@ public class CompileCalorIntegrationTests : IDisposable
     // A refutable postcondition: total can exceed cap because the guard's
     // threshold is (cap + 10) — the W5-B defective shape from the outcome corpus.
     private const string RefutedContractSource = """
-        §M{m001:Quotes}
-          §F{f003:QuoteWithSurchargeDefective:pub} (i32:baseAmount, i32:surcharge, i32:cap) -> i32
+        §M{Quotes}
+          §F{QuoteWithSurchargeDefective:pub} (i32:baseAmount, i32:surcharge, i32:cap) -> i32
             §S (<= result cap)
             §B{total:i32} (+ baseAmount surcharge)
-            §IF{if1} (> total (+ cap 10))
+            §IF (> total (+ cap 10))
               §R cap
             §R total
         """;
@@ -1518,15 +1518,15 @@ public class CompileCalorIntegrationTests : IDisposable
     public void CascadeSuppression_MsBuildTaskAgreesWithTheDriver()
     {
         const string CalleeSource = """
-            §M{m001:Lib}
-              §F{f001:Ping:pub} () -> i32
+            §M{Lib}
+              §F{Ping:pub} () -> i32
                 §E{}
                 §P "ping"
                 §R INT:1
             """;
         const string CallerSource = """
-            §M{m002:App}
-              §F{f001:Main:pub} () -> i32
+            §M{App}
+              §F{Main:pub} () -> i32
                 §E{}
                 §R §C{Ping} §/C
             """;
@@ -1581,14 +1581,14 @@ public class CompileCalorIntegrationTests : IDisposable
     {
         // Calor0002 comes from the LEXER, so Program.Compile returns a null Ast.
         const string UnlexableSource = """
-            §M{m001:Broken}
-              §F{f001:Boom:pub} () -> void
+            §M{Broken}
+              §F{Boom:pub} () -> void
                 §E{cw}
                 §P "unterminated
             """;
         const string CleanSource = """
-            §M{m002:Interop}
-              §F{f001:Use:pub} () -> i32
+            §M{Interop}
+              §F{Use:pub} () -> i32
                 §E{}
                 §R INT:1
             """;
@@ -1618,14 +1618,14 @@ public class CompileCalorIntegrationTests : IDisposable
     public void CascadeSuppression_TranspileOnly_PublishesDespiteAnUnlexableSibling()
     {
         const string UnlexableSource = """
-            §M{m001:Broken}
-              §F{f001:Boom:pub} () -> void
+            §M{Broken}
+              §F{Boom:pub} () -> void
                 §E{cw}
                 §P "unterminated
             """;
         const string CleanSource = """
-            §M{m002:Good}
-              §F{f001:One:pub} () -> i32
+            §M{Good}
+              §F{One:pub} () -> i32
                 §E{}
                 §R INT:1
             """;

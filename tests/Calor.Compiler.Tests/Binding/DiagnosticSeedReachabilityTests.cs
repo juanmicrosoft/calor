@@ -34,7 +34,7 @@ public class DiagnosticSeedReachabilityTests
         yield return new object[] { "throw-argument", "§R §TH §NEW{Exception} §A (/ 10 0) §/NEW" };
         yield return new object[] { "conversion-operand", "§R (as (/ 10 0) i64)" };
         yield return new object[] { "await-operand", "§R §AWAIT (/ 10 0)" };
-        yield return new object[] { "lambda-expression-body", "§R §LAM{l1:y:i32} (/ 10 0) §/LAM{l1}" };
+        yield return new object[] { "lambda-expression-body", "§R §LAM{y:i32} (/ 10 0) §/LAM" };
         yield return new object[] { "bind-initializer", "§B{y:i32} (/ 10 0)\n    §R y" };
         // Unsafe wrappers are structurally bound on the PR branch; their operands must
         // remain visible to every shared traversal.
@@ -48,8 +48,8 @@ public class DiagnosticSeedReachabilityTests
         // An uninitialized local read inside §ADDR fires Calor0900 only if the shared
         // structural traversal keeps the operand visible.
         const string source = """
-            §M{m001:Test}
-              §F{f001:Probe:pub} () -> OBJECT
+            §M{Test}
+              §F{Probe:pub} () -> OBJECT
                 §B{~y:i32}
                 §R §ADDR y
             """;
@@ -71,8 +71,8 @@ public class DiagnosticSeedReachabilityTests
     {
         var inputType = wrapper == "coalesce-fallback" ? "?i32" : "i32";
         var source = $$"""
-            §M{m001:Test}
-              §F{f001:Probe:pub} ({{inputType}}:x) -> OBJECT
+            §M{Test}
+              §F{Probe:pub} ({{inputType}}:x) -> OBJECT
                 §E{alloc,throw}
                 {{statement}}
             """;

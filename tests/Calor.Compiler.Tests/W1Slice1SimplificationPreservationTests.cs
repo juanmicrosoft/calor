@@ -21,8 +21,8 @@ public class W1Slice1SimplificationPreservationTests
     {
         // §Q (> 2 1) constant-folds → the pass reconstructs the module. The
         // interop block must survive the reconstruction.
-        var source = @"§M{m001:T}
-  §F{f001:F:pub} (i32:x) -> i32
+        var source = @"§M{T}
+  §F{F:pub} (i32:x) -> i32
     §Q (> 2 1)
     §R x
   §CSHARP{public static class Keep { }}§/CSHARP

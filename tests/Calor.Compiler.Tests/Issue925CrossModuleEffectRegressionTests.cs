@@ -39,9 +39,9 @@ public sealed class Issue925CrossModuleEffectRegressionTests
         try
         {
             File.WriteAllText(Path.Combine(dir, "callee.calr"),
-                "§M{m001:OrderService}\n  §F{f001:SaveOrder:pub} () -> void\n    §E{" + calleeEffects + "}\n");
+                "§M{OrderService}\n  §F{SaveOrder:pub} () -> void\n    §E{" + calleeEffects + "}\n");
             File.WriteAllText(Path.Combine(dir, "caller.calr"),
-                "§M{m002:App}\n  §F{f001:Main:pub} () -> void\n    §E{}\n    §C{" + callTarget + "} §/C\n");
+                "§M{App}\n  §F{Main:pub} () -> void\n    §E{}\n    §C{" + callTarget + "} §/C\n");
 
             var sources = Directory.GetFiles(dir, "*.calr")
                 .OrderBy(p => p, StringComparer.Ordinal).Select(p => new FileInfo(p)).ToList();

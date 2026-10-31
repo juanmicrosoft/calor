@@ -17,11 +17,11 @@ public class MetadataEmissionTests
         var original = Parse(
             $$"""
             /// Module documentation.
-            §M{m1:Metadata}
+            §M{Metadata}
               §AS{env} "The environment is ready."
               §IV true
               /// Function documentation.
-              §F{f1:Value:pub} (i32:value) -> i32
+              §F{Value:pub} (i32:value) -> i32
                 §SN{"1.0.0"}
                 {{deprecated}}
                 §BR{"2.0.0"} "First \"quoted\" change."
@@ -66,7 +66,7 @@ public class MetadataEmissionTests
         var attributes = new AttributeCollection();
         var dependency = new DependencyNode(span, "Dependency", "1.0", true, attributes);
         var issue = new IssueNode(span, IssueKind.Fixme, "issue1", "correctness", IssuePriority.High,
-            "Keep this note.\n§F{injected:NotADeclaration:pub}", attributes);
+            "Keep this note.\n§F{NotADeclaration:pub}", attributes);
         var function = new FunctionNode(
             span, "f1", "Value", Visibility.Public, [], [], new OutputNode(span, "i32"), null,
             [], [], [new ReturnStatementNode(span, new IntLiteralNode(span, 1))], attributes,
@@ -105,7 +105,7 @@ public class MetadataEmissionTests
         Assert.Contains("Hidden: hidden.calr (Hidden file.)", reparsed.DocComment);
         Assert.Contains("Focus: Value", reparsed.DocComment);
         Assert.Contains("Keep this note.", replay.DocComment);
-        Assert.Contains("§F{injected:NotADeclaration:pub}", replay.DocComment);
+        Assert.Contains("§F{NotADeclaration:pub}", replay.DocComment);
         Assert.Contains("Uses: Dependency@1.0?", replay.DocComment);
         Assert.Contains("Used by: Dependency@1.0?, [external]", replay.DocComment);
         Assert.Contains("Complexity: worst:time:O(n),space:O(1)", replay.DocComment);

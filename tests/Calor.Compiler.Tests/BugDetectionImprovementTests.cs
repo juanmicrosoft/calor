@@ -36,8 +36,8 @@ public class BugDetectionImprovementTests
     public void CompileCalor_RunsAnalysis_DetectsDivisionByZero()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -61,8 +61,8 @@ public class BugDetectionImprovementTests
     public void CompileCalor_WithContracts_NoFalsePositives()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -87,13 +87,13 @@ public class BugDetectionImprovementTests
     public void CompileCalor_AnalysisResult_HasFunctionCount()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
+§M{Test}
+  §F{Add:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
       §R (+ a b)
-  §F{f002:Mul:pub}
+  §F{Mul:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -117,8 +117,8 @@ public class BugDetectionImprovementTests
     {
         // Division by parameter should produce a warning but not an error
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -145,8 +145,8 @@ public class BugDetectionImprovementTests
     public async Task CalculateCalorDetection_WithCorrectSyntax_ScoresHigherThanBase()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -173,8 +173,8 @@ public class BugDetectionImprovementTests
     {
         // Source with §Q marker (the correct Calor syntax)
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -206,16 +206,16 @@ public class BugDetectionImprovementTests
     public void EvaluateBuggyCode_DivideByZero_CalorDetects()
     {
         var buggySource = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
       §R (/ a b)
 ";
         var fixedSource = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -246,8 +246,8 @@ public class BugDetectionImprovementTests
     public void DivisionByParameter_WithoutPrecondition_EmitsWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -280,8 +280,8 @@ public class BugDetectionImprovementTests
     public void DivisionByParameter_WithPrecondition_NoDiagnostic()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -319,8 +319,8 @@ public class BugDetectionImprovementTests
     public void DivisionByConstant_NoDiagnostic()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Half:pub}
+§M{Test}
+  §F{Half:pub}
       §I{i32:a}
       §O{i32}
       §R (/ a 2)
@@ -352,8 +352,8 @@ public class BugDetectionImprovementTests
     public void SuggestedFix_ContainsValidContractText()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -392,12 +392,12 @@ public class BugDetectionImprovementTests
     public void ForLoop_WithoutRealBoundedAccess_DoesNotWarn()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Sum:pub}
+§M{Test}
+  §F{Sum:pub}
       §I{i32:n}
       §O{i32}
       §B{~total:i32} INT:0
-      §L{l001:i:0:n:1}
+      §L{i:0:n:1}
           §B{~total:i32} (+ total i)
       §R total
 ";
@@ -428,12 +428,12 @@ public class BugDetectionImprovementTests
     {
         // When the bound is subtracted by 1, no warning
         var source = @"
-§M{m001:Test}
-  §F{f001:Sum:pub}
+§M{Test}
+  §F{Sum:pub}
       §I{i32:n}
       §O{i32}
       §B{~total:i32} INT:0
-      §L{l001:i:0:(- n 1):1}
+      §L{i:0:(- n 1):1}
           §B{~total:i32} (+ total i)
       §R total
 ";
@@ -464,12 +464,12 @@ public class BugDetectionImprovementTests
     {
         // Loop to a literal bound, body doesn't use loop var
         var source = @"
-§M{m001:Test}
-  §F{f001:Count:pub}
+§M{Test}
+  §F{Count:pub}
       §I{i32:n}
       §O{i32}
       §B{~total:i32} INT:0
-      §L{l001:i:0:10:1}
+      §L{i:0:10:1}
           §B{~total:i32} (+ total 1)
       §R total
 ";
@@ -504,8 +504,8 @@ public class BugDetectionImprovementTests
     public void DivisionFunction_InfersNonZeroPrecondition()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -528,8 +528,8 @@ public class BugDetectionImprovementTests
     public void FunctionWithExistingContract_NoInference()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -552,8 +552,8 @@ public class BugDetectionImprovementTests
     public void InferredContract_HasSuggestedFix()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -580,8 +580,8 @@ public class BugDetectionImprovementTests
     public void BugScenario_DivideByZero_CalorDetects()
     {
         var buggySource = @"
-§M{m001:UnsafeMath}
-  §F{f001:Divide:pub}
+§M{UnsafeMath}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -608,8 +608,8 @@ public class BugDetectionImprovementTests
     public void BugScenario_NullDeref_CalorDetects()
     {
         var buggySource = @"
-§M{m001:UnsafeNullable}
-  §F{f001:GetValue:pub}
+§M{UnsafeNullable}
+  §F{GetValue:pub}
       §O{i32}
       §B{maybeVal:i32[]} null
       §R §LEN maybeVal
@@ -635,8 +635,8 @@ public class BugDetectionImprovementTests
     public void BugScenario_Overflow_CalorDetects()
     {
         var buggySource = @"
-§M{m001:UnsafeAdd}
-  §F{f001:AddLarge:pub}
+§M{UnsafeAdd}
+  §F{AddLarge:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -660,8 +660,8 @@ public class BugDetectionImprovementTests
     public void BugScenario_MissingContract_CalorDetects()
     {
         var buggySource = @"
-§M{m001:UnsafeDivide}
-  §F{f001:Divide:pub}
+§M{UnsafeDivide}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -691,8 +691,8 @@ public class BugDetectionImprovementTests
     public void VerificationAnalysisPass_ExtractsPreconditionGuardedParams()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -719,8 +719,8 @@ public class BugDetectionImprovementTests
     public void VerificationAnalysisPass_ContractInference_WhenEnabled()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -751,8 +751,8 @@ public class BugDetectionImprovementTests
     {
         // Function that just returns a parameter should infer §S (== result param)
         var source = @"
-§M{m001:Test}
-  §F{f001:Identity:pub}
+§M{Test}
+  §F{Identity:pub}
       §I{i32:x}
       §O{i32}
       §R x
@@ -776,8 +776,8 @@ public class BugDetectionImprovementTests
     {
         // Function that returns x * x should infer §S (>= result 0)
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
+§M{Test}
+  §F{Square:pub}
       §I{i32:x}
       §O{i32}
       §R (* x x)
@@ -807,8 +807,8 @@ public class BugDetectionImprovementTests
         // report Success=true because they parse and bind correctly. Analysis
         // findings are informational, not compilation failures.
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -840,8 +840,8 @@ public class BugDetectionImprovementTests
         // A well-formed Calor program with module, function, name, output, body,
         // and parameters should achieve a structure score of 1.0
         var source = @"
-§M{m001:MathOps}
-  §F{f001:Add:pub}
+§M{MathOps}
+  §F{Add:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -867,8 +867,8 @@ public class BugDetectionImprovementTests
         // With both fixes applied, a well-formed Calor program should achieve
         // a GenerationAccuracy ratio >= 1.0 compared to C#
         var source = @"
-§M{m001:MathOps}
-  §F{f001:Add:pub}
+§M{MathOps}
+  §F{Add:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -902,21 +902,21 @@ namespace MathOps {
         // IsPrime was one of the 3 failing programs in v0.3.0.
         // It should succeed after the fix.
         var source = @"
-§M{m001:PrimeCheck}
-  §F{f001:IsPrime:pub}
+§M{PrimeCheck}
+  §F{IsPrime:pub}
       §I{i32:n}
       §O{bool}
       §Q (> n 0)
-      §IF{if1} (<= n 1)
+      §IF (<= n 1)
         §R false
-      §IF{if2} (<= n 3)
+      §IF (<= n 3)
         §R true
-      §IF{if3} (== (% n 2) 0)
+      §IF (== (% n 2) 0)
         §R false
-      §L{while1:i:3:1000:2}
-          §IF{if4} (> (* i i) n)
+      §L{i:3:1000:2}
+          §IF (> (* i i) n)
             §R true
-          §IF{if5} (== (% n i) 0)
+          §IF (== (% n i) 0)
             §R false
       §R true
 ";
@@ -1009,15 +1009,15 @@ namespace MathOps {
     public void EdgeCaseCoverage_ProgramWithEarlyReturnGuards_DetectsGuards()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:IsPrime:pub}
+§M{Test}
+  §F{IsPrime:pub}
       §I{i32:n}
       §O{bool}
-      §IF{if1} (<= n 1)
+      §IF (<= n 1)
         §R false
-      §IF{if2} (<= n 3)
+      §IF (<= n 3)
         §R true
-      §IF{if3} (== (% n 2) 0)
+      §IF (== (% n 2) 0)
         §R false
       §R true
 ";
@@ -1035,13 +1035,13 @@ namespace MathOps {
     public void EdgeCaseCoverage_ProgramWithBoundaryChecks_DetectsBoundaries()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Clamp:pub}
+§M{Test}
+  §F{Clamp:pub}
       §I{i32:n}
       §O{i32}
-      §IF{if1} (< n 0)
+      §IF (< n 0)
         §R INT:0
-      §IF{if2} (== n 1)
+      §IF (== n 1)
         §R INT:1
       §R n
 ";
@@ -1058,11 +1058,11 @@ namespace MathOps {
     public void EdgeCaseCoverage_ProgramWithElseBranches_DetectsCompleteness()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Abs:pub}
+§M{Test}
+  §F{Abs:pub}
       §I{i32:n}
       §O{i32}
-      §IF{if1} (< n 0)
+      §IF (< n 0)
           §R (- 0 n)
       §EL
           §R n
@@ -1080,15 +1080,15 @@ namespace MathOps {
     public void EdgeCaseCoverage_ProgramWithContracts_DetectsContractCoverage()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
       §Q (!= b 0)
       §S (>= result 0)
       §R (/ a b)
-  §F{f002:Add:pub}
+  §F{Add:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -1107,8 +1107,8 @@ namespace MathOps {
     public void EdgeCaseCoverage_MinimalProgram_ScoresLow()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
+§M{Test}
+  §F{Add:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -1131,11 +1131,11 @@ namespace MathOps {
     {
         // Match expression (inside return) with wildcard pattern
         var source = @"
-§M{m001:Test}
-  §F{f001:Describe:pub}
+§M{Test}
+  §F{Describe:pub}
       §I{i32:x}
       §O{str}
-      §R §W{sw1} x
+      §R §W x
           §K 1 → ""one""
           §K 2 → ""two""
           §K _ → ""other""
@@ -1154,11 +1154,11 @@ namespace MathOps {
     {
         // Match statement (not inside return) with wildcard pattern
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §O{i32}
-        §W{m1} x
+        §W x
             §K 1
               §R INT:10
             §K _
@@ -1178,12 +1178,12 @@ namespace MathOps {
     {
         // A Calor program with → §R conditional returns should score higher than base
         var source = @"
-§M{m001:Test}
-  §F{f001:Factorial:pub}
+§M{Test}
+  §F{Factorial:pub}
       §I{i32:n}
       §O{i32}
       §Q (>= n 0)
-      §IF{if1} (<= n 1)
+      §IF (<= n 1)
         §R INT:1
       §R (* n §C{Factorial} §A (- n 1) §/C)
 ";
@@ -1208,19 +1208,19 @@ namespace MathOps {
         // A program with actual defensive patterns should get the analysis signal bonus
         // but a minimal program without them should not
         var defensiveSource = @"
-§M{m001:Test}
-  §F{f001:SafeDiv:pub}
+§M{Test}
+  §F{SafeDiv:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
       §Q (!= b 0)
-      §IF{if1} (<= b 1)
+      §IF (<= b 1)
         §R INT:0
       §R (/ a b)
 ";
         var minimalSource = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
+§M{Test}
+  §F{Add:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -1266,16 +1266,16 @@ class C {
 }";
         // Calor with all patterns
         var calorSource = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
       §Q (!= b 0)
       §S (>= result 0)
-      §IF{if1} (<= b 1)
+      §IF (<= b 1)
         §R INT:0
-      §IF{if2} (> a 0)
+      §IF (> a 0)
           §R (/ a b)
       §EL
           §R INT:0

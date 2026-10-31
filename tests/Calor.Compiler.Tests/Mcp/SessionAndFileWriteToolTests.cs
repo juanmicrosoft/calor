@@ -22,36 +22,36 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
     private FileWriteTool WriteTool => new(_manager, _root);
 
     private const string MathSource = """
-        §M{m001:MathModule}
-          §F{f001:add:pub}
+        §M{MathModule}
+          §F{add:pub}
             §I{i32:x, i32:y}
             §O{i32}
             §R (+ x y)
-          §F{f002:multiply:pub}
+          §F{multiply:pub}
             §I{i32:a, i32:b}
             §O{i32}
             §R (* a b)
         """;
 
     private const string MathSourceWithoutAdd = """
-        §M{m001:MathModule}
-          §F{f002:multiply:pub}
+        §M{MathModule}
+          §F{multiply:pub}
             §I{i32:a, i32:b}
             §O{i32}
             §R (* a b)
         """;
 
     private const string OtherSource = """
-        §M{m002:OtherModule}
-          §F{f010:describe:pub}
+        §M{OtherModule}
+          §F{describe:pub}
             §O{str}
             §R STR:"standalone module"
         """;
 
     /// <summary>A module with a real call site targeting `add` by name.</summary>
     private const string CallerSource = """
-        §M{m003:CallerModule}
-          §F{f020:callsAdd:pub}
+        §M{CallerModule}
+          §F{callsAdd:pub}
             §I{i32:x}
             §O{i32}
             §B{total:i32} §C{add} §A x §A INT:1 §/C
@@ -111,7 +111,7 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
     [Fact]
     public async Task SessionOpen_ReportsParseErrorsAsEnvelopeDiagnostics()
     {
-        WriteFile("broken.calr", "§M{m001:Broken}\n  §F{f001:bad:pub\n");
+        WriteFile("broken.calr", "§M{Broken}\n  §F{f001:bad:pub\n");
 
         var payload = Payload(await OpenTool.ExecuteAsync(Args(new { directory = _root })));
 
@@ -194,7 +194,7 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
         var path = WriteFile("math.calr", MathSource);
 
         var payload = Payload(await WriteTool
-            .ExecuteAsync(Args(new { path, content = "§M{m001:Broken}\n  §F{f001:bad:pub\n" })));
+            .ExecuteAsync(Args(new { path, content = "§M{Broken}\n  §F{f001:bad:pub\n" })));
 
         Assert.False(payload.GetProperty("applied").GetBoolean());
         Assert.Equal("breaking", payload.GetProperty("verdict").GetString());
@@ -228,16 +228,16 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
     public async Task FileWrite_ContractRemoval_AppliesWithWarnings()
     {
         const string withContract = """
-            §M{m001:MathModule}
-              §F{f001:add:pub}
+            §M{MathModule}
+              §F{add:pub}
                 §I{i32:x, i32:y}
                 §O{i32}
                 §Q (>= x INT:0)
                 §R (+ x y)
             """;
         const string withoutContract = """
-            §M{m001:MathModule}
-              §F{f001:add:pub}
+            §M{MathModule}
+              §F{add:pub}
                 §I{i32:x, i32:y}
                 §O{i32}
                 §R (+ x y)
@@ -319,8 +319,8 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
         // them so the write survives instead of rejecting. Healing is not
         // semantics-preserving, so the verdict must not stay plain "safe".
         const string withClosers = """
-            §M{m001:MathModule}
-              §F{f002:multiply:pub}
+            §M{MathModule}
+              §F{multiply:pub}
                 §I{i32:a, i32:b}
                 §O{i32}
                 §R (* a b)
@@ -344,8 +344,8 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
     {
         var path = WriteFile("math.calr", MathSource);
         const string withClosers = """
-            §M{m001:MathModule}
-              §F{f002:multiply:pub}
+            §M{MathModule}
+              §F{multiply:pub}
                 §I{i32:a, i32:b}
                 §O{i32}
                 §R (* a b)
@@ -412,8 +412,8 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
         // must not veto the write.
         var mathPath = WriteFile("math.calr", MathSource);
         WriteFile("prose.calr", """
-            §M{m004:ProseModule}
-              §F{f030:label:pub}
+            §M{ProseModule}
+              §F{label:pub}
                 §O{str}
                 §R STR:"documentation mentions add and f001 in prose"
             """);
@@ -679,7 +679,7 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
         var logPath = Path.Combine(_root, "mcp-writes.jsonl");
         var rejectDir = Path.Combine(_root, "rejects");
         var tool = new FileWriteTool(_manager, _root, writeLogPath: logPath, rejectDir: rejectDir);
-        const string broken = "§M{m001:Broken}\n  §F{f001:bad:pub\n";
+        const string broken = "§M{Broken}\n  §F{f001:bad:pub\n";
 
         var payload = Payload(await tool.ExecuteAsync(Args(new { path, content = broken, heal = false })));
         Assert.False(payload.GetProperty("applied").GetBoolean());

@@ -27,10 +27,10 @@ public class W1Slice1EmitterTests
     public void NestedReturn_LowersToSharedExit()
     {
         var source = """
-            §M{m001:T}
-              §F{f001:Pick:pub} (i32:x) -> i32
+            §M{T}
+              §F{Pick:pub} (i32:x) -> i32
                 §S (>= result 0)
-                §IF{if1} (> x 10)
+                §IF (> x 10)
                   §R x
                 §R 0
             """;
@@ -48,8 +48,8 @@ public class W1Slice1EmitterTests
     public void EarlyTopLevelReturn_LowersWithoutFallthrough()
     {
         var source = """
-            §M{m001:T}
-              §F{f001:First:pub} (i32:x) -> i32
+            §M{T}
+              §F{First:pub} (i32:x) -> i32
                 §S (>= result 0)
                 §R x
                 §R 0
@@ -67,8 +67,8 @@ public class W1Slice1EmitterTests
     public void SingleFinalReturn_UsesStructuralResultBinding()
     {
         var source = """
-            §M{m001:T}
-              §F{f001:Id:pub} (i32:x) -> i32
+            §M{T}
+              §F{Id:pub} (i32:x) -> i32
                 §S (== result x)
                 §R x
             """;
@@ -86,17 +86,17 @@ public class W1Slice1EmitterTests
     public void OperatorOverload_NestedReturn_UsesSharedLowering()
     {
         var source = """
-            §M{m001:T}
-              §CL{c1:MyType}
-                §OP{op001:+:pub}
+            §M{T}
+              §CL{MyType}
+                §OP{+:pub}
                   §I{MyType:left}
                   §I{MyType:right}
                   §O{MyType}
                   §S (!= result null)
-                  §IF{if1} (!= left null)
+                  §IF (!= left null)
                     §R left
                   §R right
-                §/OP{op001}
+                §/OP
             """;
 
         var (code, diagnostics) = EmitWithDiagnostics(source);
@@ -112,15 +112,15 @@ public class W1Slice1EmitterTests
     public void OperatorOverload_FinalReturn_BindsExactResultReference()
     {
         var source = """
-            §M{m001:T}
-              §CL{c1:MyType}
-                §OP{op001:+:pub}
+            §M{T}
+              §CL{MyType}
+                §OP{+:pub}
                   §I{MyType:left}
                   §I{MyType:right}
                   §O{MyType}
                   §S (!= result null)
                   §R left
-                §/OP{op001}
+                §/OP
             """;
 
         var (code, diagnostics) = EmitWithDiagnostics(source);
@@ -136,8 +136,8 @@ public class W1Slice1EmitterTests
     public void ResultSubstring_IdentifierAndStringAreNotCorrupted()
     {
         var source = """
-            §M{m001:T}
-              §F{f001:Echo:pub} (i32:resultCode, str:myresult) -> i32
+            §M{T}
+              §F{Echo:pub} (i32:resultCode, str:myresult) -> i32
                 §S{"result text"} (== result resultCode)
                 §R resultCode
             """;

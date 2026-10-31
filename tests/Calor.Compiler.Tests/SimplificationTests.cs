@@ -675,8 +675,8 @@ public class SimplificationTests
     public void Integration_ParseAndSimplify()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:TestFunc:pub}
+§M{Test}
+  §F{TestFunc:pub}
       §I{i32:x}
       §O{bool}
       §Q (&& true (>= x INT:0))
@@ -703,8 +703,8 @@ public class SimplificationTests
     public void Integration_SimplifyTautology()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:TestFunc:pub}
+§M{Test}
+  §F{TestFunc:pub}
       §I{i32:x}
       §O{bool}
       §Q (-> (>= x INT:0) (>= x INT:0))
@@ -727,8 +727,8 @@ public class SimplificationTests
     public void Integration_NoSimplificationNeeded()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:TestFunc:pub}
+§M{Test}
+  §F{TestFunc:pub}
       §I{i32:x}
       §O{bool}
       §Q (>= x INT:0)
@@ -749,8 +749,8 @@ public class SimplificationTests
     public void Integration_QuantifierBodySimplification()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:TestFunc:pub}
+§M{Test}
+  §F{TestFunc:pub}
       §I{i32:n}
       §O{bool}
       §Q (forall ((i i32)) true)

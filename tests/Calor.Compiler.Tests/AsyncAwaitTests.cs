@@ -141,8 +141,8 @@ public class AsyncAwaitTests
     public void Parse_AsyncFunction_SetsIsAsyncFlag()
     {
         var calorSource = """
-            §M{m001:AsyncTests}
-                §AF{f001:FetchDataAsync:pub}
+            §M{AsyncTests}
+                §AF{FetchDataAsync:pub}
                     §I{str:url}
                     §O{str}
                     §R "data"
@@ -163,8 +163,8 @@ public class AsyncAwaitTests
     public void Parse_RegularFunction_DoesNotSetIsAsyncFlag()
     {
         var calorSource = """
-            §M{m001:SyncTests}
-                §F{f001:GetData:pub}
+            §M{SyncTests}
+                §F{GetData:pub}
                     §I{str:url}
                     §O{str}
                     §R "data"
@@ -188,13 +188,13 @@ public class AsyncAwaitTests
     public void Parse_AsyncMethod_SetsIsAsyncFlag()
     {
         var calorSource = """
-            §M{m001:AsyncMethodTests}
-                §CL{c001:Service:pub}
-                    §AMT{mt001:ProcessAsync:pub}
+            §M{AsyncMethodTests}
+                §CL{Service:pub}
+                    §AMT{ProcessAsync:pub}
                       §I{i32:id}
                       §O{str}
                       §R "done"
-                    §/AMT{mt001}
+                    §/AMT
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -213,9 +213,9 @@ public class AsyncAwaitTests
     public void Parse_RegularMethod_DoesNotSetIsAsyncFlag()
     {
         var calorSource = """
-            §M{m001:SyncMethodTests}
-                §CL{c001:Service:pub}
-                    §MT{mt001:Process:pub}
+            §M{SyncMethodTests}
+                §CL{Service:pub}
+                    §MT{Process:pub}
                         §I{i32:id}
                         §O{str}
                         §R "done"
@@ -240,8 +240,8 @@ public class AsyncAwaitTests
     public void Emit_AsyncFunction_IncludesAsyncKeywordAndTaskReturnType()
     {
         var calorSource = """
-            §M{m001:AsyncEmitTests}
-                §AF{f001:GetDataAsync:pub}
+            §M{AsyncEmitTests}
+                §AF{GetDataAsync:pub}
                     §O{str}
                     §R "data"
             """;
@@ -263,12 +263,12 @@ public class AsyncAwaitTests
     public void Emit_AsyncMethod_IncludesAsyncKeywordAndTaskReturnType()
     {
         var calorSource = """
-            §M{m001:AsyncMethodEmitTests}
-                §CL{c001:Service:pub}
-                    §AMT{mt001:ProcessAsync:pub}
+            §M{AsyncMethodEmitTests}
+                §CL{Service:pub}
+                    §AMT{ProcessAsync:pub}
                       §O{i32}
                       §R 42
-                    §/AMT{mt001}
+                    §/AMT
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -286,8 +286,8 @@ public class AsyncAwaitTests
     public void Emit_AsyncVoidFunction_EmitsTaskReturnType()
     {
         var calorSource = """
-            §M{m001:AsyncVoidTests}
-                §AF{f001:DoWorkAsync:pub}
+            §M{AsyncVoidTests}
+                §AF{DoWorkAsync:pub}
                     §R
             """;
 
@@ -308,8 +308,8 @@ public class AsyncAwaitTests
     public void Emit_SyncFunction_DoesNotIncludeAsyncKeyword()
     {
         var calorSource = """
-            §M{m001:SyncEmitTests}
-                §F{f001:GetData:pub}
+            §M{SyncEmitTests}
+                §F{GetData:pub}
                     §O{str}
                     §R "data"
             """;
@@ -386,12 +386,12 @@ public class AsyncAwaitTests
     {
         // If someone explicitly declares Task<T> as output, we shouldn't wrap it again
         var calorSource = """
-            §M{m001:NoDoubleWrap}
-                §CL{c001:Service:pub}
-                    §AMT{mt001:GetTaskAsync:pub}
+            §M{NoDoubleWrap}
+                §CL{Service:pub}
+                    §AMT{GetTaskAsync:pub}
                       §O{Task<i32>}
                       §R 42
-                    §/AMT{mt001}
+                    §/AMT
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -411,15 +411,15 @@ public class AsyncAwaitTests
     public void Emit_MixedSyncAsyncMethods_CorrectlyHandlesBoth()
     {
         var calorSource = """
-            §M{m001:MixedMethods}
-                §CL{c001:Service:pub}
-                    §MT{mt001:GetSync:pub}
+            §M{MixedMethods}
+                §CL{Service:pub}
+                    §MT{GetSync:pub}
                         §O{str}
                         §R "sync"
-                    §AMT{mt002:GetAsync:pub}
+                    §AMT{GetAsync:pub}
                       §O{str}
                       §R "async"
-                    §/AMT{mt002}
+                    §/AMT
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -447,12 +447,12 @@ public class AsyncAwaitTests
     public void Parse_AsyncMethodWithModifiers_PreservesAllModifiers()
     {
         var calorSource = """
-            §M{m001:ModifierTests}
-                §CL{c001:Service:pub}
-                    §AMT{mt001:ProcessAsync:pub:virt}
+            §M{ModifierTests}
+                §CL{Service:pub}
+                    §AMT{ProcessAsync:pub:virt}
                       §O{str}
                       §R "done"
-                    §/AMT{mt001}
+                    §/AMT
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -510,7 +510,7 @@ public class AsyncAwaitTests
     [Fact]
     public void Lexer_AsyncFuncToken_Recognized()
     {
-        var source = "§AF{f001:Test:pub}";
+        var source = "§AF{Test:pub}";
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
@@ -521,7 +521,7 @@ public class AsyncAwaitTests
     [Fact]
     public void Lexer_EndAsyncFuncToken_Recognized()
     {
-        var source = "§/AF{f001}";
+        var source = "§/AF";
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
@@ -532,7 +532,7 @@ public class AsyncAwaitTests
     [Fact]
     public void Lexer_AsyncMethodToken_Recognized()
     {
-        var source = "§AMT{m001:Test:pub}";
+        var source = "§AMT{Test:pub}";
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
@@ -543,7 +543,7 @@ public class AsyncAwaitTests
     [Fact]
     public void Lexer_EndAsyncMethodToken_Recognized()
     {
-        var source = "§/AMT{m001}";
+        var source = "§/AMT";
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
@@ -560,8 +560,8 @@ public class AsyncAwaitTests
     {
         // Test using §B (Bind) statement with await expression
         var calorSource = """
-            §M{m001:ConfigureAwaitTests}
-                §AF{f001:FetchAsync:pub}
+            §M{ConfigureAwaitTests}
+                §AF{FetchAsync:pub}
                     §O{str}
                     §B{str:result} §AWAIT{false} §C{client.GetStringAsync} §A "url" §/C
                     §R result
@@ -588,8 +588,8 @@ public class AsyncAwaitTests
     public void Parse_AwaitWithConfigureAwaitTrue_SetsConfigureAwaitProperty()
     {
         var calorSource = """
-            §M{m001:ConfigureAwaitTests}
-                §AF{f001:FetchAsync:pub}
+            §M{ConfigureAwaitTests}
+                §AF{FetchAsync:pub}
                     §O{str}
                     §B{str:result} §AWAIT{true} §C{client.GetStringAsync} §A "url" §/C
                     §R result
@@ -614,8 +614,8 @@ public class AsyncAwaitTests
     public void Emit_AwaitWithConfigureAwaitFalse_EmitsConfigureAwaitCall()
     {
         var calorSource = """
-            §M{m001:ConfigureAwaitEmit}
-                §AF{f001:FetchAsync:pub}
+            §M{ConfigureAwaitEmit}
+                §AF{FetchAsync:pub}
                     §O{str}
                     §B{str:result} §AWAIT{false} §C{client.GetStringAsync} §A "url" §/C
                     §R result
@@ -636,8 +636,8 @@ public class AsyncAwaitTests
     public void Parse_AwaitWithoutConfigureAwait_HasNullConfigureAwait()
     {
         var calorSource = """
-            §M{m001:NoConfigureAwait}
-                §AF{f001:FetchAsync:pub}
+            §M{NoConfigureAwait}
+                §AF{FetchAsync:pub}
                     §O{str}
                     §B{str:result} §AWAIT §C{client.GetStringAsync} §A "url" §/C
                     §R result
@@ -808,12 +808,12 @@ public class AsyncAwaitTests
     public void Emit_AsyncMethodWithNestedGeneric_WrapsCorrectly()
     {
         var calorSource = """
-            §M{m001:NestedGenericTests}
-                §CL{c001:Service:pub}
-                    §AMT{mt001:GetListAsync:pub}
+            §M{NestedGenericTests}
+                §CL{Service:pub}
+                    §AMT{GetListAsync:pub}
                       §O{List<i32>}
                       §R §C{new List<int>}§/C
-                    §/AMT{mt001}
+                    §/AMT
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -865,8 +865,8 @@ public class AsyncAwaitTests
     {
         // Correct syntax: §Q{"message"} (s-expression)
         var calorSource = """
-            §M{m001:ContractTests}
-                §AF{f001:GetUserAsync:pub}
+            §M{ContractTests}
+                §AF{GetUserAsync:pub}
                     §I{i32:userId}
                     §O{str}
                     §Q{"userId must be positive"} (> userId 0)
@@ -888,8 +888,8 @@ public class AsyncAwaitTests
     public void Parse_AsyncFunctionWithPostcondition_PreservesBoth()
     {
         var calorSource = """
-            §M{m001:ContractTests}
-                §AF{f001:ComputeAsync:pub}
+            §M{ContractTests}
+                §AF{ComputeAsync:pub}
                     §I{i32:x}
                     §O{i32}
                     §S{"result is non-negative"} (>= result 0)
@@ -911,8 +911,8 @@ public class AsyncAwaitTests
     public void Emit_AsyncFunctionWithContracts_EmitsContractsAndAsync()
     {
         var calorSource = """
-            §M{m001:ContractEmitTests}
-                §AF{f001:ValidateAsync:pub}
+            §M{ContractEmitTests}
+                §AF{ValidateAsync:pub}
                     §I{i32:value}
                     §O{bool}
                     §Q{"value must be non-negative"} (>= value 0)
@@ -937,14 +937,14 @@ public class AsyncAwaitTests
     public void Parse_AsyncMethodWithPrecondition_PreservesBoth()
     {
         var calorSource = """
-            §M{m001:MethodContractTests}
-                §CL{c001:Service:pub}
-                    §AMT{mt001:ProcessAsync:pub}
+            §M{MethodContractTests}
+                §CL{Service:pub}
+                    §AMT{ProcessAsync:pub}
                       §I{str:input}
                       §O{str}
                       §Q{"input must not be null"} (!= input null)
                       §R "processed"
-                    §/AMT{mt001}
+                    §/AMT
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -968,8 +968,8 @@ public class AsyncAwaitTests
     {
         // Correct syntax: type params come after the brace
         var calorSource = """
-            §M{m001:GenericAsyncTests}
-                §AF{f001:GetAsync:pub}<T>
+            §M{GenericAsyncTests}
+                §AF{GetAsync:pub}<T>
                     §I{T:item}
                     §O{T}
                     §R item
@@ -991,8 +991,8 @@ public class AsyncAwaitTests
     public void Emit_AsyncGenericFunction_EmitsTaskOfT()
     {
         var calorSource = """
-            §M{m001:GenericAsyncEmitTests}
-                §AF{f001:GetAsync:pub}<T>
+            §M{GenericAsyncEmitTests}
+                §AF{GetAsync:pub}<T>
                     §I{T:item}
                     §O{T}
                     §R item
@@ -1043,13 +1043,13 @@ public class AsyncAwaitTests
     public void Parse_StaticAsyncMethod_PreservesBothModifiers()
     {
         var calorSource = """
-            §M{m001:StaticAsyncTests}
-                §CL{c001:Helper:pub}
-                    §AMT{mt001:ComputeAsync:pub:stat}
+            §M{StaticAsyncTests}
+                §CL{Helper:pub}
+                    §AMT{ComputeAsync:pub:stat}
                       §I{i32:x}
                       §O{i32}
                       §R 42
-                    §/AMT{mt001}
+                    §/AMT
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -1068,13 +1068,13 @@ public class AsyncAwaitTests
     public void Emit_StaticAsyncMethod_EmitsCorrectSignature()
     {
         var calorSource = """
-            §M{m001:StaticAsyncEmitTests}
-                §CL{c001:Helper:pub}
-                    §AMT{mt001:ComputeAsync:pub:stat}
+            §M{StaticAsyncEmitTests}
+                §CL{Helper:pub}
+                    §AMT{ComputeAsync:pub:stat}
                       §I{i32:x}
                       §O{i32}
                       §R 42
-                    §/AMT{mt001}
+                    §/AMT
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -1120,8 +1120,8 @@ public class AsyncAwaitTests
     {
         // Use §B (Bind) for variable declarations
         var calorSource = """
-            §M{m001:MultipleAwaitsTests}
-                §AF{f001:ChainAsync:pub}
+            §M{MultipleAwaitsTests}
+                §AF{ChainAsync:pub}
                     §O{str}
                     §B{str:first} §AWAIT §C{GetFirstAsync}§/C
                     §B{str:second} §AWAIT §C{GetSecondAsync}§/C
@@ -1143,8 +1143,8 @@ public class AsyncAwaitTests
     public void Emit_AsyncFunctionWithMultipleAwaits_EmitsAllAwaits()
     {
         var calorSource = """
-            §M{m001:MultipleAwaitsEmit}
-                §AF{f001:ChainAsync:pub}
+            §M{MultipleAwaitsEmit}
+                §AF{ChainAsync:pub}
                     §O{str}
                     §B{str:first} §AWAIT §C{GetFirstAsync}§/C
                     §B{str:second} §AWAIT{false} §C{GetSecondAsync}§/C

@@ -40,8 +40,8 @@ public sealed class PermissiveEffectsTests : IDisposable
     // three-line program as its pre-rows canary before any paid run
     // (bench/phase0-agent-native/, W1 branch).
     private const string LaunderingSource = """
-        §M{m001:PermissiveCanary}
-          §F{f001:Quiet:pub} () -> void
+        §M{PermissiveCanary}
+          §F{Quiet:pub} () -> void
             §E{}
             §P "laundered"
 
@@ -55,14 +55,14 @@ public sealed class PermissiveEffectsTests : IDisposable
     // NonConvergenceTests.Permissive_StillWaives_UnknownChargedCalor0410, the compiler-side
     // pin for the same half.
     private const string UnknownChargeSource = """
-        §M{m001:UnknownCharge}
-          §F{f001:RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
+        §M{UnknownCharge}
+          §F{RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
             §E{e}
             §R (+ §C{stage} §/C §C{stage} §/C)
 
-          §CL{c001:Holder:pub}
+          §CL{Holder:pub}
             §FLD{Func<i32>:stage:priv} §E{cw}
-            §MT{mt001:Twice:pub} () -> i32
+            §MT{Twice:pub} () -> i32
               §E{}
               §R §C{RunTwice} §A this.stage §/C
 
@@ -70,8 +70,8 @@ public sealed class PermissiveEffectsTests : IDisposable
 
     // Declares what it does: compiles clean under BOTH policies.
     private const string CleanSource = """
-        §M{m001:CleanModule}
-          §F{f001:Add:pub}
+        §M{CleanModule}
+          §F{Add:pub}
               §I{i32:a}
               §I{i32:b}
               §O{i32}
@@ -83,27 +83,27 @@ public sealed class PermissiveEffectsTests : IDisposable
     // (EffectRowLambdaTests.LambdaOmittedRow_InferredRowIsCheckedAtTheBindingSite).
     // "An effect row that does not fit is never waived" — not by this property either.
     private const string RowMismatchSource = """
-        §M{m001:M}
-          §F{f001:Run:pub} () -> void
+        §M{M}
+          §F{Run:pub} () -> void
             §E{cw}
-            §B{f:Func<i32,i32>} §E{} §LAM{lam1:x:i32}
+            §B{f:Func<i32,i32>} §E{} §LAM{x:i32}
               §P x
               §R x
-            §/LAM{lam1}
+            §/LAM
             §P INT:1
 
         """;
 
     private const string CalleeSource = """
-        §M{m001:OrderService}
-          §F{f001:SaveOrder:pub}
+        §M{OrderService}
+          §F{SaveOrder:pub}
               §O{void}
               §E{db:w}
         """;
 
     private const string CallerSource = """
-        §M{m002:Handler}
-          §F{f001:HandleRequest:pub}
+        §M{Handler}
+          §F{HandleRequest:pub}
               §O{void}
               §C{SaveOrder}
               §/C

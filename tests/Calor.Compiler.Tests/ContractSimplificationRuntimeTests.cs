@@ -18,8 +18,8 @@ public class ContractSimplificationRuntimeTests
     public void QuantifierDiscovery_PreservesShortCircuitAndEndpointOrder(bool verify)
     {
         string Guarded(string predicate) => $$"""
-            §M{m1:TypedContracts}
-              §F{f1:Check:pub} (bool:guard, i32:x) -> i32
+            §M{TypedContracts}
+              §F{Check:pub} (bool:guard, i32:x) -> i32
                 §E{}
                 §Q {{predicate}}
                 §R INT:7
@@ -56,9 +56,9 @@ public class ContractSimplificationRuntimeTests
         Assert.Equal(7, Invoke(nested, 0));
         Assert.Equal(7, Invoke(nested, 2));
         var nullableArray = Compile("""
-            §M{m1:TypedContracts}
-              §CL{c1:NullableDomain:pub}
-                §MT{mt1:Check:pub} (i32[]?:x) -> i32
+            §M{TypedContracts}
+              §CL{NullableDomain:pub}
+                §MT{Check:pub} (i32[]?:x) -> i32
                   §E{}
                   §Q (forall ((i i32)) (-> (&& (!= x null) (&& (>= i INT:0) (< i x.Length))) true))
                   §R INT:7
@@ -81,14 +81,14 @@ public class ContractSimplificationRuntimeTests
         })
         {
             var source = $$"""
-                §M{m1:ContractEffects}
-                  §CL{c1:Counter:pub}
+                §M{ContractEffects}
+                  §CL{Counter:pub}
                     §FLD{i32:Value:pub}
-                    §PROP{p1:Tick:i32:pub}
+                    §PROP{Tick:i32:pub}
                       §GET
                         §ASSIGN Value (+ Value INT:1)
                         §R Value
-                    §MT{mt1:Check:pub} () -> i32
+                    §MT{Check:pub} () -> i32
                       §E{}
                       §Q {{predicate}}
                       §R INT:7
@@ -109,30 +109,30 @@ public class ContractSimplificationRuntimeTests
         })
         {
             var overloaded = $$"""
-                §M{m1:TypedContracts}
-                  §CL{c1:Probe:pub}
-                    §OP{op1:implicit:pub}
+                §M{TypedContracts}
+                  §CL{Probe:pub}
+                    §OP{implicit:pub}
                       §I{bool:value}
                       §O{Probe}
                       §R §NEW{Probe}
-                    §OP{op2:implicit:pub}
+                    §OP{implicit:pub}
                       §I{Probe:value}
                       §O{bool}
                       §R true
-                    §OP{op3:true:pub}
+                    §OP{true:pub}
                       §I{Probe:value}
                       §O{bool}
                       §R true
-                    §OP{op4:false:pub}
+                    §OP{false:pub}
                       §I{Probe:value}
                       §O{bool}
                       §R false
-                    §OP{op5:&:pub}
+                    §OP{&:pub}
                       §I{Probe:a}
                       §I{Probe:b}
                       §O{Probe}
                       §R a
-                  §F{f1:Check:pub} (Probe:x) -> i32
+                  §F{Check:pub} (Probe:x) -> i32
                     §E{}
                     §Q {{predicate}}
                     §R INT:7
@@ -149,9 +149,9 @@ public class ContractSimplificationRuntimeTests
             var lambdaHeader = overloaded.Replace("(Probe:x) -> i32", "(bool:x, object:o) -> Func<bool>")
                 .Replace("\n    §R INT:7", "");
             var patternShadow = lambdaHeader.Replace($"§Q {predicate}",
-                $"§R §LAM{{l1}} §R (? (is o Probe x) {predicate} true) §/LAM{{l1}}");
+                $"§R §LAM{{}} §R (? (is o Probe x) {predicate} true) §/LAM");
             var localShadow = lambdaHeader.Replace($"§Q {predicate}",
-                $"§R §LAM{{l1}} §B{{x:Probe}} §NEW{{Probe}} §R {predicate} §/LAM{{l1}}")
+                $"§R §LAM{{}} §B{{x:Probe}} §NEW{{Probe}} §R {predicate} §/LAM")
                 .Replace("§E{}", "§E{alloc}");
             foreach (var shadowed in new[] { patternShadow, localShadow })
             {
@@ -164,13 +164,13 @@ public class ContractSimplificationRuntimeTests
                 Assert.False(closure());
             }
 
-            var initializer = overloaded[..overloaded.IndexOf("  §F{f1:Check:pub}", StringComparison.Ordinal)] + $$"""
-                  §CL{c2:Container:pub}
-                    §MT{mt1:Seed:pub} (bool:x) -> bool
+            var initializer = overloaded[..overloaded.IndexOf("  §F{Check:pub}", StringComparison.Ordinal)] + $$"""
+                  §CL{Container:pub}
+                    §MT{Seed:pub} (bool:x) -> bool
                       §E{}
                       §R x
                     §FLD{Probe:x:pub:static}
-                    §FLD{Func<bool>:Check:pub:static} §LAM{l1} §R {{predicate}} §/LAM{l1}
+                    §FLD{Func<bool>:Check:pub:static} §LAM{} §R {{predicate}} §/LAM
                 """;
             var initializerResult = Program.Compile(initializer, "initializer-logic.calr", Options(verify));
             Assert.Contains(initializerResult.Diagnostics.Errors,
@@ -191,16 +191,16 @@ public class ContractSimplificationRuntimeTests
                 $"(-> (&& (>= {variable} INT:0) (< {variable} {endpoint})) (&& (cast bool §C{{Invoke}} §A grow §/C) (== {variable} INT:0)))";
             var quantifier = $"(forall ((i i32)) {Body("i")})";
             var captured = $$"""
-                §M{m1:TypedContracts}
-                  §F{f2:Invoke:pub} (Func<bool>:action §E{}) -> bool
+                §M{TypedContracts}
+                  §F{Invoke:pub} (Func<bool>:action §E{}) -> bool
                     §E{}
                     §R §C{action} §/C
-                  §F{f1:Check:pub} () -> Func<i32,bool> §E{}
+                  §F{Check:pub} () -> Func<i32,bool> §E{}
                     §E{}
-                    §R §LAM{l1:n:i32} §E{}
-                      §B{grow:Func<bool>} §E{} §LAM{l2} §E{} {{mutation}} §R true §/LAM{l2}
+                    §R §LAM{n:i32} §E{}
+                      §B{grow:Func<bool>} §E{} §LAM{} §E{} {{mutation}} §R true §/LAM
                       §R {{quantifier}}
-                    §/LAM{l1}
+                    §/LAM
                 """;
             var result = Program.Compile(captured, "captured-endpoint.calr", Options(verify));
             Assert.Contains(result.Diagnostics.Errors,
@@ -212,24 +212,24 @@ public class ContractSimplificationRuntimeTests
             foreach (var contractMarker in new[] { "§Q", "§S" })
             {
                 var contractCapture = $$"""
-                    §M{m1:TypedContracts}
-                      §CL{c1:Domain:pub}
-                        §MT{mt2:Invoke:pub} (Func<bool>:action §E{}) -> bool
+                    §M{TypedContracts}
+                      §CL{Domain:pub}
+                        §MT{Invoke:pub} (Func<bool>:action §E{}) -> bool
                           §E{}
                           §R §C{action} §/C
-                        §MT{mt1:Check:pub} (i32:n) -> i32
+                        §MT{Check:pub} (i32:n) -> i32
                           §E{}
-                          {{contractMarker}} (&& (is (cast Func<bool> §LAM{l1} §E{} {{mutation}} §R true §/LAM{l1}) Func<bool> grow) {{quantifier}})
+                          {{contractMarker}} (&& (is (cast Func<bool> §LAM{} §E{} {{mutation}} §R true §/LAM) Func<bool> grow) {{quantifier}})
                           §R INT:7
                     """;
                 var inheritedCapture = contractCapture
-                    .Replace("§CL{c1:Domain:pub}", "§CL{c0:Base:pub:abs}")
-                    .Replace("§MT{mt1:Check:pub}", "§MT{mt1:Check:pub:abs}")
+                    .Replace("§CL{Domain:pub}", "§CL{Base:pub:abs}")
+                    .Replace("§MT{Check:pub}", "§MT{Check:pub:abs}")
                     .Replace("\n      §R INT:7", "") + """
 
-                      §CL{c1:Domain:pub}
+                      §CL{Domain:pub}
                         §EXT{Base}
-                        §MT{mt3:Check:pub:over} (i32:n) -> i32
+                        §MT{Check:pub:over} (i32:n) -> i32
                           §E{}
                           §R INT:7
                     """;
@@ -248,21 +248,21 @@ public class ContractSimplificationRuntimeTests
 
             foreach (var initializer in new[]
             {
-                $"§ANON Grow = (cast Func<bool> §LAM{{l2}} §E{{}} {mutation} §R true §/LAM{{l2}})"
+                $"§ANON Grow = (cast Func<bool> §LAM{{}} §E{{}} {mutation} §R true §/LAM)"
             })
             {
                 var wrappedQuantifier = quantifier.Replace("§A grow", "§A box.Grow");
                 var wrapped = $$"""
-                    §M{m1:TypedContracts}
-                      §F{f2:Invoke:pub} (Func<bool>:action §E{}) -> bool
+                    §M{TypedContracts}
+                      §F{Invoke:pub} (Func<bool>:action §E{}) -> bool
                         §E{}
                         §R §C{action} §/C
-                      §F{f1:Check:pub} () -> Func<i32,bool> §E{alloc}
+                      §F{Check:pub} () -> Func<i32,bool> §E{alloc}
                         §E{alloc}
-                        §R §LAM{l1:n:i32} §E{alloc}
+                        §R §LAM{n:i32} §E{alloc}
                           §B{box} {{initializer}}
                           §R {{wrappedQuantifier}}
-                        §/LAM{l1}
+                        §/LAM
                     """;
                 var rejected = Program.Compile(wrapped, "wrapped-capture.calr", Options(verify));
                 Assert.True(rejected.Diagnostics.Errors.Any(
@@ -366,33 +366,33 @@ public class ContractSimplificationRuntimeTests
         AssertContractViolation(() => Invoke(compound, "text"));
 
         var overloaded = Compile("""
-            §M{m1:TypedContracts}
-              §CL{c1:Probe:pub}
-                §OP{op1:==:pub}
+            §M{TypedContracts}
+              §CL{Probe:pub}
+                §OP{==:pub}
                   §I{Probe:a}
                   §I{Probe:b}
                   §O{Probe}
                   §R a
-                §OP{op2:!=:pub}
+                §OP{!=:pub}
                   §I{Probe:a}
                   §I{Probe:b}
                   §O{Probe}
                   §R a
-                §OP{op3:==:pub}
+                §OP{==:pub}
                   §I{Probe:a}
                   §I{bool:b}
                   §O{bool}
                   §R false
-                §OP{op4:!=:pub}
+                §OP{!=:pub}
                   §I{Probe:a}
                   §I{bool:b}
                   §O{bool}
                   §R true
-                §OP{op5:!:pub}
+                §OP{!:pub}
                   §I{Probe:a}
                   §O{bool}
                   §R false
-              §F{f1:Check:pub} (Probe:x) -> i32
+              §F{Check:pub} (Probe:x) -> i32
                 §E{}
                 §Q (== (== x (? (is x Probe candidate) x x)) true)
                 §R INT:7
@@ -425,8 +425,8 @@ public class ContractSimplificationRuntimeTests
         })
         {
             var source = $$"""
-                §M{m1:TypedContracts}
-                  §F{f1:Check:pub} (i32:x) -> ?i64
+                §M{TypedContracts}
+                  §F{Check:pub} (i32:x) -> ?i64
                     §E{}
                     §S true
                     {{body}}
@@ -438,17 +438,17 @@ public class ContractSimplificationRuntimeTests
         }
 
         var nullable = Compile("""
-            §M{m1:TypedContracts}
-              §F{f1:Check:pub} (i32:x) -> i64?
+            §M{TypedContracts}
+              §F{Check:pub} (i32:x) -> i64?
                 §E{}
                 §R x
             """, verify);
         Assert.Equal(3L, Assert.IsType<long>(Invoke(nullable, 3)));
         var lambda = Compile("""
-            §M{m1:TypedContracts}
-              §F{f1:Check:pub} (i32:x) -> Func<i64?>
+            §M{TypedContracts}
+              §F{Check:pub} (i32:x) -> Func<i64?>
                 §E{}
-                §R §LAM{l1} §R x §/LAM{l1}
+                §R §LAM{} §R x §/LAM
             """, verify);
         var factory = Assert.IsType<Func<long?>>(Invoke(lambda, 3));
         Assert.Equal(3L, factory());
@@ -471,8 +471,8 @@ public class ContractSimplificationRuntimeTests
         foreach (var wrapper in wrappers)
         {
             var source = $$"""
-                §M{m1:TypedContracts}
-                  §F{f1:Check:pub} (object:x) -> object
+                §M{TypedContracts}
+                  §F{Check:pub} (object:x) -> object
                     §E{}
                     §S (&& {{wrapper}} (> result INT:0))
                     §R x
@@ -509,17 +509,17 @@ public class ContractSimplificationRuntimeTests
     public void PrimaryReceivers_PreserveBaseAndConditionalChains(bool verify)
     {
         const string source = """
-            §M{m1:ReceiverChains}
-              §CL{c1:Parent:pub}
+            §M{ReceiverChains}
+              §CL{Parent:pub}
                 §FLD{i32:Value:pub}
-              §CL{c2:Derived:pub}
+              §CL{Derived:pub}
                 §EXT{Parent}
-                §MT{mt1:Read:pub} () -> i32
+                §MT{Read:pub} () -> i32
                   §R §BASE.Value
-              §CL{c3:Node:pub}
+              §CL{Node:pub}
                 §FLD{Node:Child:pub}
                 §FLD{i32:Value:pub}
-              §F{f1:Check:pub} (Node:x) -> i32?
+              §F{Check:pub} (Node:x) -> i32?
                 §R x?.Child .Value
             """;
         const string harness = """
@@ -658,14 +658,14 @@ public class ContractSimplificationRuntimeTests
     public void RepeatedGetterOperands_ExecuteTwice(bool verify)
     {
         const string source = """
-            §M{m1:ContractEffects}
-              §CL{c1:Counter:pub}
+            §M{ContractEffects}
+              §CL{Counter:pub}
                 §FLD{i32:Value:pub}
-                §PROP{p1:Tick:i32:pub}
+                §PROP{Tick:i32:pub}
                   §GET
                     §ASSIGN Value (+ Value INT:1)
                     §R Value
-                §MT{mt1:Check:pub} () -> i32
+                §MT{Check:pub} () -> i32
                   §E{}
                   §Q (== Tick Tick)
                   §R INT:7
@@ -734,8 +734,8 @@ public class ContractSimplificationRuntimeTests
     private static double Identity(double value) => value;
 
     private static string Function(string type, string predicate) => $$"""
-        §M{m1:TypedContracts}
-          §F{f1:Check:pub} ({{type}}:x) -> i32
+        §M{TypedContracts}
+          §F{Check:pub} ({{type}}:x) -> i32
             §E{}
             §Q {{predicate}}
             §R INT:7

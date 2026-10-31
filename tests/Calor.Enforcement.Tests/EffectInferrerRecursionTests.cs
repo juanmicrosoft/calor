@@ -163,8 +163,8 @@ public class EffectInferrerRecursionTests
         // own type. The parameter gives the receiver a type, so the arguments
         // ARE typed and the cycle is entered.
         var source = """
-            §M{m001:SelfCycle}
-              §F{f001:Loop:priv} (FailureAwareBatchScheduler:scheduler) -> void
+            §M{SelfCycle}
+              §F{Loop:priv} (FailureAwareBatchScheduler:scheduler) -> void
                 §B{~x} §C{scheduler.MarkFailure} §A x §/C
             """;
 
@@ -184,8 +184,8 @@ public class EffectInferrerRecursionTests
         // FindLocalDeclarationType → ResolveLocalValueTypeFromAst → back, via
         // the RECEIVER rather than an argument: `§B{a} = a.Where()`.
         var source = """
-            §M{m001:SelfCycleReceiver}
-              §F{f001:Loop:priv} () -> void
+            §M{SelfCycleReceiver}
+              §F{Loop:priv} () -> void
                 §B{a} §C{a.Where} §/C
             """;
 
@@ -202,8 +202,8 @@ public class EffectInferrerRecursionTests
     {
         // a's type needs b's, b's needs a's.
         var source = """
-            §M{m001:TwoCycle}
-              §F{f001:Loop:priv} (FailureAwareBatchScheduler:scheduler) -> void
+            §M{TwoCycle}
+              §F{Loop:priv} (FailureAwareBatchScheduler:scheduler) -> void
                 §B{a} §C{scheduler.First} §A b §/C
                 §B{b} §C{scheduler.Second} §A a §/C
             """;
@@ -224,12 +224,12 @@ public class EffectInferrerRecursionTests
         // The search descends into nested statement bodies; a cycle spread
         // across them is still one cycle, and the nesting costs extra frames.
         var source = """
-            §M{m001:ThreeCycle}
-              §F{f001:Loop:priv} (FailureAwareBatchScheduler:scheduler, bool:flag) -> void
+            §M{ThreeCycle}
+              §F{Loop:priv} (FailureAwareBatchScheduler:scheduler, bool:flag) -> void
                 §B{a} §C{scheduler.First} §A c §/C
-                §IF{if001} flag
+                §IF flag
                   §B{b} §C{scheduler.Second} §A a §/C
-                  §WH{wh001} flag
+                  §WH flag
                     §B{c} §C{scheduler.Third} §A b §/C
             """;
 
@@ -252,8 +252,8 @@ public class EffectInferrerRecursionTests
         // cyclically. Goes red under the drop-`Remove` mutation (the visited
         // set would remember the shared name from the first branch).
         var source = """
-            §M{m001:Diamond}
-              §F{f001:Run:priv} (List<i32>:items) -> void
+            §M{Diamond}
+              §F{Run:priv} (List<i32>:items) -> void
                 §B{_chainWhere001} §C{items.Where} §/C
                 §B{_chainWhere002} §C{_chainWhere001.Where} §/C
                 §B{_chainWhere003} §C{_chainWhere001.Where} §/C
@@ -276,10 +276,10 @@ public class EffectInferrerRecursionTests
         // collection's name. Both take frames from the same counter now; on
         // ordinary code neither guard fires.
         var source = """
-            §M{m001:Foreach}
-              §F{f001:Run:priv} (List<i32>:items) -> void
+            §M{Foreach}
+              §F{Run:priv} (List<i32>:items) -> void
                 §B{_chainWhere001} §C{items.Where} §/C
-                §EACH{fe001:_eachItem001} _chainWhere001
+                §EACH{_eachItem001} _chainWhere001
                   §C{_eachItem001.ToString} §/C
             """;
 
@@ -305,10 +305,10 @@ public class EffectInferrerRecursionTests
         // its own visited set; a name cycling in one must not make the
         // identically-named local in another resolve to the sentinel.
         var source = """
-            §M{m001:CrossFunction}
-              §F{f001:Cycles:priv} (FailureAwareBatchScheduler:scheduler) -> void
+            §M{CrossFunction}
+              §F{Cycles:priv} (FailureAwareBatchScheduler:scheduler) -> void
                 §B{~_chainWhere001} §C{scheduler.MarkFailure} §A _chainWhere001 §/C
-              §F{f002:DoesNot:priv} (List<i32>:items) -> void
+              §F{DoesNot:priv} (List<i32>:items) -> void
                 §B{_chainWhere001} §C{items.Where} §/C
                 §C{_chainWhere001.ToList} §/C
             """;
@@ -331,11 +331,11 @@ public class EffectInferrerRecursionTests
         // Review round 2, probe P3b — the control for the above: two functions
         // that both resolve the same name normally, neither stopping.
         var source = """
-            §M{m001:CrossFunctionControl}
-              §F{f001:First:priv} (List<i32>:items) -> void
+            §M{CrossFunctionControl}
+              §F{First:priv} (List<i32>:items) -> void
                 §B{_chainWhere001} §C{items.Where} §/C
                 §C{_chainWhere001.ToList} §/C
-              §F{f002:Second:priv} (List<i32>:items) -> void
+              §F{Second:priv} (List<i32>:items) -> void
                 §B{_chainWhere001} §C{items.Where} §/C
                 §C{_chainWhere001.ToList} §/C
             """;
@@ -356,9 +356,9 @@ public class EffectInferrerRecursionTests
         // pinned here so it is discovered by a red test rather than by a bug
         // report. The guard changes nothing about it — no stop of either kind.
         var source = """
-            §M{m001:Siblings}
-              §F{f001:Run:priv} (List<i32>:items, bool:flag) -> void
-                §IF{if001} flag
+            §M{Siblings}
+              §F{Run:priv} (List<i32>:items, bool:flag) -> void
+                §IF flag
                   §B{_chainWhere001} §C{items.Where} §/C
                 §EL
                   §B{_chainWhere001} §NEW{StringBuilder} §/NEW
@@ -403,8 +403,8 @@ public class EffectInferrerRecursionTests
         // resolution returns. Drop the `Remove` on the way out and the second
         // ask below reports a cycle that is not there.
         var source = """
-            §M{m001:Twice}
-              §F{f001:Run:priv} (List<i32>:items) -> void
+            §M{Twice}
+              §F{Run:priv} (List<i32>:items) -> void
                 §B{_chainWhere001} §C{items.Where} §/C
                 §C{_chainWhere001.ToList} §/C
                 §C{_chainWhere001.ToList} §/C
@@ -424,8 +424,8 @@ public class EffectInferrerRecursionTests
         // The stop is scoped to the re-entered name; the neighbouring chain
         // still resolves and its terminal call is still known.
         var source = """
-            §M{m001:Mixed}
-              §F{f001:Run:priv} (FailureAwareBatchScheduler:scheduler, List<i32>:items) -> void
+            §M{Mixed}
+              §F{Run:priv} (FailureAwareBatchScheduler:scheduler, List<i32>:items) -> void
                 §B{~x} §C{scheduler.MarkFailure} §A x §/C
                 §B{_chainWhere001} §C{items.Where} §/C
                 §B{_chainWhere002} §C{_chainWhere001.Where} §/C
@@ -534,8 +534,8 @@ public class EffectInferrerRecursionTests
         // The smallest useful cap: one link (ask + structural level) resolves;
         // a second link needs a third frame and is refused.
         var source = """
-            §M{m001:CapTwo}
-              §F{f001:Run:priv} (List<i32>:items) -> void
+            §M{CapTwo}
+              §F{Run:priv} (List<i32>:items) -> void
                 §B{_chainWhere001} §C{items.Where} §/C
                 §C{_chainWhere001.ToList} §/C
                 §B{_chainWhere002} §C{_chainWhere001.Where} §/C
@@ -585,8 +585,8 @@ public class EffectInferrerRecursionTests
         // Enforce call — nothing resets them, and a caller that enforces twice
         // with one pass sees the sum. Pinned so the doc and the name agree.
         var (_, bound) = Enforce("""
-            §M{m001:Empty}
-              §F{f001:Run:priv} () -> void
+            §M{Empty}
+              §F{Run:priv} () -> void
                 §P "hello"
             """);
 
@@ -603,8 +603,8 @@ public class EffectInferrerRecursionTests
         var bound = new EffectEnforcementPass.AstResolutionBound();
         var pass = new EffectEnforcementPass(new DiagnosticBag()) { AstResolution = bound };
         var source = """
-            §M{m001:SelfCycle}
-              §F{f001:Loop:priv} (FailureAwareBatchScheduler:scheduler) -> void
+            §M{SelfCycle}
+              §F{Loop:priv} (FailureAwareBatchScheduler:scheduler) -> void
                 §B{~x} §C{scheduler.MarkFailure} §A x §/C
             """;
 
@@ -642,8 +642,8 @@ public class EffectInferrerRecursionTests
     private static string Chain(int links)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("§M{m001:Chain}");
-        sb.AppendLine("  §F{f001:Run:priv} (List<i32>:items) -> void");
+        sb.AppendLine("§M{Chain}");
+        sb.AppendLine("  §F{Run:priv} (List<i32>:items) -> void");
         for (var i = 1; i <= links; i++)
             sb.AppendLine($"    §B{{{Link(i)}}} §C{{{(i == 1 ? "items" : Link(i - 1))}.Where}} §/C");
         sb.AppendLine($"    §C{{{Link(links)}.ToList}} §/C");
@@ -659,12 +659,12 @@ public class EffectInferrerRecursionTests
     private static string NestedChain(int links)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("§M{m001:Nested}");
-        sb.AppendLine("  §F{f001:Run:priv} (List<i32>:items, bool:flag) -> void");
+        sb.AppendLine("§M{Nested}");
+        sb.AppendLine("  §F{Run:priv} (List<i32>:items, bool:flag) -> void");
         for (var i = 1; i <= links; i++)
         {
             var indent = new string(' ', 4 + ((i - 1) * 2));
-            sb.AppendLine($"{indent}§IF{{if{i:000}}} flag");
+            sb.AppendLine($"{indent}§IF flag");
             sb.AppendLine(
                 $"{indent}  §B{{{Link(i)}}} §C{{{(i == 1 ? "items" : Link(i - 1))}.Where}} §/C");
         }

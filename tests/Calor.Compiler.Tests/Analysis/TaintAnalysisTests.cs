@@ -312,8 +312,8 @@ public class TaintAnalysisTests
     public void TaintAnalysis_SimpleFunction_NoVulnerabilities()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
+§M{Test}
+  §F{Add:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -332,8 +332,8 @@ public class TaintAnalysisTests
     public void TaintAnalysis_ReportDiagnostics_AddsToCollection()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Simple:pub}
+§M{Test}
+  §F{Simple:pub}
       §I{i32:x}
       §O{i32}
       §R x";
@@ -353,8 +353,8 @@ public class TaintAnalysisTests
     public void TaintAnalysis_EmptyFunction_NoVulnerabilities()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Empty:pub}
+§M{Test}
+  §F{Empty:pub}
       §O{void}";
 
         var func = GetFunction(source, out var parseDiag);
@@ -369,8 +369,8 @@ public class TaintAnalysisTests
     public void TaintAnalysis_FunctionWithCall_AnalyzesArguments()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Process:pub}
+§M{Test}
+  §F{Process:pub}
       §I{string:data}
       §O{string}
       §R (CALL process data)";
@@ -388,8 +388,8 @@ public class TaintAnalysisTests
     public void TaintAnalysis_UserInputParameter_IsTainted()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Process:pub}
+§M{Test}
+  §F{Process:pub}
       §I{string:user_input}
       §O{string}
       §R user_input";
@@ -408,8 +408,8 @@ public class TaintAnalysisTests
     public void TaintAnalysis_DisabledTracking_NoTaint()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Process:pub}
+§M{Test}
+  §F{Process:pub}
       §I{string:user_input}
       §O{string}
       §R user_input";
@@ -446,11 +446,11 @@ public class TaintAnalysisTests
     public void TaintAnalysisRunner_AnalyzesModule()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §O{i32}
       §R INT:1
-  §F{f002:Bar:pub}
+  §F{Bar:pub}
       §O{i32}
       §R INT:2";
 
@@ -469,8 +469,8 @@ public class TaintAnalysisTests
     public void TaintAnalysisRunner_AnalyzesFunction()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §O{i32}
       §R x";
@@ -493,8 +493,8 @@ public class TaintAnalysisTests
     public void TaintSource_ParameterNamedUserInput_IsTainted()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Process:pub}
+§M{Test}
+  §F{Process:pub}
       §I{string:user_input}
       §O{string}
       §R user_input";
@@ -513,8 +513,8 @@ public class TaintAnalysisTests
     public void TaintSource_ParameterNamedRequest_IsTainted()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Handle:pub}
+§M{Test}
+  §F{Handle:pub}
       §I{string:request_data}
       §O{string}
       §R request_data";
@@ -530,8 +530,8 @@ public class TaintAnalysisTests
     public void TaintSource_RegularParameter_NotTainted()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Calculate:pub}
+§M{Test}
+  §F{Calculate:pub}
       §I{i32:value}
       §O{i32}
       §R value";
@@ -553,8 +553,8 @@ public class TaintAnalysisTests
     public void TaintPropagation_ThroughBinding_Propagates()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Propagate:pub}
+§M{Test}
+  §F{Propagate:pub}
       §I{string:user_data}
       §O{string}
       §B{processed:string} user_data
@@ -573,8 +573,8 @@ public class TaintAnalysisTests
     public void TaintPropagation_ThroughExpression_Propagates()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Concat:pub}
+§M{Test}
+  §F{Concat:pub}
       §I{string:user_input}
       §I{string:prefix}
       §O{string}
@@ -598,8 +598,8 @@ public class TaintAnalysisTests
     public void SafeCode_NoTaintSources_NoVulnerabilities()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Safe:pub}
+§M{Test}
+  §F{Safe:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -618,8 +618,8 @@ public class TaintAnalysisTests
     public void SafeCode_ConstantsOnly_NoVulnerabilities()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Constants:pub}
+§M{Test}
+  §F{Constants:pub}
       §O{i32}
       §B{a:i32} INT:1
       §B{b:i32} INT:2
@@ -741,8 +741,8 @@ public class TaintAnalysisTests
     public void TaintAnalysis_ReportDiagnostics_NoVulnerabilities_NoDiagnostics()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Safe:pub}
+§M{Test}
+  §F{Safe:pub}
       §I{i32:x}
       §O{i32}
       §R x";
@@ -767,12 +767,12 @@ public class TaintAnalysisTests
     public void TaintAnalysis_MultipleFunctions_AllAnalyzed()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Func1:pub}
+§M{Test}
+  §F{Func1:pub}
       §I{i32:x}
       §O{i32}
       §R x
-  §F{f002:Func2:pub}
+  §F{Func2:pub}
       §I{i32:y}
       §O{i32}
       §R y";

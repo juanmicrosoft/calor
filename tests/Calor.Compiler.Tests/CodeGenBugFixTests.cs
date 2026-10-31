@@ -17,8 +17,8 @@ public class CodeGenBugFixTests
     {
         // §IDX{args} 1 should generate args[1], NOT new object[] { args }[1]
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §I{[str]:args}
       §O{void}
       §B{~result:str} §IDX{args} 1
@@ -35,8 +35,8 @@ public class CodeGenBugFixTests
     {
         // §NEW{Dictionary<char,str>} should generate new Dictionary<char, string>()
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~dict} §NEW{Dictionary<char,str>}
 ";
@@ -52,8 +52,8 @@ public class CodeGenBugFixTests
     {
         // Backward compat: §NEW{Dictionary:char:str} should still work
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~dict} §NEW{Dictionary:char:str}
 ";
@@ -68,8 +68,8 @@ public class CodeGenBugFixTests
     {
         // §B{ConsoleKeyInfo:keyPressed} should generate ConsoleKeyInfo keyPressed
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{ConsoleKeyInfo:keyPressed} §C{Console.ReadKey} §/C
 ";
@@ -85,8 +85,8 @@ public class CodeGenBugFixTests
     {
         // Backward compat: §B{~name:str} should still work as name:type format
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~name:str} ""hello""
 ";
@@ -101,10 +101,10 @@ public class CodeGenBugFixTests
     {
         // §ARR{char:buf1:100} should generate new char[100], NOT new buf1[100]
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
-      §B{[char]:buf1} §ARR{char:buf1:100}
+      §B{[char]:buf1} §ARR{buf1:100}
 ";
 
         var result = ParseAndEmit(source);
@@ -118,10 +118,10 @@ public class CodeGenBugFixTests
     {
         // Backward compat: §ARR{arr1:i32:10} should still work
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
-      §B{[i32]:arr1} §ARR{arr1:i32:10}
+      §B{[i32]:arr1} §ARR{i32:10}
 ";
 
         var result = ParseAndEmit(source);
@@ -132,17 +132,17 @@ public class CodeGenBugFixTests
     [Fact]
     public void Bug5_PropertyWithOverrideModifier_GeneratesOverrideKeyword()
     {
-        // §PROP{p001:MaxCharCount:i32:pub:over} should generate public override int MaxCharCount
+        // §PROP{MaxCharCount:i32:pub:over} should generate public override int MaxCharCount
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyClass:pub}
+§M{Test}
+  §CL{MyClass:pub}
       §EXT{BaseClass}
-      §PROP{p001:MaxCharCount:i32:pub:over}
+      §PROP{MaxCharCount:i32:pub:over}
         §GET
         §/GET
         §SET
         §/SET
-      §/PROP{p001}
+      §/PROP
 ";
 
         var result = ParseAndEmit(source);
@@ -154,14 +154,14 @@ public class CodeGenBugFixTests
     public void Bug5_PropertyWithVirtualModifier_GeneratesVirtualKeyword()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyClass:pub}
-      §PROP{p001:Name:str:pub:virt}
+§M{Test}
+  §CL{MyClass:pub}
+      §PROP{Name:str:pub:virt}
         §GET
         §/GET
         §SET
         §/SET
-      §/PROP{p001}
+      §/PROP
 ";
 
         var result = ParseAndEmit(source);
@@ -174,14 +174,14 @@ public class CodeGenBugFixTests
     {
         // Backward compat: property with no 5th position should work as before
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyClass:pub}
-      §PROP{p001:Count:i32:pub}
+§M{Test}
+  §CL{MyClass:pub}
+      §PROP{Count:i32:pub}
         §GET
         §/GET
         §SET
         §/SET
-      §/PROP{p001}
+      §/PROP
 ";
 
         var result = ParseAndEmit(source);
@@ -196,8 +196,8 @@ public class CodeGenBugFixTests
     {
         // §C{fn} §A §NEW{Type1} §A §NEW{Type2} §/C should generate fn(new Type1(), new Type2())
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §C{DoWork}
         §A §NEW{StringBuilder}
@@ -218,8 +218,8 @@ public class CodeGenBugFixTests
     {
         // (char-lit "Y") should generate 'Y'
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~ch:char} (char-lit ""Y"")
 ";
@@ -238,8 +238,8 @@ public class CodeGenBugFixTests
         // it belongs to the enclosing §C. To pass args to §NEW inside §C,
         // use the §/NEW closure pattern with a separate §B.
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §C{Process}
         §A §NEW{Widget}
@@ -258,8 +258,8 @@ public class CodeGenBugFixTests
     {
         // Outside of §C arg context, §NEW should still consume §A tokens normally
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~obj} §NEW{Widget} §A ""hello"" §A 42 §/NEW
 ";
@@ -274,8 +274,8 @@ public class CodeGenBugFixTests
     {
         // (char-lit "'") should produce '\'' not '''
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~ch:char} (char-lit ""'"")
 ";
@@ -291,8 +291,8 @@ public class CodeGenBugFixTests
     {
         // (char-lit "\\") should produce '\\'
         var source = """
-            §M{m1:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §B{~ch:char} (char-lit "\\")
             """;
@@ -310,8 +310,8 @@ public class CodeGenBugFixTests
         // and we fall through to {name:type} format.
         // This means: HttpClient is the name, MyClient is the type.
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{HttpClient:MyClient} §NEW{MyClient}
 ";
@@ -328,8 +328,8 @@ public class CodeGenBugFixTests
         // §B{StringBuilder:StringBuilder} — both are PascalCase and identical
         // Falls through to {name:type} format, which works correctly
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{StringBuilder:StringBuilder} §NEW{StringBuilder}
 ";
@@ -346,10 +346,10 @@ public class CodeGenBugFixTests
         // Both pass IsLikelyType, so !IsLikelyType(pos1) is false,
         // falls to {id:type:size} format: MyArray is id, Buffer is type
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
-      §B{Buffer:MyArray} §ARR{MyArray:Buffer:10}
+      §B{Buffer:MyArray} §ARR{Buffer:10}
 ";
 
         var result = ParseAndEmit(source);
@@ -372,46 +372,46 @@ public class CodeGenBugFixTests
         // Bug 6: §C{fn} §A §NEW{X} §A §NEW{Y} §/C multiple NEWs in call
         // Bug 7: (char-lit "Y") char literal
         var source = @"
-§M{m1:Transliterator}
+§M{Transliterator}
 
   §U{System}
   §U{System.Collections.Generic}
   §U{System.Text}
 
-  §CL{c0:TransliteratorBase:pub:abs}
-      §PROP{p001:Name:str:pub:abs}
+  §CL{TransliteratorBase:pub:abs}
+      §PROP{Name:str:pub:abs}
         §GET
         §/GET
-      §/PROP{p001}
+      §/PROP
 
-  §CL{c1:CyrillicToLatin:pub}
+  §CL{CyrillicToLatin:pub}
       §EXT{TransliteratorBase}
 
       §FLD{str:_mappings:priv}
 
-      §PROP{p001:Name:str:pub:over}
+      §PROP{Name:str:pub:over}
         §GET
         §/GET
-      §/PROP{p001}
+      §/PROP
 
-      §CTOR{ctor1:pub}
+      §CTOR{pub}
         §I{str:name}
         §ASSIGN §THIS._mappings name
-      §/CTOR{ctor1}
+      §/CTOR
 
-      §MT{mt1:Transliterate:pub}
+      §MT{Transliterate:pub}
           §I{str:input}
           §O{str}
           §E{cw,cr}
 
           §B{~dict} §NEW{Dictionary<char,str>}
-          §B{[char]:buf} §ARR{char:buf:256}
+          §B{[char]:buf} §ARR{buf:256}
           §B{~sb} §NEW{StringBuilder}
           §B{ConsoleKeyInfo:keyPressed} §C{Console.ReadKey} §/C
 
-          §L{l1:i:0:(len input):1}
+          §L{i:0:(len input):1}
               §B{char:ch} §IDX{input} i
-              §IF{if1} (== ch (char-lit ""Y""))
+              §IF (== ch (char-lit ""Y""))
                   §C{sb.Append}
                     §A ""Y""
                   §/C
@@ -595,8 +595,8 @@ public class CodeGenBugFixTests
     {
         // Parse a §ARR with these attributes and check the resulting array type
         var source = $@"
-§M{{m1:Test}}
-  §F{{f001:Main:pub}}
+§M{{Test}}
+  §F{{Main:pub}}
     §O{{void}}
     §B{{~x}} §ARR{{{pos0}:{pos1}:10}}
 ";
@@ -616,8 +616,8 @@ public class CodeGenBugFixTests
     public void CharLiteral_VariousChars_ProducesCorrectOutput(string ch, string expected)
     {
         var source = $@"
-§M{{m1:Test}}
-  §F{{f001:Main:pub}}
+§M{{Test}}
+  §F{{Main:pub}}
     §O{{void}}
     §B{{~c:char}} (char-lit ""{ch}"")
 ";
@@ -638,7 +638,7 @@ public class CodeGenBugFixTests
     {
         var classModifier = modifier == "abs" ? "abs" : "pub";
         var source = $@"
-§M{{m1:Test}}
+§M{{Test}}
   §CL{{c1:MyClass:{classModifier}}}
     {(modifier == "over" ? "§EXT{BaseClass}" : "")}
     §PROP{{p001:Count:i32:pub:{modifier}}}
@@ -660,8 +660,8 @@ public class CodeGenBugFixTests
     {
         // (char-lit "AB") should report an error — char-lit requires a single character
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~ch:char} (char-lit ""AB"")
 ";
@@ -677,8 +677,8 @@ public class CodeGenBugFixTests
     {
         // (char-lit "") should report an error — empty string has 0 characters
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~ch:char} (char-lit """")
 ";
@@ -694,8 +694,8 @@ public class CodeGenBugFixTests
     {
         // (char-lit "\n") should be valid — escape sequences are single characters
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~ch:char} (char-lit ""\n"")
 ";
@@ -886,12 +886,12 @@ public class CodeGenBugFixTests
     [Fact]
     public void Array_BareElementInitialized_ParsesCorrectly()
     {
-        // §ARR{nums:i32} 1 2 3 §/ARR{nums} → 3 elements, no size
+        // §ARR{nums:i32} 1 2 3 §/ARR → 3 elements, no size
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
-      §ARR{nums:i32} 1 2 3 §/ARR{nums}
+      §ARR{nums:i32} 1 2 3 §/ARR
 ";
         var module = ParseModule(source);
         var func = Assert.Single(module.Functions);
@@ -908,10 +908,10 @@ public class CodeGenBugFixTests
     {
         // §ARR at statement level (no §B wrapper)
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
-      §ARR{nums:i32} 1 2 3 §/ARR{nums}
+      §ARR{nums:i32} 1 2 3 §/ARR
 ";
         var diagnostics = ParseWithDiagnostics(source);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -922,10 +922,10 @@ public class CodeGenBugFixTests
     {
         // §A-prefixed elements still work
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
-      §B{[i32]:nums} §ARR{i32:nums} §A 1 §A 2 §A 3 §/ARR{nums}
+      §B{[i32]:nums} §ARR{nums} §A 1 §A 2 §A 3 §/ARR
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("new int[]", result);
@@ -939,10 +939,10 @@ public class CodeGenBugFixTests
     {
         // Bare element syntax → correct C# generation
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
-      §ARR{nums:i32} 1 2 3 §/ARR{nums}
+      §ARR{nums:i32} 1 2 3 §/ARR
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("new int[]", result);
@@ -956,10 +956,10 @@ public class CodeGenBugFixTests
     {
         // §ARR{a1:i32:10} unchanged behavior
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
-      §B{[i32]:arr1} §ARR{i32:arr1:10}
+      §B{[i32]:arr1} §ARR{arr1:10}
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("new int[10]", result);
@@ -989,10 +989,10 @@ public class CodeGenBugFixTests
     {
         // Initialized array in return (expression context) should emit inline §ARR, not break
         var source = @"
-§M{m1:Test}
-  §F{f001:GetNums:pub}
+§M{Test}
+  §F{GetNums:pub}
       §O{[i32]}
-      §R §ARR{nums:i32} 1 2 3 §/ARR{nums}
+      §R §ARR{i32} 1 2 3 §/ARR
 ";
         var module = ParseModule(source);
         var calorEmitter = new Migration.CalorEmitter();
@@ -1000,7 +1000,7 @@ public class CodeGenBugFixTests
 
         // The §R and §ARR should be on the same line (inline), not split
         Assert.Contains("§R §ARR{", result);
-        Assert.Contains("§/ARR{nums}", result);
+        Assert.Contains("§/ARR", result);
     }
 
     [Fact]
@@ -1008,10 +1008,10 @@ public class CodeGenBugFixTests
     {
         // return new int[] { 1, 2, 3 } → parse → emit C# should produce correct code
         var source = @"
-§M{m1:Test}
-  §F{f001:GetNums:pub}
+§M{Test}
+  §F{GetNums:pub}
       §O{[i32]}
-      §R §ARR{nums:i32} 1 2 3 §/ARR{nums}
+      §R §ARR{i32} 1 2 3 §/ARR
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("return new int[]", result);
@@ -1029,9 +1029,9 @@ public class CodeGenBugFixTests
     {
         // Named modules retain the original C# static type name.
         var source = @"
-§M{m1:Test}
-  §M{c1:Utils}
-      §MT{mt1:Add:pub:stat}
+§M{Test}
+  §M{Utils}
+      §MT{Add:pub:stat}
           §I{i32:a}
           §I{i32:b}
           §O{i32}
@@ -1046,9 +1046,9 @@ public class CodeGenBugFixTests
     public void NamedModule_StaticMethod_RemainsCallable()
     {
         var source = @"
-§M{m1:Test}
-  §M{c1:Utils}
-      §MT{mt1:Add:pub:stat}
+§M{Test}
+  §M{Utils}
+      §MT{Add:pub:stat}
           §I{i32:a}
           §I{i32:b}
           §O{i32}
@@ -1063,9 +1063,9 @@ public class CodeGenBugFixTests
     public void NamedModule_ExplicitStaticMember_EmitsNoDuplicateModifier()
     {
         var source = @"
-§M{m1:Test}
-  §M{c1:Utils}
-      §MT{mt1:Add:pub:stat}
+§M{Test}
+  §M{Utils}
+      §MT{Add:pub:stat}
           §I{i32:a}
           §I{i32:b}
           §O{i32}
@@ -1079,10 +1079,10 @@ public class CodeGenBugFixTests
     [Fact]
     public void StaticClass_StModifier_DoesNotMatchStruct()
     {
-        // §CL{c1:Point:struct} should NOT produce a static class
+        // §CL{Point:struct} should NOT produce a static class
         var source = @"
-§M{m1:Test}
-  §CL{c1:Point:struct}
+§M{Test}
+  §CL{Point:struct}
       §FLD{i32:X:pub}
       §FLD{i32:Y:pub}
 ";

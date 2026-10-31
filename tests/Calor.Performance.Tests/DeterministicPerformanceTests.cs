@@ -60,11 +60,11 @@ public sealed class DeterministicPerformanceTests(ITestOutputHelper output)
     {
         var diagnostics = new DiagnosticBag();
         var source = """
-            §M{m001:TaintCounters}
-              §F{f001:Identity:pub} (i32:value) -> i32
+            §M{TaintCounters}
+              §F{Identity:pub} (i32:value) -> i32
                 §R value
-              §F{f002:Caller:pub} (i32:value) -> i32
-                §WH{w001} (> value INT:0)
+              §F{Caller:pub} (i32:value) -> i32
+                §WH (> value INT:0)
                   §B{copy:i32} §C{Identity} §A value §/C
                   §R copy
                 §R INT:0

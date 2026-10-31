@@ -9,9 +9,9 @@ public class InteropHintAnalyzerTests
     public void AnalyzeInteropBlocks_WithNoInteropBlocks_ReturnsEmpty()
     {
         var calorSource = """
-            §M{m1:TestModule}
-            §CL{c1:Calculator:pub}
-              §MT{m1:Add:pub}
+            §M{TestModule}
+            §CL{Calculator:pub}
+              §MT{Add:pub}
                 §I{i32:a}
                 §I{i32:b}
                 §O{i32}
@@ -210,9 +210,9 @@ public class InteropHintAnalyzerTests
     public void AnalyzeInteropBlocks_MultipleBlocks_AnalyzesAll()
     {
         var calorSource =
-            "§CL{c1:Test:pub}\n" +
+            "§CL{Test:pub}\n" +
             "§CSHARP{foreach (var item in items) { }}§/CSHARP\n" +
-            "§MT{m1:Foo:pub}\n  §O{void}\n§/MT\n" +
+            "§MT{Foo:pub}\n  §O{void}\n§/MT\n" +
             "§CSHARP{switch (x) { case 1: break; }}§/CSHARP\n" +
             "§/CL";
 

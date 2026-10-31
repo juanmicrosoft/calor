@@ -472,7 +472,7 @@ public class LintRegressionTests
 
         Assert.True(parseSuccess);
         // Phase 4b: indent form has no closer; the opener alone proves the empty module.
-        Assert.Contains("§M{m1:Empty}", formatted);
+        Assert.Contains("§M{Empty}", formatted);
     }
 
     [Fact]
@@ -484,9 +484,9 @@ public class LintRegressionTests
         Assert.True(parseSuccess);
 
         // Should have multiple levels of nesting
-        Assert.Contains("§IF{i1}", formatted);
-        Assert.Contains("§IF{i2}", formatted);
-        Assert.Contains("§IF{i3}", formatted);
+        Assert.Contains("§IF", formatted);
+        Assert.Contains("§IF", formatted);
+        Assert.Contains("§IF", formatted);
     }
 
     #endregion

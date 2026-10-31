@@ -17,8 +17,8 @@ public class BenchmarkRunnerTests
     {
         // Arrange
         var runner = new BenchmarkRunner();
-        var calor = @"§M{m001:Test}
-  §F{f001:Hello:pub}
+        var calor = @"§M{Test}
+  §F{Hello:pub}
       §O{void}";
         var csharp = @"namespace Test { public class TestModule { public void Hello() { } } }";
 

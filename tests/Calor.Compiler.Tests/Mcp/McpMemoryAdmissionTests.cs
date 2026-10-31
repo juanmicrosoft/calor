@@ -33,7 +33,7 @@ public class McpMemoryAdmissionTests
             {
                 "name": "calor_compile",
                 "arguments": {
-                    "source": "§M{m001:Test}\n§F{f001:Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n"
+                    "source": "§M{Test}\n§F{Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n"
                 }
             }
             """).RootElement

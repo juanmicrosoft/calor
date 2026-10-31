@@ -128,10 +128,10 @@ public class ImportReviewPacketEnvelopeTests : IDisposable
     {
         var path = Path.Combine(_tempDir, "pricing.calr");
         File.WriteAllText(path,
-            "§M{m001:Pricing}\n"
-            + "  §F{f001:ClampToCap:pub} (i32:amount, i32:cap) -> i32\n"
+            "§M{Pricing}\n"
+            + "  §F{ClampToCap:pub} (i32:amount, i32:cap) -> i32\n"
             + "    §Q (>= cap 0)\n"
-            + "    §IF{if1} (> amount cap)\n"
+            + "    §IF (> amount cap)\n"
             + "      §R cap\n"
             + "    §R amount\n");
         return path;
@@ -213,11 +213,11 @@ public class ImportReviewPacketEnvelopeTests : IDisposable
         var path = Path.Combine(_tempDir, "eject.calr");
         var outputPath = Path.Combine(_tempDir, "eject.out.cs");
         File.WriteAllText(path,
-            "§M{m001:Pricing}\n"
-            + "  §F{f001:ClampToCap:pub} (i32:amount, i32:cap) -> i32\n"
+            "§M{Pricing}\n"
+            + "  §F{ClampToCap:pub} (i32:amount, i32:cap) -> i32\n"
             + "    §Q (>= cap 0)\n"
             + "    §S (<= result cap)\n"
-            + "    §IF{if1} (> amount cap)\n"
+            + "    §IF (> amount cap)\n"
             + "      §R cap\n"
             + "    §R amount\n");
 

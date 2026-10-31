@@ -44,7 +44,7 @@ public class SilentAcceptanceLanguageTests
         diagnostics.Errors.Select(e => e.Code).ToArray();
 
     private static string Fn(string body, string signature = "() -> i32") =>
-        "§M{m1:T}\n  §F{f1:Run:pub} " + signature + "\n" +
+        "§M{T}\n  §F{Run:pub} " + signature + "\n" +
         string.Join("\n", body.Split('\n').Select(line => "    " + line)) + "\n";
 
     // ===================================================================
@@ -52,26 +52,26 @@ public class SilentAcceptanceLanguageTests
     // ===================================================================
 
     [Theory]
-    [InlineData("§MT{m2:A:bogus} () -> i32")]
-    [InlineData("§MT{m2:A:prv} () -> i32")]
-    [InlineData("§MT{m2:A:i32} () -> i32")]
+    [InlineData("§MT{A:bogus} () -> i32")]
+    [InlineData("§MT{A:prv} () -> i32")]
+    [InlineData("§MT{A:i32} () -> i32")]
     public void Parser_UnknownMethodVisibility_IsCalor0122ListingValidWords(string header)
     {
-        Parse($"§M{{m1:V}}\n  §CL{{c1:K:pub}}\n    {header}\n      §R 1\n", out var diagnostics);
+        Parse($"§M{{V}}\n  §CL{{K:pub}}\n    {header}\n      §R 1\n", out var diagnostics);
 
         var error = Assert.Single(diagnostics.Errors, e => e.Code == DiagnosticCode.UnknownVisibility);
         Assert.Contains("pub, int, prot, priv, prot-int, priv-prot", error.Message);
     }
 
     [Theory]
-    [InlineData("§F{f1:Run:bogus} () -> i32\n    §R 1")]
-    [InlineData("§CL{c1:K:pub}\n    §FLD{i32:x:bogus}")]
-    [InlineData("§CL{c1:K:pub}\n    §CTOR{ctor1:bogus}")]
-    [InlineData("§CL{c1:K:pub}\n    §PROP{p1:X:i32:bogus:get}")]
-    [InlineData("§CL{c1:K:pub}\n    §EVT{e1:Click:bogus:EventHandler}")]
+    [InlineData("§F{Run:bogus} () -> i32\n    §R 1")]
+    [InlineData("§CL{K:pub}\n    §FLD{i32:x:bogus}")]
+    [InlineData("§CL{K:pub}\n    §CTOR{bogus}")]
+    [InlineData("§CL{K:pub}\n    §PROP{X:i32:bogus:get}")]
+    [InlineData("§CL{K:pub}\n    §EVT{Click:bogus:EventHandler}")]
     public void Parser_UnknownVisibility_IsRejectedOnEveryDeclarationKind(string member)
     {
-        Parse($"§M{{m1:V}}\n  {member}\n", out var diagnostics);
+        Parse($"§M{{V}}\n  {member}\n", out var diagnostics);
 
         Assert.Contains(DiagnosticCode.UnknownVisibility, ErrorCodes(diagnostics));
     }
@@ -85,7 +85,7 @@ public class SilentAcceptanceLanguageTests
     [InlineData("priv-prot", Visibility.PrivateProtected)]
     public void Parser_EveryValidVisibilityWord_ParsesToItsLevel(string word, Visibility expected)
     {
-        var module = Parse($"§M{{m1:V}}\n  §CL{{c1:K:pub}}\n    §MT{{m2:A:{word}}} () -> i32\n      §R 1\n", out var diagnostics);
+        var module = Parse($"§M{{V}}\n  §CL{{K:pub}}\n    §MT{{m2:A:{word}}} () -> i32\n      §R 1\n", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(e => e.Message)));
         Assert.Equal(expected, module.Classes.Single().Methods.Single().Visibility);
@@ -104,42 +104,41 @@ public class SilentAcceptanceLanguageTests
     [InlineData("Priv")]
     public void Parser_VisibilitySynonymsAndCaseVariants_AreErrors(string word)
     {
-        Parse($"§M{{m1:V}}\n  §CL{{c1:K:pub}}\n    §MT{{m2:A:{word}}} () -> i32\n      §R 1\n",
+        Parse($"§M{{V}}\n  §CL{{K:pub}}\n    §MT{{m2:A:{word}}} () -> i32\n      §R 1\n",
             out var diagnostics);
         Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnknownVisibility);
     }
 
     // Review round 1: compact headers must not swallow an unknown visibility word.
     [Theory]
-    [InlineData("§MT{Run:prv} () -> i32\n      §R 1")]
-    [InlineData("§MT{Run:prv:virt} () -> i32\n      §R 1")]
-    [InlineData("§MT{Run:prv:} () -> i32\n      §R 1")]
+    [InlineData("§MT{prv} () -> i32\n      §R 1")]
+    [InlineData("§MT{prv:virt} () -> i32\n      §R 1")]
+    [InlineData("§MT{prv:} () -> i32\n      §R 1")]
     [InlineData("§CTOR{prv}")]
     public void Parser_CompactHeaderWithUnknownVisibility_IsCalor0122(string member)
     {
-        Parse($"§M{{m1:V}}\n  §CL{{c1:K:pub}}\n    {member}\n", out var diagnostics);
+        Parse($"§M{{V}}\n  §CL{{K:pub}}\n    {member}\n", out var diagnostics);
 
         Assert.Contains(DiagnosticCode.UnknownVisibility, ErrorCodes(diagnostics));
     }
 
     [Theory]
-    [InlineData("§MT{m1:Run:bogus} () -> i32")]
-    [InlineData("§MT{m1:Run:priv} () -> i32")]
-    [InlineData("§MT{Run:prv} () -> i32")]
+    [InlineData("§MT{Run:bogus} () -> i32")]
+    [InlineData("§MT{Run:priv} () -> i32")]
+    [InlineData("§MT{prv} () -> i32")]
     public void Parser_InterfaceMethodNonPublicOrUnknownVisibility_IsCalor0122(string member)
     {
-        Parse($"§M{{m1:V}}\n  §IFACE{{i1:IRun}}\n    {member}\n", out var diagnostics);
+        Parse($"§M{{V}}\n  §IFACE{{IRun}}\n    {member}\n", out var diagnostics);
 
         Assert.Contains(DiagnosticCode.UnknownVisibility, ErrorCodes(diagnostics));
     }
 
     [Theory]
-    [InlineData("§MT{m1:Run} () -> i32")]
-    [InlineData("§MT{m1:Run:pub} () -> i32")]
+    [InlineData("§MT{Run} () -> i32")]
     [InlineData("§MT{Run:pub} () -> i32")]
     public void Parser_InterfaceMethodPublicOrOmittedVisibility_Parses(string member)
     {
-        var module = Parse($"§M{{m1:V}}\n  §IFACE{{i1:IRun}}\n    {member}\n", out var diagnostics);
+        var module = Parse($"§M{{V}}\n  §IFACE{{IRun}}\n    {member}\n", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(e => e.Message)));
         Assert.Equal("Run", module.Interfaces.Single().Methods.Single().Name);
@@ -148,18 +147,18 @@ public class SilentAcceptanceLanguageTests
     [Fact]
     public void Parser_CompactAbstractMethodWithUnknownVisibility_IsCalor0122()
     {
-        Parse("§M{m1:V}\n  §CL{c1:K:pub:abs}\n    §AMT{Run:prv} () -> i32\n", out var diagnostics);
+        Parse("§M{V}\n  §CL{K:pub:abs}\n    §AMT{prv} () -> i32\n", out var diagnostics);
 
         Assert.Contains(DiagnosticCode.UnknownVisibility, ErrorCodes(diagnostics));
     }
 
     [Theory]
     [InlineData("§MT{Run:pub} () -> i32\n      §R 1", "Run", Visibility.Public)]
-    [InlineData("§MT{m2:Run} () -> i32\n      §R 1", "Run", Visibility.Private)]
+    [InlineData("§MT{Run} () -> i32\n      §R 1", "Run", Visibility.Private)]
     [InlineData("§MT{Run:prot:virt} () -> i32\n      §R 1", "Run", Visibility.Protected)]
     public void Parser_CompactMethodHeaders_PositiveControls(string member, string name, Visibility visibility)
     {
-        var module = Parse($"§M{{m1:V}}\n  §CL{{c1:K:pub}}\n    {member}\n", out var diagnostics);
+        var module = Parse($"§M{{V}}\n  §CL{{K:pub}}\n    {member}\n", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(e => e.Message)));
         var method = module.Classes.Single().Methods.Single();
@@ -170,7 +169,7 @@ public class SilentAcceptanceLanguageTests
     [Fact]
     public void Parser_ModifierInVisibilitySlot_PointsAtTheModifierField()
     {
-        Parse("§M{m1:V}\n  §CL{c1:K:pub:abs}\n    §MT{m2:A:abs} () -> i32\n", out var diagnostics);
+        Parse("§M{V}\n  §CL{K:pub:abs}\n    §MT{A:abs} () -> i32\n", out var diagnostics);
 
         var error = Assert.Single(diagnostics.Errors, e => e.Code == DiagnosticCode.UnknownVisibility);
         Assert.Contains("':pub:abs'", error.Message);
@@ -179,7 +178,7 @@ public class SilentAcceptanceLanguageTests
     [Fact]
     public void Parser_OmittedVisibility_StillDefaultsWithoutDiagnostic()
     {
-        var module = Parse("§M{m1:V}\n  §CL{c1:K:pub}\n    §FLD{i32:x}\n    §MT{m2:A} () -> i32\n      §R 1\n", out var diagnostics);
+        var module = Parse("§M{V}\n  §CL{K:pub}\n    §FLD{i32:x}\n    §MT{A} () -> i32\n      §R 1\n", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(e => e.Message)));
         Assert.Equal(Visibility.Private, module.Classes.Single().Fields.Single().Visibility);
@@ -188,7 +187,7 @@ public class SilentAcceptanceLanguageTests
     [Fact]
     public void Parser_CompactEventHeader_AsDocumented_Parses()
     {
-        var module = Parse("§M{m1:V}\n  §CL{c1:K:pub}\n    §EVT{Click:pub:EventHandler}\n", out var diagnostics);
+        var module = Parse("§M{V}\n  §CL{K:pub}\n    §EVT{Click:pub:EventHandler}\n", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(e => e.Message)));
         var evt = module.Classes.Single().Events.Single();
@@ -200,7 +199,7 @@ public class SilentAcceptanceLanguageTests
     [Fact]
     public void Emitter_ProtectedShortForm_EmitsProtectedNotPrivate()
     {
-        var result = Compile("§M{m1:V}\n  §CL{c1:K:pub}\n    §MT{m2:A:prot} () -> i32\n      §R 1\n");
+        var result = Compile("§M{V}\n  §CL{K:pub}\n    §MT{A:prot} () -> i32\n      §R 1\n");
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors.Select(e => e.Message)));
         Assert.Contains("protected int A()", result.GeneratedCode);
@@ -314,9 +313,9 @@ public class SilentAcceptanceLanguageTests
     [InlineData("§B{x} 1\n§ASSIGN x (+ x 1)\n§R x")]
     [InlineData("§B{x:i32} 1\n§B{y} (inc x)\n§R x")]
     [InlineData("§B{x:i32} 1\n§B{y} (post-dec x)\n§R x")]
-    [InlineData("§L{l1:i:0:3:1}\n  §ASSIGN i 5\n§R 0")]
-    [InlineData("§L{l1:i:0:3:1}\n  §B{~i:i32} 9\n§R 0")]
-    [InlineData("§L{l1:i:0:3:1}\n  §B{y} (inc i)\n§R 0")]
+    [InlineData("§L{i:0:3:1}\n  §ASSIGN i 5\n§R 0")]
+    [InlineData("§L{i:0:3:1}\n  §B{~i:i32} 9\n§R 0")]
+    [InlineData("§L{i:0:3:1}\n  §B{y} (inc i)\n§R 0")]
     public void Binder_WriteToReadOnlyLocal_IsCalor0213(string body)
     {
         var diagnostics = Bind(Fn(body));
@@ -327,7 +326,7 @@ public class SilentAcceptanceLanguageTests
     // Review round 1: statements the binder does not bind still may not write a read-only local.
     [Theory]
     [InlineData("§B{x:i32} 1\n§PP{DEBUG}\n  §ASSIGN x 2\n§R x")]
-    [InlineData("§L{l1:i:0:3:1}\n  §PP{DEBUG}\n    §ASSIGN i 5\n§R 0")]
+    [InlineData("§L{i:0:3:1}\n  §PP{DEBUG}\n    §ASSIGN i 5\n§R 0")]
     // #1678: `§B{x} 1` then `§PP` `§B{~x} 2` is now bound, so it is Calor0260 like the same
     // rebind outside §PP (PreprocessorBindingTests.Binder_MutableRebindOfPreprocessorImmutableBinding_IsCalor0260).
     [InlineData("§E{mut}\n§B{x:i32} 1\n§B{~xs:List<i32>} §NEW{List<i32>}\n§PUSH{xs} (inc x)\n§R x")]
@@ -341,9 +340,9 @@ public class SilentAcceptanceLanguageTests
     // Review round 2: tuple targets, and locals declared inside an unbound statement.
     [Theory]
     [InlineData("§B{x:i32} 1\n§B{~y:i32} 2\n§ASSIGN (x, y) (3, 4)\n§R x")]
-    [InlineData("§B{~y:i32} 2\n§L{l1:i:0:3:1}\n  §ASSIGN (y, i) (3, 4)\n§R y")]
+    [InlineData("§B{~y:i32} 2\n§L{i:0:3:1}\n  §ASSIGN (y, i) (3, 4)\n§R y")]
     [InlineData("§PP{DEBUG}\n  §B{z:i32} 1\n  §ASSIGN z 2\n§R 0")]
-    [InlineData("§PP{DEBUG}\n  §L{l1:j:0:3:1}\n    §ASSIGN j 2\n§R 0")]
+    [InlineData("§PP{DEBUG}\n  §L{j:0:3:1}\n    §ASSIGN j 2\n§R 0")]
     [InlineData("§B{x:i32} 1\n§PP{DEBUG}\n  §ASSIGN (x, x) (2, 3)\n§R x")]
     public void Binder_TupleAndNestedDeclarationWrites_AreCalor0213(string body)
     {
@@ -463,7 +462,7 @@ public class SilentAcceptanceLanguageTests
     [InlineData("§B{~x} 1\n§ASSIGN x (+ x 1)\n§R x")]
     [InlineData("§B{~x:i32} 1\n§B{y} (inc x)\n§R x")]
     [InlineData("§B{~x:i32} 1\n§B{~x} 5\n§R x")]
-    [InlineData("§B{~s} 0\n§L{l1:i:0:3:1}\n  §ASSIGN s (+ s i)\n§R s")]
+    [InlineData("§B{~s} 0\n§L{i:0:3:1}\n  §ASSIGN s (+ s i)\n§R s")]
     [InlineData("§LIST{xs:i32}\n  1\n§ASSIGN xs xs\n§R 0")]
     public void Binder_WritesToMutableLocals_AreAccepted(string body)
     {
@@ -481,16 +480,16 @@ public class SilentAcceptanceLanguageTests
     }
 
     private static string WithBump(string callerBody, string modifier) =>
-        "§M{m1:T}\n" +
-        $"  §F{{f0:Bump:pub}} (i32:v:{modifier}) -> void\n" +
+        "§M{T}\n" +
+        $"  §F{{Bump:pub}} (i32:v:{modifier}) -> void\n" +
         (modifier == "in" ? "    §R\n" : "    §ASSIGN v 1\n") +
-        "  §F{f1:Run:pub} () -> i32\n" +
+        "  §F{Run:pub} () -> i32\n" +
         string.Join("\n", callerBody.Split('\n').Select(line => "    " + line)) + "\n";
 
     [Theory]
     [InlineData("§B{v:i32} 1\n§C{Bump} §A{ref} v §/C\n§R v", "ref")]
     [InlineData("§B{v:i32} 1\n§C{Bump} §A{out} v §/C\n§R v", "out")]
-    [InlineData("§L{l1:i:0:3:1}\n  §C{Bump} §A{ref} i §/C\n§R 0", "ref")]
+    [InlineData("§L{i:0:3:1}\n  §C{Bump} §A{ref} i §/C\n§R 0", "ref")]
     public void Binder_RefOrOutOfReadOnlyLocal_IsCalor0213(string body, string modifier)
     {
         var diagnostics = Bind(WithBump(body, modifier));
@@ -608,8 +607,8 @@ public class SilentAcceptanceLanguageTests
     public static IEnumerable<object[]> CliCases() => new[]
     {
         new object[] { "assign-immutable", Fn("§B{x:i32} 1\n§ASSIGN x 2\n§R x"), "Calor0213" },
-        new object[] { "assign-loop-var", Fn("§L{l1:i:0:3:1}\n  §ASSIGN i 5\n§R 0"), "Calor0213" },
-        new object[] { "unknown-visibility", "§M{m1:V}\n  §CL{c1:K:pub}\n    §MT{m2:A:bogus} () -> i32\n      §R 1\n", "Calor0122" },
+        new object[] { "assign-loop-var", Fn("§L{i:0:3:1}\n  §ASSIGN i 5\n§R 0"), "Calor0213" },
+        new object[] { "unknown-visibility", "§M{V}\n  §CL{K:pub}\n    §MT{A:bogus} () -> i32\n      §R 1\n", "Calor0122" },
         new object[] { "extra-operand", Fn("§R (contains s \"@\" 3)", "(str:s) -> bool"), "Calor0110" },
         new object[] { "type-first-header", Fn("§B{W:t} default\n§R 1"), "Calor0123" },
     };

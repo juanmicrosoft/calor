@@ -32,19 +32,19 @@ public sealed class LoopDiscoveryRollbackTests
     public void SymbolsById_KeepsDeclarationOrderAcrossLoopDiscovery()
     {
         var bound = Bind("""
-            §M{m1:Order}
-              §F{f1:Run:pub} (i32:n) -> i32
+            §M{Order}
+              §F{Run:pub} (i32:n) -> i32
                 §B{~total:i32} 0
-                §L{l1:i:0:n:1}
+                §L{i:0:n:1}
                   §B{step:i32} (+ i 1)
                   §B{dup:i32} step
                   §ASSIGN total (+ total step)
-                §WH{w1} (< total 10)
+                §WH (< total 10)
                   §B{inner:i32} 1
                   §ASSIGN total (+ total inner)
                 §B{after:i32} total
                 §R after
-              §F{f2:Other:pub} () -> i32
+              §F{Other:pub} () -> i32
                 §B{x:i32} 1
                 §R x
             """);
@@ -72,15 +72,15 @@ public sealed class LoopDiscoveryRollbackTests
     public void NestedLoops_DoNotLeakDiscoveryDeclarationIds()
     {
         var bound = Bind("""
-            §M{m1:Nested}
-              §F{f1:Run:pub} (i32:n) -> i32
+            §M{Nested}
+              §F{Run:pub} (i32:n) -> i32
                 §B{~total:i32} 0
-                §L{l1:i:0:n:1}
+                §L{i:0:n:1}
                   §B{a:i32} i
-                  §L{l2:j:0:n:1}
+                  §L{j:0:n:1}
                     §B{a2:i32} (+ a j)
                     §ASSIGN total (+ total a2)
-                §L{l3:k:0:n:1}
+                §L{k:0:n:1}
                   §B{a:i32} k
                   §ASSIGN total (+ total a)
                 §R total

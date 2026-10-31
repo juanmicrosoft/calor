@@ -21,7 +21,7 @@ public class StaticModuleActiveInputTests
             if (row!["kind"]!.GetValue<string>() != "calor")
                 continue;
             var source = row["source"]!.AsArray();
-            if (source.Any(line => line!.GetValue<string>().Contains("§CL{c1:K:pub:stat}", StringComparison.Ordinal)))
+            if (source.Any(line => line!.GetValue<string>().Contains("§CL{K:pub:stat}", StringComparison.Ordinal)))
             {
                 Assert.Equal("D1-NULL-10", row["id"]!.GetValue<string>());
                 MigrateLines(source);
@@ -69,7 +69,7 @@ public class StaticModuleActiveInputTests
     {
         var (expected, actual) = Transcripts("W1-F6-rescue");
         var native = expected["mcp-convert"]!["calorSource"]!.GetValue<string>();
-        Assert.Contains("§PROP{p002:Count:i32:priv:stat}", native);
+        Assert.Contains("§PROP{Count:i32:priv:stat}", native);
         Assert.DoesNotContain("§CSHARP", native);
         Assert.Contains("§CSHARP", expected["cli-convert"]!["calor"]!.GetValue<string>());
         expected["cli-convert"]!["calor"] = native.Replace("m001:ConvertedModule:", "m001:Counter:", StringComparison.Ordinal);

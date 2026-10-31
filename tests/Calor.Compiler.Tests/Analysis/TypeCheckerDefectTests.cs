@@ -49,7 +49,7 @@ public class TypeCheckerDefectTests
     {
         // Every one of these is in docs/syntax-reference/types.md. `Unknown type 'u32'` for a
         // documented type is the checker contradicting the language reference.
-        AssertNoErrors($"§M{{m:S}}\n  §F{{f:Do:pub}} ({type}:x) -> void\n    §E{{}}\n    §R\n");
+        AssertNoErrors($"§M{{S}}\n  §F{{Do:pub}} ({type}:x) -> void\n    §E{{}}\n    §R\n");
     }
 
     /// <summary>
@@ -72,7 +72,7 @@ public class TypeCheckerDefectTests
     [InlineData("f32")]
     public void DocumentedPrimitiveTypes_AreCheckedNotJustAccepted(string type)
     {
-        var result = Check($"§M{{m:S}}\n  §F{{f:Do:pub}} () -> void\n    §E{{}}\n    §B{{x:{type}}} BOOL:true\n    §R\n");
+        var result = Check($"§M{{S}}\n  §F{{Do:pub}} () -> void\n    §E{{}}\n    §B{{x:{type}}} BOOL:true\n    §R\n");
 
         var error = Assert.Single(result.Diagnostics.Errors);
         Assert.Contains(type, error.Message);
@@ -87,15 +87,15 @@ public class TypeCheckerDefectTests
     public void ObjectIsATopType_NotAUniversalEscape()
     {
         // Everything assigns TO object...
-        AssertNoErrors("§M{m:S}\n  §F{f:Do:pub} () -> void\n    §E{}\n    §B{o:object} STR:\"a\"\n    §R\n");
+        AssertNoErrors("§M{S}\n  §F{Do:pub} () -> void\n    §E{}\n    §B{o:object} STR:\"a\"\n    §R\n");
 
         // ...and nothing assigns FROM it without a cast, which is what C# requires.
-        var result = Check("§M{m:S}\n  §F{f:Do:pub} (object:o) -> void\n    §E{}\n    §B{n:i32} o\n    §R\n");
+        var result = Check("§M{S}\n  §F{Do:pub} (object:o) -> void\n    §E{}\n    §B{n:i32} o\n    §R\n");
         Assert.Contains(result.Diagnostics.Errors, d => d.Message.Contains("Cannot assign"));
     }
 
     /// <summary>
-    /// A declared generic parameter is not an unknown type. `§F{f:Identity<T>:pub}` — the spelling
+    /// A declared generic parameter is not an unknown type. `§F{Identity<T>:pub}` — the spelling
     /// the shipped sample and the docs use — leaves `<T>` embedded in the function NAME rather
     /// than in `TypeParameters`, so the checker warned that a correct construct might be a typo,
     /// three times per parameter.
@@ -103,14 +103,14 @@ public class TypeCheckerDefectTests
     [Fact]
     public void DeclaredGenericParameter_IsNotWarnedAbout()
     {
-        var result = Check("§M{m:S}\n  §F{f001:Identity<T>:pub} (T:value) -> T\n    §R value\n");
+        var result = Check("§M{S}\n  §F{Identity<T>:pub} (T:value) -> T\n    §R value\n");
         Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("is not known"));
     }
 
     /// <summary>PUSH must stay silent on a receiver the checker cannot model, like its siblings.</summary>
     [Fact]
     public void PushOnUnmodeledReceiver_IsNotAnError()
-        => AssertNoErrors("§M{m:S}\n  §F{f:Do:pub} (SomeUnknownBag:items) -> void\n    §E{mut}\n    §PUSH{items} INT:1\n    §R\n");
+        => AssertNoErrors("§M{S}\n  §F{Do:pub} (SomeUnknownBag:items) -> void\n    §E{mut}\n    §PUSH{items} INT:1\n    §R\n");
 
     [Theory]
     [InlineData("[str]")]   // the collection-literal spelling in the syntax reference
@@ -118,7 +118,7 @@ public class TypeCheckerDefectTests
     [InlineData("str[]")]
     public void ArrayTypes_Resolve(string type)
     {
-        AssertNoErrors($"§M{{m:S}}\n  §F{{f:Do:pub}} ({type}:xs) -> void\n    §E{{}}\n    §R\n");
+        AssertNoErrors($"§M{{S}}\n  §F{{Do:pub}} ({type}:xs) -> void\n    §E{{}}\n    §R\n");
     }
 
     /// <summary>
@@ -132,7 +132,7 @@ public class TypeCheckerDefectTests
     public void ArrayTypes_RejectMismatchedElements(string paramType, string bindType)
     {
         var result = Check(
-            $"§M{{m:S}}\n  §F{{f:Do:pub}} ({paramType}:xs) -> void\n    §E{{}}\n    §B{{a:{bindType}}} xs\n    §R\n");
+            $"§M{{S}}\n  §F{{Do:pub}} ({paramType}:xs) -> void\n    §E{{}}\n    §B{{a:{bindType}}} xs\n    §R\n");
 
         Assert.Contains(result.Diagnostics.Errors, d => d.Message.Contains("Cannot assign"));
     }
@@ -152,7 +152,7 @@ public class TypeCheckerDefectTests
     [InlineData("Strng")]   // ...and one that looks external, which a case heuristic would miss
     public void UnresolvedType_IsWarnedAboutNotSilentlyAccepted(string type)
     {
-        var result = Check($"§M{{m:S}}\n  §F{{f:Do:pub}} () -> void\n    §E{{}}\n    §B{{x:{type}}} STR:\"a\"\n    §R\n");
+        var result = Check($"§M{{S}}\n  §F{{Do:pub}} () -> void\n    §E{{}}\n    §B{{x:{type}}} STR:\"a\"\n    §R\n");
 
         Assert.False(result.HasErrors);
         Assert.Contains(result.Diagnostics.Warnings, d => d.Message.Contains($"'{type}' is not known"));
@@ -163,7 +163,7 @@ public class TypeCheckerDefectTests
     public void DecimalMixedWithFloat_IsRejected()
     {
         var result = Check(
-            "§M{m:S}\n  §F{f:Do:pub} (decimal:d, f64:x) -> void\n    §E{}\n    §B{r:decimal} (+ d x)\n    §R\n");
+            "§M{S}\n  §F{Do:pub} (decimal:d, f64:x) -> void\n    §E{}\n    §B{r:decimal} (+ d x)\n    §R\n");
 
         Assert.Contains(result.Diagnostics.Errors, d => d.Message.Contains("decimal"));
     }
@@ -177,10 +177,10 @@ public class TypeCheckerDefectTests
     [Fact]
     public void SwitchExpressionPatternVariable_IsBound()
         => AssertNoErrors("""
-            §M{m:S}
-              §F{f:Do:pub} (i32:diff) -> i32
+            §M{S}
+              §F{Do:pub} (i32:diff) -> i32
                 §E{}
-                §B{result:i32} §W{sw1:expr} diff
+                §B{result:i32} §W diff
                   §K §VAR{d} §WHEN (> d 0) → d
                   §K _ → 0
                 §R result
@@ -194,8 +194,8 @@ public class TypeCheckerDefectTests
     [Fact]
     public void SetIndexOnArray_IsAccepted()
         => AssertNoErrors("""
-            §M{m:S}
-              §F{f:Do:pub} (i32[]:xs, i32:i, i32:v) -> i32
+            §M{S}
+              §F{Do:pub} (i32[]:xs, i32:i, i32:v) -> i32
                 §E{mut}
                 §SETIDX{xs} i v
                 §R INT:0
@@ -210,7 +210,7 @@ public class TypeCheckerDefectTests
     [Fact]
     public void SizedType_MismatchEchoesTheWrittenWidth()
     {
-        var result = Check("§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{x:i64} STR:\"a\"\n    §R INT:0\n");
+        var result = Check("§M{S}\n  §F{Do:pub} () -> i32\n    §B{x:i64} STR:\"a\"\n    §R INT:0\n");
 
         var error = Assert.Single(result.Diagnostics.Errors);
         Assert.Contains("i64", error.Message);
@@ -225,7 +225,7 @@ public class TypeCheckerDefectTests
     /// </summary>
     [Fact]
     public void StringConcatenation_IsNotAnArithmeticError()
-        => AssertNoErrors("§M{m:S}\n  §F{f:Do:pub} () -> str\n    §E{}\n    §R (+ STR:\"hello\" STR:\"world\")\n");
+        => AssertNoErrors("§M{S}\n  §F{Do:pub} () -> str\n    §E{}\n    §R (+ STR:\"hello\" STR:\"world\")\n");
 
     // ---- References the checker mistook for variables ----
 
@@ -238,7 +238,7 @@ public class TypeCheckerDefectTests
     {
         // These are member accesses the emitter passes through to C# verbatim. Reporting them as
         // undefined VARIABLES rejected code that compiles and runs.
-        var result = Check($"§M{{m:S}}\n  §F{{f:Do:pub}} () -> void\n    §E{{}}\n    §B{{v:object}} {member}\n    §R\n");
+        var result = Check($"§M{{S}}\n  §F{{Do:pub}} () -> void\n    §E{{}}\n    §B{{v:object}} {member}\n    §R\n");
         Assert.DoesNotContain(result.Diagnostics.Errors,
             d => d.Message.Contains("Undefined variable"));
     }
@@ -247,7 +247,7 @@ public class TypeCheckerDefectTests
     [Fact]
     public void BareUnknownIdentifier_IsStillReported()
     {
-        var result = Check("§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §E{}\n    §R nonexistent_xyz\n");
+        var result = Check("§M{S}\n  §F{Do:pub} () -> i32\n    §E{}\n    §R nonexistent_xyz\n");
         Assert.Contains(result.Diagnostics.Errors,
             d => d.Message.Contains("Undefined variable 'nonexistent_xyz'"));
     }
@@ -258,17 +258,17 @@ public class TypeCheckerDefectTests
     /// The checker models no BCL surface, so an external call yields an unknown type. Reporting
     /// "IF condition must be bool, got &lt;error&gt;" turns the checker's ignorance into the
     /// user's error — and it cascades to every downstream use of the value. This exact program
-    /// shape is the MCP primer's `§M{m3:Files}` module.
+    /// shape is the MCP primer's `§M{Files}` module.
     /// </summary>
     [Fact]
     public void UnknownCallResult_DoesNotCascadeIntoAConditionError()
     {
         AssertNoErrors("""
-            §M{m:S}
-              §F{f:Do:pub} (str:path) -> i32
+            §M{S}
+              §F{Do:pub} (str:path) -> i32
                 §E{fs:r}
                 §B{ok:bool} §C{File.Exists} §A path §/C
-                §IF{i1} (== ok BOOL:true)
+                §IF (== ok BOOL:true)
                   §R INT:1
                 §R INT:0
             """);
@@ -276,7 +276,7 @@ public class TypeCheckerDefectTests
 
     [Fact]
     public void UnknownReceiver_DoesNotCascadeIntoAFieldAccessError()
-        => AssertNoErrors("§M{m:S}\n  §F{f:Do:pub} () -> void\n    §E{}\n    §B{v:object} System.Environment.NewLine\n    §R\n");
+        => AssertNoErrors("§M{S}\n  §F{Do:pub} () -> void\n    §E{}\n    §B{v:object} System.Environment.NewLine\n    §R\n");
 
     // ---- Diagnostics that belong to another pass ----
 
@@ -288,7 +288,7 @@ public class TypeCheckerDefectTests
     [Fact]
     public void BareBinding_ReportsCalor0250_NotTheCheckersOwnTypeMismatch()
     {
-        var result = Check("§M{m:S}\n  §F{f:Do:pub} () -> void\n    §E{}\n    §B{x}\n    §R\n");
+        var result = Check("§M{S}\n  §F{Do:pub} () -> void\n    §E{}\n    §B{x}\n    §R\n");
 
         Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.BindRequiresTypeOrInitializer);
         Assert.DoesNotContain(result.Diagnostics.Errors,
@@ -303,7 +303,7 @@ public class TypeCheckerDefectTests
     [Fact]
     public void RefinementWithUnknownBaseType_IsStillAnError()
     {
-        var result = Check("§M{m:S}\n  §RTYPE{r1:MyType:nonexistent_type_xyz} (>= # INT:0)\n");
+        var result = Check("§M{S}\n  §RTYPE{MyType:nonexistent_type_xyz} (>= # INT:0)\n");
         Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.RefinementUndefinedBaseType);
     }
     /// <summary>
@@ -316,12 +316,12 @@ public class TypeCheckerDefectTests
     public void ModuleDeclaredTypes_AreNotReportedAsUnknown()
     {
         var result = Check("""
-            §M{m001:ClsTest}
-              §CL{c001:Point:pub}
+            §M{ClsTest}
+              §CL{Point:pub}
                 §FLD{i32:X:pub}
-                §CTOR{ctor1:pub} (i32:x)
+                §CTOR{pub} (i32:x)
                   §ASSIGN X x
-              §F{f001:Use:pub} () -> void
+              §F{Use:pub} () -> void
                 §E{}
                 §B{p:Point} §NEW{Point} §A INT:3 §/NEW
                 §R
@@ -337,7 +337,7 @@ public class TypeCheckerDefectTests
     [Fact]
     public void UndeclaredType_IsStillReported()
     {
-        var result = Check("§M{m:S}\n  §F{f:Do:pub} () -> void\n    §E{}\n    §B{x:NoSuchTypeXyz} STR:\"a\"\n    §R\n");
+        var result = Check("§M{S}\n  §F{Do:pub} () -> void\n    §E{}\n    §B{x:NoSuchTypeXyz} STR:\"a\"\n    §R\n");
         Assert.Contains(result.Diagnostics, d => d.Message.Contains("'NoSuchTypeXyz' is not known"));
     }
 
@@ -351,15 +351,15 @@ public class TypeCheckerDefectTests
     public void PreprocessorWrappedAndNestedDeclarations_AreNotReportedAsUnknown()
     {
         var result = Check("""
-            §M{m001:PpTest}
+            §M{PpTest}
               §PP{DEBUG}
-                §CL{c001:Dbg:pub}
+                §CL{Dbg:pub}
                   §FLD{i32:N:pub}
               §/PP{DEBUG}
-              §CL{c002:Outer:pub}
-                §CL{c003:Inner:pub}
+              §CL{Outer:pub}
+                §CL{Inner:pub}
                   §FLD{i32:M:pub}
-              §F{f001:Use:pub} (Dbg:d) -> void
+              §F{Use:pub} (Dbg:d) -> void
                 §E{}
                 §B{i:Outer.Inner}
                 §R
@@ -379,11 +379,11 @@ public class TypeCheckerDefectTests
     public void BareNestedTypeName_IsStillReported()
     {
         var result = Check("""
-            §M{m001:NestTest}
-              §CL{c002:Outer:pub}
-                §CL{c003:Inner:pub}
+            §M{NestTest}
+              §CL{Outer:pub}
+                §CL{Inner:pub}
                   §FLD{i32:M:pub}
-              §F{f001:Use:pub} () -> void
+              §F{Use:pub} () -> void
                 §E{}
                 §B{i:Inner}
                 §R
@@ -405,10 +405,10 @@ public class TypeCheckerDefectTests
     public void RefinementBaseNamingAModuleClass_DoesNotAlsoWarnUnknownType()
     {
         var result = Check("""
-            §M{m001:RtBase}
-              §CL{c001:Money:pub}
+            §M{RtBase}
+              §CL{Money:pub}
                 §FLD{i32:V:pub}
-              §RTYPE{r001:PosMoney:Money} (> # INT:0)
+              §RTYPE{PosMoney:Money} (> # INT:0)
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("'Money' is not known"));
@@ -427,11 +427,11 @@ public class TypeCheckerDefectTests
     public void TwoRefinementsSharingAClassName_IsStillADuplicate()
     {
         var result = Check("""
-            §M{m001:Dup2}
-              §CL{c001:Positive:pub}
+            §M{Dup2}
+              §CL{Positive:pub}
                 §FLD{i32:V:pub}
-              §RTYPE{r001:Positive:i32} (> # INT:0)
-              §RTYPE{r002:Positive:i32} (> # INT:1)
+              §RTYPE{Positive:i32} (> # INT:0)
+              §RTYPE{Positive:i32} (> # INT:1)
             """);
 
         Assert.Contains(result.Diagnostics, d => d.Message.Contains("Duplicate refinement type name 'Positive'"));
@@ -445,9 +445,9 @@ public class TypeCheckerDefectTests
     public void IndexedTypeDeclaration_IsNotReportedAsUnknown()
     {
         const string src = """
-            §M{m001:ItypeTest}
-              §ITYPE{it1:NonEmptyList:List:n} (> # INT:0)
-              §F{f001:Use:pub} (NonEmptyList:a) -> void
+            §M{ItypeTest}
+              §ITYPE{NonEmptyList:List:n} (> # INT:0)
+              §F{Use:pub} (NonEmptyList:a) -> void
                 §E{}
                 §R
             """;
@@ -472,11 +472,11 @@ public class TypeCheckerDefectTests
     public void RefinementType_KeepsItsName_AgainstASameNamedClass()
     {
         var result = Check("""
-            §M{m001:RtTest}
-              §CL{c001:Positive:pub}
+            §M{RtTest}
+              §CL{Positive:pub}
                 §FLD{i32:V:pub}
-              §RTYPE{r001:Positive:i32} (> # INT:0)
-              §F{f001:Use:pub} () -> void
+              §RTYPE{Positive:i32} (> # INT:0)
+              §F{Use:pub} () -> void
                 §E{}
                 §R
             """);

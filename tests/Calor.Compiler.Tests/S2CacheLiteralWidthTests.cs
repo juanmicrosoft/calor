@@ -22,8 +22,8 @@ namespace Calor.Compiler.Tests;
 public sealed class S2CacheLiteralWidthTests : IDisposable
 {
     private const string IntSource = """
-        §M{m1:R1Case:overflow=unchecked}
-          §F{f1:Probe:pub} (i32:x) -> i32
+        §M{R1Case:overflow=unchecked}
+          §F{Probe:pub} (i32:x) -> i32
             §E{}
             §Q (== x INT:2147483647)
             §S (> (+ x INT:1) INT:0)
@@ -31,8 +31,8 @@ public sealed class S2CacheLiteralWidthTests : IDisposable
         """;
 
     private const string LongSource = """
-        §M{m1:R1Case:overflow=unchecked}
-          §F{f1:Probe:pub} (i32:x) -> i32
+        §M{R1Case:overflow=unchecked}
+          §F{Probe:pub} (i32:x) -> i32
             §E{}
             §Q (== x INT:2147483647)
             §S (> (+ x LONG:1) INT:0)
@@ -235,8 +235,8 @@ public sealed class S2CacheLiteralWidthTests : IDisposable
     private static ExpressionNode ParsePostcondition(string literal)
     {
         var source = $$"""
-            §M{m1:M}
-              §F{f1:P:pub} (i64:x) -> i32
+            §M{M}
+              §F{P:pub} (i64:x) -> i32
                 §E{}
                 §S (> x {{literal}})
                 §R INT:0

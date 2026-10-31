@@ -186,8 +186,8 @@ public class BinderControlValueFamilyTests
         // fallback is a real latent bug (it is about WHEN it executes, not WHETHER the
         // expression is wrong) — Of() includes it, and the finding fires.
         const string source = @"
-§M{m001:Test}
-  §F{f001:Trap:pub} (?i32:x) -> i32
+§M{Test}
+  §F{Trap:pub} (?i32:x) -> i32
     §R (?? x (/ 10 0))";
 
         var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
@@ -302,9 +302,9 @@ public class BinderControlValueFamilyTests
         // The fix skips IsParameter symbols in use detection (function parameters are
         // seeded Initialized at entry, so this drops no true finding).
         const string source = """
-            §M{m001:Test}
-              §F{f001:Probe:pub} (List<i32>:items) -> i32
-                §B{n:i32} §C{items.Count} §A §LAM{lam001:y:i32} (> y 0) §/LAM{lam001} §/C
+            §M{Test}
+              §F{Probe:pub} (List<i32>:items) -> i32
+                §B{n:i32} §C{items.Count} §A §LAM{y:i32} (> y 0) §/LAM §/C
                 §R n
             """;
 

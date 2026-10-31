@@ -63,8 +63,8 @@ public class GoldenFileTests
     public void Golden_DivisionByLiteralZero_ProducesError()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DivByZero:pub}
+§M{Test}
+  §F{DivByZero:pub}
       §I{i32:x}
       §O{i32}
       §R (/ x INT:0)";
@@ -89,8 +89,8 @@ public class GoldenFileTests
     public void Golden_ModuloByLiteralZero_ProducesError()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:ModByZero:pub}
+§M{Test}
+  §F{ModByZero:pub}
       §I{i32:x}
       §O{i32}
       §R (% x INT:0)";
@@ -115,8 +115,8 @@ public class GoldenFileTests
     public void Golden_DivisionByUncheckedParameter_ProducesWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:UncheckedDiv:pub}
+§M{Test}
+  §F{UncheckedDiv:pub}
       §I{i32:x}
       §I{i32:divisor}
       §O{i32}
@@ -142,8 +142,8 @@ public class GoldenFileTests
     public void Golden_DivisionByNonZeroConstant_NoDiagnostic()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeDiv:pub}
+§M{Test}
+  §F{SafeDiv:pub}
       §I{i32:x}
       §O{i32}
       §R (/ x INT:7)";
@@ -168,12 +168,12 @@ public class GoldenFileTests
     public void Golden_DivisionWithNotEqualZeroGuard_NoDiagnostic()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:GuardedDiv:pub}
+§M{Test}
+  §F{GuardedDiv:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
-      §IF{if1} (!= y INT:0)
+      §IF (!= y INT:0)
           §R (/ x y)
       §R INT:0";
 
@@ -205,8 +205,8 @@ public class GoldenFileTests
     public void Golden_MultipleDivisionsUnchecked_ProducesMultipleWarnings()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:MultiDiv:pub}
+§M{Test}
+  §F{MultiDiv:pub}
       §I{i32:a}
       §I{i32:b}
       §I{i32:c}
@@ -242,8 +242,8 @@ public class GoldenFileTests
     public void Golden_NoTaintSources_NoVulnerabilities()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeArith:pub}
+§M{Test}
+  §F{SafeArith:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -266,8 +266,8 @@ public class GoldenFileTests
     public void Golden_ConstantsOnly_NoVulnerabilities()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Constants:pub}
+§M{Test}
+  §F{Constants:pub}
       §O{i32}
       §B{a:i32} INT:1
       §B{b:i32} INT:2
@@ -393,8 +393,8 @@ public class GoldenFileTests
     public void Golden_BugPatternRunner_DetectsDivisionByZero()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Buggy:pub}
+§M{Test}
+  §F{Buggy:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -419,8 +419,8 @@ public class GoldenFileTests
     public void Golden_BugPatternRunner_SafeCode_NoErrors()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Safe:pub}
+§M{Test}
+  §F{Safe:pub}
       §I{i32:x}
       §O{i32}
       §B{y:i32} (+ x INT:1)
@@ -447,8 +447,8 @@ public class GoldenFileTests
     public void Golden_BugPatternRunner_MultipleBugs_AllDetected()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:MultiBug:pub}
+§M{Test}
+  §F{MultiBug:pub}
       §I{i32:a}
       §I{i32:b}
       §I{i32:c}
@@ -485,8 +485,8 @@ public class GoldenFileTests
     public void Golden_VerificationPass_SimpleFunction_Completes()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Simple:pub}
+§M{Test}
+  §F{Simple:pub}
       §I{i32:x}
       §O{i32}
       §R (+ x INT:1)";
@@ -509,8 +509,8 @@ public class GoldenFileTests
     public void Golden_VerificationPass_BuggyFunction_DetectsBug()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Buggy:pub}
+§M{Test}
+  §F{Buggy:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -534,16 +534,16 @@ public class GoldenFileTests
     public void Golden_VerificationPass_MultipleFunctions_AllAnalyzed()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Func1:pub}
+§M{Test}
+  §F{Func1:pub}
       §I{i32:x}
       §O{i32}
       §R x
-  §F{f002:Func2:pub}
+  §F{Func2:pub}
       §I{i32:y}
       §O{i32}
       §R (+ y INT:1)
-  §F{f003:Func3:pub}
+  §F{Func3:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -579,7 +579,7 @@ public class GoldenFileTests
     public void Golden_EmptyModule_NoCrash()
     {
         var source = @"
-§M{m001:Test}";
+§M{Test}";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -599,8 +599,8 @@ public class GoldenFileTests
     public void Golden_DeeplyNestedExpression_Completes()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Nested:pub}
+§M{Test}
+  §F{Nested:pub}
       §I{i32:x}
       §O{i32}
       §R (+ (+ (+ (+ x INT:1) INT:2) INT:3) INT:4)";
@@ -623,8 +623,8 @@ public class GoldenFileTests
     public void Golden_DivisionInNestedExpression_Detected()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:NestedDiv:pub}
+§M{Test}
+  §F{NestedDiv:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -648,8 +648,8 @@ public class GoldenFileTests
     public void Golden_MultipleBindings_AllChecked()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:MultiBinds:pub}
+§M{Test}
+  §F{MultiBinds:pub}
       §I{i32:divisor1}
       §I{i32:divisor2}
       §I{i32:divisor3}
@@ -685,13 +685,13 @@ public class GoldenFileTests
     public void Golden_BugInThenBranch_Detected()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:ThenBug:pub}
+§M{Test}
+  §F{ThenBug:pub}
       §I{i32:x}
       §I{i32:y}
       §I{bool:cond}
       §O{i32}
-      §IF{if1} cond
+      §IF cond
           §R (/ x y)
       §EL
           §R INT:0";
@@ -714,13 +714,13 @@ public class GoldenFileTests
     public void Golden_BugInElseBranch_Detected()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:ElseBug:pub}
+§M{Test}
+  §F{ElseBug:pub}
       §I{i32:x}
       §I{i32:y}
       §I{bool:cond}
       §O{i32}
-      §IF{if1} cond
+      §IF cond
           §R INT:0
       §EL
           §R (/ x y)";
@@ -743,14 +743,14 @@ public class GoldenFileTests
     public void Golden_BugsInBothBranches_BothDetected()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:BothBugs:pub}
+§M{Test}
+  §F{BothBugs:pub}
       §I{i32:x}
       §I{i32:y}
       §I{i32:z}
       §I{bool:cond}
       §O{i32}
-      §IF{if1} cond
+      §IF cond
           §R (/ x y)
       §EL
           §R (/ x z)";
@@ -777,13 +777,13 @@ public class GoldenFileTests
     public void Golden_BugInLoopBody_Detected()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:LoopBug:pub}
+§M{Test}
+  §F{LoopBug:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
       §B{result:i32} INT:0
-      §L{l1:i:0:10:1}
+      §L{i:0:10:1}
           §B{temp:i32} (/ x y)
       §R result";
 
@@ -811,8 +811,8 @@ public class GoldenFileTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:PrecondDiv:pub}
+§M{Test}
+  §F{PrecondDiv:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -847,8 +847,8 @@ public class GoldenFileTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:LiteralZero:pub}
+§M{Test}
+  §F{LiteralZero:pub}
       §I{i32:x}
       §O{i32}
       §R (/ x INT:0)";

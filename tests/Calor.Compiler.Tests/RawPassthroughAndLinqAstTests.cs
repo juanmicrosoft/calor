@@ -61,8 +61,8 @@ public class RawPassthroughAndLinqAstTests
     public void Parser_RawBlock_CreatesRawCSharpNode()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §RAW
       var query = from x in items
@@ -81,8 +81,8 @@ public class RawPassthroughAndLinqAstTests
     public void CSharpEmitter_RawBlock_EmitsContentVerbatim()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §RAW
       var query = from x in items
@@ -99,7 +99,7 @@ public class RawPassthroughAndLinqAstTests
     public void Parser_RawBlock_PreservesCSharpSyntaxCharacters()
     {
         // Verify that C# syntax characters (braces, semicolons, etc.) pass through
-        var source = "§M{m1:Test}\n§F{f1:Main:pub}\n  §O{void}\n  §RAW\n  if (x > 0) { Console.WriteLine(x); }\n  §/RAW\n\n\n";
+        var source = "§M{Test}\n§F{Main:pub}\n  §O{void}\n  §RAW\n  if (x > 0) { Console.WriteLine(x); }\n  §/RAW\n\n\n";
         var csharp = ParseAndEmit(source);
         Assert.Contains("if (x > 0)", csharp);
         Assert.Contains("Console.WriteLine", csharp);

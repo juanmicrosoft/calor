@@ -18,11 +18,11 @@ public class WeakeningCheckCliTests : IDisposable
     private readonly string _tempDir;
 
     private const string FrozenSource = """
-        §M{m001:Quotes}
-          §F{f003:QuoteWithSurcharge:pub} (i32:baseAmount, i32:surcharge, i32:cap) -> i32
+        §M{Quotes}
+          §F{QuoteWithSurcharge:pub} (i32:baseAmount, i32:surcharge, i32:cap) -> i32
             §S (&& (<= result cap) (>= result 0))
             §B{total:i32} (+ baseAmount surcharge)
-            §IF{if1} (> total cap)
+            §IF (> total cap)
               §R cap
             §R total
         """;
@@ -195,8 +195,8 @@ public class WeakeningCheckCliTests : IDisposable
     public void WideLiteral_WeakeningIsDeterminate()
     {
         const string bigFrozen = """
-            §M{m001:Big}
-              §F{f009:B:pub} (i64:a) -> i64
+            §M{Big}
+              §F{B:pub} (i64:a) -> i64
                 §S (&& (>= result 0) (<= result 4000000000))
                 §R a
             """;
@@ -259,7 +259,7 @@ public class WeakeningCheckCliTests : IDisposable
     public void UnparseableFinal_WeakenedByRule()
     {
         var frozen = WriteFile("frozen.calr", FrozenSource);
-        var final_ = WriteFile("final.calr", "§M{m001:Quotes}\n  §F{f003:Broken:pub} (i32:a) -> i32\n    §R (+ a\n");
+        var final_ = WriteFile("final.calr", "§M{Quotes}\n  §F{Broken:pub} (i32:a) -> i32\n    §R (+ a\n");
 
         var (exit, json, _, _) = RunCheck(frozen, final_, "f003");
 

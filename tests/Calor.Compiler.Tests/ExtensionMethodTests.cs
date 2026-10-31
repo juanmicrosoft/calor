@@ -163,8 +163,8 @@ public class ExtensionMethodTests
     {
         // §I{string:input:this} — third position is semantic/modifier
         var source = """
-            §M{m1:TestModule}
-                §F{f1:Reverse:pub}
+            §M{TestModule}
+                §F{Reverse:pub}
                     §I{string:input:this}
                     §O{string}
                     §R input

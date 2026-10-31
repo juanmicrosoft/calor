@@ -109,10 +109,10 @@ public sealed class ArrayAllocationAnnotationTests
             _ => throw new ArgumentOutOfRangeException(nameof(boundary))
         };
         var source = $$"""
-            §M{m:AllocatedArray}
-              §F{take:Take:pub} ([str]:value) -> void
+            §M{AllocatedArray}
+              §F{Take:pub} ([str]:value) -> void
                 §E{}
-              §F{probe:Probe:pub} (i32:count) -> {{(boundary == "return" ? "[str]" : "void")}}
+              §F{Probe:pub} (i32:count) -> {{(boundary == "return" ? "[str]" : "void")}}
                 §E{alloc}
                 §B{ {{binding}} } §ARR{ {{element}} :values:{{size}} }
                 {{sink}}
@@ -179,12 +179,12 @@ public sealed class ArrayAllocationAnnotationTests
             _ => "§C{Take} §A values §/C"
         };
         var source = $$"""
-            §M{m:NullableArray}
-              §F{take:Take:pub} ([str]:value) -> void
+            §M{NullableArray}
+              §F{Take:pub} ([str]:value) -> void
                 §E{}
-              §F{probe:Probe:pub} ({{(initializedLocal ? "" : $"{type}:values")}}) -> {{(boundary == "return" ? "[str]" : "void")}}
+              §F{Probe:pub} ({{(initializedLocal ? "" : $"{type}:values")}}) -> {{(boundary == "return" ? "[str]" : "void")}}
                 §E{alloc}
-            {{(initializedLocal ? $"    §B{{values:{type}}} §ARR{{str:values:3}}" : "")}}
+            {{(initializedLocal ? $"    §B{{values:{type}}} §ARR{{values:3}}" : "")}}
                 {{sink}}
             """;
         var result = Program.Compile(source, "nullable-array.calr");

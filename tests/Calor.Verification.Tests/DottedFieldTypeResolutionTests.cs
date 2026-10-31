@@ -12,38 +12,38 @@ namespace Calor.Verification.Tests;
 public sealed class DottedFieldTypeResolutionTests
 {
     private const string Source = """
-        §M{m001:DottedFields}
-          §CL{o001:Outer:pub:partial}
-            §CL{b001:Base:pub:partial}
+        §M{DottedFields}
+          §CL{Outer:pub:partial}
+            §CL{Base:pub:partial}
               §FLD{i64:Wide:pub}
               §FLD{i16:Hidden:priv}
-          §CL{o002:Outer:pub:partial}
-            §CL{b002:Base:pub:partial}
+          §CL{Outer:pub:partial}
+            §CL{Base:pub:partial}
               §FLD{u8:Small:int}
-            §CL{d001:Derived:Base}
+            §CL{Derived:Base}
               §FLD{bool:Own:priv}
-          §F{f001:WideBoundary:pub} (Outer.Derived:item) -> bool
+          §F{WideBoundary:pub} (Outer.Derived:item) -> bool
             §S (>= item.Wide INT:-2147483648)
             §R true
-          §F{f002:SmallBoundary:pub} (Outer.Derived:item) -> bool
+          §F{SmallBoundary:pub} (Outer.Derived:item) -> bool
             §S (&& (>= item.Small INT:0) (<= item.Small INT:255))
             §R true
-          §F{f003:MissingBoundary:pub} (Outer.Derived:item) -> bool
+          §F{MissingBoundary:pub} (Outer.Derived:item) -> bool
             §S (>= item.Missing INT:-2147483648)
             §R true
         """;
 
     private const string ProductionSource = """
-        §M{m001:DottedProduction}
-          §CL{b001:Base:pub}
+        §M{DottedProduction}
+          §CL{Base:pub}
             §FLD{i64:Wide:pub}
             §FLD{u8:Small:pub}
-          §CL{d001:Derived:Base}
+          §CL{Derived:Base}
             §FLD{bool:Own:priv}
-          §F{f001:WideBoundary:pub} (Derived:item) -> bool
+          §F{WideBoundary:pub} (Derived:item) -> bool
             §S (>= item.Wide INT:-2147483648)
             §R true
-          §F{f002:SmallBoundary:pub} (Derived:item) -> bool
+          §F{SmallBoundary:pub} (Derived:item) -> bool
             §S (&& (>= item.Small INT:0) (<= item.Small INT:255))
             §R true
         """;
@@ -172,9 +172,9 @@ public sealed class DottedFieldTypeResolutionTests
             .Verify(module);
 
         var wide = Assert.Single(
-            result.GetFunctionResult("f001")!.PostconditionResults);
+            result.GetFunctionResult(module.Functions.Single(f => f.Name == "WideBoundary").Id)!.PostconditionResults);
         var small = Assert.Single(
-            result.GetFunctionResult("f002")!.PostconditionResults);
+            result.GetFunctionResult(module.Functions.Single(f => f.Name == "SmallBoundary").Id)!.PostconditionResults);
         Assert.Equal(ProofStatus.Refuted, wide.EffectiveOutcome.Status);
         Assert.Equal(ProofStatus.Assumed, small.EffectiveOutcome.Status);
         Assert.DoesNotContain(

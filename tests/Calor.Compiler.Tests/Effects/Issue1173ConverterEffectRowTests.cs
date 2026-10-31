@@ -319,8 +319,8 @@ public class Issue1173ConverterEffectRowTests
     {
         var module = Parse(
             """
-            §M{m001:RoundTrip}
-              §F{f001:Run:pub} () -> void
+            §M{RoundTrip}
+              §F{Run:pub} () -> void
                 §B{buffer} §NEW{List<i32>} §/NEW
                 §P "done"
             """);
@@ -350,8 +350,8 @@ public class Issue1173ConverterEffectRowTests
     {
         var module = Parse(
             """
-            §M{m001:Widen}
-              §F{f001:Run:pub} () -> void
+            §M{Widen}
+              §F{Run:pub} () -> void
                 §E{fs:w}
                 §P "done"
             """);

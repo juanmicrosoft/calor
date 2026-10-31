@@ -34,8 +34,8 @@ public sealed class S2NestedQuantifierTests : IDisposable
     }
 
     private static string Nested(string comparison) => $$"""
-        §M{m1:R1Case}
-          §F{f1:Probe:pub} (i8:n) -> i32
+        §M{R1Case}
+          §F{Probe:pub} (i8:n) -> i32
             §E{}
             §Q (&& (> n INT:0) (< n INT:12))
             §S (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (forall ((j i32)) (-> (&& (>= j INT:0) (< j n)) {{comparison}}))))
@@ -71,8 +71,8 @@ public sealed class S2NestedQuantifierTests : IDisposable
     public void Control_SingleBoundedForall_StillProven()
     {
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:pub} (i8:n) -> i32
+            §M{M}
+              §F{Probe:pub} (i8:n) -> i32
                 §E{}
                 §Q (&& (> n INT:0) (< n INT:12))
                 §S (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (< i INT:29)))
@@ -121,10 +121,10 @@ public sealed class S2NestedQuantifierTests : IDisposable
     public void NestedQuantifierProofObligation_IsUnsupported()
     {
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:priv} (i32:n) -> i32
+            §M{M}
+              §F{Probe:priv} (i32:n) -> i32
                 §E{}
-                §PROOF{p1:claim} (forall ((i i32)) (-> (&& (>= i INT:0) (< i INT:3)) (forall ((j i32)) (-> (&& (>= j INT:0) (< j INT:3)) (< (- i j) INT:5)))))
+                §PROOF{claim} (forall ((i i32)) (-> (&& (>= i INT:0) (< i INT:3)) (forall ((j i32)) (-> (&& (>= j INT:0) (< j INT:3)) (< (- i j) INT:5)))))
                 §R INT:0
             """;
         var options = new CompilationOptions

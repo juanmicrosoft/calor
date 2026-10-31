@@ -85,10 +85,10 @@ public class RefOutImplementationTests
     public void GenericRefCall_InvalidatesPotentiallyAliasedNarrowing(string step, bool keepsNarrowing)
     {
         var errors = Errors($$"""
-              §F{g1:Keep<T>:pub} (T:value:ref) -> void
+              §F{Keep<T>:pub} (T:value:ref) -> void
                 §ASSIGN value value
-              §F{g2:Check:pub} (?str:a:ref, ?str:b:ref) -> i32
-                §IF{i1} (!= a null)
+              §F{Check:pub} (?str:a:ref, ?str:b:ref) -> i32
+                §IF (!= a null)
                   {{step}}
                   §B{str:z} a
                   §R (len z)
@@ -112,16 +112,16 @@ public class RefOutImplementationTests
     }
 
     private const string Prelude = """
-        §M{m1:P}
-          §F{f0:Bump:pub} (i32:x:ref) -> void
+        §M{P}
+          §F{Bump:pub} (i32:x:ref) -> void
             §ASSIGN x (+ x 1)
-          §F{f9:SetOut:pub} (i32:x:out) -> void
+          §F{SetOut:pub} (i32:x:out) -> void
             §ASSIGN x 7
-          §F{f6:SetNeg:pub} (i32:x:out) -> void
+          §F{SetNeg:pub} (i32:x:out) -> void
             §ASSIGN x -5
-          §F{f8:Twice:pub} (i32:x:in) -> i32
+          §F{Twice:pub} (i32:x:in) -> i32
             §R (* x 2)
-          §F{f7:Id:pub} (i32:x) -> i32
+          §F{Id:pub} (i32:x) -> i32
             §R x
 
         """;
@@ -140,52 +140,52 @@ public class RefOutImplementationTests
     // Each refusal (Calor0212) next to the closest accepted form: the operand rule, not the call, decides.
     [Theory]
     [InlineData("property",
-        "  §CL{c1:K:pub}\n    §PROP{p1:N:i32:pub}\n      §GET\n      §SET\n    §MT{m1:Run:pub} () -> void\n      §C{Bump} §A{ref} N §/C",
-        "  §CL{c1:K:pub}\n    §FLD{i32:N:pub}\n    §MT{m1:Run:pub} () -> void\n      §C{Bump} §A{ref} N §/C")]
+        "  §CL{K:pub}\n    §PROP{N:i32:pub}\n      §GET\n      §SET\n    §MT{Run:pub} () -> void\n      §C{Bump} §A{ref} N §/C",
+        "  §CL{K:pub}\n    §FLD{i32:N:pub}\n    §MT{Run:pub} () -> void\n      §C{Bump} §A{ref} N §/C")]
     [InlineData("static readonly field outside its static constructor",
-        "  §M{c1:K:pub}\n    §FLD{i32:n:pub:stat,readonly}\n    §MT{m1:Run:pub:stat} () -> void\n      §C{Bump} §A{ref} n §/C",
-        "  §M{c1:K:pub}\n    §FLD{i32:n:pub:stat,readonly}\n    §MT{m1:Run:pub:stat} () -> i32\n      §R §C{Twice} §A{in} n §/C")]
+        "  §M{K:pub}\n    §FLD{i32:n:pub:stat,readonly}\n    §MT{Run:pub:stat} () -> void\n      §C{Bump} §A{ref} n §/C",
+        "  §M{K:pub}\n    §FLD{i32:n:pub:stat,readonly}\n    §MT{Run:pub:stat} () -> i32\n      §R §C{Twice} §A{in} n §/C")]
     [InlineData("in parameter passed as ref",
-        "  §F{f1:Run:pub} (i32:p:in) -> void\n    §C{Bump} §A{ref} p §/C",
-        "  §F{f1:Run:pub} (i32:p:in) -> i32\n    §R §C{Twice} §A{in} p §/C")]
+        "  §F{Run:pub} (i32:p:in) -> void\n    §C{Bump} §A{ref} p §/C",
+        "  §F{Run:pub} (i32:p:in) -> i32\n    §R §C{Twice} §A{in} p §/C")]
     [InlineData("call result",
-        "  §F{f1:Run:pub} () -> void\n    §C{Bump} §A{ref} §C{Twice} §A{in} 3 §/C §/C",
-        "  §F{f1:Run:pub} () -> void\n    §B{~v:i32} §C{Id} §A 3 §/C\n    §C{Bump} §A{ref} v §/C")]
+        "  §F{Run:pub} () -> void\n    §C{Bump} §A{ref} §C{Twice} §A{in} 3 §/C §/C",
+        "  §F{Run:pub} () -> void\n    §B{~v:i32} §C{Id} §A 3 §/C\n    §C{Bump} §A{ref} v §/C")]
     [InlineData("list indexer element",
-        "  §F{f1:Run:pub} (List<i32>:xs) -> void\n    §E{mut}\n    §C{Bump} §A{ref} §IDX{xs} 0 §/C",
-        "  §F{f1:Run:pub} (i32[]:xs) -> void\n    §E{mut}\n    §C{Bump} §A{ref} §IDX{xs} 0 §/C")]
+        "  §F{Run:pub} (List<i32>:xs) -> void\n    §E{mut}\n    §C{Bump} §A{ref} §IDX{xs} 0 §/C",
+        "  §F{Run:pub} (i32[]:xs) -> void\n    §E{mut}\n    §C{Bump} §A{ref} §IDX{xs} 0 §/C")]
     [InlineData("field of an in struct parameter",
-        "  §CL{s1:S:pub:struct}\n    §FLD{i32:X:pub}\n  §F{f1:Run:pub} (S:s:in) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.X §/C",
-        "  §CL{s1:S:pub:struct}\n    §FLD{i32:X:pub}\n  §F{f1:Run:pub} (S:s:ref) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.X §/C")]
+        "  §CL{S:pub:struct}\n    §FLD{i32:X:pub}\n  §F{Run:pub} (S:s:in) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.X §/C",
+        "  §CL{S:pub:struct}\n    §FLD{i32:X:pub}\n  §F{Run:pub} (S:s:ref) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.X §/C")]
     [InlineData("non-generic indexer element",
-        "  §F{f1:Run:pub} (System.Collections.ArrayList:xs) -> void\n    §E{mut}\n    §C{SetOut} §A{out} §IDX{xs} 0 §/C",
-        "  §F{f1:Run:pub} (i32[]:xs) -> void\n    §E{mut}\n    §C{SetOut} §A{out} §IDX{xs} 0 §/C")]
+        "  §F{Run:pub} (System.Collections.ArrayList:xs) -> void\n    §E{mut}\n    §C{SetOut} §A{out} §IDX{xs} 0 §/C",
+        "  §F{Run:pub} (i32[]:xs) -> void\n    §E{mut}\n    §C{SetOut} §A{out} §IDX{xs} 0 §/C")]
     [InlineData("scalar metadata property",
-        "  §F{f1:Run:pub} (str:s) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.Length §/C",
-        "  §F{f1:Run:pub} (str:s) -> void\n    §E{mut}\n    §B{~n:i32} s.Length\n    §C{Bump} §A{ref} n §/C")]
+        "  §F{Run:pub} (str:s) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.Length §/C",
+        "  §F{Run:pub} (str:s) -> void\n    §E{mut}\n    §B{~n:i32} s.Length\n    §C{Bump} §A{ref} n §/C")]
     [InlineData("readonly intermediate field of a struct path",
-        "  §CL{s1:Inner:pub:struct}\n    §FLD{i32:Y:pub}\n  §CL{s2:Outer:pub:struct}\n    §FLD{Inner:X:pub:readonly}\n  §F{f1:Run:pub} (Outer[]:a) -> void\n    §E{mut}\n    §C{Bump} §A{ref} (§IDX{a} 0).X.Y §/C",
-        "  §CL{s1:Inner:pub:struct}\n    §FLD{i32:Y:pub}\n  §CL{s2:Outer:pub:struct}\n    §FLD{Inner:X:pub}\n  §F{f1:Run:pub} (Outer[]:a) -> void\n    §E{mut}\n    §C{Bump} §A{ref} (§IDX{a} 0).X.Y §/C")]
+        "  §CL{Inner:pub:struct}\n    §FLD{i32:Y:pub}\n  §CL{Outer:pub:struct}\n    §FLD{Inner:X:pub:readonly}\n  §F{Run:pub} (Outer[]:a) -> void\n    §E{mut}\n    §C{Bump} §A{ref} (§IDX{a} 0).X.Y §/C",
+        "  §CL{Inner:pub:struct}\n    §FLD{i32:Y:pub}\n  §CL{Outer:pub:struct}\n    §FLD{Inner:X:pub}\n  §F{Run:pub} (Outer[]:a) -> void\n    §E{mut}\n    §C{Bump} §A{ref} (§IDX{a} 0).X.Y §/C")]
     [InlineData("readonly field of another instance in a constructor",
-        "  §CL{c1:K:pub}\n    §FLD{i32:n:pub:readonly}\n    §CTOR{ct1:pub} (K:other)\n      §C{Bump} §A{ref} other.n §/C",
-        "  §CL{c1:K:pub}\n    §FLD{i32:n:pub:readonly}\n    §CTOR{ct1:pub} (K:other)\n      §C{Bump} §A{ref} n §/C")]
+        "  §CL{K:pub}\n    §FLD{i32:n:pub:readonly}\n    §CTOR{pub} (K:other)\n      §C{Bump} §A{ref} other.n §/C",
+        "  §CL{K:pub}\n    §FLD{i32:n:pub:readonly}\n    §CTOR{pub} (K:other)\n      §C{Bump} §A{ref} n §/C")]
     // Codex round 3: a readonly field reached through a struct path, a property at the end of
     // one, a metadata constant, and a two-index indexer.
     [InlineData("readonly field at the end of a dotted struct path",
-        "  §CL{s1:Inner:pub:struct}\n    §FLD{i32:N:pub:readonly}\n  §CL{s2:Outer:pub:struct}\n    §FLD{Inner:F:pub}\n  §F{f1:Run:pub} (Outer:s) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.F.N §/C",
-        "  §CL{s1:Inner:pub:struct}\n    §FLD{i32:N:pub}\n  §CL{s2:Outer:pub:struct}\n    §FLD{Inner:F:pub}\n  §F{f1:Run:pub} (Outer:s) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.F.N §/C")]
+        "  §CL{Inner:pub:struct}\n    §FLD{i32:N:pub:readonly}\n  §CL{Outer:pub:struct}\n    §FLD{Inner:F:pub}\n  §F{Run:pub} (Outer:s) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.F.N §/C",
+        "  §CL{Inner:pub:struct}\n    §FLD{i32:N:pub}\n  §CL{Outer:pub:struct}\n    §FLD{Inner:F:pub}\n  §F{Run:pub} (Outer:s) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.F.N §/C")]
     [InlineData("metadata constant",
-        "  §F{f1:Run:pub} () -> void\n    §C{Bump} §A{ref} Int32.MaxValue §/C",
-        "  §F{f1:Run:pub} () -> void\n    §B{~m:i32} Int32.MaxValue\n    §C{Bump} §A{ref} m §/C")]
+        "  §F{Run:pub} () -> void\n    §C{Bump} §A{ref} Int32.MaxValue §/C",
+        "  §F{Run:pub} () -> void\n    §B{~m:i32} Int32.MaxValue\n    §C{Bump} §A{ref} m §/C")]
     [InlineData("readonly reference-typed field in an in struct",
-        "  §CL{c1:Box:pub}\n    §FLD{i32:N:pub:readonly}\n  §CL{s1:S:pub:struct}\n    §FLD{Box:B:pub}\n  §F{f1:Run:pub} (S:s:in) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.B.N §/C",
-        "  §CL{c1:Box:pub}\n    §FLD{i32:N:pub}\n  §CL{s1:S:pub:struct}\n    §FLD{Box:B:pub}\n  §F{f1:Run:pub} (S:s:in) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.B.N §/C")]
+        "  §CL{Box:pub}\n    §FLD{i32:N:pub:readonly}\n  §CL{S:pub:struct}\n    §FLD{Box:B:pub}\n  §F{Run:pub} (S:s:in) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.B.N §/C",
+        "  §CL{Box:pub}\n    §FLD{i32:N:pub}\n  §CL{S:pub:struct}\n    §FLD{Box:B:pub}\n  §F{Run:pub} (S:s:in) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.B.N §/C")]
     [InlineData("two-index indexer element (Codex R3-5)",
-        "  §CL{c1:Grid:pub}\n    §IXER{ix1:i32:pub}\n      §I{i32:r}\n      §I{i32:c}\n      §GET\n        §R 1\n  §F{f1:Run:pub} (Grid:g) -> void\n    §E{mut}\n    §C{Bump} §A{ref} §IDX2D g 0 0 §/C",
-        "  §F{f1:Run:pub} (i32[,]:g) -> void\n    §E{mut}\n    §C{Bump} §A{ref} §IDX2D g 0 0 §/C")]
+        "  §CL{Grid:pub}\n    §IXER{i32:pub}\n      §I{i32:r}\n      §I{i32:c}\n      §GET\n        §R 1\n  §F{Run:pub} (Grid:g) -> void\n    §E{mut}\n    §C{Bump} §A{ref} §IDX2D g 0 0 §/C",
+        "  §F{Run:pub} (i32[,]:g) -> void\n    §E{mut}\n    §C{Bump} §A{ref} §IDX2D g 0 0 §/C")]
     [InlineData("discard bound to a field named _",
-        "  §CL{c1:K:pub}\n    §FLD{i32:_:pub}\n    §MT{m1:Run:pub} () -> void\n      §C{SetOut} §A{out} _ §/C",
-        "  §CL{c1:K:pub}\n    §MT{m1:Run:pub} () -> void\n      §C{SetOut} §A{out} _ §/C")]
+        "  §CL{K:pub}\n    §FLD{i32:_:pub}\n    §MT{Run:pub} () -> void\n      §C{SetOut} §A{out} _ §/C",
+        "  §CL{K:pub}\n    §MT{Run:pub} () -> void\n      §C{SetOut} §A{out} _ §/C")]
     public void InvalidOperand_IsRefusedBeforeCodegen_AndItsControlCompiles(string shape, string refused, string accepted)
     {
         Assert.True(Errors(refused).SequenceEqual(["Calor0212"]), $"{shape}: [{string.Join(", ", Errors(refused))}]");
@@ -204,9 +204,9 @@ public class RefOutImplementationTests
     public void ReceiverFieldWrite_ChargesLikeAssign(string statement, string effects, string? error)
     {
         var errors = Errors($$"""
-              §CL{c1:K:pub}
+              §CL{K:pub}
                 §FLD{i32:n:pub}
-              §F{f1:Run:pub} (K:k) -> void
+              §F{Run:pub} (K:k) -> void
                 {{effects}}
                 {{statement}}
             """);
@@ -226,14 +226,14 @@ public class RefOutImplementationTests
     public void AliasNarrowing_IsInvalidatedOnlyWhenStorageMayBeShared(string parameters, string step, bool keepsNarrowing)
     {
         var errors = Errors($$"""
-              §M{c1:K:pub}
+              §M{K:pub}
                 §FLD{?str:slot:pub:stat}
-                §MT{m1:ClearSlot:pub:stat} ()
+                §MT{ClearSlot:pub:stat} ()
                   §E{mut}
                   §ASSIGN slot null
-                §MT{m2:Check:pub:stat} {{parameters}} -> i32
+                §MT{Check:pub:stat} {{parameters}} -> i32
                   §E{mut}
-                  §IF{i1} (!= a null)
+                  §IF (!= a null)
                     {{step}}
                     §B{str:u} a
                     §R (len u)
@@ -252,13 +252,13 @@ public class RefOutImplementationTests
     public void LoopBackEdge_EndsNarrowingBeforeTheBody(string parameters, string name, string step, bool keepsNarrowing)
     {
         var errors = Errors($$"""
-              §F{f2:Clear:pub} (?str:s:ref) -> void
+              §F{Clear:pub} (?str:s:ref) -> void
                 §ASSIGN s null
-              §F{f3:Keep:pub} (?str:s) -> void
+              §F{Keep:pub} (?str:s) -> void
                 §R
-              §F{f1:Check:pub} {{parameters}} -> i32
-                §IF{i1} (!= {{name}} null)
-                  §L{l1:i:0:1:1}
+              §F{Check:pub} {{parameters}} -> i32
+                §IF (!= {{name}} null)
+                  §L{i:0:1:1}
                     §B{str:u} {{name}}
                     {{step}}
                 §R 0
@@ -273,12 +273,12 @@ public class RefOutImplementationTests
     public void OverloadedOperator_EndsAliasedNarrowing(string step, bool keepsNarrowing)
     {
         var errors = Errors($$"""
-              §CL{c001:Box:pub}
-                §OP{op001:+:pub} (Box:x, Box:y) -> Box
+              §CL{Box:pub}
+                §OP{+:pub} (Box:x, Box:y) -> Box
                   §R x
-              §M{c002:K:pub}
-                §MT{mt002:Check:pub:stat} (?str:a:ref, Box:x) -> i32
-                  §IF{if001} (!= a null)
+              §M{K:pub}
+                §MT{Check:pub:stat} (?str:a:ref, Box:x) -> i32
+                  §IF (!= a null)
                     {{step}}
                     §B{str:u} a
                     §R (len u)
@@ -291,16 +291,16 @@ public class RefOutImplementationTests
     public void UsingInALoop_EndsAliasedNarrowingAtTheBackEdge()
     {
         var errors = Errors("""
-              §CL{c001:D:pub}
+              §CL{D:pub}
                 §IMPL{System.IDisposable}
-                §MT{mt001:Dispose:pub} () -> void
+                §MT{Dispose:pub} () -> void
                   §R
-              §M{c002:K:pub}
-                §MT{mt002:Check:pub:stat} (?str:a:ref, D:d) -> i32
-                  §IF{if001} (!= a null)
-                    §L{l001:i:0:1:1}
+              §M{K:pub}
+                §MT{Check:pub:stat} (?str:a:ref, D:d) -> i32
+                  §IF (!= a null)
+                    §L{i:0:1:1}
                       §B{str:u} a
-                      §USE{use001:r} d
+                      §USE{r} d
                         §B{i32:z} 1
                   §R 0
             """);
@@ -311,7 +311,7 @@ public class RefOutImplementationTests
     [Theory]
     [InlineData("§C{Bump} §A{ref} x §/C", "Unsupported")]
     [InlineData("§C{SetNeg} §A{out} x §/C", "Unsupported")]
-    [InlineData("§IF{i9} (> x 0)\n    §C{SetNeg} §A{out} x §/C", "Unsupported")]
+    [InlineData("§IF (> x 0)\n    §C{SetNeg} §A{out} x §/C", "Unsupported")]
     [InlineData("§B{d:i32} §C{Twice} §A{in} x §/C", "Discharged")]
     [InlineData("§B{d:i32} §C{Id} §A x §/C", "Discharged")]
     public void ByReferenceWrite_NeverDischargesAStaleFact(string call, string expected)
@@ -323,10 +323,10 @@ public class RefOutImplementationTests
             VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
         };
         var errors = Errors($$"""
-              §F{f1:Run:pub} (i32:x) -> i32
+              §F{Run:pub} (i32:x) -> i32
                 §Q (> x 0)
                 {{call}}
-                §PROOF{pr1} (> x 0)
+                §PROOF{} (> x 0)
                 §R x
             """, options: options);
         Assert.Empty(errors);
@@ -344,9 +344,9 @@ public class RefOutImplementationTests
     public void DivisionByZeroChecker_DoesNotUseThePreCallValueOfARefOperand(int initial, string step, bool? guaranteed)
     {
         var result = Program.Compile(Prelude + $$"""
-              §F{f5:Zero:pub} (i32:x:ref) -> void
+              §F{Zero:pub} (i32:x:ref) -> void
                 §ASSIGN x 0
-              §F{f1:Run:pub} () -> i32
+              §F{Run:pub} () -> i32
                 §B{~d:i32} {{initial}}
                 {{step}}
                 §R (/ 10 d)
@@ -377,16 +377,16 @@ public class RefOutImplementationTests
             VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
         };
         var result = Program.Compile($$"""
-            §M{m1:P}
-              §F{f1:Run:pub} (i32:x) -> i32
+            §M{P}
+              §F{Run:pub} (i32:x) -> i32
                 {{effects}}
                 §Q (> x 0)
                 §ARR{arr:i32}
                   1
                 {{call}}
-                §PROOF{pr1} (> x 0)
+                §PROOF{} (> x 0)
                 §R x
-                §F{f2:Inc} (i32:v:ref) -> void
+                §F{Inc} (i32:v:ref) -> void
                   §ASSIGN v (+ v 1)
             """, "local.calr", options);
         var errors = result.Diagnostics.Where(d => d.IsError).Select(d => d.Code).Distinct().ToArray();
@@ -552,7 +552,7 @@ public class RefOutImplementationTests
     [Fact]
     public void HandWrittenNextLineInitializer_KeepsItsMeaning()
     {
-        var result = Program.Compile("§M{m1:P}\n  §F{f1:Run:pub} () -> i32\n    §E{}\n    §B{n:i32}\n    §C{System.Math.Abs} §A -7 §/C\n    §R n\n",
+        var result = Program.Compile("§M{P}\n  §F{Run:pub} () -> i32\n    §E{}\n    §B{n:i32}\n    §C{System.Math.Abs} §A -7 §/C\n    §R n\n",
             "next.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
         Assert.Equal("7", Run(result.GeneratedCode + "\npublic static class Probe { public static string Run() => P.PModule.Run().ToString(); }"));

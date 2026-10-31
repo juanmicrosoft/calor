@@ -47,7 +47,7 @@ public class ExtendedFeaturesTests
         Assert.Contains("///", diagnostic.Message);
         Assert.DoesNotContain(marker, SectionMarkerSuggestions.AllMarkers);
 
-        Parse($"§M{{m1:Test}}\n  §F{{f1:Run:pub}} () -> void\n    §{marker}\n", out var parsedDiagnostics);
+        Parse($"§M{{Test}}\n  §F{{Run:pub}} () -> void\n    §{marker}\n", out var parsedDiagnostics);
         Assert.Contains(parsedDiagnostics, d => d.Code == DiagnosticCode.UnknownSectionMarker
             && d.Message.Contains("///", StringComparison.Ordinal));
     }
@@ -89,8 +89,8 @@ public class ExtendedFeaturesTests
     public void Parser_ParsesInlineExample()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
+§M{Test}
+  §F{Add:pub}
       §I{i32:a} §I{i32:b}
       §O{i32}
       §EX (+ 2 3) → 5
@@ -110,8 +110,8 @@ public class ExtendedFeaturesTests
     public void Parser_ParsesExampleWithId()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
+§M{Test}
+  §F{Add:pub}
       §I{i32:a} §I{i32:b}
       §O{i32}
       §EX{ex001} (+ 2 3) → 5
@@ -129,8 +129,8 @@ public class ExtendedFeaturesTests
     public void Emitter_EmitsExampleAsDebugAssert()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
+§M{Test}
+  §F{Add:pub}
       §I{i32:a} §I{i32:b}
       §O{i32}
       §EX (+ 2 3) → 5
@@ -161,9 +161,9 @@ public class ExtendedFeaturesTests
     public void Parser_ParsesAssumeDeclaration()
     {
         var source = @"
-§M{m001:Test}
+§M{Test}
   §AS{env} ""Database connection pool initialized""
-  §F{f001:GetOrder:pub}
+  §F{GetOrder:pub}
       §AS{data} ""orderId exists in database""
       §O{i32}
       §R 42
@@ -207,8 +207,8 @@ public class ExtendedFeaturesTests
     {
         // Use quoted values for version
         var source = @"
-§M{m001:Test}
-  §F{f001:NewMethod:pub}
+§M{Test}
+  §F{NewMethod:pub}
       §SN{""1.5.0""}
       §O{i32}
       §R 42
@@ -227,8 +227,8 @@ public class ExtendedFeaturesTests
     {
         // v2 positional format: {version:replacement}
         var source = @"
-§M{m001:Test}
-  §F{f001:OldMethod:pub}
+§M{Test}
+  §F{OldMethod:pub}
       §DP{""1.5.0"":NewMethod}
       §O{i32}
       §R 42
@@ -248,8 +248,8 @@ public class ExtendedFeaturesTests
     {
         // v2 positional format: {version:replacement}
         var source = @"
-§M{m001:Test}
-  §F{f001:OldMethod:pub}
+§M{Test}
+  §F{OldMethod:pub}
       §DP{""1.5.0"":NewMethod}
       §O{i32}
       §R 42
@@ -274,8 +274,8 @@ public class ExtendedFeaturesTests
     public void PropertyQuantifier_RequiresExactCase(string quantifier, bool hasError)
     {
         var module = Parse($$"""
-            §M{m1:Properties}
-              §F{f1:Check:pub} (i32:x, i32:y) -> bool
+            §M{Properties}
+              §F{Check:pub} (i32:x, i32:y) -> bool
                 §PT {{quantifier}} x,y: (== x y)
                 §R true
             """, out var diagnostics);
@@ -299,8 +299,8 @@ public class ExtendedFeaturesTests
     public void Parser_ParsesPropertyDeclaration()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Reverse:pub}
+§M{Test}
+  §F{Reverse:pub}
       §PT (== 1 1)
       §O{i32}
       §R 42
@@ -322,10 +322,10 @@ public class ExtendedFeaturesTests
     {
         // Updated to v2 positional format
         var source = @"
-§M{m001:Demo}
+§M{Demo}
   // TODO: Add examples
 
-  §F{f001:Add:pub}
+  §F{Add:pub}
       §SN{""1.0.0""}
       §AS{data} ""Inputs are within i32 range""
       §I{i32:a} §I{i32:b}
@@ -334,7 +334,7 @@ public class ExtendedFeaturesTests
       §EX (+ 0 0) → 0
       §R (+ a b)
 
-  §F{f002:OldAdd:pub}
+  §F{OldAdd:pub}
       §SN{""0.5.0""}
       §DP{""1.0.0"":Add}
       §I{i32:x} §I{i32:y}
@@ -366,17 +366,17 @@ public class ExtendedFeaturesTests
     {
         // Updated to v2 positional format
         var source = @"
-§M{m001:Demo}
+§M{Demo}
   // TODO: Add examples
 
-  §F{f001:Add:pub}
+  §F{Add:pub}
       §SN{""1.0.0""}
       §I{i32:a} §I{i32:b}
       §O{i32}
       §EX (+ 2 3) → 5
       §R (+ a b)
 
-  §F{f002:OldAdd:pub}
+  §F{OldAdd:pub}
       §DP{""1.0.0"":Add}
       §I{i32:x} §I{i32:y}
       §O{i32}

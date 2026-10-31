@@ -70,10 +70,10 @@ public class CompilerBugFixTests
     public void Emitter_AllModuleFunctions_AreStatic()
     {
         var source = """
-            §M{m001:TestMod}
-              §F{f001:Helper:pub}
+            §M{TestMod}
+              §F{Helper:pub}
                   §O{void}
-              §F{f002:Main:pub}
+              §F{Main:pub}
                   §O{void}
             """;
 
@@ -92,8 +92,8 @@ public class CompilerBugFixTests
     public void CnfLowering_StringParameter_HasStringType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Greet:pub}
+            §M{Test}
+              §F{Greet:pub}
                   §I{string:name}
                   §O{string}
                   §R name
@@ -115,8 +115,8 @@ public class CompilerBugFixTests
     public void CnfLowering_BoolParameter_HasBoolType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Check:pub}
+            §M{Test}
+              §F{Check:pub}
                   §I{bool:flag}
                   §O{bool}
                   §R flag
@@ -136,8 +136,8 @@ public class CompilerBugFixTests
     public void CnfLowering_BindTracksType_AssignHasCorrectType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{msg:string} STR:"hello"
                   §C{Console.WriteLine}
@@ -169,8 +169,8 @@ public class CompilerBugFixTests
     public void TypeChecker_MatchExpression_NoTypeErrorForValidMatch()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Classify:pub}
+            §M{Test}
+              §F{Classify:pub}
                   §I{i32:x}
                   §O{i32}
                   §X{ma001:x}
@@ -195,7 +195,7 @@ public class CompilerBugFixTests
     /// <c>"hello" + "world"</c> is a type error. It is not: `+` on strings is CONCATENATION in
     /// Calor exactly as in the emitted C#, and `calor run` on that program prints
     /// <c>helloworld</c>. The old assertion pinned a defect — it made the opt-in checker reject a
-    /// working program, including the MCP primer's own <c>§M{m3:Files}</c> module, which
+    /// working program, including the MCP primer's own <c>§M{Files}</c> module, which
     /// <c>PrimerCompilesTests</c> requires to compile. The two tests contradicted each other and
     /// this one was wrong.
     /// </summary>
@@ -223,8 +223,8 @@ public class CompilerBugFixTests
     public void TypeChecker_IntArithmetic_NoError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Add:pub}
+            §M{Test}
+              §F{Add:pub}
                   §I{i32:a}
                   §I{i32:b}
                   §O{i32}
@@ -242,8 +242,8 @@ public class CompilerBugFixTests
     public void TypeChecker_FloatArithmetic_NoError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Add:pub}
+            §M{Test}
+              §F{Add:pub}
                   §I{f64:a}
                   §I{f64:b}
                   §O{f64}
@@ -265,8 +265,8 @@ public class CompilerBugFixTests
     public void TypeChecker_PrintStatement_NoError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §E{cw}
                   §C{Console.WriteLine}
@@ -540,8 +540,8 @@ public class CompilerBugFixTests
     public void ContractVerificationPass_EmptyContracts_NoCrash()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Simple:pub}
+            §M{Test}
+              §F{Simple:pub}
                   §O{void}
             """;
 
@@ -557,13 +557,13 @@ public class CompilerBugFixTests
     public void E2E_CompleteProgram_WithArithmetic_Compiles()
     {
         var source = """
-            §M{m001:Calculator}
-              §F{f001:Add:pub}
+            §M{Calculator}
+              §F{Add:pub}
                   §I{i32:a}
                   §I{i32:b}
                   §O{i32}
                   §R (+ a b)
-              §F{f002:Main:pub}
+              §F{Main:pub}
                   §O{void}
                   §E{cw}
                   §C{Console.WriteLine}
@@ -582,8 +582,8 @@ public class CompilerBugFixTests
     public void E2E_ProgramWithContracts_CompilesCleanly()
     {
         var source = """
-            §M{m001:Safe}
-              §F{f001:Divide:pub}
+            §M{Safe}
+              §F{Divide:pub}
                   §I{i32:a}
                   §I{i32:b}
                   §O{i32}
@@ -599,8 +599,8 @@ public class CompilerBugFixTests
     public void E2E_ArrayInitializer_Compiles()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §ARR{a001:nums:i32} INT:1 INT:2 INT:3
             """;
@@ -624,8 +624,8 @@ public class CompilerBugFixTests
         // in the Binder, but the Binder is not invoked from Program.Compile;
         // BindValidationPass wires this check into the main pipeline.
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{x}
             """;
@@ -643,8 +643,8 @@ public class CompilerBugFixTests
     {
         // §B{x:i32} (typed, no initializer) is valid — default-initializes.
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{x:i32}
             """;
@@ -661,8 +661,8 @@ public class CompilerBugFixTests
     {
         // §B{x} INT:42 (untyped, with initializer) is valid — type is inferred.
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{x} INT:42
             """;
@@ -679,11 +679,11 @@ public class CompilerBugFixTests
     {
         // The validator must recurse into nested statement bodies.
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §I{i32:n}
                   §O{void}
-                  §IF{if1} (> n INT:0)
+                  §IF (> n INT:0)
                       §B{tmp}
             """;
 
@@ -698,16 +698,16 @@ public class CompilerBugFixTests
     [Fact]
     public void BindValidation_BareBinding_InsideForBody_ReportsCalor0250()
     {
-        // The loop header is `§L{id:var:from:to:step}` — colon-delimited, so a typed literal
+        // The loop header is `§L{var:from:to:step}` — colon-delimited, so a typed literal
         // `INT:0` inside it parses `INT` as the `from` expression. The fixture used to write
         // that, and nothing noticed: the misparse was silent until the type checker started
         // reporting `Undefined variable 'INT'`. Corrected to the documented form; the §B{tmp}
         // this test is actually about is unchanged.
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
-                  §L{l1:i:0:10:1}
+                  §L{i:0:10:1}
                       §B{tmp}
             """;
 
@@ -724,8 +724,8 @@ public class CompilerBugFixTests
     {
         // A null initializer requires an explicit nullable type.
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{x} null
             """;
@@ -742,8 +742,8 @@ public class CompilerBugFixTests
     public void StrictBindInference_NullInitializer_NoStrict_DoesNotReportCalor0251()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{x} null
             """;
@@ -761,8 +761,8 @@ public class CompilerBugFixTests
     public void StrictBindInference_TypedNull_DoesNotReportCalor0251()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{x:?i32} null
             """;
@@ -779,8 +779,8 @@ public class CompilerBugFixTests
     {
         // §B{x} §C{Vec.empty} §/C is a known generic factory; strict mode flags it.
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{x} §C{Vec.empty} §/C
             """;
@@ -797,8 +797,8 @@ public class CompilerBugFixTests
     public void StrictBindInference_GenericFactoryCall_NoStrict_Compiles()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{x} §C{Vec.empty} §/C
             """;
@@ -815,8 +815,8 @@ public class CompilerBugFixTests
     {
         // (+ INT:0 FLOAT:0.0) mixes integer and float literals: ambiguous widening.
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{x} (+ INT:0 FLOAT:0.0)
             """;
@@ -833,8 +833,8 @@ public class CompilerBugFixTests
     public void StrictBindInference_AmbiguousNumeric_NoStrict_Compiles()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{x} (+ INT:0 FLOAT:0.0)
             """;
@@ -851,8 +851,8 @@ public class CompilerBugFixTests
     {
         // Same-type operands: no ambiguity, no diagnostic.
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{x} (+ INT:1 INT:2)
             """;

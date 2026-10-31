@@ -68,8 +68,8 @@ public class ContractTests
     public void Parser_ParsesRequiresContract()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
+§M{Test}
+  §F{Square:pub}
       §I{i32:x}
       §O{i32}
       §Q (>= x INT:0)
@@ -93,8 +93,8 @@ public class ContractTests
     public void Parser_ParsesEnsuresContract()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
+§M{Test}
+  §F{Square:pub}
       §I{i32:x}
       §O{i32}
       §S (>= result INT:0)
@@ -118,8 +118,8 @@ public class ContractTests
     public void Parser_ParsesMultipleContracts()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -143,8 +143,8 @@ public class ContractTests
     {
         // v2 syntax: message is first positional §Q{"message"} (condition)
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
+§M{Test}
+  §F{Square:pub}
     §I{i32:x}
     §O{i32}
     §Q{""x must be nonnegative""} (>= x 0)
@@ -231,8 +231,8 @@ public class ContractTests
     public void Emitter_EmitsFunctionWithPrecondition()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
+§M{Test}
+  §F{Square:pub}
       §I{i32:x}
       §O{i32}
       §Q (>= x INT:0)
@@ -254,8 +254,8 @@ public class ContractTests
     public void Emitter_EmitsFunctionWithPostcondition()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
+§M{Test}
+  §F{Square:pub}
       §I{i32:x}
       §O{i32}
       §S (>= result INT:0)
@@ -281,8 +281,8 @@ public class ContractTests
     public void ContractVerifier_AcceptsValidPrecondition()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
+§M{Test}
+  §F{Square:pub}
       §I{i32:x}
       §O{i32}
       §Q (>= x INT:0)

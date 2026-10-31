@@ -21,8 +21,8 @@ public class CharOperationTests
     private static string WrapInFunction(string body, string inputType = "string", string outputType = "object")
     {
         return $$"""
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{{{inputType}}:s}
                   §O{{{outputType}}}
                   {{body}}
@@ -32,8 +32,8 @@ public class CharOperationTests
     private static string WrapCharFunction(string body)
     {
         return $$"""
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{char:c}
                   §O{object}
                   {{body}}
@@ -190,8 +190,8 @@ public class CharOperationTests
     public void Emit_CharOperation_ProducesCorrectCSharp(string calor, string expectedCSharp)
     {
         var source = $$"""
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{string:s}
                   §I{char:c}
                   §O{object}
@@ -225,8 +225,8 @@ public class CharOperationTests
     public void RoundTrip_CharOp_ProducesValidCalor(string op)
     {
         var source = $$"""
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{string:s}
                   §I{char:c}
                   §O{object}

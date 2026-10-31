@@ -50,9 +50,9 @@ public class ClassMemberBindingTests
     public void BindMethod_SimpleMethod_ProducesMethod()
     {
         var source = @"
-§M{m001:Test}
-    §CL{c001:Calculator:pub}
-        §MT{m002:Add:pub} (i32:x, i32:y) -> i32
+§M{Test}
+    §CL{Calculator:pub}
+        §MT{Add:pub} (i32:x, i32:y) -> i32
             §E{}
             §R (+ x y)
 ";
@@ -71,12 +71,12 @@ public class ClassMemberBindingTests
     public void BindMethod_OverloadedMethods_AllBound()
     {
         var source = @"
-§M{m001:Test}
-    §CL{c001:Converter:pub}
-        §MT{m002:Convert:pub} (i32:x) -> str
+§M{Test}
+    §CL{Converter:pub}
+        §MT{Convert:pub} (i32:x) -> str
             §E{}
             §R (str x)
-        §MT{m003:Convert:pub} (i32:x, str:format) -> str
+        §MT{Convert:pub} (i32:x, str:format) -> str
             §E{}
             §R (str x)
 ";
@@ -92,9 +92,9 @@ public class ClassMemberBindingTests
     public void BindMethod_AbstractMethod_NotBound()
     {
         var source = @"
-§M{m001:Test}
-    §CL{c001:Base:pub:abs}
-        §MT{m002:DoWork:pub:abs}
+§M{Test}
+    §CL{Base:pub:abs}
+        §MT{DoWork:pub:abs}
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -109,12 +109,12 @@ public class ClassMemberBindingTests
     public void BindConstructor_WithFieldAssignment_FieldResolves()
     {
         var source = @"
-§M{m001:Test}
-    §CL{c001:Widget:pub}
+§M{Test}
+    §CL{Widget:pub}
         §FLD{i32:_count:priv}
-        §CTOR{ctor002:pub} (i32:count)
+        §CTOR{pub} (i32:count)
           §ASSIGN _count count
-        §/CTOR{ctor002}
+        §/CTOR
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -131,10 +131,10 @@ public class ClassMemberBindingTests
     public void BindConstructor_FieldInScope_NoUndefinedReference()
     {
         var source = @"
-§M{m001:Test}
-    §CL{c001:Widget:pub}
+§M{Test}
+    §CL{Widget:pub}
         §FLD{i32:_count:priv}
-        §MT{m002:UseCount:pub}
+        §MT{UseCount:pub}
             §E{}
             §C{Console.WriteLine} §A _count §/C
 ";
@@ -151,15 +151,15 @@ public class ClassMemberBindingTests
     public void InheritedFields_ResolveAcrossHierarchy_WithVisibilityAndIdentity()
     {
         var source = """
-            §M{m001:Test}
-              §CL{c001:Base:pub}
+            §M{Test}
+              §CL{Base:pub}
                 §FLD{i32:shared:prot}
                 §FLD{i32:publicValue:pub}
                 §FLD{i32:internalValue:int}
-              §CL{c002:Middle:Base:pub}
+              §CL{Middle:Base:pub}
                 §FLD{i32:secret:priv}
-              §CL{c003:Derived:Middle:pub}
-                §MT{m001:Use:pub} () -> i32
+              §CL{Derived:Middle:pub}
+                §MT{Use:pub} () -> i32
                   §B{bare:i32} shared
                   §B{viaThis:i32} §THIS.shared
                   §B{viaBase:i32} §BASE.shared
@@ -226,14 +226,14 @@ public class ClassMemberBindingTests
     public void BindPropertyAccessor_Getter_ProducesPropertyGetter()
     {
         var source = @"
-§M{m001:Test}
-    §CL{c001:Config:pub}
+§M{Test}
+    §CL{Config:pub}
         §FLD{str:_name:priv}
-        §PROP{p002:Name:str:pub}
+        §PROP{Name:str:pub}
           §GET{pub}
             §R _name
           §/GET
-        §/PROP{p002}
+        §/PROP
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -247,17 +247,17 @@ public class ClassMemberBindingTests
     public void BindPropertyAccessor_Setter_HasImplicitValueParam()
     {
         var source = @"
-§M{m001:Test}
-    §CL{c001:Config:pub}
+§M{Test}
+    §CL{Config:pub}
         §FLD{str:_name:priv}
-        §PROP{p002:Name:str:pub}
+        §PROP{Name:str:pub}
           §GET{pub}
             §R _name
           §/GET
           §SET{pub}
             §ASSIGN _name value
           §/SET
-        §/PROP{p002}
+        §/PROP
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -279,13 +279,13 @@ public class ClassMemberBindingTests
     public void BindOperator_ProducesOperatorOverload()
     {
         var source = @"
-§M{m001:Test}
-    §CL{c001:Vector:pub}
+§M{Test}
+    §CL{Vector:pub}
         §FLD{f64:X:pub}
         §FLD{f64:Y:pub}
-        §OP{op002:+:pub} (Vector:a, Vector:b) -> Vector
+        §OP{+:pub} (Vector:a, Vector:b) -> Vector
           §R §NEW{Vector} §/NEW
-        §/OP{op002}
+        §/OP
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -356,10 +356,10 @@ public class ClassMemberBindingTests
         // When a parameter has the same name as a field, bare name references
         // resolve to the parameter (innermost scope wins)
         var source = @"
-§M{m001:Test}
-    §CL{c001:Foo:pub}
+§M{Test}
+    §CL{Foo:pub}
         §FLD{i32:x:priv}
-        §MT{m002:Set:pub} (i32:x)
+        §MT{Set:pub} (i32:x)
             §E{}
             §C{Console.WriteLine} §A x §/C
 ";
@@ -400,10 +400,10 @@ public class ClassMemberBindingTests
     public void BindAssignment_InMethod_ProducesBoundAssignment()
     {
         var source = @"
-§M{m001:Test}
-    §CL{c001:Counter:pub}
+§M{Test}
+    §CL{Counter:pub}
         §FLD{i32:_count:priv}
-        §MT{m002:Increment:pub}
+        §MT{Increment:pub}
             §E{}
             §ASSIGN _count (+ _count 1)
 ";
@@ -421,9 +421,9 @@ public class ClassMemberBindingTests
         // If we encounter an AST node type the Binder doesn't handle,
         // it should produce BoundUnsupportedStatement + Calor0931, not throw
         var source = @"
-§M{m001:Test}
-    §CL{c001:MyClass:pub}
-        §MT{m002:DoWork:pub}
+§M{Test}
+    §CL{MyClass:pub}
+        §MT{DoWork:pub}
             §E{}
             §C{Console.WriteLine} §A ""hello"" §/C
 ";
@@ -441,8 +441,8 @@ public class ClassMemberBindingTests
     public void TopLevelFunction_HasCorrectMemberKind()
     {
         var source = @"
-§M{m001:Test}
-    §F{f001:add:pub} (i32:x, i32:y) -> i32
+§M{Test}
+    §F{add:pub} (i32:x, i32:y) -> i32
         §R (+ x y)
 ";
         var bound = Bind(source, out var diagnostics);
@@ -456,23 +456,23 @@ public class ClassMemberBindingTests
     public void AllMemberKinds_CorrectlyClassified()
     {
         var source = @"
-§M{m001:Test}
-    §CL{c001:MyClass:pub}
+§M{Test}
+    §CL{MyClass:pub}
         §FLD{i32:_x:priv}
-        §MT{m002:Foo:pub}
+        §MT{Foo:pub}
             §E{}
             §C{Console.WriteLine} §A ""hello"" §/C
-        §CTOR{ctor003:pub} (i32:x)
+        §CTOR{pub} (i32:x)
           §ASSIGN _x x
-        §/CTOR{ctor003}
-        §PROP{p004:X:i32:pub}
+        §/CTOR
+        §PROP{X:i32:pub}
           §GET{pub}
             §R _x
           §/GET
           §SET{pub}
             §ASSIGN _x value
           §/SET
-        §/PROP{p004}
+        §/PROP
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -495,9 +495,9 @@ public class ClassMemberBindingTests
     public void ContractInference_SkipsClassMembers()
     {
         var source = @"
-§M{m001:Test}
-    §CL{c001:Math:pub}
-        §MT{m002:Divide:pub} (i32:x, i32:y) -> i32
+§M{Test}
+    §CL{Math:pub}
+        §MT{Divide:pub} (i32:x, i32:y) -> i32
             §E{}
             §R (/ x y)
 ";
@@ -523,9 +523,9 @@ public class ClassMemberBindingTests
         // If a class has methods that fail to bind, they should produce diagnostics
         // but not be added to the functions list
         var source = @"
-§M{m001:Test}
-    §CL{c001:Good:pub}
-        §MT{m002:WorkingMethod:pub}
+§M{Test}
+    §CL{Good:pub}
+        §MT{WorkingMethod:pub}
             §E{}
             §C{Console.WriteLine} §A ""ok"" §/C
 ";
@@ -543,8 +543,8 @@ public class ClassMemberBindingTests
     public void ConditionalExpression_BothBranchesPreserved()
     {
         var source = @"
-§M{m001:Test}
-    §F{f001:abs:pub} (i32:x) -> i32
+§M{Test}
+    §F{abs:pub} (i32:x) -> i32
         §R (? (>= x 0) x (- 0 x))
 ";
         var bound = Bind(source, out var diagnostics);
@@ -567,11 +567,11 @@ public class ClassMemberBindingTests
     public void BindForeach_InMethod_ProducesBoundForeach()
     {
         var source = @"
-§M{m001:Test}
-    §CL{c001:Processor:pub}
-        §MT{m002:Process:pub} (List<str>:items)
+§M{Test}
+    §CL{Processor:pub}
+        §MT{Process:pub} (List<str>:items)
             §E{}
-            §EACH{each003:item:str} items
+            §EACH{item:str} items
                 §C{Console.WriteLine} §A item §/C
 ";
         var bound = Bind(source, out var diagnostics);
@@ -585,11 +585,11 @@ public class ClassMemberBindingTests
     public void BindThrow_InMethod_ProducesBoundThrow()
     {
         var source = @"
-§M{m001:Test}
-    §CL{c001:Guard:pub}
-        §MT{m002:Check:pub} (i32:x)
+§M{Test}
+    §CL{Guard:pub}
+        §MT{Check:pub} (i32:x)
             §E{throw,alloc}
-            §IF{if003} (< x 0)
+            §IF (< x 0)
                 §TH §NEW{ArgumentException} §A ""negative"" §/NEW
 ";
         var bound = Bind(source, out var diagnostics);
@@ -602,13 +602,13 @@ public class ClassMemberBindingTests
     public void BindUsing_InMethod_ProducesBoundUsing()
     {
         var source = @"
-§M{m001:Test}
-    §CL{c001:FileHandler:pub}
-        §MT{m002:ReadFile:pub} (str:path) -> str
+§M{Test}
+    §CL{FileHandler:pub}
+        §MT{ReadFile:pub} (str:path) -> str
             §E{}
-            §USE{use003:reader:StreamReader} §C{File.OpenText} §A path §/C
+            §USE{reader:StreamReader} §C{File.OpenText} §A path §/C
               §R §C{reader.ReadToEnd} §/C
-            §/USE{use003}
+            §/USE
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -708,10 +708,10 @@ public class ClassMemberBindingTests
     public void RegisterClassMembers_PropertiesResolvable()
     {
         var source = @"
-§M{m001:Test}
-    §CL{c001:Config:pub}
-        §PROP{p002:Name:str:pub:get,set}
-        §MT{m003:UseProperty:pub}
+§M{Test}
+    §CL{Config:pub}
+        §PROP{Name:str:pub:get,set}
+        §MT{UseProperty:pub}
             §E{}
             §C{Console.WriteLine} §A Name §/C
 ";
@@ -731,8 +731,8 @@ public class ClassMemberBindingTests
     public void DecimalLiteral_NotMisparsedAsZero()
     {
         var source = @"
-§M{m001:Test}
-    §F{f001:convert:pub} (dec:amount) -> dec
+§M{Test}
+    §F{convert:pub} (dec:amount) -> dec
         §R (/ amount DEC:100)
 ";
         var bound = Bind(source, out var diagnostics);
@@ -758,9 +758,9 @@ public class ClassMemberBindingTests
         // End-to-end: parse → bind → analyze → assert Calor0920 found
         // Uses ReportOnlyVerified=false to see heuristic findings
         var source = @"
-§M{m001:Test}
-    §CL{c001:Calculator:pub}
-        §MT{m002:Divide:pub} (i32:x, i32:y) -> i32
+§M{Test}
+    §CL{Calculator:pub}
+        §MT{Divide:pub} (i32:x, i32:y) -> i32
             §E{}
             §R (/ x y)
 ";
@@ -780,13 +780,13 @@ public class ClassMemberBindingTests
     {
         // Constructor with : base(args) — initializer args should be visible to analysis
         var source = @"
-§M{m001:Test}
-    §CL{c001:Widget:pub}
+§M{Test}
+    §CL{Widget:pub}
         §FLD{i32:_value:priv}
-        §CTOR{ctor002:pub} (i32:v)
+        §CTOR{pub} (i32:v)
           §BASE §A v §/BASE
           §ASSIGN _value v
-        §/CTOR{ctor002}
+        §/CTOR
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -805,17 +805,17 @@ public class ClassMemberBindingTests
     public void StaticMethod_BareInstanceFieldsAndProperties_AreRejectedButStaticMembersResolve()
     {
         var source = @"
-§M{m001:Test}
-    §CL{c001:Utils:pub}
+§M{Test}
+    §CL{Utils:pub}
         §FLD{i32:instanceField:priv}
         §FLD{i32:StaticField:priv:stat}
-        §PROP{p001:InstanceProperty:i32:pub}
+        §PROP{InstanceProperty:i32:pub}
           §GET
-        §/PROP{p001}
-        §PROP{p002:StaticProperty:i32:pub:stat}
+        §/PROP
+        §PROP{StaticProperty:i32:pub:stat}
           §GET
-        §/PROP{p002}
-        §MT{m002:Use:pub:stat} () -> i32
+        §/PROP
+        §MT{Use:pub:stat} () -> i32
             §B{fieldValue:i32} instanceField
             §B{propertyValue:i32} InstanceProperty
             §R (+ StaticField StaticProperty)
@@ -845,11 +845,11 @@ public class ClassMemberBindingTests
     public void ProgramCompile_StaticMethodBareInstanceMembers_FailsWithoutOptionalAnalysis()
     {
         var source = """
-            §M{m001:Test}
-              §CL{c001:Utils:pub}
+            §M{Test}
+              §CL{Utils:pub}
                 §FLD{i32:instanceField:priv}
-                §PROP{p001:InstanceProperty:i32:pub:get}
-                §MT{m002:Use:pub:stat} () -> i32
+                §PROP{InstanceProperty:i32:pub:get}
+                §MT{Use:pub:stat} () -> i32
                   §B{fieldValue:i32} instanceField
                   §R InstanceProperty
             """;
@@ -868,15 +868,15 @@ public class ClassMemberBindingTests
     public void StaticAndInstanceParameterlessConstructors_CoexistAndNewUsesInstanceConstructor()
     {
         var source = @"
-§M{m001:Test}
-    §CL{c001:Widget:pub}
-        §CTOR{cctor:stat}
+§M{Test}
+    §CL{Widget:pub}
+        §CTOR{stat}
           §P STR:""static""
-        §/CTOR{cctor}
-        §CTOR{ctor:pub}
+        §/CTOR
+        §CTOR{pub}
           §P STR:""instance""
-        §/CTOR{ctor}
-    §F{f001:Create:pub} () -> Widget
+        §/CTOR
+    §F{Create:pub} () -> Widget
       §R §NEW{Widget} §/NEW
 ";
 
@@ -912,10 +912,10 @@ public class ClassMemberBindingTests
     public void StaticMethod_ThisExpression_DoesNotResolve()
     {
         var source = @"
-§M{m001:Test}
-    §CL{c001:Utils:pub}
+§M{Test}
+    §CL{Utils:pub}
         §FLD{i32:_counter:priv}
-        §MT{m002:StaticMethod:pub:stat}
+        §MT{StaticMethod:pub:stat}
             §E{}
             §C{Console.WriteLine} §A §THIS §/C
 ";

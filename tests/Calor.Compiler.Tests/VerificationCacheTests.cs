@@ -681,8 +681,8 @@ public class VerificationCacheTests : IDisposable
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
+§M{Test}
+  §F{Square:pub}
       §I{i32:x}
       §O{i32}
       §Q (>= x INT:0)
@@ -719,8 +719,8 @@ public class VerificationCacheTests : IDisposable
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
+§M{Test}
+  §F{Square:pub}
       §I{i32:x}
       §O{i32}
       §Q (>= x INT:0)
@@ -773,8 +773,8 @@ public class VerificationCacheTests : IDisposable
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
+§M{Test}
+  §F{Square:pub}
       §I{i32:x}
       §O{i32}
       §Q (>= x INT:0)
@@ -810,8 +810,8 @@ public class VerificationCacheTests : IDisposable
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
+§M{Test}
+  §F{Square:pub}
       §I{i32:x}
       §O{i32}
       §Q (>= x INT:0)
@@ -866,14 +866,14 @@ public class VerificationCacheTests : IDisposable
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
+§M{Test}
+  §F{Square:pub}
       §I{i32:x}
       §O{i32}
       §Q (>= x INT:0)
       §S (>= result INT:0)
       §R (* x x)
-  §F{f002:BadDecrement:pub}
+  §F{BadDecrement:pub}
       §I{i32:x}
       §O{i32}
       §S (>= result INT:0)

@@ -64,8 +64,8 @@ public class LanguageFeatureTests
     public void TrailingAccess_NewExpression_DotMethod()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §O{string}
                   §R §NEW{object}§/NEW.ToString
             """;
@@ -77,8 +77,8 @@ public class LanguageFeatureTests
     public void TrailingAccess_NewExpression_NullConditional()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §O{string}
                   §R §NEW{object}§/NEW?.ToString
             """;
@@ -90,8 +90,8 @@ public class LanguageFeatureTests
     public void TrailingAccess_CallExpression_DotProperty()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §O{i32}
                   §R §C{GetItems}§/C.Count
             """;
@@ -105,8 +105,8 @@ public class LanguageFeatureTests
         // The lexer may tokenize "GetType.Name" in the attribute as a single identifier with dots.
         // Use separate tokens to ensure proper chaining.
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §O{string}
                   §B{result:string} §NEW{object}§/NEW.GetType
                   §R result.Name
@@ -119,8 +119,8 @@ public class LanguageFeatureTests
     public void TrailingAccess_ParsesFieldAccessNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §O{string}
                   §R §NEW{object}§/NEW.ToString
             """;
@@ -139,8 +139,8 @@ public class LanguageFeatureTests
     public void NullCoalesce_LispExpression_TwoArgs()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §I{string:x}
                   §O{string}
                   §R (?? x "default")
@@ -153,8 +153,8 @@ public class LanguageFeatureTests
     public void NullCoalesce_LispExpression_WithReference()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §I{string:a}
                   §I{string:b}
                   §O{string}
@@ -168,8 +168,8 @@ public class LanguageFeatureTests
     public void NullCoalesce_LispExpression_WrongArgCount_ReportsError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §I{string:a}
                   §I{string:b}
                   §I{string:c}
@@ -185,8 +185,8 @@ public class LanguageFeatureTests
     public void NullCoalesce_ParsesNullCoalesceNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §I{string:x}
                   §O{string}
                   §R (?? x "default")
@@ -205,8 +205,8 @@ public class LanguageFeatureTests
     public void TypeOf_SimpleType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §O{Type}
                   §R (typeof int)
             """;
@@ -218,8 +218,8 @@ public class LanguageFeatureTests
     public void TypeOf_StringType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §O{Type}
                   §R (typeof string)
             """;
@@ -231,8 +231,8 @@ public class LanguageFeatureTests
     public void TypeOf_QualifiedType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §O{Type}
                   §R (typeof System.String)
             """;
@@ -244,8 +244,8 @@ public class LanguageFeatureTests
     public void TypeOf_ParsesTypeOfExpressionNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §O{Type}
                   §R (typeof int)
             """;
@@ -264,8 +264,8 @@ public class LanguageFeatureTests
     public void GenericIs_SimpleType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §I{object:x}
                   §O{bool}
                   §R (is x string)
@@ -278,8 +278,8 @@ public class LanguageFeatureTests
     public void GenericIs_GenericType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §I{object:x}
                   §O{bool}
                   §R (is x List<string>)
@@ -292,8 +292,8 @@ public class LanguageFeatureTests
     public void GenericIs_WithVariableBinding()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §I{object:x}
                   §O{bool}
                   §R (is x List<string> items)
@@ -315,8 +315,8 @@ public class LanguageFeatureTests
     public void GenericAs_GenericType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §I{object:x}
                   §O{List<string>}
                   §R (as x List<string>)
@@ -329,8 +329,8 @@ public class LanguageFeatureTests
     public void GenericAs_SimpleType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §I{object:x}
                   §O{?string}
                   §R (as x string)
@@ -343,8 +343,8 @@ public class LanguageFeatureTests
     public void GenericIs_ParsesIsPatternNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §I{object:x}
                   §O{bool}
                   §R (is x string)
@@ -361,8 +361,8 @@ public class LanguageFeatureTests
     public void GenericAs_ParsesTypeOperationNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §I{object:x}
                   §O{string}
                   §R (as x string)
@@ -410,8 +410,8 @@ public class LanguageFeatureTests
     public void MultilineString_EmitsCSharpEscapes()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §O{string}
                   §R "line1\nline2"
             """;
@@ -435,8 +435,8 @@ public class LanguageFeatureTests
     public void ExpressionCall_NewObjectGetType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §O{Type}
                   §R §C §NEW{object}§/NEW.GetType §/C
             """;
@@ -448,8 +448,8 @@ public class LanguageFeatureTests
     public void ExpressionCall_WithArguments()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §I{string:x}
                   §O{bool}
                   §R §C §NEW{object}§/NEW.Equals §A x §/C
@@ -462,8 +462,8 @@ public class LanguageFeatureTests
     public void ExpressionCall_ParsesExpressionCallNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §O{Type}
                   §R §C §NEW{object}§/NEW.GetType §/C
             """;
@@ -482,8 +482,8 @@ public class LanguageFeatureTests
     public void NewInsideArg_BasicNew()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §O{string}
                   §R §C{ToString} §A §NEW{object}§/NEW §/C
             """;
@@ -495,8 +495,8 @@ public class LanguageFeatureTests
     public void NewInsideArg_WithTrailingAccess()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §O{string}
                   §R §C{Process} §A §NEW{StringBuilder}§/NEW.ToString §/C
             """;
@@ -512,8 +512,8 @@ public class LanguageFeatureTests
     public void GenericIs_NestedGenericType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §I{object:x}
                   §O{bool}
                   §R (is x Dictionary<string, List<int>>)
@@ -532,8 +532,8 @@ public class LanguageFeatureTests
     public void GenericAs_NestedGenericType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §I{object:x}
                   §O{object}
                   §R (as x Dictionary<string, List<int>>)
@@ -552,8 +552,8 @@ public class LanguageFeatureTests
     public void TypeOf_GenericType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §O{Type}
                   §R (typeof List<string>)
             """;
@@ -565,8 +565,8 @@ public class LanguageFeatureTests
     public void TypeOf_NestedGenericType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §O{Type}
                   §R (typeof Dictionary<string, List<int>>)
             """;
@@ -578,8 +578,8 @@ public class LanguageFeatureTests
     public void GenericIs_NullableType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §I{object:x}
                   §O{bool}
                   §R (is x int?)
@@ -602,8 +602,8 @@ public class LanguageFeatureTests
     public void NullCoalesce_WithNestedExpression()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §I{?i32:a}
                   §I{i32:b}
                   §O{i32}
@@ -618,8 +618,8 @@ public class LanguageFeatureTests
     public void NullCoalesce_NestedCoalescing()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §I{string:a}
                   §I{string:b}
                   §I{string:c}
@@ -639,7 +639,7 @@ public class LanguageFeatureTests
     {
         // Use actual triple-quote multiline syntax in a full compilation
         // Note: The triple-quote must be in the Calor source, not the C# raw string
-        var calorSource = "§M{m001:Test}\n§F{f001:Run:pub}\n§O{string}\n§R \"\"\"hello\nworld\"\"\"\n\n";
+        var calorSource = "§M{Test}\n§F{Run:pub}\n§O{string}\n§R \"\"\"hello\nworld\"\"\"\n\n";
         var result = Program.Compile(calorSource, null, new CompilationOptions { EnforceEffects = false });
         Assert.False(result.HasErrors, $"Errors: {string.Join("; ", result.Diagnostics)}");
         // Multiline string should emit as C# verbatim string
@@ -673,8 +673,8 @@ public class LanguageFeatureTests
     public void ExpressionCall_MultipleArgs()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §I{string:a}
                   §I{string:b}
                   §O{string}
@@ -688,8 +688,8 @@ public class LanguageFeatureTests
     public void ExpressionCall_ReferenceTarget()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                   §I{object:x}
                   §O{string}
                   §R §C x.ToString §/C

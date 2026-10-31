@@ -73,14 +73,14 @@ public class IncrementalCliBuildTests : IDisposable
     private (string APath, string BPath) WriteIndependentPair()
     {
         var a = WriteSource("a.calr", """
-            §M{m001:Alpha}
-              §F{f001:Greet:pub} () -> void
+            §M{Alpha}
+              §F{Greet:pub} () -> void
                 §E{cw}
                 §P "hello"
             """);
         var b = WriteSource("b.calr", """
-            §M{m002:Beta}
-              §F{f001:Wave:pub} () -> void
+            §M{Beta}
+              §F{Wave:pub} () -> void
                 §E{cw}
                 §P "wave"
             """);
@@ -152,8 +152,8 @@ public class IncrementalCliBuildTests : IDisposable
         Run([a, b]);
 
         File.WriteAllText(a, """
-            §M{m001:Alpha}
-              §F{f001:Greet:pub} () -> void
+            §M{Alpha}
+              §F{Greet:pub} () -> void
                 §E{cw}
                 §P "changed"
             """);
@@ -173,8 +173,8 @@ public class IncrementalCliBuildTests : IDisposable
         // run would skip and the edited content would never be compiled.
         var (a, b) = WriteIndependentPair();
         var edited = """
-            §M{m001:Alpha}
-              §F{f001:Greet:pub} () -> void
+            §M{Alpha}
+              §F{Greet:pub} () -> void
                 §E{cw}
                 §P "edited mid-compile"
             """;
@@ -311,13 +311,13 @@ public class IncrementalCliBuildTests : IDisposable
     public void CrossModuleViolation_IsNeverPublishedOrCached()
     {
         var callee = WriteSource("callee.calr", """
-            §M{m001:OrderService}
-              §F{f001:SaveOrder:pub} () -> void
+            §M{OrderService}
+              §F{SaveOrder:pub} () -> void
                 §E{db:w}
             """);
         var caller = WriteSource("caller.calr", """
-            §M{m002:App}
-              §F{f001:Main:pub} () -> void
+            §M{App}
+              §F{Main:pub} () -> void
                 §E{}
                 §C{OrderService.SaveOrder} §/C
             """);
@@ -343,13 +343,13 @@ public class IncrementalCliBuildTests : IDisposable
         // the module from cross-module enforcement and Calor0410 would silently
         // disappear on warm builds. Rule: no summary, no hit.
         var callee = WriteSource("callee2.calr", """
-            §M{m001:OrderService}
-              §F{f001:SaveOrder:pub} () -> void
+            §M{OrderService}
+              §F{SaveOrder:pub} () -> void
                 §E{db:w}
             """);
         var caller = WriteSource("caller2.calr", """
-            §M{m002:App}
-              §F{f001:Main:pub} () -> void
+            §M{App}
+              §F{Main:pub} () -> void
                 §E{}
                 §C{OrderService.SaveOrder} §/C
             """);
@@ -449,14 +449,14 @@ public class IncrementalCliEndToEndTests : IDisposable
         var a = Path.Combine(_tempDir, "a.calr");
         var b = Path.Combine(_tempDir, "b.calr");
         File.WriteAllText(a, """
-            §M{m001:Alpha}
-              §F{f001:Greet:pub} () -> void
+            §M{Alpha}
+              §F{Greet:pub} () -> void
                 §E{cw}
                 §P "hello"
             """);
         File.WriteAllText(b, """
-            §M{m002:Beta}
-              §F{f001:Wave:pub} () -> void
+            §M{Beta}
+              §F{Wave:pub} () -> void
                 §E{cw}
                 §P "wave"
             """);
@@ -484,8 +484,8 @@ public class IncrementalCliEndToEndTests : IDisposable
         // --cache no state file is written and repeat runs always recompile.
         var a = Path.Combine(_tempDir, "a.calr");
         File.WriteAllText(a, """
-            §M{m001:Alpha}
-              §F{f001:Greet:pub} () -> void
+            §M{Alpha}
+              §F{Greet:pub} () -> void
                 §E{cw}
                 §P "hello"
             """);
@@ -508,8 +508,8 @@ public class IncrementalCliEndToEndTests : IDisposable
         var source = Path.Combine(_tempDir, "explicit-output.calr");
         var output = Path.Combine(_tempDir, "explicit-output.cs");
         File.WriteAllText(source, """
-            §M{m001:ExplicitOutput}
-              §F{f001:Main:pub} () -> void
+            §M{ExplicitOutput}
+              §F{Main:pub} () -> void
                 §E{cw}
                 §P "hello"
             """);
@@ -589,8 +589,8 @@ public class IncrementalCliEndToEndTests : IDisposable
     {
         var path = Path.Combine(_tempDir, "nullable-assignment.calr");
         File.WriteAllText(path, """
-            §M{m001:N0}
-              §F{f001:Probe:pub} () -> void
+            §M{N0}
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{x:?str} null
                 §B{y:str} x
@@ -667,15 +667,15 @@ public class IncrementalCliEndToEndTests : IDisposable
     {
         var a = Path.Combine(_tempDir, "a.calr");
         File.WriteAllText(a, """
-            §M{m001:Alpha}
-              §F{f001:Greet:pub} () -> void
+            §M{Alpha}
+              §F{Greet:pub} () -> void
                 §E{cw}
                 §P "hello"
             """);
         var b = Path.Combine(_tempDir, "b.calr");
         File.WriteAllText(b, """
-            §M{m002:Beta}
-              §F{f001:Wave:pub} () -> void
+            §M{Beta}
+              §F{Wave:pub} () -> void
                 §E{cw}
                 §P "wave"
             """);
@@ -699,8 +699,8 @@ public class IncrementalCliEndToEndTests : IDisposable
         var (a, b) = WritePair();
         var c = Path.Combine(_tempDir, "c.calr");
         File.WriteAllText(c, """
-            §M{m003:Gamma}
-              §F{f001:Call:pub} () -> void
+            §M{Gamma}
+              §F{Call:pub} () -> void
                 §E{cw}
                 §C{Greet} §/C
             """);
@@ -793,12 +793,12 @@ public class IncrementalCliEndToEndTests : IDisposable
         var diagnostics = new DiagnosticBag();
         var parser = new Parsing.Parser(
             new Parsing.Lexer("""
-                §M{m001:Overloads}
-                  §CL{c001:Box:pub}
-                    §MT{m001:Run:pub} (i32:x) -> void
+                §M{Overloads}
+                  §CL{Box:pub}
+                    §MT{Run:pub} (i32:x) -> void
                       §E{cw}
                       §C{System.Console.WriteLine} §A x §/C
-                    §MT{m002:Run:pub} (str:s) -> void
+                    §MT{Run:pub} (str:s) -> void
                       §E{cw}
                       §C{System.Console.WriteLine} §A s §/C
                 """, diagnostics).TokenizeAllForParser(), diagnostics);

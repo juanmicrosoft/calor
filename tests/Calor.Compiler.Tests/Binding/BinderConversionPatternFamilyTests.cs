@@ -123,8 +123,8 @@ public class BinderConversionPatternFamilyTests
         // a hard ERROR silently became nothing. DEFAULT options (ReportOnlyVerified) —
         // the literal-zero case must not need --all-findings.
         const string source = @"
-§M{m001:Test}
-  §F{f001:Trap:pub} (i32:x) -> dec
+§M{Test}
+  §F{Trap:pub} (i32:x) -> dec
     §R (/ x DEC:0)";
 
         // ReportOnlyVerified=true IS the CLI default (--analyze without --all-findings);
@@ -155,8 +155,8 @@ public class BinderConversionPatternFamilyTests
         // untranslatable and the verified Warning vanished. CheckDivisor now unwraps
         // conversions (numeric casts are zero-preserving).
         const string source = @"
-§M{m001:Test}
-  §F{f001:Trap:pub} (i32:y) -> i64
+§M{Test}
+  §F{Trap:pub} (i32:y) -> i64
     §R (/ 100 (cast i64 y))";
 
         var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
@@ -202,8 +202,8 @@ public class BinderConversionPatternFamilyTests
         // the real Calor0920 — the old Cast arm returned the operand so this already
         // worked; the pin guards the new conversion node against regressing it.
         const string source = @"
-§M{m001:Test}
-  §F{f001:Trap:pub} () -> void
+§M{Test}
+  §F{Trap:pub} () -> void
     §E{cw}
     §P (cast f64 (/ 10 0))";
 

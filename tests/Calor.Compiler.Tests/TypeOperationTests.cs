@@ -21,8 +21,8 @@ public class TypeOperationTests
     private static string WrapInFunction(string body, string inputType = "object", string outputType = "object")
     {
         return $$"""
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{{{inputType}}:x}
                   §O{{{outputType}}}
                   {{body}}

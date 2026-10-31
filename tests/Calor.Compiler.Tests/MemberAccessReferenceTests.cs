@@ -239,8 +239,8 @@ public class MemberAccessReferenceTests
     {
         // Parse Calor DSL with an attribute containing a qualified identifier
         var calorSource = """
-            §M{m001:TestModule}
-                §CL{c001:MyAttribute:pub}[@AttributeUsage(AttributeTargets.Method)]
+            §M{TestModule}
+                §CL{MyAttribute:pub}[@AttributeUsage(AttributeTargets.Method)]
             """;
 
         var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
@@ -266,8 +266,8 @@ public class MemberAccessReferenceTests
     {
         // A bare (non-dotted) identifier in an attribute should also be emitted unquoted
         var calorSource = """
-            §M{m001:TestModule}
-                §CL{c001:TestClass:pub}[@DefaultValue(SomeConstant)]
+            §M{TestModule}
+                §CL{TestClass:pub}[@DefaultValue(SomeConstant)]
             """;
 
         var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();

@@ -626,9 +626,9 @@ public class ConverterImprovementTests
     public void Parser_NewExpressionWithClosingTag_ParsesCorrectly()
     {
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Service}
-                §MT{m2:Create:pub}
+            §M{Test}
+              §CL{Service}
+                §MT{Create:pub}
                     §O{string}
                     §E{alloc}
                     §B{string:x} §NEW{StringBuilder} §A "hello" §/NEW
@@ -648,9 +648,9 @@ public class ConverterImprovementTests
     public void Parser_NewExpressionWithoutArgs_ClosingTagParsesCorrectly()
     {
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Service}
-                §MT{m2:Create:pub}
+            §M{Test}
+              §CL{Service}
+                §MT{Create:pub}
                     §O{string}
                     §E{alloc}
                     §B{List<i32>:items} §NEW{List<i32>} §/NEW
@@ -671,9 +671,9 @@ public class ConverterImprovementTests
     {
         // Backward compatibility: §/NEW is optional
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Service}
-                §MT{m2:Create:pub}
+            §M{Test}
+              §CL{Service}
+                §MT{Create:pub}
                     §O{string}
                     §E{alloc}
                     §B{string:x} §NEW{StringBuilder} §A "hello"
@@ -1200,15 +1200,15 @@ public class ConverterImprovementTests
     public void CalorEmitter_NamedModule_EmitsNoRedundantStaticModifier()
     {
         var source = """
-            §M{m1:TestMod}
-              §M{c1:Helper:pub}
+            §M{TestMod}
+              §M{Helper:pub}
             """;
 
         var ast = Parse(source);
         var emitter = new CalorEmitter();
         var output = emitter.Emit(ast);
 
-        Assert.Contains("§M{c1:Helper:pub}", output);
+        Assert.Contains("§M{Helper:pub}", output);
         Assert.DoesNotContain(":stat}", output);
         Assert.DoesNotContain(":static}", output);
     }
@@ -1217,8 +1217,8 @@ public class ConverterImprovementTests
     public void CalorEmitter_SealedClass_EmitsSealAbbreviation()
     {
         var source = """
-            §M{m1:TestMod}
-              §CL{c1:Final:pub:seal}
+            §M{TestMod}
+              §CL{Final:pub:seal}
             """;
 
         var ast = Parse(source);
@@ -1233,8 +1233,8 @@ public class ConverterImprovementTests
     public void RoundTrip_NamedModule_PreservesStaticIdentity()
     {
         var source = """
-            §M{m1:TestMod}
-              §M{c1:Helper:pub}
+            §M{TestMod}
+              §M{Helper:pub}
             """;
 
         // Step 1: Parse original
@@ -1283,8 +1283,8 @@ public class ConverterImprovementTests
     public void CalorEmitter_StaticField_EmitsStatAbbreviation()
     {
         var source = """
-            §M{m1:TestMod}
-              §CL{c1:Counter:pub}
+            §M{TestMod}
+              §CL{Counter:pub}
                   §FLD{i32:Count:pub:stat}
             """;
 
@@ -1302,12 +1302,12 @@ public class ConverterImprovementTests
         // Parse Calor source with a static property, verify CalorEmitter
         // emits "stat" in the PROP tag (not "static")
         var source = """
-            §M{m1:TestMod}
-              §CL{c1:Counter:pub}
-                  §PROP{p1:Count:i32:pub:stat}
+            §M{TestMod}
+              §CL{Counter:pub}
+                  §PROP{Count:i32:pub:stat}
                     §GET
                     §SET
-                  §/PROP{p1}
+                  §/PROP
             """;
 
         var ast = Parse(source);
@@ -1323,12 +1323,12 @@ public class ConverterImprovementTests
     public void RoundTrip_StaticProperty_PreservesModifier()
     {
         var source = """
-            §M{m1:TestMod}
-              §CL{c1:Counter:pub}
-                  §PROP{p1:Instance:Counter:pub:stat}
+            §M{TestMod}
+              §CL{Counter:pub}
+                  §PROP{Instance:Counter:pub:stat}
                     §GET
                     §SET
-                  §/PROP{p1}
+                  §/PROP
             """;
 
         // Parse → emit → reparse
@@ -1567,9 +1567,9 @@ public class ConverterImprovementTests
     public void Parser_DefaultParameterValue_ParsesDirectly()
     {
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Service:pub}
-                §MT{m1:Greet:pub}
+            §M{Test}
+              §CL{Service:pub}
+                §MT{Greet:pub}
                     §I{str:name}
                     §I{str:greeting} = "Hello"
                     §O{str}
@@ -1591,9 +1591,9 @@ public class ConverterImprovementTests
     public void Parser_DefaultNumericParameterValue_ParsesCorrectly()
     {
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Service:pub}
-                §MT{m1:Add:pub}
+            §M{Test}
+              §CL{Service:pub}
+                §MT{Add:pub}
                     §I{i32:a}
                     §I{i32:b} = 0
                     §O{i32}
@@ -1701,9 +1701,9 @@ public class ConverterImprovementTests
     {
         // Existing Calor files without default values should continue to parse correctly
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Service:pub}
-                §MT{m1:Greet:pub}
+            §M{Test}
+              §CL{Service:pub}
+                §MT{Greet:pub}
                     §I{str:name}
                     §I{str:greeting}
                     §O{str}
@@ -1725,9 +1725,9 @@ public class ConverterImprovementTests
     public void RoundTrip_DefaultEnumParameter_PreservesFieldAccess()
     {
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Service:pub}
-                §MT{m1:Compare:pub}
+            §M{Test}
+              §CL{Service:pub}
+                §MT{Compare:pub}
                     §I{str:a}
                     §I{str:b}
                     §I{StringComparison:comparison} = StringComparison.Ordinal

@@ -39,8 +39,8 @@ public sealed class LosslessFormattingTests : IDisposable
     public void User001Reproduction_PreservesDeclarationReferenceAndComment()
     {
         const string source = """
-            §M{m001:Test}
-                §F{f001:Main:pub} () -> void
+            §M{Test}
+                §F{Main:pub} () -> void
                     §E{cw}
                     §B{user001} STR:"secret"
                     // This comment must survive.
@@ -62,13 +62,13 @@ public sealed class LosslessFormattingTests : IDisposable
     public void ZeroPaddedSemanticText_IsPreservedInEveryContext()
     {
         const string source = """
-            §M{m001:Test001}
-              §CL{c001:Type001:pub}
+            §M{Test001}
+              §CL{Type001:pub}
                 §FLD{str:field001:priv}
-                §CTOR{ctor001:pub}
-                §MT{mt001:method001:pub} (Type001:arg001) -> str
+                §CTOR{pub}
+                §MT{method001:pub} (Type001:arg001) -> str
                   §R field001
-              §F{f001:call001:pub} () -> void
+              §F{call001:pub} () -> void
                 §E{cw,alloc}
                 §B{user001:Type001} §NEW{Type001} §/NEW
                 §C{user001.method001} user001
@@ -99,22 +99,22 @@ public sealed class LosslessFormattingTests : IDisposable
     {
         const string source = """
             // before module
-            §M{m001:Comments}
+            §M{Comments}
                 /// function docs
-                §F{f001:Main:pub} () -> void
+                §F{Main:pub} () -> void
                     §E{cw}
                     // before if
-                    §IF{i001} true
+                    §IF true
                         // inside if
                         §P "if"
                     // between blocks
 
-                    §L{l001:i:0:1:1}
+                    §L{i:0:1:1}
                         // inside loop
                         §P i
                     // after loop
                 // after function
-                §CL{c001:Holder:pub}
+                §CL{Holder:pub}
                     // inside class
                     §FLD{str:value001:priv}
                 // after class
@@ -159,11 +159,11 @@ public sealed class LosslessFormattingTests : IDisposable
         [
             "while",
             """
-            §M{m001:WhileComments}
-                §F{f001:Main:pub} () -> void
+            §M{WhileComments}
+                §F{Main:pub} () -> void
                     §E{cw}
                     // before while
-                    §WH{w001} false
+                    §WH false
                         // inside while
                         §P "inside"
                     // after while
@@ -174,11 +174,11 @@ public sealed class LosslessFormattingTests : IDisposable
         [
             "foreach",
             """
-            §M{m001:ForeachComments}
-                §F{f001:Main:pub} (i32[]:items001) -> void
+            §M{ForeachComments}
+                §F{Main:pub} (i32[]:items001) -> void
                     §E{cw}
                     // before foreach
-                    §EACH{e001:item001:i32} items001
+                    §EACH{item001:i32} items001
                         // inside foreach
                         §P item001
                     // after foreach
@@ -189,11 +189,11 @@ public sealed class LosslessFormattingTests : IDisposable
         [
             "try",
             """
-            §M{m001:TryComments}
-                §F{f001:Main:pub} () -> void
+            §M{TryComments}
+                §F{Main:pub} () -> void
                     §E{cw}
                     // before try
-                    §TR{t001}
+                    §TR
                         // inside try
                         §P "inside"
                     §FI
@@ -206,11 +206,11 @@ public sealed class LosslessFormattingTests : IDisposable
         [
             "match",
             """
-            §M{m001:MatchComments}
-                §F{f001:Main:pub} (i32:value001) -> void
+            §M{MatchComments}
+                §F{Main:pub} (i32:value001) -> void
                     §E{cw}
                     // before match
-                    §W{w001} value001
+                    §W value001
                         §K 1
                             // inside match
                             §P "one"
@@ -224,13 +224,13 @@ public sealed class LosslessFormattingTests : IDisposable
         [
             "interface",
             """
-            §M{m001:InterfaceComments}
+            §M{InterfaceComments}
                 // before interface
-                §IFACE{i001:IThing001}
+                §IFACE{IThing001}
                     // inside interface
-                    §MT{mt001:Run001} () -> void
+                    §MT{Run001} () -> void
                 // after interface
-                §F{f001:Main:pub} () -> void
+                §F{Main:pub} () -> void
             """
         ];
     }
@@ -241,8 +241,8 @@ public sealed class LosslessFormattingTests : IDisposable
         const string rawLine = "  var user001 = \"// not a Calor comment\";   ";
         var source = string.Join(
             "\n",
-            "§M{m001:Raw}",
-            "    §F{f001:Main:pub} () -> void",
+            "§M{Raw}",
+            "    §F{Main:pub} () -> void",
             "        §E{cw}",
             "        §P \"user001 // literal\"   // inline comment   ",
             "        §RAW",
@@ -283,8 +283,8 @@ public sealed class LosslessFormattingTests : IDisposable
         yield return
         [
             "multiline-string",
-            "§M{m001:MultilineString}   \n" +
-            "  §F{f001:Main:pub} () -> void\n" +
+            "§M{MultilineString}   \n" +
+            "  §F{Main:pub} () -> void\n" +
             "    §E{cw}\n" +
             "    §P \"\"\"\n" +
             "      first line   \n" +
@@ -296,8 +296,8 @@ public sealed class LosslessFormattingTests : IDisposable
         yield return
         [
             "multiline-raw-expression",
-            "§M{m001:MultilineExpression}   \n" +
-            "  §F{f001:Get:pub} () -> i32\n" +
+            "§M{MultilineExpression}   \n" +
+            "  §F{Get:pub} () -> i32\n" +
             "    §R §CS{\n" +
             "      1 +   \n" +
             "        2\t\n" +
@@ -307,8 +307,8 @@ public sealed class LosslessFormattingTests : IDisposable
         yield return
         [
             "multiline-raw-block",
-            "§M{m001:MultilineRaw}   \n" +
-                        "  §F{f001:Main:pub} () -> void\n" +
+            "§M{MultilineRaw}   \n" +
+                        "  §F{Main:pub} () -> void\n" +
                         "    §E{cw}\n" +
                         "    §RAW\n" +
                         "var rawKeep = \"keep\";   \n" +
@@ -319,7 +319,7 @@ public sealed class LosslessFormattingTests : IDisposable
         yield return
         [
             "multiline-interop-block",
-            "§M{m001:MultilineInterop}   \n" +
+            "§M{MultilineInterop}   \n" +
             "  §CSHARP{\n" +
             "public static class InteropKeep\n" +
             "{\n" +
@@ -334,8 +334,8 @@ public sealed class LosslessFormattingTests : IDisposable
     public void CrOnlyInput_FormatsWithoutLineDesynchronization()
     {
         const string source =
-            "§M{m001:CrOnly}\r" +
-            "    §F{f001:Main:pub} () -> void   \r" +
+            "§M{CrOnly}\r" +
+            "    §F{Main:pub} () -> void   \r" +
             "        §E{cw}\r" +
             "        §P \"ok\"   \r";
 
@@ -344,8 +344,8 @@ public sealed class LosslessFormattingTests : IDisposable
         Assert.True(result.Success, string.Join("\n", result.Errors));
         Assert.False(result.UsedConservativeFallback, result.ConservativeFallbackReason);
         Assert.Equal(
-            "§M{m001:CrOnly}\r" +
-            "  §F{f001:Main:pub} () -> void\r" +
+            "§M{CrOnly}\r" +
+            "  §F{Main:pub} () -> void\r" +
             "    §E{cw}\r" +
             "    §P \"ok\"\r",
             result.Formatted);
@@ -355,8 +355,8 @@ public sealed class LosslessFormattingTests : IDisposable
     public void MixedLoneCrInput_PreservesEveryTerminatorAndRemainsIdempotent()
     {
         const string source =
-            "§M{m001:MixedCr}\r\n" +
-            "    §F{f001:Main:pub} () -> void   \r" +
+            "§M{MixedCr}\r\n" +
+            "    §F{Main:pub} () -> void   \r" +
             "        §E{cw}\n" +
             "        §P \"ok\"   \r\n";
         var formatter = new CalorFormatter();
@@ -382,7 +382,7 @@ public sealed class LosslessFormattingTests : IDisposable
     {
         var source = string.Join(
             "\n",
-            "§M{m001:Trivia}   ",
+            "§M{Trivia}   ",
             "  // comment whitespace is content   ",
             "  §RAW",
             "var value001 = 1;   ",
@@ -403,8 +403,8 @@ public sealed class LosslessFormattingTests : IDisposable
     {
         var path = Path.Combine(_testDirectory, $"{encodingName}.calr");
         const string source =
-            "§M{m001:Encoding}\r\n" +
-            "    §F{f001:Main:pub} () -> void   \n" +
+            "§M{Encoding}\r\n" +
+            "    §F{Main:pub} () -> void   \n" +
             "        §E{cw}\r\n" +
             "        §P \"é\" \r\n";
         var encoding = encodingName == "utf8-bom"
@@ -428,7 +428,7 @@ public sealed class LosslessFormattingTests : IDisposable
         Assert.Contains("\r\n", rewritten.Text, StringComparison.Ordinal);
         Assert.Contains("void\n", rewritten.Text, StringComparison.Ordinal);
         Assert.EndsWith("\r\n", rewritten.Text, StringComparison.Ordinal);
-        Assert.Contains("§F{f001:Main:pub}", rewritten.Text, StringComparison.Ordinal);
+        Assert.Contains("§F{Main:pub}", rewritten.Text, StringComparison.Ordinal);
         Assert.Contains("§P \"é\"", rewritten.Text, StringComparison.Ordinal);
     }
 
@@ -438,7 +438,7 @@ public sealed class LosslessFormattingTests : IDisposable
         var path = Path.Combine(_testDirectory, "atomic.calr");
         var original = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true)
             .GetPreamble()
-            .Concat(Encoding.UTF8.GetBytes("§M{m001:Atomic}   \r\n"))
+            .Concat(Encoding.UTF8.GetBytes("§M{Atomic}   \r\n"))
             .ToArray();
         await File.WriteAllBytesAsync(path, original);
 
@@ -469,8 +469,8 @@ public sealed class LosslessFormattingTests : IDisposable
         var target = Path.Combine(_testDirectory, "symlink-target.calr");
         var link = Path.Combine(_testDirectory, "symlink.calr");
         const string source =
-            "§M{m001:Symlink}\n" +
-            "    §F{f001:Main:pub} () -> void   \n";
+            "§M{Symlink}\n" +
+            "    §F{Main:pub} () -> void   \n";
         await File.WriteAllTextAsync(target, source);
         File.CreateSymbolicLink(link, target);
 
@@ -497,8 +497,8 @@ public sealed class LosslessFormattingTests : IDisposable
         var path = Path.Combine(_testDirectory, "hardlink-source.calr");
         var alias = Path.Combine(_testDirectory, "hardlink-alias.calr");
         const string source =
-            "§M{m001:HardLink}\n" +
-            "    §F{f001:Main:pub} () -> void   \n";
+            "§M{HardLink}\n" +
+            "    §F{Main:pub} () -> void   \n";
         await File.WriteAllTextAsync(path, source);
         Assert.Equal(0, CreateHardLink(path, alias));
         Assert.True(NativeFileLinks.TryGetLinkCount(path) > 1);
@@ -692,8 +692,8 @@ public sealed class LosslessFormattingTests : IDisposable
 
         var path = Path.Combine(_testDirectory, "mode.calr");
         const string source =
-            "§M{m001:Mode}\n" +
-            "    §F{f001:Main:pub} () -> void   \n";
+            "§M{Mode}\n" +
+            "    §F{Main:pub} () -> void   \n";
         await File.WriteAllTextAsync(path, source);
         var originalMode = UnixFileMode.UserRead
             | UnixFileMode.UserWrite
@@ -733,8 +733,8 @@ public sealed class LosslessFormattingTests : IDisposable
     public void SemanticHashGeneratedCSharpAndPublicApi_AreEquivalent()
     {
         const string source = """
-            §M{m001:Api}
-                §F{f001:Add001:pub} (i32:user001, i32:value001) -> i32
+            §M{Api}
+                §F{Add001:pub} (i32:user001, i32:value001) -> i32
                     §R (+ user001 value001)
             """;
         var formatter = new CalorFormatter();
@@ -763,8 +763,8 @@ public sealed class LosslessFormattingTests : IDisposable
     public void SemanticallyUnsupportedInput_UsesDocumentedConservativeFallback()
     {
         const string source = """
-            §M{m001:Unsupported}
-                §F{f001:Main:pub} () -> void
+            §M{Unsupported}
+                §F{Main:pub} () -> void
                     §P "missing effect declaration"
             """;
 

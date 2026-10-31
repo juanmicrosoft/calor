@@ -15,18 +15,18 @@ public class ApiStrictnessCheckerTests
     {
         var source = string.Join(newline,
             "/// Module documentation.",
-            "§M{m1:Docs}",
+            "§M{Docs}",
             "  /// Function documentation.",
             "  /// A second line.",
-            "  §F{f1:Run:pub} () -> void",
+            "  §F{Run:pub} () -> void",
             "  /// Class documentation.",
-            "  §CL{c1:Widget:pub}",
+            "  §CL{Widget:pub}",
             "    /// Method documentation.",
-            "    §MT{mt1:Work:pub} () -> void",
+            "    §MT{Work:pub} () -> void",
             "    /// Property documentation.",
-            "    §PROP{p1:Value:i32:pub:get}",
+            "    §PROP{Value:i32:pub:get}",
             "  /// Interface documentation.",
-            "  §IFACE{i1:IWidget}");
+            "  §IFACE{IWidget}");
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         Assert.Equal("Module documentation.", module.DocComment);
@@ -52,7 +52,7 @@ public class ApiStrictnessCheckerTests
     [InlineData("/// detached documentation\n// ordinary comment\n")]
     public void DocumentationComments_DoNotAcceptEmptyOrdinaryOrDetachedComments(string comment)
     {
-        var module = Parse(comment + "§M{m1:Docs}", out var diagnostics);
+        var module = Parse(comment + "§M{Docs}", out var diagnostics);
         new ApiStrictnessChecker(diagnostics, new ApiStrictnessOptions { RequireDocs = true }).Check(module);
         Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.MissingDocComment);
     }
@@ -72,8 +72,8 @@ public class ApiStrictnessCheckerTests
     public void Check_DefaultMode_NoWarningsOnPublicFunction()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §O{void}
 ";
         var module = Parse(source, out var parseDiagnostics);
@@ -90,8 +90,8 @@ public class ApiStrictnessCheckerTests
     public void Check_DefaultMode_NoWarningsOnPrivateFunction()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:priv}
+§M{Test}
+  §F{Test:priv}
       §O{void}
 ";
         var module = Parse(source, out var parseDiagnostics);
@@ -112,8 +112,8 @@ public class ApiStrictnessCheckerTests
     public void Check_RequireDocs_WarnsOnUndocumentedPublicFunction()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §O{void}
 ";
         var module = Parse(source, out var parseDiagnostics);
@@ -131,8 +131,8 @@ public class ApiStrictnessCheckerTests
     public void Check_RequireDocs_NoWarningOnPrivateFunction()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:PrivateHelper:priv}
+§M{Test}
+  §F{PrivateHelper:priv}
       §O{void}
 ";
         var module = Parse(source, out var parseDiagnostics);
@@ -153,7 +153,7 @@ public class ApiStrictnessCheckerTests
     public void Check_RequireDocs_WarnsOnUndocumentedModule()
     {
         var source = @"
-§M{m001:Test}
+§M{Test}
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -176,8 +176,8 @@ public class ApiStrictnessCheckerTests
     public void Check_StrictApi_WarnsOnPublicFunctionWithoutContractsOrDocs()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §O{void}
 ";
         var module = Parse(source, out var parseDiagnostics);
@@ -197,8 +197,8 @@ public class ApiStrictnessCheckerTests
     public void Check_StrictApi_NoWarningOnFunctionWithContracts()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -228,8 +228,8 @@ public class ApiStrictnessCheckerTests
     public void Check_RequireStabilityMarkers_InfoOnFunctionWithoutSince()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §O{void}
 ";
         var module = Parse(source, out var parseDiagnostics);
@@ -253,8 +253,8 @@ public class ApiStrictnessCheckerTests
     public void Check_StrictPreset_ChecksAllRules()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §O{void}
 ";
         var module = Parse(source, out var parseDiagnostics);
@@ -277,8 +277,8 @@ public class ApiStrictnessCheckerTests
     public void Compare_NoChanges_NoBrokenChanges()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §O{i32}
       §R x
@@ -300,15 +300,15 @@ public class ApiStrictnessCheckerTests
     public void Compare_ParameterTypeChange_ReportsBreakingChange()
     {
         var oldSource = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §O{i32}
       §R x
 ";
         var newSource = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{str:x}
       §O{i32}
       §R 0
@@ -330,15 +330,15 @@ public class ApiStrictnessCheckerTests
     public void Compare_ParameterCountChange_ReportsBreakingChange()
     {
         var oldSource = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §O{i32}
       §R x
 ";
         var newSource = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -361,15 +361,15 @@ public class ApiStrictnessCheckerTests
     public void Compare_FunctionRemoved_ReportsBreakingChange()
     {
         var oldSource = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §O{void}
-  §F{f002:Helper:pub}
+  §F{Helper:pub}
       §O{void}
 ";
         var newSource = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §O{void}
 ";
         var oldModule = Parse(oldSource, out var oldDiagnostics);
@@ -389,15 +389,15 @@ public class ApiStrictnessCheckerTests
     public void Compare_FunctionAdded_NotBreakingChange()
     {
         var oldSource = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §O{void}
 ";
         var newSource = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §O{void}
-  §F{f002:NewFunction:pub}
+  §F{NewFunction:pub}
       §O{void}
 ";
         var oldModule = Parse(oldSource, out var oldDiagnostics);
@@ -417,14 +417,14 @@ public class ApiStrictnessCheckerTests
     public void Compare_ReturnTypeChange_ReportsBreakingChange()
     {
         var oldSource = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §O{i32}
       §R 0
 ";
         var newSource = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §O{str}
       §R ""hello""
 ";

@@ -34,8 +34,8 @@ public class EffectsSuggestTests
     public void Collector_FindsExternalCalls()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §O{void}
       §C{Console.WriteLine} §A STR:""test"" §/C
       §C{MyService.Process} §/C
@@ -51,8 +51,8 @@ public class EffectsSuggestTests
     public void Collector_DeduplicatesCalls()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §O{void}
       §C{Console.WriteLine} §A STR:""a"" §/C
       §C{Console.WriteLine} §A STR:""b"" §/C
@@ -68,8 +68,8 @@ public class EffectsSuggestTests
     public void Collector_ExpandsShortNames()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §O{void}
       §C{File.ReadAllText} §A STR:""test.txt"" §/C
       §C{HttpClient.GetAsync} §A STR:""url"" §/C
@@ -85,9 +85,9 @@ public class EffectsSuggestTests
     public void Collector_WalksClassMethods()
     {
         var source = @"
-§M{m001:Test}
-  §CL{c001:MyClass:pub}
-      §MT{mt001:DoWork:pub}
+§M{Test}
+  §CL{MyClass:pub}
+      §MT{DoWork:pub}
           §O{void}
           §C{ExternalService.Call} §/C
 ";
@@ -101,8 +101,8 @@ public class EffectsSuggestTests
     public void Collector_ResolvesVariableTypes()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §O{void}
       §B{r} §NEW{Random} §/NEW
       §C{r.Next} §/C
@@ -118,11 +118,11 @@ public class EffectsSuggestTests
     public void Collector_UsesBoundReceiverIdentityForShadowedNames()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §O{void}
       §B{r} §NEW{Random} §/NEW
-      §IF{if1} BOOL:true
+      §IF BOOL:true
           §B{r} §NEW{HttpClient} §/NEW
           §C{r.GetAsync} §A STR:""/"" §/C
       §C{r.Next} §/C
@@ -182,8 +182,8 @@ public class EffectsSuggestTests
     public void E1_ExitPin_ReceiverTypeKnownOnlyThroughMetadata_Resolves()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §O{void}
       §B{g} §C{System.Guid.NewGuid} §/C
       §C{g.ToString} §/C
@@ -211,8 +211,8 @@ public class EffectsSuggestTests
     public void Collector_InferredBinding_ResolvesReceiverFromBoundType()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §O{void}
       §B{sb} §NEW{System.Text.StringBuilder} §/NEW
       §C{sb.Append} §A STR:""x"" §/C
@@ -245,16 +245,16 @@ public class EffectsSuggestTests
     public void Collector_UnresolvedReceiver_IsReportedWithoutGuessedType()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §O{void}
       §B{x} §C{Unknown.Make} §/C
       §C{x.Run} §/C
       §B{a} §NEW{Random} §/NEW
       §C{a.b.Chain} §/C
       §C{foo.Bar} §/C
-  §CL{c001:Holder:pub}
-      §MT{mt001:Write:pub}
+  §CL{Holder:pub}
+      §MT{Write:pub}
           §O{void}
           §C{this.sb.Append} §A STR:""x"" §/C
 ";
@@ -301,10 +301,10 @@ public class EffectsSuggestTests
     public void Collector_FunctionTypedReceiver_IsUnresolved()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §O{void}
-      §B{f} §LAM{lam1:x:i32} (+ x 1) §/LAM{lam1}
+      §B{f} §LAM{x:i32} (+ x 1) §/LAM
       §C{f.Invoke} §A INT:1 §/C
 ";
         var module = Parse(source);
@@ -324,8 +324,8 @@ public class EffectsSuggestTests
     public void Collector_ArrayReceiver_ResolvesToSystemArray()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §I{i32[]:arr}
       §O{void}
       §C{arr.Clone} §/C
@@ -351,11 +351,11 @@ public class EffectsSuggestTests
     public void Collector_CalorClassStaticReceiver_ResolvesThroughTypeSymbol()
     {
         var source = @"
-§M{m001:Test}
-  §CL{c001:Helper:pub}
-      §MT{mt001:Run:pub}
+§M{Test}
+  §CL{Helper:pub}
+      §MT{Run:pub}
           §O{void}
-  §F{f001:DoWork:pub}
+  §F{DoWork:pub}
       §O{void}
       §C{Helper.Run} §/C
       §C{OrderRepo.Save} §/C
@@ -424,12 +424,12 @@ public class EffectsSuggestTests
     public void E1_Slice2a_UnboundDottedHead_YieldsNullReceiverAndUnresolvedCall()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §O{void}
       §C{foo.Bar} §/C
-  §CL{c001:Holder:pub}
-      §MT{mt001:Write:pub}
+  §CL{Holder:pub}
+      §MT{Write:pub}
           §O{void}
           §C{this.sb.Append} §A STR:""x"" §/C
 ";
@@ -457,8 +457,8 @@ public class EffectsSuggestTests
     public void E1_Slice2a_MetadataOnlyReceiver_CarriesNominalBoundTypeOnReceiver()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §O{void}
       §B{g} §C{System.Guid.NewGuid} §/C
       §C{g.ToString} §/C
@@ -505,8 +505,8 @@ public class EffectsSuggestTests
     public void E1_Slice2a_UnresolvedReceiver_ReportsCalor0270OnceAndIsNeverResolved()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §O{void}
       §B{x} §C{Unknown.Make} §/C
       §C{x.Run} §/C
@@ -543,8 +543,8 @@ public class EffectsSuggestTests
     public void E1_Slice2a_ReceiverShapes_AreTheFourDocumentedOnes()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §O{void}
       §B{sb} §NEW{System.Text.StringBuilder} §/NEW
       §C{sb.Append} §A STR:""x"" §/C
@@ -601,8 +601,8 @@ public class EffectsSuggestTests
     public void E1_Slice2a_Calor0270_FiresOnlyForActionableReceiverShapes()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §O{void}
       §B{x} §C{Unknown.Make} §/C
       §C{x.Run} §/C
@@ -644,12 +644,12 @@ public class EffectsSuggestTests
     public void E1_Slice2a_UninferredLambdaParameterReceiver_IsUnresolvedNotAnIce()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §O{void}
-      §B{f} §LAM{l1:ctx:?}
+      §B{f} §LAM{ctx:?}
           §C{ctx.Trim} §/C
-      §/LAM{l1}
+      §/LAM
 ";
         var module = Parse(source);
         var (bound, diagnostics) = Bind(module);
@@ -681,8 +681,8 @@ public class EffectsSuggestTests
     public void E1_Slice2a_ReceiverAndReceiverSymbol_DoNotDrift()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §O{void}
       §B{sb} §NEW{System.Text.StringBuilder} §/NEW
       §C{sb.Append} §A STR:""x"" §/C
@@ -745,8 +745,8 @@ public class EffectsSuggestTests
     public void Collector_TagsConstructors()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §O{void}
       §B{x} §NEW{HttpClient} §/NEW
 ";
@@ -764,11 +764,11 @@ public class EffectsSuggestTests
     public void InternalFunction_NotIncludedWhenFiltered()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Helper:pub}
+§M{Test}
+  §F{Helper:pub}
       §O{void}
       §C{Console.WriteLine} §A STR:""internal"" §/C
-  §F{f002:Main:pub}
+  §F{Main:pub}
       §O{void}
       §C{Helper}
       §/C
@@ -802,8 +802,8 @@ public class EffectsSuggestTests
     public void AllResolved_ProducesEmptyList()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §O{void}
       §C{Console.WriteLine} §A STR:""test"" §/C
       §C{Math.Abs} §A INT:42 §/C
@@ -825,8 +825,8 @@ public class EffectsSuggestTests
     public void NoExternalCalls_ProducesEmptyList()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
+§M{Test}
+  §F{Add:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -1002,8 +1002,8 @@ public class EffectsSuggestTests
     {
         // Step 1: Source with an unknown external call
         var source = @"
-§M{m001:Test}
-  §F{f001:ProcessOrder:pub}
+§M{Test}
+  §F{ProcessOrder:pub}
       §O{void}
       §E{cw}
       §C{Console.WriteLine} §A STR:""Starting"" §/C
@@ -1053,8 +1053,8 @@ public class EffectsSuggestTests
 
         // Step 6: Full compilation should succeed with correct effect declarations
         var fullSource = @"
-§M{m001:Test}
-  §F{f001:ProcessOrder:pub}
+§M{Test}
+  §F{ProcessOrder:pub}
       §O{void}
       §E{cw,db:w}
       §C{Console.WriteLine} §A STR:""Starting"" §/C
@@ -1084,16 +1084,16 @@ public class EffectsSuggestTests
     {
         // File A defines a helper function
         var sourceA = @"
-§M{m001:Helpers}
-  §F{f001:FormatName:pub}
+§M{Helpers}
+  §F{FormatName:pub}
       §I{str:name}
       §O{str}
       §R name
 ";
         // File B calls the helper + an external type
         var sourceB = @"
-§M{m002:App}
-  §F{f002:ProcessUser:pub}
+§M{App}
+  §F{ProcessUser:pub}
       §O{void}
       §C{FormatName} §A STR:""test"" §/C
       §C{ExternalApi.Submit} §/C
@@ -1133,8 +1133,8 @@ public class EffectsSuggestTests
     public void Constructor_CollectedWithTypeNameAndCtorKind()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §O{void}
       §B{svc} §NEW{OrderService} §/NEW
       §B{client} §NEW{HttpClient} §/NEW

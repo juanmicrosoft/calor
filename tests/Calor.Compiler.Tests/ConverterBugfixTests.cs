@@ -260,8 +260,8 @@ public class Test
     public void Parser_StModifier_OnClass_SetsIsStatic()
     {
         var source = @"
-§M{m1:Test}
-  §M{c1:Helper}";
+§M{Test}
+  §M{Helper}";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
         Assert.True(cls.IsStatic);
@@ -271,9 +271,9 @@ public class Test
     public void Parser_StModifier_OnMethod_SetsIsStatic()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Helper}
-    §MT{m1:Greet:pub:st}";
+§M{Test}
+  §CL{Helper}
+    §MT{Greet:pub:st}";
         var module = ParseModule(source);
         var method = module.Classes[0].Methods[0];
         Assert.True(method.Modifiers.HasFlag(Calor.Compiler.Ast.MethodModifiers.Static));
@@ -283,8 +283,8 @@ public class Test
     public void Parser_StModifier_OnClass_EmitsStaticInCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §M{c1:Helper}";
+§M{Test}
+  §M{Helper}";
         var csharp = ParseAndEmit(source);
         Assert.Contains("static class Helper", csharp);
     }
@@ -406,9 +406,9 @@ public class Test
     public void TypeMapper_DecRoundtripsToDecimal()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Calc}
-    §MT{m1:GetPrice:pub}
+§M{Test}
+  §CL{Calc}
+    §MT{GetPrice:pub}
         §O{dec}
         §R 0";
         var csharp = ParseAndEmit(source);
@@ -423,9 +423,9 @@ public class Test
     public void Parser_NewExpression_EmptyParens_ParsesWithoutError()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyClass}
-    §MT{m1:Create:pub}
+§M{Test}
+  §CL{MyClass}
+    §MT{Create:pub}
         §R §NEW{MyClass}()§/NEW";
         var module = ParseModule(source);
         Assert.NotNull(module);
@@ -435,14 +435,14 @@ public class Test
     public void Parser_NewExpression_EmptyParens_EquivalentToWithout()
     {
         var sourceWithParens = @"
-§M{m1:Test}
-  §CL{c1:MyClass}
-    §MT{m1:Create:pub}
+§M{Test}
+  §CL{MyClass}
+    §MT{Create:pub}
         §R §NEW{MyClass}()§/NEW";
         var sourceWithout = @"
-§M{m1:Test}
-  §CL{c1:MyClass}
-    §MT{m1:Create:pub}
+§M{Test}
+  §CL{MyClass}
+    §MT{Create:pub}
         §R §NEW{MyClass}§/NEW";
         var csharp1 = ParseAndEmit(sourceWithParens);
         var csharp2 = ParseAndEmit(sourceWithout);
@@ -458,8 +458,8 @@ public class Test
     public void Parser_StaticStructDeclaration_IsRejected()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Point:st struct}";
+§M{Test}
+  §CL{Point:st struct}";
         var result = Program.Compile(source, "static-struct.calr");
         Assert.Contains(result.Diagnostics.Errors, diagnostic =>
             diagnostic.Code == DiagnosticCode.InvalidModifier
@@ -470,8 +470,8 @@ public class Test
     public void Parser_StructAlone_IsNotStatic()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Point:struct}";
+§M{Test}
+  §CL{Point:struct}";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
         Assert.False(cls.IsStatic, "struct alone should not be static");
@@ -486,9 +486,9 @@ public class Test
     public void Parser_NewExpression_EmptyParens_WithTrailingMemberAccess()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyClass}
-    §MT{m1:GetName:pub}
+§M{Test}
+  §CL{MyClass}
+    §MT{GetName:pub}
         §R §NEW{MyClass}()§/NEW.ToString";
         var csharp = ParseAndEmit(source);
         // Should produce new MyClass().ToString() in the output
@@ -846,11 +846,11 @@ public class Test
     {
         // §K Status.OK in Calor source should parse correctly and emit Status.OK in C#
         var source = @"
-§M{m1:Test}
-  §F{f001:Describe:pub}
+§M{Test}
+  §F{Describe:pub}
       §I{i32:status}
       §O{str}
-      §R §W{m1} status
+      §R §W status
           §K Status.OK → ""ok""
           §K Status.Error → ""error""
           §K _ → ""unknown""
@@ -896,8 +896,8 @@ public class Test
     public void IDX_SimpleRef_ParsesAndEmitsValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~result:str} §IDX{words} 0
 ";
@@ -1117,9 +1117,9 @@ public class Test
     public void CalorParser_TernaryLispSyntax_ParsesCorrectly()
     {
         var calor = """
-            §M{m001:TestModule}
-                §CL{c001:Test}
-                    §MT{m001:Max:pub}
+            §M{TestModule}
+                §CL{Test}
+                    §MT{Max:pub}
                         §I{i32:a}
                         §I{i32:b}
                         §O{i32}

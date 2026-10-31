@@ -66,12 +66,12 @@ public class BclLoweringPrerequisiteTests
     public void MetadataArrayResults_AreIndexedByCallerAndExpressionSpan()
     {
         var source = """
-            §M{m1:MetadataArrays}
+            §M{MetadataArrays}
               §U{ReflectionType:System.Type}
-              §F{f1:Known:pub} (ReflectionType:receiver) -> i32
+              §F{Known:pub} (ReflectionType:receiver) -> i32
                 §B{arguments} §C{receiver.GetGenericArguments}
                 §R arguments.Length
-              §F{f2:Unknown:pub} (Missing:receiver) -> i32
+              §F{Unknown:pub} (Missing:receiver) -> i32
                 §B{arguments} §C{receiver.GetGenericArguments}
                 §R arguments.Length
             """;
@@ -96,8 +96,8 @@ public class BclLoweringPrerequisiteTests
     public void MetadataArrayResult_IsInvalidatedByMutableRebinding()
     {
         var source = """
-            §M{m1:MetadataArrays}
-              §F{f1:Run:pub} (System.Type:receiver) -> i32
+            §M{MetadataArrays}
+              §F{Run:pub} (System.Type:receiver) -> i32
                 §B{~values} §C{receiver.GetGenericArguments}
                 §B{~values} 3
                 §R values.Length
@@ -112,10 +112,10 @@ public class BclLoweringPrerequisiteTests
     public void MutableCapturedArrayResult_IsNotADeferredTypeGuarantee()
     {
         var source = """
-            §M{m1:MetadataArrays}
-              §F{f1:Run:pub} (System.Type:receiver) -> i32
+            §M{MetadataArrays}
+              §F{Run:pub} (System.Type:receiver) -> i32
                 §B{~values} §C{receiver.GetGenericArguments}
-                §B{read} §LAM{l1} values.Length §/LAM{l1}
+                §B{read} §LAM{} values.Length §/LAM
                 §B{~values} 3
                 §R §C{read}
             """;
@@ -131,8 +131,8 @@ public class BclLoweringPrerequisiteTests
     public void InstanceArrayCallThroughType_DoesNotEstablishAProducerType()
     {
         var source = """
-            §M{m1:MetadataArrays}
-              §F{f1:Run:pub} () -> i32
+            §M{MetadataArrays}
+              §F{Run:pub} () -> i32
                 §B{values} §C{System.Type.GetGenericArguments}
                 §R values.Length
             """;
@@ -365,8 +365,8 @@ public class BclLoweringPrerequisiteTests
     public void BclContracts_CompileAndExecuteWithAndWithoutVerification(bool verify)
     {
         var source = """
-            §M{m1:BclContracts}
-              §F{f1:Run:pub} (str:s) -> bool
+            §M{BclContracts}
+              §F{Run:pub} (str:s) -> bool
                 §E{}
                 §Q §C{s.Contains} §A "b" §/C
                 §S (== result §C{s.StartsWith} §A "a" §A System.StringComparison.Ordinal §/C)

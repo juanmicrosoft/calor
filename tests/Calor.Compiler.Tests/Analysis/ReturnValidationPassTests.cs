@@ -47,8 +47,8 @@ public class ReturnValidationPassTests
     public void VoidFunction_InlineHeader_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §F{f1:Do:pub} () -> void
+§M{T}
+  §F{Do:pub} () -> void
     §R INT:0
 ");
     }
@@ -57,8 +57,8 @@ public class ReturnValidationPassTests
     public void VoidFunction_OmittedReturnType_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §F{f1:Do:pub}
+§M{T}
+  §F{Do:pub}
     §R INT:0
 ");
     }
@@ -67,8 +67,8 @@ public class ReturnValidationPassTests
     public void VoidFunction_OutputVoidMarker_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §F{f1:Do:pub}
+§M{T}
+  §F{Do:pub}
     §O{void}
     §R INT:0
 ");
@@ -78,8 +78,8 @@ public class ReturnValidationPassTests
     public void AsyncVoidFunction_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §AF{f1:DoAsync:pub}
+§M{T}
+  §AF{DoAsync:pub}
     §R INT:0
 ");
     }
@@ -88,8 +88,8 @@ public class ReturnValidationPassTests
     public void Iterator_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §F{f1:Nums:pub}
+§M{T}
+  §F{Nums:pub}
     §O{i32}
     §YIELD 42
     §R INT:0
@@ -100,9 +100,9 @@ public class ReturnValidationPassTests
     public void VoidMethod_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §CL{c1:C:pub}
-    §MT{mt1:Do:pub} () -> void
+§M{T}
+  §CL{C:pub}
+    §MT{Do:pub} () -> void
       §R INT:0
 ");
     }
@@ -111,9 +111,9 @@ public class ReturnValidationPassTests
     public void Constructor_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §CL{c1:C:pub}
-    §CTOR{ctor1:pub} ()
+§M{T}
+  §CL{C:pub}
+    §CTOR{pub} ()
       §R INT:0
 ");
     }
@@ -122,16 +122,16 @@ public class ReturnValidationPassTests
     public void Setter_ReturnsValue_Fires_ButGetterDoesNot()
     {
         AssertFires(@"
-§M{m1:T}
-  §CL{c1:C:pub}
-    §PROP{p1:Name:str:pub}
+§M{T}
+  §CL{C:pub}
+    §PROP{Name:str:pub}
       §GET
         §R ""x""
       §/GET
       §SET
         §R INT:0
       §/SET
-    §/PROP{p1}
+    §/PROP
 ");
     }
 
@@ -139,13 +139,13 @@ public class ReturnValidationPassTests
     public void EventAddAccessor_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §CL{c1:C:pub}
-    §EVT{e1:Click:pub:EventHandler}
+§M{T}
+  §CL{C:pub}
+    §EVT{Click:pub:EventHandler}
     §EADD
     §R INT:0
     §/EADD
-    §/EVT{e1}
+    §/EVT
 ");
     }
 
@@ -153,12 +153,12 @@ public class ReturnValidationPassTests
     public void EnumExtensionVoidMethod_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §EEXT{ext1:Color}
-    §F{f1:Describe:pub}
+§M{T}
+  §EEXT{Color}
+    §F{Describe:pub}
       §I{Color:self}
       §R INT:0
-  §/EEXT{ext1}
+  §/EEXT
 ");
     }
 
@@ -166,9 +166,9 @@ public class ReturnValidationPassTests
     public void NestedInIf_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §F{f1:Do:pub} () -> void
-    §IF{if1} BOOL:true
+§M{T}
+  §F{Do:pub} () -> void
+    §IF BOOL:true
       §R INT:0
 ");
     }
@@ -177,9 +177,9 @@ public class ReturnValidationPassTests
     public void NestedInForLoop_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §F{f1:Do:pub} () -> void
-    §L{for1:i:1:10:1}
+§M{T}
+  §F{Do:pub} () -> void
+    §L{i:1:10:1}
       §R INT:0
 ");
     }
@@ -188,9 +188,9 @@ public class ReturnValidationPassTests
     public void NestedInWhile_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §F{f1:Do:pub} () -> void
-    §WH{w1} BOOL:true
+§M{T}
+  §F{Do:pub} () -> void
+    §WH BOOL:true
       §R INT:0
 ");
     }
@@ -199,13 +199,13 @@ public class ReturnValidationPassTests
     public void NestedInTryBody_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §F{f1:Do:pub} () -> void
-    §TR{t1}
+§M{T}
+  §F{Do:pub} () -> void
+    §TR
     §R INT:0
     §CA{Exception:e}
     §P ""x""
-    §/TR{t1}
+    §/TR
 ");
     }
 
@@ -218,8 +218,8 @@ public class ReturnValidationPassTests
     public void VoidFunction_DefiniteValueForms_Fire(string valueExpr)
     {
         AssertFires($@"
-§M{{m1:T}}
-  §F{{f1:Do:pub}} () -> void
+§M{{T}}
+  §F{{Do:pub}} () -> void
     §R {valueExpr}
 ");
     }
@@ -228,8 +228,8 @@ public class ReturnValidationPassTests
     public void VoidFunction_ReturnsReference_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §F{f1:Do:pub}
+§M{T}
+  §F{Do:pub}
     §I{i32:x}
     §O{void}
     §R x
@@ -242,8 +242,8 @@ public class ReturnValidationPassTests
     public void NonVoidFunction_ReturnsValue_Silent()
     {
         AssertSilent(@"
-§M{m1:T}
-  §F{f1:Do:pub} () -> i32
+§M{T}
+  §F{Do:pub} () -> i32
     §R INT:0
 ");
     }
@@ -252,8 +252,8 @@ public class ReturnValidationPassTests
     public void VoidFunction_BareReturn_Silent()
     {
         AssertSilent(@"
-§M{m1:T}
-  §F{f1:Do:pub} () -> void
+§M{T}
+  §F{Do:pub} () -> void
     §R
 ");
     }
@@ -262,8 +262,8 @@ public class ReturnValidationPassTests
     public void AsyncFunctionWithReturnType_ReturnsValue_Silent()
     {
         AssertSilent(@"
-§M{m1:T}
-  §AF{f1:GetAsync:pub}
+§M{T}
+  §AF{GetAsync:pub}
     §O{str}
     §R ""data""
 ");
@@ -275,8 +275,8 @@ public class ReturnValidationPassTests
         // A call can be void-typed (a migrated `void F() => VoidCall();` lowers to
         // `§R <call>`), so the pass conservatively does not flag it.
         AssertSilent(@"
-§M{m1:T}
-  §F{f1:Do:pub} () -> void
+§M{T}
+  §F{Do:pub} () -> void
     §R §C{Helper.Run} INT:1
 ");
     }
@@ -285,13 +285,13 @@ public class ReturnValidationPassTests
     public void Getter_ReturnsValue_Silent()
     {
         AssertSilent(@"
-§M{m1:T}
-  §CL{c1:C:pub}
-    §PROP{p1:Name:str:pub}
+§M{T}
+  §CL{C:pub}
+    §PROP{Name:str:pub}
       §GET
         §R ""x""
       §/GET
-    §/PROP{p1}
+    §/PROP
 ");
     }
 
@@ -299,9 +299,9 @@ public class ReturnValidationPassTests
     public void AbstractMethod_NoBody_Silent()
     {
         AssertSilent(@"
-§M{m1:T}
-  §CL{c1:C:int:abs}
-    §MT{mt1:Do:pub:abs} () -> void
+§M{T}
+  §CL{C:int:abs}
+    §MT{Do:pub:abs} () -> void
 ");
     }
 
@@ -309,9 +309,9 @@ public class ReturnValidationPassTests
     public void VoidMethodWithModifier_BareReturn_Silent()
     {
         AssertSilent(@"
-§M{m1:T}
-  §CL{c1:C:pub}
-    §MT{mt1:Do:pub:stat} () -> void
+§M{T}
+  §CL{C:pub}
+    §MT{Do:pub:stat} () -> void
       §R
 ");
     }
@@ -322,8 +322,8 @@ public class ReturnValidationPassTests
     public void Compile_VoidFunctionReturningValue_EmitsCalor0205_WithoutTypeChecking()
     {
         var source = @"
-§M{m1:T}
-  §F{f1:Do:pub} () -> void
+§M{T}
+  §F{Do:pub} () -> void
     §R INT:0
 ";
         var result = Program.Compile(source, filePath: null, new CompilationOptions { EnableTypeChecking = false });
@@ -336,8 +336,8 @@ public class ReturnValidationPassTests
     public void Compile_CleanVoidFunction_NoCalor0205()
     {
         var source = @"
-§M{m1:T}
-  §F{f1:Do:pub} () -> void
+§M{T}
+  §F{Do:pub} () -> void
     §R
 ";
         var result = Program.Compile(source, filePath: null, new CompilationOptions { EnableTypeChecking = false });

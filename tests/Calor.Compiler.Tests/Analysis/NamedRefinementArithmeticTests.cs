@@ -128,10 +128,10 @@ public class NamedRefinementArithmeticTests
     {
         // i32 refinement with an f64 value widens to f64, exactly as plain i32 + f64 does.
         AssertNoErrors("""
-            §M{m:R}
-              §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §RTYPE{r2:Pos:f64} (> # FLOAT:0.0)
-              §F{f1:Mix:pub} (Nat:a, Pos:x) -> f64
+            §M{R}
+              §RTYPE{Nat:i32} (>= # INT:0)
+              §RTYPE{Pos:f64} (> # FLOAT:0.0)
+              §F{Mix:pub} (Nat:a, Pos:x) -> f64
                 §B{y:f64} (+ a x)
                 §R (* y a)
             """);
@@ -163,13 +163,13 @@ public class NamedRefinementArithmeticTests
     public void UnaryMinus_ResultIsTheBaseType_NotTheRefinementNorAnErrorType()
     {
         var result = Check("""
-            §M{m:R}
-              §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §RTYPE{r2:Pos:f64} (> # FLOAT:0.0)
-              §F{f1:Neg:pub} (Nat:a) -> i32
+            §M{R}
+              §RTYPE{Nat:i32} (>= # INT:0)
+              §RTYPE{Pos:f64} (> # FLOAT:0.0)
+              §F{Neg:pub} (Nat:a) -> i32
                 §B{y:Nat} (- a)
                 §R y
-              §F{f2:NegF:pub} (Pos:x) -> i32
+              §F{NegF:pub} (Pos:x) -> i32
                 §B{z:i32} (- x)
                 §R z
             """);
@@ -208,9 +208,9 @@ public class NamedRefinementArithmeticTests
     public void BitwiseAndShift_OnIntegerNamedRefinement_TypeChecks()
     {
         AssertNoErrors("""
-            §M{m:R}
-              §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §F{f1:Bits:pub} (Nat:a, Nat:b) -> i32
+            §M{R}
+              §RTYPE{Nat:i32} (>= # INT:0)
+              §F{Bits:pub} (Nat:a, Nat:b) -> i32
                 §R (^ (& a b) (| (<< a INT:1) (>> b INT:1)))
             """);
     }
@@ -219,10 +219,10 @@ public class NamedRefinementArithmeticTests
     public void NamedRefinementOfBool_WorksInLogicalOperatorsAndConditions()
     {
         AssertNoErrors("""
-            §M{m:R}
-              §RTYPE{r1:Yes:bool} (== # true)
-              §F{f1:Logic:pub} (Yes:f, bool:g) -> bool
-                §IF{i1} f
+            §M{R}
+              §RTYPE{Yes:bool} (== # true)
+              §F{Logic:pub} (Yes:f, bool:g) -> bool
+                §IF f
                   §R (|| (&& f g) (! f))
                 §R false
             """);
@@ -232,11 +232,11 @@ public class NamedRefinementArithmeticTests
     public void NamedRefinement_AsLoopBoundAndArithmeticInBody_TypeChecks()
     {
         AssertNoErrors("""
-            §M{m:R}
-              §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §F{f1:Sum:pub} (Nat:n) -> i32
+            §M{R}
+              §RTYPE{Nat:i32} (>= # INT:0)
+              §F{Sum:pub} (Nat:n) -> i32
                 §B{~s:i32} INT:0
-                §L{l1:i:0:n:1}
+                §L{i:0:n:1}
                   §ASSIGN s (+ s (* i n))
                 §R s
             """);
@@ -254,10 +254,10 @@ public class NamedRefinementArithmeticTests
     public void IncrementDecrement_OfUnguardedElement_GetsTheBaseType()
     {
         var result = Check("""
-            §M{m:R}
+            §M{R}
               §U{Nat:System.Int32}
-              §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §F{f1:Bad:pub} (Dictionary<i32,Nat>:a) -> Nat
+              §RTYPE{Nat:i32} (>= # INT:0)
+              §F{Bad:pub} (Dictionary<i32,Nat>:a) -> Nat
                 §B{x} (dec §IDX a INT:0)
                 §B{boxed:Nat} x
                 §R boxed
@@ -296,9 +296,9 @@ public class NamedRefinementArithmeticTests
         // binding a plain base value into an explicitly refined §B was rejected before #1515 (even
         // for a literal) and still is.
         var result = Check("""
-            §M{m:R}
-              §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §F{f1:Sub:pub} (Nat:a, Nat:b) -> i32
+            §M{R}
+              §RTYPE{Nat:i32} (>= # INT:0)
+              §F{Sub:pub} (Nat:a, Nat:b) -> i32
                 §B{d:Nat} (- a b)
                 §R d
             """);
@@ -313,9 +313,9 @@ public class NamedRefinementArithmeticTests
     public void ArithmeticResult_OfFloatRefinement_IsFloat_NotAssignableToInt()
     {
         var result = Check("""
-            §M{m:R}
-              §RTYPE{r1:Pos:f64} (> # FLOAT:0.0)
-              §F{f1:Half:pub} (Pos:x) -> i32
+            §M{R}
+              §RTYPE{Pos:f64} (> # FLOAT:0.0)
+              §F{Half:pub} (Pos:x) -> i32
                 §B{y:i32} (/ x INT:2)
                 §R y
             """);
@@ -328,9 +328,9 @@ public class NamedRefinementArithmeticTests
     public void DecimalRefinement_MixedWithFloat_IsStillRejected()
     {
         var result = Check("""
-            §M{m:R}
-              §RTYPE{r1:Money:decimal} (>= # INT:0)
-              §F{f1:Mix:pub} (Money:m, f64:x) -> decimal
+            §M{R}
+              §RTYPE{Money:decimal} (>= # INT:0)
+              §F{Mix:pub} (Money:m, f64:x) -> decimal
                 §R (+ m x)
             """);
 
@@ -342,18 +342,18 @@ public class NamedRefinementArithmeticTests
     public void DecimalRefinementArithmetic_IsDecimal()
     {
         AssertNoErrors("""
-            §M{m:R}
-              §RTYPE{r1:Money:decimal} (>= # INT:0)
-              §F{f1:Sum:pub} (Money:a, Money:b) -> decimal
+            §M{R}
+              §RTYPE{Money:decimal} (>= # INT:0)
+              §F{Sum:pub} (Money:a, Money:b) -> decimal
                 §B{boxed:?decimal} (+ a b)
                 §B{total:decimal} (* (+ a b) INT:2)
                 §R total
             """);
 
         var narrowed = Check("""
-            §M{m:R}
-              §RTYPE{r1:Money:decimal} (>= # INT:0)
-              §F{f1:Sum:pub} (Money:a, Money:b) -> i32
+            §M{R}
+              §RTYPE{Money:decimal} (>= # INT:0)
+              §F{Sum:pub} (Money:a, Money:b) -> i32
                 §B{x:i32} (+ a b)
                 §R x
             """);
@@ -361,9 +361,9 @@ public class NamedRefinementArithmeticTests
             && d.Message.Contains("Cannot assign decimal to variable of type i32"));
 
         var nested = Check("""
-            §M{m:R}
-              §RTYPE{r1:Money:decimal} (>= # INT:0)
-              §F{f1:Mix:pub} (Money:a, Money:b, f64:f) -> decimal
+            §M{R}
+              §RTYPE{Money:decimal} (>= # INT:0)
+              §F{Mix:pub} (Money:a, Money:b, f64:f) -> decimal
                 §R (+ (+ a b) f)
             """);
         Assert.Contains(nested.Diagnostics.Errors,
@@ -379,17 +379,17 @@ public class NamedRefinementArithmeticTests
     public void DecimalWithUnmodeledOperand_DefersToUserDefinedOperator()
     {
         AssertNoErrors("""
-            §M{m:R}
-              §CL{c1:Box:pub}
-                §PROP{p1:Value:Box:pub}
+            §M{R}
+              §CL{Box:pub}
+                §PROP{Value:Box:pub}
                   §GET
                     §R this
-                §OP{op1:+:pub}
+                §OP{+:pub}
                   §I{decimal:d}
                   §I{Box:b}
                   §O{f64}
                   §R FLOAT:2.0
-              §F{f1:Good:pub} (decimal:d,Box:b) -> f64
+              §F{Good:pub} (decimal:d,Box:b) -> f64
                 §B{x:f64} (+ (+ d b.Value) FLOAT:1.0)
                 §R x
             """);
@@ -399,9 +399,9 @@ public class NamedRefinementArithmeticTests
     public void NonNumericRefinement_IsStillRejectedInArithmetic()
     {
         var result = Check("""
-            §M{m:R}
-              §RTYPE{r1:NonEmpty:str} (> (len #) INT:0)
-              §F{f1:Bad:pub} (NonEmpty:s) -> i32
+            §M{R}
+              §RTYPE{NonEmpty:str} (> (len #) INT:0)
+              §F{Bad:pub} (NonEmpty:s) -> i32
                 §R (* s INT:2)
             """);
 
@@ -413,9 +413,9 @@ public class NamedRefinementArithmeticTests
     public void StringRefinement_ConcatenatesLikeItsBase()
     {
         AssertNoErrors("""
-            §M{m:R}
-              §RTYPE{r1:NonEmpty:str} (> (len #) INT:0)
-              §F{f1:Greet:pub} (NonEmpty:s) -> str
+            §M{R}
+              §RTYPE{NonEmpty:str} (> (len #) INT:0)
+              §F{Greet:pub} (NonEmpty:s) -> str
                 §R (+ STR:"hi " s)
             """);
     }
@@ -423,28 +423,28 @@ public class NamedRefinementArithmeticTests
     // ---- Compile, emit and run with the type checker ON ----
 
     private const string RuntimeSource = """
-        §M{m:Rt}
-          §RTYPE{r1:Nat:i32} (>= # INT:0)
-          §RTYPE{r2:Small:i32} (< # INT:100)
-          §RTYPE{r3:BigNat:i64} (>= # INT:0)
-          §RTYPE{r4:Pos:f64} (> # FLOAT:0.0)
-          §F{f1:Calc:pub} (Nat:a, Small:b, i32:c) -> i32
+        §M{Rt}
+          §RTYPE{Nat:i32} (>= # INT:0)
+          §RTYPE{Small:i32} (< # INT:100)
+          §RTYPE{BigNat:i64} (>= # INT:0)
+          §RTYPE{Pos:f64} (> # FLOAT:0.0)
+          §F{Calc:pub} (Nat:a, Small:b, i32:c) -> i32
             §R (+ (- (* a b) (/ a INT:2)) (% (+ a c) INT:7))
-          §F{f2:Neg:pub} (Nat:a) -> i32
+          §F{Neg:pub} (Nat:a) -> i32
             §R (- a)
-          §F{f3:Less:pub} (Nat:a, Small:b) -> bool
+          §F{Less:pub} (Nat:a, Small:b) -> bool
             §R (< a b)
-          §F{f4:Wide:pub} (BigNat:a, BigNat:b) -> i64
+          §F{Wide:pub} (BigNat:a, BigNat:b) -> i64
             §R (* a b)
-          §F{f5:Halve:pub} (Pos:x) -> f64
+          §F{Halve:pub} (Pos:x) -> f64
             §R (/ x FLOAT:2.0)
-          §F{f6:Down:pub} (Nat:a) -> Nat
+          §F{Down:pub} (Nat:a) -> Nat
             §R (- a INT:3)
-          §F{f7:Step:pub} (Nat:a) -> i32
+          §F{Step:pub} (Nat:a) -> i32
             §B{~x:Nat} a
             §ASSIGN x (- x INT:5)
             §R x
-          §F{f8:Dec:pub} (Nat:a) -> i32
+          §F{Dec:pub} (Nat:a) -> i32
             §B{~x:Nat} a
             (dec x)
             §R x
@@ -524,13 +524,13 @@ public class NamedRefinementArithmeticTests
     public void Emit_NamedAndInlineRefinement_GetTheSameAssignmentGuardShape()
     {
         var result = Program.Compile("""
-            §M{m:G}
-              §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §F{f1:Named:pub} (Nat:a) -> i32
+            §M{G}
+              §RTYPE{Nat:i32} (>= # INT:0)
+              §F{Named:pub} (Nat:a) -> i32
                 §B{d:i32} (- a INT:5)
                 §ASSIGN a d
                 §R a
-              §F{f2:Inline:pub}
+              §F{Inline:pub}
                 §I{i32:a} | (>= # INT:0)
                 §O{i32}
                 §B{d:i32} (- a INT:5)
@@ -572,23 +572,23 @@ public class NamedRefinementArithmeticTests
 
         var options = new CompilationOptions { VerifyRefinements = true, EnableTypeChecking = true };
         var result = Program.Compile("""
-            §M{m:V}
-              §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §F{n1:NamedDown:priv} (Nat:a) -> i32
+            §M{V}
+              §RTYPE{Nat:i32} (>= # INT:0)
+              §F{NamedDown:priv} (Nat:a) -> i32
                 §B{d:i32} (- a INT:5)
                 §ASSIGN a d
                 §R a
-              §F{n2:NamedUp:priv} (Nat:a) -> i32
+              §F{NamedUp:priv} (Nat:a) -> i32
                 §B{u:i32} (+ a INT:1)
                 §ASSIGN a u
                 §R a
-              §F{i1:InlineDown:priv}
+              §F{InlineDown:priv}
                 §I{i32:a} | (>= # INT:0)
                 §O{i32}
                 §B{d:i32} (- a INT:5)
                 §ASSIGN a d
                 §R a
-              §F{i2:InlineUp:priv}
+              §F{InlineUp:priv}
                 §I{i32:a} | (>= # INT:0)
                 §O{i32}
                 §B{u:i32} (+ a INT:1)

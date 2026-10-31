@@ -21,8 +21,8 @@ public sealed class S2NumericDeterminismTests
         string leftType, string rightType, string arithmetic)
     {
         var source = $$"""
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} ({{leftType}}:x, {{rightType}}:y) -> i32
+            §M{R1Case}
+              §F{Probe:pub} ({{leftType}}:x, {{rightType}}:y) -> i32
                 §E{}
                 §S (== {{arithmetic}} {{arithmetic}})
                 §R INT:0
@@ -83,11 +83,11 @@ public sealed class S2NumericDeterminismTests
     {
         Assert.True(Z3ContextFactory.IsAvailable, "this witness needs Z3");
         var source = $$"""
-            §M{m001:Test}
-              §F{f001:Probe:pub}
+            §M{Test}
+              §F{Probe:pub}
                 §O{i32}
                 §B{~i:i64} INT:0
-                §WH{w1} {{condition}}
+                §WH {{condition}}
                   §ASSIGN i (+ i INT:1)
                 §R INT:0
             """;

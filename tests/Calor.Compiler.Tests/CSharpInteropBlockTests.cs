@@ -154,7 +154,7 @@ public class CSharpInteropBlockTests
     public void Parser_ModuleWithInteropBlock_ParsesCorrectly()
     {
         var source = """
-            §M{m001:TestModule}
+            §M{TestModule}
               §CSHARP{public static void Helper() { Console.WriteLine("hi"); }}§/CSHARP
             """;
         var diag = new DiagnosticBag();
@@ -175,8 +175,8 @@ public class CSharpInteropBlockTests
     public void Parser_ClassWithInteropBlock_ParsesCorrectly()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:MyClass:pub}
+            §M{TestModule}
+              §CL{MyClass:pub}
                 §CSHARP{public T GetAll<T>() where T : class => default!;}§/CSHARP
             """;
         var diag = new DiagnosticBag();
@@ -198,8 +198,8 @@ public class CSharpInteropBlockTests
     public void CalorEmitter_RoundTrips_CSharpInteropBlock()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:MyClass:pub}
+            §M{TestModule}
+              §CL{MyClass:pub}
                 §CSHARP{public T GetAll<T>() => default!;}§/CSHARP
             """;
         var diag = new DiagnosticBag();

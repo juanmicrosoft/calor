@@ -54,8 +54,8 @@ public class GenericSyntaxTests
     public void Parse_GenericFunction_SingleTypeParam()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Identity:pub}<T>
+            §M{Test}
+              §F{Identity:pub}<T>
                   §I{T:value}
                   §O{T}
                   §R value
@@ -76,8 +76,8 @@ public class GenericSyntaxTests
     public void Parse_GenericFunction_MultipleTypeParams()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Map:pub}<T, U>
+            §M{Test}
+              §F{Map:pub}<T, U>
                   §I{T:input}
                   §I{Func<T, U>:mapper}
                   §O{U}
@@ -99,8 +99,8 @@ public class GenericSyntaxTests
     public void Parse_GenericClass_WithConstraints()
     {
         var source = """
-            §M{m001:Test}
-              §CL{c001:Repository:pub}<T>
+            §M{Test}
+              §CL{Repository:pub}<T>
                   §WHERE T : class
                   §FLD{T:_item:priv}
             """;
@@ -122,8 +122,8 @@ public class GenericSyntaxTests
     public void Parse_GenericTypeRef_Simple()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:GetItems:pub}
+            §M{Test}
+              §F{GetItems:pub}
                   §I{List<i32>:items}
                   §O{void}
             """;
@@ -140,8 +140,8 @@ public class GenericSyntaxTests
     public void Parse_GenericTypeRef_Nested()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:GetLookup:pub}<T>
+            §M{Test}
+              §F{GetLookup:pub}<T>
                   §I{Dictionary<str, List<T>>:lookup}
                   §O{void}
             """;
@@ -158,8 +158,8 @@ public class GenericSyntaxTests
     public void Parse_Where_MultipleConstraints()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Sort:pub}<T>
+            §M{Test}
+              §F{Sort:pub}<T>
                   §WHERE T : class, IComparable<T>
                   §I{List<T>:items}
                   §O{void}
@@ -180,10 +180,10 @@ public class GenericSyntaxTests
     public void Parse_GenericInterface()
     {
         var source = """
-            §M{m001:Test}
-              §IFACE{i001:IRepository}<T>
+            §M{Test}
+              §IFACE{IRepository}<T>
                   §WHERE T : class
-                  §MT{m001:Get}
+                  §MT{Get}
                       §I{i32:id}
                       §O{T}
             """;
@@ -204,8 +204,8 @@ public class GenericSyntaxTests
     public void Parse_BracedWhereConstraint()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Identity:pub}<T>
+            §M{Test}
+              §F{Identity:pub}<T>
                   §WHERE{T:class}
                   §I{T:value}
                   §O{T}
@@ -226,8 +226,8 @@ public class GenericSyntaxTests
     public void E2E_GenericFunction_CompilesAndRuns()
     {
         var calor = """
-            §M{m001:Test}
-              §F{f001:Identity:pub}<T>
+            §M{Test}
+              §F{Identity:pub}<T>
                   §I{T:value}
                   §O{T}
                   §R value
@@ -243,8 +243,8 @@ public class GenericSyntaxTests
     public void E2E_GenericClass_WithConstraint_CompilesCorrectly()
     {
         var calor = """
-            §M{m001:Test}
-              §CL{c001:Repository:pub}<T>
+            §M{Test}
+              §CL{Repository:pub}<T>
                   §WHERE T : class
                   §FLD{List<T>:_items:priv}
             """;
@@ -260,13 +260,13 @@ public class GenericSyntaxTests
     public void E2E_GenericInterface_EmitsCorrectly()
     {
         var calor = """
-            §M{m001:Test}
-              §IFACE{i001:IRepository}<T>
+            §M{Test}
+              §IFACE{IRepository}<T>
                   §WHERE T : class
-                  §MT{m001:GetById}
+                  §MT{GetById}
                       §I{i32:id}
                       §O{T}
-                  §MT{m002:Save}
+                  §MT{Save}
                       §I{T:entity}
                       §O{void}
             """;
@@ -283,8 +283,8 @@ public class GenericSyntaxTests
     public void E2E_NestedGenericTypes_HandleCorrectly()
     {
         var calor = """
-            §M{m001:Test}
-              §F{f001:GetLookup:pub}<T>
+            §M{Test}
+              §F{GetLookup:pub}<T>
                   §I{Dictionary<str, List<T>>:lookup}
                   §O{Dictionary<str, List<T>>}
                   §R lookup
@@ -306,9 +306,9 @@ public class GenericSyntaxTests
         // --permissive-effects waiver, which suppresses the Calor0425 and charges
         // nothing for the Unknown row.
         var calor = """
-            §M{m001:Test}
-              §CL{c001:Container:pub}
-                  §MT{m001:Convert:pub}<T, U>
+            §M{Test}
+              §CL{Container:pub}
+                  §MT{Convert:pub}<T, U>
                       §I{T:input}
                       §I{Func<T, U>:converter}
                       §O{U}
@@ -330,8 +330,8 @@ public class GenericSyntaxTests
     public void E2E_GenericFunction_WithStructConstraint_CompilesCorrectly()
     {
         var calor = """
-            §M{m001:Test}
-              §F{f001:GetDefault:pub}<T>
+            §M{Test}
+              §F{GetDefault:pub}<T>
                   §WHERE T : struct
                   §O{T}
                   §R default
@@ -347,8 +347,8 @@ public class GenericSyntaxTests
     public void E2E_GenericFunction_WithNewConstraint_CompilesCorrectly()
     {
         var calor = """
-            §M{m001:Test}
-              §F{f001:Create:pub}<T>
+            §M{Test}
+              §F{Create:pub}<T>
                   §WHERE T : new
                   §O{T}
                   §E{alloc}
@@ -366,8 +366,8 @@ public class GenericSyntaxTests
     public void E2E_GenericClass_MultipleTypeParams_CompilesCorrectly()
     {
         var calor = """
-            §M{m001:Test}
-              §CL{c001:Pair:pub}<TKey, TValue>
+            §M{Test}
+              §CL{Pair:pub}<TKey, TValue>
                   §FLD{TKey:Key:pub}
                   §FLD{TValue:Value:pub}
             """;
@@ -387,8 +387,8 @@ public class GenericSyntaxTests
     public void CSharpEmitter_GenericFunction_EmitsTypeParams()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Transform:pub}<T, U>
+            §M{Test}
+              §F{Transform:pub}<T, U>
                   §I{T:input}
                   §O{U}
             """;
@@ -407,8 +407,8 @@ public class GenericSyntaxTests
     public void CSharpEmitter_WhereClause_EmitsConstraints()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Sort:pub}<T>
+            §M{Test}
+              §F{Sort:pub}<T>
                   §WHERE T : class, IComparable<T>
                   §I{List<T>:items}
                   §O{void}
@@ -427,8 +427,8 @@ public class GenericSyntaxTests
     public void CSharpEmitter_GenericClass_EmitsCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §CL{c001:Cache:pub}<TKey, TValue>
+            §M{Test}
+              §CL{Cache:pub}<TKey, TValue>
                   §WHERE TKey : class
                   §FLD{Dictionary<TKey, TValue>:_data:priv}
             """;
@@ -448,10 +448,10 @@ public class GenericSyntaxTests
     public void CSharpEmitter_GenericInterface_EmitsCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §IFACE{i001:IFactory}<T>
+            §M{Test}
+              §IFACE{IFactory}<T>
                   §WHERE T : new
-                  §MT{m001:Create}
+                  §MT{Create}
                       §O{T}
             """;
 
@@ -470,9 +470,9 @@ public class GenericSyntaxTests
     public void CSharpEmitter_GenericMethod_InClass_EmitsCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §CL{c001:Mapper:pub}
-                  §MT{m001:Map:pub}<TSource, TDest>
+            §M{Test}
+              §CL{Mapper:pub}
+                  §MT{Map:pub}<TSource, TDest>
                       §WHERE TDest : new
                       §I{TSource:source}
                       §O{TDest}
@@ -496,8 +496,8 @@ public class GenericSyntaxTests
     public void CalorEmitter_GenericFunction_EmitsNewSyntax()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Identity:pub}<T>
+            §M{Test}
+              §F{Identity:pub}<T>
                   §I{T:value}
                   §O{T}
                   §R value
@@ -509,7 +509,7 @@ public class GenericSyntaxTests
         var emitter = new CalorEmitter();
         var calorOutput = emitter.Emit(module);
 
-        Assert.Contains("§F{f001:Identity<T>:pub}", calorOutput);
+        Assert.Contains("§F{Identity<T>:pub}", calorOutput);
         Assert.Contains("T:value", calorOutput);
         Assert.Contains("-> T", calorOutput);
     }
@@ -518,8 +518,8 @@ public class GenericSyntaxTests
     public void CalorEmitter_WhereClause_EmitsCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §CL{c001:Repository:pub}<T>
+            §M{Test}
+              §CL{Repository:pub}<T>
                   §WHERE T : class
                   §FLD{T:_item:priv}
             """;
@@ -538,8 +538,8 @@ public class GenericSyntaxTests
     public void CalorEmitter_GenericClass_MultipleConstraints_EmitsCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Sort:pub}<T>
+            §M{Test}
+              §F{Sort:pub}<T>
                   §WHERE T : class, IComparable<T>
                   §I{List<T>:items}
                   §O{void}
@@ -677,8 +677,8 @@ public class GenericSyntaxTests
     public void TypeChecker_TypeParamInScope_Resolves()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Identity:pub}<T>
+            §M{Test}
+              §F{Identity:pub}<T>
                   §I{T:value}
                   §O{T}
                   §R value
@@ -698,8 +698,8 @@ public class GenericSyntaxTests
     public void TypeChecker_GenericListType_Resolves()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Process:pub}<T>
+            §M{Test}
+              §F{Process:pub}<T>
                   §I{List<T>:items}
                   §O{void}
             """;
@@ -718,8 +718,8 @@ public class GenericSyntaxTests
     public void TypeChecker_NestedGenericType_Resolves()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:GetData:pub}<T>
+            §M{Test}
+              §F{GetData:pub}<T>
                   §I{Dictionary<str, List<T>>:data}
                   §O{void}
             """;
@@ -738,8 +738,8 @@ public class GenericSyntaxTests
     public void TypeChecker_MultipleTypeParams_AllResolve()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Combine:pub}<T, U>
+            §M{Test}
+              §F{Combine:pub}<T, U>
                   §I{T:first}
                   §I{U:second}
                   §O{T}
@@ -764,8 +764,8 @@ public class GenericSyntaxTests
     public void Parse_MultipleWhereClauses_DifferentTypeParams()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Combine:pub}<T, U>
+            §M{Test}
+              §F{Combine:pub}<T, U>
                   §WHERE T : class
                   §WHERE U : struct
                   §I{T:a}
@@ -788,8 +788,8 @@ public class GenericSyntaxTests
     public void Parse_Where_InvalidTypeParam_ReportsError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Test:pub}<T>
+            §M{Test}
+              §F{Test:pub}<T>
                   §WHERE X : class
                   §O{void}
             """;
@@ -805,9 +805,9 @@ public class GenericSyntaxTests
     public void E2E_GenericMethodInInterface_WithTypeParams_CompilesCorrectly()
     {
         var calor = """
-            §M{m001:Test}
-              §IFACE{i001:IMapper}
-                  §MT{m001:Map}<TSource, TDest>
+            §M{Test}
+              §IFACE{IMapper}
+                  §MT{Map}<TSource, TDest>
                       §I{TSource:source}
                       §O{TDest}
             """;
@@ -821,10 +821,10 @@ public class GenericSyntaxTests
     public void E2E_CombinedInterfaceAndMethodTypeParams_CompilesCorrectly()
     {
         var calor = """
-            §M{m001:Test}
-              §IFACE{i001:IConverter}<T>
+            §M{Test}
+              §IFACE{IConverter}<T>
                   §WHERE T : class
-                  §MT{m001:Convert}<U>
+                  §MT{Convert}<U>
                       §I{T:input}
                       §O{U}
             """;
@@ -840,8 +840,8 @@ public class GenericSyntaxTests
     public void Parse_GenericTypeInFieldDeclaration_Parses()
     {
         var source = """
-            §M{m001:Test}
-              §CL{c001:Container:pub}<T>
+            §M{Test}
+              §CL{Container:pub}<T>
                   §FLD{List<T>:_items:priv}
                   §FLD{Dictionary<str, T>:_lookup:priv}
             """;

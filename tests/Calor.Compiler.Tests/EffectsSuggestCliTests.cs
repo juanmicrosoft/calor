@@ -29,8 +29,8 @@ public class EffectsSuggestCliTests : IDisposable
     // OrderRepo.Save: a type-qualified external call → manifest entry.
     // x.Run: x is inferred from an unknown callee → receiver has no resolved type.
     private const string MixedSource = @"
-§M{m001:Sample}
-  §F{f001:DoWork:pub}
+§M{Sample}
+  §F{DoWork:pub}
       §O{void}
       §C{OrderRepo.Save} §/C
       §B{x} §C{Unknown.Make} §/C
@@ -40,8 +40,8 @@ public class EffectsSuggestCliTests : IDisposable
     // Every typed external call resolves (Console.WriteLine is in the built-in
     // manifests); the only unresolved calls are on receivers without a type.
     private const string OnlyUntypedSource = @"
-§M{m001:Sample}
-  §F{f001:DoWork:pub}
+§M{Sample}
+  §F{DoWork:pub}
       §O{void}
       §C{Console.WriteLine} §A STR:""hi"" §/C
       §B{x} §C{foo.Bar} §/C

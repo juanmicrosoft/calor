@@ -13,7 +13,7 @@ public class NamespaceEmissionTests
     public void Compile_DottedNamespace_PreservesDots()
     {
         // Arrange: Calor source with dotted namespace
-        var source = "§M{m1:Calor.Runtime.Tests}\n§F{f1:Test:pub}\n§O{void}\n\n";
+        var source = "§M{Calor.Runtime.Tests}\n§F{Test:pub}\n§O{void}\n\n";
 
         // Act
         var result = Program.Compile(source);
@@ -29,7 +29,7 @@ public class NamespaceEmissionTests
     public void Compile_DottedNamespace_ModuleClassUsesLastSegment()
     {
         // Arrange: Calor source with dotted namespace and a function
-        var source = "§M{m1:Calor.Runtime.Tests}\n§F{f1:TestFunc:pub}\n§O{void}\n\n";
+        var source = "§M{Calor.Runtime.Tests}\n§F{TestFunc:pub}\n§O{void}\n\n";
 
         // Act
         var result = Program.Compile(source);
@@ -46,7 +46,7 @@ public class NamespaceEmissionTests
     public void Compile_SimpleNamespace_NoDotsToPreserve()
     {
         // Arrange
-        var source = "§M{m1:MyNamespace}\n§F{f1:Test:pub}\n§O{void}\n\n";
+        var source = "§M{MyNamespace}\n§F{Test:pub}\n§O{void}\n\n";
 
         // Act
         var result = Program.Compile(source);
@@ -61,7 +61,7 @@ public class NamespaceEmissionTests
     public void Compile_DeepDottedNamespace_PreservesAllDots()
     {
         // Arrange
-        var source = "§M{m1:Company.Product.Feature.SubFeature.Tests}\n§F{f1:Test:pub}\n§O{void}\n\n";
+        var source = "§M{Company.Product.Feature.SubFeature.Tests}\n§F{Test:pub}\n§O{void}\n\n";
 
         // Act
         var result = Program.Compile(source);

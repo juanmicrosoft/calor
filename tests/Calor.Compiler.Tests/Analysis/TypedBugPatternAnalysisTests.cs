@@ -16,8 +16,8 @@ public class TypedBugPatternAnalysisTests
     public void Division_ReassignmentIsStrongUpdate()
     {
         var function = BindFunction("""
-            §M{m:Typed}
-              §F{f:Divide:pub} (i32:x) -> i32
+            §M{Typed}
+              §F{Divide:pub} (i32:x) -> i32
                 §B{~divisor:i32} INT:2
                 §ASSIGN divisor INT:0
                 §R (/ x divisor)
@@ -34,9 +34,9 @@ public class TypedBugPatternAnalysisTests
     public void Division_NegatedFallthroughPathIsSafe()
     {
         var function = BindFunction("""
-            §M{m:Typed}
-              §F{f:Divide:pub} (i32:x, i32:divisor) -> i32
-                §IF{i1} (== divisor INT:0)
+            §M{Typed}
+              §F{Divide:pub} (i32:x, i32:divisor) -> i32
+                §IF (== divisor INT:0)
                   §R INT:0
                 §R (/ x divisor)
             """);
@@ -51,9 +51,9 @@ public class TypedBugPatternAnalysisTests
     public void Division_ZeroBranchIsUnsafe()
     {
         var function = BindFunction("""
-            §M{m:Typed}
-              §F{f:Divide:pub} (i32:x, i32:divisor) -> i32
-                §IF{i1} (== divisor INT:0)
+            §M{Typed}
+              §F{Divide:pub} (i32:x, i32:divisor) -> i32
+                §IF (== divisor INT:0)
                   §R (/ x divisor)
                 §R INT:0
             """);
@@ -459,11 +459,11 @@ public class TypedBugPatternAnalysisTests
     public void Bounds_SequentialNegatedGuardsProveBothSides()
     {
         var function = BindFunction("""
-            §M{m:Typed}
-              §F{f:Read:pub} (i32[]:items, i32:index) -> i32
-                §IF{i1} (< index INT:0)
+            §M{Typed}
+              §F{Read:pub} (i32[]:items, i32:index) -> i32
+                §IF (< index INT:0)
                   §R INT:0
-                §IF{i2} (>= index §LEN items)
+                §IF (>= index §LEN items)
                   §R INT:0
                 §R §IDX items index
             """);
@@ -478,9 +478,9 @@ public class TypedBugPatternAnalysisTests
     public void Bounds_UnrelatedLengthDoesNotProtectAccess()
     {
         var function = BindFunction("""
-            §M{m:Typed}
-              §F{f:Read:pub} (i32[]:items, i32[]:other, i32:index) -> i32
-                §IF{i1} (&& (>= index INT:0) (< index §LEN other))
+            §M{Typed}
+              §F{Read:pub} (i32[]:items, i32[]:other, i32:index) -> i32
+                §IF (&& (>= index INT:0) (< index §LEN other))
                   §R §IDX items index
                 §R INT:0
             """);
@@ -495,9 +495,9 @@ public class TypedBugPatternAnalysisTests
     public void Bounds_IndexReassignmentInvalidatesPriorChecks()
     {
         var function = BindFunction("""
-            §M{m:Typed}
-              §F{f:Read:pub} (i32[]:items, i32:index) -> i32
-                §IF{i1} (&& (>= index INT:0) (< index §LEN items))
+            §M{Typed}
+              §F{Read:pub} (i32[]:items, i32:index) -> i32
+                §IF (&& (>= index INT:0) (< index §LEN items))
                   §ASSIGN index §LEN items
                   §R §IDX items index
                 §R INT:0
@@ -1157,11 +1157,11 @@ public class TypedBugPatternAnalysisTests
     public void ExternalOption_AliasCheckDoesNotAddLanguageVariantSemantics()
     {
         var function = BindFunction("""
-            §M{m:Typed}
-              §F{f:Read:pub} (Option<i32>:input) -> i32
+            §M{Typed}
+              §F{Read:pub} (Option<i32>:input) -> i32
                 §B{~original:Option<i32>} input
                 §B{alias:Option<i32>} original
-                §IF{i1} (== alias null)
+                §IF (== alias null)
                   §R INT:0
                 §R §C{original.Unwrap} §/C
             """);
@@ -1177,11 +1177,11 @@ public class TypedBugPatternAnalysisTests
     public void ExternalOption_ReassignmentDoesNotProduceUnsafeUnwrap()
     {
         var function = BindFunction("""
-            §M{m:Typed}
-              §F{f:Read:pub} (Option<i32>:input) -> i32
+            §M{Typed}
+              §F{Read:pub} (Option<i32>:input) -> i32
                 §B{~original:Option<i32>} input
                 §B{alias:Option<i32>} original
-                §IF{i1} (!= alias null)
+                §IF (!= alias null)
                   §ASSIGN original null
                   §R §C{original.Unwrap} §/C
                 §R INT:0

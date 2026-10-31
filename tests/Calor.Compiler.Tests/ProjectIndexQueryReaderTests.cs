@@ -476,15 +476,15 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
     {
         var dir = TempDir();
         File.WriteAllText(Path.Combine(dir, "lib.calr"), """
-            §M{m001:Lib}
-              §F{f001:Double:pub} (i32:n) -> i32
+            §M{Lib}
+              §F{Double:pub} (i32:n) -> i32
                 §E{cw}
                 §P n
                 §R (* n INT:2)
             """);
         File.WriteAllText(Path.Combine(dir, "broken.calr"), """
-            §M{m002:Broken}
-              §F{f001:Uses:pub} () -> i32
+            §M{Broken}
+              §F{Uses:pub} () -> i32
                 §E{}
                 §R (+ §C{Double} §A undefinedName §/C INT:1)
             """);
@@ -509,8 +509,8 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
     {
         var dir = TempDir();
         File.WriteAllText(Path.Combine(dir, "broken.calr"), """
-            §M{m002:Broken}
-              §F{f001:Uses:pub} () -> i32
+            §M{Broken}
+              §F{Uses:pub} () -> i32
                 §E{}
                 §R (+ undefinedName INT:1)
             """);

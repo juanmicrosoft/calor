@@ -36,8 +36,8 @@ public class ParserLegacyCloserRejectionTests
     public void IndentFormSource_NoLegacyDiagnostic()
     {
         const string src = """
-            §M{m1:Calc}
-              §F{f1:Add:pub}
+            §M{Calc}
+              §F{Add:pub}
                 §I{i32:a}
                 §I{i32:b}
                 §O{i32}
@@ -52,14 +52,14 @@ public class ParserLegacyCloserRejectionTests
     public void LegacyCloserFunction_EmitsCalor0830()
     {
         const string src = """
-            §M{m1:Calc}
-              §F{f1:Add:pub}
+            §M{Calc}
+              §F{Add:pub}
                 §I{i32:a}
                 §I{i32:b}
                 §O{i32}
                 §R (+ a b)
-              §/F{f1}
-            §/M{m1}
+              §/F
+            §/M
             """;
         var (diags, hasErrors) = Parse(src);
         Assert.True(hasErrors, "Source with legacy structural closers must error");
@@ -74,13 +74,13 @@ public class ParserLegacyCloserRejectionTests
     {
         // §/DO carries the do-while loop condition — retained.
         const string src = """
-            §M{m1:Calc}
-              §F{f1:Tick:pub}
+            §M{Calc}
+              §F{Tick:pub}
                 §O{void}
                 §B{~i:i32} (INT:0)
-                §DO{d1}
+                §DO
                   §= ~i (+ i (INT:1))
-                §/DO{d1} (< i (INT:10))
+                §/DO (< i (INT:10))
             """;
         var (diags, _) = Parse(src);
         Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.LegacyCloserForm);
@@ -93,12 +93,12 @@ public class ParserLegacyCloserRejectionTests
         // Calor0830, so they cannot heal closer-form. The message must
         // not send users to a command that can't fix the file.
         const string src = """
-            §M{m1:Calc}
-              §F{f1:Add:pub}
+            §M{Calc}
+              §F{Add:pub}
                 §O{i32}
                 §R (INT:1)
-              §/F{f1}
-            §/M{m1}
+              §/F
+            §/M
             """;
         var (diags, _) = Parse(src);
         var legacy = diags.Where(d => d.Code == DiagnosticCode.LegacyCloserForm).ToList();
@@ -112,12 +112,12 @@ public class ParserLegacyCloserRejectionTests
     public void LegacyCloser_CarriesSuggestedFix_ThatDeletesTheCloser()
     {
         const string src = """
-            §M{m1:Calc}
-              §F{f1:Add:pub}
+            §M{Calc}
+              §F{Add:pub}
                 §O{i32}
                 §R (INT:1)
-              §/F{f1}
-            §/M{m1}
+              §/F
+            §/M
             """;
         var bag = ParseBag(src);
 
@@ -142,14 +142,14 @@ public class ParserLegacyCloserRejectionTests
     public void ApplyingLegacyCloserFix_YieldsCleanIndentOnlySource()
     {
         const string src = """
-            §M{m1:Calc}
-              §F{f1:Add:pub}
+            §M{Calc}
+              §F{Add:pub}
                 §I{i32:a}
                 §I{i32:b}
                 §O{i32}
                 §R (+ a b)
-              §/F{f1}
-            §/M{m1}
+              §/F
+            §/M
             """;
         var bag = ParseBag(src);
         var healed = ApplyFixes(src, bag);
@@ -168,8 +168,8 @@ public class ParserLegacyCloserRejectionTests
         // path where the removal range is computed from the closer keyword
         // length alone (no brace tokens to peek).
         const string src = """
-            §M{m1:Calc}
-              §F{f1:Add:pub}
+            §M{Calc}
+              §F{Add:pub}
                 §I{i32:a}
                 §I{i32:b}
                 §O{i32}

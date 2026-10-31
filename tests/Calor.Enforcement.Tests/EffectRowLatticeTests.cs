@@ -43,8 +43,8 @@ public class EffectRowLatticeTests
         // and that is a PROMISE, not an absence of information. 390 of the 886
         // committed files rely on it.
         var compiled = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Pure:pub} () -> i32
+            §M{M}
+              §F{Pure:pub} () -> i32
                 §R INT:1
             """);
 
@@ -59,8 +59,8 @@ public class EffectRowLatticeTests
         // exactly the laundering rows exist to close: the caller could hand in a
         // printing callback and the pure declaration would still compile.
         var parameter = BindSingleParameter("""
-            §M{m001:M}
-              §F{f001:Apply:pub} (Func<i32,i32>:transform, i32:value) -> i32
+            §M{M}
+              §F{Apply:pub} (Func<i32,i32>:transform, i32:value) -> i32
                 §E{}
                 §R value
             """);
@@ -83,10 +83,10 @@ public class EffectRowLatticeTests
         // Unknown, or §5's inferred-lambda rule is dead on arrival — Y9a is that
         // exact shape. The initializer's row is known, so it is used.
         var binding = BindSingleLocal("""
-            §M{m001:M}
-              §F{f001:Main:pub} () -> void
+            §M{M}
+              §F{Main:pub} () -> void
                 §E{cw}
-                §B{f} §LAM{lam1:x:i32} §E{cw} (+ x INT:1) §/LAM{lam1}
+                §B{f} §LAM{x:i32} §E{cw} (+ x INT:1) §/LAM
             """);
 
         Assert.NotNull(binding.FunctionType);
@@ -102,10 +102,10 @@ public class EffectRowLatticeTests
         // (MAJOR 2): it was called _OnABindingWithNoInitializer_IsUnknown while
         // plainly having one, which left §3.5's bare-binding row unpinned.
         var binding = BindSingleLocal("""
-            §M{m001:M}
-              §F{f001:Main:pub} () -> void
+            §M{M}
+              §F{Main:pub} () -> void
                 §E{}
-                §B{f:Func<i32,i32>} §LAM{lam1:x:i32} §E{} x §/LAM{lam1}
+                §B{f:Func<i32,i32>} §LAM{x:i32} §E{} x §/LAM
             """);
 
         Assert.NotNull(binding.FunctionType);
@@ -127,8 +127,8 @@ public class EffectRowLatticeTests
         // b read "Unknown" off the ABSENCE of a type; the row itself is the
         // durable assertion and is what this pins now.
         var binding = BindSingleLocal("""
-            §M{m001:M}
-              §F{f001:Main:pub} () -> void
+            §M{M}
+              §F{Main:pub} () -> void
                 §E{}
                 §B{~f:Func<i32,i32>}
             """);
@@ -147,30 +147,30 @@ public class EffectRowLatticeTests
     [Theory]
     // Z9 — `-> void §E{cw}`, the arrow spelling of position 6. Compiles on main.
     [InlineData("""
-        §M{m001:Z9}
-          §F{f001:Log:pub} (i32:x) -> void §E{cw}
+        §M{Z9}
+          §F{Log:pub} (i32:x) -> void §E{cw}
             §P x
         """)]
     // Z9b — `§I{i32:x} §E{cw}`, position 4 on a non-function type. Compiles on main.
     [InlineData("""
-        §M{m001:Z9}
-          §F{f001:Log:pub}
+        §M{Z9}
+          §F{Log:pub}
             §I{i32:x} §E{cw}
             §O{void}
             §P x
         """)]
     // Z9c — `§O{i32} §E{cw}`, the §O spelling of position 6. Compiles on main.
     [InlineData("""
-        §M{m001:Z9}
-          §F{f001:Get:pub}
+        §M{Z9}
+          §F{Get:pub}
             §O{i32} §E{cw}
             §R INT:1
         """)]
     // R2-A (PR #1102 review round 2) -- an EMPTY-typed field with a row must report
     // Calor0405, not throw from TypeIdentity.Canonicalize on the empty type string.
     [InlineData("""
-        §M{m001:R2A}
-          §CL{c001:Box:pub}
+        §M{R2A}
+          §CL{Box:pub}
             §FLD{:c:priv} §E{cw}
         """)]
     public void RowOnNonFunctionTypedPosition_IsCalor0405(string source)
@@ -193,8 +193,8 @@ public class EffectRowLatticeTests
         // a body, so it is checked at BindBindStatement rather than in the
         // declaration sweep; this pins that the rule reaches it.
         var compiled = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Main:pub} () -> void
+            §M{M}
+              §F{Main:pub} () -> void
                 §E{}
                 §B{n:i32} §E{cw} INT:1
             """);
@@ -211,8 +211,8 @@ public class EffectRowLatticeTests
         // Position 8's half. X9b proves the FORM parses since slice a; this
         // proves the row still has to land somewhere a row can go.
         var compiled = TestHarness.Compile("""
-            §M{m001:M}
-              §CL{c001:Holder:pub}
+            §M{M}
+              §CL{Holder:pub}
                 §FLD{i32:count:priv} §E{cw}
             """);
 
@@ -225,8 +225,8 @@ public class EffectRowLatticeTests
         // The control. Without it the pin above would pass on a compiler that
         // reported Calor0405 for EVERY row.
         var compiled = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Apply:pub}
+            §M{M}
+              §F{Apply:pub}
                 §I{Func<i32,i32>:transform} §E{cw}
                 §O{i32}
                 §E{cw}
@@ -245,9 +245,9 @@ public class EffectRowLatticeTests
         // list knows. It is also why the placement check runs AFTER registration:
         // top-level functions register before module.Delegates do.
         var compiled = TestHarness.Compile("""
-            §M{m001:M}
-              §DEL{d001:Callback} (i32:x) -> void
-              §F{f001:Apply:pub}
+            §M{M}
+              §DEL{Callback} (i32:x) -> void
+              §F{Apply:pub}
                 §I{Callback:cb} §E{cw}
                 §O{void}
                 §E{cw}
@@ -274,8 +274,8 @@ public class EffectRowLatticeTests
         // Discriminating revert: drop the interop scan in
         // CollectDelegateTypeNames and the Calor0405 comes back.
         var compiled = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Apply:pub} (Handler:h §E{cw}) -> void
+            §M{M}
+              §F{Apply:pub} (Handler:h §E{cw}) -> void
                 §E{cw}
               §CSHARP{public delegate void Handler(int x);}§/CSHARP
             """);
@@ -291,8 +291,8 @@ public class EffectRowLatticeTests
         // position then gets a FunctionBoundType, so the row is available to the
         // §6.2 sites rather than merely un-rejected.
         var parameter = BindSingleParameter("""
-            §M{m001:M}
-              §F{f001:Apply:pub} (Handler:h §E{cw}) -> void
+            §M{M}
+              §F{Apply:pub} (Handler:h §E{cw}) -> void
                 §E{cw}
               §CSHARP{public delegate void Handler(int x);}§/CSHARP
             """);
@@ -313,8 +313,8 @@ public class EffectRowLatticeTests
         // Discriminating revert: restore `!IsFunctionTypedSpelling` as the test
         // and this reports again.
         var compiled = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Apply:pub} (SomeAliasFromElsewhere:h §E{cw}) -> void
+            §M{M}
+              §F{Apply:pub} (SomeAliasFromElsewhere:h §E{cw}) -> void
                 §E{cw}
             """);
 
@@ -559,10 +559,10 @@ public class EffectRowLatticeTests
         // carries ρ_decl, the declaration being the contract. Slice a parsed the
         // annotation and threw it away; here it reaches the type.
         var binding = BindSingleLocal("""
-            §M{m001:M}
-              §F{f001:Main:pub} () -> void
+            §M{M}
+              §F{Main:pub} () -> void
                 §E{cw}
-                §B{f} §LAM{lam1:x:i32} §E{cw} (+ x INT:1) §/LAM{lam1}
+                §B{f} §LAM{x:i32} §E{cw} (+ x INT:1) §/LAM
             """);
 
         Assert.Equal(EffectRowKind.Concrete, binding.FunctionType!.Row.Kind);
@@ -578,10 +578,10 @@ public class EffectRowLatticeTests
         // sound placeholder: it fits nothing, so no check can pass on the
         // strength of a row that has not been computed.
         var binding = BindSingleLocal("""
-            §M{m001:M}
-              §F{f001:Main:pub} () -> void
+            §M{M}
+              §F{Main:pub} () -> void
                 §E{cw}
-                §B{f} §LAM{lam1:x:i32} (+ x INT:1) §/LAM{lam1}
+                §B{f} §LAM{x:i32} (+ x INT:1) §/LAM
             """);
 
         Assert.True(binding.FunctionType!.Row.IsUnknown);
@@ -673,15 +673,15 @@ public class EffectRowLatticeTests
         // itself. Discriminating revert: skip the body check on rowed sources
         // and one of the two diagnostics disappears.
         const string withE = """
-            §M{m001:M}
-              §F{f001:Apply:pub} (Func<i32,i32>:transform §E{}, i32:value) -> i32
+            §M{M}
+              §F{Apply:pub} (Func<i32,i32>:transform §E{}, i32:value) -> i32
                 §E{}
                 §R value
-              §F{f002:Shout:pub} (i32:x) -> i32
+              §F{Shout:pub} (i32:x) -> i32
                 §E{cw}
                 §P x
                 §R x
-              §F{f003:Main:pub} () -> i32
+              §F{Main:pub} () -> i32
                 §E{}
                 §R §C{Apply} §A Shout §A INT:1 §/C
             """;
@@ -786,11 +786,11 @@ public class EffectRowLatticeTests
         // and this fixture goes SILENT — no Calor0425, no Calor0424, a clean
         // compile of a program nothing was ever known about.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Apply:pub} (Func<i32,i32>:transform §E{}, i32:value) -> i32
+            §M{M}
+              §F{Apply:pub} (Func<i32,i32>:transform §E{}, i32:value) -> i32
                 §E{}
                 §R value
-              §F{f002:Main:pub} (Func<i32,i32>:opaque) -> i32
+              §F{Main:pub} (Func<i32,i32>:opaque) -> i32
                 §E{}
                 §R §C{Apply} §A opaque §A INT:1 §/C
             """);
@@ -811,11 +811,11 @@ public class EffectRowLatticeTests
         // the site goes quiet — without this half, a checker that emitted
         // Calor0425 unconditionally would pass every assertion above.
         var rowed = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Apply:pub} (Func<i32,i32>:transform §E{}, i32:value) -> i32
+            §M{M}
+              §F{Apply:pub} (Func<i32,i32>:transform §E{}, i32:value) -> i32
                 §E{}
                 §R value
-              §F{f002:Main:pub} (Func<i32,i32>:opaque §E{}) -> i32
+              §F{Main:pub} (Func<i32,i32>:opaque §E{}) -> i32
                 §E{}
                 §R §C{Apply} §A opaque §A INT:1 §/C
             """);
@@ -840,17 +840,17 @@ public class EffectRowLatticeTests
         // CarriedReasons, or drop the Fits-with-reasons arm, and this goes
         // silent while the program keeps compiling on an unverified assumption.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Interop:pub} (i32:x) -> i32
+            §M{M}
+              §F{Interop:pub} (i32:x) -> i32
                 §E{cw}
                 §RAW
             System.Console.WriteLine(x);
             §/RAW
                 §R x
-              §F{f002:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
+              §F{Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
                 §E{}
                 §R value
-              §F{f003:Main:pub} () -> i32
+              §F{Main:pub} () -> i32
                 §E{cw}
                 §R §C{Apply} §A Interop §A INT:1 §/C
             """);
@@ -879,11 +879,11 @@ public class EffectRowLatticeTests
         // Discriminating revert: report at both the source and the destination
         // of a hop and this reads 4.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
+            §M{M}
+              §F{Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
                 §E{cw}
                 §R value
-              §F{f002:Pick:pub} (Func<i32,i32>:a) -> Func<i32,i32> §E{cw}
+              §F{Pick:pub} (Func<i32,i32>:a) -> Func<i32,i32> §E{cw}
                 §E{cw}
                 §B{used:i32} §C{Apply} §A a §A INT:1 §/C
                 §R a
@@ -963,11 +963,11 @@ public class EffectRowLatticeTests
         // IsParameterFunctionTyped and the Calor0424 disappears — measured, not
         // assumed: the same source on 9119397e produces zero Calor0424.
         var result = TestHarness.Compile("""
-            §M{m001:A2Shape}
-              §F{f001:Apply:pub} (Handler:h §E{}) -> void
+            §M{A2Shape}
+              §F{Apply:pub} (Handler:h §E{}) -> void
                 §E{}
                 §R
-              §F{f002:Wrap:pub} (Handler:g §E{cw}) -> void
+              §F{Wrap:pub} (Handler:g §E{cw}) -> void
                 §E{}
                 §C{Apply} §A g §/C
               §CSHARP{public delegate void Handler(int x);}§/CSHARP
@@ -986,11 +986,11 @@ public class EffectRowLatticeTests
         // The `_Compiles` polarity, so the pin above cannot be satisfied by an
         // unconditional emitter.
         var result = TestHarness.Compile("""
-            §M{m001:A2Shape}
-              §F{f001:Apply:pub} (Handler:h §E{cw}) -> void
+            §M{A2Shape}
+              §F{Apply:pub} (Handler:h §E{cw}) -> void
                 §E{cw}
                 §R
-              §F{f002:Wrap:pub} (Handler:g §E{cw}) -> void
+              §F{Wrap:pub} (Handler:g §E{cw}) -> void
                 §E{cw}
                 §C{Apply} §A g §/C
               §CSHARP{public delegate void Handler(int x);}§/CSHARP

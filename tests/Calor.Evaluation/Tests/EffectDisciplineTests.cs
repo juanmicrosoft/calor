@@ -74,7 +74,7 @@ public class EffectDisciplineTests
         var violations = new List<string> { "Effect violation: method has side effects" };
 
         var score = EffectDisciplineScorer.ScoreCalorBugPrevention(
-            code: "§M{m001:Test}\n§F{f001:Test:pub}\n§R 1\n§/F\n§/M",
+            code: "§M{Test}\n§F{Test:pub}\n§R 1\n§/F\n§/M",
             compilationSuccess: false,
             effectViolations: violations,
             category: "flaky-test-prevention");
@@ -101,8 +101,8 @@ public class EffectDisciplineTests
     public void ScoreCalorBugPrevention_CompiledWithEffectAnnotations_ScoresWell()
     {
         var code = @"
-§M{m001:Test}
-  §F{f001:Calculate:pub}
+§M{Test}
+  §F{Calculate:pub}
       §E{}
       §I{i32:a}
       §I{i32:b}
@@ -336,8 +336,8 @@ public static int Add(int a, int b)
     public void ScoreMaintainability_CalorWithEffects_ScoresReasonably()
     {
         var code = @"
-§M{m001:Calculator}
-  §F{f001:CalculateTotal:pub}
+§M{Calculator}
+  §F{CalculateTotal:pub}
       §E{}
       §I{i32:price}
       §I{i32:quantity}
@@ -420,8 +420,8 @@ public static class Solution
     public void CodeExecutor_PureCalorFunction_ExecutesCorrectly()
     {
         var calorCode = @"
-§M{m001:Solution}
-  §F{f001:Add:pub}
+§M{Solution}
+  §F{Add:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -695,7 +695,7 @@ public static class Solution
         {
             var code = language.ToLowerInvariant() switch
             {
-                "calor" => "§M{m001:Solution}\n§F{f001:Add:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §R (+ a b)\n\n",
+                "calor" => "§M{Solution}\n§F{Add:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §R (+ a b)\n\n",
                 _ => "public static class Solution { public static int Add(int a, int b) => a + b; }"
             };
 
@@ -730,7 +730,7 @@ public static class Solution
         {
             var code = language.ToLowerInvariant() switch
             {
-                "calor" => "§M{m001:Solution}\n§F{f001:Add:pub}\n  §E{}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §R (+ a b)\n\n",
+                "calor" => "§M{Solution}\n§F{Add:pub}\n  §E{}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §R (+ a b)\n\n",
                 _ => @"
 public static class Solution
 {
@@ -773,7 +773,7 @@ public static class Solution
         {
             var code = language.ToLowerInvariant() switch
             {
-                "calor" => "§M{m001:Solution}\n§F{f001:GetTime:pub}\n  §O{str}\n  §R \"now\"\n\n",
+                "calor" => "§M{Solution}\n§F{GetTime:pub}\n  §O{str}\n  §R \"now\"\n\n",
                 _ => @"
 public static class Solution
 {

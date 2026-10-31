@@ -38,7 +38,7 @@ public class TypeCheckToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n"
+                "source": "§M{Test}\n§F{Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n"
             }
             """).RootElement;
 
@@ -79,7 +79,7 @@ public class TypeCheckToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n",
+                "source": "§M{Test}\n§F{Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n",
                 "filePath": "test-file.calr"
             }
             """).RootElement;
@@ -97,7 +97,7 @@ public class TypeCheckToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n"
+                "source": "§M{Test}\n§F{Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n"
             }
             """).RootElement;
 
@@ -117,7 +117,7 @@ public class TypeCheckToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Bad} invalid syntax"
+                "source": "§M{Test}\n§F{Bad} invalid syntax"
             }
             """).RootElement;
 
@@ -135,7 +135,7 @@ public class TypeCheckToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Test:pub}\n§O{i32}\n§B{counter} 0\n§R undefinedVar\n\n"
+                "source": "§M{Test}\n§F{Test:pub}\n§O{i32}\n§B{counter} 0\n§R undefinedVar\n\n"
             }
             """).RootElement;
 
@@ -176,11 +176,11 @@ public class TypeCheckToolTests
     public async Task ExecuteAsync_WithTypeMismatch_ReportsTypeMismatchCategory()
     {
         // Source with type mismatch: WHILE condition must be BOOL, not INT
-        // §WH{id} (condition) is the correct WHILE syntax
+        // §WH (condition) is the correct WHILE syntax
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Test:pub}\n§O{i32}\n§B{x} 0\n§WH{wh1} (+ x 1)\n  §B{x} (+ x 1)\n\n§R x\n\n"
+                "source": "§M{Test}\n§F{Test:pub}\n§O{i32}\n§B{x} 0\n§WH (+ x 1)\n  §B{x} (+ x 1)\n\n§R x\n\n"
             }
             """).RootElement;
 
@@ -221,7 +221,7 @@ public class TypeCheckToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Test:pub}\n§O{i32}\n§B{x} 0\n§WH{wh1} (+ x 1)\n  §B{y} undefinedVar\n\n§R x\n\n"
+                "source": "§M{Test}\n§F{Test:pub}\n§O{i32}\n§B{x} 0\n§WH (+ x 1)\n  §B{y} undefinedVar\n\n§R x\n\n"
             }
             """).RootElement;
 
@@ -251,7 +251,7 @@ public class TypeCheckToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Test:pub}\n§O{i32}\n§R undefinedVar\n\n"
+                "source": "§M{Test}\n§F{Test:pub}\n§O{i32}\n§R undefinedVar\n\n"
             }
             """).RootElement;
 
@@ -277,11 +277,11 @@ public class TypeCheckToolTests
     public async Task ExecuteAsync_IfConditionTypeMismatch_ReportsError()
     {
         // IF condition must be BOOL, using INT should fail
-        // §IF{id} condition syntax
+        // §IF condition syntax
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Test:pub}\n§I{i32:x}\n§O{i32}\n§IF{if1} (+ x 1)\n  §R 1\n\n§R 0\n\n"
+                "source": "§M{Test}\n§F{Test:pub}\n§I{i32:x}\n§O{i32}\n§IF (+ x 1)\n  §R 1\n\n§R 0\n\n"
             }
             """).RootElement;
 
@@ -298,11 +298,11 @@ public class TypeCheckToolTests
     public async Task ExecuteAsync_ForLoopWithNonNumericBounds_ReportsError()
     {
         // FOR loop bounds must be numeric
-        // §L{id:var:from:to:step} syntax - using BOOL:true as from should fail
+        // §L{var:from:to:step} syntax - using BOOL:true as from should fail
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Test:pub}\n§O{i32}\n§B{x} 0\n§L{l1:i:BOOL:true:10:1}\n  §B{x} (+ x i)\n\n§R x\n\n"
+                "source": "§M{Test}\n§F{Test:pub}\n§O{i32}\n§B{x} 0\n§L{i:BOOL:true:10:1}\n  §B{x} (+ x i)\n\n§R x\n\n"
             }
             """).RootElement;
 
@@ -322,12 +322,12 @@ public class TypeCheckToolTests
         // rebinds are reassignments (emitted as `result = …`); an immutable §B in a
         // nested block would re-declare and shadow the outer local — CS0136, now
         // caught as Calor0255 (#727).
-        // Using correct IF syntax: §IF{id} condition ... §EL ... §/I{id}
-        // Using correct FOR syntax: §L{id:var:from:to:step} ... §/L{id}
+        // Using correct IF syntax: §IF condition ... §EL ... §/I
+        // Using correct FOR syntax: §L{var:from:to:step} ... §/L
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Complex:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§B{~result} 0\n§IF{if1} (> a b)\n  §B{~result} a\n§EL\n  §B{~result} b\n\n§L{l1:i:0:result:1}\n  §B{~result} (+ result i)\n\n§R result\n\n"
+                "source": "§M{Test}\n§F{Complex:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§B{~result} 0\n§IF (> a b)\n  §B{~result} a\n§EL\n  §B{~result} b\n\n§L{i:0:result:1}\n  §B{~result} (+ result i)\n\n§R result\n\n"
             }
             """).RootElement;
 

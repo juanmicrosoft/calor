@@ -49,12 +49,12 @@ public sealed class S2ObligationStateTests
     public void PreconditionFactKilledByAssignment_IsNotDischarged(string predicate, string assigned)
     {
         var source = $$"""
-            §M{m1:R1Case}
-              §F{f1:Probe:priv} (i32:x) -> i32
+            §M{R1Case}
+              §F{Probe:priv} (i32:x) -> i32
                 §E{}
                 §Q {{predicate}}
                 §ASSIGN x {{assigned}}
-                §PROOF{p1:claim} {{predicate}}
+                §PROOF{claim} {{predicate}}
                 §R x
             """;
         // Oracle witnesses (x = 0 and x = int.MaxValue satisfy §Q): after the assignment
@@ -75,15 +75,15 @@ public sealed class S2ObligationStateTests
     public void RefArgumentKillsPreconditionFact()
     {
         const string source = """
-            §M{m1:M}
-              §F{g1:Bump:priv} (i32:v:ref) -> void
+            §M{M}
+              §F{Bump:priv} (i32:v:ref) -> void
                 §E{}
                 §ASSIGN v INT:-5
-              §F{f1:Probe:priv} (i32:x) -> i32
+              §F{Probe:priv} (i32:x) -> i32
                 §E{}
                 §Q (> x INT:0)
                 §C{Bump} §A{ref} x §/C
-                §PROOF{p1:claim} (> x INT:0)
+                §PROOF{claim} (> x INT:0)
                 §R x
             """;
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
@@ -95,12 +95,12 @@ public sealed class S2ObligationStateTests
     {
         // Probe(ref a, ref a) passes one variable twice: writing y also writes x.
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:priv} (i32:x:ref, i32:y:ref) -> i32
+            §M{M}
+              §F{Probe:priv} (i32:x:ref, i32:y:ref) -> i32
                 §E{}
                 §Q (> x INT:0)
                 §ASSIGN y INT:-5
-                §PROOF{p1:claim} (> x INT:0)
+                §PROOF{claim} (> x INT:0)
                 §R x
             """;
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
@@ -111,12 +111,12 @@ public sealed class S2ObligationStateTests
     public void ArrayElementStoreKillsPreconditionFact()
     {
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:priv} ([i32]:a) -> i32
+            §M{M}
+              §F{Probe:priv} ([i32]:a) -> i32
                 §E{mut}
                 §Q (> §IDX a INT:0 INT:0)
                 §SETIDX{a} INT:0 INT:-5
-                §PROOF{p1:claim} (> §IDX a INT:0 INT:0)
+                §PROOF{claim} (> §IDX a INT:0 INT:0)
                 §R INT:0
             """;
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
@@ -127,70 +127,70 @@ public sealed class S2ObligationStateTests
     // Review round 1 witnesses: each was a false Discharged (guard elided) or a lost proof.
     [Theory]
     [InlineData("""
-        §M{m1:M}
-          §F{f1:Probe:priv} (i32:x) -> i32
+        §M{M}
+          §F{Probe:priv} (i32:x) -> i32
             §E{}
             §Q (> x INT:0)
             §B{sink:i32} §CS{(x = -5)}
-            §PROOF{p1:claim} (> x INT:0)
+            §PROOF{claim} (> x INT:0)
             §R x
         """)]
     [InlineData("""
-        §M{m1:M}
-          §F{f1:Probe:priv} (i32:x:ref, i32:y:ref) -> i32
+        §M{M}
+          §F{Probe:priv} (i32:x:ref, i32:y:ref) -> i32
             §E{}
-            §IF{if1} (< x INT:0)
+            §IF (< x INT:0)
               §R INT:0
             §EL
               §ASSIGN y INT:-5
-              §PROOF{p1:claim} (>= x INT:0)
+              §PROOF{claim} (>= x INT:0)
             §R x
         """)]
     [InlineData("""
-        §M{m1:M}
-          §F{f1:Probe:priv} (i32:x) -> i32
+        §M{M}
+          §F{Probe:priv} (i32:x) -> i32
             §E{unsafe}
             §Q (> x INT:0)
-            §UNSAFE{u1}
+            §UNSAFE
               §B{ptr:i32*} §ADDR x
               §ASSIGN §DEREF ptr INT:-5
-            §PROOF{p1:claim} (> x INT:0)
+            §PROOF{claim} (> x INT:0)
             §R x
         """)]
     [InlineData("""
-        §M{m1:M}
-          §F{f1:Probe:priv} (i32:x) -> i32
+        §M{M}
+          §F{Probe:priv} (i32:x) -> i32
             §E{}
-            §B{bump:Func<i32>} §LAM{l1} §ASSIGN x INT:-5 §R INT:0 §/LAM{l1}
-            §IF{if1} (< x INT:0)
+            §B{bump:Func<i32>} §LAM{} §ASSIGN x INT:-5 §R INT:0 §/LAM
+            §IF (< x INT:0)
               §R INT:0
             §EL
               §B{z:i32} §C{bump} §/C
-              §PROOF{p1:claim} (>= x INT:0)
+              §PROOF{claim} (>= x INT:0)
             §R x
         """)]
     // Review round 2 witnesses: a compiler-directive payload ("x = -5;") and a field the caller
     // can pass by reference as x.
     [InlineData("""
-        §M{m1:M}
-          §F{f1:Probe:priv} (i32:x) -> i32
+        §M{M}
+          §F{Probe:priv} (i32:x) -> i32
             §E{}
             §Q (> x INT:0)
             §CDIR{compiler-directive:eCA9IC01Ow}
-            §PROOF{p1:claim} (> x INT:0)
+            §PROOF{claim} (> x INT:0)
             §R x
         """)]
     [InlineData("""
-        §M{m1:M}
-          §CL{c1:Box:pub}
+        §M{M}
+          §CL{Box:pub}
             §FLD{i32:Value:pub}
-            §MT{mt1:Probe:pub}
+            §MT{Probe:pub}
               §I{i32:x:ref}
               §O{i32}
               §E{mut}
               §Q (> x INT:0)
               §ASSIGN this.Value INT:-5
-              §PROOF{p1:claim} (> x INT:0)
+              §PROOF{claim} (> x INT:0)
               §R x
         """)]
     public void IndirectWrite_KillsFacts(string source)
@@ -205,14 +205,14 @@ public sealed class S2ObligationStateTests
         // Review round 2 witness: the entry guard enforces y > 0, but the refinement is dropped
         // because x is reassigned, so a model y <= 0 must not become a Failed compile error.
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:pub}
+            §M{M}
+              §F{Probe:pub}
                 §I{i32:x} | (&& (> # INT:0) (> y INT:0))
                 §I{i32:y}
                 §O{void}
                 §E{}
                 §ASSIGN x INT:1
-                §PROOF{p1:claim} (> y INT:0)
+                §PROOF{claim} (> y INT:0)
             """;
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
         Assert.NotEqual(ObligationStatus.Failed, proof.Status);
@@ -225,8 +225,8 @@ public sealed class S2ObligationStateTests
         // Review round 3 witness: y > 0 (dropped entry refinement) and y == z (retained
         // precondition) make the claim hold; a model y = z = 0 is unreachable.
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:pub}
+            §M{M}
+              §F{Probe:pub}
                 §I{i32:x} | (&& (> # INT:0) (> y INT:0))
                 §I{i32:y}
                 §I{i32:z}
@@ -234,7 +234,7 @@ public sealed class S2ObligationStateTests
                 §E{}
                 §Q (== y z)
                 §ASSIGN x INT:1
-                §PROOF{p1:claim} (> z INT:0)
+                §PROOF{claim} (> z INT:0)
             """;
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
         Assert.NotEqual(ObligationStatus.Failed, proof.Status);
@@ -246,14 +246,14 @@ public sealed class S2ObligationStateTests
         // Review round 3 witness: Probe(1, 0) passes x's guard, then y's guard runs
         // `x = -5` and is true, so the claim is false.
         const string source = """
-            §M{m1:M}
-              §RTYPE{r1:Pos:i32} (> # INT:0)
-              §F{f1:Probe:pub}
+            §M{M}
+              §RTYPE{Pos:i32} (> # INT:0)
+              §F{Probe:pub}
                 §I{Pos:x}
                 §I{i32:y} | §CS{((x = -5) == -5)}
                 §O{i32}
                 §E{mut}
-                §PROOF{p1:claim} (> x INT:0)
+                §PROOF{claim} (> x INT:0)
                 §R x
             """;
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
@@ -266,20 +266,20 @@ public sealed class S2ObligationStateTests
         // Review round 3 witness: box.Probe(ref box.Value) with Value = 1; reading Trigger
         // runs a getter that stores -5 through the alias.
         const string source = """
-            §M{m1:M}
-              §CL{c1:Box:pub}
+            §M{M}
+              §CL{Box:pub}
                 §FLD{i32:Value:pub}
-                §PROP{pr1:Trigger:i32:pub}
+                §PROP{Trigger:i32:pub}
                   §GET
                     §ASSIGN this.Value INT:-5
                     §R INT:0
-                §MT{mt1:Probe:pub}
+                §MT{Probe:pub}
                   §I{i32:x:ref}
                   §O{i32}
                   §E{mut}
                   §Q (> x INT:0)
                   §B{sink:i32} this.Trigger
-                  §PROOF{p1:claim} (> x INT:0)
+                  §PROOF{claim} (> x INT:0)
                   §R x
             """;
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
@@ -292,20 +292,20 @@ public sealed class S2ObligationStateTests
         // Verification-pass witness: p0's retained guard runs the getter, which stores -5 through
         // the alias before p1 is checked.
         const string source = """
-            §M{m1:M}
-              §CL{c1:Box:pub}
+            §M{M}
+              §CL{Box:pub}
                 §FLD{i32:Value:pub}
-                §PROP{pr1:Trigger:i32:pub}
+                §PROP{Trigger:i32:pub}
                   §GET
                     §ASSIGN this.Value INT:-5
                     §R INT:0
-                §MT{mt1:Probe:pub}
+                §MT{Probe:pub}
                   §I{i32:x:ref}
                   §O{i32}
                   §E{mut}
                   §Q (> x INT:0)
-                  §PROOF{p0:trigger} (== this.Trigger INT:0)
-                  §PROOF{p1:claim} (> x INT:0)
+                  §PROOF{trigger} (== this.Trigger INT:0)
+                  §PROOF{claim} (> x INT:0)
                   §R x
             """;
         var proof = Assert.Single(Solve(source).Obligations,
@@ -319,16 +319,16 @@ public sealed class S2ObligationStateTests
         // Second verification-pass witness: the getter always returns 0, but the solver models
         // the inherited field accessor as free; the read is not a proof condition.
         const string source = """
-            §M{m1:M}
-              §RTYPE{r1:Zero:i32} (== # INT:0)
-              §CL{c1:Base:pub}
+            §M{M}
+              §RTYPE{Zero:i32} (== # INT:0)
+              §CL{Base:pub}
                 §FLD{i32:Trigger:pub}
-              §CL{c2:Box:pub}
+              §CL{Box:pub}
                 §EXT{Base}
-                §PROP{pr1:Trigger:i32:pub}
+                §PROP{Trigger:i32:pub}
                   §GET
                     §R INT:0
-              §F{f1:Probe:pub} (Box:box) -> void
+              §F{Probe:pub} (Box:box) -> void
                 §E{}
                 §B{value:Zero} box.Trigger
             """;
@@ -340,9 +340,9 @@ public sealed class S2ObligationStateTests
     public void ParameterNamedResult_DoesNotDischargeTheRefinedReturn()
     {
         const string source = """
-            §M{m1:M}
-              §RTYPE{r1:Pos:i32} (> # INT:0)
-              §F{f1:Probe:pub} (Pos:result) -> Pos
+            §M{M}
+              §RTYPE{Pos:i32} (> # INT:0)
+              §F{Probe:pub} (Pos:result) -> Pos
                 §E{}
                 §R INT:-5
             """;
@@ -355,13 +355,13 @@ public sealed class S2ObligationStateTests
     public void GuardAfterEarlyExit_StillUsedAsAFact()
     {
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:priv} (i32:x) -> i32
+            §M{M}
+              §F{Probe:priv} (i32:x) -> i32
                 §E{}
-                §IF{e1} (< x INT:0)
+                §IF (< x INT:0)
                   §R INT:0
-                §IF{p2} (> x INT:5)
-                  §PROOF{p1:claim} (> x INT:0)
+                §IF (> x INT:5)
+                  §PROOF{claim} (> x INT:0)
                 §R x
             """;
         Assert.Equal(ObligationStatus.Discharged, Single(Solve(source).Obligations, ObligationKind.ProofObligation).Status);
@@ -371,12 +371,12 @@ public sealed class S2ObligationStateTests
     public void ObligationAfterLoop_IsNotRefutedWithANonExitingModel()
     {
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:priv} (i32:x) -> i32
+            §M{M}
+              §F{Probe:priv} (i32:x) -> i32
                 §E{cw}
-                §WH{w1} (< x INT:0)
+                §WH (< x INT:0)
                   §P x
-                §PROOF{p1:claim} (>= x INT:0)
+                §PROOF{claim} (>= x INT:0)
                 §R x
             """;
         Assert.NotEqual(ObligationStatus.Failed, Single(Solve(source).Obligations, ObligationKind.ProofObligation).Status);
@@ -386,11 +386,11 @@ public sealed class S2ObligationStateTests
     public void ConstructorNamedRefinementParameter_IsAnEntryFact()
     {
         const string source = """
-            §M{m1:M}
-              §RTYPE{r1:Pos:i32} (> # INT:0)
-              §CL{c001:Box:pub}
-                §CTOR{ctor1:pub} (Pos:value)
-                  §PROOF{p1:claim} (> value INT:0)
+            §M{M}
+              §RTYPE{Pos:i32} (> # INT:0)
+              §CL{Box:pub}
+                §CTOR{pub} (Pos:value)
+                  §PROOF{claim} (> value INT:0)
             """;
         Assert.Equal(ObligationStatus.Discharged, Single(Solve(source).Obligations, ObligationKind.ProofObligation).Status);
     }
@@ -399,14 +399,14 @@ public sealed class S2ObligationStateTests
     public void RawCSharpKillsPreconditionFact()
     {
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:priv} (i32:x) -> i32
+            §M{M}
+              §F{Probe:priv} (i32:x) -> i32
                 §E{}
                 §Q (> x INT:0)
                 §RAW
                 x = -5;
                 §/RAW
-                §PROOF{p1:claim} (> x INT:0)
+                §PROOF{claim} (> x INT:0)
                 §R x
             """;
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
@@ -417,12 +417,12 @@ public sealed class S2ObligationStateTests
     public void NamedRefinementFactKilledByAssignment_IsNotDischarged()
     {
         const string source = """
-            §M{m1:M}
-              §RTYPE{r1:Pos:i32} (> # INT:0)
-              §F{f1:Probe:priv} (Pos:x) -> i32
+            §M{M}
+              §RTYPE{Pos:i32} (> # INT:0)
+              §F{Probe:priv} (Pos:x) -> i32
                 §E{}
                 §ASSIGN x INT:-5
-                §PROOF{p1:claim} (> x INT:0)
+                §PROOF{claim} (> x INT:0)
                 §R x
             """;
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
@@ -433,11 +433,11 @@ public sealed class S2ObligationStateTests
     public void Control_UnassignedPreconditionFact_StillDischarges()
     {
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:priv} (i32:x) -> i32
+            §M{M}
+              §F{Probe:priv} (i32:x) -> i32
                 §E{}
                 §Q (> x INT:0)
-                §PROOF{p1:claim} (> x INT:0)
+                §PROOF{claim} (> x INT:0)
                 §R x
             """;
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
@@ -454,12 +454,12 @@ public sealed class S2ObligationStateTests
     public void ReassignedVariable_IsNotRefutedWithAnUnreachableModel(string guard, string assigned)
     {
         var source = $$"""
-            §M{m1:R1Case}
-              §F{f1:Probe:priv} (i32:x) -> i32
+            §M{R1Case}
+              §F{Probe:priv} (i32:x) -> i32
                 §E{}
-                §IF{if1} {{guard}}
+                §IF {{guard}}
                   §ASSIGN x {{assigned}}
-                  §PROOF{p1:claim} {{guard}}
+                  §PROOF{claim} {{guard}}
                 §R x
             """;
         var (obligations, csharp, hasErrors) = Solve(source);
@@ -477,13 +477,13 @@ public sealed class S2ObligationStateTests
         // R1-OBL-BRANCH-FACTS-006: the else body runs only for x == 548596110, where the
         // claim x <= -2147483647 is false. The counterexample must be that input.
         const string source = """
-            §M{m1:R1Case}
-              §F{f1:Probe:priv} (i32:x) -> i32
+            §M{R1Case}
+              §F{Probe:priv} (i32:x) -> i32
                 §E{}
-                §IF{if1} (!= x INT:548596110)
+                §IF (!= x INT:548596110)
                   §R INT:1
                 §EL
-                  §PROOF{p1:claim} (<= x INT:-2147483647)
+                  §PROOF{claim} (<= x INT:-2147483647)
                 §R INT:0
             """;
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
@@ -497,13 +497,13 @@ public sealed class S2ObligationStateTests
     {
         // R1-OBL-BRANCH-FACTS-007: the else body runs only for x == int.MaxValue.
         const string source = """
-            §M{m1:R1Case}
-              §F{f1:Probe:priv} (i32:x) -> i32
+            §M{R1Case}
+              §F{Probe:priv} (i32:x) -> i32
                 §E{}
-                §IF{if1} (< x INT:2147483647)
+                §IF (< x INT:2147483647)
                   §R INT:1
                 §EL
-                  §PROOF{p1:claim} (> x INT:-2147483647)
+                  §PROOF{claim} (> x INT:-2147483647)
                 §R INT:0
             """;
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
@@ -515,13 +515,13 @@ public sealed class S2ObligationStateTests
     {
         // The elseif body runs only when x <= 0 and x >= -5: x + 10 > 0 holds there.
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:priv} (i32:x) -> i32
+            §M{M}
+              §F{Probe:priv} (i32:x) -> i32
                 §E{}
-                §IF{if1} (> x INT:0)
+                §IF (> x INT:0)
                   §R INT:1
                 §EI (>= x INT:-5)
-                  §PROOF{p1:claim} (> (+ x INT:10) INT:0)
+                  §PROOF{claim} (> (+ x INT:10) INT:0)
                 §R INT:0
             """;
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
@@ -532,14 +532,14 @@ public sealed class S2ObligationStateTests
     public void ElseFact_KilledWhenElseBodyReassigns()
     {
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:priv} (i32:x) -> i32
+            §M{M}
+              §F{Probe:priv} (i32:x) -> i32
                 §E{}
-                §IF{if1} (< x INT:0)
+                §IF (< x INT:0)
                   §R INT:1
                 §EL
                   §ASSIGN x INT:-7
-                  §PROOF{p1:claim} (>= x INT:0)
+                  §PROOF{claim} (>= x INT:0)
                 §R INT:0
             """;
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
@@ -550,12 +550,12 @@ public sealed class S2ObligationStateTests
     public void ObligationAfterEarlyReturn_IsNotRefutedWithAnUnreachableModel()
     {
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:priv} (i32:x) -> i32
+            §M{M}
+              §F{Probe:priv} (i32:x) -> i32
                 §E{}
-                §IF{if1} (< x INT:0)
+                §IF (< x INT:0)
                   §R INT:0
-                §PROOF{p1:claim} (>= x INT:0)
+                §PROOF{claim} (>= x INT:0)
                 §R x
             """;
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
@@ -569,9 +569,9 @@ public sealed class S2ObligationStateTests
         // R1-OBL-REFINEMENT-RETURN-002: the solver's `result` is not bound to the returned
         // expression, so `result = 2` is no counterexample (x = 439613318 returns 439613316).
         const string source = """
-            §M{m1:R1Case}
-              §RTYPE{r1:Ref:i32} (!= # INT:2)
-              §F{f1:Probe:pub}
+            §M{R1Case}
+              §RTYPE{Ref:i32} (!= # INT:2)
+              §F{Probe:pub}
                 §I{i32:x}
                 §O{Ref}
                 §E{}
@@ -587,17 +587,17 @@ public sealed class S2ObligationStateTests
     }
 
     [Theory]
-    [InlineData("§RTYPE{r1:Ref:i32} (> (- # INT:403639039) INT:608460032)", "i32")]        // SELFREF-001
-    [InlineData("§RTYPE{r1:Ref:i32} (>= (& # INT:-1200624532) INT:-2147483647)", "i32")]  // SELFREF-002
-    [InlineData("§RTYPE{r1:Ref:i64} (>= (+ # INT:-2147483648) LONG:4788170680209598745)", "i64")] // SELFREF-003
-    [InlineData("§RTYPE{r1:Ref:i32} (>= (& # INT:2147483647) INT:2147483646)", "i32")]    // SELFREF-004
-    [InlineData("§RTYPE{r1:Ref:i64} (< (- # LONG:-9223372036854775808) INT:-1)", "i64")]  // SELFREF-005
+    [InlineData("§RTYPE{Ref:i32} (> (- # INT:403639039) INT:608460032)", "i32")]        // SELFREF-001
+    [InlineData("§RTYPE{Ref:i32} (>= (& # INT:-1200624532) INT:-2147483647)", "i32")]  // SELFREF-002
+    [InlineData("§RTYPE{Ref:i64} (>= (+ # INT:-2147483648) LONG:4788170680209598745)", "i64")] // SELFREF-003
+    [InlineData("§RTYPE{Ref:i32} (>= (& # INT:2147483647) INT:2147483646)", "i32")]    // SELFREF-004
+    [InlineData("§RTYPE{Ref:i64} (< (- # LONG:-9223372036854775808) INT:-1)", "i64")]  // SELFREF-005
     public void NamedRefinementParameter_IsAnEntryFact(string refinement, string _)
     {
         var source = $$"""
-            §M{m1:R1Case}
+            §M{R1Case}
               {{refinement}}
-              §F{f1:Probe:pub}
+              §F{Probe:pub}
                 §I{Ref:x}
                 §O{i32}
                 §E{}
@@ -616,10 +616,10 @@ public sealed class S2ObligationStateTests
     {
         // R1-OBL-SUBTYPE-002: x : Src (x == long.MaxValue) implies Dst (x != -5562123229525975277).
         const string source = """
-            §M{m1:R1Case}
-              §RTYPE{r1:Src:i64} (== # LONG:9223372036854775807)
-              §RTYPE{r2:Dst:i64} (!= # LONG:-5562123229525975277)
-              §F{f1:Probe:pub}
+            §M{R1Case}
+              §RTYPE{Src:i64} (== # LONG:9223372036854775807)
+              §RTYPE{Dst:i64} (!= # LONG:-5562123229525975277)
+              §F{Probe:pub}
                 §I{Src:x}
                 §O{i32}
                 §E{}
@@ -638,10 +638,10 @@ public sealed class S2ObligationStateTests
     {
         // x : Pos does not imply Big: x = 1 is a real counterexample at a reachable binding.
         const string source = """
-            §M{m1:M}
-              §RTYPE{r1:Pos:i32} (> # INT:0)
-              §RTYPE{r2:Big:i32} (> # INT:100)
-              §F{f1:Probe:pub}
+            §M{M}
+              §RTYPE{Pos:i32} (> # INT:0)
+              §RTYPE{Big:i32} (> # INT:100)
+              §F{Probe:pub}
                 §I{Pos:x}
                 §O{i32}
                 §E{}

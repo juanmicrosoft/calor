@@ -43,8 +43,8 @@ public class MicroValidationRunnerTests : IDisposable
     [Fact]
     public void Run_PilotFlag_EmitsExpectedDiagnosticWhenFlagOn()
     {
-        var program = WriteProgram(@"§M{m1:Test}
-  §F{f001:Noop:pub}
+        var program = WriteProgram(@"§M{Test}
+  §F{Noop:pub}
       §O{void}
 ");
 
@@ -66,7 +66,7 @@ public class MicroValidationRunnerTests : IDisposable
     [Fact]
     public void Run_NullManifest_Throws()
     {
-        var program = WriteProgram("§M{m1:Test}");
+        var program = WriteProgram("§M{Test}");
         Assert.Throws<ArgumentNullException>(() =>
             MicroValidationRunner.Run(null!, program));
     }

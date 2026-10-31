@@ -105,7 +105,7 @@ public class BatchConvertToolTests
         {
             // Structural closer tags are a hard parser error (Calor0830)
             File.WriteAllText(Path.Combine(tempDir, "Bad.calr"),
-                "§M{m001:Test}\n  §F{f001:Foo:pub} () -> void\n    §P \"hi\"\n  §/F{f001}\n");
+                "§M{Test}\n  §F{Foo:pub} () -> void\n    §P \"hi\"\n  §/F\n");
 
             var args = JsonDocument.Parse($$"""
                 {
@@ -152,7 +152,7 @@ public class BatchConvertToolTests
         try
         {
             File.WriteAllText(Path.Combine(tempDir, "BindError.calr"),
-                "§M{m001:Test}\n  §F{f001:Foo:pub} () -> void\n    §B{x}\n");
+                "§M{Test}\n  §F{Foo:pub} () -> void\n    §B{x}\n");
 
             var args = JsonDocument.Parse($$"""
                 {

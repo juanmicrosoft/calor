@@ -371,8 +371,8 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     {
         // Review round 2: Calor keeps "\x41" as four characters; C# reads "A". Not lifted.
         const string calor = """
-            §M{m001:InterpEscape}
-              §F{f001:Show:pub} () -> str
+            §M{InterpEscape}
+              §F{Show:pub} () -> str
                 §R "${String.Concat("\x41")}"
             """;
         var result = Program.Compile(calor, "f2-escape-arg.calr",
@@ -385,8 +385,8 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     public void NativeHole_StringArgumentWithDollarBrace_StaysLiteral()
     {
         const string calor = """
-            §M{m001:InterpLiteralArg}
-              §F{f001:Show:pub} (i32:x) -> str
+            §M{InterpLiteralArg}
+              §F{Show:pub} (i32:x) -> str
                 §R "${String.Concat("${x}")}"
             """;
         var result = Program.Compile(calor, "f2-literal-arg.calr",
@@ -419,8 +419,8 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     public void UndefinedHoleName_IsReportedAtTheHole()
     {
         const string calor = """
-            §M{m001:InterpBinding}
-              §F{f001:Show:pub} (i32:n) -> str
+            §M{InterpBinding}
+              §F{Show:pub} (i32:n) -> str
                 §R "value=${nope}"
             """;
         var result = Program.Compile(calor, "f2-interp-05.calr");
@@ -432,8 +432,8 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     public void HoleDiagnostic_OnALaterLine_KeepsItsLineAndColumn()
     {
         const string calor = """
-            §M{m001:InterpBinding}
-              §F{f001:Show:pub} (i32:n) -> str
+            §M{InterpBinding}
+              §F{Show:pub} (i32:n) -> str
                 §B{str:a} "first ${n}"
                 §R "x=${n} y=${(+ n missing)}"
             """;
@@ -448,8 +448,8 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     public void CallHole_InAPureFunction_IsAnUndeclaredEffect()
     {
         const string calor = """
-            §M{m001:InterpEffects}
-              §F{f001:Greet:pub} () -> str
+            §M{InterpEffects}
+              §F{Greet:pub} () -> str
                 §E{}
                 §R "hello ${Console.ReadLine()}"
             """;
@@ -462,8 +462,8 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     public void CallHole_WithTheDeclaredEffect_Compiles()
     {
         const string calor = """
-            §M{m001:InterpEffects}
-              §F{f001:Greet:pub} () -> str
+            §M{InterpEffects}
+              §F{Greet:pub} () -> str
                 §E{cr}
                 §R "hello ${Console.ReadLine()} ${Math.Max(1, 2)}"
             """;
@@ -478,8 +478,8 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     {
         // Negative control: a named argument keeps the hole raw C#; it must not become pure.
         const string calor = """
-            §M{m001:InterpEffects}
-              §F{f001:Show:pub} (i32:n) -> str
+            §M{InterpEffects}
+              §F{Show:pub} (i32:n) -> str
                 §E{}
                 §R "v=${Math.Max(val1: n, val2: 3)}"
             """;
@@ -491,8 +491,8 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     public void NameofHole_IsNotTreatedAsACall()
     {
         const string calor = """
-            §M{m001:InterpNameof}
-              §F{f001:Show:pub} (i32:n) -> str
+            §M{InterpNameof}
+              §F{Show:pub} (i32:n) -> str
                 §R "${nameof(n)}=${n}"
             """;
         var result = Program.Compile(calor, "f2-interp-nameof.calr");
@@ -505,8 +505,8 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     {
         // F2-INTERP-04 negative control at the compiler: an escaped \${x} is text, not a hole.
         const string calor = """
-            §M{m001:Literal}
-              §F{f001:Show:pub} (i32:x) -> str
+            §M{Literal}
+              §F{Show:pub} (i32:x) -> str
                 §R "\${x}|{x}"
             """;
         var result = Program.Compile(calor, "f2-interp-04.calr");

@@ -7,20 +7,17 @@ using Xunit;
 namespace Calor.Compiler.Tests;
 
 /// <summary>
-/// v0.6.7 Item 1a — the parser flags a malformed four-field function header
-/// <c>§F{id:name:type:vis}</c> / <c>§AF{id:name:type:vis}</c> with
+/// The parser flags a malformed three-field function header
+/// <c>§F{name:type:vis}</c> / <c>§AF{name:type:vis}</c> with
 /// <c>Calor0116 MalformedFunctionHeader</c> and an auto-applicable
 /// <see cref="SuggestedFix"/>.
 ///
 /// <para>
-/// Canonical function headers are three-field (<c>§F{id:name:vis}</c>) with the
-/// return type declared in the signature (<c>(...) -&gt; type</c>). A four-field
-/// header silently misreads the return type as the visibility, drops the real
-/// visibility, and emits a <c>void</c> method that returns a value — a CS0127 in
-/// the generated C# with no Calor-level explanation. This diagnostic closes that
-/// gap. It is deliberately narrow: it fires ONLY when the fourth field is a
+/// Canonical function headers are two-field (<c>§F{name:vis}</c>) with the
+/// return type declared in the signature (<c>(...) -&gt; type</c>).
+/// The diagnostic fires only when the third field is a
 /// visibility token, and it is wired ONLY into <c>§F</c>/<c>§AF</c> — never into
-/// <c>§MT</c>/<c>§AMT</c>, whose fourth field is a legitimate modifier.
+/// <c>§MT</c>/<c>§AMT</c>, whose third field is a legitimate modifier.
 /// </para>
 /// </summary>
 public class MalformedFunctionHeaderTests
@@ -46,38 +43,38 @@ public class MalformedFunctionHeaderTests
     }
 
     // ---------------------------------------------------------------------
-    // Positive — fires on malformed four-field §F / §AF headers.
+    // Positive — fires on malformed three-field §F / §AF headers.
     // ---------------------------------------------------------------------
 
     [Fact]
-    public void Function_FourFieldHeader_EmitsCalor0116()
+    public void Function_ThreeFieldHeader_EmitsCalor0116()
     {
         const string src = """
-            §M{m1:Calc}
-              §F{f1:Add:i32:pub}
+            §M{Calc}
+              §F{Add:i32:pub}
                 §R (+ 1 2)
             """;
         var (diags, _) = Parse(src);
 
         var malformed = diags.Where(d => d.Code == DiagnosticCode.MalformedFunctionHeader).ToList();
         Assert.Single(malformed);
-        Assert.Contains("four fields", malformed[0].Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("three fields", malformed[0].Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("i32", malformed[0].Message, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void AsyncFunction_FourFieldHeader_EmitsCalor0116()
+    public void AsyncFunction_ThreeFieldHeader_EmitsCalor0116()
     {
         const string src = """
-            §M{m1:Calc}
-              §AF{f1:FetchAsync:i32:pub}
+            §M{Calc}
+              §AF{FetchAsync:i32:pub}
                 §R (+ 1 2)
             """;
         var (diags, _) = Parse(src);
 
         var malformed = diags.Where(d => d.Code == DiagnosticCode.MalformedFunctionHeader).ToList();
         Assert.Single(malformed);
-        Assert.Contains("four fields", malformed[0].Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("three fields", malformed[0].Message, StringComparison.OrdinalIgnoreCase);
     }
 
     // ---------------------------------------------------------------------
@@ -85,27 +82,27 @@ public class MalformedFunctionHeaderTests
     // ---------------------------------------------------------------------
 
     [Fact]
-    public void Function_ThreeFieldHeader_NoCalor0116()
+    public void Function_TwoFieldHeader_NoCalor0116()
     {
         const string src = """
-            §M{m1:Calc}
-              §F{f1:Add:pub} (i32:a, i32:b) -> i32
+            §M{Calc}
+              §F{Add:pub} (i32:a, i32:b) -> i32
                 §R (+ a b)
             """;
         var (diags, hasErrors) = Parse(src);
 
         Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.MalformedFunctionHeader);
-        Assert.False(hasErrors, "Canonical three-field header must parse cleanly");
+        Assert.False(hasErrors, "Canonical two-field header must parse cleanly");
     }
 
     [Fact]
-    public void Method_FourFieldModifier_NoCalor0116()
+    public void Method_ThreeFieldModifier_NoCalor0116()
     {
-        // §MT's fourth field is a legitimate modifier (virt) — never Calor0116.
+        // §MT's third field is a legitimate modifier (virt) — never Calor0116.
         const string src = """
-            §M{m1:Calc}
-              §CL{c1:Greeter:pub}
-                §MT{mt1:Name:pub:virt} () -> str
+            §M{Calc}
+              §CL{Greeter:pub}
+                §MT{Name:pub:virt} () -> str
                   §R STR:"x"
             """;
         var (diags, _) = Parse(src);
@@ -114,13 +111,13 @@ public class MalformedFunctionHeaderTests
     }
 
     [Fact]
-    public void AsyncMethod_FourFieldModifier_NoCalor0116()
+    public void AsyncMethod_ThreeFieldModifier_NoCalor0116()
     {
-        // §AMT's fourth field is a legitimate modifier (virt) — never Calor0116.
+        // §AMT's third field is a legitimate modifier (virt) — never Calor0116.
         const string src = """
-            §M{m1:Calc}
-              §CL{c1:Svc:pub}
-                §AMT{mt1:GetAsync:pub:virt} () -> i32
+            §M{Calc}
+              §CL{Svc:pub}
+                §AMT{GetAsync:pub:virt} () -> i32
                   §R (+ 1 2)
             """;
         var (diags, _) = Parse(src);
@@ -129,19 +126,33 @@ public class MalformedFunctionHeaderTests
     }
 
     [Fact]
-    public void Function_FourFieldHeader_NonVisibilityFourthField_NoCalor0116()
+    public void Function_ThreeFieldHeader_NonVisibilityThirdField_NoCalor0116()
     {
-        // Narrowness guard: the diagnostic requires the FOURTH field to be a
-        // visibility token. A non-visibility fourth field is some other shape
+        // Narrowness guard: the diagnostic requires the third field to be a
+        // visibility token. A non-visibility third field is some other shape
         // and must not be misattributed to the malformed-header pattern.
         const string src = """
-            §M{m1:Calc}
-              §F{f1:Add:i32:frobnicate}
+            §M{Calc}
+              §F{Add:i32:frobnicate}
                 §R (+ 1 2)
             """;
         var (diags, _) = Parse(src);
 
         Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.MalformedFunctionHeader);
+    }
+
+    [Theory]
+    [InlineData("f001")]
+    [InlineData("f_000000000001")]
+    public void RetiredSourceIdHeader_DoesNotOfferANameGuess(string oldId)
+    {
+        var source = $"§M{{Calc}}\n  §F{{{oldId}:Add:pub}} () -> i32\n    §R 1\n";
+        var bag = ParseBag(source);
+        Assert.True(bag.HasErrors);
+        Assert.Contains(bag, d => d.Code == DiagnosticCode.UnexpectedToken &&
+            d.Message.Contains("Source IDs are removed", StringComparison.Ordinal));
+        Assert.DoesNotContain(bag.DiagnosticsWithFixes,
+            d => d.Code == DiagnosticCode.MalformedFunctionHeader);
     }
 
     // ---------------------------------------------------------------------
@@ -152,8 +163,8 @@ public class MalformedFunctionHeaderTests
     public void Fix_HeaderOnly_CarriesReplaceAndSignatureInsert()
     {
         const string src = """
-            §M{m1:Calc}
-              §F{f1:Add:i32:pub}
+            §M{Calc}
+              §F{Add:i32:pub}
                 §R (+ 1 2)
             """;
         var bag = ParseBag(src);
@@ -161,10 +172,10 @@ public class MalformedFunctionHeaderTests
         var dwf = Assert.Single(
             bag.DiagnosticsWithFixes.Where(d => d.Code == DiagnosticCode.MalformedFunctionHeader));
 
-        // Two edits: rewrite the header to three fields, then append a signature
+        // Two edits: rewrite the header to two fields, then append a signature
         // so the healed function keeps its return type instead of becoming void.
         Assert.Equal(2, dwf.Fix.Edits.Count);
-        Assert.Contains(dwf.Fix.Edits, e => e.NewText == "{f1:Add:pub}");
+        Assert.Contains(dwf.Fix.Edits, e => e.NewText == "{Add:pub}");
         Assert.Contains(dwf.Fix.Edits, e => e.NewText == " () -> i32");
     }
 
@@ -172,14 +183,14 @@ public class MalformedFunctionHeaderTests
     public void ApplyingFix_HeaderOnly_HealsToReturningFunction()
     {
         const string src = """
-            §M{m1:Calc}
-              §F{f1:Add:i32:pub}
+            §M{Calc}
+              §F{Add:i32:pub}
                 §R (+ 1 2)
             """;
         var bag = ParseBag(src);
         var healed = ApplyFixes(src, bag);
 
-        Assert.Contains("§F{f1:Add:pub} () -> i32", healed);
+        Assert.Contains("§F{Add:pub} () -> i32", healed);
         Assert.DoesNotContain("i32:pub", healed);
 
         // Healed source parses cleanly (no residual Calor0116).
@@ -200,8 +211,8 @@ public class MalformedFunctionHeaderTests
         // When an inline signature already follows the header, the fix must drop
         // ONLY the header type — it must not append a second signature.
         const string src = """
-            §M{m1:Calc}
-              §F{f1:Add:i32:pub} (i32:a) -> i32
+            §M{Calc}
+              §F{Add:i32:pub} (i32:a) -> i32
                 §R a
             """;
         var bag = ParseBag(src);
@@ -209,10 +220,10 @@ public class MalformedFunctionHeaderTests
         var dwf = Assert.Single(
             bag.DiagnosticsWithFixes.Where(d => d.Code == DiagnosticCode.MalformedFunctionHeader));
         var edit = Assert.Single(dwf.Fix.Edits);
-        Assert.Equal("{f1:Add:pub}", edit.NewText);
+        Assert.Equal("{Add:pub}", edit.NewText);
 
         var healed = ApplyFixes(src, bag);
-        Assert.Contains("§F{f1:Add:pub} (i32:a) -> i32", healed);
+        Assert.Contains("§F{Add:pub} (i32:a) -> i32", healed);
         // Exactly one signature arrow — no duplicated "() -> i32" tail.
         Assert.Equal(1, CountOccurrences(healed, "-> i32"));
 

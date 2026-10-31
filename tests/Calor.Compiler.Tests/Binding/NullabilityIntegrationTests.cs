@@ -36,10 +36,10 @@ public class NullabilityIntegrationTests
     public void LiteralNull_TriggersAllScalarReceivingDiagnostics()
     {
         const string source = """
-            §M{m1:LiteralNull}
-              §F{f1:Take:pub} (string:value) -> void
+            §M{LiteralNull}
+              §F{Take:pub} (string:value) -> void
                 §E{}
-              §F{f2:Probe:pub} () -> string
+              §F{Probe:pub} () -> string
                 §B{required:string} null
                 §C{Take} §A null §/C
                 §R null
@@ -60,10 +60,10 @@ public class NullabilityIntegrationTests
     public void ConditionalNullStringJoins_TriggerAllScalarReceivingDiagnostics()
     {
         const string source = """
-            §M{m1:ConditionalNull}
-              §F{f1:Take:pub} (string:value) -> void
+            §M{ConditionalNull}
+              §F{Take:pub} (string:value) -> void
                 §E{}
-              §F{f2:Probe:pub} (bool:flag) -> string
+              §F{Probe:pub} (bool:flag) -> string
                 §B{required:string} (? flag null STR:"safe")
                 §C{Take} §A (? flag STR:"safe" null) §/C
                 §R (? flag null STR:"safe")
@@ -82,8 +82,8 @@ public class NullabilityIntegrationTests
     public void ConditionalNullWithUnrelatedArm_DoesNotTriggerScalarNullability()
     {
         const string source = """
-            §M{m1:UnrelatedConditionalNull}
-              §F{f1:Probe:pub} (bool:flag) -> void
+            §M{UnrelatedConditionalNull}
+              §F{Probe:pub} (bool:flag) -> void
                 §B{required:string} (? flag null INT:1)
             """;
 
@@ -103,11 +103,11 @@ public class NullabilityIntegrationTests
         string parameterType)
     {
         var source = $$"""
-            §M{m1:NullReferenceApplicability}
-              §CL{c1:Foo:pub}
-                §MT{f1:Take:pub:static} ({{parameterType}}:value) -> void
+            §M{NullReferenceApplicability}
+              §CL{Foo:pub}
+                §MT{Take:pub:static} ({{parameterType}}:value) -> void
                   §E{}
-                §MT{f2:Probe:pub:static} () -> void
+                §MT{Probe:pub:static} () -> void
                   §C{Foo.Take} §A null §/C
             """;
 
@@ -127,13 +127,13 @@ public class NullabilityIntegrationTests
     public void LiteralNull_DoesNotPreferScalarStringOverUnrelatedReferenceOverload()
     {
         const string source = """
-            §M{m1:NullOverloadIdentity}
-              §CL{c1:Foo:pub}
-                §MT{f1:Take:pub:static} (str:value) -> i32
+            §M{NullOverloadIdentity}
+              §CL{Foo:pub}
+                §MT{Take:pub:static} (str:value) -> i32
                   §R 1
-                §MT{f2:Take:pub:static} (Foo:value) -> i32
+                §MT{Take:pub:static} (Foo:value) -> i32
                   §R 2
-                §MT{f3:Probe:pub:static} () -> i32
+                §MT{Probe:pub:static} () -> i32
                   §R §C{Foo.Take} §A null §/C
             """;
 
@@ -149,12 +149,12 @@ public class NullabilityIntegrationTests
     public void LiteralNull_PrefersScalarStringOverObject_ThenReportsCalor0274()
     {
         const string source = """
-            §M{m1:NullOverloadSpecificity}
-              §F{f1:Take:pub} (str:value) -> i32
+            §M{NullOverloadSpecificity}
+              §F{Take:pub} (str:value) -> i32
                 §R 1
-              §F{f2:Take:pub} (object:value) -> i32
+              §F{Take:pub} (object:value) -> i32
                 §R 2
-              §F{f3:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §R §C{Take} §A null §/C
             """;
 
@@ -175,15 +175,15 @@ public class NullabilityIntegrationTests
     public void LiteralNull_PrefersDerivedReferenceParameter()
     {
         const string source = """
-            §M{m1:NullDerivedSpecificity}
-              §CL{c1:Parent:pub}
-              §CL{c2:Child:pub}
+            §M{NullDerivedSpecificity}
+              §CL{Parent:pub}
+              §CL{Child:pub}
                 §EXT{Parent}
-                §MT{f1:Take:pub:static} (Parent:value) -> i32
+                §MT{Take:pub:static} (Parent:value) -> i32
                   §R 1
-                §MT{f2:Take:pub:static} (Child:value) -> i32
+                §MT{Take:pub:static} (Child:value) -> i32
                   §R 2
-                §MT{f3:Probe:pub:static} () -> i32
+                §MT{Probe:pub:static} () -> i32
                   §R §C{Child.Take} §A null §/C
             """;
 
@@ -206,13 +206,13 @@ public class NullabilityIntegrationTests
         string modifier)
     {
         var source = $$"""
-            §M{m1:RefFlow}
-              §F{f1:Mutate:pub} (?str:value:{{modifier}}) -> void
+            §M{RefFlow}
+              §F{Mutate:pub} (?str:value:{{modifier}}) -> void
                 §E{}
-              §F{f2:Take:pub} (str:value) -> void
+              §F{Take:pub} (str:value) -> void
                 §E{}
-              §F{f3:Probe:pub} (?str:value) -> void
-                §IF{i1} (is value str)
+              §F{Probe:pub} (?str:value) -> void
+                §IF (is value str)
                   §C{Mutate} §A{{{modifier}}} value §/C
                   §C{Take} §A value §/C
             """;
@@ -230,11 +230,11 @@ public class NullabilityIntegrationTests
     public void MetadataRefCall_InvalidatesFlowNarrowingBeforeNextScalarBoundary()
     {
         const string source = """
-            §M{m1:MetadataRefFlow}
-              §F{f1:Take:pub} (str:value) -> void
+            §M{MetadataRefFlow}
+              §F{Take:pub} (str:value) -> void
                 §E{}
-              §F{f2:Probe:pub} (?str:value, str:replacement) -> void
-                §IF{i1} (is value str)
+              §F{Probe:pub} (?str:value, str:replacement) -> void
+                §IF (is value str)
                   §C{System.Threading.Interlocked.Exchange} §A{ref} value §A replacement §/C
                   §C{Take} §A value §/C
             """;
@@ -250,14 +250,14 @@ public class NullabilityIntegrationTests
     public void IfBranchMutation_DoesNotLeakIntoSibling_ButInvalidatesPostIfState()
     {
         const string source = """
-            §M{m1:BranchFlow}
-              §F{f1:Take:pub} (str:value) -> void
+            §M{BranchFlow}
+              §F{Take:pub} (str:value) -> void
                 §E{}
-              §F{f2:Probe:pub} (?str:value, ?str:replacement, bool:flag) -> void
+              §F{Probe:pub} (?str:value, ?str:replacement, bool:flag) -> void
                 §B{~candidate} value
-                §IF{guard} (isempty candidate)
+                §IF (isempty candidate)
                   §R
-                §IF{branch} flag
+                §IF flag
                   §ASSIGN candidate replacement
                 §EL
                   §C{Take} §A candidate §/C
@@ -277,9 +277,9 @@ public class NullabilityIntegrationTests
     public void DirectFunctionTypeInvocation_ActivatesOnlyNonnullScalarStringParameters()
     {
         const string source = """
-            §M{m1:DirectDelegate}
-              §CL{c1:Foo:pub}
-                §MT{f1:Probe:pub:static} (Func<str,void>:takeString, Func<[str],void>:takeArray, Func<Option<str>,void>:takeOption, Func<Foo,void>:takeFoo, ?str:value) -> void
+            §M{DirectDelegate}
+              §CL{Foo:pub}
+                §MT{Probe:pub:static} (Func<str,void>:takeString, Func<[str],void>:takeArray, Func<Option<str>,void>:takeOption, Func<Foo,void>:takeFoo, ?str:value) -> void
                   §C{takeString} §A value §/C
                   §C{takeString} §A null §/C
                   §C{takeArray} §A null §/C
@@ -308,12 +308,12 @@ public class NullabilityIntegrationTests
         string mutation)
     {
         var source = $$"""
-            §M{m1:FlowRebind}
-              §F{f1:Take:pub} (string:value) -> void
+            §M{FlowRebind}
+              §F{Take:pub} (string:value) -> void
                 §E{}
-              §F{f2:Probe:pub} (?string:value, ?string:replacement) -> string
+              §F{Probe:pub} (?string:value, ?string:replacement) -> string
                 §B{~candidate} value
-                §IF{i1} (isempty candidate)
+                §IF (isempty candidate)
                   §R STR:"fallback"
                 {{mutation}}
                 §B{required:string} candidate
@@ -336,13 +336,13 @@ public class NullabilityIntegrationTests
     public void NestedChildMutation_InvalidatesParentNarrowingAfterJoin(string mutation)
     {
         var source = $$"""
-            §M{m1:NestedJoinMutation}
-              §F{f1:Take:pub} (string:value) -> void
+            §M{NestedJoinMutation}
+              §F{Take:pub} (string:value) -> void
                 §E{}
-              §F{f2:Probe:pub} (?string:value, ?string:replacement, bool:flag) -> string
+              §F{Probe:pub} (?string:value, ?string:replacement, bool:flag) -> string
                 §B{~candidate} value
-                §IF{i1} (is candidate string)
-                  §IF{i2} flag
+                §IF (is candidate string)
+                  §IF flag
                     {{mutation}}
                   §B{required:string} candidate
                   §C{Take} §A candidate §/C
@@ -365,12 +365,12 @@ public class NullabilityIntegrationTests
     public void TypedCheckNarrowing_IsInvalidatedByMutableMutation(string mutation)
     {
         var source = $$"""
-            §M{m1:FlowAssignment}
-              §F{f1:Take:pub} (string:value) -> void
+            §M{FlowAssignment}
+              §F{Take:pub} (string:value) -> void
                 §E{}
-              §F{f2:Probe:pub} (?string:value, ?string:replacement) -> string
+              §F{Probe:pub} (?string:value, ?string:replacement) -> string
                 §B{~candidate} value
-                §IF{i1} (is candidate string)
+                §IF (is candidate string)
                   {{mutation}}
                   §B{required:string} candidate
                   §C{Take} §A candidate §/C
@@ -394,13 +394,13 @@ public class NullabilityIntegrationTests
         string mutation)
     {
         var source = $$"""
-            §M{m1:NestedFlowMutation}
-              §F{f1:Take:pub} (string:value) -> void
+            §M{NestedFlowMutation}
+              §F{Take:pub} (string:value) -> void
                 §E{}
-              §F{f2:Probe:pub} (?string:value, ?string:replacement) -> string
+              §F{Probe:pub} (?string:value, ?string:replacement) -> string
                 §B{~candidate} value
-                §IF{i1} (is candidate string)
-                  §IF{i2} (is candidate string)
+                §IF (is candidate string)
+                  §IF (is candidate string)
                     {{mutation}}
                     §B{required:string} candidate
                     §C{Take} §A candidate §/C
@@ -422,11 +422,11 @@ public class NullabilityIntegrationTests
     public void YieldReturnGuard_DoesNotNarrowContinuation()
     {
         const string source = """
-            §M{m1:YieldFlow}
-              §F{f1:Take:pub} (string:value) -> void
+            §M{YieldFlow}
+              §F{Take:pub} (string:value) -> void
                 §E{}
-              §F{f2:Probe:pub} (?string:value) -> string
-                §IF{i1} (isempty value)
+              §F{Probe:pub} (?string:value) -> string
+                §IF (isempty value)
                   §YIELD STR:"fallback"
                 §B{required:string} value
                 §C{Take} §A value §/C
@@ -445,21 +445,21 @@ public class NullabilityIntegrationTests
     public void NestedDelegateReturnNullability_UsesQualifiedLexicalDeclaration()
     {
         const string source = """
-            §M{m1:NestedDelegates}
-              §CL{c1:NullableOwner:pub}
-                §DEL{d1:Handler:pub}
+            §M{NestedDelegates}
+              §CL{NullableOwner:pub}
+                §DEL{Handler:pub}
                   §O{?string}
-                §MT{mt1:Probe:pub} (Handler:handler) -> string
+                §MT{Probe:pub} (Handler:handler) -> string
                   §R §C{handler} §/C
-              §CL{c2:NonNullOwner:pub}
-                §DEL{d2:Handler:pub}
+              §CL{NonNullOwner:pub}
+                §DEL{Handler:pub}
                   §O{string}
-                §MT{mt2:Probe:pub} (Handler:handler) -> string
+                §MT{Probe:pub} (Handler:handler) -> string
                   §R §C{handler} §/C
-              §CL{c3:UniqueOwner:pub}
-                §DEL{d3:NullableReader:pub}
+              §CL{UniqueOwner:pub}
+                §DEL{NullableReader:pub}
                   §O{?string}
-                §MT{mt3:Probe:pub} (UniqueOwner.NullableReader:reader) -> string
+                §MT{Probe:pub} (UniqueOwner.NullableReader:reader) -> string
                   §R §C{reader} §/C
             """;
 
@@ -504,8 +504,8 @@ public class NullabilityIntegrationTests
     public void DelegateInvoke_UsesNullableReturnSignature()
     {
         const string source = """
-            §M{m1:DelegateInvoke}
-              §F{f1:Probe:pub} (Func<?str>:read) -> str
+            §M{DelegateInvoke}
+              §F{Probe:pub} (Func<?str>:read) -> str
                 §R §C{read.Invoke} §/C
             """;
 
@@ -521,15 +521,15 @@ public class NullabilityIntegrationTests
     public void RefOverloadApplicability_UsesDeclaredStorageNullability()
     {
         const string source = """
-            §M{m1:RefStorage}
-              §F{f1:Mutate:pub} (str:value:ref) -> i32
+            §M{RefStorage}
+              §F{Mutate:pub} (str:value:ref) -> i32
                 §E{}
                 §R 1
-              §F{f2:Mutate:pub} (?str:value:ref) -> i32
+              §F{Mutate:pub} (?str:value:ref) -> i32
                 §E{}
                 §R 2
-              §F{f3:Probe:pub} (?str:value) -> i32
-                §IF{i1} (is value str)
+              §F{Probe:pub} (?str:value) -> i32
+                §IF (is value str)
                   §R §C{Mutate} §A{ref} value §/C
                 §R 0
             """;
@@ -578,11 +578,11 @@ public class NullabilityIntegrationTests
         var second = nullableToRequired ? "maybe" : "sure";
         var call = $"§C{{this.Take}} §A[optional] {first} §A[required] {second} §/C";
         var source = $$"""
-            §M{m1:NativeMapping}
-              §CL{c1:Bar:pub}
-                §MT{take:Take:pub} (Bar:required, ?Bar:optional) -> i32
+            §M{NativeMapping}
+              §CL{Bar:pub}
+                §MT{Take:pub} (Bar:required, ?Bar:optional) -> i32
                   §R 1
-                §MT{caller:Caller:pub} (?Bar:maybe, Bar:sure) -> i32
+                §MT{Caller:pub} (?Bar:maybe, Bar:sure) -> i32
                   {{(expression ? "§R " : "")}}{{call}}
                   {{(expression ? "" : "§R 0")}}
             """;
@@ -621,8 +621,8 @@ public class NullabilityIntegrationTests
     {
         const string call = "§C{System.IO.Path.Combine} §A[path2] STR:\"safe\" §A[path1] maybe §/C";
         var source = $$"""
-            §M{m1:BclMapping}
-              §F{caller:Caller:pub} (?string:maybe) -> string
+            §M{BclMapping}
+              §F{Caller:pub} (?string:maybe) -> string
                 {{(expression ? "§R " : "")}}{{call}}
                 {{(expression ? "" : "§R STR:\"done\"")}}
             """;
@@ -656,8 +656,8 @@ public class NullabilityIntegrationTests
             _ => ""
         };
         var source = $$"""
-            §M{m1:BclParams}
-              §F{caller:Caller:pub} (?string:maybe) -> string
+            §M{BclParams}
+              §F{Caller:pub} (?string:maybe) -> string
                 {{(expression ? "§R " : "")}}§C{System.IO.Path.Combine} {{args}} §/C
                 {{(expression ? "" : "§R STR:\"done\"")}}
             """;
@@ -752,12 +752,12 @@ public class NullabilityIntegrationTests
     public void N3_RejectedNativeOverloads_RemainResolutionErrors(bool expression, bool ambiguous)
     {
         var source = $$"""
-            §M{m1:RejectedMappings}
-              §F{one:Pick:pub} (i64:required) -> i32
+            §M{RejectedMappings}
+              §F{Pick:pub} (i64:required) -> i32
                 §R 1
-              §F{two:Pick:pub} (f64:required) -> i32
+              §F{Pick:pub} (f64:required) -> i32
                 §R 2
-              §F{caller:Caller:pub} () -> i32
+              §F{Caller:pub} () -> i32
                 {{(expression ? "§R " : "")}}§C{Pick} §A[required] {{(ambiguous ? "INT:1" : "BOOL:true")}} §/C
                 {{(expression ? "" : "§R 0")}}
             """;
@@ -871,8 +871,8 @@ public class NullabilityIntegrationTests
     {
         const string call = "§C{System.IO.FileSystemAclExtensions.GetAccessControl} §A[directoryInfo] §C{System.IO.Directory.GetParent} §A STR:\"/\" §/C §/C";
         var source = $$"""
-            §M{m1:NominalMapping}
-              §F{probe:Probe:pub} () -> void
+            §M{NominalMapping}
+              §F{Probe:pub} () -> void
                 {{(expression ? "§B{permissions} " : "")}}{{call}}
             """;
         var (bound, diagnostics) = BindSource(source);
@@ -898,17 +898,17 @@ public class NullabilityIntegrationTests
     public void N3_NamedNativeInput_ResolvesFormalInSelectedCalleeNamespace(bool expression)
     {
         const string producer = """
-            §M{m1:LexicalMapping}
-              §CL{c1:Foo:pub}
-                §MT{get:Get:pub:static} () -> ?Foo
+            §M{LexicalMapping}
+              §CL{Foo:pub}
+                §MT{Get:pub:static} () -> ?Foo
                   §R §NEW{Foo}
-                §MT{take:Take:pub:static} (Foo:required, ?Foo:optional) -> i32
+                §MT{Take:pub:static} (Foo:required, ?Foo:optional) -> i32
                   §R 1
             """;
         var consumer = $$"""
-            §M{m1:LexicalMapping}
-              §CL{c2:Foo:pub}
-                §MT{probe:Probe:pub:static} () -> i32
+            §M{LexicalMapping}
+              §CL{Foo:pub}
+                §MT{Probe:pub:static} () -> i32
                   {{(expression ? "§R " : "")}}§C{A.Foo.Take} §A[optional] §C{A.Foo.Get} §/C §A[required] §C{A.Foo.Get} §/C §/C
                   {{(expression ? "" : "§R 0")}}
             """;
@@ -960,10 +960,10 @@ public class NullabilityIntegrationTests
             ? "§C{System.IO.FileSystemAclExtensions.GetAccessControl} §A[directoryInfo] second §/C"
             : "§C{Take} §A[safe] safe §A[required] second §/C";
         var source = $$"""
-            §M{m1:LocalMapping}
-              §F{take:Take:pub} (System.IO.DirectoryInfo:required, System.IO.DirectoryInfo:safe) -> i32
+            §M{LocalMapping}
+              §F{Take:pub} (System.IO.DirectoryInfo:required, System.IO.DirectoryInfo:safe) -> i32
                 §R 1
-              §F{probe:Probe:pub} () -> void
+              §F{Probe:pub} () -> void
                 §B{first} §C{System.IO.Directory.{{producer}}} §A STR:"/" §/C
                 §B{second} first
                 §B{safe} §C{System.IO.Directory.CreateDirectory} §A STR:"/" §/C
@@ -1024,8 +1024,8 @@ public class NullabilityIntegrationTests
     public void Calor0272_FiresFor_EnvironmentGetVariable_AssignedToNonNullString()
     {
         const string source = """
-            §M{m1:D3Repro}
-              §F{f1:Bad:pub} () -> void
+            §M{D3Repro}
+              §F{Bad:pub} () -> void
                 §E{env}
                 §B{bad:string} §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
             """;
@@ -1045,8 +1045,8 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_When_TargetIs_NullableString()
     {
         const string source = """
-            §M{m1:Nullable}
-              §F{f1:Ok:pub} () -> void
+            §M{Nullable}
+              §F{Ok:pub} () -> void
                 §E{env}
                 §B{ok:?string} §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
             """;
@@ -1068,8 +1068,8 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_CalorNative_StringLiteral_Bound_To_NonNullString()
     {
         const string source = """
-            §M{m1:LocalLiteral}
-              §F{f1:Ok:pub} () -> void
+            §M{LocalLiteral}
+              §F{Ok:pub} () -> void
                 §B{greeting:string} STR:"hello"
             """;
 
@@ -1088,8 +1088,8 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_InterpolatedString_Bound_To_NonNullString()
     {
         const string source = """
-            §M{m1:Interp}
-              §F{f1:Ok:pub} () -> void
+            §M{Interp}
+              §F{Ok:pub} () -> void
                 §B{name:string} STR:"world"
                 §B{greeting:string} §INTERP "hello, " §EXP name §/INTERP
             """;
@@ -1111,8 +1111,8 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_StringConcatenation_Bound_To_NonNullString()
     {
         const string source = """
-            §M{m1:Concat}
-              §F{f1:Ok:pub} () -> void
+            §M{Concat}
+              §F{Ok:pub} () -> void
                 §B{a:string} STR:"hello"
                 §B{b:string} STR:"world"
                 §B{joined:string} (+ a b)
@@ -1133,8 +1133,8 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_NameOf_Bound_To_NonNullString()
     {
         const string source = """
-            §M{m1:NameOf}
-              §F{f1:Ok:pub} () -> void
+            §M{NameOf}
+              §F{Ok:pub} () -> void
                 §B{a:string} STR:"hello"
                 §B{name:string} (nameof a)
             """;
@@ -1226,8 +1226,8 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_StringOperation_Trim_Bound_To_NonNullString()
     {
         const string source = """
-            §M{m1:Trim}
-              §F{f1:Ok:pub} () -> void
+            §M{Trim}
+              §F{Ok:pub} () -> void
                 §B{a:string} STR:"  hello  "
                 §B{trimmed:string} (trim a)
             """;
@@ -1242,8 +1242,8 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_StringOperation_Substr_Bound_To_NonNullString()
     {
         const string source = """
-            §M{m1:Substr}
-              §F{f1:Ok:pub} () -> void
+            §M{Substr}
+              §F{Ok:pub} () -> void
                 §B{a:string} STR:"hello"
                 §B{sub:string} (substr a INT:0 INT:3)
             """;
@@ -1270,8 +1270,8 @@ public class NullabilityIntegrationTests
     {
         // (str x) is StringOp.ToString — the BCL object.ToString() shape.
         const string source = """
-            §M{m1:ToStr}
-              §F{f1:Bad:pub} (object:n) -> void
+            §M{ToStr}
+              §F{Bad:pub} (object:n) -> void
                 §B{s:string} (str n)
             """;
 
@@ -1296,8 +1296,8 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_NonNullString_ToString()
     {
         const string source = """
-            §M{m1:ToStr}
-              §F{f1:Ok:pub} (string:value) -> void
+            §M{ToStr}
+              §F{Ok:pub} (string:value) -> void
                 §B{s:string} (str value)
             """;
 
@@ -1320,8 +1320,8 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_Ternary_BothBranches_NotAnnotated_String()
     {
         const string source = """
-            §M{m1:Tern}
-              §F{f1:Ok:pub} () -> void
+            §M{Tern}
+              §F{Ok:pub} () -> void
                 §B{picked:string} (? BOOL:true STR:"yes" STR:"no")
             """;
 
@@ -1522,8 +1522,8 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_When_NonNullStringVariable_BoundToNonNullString()
     {
         const string source = """
-            §M{m1:VarFlow}
-              §F{f1:Ok:pub} () -> void
+            §M{VarFlow}
+              §F{Ok:pub} () -> void
                 §B{a:string} STR:"x"
                 §B{b:string} a
             """;
@@ -1545,8 +1545,8 @@ public class NullabilityIntegrationTests
     public void Calor0272_Fires_When_NullableStringVariable_BoundToNonNullString()
     {
         const string source = """
-            §M{m1:NullableVar}
-              §F{f1:Bad:pub} () -> void
+            §M{NullableVar}
+              §F{Bad:pub} () -> void
                 §B{a:?string} STR:"x"
                 §B{b:string} a
             """;
@@ -1571,8 +1571,8 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_Ternary_VariableBranch_NonNullString()
     {
         const string source = """
-            §M{m1:TernVar}
-              §F{f1:Ok:pub} () -> void
+            §M{TernVar}
+              §F{Ok:pub} () -> void
                 §B{a:string} STR:"x"
                 §B{r:string} (? BOOL:true a STR:"safe")
             """;
@@ -1679,8 +1679,8 @@ public class NullabilityIntegrationTests
     public void Calor0273_FiresFor_ReturningBcl_NullableString_FromNonNullReturn()
     {
         const string source = """
-            §M{m1:S4Repro}
-              §F{f1:GetEnv:pub} () -> string
+            §M{S4Repro}
+              §F{GetEnv:pub} () -> string
                 §E{env}
                 §R §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
             """;
@@ -1701,8 +1701,8 @@ public class NullabilityIntegrationTests
     public void Calor0273_DoesNotFire_When_ReturnType_IsNullableString()
     {
         const string source = """
-            §M{m1:S4Ok}
-              §F{f1:GetEnv:pub} () -> ?string
+            §M{S4Ok}
+              §F{GetEnv:pub} () -> ?string
                 §E{env}
                 §R §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
             """;
@@ -1723,8 +1723,8 @@ public class NullabilityIntegrationTests
     public void Calor0273_DoesNotFire_For_ProvablyNonNull_StringLiteral()
     {
         const string source = """
-            §M{m1:S4Literal}
-              §F{f1:Hi:pub} () -> string
+            §M{S4Literal}
+              §F{Hi:pub} () -> string
                 §R STR:"hello"
             """;
 
@@ -1744,8 +1744,8 @@ public class NullabilityIntegrationTests
     public void Calor0273_DoesNotFire_For_NonString_Return()
     {
         const string source = """
-            §M{m1:S4Int}
-              §F{f1:Answer:pub} () -> int
+            §M{S4Int}
+              §F{Answer:pub} () -> int
                 §R INT:42
             """;
 
@@ -1765,8 +1765,8 @@ public class NullabilityIntegrationTests
     public void Calor0273_Diagnostic_Message_MentionsSourceAnnotation()
     {
         const string source = """
-            §M{m1:S4Msg}
-              §F{f1:GetEnv:pub} () -> string
+            §M{S4Msg}
+              §F{GetEnv:pub} () -> string
                 §E{env}
                 §R §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
             """;
@@ -1791,9 +1791,9 @@ public class NullabilityIntegrationTests
     public void Calor0273_FiresFor_ReturningBcl_NullableString_FromMethod()
     {
         const string source = """
-            §M{m1:S4Method}
-              §CL{c1:Bad:pub}
-                §MT{f1:GetEnv:pub} () -> string
+            §M{S4Method}
+              §CL{Bad:pub}
+                §MT{GetEnv:pub} () -> string
                   §E{env}
                   §R §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
             """;
@@ -1832,8 +1832,8 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_InferredType_StringLocal_FromLiteral()
     {
         const string source = """
-            §M{m1:InferredOk}
-              §F{f1:Ok:pub} () -> void
+            §M{InferredOk}
+              §F{Ok:pub} () -> void
                 §B{a} STR:"hi"
                 §B{b:string} a
             """;
@@ -1854,8 +1854,8 @@ public class NullabilityIntegrationTests
     public void Calor0272_Fires_For_PostfixNullableString_Bound_To_NonNullString()
     {
         const string source = """
-            §M{m1:PostfixNullable}
-              §F{f1:Bad:pub} () -> void
+            §M{PostfixNullable}
+              §F{Bad:pub} () -> void
                 §E{env}
                 §B{a:string?} §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
                 §B{b:string} a
@@ -1896,8 +1896,8 @@ public class NullabilityIntegrationTests
     public void Calor0274_FiresFor_PassingNullableBclString_To_NonNullableParameter()
     {
         const string source = """
-            §M{m1:S4Repro}
-              §F{f1:Bad:pub} () -> void
+            §M{S4Repro}
+              §F{Bad:pub} () -> void
                 §B{contents:string} §C{System.IO.File.ReadAllText} §A §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C §/C
             """;
 
@@ -1917,8 +1917,8 @@ public class NullabilityIntegrationTests
     public void Calor0274_DoesNotFire_When_Parameter_IsNullableString()
     {
         const string source = """
-            §M{m1:S4NullableParam}
-              §F{f1:Ok:pub} () -> void
+            §M{S4NullableParam}
+              §F{Ok:pub} () -> void
                 §E{env}
                 §B{path:?string} §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C
                 §B{name:?string} §C{System.IO.Path.GetFileName} §A path §/C
@@ -1939,8 +1939,8 @@ public class NullabilityIntegrationTests
     public void Calor0274_DoesNotFire_For_ProvablyNonNull_Literal_Argument()
     {
         const string source = """
-            §M{m1:S4LiteralOk}
-              §F{f1:Ok:pub} () -> void
+            §M{S4LiteralOk}
+              §F{Ok:pub} () -> void
                 §E{io}
                 §C{System.IO.File.WriteAllText} §A STR:"path.txt" §A STR:"contents" §/C
             """;
@@ -1960,8 +1960,8 @@ public class NullabilityIntegrationTests
     public void Calor0274_DoesNotFire_For_NonString_Parameter()
     {
         const string source = """
-            §M{m1:S4IntParam}
-              §F{f1:Ok:pub} () -> void
+            §M{S4IntParam}
+              §F{Ok:pub} () -> void
                 §B{v:int} §C{System.Math.Abs} §A INT:-3 §/C
             """;
 
@@ -1980,8 +1980,8 @@ public class NullabilityIntegrationTests
     public void Calor0274_Message_NamesParameter_And_SourceAnnotation()
     {
         const string source = """
-            §M{m1:S4Message}
-              §F{f1:Bad:pub} () -> void
+            §M{S4Message}
+              §F{Bad:pub} () -> void
                 §B{contents:string} §C{System.IO.File.ReadAllText} §A §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C §/C
             """;
 
@@ -2011,8 +2011,8 @@ public class NullabilityIntegrationTests
         // Wrap the ReadAllText call in a §B initializer so it routes
         // through BindCallExpression (where the Calor0274 emitter lives).
         const string source = """
-            §M{m1:S4NullableArg}
-              §F{f1:Bad:pub} () -> void
+            §M{S4NullableArg}
+              §F{Bad:pub} () -> void
                 §E{env}
                 §B{path:?string} §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C
                 §B{contents:string} §C{System.IO.File.ReadAllText} §A path §/C
@@ -2048,8 +2048,8 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_NonNullStringParameter_Bound_To_NonNullString()
     {
         const string source = """
-            §M{m1:ParamOk}
-              §F{f1:Ok:pub} (STRING:name) -> void
+            §M{ParamOk}
+              §F{Ok:pub} (STRING:name) -> void
                 §B{copy:string} name
             """;
 
@@ -2069,8 +2069,8 @@ public class NullabilityIntegrationTests
     public void Calor0272_Fires_For_NullableStringParameter_Bound_To_NonNullString()
     {
         const string source = """
-            §M{m1:ParamBad}
-              §F{f1:Bad:pub} (?string:name) -> void
+            §M{ParamBad}
+              §F{Bad:pub} (?string:name) -> void
                 §B{copy:string} name
             """;
 
@@ -2091,8 +2091,8 @@ public class NullabilityIntegrationTests
     public void FieldSymbol_Inherits_NotAnnotated_From_NonNullStringField()
     {
         const string source = """
-            §M{m1:FieldOk}
-              §CL{c1:Holder:pub}
+            §M{FieldOk}
+              §CL{Holder:pub}
                 §FLD{string:Name:pub}
             """;
 
@@ -2109,8 +2109,8 @@ public class NullabilityIntegrationTests
     public void FieldSymbol_Inherits_Annotated_From_NullableStringField()
     {
         const string source = """
-            §M{m1:FieldNullable}
-              §CL{c1:Holder:pub}
+            §M{FieldNullable}
+              §CL{Holder:pub}
                 §FLD{?string:Name:pub}
             """;
 
@@ -2127,9 +2127,9 @@ public class NullabilityIntegrationTests
     public void PropertySymbol_Inherits_NotAnnotated_From_NonNullStringProperty()
     {
         const string source = """
-            §M{m1:PropOk}
-              §CL{c1:Holder:pub}
-                §PROP{p1:Name:string:pub:get,set}
+            §M{PropOk}
+              §CL{Holder:pub}
+                §PROP{Name:string:pub:get,set}
             """;
 
         var (module, _) = BindSource(source);
@@ -2145,9 +2145,9 @@ public class NullabilityIntegrationTests
     public void PropertySymbol_Inherits_Annotated_From_NullableStringProperty()
     {
         const string source = """
-            §M{m1:PropNullable}
-              §CL{c1:Holder:pub}
-                §PROP{p1:Name:?string:pub:get,set}
+            §M{PropNullable}
+              §CL{Holder:pub}
+                §PROP{Name:?string:pub:get,set}
             """;
 
         var (module, _) = BindSource(source);
@@ -2164,9 +2164,9 @@ public class NullabilityIntegrationTests
     public void LambdaParameter_Inherits_NotAnnotated_From_NonNullStringParameter()
     {
         const string source = """
-            §M{m1:LamOk}
-              §F{f1:Use:pub} () -> void
-                §B{f} §LAM{l1:name:string} name §/LAM
+            §M{LamOk}
+              §F{Use:pub} () -> void
+                §B{f} §LAM{name:string} name §/LAM
             """;
 
         var (module, _) = BindSource(source);
@@ -2182,9 +2182,9 @@ public class NullabilityIntegrationTests
     public void LambdaParameter_Inherits_Annotated_From_NullableStringParameter()
     {
         const string source = """
-            §M{m1:LamNullable}
-              §F{f1:Use:pub} () -> void
-                §B{f} §LAM{l1:name:?string} name §/LAM
+            §M{LamNullable}
+              §F{Use:pub} () -> void
+                §B{f} §LAM{name:?string} name §/LAM
             """;
 
         var (module, _) = BindSource(source);
@@ -2249,11 +2249,11 @@ public class NullabilityIntegrationTests
     public void ForeachLoopVariable_BinderPath_Inherits_NotAnnotated_From_NonNullString()
     {
         const string source = """
-            §M{m1:ForeachStr}
-              §F{f1:Use:pub} () -> void
-                §EACH{e1:s:string} STR:"unused"
+            §M{ForeachStr}
+              §F{Use:pub} () -> void
+                §EACH{s:string} STR:"unused"
                   §P s
-                §/EACH{e1}
+                §/EACH
             """;
 
         var (module, _) = BindSource(source);
@@ -2269,11 +2269,11 @@ public class NullabilityIntegrationTests
     public void ForeachLoopVariable_BinderPath_Inherits_Annotated_From_NullableString()
     {
         const string source = """
-            §M{m1:ForeachNullStr}
-              §F{f1:Use:pub} () -> void
-                §EACH{e1:s:?string} STR:"unused"
+            §M{ForeachNullStr}
+              §F{Use:pub} () -> void
+                §EACH{s:?string} STR:"unused"
                   §P s
-                §/EACH{e1}
+                §/EACH
             """;
 
         var (module, _) = BindSource(source);
@@ -2290,8 +2290,8 @@ public class NullabilityIntegrationTests
     public void ParameterSymbol_NonString_Keeps_Oblivious()
     {
         const string source = """
-            §M{m1:IntParam}
-              §F{f1:Ok:pub} (INT:n) -> void
+            §M{IntParam}
+              §F{Ok:pub} (INT:n) -> void
                 §B{~x} n
             """;
 
@@ -2420,8 +2420,8 @@ public class NullabilityIntegrationTests
             "This test only exercises the S5 Error branch; if Major reverts below 2 the assertion below is invalid.");
 
         const string source = """
-            §M{m1:S5Bind}
-              §F{f1:Bad:pub} () -> void
+            §M{S5Bind}
+              §F{Bad:pub} () -> void
                 §E{env}
                 §B{bad:string} §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
             """;
@@ -2444,8 +2444,8 @@ public class NullabilityIntegrationTests
             "This test only exercises the S5 Error branch; if Major reverts below 2 the assertion below is invalid.");
 
         const string source = """
-            §M{m1:S5Return}
-              §F{f1:GetEnv:pub} () -> string
+            §M{S5Return}
+              §F{GetEnv:pub} () -> string
                 §E{env}
                 §R §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
             """;
@@ -2468,8 +2468,8 @@ public class NullabilityIntegrationTests
             "This test only exercises the S5 Error branch; if Major reverts below 2 the assertion below is invalid.");
 
         const string source = """
-            §M{m1:S5Call}
-              §F{f1:Bad:pub} () -> void
+            §M{S5Call}
+              §F{Bad:pub} () -> void
                 §B{contents:string} §C{System.IO.File.ReadAllText} §A §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C §/C
             """;
 
@@ -2492,20 +2492,20 @@ public class NullabilityIntegrationTests
     public void S5_AllThreeCodes_ShareSameGatedSeverity()
     {
         const string bindSource = """
-            §M{m1:S5Bind}
-              §F{f1:Bad:pub} () -> void
+            §M{S5Bind}
+              §F{Bad:pub} () -> void
                 §E{env}
                 §B{bad:string} §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
             """;
         const string returnSource = """
-            §M{m1:S5Return}
-              §F{f1:GetEnv:pub} () -> string
+            §M{S5Return}
+              §F{GetEnv:pub} () -> string
                 §E{env}
                 §R §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
             """;
         const string callSource = """
-            §M{m1:S5Call}
-              §F{f1:Bad:pub} () -> void
+            §M{S5Call}
+              §F{Bad:pub} () -> void
                 §B{contents:string} §C{System.IO.File.ReadAllText} §A §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C §/C
             """;
 
@@ -2844,9 +2844,9 @@ public class NullabilityIntegrationTests
     public void S8_Calor0272_Fires_When_NullableUserClass_Bound_To_NonNullUserClass()
     {
         const string source = """
-            §M{m1:S8Bind}
-              §CL{c1:Foo:pub}
-                §MT{m1:Use:pub} (?Foo:a) -> void
+            §M{S8Bind}
+              §CL{Foo:pub}
+                §MT{Use:pub} (?Foo:a) -> void
                   §B{b:Foo} a
             """;
 
@@ -2867,9 +2867,9 @@ public class NullabilityIntegrationTests
     public void S8_Calor0272_DoesNotFire_For_NonNullUserClass_Roundtrip()
     {
         const string source = """
-            §M{m1:S8Roundtrip}
-              §CL{c1:Foo:pub}
-                §MT{m1:Use:pub} (Foo:a) -> void
+            §M{S8Roundtrip}
+              §CL{Foo:pub}
+                §MT{Use:pub} (Foo:a) -> void
                   §B{b:Foo} a
             """;
 
@@ -2889,9 +2889,9 @@ public class NullabilityIntegrationTests
     public void S8_Calor0273_Fires_For_NullableUserClass_Return_Into_NonNullDeclared()
     {
         const string source = """
-            §M{m1:S8Return}
-              §CL{c1:Foo:pub}
-                §MT{m1:Get:pub} (?Foo:a) -> Foo
+            §M{S8Return}
+              §CL{Foo:pub}
+                §MT{Get:pub} (?Foo:a) -> Foo
                   §R a
             """;
 
@@ -3023,11 +3023,11 @@ public class NullabilityIntegrationTests
     public void F3A_Calor0274_Replaces_ScopeBlocked_NullableStringArgument(bool expression)
     {
         var source = $$"""
-            §M{m1:F3ANativeBlocked}
-              §F{f1:Take:pub} (string:name) -> i32
+            §M{F3ANativeBlocked}
+              §F{Take:pub} (string:name) -> i32
                 §E{env}
                 §R 1
-              §F{f2:Caller:pub} () -> i32
+              §F{Caller:pub} () -> i32
                 §E{env}
                 {{(expression ? "§R " : "")}}§C{Take} §A §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C §/C
                 {{(expression ? "" : "§R 0")}}
@@ -3056,11 +3056,11 @@ public class NullabilityIntegrationTests
     public void F3A_Calor0274_DoesNotFire_For_NonNullArg_To_NonNullable_CalorParameter()
     {
         const string source = """
-            §M{m1:F3AUserRefOk}
-              §CL{c1:Bar:pub}
-                §MT{m1:Take:pub} (Bar:a) -> Bar
+            §M{F3AUserRefOk}
+              §CL{Bar:pub}
+                §MT{Take:pub} (Bar:a) -> Bar
                   §R a
-                §MT{m2:Caller:pub} (Bar:x) -> Bar
+                §MT{Caller:pub} (Bar:x) -> Bar
                   §R §C{this.Take} §A x §/C
             """;
 
@@ -3083,11 +3083,11 @@ public class NullabilityIntegrationTests
     public void F3A_Calor0274_DoesNotFire_When_TargetParameter_IsNullable()
     {
         const string source = """
-            §M{m1:F3AUserRefNullableParam}
-              §CL{c1:Bar:pub}
-                §MT{m1:Take:pub} (?Bar:a) -> Bar
+            §M{F3AUserRefNullableParam}
+              §CL{Bar:pub}
+                §MT{Take:pub} (?Bar:a) -> Bar
                   §R a
-                §MT{m2:Caller:pub} (?Bar:x) -> Bar
+                §MT{Caller:pub} (?Bar:x) -> Bar
                   §R §C{this.Take} §A x §/C
             """;
 
@@ -3118,11 +3118,11 @@ public class NullabilityIntegrationTests
     public void F3A_Calor0274_Fires_For_NullableUserRefArg_To_NonNullable_CalorParameter()
     {
         const string source = """
-            §M{m1:F3AUserRef}
-              §CL{c1:Bar:pub}
-                §MT{m1:Take:pub} (Bar:a) -> Bar
+            §M{F3AUserRef}
+              §CL{Bar:pub}
+                §MT{Take:pub} (Bar:a) -> Bar
                   §R a
-                §MT{m2:Caller:pub} (?Bar:x) -> Bar
+                §MT{Caller:pub} (?Bar:x) -> Bar
                   §R §C{this.Take} §A x §/C
             """;
 
@@ -3156,10 +3156,10 @@ public class NullabilityIntegrationTests
     public void F3B_BoundCall_Type_Inherits_Declared_ReturnAnnotation_ForCalorFunction()
     {
         const string source = """
-            §M{m1:F3BNullableStringReturn}
-              §F{f1:GetFoo:pub} () -> ?string
+            §M{F3BNullableStringReturn}
+              §F{GetFoo:pub} () -> ?string
                 §R STR:"hi"
-              §F{f2:Use:pub} () -> void
+              §F{Use:pub} () -> void
                 §B{tmp:?string} §C{GetFoo} §/C
             """;
 
@@ -3188,10 +3188,10 @@ public class NullabilityIntegrationTests
     public void F3B_BoundCall_Type_Inherits_NotAnnotated_For_NonNullableCalorReturn()
     {
         const string source = """
-            §M{m1:F3BNonNullStringReturn}
-              §F{f1:GetFoo:pub} () -> string
+            §M{F3BNonNullStringReturn}
+              §F{GetFoo:pub} () -> string
                 §R STR:"hi"
-              §F{f2:Use:pub} () -> void
+              §F{Use:pub} () -> void
                 §B{tmp:string} §C{GetFoo} §/C
             """;
 
@@ -3223,11 +3223,11 @@ public class NullabilityIntegrationTests
         // sibling §MT methods. Static Foo.GetFoo call from Use exercises
         // the same user-ref channel §S8's target-side gate already handles.
         const string source = """
-            §M{m1:F3BNullableUserClassReturn}
-              §CL{c1:Foo:pub}
-                §MT{m1:GetFoo:pub:static} (?Foo:x) -> ?Foo
+            §M{F3BNullableUserClassReturn}
+              §CL{Foo:pub}
+                §MT{GetFoo:pub:static} (?Foo:x) -> ?Foo
                   §R x
-                §MT{m2:Use:pub:static} (?Foo:y) -> void
+                §MT{Use:pub:static} (?Foo:y) -> void
                   §B{tmp:?Foo} §C{Foo.GetFoo} §A y §/C
             """;
 
@@ -3257,11 +3257,11 @@ public class NullabilityIntegrationTests
     public void F3B_BoundCall_Type_Inherits_NotAnnotated_For_NonNullableUserClassReturn()
     {
         const string source = """
-            §M{m1:F3BNonNullUserClassReturn}
-              §CL{c1:Foo:pub}
-                §MT{m1:GetFoo:pub:static} (Foo:x) -> Foo
+            §M{F3BNonNullUserClassReturn}
+              §CL{Foo:pub}
+                §MT{GetFoo:pub:static} (Foo:x) -> Foo
                   §R x
-                §MT{m2:Use:pub:static} (Foo:y) -> void
+                §MT{Use:pub:static} (Foo:y) -> void
                   §B{tmp:Foo} §C{Foo.GetFoo} §A y §/C
             """;
 
@@ -3301,9 +3301,9 @@ public class NullabilityIntegrationTests
     public void New_Expression_Has_NotAnnotated_Type()
     {
         const string source = """
-            §M{m1:NewNoArgs}
-              §CL{c1:Foo:pub}
-                §MT{m1:Make:pub:static} () -> Foo
+            §M{NewNoArgs}
+              §CL{Foo:pub}
+                §MT{Make:pub:static} () -> Foo
                   §R §NEW{Foo}
             """;
 
@@ -3325,10 +3325,10 @@ public class NullabilityIntegrationTests
     public void New_Expression_With_Args_Has_NotAnnotated_Type()
     {
         const string source = """
-            §M{m1:NewWithArgs}
-              §CL{c1:Foo:pub}
-                §CTOR{ct1:pub} (i32:x)
-                §MT{m1:Make:pub:static} () -> Foo
+            §M{NewWithArgs}
+              §CL{Foo:pub}
+                §CTOR{pub} (i32:x)
+                §MT{Make:pub:static} () -> Foo
                   §R §NEW{Foo} §A INT:1 §/C
             """;
 
@@ -3351,9 +3351,9 @@ public class NullabilityIntegrationTests
     public void New_Expression_Result_Assigned_To_NonNull_UserRef_DoesNotFire_Calor0272()
     {
         const string source = """
-            §M{m1:NewIntoNonNull}
-              §CL{c1:Foo:pub}
-                §MT{m1:Make:pub:static} () -> void
+            §M{NewIntoNonNull}
+              §CL{Foo:pub}
+                §MT{Make:pub:static} () -> void
                   §B{b:Foo} §NEW{Foo}
             """;
 
@@ -3364,19 +3364,19 @@ public class NullabilityIntegrationTests
     }
 
     [Theory]
-    [InlineData("§B{copy:[str]} value", "§F{probe:Probe:pub} (?[str]:value) -> void",
+    [InlineData("§B{copy:[str]} value", "§F{Probe:pub} (?[str]:value) -> void",
         DiagnosticCode.NullableToNonNullableBinding)]
-    [InlineData("§R value", "§F{probe:Probe:pub} (?[str]:value) -> [str]",
+    [InlineData("§R value", "§F{Probe:pub} (?[str]:value) -> [str]",
         DiagnosticCode.NullableReturnFromNonNullable)]
-    [InlineData("§B{copy:[str]} value", "§F{probe:Probe:pub} ([?str]:value) -> void",
+    [InlineData("§B{copy:[str]} value", "§F{Probe:pub} ([?str]:value) -> void",
         DiagnosticCode.NullableToNonNullableBinding)]
-    [InlineData("§R value", "§F{probe:Probe:pub} ([?str]:value) -> [str]",
+    [InlineData("§R value", "§F{Probe:pub} ([?str]:value) -> [str]",
         DiagnosticCode.NullableReturnFromNonNullable)]
     public void StageB_ArrayVariablesAreCheckedOutsideMethodArguments(
         string statement, string signature, string expectedCode)
     {
         var source = $$"""
-            §M{m1:ArrayBoundary}
+            §M{ArrayBoundary}
               {{signature}}
                 {{statement}}
             """;
@@ -3385,19 +3385,19 @@ public class NullabilityIntegrationTests
     }
 
     [Theory]
-    [InlineData("§R value", "§F{probe:Probe:pub} (IEnumerable<?str>:value) -> IEnumerable<str>",
+    [InlineData("§R value", "§F{Probe:pub} (IEnumerable<?str>:value) -> IEnumerable<str>",
         DiagnosticCode.NullableReturnFromNonNullable)]
     [InlineData("§R §C{Take} §A value §/C",
-        "§F{probe:Probe:pub} (IEnumerable<?str>:value) -> IEnumerable<str>",
+        "§F{Probe:pub} (IEnumerable<?str>:value) -> IEnumerable<str>",
         DiagnosticCode.NullableArgumentToNonNullableParameter)]
     public void StageB_GenericVariablePayloadNullabilitySurvivesReferences(
         string statement, string signature, string expectedCode)
     {
         var helper = expectedCode == DiagnosticCode.NullableArgumentToNonNullableParameter
-            ? "§F{take:Take:pub} (IEnumerable<str>:value) -> IEnumerable<str>\n    §R value"
+            ? "§F{Take:pub} (IEnumerable<str>:value) -> IEnumerable<str>\n    §R value"
             : "";
         var source = $$"""
-            §M{m1:GenericBoundary}
+            §M{GenericBoundary}
               {{helper}}
               {{signature}}
                 {{statement}}
@@ -3431,12 +3431,12 @@ public class NullabilityIntegrationTests
         string statement, string expectedCode)
     {
         var source = $$"""
-            §M{m1:GenericCallResult}
-              §F{give:Give:pub} () -> IEnumerable<?str>
+            §M{GenericCallResult}
+              §F{Give:pub} () -> IEnumerable<?str>
                 §TH null
-              §F{take:Take:pub} (IEnumerable<str>:value) -> void
+              §F{Take:pub} (IEnumerable<str>:value) -> void
                 §E{}
-              §F{probe:Probe:pub} () -> IEnumerable<str>
+              §F{Probe:pub} () -> IEnumerable<str>
                 {{statement}}
                 §TH null
             """;
@@ -3475,10 +3475,10 @@ public class NullabilityIntegrationTests
     public void StageB_NestedGenericPayloadDifferenceDoesNotSelectOverload()
     {
         var source = """
-            §M{m1:NestedGeneric}
-              §F{take:Take:pub} (List<List<str>>:value) -> void
+            §M{NestedGeneric}
+              §F{Take:pub} (List<List<str>>:value) -> void
                 §E{}
-              §F{probe:Probe:pub} (List<List<?str>>:value) -> void
+              §F{Probe:pub} (List<List<?str>>:value) -> void
                 §C{Take} §A value §/C
             """;
 
@@ -3497,9 +3497,9 @@ public class NullabilityIntegrationTests
     public void StageB_NullableGenericContainerGuardPreservesPayloadNullability(string sourceType)
     {
         var source = $$"""
-            §M{m1:NullableGenericContainer}
-              §F{probe:Probe:pub} ({{sourceType}}:value) -> List<str>
-                §IF{guard} (!= value null)
+            §M{NullableGenericContainer}
+              §F{Probe:pub} ({{sourceType}}:value) -> List<str>
+                §IF (!= value null)
                   §R value
                 §TH null
             """;
@@ -3516,10 +3516,10 @@ public class NullabilityIntegrationTests
     public void StageB_NullableGenericCallResultPreservesPayloadNullability(string returnType)
     {
         var source = $$"""
-            §M{m1:NullableGenericCall}
-              §F{give:Give:pub} () -> {{returnType}}
+            §M{NullableGenericCall}
+              §F{Give:pub} () -> {{returnType}}
                 §TH null
-              §F{probe:Probe:pub} () -> List<str>
+              §F{Probe:pub} () -> List<str>
                 §R §C{Give} §/C
             """;
 
@@ -3536,10 +3536,10 @@ public class NullabilityIntegrationTests
         string targetType, string sourceType)
     {
         var source = $$"""
-            §M{m1:NullableGenericArgument}
-              §F{take:Take:pub} ({{targetType}}:value) -> void
+            §M{NullableGenericArgument}
+              §F{Take:pub} ({{targetType}}:value) -> void
                 §E{}
-              §F{probe:Probe:pub} ({{sourceType}}:value) -> void
+              §F{Probe:pub} ({{sourceType}}:value) -> void
                 §C{Take} §A value §/C
             """;
 

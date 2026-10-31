@@ -107,8 +107,8 @@ public class EffectEnforcementTests
     public void MultipleEffects_AllMustBeDeclared()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:PrintAndRead:pub}
+§M{Test}
+  §F{PrintAndRead:pub}
       §O{str}
       §P ""Enter your name: ""
       §B{str:name} STR:""placeholder""
@@ -124,8 +124,8 @@ public class EffectEnforcementTests
     public void PureFunction_WithNoEffects_Compiles()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
+§M{Test}
+  §F{Add:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -140,8 +140,8 @@ public class EffectEnforcementTests
     public void ConsolePrint_RequiresCwEffect()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:TestPrint:pub}
+§M{Test}
+  §F{TestPrint:pub}
       §O{void}
       §P ""test""
 ";
@@ -156,8 +156,8 @@ public class EffectEnforcementTests
     {
         // LINQ extension method calls in §F should be recognized as pure
         var source = @"
-§M{m001:Test}
-  §F{f001:SortItems:pub}
+§M{Test}
+  §F{SortItems:pub}
       §I{List<i32>:items}
       §O{void}
       §C{items.OrderByDescending}
@@ -190,8 +190,8 @@ public class EffectEnforcementTests
     {
         // Static LINQ calls like Enumerable.Range should resolve via type mapping
         var source = @"
-§M{m001:Test}
-  §F{f001:MakeRange:pub}
+§M{Test}
+  §F{MakeRange:pub}
       §O{void}
       §C{Enumerable.Range}
         §A INT:1
@@ -215,8 +215,8 @@ public class EffectEnforcementTests
     {
         // OfType<T> calls should be recognized as pure
         var source = @"
-§M{m001:Test}
-  §F{f001:FilterTypes:pub}
+§M{Test}
+  §F{FilterTypes:pub}
       §I{List<object>:items}
       §O{void}
       §C{items.OfType}
@@ -235,9 +235,9 @@ public class EffectEnforcementTests
     {
         // §MT method inside §CL using §P without declaring cw should fail
         var source = @"
-§M{m001:Test}
-  §CL{c001:MyService:pub}
-      §MT{mt001:PrintHello:pub}
+§M{Test}
+  §CL{MyService:pub}
+      §MT{PrintHello:pub}
           §O{void}
           §P ""Hello from method""
 ";
@@ -254,9 +254,9 @@ public class EffectEnforcementTests
     {
         // §MT method inside §CL using §P with cw declared should pass
         var source = @"
-§M{m001:Test}
-  §CL{c001:MyService:pub}
-      §MT{mt001:PrintHello:pub}
+§M{Test}
+  §CL{MyService:pub}
+      §MT{PrintHello:pub}
           §O{void}
           §E{cw}
           §P ""Hello from method""
@@ -272,9 +272,9 @@ public class EffectEnforcementTests
     {
         // §MT method with LINQ calls should compile (both class enforcement and LINQ purity)
         var source = @"
-§M{m001:Test}
-  §CL{c001:DataProcessor:pub}
-      §MT{mt001:ProcessItems:pub}
+§M{Test}
+  §CL{DataProcessor:pub}
+      §MT{ProcessItems:pub}
           §I{List<i32>:items}
           §O{void}
           §C{items.OrderByDescending}
@@ -295,9 +295,9 @@ public class EffectEnforcementTests
     {
         // §MT method calling Console.WriteLine without §E{cw} should fail
         var source = @"
-§M{m001:Test}
-  §CL{c001:Logger:pub}
-      §MT{mt001:Log:pub}
+§M{Test}
+  §CL{Logger:pub}
+      §MT{Log:pub}
           §O{void}
           §C{Console.WriteLine}
             §A STR:""log message""
@@ -316,9 +316,9 @@ public class EffectEnforcementTests
     {
         // §MT method with only pure operations should compile
         var source = @"
-§M{m001:Test}
-  §CL{c001:Calculator:pub}
-      §MT{mt001:Add:pub}
+§M{Test}
+  §CL{Calculator:pub}
+      §MT{Add:pub}
           §I{i32:a}
           §I{i32:b}
           §O{i32}
@@ -336,13 +336,13 @@ public class EffectEnforcementTests
         // §CTOR that assigns to §THIS fields should NOT be flagged for mut effect
         // since constructors can't declare effects and field assignment is their purpose
         var source = @"
-§M{m001:Test}
-  §CL{c001:Person:pub}
+§M{Test}
+  §CL{Person:pub}
       §FLD{str:_name:priv}
-      §CTOR{ctor1:pub}
+      §CTOR{pub}
         §I{str:name}
         §ASSIGN §THIS._name name
-      §/CTOR{ctor1}
+      §/CTOR
 ";
         var result = TestHarness.Compile(source);
 
@@ -359,9 +359,9 @@ public class EffectEnforcementTests
         // unknown-call chain and fails closed under the default strict policy.
         // (Pre-W2 this test pinned the delegate hole: it asserted no failure.)
         var source = @"
-§M{m001:Test}
-  §CL{c001:Mapper:pub}
-      §MT{mt001:Apply:pub}
+§M{Test}
+  §CL{Mapper:pub}
+      §MT{Apply:pub}
           §I{i32:value}
           §O{i32}
           §R §C{transform} §A value §/C
@@ -380,8 +380,8 @@ public class EffectEnforcementTests
         // WS-W2 (D-W2.1): under --strict-effects an unresolvable bare-name
         // invocation is a hard Calor0411 error (pre-W2: warning only).
         var source = @"
-§M{m001:Test}
-  §F{f001:UseDelegate:pub}
+§M{Test}
+  §F{UseDelegate:pub}
       §O{void}
       §C{callback}
       §/C
@@ -404,17 +404,17 @@ public class EffectEnforcementTests
     public void OverloadedInternalCall_ChargesOnlyResolvedSymbol()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Work:pub}
+§M{Test}
+  §F{Work:pub}
       §I{i32:value}
       §O{i32}
       §R value
-  §F{f002:Work:pub}
+  §F{Work:pub}
       §I{str:value}
       §O{void}
       §E{cw}
       §P value
-  §F{f003:Caller:pub}
+  §F{Caller:pub}
       §O{i32}
       §R §C{Work} §A INT:1 §/C
 ";
@@ -431,17 +431,17 @@ public class EffectEnforcementTests
     public void UnresolvedInternalOverload_ReportsNoMatchWithoutChargingFirstFunction()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Work:pub}
+§M{Test}
+  §F{Work:pub}
       §I{i32:value}
       §O{i32}
       §R value
-  §F{f002:Work:pub}
+  §F{Work:pub}
       §I{str:value}
       §O{void}
       §E{cw}
       §P value
-  §F{f003:Caller:pub}
+  §F{Caller:pub}
       §O{void}
       §C{Work} §A BOOL:true §/C
 ";
@@ -458,13 +458,13 @@ public class EffectEnforcementTests
     public void PreprocessorWrappedMethod_ParticipatesInBoundCallGraph()
     {
         var source = @"
-§M{m001:Test}
-  §CL{c001:Worker:pub}
+§M{Test}
+  §CL{Worker:pub}
       §PP{FEATURE}
-          §MT{mt001:Do:pub} () -> i32
+          §MT{Do:pub} () -> i32
               §R 1
       §/PP{FEATURE}
-      §MT{mt002:Run:pub} () -> i32
+      §MT{Run:pub} () -> i32
           §R §C{Do} §/C
 ";
 
@@ -482,14 +482,14 @@ public class EffectEnforcementTests
         // Function calls a pure method on another class in the same module.
         // Should resolve as an internal call, NOT produce Calor0411.
         var source = @"
-§M{m001:Test}
-  §CL{c001:Calculator:pub}
-      §MT{mt001:Add:pub}
+§M{Test}
+  §CL{Calculator:pub}
+      §MT{Add:pub}
           §I{i32:a}
           §I{i32:b}
           §O{i32}
           §R (+ a b)
-  §F{f001:UseCalculator:pub}
+  §F{UseCalculator:pub}
       §I{Calculator:_calc}
       §O{i32}
       §R §C{_calc.Add} §A INT:1 §A INT:2 §/C
@@ -506,14 +506,14 @@ public class EffectEnforcementTests
         // Function calls a method with cw effect on another class.
         // The caller must declare cw or the effect should propagate as an error.
         var source = @"
-§M{m001:Test}
-  §CL{c001:Logger:pub}
-      §MT{mt001:Log:pub}
+§M{Test}
+  §CL{Logger:pub}
+      §MT{Log:pub}
           §I{str:message}
           §O{void}
           §E{cw}
           §P message
-  §F{f001:DoWork:pub}
+  §F{DoWork:pub}
       §I{Logger:_logger}
       §O{void}
       §C{_logger.Log}
@@ -534,14 +534,14 @@ public class EffectEnforcementTests
     {
         // Function calls a method with cw effect and properly declares cw.
         var source = @"
-§M{m001:Test}
-  §CL{c001:Logger:pub}
-      §MT{mt001:Log:pub}
+§M{Test}
+  §CL{Logger:pub}
+      §MT{Log:pub}
           §I{str:message}
           §O{void}
           §E{cw}
           §P message
-  §F{f001:DoWork:pub}
+  §F{DoWork:pub}
       §I{Logger:_logger}
       §O{void}
       §E{cw}
@@ -560,16 +560,16 @@ public class EffectEnforcementTests
     {
         // Method in one class calls a method in another class (both §MT).
         var source = @"
-§M{m001:Test}
-  §CL{c001:Printer:pub}
-      §MT{mt001:PrintMessage:pub}
+§M{Test}
+  §CL{Printer:pub}
+      §MT{PrintMessage:pub}
           §I{str:msg}
           §O{void}
           §E{cw}
           §P msg
-  §CL{c002:App:pub}
+  §CL{App:pub}
       §FLD{Printer:_printer:priv}
-      §MT{mt002:Run:pub}
+      §MT{Run:pub}
           §O{void}
           §E{cw}
           §C{_printer.PrintMessage}
@@ -587,16 +587,16 @@ public class EffectEnforcementTests
     {
         // Method in one class calls effectful method in another without declaring the effect.
         var source = @"
-§M{m001:Test}
-  §CL{c001:Printer:pub}
-      §MT{mt001:PrintMessage:pub}
+§M{Test}
+  §CL{Printer:pub}
+      §MT{PrintMessage:pub}
           §I{str:msg}
           §O{void}
           §E{cw}
           §P msg
-  §CL{c002:App:pub}
+  §CL{App:pub}
       §FLD{Printer:_printer:priv}
-      §MT{mt002:Run:pub}
+      §MT{Run:pub}
           §O{void}
           §C{_printer.PrintMessage}
             §A STR:""hello""
@@ -615,22 +615,22 @@ public class EffectEnforcementTests
     {
         // A → B → C chain across three classes. Effect should propagate from C to A.
         var source = @"
-§M{m001:Test}
-  §CL{c001:ServiceC:pub}
-      §MT{mt001:WriteOutput:pub}
+§M{Test}
+  §CL{ServiceC:pub}
+      §MT{WriteOutput:pub}
           §O{void}
           §E{cw}
           §P ""output""
-  §CL{c002:ServiceB:pub}
+  §CL{ServiceB:pub}
       §FLD{ServiceC:_c:priv}
-      §MT{mt002:Process:pub}
+      §MT{Process:pub}
           §O{void}
           §E{cw}
           §C{_c.WriteOutput}
           §/C
-  §CL{c003:ServiceA:pub}
+  §CL{ServiceA:pub}
       §FLD{ServiceB:_b:priv}
-      §MT{mt003:Execute:pub}
+      §MT{Execute:pub}
           §O{void}
           §E{cw}
           §C{_b.Process}
@@ -651,19 +651,19 @@ public class EffectEnforcementTests
         // With the multi-map, ambiguous bare names fall through to external resolution
         // (which produces Calor0411 in strict mode). The caller declares cw to be safe.
         var source = @"
-§M{m001:Test}
-  §CL{c001:PureService:pub}
-      §MT{mt001:Process:pub}
+§M{Test}
+  §CL{PureService:pub}
+      §MT{Process:pub}
           §I{str:data}
           §O{str}
           §R data
-  §CL{c002:EffectfulService:pub}
-      §MT{mt002:Process:pub}
+  §CL{EffectfulService:pub}
+      §MT{Process:pub}
           §I{str:data}
           §O{void}
           §E{cw}
           §P data
-  §F{f001:DoWork:pub}
+  §F{DoWork:pub}
       §I{str:input}
       §O{void}
       §E{cw}
@@ -689,18 +689,18 @@ public class EffectEnforcementTests
         // When only one class defines a method name, cross-class resolution should still work
         // even with the multi-map (the method name is unambiguous).
         var source = @"
-§M{m001:Test}
-  §CL{c001:Calculator:pub}
-      §MT{mt001:Compute:pub}
+§M{Test}
+  §CL{Calculator:pub}
+      §MT{Compute:pub}
           §I{i32:x}
           §O{i32}
           §R (+ x 1)
-  §CL{c002:OtherService:pub}
-      §MT{mt002:Format:pub}
+  §CL{OtherService:pub}
+      §MT{Format:pub}
           §I{str:s}
           §O{str}
           §R s
-  §F{f001:UseCalc:pub}
+  §F{UseCalc:pub}
       §I{Calculator:_calc}
       §O{i32}
       §R §C{_calc.Compute} §A INT:5 §/C
@@ -722,8 +722,8 @@ public class EffectEnforcementTests
         // A Calor function calls ILogger.LogInformation and declares cw effect.
         // Should compile without Calor0411 (unknown external call).
         var source = @"
-§M{m001:Test}
-  §F{f001:LogSomething:pub}
+§M{Test}
+  §F{LogSomething:pub}
       §O{void}
       §E{cw}
       §C{ILogger.LogInformation}
@@ -742,8 +742,8 @@ public class EffectEnforcementTests
     {
         // A Calor function calls DbContext.SaveChanges and declares db:w effect.
         var source = @"
-§M{m001:Test}
-  §F{f001:SaveData:pub}
+§M{Test}
+  §F{SaveData:pub}
       §O{void}
       §E{db:w}
       §C{DbContext.SaveChanges}
@@ -761,8 +761,8 @@ public class EffectEnforcementTests
     {
         // A Calor function calls IConfiguration.GetSection and declares env:r effect.
         var source = @"
-§M{m001:Test}
-  §F{f001:ReadConfig:pub}
+§M{Test}
+  §F{ReadConfig:pub}
       §O{void}
       §E{env:r}
       §C{IConfiguration.GetSection}
@@ -781,8 +781,8 @@ public class EffectEnforcementTests
     {
         // A Calor function calls ControllerBase.Ok — should be pure.
         var source = @"
-§M{m001:Test}
-  §F{f001:GetResult:pub}
+§M{Test}
+  §F{GetResult:pub}
       §O{void}
       §C{ControllerBase.Ok}
       §/C
@@ -800,8 +800,8 @@ public class EffectEnforcementTests
         // A Calor function calls DbContext.SaveChanges but does NOT declare db:w.
         // Should produce Calor0410 (forbidden effect), NOT Calor0411 (unknown).
         var source = @"
-§M{m001:Test}
-  §F{f001:SaveData:pub}
+§M{Test}
+  §F{SaveData:pub}
       §O{void}
       §C{DbContext.SaveChanges}
       §/C
@@ -821,8 +821,8 @@ public class EffectEnforcementTests
         // A realistic function that calls multiple framework methods in STRICT mode.
         // This verifies the full pipeline: declared effects match computed effects.
         var source = @"
-§M{m001:Test}
-  §F{f001:HandleRequest:pub}
+§M{Test}
+  §F{HandleRequest:pub}
       §O{void}
       §E{cw,db:w,env:r}
       §C{ILogger.LogInformation}
@@ -867,10 +867,10 @@ public class EffectEnforcementTests
     public void SelfRecursiveFunction_IsNotAnUnknownCallTarget()
     {
         const string source = """
-            §M{m001:Rec}
-              §F{f001:Fact:pub} (i32:n) -> i32
+            §M{Rec}
+              §F{Fact:pub} (i32:n) -> i32
                 §E{}
-                §IF{if1} (<= n 1)
+                §IF (<= n 1)
                   §R 1
                 §R (* n §C{Fact} (- n 1))
             """;
@@ -891,11 +891,11 @@ public class EffectEnforcementTests
     public void SelfRecursiveFunction_WithUndeclaredEffect_StillFails()
     {
         const string source = """
-            §M{m001:RecUndecl}
-              §F{f001:Countdown:pub} (i32:n) -> void
+            §M{RecUndecl}
+              §F{Countdown:pub} (i32:n) -> void
                 §E{}
                 §P n
-                §IF{if1} (> n 0)
+                §IF (> n 0)
                   §C{Countdown} (- n 1)
             """;
 
@@ -912,11 +912,11 @@ public class EffectEnforcementTests
     public void SelfRecursiveFunction_DeclaredEffect_IsAccepted()
     {
         const string source = """
-            §M{m001:RecEff}
-              §F{f001:Countdown:pub} (i32:n) -> void
+            §M{RecEff}
+              §F{Countdown:pub} (i32:n) -> void
                 §E{cw}
                 §P n
-                §IF{if1} (> n 0)
+                §IF (> n 0)
                   §C{Countdown} (- n 1)
             """;
 
@@ -953,8 +953,8 @@ public class EffectEnforcementTests
     public void E1Slice2b_InferredLocalReceiverTypedOnlyByTheBinder_ChargesTheRealCallee()
     {
         var source = @"
-§M{m001:BoundReceiverProbe}
-  §F{f001:Go:pub}
+§M{BoundReceiverProbe}
+  §F{Go:pub}
     §O{str}
     §E{rand}
     §B{g} §C{System.Guid.NewGuid} §/C
@@ -988,10 +988,10 @@ public class EffectEnforcementTests
     public void E1Slice2b_LocalShadowsFieldAndTheStringPathIsWrong_TheBoundTypeWins()
     {
         var source = @"
-§M{m001:ShadowProbe}
-  §CL{c001:Box:pub}
+§M{ShadowProbe}
+  §CL{Box:pub}
     §FLD{x:Random:priv}
-    §MT{mt01:Go:pub}
+    §MT{Go:pub}
       §O{str}
       §E{rand}
       §B{x} §C{System.Guid.NewGuid} §/C
@@ -1036,8 +1036,8 @@ public class EffectEnforcementTests
     public void E1Slice2b_UnresolvedBoundReceiver_FailsClosed()
     {
         var source = @"
-§M{m001:UnresolvedProbe}
-  §F{f001:Go:pub}
+§M{UnresolvedProbe}
+  §F{Go:pub}
     §I{Mystery:m}
     §O{void}
     §E{}
@@ -1089,8 +1089,8 @@ public class EffectEnforcementTests
     public void E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel()
     {
         var source = @"
-§M{m001:VetoReach}
-  §F{f001:Go:pub}
+§M{VetoReach}
+  §F{Go:pub}
     §E{}
     §B{u} §C{Mystery.Make} §/C
     §C{u.Run} §/C
@@ -1139,15 +1139,15 @@ public class EffectEnforcementTests
     public void E1Slice2c_BareCallOnUnknownTypedBinding_IsCalor0411WithOrWithoutAReceiverUse()
     {
         var withoutReceiverUse = @"
-§M{m001:VetoControl}
-  §F{f001:Go:pub}
+§M{VetoControl}
+  §F{Go:pub}
     §E{}
     §B{u} §C{Mystery.Make} §/C
     §C{u} §/C
 ";
         var withReceiverUse = @"
-§M{m001:VetoReach}
-  §F{f001:Go:pub}
+§M{VetoReach}
+  §F{Go:pub}
     §E{}
     §B{u} §C{Mystery.Make} §/C
     §C{u.Run} §/C
@@ -1186,8 +1186,8 @@ public class EffectEnforcementTests
     public void E1Slice2b_FunctionTypedParameterAsBareTarget_UsesTheAstParameterType()
     {
         var source = @"
-§M{m001:BareTargetProbe}
-  §F{f001:Go:pub}
+§M{BareTargetProbe}
+  §F{Go:pub}
     §I{Func<i32>:make}
     §O{i32}
     §E{}

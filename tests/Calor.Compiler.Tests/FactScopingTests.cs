@@ -19,12 +19,12 @@ public sealed class FactScopingTests
     public void DoWhile_FirstIterationIsExactWithoutAssumingItsCondition()
     {
         var module = Parse("""
-            §M{m1:Test}
-              §F{f1:Probe:pub} (i32:n) -> void
-                §DO{d1}
-                  §PROOF{p1} (== n 0)
-                §/DO{d1} (> n 0)
-                §PROOF{p2} (== n 0)
+            §M{Test}
+              §F{Probe:pub} (i32:n) -> void
+                §DO
+                  §PROOF{} (== n 0)
+                §/DO (> n 0)
+                §PROOF{} (== n 0)
             """, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Select(d => d.Message)));
         var function = Assert.Single(module.Functions);
@@ -45,11 +45,11 @@ public sealed class FactScopingTests
         string step, BinaryOperator fromOperator, BinaryOperator toOperator)
     {
         var module = Parse($$"""
-            §M{m1:Test}
-              §F{f1:Probe:pub} (i32:start, i32:end) -> void
+            §M{Test}
+              §F{Probe:pub} (i32:start, i32:end) -> void
                 §L{l1:i:start:end:{{step}}}
-                  §PROOF{p1} (== i i)
-                §PROOF{p2} (== start start)
+                  §PROOF{} (== i i)
+                §PROOF{} (== start start)
             """, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Select(d => d.Message)));
         var function = Assert.Single(module.Functions);
@@ -79,11 +79,11 @@ public sealed class FactScopingTests
     public void SiblingGuards_HaveDisjointScopes()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Branchy:priv}
+            §M{Test}
+              §F{Branchy:priv}
                   §I{i32:x}
                   §O{i32}
-                  §IF{if1} (== x 1)
+                  §IF (== x 1)
                       §R INT:1
                   §EI (== x 2)
                       §R INT:2
@@ -113,11 +113,11 @@ public sealed class FactScopingTests
     public void GuardFact_DoesNotApply_OutsideItsBranch()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Guarded:priv}
+            §M{Test}
+              §F{Guarded:priv}
                   §I{i32:x}
                   §O{i32}
-                  §IF{if1} (> x 0)
+                  §IF (> x 0)
                       §R INT:1
                   §R INT:0
             """;
@@ -142,12 +142,12 @@ public sealed class FactScopingTests
     public void WhileCondition_Killed_WhenBodyRebindsItsVariable()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Counter:priv}
+            §M{Test}
+              §F{Counter:priv}
                   §I{i32:n}
                   §O{i32}
                   §B{~i:i32} INT:0
-                  §WH{w1} (< i n)
+                  §WH (< i n)
                       §B{i:i32} (+ i INT:1)
                   §R i
             """;
@@ -170,13 +170,13 @@ public sealed class FactScopingTests
     public void BranchGuard_Killed_WhenBodyAssignsItsVariable()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Mutate:priv}
+            §M{Test}
+              §F{Mutate:priv}
                 §I{i32:x}
                 §O{void}
-                §IF{if1} (> x INT:0)
+                §IF (> x INT:0)
                   §ASSIGN x INT:-1
-                  §PROOF{p1} (> x INT:0)
+                  §PROOF{} (> x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -197,13 +197,13 @@ public sealed class FactScopingTests
     public void BranchGuard_Killed_WhenBodyMutatesVariableWithUnaryOperator()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Mutate:priv}
+            §M{Test}
+              §F{Mutate:priv}
                 §I{i32:x}
                 §O{void}
-                §IF{if1} (> x INT:0)
+                §IF (> x INT:0)
                   (dec x)
-                  §PROOF{p1} (> x INT:0)
+                  §PROOF{} (> x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -224,13 +224,13 @@ public sealed class FactScopingTests
     public void MethodBranchGuard_IsCollectedWithFunctionSemantics()
     {
         var source = """
-            §M{m001:Test}
-              §CL{c001:Checker:pub}
-                §MT{m001:Check:pub}
+            §M{Test}
+              §CL{Checker:pub}
+                §MT{Check:pub}
                   §I{i32:x}
                   §O{void}
-                  §IF{if1} (> x INT:0)
-                    §PROOF{p1} (> x INT:0)
+                  §IF (> x INT:0)
+                    §PROOF{} (> x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -253,10 +253,10 @@ public sealed class FactScopingTests
     public void NegativeStepForLoop_UsesInclusiveDescendingBounds()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Descending:priv}
+            §M{Test}
+              §F{Descending:priv}
                 §O{i32}
-                §L{l1:i:2:0:-1}
+                §L{i:2:0:-1}
                   §P (>= i INT:0)
                 §R INT:0
             """;
@@ -279,12 +279,12 @@ public sealed class FactScopingTests
     public void DynamicStepForLoop_DoesNotAssumeDirection()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Dynamic:priv}
+            §M{Test}
+              §F{Dynamic:priv}
                 §I{i32:step}
                 §O{i32}
-                §L{l1:i:0:10:step}
-                  §PROOF{p1} (>= i INT:0)
+                §L{i:0:10:step}
+                  §PROOF{} (>= i INT:0)
                 §R INT:0
             """;
 
@@ -311,13 +311,13 @@ public sealed class FactScopingTests
         // together for every obligation in the function, making the assumption
         // set UNSAT and vacuously discharging the unguarded index access.
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedList:IntArr:n}
-              §F{f001:Bad:priv}
+            §M{Test}
+              §ITYPE{SizedList:IntArr:n}
+              §F{Bad:priv}
                   §I{SizedList:items}
                   §I{i32:x}
                   §O{i32}
-                  §IF{if1} (== x 1)
+                  §IF (== x 1)
                       §B{a:i32} INT:1
                   §EI (== x 2)
                       §B{b:i32} INT:2
@@ -350,13 +350,13 @@ public sealed class FactScopingTests
         // The scoping change must not break the legitimate case: an index
         // obligation inside the guarded body still sees the dominating guard.
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedList:IntArr:n}
-              §F{f001:SafeGet:priv}
+            §M{Test}
+              §ITYPE{SizedList:IntArr:n}
+              §F{SafeGet:priv}
                   §I{SizedList:items}
                   §I{i32:i} | (>= # INT:0)
                   §O{i32}
-                  §IF{if1} (< i n)
+                  §IF (< i n)
                       §R §IDX items i
                   §R INT:0
             """;

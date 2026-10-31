@@ -35,8 +35,8 @@ public class FormatExpressionCoverageTests
     public void Format_ConditionalExpression_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §O{i32}
                 §R (? true 1 0)
             """;
@@ -49,8 +49,8 @@ public class FormatExpressionCoverageTests
     public void Format_DecimalLiteral_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §O{void}
                 §B{x} DEC:3.14
             """;
@@ -67,8 +67,8 @@ public class FormatExpressionCoverageTests
     public void Format_InterpolatedString_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §O{str}
                 §B{name} "World"
                 §R §INTERP "Hello, " §EXP name "!" §/INTERP
@@ -85,8 +85,8 @@ public class FormatExpressionCoverageTests
     public void Format_RangeExpression_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §O{void}
                 §B{r} §RANGE 1 5
             """;
@@ -133,14 +133,14 @@ public class FormatExpressionCoverageTests
     public void Format_ListCreation_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §O{void}
                 §LIST{l1:i32}
                   1
                   2
                   3
-                §/LIST{l1}
+                §/LIST
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* ListCreationNode */", result);
@@ -151,13 +151,13 @@ public class FormatExpressionCoverageTests
     public void Format_DictionaryCreation_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §O{void}
                 §DICT{d1:str:i32}
                   §KV "one" 1
                   §KV "two" 2
-                §/DICT{d1}
+                §/DICT
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* DictionaryCreationNode */", result);
@@ -168,13 +168,13 @@ public class FormatExpressionCoverageTests
     public void Format_SetCreation_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §O{void}
                 §HSET{s1:str}
                   "apple"
                   "banana"
-                §/HSET{s1}
+                §/HSET
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* SetCreationNode */", result);
@@ -185,12 +185,12 @@ public class FormatExpressionCoverageTests
     public void Format_CollectionCount_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §O{i32}
                 §LIST{l1:i32}
                   1
-                §/LIST{l1}
+                §/LIST
                 §R §CNT l1
             """;
         var result = FormatModule(source);
@@ -202,12 +202,12 @@ public class FormatExpressionCoverageTests
     public void Format_CollectionContains_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §O{bool}
                 §LIST{l1:i32}
                   1
-                §/LIST{l1}
+                §/LIST
                 §R §HAS{l1} 1
             """;
         var result = FormatModule(source);
@@ -223,10 +223,10 @@ public class FormatExpressionCoverageTests
     public void Format_ArrayLength_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §O{i32}
-                §B{arr} §ARR{arr:i32} 1 2 3 §/ARR{arr}
+                §B{arr} §ARR{i32} 1 2 3 §/ARR
                 §R §LEN arr
             """;
         var result = FormatModule(source);
@@ -241,8 +241,8 @@ public class FormatExpressionCoverageTests
     public void Format_StringOperation_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §O{str}
                 §B{s} "hello"
                 §R (upper s)
@@ -256,8 +256,8 @@ public class FormatExpressionCoverageTests
     public void Format_CharOperation_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §O{bool}
                 §B{c} (char-lit "A")
                 §R (is-letter c)
@@ -271,8 +271,8 @@ public class FormatExpressionCoverageTests
     public void Format_StringBuilderOperation_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §O{str}
                 §B{sb} (sb-new)
                 §R (sb-tostring sb)
@@ -290,8 +290,8 @@ public class FormatExpressionCoverageTests
     public void Format_ForallExpression_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §I{i32:x}
                 §O{i32}
                 §Q (forall ((n i32)) (>= n 0))
@@ -306,8 +306,8 @@ public class FormatExpressionCoverageTests
     public void Format_ExistsExpression_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §I{i32:x}
                 §O{i32}
                 §Q (exists ((n i32)) (> n 0))
@@ -322,8 +322,8 @@ public class FormatExpressionCoverageTests
     public void Format_ImplicationExpression_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §I{i32:x}
                 §O{i32}
                 §Q (-> (> x 0) (>= x 1))
@@ -342,8 +342,8 @@ public class FormatExpressionCoverageTests
     public void Format_WithExpression_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §O{void}
                 §B{p} §NEW{Person} §/NEW
                 §B{p2} §WITH p
@@ -403,8 +403,8 @@ public class FormatExpressionCoverageTests
     public void Format_AnonymousObject_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §O{void}
                 §B{obj} §ANON
                   Name = "Alice"
@@ -425,8 +425,8 @@ public class FormatExpressionCoverageTests
     {
         // A function using multiple expression types that were previously unhandled
         var source = """
-            §M{m1:Test}
-              §F{f1:Complex:pub}
+            §M{Test}
+              §F{Complex:pub}
                 §I{str:input}
                 §O{i32}
                 §B{upper} (upper input)

@@ -813,31 +813,20 @@ public sealed class Parser
     }
 
     /// <summary>
-    /// Detects the malformed four-field function header
-    /// <c>§F{id:name:type:vis}</c> / <c>§AF{id:name:type:vis}</c> and reports
-    /// <see cref="DiagnosticCode.MalformedFunctionHeader"/> (Calor0116). Only
-    /// <c>§F</c>/<c>§AF</c> are checked -- <c>§MT</c>/<c>§AMT</c> legitimately
-    /// take a fourth modifier field. The detection is deliberately narrow:
-    /// exactly four positional fields whose fourth is a visibility token, which
-    /// uniquely identifies the "return type placed in the header" mistake. Left
-    /// unflagged the parser reads the type as the visibility and silently drops
-    /// the real visibility, emitting a void method (CS0127).
-    ///
-    /// The attached <see cref="SuggestedFix"/> is safe to auto-apply: it drops
-    /// the type from the header (<c>{id:name:vis}</c>) and, when no inline
-    /// signature or type-parameter list follows on the header line, appends
-    /// <c>() -&gt; type</c> so the healed function keeps the intended return
-    /// type instead of becoming void.
+    /// Repairs a misplaced return type in a three-field function header.
+    /// Methods may legitimately carry a third modifier field. An ID-shaped
+    /// leading field is ambiguous with retired source syntax and is never
+    /// auto-rewritten into a declaration name.
     /// </summary>
     private void CheckMalformedFunctionHeader(Token startToken, AttributeCollection attrs, Token headerOpen, Token headerClose)
     {
         var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        if (posCount != 4)
+        if (posCount != 3)
         {
             return;
         }
 
-        var visRaw = attrs["_pos3"] ?? string.Empty;
+        var visRaw = attrs["_pos2"] ?? string.Empty;
         if (!AttributeHelper.IsVisibilityToken(visRaw))
         {
             return;
@@ -849,9 +838,14 @@ public sealed class Parser
             return;
         }
 
-        var id = attrs["_pos0"] ?? string.Empty;
-        var name = attrs["_pos1"] ?? string.Empty;
-        var type = attrs["_pos2"] ?? string.Empty;
+        var name = attrs["_pos0"] ?? string.Empty;
+        var type = attrs["_pos1"] ?? string.Empty;
+        if (name.StartsWith("f_", StringComparison.Ordinal) ||
+            (name.Length > 1 && name[0] == 'f' &&
+             name.AsSpan(1).IndexOfAnyExceptInRange('0', '9') < 0))
+        {
+            return;
+        }
 
         var filePath = _diagnostics.CurrentFilePath ?? string.Empty;
         var headerEndLine = headerClose.Span.Line;
@@ -865,7 +859,7 @@ public sealed class Parser
                 headerOpen.Span.Column,
                 headerEndLine,
                 headerEndColumn,
-                $"{{{id}:{name}:{visRaw}}}"),
+                $"{{{name}:{visRaw}}}"),
         };
 
         // Only inject a signature when nothing already follows the header on
@@ -878,15 +872,15 @@ public sealed class Parser
         }
 
         var fix = new SuggestedFix(
-            $"Move the return type '{type}' out of the header: use {{{id}:{name}:{visRaw}}} and declare the return type in the signature",
+            $"Move the return type '{type}' out of the header: use {{{name}:{visRaw}}} and declare the return type in the signature",
             edits, isSafeToApply: true);
 
         _diagnostics.ReportErrorWithFix(
             startToken.Span.Union(headerClose.Span),
             DiagnosticCode.MalformedFunctionHeader,
-            $"'{startToken.Text}' header has four fields ({{{id}:{name}:{type}:{visRaw}}}), but §F/§AF headers take at most {{id:name:visibility}}. " +
-            $"The third field '{type}' is a return type -- declare it in the signature as '(...) -> {type}', not in the header. " +
-            "A four-field header silently drops the return type and emits a void method.",
+            $"'{startToken.Text}' header has three fields ({{{name}:{type}:{visRaw}}}), but §F/§AF headers take at most {{name:visibility}}. " +
+            $"The second field '{type}' is a return type -- declare it in the signature as '(...) -> {type}', not in the header. " +
+            "A return type belongs in the inline signature, not the header.",
             fix);
     }
 

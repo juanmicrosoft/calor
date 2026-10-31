@@ -149,7 +149,7 @@ internal static class SweepCaseGenerator
         var oracle = template["oracle"]!;
         var claim = oracle["claim"]?.GetValue<string>() ?? "forall";
         var overflow = template["overflow"]?.GetValue<string>() ?? "checked";
-        var header = overflow == "unchecked" ? "§M{m1:R1Case:overflow=unchecked}" : "§M{m1:R1Case}";
+        var header = overflow == "unchecked" ? "§M{R1Case:overflow=unchecked}" : "§M{R1Case}";
         var calor = header + "\n" + Fill(Text(template["calor"]!), holes, csharp: false).TrimEnd() + "\n";
         var prime = template["calorPrime"] is { } primeNode
             ? header + "\n" + Fill(Text(primeNode), holes, csharp: false).TrimEnd() + "\n"

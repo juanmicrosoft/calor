@@ -47,8 +47,8 @@ public class QuantifierTests
     public void Parser_ParsesSimpleForall()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:TestFunc:pub}
+§M{Test}
+  §F{TestFunc:pub}
       §I{i32:x}
       §O{bool}
       §Q (forall ((i i32)) (>= i INT:0))
@@ -76,8 +76,8 @@ public class QuantifierTests
     public void Parser_ParsesSimpleExists()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:TestFunc:pub}
+§M{Test}
+  §F{TestFunc:pub}
       §I{i32:x}
       §O{bool}
       §Q (exists ((i i32)) (== i x))
@@ -101,8 +101,8 @@ public class QuantifierTests
     public void Parser_ParsesMultipleBoundVariables()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:TestFunc:pub}
+§M{Test}
+  §F{TestFunc:pub}
       §I{i32:n}
       §O{bool}
       §Q (forall ((i i32) (j i32)) (== i j))
@@ -127,8 +127,8 @@ public class QuantifierTests
     public void Parser_ParsesImplication()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:TestFunc:pub}
+§M{Test}
+  §F{TestFunc:pub}
       §I{i32:x}
       §O{bool}
       §Q (-> (>= x INT:0) (>= x INT:0))
@@ -152,8 +152,8 @@ public class QuantifierTests
     public void Parser_ParsesNestedQuantifiers()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:TestFunc:pub}
+§M{Test}
+  §F{TestFunc:pub}
       §I{i32:n}
       §O{bool}
       §Q (forall ((x i32)) (exists ((y i32)) (== x y)))
@@ -180,8 +180,8 @@ public class QuantifierTests
     public void Parser_ParsesForallWithImplication()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:ArrayAllNonNeg:pub}
+§M{Test}
+  §F{ArrayAllNonNeg:pub}
       §I{i32:n}
       §O{bool}
       §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= i INT:0)))
@@ -665,8 +665,8 @@ public class QuantifierTests
     public void Integration_ParseAndEmitQuantifiedContract()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:CheckAllPositive:pub}
+§M{Test}
+  §F{CheckAllPositive:pub}
       §I{i32:n}
       §O{bool}
       §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= i INT:0)))
@@ -693,8 +693,8 @@ public class QuantifierTests
     public void Integration_ParseAndEmitImplication()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:CheckImplication:pub}
+§M{Test}
+  §F{CheckImplication:pub}
       §I{i32:x}
       §O{bool}
       §Q (-> (> x INT:0) (>= x INT:0))
@@ -720,8 +720,8 @@ public class QuantifierTests
     {
         // Declared element types provide evidence that the comparisons are built-in.
         var source = @"
-§M{m001:Test}
-  §F{f001:AllNonNegative:pub}
+§M{Test}
+  §F{AllNonNegative:pub}
       §I{i32[]:arr}
       §I{i32:n}
       §O{bool}
@@ -750,8 +750,8 @@ public class QuantifierTests
     {
         // Declared element types provide evidence that the comparisons are built-in.
         var source = @"
-§M{m001:Test}
-  §F{f001:ContainsTarget:pub}
+§M{Test}
+  §F{ContainsTarget:pub}
       §I{i32[]:arr}
       §I{i32:n}
       §I{i32:target}
@@ -857,8 +857,8 @@ public class QuantifierTests
     {
         // Parse source with quantifiers
         var source = @"
-§M{m001:Test}
-  §F{f001:TestFunc:pub}
+§M{Test}
+  §F{TestFunc:pub}
       §I{i32:n}
       §O{bool}
       §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= i INT:0)))
@@ -888,8 +888,8 @@ public class QuantifierTests
     {
         // Test that integer types are accepted without warnings
         var source = @"
-§M{m001:Test}
-  §F{f001:TestFunc:pub}
+§M{Test}
+  §F{TestFunc:pub}
       §I{i32:n}
       §O{bool}
       §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= i INT:0)))
@@ -909,8 +909,8 @@ public class QuantifierTests
     {
         // Test that float types generate a warning
         var source = @"
-§M{m001:Test}
-  §F{f001:TestFunc:pub}
+§M{Test}
+  §F{TestFunc:pub}
       §I{i32:n}
       §O{bool}
       §Q (forall ((x f32)) (>= x INT:0))
@@ -985,8 +985,8 @@ public class QuantifierTests
     {
         // Test: quantifier in postcondition referencing 'result'
         var source = @"
-§M{m001:Test}
-  §F{f001:SumPositive:pub}
+§M{Test}
+  §F{SumPositive:pub}
       §I{i32:n}
       §O{i32}
       §S (forall ((i i32)) (-> (&& (>= i INT:0) (< i result)) (>= i INT:0)))
@@ -1066,8 +1066,8 @@ public class QuantifierTests
     public void RealWorld_SortedArrayInvariant()
     {
         var source = @"
-§M{m001:Sorting}
-  §F{f001:IsSorted:pub}
+§M{Sorting}
+  §F{IsSorted:pub}
       §I{i32:arr}
       §I{i32:n}
       §O{bool}
@@ -1095,8 +1095,8 @@ public class QuantifierTests
     public void RealWorld_BinarySearchContract()
     {
         var source = @"
-§M{m001:Search}
-  §F{f001:BinarySearch:pub}
+§M{Search}
+  §F{BinarySearch:pub}
       §I{i32:arr}
       §I{i32:n}
       §I{i32:target}
@@ -1125,8 +1125,8 @@ public class QuantifierTests
     public void RealWorld_PartitionContract()
     {
         var source = @"
-§M{m001:QuickSort}
-  §F{f001:Partition:pub}
+§M{QuickSort}
+  §F{Partition:pub}
       §I{i32:arr}
       §I{i32:low}
       §I{i32:high}
@@ -1160,8 +1160,8 @@ public class QuantifierTests
     public void RealWorld_ArrayBoundsContract()
     {
         var source = @"
-§M{m001:Validation}
-  §F{f001:ValidateGrades:pub}
+§M{Validation}
+  §F{ValidateGrades:pub}
       §I{i32:grades}
       §I{i32:n}
       §O{bool}
@@ -1190,8 +1190,8 @@ public class QuantifierTests
     public void RealWorld_ElementExistsContract()
     {
         var source = @"
-§M{m001:Collections}
-  §F{f001:Contains:pub}
+§M{Collections}
+  §F{Contains:pub}
       §I{i32:arr}
       §I{i32:n}
       §I{i32:target}
@@ -1220,8 +1220,8 @@ public class QuantifierTests
     public void RealWorld_MatrixDimensionContract()
     {
         var source = @"
-§M{m001:Matrix}
-  §F{f001:MultiplyDimCheck:pub}
+§M{Matrix}
+  §F{MultiplyDimCheck:pub}
       §I{i32:rowsA}
       §I{i32:colsA}
       §I{i32:rowsB}
@@ -1251,8 +1251,8 @@ public class QuantifierTests
     public void RealWorld_UniqueElementsContract()
     {
         var source = @"
-§M{m001:Sets}
-  §F{f001:HasUniqueElements:pub}
+§M{Sets}
+  §F{HasUniqueElements:pub}
       §I{i32:arr}
       §I{i32:n}
       §O{bool}
@@ -1287,8 +1287,8 @@ public class QuantifierTests
     public void RealWorld_MaxHeapPropertyContract()
     {
         var source = @"
-§M{m001:Heap}
-  §F{f001:IsMaxHeap:pub}
+§M{Heap}
+  §F{IsMaxHeap:pub}
       §I{i32:heap}
       §I{i32:n}
       §O{bool}
@@ -1312,8 +1312,8 @@ public class QuantifierTests
     public void RealWorld_EmitSortedArrayContract()
     {
         var source = @"
-§M{m001:Sorting}
-  §F{f001:Sort:pub}
+§M{Sorting}
+  §F{Sort:pub}
       §I{i32[]:arr}
       §I{i32:n}
       §O{bool}

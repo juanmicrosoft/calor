@@ -12,9 +12,9 @@ public class PatternCheckerTests
     private static DiagnosticBag Check(string cases)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Test:pub} (bool:x) -> i32
-                §W{m1} x
+            §M{Test}
+              §F{Test:pub} (bool:x) -> i32
+                §W x
             """ + "\n" + cases;
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
@@ -74,9 +74,9 @@ public class PatternCheckerTests
     public void RemovedPatterns_AreRejectedBeforeExhaustivenessAnalysis(string pattern)
     {
         var source = $$"""
-            §M{m1:RemovedPatterns}
-              §F{f1:Probe:pub} (object:value) -> i32
-                §R §W{w1} value
+            §M{RemovedPatterns}
+              §F{Probe:pub} (object:value) -> i32
+                §R §W value
                   §K {{pattern}} → 1
                   §K _ → 0
             """;

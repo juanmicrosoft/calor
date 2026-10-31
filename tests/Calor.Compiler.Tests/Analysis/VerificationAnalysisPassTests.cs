@@ -83,14 +83,14 @@ public class VerificationAnalysisPassTests
     public void PreconditionFacts_AreScopedToExactOverloadSymbol()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Divide:pub}
+            §M{Test}
+              §F{Divide:pub}
                 §I{i32:x}
                 §I{i32:y}
                 §O{i32}
                 §Q (!= y INT:0)
                 §R (/ x y)
-              §F{f002:Divide:pub}
+              §F{Divide:pub}
                 §I{i64:x}
                 §I{i64:y}
                 §O{i64}
@@ -238,8 +238,8 @@ public class VerificationAnalysisPassTests
     public void VerificationAnalysisPass_SimpleFunction_Completes()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
+§M{Test}
+  §F{Add:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -260,8 +260,8 @@ public class VerificationAnalysisPassTests
     public void VerificationAnalysisPass_BoundModule_Completes()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Multiply:pub}
+§M{Test}
+  §F{Multiply:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -281,14 +281,14 @@ public class VerificationAnalysisPassTests
     public void VerificationAnalysisPass_MultipleFunctions_AnalyzesAll()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §O{i32}
       §R INT:1
-  §F{f002:Bar:pub}
+  §F{Bar:pub}
       §O{i32}
       §R INT:2
-  §F{f003:Baz:pub}
+  §F{Baz:pub}
       §O{i32}
       §R INT:3";
 
@@ -306,8 +306,8 @@ public class VerificationAnalysisPassTests
     public void VerificationAnalysisPass_DivisionByZero_DetectsBug()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -327,8 +327,8 @@ public class VerificationAnalysisPassTests
     public void VerificationAnalysisPass_SafeCode_FewIssues()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Safe:pub}
+§M{Test}
+  §F{Safe:pub}
       §I{i32:x}
       §O{i32}
       §R (+ x INT:1)";
@@ -348,8 +348,8 @@ public class VerificationAnalysisPassTests
     public void VerificationAnalysisPass_DisabledDataflow_SkipsDataflow()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §O{i32}
       §B{x:i32} INT:1
       §R x";
@@ -378,12 +378,12 @@ public class VerificationAnalysisPassTests
     public void VerificationAnalysisPass_WithLoop_AnalyzesLoop()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Sum:pub}
+§M{Test}
+  §F{Sum:pub}
       §I{i32:n}
       §O{i32}
       §B{sum:i32} INT:0
-      §L{l1:i:0:10:1}
+      §L{i:0:10:1}
           §C{Console.WriteLine}
             §A i
           §/C
@@ -405,8 +405,8 @@ public class VerificationAnalysisPassTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeDivide:pub}
+§M{Test}
+  §F{SafeDivide:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -440,13 +440,13 @@ public class VerificationAnalysisPassTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:Sum:pub}
+§M{Test}
+  §F{Sum:pub}
       §I{i32:n}
       §O{i32}
       §Q (>= n INT:0)
       §B{sum:i32} INT:0
-      §L{l1:i:0:10:1}
+      §L{i:0:10:1}
           §C{Console.WriteLine}
             §A i
           §/C
@@ -473,8 +473,8 @@ public class VerificationAnalysisPassTests
         bool expectedDivisionWarning)
     {
         var source = $@"
-§M{{m001:Test}}
-  §F{{f001:Divide:pub}}
+§M{{Test}}
+  §F{{Divide:pub}}
       §I{{i32:divisor}}
       §O{{i32}}
       §Q {precondition}
@@ -529,7 +529,7 @@ public class VerificationAnalysisPassTests
     public void VerificationAnalysisPass_EmptyModule_Handles()
     {
         var source = @"
-§M{m001:Test}";
+§M{Test}";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);

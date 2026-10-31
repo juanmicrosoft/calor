@@ -27,8 +27,8 @@ public class NullableReferenceTypingTests
     public void NullableStringLiteralAndInlineParameter_AgreeWithGeneratedRuntime(string spelling)
     {
         var source = $$"""
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} ({{spelling}}:input) -> {{spelling}}
+            §M{NullableTyping}
+              §F{Probe:pub} ({{spelling}}:input) -> {{spelling}}
                 §E{}
                 §B{literal:{{spelling}}} "value"
                 §B{copy:{{spelling}}} input
@@ -57,8 +57,8 @@ public class NullableReferenceTypingTests
         var key = "CALOR_T1_ABSENT_" + Guid.NewGuid().ToString("N");
         Assert.Null(Environment.GetEnvironmentVariable(key));
         var source = $$"""
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} () -> {{spelling}}
+            §M{NullableTyping}
+              §F{Probe:pub} () -> {{spelling}}
                 §E{env}
                 §B{value:{{spelling}}} §C{System.Environment.GetEnvironmentVariable} §A "{{key}}" §/C
                 §R value
@@ -82,10 +82,10 @@ public class NullableReferenceTypingTests
     public void DeclaredNominalReference_ParametersCopiesAndConstructorsRemainReferences()
     {
         const string source = """
-            §M{m1:NullableTyping}
-              §CL{c1:Foo:pub}
+            §M{NullableTyping}
+              §CL{Foo:pub}
                 §FLD{i32:value:pub}
-              §F{f1:Probe:pub} (?Foo:input) -> ?Foo
+              §F{Probe:pub} (?Foo:input) -> ?Foo
                 §E{alloc}
                 §B{copy:?Foo} input
                 §B{created:?Foo} §NEW{Foo}
@@ -108,10 +108,10 @@ public class NullableReferenceTypingTests
     public void NullableConstructionAndConsumption_KeepTheirDeclaredType()
     {
         const string source = """
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} (bool:present) -> ?str
+            §M{NullableTyping}
+              §F{Probe:pub} (bool:present) -> ?str
                 §E{alloc}
-                §IF{if1} present
+                §IF present
                   §R "value"
                 §EL
                   §R null
@@ -135,8 +135,8 @@ public class NullableReferenceTypingTests
     public void RemovedOptionConstructors_AreRejectedInNullableBindings(string target, string expression)
     {
         var source = $$"""
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} (?str:input) -> void
+            §M{NullableTyping}
+              §F{Probe:pub} (?str:input) -> void
                 §E{alloc}
                 §B{value:{{target}}} {{expression}}
             """;
@@ -158,8 +158,8 @@ public class NullableReferenceTypingTests
     public void ExpandedNullableAssignment_UsesActivatedBinderOwnership()
     {
         const string source = """
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} () -> void
+            §M{NullableTyping}
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{x:?str} null
                 §B{y:str} x
@@ -189,8 +189,8 @@ public class NullableReferenceTypingTests
     public void RawInlineNullableFlow_IsActivatedForScalarString()
     {
         const string source = """
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} (?str:input) -> void
+            §M{NullableTyping}
+              §F{Probe:pub} (?str:input) -> void
                 §E{}
                 §B{y:str} input
             """;
@@ -215,10 +215,10 @@ public class NullableReferenceTypingTests
     public void NullableNativeArguments_KeepRejectionWithNullabilityOwnership()
     {
         const string source = """
-            §M{m1:NullableTyping}
-              §F{f1:Take:pub} (str:input) -> void
+            §M{NullableTyping}
+              §F{Take:pub} (str:input) -> void
                 §E{env}
-              §F{f2:Probe:pub} () -> void
+              §F{Probe:pub} () -> void
                 §E{env}
                 §C{Take} §A §C{System.Environment.GetEnvironmentVariable} §A "PATH" §/C §/C
             """;
@@ -235,14 +235,14 @@ public class NullableReferenceTypingTests
     public void NullableNativeTarget_PreservesNullAndNonNullRuntimeValues()
     {
         const string source = """
-            §M{m1:NullableTyping}
-              §F{take:Take:pub} (?str:value) -> ?str
+            §M{NullableTyping}
+              §F{Take:pub} (?str:value) -> ?str
                 §E{}
                 §R value
-              §F{probe:Probe:pub} (?str:value) -> ?str
+              §F{Probe:pub} (?str:value) -> ?str
                 §E{}
                 §R §C{Take} §A value §/C
-              §F{nonNull:NonNull:pub} (str:value) -> ?str
+              §F{NonNull:pub} (str:value) -> ?str
                 §E{}
                 §R §C{Take} §A value §/C
             """;
@@ -262,14 +262,14 @@ public class NullableReferenceTypingTests
     public void ObjectAlternative_DoesNotBypassScalarStringActivation()
     {
         const string source = """
-            §M{m1:NullableTyping}
-              §F{takeString:Take:pub} (str:value) -> i32
+            §M{NullableTyping}
+              §F{Take:pub} (str:value) -> i32
                 §E{}
                 §R 1
-              §F{takeObject:Take:pub} (object:value) -> i32
+              §F{Take:pub} (object:value) -> i32
                 §E{}
                 §R 2
-              §F{probe:Probe:pub} (?str:value) -> i32
+              §F{Probe:pub} (?str:value) -> i32
                 §E{}
                 §R §C{Take} §A value §/C
             """;
@@ -292,13 +292,13 @@ public class NullableReferenceTypingTests
     {
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer($$"""
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub}
+            §M{NullableTyping}
+              §F{Probe:pub}
                 §I{?str:value}
                 §O{void}
                 §LIST{items:str}
                   "seed"
-                §/LIST{items}
+                §/LIST
                 {{operation}}
             """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
@@ -313,8 +313,8 @@ public class NullableReferenceTypingTests
     public void NullableStringReturn_PreservesAnnotatedPayload()
     {
         const string source = """
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} (?str:value) -> str
+            §M{NullableTyping}
+              §F{Probe:pub} (?str:value) -> str
                 §E{throw}
                 §R value
             """;
@@ -350,8 +350,8 @@ public class NullableReferenceTypingTests
         string target, string expression)
     {
         var result = Program.Compile($$"""
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} () -> void
+            §M{NullableTyping}
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{value:{{target}}} {{expression}}
             """, "nullable-typing.calr");
@@ -362,8 +362,8 @@ public class NullableReferenceTypingTests
     public void NullableValueTypes_AcceptImplicitUnderlyingValueConversion()
     {
         var result = Program.Compile("""
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} () -> void
+            §M{NullableTyping}
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{value:?i32} 42
             """, "nullable-typing.calr");
@@ -383,9 +383,9 @@ public class NullableReferenceTypingTests
     public void ArrayRankSuffixes_AcceptNullWithDefaultChecking(string type, string emittedType)
     {
         var result = Program.Compile($$"""
-            §M{m1:NullableTyping}
+            §M{NullableTyping}
               §U{System.Collections.Generic}
-              §F{f1:Probe:pub} () -> void
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{grid:{{type}}} null
             """, "array-rank-typing.calr");
@@ -408,8 +408,8 @@ public class NullableReferenceTypingTests
     public void ArraysAndOrdinaryGenerics_KeepExistingNullRejection(string type)
     {
         var result = Program.Compile($$"""
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} () -> void
+            §M{NullableTyping}
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{value:{{type}}} null
             """, "array-generic-typing.calr");
@@ -425,9 +425,9 @@ public class NullableReferenceTypingTests
     public void GenericsWithArrayArguments_KeepTheirGenericIdentity(string type, string emittedType)
     {
         var result = Program.Compile($$"""
-            §M{m1:NullableTyping}
+            §M{NullableTyping}
               §U{System.Collections.Generic}
-              §F{f1:Probe:pub} ({{type}}:input) -> void
+              §F{Probe:pub} ({{type}}:input) -> void
                 §E{}
                 §B{grid:{{type}}} input
             """, "array-generic-typing.calr");
@@ -445,8 +445,8 @@ public class NullableReferenceTypingTests
     public void ArrayAndGenericMismatches_KeepTheirExistingTypeChecks(string sourceType, string target)
     {
         var result = Program.Compile($$"""
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} ({{sourceType}}:input) -> void
+            §M{NullableTyping}
+              §F{Probe:pub} ({{sourceType}}:input) -> void
                 §E{}
                 §B{value:{{target}}} input
             """, "nullable-typing.calr");
@@ -476,8 +476,8 @@ public class NullableReferenceTypingTests
     public void NullableStringConcatenation_PreservesExistingNonNullRuntimeResult()
     {
         const string source = """
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} (?str:left, ?str:right) -> str
+            §M{NullableTyping}
+              §F{Probe:pub} (?str:left, ?str:right) -> str
                 §E{}
                 §R (+ left right)
             """;
@@ -496,8 +496,8 @@ public class NullableReferenceTypingTests
     public void NullablePayloads_DoNotCollapseTheirArrayContainer(string type, string emittedType)
     {
         var source = $$"""
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} ({{type}}:input) -> {{type}}
+            §M{NullableTyping}
+              §F{Probe:pub} ({{type}}:input) -> {{type}}
                 §E{}
                 §B{copy:{{type}}} input
                 §R copy
@@ -519,8 +519,8 @@ public class NullableReferenceTypingTests
     public void RemovedOptionReturns_AreRejectedWithoutTypeChecking(string returnType, string expression)
     {
         var source = $$"""
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} () -> {{returnType}}
+            §M{NullableTyping}
+              §F{Probe:pub} () -> {{returnType}}
                 §E{alloc}
                 §R {{expression}}
             """;
@@ -541,12 +541,12 @@ public class NullableReferenceTypingTests
     public void LambdaReturn_DoesNotUseEnclosingReferenceReturnContract()
     {
         const string source = """
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} () -> str
+            §M{NullableTyping}
+              §F{Probe:pub} () -> str
                 §E{alloc}
-                §B{factory:Func<str?>} §LAM{lam1}
+                §B{factory:Func<str?>} §LAM{}
                   §R null
-                §/LAM{lam1}
+                §/LAM
                 §R "outer"
             """;
         foreach (var checking in new[] { true, false })
@@ -571,14 +571,14 @@ public class NullableReferenceTypingTests
     public void DeclarationClassification_DoesNotTreatStructsOrEnumsAsReferences()
     {
         const string source = """
-            §M{m1:NullableTyping}
-              §CL{c1:Foo:pub}
+            §M{NullableTyping}
+              §CL{Foo:pub}
                 §FLD{i32:value:pub}
-              §CL{c2:Value:pub:struct}
+              §CL{Value:pub:struct}
                 §FLD{i32:value:pub}
-              §EN{e1:Kind:pub}
+              §EN{Kind:pub}
                 First
-              §F{f1:Probe:pub} (?Foo:reference, ?Value:value, ?Kind:kind) -> void
+              §F{Probe:pub} (?Foo:reference, ?Value:value, ?Kind:kind) -> void
                 §E{}
             """;
         var diagnostics = new DiagnosticBag();
@@ -601,8 +601,8 @@ public class NullableReferenceTypingTests
     public void NullableObjectBoxing_PreservesTheValue()
     {
         const string source = """
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} () -> ?object
+            §M{NullableTyping}
+              §F{Probe:pub} () -> ?object
                 §E{alloc}
                 §B{boxed:?object} "value"
                 §R boxed
@@ -621,10 +621,10 @@ public class NullableReferenceTypingTests
     public void NullableNominalMemberAccess_IsNotMisdiagnosedAsARecordOperation()
     {
         const string source = """
-            §M{m1:NullableTyping}
-              §CL{c1:Foo:pub}
+            §M{NullableTyping}
+              §CL{Foo:pub}
                 §FLD{i32:value:pub}
-              §F{f1:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{alloc}
                 §B{input:?Foo} §NEW{Foo}
                 §R input.value
@@ -655,23 +655,23 @@ public class NullableReferenceTypingTests
     public void PrimaryReceiverGetters_AreChargedInsteadOfBeingTreatedAsOptionMembers(bool conditional)
     {
         var source = $$"""
-            §M{m1:ReceiverTyping}
+            §M{ReceiverTyping}
               §U{System.Collections.Generic}
-              §CL{c1:Parent:pub}
-                §PROP{p1:Value:i32:pub}
+              §CL{Parent:pub}
+                §PROP{Value:i32:pub}
                   §GET
                     §B{created:List<i32>} §NEW{List<i32>}
                     §R INT:3
-              §CL{c2:Node:pub}
+              §CL{Node:pub}
                 §FLD{i32:Value:pub}
-                §PROP{p2:Child:Node:pub}
+                §PROP{Child:Node:pub}
                   §GET
                     §B{created:List<i32>} §NEW{List<i32>}
                     §B{child:Node} §NEW{Node}
                     §R child
-              §CL{c3:Derived:pub}
+              §CL{Derived:pub}
                 §EXT{Parent}
-                §MT{mt1:Read:pub} (Node:input) -> i32?
+                §MT{Read:pub} (Node:input) -> i32?
                   §E{}
                   §R {{(conditional ? "input?.Child .Value" : "§BASE.Value")}}
             """;
@@ -698,10 +698,10 @@ public class NullableReferenceTypingTests
     {
         Assert.Equal("?", TypeIdentity.MapShortTypeNameToFullName("?"));
         const string source = """
-            §M{m1:ReceiverTyping}
-              §CL{c1:Node:pub}
+            §M{ReceiverTyping}
+              §CL{Node:pub}
                 §FLD{i32:Value:pub}
-              §F{f1:Probe:pub} (Node:input) -> i32
+              §F{Probe:pub} (Node:input) -> i32
                 §E{}
                 §R (?? input input).Value
             """;
@@ -719,12 +719,12 @@ public class NullableReferenceTypingTests
     public void NullableNormalization_PreservesActiveNonFunctionRowErrors(string type, string expression)
     {
         var source = $$"""
-            §M{m1:NullableTyping}
-              §CL{c1:Foo:pub}
+            §M{NullableTyping}
+              §CL{Foo:pub}
                 §FLD{i32:value:pub}
-              §CL{c2:Value:pub:struct}
+              §CL{Value:pub:struct}
                 §FLD{i32:value:pub}
-              §F{f1:Probe:pub} () -> void
+              §F{Probe:pub} () -> void
                 §E{alloc}
                 §B{item:{{type}}} §E{} {{expression}}
             """;

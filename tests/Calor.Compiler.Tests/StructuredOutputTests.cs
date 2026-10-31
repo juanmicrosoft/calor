@@ -37,8 +37,8 @@ public class StructuredOutputTests : IDisposable
         // compile-time error (Calor0250, bind validation) at line 3.
         var file = Path.Combine(_tempDir, "broken.calr");
         File.WriteAllText(file, """
-            §M{m001:Broken}
-              §F{f001:Main:pub} () -> void
+            §M{Broken}
+              §F{Main:pub} () -> void
                 §B{x}
             """);
         return file;
@@ -48,8 +48,8 @@ public class StructuredOutputTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "good.calr");
         File.WriteAllText(file, """
-            §M{m001:Good}
-              §F{f001:Main:pub} () -> void
+            §M{Good}
+              §F{Main:pub} () -> void
                 §E{cw}
                 §P "hello"
             """);
@@ -60,8 +60,8 @@ public class StructuredOutputTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "generated-error.calr");
         File.WriteAllText(file, """
-            §M{m001:GeneratedError}
-              §F{f001:Main:pub} () -> void
+            §M{GeneratedError}
+              §F{Main:pub} () -> void
                 §B{x:i32} STR:"not an int"
             """);
         return file;
@@ -295,8 +295,8 @@ public class StructuredOutputTests : IDisposable
         var file = Path.Combine(_tempDir, "style.calr");
         // Trailing whitespace on the module line is a lint style issue.
         File.WriteAllText(file,
-            "§M{m001:Style}   \n" +
-            "  §F{f001:Main:pub} () -> void\n" +
+            "§M{Style}   \n" +
+            "  §F{Main:pub} () -> void\n" +
             "    §E{cw}\n" +
             "    §P \"hi\"\n");
 
@@ -321,7 +321,7 @@ public class StructuredOutputTests : IDisposable
     public void Lint_FormatJson_ParseError_SurfacesErrorDiagnostics()
     {
         var file = Path.Combine(_tempDir, "badparse.calr");
-        File.WriteAllText(file, "§M{m001:Bad}\n  §F{f001:Main:pub () -> void\n");
+        File.WriteAllText(file, "§M{Bad}\n  §F{f001:Main:pub () -> void\n");
 
         var (exitCode, stdOut, _) = RunCli("lint", file, "--format", "json");
 
@@ -369,8 +369,8 @@ public class StructuredOutputTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "check.calr");
         File.WriteAllText(file,
-            "§M{m001:Check}   \n" +
-            "  §F{f001:Main:pub} () -> void\n" +
+            "§M{Check}   \n" +
+            "  §F{Main:pub} () -> void\n" +
             "    §E{cw}\n" +
             "    §P \"hi\"\n");
 
@@ -516,8 +516,8 @@ public class StructuredOutputTests : IDisposable
         // unknown/unsupported but never to a name outside the closed vocabulary.
         var file = Path.Combine(_tempDir, "contract.calr");
         File.WriteAllText(file, """
-            §M{m001:Contract}
-              §F{f001:Add:pub} (i32:a, i32:b) -> i32
+            §M{Contract}
+              §F{Add:pub} (i32:a, i32:b) -> i32
                 §S (== result 0)
                 §R (+ a b)
             """);

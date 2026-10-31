@@ -135,8 +135,8 @@ public class BinderQuantifierFamilyTests
         // binder's bag, so the 0200 assertion here cannot fail via binder scoping —
         // the real scope guards are the live-bag unit tests above.
         const string source = """
-            §M{m001:Test}
-              §F{f001:Probe:pub} () -> bool
+            §M{Test}
+              §F{Probe:pub} () -> bool
                 §R (forall ((i i32)) (> i 0))
             """;
 
@@ -159,8 +159,8 @@ public class BinderQuantifierFamilyTests
         // This is the bug-pattern Z3 path consuming a BOUND quantifier body — the one
         // Z3-involving verdict B7 deliberately changes (contract Z3 is untouched).
         const string source = """
-            §M{m001:Test}
-              §F{f001:Trap:pub} (i32:x) -> bool
+            §M{Test}
+              §F{Trap:pub} (i32:x) -> bool
                 §R (forall ((i i32)) (> (/ 10 0) i))
             """;
 
@@ -187,8 +187,8 @@ public class BinderQuantifierFamilyTests
         // just forall — `(exists ((v T)) body)` from real source.
         // The explicit i32 maximum preserves j > x while requesting a finite runtime check.
         const string source = """
-            §M{m001:Test}
-              §F{f001:Probe:pub} (i32:x) -> bool
+            §M{Test}
+              §F{Probe:pub} (i32:x) -> bool
                 §R (exists ((j i32)) (&& (> j x) (<= j INT:2147483647)))
             """;
 
@@ -207,8 +207,8 @@ public class BinderQuantifierFamilyTests
         // `(-> a b)` is the ONLY implication spelling (==>/implies are parse errors);
         // `->` in Lisp operator position cannot collide with the return arrow.
         const string source = """
-            §M{m001:Test}
-              §F{f001:Probe:pub} (i32:x) -> bool
+            §M{Test}
+              §F{Probe:pub} (i32:x) -> bool
                 §R (-> (> x 0) (> x -1))
             """;
 

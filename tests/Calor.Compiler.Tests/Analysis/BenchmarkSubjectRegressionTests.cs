@@ -217,14 +217,14 @@ public sealed class BenchmarkSubjectRegressionTests(ITestOutputHelper output)
 
     [Theory]
     [InlineData("?string:value", "§R §C{value.GetHashCode} §/C", "Warning")]
-    [InlineData("?string:value", "§IF{i1} (!= value null)\n      §R §C{value.GetHashCode} §/C\n    §R INT:0", null)]
-    [InlineData("?string:value", "§IF{i1} (== null value)\n      §R INT:0\n    §R §C{value.GetHashCode} §/C", null)]
+    [InlineData("?string:value", "§IF (!= value null)\n      §R §C{value.GetHashCode} §/C\n    §R INT:0", null)]
+    [InlineData("?string:value", "§IF (== null value)\n      §R INT:0\n    §R §C{value.GetHashCode} §/C", null)]
     [InlineData("", "§B{value:?string} null\n    §R §C{value.GetHashCode} §/C", "Error")]
     [InlineData("", "§B{value:?string} STR:\"present\"\n    §R §C{value.GetHashCode} §/C", null)]
     [InlineData("", "§B{~value:?string} STR:\"present\"\n    §ASSIGN value null\n    §R §C{value.GetHashCode} §/C", "Error")]
     public void NullableReferences_PreserveCertaintyAndSafeControls(string parameters, string body, string? severity)
     {
-        var diagnostics = AnalyzeSource($"§M{{m:NullControl}}\n  §F{{f:Run:pub}} ({parameters}) -> i32\n    {body}");
+        var diagnostics = AnalyzeSource($"§M{{NullControl}}\n  §F{{Run:pub}} ({parameters}) -> i32\n    {body}");
         var findings = diagnostics.Where(d => d.Code == DiagnosticCode.NullDereference).ToArray();
         if (severity == null)
             Assert.Empty(findings);
@@ -239,11 +239,11 @@ public sealed class BenchmarkSubjectRegressionTests(ITestOutputHelper output)
     [InlineData("§R (<< INT:-1 n)", false)]
     [InlineData("§R (<< INT:1 INT:32)", false)]
     [InlineData("§R (<< INT:1 INT:-1)", true)]
-    [InlineData("§IF{i1} (&& (>= x INT:-1000) (<= x INT:1000))\n      §IF{i2} (&& (>= n INT:0) (<= n INT:2))\n        §R (<< x n)\n    §R INT:0", false)]
-    [InlineData("§IF{i1} (&& (>= x INT:-1000) (<= x INT:1000))\n      §IF{i2} (&& (>= n INT:-32) (<= n INT:-30))\n        §R (<< x n)\n    §R INT:0", false)]
+    [InlineData("§IF (&& (>= x INT:-1000) (<= x INT:1000))\n      §IF (&& (>= n INT:0) (<= n INT:2))\n        §R (<< x n)\n    §R INT:0", false)]
+    [InlineData("§IF (&& (>= x INT:-1000) (<= x INT:1000))\n      §IF (&& (>= n INT:-32) (<= n INT:-30))\n        §R (<< x n)\n    §R INT:0", false)]
     public void VariableShifts_RespectMaskedCountsAndBoundedControls(string body, bool overflow)
     {
-        var diagnostics = AnalyzeSource($"§M{{m:ShiftControl}}\n  §F{{f:Run:pub}} (i32:x, i32:n) -> i32\n    {body}");
+        var diagnostics = AnalyzeSource($"§M{{ShiftControl}}\n  §F{{Run:pub}} (i32:x, i32:n) -> i32\n    {body}");
         Assert.Equal(overflow, diagnostics.Any(d => d.Code == DiagnosticCode.IntegerOverflow));
     }
 
@@ -255,8 +255,8 @@ public sealed class BenchmarkSubjectRegressionTests(ITestOutputHelper output)
     public void LongShifts_UseSixBitCountMask(string value, string count, bool overflow)
     {
         var source = $$"""
-            §M{m:LongShiftControl}
-              §F{f:Run:pub} (i32:n) -> i64
+            §M{LongShiftControl}
+              §F{Run:pub} (i32:n) -> i64
                 §B{value:i64} {{value}}
                 §R (<< value {{count}})
             """;
@@ -270,8 +270,8 @@ public sealed class BenchmarkSubjectRegressionTests(ITestOutputHelper output)
     public void Taint_StringTransformPreservesReceiverAndArgumentFlows(string receiver, string replacement, bool tainted)
     {
         var source = $$"""
-            §M{m:ReceiverTaint}
-              §F{f:Run:pub} (string:user_input) -> void
+            §M{ReceiverTaint}
+              §F{Run:pub} (string:user_input) -> void
                 §B{value:string} {{receiver}}
                 §B{path:string} §C{value.Replace} §A STR:"x" §A {{replacement}} §/C
                 §C{System.IO.File.Delete} §A path §/C

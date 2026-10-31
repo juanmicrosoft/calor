@@ -131,11 +131,11 @@ public class Foo
     {
         // Minimal Calor source with a goto case inside a switch
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §O{i32}
-      §W{sw1} x
+      §W x
           §K 1
             §GOTO{CASE:2}
           §/K
@@ -155,11 +155,11 @@ public class Foo
     public void ParseGotoDefault_ProducesCorrectAst()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §O{i32}
-      §W{sw1} x
+      §W x
           §K 1
             §GOTO{DEFAULT}
           §/K
@@ -176,11 +176,11 @@ public class Foo
     public void GotoCaseInteger_EmitsCSharpCorrectly()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §O{i32}
-      §W{sw1} x
+      §W x
           §K 1
             §GOTO{CASE:2}
           §/K
@@ -201,11 +201,11 @@ public class Foo
     public void GotoDefault_EmitsCSharpCorrectly()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §O{i32}
-      §W{sw1} x
+      §W x
           §K 1
             §GOTO{DEFAULT}
           §/K

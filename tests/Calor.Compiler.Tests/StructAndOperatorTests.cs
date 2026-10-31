@@ -137,8 +137,8 @@ public class StructAndOperatorTests
     public void Parser_StructModifier_ParsesCorrectly()
     {
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Foo:struct}
+            §M{Test}
+              §CL{Foo:struct}
                 §FLD{i32:Value:pub}
             """;
 
@@ -158,8 +158,8 @@ public class StructAndOperatorTests
     public void Parser_ReadonlyStructModifier_ParsesCorrectly()
     {
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Point:struct,readonly}
+            §M{Test}
+              §CL{Point:struct,readonly}
                 §FLD{f64:X:pub}
             """;
 
@@ -673,11 +673,11 @@ public class StructAndOperatorTests
     public void CSharpEmitter_OperatorWithPrecondition_EmitsContractCheck()
     {
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Vector:struct}
+            §M{Test}
+              §CL{Vector:struct}
                 §FLD{f64:X:pub}
                 §FLD{f64:Y:pub}
-                §MT{m1:op_Addition:pub:static}
+                §MT{op_Addition:pub:static}
                     §I{i32:a}
                     §I{i32:b}
                     §O{i32}
@@ -708,10 +708,10 @@ public class StructAndOperatorTests
     public void CSharpEmitter_OperatorWithPostcondition_EmitsResultCheck()
     {
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Counter:struct}
+            §M{Test}
+              §CL{Counter:struct}
                 §FLD{i32:Value:pub}
-                §MT{m1:op_Addition:pub:static}
+                §MT{op_Addition:pub:static}
                     §I{i32:a}
                     §I{i32:b}
                     §O{i32}

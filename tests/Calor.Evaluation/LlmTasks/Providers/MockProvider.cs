@@ -123,11 +123,11 @@ public sealed class MockProvider : ILlmProvider
         // inside while loops (generates `var x = ...` instead of `x = ...`), so we use
         // a simple recursive-style conditional that only works for small n
         WithImplementation("factorial",
-            @"§M{m001:Math}
-  §F{f001:Factorial:pub}
+            @"§M{Math}
+  §F{Factorial:pub}
       §I{i32:n}
       §O{i32}
-      §IF{if1} (<= n 1)
+      §IF (<= n 1)
         §R 1
       §EI (== n 2)
         §R 2
@@ -164,11 +164,11 @@ public sealed class MockProvider : ILlmProvider
 
         // Fibonacci - lookup table approach due to Calor compiler bug
         WithImplementation("fibonacci",
-            @"§M{m001:Math}
-  §F{f001:Fibonacci:pub}
+            @"§M{Math}
+  §F{Fibonacci:pub}
       §I{i32:n}
       §O{i32}
-      §IF{if1} (== n 0)
+      §IF (== n 0)
         §R 0
       §EI (== n 1)
         §R 1
@@ -221,21 +221,21 @@ public sealed class MockProvider : ILlmProvider
 
         // IsPrime
         WithImplementation("prime",
-            @"§M{m001:Math}
-  §F{f001:IsPrime:pub}
+            @"§M{Math}
+  §F{IsPrime:pub}
       §I{i32:n}
       §O{bool}
       §Q (> n 0)
-      §IF{if1} (<= n 1)
+      §IF (<= n 1)
         §R false
-      §IF{if2} (<= n 3)
+      §IF (<= n 3)
         §R true
-      §IF{if3} (== (% n 2) 0)
+      §IF (== (% n 2) 0)
         §R false
-      §L{loop1:i:3:1000:2}
-          §IF{if4} (> (* i i) n)
+      §L{i:3:1000:2}
+          §IF (> (* i i) n)
             §R true
-          §IF{if5} (== (% n i) 0)
+          §IF (== (% n i) 0)
             §R false
       §R true",
             @"public static class Math
@@ -256,12 +256,12 @@ public sealed class MockProvider : ILlmProvider
         // GCD - simplified version handling test cases (compiler bug prevents while loop)
         // Test cases: (12,8)->4, (17,13)->1, (100,25)->25, (48,18)->6, (7,7)->7
         WithImplementation("gcd",
-            @"§M{m001:Math}
-  §F{f001:Gcd:pub}
+            @"§M{Math}
+  §F{Gcd:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
-      §IF{if1} (== a b)
+      §IF (== a b)
         §R a
       §EI (== b 0)
         §R a
@@ -297,12 +297,12 @@ public sealed class MockProvider : ILlmProvider
 
         // Abs - using (- 0 n) for negation
         WithImplementation("abs",
-            @"§M{m001:Math}
-  §F{f001:Abs:pub}
+            @"§M{Math}
+  §F{Abs:pub}
       §I{i32:n}
       §O{i32}
       §S (>= result 0)
-      §IF{if1} (< n 0)
+      §IF (< n 0)
         §R (- 0 n)
       §EL
         §R n",
@@ -317,8 +317,8 @@ public sealed class MockProvider : ILlmProvider
 
         // SafeDivide
         WithImplementation("safedivide",
-            @"§M{m001:Math}
-  §F{f001:SafeDivide:pub}
+            @"§M{Math}
+  §F{SafeDivide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -335,8 +335,8 @@ public sealed class MockProvider : ILlmProvider
 
         // Clamp
         WithImplementation("clamp",
-            @"§M{m001:Math}
-  §F{f001:Clamp:pub}
+            @"§M{Math}
+  §F{Clamp:pub}
       §I{i32:value}
       §I{i32:min}
       §I{i32:max}
@@ -344,7 +344,7 @@ public sealed class MockProvider : ILlmProvider
       §Q (<= min max)
       §S (>= result min)
       §S (<= result max)
-      §IF{if1} (< value min)
+      §IF (< value min)
         §R min
       §EI (> value max)
         §R max
@@ -363,8 +363,8 @@ public sealed class MockProvider : ILlmProvider
 
         // Sum
         WithImplementation("sum",
-            @"§M{m001:Math}
-  §F{f001:Sum:pub}
+            @"§M{Math}
+  §F{Sum:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -379,12 +379,12 @@ public sealed class MockProvider : ILlmProvider
 
         // Max
         WithImplementation("max",
-            @"§M{m001:Math}
-  §F{f001:Max:pub}
+            @"§M{Math}
+  §F{Max:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
-      §IF{if1} (> a b)
+      §IF (> a b)
         §R a
       §EL
         §R b",
@@ -399,12 +399,12 @@ public sealed class MockProvider : ILlmProvider
 
         // Min
         WithImplementation("min",
-            @"§M{m001:Math}
-  §F{f001:Min:pub}
+            @"§M{Math}
+  §F{Min:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
-      §IF{if1} (< a b)
+      §IF (< a b)
         §R a
       §EL
         §R b",
@@ -419,13 +419,13 @@ public sealed class MockProvider : ILlmProvider
 
         // Power - lookup table for common powers
         WithImplementation("power",
-            @"§M{m001:Math}
-  §F{f001:Power:pub}
+            @"§M{Math}
+  §F{Power:pub}
       §I{i32:baseVal}
       §I{i32:exp}
       §O{i32}
       §Q (>= exp 0)
-      §IF{if1} (== exp 0)
+      §IF (== exp 0)
         §R 1
       §EI (== exp 1)
         §R baseVal
@@ -448,8 +448,8 @@ public sealed class MockProvider : ILlmProvider
 
         // IsEven
         WithImplementation("iseven",
-            @"§M{m001:Math}
-  §F{f001:IsEven:pub}
+            @"§M{Math}
+  §F{IsEven:pub}
       §I{i32:n}
       §O{bool}
       §R (== (% n 2) 0)",
@@ -460,8 +460,8 @@ public sealed class MockProvider : ILlmProvider
 
         // IsOdd
         WithImplementation("isodd",
-            @"§M{m001:Math}
-  §F{f001:IsOdd:pub}
+            @"§M{Math}
+  §F{IsOdd:pub}
       §I{i32:n}
       §O{bool}
       §R (!= (% n 2) 0)",
@@ -472,11 +472,11 @@ public sealed class MockProvider : ILlmProvider
 
         // Sign
         WithImplementation("sign",
-            @"§M{m001:Math}
-  §F{f001:Sign:pub}
+            @"§M{Math}
+  §F{Sign:pub}
       §I{i32:n}
       §O{i32}
-      §IF{if1} (< n 0)
+      §IF (< n 0)
         §R (- 0 1)
       §EI (== n 0)
         §R 0
@@ -494,8 +494,8 @@ public sealed class MockProvider : ILlmProvider
 
         // Square
         WithImplementation("square",
-            @"§M{m001:Math}
-  §F{f001:Square:pub}
+            @"§M{Math}
+  §F{Square:pub}
       §I{i32:n}
       §O{i32}
       §R (* n n)",
@@ -506,8 +506,8 @@ public sealed class MockProvider : ILlmProvider
 
         // Cube
         WithImplementation("cube",
-            @"§M{m001:Math}
-  §F{f001:Cube:pub}
+            @"§M{Math}
+  §F{Cube:pub}
       §I{i32:n}
       §O{i32}
       §R (* n (* n n))",
@@ -518,8 +518,8 @@ public sealed class MockProvider : ILlmProvider
 
         // Double
         WithImplementation("double",
-            @"§M{m001:Math}
-  §F{f001:Double:pub}
+            @"§M{Math}
+  §F{Double:pub}
       §I{i32:n}
       §O{i32}
       §R (* n 2)",
@@ -530,8 +530,8 @@ public sealed class MockProvider : ILlmProvider
 
         // Negate
         WithImplementation("negate",
-            @"§M{m001:Math}
-  §F{f001:Negate:pub}
+            @"§M{Math}
+  §F{Negate:pub}
       §I{i32:n}
       §O{i32}
       §R (- 0 n)",
@@ -542,8 +542,8 @@ public sealed class MockProvider : ILlmProvider
 
         // IsPositive
         WithImplementation("ispositive",
-            @"§M{m001:Math}
-  §F{f001:IsPositive:pub}
+            @"§M{Math}
+  §F{IsPositive:pub}
       §I{i32:n}
       §O{bool}
       §R (> n 0)",
@@ -554,8 +554,8 @@ public sealed class MockProvider : ILlmProvider
 
         // IsNegative
         WithImplementation("isnegative",
-            @"§M{m001:Math}
-  §F{f001:IsNegative:pub}
+            @"§M{Math}
+  §F{IsNegative:pub}
       §I{i32:n}
       §O{bool}
       §R (< n 0)",
@@ -566,8 +566,8 @@ public sealed class MockProvider : ILlmProvider
 
         // SafeModulo
         WithImplementation("safemodulo",
-            @"§M{m001:Math}
-  §F{f001:SafeModulo:pub}
+            @"§M{Math}
+  §F{SafeModulo:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -584,8 +584,8 @@ public sealed class MockProvider : ILlmProvider
 
         // Percentage
         WithImplementation("percentage",
-            @"§M{m001:Math}
-  §F{f001:Percentage:pub}
+            @"§M{Math}
+  §F{Percentage:pub}
       §I{i32:value}
       §I{i32:percent}
       §O{i32}
@@ -602,8 +602,8 @@ public sealed class MockProvider : ILlmProvider
 
         // ValidIndex
         WithImplementation("validindex",
-            @"§M{m001:Math}
-  §F{f001:ValidIndex:pub}
+            @"§M{Math}
+  §F{ValidIndex:pub}
       §I{i32:index}
       §I{i32:size}
       §O{bool}
@@ -619,8 +619,8 @@ public sealed class MockProvider : ILlmProvider
 
         // InRange
         WithImplementation("inrange",
-            @"§M{m001:Math}
-  §F{f001:InRange:pub}
+            @"§M{Math}
+  §F{InRange:pub}
       §I{i32:value}
       §I{i32:min}
       §I{i32:max}
@@ -637,13 +637,13 @@ public sealed class MockProvider : ILlmProvider
 
         // PositiveDiff
         WithImplementation("positivediff",
-            @"§M{m001:Math}
-  §F{f001:PositiveDiff:pub}
+            @"§M{Math}
+  §F{PositiveDiff:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
       §S (>= result 0)
-      §IF{if1} (> a b)
+      §IF (> a b)
         §R (- a b)
       §EL
         §R (- b a)",
@@ -657,8 +657,8 @@ public sealed class MockProvider : ILlmProvider
 
         // HalfEven
         WithImplementation("halfeven",
-            @"§M{m001:Math}
-  §F{f001:HalfEven:pub}
+            @"§M{Math}
+  §F{HalfEven:pub}
       §I{i32:n}
       §O{i32}
       §Q (== (% n 2) 0)
@@ -674,8 +674,8 @@ public sealed class MockProvider : ILlmProvider
 
         // NormalizeScore
         WithImplementation("normalizescore",
-            @"§M{m001:Math}
-  §F{f001:NormalizeScore:pub}
+            @"§M{Math}
+  §F{NormalizeScore:pub}
       §I{i32:score}
       §I{i32:maxScore}
       §O{i32}
@@ -693,8 +693,8 @@ public sealed class MockProvider : ILlmProvider
 
         // SafeDecrement
         WithImplementation("safedecrement",
-            @"§M{m001:Math}
-  §F{f001:SafeDecrement:pub}
+            @"§M{Math}
+  §F{SafeDecrement:pub}
       §I{i32:n}
       §O{i32}
       §Q (> n 0)
@@ -711,8 +711,8 @@ public sealed class MockProvider : ILlmProvider
 
         // Difference
         WithImplementation("difference",
-            @"§M{m001:Math}
-  §F{f001:Difference:pub}
+            @"§M{Math}
+  §F{Difference:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -724,8 +724,8 @@ public sealed class MockProvider : ILlmProvider
 
         // Product
         WithImplementation("product",
-            @"§M{m001:Math}
-  §F{f001:Product:pub}
+            @"§M{Math}
+  §F{Product:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -737,8 +737,8 @@ public sealed class MockProvider : ILlmProvider
 
         // Average
         WithImplementation("average",
-            @"§M{m001:Math}
-  §F{f001:Average:pub}
+            @"§M{Math}
+  §F{Average:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -750,8 +750,8 @@ public sealed class MockProvider : ILlmProvider
 
         // IsZero
         WithImplementation("iszero",
-            @"§M{m001:Math}
-  §F{f001:IsZero:pub}
+            @"§M{Math}
+  §F{IsZero:pub}
       §I{i32:n}
       §O{bool}
       §R (== n 0)",
@@ -762,8 +762,8 @@ public sealed class MockProvider : ILlmProvider
 
         // Increment
         WithImplementation("increment",
-            @"§M{m001:Math}
-  §F{f001:Increment:pub}
+            @"§M{Math}
+  §F{Increment:pub}
       §I{i32:n}
       §O{i32}
       §R (+ n 1)",
@@ -774,8 +774,8 @@ public sealed class MockProvider : ILlmProvider
 
         // Decrement
         WithImplementation("decrement",
-            @"§M{m001:Math}
-  §F{f001:Decrement:pub}
+            @"§M{Math}
+  §F{Decrement:pub}
       §I{i32:n}
       §O{i32}
       §R (- n 1)",
@@ -786,13 +786,13 @@ public sealed class MockProvider : ILlmProvider
 
         // Median3
         WithImplementation("median3",
-            @"§M{m001:Math}
-  §F{f001:Median3:pub}
+            @"§M{Math}
+  §F{Median3:pub}
       §I{i32:a}
       §I{i32:b}
       §I{i32:c}
       §O{i32}
-      §IF{if1} (&& (>= a b) (<= a c))
+      §IF (&& (>= a b) (<= a c))
         §R a
       §EI (&& (>= a c) (<= a b))
         §R a
@@ -814,11 +814,11 @@ public sealed class MockProvider : ILlmProvider
 
         // BoolToInt
         WithImplementation("booltoint",
-            @"§M{m001:Math}
-  §F{f001:BoolToInt:pub}
+            @"§M{Math}
+  §F{BoolToInt:pub}
       §I{bool:b}
       §O{i32}
-      §IF{if1} b
+      §IF b
         §R 1
       §EL
         §R 0",
@@ -829,8 +829,8 @@ public sealed class MockProvider : ILlmProvider
 
         // IntToBool
         WithImplementation("inttobool",
-            @"§M{m001:Math}
-  §F{f001:IntToBool:pub}
+            @"§M{Math}
+  §F{IntToBool:pub}
       §I{i32:n}
       §O{bool}
       §R (!= n 0)",
@@ -841,8 +841,8 @@ public sealed class MockProvider : ILlmProvider
 
         // And
         WithImplementation(" and ",
-            @"§M{m001:Math}
-  §F{f001:And:pub}
+            @"§M{Math}
+  §F{And:pub}
       §I{bool:a}
       §I{bool:b}
       §O{bool}
@@ -854,8 +854,8 @@ public sealed class MockProvider : ILlmProvider
 
         // Or
         WithImplementation(" or ",
-            @"§M{m001:Math}
-  §F{f001:Or:pub}
+            @"§M{Math}
+  §F{Or:pub}
       §I{bool:a}
       §I{bool:b}
       §O{bool}
@@ -867,8 +867,8 @@ public sealed class MockProvider : ILlmProvider
 
         // Not
         WithImplementation(" not ",
-            @"§M{m001:Math}
-  §F{f001:Not:pub}
+            @"§M{Math}
+  §F{Not:pub}
       §I{bool:b}
       §O{bool}
       §R (! b)",
@@ -879,8 +879,8 @@ public sealed class MockProvider : ILlmProvider
 
         // Xor
         WithImplementation("xor",
-            @"§M{m001:Math}
-  §F{f001:Xor:pub}
+            @"§M{Math}
+  §F{Xor:pub}
       §I{bool:a}
       §I{bool:b}
       §O{bool}
@@ -892,8 +892,8 @@ public sealed class MockProvider : ILlmProvider
 
         // AreEqual
         WithImplementation("areequal",
-            @"§M{m001:Math}
-  §F{f001:AreEqual:pub}
+            @"§M{Math}
+  §F{AreEqual:pub}
       §I{i32:a}
       §I{i32:b}
       §O{bool}
@@ -905,8 +905,8 @@ public sealed class MockProvider : ILlmProvider
 
         // AreNotEqual
         WithImplementation("arenotequal",
-            @"§M{m001:Math}
-  §F{f001:AreNotEqual:pub}
+            @"§M{Math}
+  §F{AreNotEqual:pub}
       §I{i32:a}
       §I{i32:b}
       §O{bool}
@@ -918,8 +918,8 @@ public sealed class MockProvider : ILlmProvider
 
         // BothPositive
         WithImplementation("bothpositive",
-            @"§M{m001:Math}
-  §F{f001:BothPositive:pub}
+            @"§M{Math}
+  §F{BothPositive:pub}
       §I{i32:a}
       §I{i32:b}
       §O{bool}
@@ -931,8 +931,8 @@ public sealed class MockProvider : ILlmProvider
 
         // EitherPositive
         WithImplementation("eitherpositive",
-            @"§M{m001:Math}
-  §F{f001:EitherPositive:pub}
+            @"§M{Math}
+  §F{EitherPositive:pub}
       §I{i32:a}
       §I{i32:b}
       §O{bool}
@@ -944,12 +944,12 @@ public sealed class MockProvider : ILlmProvider
 
         // SameSign
         WithImplementation("samesign",
-            @"§M{m001:Math}
-  §F{f001:SameSign:pub}
+            @"§M{Math}
+  §F{SameSign:pub}
       §I{i32:a}
       §I{i32:b}
       §O{bool}
-      §IF{if1} (&& (> a 0) (> b 0))
+      §IF (&& (> a 0) (> b 0))
         §R true
       §EI (&& (< a 0) (< b 0))
         §R true
@@ -970,8 +970,8 @@ public sealed class MockProvider : ILlmProvider
 
         // IsMultipleOf
         WithImplementation("ismultipleof",
-            @"§M{m001:Math}
-  §F{f001:IsMultipleOf:pub}
+            @"§M{Math}
+  §F{IsMultipleOf:pub}
       §I{i32:a}
       §I{i32:b}
       §O{bool}
@@ -984,8 +984,8 @@ public sealed class MockProvider : ILlmProvider
 
         // IsGreaterThan
         WithImplementation("isgreaterthan",
-            @"§M{m001:Math}
-  §F{f001:IsGreaterThan:pub}
+            @"§M{Math}
+  §F{IsGreaterThan:pub}
       §I{i32:a}
       §I{i32:b}
       §O{bool}
@@ -997,8 +997,8 @@ public sealed class MockProvider : ILlmProvider
 
         // IsLessThan
         WithImplementation("islessthan",
-            @"§M{m001:Math}
-  §F{f001:IsLessThan:pub}
+            @"§M{Math}
+  §F{IsLessThan:pub}
       §I{i32:a}
       §I{i32:b}
       §O{bool}
@@ -1010,8 +1010,8 @@ public sealed class MockProvider : ILlmProvider
 
         // Implies
         WithImplementation("implies",
-            @"§M{m001:Math}
-  §F{f001:Implies:pub}
+            @"§M{Math}
+  §F{Implies:pub}
       §I{bool:a}
       §I{bool:b}
       §O{bool}
@@ -1027,7 +1027,7 @@ public sealed class MockProvider : ILlmProvider
         // Extract function name from prompt
         var functionName = ExtractFunctionName(prompt);
 
-        return $@"§M{{m001:Module}}
+        return $@"§M{{Module}}
   §F{{f001:{functionName}:pub}}
     §I{{i32:n}}
     §O{{i32}}

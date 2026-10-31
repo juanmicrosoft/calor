@@ -67,8 +67,8 @@ public sealed class TaintAnalysisCfgTests
     }
 
     private static string N3TaintSource(string method, bool expression, bool tainted) => $$"""
-        §M{m1:TaintIdentity}
-          §F{f1:Run:pub} () -> void
+        §M{TaintIdentity}
+          §F{Run:pub} () -> void
             §B{path:string} {{(tainted ? "(?? §C{System.Environment.GetEnvironmentVariable} §A STR:\"N3_INPUT\" §/C STR:\"missing.txt\")" : "STR:\"constant.txt\"")}}
             {{(expression ? "§B{ignored} " : "")}}§C{System.IO.File.{{method}}} §A path {{(method == "WriteAllText" ? "§A STR:\"content\"" : "")}} §/C
         """;
@@ -95,15 +95,15 @@ public sealed class TaintAnalysisCfgTests
         var bcl = $"{(expression ? "§B{ignored} " : "")}§C{{System.IO.File.ReadAllText}} §A[encoding] {(wrapper ? "encoding" : encoding)} §A[path] {(wrapper ? "path" : path)} §/C";
         var wrapperArguments = namedWrapper ? $"§A[path] {path} §A[encoding] {encoding}" : $"§A {encoding} §A {path}";
         var source = wrapper ? $$"""
-            §M{m1:NamedSummary}
-              §F{helper:Wrapper:pub} (System.Text.Encoding:encoding, string:path) -> string
+            §M{NamedSummary}
+              §F{Wrapper:pub} (System.Text.Encoding:encoding, string:path) -> string
                 {{bcl}}
                 §R STR:"done"
-              §F{caller:Run:pub} ({{parameters}}) -> void
+              §F{Run:pub} ({{parameters}}) -> void
                 {{(expression ? "§B{result} " : "")}}§C{Wrapper} {{wrapperArguments}} §/C
             """ : $$"""
-            §M{m1:NamedDirect}
-              §F{caller:Run:pub} ({{parameters}}) -> void
+            §M{NamedDirect}
+              §F{Run:pub} ({{parameters}}) -> void
                 {{bcl}}
             """;
         var parsing = new DiagnosticBag();
@@ -144,10 +144,10 @@ public sealed class TaintAnalysisCfgTests
         var drop = taintedReturn ? "STR:\"unused\"" : "user_input";
         var arguments = named ? $"§A[keep] {keep} §A[drop] {drop}" : $"§A {drop} §A {keep}";
         var source = $$"""
-            §M{m1:NamedReturnSummary}
-              §F{helper:Choose:pub} (string:drop, string:keep) -> string
+            §M{NamedReturnSummary}
+              §F{Choose:pub} (string:drop, string:keep) -> string
                 §R keep
-              §F{caller:Run:pub} (string:user_input) -> void
+              §F{Run:pub} (string:user_input) -> void
                 §B{result} §C{Choose} {{arguments}} §/C
                 §C{System.IO.File.Delete} §A result §/C
             """;

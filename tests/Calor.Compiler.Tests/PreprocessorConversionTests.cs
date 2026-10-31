@@ -107,9 +107,9 @@ public class Test
     {
         // Verify the Calor parser and C# emitter can round-trip preprocessor blocks
         var calor = @"
-§M{m1:Test}
-    §CL{c1:Test}
-        §MT{mt1:M:pub}
+§M{Test}
+    §CL{Test}
+        §MT{M:pub}
             §O{void}
             §PP{DEBUG}
               §B{x} INT:1
@@ -250,9 +250,9 @@ public class Test
     {
         // Verify nested §PP round-trips back to C# #if/#else/#endif
         var calor = @"
-§M{m1:Test}
-    §CL{c1:Test}
-        §MT{mt1:M:pub}
+§M{Test}
+    §CL{Test}
+        §MT{M:pub}
             §O{i32}
             §PP{NET8_0_OR_GREATER}
               §R INT:1
@@ -373,10 +373,10 @@ public class Test
     public void Converter_MemberLevelPP_RoundTripsCalorToCSharp()
     {
         var calor = @"
-§M{m1:Test}
-    §CL{c1:Test}
+§M{Test}
+    §CL{Test}
         §PP{DEBUG}
-          §MT{mt1:DebugMethod:pub}
+          §MT{DebugMethod:pub}
               §O{void}
         §/PP{DEBUG}
 ";
@@ -2780,13 +2780,13 @@ public class Test
     public void NestedType_RestoresOuterEmitterAndParserContext()
     {
         const string calor = """
-            §M{m001:NestedContext}
-              §CL{c001:Outer:pub}
-                §CL{c002:Inner:pub}
+            §M{NestedContext}
+              §CL{Outer:pub}
+                §CL{Inner:pub}
                   §FLD{i32:Value:pub}
-                §CTOR{ctor001:pub}
+                §CTOR{pub}
                 §FLD{i32:Value:pub}
-                §MT{m001:Get:pub} () -> i32
+                §MT{Get:pub} () -> i32
                   §R Value
             """;
 

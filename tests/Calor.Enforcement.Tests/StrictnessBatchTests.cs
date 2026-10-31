@@ -29,8 +29,8 @@ public class StrictnessBatchTests
     public void DelegateInvocation_FunctionTypedParameter_WithoutRow_IsUnknown()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Apply:pub}
+§M{Test}
+  §F{Apply:pub}
       §I{Func<i32,i32>:transform}
       §I{i32:value}
       §O{i32}
@@ -48,10 +48,10 @@ public class StrictnessBatchTests
     public void DelegateInvocation_LambdaBoundLocal_ChargesInferredRow()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:UseLambda:pub}
+§M{Test}
+  §F{UseLambda:pub}
       §O{i32}
-      §B{f} §LAM{lam1:x:i32} (+ x 1) §/LAM{lam1}
+      §B{f} §LAM{x:i32} (+ x 1) §/LAM
       §R §C{f} §A INT:1 §/C
 ";
         var result = TestHarness.Compile(source);
@@ -64,8 +64,8 @@ public class StrictnessBatchTests
     public void DelegateInvocation_UnderPermissiveEffects_Calor0425IsSuppressed()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Apply:pub}
+§M{Test}
+  §F{Apply:pub}
       §I{Func<i32,i32>:transform}
       §I{i32:value}
       §O{i32}
@@ -85,12 +85,12 @@ public class StrictnessBatchTests
     {
         // The delegate error must NOT hit same-module bare-name calls.
         var source = @"
-§M{m001:Test}
-  §F{f001:Helper:priv}
+§M{Test}
+  §F{Helper:priv}
       §I{i32:x}
       §O{i32}
       §R (+ x 1)
-  §F{f002:Main:pub}
+  §F{Main:pub}
       §O{i32}
       §R §C{Helper} §A INT:1 §/C
 ";
@@ -109,9 +109,9 @@ public class StrictnessBatchTests
         // Now it routes through the unknown-call chain (Calor0411 + worst-case
         // effects → Calor0410) under the default strict policy.
         var source = @"
-§M{m001:Test}
-  §CL{c001:Mapper:pub}
-      §MT{mt001:Apply:pub}
+§M{Test}
+  §CL{Mapper:pub}
+      §MT{Apply:pub}
           §I{i32:value}
           §O{i32}
           §R §C{transform} §A value §/C
@@ -133,14 +133,14 @@ public class StrictnessBatchTests
     public void OverrideWithBroaderEffects_IsError()
     {
         var source = @"
-§M{m001:Test}
-  §CL{c001:Base:pub}
-      §MT{mt001:Render:pub:virt}
+§M{Test}
+  §CL{Base:pub}
+      §MT{Render:pub:virt}
           §O{void}
           §E{}
-  §CL{c002:Derived:pub}
+  §CL{Derived:pub}
       §EXT{Base}
-      §MT{mt002:Render:pub:over}
+      §MT{Render:pub:over}
           §O{void}
           §E{cw}
           §P ""laundered""
@@ -156,12 +156,12 @@ public class StrictnessBatchTests
     public void GenericOverrideWithAlphaEquivalentTypeParameters_IsMatchedForVariance()
     {
         var source = """
-            §M{m001:Test}
-              §CL{c001:Base:pub}
-                §MT{mt001:Render<T>:pub:virt} (T:value) -> void
+            §M{Test}
+              §CL{Base:pub}
+                §MT{Render<T>:pub:virt} (T:value) -> void
                   §E{}
-              §CL{c002:Derived:Base:pub}
-                §MT{mt002:Render<U>:pub:over} (U:value) -> void
+              §CL{Derived:Base:pub}
+                §MT{Render<U>:pub:over} (U:value) -> void
                   §E{cw}
                   §P "laundered"
             """;
@@ -177,15 +177,15 @@ public class StrictnessBatchTests
     public void OverrideWithSubsetEffects_Compiles()
     {
         var source = @"
-§M{m001:Test}
-  §CL{c001:Base:pub}
-      §MT{mt001:Render:pub:virt}
+§M{Test}
+  §CL{Base:pub}
+      §MT{Render:pub:virt}
           §O{void}
           §E{cw,fs:w}
           §P ""base""
-  §CL{c002:Derived:pub}
+  §CL{Derived:pub}
       §EXT{Base}
-      §MT{mt002:Render:pub:over}
+      §MT{Render:pub:over}
           §O{void}
           §E{cw}
           §P ""derived""
@@ -200,14 +200,14 @@ public class StrictnessBatchTests
     public void InterfaceImplementationWithBroaderEffects_IsError()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IRenderer}
-      §MT{m001:Render}
+§M{Test}
+  §IFACE{IRenderer}
+      §MT{Render}
           §O{void}
           §E{}
-  §CL{c001:ConsoleRenderer:pub}
+  §CL{ConsoleRenderer:pub}
       §IMPL{IRenderer}
-      §MT{mt001:Render:pub}
+      §MT{Render:pub}
           §O{void}
           §E{cw}
           §P ""rendering""
@@ -223,14 +223,14 @@ public class StrictnessBatchTests
     public void InterfaceImplementationWithinDeclaredEffects_Compiles()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IRenderer}
-      §MT{m001:Render}
+§M{Test}
+  §IFACE{IRenderer}
+      §MT{Render}
           §O{void}
           §E{cw}
-  §CL{c001:ConsoleRenderer:pub}
+  §CL{ConsoleRenderer:pub}
       §IMPL{IRenderer}
-      §MT{mt001:Render:pub}
+      §MT{Render:pub}
           §O{void}
           §E{cw}
           §P ""rendering""
@@ -247,10 +247,10 @@ public class StrictnessBatchTests
         // Base class is external C# (not in this module): variance cannot be
         // checked, so the assumed channel is Calor0425 (§13.1's `:260` rewrite).
         var source = @"
-§M{m001:Test}
-  §CL{c001:MyController:pub}
+§M{Test}
+  §CL{MyController:pub}
       §EXT{SomeExternalBase}
-      §MT{mt001:Handle:pub:over}
+      §MT{Handle:pub:over}
           §O{void}
           §E{}
 ";
@@ -267,12 +267,12 @@ public class StrictnessBatchTests
         // charges the interface's declared §E{cw} — no unknown-call diagnostic,
         // and the caller must declare cw.
         var missingDeclaration = @"
-§M{m001:Test}
-  §IFACE{i001:IShape}
-      §MT{m001:Describe}
+§M{Test}
+  §IFACE{IShape}
+      §MT{Describe}
           §O{void}
           §E{cw}
-  §F{f001:Draw:pub}
+  §F{Draw:pub}
       §I{IShape:shape}
       §O{void}
       §C{shape.Describe}
@@ -300,8 +300,8 @@ public class StrictnessBatchTests
     public void InteropContent_SurfacesAssumption()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:UsesInterop:pub}
+§M{Test}
+  §F{UsesInterop:pub}
       §O{void}
       §RAW
 var x = System.Environment.TickCount;
@@ -319,17 +319,17 @@ var x = System.Environment.TickCount;
     public void InteropAssumption_PropagatesToCaller()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:UsesInterop:pub}
+§M{Test}
+  §F{UsesInterop:pub}
       §O{void}
       §RAW
 var x = 1;
 §/RAW
-  §F{f002:Caller:pub}
+  §F{Caller:pub}
       §O{void}
       §C{UsesInterop}
       §/C
-  §F{f003:Transitive:pub}
+  §F{Transitive:pub}
       §O{void}
       §C{Caller}
       §/C
@@ -347,8 +347,8 @@ var x = 1;
     public void InteropAssumption_UnderStrictEffects_IsError()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:UsesInterop:pub}
+§M{Test}
+  §F{UsesInterop:pub}
       §O{void}
       §RAW
 var x = 1;
@@ -376,8 +376,8 @@ var x = 1;
         // pass strict enforcement. With no type information the call routes
         // through the unknown-call chain (fail loud), not the purged name list.
         var source = @"
-§M{m001:Test}
-  §F{f001:AddItem:pub}
+§M{Test}
+  §F{AddItem:pub}
       §O{void}
       §C{items.Add}
         §A INT:1
@@ -396,8 +396,8 @@ var x = 1;
         // With a typed receiver the manifest resolves List`1.Add = mut: the
         // caller must declare mut (and gets Calor0410, not Calor0411, without it).
         var missing = @"
-§M{m001:Test}
-  §F{f001:AddItem:pub}
+§M{Test}
+  §F{AddItem:pub}
       §O{void}
       §B{List<i32>:items} §NEW{List<i32>} §/NEW
       §C{items.Add}
@@ -416,8 +416,8 @@ var x = 1;
     public void UntypedReceiver_PureLookingMethodName_FailsClosed()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Query:pub}
+§M{Test}
+  §F{Query:pub}
       §O{void}
       §E{}
       §C{items.Where}
@@ -439,8 +439,8 @@ var x = 1;
         // Pure calls remain pure only through resolved receiver identities and
         // authoritative manifest entries — never through a global name list.
         var source = @"
-§M{m001:Test}
-  §F{f001:Query:pub}
+§M{Test}
+  §F{Query:pub}
       §I{List<i32>:items}
       §I{str:name}
       §O{void}
@@ -475,22 +475,22 @@ var x = 1;
         // function is resolved as the VALUE, so the DECOY'S row governs — row-less
         // ⇒ Calor0425 + Calor0410 'unknown' — never the shadowed pure function's.
         var source = @"
-§M{m001:Shadow}
-  §F{f001:Helper:pub}
+§M{Shadow}
+  §F{Helper:pub}
       §O{i32}
       §E{}
       §R INT:1
-  §F{f002:Loud:pub}
+  §F{Loud:pub}
       §O{i32}
       §E{cw}
       §P ""laundered""
       §R INT:2
-  §F{f003:Go:pub}
+  §F{Go:pub}
       §I{Func<i32>:Helper}
       §O{i32}
       §E{}
       §R §C{Helper} §/C
-  §F{f004:Main:pub}
+  §F{Main:pub}
       §O{void}
       §E{}
       §B{r:i32} §C{Go} §A Loud §/C
@@ -512,8 +512,8 @@ var x = 1;
         // Review C1 (statement leg): effects inside a §PP conditional block are
         // charged (union of branches) — a §PP body is never silently pure.
         var source = @"
-§M{m001:PpHole}
-  §F{f001:Sneaky:pub}
+§M{PpHole}
+  §F{Sneaky:pub}
       §O{void}
       §E{}
       §PP{DEBUG}
@@ -534,10 +534,10 @@ var x = 1;
         // Review C1 (member leg): a class method wrapped in a class-level §PP
         // block must not escape enforcement.
         var source = @"
-§M{m001:PPM}
-  §CL{c001:Logger:pub}
+§M{PPM}
+  §CL{Logger:pub}
       §PP{DEBUG}
-      §MT{mt001:Sneak:pub}
+      §MT{Sneak:pub}
           §O{void}
           §E{}
           §C{Console.WriteLine} §A ""pp-wrapped method effect"" §/C
@@ -558,20 +558,20 @@ var x = 1;
         // in-module method is variance-checked (Calor0421) — inheritance must
         // not launder through interface dispatch.
         var source = @"
-§M{m001:InheritLaunder}
-  §IFACE{i001:IQuiet}
-      §MT{m001:Run}
+§M{InheritLaunder}
+  §IFACE{IQuiet}
+      §MT{Run}
           §O{void}
           §E{}
-  §CL{c001:Loud:pub}
-      §MT{mt001:Run:pub}
+  §CL{Loud:pub}
+      §MT{Run:pub}
           §O{void}
           §E{cw}
           §P ""runs loud""
-  §CL{c002:Sneaky:pub}
+  §CL{Sneaky:pub}
       §EXT{Loud}
       §IMPL{IQuiet}
-      §MT{mt002:Noop:pub}
+      §MT{Noop:pub}
           §O{void}
           §E{}
 ";
@@ -589,15 +589,15 @@ var x = 1;
         // Review C3 (external arm): §IMPL satisfied only by a member inherited
         // from an external base is surfaced as Calor0425 (§13.1's `:607`).
         var source = @"
-§M{m001:ExtImpl}
-  §IFACE{i001:IQuiet}
-      §MT{m001:Run}
+§M{ExtImpl}
+  §IFACE{IQuiet}
+      §MT{Run}
           §O{void}
           §E{}
-  §CL{c001:Bridge:pub}
+  §CL{Bridge:pub}
       §EXT{SomeExternalBase}
       §IMPL{IQuiet}
-      §MT{mt001:Other:pub}
+      §MT{Other:pub}
           §O{void}
           §E{}
 ";
@@ -615,14 +615,14 @@ var x = 1;
         // function) charges that function's declared effects at the passing
         // site — ConvertAll and friends can no longer launder it.
         var source = @"
-§M{m001:HigherOrder}
-  §F{f001:LoudMap:pub}
+§M{HigherOrder}
+  §F{LoudMap:pub}
       §I{i32:x}
       §O{i32}
       §E{cw}
       §P ""mapping""
       §R x
-  §F{f002:Go:pub}
+  §F{Go:pub}
       §I{List<i32>:items}
       §O{void}
       §E{}
@@ -643,8 +643,8 @@ var x = 1;
         // manifest-resolved higher-order call (Select) is surfaced as a
         // Calor0419 assumption — the BCL callee may invoke it invisibly.
         var source = @"
-§M{m001:HofVal}
-  §F{f001:Go:pub}
+§M{HofVal}
+  §F{Go:pub}
       §I{Func<i32,i32>:f}
       §I{List<i32>:items}
       §O{void}
@@ -665,19 +665,19 @@ var x = 1;
         // be captured by an in-module method-name collision — it goes to the
         // unknown chain (fail loud), for both single and chained receivers.
         var source = @"
-§M{m001:RC}
-  §CL{c001:Helper:pub}
-      §MT{mt001:Refresh:pub}
+§M{RC}
+  §CL{Helper:pub}
+      §MT{Refresh:pub}
           §O{i32}
           §E{}
           §R INT:1
-  §F{f001:GoSingle:pub}
+  §F{GoSingle:pub}
       §I{SomeExternal:svc}
       §O{void}
       §E{}
       §C{svc.Refresh}
       §/C
-  §F{f002:GoChained:pub}
+  §F{GoChained:pub}
       §I{SomeExternal:svc}
       §O{void}
       §E{}
@@ -703,13 +703,13 @@ var x = 1;
         // Companion: a receiver statically typed as the in-module declaring
         // class still resolves (declared-§E charge) — no unknown-call noise.
         var source = @"
-§M{m001:RC2}
-  §CL{c001:Helper:pub}
-      §MT{mt001:Refresh:pub}
+§M{RC2}
+  §CL{Helper:pub}
+      §MT{Refresh:pub}
           §O{i32}
           §E{}
           §R INT:1
-  §F{f001:Go:pub}
+  §F{Go:pub}
       §O{void}
       §E{alloc}
       §B{h:Helper} §NEW{Helper} §/NEW
@@ -730,8 +730,8 @@ var x = 1;
         // Review M1 / v0.15 E4 (§13.1): `§C f §A x §/C` is the same invocation as
         // `§C{f}` — the row of `f` is charged; row-less ⇒ Calor0425 + 0410 'unknown'.
         var source = @"
-§M{m001:Wrap}
-  §F{f001:Apply:pub}
+§M{Wrap}
+  §F{Apply:pub}
       §I{Func<i32,i32>:f}
       §I{i32:x}
       §O{i32}
@@ -751,12 +751,12 @@ var x = 1;
         // Review M1 / v0.15 E4 (§13.1): invoking the RESULT of a call (`GetF()()`)
         // charges the callee's declared RETURN row; `§O` with no row ⇒ Calor0425.
         var source = @"
-§M{m001:E}
-  §F{f001:GetF:pub}
+§M{E}
+  §F{GetF:pub}
       §O{Func<i32>}
       §E{}
-      §R §LAM{l1} §R INT:1 §/LAM{l1}
-  §F{f002:Go:pub}
+      §R §LAM{} §R INT:1 §/LAM
+  §F{Go:pub}
       §O{i32}
       §E{}
       §R §C §C{GetF} §/C §/C
@@ -854,8 +854,8 @@ var x = 1;
     public void RowMismatch_AtAssignment_IsError()
     {
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
+            §M{M}
+              §F{Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
                 §E{cw}
                 §B{f:Func<i32,i32>} §E{} src
                 §R INT:1
@@ -870,8 +870,8 @@ var x = 1;
     public void RowMismatch_AtAssignment_Compiles()
     {
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
+            §M{M}
+              §F{Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
                 §E{cw}
                 §B{f:Func<i32,i32>} §E{cw} src
                 §R INT:1
@@ -888,8 +888,8 @@ var x = 1;
         // The source carries no row, so nothing is known about it. Not a
         // mismatch — an undecidable hop.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Main:pub} (Func<i32,i32>:src) -> i32
+            §M{M}
+              §F{Main:pub} (Func<i32,i32>:src) -> i32
                 §E{cw}
                 §B{f:Func<i32,i32>} §E{} src
                 §R INT:1
@@ -913,8 +913,8 @@ var x = 1;
         // Two Calor0424s here, and both are wanted: one for the initializer
         // (site 1's first half) and one for the re-assignment.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
+            §M{M}
+              §F{Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
                 §E{cw}
                 §B{~f:Func<i32,i32>} §E{} src
                 §ASSIGN f src
@@ -930,8 +930,8 @@ var x = 1;
     public void RowMismatch_AtReassignment_Compiles()
     {
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
+            §M{M}
+              §F{Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
                 §E{cw}
                 §B{~f:Func<i32,i32>} §E{cw} src
                 §ASSIGN f src
@@ -952,10 +952,10 @@ var x = 1;
         // and that limit is recorded in the method's doc comment rather than
         // silently relied on.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §CL{c001:Holder:pub}
+            §M{M}
+              §CL{Holder:pub}
                 §FLD{Func<i32,i32>:cb:priv} §E{}
-                §MT{mt001:Set:pub} (Func<i32,i32>:src §E{cw}) -> void
+                §MT{Set:pub} (Func<i32,i32>:src §E{cw}) -> void
                   §E{}
                   §ASSIGN cb src
             """);
@@ -1002,15 +1002,15 @@ var x = 1;
 
     /// <summary>§6.4's own example, parameterised on the destination row.</summary>
     private static string ArgumentSite(string parameterRow) => $$"""
-        §M{m001:M}
-          §F{f001:Shout:pub} (i32:x) -> i32
+        §M{M}
+          §F{Shout:pub} (i32:x) -> i32
             §E{cw}
             §P x
             §R x
-          §F{f002:Apply:pub} (Func<i32,i32>:transform {{parameterRow}}, i32:value) -> i32
+          §F{Apply:pub} (Func<i32,i32>:transform {{parameterRow}}, i32:value) -> i32
             §E{}
             §R value
-          §F{f003:Main:pub} () -> i32
+          §F{Main:pub} () -> i32
             §E{cw}
             §R §C{Apply} §A Shout §A INT:1 §/C
         """;
@@ -1021,8 +1021,8 @@ var x = 1;
     public void RowMismatch_AtReturn_IsError()
     {
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Pick:pub} (Func<i32,i32>:src §E{cw}) -> Func<i32,i32> §E{}
+            §M{M}
+              §F{Pick:pub} (Func<i32,i32>:src §E{cw}) -> Func<i32,i32> §E{}
                 §E{}
                 §R src
             """);
@@ -1036,8 +1036,8 @@ var x = 1;
     public void RowMismatch_AtReturn_Compiles()
     {
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Pick:pub} (Func<i32,i32>:src §E{cw}) -> Func<i32,i32> §E{cw}
+            §M{M}
+              §F{Pick:pub} (Func<i32,i32>:src §E{cw}) -> Func<i32,i32> §E{cw}
                 §E{}
                 §R src
             """);
@@ -1051,8 +1051,8 @@ var x = 1;
     public void RowMismatch_AtReturn_CannotTell()
     {
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Pick:pub} (Func<i32,i32>:src) -> Func<i32,i32> §E{cw}
+            §M{M}
+              §F{Pick:pub} (Func<i32,i32>:src) -> Func<i32,i32> §E{cw}
                 §E{}
                 §R src
             """);
@@ -1074,12 +1074,12 @@ var x = 1;
     public void RowMismatch_AtOverride_IsError()
     {
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §CL{c001:Base:pub}
-                §MT{mt001:Render:pub:virt} () -> void
+            §M{M}
+              §CL{Base:pub}
+                §MT{Render:pub:virt} () -> void
                   §E{}
-              §CL{c002:Derived:Base:pub}
-                §MT{mt002:Render:pub:over} () -> void
+              §CL{Derived:Base:pub}
+                §MT{Render:pub:over} () -> void
                   §E{cw}
                   §P "laundered"
             """);
@@ -1094,13 +1094,13 @@ var x = 1;
     public void RowMismatch_AtOverride_Compiles()
     {
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §CL{c001:Base:pub}
-                §MT{mt001:Render:pub:virt} () -> void
+            §M{M}
+              §CL{Base:pub}
+                §MT{Render:pub:virt} () -> void
                   §E{cw,fs:w}
                   §P "base"
-              §CL{c002:Derived:Base:pub}
-                §MT{mt002:Render:pub:over} () -> void
+              §CL{Derived:Base:pub}
+                §MT{Render:pub:over} () -> void
                   §E{cw}
                   §P "derived"
             """);
@@ -1116,13 +1116,13 @@ var x = 1;
     public void RowMismatch_AtInterfaceImpl_IsError()
     {
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §IFACE{i001:IRenderer}
-                §MT{m002:Render} () -> void
+            §M{M}
+              §IFACE{IRenderer}
+                §MT{Render} () -> void
                   §E{}
-              §CL{c001:ConsoleRenderer:pub}
+              §CL{ConsoleRenderer:pub}
                 §IMPL{IRenderer}
-                §MT{mt001:Render:pub} () -> void
+                §MT{Render:pub} () -> void
                   §E{cw}
                   §P "rendering"
             """);
@@ -1137,13 +1137,13 @@ var x = 1;
     public void RowMismatch_AtInterfaceImpl_Compiles()
     {
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §IFACE{i001:IRenderer}
-                §MT{m002:Render} () -> void
+            §M{M}
+              §IFACE{IRenderer}
+                §MT{Render} () -> void
                   §E{cw}
-              §CL{c001:ConsoleRenderer:pub}
+              §CL{ConsoleRenderer:pub}
                 §IMPL{IRenderer}
-                §MT{mt001:Render:pub} () -> void
+                §MT{Render:pub} () -> void
                   §E{cw}
                   §P "rendering"
             """);
@@ -1176,15 +1176,15 @@ var x = 1;
         // Discriminating revert: delete the InstantiateAndCharge call in
         // CheckArgumentSite and `UsePure` is silently charged nothing.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Map:pub}<eff e> (i32:x, Func<i32,i32>:f §E{e}) -> i32
+            §M{M}
+              §F{Map:pub}<eff e> (i32:x, Func<i32,i32>:f §E{e}) -> i32
                 §E{e}
                 §R x
-              §F{f002:Announce:pub} (i32:x) -> i32
+              §F{Announce:pub} (i32:x) -> i32
                 §E{cw}
                 §P x
                 §R x
-              §F{f003:UsePure:pub} () -> i32
+              §F{UsePure:pub} () -> i32
                 §E{}
                 §R §C{Map} §A INT:1 §A Announce §/C
             """);
@@ -1204,14 +1204,14 @@ var x = 1;
         // The `_Compiles` half the gap pin promised: `Double` in place of
         // `Announce`, so `e := Concrete(∅)` and `Map`'s instantiated row is pure.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Map:pub}<eff e> (i32:x, Func<i32,i32>:f §E{e}) -> i32
+            §M{M}
+              §F{Map:pub}<eff e> (i32:x, Func<i32,i32>:f §E{e}) -> i32
                 §E{e}
                 §R x
-              §F{f002:Double:pub} (i32:x) -> i32
+              §F{Double:pub} (i32:x) -> i32
                 §E{}
                 §R (* x INT:2)
-              §F{f003:UsePure:pub} () -> i32
+              §F{UsePure:pub} () -> i32
                 §E{}
                 §R §C{Map} §A INT:1 §A Double §/C
             """);
@@ -1230,11 +1230,11 @@ var x = 1;
         // Calor0425." Here `cb` is a function-typed parameter with NO row, so its
         // row is Unknown (§3.5) and the variable cannot be solved.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Map:pub}<eff e> (i32:x, Func<i32,i32>:f §E{e}) -> i32
+            §M{M}
+              §F{Map:pub}<eff e> (i32:x, Func<i32,i32>:f §E{e}) -> i32
                 §E{e}
                 §R x
-              §F{f003:Use:pub} (Func<i32,i32>:cb) -> i32
+              §F{Use:pub} (Func<i32,i32>:cb) -> i32
                 §E{}
                 §R §C{Map} §A INT:1 §A cb §/C
             """);
@@ -1287,11 +1287,11 @@ var x = 1;
         // Discriminating revert: compare binders by NAME and this reports that
         // 'Outer' uses effect variable 'b'.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Inner:pub}<eff b> (Func<i32>:g §E{b}) -> i32
+            §M{M}
+              §F{Inner:pub}<eff b> (Func<i32>:g §E{b}) -> i32
                 §E{b}
                 §R INT:0
-              §F{f002:Outer:pub}<eff a> (Func<i32>:h §E{a}) -> i32
+              §F{Outer:pub}<eff a> (Func<i32>:h §E{a}) -> i32
                 §E{a}
                 §R §C{Inner} §A h §/C
             """);
@@ -1311,11 +1311,11 @@ var x = 1;
         // caller has not promised. That is an undeclared effect, spelled in
         // today's Calor0410 shape.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Inner:pub}<eff b> (Func<i32>:g §E{b}) -> i32
+            §M{M}
+              §F{Inner:pub}<eff b> (Func<i32>:g §E{b}) -> i32
                 §E{b}
                 §R INT:0
-              §F{f002:Outer:pub}<eff a> (Func<i32>:h §E{a}) -> i32
+              §F{Outer:pub}<eff a> (Func<i32>:h §E{a}) -> i32
                 §E{}
                 §R §C{Inner} §A h §/C
             """);
@@ -1342,10 +1342,10 @@ var x = 1;
         // Discriminating revert: restore either AddAssumption/Report and the
         // matching DoesNotContain fails.
         var overrideArm = TestHarness.Compile(@"
-§M{m001:Test}
-  §CL{c001:MyController:pub}
+§M{Test}
+  §CL{MyController:pub}
       §EXT{SomeExternalBase}
-      §MT{mt001:Handle:pub:over}
+      §MT{Handle:pub:over}
           §O{void}
           §E{}
 ");
@@ -1355,15 +1355,15 @@ var x = 1;
             d => d.Code == DiagnosticCode.EffectRowUnknown);
 
         var interfaceArm = TestHarness.Compile(@"
-§M{m001:ExtImpl}
-  §IFACE{i001:IQuiet}
-      §MT{m001:Run}
+§M{ExtImpl}
+  §IFACE{IQuiet}
+      §MT{Run}
           §O{void}
           §E{}
-  §CL{c001:Bridge:pub}
+  §CL{Bridge:pub}
       §EXT{SomeExternalBase}
       §IMPL{IQuiet}
-      §MT{mt001:Other:pub}
+      §MT{Other:pub}
           §O{void}
           §E{}
 ");
@@ -1403,14 +1403,14 @@ var x = 1;
         // Discriminating revert: delete the PropagateInstantiatedCharges call and
         // `Top` goes silent.
         const string source = """
-            §M{m001:M}
-              §F{f001:Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+            §M{M}
+              §F{Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
                 §E{e}
                 §R §C{g}
-              §F{f002:Outer:pub} (Func<i32>:h §E{cw}) -> i32
+              §F{Outer:pub} (Func<i32>:h §E{cw}) -> i32
                 §E{cw}
                 §R §C{Run} §A h §/C
-              §F{f003:Top:pub} (Func<i32>:q §E{cw}) -> i32
+              §F{Top:pub} (Func<i32>:q §E{cw}) -> i32
                 §E{}
                 §R §C{Outer} §A q §/C
             """;
@@ -1442,17 +1442,17 @@ var x = 1;
         // PropagateInstantiatedCharges with one sweep over the seed set and this
         // fails while the two-hop pin above still passes.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+            §M{M}
+              §F{Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
                 §E{e}
                 §R §C{g}
-              §F{f002:Outer:pub} (Func<i32>:h §E{cw}) -> i32
+              §F{Outer:pub} (Func<i32>:h §E{cw}) -> i32
                 §E{cw}
                 §R §C{Run} §A h §/C
-              §F{f003:Top:pub} (Func<i32>:q §E{cw}) -> i32
+              §F{Top:pub} (Func<i32>:q §E{cw}) -> i32
                 §E{cw}
                 §R §C{Outer} §A q §/C
-              §F{f004:Top2:pub} (Func<i32>:r §E{cw}) -> i32
+              §F{Top2:pub} (Func<i32>:r §E{cw}) -> i32
                 §E{}
                 §R §C{Top} §A r §/C
             """);
@@ -1476,14 +1476,14 @@ var x = 1;
         // Discriminating revert: drop the IsAssumed arm in InstantiateAndCharge
         // and only the Calor0419 remains.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+            §M{M}
+              §F{Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
                 §E{e}
                 §R INT:0
-              §F{f002:Wrapped:pub} () -> i32
+              §F{Wrapped:pub} () -> i32
                 §E{}
                 §R §CS{ 1 + 1 }
-              §F{f003:Caller:pub} () -> i32
+              §F{Caller:pub} () -> i32
                 §E{}
                 §R §C{Run} §A Wrapped §/C
             """);
@@ -1506,11 +1506,11 @@ var x = 1;
         // Discriminating revert: move `if (arguments.Count == 0) return;` back
         // above the binder-count check and this goes silent.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:NoBinder:pub}<eff e> () -> i32
+            §M{M}
+              §F{NoBinder:pub}<eff e> () -> i32
                 §E{e}
                 §R INT:0
-              §F{f002:Use:pub} () -> i32
+              §F{Use:pub} () -> i32
                 §E{}
                 §R §C{NoBinder} §/C
             """);
@@ -1534,14 +1534,14 @@ var x = 1;
         // Discriminating revert: compute the extras from the names again and both
         // assertions below fail.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §IFACE{i001:IThing}
-                §MT{mt001:Handle}<eff e, eff f> (Func<i32>:next §E{f}) -> i32
+            §M{M}
+              §IFACE{IThing}
+                §MT{Handle}<eff e, eff f> (Func<i32>:next §E{f}) -> i32
                   §E{f}
 
-              §CL{c001:Impl:pub}
+              §CL{Impl:pub}
                 §IMPL{IThing}
-                §MT{mt002:Handle:pub}<eff f, eff e> (Func<i32>:next §E{f}) -> i32
+                §MT{Handle:pub}<eff f, eff e> (Func<i32>:next §E{f}) -> i32
                   §E{f}
                   §R INT:0
             """);
@@ -1566,8 +1566,8 @@ var x = 1;
         // route Calor0424 through the policy check, or restore the
         // varianceSeverity demotion at EffectEnforcementPass.cs:517-519.
         var assignment = Permissive("""
-            §M{m001:M}
-              §F{f001:Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
+            §M{M}
+              §F{Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
                 §E{cw}
                 §B{f:Func<i32,i32>} §E{} src
                 §R INT:1
@@ -1580,8 +1580,8 @@ var x = 1;
             d => d.Code == DiagnosticCode.EffectRowMismatch);
 
         var @return = Permissive("""
-            §M{m001:M}
-              §F{f001:Pick:pub} (Func<i32,i32>:src §E{cw}) -> Func<i32,i32> §E{}
+            §M{M}
+              §F{Pick:pub} (Func<i32,i32>:src §E{cw}) -> Func<i32,i32> §E{}
                 §E{}
                 §R src
             """);
@@ -1593,12 +1593,12 @@ var x = 1;
         // error. No test asserted the demotion, and no committed .calr depends
         // on it.
         var @override = Permissive("""
-            §M{m001:M}
-              §CL{c001:Base:pub}
-                §MT{mt001:Render:pub:virt} () -> void
+            §M{M}
+              §CL{Base:pub}
+                §MT{Render:pub:virt} () -> void
                   §E{}
-              §CL{c002:Derived:Base:pub}
-                §MT{mt002:Render:pub:over} () -> void
+              §CL{Derived:Base:pub}
+                §MT{Render:pub:over} () -> void
                   §E{cw}
                   §P "laundered"
             """);
@@ -1608,13 +1608,13 @@ var x = 1;
             d => d.Code == DiagnosticCode.OverrideEffectVariance);
 
         var impl = Permissive("""
-            §M{m001:M}
-              §IFACE{i001:IRenderer}
-                §MT{m002:Render} () -> void
+            §M{M}
+              §IFACE{IRenderer}
+                §MT{Render} () -> void
                   §E{}
-              §CL{c001:ConsoleRenderer:pub}
+              §CL{ConsoleRenderer:pub}
                 §IMPL{IRenderer}
-                §MT{mt001:Render:pub} () -> void
+                §MT{Render:pub} () -> void
                   §E{cw}
                   §P "rendering"
             """);
@@ -1632,8 +1632,8 @@ var x = 1;
         // waiver for "we do not know" is honest; a waiver for "we know it is
         // wrong" is not, and the test above is that half.
         const string source = """
-            §M{m001:M}
-              §F{f001:Main:pub} (Func<i32,i32>:src) -> i32
+            §M{M}
+              §F{Main:pub} (Func<i32,i32>:src) -> i32
                 §E{cw}
                 §B{f:Func<i32,i32>} §E{} src
                 §R INT:1
@@ -1656,8 +1656,8 @@ var x = 1;
             UnsafeTranspileOnly = true,
         };
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Main:pub} (Func<i32,i32>:src) -> i32
+            §M{M}
+              §F{Main:pub} (Func<i32,i32>:src) -> i32
                 §E{cw}
                 §B{f:Func<i32,i32>} §E{} src
                 §R INT:1
@@ -1718,10 +1718,10 @@ var x = 1;
     /// <summary>The A3-callback shape (§10.1's worked example, X13) with the
     /// invoking method's own row as <paramref name="bumpRow"/>.</summary>
     private static string CallbackField(string bumpRow) => $$"""
-        §M{m001:CallbackAfter}
-          §CL{c001:Counter:pub}
+        §M{CallbackAfter}
+          §CL{Counter:pub}
             §FLD{Action<i32>:onChange:priv} §E{cw}
-            §MT{mt001:Bump:pub} (i32:n) -> void
+            §MT{Bump:pub} (i32:n) -> void
               {{bumpRow}}
               §C{onChange} §A n §/C
         """;
@@ -1772,8 +1772,8 @@ var x = 1;
         // clause), by FULL equality. X9c's shape with the row deleted — PP-E1's
         // L7 class.
         var result = TestHarness.Compile("""
-            §M{m001:X9}
-              §F{f001:Apply:pub} (Func<i32,i32>:transform, i32:value) -> i32
+            §M{X9}
+              §F{Apply:pub} (Func<i32,i32>:transform, i32:value) -> i32
                 §E{cw}
                 §R §C{transform} §A value §/C
             """);
@@ -1799,10 +1799,10 @@ var x = 1;
         // lambda-bound local is CHARGED, so a declaration narrower than it is
         // Calor0410 — with §10.1's provenance naming the local.
         var result = TestHarness.Compile("""
-            §M{m001:Y9}
-              §F{f001:Narrow:pub} () -> void
+            §M{Y9}
+              §F{Narrow:pub} () -> void
                 §E{}
-                §B{g} §LAM{lam2} §P "hi" §/LAM{lam2}
+                §B{g} §LAM{} §P "hi" §/LAM
                 §C{g} §/C
             """);
 
@@ -1820,10 +1820,10 @@ var x = 1;
         // Assumed (its body is raw interop), so the invocation charges the set
         // and reports ONE Calor0425 carrying the reason.
         var result = TestHarness.Compile("""
-            §M{m001:Asm}
-              §F{f001:Go:pub} () -> i32
+            §M{Asm}
+              §F{Go:pub} () -> i32
                 §E{}
-                §B{h} §LAM{l1} §R §CS{Foo.Bar()} §/LAM{l1}
+                §B{h} §LAM{} §R §CS{Foo.Bar()} §/LAM
                 §R §C{h} §/C
             """);
 
@@ -1844,8 +1844,8 @@ var x = 1;
         // concrete part is empty, and nothing is reported — this is what makes
         // the four A3 fixtures exit 0 with zero diagnostics (A-1.11).
         var result = TestHarness.Compile("""
-            §M{m001:MiddlewareAfter}
-              §F{f001:RunTwice:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+            §M{MiddlewareAfter}
+              §F{RunTwice:pub}<eff e> (Func<i32>:g §E{e}) -> i32
                 §E{e}
                 §B{first:i32} §C{g}
                 §B{second:i32} §C{g}
@@ -1868,8 +1868,8 @@ var x = 1;
         // know it is wrong", not "we cannot tell" (§4.5), and the binder does
         // not catch it (measured: `§C{x}` on an i32 parameter binds clean).
         const string source = """
-            §M{m001:P1}
-              §F{f001:Go:pub} (i32:x) -> i32
+            §M{P1}
+              §F{Go:pub} (i32:x) -> i32
                 §E{}
                 §R §C{x} §/C
             """;
@@ -1896,8 +1896,8 @@ var x = 1;
         // Unknown (Calor0425, fails closed) rather than Calor0418. Pre-E4 this
         // drew Calor0418 "value 'cb' (declared type 'MyExternalDelegate')".
         var result = TestHarness.Compile("""
-            §M{m001:P2}
-              §F{f001:Go:pub} (MyExternalDelegate:cb) -> void
+            §M{P2}
+              §F{Go:pub} (MyExternalDelegate:cb) -> void
                 §E{}
                 §C{cb} §/C
             """);
@@ -1916,8 +1916,8 @@ var x = 1;
         // DECLARED row is the value's row (§4.4), and invoking it charges that
         // row, with provenance, and reports nothing further.
         const string source = """
-            §M{m001:F15}
-              §F{f001:Main:pub} (Func<i32,i32>:opaque) -> i32
+            §M{F15}
+              §F{Main:pub} (Func<i32,i32>:opaque) -> i32
                 §E{}
                 §B{g:Func<i32,i32>} §E{cw} opaque
                 §R §C{g} §A INT:1 §/C
@@ -1958,14 +1958,14 @@ var x = 1;
     public void Invocation_MutableReboundToImpure_IsCaughtAtSite1_TypedAndUntyped(string declaredType)
     {
         var result = TestHarness.Compile($$"""
-            §M{m001:F1}
-              §F{f001:Impure:pub} (i32:x) -> i32
+            §M{F1}
+              §F{Impure:pub} (i32:x) -> i32
                 §E{cw}
                 §P x
                 §R x
-              §F{f002:Go:pub} () -> i32
+              §F{Go:pub} () -> i32
                 §E{}
-                §B{~f{{declaredType}}} §LAM{l1:x:i32} (+ x 1) §/LAM{l1}
+                §B{~f{{declaredType}}} §LAM{x:i32} (+ x 1) §/LAM
                 §ASSIGN f Impure
                 §R §C{f} §A INT:1 §/C
             """);
@@ -1991,10 +1991,10 @@ var x = 1;
         string firstBinding, string secondBinding, bool expectCalor0410)
     {
         var result = TestHarness.Compile($$"""
-            §M{m001:F2}
-              §F{f003:Go:pub} (bool:b, Func<i32,i32>:pure §E{}, Func<i32,i32>:impure §E{cw}) -> i32
+            §M{F2}
+              §F{Go:pub} (bool:b, Func<i32,i32>:pure §E{}, Func<i32,i32>:impure §E{cw}) -> i32
                 §E{}
-                §IF{if1} b
+                §IF b
                   §B{f:Func<i32,i32>} {{firstBinding}}
                   §R INT:0
                 §EL
@@ -2027,11 +2027,11 @@ var x = 1;
         // construction. Pinned so the day the binder admits shadowing, this
         // test says the invocation charge must be re-checked for it.
         var result = TestHarness.Compile("""
-            §M{m001:F2c}
-              §F{f003:Go:pub} (Func<i32,i32>:f §E{}) -> i32
+            §M{F2c}
+              §F{Go:pub} (Func<i32,i32>:f §E{}) -> i32
                 §E{}
-                §IF{if1} true
-                  §B{f:Func<i32,i32>} §E{cw} §LAM{l2:x:i32} §P x §R x §/LAM{l2}
+                §IF true
+                  §B{f:Func<i32,i32>} §E{cw} §LAM{x:i32} §P x §R x §/LAM
                   §R §C{f} §A INT:1 §/C
                 §R §C{f} §A INT:2 §/C
             """);
@@ -2052,11 +2052,11 @@ var x = 1;
         // destination message) and never a Calor0424 reading "declared row:
         // [unknown]" with a leaked "(binder #0)".
         var result = TestHarness.Compile("""
-            §M{m001:F6}
-              §F{f001:RunTwice:pub} (Func<i32>:g) -> i32
+            §M{F6}
+              §F{RunTwice:pub} (Func<i32>:g) -> i32
                 §E{}
                 §R INT:0
-              §F{f002:Handle:pub}<eff e> (Func<i32>:next §E{e}) -> i32
+              §F{Handle:pub}<eff e> (Func<i32>:next §E{e}) -> i32
                 §E{e}
                 §R §C{RunTwice} §A next §/C
             """);
@@ -2080,14 +2080,14 @@ var x = 1;
     public void PropertyRow_IsParsedAndHonoured()
     {
         var result = TestHarness.Compile("""
-            §M{m001:PropRow}
-              §F{f001:RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
+            §M{PropRow}
+              §F{RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
                 §E{e}
                 §R (+ §C{stage} §/C §C{stage} §/C)
 
-              §CL{c001:Holder:pub}
-                §PROP{p001:Stage:Func<i32>:pub:get,set} §E{cw}
-                §MT{mt001:Twice:pub} () -> i32
+              §CL{Holder:pub}
+                §PROP{Stage:Func<i32>:pub:get,set} §E{cw}
+                §MT{Twice:pub} () -> i32
                   §E{cw}
                   §R §C{RunTwice} §A Stage §/C
             """);
@@ -2108,14 +2108,14 @@ var x = 1;
     public void PropertyRow_IsResolved_NotMerelyParsed()
     {
         var result = TestHarness.Compile("""
-            §M{m001:PropRow}
-              §F{f001:RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
+            §M{PropRow}
+              §F{RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
                 §E{e}
                 §R (+ §C{stage} §/C §C{stage} §/C)
 
-              §CL{c001:Holder:pub}
-                §PROP{p001:Stage:Func<i32>:pub:get,set} §E{cw}
-                §MT{mt001:Twice:pub} () -> i32
+              §CL{Holder:pub}
+                §PROP{Stage:Func<i32>:pub:get,set} §E{cw}
+                §MT{Twice:pub} () -> i32
                   §E{}
                   §R §C{RunTwice} §A Stage §/C
             """);
@@ -2136,14 +2136,14 @@ var x = 1;
     public void UnnameableArgument_IsChargedUnknown_NotSilentlyDropped()
     {
         var result = TestHarness.Compile("""
-            §M{m001:FailClosed}
-              §F{f001:RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
+            §M{FailClosed}
+              §F{RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
                 §E{e}
                 §R (+ §C{stage} §/C §C{stage} §/C)
 
-              §CL{c001:Holder:pub}
+              §CL{Holder:pub}
                 §FLD{Func<i32>:stage:priv} §E{cw}
-                §MT{mt001:Twice:pub} () -> i32
+                §MT{Twice:pub} () -> i32
                   §E{}
                   §R §C{RunTwice} §A this.stage §/C
             """);

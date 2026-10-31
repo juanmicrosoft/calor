@@ -35,10 +35,10 @@ public sealed class StructuralNullabilityJoinTests
             _ => "§C{Take} §A joined §/C"
         };
         var source = $$"""
-            §M{m1:QualifiedJoins}
-              §F{take:Take:pub} ({{targetType}}:value) -> void
+            §M{QualifiedJoins}
+              §F{Take:pub} ({{targetType}}:value) -> void
                 §E{}
-              §F{probe:Probe:pub} ({{sourceType}}:value, {{targetType}}:fallback, bool:flag) -> {{targetType}}
+              §F{Probe:pub} ({{sourceType}}:value, {{targetType}}:fallback, bool:flag) -> {{targetType}}
                 §B{joined} {{expression}}
                 {{statement}}
                 §TH null
@@ -97,8 +97,8 @@ public sealed class StructuralNullabilityJoinTests
     {
         var expression = coalesce ? "(?? value fallback)" : "(? flag value fallback)";
         var diagnostics = Bind($$"""
-            §M{m1:MixedAnnotationJoin}
-              §F{probe:Probe:pub} ({{sourceType}}:value, {{targetType}}:fallback, bool:flag) -> {{targetType}}
+            §M{MixedAnnotationJoin}
+              §F{Probe:pub} ({{sourceType}}:value, {{targetType}}:fallback, bool:flag) -> {{targetType}}
                 §B{joined} {{expression}}
                 §R joined
             """);
@@ -119,10 +119,10 @@ public sealed class StructuralNullabilityJoinTests
             _ => $"§C{{Take}} §A {value} §/C"
         };
         var source = $$"""
-            §M{m1:StructuralJoins}
-              §F{take:Take:pub} ({{targetType}}:value) -> void
+            §M{StructuralJoins}
+              §F{Take:pub} ({{targetType}}:value) -> void
                 §E{}
-              §F{probe:Probe:pub} ({{sourceType}}:value, bool:flag) -> {{targetType}}
+              §F{Probe:pub} ({{sourceType}}:value, bool:flag) -> {{targetType}}
                 {{(local ? $"§B{{joined}} {expression}" : "")}}
                 {{statement}}
                 §TH null
@@ -153,8 +153,8 @@ public sealed class StructuralNullabilityJoinTests
     public void ArrayContainerJoinDistinguishesNullFromFallback(string expression, bool unsafeValue)
     {
         var diagnostics = Bind($$"""
-            §M{m1:ContainerJoins}
-              §F{probe:Probe:pub} (?[str]:value, [str]:fallback, bool:flag) -> [str]
+            §M{ContainerJoins}
+              §F{Probe:pub} (?[str]:value, [str]:fallback, bool:flag) -> [str]
                 §R {{expression}}
             """);
         Assert.Equal(unsafeValue, diagnostics.Any(d =>
@@ -169,8 +169,8 @@ public sealed class StructuralNullabilityJoinTests
         string expression, bool unsafeValue)
     {
         var diagnostics = Bind($$"""
-            §M{m1:ElementJoins}
-              §F{probe:Probe:pub} (?[?str]:value, [str]:fallback, bool:flag) -> [str]
+            §M{ElementJoins}
+              §F{Probe:pub} (?[?str]:value, [str]:fallback, bool:flag) -> [str]
                 §R {{expression}}
             """);
         Assert.Equal(unsafeValue, diagnostics.Any(d =>

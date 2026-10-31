@@ -70,9 +70,9 @@ public class AnalyzeDirectoryTests
         {
             // Write two simple .calr files
             File.WriteAllText(Path.Combine(tempDir, "file1.calr"),
-                "§M{m001:Test1}\n§F{f001:Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n");
+                "§M{Test1}\n§F{Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n");
             File.WriteAllText(Path.Combine(tempDir, "file2.calr"),
-                "§M{m002:Test2}\n§F{f002:Sub:pub}\n§I{i32:x}\n§I{i32:y}\n§O{i32}\n§R (- x y)\n\n");
+                "§M{Test2}\n§F{Sub:pub}\n§I{i32:x}\n§I{i32:y}\n§O{i32}\n§R (- x y)\n\n");
 
             var args = JsonDocument.Parse($$"""
                 {
@@ -111,9 +111,9 @@ public class AnalyzeDirectoryTests
         try
         {
             File.WriteAllText(Path.Combine(tempDir, "root.calr"),
-                "§M{m001:Root}\n§F{f001:Foo:pub}\n§O{i32}\n§R 42\n\n");
+                "§M{Root}\n§F{Foo:pub}\n§O{i32}\n§R 42\n\n");
             File.WriteAllText(Path.Combine(subDir, "nested.calr"),
-                "§M{m002:Nested}\n§F{f002:Bar:pub}\n§O{i32}\n§R 99\n\n");
+                "§M{Nested}\n§F{Bar:pub}\n§O{i32}\n§R 99\n\n");
 
             var args = JsonDocument.Parse($$"""
                 {
@@ -141,7 +141,7 @@ public class AnalyzeDirectoryTests
         var args = JsonDocument.Parse("""
             {
                 "action": "security",
-                "source": "§M{m001:Test}\n§F{f001:Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n"
+                "source": "§M{Test}\n§F{Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n"
             }
             """).RootElement;
 
@@ -211,7 +211,7 @@ public class AnalyzeDirectoryTests
         try
         {
             File.WriteAllText(Path.Combine(tempDir, "file1.calr"),
-                "§M{m001:Test1}\n§F{f001:Add:pub}\n§I{i32:a}\n§O{i32}\n§CSHARP\nreturn a + 1;\n§/CSHARP\n\n");
+                "§M{Test1}\n§F{Add:pub}\n§I{i32:a}\n§O{i32}\n§CSHARP\nreturn a + 1;\n§/CSHARP\n\n");
 
             var args = JsonDocument.Parse($$"""
                 {

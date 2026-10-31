@@ -145,7 +145,7 @@ public class McpServerTests
                 {
                     "name": "calor_compile",
                     "arguments": {
-                        "source": "§M{m001:Test}\n§F{f001:Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n"
+                        "source": "§M{Test}\n§F{Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n"
                     }
                 }
                 """).RootElement
@@ -207,7 +207,7 @@ public class McpServerTests
                 {
                     "name": "calor_compile",
                     "arguments": {
-                        "source": "§M{m001:Legacy}\n  §SEMVER{1.0.0}\n  §F{f001:Answer:pub} () -> i32\n    §E{}\n    §R INT:42\n"
+                        "source": "§M{Legacy}\n  §SEMVER{1.0.0}\n  §F{Answer:pub} () -> i32\n    §E{}\n    §R INT:42\n"
                     }
                 }
                 """).RootElement
@@ -654,7 +654,7 @@ public class McpServerTests
                 {
                     "name": "calor_check",
                     "arguments": {
-                        "source": "§M{m001:Test} §F{f001:Fn} §O{bool} §R (cotains \"hello\" \"h\")"
+                        "source": "§M{Test} §F{Fn} §O{bool} §R (cotains \"hello\" \"h\")"
                     }
                 }
                 """).RootElement
@@ -692,7 +692,7 @@ public class McpServerTests
                 {
                     "name": "calor_check",
                     "arguments": {
-                        "source": "§M{m001:Test} §F{f001:Fn} §O{str} §R (nameof x)"
+                        "source": "§M{Test} §F{Fn} §O{str} §R (nameof x)"
                     }
                 }
                 """).RootElement
@@ -716,7 +716,7 @@ public class McpServerTests
     {
         // Test the full MCP server flow with diagnose tool
         // MCP uses newline-delimited JSON (NDJSON)
-        var source = "§M{m001:Test} §F{f001:Add} §O{i32} §R (abss -5)";
+        var source = "§M{Test} §F{Add} §O{i32} §R (abss -5)";
         var jsonSource = JsonSerializer.Serialize(source); // Properly escape for JSON
         var inputMessage = $"{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{{\"name\":\"calor_check\",\"arguments\":{{\"source\":{jsonSource}}}}}}}\n";
 
@@ -779,7 +779,7 @@ public class McpServerTests
                 {
                     "name": "calor_check",
                     "arguments": {
-                        "source": "§M{m001:Test} §F{f001:Add} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b)"
+                        "source": "§M{Test} §F{Add} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b)"
                     }
                 }
                 """).RootElement

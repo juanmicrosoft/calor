@@ -21,8 +21,8 @@ public class StringOperationTests
     private static string WrapInFunction(string body)
     {
         return $$"""
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{string:s}
                   §O{string}
                   {{body}}
@@ -32,8 +32,8 @@ public class StringOperationTests
     private static string WrapInFunctionWithParams(string body, string paramStr)
     {
         return $$"""
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   {{paramStr}}
                   §O{string}
                   {{body}}
@@ -533,11 +533,11 @@ public class StringOperationTests
     public void Parse_StringOp_InCondition_Works()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{string:s}
                   §O{string}
-                  §IF{if1} (isempty s)
+                  §IF (isempty s)
                       §R ""
                   §R s
             """;
@@ -576,8 +576,8 @@ public class StringOperationTests
     public void Parse_StringOp_InBinding_Works()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{string:s}
                   §O{string}
                   §B{x} (upper (trim s))
@@ -638,8 +638,8 @@ public class StringOperationTests
     {
         // Extract domain from email: get part after @
         var source = """
-            §M{m001:Test}
-              §F{f001:GetDomain:pub}
+            §M{Test}
+              §F{GetDomain:pub}
                   §I{string:email}
                   §O{string}
                   §B{atIdx} (indexof email "@")
@@ -661,8 +661,8 @@ public class StringOperationTests
     {
         // Generate slug: lowercase, replace spaces with dashes
         var source = """
-            §M{m001:Test}
-              §F{f001:ToSlug:pub}
+            §M{Test}
+              §F{ToSlug:pub}
                   §I{string:title}
                   §O{string}
                   §B{cleaned} (lower (trim title))
@@ -684,8 +684,8 @@ public class StringOperationTests
     {
         // Validate non-empty and starts with prefix
         var source = """
-            §M{m001:Test}
-              §F{f001:IsValid:pub}
+            §M{Test}
+              §F{IsValid:pub}
                   §I{string:value}
                   §I{string:prefix}
                   §O{bool}

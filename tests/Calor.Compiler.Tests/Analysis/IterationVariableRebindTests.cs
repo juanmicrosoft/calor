@@ -33,27 +33,27 @@ public class IterationVariableRebindTests
     public void RebindOfForeachVariable_IsRejected()
     {
         Assert.True(RebindsIterationVar(
-            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+            "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
             "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §EACH{e1:x} arr\n      §B{~x:str} \"y\"\n    §R 0\n"));
+            "    §EACH{x} arr\n      §B{~x:str} \"y\"\n    §R 0\n"));
     }
 
     [Fact]
     public void RebindOfEachKvKey_IsRejected()
     {
         Assert.True(RebindsIterationVar(
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n" +
+            "§M{S}\n  §F{Do:pub} () -> i32\n" +
             "    §B{d:Dictionary<str:i32>} §NEW{Dictionary<str:i32>} §/NEW\n" +
-            "    §EACHKV{e2:k:v} d\n      §B{~k:str} \"z\"\n    §R 0\n"));
+            "    §EACHKV{k:v} d\n      §B{~k:str} \"z\"\n    §R 0\n"));
     }
 
     [Fact]
     public void RebindOfEachKvValue_IsRejected()
     {
         Assert.True(RebindsIterationVar(
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n" +
+            "§M{S}\n  §F{Do:pub} () -> i32\n" +
             "    §B{d:Dictionary<str:i32>} §NEW{Dictionary<str:i32>} §/NEW\n" +
-            "    §EACHKV{e2:k:v} d\n      §B{~v:i32} 9\n    §R 0\n"));
+            "    §EACHKV{k:v} d\n      §B{~v:i32} 9\n    §R 0\n"));
     }
 
     [Fact]
@@ -62,9 +62,9 @@ public class IterationVariableRebindTests
         // The same defect via §ASSIGN rather than §B: `x = "y"` inside the foreach is
         // CS1656 too. (#743 review finding 2.)
         Assert.True(RebindsIterationVar(
-            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+            "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
             "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §EACH{e1:x} arr\n      §ASSIGN x \"y\"\n    §R 0\n"));
+            "    §EACH{x} arr\n      §ASSIGN x \"y\"\n    §R 0\n"));
     }
 
     [Fact]
@@ -73,8 +73,8 @@ public class IterationVariableRebindTests
         // A §L for-loop variable is a plain local that IS reassignable in C#, so
         // rebinding it is a legal reassignment — Calor0257 must NOT fire.
         Assert.False(RebindsIterationVar(
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~s} 0\n" +
-            "    §L{l1:i:0:3:1}\n      §B{~i:i32} 9\n      §ASSIGN s (+ s i)\n    §R s\n"));
+            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~s} 0\n" +
+            "    §L{i:0:3:1}\n      §B{~i:i32} 9\n      §ASSIGN s (+ s i)\n    §R s\n"));
     }
 
     [Fact]
@@ -84,18 +84,18 @@ public class IterationVariableRebindTests
         // local — it IS reassignable, unlike the item variable, so Calor0257 must NOT
         // fire on rebinding it. (#743 review finding 1.)
         Assert.False(RebindsIterationVar(
-            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+            "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
             "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §EACH{e1:x:str:i} arr\n      §B{~i:i32} 5\n    §R 0\n"));
+            "    §EACH{x:str:i} arr\n      §B{~i:i32} 5\n    §R 0\n"));
     }
 
     [Fact]
     public void AssignToForeachIndexVariable_IsAccepted()
     {
         Assert.False(RebindsIterationVar(
-            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+            "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
             "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §EACH{e1:x:str:i} arr\n      §ASSIGN i 0\n    §R 0\n"));
+            "    §EACH{x:str:i} arr\n      §ASSIGN i 0\n    §R 0\n"));
     }
 
     [Fact]
@@ -104,9 +104,9 @@ public class IterationVariableRebindTests
         // Once the §EACH block closes, the iteration variable is out of scope, so a
         // fresh §B of the same name is a new declaration, not a rebind of the iter var.
         Assert.False(RebindsIterationVar(
-            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+            "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
             "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §EACH{e1:x} arr\n      §P x\n    §B{~x:str} \"y\"\n    §R 0\n"));
+            "    §EACH{x} arr\n      §P x\n    §B{~x:str} \"y\"\n    §R 0\n"));
     }
 
     [Fact]
@@ -114,9 +114,9 @@ public class IterationVariableRebindTests
     {
         // Merely using (not rebinding) the iteration variable is always fine.
         Assert.False(RebindsIterationVar(
-            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r,cw}\n" +
+            "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r,cw}\n" +
             "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §EACH{e1:x} arr\n      §P x\n    §R 0\n"));
+            "    §EACH{x} arr\n      §P x\n    §R 0\n"));
     }
 
     // §EACHKV-body traversal (#743 review finding 3): adding the DictionaryForeachNode
@@ -129,9 +129,9 @@ public class IterationVariableRebindTests
     {
         // Calor0255: an inner §B reusing the enclosing parameter name 'x' — CS0136.
         Assert.True(HasCode(
-            "§M{m:S}\n  §F{f:Do:pub} (i32:x) -> i32\n" +
+            "§M{S}\n  §F{Do:pub} (i32:x) -> i32\n" +
             "    §B{d:Dictionary<str:i32>} §NEW{Dictionary<str:i32>} §/NEW\n" +
-            "    §EACHKV{e2:k:v} d\n      §B{x:i32} 9\n      §R x\n    §R x\n",
+            "    §EACHKV{k:v} d\n      §B{x:i32} 9\n      §R x\n    §R x\n",
             DiagnosticCode.BindShadowsEnclosingScope));
     }
 
@@ -140,9 +140,9 @@ public class IterationVariableRebindTests
     {
         // Calor0254: an array bound to a concrete List<T> inside the §EACHKV body.
         Assert.True(HasCode(
-            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+            "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
             "    §B{d:Dictionary<str:i32>} §NEW{Dictionary<str:i32>} §/NEW\n" +
-            "    §EACHKV{e2:k:v} d\n      §B{lines:List<str>} §C{File.ReadAllLines} §A path §/C\n" +
+            "    §EACHKV{k:v} d\n      §B{lines:List<str>} §C{File.ReadAllLines} §A path §/C\n" +
             "      §R (len lines)\n    §R 0\n",
             DiagnosticCode.BindArrayToConcreteCollection));
     }

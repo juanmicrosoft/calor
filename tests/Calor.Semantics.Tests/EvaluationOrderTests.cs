@@ -20,14 +20,14 @@ public class EvaluationOrderTests
         // We verify this by checking the CNF lowering produces temporaries in order.
 
         var source = @"
-§M{m001:Test}
-  §F{f001:target:pub}
+§M{Test}
+  §F{target:pub}
       §I{i32:a}
       §I{i32:b}
       §I{i32:c}
       §O{i32}
       §R (+ (+ a b) c)
-  §F{f002:test:pub}
+  §F{test:pub}
       §O{i32}
       §B{i32:x} INT:1
       §B{i32:y} INT:2
@@ -59,8 +59,8 @@ public class EvaluationOrderTests
         // For a + b + c, evaluate a, then b, compute a+b, then c, compute (a+b)+c
 
         var source = @"
-§M{m001:Test}
-  §F{f001:compute:pub}
+§M{Test}
+  §F{compute:pub}
       §I{i32:a}
       §I{i32:b}
       §I{i32:c}
@@ -87,8 +87,8 @@ public class EvaluationOrderTests
         // When A is false in A && B, B should not be evaluated
 
         var source = @"
-§M{m001:Test}
-  §F{f001:testAnd:pub}
+§M{Test}
+  §F{testAnd:pub}
       §I{bool:a}
       §I{bool:b}
       §O{bool}
@@ -116,8 +116,8 @@ public class EvaluationOrderTests
         // When A is true in A || B, B should not be evaluated
 
         var source = @"
-§M{m001:Test}
-  §F{f001:testOr:pub}
+§M{Test}
+  §F{testOr:pub}
       §I{bool:a}
       §I{bool:b}
       §O{bool}
@@ -143,8 +143,8 @@ public class EvaluationOrderTests
     public void CNF_Validation_ProducesValidIR()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:simple:pub}
+§M{Test}
+  §F{simple:pub}
       §I{i32:x}
       §O{i32}
       §R (* x INT:2)

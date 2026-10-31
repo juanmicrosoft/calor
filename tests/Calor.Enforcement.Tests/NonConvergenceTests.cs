@@ -44,23 +44,23 @@ public class NonConvergenceTests
     /// can add is Calor0406.
     /// </summary>
     private const string ThreeHopMutualRecursion = """
-        §M{m001:M}
-          §F{f001:A:pub} (i32:n) -> i32
+        §M{M}
+          §F{A:pub} (i32:n) -> i32
             §E{cw,cr,fs:r}
             §C{Console.WriteLine} §A "a" §/C
-            §IF{if1} (> n 0)
+            §IF (> n 0)
               §R §C{B} §A (- n 1) §/C
             §R n
-          §F{f002:B:pub} (i32:n) -> i32
+          §F{B:pub} (i32:n) -> i32
             §E{cw,cr,fs:r}
             §B{s:str} §C{Console.ReadLine}
-            §IF{if2} (> n 0)
+            §IF (> n 0)
               §R §C{C} §A (- n 1) §/C
             §R n
-          §F{f003:C:pub} (i32:n) -> i32
+          §F{C:pub} (i32:n) -> i32
             §E{cw,cr,fs:r}
             §B{t:str} §C{File.ReadAllText} §A "x" §/C
-            §IF{if3} (> n 0)
+            §IF (> n 0)
               §R §C{A} §A (- n 1) §/C
             §R n
         """;
@@ -76,17 +76,17 @@ public class NonConvergenceTests
     /// observable as its Calor0410.
     /// </summary>
     private const string ThreeHopRank1Chain = """
-        §M{m001:M}
-          §F{f001:Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+        §M{M}
+          §F{Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
             §E{e}
             §R §C{g}
-          §F{f002:Outer:pub} (Func<i32>:h §E{cw}) -> i32
+          §F{Outer:pub} (Func<i32>:h §E{cw}) -> i32
             §E{cw}
             §R §C{Run} §A h §/C
-          §F{f003:Top:pub} (Func<i32>:q §E{cw}) -> i32
+          §F{Top:pub} (Func<i32>:q §E{cw}) -> i32
             §E{cw}
             §R §C{Outer} §A q §/C
-          §F{f004:Top2:pub} (Func<i32>:r §E{cw}) -> i32
+          §F{Top2:pub} (Func<i32>:r §E{cw}) -> i32
             §E{}
             §R §C{Top} §A r §/C
         """;
@@ -98,40 +98,40 @@ public class NonConvergenceTests
     /// <c>Top3</c>'s missing Calor0410.
     /// </summary>
     private const string FourHopRank1Chain = """
-        §M{m001:M}
-          §F{f001:Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+        §M{M}
+          §F{Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
             §E{e}
             §R §C{g}
-          §F{f002:Outer:pub} (Func<i32>:h §E{cw}) -> i32
+          §F{Outer:pub} (Func<i32>:h §E{cw}) -> i32
             §E{cw}
             §R §C{Run} §A h §/C
-          §F{f003:Top:pub} (Func<i32>:q §E{cw}) -> i32
+          §F{Top:pub} (Func<i32>:q §E{cw}) -> i32
             §E{cw}
             §R §C{Outer} §A q §/C
-          §F{f004:Top2:pub} (Func<i32>:r §E{cw}) -> i32
+          §F{Top2:pub} (Func<i32>:r §E{cw}) -> i32
             §E{cw}
             §R §C{Top} §A r §/C
-          §F{f005:Top3:pub} (Func<i32>:s §E{cw}) -> i32
+          §F{Top3:pub} (Func<i32>:s §E{cw}) -> i32
             §E{}
             §R §C{Top2} §A s §/C
         """;
 
     private const string SelfRecursive = """
-        §M{m001:M}
-          §F{f001:Fact:pub} (i32:n) -> i32
+        §M{M}
+          §F{Fact:pub} (i32:n) -> i32
             §E{cw}
             §C{Console.WriteLine} §A "step" §/C
-            §IF{if1} (<= n 1)
+            §IF (<= n 1)
               §R 1
             §R (* n §C{Fact} §A (- n 1) §/C)
         """;
 
     private const string NoRecursionNoRows = """
-        §M{m001:M}
-          §F{f001:Leaf:pub} () -> void
+        §M{M}
+          §F{Leaf:pub} () -> void
             §E{cw}
             §C{Console.WriteLine} §A "leaf" §/C
-          §F{f002:Root:pub} () -> void
+          §F{Root:pub} () -> void
             §E{cw}
             §C{Leaf} §/C
         """;
@@ -144,14 +144,14 @@ public class NonConvergenceTests
     /// </summary>
     private static string Ring(int n)
     {
-        var sb = new StringBuilder("§M{m001:M}\n");
+        var sb = new StringBuilder("§M{M}\n");
         for (var i = 1; i <= n; i++)
         {
             var next = i == n ? 1 : i + 1;
-            sb.Append($"  §F{{f{i:D4}:F{i}:pub}} (i32:n) -> i32\n    §E{{cw}}\n");
+            sb.Append($"  §F{{F{i}:pub}} (i32:n) -> i32\n    §E{{cw}}\n");
             if (i == 1)
                 sb.Append("    §C{Console.WriteLine} §A \"x\" §/C\n");
-            sb.Append($"    §IF{{if{i}}} (> n 0)\n      §R §C{{F{next}}} §A (- n 1) §/C\n    §R n\n");
+            sb.Append($"    §IF (> n 0)\n      §R §C{{F{next}}} §A (- n 1) §/C\n    §R n\n");
         }
         return sb.ToString();
     }
@@ -166,13 +166,13 @@ public class NonConvergenceTests
     /// </summary>
     private static string DoubleChain(int n)
     {
-        var sb = new StringBuilder("§M{m001:M}\n");
+        var sb = new StringBuilder("§M{M}\n");
         for (var i = 1; i <= n; i++)
         {
-            sb.Append($"  §F{{f{i:D4}:A{i}:pub}} (i32:n) -> i32\n    §E{{cw}}\n");
+            sb.Append($"  §F{{A{i}:pub}} (i32:n) -> i32\n    §E{{cw}}\n");
             if (i == 1)
                 sb.Append("    §C{Console.WriteLine} §A \"x\" §/C\n");
-            sb.Append($"    §IF{{if{i}}} (> n 0)\n");
+            sb.Append("    §IF (> n 0)\n");
             if (i < n)
                 sb.Append($"      §B{{u{i}:i32}} §C{{A{i + 1}}} §A (- n 1) §/C\n");
             sb.Append(i > 1 ? $"      §R §C{{A{i - 1}}} §A (- n 1) §/C\n" : "      §R 0\n");
@@ -579,8 +579,8 @@ public class NonConvergenceTests
     public void Permissive_DoesNotDemoteNamedCalor0410_AndLeavesCalor0406Alone()
     {
         var underDeclared = ThreeHopMutualRecursion.Replace(
-            "§F{f003:C:pub} (i32:n) -> i32\n    §E{cw,cr,fs:r}",
-            "§F{f003:C:pub} (i32:n) -> i32\n    §E{cw,cr}",
+            "§F{C:pub} (i32:n) -> i32\n    §E{cw,cr,fs:r}",
+            "§F{C:pub} (i32:n) -> i32\n    §E{cw,cr}",
             StringComparison.Ordinal);
         Assert.NotEqual(ThreeHopMutualRecursion, underDeclared);
 
@@ -617,14 +617,14 @@ public class NonConvergenceTests
     public void Permissive_StillWaives_UnknownChargedCalor0410()
     {
         const string source = """
-            §M{m001:UnknownCharge}
-              §F{f001:RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
+            §M{UnknownCharge}
+              §F{RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
                 §E{e}
                 §R (+ §C{stage} §/C §C{stage} §/C)
 
-              §CL{c001:Holder:pub}
+              §CL{Holder:pub}
                 §FLD{Func<i32>:stage:priv} §E{cw}
-                §MT{mt001:Twice:pub} () -> i32
+                §MT{Twice:pub} () -> i32
                   §E{}
                   §R §C{RunTwice} §A this.stage §/C
             """;

@@ -68,12 +68,12 @@ public sealed class SymbolAndOverloadBindingTests
     public void NullCoalesce_UsesFallbackTypeToResolveOverload()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Pick:priv} (i32:value) -> i32
+            §M{Test}
+              §F{Pick:priv} (i32:value) -> i32
                 §R value
-              §F{f2:Pick:priv} (str:value) -> str
+              §F{Pick:priv} (str:value) -> str
                 §R value
-              §F{f3:Use:pub} () -> i32
+              §F{Use:pub} () -> i32
                 §R §C{Pick} §A (?? null INT:0) §/C
             """;
 
@@ -91,19 +91,19 @@ public sealed class SymbolAndOverloadBindingTests
     public void MemberOverloads_ResolveBareQualifiedAndStatementCalls()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:UseQualified:pub} (Converter:c) -> i32
+            §M{Test}
+              §F{UseQualified:pub} (Converter:c) -> i32
                 §R §C{c.Convert} §A INT:1 §/C
 
-              §CL{c1:Converter:pub}
+              §CL{Converter:pub}
                 §FLD{i32:_value:priv}
-                §MT{m1:Convert:pub} (i32:x) -> i32
+                §MT{Convert:pub} (i32:x) -> i32
                   §R x
-                §MT{m2:Convert:pub} (str:x) -> str
+                §MT{Convert:pub} (str:x) -> str
                   §R x
-                §MT{m3:Convert:pub} (i32:x, i32:y) -> bool
+                §MT{Convert:pub} (i32:x, i32:y) -> bool
                   §R BOOL:true
-                §MT{m4:Use:pub}
+                §MT{Use:pub}
                   §C{Convert} §A INT:1 §/C
                   §C{Convert} §A STR:"x" §/C
                   §C{Convert} §A INT:1 §A INT:2 §/C
@@ -211,10 +211,10 @@ public sealed class SymbolAndOverloadBindingTests
     public void ProgramCompile_KnownInternalNoMatch_FailsBeforeEmission()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Pick:priv} (i32:value) -> i32
+            §M{Test}
+              §F{Pick:priv} (i32:value) -> i32
                 §R value
-              §F{f2:Use:pub} () -> i32
+              §F{Use:pub} () -> i32
                 §R §C{Pick} §A STR:"wrong" §/C
             """;
 
@@ -230,12 +230,12 @@ public sealed class SymbolAndOverloadBindingTests
     public void ProgramCompile_KnownInternalAmbiguity_FailsBeforeEmission()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Pick<T>:priv} (T:value, i32:other) -> T
+            §M{Test}
+              §F{Pick<T>:priv} (T:value, i32:other) -> T
                 §R value
-              §F{f2:Pick<T>:priv} (i32:value, T:other) -> T
+              §F{Pick<T>:priv} (i32:value, T:other) -> T
                 §R other
-              §F{f3:Use:pub} () -> i32
+              §F{Use:pub} () -> i32
                 §R §C{Pick} §A INT:1 §A INT:2 §/C
             """;
 
@@ -251,8 +251,8 @@ public sealed class SymbolAndOverloadBindingTests
     public void ProgramCompile_ExternalInteropCall_RemainsEmissionEligible()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Use:pub} () -> void
+            §M{Test}
+              §F{Use:pub} () -> void
                 §C{Console.WriteLine} §A STR:"ok" §/C
             """;
 
@@ -272,12 +272,12 @@ public sealed class SymbolAndOverloadBindingTests
     public void NewExpressionGenericTypeReferences_RetainExactNestedIdentities()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Create:pub} () -> object
+            §M{Test}
+              §F{Create:pub} () -> object
                 §R §NEW{Box<List<Widget>>} §/NEW
-              §CL{c1:Widget:pub}
-              §CL{c2:List:pub}<T>
-              §CL{c3:Box:pub}<T>
+              §CL{Widget:pub}
+              §CL{List:pub}<T>
+              §CL{Box:pub}<T>
                 §FLD{i32:_dummy:priv}
             """;
 
@@ -429,12 +429,12 @@ public sealed class SymbolAndOverloadBindingTests
     public void StatementGenericCalls_RetainTypeArgumentsAndResolveGenericArity()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Select<T>:priv} (T:value) -> T
+            §M{Test}
+              §F{Select<T>:priv} (T:value) -> T
                 §R value
-              §F{f2:Select<T,U>:priv} (T:value) -> T
+              §F{Select<T,U>:priv} (T:value) -> T
                 §R value
-              §F{f3:Use:pub} () -> void
+              §F{Use:pub} () -> void
                 §C{Select<i32>} §A INT:1 §/C
                 §C{Select<i32,str>} §A INT:1 §/C
             """;
@@ -525,16 +525,16 @@ public sealed class SymbolAndOverloadBindingTests
     public void DeclarationSymbols_UseIdentifierSpans_AndStableAstIdsIgnoreSiblingInsertion()
     {
         const string original = """
-            §M{m1:Test}
-              §F{stable:Keep:pub} (i32:value) -> i32
+            §M{Test}
+              §F{Keep:pub} (i32:value) -> i32
                 §B{local:i32} value
                 §R local
             """;
         const string inserted = """
-            §M{m1:Test}
-              §F{before:Before:pub} () -> i32
+            §M{Test}
+              §F{Before:pub} () -> i32
                 §R 0
-              §F{stable:Keep:pub} (i32:value) -> i32
+              §F{Keep:pub} (i32:value) -> i32
                 §B{local:i32} value
                 §R local
             """;
@@ -565,8 +565,8 @@ public sealed class SymbolAndOverloadBindingTests
     public void MutableRebind_BindsAsAssignmentToOriginalSymbol()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Update:pub} () -> i32
+            §M{Test}
+              §F{Update:pub} () -> i32
                 §B{~value:i32} 1
                 §B{~value} 2
                 §R value
@@ -591,8 +591,8 @@ public sealed class SymbolAndOverloadBindingTests
     public void ImmutableAndTypeInvalidRebinds_AreDiagnosed()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Update:pub} () -> i32
+            §M{Test}
+              §F{Update:pub} () -> i32
                 §B{fixed:i32} 1
                 §B{~fixed} 2
                 §B{~value:i32} 1
@@ -675,17 +675,17 @@ public sealed class SymbolAndOverloadBindingTests
     public void BaseMemberAndBaseConstructorCalls_ResolveAgainstTrackedBaseClass()
     {
         const string source = """
-            §M{m1:Test}
-              §CL{c1:Base:pub}
+            §M{Test}
+              §CL{Base:pub}
                 §FLD{i32:value:prot}
-                §CTOR{ctor1:pub} (i32:x)
+                §CTOR{pub} (i32:x)
                   §ASSIGN value x
-                §MT{m1:Pick:pub} (i32:x) -> i32
+                §MT{Pick:pub} (i32:x) -> i32
                   §R x
-              §CL{c2:Derived:Base:pub}
-                §CTOR{ctor2:pub} (i32:x)
+              §CL{Derived:Base:pub}
+                §CTOR{pub} (i32:x)
                   §BASE §A x §/BASE
-                §MT{m2:Use:pub} () -> i32
+                §MT{Use:pub} () -> i32
                   §R §C{base.Pick} §A INT:1 §/C
             """;
 
@@ -711,13 +711,13 @@ public sealed class SymbolAndOverloadBindingTests
     public void PreprocessorWrappedMethods_AreRegisteredBoundAndResolvedTogether()
     {
         const string source = """
-            §M{m1:Test}
-              §CL{c1:Worker:pub}
+            §M{Test}
+              §CL{Worker:pub}
                 §PP{FEATURE}
-                  §MT{m1:Do:pub} () -> i32
+                  §MT{Do:pub} () -> i32
                     §R 1
                 §/PP{FEATURE}
-                §MT{m2:Run:pub} () -> i32
+                §MT{Run:pub} () -> i32
                   §R §C{Do} §/C
             """;
 
@@ -1025,16 +1025,16 @@ public sealed class SymbolAndOverloadBindingTests
     public void InheritedBareAndThisCalls_ResolveExactAccessibleBaseMember()
     {
         const string source = """
-            §M{m1:Test}
-              §CL{c1:Base:pub}
-                §MT{pick:Pick:prot} (i32:value) -> i32
+            §M{Test}
+              §CL{Base:pub}
+                §MT{Pick:prot} (i32:value) -> i32
                   §E{cw}
                   §P STR:"pick"
                   §R value
-                §MT{hidden:Hidden:priv} () -> i32
+                §MT{Hidden:priv} () -> i32
                   §R 0
-              §CL{c2:Derived:Base:pub}
-                §MT{use:Use:pub} () -> i32
+              §CL{Derived:Base:pub}
+                §MT{Use:pub} () -> i32
                   §B{first:i32} §C{Pick} §A INT:1 §/C
                   §B{second:i32} §C{this.Pick} §A INT:2 §/C
                   §C{Hidden} §/C
@@ -1093,16 +1093,16 @@ public sealed class SymbolAndOverloadBindingTests
     public void PreprocessorWrappedConstructorsAndProperties_AreBoundIntoModule()
     {
         const string source = """
-            §M{m1:Test}
-              §CL{c1:Worker:pub}
+            §M{Test}
+              §CL{Worker:pub}
                 §PP{FEATURE}
-                  §CTOR{ctor1:pub} ()
+                  §CTOR{pub} ()
                     §P STR:"created"
-                  §PROP{p1:Value:i32:pub}
+                  §PROP{Value:i32:pub}
                     §GET
                       §R INT:1
                     §/GET
-                  §/PROP{p1}
+                  §/PROP
                 §/PP{FEATURE}
             """;
 
@@ -1121,11 +1121,11 @@ public sealed class SymbolAndOverloadBindingTests
     public void ForeachElementInference_ResolvesInternalOverloadWithoutNameFallback()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Echo:priv} (str:value) -> str
+            §M{Test}
+              §F{Echo:priv} (str:value) -> str
                 §R value
-              §F{f2:Use:pub} ([str]:values) -> void
-                §EACH{e1:item} values
+              §F{Use:pub} ([str]:values) -> void
+                §EACH{item} values
                   §B{copy:str} §C{Echo} §A item §/C
             """;
 
@@ -1174,8 +1174,8 @@ public sealed class SymbolAndOverloadBindingTests
     public void ResolvedCallGraph_BinderExpressionCall_RemainsExplicitlyUnresolved()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Use:pub} () -> object
+            §M{Test}
+              §F{Use:pub} () -> object
                 §R §C §NEW{object} §/NEW.GetType §/C
             """;
 

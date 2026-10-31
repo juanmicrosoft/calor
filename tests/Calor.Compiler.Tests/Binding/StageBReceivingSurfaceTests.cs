@@ -66,8 +66,8 @@ public sealed class StageBReceivingSurfaceTests
     public void UnrelatedTypeMismatchesAreNotDelegatedToNullability(string sourceType, string targetType)
     {
         var source = $$"""
-            §M{m1:UnsupportedPayload}
-              §F{probe:Probe:pub} ({{sourceType}}:value) -> void
+            §M{UnsupportedPayload}
+              §F{Probe:pub} ({{sourceType}}:value) -> void
                 §B{required:{{targetType}}} value
             """;
         var result = Program.Compile(source, "unsupported-payload.calr", new CompilationOptions

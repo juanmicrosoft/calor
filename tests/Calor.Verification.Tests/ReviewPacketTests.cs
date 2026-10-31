@@ -1,6 +1,7 @@
 using Calor.Compiler.Reporting;
 using Calor.Compiler.Verification.Z3;
 using Calor.Compiler.CodeGen;
+using Calor.Compiler.Ids;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
@@ -14,11 +15,17 @@ namespace Calor.Verification.Tests;
 /// interop fraction, caller impact from the in-memory call graph, and the
 /// #782 refinement honesty note present on every packet.
 /// </summary>
-public class ReviewPacketTests
+public class ReviewPacketTests : IDisposable
 {
+    private readonly string _root = Path.Combine(Path.GetTempPath(), "calor-review-identities-" + Guid.NewGuid().ToString("N"));
+
+    public ReviewPacketTests() => Directory.CreateDirectory(_root);
+
+    public void Dispose() => Directory.Delete(_root, recursive: true);
+
     private const string MixedModule = @"
-§M{m001:Pricing}
-  §F{f001:Square:pub}
+§M{Pricing}
+  §F{Square:pub}
       §I{i32:x}
       §O{i32}
       §Q (>= x 0)
@@ -26,27 +33,33 @@ public class ReviewPacketTests
       §S (>= result 0)
       §R (* x x)
 
-  §F{f002:BrokenCap:pub}
+  §F{BrokenCap:pub}
       §I{i32:amount}
       §I{i32:cap}
       §O{i32}
       §S (<= result cap)
       §R amount
 
-  §F{f003:Caller:pub}
+  §F{Caller:pub}
       §I{i32:y}
       §O{i32}
       §R §C{Square} §A y §/C
 ";
 
-    private static ReviewPacketBuilder.Result Build(
+    private ReviewPacketBuilder.Result Build(
         string source,
         ReviewPacketBuilder.Options? options = null)
     {
+        var file = Path.Combine(_root, "pricing.calr");
+        File.WriteAllText(file, source);
+        new DeclarationIdentityStore(_root).Sync([file]);
         return ReviewPacketBuilder.Build(
-            [new ReviewPacketBuilder.InputFile("pricing.calr", source)],
+            [new ReviewPacketBuilder.InputFile(file, source)],
             options ?? new ReviewPacketBuilder.Options());
     }
+
+    private string Id(string name) =>
+        new DeclarationIdentityStore(_root).Sync().Declarations.Single(d => d.Name == name).Id;
 
     [Fact]
     public void Packet_ValidatesGeneratedCodeAgainstExplicitReferences()
@@ -67,8 +80,8 @@ public class ReviewPacketTests
             var emit = compilation.Emit(referencePath);
             Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
             const string source = """
-                §M{m001:Review}
-                  §CL{c001:Consumer:pub}
+                §M{Review}
+                  §CL{Consumer:pub}
                     §CSHARP{public External.Library.Api Create() => new External.Library.Api();}§/CSHARP
                 """;
 
@@ -171,7 +184,7 @@ public class ReviewPacketTests
     public void Packet_AlwaysCarriesRefinementHonestyNote()
     {
         // No Z3 needed: the honesty note is unconditional.
-        var result = Build("§M{m001:Empty}\n  §F{f001:Id:pub} (i32:x) -> i32\n    §R x\n");
+        var result = Build("§M{Empty}\n  §F{Id:pub} (i32:x) -> i32\n    §R x\n");
         Assert.Contains(ReviewPacketBuilder.RefinementHonestyNote, result.Packet.HonestyNotes);
 
         var markdown = ReviewPacketBuilder.RenderMarkdown(result.Packet);
@@ -184,8 +197,8 @@ public class ReviewPacketTests
     public void Packet_ModuleDisclosure_ReportsInteropFraction()
     {
         var source = @"
-§M{m001:WithInterop}
-  §F{f001:Pure:pub} (i32:x) -> i32
+§M{WithInterop}
+  §F{Pure:pub} (i32:x) -> i32
     §R x
 
   §CSHARP{
@@ -202,27 +215,30 @@ public class ReviewPacketTests
     [Fact]
     public void Packet_CallerImpact_ListsDirectCallers()
     {
+        Build(MixedModule);
+        var changed = Id("Square");
+        var caller = Id("Caller");
         var result = Build(MixedModule, new ReviewPacketBuilder.Options(
-            ChangedDeclarations: ["f001"]));
+            ChangedDeclarations: [changed]));
 
         var impact = Assert.Single(result.Packet.CallerImpact);
-        Assert.Equal("f001", impact.ChangedId);
-        Assert.Contains(impact.Callers, c => c.Id == "f003");
+        Assert.Equal(changed, impact.ChangedId);
+        Assert.Contains(impact.Callers, c => c.Id == caller);
     }
 
     [Fact]
     public void Packet_ChangedLineRanges_MapToDeclarations()
     {
-        // Lines covering f002 (BrokenCap) only.
+        // Lines covering BrokenCap only.
         var ranges = new Dictionary<string, IReadOnlyList<(int, int)>>(StringComparer.Ordinal)
         {
-            [System.IO.Path.GetFullPath("pricing.calr")] = [(11, 16)]
+            [Path.Combine(_root, "pricing.calr")] = [(11, 16)]
         };
         var result = Build(MixedModule, new ReviewPacketBuilder.Options(
             ChangedLineRanges: ranges, BaselineRef: "HEAD"));
 
-        Assert.Contains("f002", result.Packet.ChangedDeclarations);
-        Assert.DoesNotContain("f003", result.Packet.ChangedDeclarations);
+        Assert.Contains(Id("BrokenCap"), result.Packet.ChangedDeclarations);
+        Assert.DoesNotContain(Id("Caller"), result.Packet.ChangedDeclarations);
     }
 
     [Fact]
@@ -231,29 +247,36 @@ public class ReviewPacketTests
         // M2 pin (PR #841 review): a caller in one file of a declaration
         // changed in another file of the SAME invocation must be found.
         const string lib = @"
-§M{m001:Lib}
-  §F{f100:Square:pub}
+§M{Lib}
+  §F{Square:pub}
       §I{i32:x}
       §O{i32}
       §R (* x x)
 ";
         const string app = @"
-§M{m002:App}
-  §F{f200:UseSquare:pub}
+§M{App}
+  §F{UseSquare:pub}
       §I{i32:y}
       §O{i32}
       §R §C{Square} §A y §/C
 ";
+        var libFile = Path.Combine(_root, "lib.calr");
+        var appFile = Path.Combine(_root, "app.calr");
+        File.WriteAllText(libFile, lib);
+        File.WriteAllText(appFile, app);
+        new DeclarationIdentityStore(_root).Sync([libFile, appFile]);
+        var changed = Id("Square");
+        var caller = Id("UseSquare");
         var result = ReviewPacketBuilder.Build(
             [
-                new ReviewPacketBuilder.InputFile("lib.calr", lib),
-                new ReviewPacketBuilder.InputFile("app.calr", app)
+                new ReviewPacketBuilder.InputFile(libFile, lib),
+                new ReviewPacketBuilder.InputFile(appFile, app)
             ],
-            new ReviewPacketBuilder.Options(ChangedDeclarations: ["f100"]));
+            new ReviewPacketBuilder.Options(ChangedDeclarations: [changed]));
 
         var impact = Assert.Single(result.Packet.CallerImpact);
-        Assert.Equal("f100", impact.ChangedId);
-        Assert.Contains(impact.Callers, c => c.Id == "f200");
+        Assert.Equal(changed, impact.ChangedId);
+        Assert.Contains(impact.Callers, c => c.Id == caller);
         Assert.Empty(result.UnmatchedChangedDeclarations);
     }
 
@@ -275,8 +298,8 @@ public class ReviewPacketTests
         // m2 pin: a vacuously-proven contract (unsatisfiable §Q set) must not
         // let summary.proven read clean — proven counts non-vacuous only.
         const string vacuous = @"
-§M{m001:Vac}
-  §F{f001:Weird:pub}
+§M{Vac}
+  §F{Weird:pub}
       §I{i32:x}
       §O{i32}
       §Q (>= x 1)
@@ -305,7 +328,10 @@ public class ReviewPacketTests
     public void Packet_CompileError_SurfacesDiagnosticsAndFlags()
     {
         // A parse-level error: unterminated call argument list.
-        var result = Build("§M{m001:Broken}\n  §F{f001:Bad:pub} (i32:x) -> i32\n    §R (+ x\n");
+        var result = ReviewPacketBuilder.Build(
+            [new ReviewPacketBuilder.InputFile(Path.Combine(_root, "broken.calr"),
+                "§M{Broken}\n  §F{Bad:pub} (i32:x) -> i32\n    §R (+ x\n")],
+            new ReviewPacketBuilder.Options());
         Assert.True(result.HasCompileErrors);
         Assert.NotEmpty(result.CompileDiagnostics);
     }

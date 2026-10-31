@@ -124,7 +124,7 @@ public sealed class NodeIdCanonicalizationPropertyTests
         }
         // Class header disambiguation currently only recognizes numeric IDs.
         // Keep the container stable; mixed IDs are exercised on its methods.
-        source.AppendLine("  §CL{c020:Calculator:pub}");
+        source.AppendLine("  §CL{Calculator:pub}");
         for (var index = 1; index <= sample.MethodCount; index++)
         {
             source.AppendLine($"    §MT{{{Header(IdKind.Method, "mt", 20 + index, $"Apply{index}:pub")}}} (bool:flag) -> bool");

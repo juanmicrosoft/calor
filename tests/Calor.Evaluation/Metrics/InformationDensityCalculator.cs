@@ -108,7 +108,7 @@ public class InformationDensityCalculator : IMetricCalculator
         var counts = new SemanticElementCounts();
 
         // Count from source patterns (backup if compilation fails)
-        // Note: Calor uses curly brace syntax: §M{id:name}, §F{id:name:vis}, etc.
+        // Note: Calor uses curly brace syntax: §M{name}, §F{name:vis}, etc.
         counts.Modules = CountPattern(source, @"§M\{");
         counts.Functions = CountPattern(source, @"§F\{") + CountPattern(source, @"§AF\{") + CountPattern(source, @"§MT\{") + CountPattern(source, @"§AMT\{");
         counts.Variables = CountPattern(source, @"§B\{");

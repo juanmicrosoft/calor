@@ -39,7 +39,7 @@ public class ContractInheritanceTests
         checker.Dispose();
         Assert.Equal(IntPtr.Zero, ReadNativeContextHandle(context));
 
-        var module = Parse("§M{m1:Disposed}", out var diagnostics);
+        var module = Parse("§M{Disposed}", out var diagnostics);
         Assert.False(diagnostics.HasErrors);
         Assert.Throws<ObjectDisposedException>(() => checker.Check(module));
         GC.KeepAlive(context);
@@ -100,9 +100,9 @@ public class ContractInheritanceTests
     public void Parser_ParsesInterfaceMethodWithPrecondition()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IValidator}
-      §MT{m001:Validate}
+§M{Test}
+  §IFACE{IValidator}
+      §MT{Validate}
           §I{str:input}
           §O{bool}
           §Q (!= input null)
@@ -126,9 +126,9 @@ public class ContractInheritanceTests
     public void Parser_ParsesInterfaceMethodWithPostcondition()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IRepository}
-      §MT{m001:GetById}
+§M{Test}
+  §IFACE{IRepository}
+      §MT{GetById}
           §I{i32:id}
           §O{str}
           §S (!= result null)
@@ -148,9 +148,9 @@ public class ContractInheritanceTests
     public void Parser_ParsesInterfaceMethodWithMultipleContracts()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:ICalculator}
-      §MT{m001:Divide}
+§M{Test}
+  §IFACE{ICalculator}
+      §MT{Divide}
           §I{i32:a}
           §I{i32:b}
           §O{i32}
@@ -176,16 +176,16 @@ public class ContractInheritanceTests
     public void ContractInheritanceChecker_InheritsContractsWhenImplementerHasNone()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IRepository}
-      §MT{m001:GetById}
+§M{Test}
+  §IFACE{IRepository}
+      §MT{GetById}
           §I{i32:id}
           §O{str}
           §Q (> id INT:0)
           §S (!= result null)
-  §CL{c001:SqlRepository:pub}
+  §CL{SqlRepository:pub}
       §IMPL{IRepository}
-      §MT{mt001:GetById:pub}
+      §MT{GetById:pub}
           §I{i32:id}
           §O{str}
           §R ""found""
@@ -213,15 +213,15 @@ public class ContractInheritanceTests
     public void ContractInheritanceChecker_ValidWhenContractsMatch()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IRepository}
-      §MT{m001:GetById}
+§M{Test}
+  §IFACE{IRepository}
+      §MT{GetById}
           §I{i32:id}
           §O{str}
           §Q (> id INT:0)
-  §CL{c001:SqlRepository:pub}
+  §CL{SqlRepository:pub}
       §IMPL{IRepository}
-      §MT{mt001:GetById:pub}
+      §MT{GetById:pub}
           §I{i32:id}
           §O{str}
           §Q (> id INT:0)
@@ -244,15 +244,15 @@ public class ContractInheritanceTests
     {
         // Weaker precondition (>= instead of >) is OK
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IRepository}
-      §MT{m001:GetById}
+§M{Test}
+  §IFACE{IRepository}
+      §MT{GetById}
           §I{i32:id}
           §O{str}
           §Q (> id INT:0)
-  §CL{c001:SqlRepository:pub}
+  §CL{SqlRepository:pub}
       §IMPL{IRepository}
-      §MT{mt001:GetById:pub}
+      §MT{GetById:pub}
           §I{i32:id}
           §O{str}
           §Q (>= id INT:0)
@@ -275,15 +275,15 @@ public class ContractInheritanceTests
     {
         // Stronger precondition (> instead of >=) is an LSP violation
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IRepository}
-      §MT{m001:GetById}
+§M{Test}
+  §IFACE{IRepository}
+      §MT{GetById}
           §I{i32:id}
           §O{str}
           §Q (>= id INT:0)
-  §CL{c001:SqlRepository:pub}
+  §CL{SqlRepository:pub}
       §IMPL{IRepository}
-      §MT{mt001:GetById:pub}
+      §MT{GetById:pub}
           §I{i32:id}
           §O{str}
           §Q (> id INT:0)
@@ -307,14 +307,14 @@ public class ContractInheritanceTests
     {
         // Weaker postcondition (>= instead of >) is an LSP violation
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IRepository}
-      §MT{m001:GetCount}
+§M{Test}
+  §IFACE{IRepository}
+      §MT{GetCount}
           §O{i32}
           §S (> result INT:0)
-  §CL{c001:SqlRepository:pub}
+  §CL{SqlRepository:pub}
       §IMPL{IRepository}
-      §MT{mt001:GetCount:pub}
+      §MT{GetCount:pub}
           §O{i32}
           §S (>= result INT:0)
           §R INT:1
@@ -336,14 +336,14 @@ public class ContractInheritanceTests
     public void ContractInheritanceChecker_NoContractsNoIssues()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IRepository}
-      §MT{m001:GetById}
+§M{Test}
+  §IFACE{IRepository}
+      §MT{GetById}
           §I{i32:id}
           §O{str}
-  §CL{c001:SqlRepository:pub}
+  §CL{SqlRepository:pub}
       §IMPL{IRepository}
-      §MT{mt001:GetById:pub}
+      §MT{GetById:pub}
           §I{i32:id}
           §O{str}
           §R ""found""
@@ -369,15 +369,15 @@ public class ContractInheritanceTests
     public void Emitter_EmitsInheritedPrecondition()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IRepository}
-      §MT{m001:GetById}
+§M{Test}
+  §IFACE{IRepository}
+      §MT{GetById}
           §I{i32:id}
           §O{str}
           §Q (> id INT:0)
-  §CL{c001:SqlRepository:pub}
+  §CL{SqlRepository:pub}
       §IMPL{IRepository}
-      §MT{mt001:GetById:pub}
+      §MT{GetById:pub}
           §I{i32:id}
           §O{str}
           §R ""found""
@@ -404,15 +404,15 @@ public class ContractInheritanceTests
     public void Emitter_EmitsInheritedPostcondition()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IRepository}
-      §MT{m001:GetById}
+§M{Test}
+  §IFACE{IRepository}
+      §MT{GetById}
           §I{i32:id}
           §O{str}
           §S (!= result null)
-  §CL{c001:SqlRepository:pub}
+  §CL{SqlRepository:pub}
       §IMPL{IRepository}
-      §MT{mt001:GetById:pub}
+      §MT{GetById:pub}
           §I{i32:id}
           §O{str}
           §R ""found""
@@ -438,9 +438,9 @@ public class ContractInheritanceTests
     public void Emitter_EmitsInterfaceMethodContractsAsXmlComments()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IRepository}
-      §MT{m001:GetById}
+§M{Test}
+  §IFACE{IRepository}
+      §MT{GetById}
           §I{i32:id}
           §O{str}
           §Q (> id INT:0)
@@ -462,15 +462,15 @@ public class ContractInheritanceTests
     public void Emitter_DoesNotEmitInheritedWhenMethodHasOwnContracts()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IRepository}
-      §MT{m001:GetById}
+§M{Test}
+  §IFACE{IRepository}
+      §MT{GetById}
           §I{i32:id}
           §O{str}
           §Q (> id INT:0)
-  §CL{c001:SqlRepository:pub}
+  §CL{SqlRepository:pub}
       §IMPL{IRepository}
-      §MT{mt001:GetById:pub}
+      §MT{GetById:pub}
           §I{i32:id}
           §O{str}
           §Q (> id INT:0)
@@ -501,22 +501,22 @@ public class ContractInheritanceTests
     public void ContractInheritanceChecker_HandlesMultipleInterfaces()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IReader}
-      §MT{m001:Read}
+§M{Test}
+  §IFACE{IReader}
+      §MT{Read}
           §O{str}
           §S (!= result null)
-  §IFACE{i002:IWriter}
-      §MT{m002:Write}
+  §IFACE{IWriter}
+      §MT{Write}
           §I{str:data}
           §Q (!= data null)
-  §CL{c001:FileHandler:pub}
+  §CL{FileHandler:pub}
       §IMPL{IReader}
       §IMPL{IWriter}
-      §MT{mt001:Read:pub}
+      §MT{Read:pub}
           §O{str}
           §R ""data""
-      §MT{mt002:Write:pub}
+      §MT{Write:pub}
           §I{str:data}
 ";
 
@@ -542,10 +542,10 @@ public class ContractInheritanceTests
     {
         // When interface is not in the module (external), no checking occurs
         var source = @"
-§M{m001:Test}
-  §CL{c001:MyClass:pub}
+§M{Test}
+  §CL{MyClass:pub}
       §IMPL{IExternalInterface}
-      §MT{mt001:DoSomething:pub}
+      §MT{DoSomething:pub}
           §R ""done""
 ";
 
@@ -565,15 +565,15 @@ public class ContractInheritanceTests
     public void Emitter_ContractModeOffSkipsInheritedContracts()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IRepository}
-      §MT{m001:GetById}
+§M{Test}
+  §IFACE{IRepository}
+      §MT{GetById}
           §I{i32:id}
           §O{str}
           §Q (> id INT:0)
-  §CL{c001:SqlRepository:pub}
+  §CL{SqlRepository:pub}
       §IMPL{IRepository}
-      §MT{mt001:GetById:pub}
+      §MT{GetById:pub}
           §I{i32:id}
           §O{str}
           §R ""found""
@@ -606,15 +606,15 @@ public class ContractInheritanceTests
         // The second clause makes the complete implementation requirement stronger,
         // despite the first clause being individually weaker.
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Process}
+§M{Test}
+  §IFACE{IService}
+      §MT{Process}
           §I{i32:x}
           §O{i32}
           §Q (>= x INT:0)
-  §CL{c001:Service:pub}
+  §CL{Service:pub}
       §IMPL{IService}
-      §MT{mt001:Process:pub}
+      §MT{Process:pub}
           §I{i32:x}
           §O{i32}
           §Q (>= x INT:-10)
@@ -647,15 +647,15 @@ public class ContractInheritanceTests
         // The second implementer postcondition (!= result 999) does NOT imply the interface postcondition.
         // With correct "at least one matching" semantics, this should be VALID.
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Process}
+§M{Test}
+  §IFACE{IService}
+      §MT{Process}
           §I{i32:x}
           §O{i32}
           §S (> result INT:0)
-  §CL{c001:Service:pub}
+  §CL{Service:pub}
       §IMPL{IService}
-      §MT{mt001:Process:pub}
+      §MT{Process:pub}
           §I{i32:x}
           §O{i32}
           §S (>= result INT:10)
@@ -691,15 +691,15 @@ public class ContractInheritanceTests
         // - (< x 1000) doesn't relate to the lower bound at all
         // This should report a violation because no implementer precondition is weaker-or-equal.
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Process}
+§M{Test}
+  §IFACE{IService}
+      §MT{Process}
           §I{i32:x}
           §O{i32}
           §Q (>= x INT:0)
-  §CL{c001:Service:pub}
+  §CL{Service:pub}
       §IMPL{IService}
-      §MT{mt001:Process:pub}
+      §MT{Process:pub}
           §I{i32:x}
           §O{i32}
           §Q (>= x INT:10)
@@ -732,15 +732,15 @@ public class ContractInheritanceTests
         // - (!= result 0) doesn't guarantee >= 100 either
         // This should report a violation because no implementer postcondition implies the interface.
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Process}
+§M{Test}
+  §IFACE{IService}
+      §MT{Process}
           §I{i32:x}
           §O{i32}
           §S (>= result INT:100)
-  §CL{c001:Service:pub}
+  §CL{Service:pub}
       §IMPL{IService}
-      §MT{mt001:Process:pub}
+      §MT{Process:pub}
           §I{i32:x}
           §O{i32}
           §S (> result INT:0)
@@ -770,15 +770,15 @@ public class ContractInheritanceTests
         // Interface: §Q (>= id 1)
         // Implementer: §Q (>= id 0)  // weaker - accepts more values - VALID
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Process}
+§M{Test}
+  §IFACE{IService}
+      §MT{Process}
           §I{i32:id}
           §O{i32}
           §Q (>= id INT:1)
-  §CL{c001:ValidService:pub}
+  §CL{ValidService:pub}
       §IMPL{IService}
-      §MT{mt001:Process:pub}
+      §MT{Process:pub}
           §I{i32:id}
           §O{i32}
           §Q (>= id INT:0)
@@ -806,15 +806,15 @@ public class ContractInheritanceTests
         // Interface: §Q (>= id 0)
         // Implementer: §Q (>= id 10)  // stronger - rejects valid inputs - VIOLATION
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Process}
+§M{Test}
+  §IFACE{IService}
+      §MT{Process}
           §I{i32:id}
           §O{i32}
           §Q (>= id INT:0)
-  §CL{c001:InvalidService:pub}
+  §CL{InvalidService:pub}
       §IMPL{IService}
-      §MT{mt001:Process:pub}
+      §MT{Process:pub}
           §I{i32:id}
           §O{i32}
           §Q (>= id INT:10)
@@ -841,15 +841,15 @@ public class ContractInheritanceTests
         // Interface: §Q (> x 0)
         // Implementer: §Q (&& (> x 0) (< x 100))  // stronger - adds restriction - VIOLATION
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Process}
+§M{Test}
+  §IFACE{IService}
+      §MT{Process}
           §I{i32:x}
           §O{i32}
           §Q (> x INT:0)
-  §CL{c001:InvalidService:pub}
+  §CL{InvalidService:pub}
       §IMPL{IService}
-      §MT{mt001:Process:pub}
+      §MT{Process:pub}
           §I{i32:x}
           §O{i32}
           §Q (&& (> x INT:0) (< x INT:100))
@@ -876,15 +876,15 @@ public class ContractInheritanceTests
         // Interface: §S (> result 0)
         // Implementer: §S (>= result 10)  // stronger - guarantees more - VALID
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Process}
+§M{Test}
+  §IFACE{IService}
+      §MT{Process}
           §I{i32:value}
           §O{i32}
           §S (> result INT:0)
-  §CL{c001:ValidService:pub}
+  §CL{ValidService:pub}
       §IMPL{IService}
-      §MT{mt001:Process:pub}
+      §MT{Process:pub}
           §I{i32:value}
           §O{i32}
           §S (>= result INT:10)
@@ -911,15 +911,15 @@ public class ContractInheritanceTests
         // Interface: §S (>= result 10)
         // Implementer: §S (> result 0)  // weaker - guarantees less - VIOLATION
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Process}
+§M{Test}
+  §IFACE{IService}
+      §MT{Process}
           §I{i32:value}
           §O{i32}
           §S (>= result INT:10)
-  §CL{c001:InvalidService:pub}
+  §CL{InvalidService:pub}
       §IMPL{IService}
-      §MT{mt001:Process:pub}
+      §MT{Process:pub}
           §I{i32:value}
           §O{i32}
           §S (> result INT:0)
@@ -947,15 +947,15 @@ public class ContractInheritanceTests
         // Implementer: §Q (>= x 1)  // equivalent for integers - VALID
         // Z3 should prove that x >= 1 implies x > 0 for integers
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Process}
+§M{Test}
+  §IFACE{IService}
+      §MT{Process}
           §I{i32:x}
           §O{i32}
           §Q (> x INT:0)
-  §CL{c001:ValidService:pub}
+  §CL{ValidService:pub}
       §IMPL{IService}
-      §MT{mt001:Process:pub}
+      §MT{Process:pub}
           §I{i32:x}
           §O{i32}
           §Q (>= x INT:1)
@@ -979,15 +979,15 @@ public class ContractInheritanceTests
     {
         // When Z3 is explicitly disabled, should fall back to heuristics
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Process}
+§M{Test}
+  §IFACE{IService}
+      §MT{Process}
           §I{i32:id}
           §O{i32}
           §Q (> id INT:0)
-  §CL{c001:Service:pub}
+  §CL{Service:pub}
       §IMPL{IService}
-      §MT{mt001:Process:pub}
+      §MT{Process:pub}
           §I{i32:id}
           §O{i32}
           §Q (> id INT:0)
@@ -1014,14 +1014,14 @@ public class ContractInheritanceTests
             Calor.Compiler.Verification.Z3.Z3ContextFactory.IsAvailable,
             "Z3 not available");
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Process}
+§M{Test}
+  §IFACE{IService}
+      §MT{Process}
           §I{i32:x}
           §O{i32}
-  §CL{c001:Service:pub}
+  §CL{Service:pub}
       §IMPL{IService}
-      §MT{mt001:Process:pub}
+      §MT{Process:pub}
           §I{i32:x}
           §O{i32}
           §Q (> x INT:0)
@@ -1045,23 +1045,23 @@ public class ContractInheritanceTests
     public void Overloads_KeepDistinctInheritedContracts()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IParser}
-      §MT{m001:Parse}
+§M{Test}
+  §IFACE{IParser}
+      §MT{Parse}
           §I{i32:value}
           §O{i32}
           §Q (> value INT:0)
-      §MT{m002:Parse}
+      §MT{Parse}
           §I{str:value}
           §O{str}
           §Q (!= value null)
-  §CL{c001:Parser:pub}
+  §CL{Parser:pub}
       §IMPL{IParser}
-      §MT{mt001:Parse:pub}
+      §MT{Parse:pub}
           §I{i32:value}
           §O{i32}
           §R value
-      §MT{mt002:Parse:pub}
+      §MT{Parse:pub}
           §I{str:value}
           §O{str}
           §R value
@@ -1088,21 +1088,21 @@ public class ContractInheritanceTests
     public void MultipleInterfaces_CombineInheritedPreconditionsAsDisjunction()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IPositive}
-      §MT{m001:Use}
+§M{Test}
+  §IFACE{IPositive}
+      §MT{Use}
           §I{i32:value}
           §O{i32}
           §Q (> value INT:0)
-  §IFACE{i002:INegative}
-      §MT{m002:Use}
+  §IFACE{INegative}
+      §MT{Use}
           §I{i32:value}
           §O{i32}
           §Q (< value INT:0)
-  §CL{c001:Service:pub}
+  §CL{Service:pub}
       §IMPL{IPositive}
       §IMPL{INegative}
-      §MT{mt001:Use:pub}
+      §MT{Use:pub}
           §I{i32:value}
           §O{i32}
           §R value
@@ -1133,16 +1133,16 @@ public class ContractInheritanceTests
     public void BaseClassContracts_AreInheritedBySignature()
     {
         var source = @"
-§M{m001:Test}
-  §CL{c001:Base:pub}
-      §MT{m001:Use:pub:virt}
+§M{Test}
+  §CL{Base:pub}
+      §MT{Use:pub:virt}
           §I{i32:value}
           §O{i32}
           §Q (> value INT:0)
           §R value
-  §CL{c002:Derived:pub}
+  §CL{Derived:pub}
       §EXT{Base}
-      §MT{m002:Use:pub:over}
+      §MT{Use:pub:over}
           §I{i32:value}
           §O{i32}
           §R value
@@ -1167,15 +1167,15 @@ public class ContractInheritanceTests
     public void InheritedContracts_RebindParameterNamesPositionally()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Use}
+§M{Test}
+  §IFACE{IService}
+      §MT{Use}
           §I{i32:x}
           §O{i32}
           §Q (> x INT:0)
-  §CL{c001:Service:pub}
+  §CL{Service:pub}
       §IMPL{IService}
-      §MT{mt001:Use:pub}
+      §MT{Use:pub}
           §I{i32:value}
           §O{i32}
           §R value
@@ -1200,21 +1200,21 @@ public class ContractInheritanceTests
     public void IntermediateOverride_PreservesEffectiveInterfaceContract()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Use}
+§M{Test}
+  §IFACE{IService}
+      §MT{Use}
           §I{i32:value}
           §O{i32}
           §Q (> value INT:0)
-  §CL{c001:Base:pub}
+  §CL{Base:pub}
       §IMPL{IService}
-      §MT{mt001:Use:pub:virt}
+      §MT{Use:pub:virt}
           §I{i32:value}
           §O{i32}
           §R value
-  §CL{c002:Derived:pub}
+  §CL{Derived:pub}
       §EXT{Base}
-      §MT{mt002:Use:pub:over}
+      §MT{Use:pub:over}
           §I{i32:value}
           §O{i32}
           §R value
@@ -1239,15 +1239,15 @@ public class ContractInheritanceTests
     public void GenericInterface_ResolvesClosedMethodSignature()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IRepository}<T>
-      §MT{m001:Save}
+§M{Test}
+  §IFACE{IRepository}<T>
+      §MT{Save}
           §I{T:value}
           §O{T}
           §Q (!= value null)
-  §CL{c001:IntRepository:pub}
+  §CL{IntRepository:pub}
       §IMPL{IRepository<i32>}
-      §MT{mt001:Save:pub}
+      §MT{Save:pub}
           §I{i32:value}
           §O{i32}
           §R value
@@ -1274,16 +1274,16 @@ public class ContractInheritanceTests
     public void GenericBaseClass_ResolvesClosedMethodSignature()
     {
         var source = @"
-§M{m001:Test}
-  §CL{c001:Base:pub}<T>
-      §MT{mt001:Save:pub:virt}
+§M{Test}
+  §CL{Base:pub}<T>
+      §MT{Save:pub:virt}
           §I{T:value}
           §O{T}
           §Q (!= value null)
           §R value
-  §CL{c002:IntRepository:pub}
+  §CL{IntRepository:pub}
       §EXT{Base<i32>}
-      §MT{mt002:Save:pub:over}
+      §MT{Save:pub:over}
           §I{i32:value}
           §O{i32}
           §R value
@@ -1303,23 +1303,23 @@ public class ContractInheritanceTests
     public void ParameterModifiers_DisambiguateInheritedOverloads()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Touch}
+§M{Test}
+  §IFACE{IService}
+      §MT{Touch}
           §I{i32:value}
           §O{i32}
           §Q (> value INT:0)
-      §MT{m002:Touch}
+      §MT{Touch}
           §I{i32:value:ref}
           §O{i32}
           §Q (>= value INT:0)
-  §CL{c001:Service:pub}
+  §CL{Service:pub}
       §IMPL{IService}
-      §MT{mt001:Touch:pub}
+      §MT{Touch:pub}
           §I{i32:value}
           §O{i32}
           §R value
-      §MT{mt002:Touch:pub}
+      §MT{Touch:pub}
           §I{i32:value:ref}
           §O{i32}
           §R value
@@ -1339,17 +1339,17 @@ public class ContractInheritanceTests
     public void GenericMethodTypeParameters_MatchByPosition()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:ITransformer}
-      §MT{m001:Map}<T>
+§M{Test}
+  §IFACE{ITransformer}
+      §MT{Map}<T>
           §I{T:item}
           §I{i32:limit}
           §O{T}
           §Q (> limit INT:0)
           §Q (is item T)
-  §CL{c001:Transformer:pub}
+  §CL{Transformer:pub}
       §IMPL{ITransformer}
-      §MT{mt001:Map:pub}<U>
+      §MT{Map:pub}<U>
           §I{U:item}
           §I{i32:limit}
           §O{U}
@@ -1374,15 +1374,15 @@ public class ContractInheritanceTests
     public void InheritedContractCalls_RebindArgumentNames()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Use}
+§M{Test}
+  §IFACE{IService}
+      §MT{Use}
           §I{i32:x}
           §O{i32}
           §Q (CALL IsValid x)
-  §CL{c001:Service:pub}
+  §CL{Service:pub}
       §IMPL{IService}
-      §MT{mt001:Use:pub}
+      §MT{Use:pub}
           §I{i32:value}
           §O{i32}
           §R value
@@ -1404,15 +1404,15 @@ public class ContractInheritanceTests
     public void NestedNullCoalesce_RebindsParameterNames()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Use}
+§M{Test}
+  §IFACE{IService}
+      §MT{Use}
           §I{str:x}
           §O{str}
           §Q (!= (?? x STR:""fallback"") STR:""invalid"")
-  §CL{c001:Service:pub}
+  §CL{Service:pub}
       §IMPL{IService}
-      §MT{mt001:Use:pub}
+      §MT{Use:pub}
           §I{str:value}
           §O{str}
           §R value
@@ -1435,15 +1435,15 @@ public class ContractInheritanceTests
     public void InterpolatedString_RebindsHoleReferences()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Use}
+§M{Test}
+  §IFACE{IService}
+      §MT{Use}
           §I{str:x}
           §O{str}
           §Q (!= §INTERP ""id:"" §EXP x §/INTERP STR:"""")
-  §CL{c001:Service:pub}
+  §CL{Service:pub}
       §IMPL{IService}
-      §MT{mt001:Use:pub}
+      §MT{Use:pub}
           §I{str:value}
           §O{str}
           §R value
@@ -1469,15 +1469,15 @@ public class ContractInheritanceTests
     public void IsPatternBinding_AvoidsParameterCapture()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Use}
+§M{Test}
+  §IFACE{IService}
+      §MT{Use}
           §I{object:x}
           §O{bool}
           §Q (&& (is x i32 value) (> value INT:0))
-  §CL{c001:Service:pub}
+  §CL{Service:pub}
       §IMPL{IService}
-      §MT{mt001:Use:pub}
+      §MT{Use:pub}
           §I{object:value}
           §O{bool}
           §R true
@@ -1504,21 +1504,21 @@ public class ContractInheritanceTests
     public void ClosedGenericBase_ComposesInheritedInterfaceSubstitutions()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IFoo}<T>
-      §MT{m001:Use}
+§M{Test}
+  §IFACE{IFoo}<T>
+      §MT{Use}
           §I{T:x}
           §O{T}
           §Q (is x T)
-  §CL{c001:Base:pub}<U>
+  §CL{Base:pub}<U>
       §IMPL{IFoo<U>}
-      §MT{mt001:Use:pub:virt}
+      §MT{Use:pub:virt}
           §I{U:x}
           §O{U}
           §R x
-  §CL{c002:Derived:pub}
+  §CL{Derived:pub}
       §EXT{Base<i32>}
-      §MT{mt002:Use:pub:over}
+      §MT{Use:pub:over}
           §I{i32:value}
           §O{i32}
           §R value
@@ -1543,15 +1543,15 @@ public class ContractInheritanceTests
     public void GenericCallTypeArguments_AreSubstituted()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}<T>
-      §MT{m001:Use}
+§M{Test}
+  §IFACE{IService}<T>
+      §MT{Use}
           §I{T:x}
           §O{T}
           §Q §C{Check<T>} §A x §/C
-  §CL{c001:IntService:pub}
+  §CL{IntService:pub}
       §IMPL{IService<i32>}
-      §MT{mt001:Use:pub}
+      §MT{Use:pub}
           §I{i32:value}
           §O{i32}
           §R value
@@ -1573,15 +1573,15 @@ public class ContractInheritanceTests
     public void GenericConstructorTypeArguments_AreSubstituted()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}<T>
-      §MT{m001:Use}
+§M{Test}
+  §IFACE{IService}<T>
+      §MT{Use}
           §I{T:x}
           §O{T}
           §Q (!= §NEW{Box<T>} §/NEW null)
-  §CL{c001:IntService:pub}
+  §CL{IntService:pub}
       §IMPL{IService<i32>}
-      §MT{mt001:Use:pub}
+      §MT{Use:pub}
           §I{i32:value}
           §O{i32}
           §R value
@@ -1604,15 +1604,15 @@ public class ContractInheritanceTests
     public void ExplicitInterfaceImplementation_InheritsContract()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Use}
+§M{Test}
+  §IFACE{IService}
+      §MT{Use}
           §I{i32:value}
           §O{i32}
           §Q (> value INT:0)
-  §CL{c001:Service:pub}
+  §CL{Service:pub}
       §IMPL{IService}
-      §MT{mt001:IService.Use:priv}
+      §MT{IService.Use:priv}
           §I{i32:value}
           §O{i32}
           §R value
@@ -1635,15 +1635,15 @@ public class ContractInheritanceTests
     public void QuantifierRebinding_AvoidsCapturingImplementationParameter()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Use}
+§M{Test}
+  §IFACE{IService}
+      §MT{Use}
           §I{i32:limit}
           §O{i32}
           §Q (exists ((i i32)) (&& (>= i INT:0) (< i limit)))
-  §CL{c001:Service:pub}
+  §CL{Service:pub}
       §IMPL{IService}
-      §MT{mt001:Use:pub}
+      §MT{Use:pub}
           §I{i32:i}
           §O{i32}
           §R i
@@ -1671,18 +1671,18 @@ public class ContractInheritanceTests
     public void InterfaceImplementedOnlyByBaseMethod_FailsClosed()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IService}
-      §MT{m001:Use}
+§M{Test}
+  §IFACE{IService}
+      §MT{Use}
           §I{i32:value}
           §O{i32}
           §Q (> value INT:0)
-  §CL{c001:Base:pub}
-      §MT{mt001:Use:pub:virt}
+  §CL{Base:pub}
+      §MT{Use:pub:virt}
           §I{i32:value}
           §O{i32}
           §R value
-  §CL{c002:Derived:pub}
+  §CL{Derived:pub}
       §EXT{Base}
       §IMPL{IService}
 ";
@@ -1704,23 +1704,23 @@ public class ContractInheritanceTests
     public void DisjointSourcePostconditions_AreQualifiedByTheirPreconditions()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IPositive}
-      §MT{m001:Use}
+§M{Test}
+  §IFACE{IPositive}
+      §MT{Use}
           §I{i32:value}
           §O{i32}
           §Q (> value INT:0)
           §S (> result INT:0)
-  §IFACE{i002:INegative}
-      §MT{m002:Use}
+  §IFACE{INegative}
+      §MT{Use}
           §I{i32:value}
           §O{i32}
           §Q (< value INT:0)
           §S (< result INT:0)
-  §CL{c001:Service:pub}
+  §CL{Service:pub}
       §IMPL{IPositive}
       §IMPL{INegative}
-      §MT{mt001:Use:pub}
+      §MT{Use:pub}
           §I{i32:value}
           §O{i32}
           §R value
@@ -1746,19 +1746,19 @@ public class ContractInheritanceTests
             Calor.Compiler.Verification.Z3.Z3ContextFactory.IsAvailable,
             "Z3 not available");
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IPositive}
-      §MT{m001:Get}
+§M{Test}
+  §IFACE{IPositive}
+      §MT{Get}
           §O{i32}
           §S (> result INT:0)
-  §IFACE{i002:INegative}
-      §MT{m002:Get}
+  §IFACE{INegative}
+      §MT{Get}
           §O{i32}
           §S (< result INT:0)
-  §CL{c001:Service:pub}
+  §CL{Service:pub}
       §IMPL{IPositive}
       §IMPL{INegative}
-      §MT{mt001:Get:pub}
+      §MT{Get:pub}
           §O{i32}
           §R INT:1
 ";

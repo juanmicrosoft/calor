@@ -47,8 +47,8 @@ public class LinqSupportTests
     public void DecimalLiteral_TypedSyntax_EmitsCorrectly()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f1:Test:pub}
+§M{TestMod}
+  §F{Test:pub}
       §B{~price:decimal} DECIMAL:18.0000
 ";
 
@@ -61,8 +61,8 @@ public class LinqSupportTests
     public void DecimalLiteral_InlineSuffix_EmitsCorrectly()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f1:Test:pub}
+§M{TestMod}
+  §F{Test:pub}
       §B{~amount:decimal} 99.95M
 ";
 
@@ -75,8 +75,8 @@ public class LinqSupportTests
     public void DecimalLiteral_IntegerWithSuffix_EmitsCorrectly()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f1:Test:pub}
+§M{TestMod}
+  §F{Test:pub}
       §B{~count:decimal} 42m
 ";
 
@@ -109,9 +109,9 @@ public class LinqSupportTests
     public void ArrayInitializer_WithArgElements_EmitsCorrectly()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f1:Test:pub}
-      §B{[i32]:nums} §ARR{a1:i32} §A 1 §A 2 §A 3 §/ARR{a1}
+§M{TestMod}
+  §F{Test:pub}
+      §B{[i32]:nums} §ARR{i32} §A 1 §A 2 §A 3 §/ARR
 ";
 
         var result = ParseAndEmit(source);
@@ -125,9 +125,9 @@ public class LinqSupportTests
     {
         // Type-first format: §ARR{type:id:size}
         var source = @"
-§M{m1:TestMod}
-  §F{f1:Test:pub}
-      §B{[i32]:nums} §ARR{i32:nums:3}
+§M{TestMod}
+  §F{Test:pub}
+      §B{[i32]:nums} §ARR{nums:3}
 ";
 
         var result = ParseAndEmit(source);
@@ -251,8 +251,8 @@ public class LinqSupportTests
     public void ObjectInitializer_BasicProperties_EmitsCorrectly()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f1:Test:pub}
+§M{TestMod}
+  §F{Test:pub}
       §B{~p:Person} §NEW{Person}
         Name = ""John""
         Age = 30
@@ -270,8 +270,8 @@ public class LinqSupportTests
     public void ObjectInitializer_EmitsInitializerBlock()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f1:Test:pub}
+§M{TestMod}
+  §F{Test:pub}
       §B{~cfg:Config} §NEW{Config}
         Timeout = 30
         Enabled = true
@@ -309,8 +309,8 @@ public class LinqSupportTests
     public void AnonymousType_BasicSyntax_EmitsNewAnonymous()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f1:Test:pub}
+§M{TestMod}
+  §F{Test:pub}
       §B{~obj:var} §ANON
         Name = ""test""
         Value = 42

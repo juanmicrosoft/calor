@@ -30,12 +30,12 @@ namespace Calor.Compiler.Tests.Analysis;
 public class RefinementStaticGapsTests
 {
     private const string Header = """
-        §M{m:Rt}
-          §RTYPE{r1:Nat:i32} (>= # INT:0)
-          §RTYPE{r2:Pos:i32} (> # INT:0)
-          §F{tp:TakePos:pub} (Pos:p) -> i32
+        §M{Rt}
+          §RTYPE{Nat:i32} (>= # INT:0)
+          §RTYPE{Pos:i32} (> # INT:0)
+          §F{TakePos:pub} (Pos:p) -> i32
             §R p
-          §F{tn:TakeNat:pub} (Nat:n) -> i32
+          §F{TakeNat:pub} (Nat:n) -> i32
             §R n
         """;
 
@@ -96,7 +96,7 @@ public class RefinementStaticGapsTests
     public void Print_CallWithADifferentRefinement_IsRejected()
     {
         var result = Compile("""
-              §F{f1:Main:pub} (Nat:n) -> void
+              §F{Main:pub} (Nat:n) -> void
                 §P §C{TakePos} §A n §/C
             """);
         AssertDistinct(result, "Nat", "Pos", "argument 1 of 'TakePos'");
@@ -106,7 +106,7 @@ public class RefinementStaticGapsTests
     public void Print_CallWithTheSameRefinementOrABaseValue_IsAccepted()
     {
         AssertNoRefinementError(Compile("""
-              §F{f1:Main:pub} (Pos:p, i32:k) -> void
+              §F{Main:pub} (Pos:p, i32:k) -> void
                 §P §C{TakePos} §A p §/C
                 §P (+ p k)
                 §P "text"
@@ -117,24 +117,24 @@ public class RefinementStaticGapsTests
     public void Print_NestedWrongRefinementInsideAnInterpolation_IsRejected()
     {
         var result = Compile("""
-              §F{f1:Main:pub} (Nat:n) -> void
+              §F{Main:pub} (Nat:n) -> void
                 §P (+ STR:"v=" §C{TakePos} §A n §/C)
             """);
         AssertDistinct(result, "Nat", "Pos", "argument 1 of 'TakePos'");
     }
 
     private const string PrintLambda = """
-          §DEL{d1:Mapper:pub}
+          §DEL{Mapper:pub}
             §I{Nat:p}
             §O{i32}
-          §F{f1:Apply:pub} (Mapper:fn, Nat:a) -> i32
+          §F{Apply:pub} (Mapper:fn, Nat:a) -> i32
             §R §C{fn} §A a §/C
-          §F{f2:Run:pub} (Nat:a) -> void
+          §F{Run:pub} (Nat:a) -> void
             §P §C{Apply}
-              §A §LAM{l1:p}
+              §A §LAM{p}
                 §ASSIGN p (- p INT:10)
                 §R p
-              §/LAM{l1}
+              §/LAM
               §A a
             §/C
         """;
@@ -164,16 +164,16 @@ public class RefinementStaticGapsTests
     public void Print_LambdaReturningADifferentRefinement_IsRejected()
     {
         var result = Compile("""
-              §DEL{d1:ToPos:pub}
+              §DEL{ToPos:pub}
                 §I{i32:v}
                 §O{Pos}
-              §F{f1:Apply:pub} (ToPos:fn) -> i32
+              §F{Apply:pub} (ToPos:fn) -> i32
                 §R §C{fn} §A INT:1 §/C
-              §F{f2:Run:pub} (Nat:a) -> void
+              §F{Run:pub} (Nat:a) -> void
                 §P §C{Apply}
-                  §A §LAM{l1:v}
+                  §A §LAM{v}
                     §R a
-                  §/LAM{l1}
+                  §/LAM
                 §/C
             """);
         AssertDistinct(result, "Nat", "Pos", "a return");
@@ -183,10 +183,10 @@ public class RefinementStaticGapsTests
     public void Print_InAModuleWithoutRefinements_StillCompiles()
     {
         var result = Program.Compile("""
-            §M{m:P}
-              §F{f1:Twice:pub} (i32:x) -> i32
+            §M{P}
+              §F{Twice:pub} (i32:x) -> i32
                 §R (* x INT:2)
-              §F{f2:Main:pub} () -> void
+              §F{Main:pub} () -> void
                 §E{cw}
                 §P §C{Twice} §A INT:21 §/C
                 §P (+ STR:"a" STR:"b")
@@ -200,9 +200,9 @@ public class RefinementStaticGapsTests
     public void AssignMatch_EveryArmADifferentRefinement_IsRejected()
     {
         var result = Compile("""
-              §F{f1:Run:pub} (Pos:p, Nat:seed, i32:k) -> i32
+              §F{Run:pub} (Pos:p, Nat:seed, i32:k) -> i32
                 §B{~x:Nat} seed
-                §ASSIGN x §W{w1} k
+                §ASSIGN x §W k
                   §K INT:1 → p
                   §K _ → p
                 §R x
@@ -214,9 +214,9 @@ public class RefinementStaticGapsTests
     public void AssignMatch_OneArmADifferentRefinement_IsRejected()
     {
         var result = Compile("""
-              §F{f1:Run:pub} (Pos:p, Nat:seed, i32:k) -> i32
+              §F{Run:pub} (Pos:p, Nat:seed, i32:k) -> i32
                 §B{~x:Nat} seed
-                §ASSIGN x §W{w1} k
+                §ASSIGN x §W k
                   §K INT:1 → p
                   §K _ → k
                 §R x
@@ -228,10 +228,10 @@ public class RefinementStaticGapsTests
     public void AssignMatch_NestedMatchArmADifferentRefinement_IsRejected()
     {
         var result = Compile("""
-              §F{f1:Run:pub} (Pos:p, Nat:seed, i32:k) -> i32
+              §F{Run:pub} (Pos:p, Nat:seed, i32:k) -> i32
                 §B{~x:Nat} seed
-                §ASSIGN x §W{w1} k
-                  §K INT:1 → §W{w2} k
+                §ASSIGN x §W k
+                  §K INT:1 → §W k
                     §K INT:2 → p
                     §K _ → seed
                   §K _ → seed
@@ -244,21 +244,21 @@ public class RefinementStaticGapsTests
     public void AssignMatch_SameRefinementOrBaseArms_IsAccepted()
     {
         AssertNoRefinementError(Compile("""
-              §F{f1:Same:pub} (Nat:n, Nat:seed, i32:k) -> i32
+              §F{Same:pub} (Nat:n, Nat:seed, i32:k) -> i32
                 §B{~x:Nat} seed
-                §ASSIGN x §W{w1} k
+                §ASSIGN x §W k
                   §K INT:1 → n
                   §K _ → seed
                 §R x
-              §F{f2:Base:pub} (Nat:seed, i32:k) -> i32
+              §F{Base:pub} (Nat:seed, i32:k) -> i32
                 §B{~x:Nat} seed
-                §ASSIGN x §W{w1} k
+                §ASSIGN x §W k
                   §K INT:1 → (- k INT:1)
                   §K _ → k
                 §R x
-              §F{f3:Plain:pub} (Pos:p, i32:k) -> i32
+              §F{Plain:pub} (Pos:p, i32:k) -> i32
                 §B{~y:i32} k
-                §ASSIGN y §W{w1} k
+                §ASSIGN y §W k
                   §K INT:1 → p
                   §K _ → k
                 §R y
@@ -269,9 +269,9 @@ public class RefinementStaticGapsTests
     public void Runtime_AssignMatchOfBaseArms_IsStillGuarded()
     {
         var assembly = CompileAndLoad("""
-              §F{f1:Run:pub} (Nat:seed, i32:k) -> i32
+              §F{Run:pub} (Nat:seed, i32:k) -> i32
                 §B{~x:Nat} seed
-                §ASSIGN x §W{w1} k
+                §ASSIGN x §W k
                   §K INT:1 → INT:7
                   §K _ → k
                 §R x
@@ -288,9 +288,9 @@ public class RefinementStaticGapsTests
     public void Try_BindingAMatchOfADifferentRefinement_IsRejected()
     {
         var result = Compile("""
-              §F{f1:Run:pub} (Pos:p, i32:k) -> i32
-                §TR{t1}
-                  §B{x:Nat} §W{w1} k
+              §F{Run:pub} (Pos:p, i32:k) -> i32
+                §TR
+                  §B{x:Nat} §W k
                     §K INT:1 → p
                     §K _ → p
                   §R x
@@ -305,15 +305,15 @@ public class RefinementStaticGapsTests
     public void Try_ReturningAMatchOfADifferentRefinement_IsRejected()
     {
         var result = Compile("""
-              §F{f1:Run:pub} (Pos:p, i32:k) -> Nat
-                §TR{t1}
-                  §R §W{w1} k
+              §F{Run:pub} (Pos:p, i32:k) -> Nat
+                §TR
+                  §R §W k
                     §K INT:1 → p
                     §K _ → p
                 §CA{Exception:e}
                   §R §C{Make} §A INT:0 §/C
                 §R §C{Make} §A INT:0 §/C
-              §F{f2:Make:pub} (i32:v) -> Nat
+              §F{Make:pub} (i32:v) -> Nat
                 §R v
             """);
         AssertDistinct(result, "Pos", "Nat", "a match arm");
@@ -323,9 +323,9 @@ public class RefinementStaticGapsTests
     public void Try_ForeachAndUsingBodies_ReportTheMatchArmMismatch()
     {
         var result = Compile("""
-              §F{f1:Run:pub} (Pos:p, i32:k, List<i32>:xs) -> i32
-                §EACH{e1:v:i32} xs
-                  §B{x:Nat} §W{w1} k
+              §F{Run:pub} (Pos:p, i32:k, List<i32>:xs) -> i32
+                §EACH{v:i32} xs
+                  §B{x:Nat} §W k
                     §K INT:1 → p
                     §K _ → p
                 §R INT:0
@@ -337,9 +337,9 @@ public class RefinementStaticGapsTests
     public void Try_MatchOfTheSameRefinement_IsAccepted()
     {
         AssertNoRefinementError(Compile("""
-              §F{f1:Run:pub} (Nat:n, i32:k) -> i32
-                §TR{t1}
-                  §B{x:Nat} §W{w1} k
+              §F{Run:pub} (Nat:n, i32:k) -> i32
+                §TR
+                  §B{x:Nat} §W k
                     §K INT:1 → n
                     §K _ → n
                   §R x
@@ -373,16 +373,16 @@ public class RefinementStaticGapsTests
                     §K _ → k
             """;
         var inTry = Check($$"""
-              §F{f1:Run:pub} (i32:k) -> void
-                §TR{t1}
-                  §B{s:str} §W{w1} k
+              §F{Run:pub} (i32:k) -> void
+                §TR
+                  §B{s:str} §W k
             {{Arms}}
                 §CA{Exception:e}
                   §P "caught"
             """);
         var outside = Check($$"""
-              §F{f1:Run:pub} (i32:k) -> void
-                §B{s:str} §W{w1} k
+              §F{Run:pub} (i32:k) -> void
+                §B{s:str} §W k
             {{Arms}}
             """);
 
@@ -394,10 +394,10 @@ public class RefinementStaticGapsTests
     public void Runtime_TryBodyBaseArmBoundAsRefinement_IsStillGuarded()
     {
         var assembly = CompileAndLoad("""
-              §F{f1:Run:pub} (Nat:seed, i32:k) -> i32
-                §TR{t1}
+              §F{Run:pub} (Nat:seed, i32:k) -> i32
+                §TR
                   §B{~x:Nat} seed
-                  §ASSIGN x §W{w1} k
+                  §ASSIGN x §W k
                     §K INT:1 → INT:5
                     §K _ → k
                   §R x
@@ -416,16 +416,16 @@ public class RefinementStaticGapsTests
     public void ClassMethod_BindCallReturnAndAssign_AreChecked()
     {
         var result = Compile("""
-              §CL{c1:Holder:pub}
+              §CL{Holder:pub}
                 §FLD{Pos:_p:priv}
-                §MT{mt1:Bind:pub} (Nat:n) -> i32
+                §MT{Bind:pub} (Nat:n) -> i32
                   §B{y:Pos} n
                   §R y
-                §MT{mt2:Call:pub} (Nat:n) -> i32
+                §MT{Call:pub} (Nat:n) -> i32
                   §R §C{TakePos} §A n §/C
-                §MT{mt3:Ret:pub} (Nat:n) -> Pos
+                §MT{Ret:pub} (Nat:n) -> Pos
                   §R n
-                §MT{mt4:Set:pub} (Nat:n) -> void
+                §MT{Set:pub} (Nat:n) -> void
                   §ASSIGN _p n
             """);
         AssertDistinct(result, "Nat", "Pos", "the binding of 'y'");
@@ -438,26 +438,26 @@ public class RefinementStaticGapsTests
     public void ClassConstructorAccessorsAndOperators_AreChecked()
     {
         var ctor = Compile("""
-              §CL{c1:Holder:pub}
+              §CL{Holder:pub}
                 §FLD{Pos:_p:priv}
-                §CTOR{ctor1:pub} (Nat:n)
+                §CTOR{pub} (Nat:n)
                   §ASSIGN _p n
             """);
         AssertDistinct(ctor, "Nat", "Pos", "assignment to '_p'");
 
         var getter = Compile("""
-              §CL{c1:Holder:pub}
+              §CL{Holder:pub}
                 §FLD{Pos:_p:priv}
-                §PROP{p1:P:Nat:pub}
+                §PROP{P:Nat:pub}
                   §GET{pub}
                     §R _p
             """);
         AssertDistinct(getter, "Pos", "Nat", "a return");
 
         var setter = Compile("""
-              §CL{c1:Holder:pub}
+              §CL{Holder:pub}
                 §FLD{Pos:_p:priv}
-                §PROP{p1:P:Nat:pub}
+                §PROP{P:Nat:pub}
                   §GET{pub}
                     §R INT:0
                   §SET{pub}
@@ -468,8 +468,8 @@ public class RefinementStaticGapsTests
         AssertNoRefinementError(setter);
 
         var op = Compile("""
-              §CL{c1:Holder:pub}
-                §OP{op1:+:pub} (Holder:a, Nat:b) -> Pos
+              §CL{Holder:pub}
+                §OP{+:pub} (Holder:a, Nat:b) -> Pos
                   §R b
             """);
         AssertDistinct(op, "Nat", "Pos", "a return");
@@ -479,11 +479,11 @@ public class RefinementStaticGapsTests
     public void ClassMember_MatchArmAndTryBody_AreChecked()
     {
         var result = Compile("""
-              §CL{c1:Holder:pub}
-                §MT{mt1:Run:pub} (Pos:p, Nat:seed, i32:k) -> i32
+              §CL{Holder:pub}
+                §MT{Run:pub} (Pos:p, Nat:seed, i32:k) -> i32
                   §B{~x:Nat} seed
-                  §TR{t1}
-                    §ASSIGN x §W{w1} k
+                  §TR
+                    §ASSIGN x §W k
                       §K INT:1 → p
                       §K _ → p
                   §CA{Exception:e}
@@ -497,8 +497,8 @@ public class RefinementStaticGapsTests
     public void ClassMember_InferredLocalRebindChangingTheRefinement_IsRejected()
     {
         var result = Compile("""
-              §CL{c1:Holder:pub}
-                §MT{mt1:Run:pub} (Pos:x, Nat:a) -> i32
+              §CL{Holder:pub}
+                §MT{Run:pub} (Pos:x, Nat:a) -> i32
                   §B{~x} a
                   §R x
             """);
@@ -514,27 +514,27 @@ public class RefinementStaticGapsTests
         // of an external base class) is left to Roslyn; a method shadows a same-named module
         // function, as it does in C#.
         AssertNoRefinementError(Compile("""
-              §CL{c0:BaseHolder:pub}
+              §CL{BaseHolder:pub}
                 §FLD{Nat:_base:prot}
-              §CL{c1:Holder:pub}
+              §CL{Holder:pub}
                 §EXT{BaseHolder}
                 §FLD{Pos:_p:priv}
-                §PROP{p1:P:Pos:pub}
+                §PROP{P:Pos:pub}
                   §GET{pub}
                     §R _p
                   §SET{pub}
                     §ASSIGN _p value
-                §CTOR{ctor1:pub} (Pos:p)
+                §CTOR{pub} (Pos:p)
                   §ASSIGN _p p
-                §MT{mt1:TakePos:pub} (Nat:n) -> i32
+                §MT{TakePos:pub} (Nat:n) -> i32
                   §R n
-                §MT{mt2:Use:pub} (Nat:n, i32:k) -> i32
+                §MT{Use:pub} (Nat:n, i32:k) -> i32
                   §B{a:Nat} _base
                   §B{b:Pos} _p
                   §B{~c:Nat} n
                   §ASSIGN c (+ k INT:1)
                   §R §C{TakePos} §A n §/C
-                §MT{mt3:Generic<T>:pub} (T:v) -> T
+                §MT{Generic<T>:pub} (T:v) -> T
                   §R v
             """));
     }
@@ -544,8 +544,8 @@ public class RefinementStaticGapsTests
     {
         // The checker stays silent (it has no member table); Roslyn still rejects the name.
         var result = Compile("""
-              §CL{c1:Holder:pub}
-                §MT{mt1:Run:pub} () -> i32
+              §CL{Holder:pub}
+                §MT{Run:pub} () -> i32
                   §R NoSuchMember
             """);
         Assert.DoesNotContain(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.UndefinedReference);
@@ -556,12 +556,12 @@ public class RefinementStaticGapsTests
     public void Runtime_ClassMemberGuards_StillFire()
     {
         var assembly = CompileAndLoad("""
-              §CL{c1:Holder:pub}
+              §CL{Holder:pub}
                 §FLD{Nat:_n:priv}
-                §MT{mt1:Write:pub} (i32:v) -> i32
+                §MT{Write:pub} (i32:v) -> i32
                   §ASSIGN _n v
                   §R _n
-                §MT{mt2:Local:pub} (Nat:a, i32:v) -> i32
+                §MT{Local:pub} (Nat:a, i32:v) -> i32
                   §B{~x} a
                   §ASSIGN x v
                   §R x
@@ -578,9 +578,9 @@ public class RefinementStaticGapsTests
         // The emitter declares `var _p = n;` (a local shadowing the field), so the rebind rules,
         // which reject changing a refinement, must not treat the Pos field as the target.
         var assembly = CompileAndLoad("""
-              §CL{c1:Holder:pub}
+              §CL{Holder:pub}
                 §FLD{Pos:_p:priv}
-                §MT{mt1:Run:pub} (Nat:n, i32:v) -> i32
+                §MT{Run:pub} (Nat:n, i32:v) -> i32
                   §B{~_p} n
                   §ASSIGN _p v
                   §R _p
@@ -594,9 +594,9 @@ public class RefinementStaticGapsTests
     public void Runtime_LocalInferredFromARefinedField_IsGuarded()
     {
         var assembly = CompileAndLoad("""
-              §CL{c1:Holder:pub}
+              §CL{Holder:pub}
                 §FLD{Nat:_n:priv}
-                §MT{mt1:Run:pub} (i32:v) -> i32
+                §MT{Run:pub} (i32:v) -> i32
                   §B{~x} _n
                   §ASSIGN x v
                   §R x
@@ -614,9 +614,9 @@ public class RefinementStaticGapsTests
     public void Print_MemberAccessTheCheckerCannotType_StillCompiles(bool withRefinements)
     {
         // §P keeps only refinement errors: the checker cannot type `s.Length`, Roslyn can.
-        var header = withRefinements ? Header : "§M{m:Rt}";
+        var header = withRefinements ? Header : "§M{Rt}";
         var result = Program.Compile(header + "\n" + """
-              §F{f1:Show:pub} (str:s) -> void
+              §F{Show:pub} (str:s) -> void
                 §E{cw}
                 §P s.Length
             """, "print-member.calr", new CompilationOptions { EnableTypeChecking = true });
@@ -627,9 +627,9 @@ public class RefinementStaticGapsTests
     public void Try_OrdinaryArmMismatchBeforeARefinementArm_StillReportsTheRefinement()
     {
         var result = Compile("""
-              §F{f1:Run:pub} (Pos:p, i32:k) -> i32
-                §TR{t1}
-                  §B{x:Nat} §W{w1} k
+              §F{Run:pub} (Pos:p, i32:k) -> i32
+                §TR
+                  §B{x:Nat} §W k
                     §K INT:0 → k
                     §K _ → p
                   §R x
@@ -644,17 +644,17 @@ public class RefinementStaticGapsTests
     public void ClassMember_ThisQualifiedFieldWriteAndRead_AreChecked()
     {
         var write = Compile("""
-              §CL{c1:Holder:pub}
+              §CL{Holder:pub}
                 §FLD{Pos:_p:priv}
-                §MT{mt1:Set:pub} (Nat:n) -> void
+                §MT{Set:pub} (Nat:n) -> void
                   §ASSIGN this._p n
             """);
         AssertDistinct(write, "Nat", "Pos", "assignment to 'this._p'");
 
         var read = Compile("""
-              §CL{c1:Holder:pub}
+              §CL{Holder:pub}
                 §FLD{Pos:_p:priv}
-                §MT{mt1:Get:pub} (Nat:_p) -> Nat
+                §MT{Get:pub} (Nat:_p) -> Nat
                   §R this._p
             """);
         AssertDistinct(read, "Pos", "Nat", "a return");
@@ -664,18 +664,18 @@ public class RefinementStaticGapsTests
     public void ClassMember_CaseDistinctMembers_AreDistinctVariables()
     {
         const string Members = """
-              §CL{c1:Holder:pub}
+              §CL{Holder:pub}
                 §FLD{Nat:n:priv}
-                §PROP{p1:N:Pos:pub:get,set}
+                §PROP{N:Pos:pub:get,set}
             """;
         AssertNoRefinementError(Compile(Members + """
 
-                §MT{mt1:Small:pub} () -> Nat
+                §MT{Small:pub} () -> Nat
                   §R n
             """));
         AssertDistinct(Compile(Members + """
 
-                §MT{mt1:Big:pub} () -> Nat
+                §MT{Big:pub} () -> Nat
                   §R N
             """), "Pos", "Nat", "a return");
     }
@@ -685,13 +685,13 @@ public class RefinementStaticGapsTests
     {
         // C# resolves `Take` to the enclosing class's static method, not the module function.
         AssertNoRefinementError(Compile("""
-              §F{f0:Take:pub} (Pos:p) -> i32
+              §F{Take:pub} (Pos:p) -> i32
                 §R p
-              §CL{c1:Outer:pub}
-                §MT{mt1:Take:pub:stat} (Nat:n) -> i32
+              §CL{Outer:pub}
+                §MT{Take:pub:stat} (Nat:n) -> i32
                   §R n
-                §CL{c2:Inner:pub}
-                  §MT{mt2:Use:pub} (Nat:n) -> i32
+                §CL{Inner:pub}
+                  §MT{Use:pub} (Nat:n) -> i32
                     §R §C{Take} §A n §/C
             """));
     }
@@ -700,13 +700,13 @@ public class RefinementStaticGapsTests
     public void ClassMember_AmbiguousOrGenericBaseClass_ImportsNoMembers()
     {
         AssertNoRefinementError(Compile("""
-              §CL{c0:Base:pub}
+              §CL{Base:pub}
                 §FLD{Nat:v:prot}
-              §CL{c1:Base<T>:pub}
+              §CL{Base<T>:pub}
                 §FLD{Pos:v:prot}
-              §CL{c2:Derived:pub}
+              §CL{Derived:pub}
                 §EXT{Base<i32>}
-                §MT{mt1:Get:pub} () -> Pos
+                §MT{Get:pub} () -> Pos
                   §R v
             """));
     }
@@ -719,18 +719,18 @@ public class RefinementStaticGapsTests
         // C# calls Derived.Take (returns Nat); the checker must not pick Base.Take (returns Pos)
         // and give x a Pos guard that rejects a valid 0.
         var assembly = CompileAndLoad("""
-              §CL{c0:Base:pub}
-                §MT{mt0:Take:pub} (Nat:n) -> Pos
+              §CL{Base:pub}
+                §MT{Take:pub} (Nat:n) -> Pos
                   §R §C{ToPos} §A INT:1 §/C
-                §MT{mt9:ToPos:pub} (i32:v) -> Pos
+                §MT{ToPos:pub} (i32:v) -> Pos
                   §R v
-              §CL{c1:Derived:pub}
+              §CL{Derived:pub}
                 §EXT{Base}
-                §MT{mt1:Take:pub} (i32:n) -> Nat
+                §MT{Take:pub} (i32:n) -> Nat
                   §R §C{ToNat} §A INT:0 §/C
-                §MT{mt8:ToNat:pub} (i32:v) -> Nat
+                §MT{ToNat:pub} (i32:v) -> Nat
                   §R v
-                §MT{mt2:Get:pub} (Nat:n) -> i32
+                §MT{Get:pub} (Nat:n) -> i32
                   §B{~x} §C{Take} §A n §/C
                   §R x
             """);
@@ -742,14 +742,14 @@ public class RefinementStaticGapsTests
     public void ClassMember_NestedBaseClassOfTheSameName_ImportsNoMembers()
     {
         AssertNoRefinementError(Compile("""
-              §CL{c0:Base:pub}
+              §CL{Base:pub}
                 §FLD{Nat:v:prot}
-              §CL{c1:Outer:pub}
-                §CL{c2:Base:pub}
+              §CL{Outer:pub}
+                §CL{Base:pub}
                   §FLD{Pos:v:prot}
-                §CL{c3:Derived:pub}
+                §CL{Derived:pub}
                   §EXT{Base}
-                  §MT{mt1:Get:pub} () -> Pos
+                  §MT{Get:pub} () -> Pos
                     §R v
             """));
     }
@@ -758,11 +758,11 @@ public class RefinementStaticGapsTests
     public void ClassMember_CallThatMayBeAnInheritedMethod_IsNotCheckedAgainstAModuleFunction()
     {
         AssertNoRefinementError(Compile("""
-              §F{f0:Add:pub} (Pos:p) -> i32
+              §F{Add:pub} (Pos:p) -> i32
                 §R p
-              §CL{c1:Holder:pub}
+              §CL{Holder:pub}
                 §EXT{System.Collections.Generic.List<i32>}
-                §MT{mt1:Use:pub} (Nat:n) -> void
+                §MT{Use:pub} (Nat:n) -> void
                   §C{Add} §A n §/C
             """));
     }
@@ -771,21 +771,21 @@ public class RefinementStaticGapsTests
     public void ExpressionLambdaReturningADifferentRefinement_IsRejectedInPrintAndInAClassMethod()
     {
         const string Factory = """
-              §DEL{d1:Factory:pub}
+              §DEL{Factory:pub}
                 §O{Pos}
-              §F{f0:Apply:pub} (Factory:fn) -> i32
+              §F{Apply:pub} (Factory:fn) -> i32
                 §R §C{fn} §/C
             """;
         AssertDistinct(Compile(Factory + """
 
-              §F{f1:Run:pub} (Nat:n) -> void
-                §P §C{Apply} §A §LAM{l1} n §/LAM{l1} §/C
+              §F{Run:pub} (Nat:n) -> void
+                §P §C{Apply} §A §LAM{} n §/LAM §/C
             """), "Nat", "Pos", "a lambda return");
         AssertDistinct(Compile(Factory + """
 
-              §CL{c1:Holder:pub}
-                §MT{mt1:Run:pub} (Nat:n) -> i32
-                  §B{f:Factory} §LAM{l1} n §/LAM{l1}
+              §CL{Holder:pub}
+                §MT{Run:pub} (Nat:n) -> i32
+                  §B{f:Factory} §LAM{} n §/LAM
                   §R §C{f} §/C
             """), "Nat", "Pos", "a lambda return");
     }
@@ -794,15 +794,15 @@ public class RefinementStaticGapsTests
     public void Runtime_LambdaInAClassMethod_IsGuarded()
     {
         var assembly = CompileAndLoad("""
-              §DEL{d1:Mapper:pub}
+              §DEL{Mapper:pub}
                 §I{Nat:p}
                 §O{i32}
-              §CL{c1:Holder:pub}
-                §MT{mt1:Run:pub} (Nat:a) -> i32
-                  §B{fn:Mapper} §LAM{l1:p}
+              §CL{Holder:pub}
+                §MT{Run:pub} (Nat:a) -> i32
+                  §B{fn:Mapper} §LAM{p}
                     §ASSIGN p (- p INT:10)
                     §R p
-                  §/LAM{l1}
+                  §/LAM
                   §R §C{fn} §A a §/C
             """);
 

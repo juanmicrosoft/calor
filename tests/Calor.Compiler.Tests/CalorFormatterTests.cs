@@ -23,7 +23,7 @@ public class CalorFormatterTests
     public void Format_MinimalModule_ProducesCorrectOutput()
     {
         var source = @"
-§M{m001:Test}
+§M{Test}
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -40,8 +40,8 @@ public class CalorFormatterTests
     {
         // Simplified test without using directives which have complex parsing
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
     §O{void}
 ";
         var module = Parse(source, out var diagnostics);
@@ -62,8 +62,8 @@ public class CalorFormatterTests
     public void Format_FunctionWithParameters_IncludesTypeAndName()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
+§M{Test}
+  §F{Add:pub}
     §I{i32:a}
     §I{i32:b}
     §O{i32}
@@ -83,8 +83,8 @@ public class CalorFormatterTests
     public void Format_FunctionWithEffects_IncludesEffectsDeclaration()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Print:pub}
+§M{Test}
+  §F{Print:pub}
     §I{str:message}
     §E{cw}
     §C{Console.WriteLine} message
@@ -104,8 +104,8 @@ public class CalorFormatterTests
     public void Format_FunctionWithContracts_IncludesPreconditionsAndPostconditions()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
     §I{i32:a}
     §I{i32:b}
     §O{i32}
@@ -131,8 +131,8 @@ public class CalorFormatterTests
     public void Format_BindStatement_FormatsCorrectly()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
     §O{i32}
     §B{x} 42
     §R x
@@ -150,11 +150,11 @@ public class CalorFormatterTests
     public void Format_IfStatement_FormatsWithIndentation()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
     §I{bool:cond}
     §O{i32}
-    §IF{if1} cond
+    §IF cond
       §R 1
     §EL
       §R 0
@@ -172,11 +172,11 @@ public class CalorFormatterTests
     public void Format_ForLoop_FormatsCorrectly()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
     §O{void}
     §E{cw}
-    §L{l1:i:0:10:1}
+    §L{i:0:10:1}
       §C{Console.WriteLine} i
 ";
         var module = Parse(source, out var diagnostics);
@@ -193,12 +193,12 @@ public class CalorFormatterTests
     public void Format_WhileLoop_FormatsCorrectly()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
     §I{bool:running}
     §O{void}
     §E{cw}
-    §WH{w1} running
+    §WH running
       §P ""working""
 ";
         var module = Parse(source, out var diagnostics);
@@ -215,11 +215,11 @@ public class CalorFormatterTests
     public void Format_MatchStatement_FormatsWithCases()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
     §I{i32:x}
     §O{i32}
-    §W{m1} x
+    §W x
     §K null
       §R 1
     §K _
@@ -243,8 +243,8 @@ public class CalorFormatterTests
     public void Format_Literals_FormatsCorrectly()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
     §O{void}
     §B{a} 42
     §B{b} 3.14
@@ -266,8 +266,8 @@ public class CalorFormatterTests
     public void Format_BinaryOperations_FormatsWithParentheses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
     §I{i32:a}
     §I{i32:b}
     §O{i32}
@@ -286,11 +286,11 @@ public class CalorFormatterTests
     public void Format_NullableExpressions_FormatsCorrectly()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
     §O{?i32}
     §R 42
-  §F{f002:Test2:pub}
+  §F{Test2:pub}
     §O{?i32}
     §R null
 ";
@@ -308,11 +308,11 @@ public class CalorFormatterTests
     public void Format_ReturnAndThrow_FormatsCorrectly()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
     §O{i32}
     §R 42
-  §F{f002:Test2:pub}
+  §F{Test2:pub}
     §O{str}
     §TH §NEW{Exception} §A ""error"" §/NEW
 ";
@@ -334,13 +334,13 @@ public class CalorFormatterTests
     public void Format_NestedStatements_IndentsCorrectly()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
     §I{bool:a}
     §I{bool:b}
     §O{i32}
-    §IF{if1} a
-      §IF{if2} b
+    §IF a
+      §IF b
         §R 2
       §EL
         §R 1
@@ -368,8 +368,8 @@ public class CalorFormatterTests
     {
         // Test that basic formatting works and produces parseable output
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
+§M{Test}
+  §F{Add:pub}
     §I{i32:a}
     §I{i32:b}
     §O{i32}
@@ -397,10 +397,10 @@ public class CalorFormatterTests
     public void Format_ForeachWithIndex_EmitsForeachBlock()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
-                  §EACH{e001:item:i32:idx} items
+                  §EACH{item:i32:idx} items
                       §P item
             """;
 
@@ -418,10 +418,10 @@ public class CalorFormatterTests
     public void Format_ForeachWithoutIndex_EmitsForeachBlockWithoutIndex()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
-                  §EACH{e001:item:i32} items
+                  §EACH{item:i32} items
                       §P item
             """;
 

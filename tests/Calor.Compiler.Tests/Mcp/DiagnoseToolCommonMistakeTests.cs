@@ -22,7 +22,7 @@ public class DiagnoseToolCommonMistakeTests
         var args = JsonDocument.Parse("""
             {
                 "action": "diagnose",
-                "source": "§M{m001:Test} §F{f001:Fn:pub} §I{i32:x} §O{i32} §R (abs x)"
+                "source": "§M{Test} §F{Fn:pub} §I{i32:x} §O{i32} §R (abs x)"
             }
             """).RootElement;
 
@@ -79,7 +79,7 @@ public class DiagnoseToolCommonMistakeTests
         var args = JsonDocument.Parse("""
             {
                 "action": "diagnose",
-                "source": "§M{m001:Test} §F{f001:Add:pub} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b)"
+                "source": "§M{Test} §F{Add:pub} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b)"
             }
             """).RootElement;
 
@@ -101,7 +101,7 @@ public class DiagnoseToolCommonMistakeTests
         var args = JsonDocument.Parse("""
             {
                 "action": "diagnose",
-                "source": "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\")"
+                "source": "§M{Test} §F{Fn} §O{i32} §R (cotains \"hello\" \"h\")"
             }
             """).RootElement;
 

@@ -10,12 +10,12 @@ public class OpaqueInteropOverloadTests
     public void PreprocessorInteropMethod_KeepsSameNameCallOpaque()
     {
         const string source = """
-            §M{m001:TestModule}
-              §CL{c001:Value:pub}
+            §M{TestModule}
+              §CL{Value:pub}
                 §PP{true}
                   §CSHARP{public string Format(string? format, object? provider) => "";}§/CSHARP
                 §/PP{true}
-                §MT{m001:Format:pub} () -> string
+                §MT{Format:pub} () -> string
                   §R §C{Format} §A null §A null §/C
             """;
 
@@ -45,12 +45,12 @@ public class OpaqueInteropOverloadTests
     public void ExplicitInterfaceInteropMethod_DoesNotHideNoMatchingOverload(string target)
     {
         var source = $$"""
-            §M{m001:TestModule}
-              §CL{c001:Value:pub}
+            §M{TestModule}
+              §CL{Value:pub}
                 §CSHARP{string IFoo.Format(string value) => value;}§/CSHARP
-                §MT{m001:Format:pub} () -> string
+                §MT{Format:pub} () -> string
                   §R ""
-                §MT{m002:Probe:pub} () -> string
+                §MT{Probe:pub} () -> string
                   §R §C{ {{target}} } §A "value" §/C
             """;
 

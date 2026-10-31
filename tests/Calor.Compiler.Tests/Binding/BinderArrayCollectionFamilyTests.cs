@@ -213,12 +213,12 @@ public class BinderArrayCollectionFamilyTests
         // The B2-review standard applied to B3: a /0 nested in a bound B3 node must
         // produce the actual Calor0920 through the full pipeline, not merely a subtree.
         const string source = @"
-§M{m001:Test}
-  §F{f001:Trap:pub} () -> void
+§M{Test}
+  §F{Trap:pub} () -> void
     §E{cw,alloc}
     §LIST{xs:i32}
       (/ 10 0)
-    §/LIST{xs}
+    §/LIST
     §P §CNT{xs}";
 
         var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions

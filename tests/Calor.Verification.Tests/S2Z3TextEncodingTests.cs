@@ -44,8 +44,8 @@ public sealed class S2Z3TextEncodingTests
         // R1-STR-NULL-NONASCII-001 and -004 (the same source).
         Assert.Equal(1, "\u00e9".Length);
         const string source = """
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} (bool:c) -> str
+            §M{R1Case}
+              §F{Probe:pub} (bool:c) -> str
                 §E{}
                 §S (<= (len result) INT:1)
                 §R (? c STR:"\u00e9" STR:"")
@@ -60,8 +60,8 @@ public sealed class S2Z3TextEncodingTests
     {
         Assert.Equal(4, "\ud83d\ude00ab".Length);
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:pub} (bool:c) -> i32
+            §M{M}
+              §F{Probe:pub} (bool:c) -> i32
                 §E{}
                 §S (== result INT:4)
                 §R (len (? c STR:"\ud83d\ude00ab" STR:"abcd"))
@@ -75,8 +75,8 @@ public sealed class S2Z3TextEncodingTests
         // The Calor literal is the six characters \u{41}; Z3 must not read it as "A".
         Assert.Equal(6, "\\u{41}".Length);
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:pub} () -> i32
+            §M{M}
+              §F{Probe:pub} () -> i32
                 §E{}
                 §S (== result INT:6)
                 §R (len STR:"\\u{41}")
@@ -91,8 +91,8 @@ public sealed class S2Z3TextEncodingTests
         // R1-STR-OPS-COUNT-INDEX-003: s.Substring(1, 1) throws for s.Length < 2.
         Assert.Throws<ArgumentOutOfRangeException>(() => "".Substring(1, 1));
         const string source = """
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} (str:s) -> i32
+            §M{R1Case}
+              §F{Probe:pub} (str:s) -> i32
                 §E{}
                 §S (== result INT:4)
                 §R (len (substr s INT:1 INT:1))
@@ -111,8 +111,8 @@ public sealed class S2Z3TextEncodingTests
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => "a".Substring(2));
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:pub} (str:s) -> i32
+            §M{M}
+              §F{Probe:pub} (str:s) -> i32
                 §E{}
                 §S (== result INT:5)
                 §R (len (substr s INT:2))
@@ -131,8 +131,8 @@ public sealed class S2Z3TextEncodingTests
     {
         // Review round 2 witness: every normal return produces 1; s = "" throws in .NET.
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:pub} (str:s) -> i32
+            §M{M}
+              §F{Probe:pub} (str:s) -> i32
                 §E{}
                 §S (== result INT:1)
                 §B{i:i32} INT:1
@@ -149,8 +149,8 @@ public sealed class S2Z3TextEncodingTests
         string? s = null;
         Assert.True(string.IsNullOrEmpty(s) && s != "");
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:pub} (str:s) -> i32
+            §M{M}
+              §F{Probe:pub} (str:s) -> i32
                 §E{}
                 §Q (|| (!= (len STR:"\u00e9") INT:1) (&& (isempty s) (!= s STR:"")))
                 §S (== result INT:1)
@@ -169,8 +169,8 @@ public sealed class S2Z3TextEncodingTests
         Assert.True(translator.DeclareVariable("a", "i32[]"));
         var diagnostics = new DiagnosticBag();
         var module = new Calor.Compiler.Parsing.Parser(new Calor.Compiler.Parsing.Lexer("""
-            §M{m1:M}
-              §F{f1:P:pub} () -> i32
+            §M{M}
+              §F{P:pub} () -> i32
                 §E{}
                 §S (forall ((q i32)) (>= q INT:0))
                 §R INT:0
@@ -193,8 +193,8 @@ public sealed class S2Z3TextEncodingTests
     {
         // The emitted call ignores the start index, so the solver must not model one.
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:pub} () -> i32
+            §M{M}
+              §F{Probe:pub} () -> i32
                 §E{}
                 §S (== result INT:4)
                 §R (indexof STR:"abcabc" STR:"b" INT:3 :ordinal)
@@ -206,8 +206,8 @@ public sealed class S2Z3TextEncodingTests
     public void SubstringOverALocal_IsUnsupported()
     {
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:pub} (str:s) -> i32
+            §M{M}
+              §F{Probe:pub} (str:s) -> i32
                 §E{}
                 §Q (== s STR:"ab")
                 §S (== result INT:1)
@@ -225,8 +225,8 @@ public sealed class S2Z3TextEncodingTests
         // throws; substituting the literal 1 for i would wrap to start 0.
         Assert.Throws<ArgumentOutOfRangeException>(() => "".Substring(1, 0));
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:pub} (u32:x, str:s) -> i32
+            §M{M}
+              §F{Probe:pub} (u32:x, str:s) -> i32
                 §E{}
                 §Q (== x UINT:4294967295)
                 §Q (== s STR:"")
@@ -242,8 +242,8 @@ public sealed class S2Z3TextEncodingTests
     {
         // Review round 3 witness: the substring runs once, at the binding, not in the arms.
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:pub} (str:s, bool:c) -> i32
+            §M{M}
+              §F{Probe:pub} (str:s, bool:c) -> i32
                 §E{}
                 §Q (== s STR:"ab")
                 §S (== result INT:1)
@@ -259,8 +259,8 @@ public sealed class S2Z3TextEncodingTests
         // Review round 3 witness: every string operand is a non-null literal, so the
         // precondition is unsatisfiable at runtime too.
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:pub} (bool:c) -> i32
+            §M{M}
+              §F{Probe:pub} (bool:c) -> i32
                 §E{}
                 §Q (== (? c STR:"a" STR:"b") STR:"c")
                 §S (== result INT:1)
@@ -284,8 +284,8 @@ public sealed class S2Z3TextEncodingTests
     public void SubstringInConditionalPosition_IsUnsupported()
     {
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:pub} (str:s, bool:c) -> i32
+            §M{M}
+              §F{Probe:pub} (str:s, bool:c) -> i32
                 §E{}
                 §S (== result INT:4)
                 §R (? c (len (substr s INT:1 INT:1)) INT:4)
@@ -331,8 +331,8 @@ public sealed class S2Z3TextEncodingTests
         // #1493: if the two names collapsed into one Z3 constant (Windows, ANSI code page),
         // the precondition on ж would "prove" the postcondition on щ.
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:pub} (i32:ж, i32:щ) -> i32
+            §M{M}
+              §F{Probe:pub} (i32:ж, i32:щ) -> i32
                 §E{}
                 §Q (== ж INT:0)
                 §S (== щ INT:0)

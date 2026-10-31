@@ -14,7 +14,7 @@ namespace Calor.Compiler.Tests;
 ///
 /// Invariants:
 ///   T-heal-a  bare structural closers (§/F, §/M) are removed
-///   T-heal-b  id-bearing closers (§/F{f1}, §/M{m1}) removed incl. payload
+///   T-heal-b  id-bearing closers (§/F, §/M) removed incl. payload
 ///   T-heal-c  non-structural inline closer (§/C) is NOT removed
 ///   T-heal-d  a §/F inside a STRING literal is NOT removed (safety)
 ///   T-heal-e  a §/F inside a // COMMENT is NOT removed (safety)
@@ -30,14 +30,14 @@ public class CloserHealMigratorTests
     private static readonly CloserHealMigrator Sut = new();
 
     private const string CloserModule =
-        "§M{m1:Calc}\n" +
-        "  §F{f1:Add:pub}\n" +
+        "§M{Calc}\n" +
+        "  §F{Add:pub}\n" +
         "    §I{i32:a}\n" +
         "    §I{i32:b}\n" +
         "    §O{i32}\n" +
         "    §R (+ a b)\n" +
-        "  §/F{f1}\n" +
-        "§/M{m1}\n";
+        "  §/F\n" +
+        "§/M\n";
 
     [Fact]
     public void T_heal_a_RemovesBareStructuralClosers()
@@ -101,12 +101,12 @@ public class CloserHealMigratorTests
     public void T_heal_f_MixedStringAndGenuine_HealsOnlyGenuine()
     {
         const string src =
-            "§M{m1:Calc}\n" +
-            "  §F{f1:run:pub}\n" +
+            "§M{Calc}\n" +
+            "  §F{run:pub}\n" +
             "    §P \"literal §/F stays\"\n" +
             "    §R INT:0\n" +
-            "  §/F{f1}\n" +
-            "§/M{m1}\n";
+            "  §/F\n" +
+            "§/M\n";
 
         // Raw scan sees 3 (string §/F + two genuine); safe scan sees 2.
         Assert.Equal(3, LegacyCloserFormLint.Scan(src, "f.calr").Count);
@@ -134,11 +134,11 @@ public class CloserHealMigratorTests
         // Unicode before the closer (é, 世) exercises the char→byte offset
         // conversion; CRLF line endings exercise \r handling.
         var src =
-            "§M{m1:Café}\r\n" +
-            "  §F{f1:世界:pub}\r\n" +
+            "§M{Café}\r\n" +
+            "  §F{世界:pub}\r\n" +
             "    §R INT:0\r\n" +
-            "  §/F{f1}\r\n" +
-            "§/M{m1}\r\n";
+            "  §/F\r\n" +
+            "§/M\r\n";
         var (migrated, removals) = Sut.Process(src, "h.calr");
         Assert.Equal(2, removals.Count);
 

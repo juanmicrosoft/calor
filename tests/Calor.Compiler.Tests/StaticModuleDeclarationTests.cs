@@ -230,37 +230,37 @@ public class StaticModuleDeclarationTests
         var declarations = shape switch
         {
             "unrelated" => """
-                  §M{m1:Outer:pub}
+                  §M{Outer:pub}
                     §FLD{i32:Value:priv:stat} = 3
-                  §M{m2:Caller:pub}
-                    §F{f1:Read:pub} () -> i32
+                  §M{Caller:pub}
+                    §F{Read:pub} () -> i32
                       §R Outer.Value
                 """,
             "outer-to-inner" => """
-                  §M{m1:Outer:pub}
-                    §CL{c1:Inner:pub}
+                  §M{Outer:pub}
+                    §CL{Inner:pub}
                       §FLD{i32:Value:priv:stat} = 3
-                    §F{f1:Read:pub} () -> i32
+                    §F{Read:pub} () -> i32
                       §R Inner.Value
                 """,
             "sibling" => """
-                  §M{m1:Outer:pub}
-                    §CL{c1:Sibling:pub}
-                      §MT{mt1:Secret:priv:stat} () -> i32
+                  §M{Outer:pub}
+                    §CL{Sibling:pub}
+                      §MT{Secret:priv:stat} () -> i32
                         §R 3
-                    §CL{c2:Caller:pub}
-                      §MT{mt2:Read:pub:stat} () -> i32
+                    §CL{Caller:pub}
+                      §MT{Read:pub:stat} () -> i32
                         §R §C{Sibling.Secret} §/C
                 """,
             _ => """
-                  §M{m1:Outer:pub}
+                  §M{Outer:pub}
                     §FLD{i32:Value:priv:stat} = 3
-                    §CL{c1:Inner:pub}
-                      §MT{mt1:Read:pub:stat} () -> i32
+                    §CL{Inner:pub}
+                      §MT{Read:pub:stat} () -> i32
                         §R Inner.Value
                 """
         };
-        var source = "§M{root:Access}\n" + declarations;
+        var source = "§M{Access}\n" + declarations;
         var module = Parse(source);
         var generated = new CSharpEmitter().Emit(module);
         Assert.Contains(Compilation(generated).GetDiagnostics(), diagnostic => diagnostic.Id == expectedCSharpCode);
@@ -343,14 +343,14 @@ public class StaticModuleDeclarationTests
     public void ModuleMembers_AreImplicitlyStatic_AndEmptySiblingsRemainSiblings()
     {
         var module = Parse("""
-            §M{m0:Library}
-              §M{m1:Empty:pub}
-              §M{m2:Helpers:pub}
+            §M{Library}
+              §M{Empty:pub}
+              §M{Helpers:pub}
                 §FLD{i32:Count:pub} = 3
-                §PROP{p1:Value:i32:pub} = 4
-                §F{f1:Get:pub} () -> i32
+                §PROP{Value:i32:pub} = 4
+                §F{Get:pub} () -> i32
                   §R (+ Count Value)
-              §CL{c1:Sibling:pub}
+              §CL{Sibling:pub}
             """);
         Assert.Equal(3, module.Classes.Count);
         var helpers = module.Classes[1];
@@ -368,9 +368,9 @@ public class StaticModuleDeclarationTests
     public void ModuleClassCollision_IsDiagnosedInEitherOrder(bool moduleFirst)
     {
         var declarations = moduleFirst
-            ? "  §M{m1:Helpers:pub}\n  §CL{c1:Helpers:pub}"
-            : "  §CL{c1:Helpers:pub}\n  §M{m1:Helpers:pub}";
-        var module = Parse("§M{m0:Library}\n" + declarations);
+            ? "  §M{Helpers:pub}\n  §CL{Helpers:pub}"
+            : "  §CL{Helpers:pub}\n  §M{Helpers:pub}";
+        var module = Parse("§M{Library}\n" + declarations);
         Assert.Contains(Bind(module), diagnostic => diagnostic.Code == DiagnosticCode.DuplicateDefinition);
     }
 
@@ -378,14 +378,14 @@ public class StaticModuleDeclarationTests
     public void CollisionCheck_UsesLexicalNamespaceContainingTypeAndGenericArity()
     {
         var module = Parse("""
-            §M{m0:File}
-              §NS{ns1:First}
-                §M{m1:Helpers:pub}
-                §CL{c1:Helpers<T>:pub}
-                §CL{c2:Outer:pub}
-                  §M{m2:Helpers:pub}
-              §NS{ns2:Second}
-                §CL{c3:Helpers:pub}
+            §M{File}
+              §NS{First}
+                §M{Helpers:pub}
+                §CL{Helpers<T>:pub}
+                §CL{Outer:pub}
+                  §M{Helpers:pub}
+              §NS{Second}
+                §CL{Helpers:pub}
             """);
         Assert.DoesNotContain(Bind(module), diagnostic => diagnostic.Code == DiagnosticCode.DuplicateDefinition);
         Compile(new CSharpEmitter().Emit(module));
@@ -395,10 +395,10 @@ public class StaticModuleDeclarationTests
     public void NestedModuleClassCollision_IsDiagnosed()
     {
         var module = Parse("""
-            §M{m0:Library}
-              §CL{c1:Outer:pub}
-                §M{m1:Helpers:pub}
-                §CL{c2:Helpers:pub}
+            §M{Library}
+              §CL{Outer:pub}
+                §M{Helpers:pub}
+                §CL{Helpers:pub}
             """);
         Assert.Contains(Bind(module), diagnostic => diagnostic.Code == DiagnosticCode.DuplicateDefinition);
     }
@@ -407,33 +407,33 @@ public class StaticModuleDeclarationTests
     public void LegacyFunctionContainerCollision_IsDiagnosed()
     {
         var module = Parse("""
-            §M{m0:Library}
-              §F{f1:Get:pub} () -> i32
+            §M{Library}
+              §F{Get:pub} () -> i32
                 §R 1
-              §CL{c1:LibraryModule:pub}
+              §CL{LibraryModule:pub}
             """);
         Assert.Contains(Bind(module), diagnostic => diagnostic.Code == DiagnosticCode.DuplicateDefinition);
     }
 
     [Theory]
-    [InlineData("  §M{m1:Helpers<T>:pub}\n    §F{f1:Run:pub} (T:value:this) -> T\n      §R value")]
-    [InlineData("  §CL{c1:Outer:pub}\n    §M{m1:Helpers:pub}\n      §F{f1:Run:pub} (i32:value:this) -> i32\n        §R value")]
-    [InlineData("  §M{m1:Helpers:pub}\n    §F{f1:Run:pub} (i32:first, i32:second:this) -> i32\n      §R first")]
+    [InlineData("  §M{Helpers<T>:pub}\n    §F{Run:pub} (T:value:this) -> T\n      §R value")]
+    [InlineData("  §CL{Outer:pub}\n    §M{Helpers:pub}\n      §F{Run:pub} (i32:value:this) -> i32\n        §R value")]
+    [InlineData("  §M{Helpers:pub}\n    §F{Run:pub} (i32:first, i32:second:this) -> i32\n      §R first")]
     public void InvalidExtensionContainersOrReceiverPositions_AreDiagnosed(string declarations)
     {
-        var module = Parse("§M{m0:Library}\n" + declarations);
+        var module = Parse("§M{Library}\n" + declarations);
         Assert.Contains(Bind(module), diagnostic =>
             diagnostic.Code == DiagnosticCode.InvalidReference && diagnostic.Message.Contains("Extension"));
-        Assert.True(Program.Compile("§M{m0:Library}\n" + declarations, "invalid-extension.calr").HasErrors);
+        Assert.True(Program.Compile("§M{Library}\n" + declarations, "invalid-extension.calr").HasErrors);
     }
 
     [Theory]
-    [InlineData("  §M{m1:Helpers:pub:abs}")]
-    [InlineData("  §M{m1:Helpers:pub:seal}")]
-    [InlineData("  §M{m1:Helpers:pub}\n    §CTOR{ctor1:pub} ()")]
+    [InlineData("  §M{Helpers:pub:abs}")]
+    [InlineData("  §M{Helpers:pub:seal}")]
+    [InlineData("  §M{Helpers:pub}\n    §CTOR{pub} ()")]
     public void InvalidModuleInstanceShapes_StopCompilation(string declaration)
     {
-        var source = "§M{m0:Library}\n" + declaration;
+        var source = "§M{Library}\n" + declaration;
         Parse(source);
         var compilation = Program.Compile(source, "invalid-module.calr");
         Assert.True(compilation.HasErrors);
@@ -492,9 +492,9 @@ public class StaticModuleDeclarationTests
     public void LegacyStaticClasses_AreRejectedWithNamedModuleReplacement(string modifiers)
     {
         var source = $$"""
-            §M{m0:Library}
+            §M{Library}
               §CL{c1:Helpers:{{modifiers}}}
-                §MT{mt1:Get:pub:stat} () -> i32
+                §MT{Get:pub:stat} () -> i32
                   §R 1
             """;
         var result = Program.Compile(source, "legacy-static.calr");
@@ -601,16 +601,16 @@ public class StaticModuleDeclarationTests
     public void PartialMergeAndContractSimplification_PreserveModuleOwnership()
     {
         var first = Parse("""
-            §M{m0:Library}
-              §M{m1:Helpers:pub:partial}
-                §F{f1:First:pub} (i32:value) -> i32
+            §M{Library}
+              §M{Helpers:pub:partial}
+                §F{First:pub} (i32:value) -> i32
                   §Q (> 2 1)
                   §R value
             """);
         var second = Parse("""
-            §M{m2:Library}
-              §M{m3:Helpers:pub:partial}
-                §F{f2:Second:pub} () -> i32
+            §M{Library}
+              §M{Helpers:pub:partial}
+                §F{Second:pub} () -> i32
                   §R 2
             """);
         var merged = new PartialClassMerger().Merge([first, second]);

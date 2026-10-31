@@ -103,11 +103,11 @@ public class CollectionOperationsTests
     public void Parse_ListCreation_Empty_ReturnsListNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{list1:i32}
-                  §/LIST{list1}
+                  §/LIST
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -130,14 +130,14 @@ public class CollectionOperationsTests
     public void Parse_ListCreation_WithElements_ReturnsListNodeWithElements()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{list1:i32}
                     1
                     2
                     3
-                  §/LIST{list1}
+                  §/LIST
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -161,11 +161,11 @@ public class CollectionOperationsTests
     public void Parse_DictionaryCreation_Empty_ReturnsDictNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §DICT{dict1:str:i32}
-                  §/DICT{dict1}
+                  §/DICT
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -188,13 +188,13 @@ public class CollectionOperationsTests
     public void Parse_DictionaryCreation_WithEntries_ReturnsDictNodeWithEntries()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §DICT{dict1:str:i32}
                     §KV "one" 1
                     §KV "two" 2
-                  §/DICT{dict1}
+                  §/DICT
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -218,11 +218,11 @@ public class CollectionOperationsTests
     public void Parse_SetCreation_Empty_ReturnsSetNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §HSET{set1:str}
-                  §/HSET{set1}
+                  §/HSET
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -244,13 +244,13 @@ public class CollectionOperationsTests
     public void Parse_SetCreation_WithElements_ReturnsSetNodeWithElements()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §HSET{set1:str}
                     "apple"
                     "banana"
-                  §/HSET{set1}
+                  §/HSET
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -274,8 +274,8 @@ public class CollectionOperationsTests
     public void Parse_CollectionPush_ReturnsPushNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §PUSH{list1} 42
             """;
@@ -294,8 +294,8 @@ public class CollectionOperationsTests
     public void Parse_DictionaryPut_ReturnsPutNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §PUT{dict1} "key" 42
             """;
@@ -314,8 +314,8 @@ public class CollectionOperationsTests
     public void Parse_CollectionRemove_ReturnsRemoveNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §REM{coll1} "item"
             """;
@@ -334,8 +334,8 @@ public class CollectionOperationsTests
     public void Parse_CollectionClear_ReturnsClearNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §CLR{coll1}
             """;
@@ -354,8 +354,8 @@ public class CollectionOperationsTests
     public void Parse_CollectionInsert_ReturnsInsertNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §INS{list1} 0 "first"
             """;
@@ -374,8 +374,8 @@ public class CollectionOperationsTests
     public void Parse_CollectionSetIndex_ReturnsSetIndexNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §SETIDX{list1} 0 42
             """;
@@ -398,8 +398,8 @@ public class CollectionOperationsTests
     public void Parse_CollectionContains_Value_ReturnsContainsNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{bool}
                   §R §HAS{list1} 42
             """;
@@ -422,8 +422,8 @@ public class CollectionOperationsTests
     public void Parse_CollectionContains_Key_ReturnsContainsNodeWithKeyMode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{bool}
                   §R §HAS{dict1} §KEY "mykey"
             """;
@@ -446,8 +446,8 @@ public class CollectionOperationsTests
     public void Parse_CollectionContains_DictValue_ReturnsContainsNodeWithDictValueMode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{bool}
                   §R §HAS{dict1} §VAL 42
             """;
@@ -474,8 +474,8 @@ public class CollectionOperationsTests
     public void Parse_CollectionCount_ReturnsCountNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{i32}
                   §R §CNT myList
             """;
@@ -500,10 +500,10 @@ public class CollectionOperationsTests
     public void Parse_DictionaryForeach_ReturnsDictForeachNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
-                  §EACHKV{e1:k:v} dict1
+                  §EACHKV{k:v} dict1
                       §P k
             """;
 
@@ -528,14 +528,14 @@ public class CollectionOperationsTests
     public void Emit_ListCreation_GeneratesCorrectCSharp()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{nums:i32}
                     1
                     2
                     3
-                  §/LIST{nums}
+                  §/LIST
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -553,13 +553,13 @@ public class CollectionOperationsTests
     public void Emit_DictionaryCreation_GeneratesCorrectCSharp()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §DICT{ages:str:i32}
                     §KV "alice" 30
                     §KV "bob" 25
-                  §/DICT{ages}
+                  §/DICT
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -575,13 +575,13 @@ public class CollectionOperationsTests
     public void Emit_SetCreation_GeneratesCorrectCSharp()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §HSET{items:str}
                     "apple"
                     "banana"
-                  §/HSET{items}
+                  §/HSET
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -598,8 +598,8 @@ public class CollectionOperationsTests
     public void Emit_CollectionPush_GeneratesAddCall()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §PUSH{myList} 42
             """;
@@ -617,8 +617,8 @@ public class CollectionOperationsTests
     public void Emit_DictionaryPut_GeneratesIndexerAssignment()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §PUT{myDict} "key" 42
             """;
@@ -636,8 +636,8 @@ public class CollectionOperationsTests
     public void Emit_CollectionRemove_GeneratesRemoveCall()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §REM{myColl} "item"
             """;
@@ -655,8 +655,8 @@ public class CollectionOperationsTests
     public void Emit_CollectionClear_GeneratesClearCall()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §CLR{myColl}
             """;
@@ -674,8 +674,8 @@ public class CollectionOperationsTests
     public void Emit_CollectionInsert_GeneratesInsertCall()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §INS{myList} 0 "first"
             """;
@@ -693,8 +693,8 @@ public class CollectionOperationsTests
     public void Emit_CollectionContainsKey_GeneratesContainsKeyCall()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:HasKey:pub}
+            §M{Test}
+              §F{HasKey:pub}
                   §O{bool}
                   §R §HAS{myDict} §KEY "testKey"
             """;
@@ -712,8 +712,8 @@ public class CollectionOperationsTests
     public void Emit_CollectionContainsValue_GeneratesContainsValueCall()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:HasValue:pub}
+            §M{Test}
+              §F{HasValue:pub}
                   §O{bool}
                   §R §HAS{myDict} §VAL 42
             """;
@@ -731,10 +731,10 @@ public class CollectionOperationsTests
     public void Emit_DictionaryForeach_GeneratesDeconstructingForeach()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
-                  §EACHKV{e1:key:value} myDict
+                  §EACHKV{key:value} myDict
                       §P key
             """;
 
@@ -751,8 +751,8 @@ public class CollectionOperationsTests
     public void Emit_CollectionCount_GeneratesCountProperty()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:GetLength:pub}
+            §M{Test}
+              §F{GetLength:pub}
                   §O{i32}
                   §R §CNT myList
             """;
@@ -811,14 +811,14 @@ public class CollectionOperationsTests
     {
         // §/EACHKV is removed closer-form (Phase 4d): rejected with Calor0830, not MismatchedId.
         var source = """
-            §M{m001:Test}
-            §F{f001:Main:pub}
+            §M{Test}
+            §F{Main:pub}
               §O{void}
-              §EACHKV{e1:k:v} dict1
+              §EACHKV{k:v} dict1
                 §P k
-              §/EACHKV{e2}
-            §/F{f001}
-            §/M{m001}
+              §/EACHKV
+            §/F
+            §/M
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -835,11 +835,11 @@ public class CollectionOperationsTests
     public void Parse_EmptyList_ReturnsListNodeWithNoElements()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{empty:str}
-                  §/LIST{empty}
+                  §/LIST
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -856,11 +856,11 @@ public class CollectionOperationsTests
     public void Parse_EmptyDictionary_ReturnsDictNodeWithNoEntries()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §DICT{empty:str:i32}
-                  §/DICT{empty}
+                  §/DICT
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -877,11 +877,11 @@ public class CollectionOperationsTests
     public void Parse_EmptyHashSet_ReturnsSetNodeWithNoElements()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §HSET{empty:i32}
-                  §/HSET{empty}
+                  §/HSET
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -898,15 +898,15 @@ public class CollectionOperationsTests
     public void Emit_EmptyCollections_GeneratesEmptyInitializers()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{emptyList:i32}
-                  §/LIST{emptyList}
+                  §/LIST
                   §DICT{emptyDict:str:str}
-                  §/DICT{emptyDict}
+                  §/DICT
                   §HSET{emptySet:bool}
-                  §/HSET{emptySet}
+                  §/HSET
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -924,12 +924,12 @@ public class CollectionOperationsTests
     public void Parse_CollectionWithSingleElement_ReturnsCorrectCount()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{single:i32}
                     42
-                  §/LIST{single}
+                  §/LIST
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -946,12 +946,12 @@ public class CollectionOperationsTests
     public void Parse_DictionaryWithSingleEntry_ReturnsCorrectCount()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §DICT{single:str:i32}
                     §KV "key" 1
-                  §/DICT{single}
+                  §/DICT
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -968,11 +968,11 @@ public class CollectionOperationsTests
     public void Parse_MultipleCollectionOperations_InSequence()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{nums:i32}
-                  §/LIST{nums}
+                  §/LIST
                   §PUSH{nums} 1
                   §PUSH{nums} 2
                   §INS{nums} 0 0
@@ -992,13 +992,13 @@ public class CollectionOperationsTests
     public void Emit_CollectionWithExpressionElements_GeneratesCorrectCode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{nums:i32}
                     (+ 1 2)
                     (* 3 4)
-                  §/LIST{nums}
+                  §/LIST
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1019,8 +1019,8 @@ public class CollectionOperationsTests
     public void Effect_CollectionPush_ReportsMutationWhenNotDeclared()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §PUSH{list1} 42
             """;
@@ -1039,8 +1039,8 @@ public class CollectionOperationsTests
     public void Effect_DictionaryPut_ReportsMutationWhenNotDeclared()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §PUT{dict1} "key" 42
             """;
@@ -1059,8 +1059,8 @@ public class CollectionOperationsTests
     public void Effect_CollectionRemove_ReportsMutationWhenNotDeclared()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §REM{coll1} "item"
             """;
@@ -1079,8 +1079,8 @@ public class CollectionOperationsTests
     public void Effect_CollectionClear_ReportsMutationWhenNotDeclared()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §CLR{coll1}
             """;
@@ -1099,8 +1099,8 @@ public class CollectionOperationsTests
     public void Effect_CollectionInsert_ReportsMutationWhenNotDeclared()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §INS{list1} 0 "first"
             """;
@@ -1119,8 +1119,8 @@ public class CollectionOperationsTests
     public void Effect_CollectionSetIndex_ReportsMutationWhenNotDeclared()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §SETIDX{list1} 0 42
             """;
@@ -1139,8 +1139,8 @@ public class CollectionOperationsTests
     public void Effect_CollectionContains_NoMutationReported()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{bool}
                   §R §HAS{list1} 42
             """;
@@ -1159,13 +1159,13 @@ public class CollectionOperationsTests
     public void Effect_ListCreation_NoMutationReported()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{nums:i32}
                     1
                     2
-                  §/LIST{nums}
+                  §/LIST
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1186,14 +1186,14 @@ public class CollectionOperationsTests
     public void RoundTrip_ListCreation_EmitsValidCalor()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{nums:i32}
                     1
                     2
                     3
-                  §/LIST{nums}
+                  §/LIST
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1219,13 +1219,13 @@ public class CollectionOperationsTests
     public void RoundTrip_DictionaryCreation_EmitsValidCalor()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §DICT{ages:str:i32}
                     §KV "alice" 30
                     §KV "bob" 25
-                  §/DICT{ages}
+                  §/DICT
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1251,13 +1251,13 @@ public class CollectionOperationsTests
     public void RoundTrip_HashSetCreation_EmitsValidCalor()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §HSET{tags:str}
                     "important"
                     "urgent"
-                  §/HSET{tags}
+                  §/HSET
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1283,8 +1283,8 @@ public class CollectionOperationsTests
     public void RoundTrip_CollectionOperations_EmitsValidCalor()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §PUSH{nums} 42
                   §PUT{dict} "key" 99
@@ -1313,11 +1313,11 @@ public class CollectionOperationsTests
     public void RoundTrip_DictionaryForeach_EmitsValidCalor()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §E{cw}
-                  §EACHKV{e1:k:v} myDict
+                  §EACHKV{k:v} myDict
                       §P k
             """;
 
@@ -1348,11 +1348,11 @@ public class CollectionOperationsTests
     public void Parse_ListOfLists_ParsesCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{outer:List<i32>}
-                  §/LIST{outer}
+                  §/LIST
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1369,11 +1369,11 @@ public class CollectionOperationsTests
     public void Emit_ListOfLists_GeneratesNestedListType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{matrix:List<i32>}
-                  §/LIST{matrix}
+                  §/LIST
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1389,11 +1389,11 @@ public class CollectionOperationsTests
     public void Parse_DictionaryWithListValue_ParsesCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §DICT{grouped:str:List<i32>}
-                  §/DICT{grouped}
+                  §/DICT
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1411,11 +1411,11 @@ public class CollectionOperationsTests
     public void Emit_DictionaryWithListValue_GeneratesCorrectType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §DICT{grouped:str:List<i32>}
-                  §/DICT{grouped}
+                  §/DICT
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1431,11 +1431,11 @@ public class CollectionOperationsTests
     public void Parse_SetOfSets_ParsesCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §HSET{nestedSet:HashSet<str>}
-                  §/HSET{nestedSet}
+                  §/HSET
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1452,11 +1452,11 @@ public class CollectionOperationsTests
     public void Emit_SetOfSets_GeneratesNestedSetType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §HSET{nestedSet:HashSet<str>}
-                  §/HSET{nestedSet}
+                  §/HSET
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1476,8 +1476,8 @@ public class CollectionOperationsTests
     public void Parse_ArrayAccess_ReturnsArrayAccessNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:GetFirst:pub}
+            §M{Test}
+              §F{GetFirst:pub}
                   §O{i32}
                   §R §IDX myList 0
             """;
@@ -1498,8 +1498,8 @@ public class CollectionOperationsTests
     public void Emit_ArrayAccess_GeneratesIndexerAccess()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:GetFirst:pub}
+            §M{Test}
+              §F{GetFirst:pub}
                   §O{i32}
                   §R §IDX myList 0
             """;
@@ -1517,8 +1517,8 @@ public class CollectionOperationsTests
     public void RoundTrip_ArrayAccess_EmitsValidCalor()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:GetFirst:pub}
+            §M{Test}
+              §F{GetFirst:pub}
                   §O{i32}
                   §R §IDX myList 0
             """;
@@ -1546,14 +1546,14 @@ public class CollectionOperationsTests
     public void TypeCheck_ListCreation_ValidElements_NoErrors()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{numbers:i32}
                     1
                     2
                     3
-                  §/LIST{numbers}
+                  §/LIST
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1569,14 +1569,14 @@ public class CollectionOperationsTests
     public void TypeCheck_ListCreation_InvalidElement_ReportsError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{numbers:i32}
                     1
                     "invalid"
                     3
-                  §/LIST{numbers}
+                  §/LIST
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1593,13 +1593,13 @@ public class CollectionOperationsTests
     public void TypeCheck_DictionaryCreation_ValidEntries_NoErrors()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §DICT{ages:str:i32}
                     §KV "alice" 30
                     §KV "bob" 25
-                  §/DICT{ages}
+                  §/DICT
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1615,13 +1615,13 @@ public class CollectionOperationsTests
     public void TypeCheck_DictionaryCreation_InvalidKeyType_ReportsError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §DICT{ages:str:i32}
                     §KV 123 30
                     §KV "bob" 25
-                  §/DICT{ages}
+                  §/DICT
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1638,12 +1638,12 @@ public class CollectionOperationsTests
     public void TypeCheck_DictionaryCreation_InvalidValueType_ReportsError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §DICT{ages:str:i32}
                     §KV "alice" "thirty"
-                  §/DICT{ages}
+                  §/DICT
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1660,13 +1660,13 @@ public class CollectionOperationsTests
     public void TypeCheck_SetCreation_ValidElements_NoErrors()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §HSET{fruits:str}
                     "apple"
                     "banana"
-                  §/HSET{fruits}
+                  §/HSET
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1682,13 +1682,13 @@ public class CollectionOperationsTests
     public void TypeCheck_SetCreation_InvalidElement_ReportsError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §HSET{fruits:str}
                     "apple"
                     42
-                  §/HSET{fruits}
+                  §/HSET
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1705,13 +1705,13 @@ public class CollectionOperationsTests
     public void TypeCheck_CollectionPush_ValidValue_NoErrors()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{numbers:i32}
                     1
                     2
-                  §/LIST{numbers}
+                  §/LIST
                   §PUSH{numbers} 3
             """;
 
@@ -1728,13 +1728,13 @@ public class CollectionOperationsTests
     public void TypeCheck_CollectionPush_InvalidValue_ReportsError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{numbers:i32}
                     1
                     2
-                  §/LIST{numbers}
+                  §/LIST
                   §PUSH{numbers} "invalid"
             """;
 
@@ -1752,12 +1752,12 @@ public class CollectionOperationsTests
     public void TypeCheck_DictionaryPut_ValidKeyValue_NoErrors()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §DICT{ages:str:i32}
                     §KV "alice" 30
-                  §/DICT{ages}
+                  §/DICT
                   §PUT{ages} "bob" 25
             """;
 
@@ -1774,12 +1774,12 @@ public class CollectionOperationsTests
     public void TypeCheck_DictionaryPut_InvalidKey_ReportsError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §DICT{ages:str:i32}
                     §KV "alice" 30
-                  §/DICT{ages}
+                  §/DICT
                   §PUT{ages} 123 25
             """;
 
@@ -1797,13 +1797,13 @@ public class CollectionOperationsTests
     public void TypeCheck_CollectionSetIndex_ValidIndex_NoErrors()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{numbers:i32}
                     1
                     2
-                  §/LIST{numbers}
+                  §/LIST
                   §SETIDX{numbers} 0 99
             """;
 
@@ -1820,13 +1820,13 @@ public class CollectionOperationsTests
     public void TypeCheck_CollectionSetIndex_InvalidValue_ReportsError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{numbers:i32}
                     1
                     2
-                  §/LIST{numbers}
+                  §/LIST
                   §SETIDX{numbers} 0 "invalid"
             """;
 
@@ -1844,8 +1844,8 @@ public class CollectionOperationsTests
     public void TypeCheck_UndefinedCollection_ReportsError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §PUSH{undefined} 1
             """;
@@ -1864,13 +1864,13 @@ public class CollectionOperationsTests
     public void TypeCheck_CollectionInsert_ValidIndexAndValue_NoErrors()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{numbers:i32}
                     1
                     2
-                  §/LIST{numbers}
+                  §/LIST
                   §INS{numbers} 0 99
             """;
 
@@ -1887,13 +1887,13 @@ public class CollectionOperationsTests
     public void TypeCheck_CollectionClear_ValidCollection_NoErrors()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{numbers:i32}
                     1
                     2
-                  §/LIST{numbers}
+                  §/LIST
                   §CLR{numbers}
             """;
 
@@ -1910,13 +1910,13 @@ public class CollectionOperationsTests
     public void TypeCheck_CollectionRemove_ValidValue_NoErrors()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{numbers:i32}
                     1
                     2
-                  §/LIST{numbers}
+                  §/LIST
                   §REM{numbers} 1
             """;
 
@@ -1933,13 +1933,13 @@ public class CollectionOperationsTests
     public void TypeCheck_CollectionRemove_InvalidValue_ReportsError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{numbers:i32}
                     1
                     2
-                  §/LIST{numbers}
+                  §/LIST
                   §REM{numbers} "invalid"
             """;
 
@@ -1961,15 +1961,15 @@ public class CollectionOperationsTests
     public void Parse_ForeachOverList_ParsesCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{numbers:i32}
                     1
                     2
                     3
-                  §/LIST{numbers}
-                  §EACH{e001:n} numbers
+                  §/LIST
+                  §EACH{n} numbers
                       §P n
             """;
 
@@ -1985,15 +1985,15 @@ public class CollectionOperationsTests
     public void Emit_ForeachOverList_GeneratesCorrectCSharp()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{numbers:i32}
                     1
                     2
                     3
-                  §/LIST{numbers}
-                  §EACH{e001:n} numbers
+                  §/LIST
+                  §EACH{n} numbers
                       §P n
             """;
 
@@ -2011,14 +2011,14 @@ public class CollectionOperationsTests
     public void Parse_DictionaryForeachKV_ParsesCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §DICT{scores:str:i32}
                     §KV "alice" 100
                     §KV "bob" 85
-                  §/DICT{scores}
-                  §EACHKV{e001:name:score} scores
+                  §/DICT
+                  §EACHKV{name:score} scores
                       §P name
                       §P score
             """;
@@ -2040,14 +2040,14 @@ public class CollectionOperationsTests
     public void Emit_DictionaryForeachKV_GeneratesCorrectCSharp()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §DICT{scores:str:i32}
                     §KV "alice" 100
                     §KV "bob" 85
-                  §/DICT{scores}
-                  §EACHKV{e001:name:score} scores
+                  §/DICT
+                  §EACHKV{name:score} scores
                       §P name
             """;
 
@@ -2065,14 +2065,14 @@ public class CollectionOperationsTests
     public void Emit_CollectionWithMultipleOperations_GeneratesCorrectCSharp()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §LIST{data:i32}
                     1
                     2
                     3
-                  §/LIST{data}
+                  §/LIST
                   §PUSH{data} 4
                   §INS{data} 0 0
                   §SETIDX{data} 2 99
@@ -2098,14 +2098,14 @@ public class CollectionOperationsTests
     public void Parse_CollectionContainsExpression_ParsesCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{bool}
                   §LIST{items:i32}
                     1
                     2
                     3
-                  §/LIST{items}
+                  §/LIST
                   §R §HAS{items} 2
             """;
 
@@ -2123,14 +2123,14 @@ public class CollectionOperationsTests
     public void Emit_CollectionContainsExpression_GeneratesCorrectCSharp()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{bool}
                   §LIST{items:i32}
                     1
                     2
                     3
-                  §/LIST{items}
+                  §/LIST
                   §R §HAS{items} 2
             """;
 
@@ -2147,12 +2147,12 @@ public class CollectionOperationsTests
     public void Parse_DictionaryContainsKey_ParsesCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{bool}
                   §DICT{cache:str:i32}
                     §KV "test" 42
-                  §/DICT{cache}
+                  §/DICT
                   §R §HAS{cache} §KEY "test"
             """;
 
@@ -2171,12 +2171,12 @@ public class CollectionOperationsTests
     public void Emit_DictionaryContainsKey_GeneratesCorrectCSharp()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{bool}
                   §DICT{cache:str:i32}
                     §KV "test" 42
-                  §/DICT{cache}
+                  §/DICT
                   §R §HAS{cache} §KEY "test"
             """;
 
@@ -2193,14 +2193,14 @@ public class CollectionOperationsTests
     public void Parse_CollectionCount_ParsesCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{i32}
                   §LIST{items:i32}
                     1
                     2
                     3
-                  §/LIST{items}
+                  §/LIST
                   §R §CNT items
             """;
 
@@ -2217,14 +2217,14 @@ public class CollectionOperationsTests
     public void Emit_CollectionCount_GeneratesCorrectCSharp()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{i32}
                   §LIST{items:i32}
                     1
                     2
                     3
-                  §/LIST{items}
+                  §/LIST
                   §R §CNT items
             """;
 
@@ -2241,11 +2241,11 @@ public class CollectionOperationsTests
     public void EffectSystem_CollectionMutations_TracksMutation()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:TestFunc:pub}
+            §M{Test}
+              §F{TestFunc:pub}
                   §O{void}
                   §LIST{a:i32}
-                  §/LIST{a}
+                  §/LIST
                   §PUSH{a} 1
             """;
 
@@ -2269,8 +2269,8 @@ public class CollectionOperationsTests
     {
         // §IDX arr 0 (correct format) should parse to ArrayAccessNode
         var source = """
-            §M{m001:Test}
-              §F{f001:Get:pub}
+            §M{Test}
+              §F{Get:pub}
                   §O{i32}
                   §R §IDX args 0
             """;
@@ -2305,8 +2305,8 @@ public class CollectionOperationsTests
     {
         // §IDX{arr} 0 (brace format) is valid — the attribute provides the array reference
         var source = """
-            §M{m001:Test}
-              §F{f001:Get:pub}
+            §M{Test}
+              §F{Get:pub}
                   §O{i32}
                   §R §IDX{arr} 0
             """;
@@ -2326,8 +2326,8 @@ public class CollectionOperationsTests
     public void RoundTrip_ArrayAccess_EmitsAndReparsesCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:GetFirst:pub}
+            §M{Test}
+              §F{GetFirst:pub}
                   §O{i32}
                   §R §IDX myList 0
             """;
@@ -2356,10 +2356,10 @@ public class CollectionOperationsTests
     public void Parse_ForeachWithIndex_ParsesIndexVariable()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
-                  §EACH{e1:item:i32:idx} items
+                  §EACH{item:i32:idx} items
                       §P item
             """;
 
@@ -2377,10 +2377,10 @@ public class CollectionOperationsTests
     public void Parse_ForeachWithoutIndex_IndexIsNull()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
-                  §EACH{e1:item:i32} items
+                  §EACH{item:i32} items
                       §P item
             """;
 
@@ -2398,10 +2398,10 @@ public class CollectionOperationsTests
     public void Emit_ForeachWithIndex_GeneratesIndexCounter()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
-                  §EACH{e1:item:i32:idx} items
+                  §EACH{item:i32:idx} items
                       §P item
             """;
 
@@ -2423,10 +2423,10 @@ public class CollectionOperationsTests
         // a `continue` doesn't skip the increment — matching C#'s
         // Select((item, index) => ...) semantics.
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
-                  §EACH{e1:item:i32:idx} items
+                  §EACH{item:i32:idx} items
                       §P item
             """;
 
@@ -2448,10 +2448,10 @@ public class CollectionOperationsTests
     public void RoundTrip_ForeachWithIndex_EmitsValidCalor()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
-                  §EACH{e1:item:i32:idx} items
+                  §EACH{item:i32:idx} items
                       §P item
             """;
 

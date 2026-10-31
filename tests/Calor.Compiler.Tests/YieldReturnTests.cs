@@ -61,8 +61,8 @@ public class YieldReturnTests
     public void Parser_YieldReturn_ParsesExpression()
     {
         var source = """
-            §M{m1:TestModule}
-                §F{f1:GetNumbers:pub}
+            §M{TestModule}
+                §F{GetNumbers:pub}
                     §O{i32}
                     §YIELD 42
             """;
@@ -81,8 +81,8 @@ public class YieldReturnTests
     public void Parser_YieldBreak_ParsesCorrectly()
     {
         var source = """
-            §M{m1:TestModule}
-                §F{f1:GetNumbers:pub}
+            §M{TestModule}
+                §F{GetNumbers:pub}
                     §O{i32}
                     §YBRK
             """;
@@ -98,8 +98,8 @@ public class YieldReturnTests
     public void Parser_YieldReturnWithReference_ParsesCorrectly()
     {
         var source = """
-            §M{m1:TestModule}
-                §F{f1:GetItems:pub}
+            §M{TestModule}
+                §F{GetItems:pub}
                     §I{i32:x}
                     §O{i32}
                     §YIELD x
@@ -160,8 +160,8 @@ public class YieldReturnTests
     public void CSharpEmitter_IteratorFunction_WrapsReturnType()
     {
         var source = """
-            §M{m1:TestModule}
-                §F{f1:GetNumbers:pub}
+            §M{TestModule}
+                §F{GetNumbers:pub}
                     §O{i32}
                     §YIELD 1
                     §YIELD 2
@@ -457,8 +457,8 @@ public class YieldReturnTests
     public void E2E_CalorSource_WithYield_CompilesToCSharp()
     {
         var calorSource = """
-            §M{m1:TestModule}
-                §F{f1:GetNumbers:pub}
+            §M{TestModule}
+                §F{GetNumbers:pub}
                     §O{i32}
                     §YIELD 1
                     §YIELD 2
@@ -477,8 +477,8 @@ public class YieldReturnTests
     public void E2E_CalorSource_WithYieldBreak_CompilesToCSharp()
     {
         var calorSource = """
-            §M{m1:TestModule}
-                §F{f1:GetNumbers:pub}
+            §M{TestModule}
+                §F{GetNumbers:pub}
                     §O{i32}
                     §YIELD 1
                     §YBRK
@@ -500,9 +500,9 @@ public class YieldReturnTests
     public void E2E_CalorClassMethod_WithYield_WrapsReturnType()
     {
         var calorSource = """
-            §M{m1:TestModule}
-                §CL{c1:NumberGenerator}
-                    §MT{m1:GetNumbers:pub}
+            §M{TestModule}
+                §CL{NumberGenerator}
+                    §MT{GetNumbers:pub}
                         §O{i32}
                         §YIELD 1
                         §YIELD 2
@@ -521,9 +521,9 @@ public class YieldReturnTests
     public void E2E_CalorClassMethod_WithYieldBreak_CompilesToCSharp()
     {
         var calorSource = """
-            §M{m1:TestModule}
-                §CL{c1:Service}
-                    §MT{m1:GetItems:pub}
+            §M{TestModule}
+                §CL{Service}
+                    §MT{GetItems:pub}
                         §O{string}
                         §YIELD "hello"
                         §YBRK
@@ -742,8 +742,8 @@ public class YieldReturnTests
     public void Parser_RefModifier_ParsedFromCalorSyntax()
     {
         var source = """
-            §M{m1:TestModule}
-                §F{f1:Process:pub}
+            §M{TestModule}
+                §F{Process:pub}
                     §I{i32:value:ref}
                     §O{void}
             """;
@@ -760,8 +760,8 @@ public class YieldReturnTests
     public void Parser_OutModifier_ParsedFromCalorSyntax()
     {
         var source = """
-            §M{m1:TestModule}
-                §F{f1:Process:pub}
+            §M{TestModule}
+                §F{Process:pub}
                     §I{i32:value:out}
                     §O{void}
             """;
@@ -778,8 +778,8 @@ public class YieldReturnTests
     public void Parser_ParamsModifier_ParsedFromCalorSyntax()
     {
         var source = """
-            §M{m1:TestModule}
-                §F{f1:Process:pub}
+            §M{TestModule}
+                §F{Process:pub}
                     §I{string:values:params}
                     §O{void}
             """;

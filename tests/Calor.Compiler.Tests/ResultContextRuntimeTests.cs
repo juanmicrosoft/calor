@@ -13,14 +13,14 @@ public class ResultContextRuntimeTests
 {
     [Theory]
     [InlineData("§R value")]
-    [InlineData("§IF{if1} (> value 0)\n      §R value\n    §EL\n      §TH §NEW{InvalidOperationException} §A error §/NEW")]
-    [InlineData("§L{for1:i:0:1:1}\n      §IF{if1} (> value 0)\n        §R value\n    §TH §NEW{InvalidOperationException} §A error §/NEW")]
+    [InlineData("§IF (> value 0)\n      §R value\n    §EL\n      §TH §NEW{InvalidOperationException} §A error §/NEW")]
+    [InlineData("§L{i:0:1:1}\n      §IF (> value 0)\n        §R value\n    §TH §NEW{InvalidOperationException} §A error §/NEW")]
     public void ReturnContexts_PreserveValueAndThrowMessage(string body)
     {
         var source = """
-            §M{m1:ResultContext}
+            §M{ResultContext}
               §U{System}
-              §F{f1:Probe:pub} (i32:value, str:error) -> i64
+              §F{Probe:pub} (i32:value, str:error) -> i64
                 §E{alloc,throw}
             """ + "\n    " + body;
         foreach (var text in RoundTrip(source))
@@ -41,12 +41,12 @@ public class ResultContextRuntimeTests
     public void NestedFailure_PreservesEvaluationOrderAndStopsAfterThrow()
     {
         const string source = """
-            §M{m1:ResultContext}
+            §M{ResultContext}
               §U{System}
-              §F{f1:Probe:pub} (Func<i32>:first §E{throw}, Func<i32>:second §E{throw}, bool:fail) -> i64
+              §F{Probe:pub} (Func<i32>:first §E{throw}, Func<i32>:second §E{throw}, bool:fail) -> i64
                 §E{alloc,throw}
                 §B{left:i32} §C{first} §/C
-                §IF{if1} fail
+                §IF fail
                   §TH §NEW{InvalidOperationException} §A "failed" §/NEW
                 §R (+ left §C{second} §/C)
             """;
@@ -80,10 +80,10 @@ public class ResultContextRuntimeTests
     public void NonStringErrorAndNestedResult_AreRejectedRatherThanFlattened()
     {
         const string source = """
-            §M{m1:ResultContext}
-              §F{f1:Probe:pub} (i32:value, i32:error) -> Result<Result<i64,i32>,i32>
+            §M{ResultContext}
+              §F{Probe:pub} (i32:value, i32:error) -> Result<Result<i64,i32>,i32>
                 §E{alloc}
-                §IF{if1} (> value 0)
+                §IF (> value 0)
                   §R §OK §OK value
                 §EL
                   §R §OK §ERR error

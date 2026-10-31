@@ -13,15 +13,15 @@ namespace Calor.Compiler.Tests;
 public sealed class WebsiteExampleCheckerTests
 {
     private const string Good = """
-        §M{m001:Good}
-          §F{f001:Add:pub} (i32:a, i32:b) -> i32
+        §M{Good}
+          §F{Add:pub} (i32:a, i32:b) -> i32
             §E{}
             §R (+ a b)
         """;
 
     private const string UndefinedVariable = """
-        §M{m001:Calculator}
-          §F{f001:Increment:pub} (i32:value) -> i32
+        §M{Calculator}
+          §F{Increment:pub} (i32:value) -> i32
             §E{}
             §R (+ x 1)
         """;
@@ -53,8 +53,8 @@ public sealed class WebsiteExampleCheckerTests
     {
         // Parses and binds, but the emitted C# names a type that does not exist (Calor1002).
         var finding = Assert.Single(Check(Fence("calor", """
-            §M{m001:Orders}
-              §F{f001:Save:pub} () -> void
+            §M{Orders}
+              §F{Save:pub} () -> void
                 §E{db:w}
                 §C{DbContext.SaveChanges} §/C
             """)));
@@ -64,8 +64,8 @@ public sealed class WebsiteExampleCheckerTests
     [Fact]
     public void FragmentsAreNotCompiled()
     {
-        Assert.Empty(Check(Fence("calor", "§F{f001:Broken:pub}\n  §R (+ x 1)")));
-        Assert.Empty(Check(Fence("calor", "§MT{mt1:Compute:pub}\n  §R x")));
+        Assert.Empty(Check(Fence("calor", "§F{Broken:pub}\n  §R (+ x 1)")));
+        Assert.Empty(Check(Fence("calor", "§MT{Compute:pub}\n  §R x")));
     }
 
     [Fact]
@@ -95,8 +95,8 @@ public sealed class WebsiteExampleCheckerTests
         // HandleRequest is public with no effect row: cross-module checking adds Calor0417.
         const string page = """
             ```calor group=g
-            §M{m001:OrderService}
-              §F{f001:SaveOrder:pub}
+            §M{OrderService}
+              §F{SaveOrder:pub}
                 §O{void}
                 §E{db:w}
             ```
@@ -104,8 +104,8 @@ public sealed class WebsiteExampleCheckerTests
             Fails with Calor0410 and warns with Calor0417.
 
             ```calor group=g expect=Calor0410
-            §M{m002:Handler}
-              §F{f001:HandleRequest:pub}
+            §M{Handler}
+              §F{HandleRequest:pub}
                 §O{void}
                 §C{SaveOrder} §/C
             ```
@@ -121,15 +121,15 @@ public sealed class WebsiteExampleCheckerTests
     {
         const string page = """
             ```calor group=g
-            §M{m001:OrderService}
-              §F{f001:SaveOrder:pub}
+            §M{OrderService}
+              §F{SaveOrder:pub}
                 §O{void}
                 §E{db:w}
             ```
 
             ```calor group=g
-            §M{m002:Handler}
-              §F{f001:HandleRequest:pub}
+            §M{Handler}
+              §F{HandleRequest:pub}
                 §O{void}
                 §E{db:w}
                 §C{SaveOrder} §/C
@@ -207,15 +207,15 @@ public sealed class WebsiteExampleCheckerTests
     }
 
     [Theory]
-    [InlineData("```calor expct=Calor0200\n" + "§M{m1:A}\n```\n")]
-    [InlineData("```calor expect=0200\n§M{m1:A}\n```\n")]
-    [InlineData("```calor expect=\n§M{m1:A}\n```\n")]
-    [InlineData("```calor expect=Calor0200\n§F{f1:A:pub}\n```\n")]
-    [InlineData("```calor group=a/b\n§M{m1:A}\n```\n")]
+    [InlineData("```calor expct=Calor0200\n" + "§M{A}\n```\n")]
+    [InlineData("```calor expect=0200\n§M{A}\n```\n")]
+    [InlineData("```calor expect=\n§M{A}\n```\n")]
+    [InlineData("```calor expect=Calor0200\n§F{A:pub}\n```\n")]
+    [InlineData("```calor group=a/b\n§M{A}\n```\n")]
     [InlineData("```text output illustrative\nx\n```\n")]
     [InlineData("```text verified\nx\n```\n")]
-    [InlineData("```\n§M{m001:Hidden}\n```\n")]
-    [InlineData("```csharp\n§M{m001:Hidden}\n```\n")]
+    [InlineData("```\n§M{Hidden}\n```\n")]
+    [InlineData("```csharp\n§M{Hidden}\n```\n")]
     public void MalformedOrMisplacedAnnotation_Fails(string fence)
     {
         Assert.Contains(Check(fence), f => f.Code == DiagnosticCode.DocDriftWebsiteAnnotation);
@@ -257,15 +257,15 @@ public sealed class WebsiteExampleCheckerTests
     }
 
     [Theory]
-    [InlineData("> ```calor\n> §M{m1:A}\n> ```\n")]
-    [InlineData(">   > ```calor\n>   > §M{m1:A}\n>   > ```\n")]
-    [InlineData("- ```calor\n  §M{m1:A}\n  ```\n")]
-    [InlineData("1. ```calor\n   §M{m1:A}\n   ```\n")]
-    [InlineData("> ~~~text\n> hello\n\n```calor\n§M{m1:A}\n```\n")]
-    [InlineData("- item\n\n  ```calor\n§M{m001:Broken}\n  ```\n")]
-    [InlineData("```calor\n§M{m1:A}\n")]
-    [InlineData("- - - ```calor\n      §M{m1:A}\n      ```\n")]
-    [InlineData("~~~calor `x`\n§M{m1:A}\n")]
+    [InlineData("> ```calor\n> §M{A}\n> ```\n")]
+    [InlineData(">   > ```calor\n>   > §M{A}\n>   > ```\n")]
+    [InlineData("- ```calor\n  §M{A}\n  ```\n")]
+    [InlineData("1. ```calor\n   §M{A}\n   ```\n")]
+    [InlineData("> ~~~text\n> hello\n\n```calor\n§M{A}\n```\n")]
+    [InlineData("- item\n\n  ```calor\n§M{Broken}\n  ```\n")]
+    [InlineData("```calor\n§M{A}\n")]
+    [InlineData("- - - ```calor\n      §M{A}\n      ```\n")]
+    [InlineData("~~~calor `x`\n§M{A}\n")]
     public void ContainerDependentOrUnclosedFence_IsRejected(string page)
     {
         // Their extent depends on a list or blockquote container (review round 2, findings 1-2).
@@ -306,8 +306,8 @@ public sealed class WebsiteExampleCheckerTests
         // C#, but the lexer-failing Broken file stopped that C# from being validated.
         const string page = """
             ```calor group=g
-            §M{m001:OrderService}
-              §F{f001:SaveOrder:pub}
+            §M{OrderService}
+              §F{SaveOrder:pub}
                 §O{void}
                 §E{db:w}
             ```
@@ -315,11 +315,11 @@ public sealed class WebsiteExampleCheckerTests
             Handler fails with Calor0410 and warns with Calor0417.
 
             ```calor group=g expect=Calor0410,Calor0417
-            §M{m002:Handler}
-              §F{f001:HandleRequest:pub}
+            §M{Handler}
+              §F{HandleRequest:pub}
                 §O{void}
                 §C{SaveOrder} §/C
-              §F{f002:Flush:pub} () -> void
+              §F{Flush:pub} () -> void
                 §E{db:w}
                 §C{DbContext.SaveChanges} §/C
             ```
@@ -327,8 +327,8 @@ public sealed class WebsiteExampleCheckerTests
             Broken fails with Calor0002.
 
             ```calor group=g expect=Calor0002
-            §M{m003:Broken}
-              §F{f001:Run:pub} () -> void
+            §M{Broken}
+              §F{Run:pub} () -> void
                 §P "unterminated
             ```
             """;
@@ -344,19 +344,19 @@ public sealed class WebsiteExampleCheckerTests
             Orders warns with Calor0417.
 
             ```calor group=g expect=Calor0417
-            §M{m001:Orders}
-              §F{f001:Save:pub} () -> void
+            §M{Orders}
+              §F{Save:pub} () -> void
                 §E{db:w}
                 §C{DbContext.SaveChanges} §/C
-              §F{f002:Version:pub} () -> i32
+              §F{Version:pub} () -> i32
                 §R 1
             ```
 
             This one fails with Calor0002.
 
             ```calor group=g expect=Calor0002
-            §M{m002:Broken}
-              §F{f001:Run:pub} () -> void
+            §M{Broken}
+              §F{Run:pub} () -> void
                 §E{cw}
                 §P "unterminated
             ```
@@ -373,17 +373,17 @@ public sealed class WebsiteExampleCheckerTests
             Warns with Calor0417.
 
             ```calor group=g expect=Calor0417
-            §M{m001:Store}
-              §F{f001:Save:pub} () -> i32
+            §M{Store}
+              §F{Save:pub} () -> i32
                 §E{}
                 §R 1
-              §F{f002:Version:pub} () -> i32
+              §F{Version:pub} () -> i32
                 §R 2
             ```
 
             ```calor group=g
-            §M{m002:Caller}
-              §F{f001:Run:pub} () -> i32
+            §M{Caller}
+              §F{Run:pub} () -> i32
                 §E{}
                 §R §C{Save} §/C
             ```
@@ -391,8 +391,8 @@ public sealed class WebsiteExampleCheckerTests
             Fails with Calor0002.
 
             ```calor group=g expect=Calor0002
-            §M{m003:Broken}
-              §F{f001:Run:pub} () -> void
+            §M{Broken}
+              §F{Run:pub} () -> void
                 §P "unterminated
             ```
             """;
@@ -406,8 +406,8 @@ public sealed class WebsiteExampleCheckerTests
         // group; the positive member must still be validated on its own (review round 1, finding 2).
         const string page = """
             ```calor group=g
-            §M{m001:Orders}
-              §F{f001:Save:pub} () -> void
+            §M{Orders}
+              §F{Save:pub} () -> void
                 §E{db:w}
                 §C{DbContext.SaveChanges} §/C
             ```
@@ -415,8 +415,8 @@ public sealed class WebsiteExampleCheckerTests
             This one fails with Calor0002.
 
             ```calor group=g expect=Calor0002
-            §M{m002:Broken}
-              §F{f001:Run:pub} () -> void
+            §M{Broken}
+              §F{Run:pub} () -> void
                 §E{cw}
                 §P "unterminated
             ```
@@ -477,7 +477,7 @@ public sealed class WebsiteExampleCheckerTests
     [InlineData("firstProgram", "§P \"Hello from Calor!\"", "§R (+ 1 )")]
     [InlineData("contracts", "(>= x 0)", "(>= missing 0)")]
     [InlineData("effects", "§E{db:rw,net:rw}", "§E{db:rw,net:rw}\n§C{MissingType.Save} §/C")]
-    [InlineData("stableId", "§F{f001:Process:pub}", "§F{f001:Process:pub} (MissingType:x)")]
+    [InlineData("stableId", "§F{Process:pub}", "§F{Process:pub} (MissingType:x)")]
     [InlineData("missingEffect", "§E{db:rw}", "§E{db:rw,net:rw}")]
     [InlineData("missingEffect", "NotifyCustomer", "MissingCustomer")]
     public void Landing_MutatedDisplayedCodeFails(string id, string original, string replacement)
@@ -525,7 +525,7 @@ public sealed class WebsiteExampleCheckerTests
     }
 
     [Theory]
-    [InlineData("const extra = `§M{m999:Uncovered}`;")]
+    [InlineData("const extra = `§M{Uncovered}`;")]
     [InlineData("const extra = '§Q (> unknown 0)';")]
     [InlineData("const extra = `§P \"unchecked\"`;")]
     [InlineData("const extra = '§R unknown';")]
@@ -555,7 +555,7 @@ public sealed class WebsiteExampleCheckerTests
     {
         var (source, components) = LandingInputs();
         var brokenType = MutateLanding(source, json =>
-            json["stableId"]!["code"] = "§F{f001:Process:pub} (MissingType:x)");
+            json["stableId"]!["code"] = "§F{Process:pub} (MissingType:x)");
         Assert.Contains(WebsiteExampleChecker.CheckLanding(brokenType, components),
             d => d.Message.Contains("Calor1002"));
 
@@ -706,9 +706,9 @@ public sealed class WebsiteExampleCheckerTests
     [InlineData("guides/nullability-and-dotnet-interop.mdx", "```calor expect=Calor0272\n", "```calor\n")]
     [InlineData("guides/cross-module-effect-propagation.mdx", "expect=Calor0410,Calor0417", "expect=Calor0410")]
     [InlineData("guides/dependent-types-tutorial.mdx", "    §I{i32:amount} | (> # INT:0)\n    §O{i32}\n    §Q", "    §I{i32:amount} | (> # INT:0)\n    §O{str}\n    §Q")]
-    [InlineData("benchmarking/metrics/token-economics.mdx", "```calor\n§M{m001:Name}    // Module requires tag + ID + name\n```",
-        "```calor\n§M{m001:Name}    // Module requires tag + ID + name\nnamespace Name\n```")]
-    [InlineData("syntax-reference/structure-tags.mdx", "      §IF{if1} (> i 5)", "      §IF (> i 5)")]
+    [InlineData("benchmarking/metrics/token-economics.mdx", "```calor\n§M{Name}    // Module requires tag + ID + name\n```",
+        "```calor\n§M{Name}    // Module requires tag + ID + name\nnamespace Name\n```")]
+    [InlineData("syntax-reference/structure-tags.mdx", "      §IF (> i 5)", "      §IF (> i 5)")]
     [InlineData("cli/compile.mdx", "error Calor0200: Undefined variable 'x'", "error Calor0200: Undefined variable 'y'")]
     [InlineData("guides/cross-module-effect-propagation.mdx", "warning Calor0417: Public function 'HandleRequest'", "warning Calor0417: Public function 'HandleRequests'")]
     public void PublishedWebsite_MutatedExampleIsCaught(string page, string original, string mutated)

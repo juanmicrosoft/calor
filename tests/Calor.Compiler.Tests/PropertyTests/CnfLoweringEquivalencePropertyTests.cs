@@ -148,8 +148,8 @@ public sealed class CnfLoweringEquivalencePropertyTests
 
     private static IReadOnlyList<CnfStatement> Lower(Term term)
     {
-        var source = "§M{m001:BooleanProperties}\n"
-            + "  §F{f001:Evaluate:pub} (bool:a, bool:b, bool:c) -> bool\n"
+        var source = "§M{BooleanProperties}\n"
+            + "  §F{Evaluate:pub} (bool:a, bool:b, bool:c) -> bool\n"
             + $"    §R {Render(term)}\n";
         var (module, diagnostics) = GeneratedProductionPipelinePropertyTests.Parse(source);
         Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Errors));

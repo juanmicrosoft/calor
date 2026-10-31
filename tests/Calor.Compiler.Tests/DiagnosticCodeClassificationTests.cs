@@ -23,8 +23,8 @@ public class DiagnosticCodeClassificationTests
     private static string WrapInFunction(string body, string inputType = "string", string outputType = "object")
     {
         return $$"""
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{{{inputType}}:x}
                   §O{{{outputType}}}
                   {{body}}
@@ -249,8 +249,8 @@ public class DiagnosticCodeClassificationTests
     public void WhereClause_UnknownTypeParam_ProducesCalor0115()
     {
         var source = """
-            §M{m001:Test}
-              §CL{c001:MyClass:pub}<T>
+            §M{Test}
+              §CL{MyClass:pub}<T>
                   §WHERE U : class
                   §FLD{T:_item:priv}
             """;
@@ -269,7 +269,7 @@ public class DiagnosticCodeClassificationTests
     public void IfExpression_MissingArrow_ProducesCalor0104()
     {
         // IF condition without → should produce ExpectedExpression
-        var source = WrapInFunction("§R §IF{i001} true §/I{i001}", inputType: "bool", outputType: "int");
+        var source = WrapInFunction("§R §IF true §/I", inputType: "bool", outputType: "int");
         Parse(source, out var diagnostics);
 
         Assert.Contains(diagnostics.Errors, d => d.Code == DiagnosticCode.ExpectedExpression);

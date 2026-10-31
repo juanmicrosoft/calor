@@ -129,8 +129,8 @@ public class BinderCoreFamilyTests
         // this pins the claim END TO END: a division nested inside a call argument
         // must produce the actual Calor0920, not merely a bound subtree.
         const string source = @"
-§M{m001:Test}
-  §F{f001:Trap:pub} () -> void
+§M{Test}
+  §F{Trap:pub} () -> void
     §E{cw}
     §B{b} §C{Math.Abs} §A (/ 10 0) §/C
     §P b";

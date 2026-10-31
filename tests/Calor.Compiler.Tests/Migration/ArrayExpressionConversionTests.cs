@@ -850,7 +850,7 @@ public class ArrayExpressionConversionTests
         // name the C# never declared (CS0103 arr2d005) plus a bare `new …;` (CS0201).
         var result = new CSharpToCalorConverter().Convert(R0Fixture("F5-ARRAY-01"));
         Assert.True(result.Success, string.Join("\n", result.Issues));
-        Assert.Matches(@"§R §ARR2D\{(\w+):\1:Cell\} §ROW §NEW\{Cell\} V = 1 §/NEW", result.CalorSource!);
+        Assert.Matches(@"§R §ARR2D\{Cell\} §ROW §NEW\{Cell\} V = 1 §/NEW", result.CalorSource!);
         Assert.DoesNotContain("§B{~_hoist", result.CalorSource);
         Assert.Contains("(§IDX2D cells 0 1).V", result.CalorSource);
     }
@@ -928,8 +928,8 @@ public class ArrayExpressionConversionTests
         Assert.False(old.HasErrors, string.Join("\n", old.Diagnostics.Errors));
         Assert.False(current.HasErrors, string.Join("\n", current.Diagnostics.Errors));
         Assert.Equal(old.GeneratedCode, current.GeneratedCode);
-        Assert.Contains("§M{c001:Probe:pub}", calor);
-        Assert.Contains("§F{m002:Run:pub}", calor);
+        Assert.Contains("§M{Probe:pub}", calor);
+        Assert.Contains("§F{Run:pub}", calor);
     }
 
     [Fact]
@@ -1179,7 +1179,7 @@ public class ArrayExpressionConversionTests
     public void SizedArrays_OfLowercaseMappedTypes_ParseWithTheirCloser()
     {
         // #1554 CI (FluentValidation `Ids = new Guid[0]`): `guid`, `datetime` and `timespan` are
-        // not types to the §ARR attribute reader, so `§ARR{guid:arrGuid1:0} §/ARR{arrGuid1}` read
+        // not types to the §ARR attribute reader, so `§ARR{arrGuid1:0} §/ARR` read
         // `guid` as the id and the closer mismatched. The id now goes first for such types.
         const string source = """
             using System;
@@ -1203,9 +1203,9 @@ public class ArrayExpressionConversionTests
         var result = new CSharpToCalorConverter().Convert(source);
         Assert.True(result.Success, string.Join("\n", result.Issues));
         Assert.Empty(result.Losses);
-        Assert.Matches(@"§ARR\{arrGuid\d+:guid:2\} §/ARR\{arrGuid\d+\}", result.CalorSource!);
-        Assert.Matches(@"§ARR\{arrDatetime\d+:datetime:3\}|§ARR\{\w+:datetime:3\}", result.CalorSource!);
-        Assert.Matches(@"§ARR\{i32:arrI32\d+:4\}", result.CalorSource!);
+        Assert.Matches(@"§ARR\{guid:2\} §/ARR", result.CalorSource!);
+        Assert.Matches(@"§ARR\{datetime:3\}", result.CalorSource!);
+        Assert.Matches(@"§ARR\{i32:4\}", result.CalorSource!);
         var compilation = Program.Compile(result.CalorSource!, "lowercase.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
         Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
@@ -1217,7 +1217,7 @@ public class ArrayExpressionConversionTests
     public void EmptyJaggedArray_KeepsItsElementRank()
     {
         // PR 2 Codex round 3: an empty §ARR of i32[] is Array.Empty<int[]>(), not Array.Empty<int>().
-        const string calor = "§M{m1:T}\n  §M{c1:P:pub}\n    §MT{f1:Make:pub:stat} () -> i32[][]\n      §E{alloc}\n      §R §ARR{a:i32[]} §/ARR{a}\n";
+        const string calor = "§M{T}\n  §M{P:pub}\n    §MT{Make:pub:stat} () -> i32[][]\n      §E{alloc}\n      §R §ARR{i32[]} §/ARR\n";
         var compilation = Program.Compile(calor, "empty.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
         Assert.Contains("Array.Empty<int[]>()", compilation.GeneratedCode);
@@ -1228,11 +1228,11 @@ public class ArrayExpressionConversionTests
     {
         // `(§IDX2D g 0 1).V` is g[0, 1].V; written bare, `.V` belonged to the last index.
         const string calor = """
-            §M{m1:T}
-              §CL{c1:Cell:pub}
+            §M{T}
+              §CL{Cell:pub}
                 §FLD{i32:V:pub}
-              §M{c2:G:pub}
-                §MT{m2:Get:pub:stat} (Cell[,]:g, [Cell]:xs) -> i32
+              §M{G:pub}
+                §MT{Get:pub:stat} (Cell[,]:g, [Cell]:xs) -> i32
                   §R (+ (§IDX2D g 0 1).V (§IDX{xs} 0).V)
             """;
         var compilation = Program.Compile(calor, "group.calr", new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
@@ -1242,28 +1242,28 @@ public class ArrayExpressionConversionTests
     }
 
     [Theory]
-    [InlineData("§ARR2D{a:a:i32:2:1:2} §ROW 1 2 §ROW 3 4 §/ARR2D{a}", "i32[,,]", "new int[2, 1, 2] { { { 1, 2 } }, { { 3, 4 } } }", true)]
-    [InlineData("§ARR2D{a:a:i32:2:2} §ROW 1 2 §ROW 3 4 §/ARR2D{a}", "i32[,]", "new int[2, 2] { { 1, 2 }, { 3, 4 } }", true)]
-    [InlineData("§ARR2D{a:a:i32:2:2} §ROW 1 2 §/ARR2D{a}", "i32[,]", "new int[2, 2] { { 1, 2 } }", false)]
+    [InlineData("§ARR2D{i32:2:1:2} §ROW 1 2 §ROW 3 4 §/ARR2D", "i32[,,]", "new int[2, 1, 2] { { { 1, 2 } }, { { 3, 4 } } }", true)]
+    [InlineData("§ARR2D{i32:2:2} §ROW 1 2 §ROW 3 4 §/ARR2D", "i32[,]", "new int[2, 2] { { 1, 2 }, { 3, 4 } }", true)]
+    [InlineData("§ARR2D{i32:2:2} §ROW 1 2 §/ARR2D", "i32[,]", "new int[2, 2] { { 1, 2 } }", false)]
     public void SizedRows_KeepTheirShape_AndAMismatchIsAnError(string array, string type, string csharp, bool compiles)
     {
         // Rank 3+ and sized initializers: the rows are innermost vectors, regrouped by
         // the sizes. A row count that disagrees with the sizes is rejected (CS0847),
         // never padded or truncated.
-        var calor = $"§M{{m1:T}}\n  §M{{c1:G:pub}}\n    §MT{{m2:Make:pub:stat}} () -> {type}\n      §E{{alloc}}\n      §R {array}\n";
+        var calor = $"§M{{T}}\n  §M{{G:pub}}\n    §MT{{Make:pub:stat}} () -> {type}\n      §E{{alloc}}\n      §R {array}\n";
         var compilation = Program.Compile(calor, "sized.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.Contains(csharp, compilation.GeneratedCode ?? "");
         Assert.Equal(!compiles, compilation.HasErrors);
     }
 
     [Theory]
-    [InlineData("§B{x} §ARR2D{a:a:str} §ROW §C{Console.ReadLine} §/C §/ARR2D{a}", true)]
-    [InlineData("§B{x} §ARR2D{a:a:str} §ROW \"r\" §/ARR2D{a}", false)]
+    [InlineData("§B{x} §ARR2D{str} §ROW §C{Console.ReadLine} §/C §/ARR2D", true)]
+    [InlineData("§B{x} §ARR2D{str} §ROW \"r\" §/ARR2D", false)]
     public void RowElements_AreCharged(string statement, bool undeclaredEffect)
     {
         // The elements of §ARR2D rows are effect-inferred (they were not, so a row could
         // carry an effect its function did not declare).
-        var calor = $"§M{{m1:T}}\n  §M{{c1:G:pub}}\n    §MT{{m2:Go:pub:stat}} () -> void\n      §E{{alloc}}\n      {statement}\n";
+        var calor = $"§M{{T}}\n  §M{{G:pub}}\n    §MT{{Go:pub:stat}} () -> void\n      §E{{alloc}}\n      {statement}\n";
         var compilation = Program.Compile(calor, "effects.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.Equal(undeclaredEffect, compilation.Diagnostics.Errors.Any(d => d.Code == "Calor0410"));
     }

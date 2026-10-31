@@ -486,9 +486,9 @@ public class MigrateWorkflowTests : IDisposable
 
         // Write a .calr file directly with known contracts
         var calrSource = """
-            §M{m001:VerifyTest}
+            §M{VerifyTest}
 
-              §F{f001:Square:pub}
+              §F{Square:pub}
                   §I{i32:x}
                   §O{i32}
                   §Q (>= x 0)

@@ -20,10 +20,10 @@ public class TupleTests
     public void Parse_TupleReturnType_EmitsCorrectCSharp()
     {
         var calor = """
-            §M{m001:TupleType}
-              §M{c001:Tuples:pub}
-                §MT{m002:GetMinMax:pub:stat} (i32:a, i32:b) -> (i32, i32)
-                  §IF{if003} (< a b)
+            §M{TupleType}
+              §M{Tuples:pub}
+                §MT{GetMinMax:pub:stat} (i32:a, i32:b) -> (i32, i32)
+                  §IF (< a b)
                     §R (a, b)
                   §R (b, a)
             """;
@@ -43,9 +43,9 @@ public class TupleTests
     public void Parse_NamedTupleReturnType_EmitsCorrectCSharp()
     {
         var calor = """
-            §M{m001:TupleType}
-              §M{c001:Tuples:pub}
-                §MT{m002:GetPerson:pub:stat} () -> (str Name, i32 Age)
+            §M{TupleType}
+              §M{Tuples:pub}
+                §MT{GetPerson:pub:stat} () -> (str Name, i32 Age)
                   §R ("Alice", 30)
             """;
 
@@ -62,9 +62,9 @@ public class TupleTests
     public void Parse_TupleParameterType_EmitsCorrectCSharp()
     {
         var calor = """
-            §M{m001:TupleType}
-              §M{c001:Tuples:pub}
-                §MT{m002:GetFirst:pub:stat} ((i32, i32):tuple) -> i32
+            §M{TupleType}
+              §M{Tuples:pub}
+                §MT{GetFirst:pub:stat} ((i32, i32):tuple) -> i32
                   §R tuple.Item1
             """;
 
@@ -86,9 +86,9 @@ public class TupleTests
     public void Parse_TupleReturnExpression_ProducesTupleLiteralNode()
     {
         var calor = """
-            §M{m001:TupleType}
-              §M{c001:Tuples:pub}
-                §MT{m002:MakeTuple:pub:stat} (i32:a, i32:b) -> (i32, i32)
+            §M{TupleType}
+              §M{Tuples:pub}
+                §MT{MakeTuple:pub:stat} (i32:a, i32:b) -> (i32, i32)
                   §R (a, b)
             """;
 
@@ -112,9 +112,9 @@ public class TupleTests
     public void Parse_TupleWithLiterals_EmitsCorrectCSharp()
     {
         var calor = """
-            §M{m001:TupleType}
-              §M{c001:Tuples:pub}
-                §MT{m002:GetPair:pub:stat} () -> (i32, i32)
+            §M{TupleType}
+              §M{Tuples:pub}
+                §MT{GetPair:pub:stat} () -> (i32, i32)
                   §R (10, 20)
             """;
 
@@ -131,9 +131,9 @@ public class TupleTests
     public void Parse_TupleWithStringAndInt_EmitsCorrectCSharp()
     {
         var calor = """
-            §M{m001:TupleType}
-              §M{c001:Tuples:pub}
-                §MT{m002:GetPerson:pub:stat} () -> (str, i32)
+            §M{TupleType}
+              §M{Tuples:pub}
+                §MT{GetPerson:pub:stat} () -> (str, i32)
                   §R ("Alice", 30)
             """;
 

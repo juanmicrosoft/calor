@@ -326,8 +326,8 @@ public sealed class McpCompileGateTests : IDisposable
         // CrossModuleEnforcement_StillRunsWithEffectsOff_AndAgreesWithTheCli.
         var violating = CreateTempDir();
         File.WriteAllText(Path.Combine(violating, "leaky.calr"), """
-            §M{m001:Leaky}
-              §F{f001:Speak:pub} () -> void
+            §M{Leaky}
+              §F{Speak:pub} () -> void
                 §E{}
                 §P "cw without declaring it"
             """);

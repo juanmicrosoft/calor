@@ -19,8 +19,8 @@ public class ContractTests
         // Test that None can be created and pattern matched
         // For now, just verify a simple function compiles and runs
         var source = @"
-§M{m001:Test}
-  §F{f001:getNone:pub}
+§M{Test}
+  §F{getNone:pub}
       §O{i32}
       §R INT:0
 ";
@@ -42,8 +42,8 @@ public class ContractTests
     public void S10_RequiresFails_ThrowsContractViolation()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:positiveOnly:pub}
+§M{Test}
+  §F{positiveOnly:pub}
       §I{i32:x}
       §O{i32}
       §Q (> x INT:0)
@@ -63,8 +63,10 @@ public class ContractTests
 
         var cve = (ContractViolationException)result.Exception;
 
-        // Exception should include function ID
-        Assert.Contains("f001", cve.FunctionId ?? cve.Message);
+        var compilation = Program.Compile(source, "test.calr",
+            new CompilationOptions { EnforceEffects = false });
+        Assert.False(compilation.HasErrors);
+        Assert.Equal(Assert.Single(compilation.Ast!.Functions).Id, cve.FunctionId);
     }
 
     /// <summary>
@@ -74,8 +76,8 @@ public class ContractTests
     public void Requires_Passes_WhenConditionTrue()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:positiveOnly:pub}
+§M{Test}
+  §F{positiveOnly:pub}
       §I{i32:x}
       §O{i32}
       §Q (> x INT:0)
@@ -96,8 +98,8 @@ public class ContractTests
     public void MultipleRequires_EvaluatedInOrder()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:bounded:pub}
+§M{Test}
+  §F{bounded:pub}
       §I{i32:x}
       §O{i32}
       §Q (> x INT:0)
@@ -130,8 +132,8 @@ public class ContractTests
         // This test uses simple REQUIRES without custom message
         // since message syntax may not be supported
         var source = @"
-§M{m001:Test}
-  §F{f001:withMessage:pub}
+§M{Test}
+  §F{withMessage:pub}
       §I{i32:x}
       §O{i32}
       §Q (> x INT:0)

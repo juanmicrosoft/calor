@@ -20,8 +20,8 @@ public class NullCoalescingTests
     private static string WrapInFunction(string body, string parameters = "", string returnType = "object")
     {
         return $$"""
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   {{parameters}}
                   §O{{{returnType}}}
                   {{body}}

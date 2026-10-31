@@ -111,12 +111,12 @@ public class Service
     {
         // Verify that codegen emits `throw new InvalidOperationException(...)`
         var source = @"
-§M{m001:Test}
-  §CL{c001:Svc:pub}
-    §MT{m001:Validate:pub}
+§M{Test}
+  §CL{Svc:pub}
+    §MT{Validate:pub}
       §I{str:name}
       §O{str}
-      §IF{i1} (== name null)
+      §IF (== name null)
         §TH §NEW{InvalidOperationException} §A ""name is null"" §/NEW
       §R name
 ";
@@ -154,9 +154,9 @@ public class Service
     {
         // Parse inline method syntax with default parameter
         var source = @"
-§M{m001:Test}
-  §CL{c001:Calculator:pub}
-    §MT{m001:Add:pub} (i32:x, i32:y = 0) -> i32
+§M{Test}
+  §CL{Calculator:pub}
+    §MT{Add:pub} (i32:x, i32:y = 0) -> i32
       §R (+ x y)
 ";
         var module = ParseCalor(source);
@@ -172,9 +172,9 @@ public class Service
     public void DefaultParam_Codegen_EmitsDefaultInParameter()
     {
         var source = @"
-§M{m001:Test}
-  §CL{c001:Calculator:pub}
-    §MT{m001:Add:pub} (i32:x, i32:y = 0) -> i32
+§M{Test}
+  §CL{Calculator:pub}
+    §MT{Add:pub} (i32:x, i32:y = 0) -> i32
       §R (+ x y)
 ";
         var csharp = ParseAndEmit(source);
@@ -336,8 +336,8 @@ public class DataProcessor
     {
         // (+ a b) should generate `a + b` without unnecessary parentheses
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
+§M{Test}
+  §F{Add:pub}
     §I{i32:a}
     §I{i32:b}
     §O{i32}
@@ -352,8 +352,8 @@ public class DataProcessor
     {
         // Multiplication binds tighter than addition; each native arithmetic operation checks overflow.
         var source = @"
-§M{m001:Test}
-  §F{f001:Calc:pub}
+§M{Test}
+  §F{Calc:pub}
     §I{i32:a}
     §I{i32:b}
     §I{i32:c}
@@ -370,8 +370,8 @@ public class DataProcessor
     {
         // Preserve the sum as the complete multiplicand, with checked arithmetic.
         var source = @"
-§M{m001:Test}
-  §F{f001:Calc:pub}
+§M{Test}
+  §F{Calc:pub}
     §I{i32:a}
     §I{i32:b}
     §I{i32:c}
@@ -391,8 +391,8 @@ public class DataProcessor
     {
         // A simple program without LINQ usage should NOT have `using System.Linq;`
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
     §O{void}
     §E{cw}
     §P ""Hello""
@@ -408,9 +408,9 @@ public class DataProcessor
         // A program that uses LINQ methods (via quantifier/contract expansion) should have `using System.Linq;`
         // We can trigger this by including code that generates .Any(), .All(), .Select(), etc.
         var source = @"
-§M{m001:Test}
-  §CL{c001:Svc:pub}
-    §MT{m001:HasPositive:pub}
+§M{Test}
+  §CL{Svc:pub}
+    §MT{HasPositive:pub}
       §I{List<i32>:items}
       §O{bool}
       §R §CS{items.Any(x => x > 0)}
@@ -432,8 +432,8 @@ public class DataProcessor
     {
         // Parse §CS{DateTime.Now.Ticks} and verify it round-trips correctly
         var source = @"
-§M{m001:Test}
-  §F{f001:GetTicks:pub}
+§M{Test}
+  §F{GetTicks:pub}
     §O{i64}
     §R §CS{DateTime.Now.Ticks}
 ";
@@ -447,8 +447,8 @@ public class DataProcessor
     {
         // Verify codegen emits `DateTime.Now.Ticks` verbatim
         var source = @"
-§M{m001:Test}
-  §F{f001:GetTicks:pub}
+§M{Test}
+  §F{GetTicks:pub}
     §O{i64}
     §R §CS{DateTime.Now.Ticks}
 ";
@@ -460,8 +460,8 @@ public class DataProcessor
     public void InlineCSharp_ComplexExpression_EmitsVerbatim()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:GetEnv:pub}
+§M{Test}
+  §F{GetEnv:pub}
     §O{str}
     §R §CS{Environment.GetEnvironmentVariable(""HOME"") ?? ""/tmp""}
 ";
@@ -478,9 +478,9 @@ public class DataProcessor
     {
         // Parse §PP{DEBUG} ... §/PP{DEBUG} and verify codegen emits #if DEBUG ... #endif
         var source = @"
-§M{m001:Test}
-  §CL{c001:Logger:pub}
-    §MT{m001:Log:pub}
+§M{Test}
+  §CL{Logger:pub}
+    §MT{Log:pub}
       §I{str:msg}
       §PP{DEBUG}
       §C{Console.WriteLine} msg
@@ -497,9 +497,9 @@ public class DataProcessor
     {
         // Test with else body: §PP{DEBUG} ... §PPE ... §/PP{DEBUG}
         var source = @"
-§M{m001:Test}
-  §CL{c001:Logger:pub}
-    §MT{m001:GetLevel:pub}
+§M{Test}
+  §CL{Logger:pub}
+    §MT{GetLevel:pub}
         §O{str}
         §PP{DEBUG}
         §R ""debug""
@@ -519,9 +519,9 @@ public class DataProcessor
     public void Preprocessor_CustomCondition_EmitsCorrectly()
     {
         var source = @"
-§M{m001:Test}
-  §CL{c001:Config:pub}
-    §MT{m001:GetEndpoint:pub}
+§M{Test}
+  §CL{Config:pub}
+    §MT{GetEndpoint:pub}
         §O{str}
         §PP{RELEASE}
         §R ""https://prod.example.com""
@@ -620,12 +620,12 @@ public class Test
     {
         // A throw statement inside a preprocessor-guarded block
         var source = @"
-§M{m001:Test}
-  §CL{c001:Guard:pub}
-    §MT{m001:Check:pub}
+§M{Test}
+  §CL{Guard:pub}
+    §MT{Check:pub}
       §I{bool:flag}
       §PP{DEBUG}
-      §IF{if1} (! flag)
+      §IF (! flag)
         §TH §NEW{InvalidOperationException} §A ""debug check failed"" §/NEW
       §/PP{DEBUG}
 ";
@@ -640,9 +640,9 @@ public class Test
     {
         // Inline method with default params and inline C# expression
         var source = @"
-§M{m001:Test}
-  §CL{c001:TimeHelper:pub}
-    §MT{m001:GetTime:pub} (i32:offset = 0) -> i64
+§M{Test}
+  §CL{TimeHelper:pub}
+    §MT{GetTime:pub} (i32:offset = 0) -> i64
       §R §CS{DateTimeOffset.UtcNow.ToUnixTimeSeconds() + offset}
 ";
         var csharp = ParseAndEmit(source);
@@ -655,9 +655,9 @@ public class Test
     {
         // Compile a program with several features and verify the generated C# is syntactically valid
         var source = @"
-§M{m001:Test}
-  §CL{c001:Utility:pub}
-    §MT{m001:Greet:pub} (str:name, str:greeting = ""Hello"") -> str
+§M{Test}
+  §CL{Utility:pub}
+    §MT{Greet:pub} (str:name, str:greeting = ""Hello"") -> str
       §R §CS{$""{greeting}, {name}!""}
 ";
         var result = Program.Compile(source, "test.calr", new CompilationOptions

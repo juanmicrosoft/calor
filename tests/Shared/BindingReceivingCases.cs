@@ -32,14 +32,14 @@ internal static class BindingReceivingCases
             _ => "§C{Take} §A value §/C"
         };
         return $$"""
-            §M{m1:StageBReceiving}
-              §CL{c1:Widget:pub}
-                §MT{id:Id:pub} () -> i32
+            §M{StageBReceiving}
+              §CL{Widget:pub}
+                §MT{Id:pub} () -> i32
                   §E{}
                   §R 1
-              §F{take:Take:pub} ({{targetType}}:value) -> void
+              §F{Take:pub} ({{targetType}}:value) -> void
                 §E{}
-              §F{probe:Probe:pub} ({{inputType}}:value) -> {{(boundary == BindingReceivingBoundary.NativeReturn ? targetType : "void")}}
+              §F{Probe:pub} ({{inputType}}:value) -> {{(boundary == BindingReceivingBoundary.NativeReturn ? targetType : "void")}}
                 §E{}
                 {{statement}}
             """;

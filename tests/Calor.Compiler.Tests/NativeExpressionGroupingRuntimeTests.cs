@@ -17,8 +17,8 @@ public class NativeExpressionGroupingRuntimeTests
         string expression, string returnType, string a, string b, object expected)
     {
         var type = Compile($$"""
-            §M{m1:Grouping}
-              §F{f1:Probe:pub} (str:a, str:b) -> {{returnType}}
+            §M{Grouping}
+              §F{Probe:pub} (str:a, str:b) -> {{returnType}}
                 §E{}
                 §R {{expression}}
             """);
@@ -33,8 +33,8 @@ public class NativeExpressionGroupingRuntimeTests
     public void CoalescingArithmeticAndCasts_PreserveComposition(string expression, int present, int absent)
     {
         var type = Compile($$"""
-            §M{m1:Grouping}
-              §F{f1:Probe:pub} (?i32:x) -> i32
+            §M{Grouping}
+              §F{Probe:pub} (?i32:x) -> i32
                 §E{}
                 §R {{expression}}
             """);
@@ -46,17 +46,17 @@ public class NativeExpressionGroupingRuntimeTests
     public void CastAndUnaryComposition_PreserveCompleteOperands()
     {
         var type = Compile("""
-            §M{m1:Grouping}
-              §F{f1:CastSum:pub} (f64:x, f64:y) -> i32
+            §M{Grouping}
+              §F{CastSum:pub} (f64:x, f64:y) -> i32
                 §E{}
                 §R (cast i32 (+ x y))
-              §F{f2:NegatedSum:pub} (f64:x, f64:y) -> i32
+              §F{NegatedSum:pub} (f64:x, f64:y) -> i32
                 §E{}
                 §R (- (cast i32 (+ x y)))
-              §F{f3:Character:pub} (i32:x, i32:y) -> char
+              §F{Character:pub} (i32:x, i32:y) -> char
                 §E{}
                 §R (char-from-code (+ x y))
-              §F{f4:Code:pub} (str:a, str:b) -> i32
+              §F{Code:pub} (str:a, str:b) -> i32
                 §E{}
                 §R (char-code (char-at (+ a b) INT:1))
             """);
@@ -83,10 +83,10 @@ public class NativeExpressionGroupingRuntimeTests
         foreach (var (pattern, oracle) in cases)
         {
             var type = Compile($$"""
-                §M{m1:Grouping}
-                  §F{f1:Probe:pub} (i32:x) -> bool
+                §M{Grouping}
+                  §F{Probe:pub} (i32:x) -> bool
                     §E{}
-                    §R §W{w1} x
+                    §R §W x
                       §K {{pattern}} → BOOL:true
                       §K _ → BOOL:false
                 """);
@@ -99,19 +99,19 @@ public class NativeExpressionGroupingRuntimeTests
     public void GroupedReceiversAndCoalescing_EvaluateChildrenOnceInOrder()
     {
         var type = Compile("""
-            §M{m1:Grouping}
-              §F{f1:RecordText:priv} (List<str>:trace, str:value) -> str
+            §M{Grouping}
+              §F{RecordText:priv} (List<str>:trace, str:value) -> str
                 §E{mut}
                 §C{trace.Add} §A value §/C
                 §R value
-              §F{f2:RecordNumber:priv} (List<i32>:trace, i32:value) -> i32
+              §F{RecordNumber:priv} (List<i32>:trace, i32:value) -> i32
                 §E{mut}
                 §C{trace.Add} §A value §/C
                 §R value
-              §F{f3:Text:pub} (List<str>:trace) -> str
+              §F{Text:pub} (List<str>:trace) -> str
                 §E{mut}
                 §R (upper (+ §C{RecordText} §A trace §A "a" §/C §C{RecordText} §A trace §A "b" §/C))
-              §F{f4:Number:pub} (?i32:value, List<i32>:trace) -> i32
+              §F{Number:pub} (?i32:value, List<i32>:trace) -> i32
                 §E{mut}
                 §R (+ (?? value §C{RecordNumber} §A trace §A INT:1 §/C) §C{RecordNumber} §A trace §A INT:2 §/C)
             """);
@@ -132,8 +132,8 @@ public class NativeExpressionGroupingRuntimeTests
     public async Task AwaitCoalescedTask_AwaitsSelectedReceiver(string configuration)
     {
         var type = Compile($$"""
-            §M{m1:Grouping}
-              §AF{f1:Probe:pub} (Task<i32>:first, Task<i32>:second) -> i32
+            §M{Grouping}
+              §AF{Probe:pub} (Task<i32>:first, Task<i32>:second) -> i32
                 §R §AWAIT{{configuration}} (?? first second)
             """);
         foreach (var first in new[] { Task.FromResult(5), null })

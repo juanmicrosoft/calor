@@ -52,9 +52,9 @@ public class CompactSyntaxTests
     public void CompactProp_GetOnly_ParsesSingleLine()
     {
         var source = """
-            §M{m001:Test}
-              §CL{c001:Person}
-                §PROP{p001:Name:str:pub:get}
+            §M{Test}
+              §CL{Person}
+                §PROP{Name:str:pub:get}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -74,9 +74,9 @@ public class CompactSyntaxTests
     public void CompactProp_GetSet_ParsesSingleLine()
     {
         var source = """
-            §M{m001:Test}
-              §CL{c001:Person}
-                §PROP{p001:Age:i32:pub:get,set}
+            §M{Test}
+              §CL{Person}
+                §PROP{Age:i32:pub:get,set}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -95,9 +95,9 @@ public class CompactSyntaxTests
     public void CompactProp_GetInit_ParsesSingleLine()
     {
         var source = """
-            §M{m001:Test}
-              §CL{c001:Record}
-                §PROP{p001:Id:i32:pub:get,init}
+            §M{Test}
+              §CL{Record}
+                §PROP{Id:i32:pub:get,init}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -116,9 +116,9 @@ public class CompactSyntaxTests
     public void CompactProp_GetPrivateSet_ParsesSingleLine()
     {
         var source = """
-            §M{m001:Test}
-              §CL{c001:Item}
-                §PROP{p001:Count:i32:pub:get,priset}
+            §M{Test}
+              §CL{Item}
+                §PROP{Count:i32:pub:get,priset}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -137,9 +137,9 @@ public class CompactSyntaxTests
     public void CompactProp_WithDefaultValue_ParsesValueExpression()
     {
         var source = """
-            §M{m001:Test}
-              §CL{c001:Config}
-                §PROP{p001:MaxRetries:i32:pub:get,set} = 3
+            §M{Test}
+              §CL{Config}
+                §PROP{MaxRetries:i32:pub:get,set} = 3
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -158,10 +158,10 @@ public class CompactSyntaxTests
     {
         // Compact accessor shorthand means no §/PROP closing tag is required
         var source = """
-            §M{m001:Test}
-              §CL{c001:Data}
-                §PROP{p001:Value:str:pub:get,set}
-                §PROP{p002:Label:str:pub:get}
+            §M{Test}
+              §CL{Data}
+                §PROP{Value:str:pub:get,set}
+                §PROP{Label:str:pub:get}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -178,14 +178,14 @@ public class CompactSyntaxTests
     {
         // Old verbose format with separate §GET/§SET tags
         var source = """
-            §M{m001:Test}
-              §CL{c001:Person}
-                §PROP{p001:Name:str:pub}
+            §M{Test}
+              §CL{Person}
+                §PROP{Name:str:pub}
                 §GET
                 §/GET
                 §SET{priv}
                 §/SET
-                §/PROP{p001}
+                §/PROP
             """;
 
         var (original, formatted, reparsed) = FormatAndReparse(source);
@@ -211,9 +211,9 @@ public class CompactSyntaxTests
     public void CompactProp_Static_ParsesWithModifier()
     {
         var source = """
-            §M{m001:Test}
-              §CL{c001:Counter}
-                §PROP{p001:Count:i32:pub:static:get,set}
+            §M{Test}
+              §CL{Counter}
+                §PROP{Count:i32:pub:static:get,set}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -234,9 +234,9 @@ public class CompactSyntaxTests
     [Fact]
     public void OptionalId_Function_TwoPartNameVis()
     {
-        // §F{name:vis} instead of §F{id:name:vis}
+        // §F{vis} instead of §F{name:vis}
         var source = """
-            §M{m001:Test}
+            §M{Test}
               §F{Main:pub}
                 §O{void}
                 §R
@@ -255,10 +255,10 @@ public class CompactSyntaxTests
     [Fact]
     public void OptionalId_Function_ThreePartOldFormatPreserved()
     {
-        // Old format §F{id:name:vis} should still work
+        // Old format §F{name:vis} should still work
         var source = """
-            §M{m001:Test}
-              §F{f001:Add:pub}
+            §M{Test}
+              §F{Add:pub}
                 §I{i32:a}
                 §I{i32:b}
                 §O{i32}
@@ -279,7 +279,7 @@ public class CompactSyntaxTests
     {
         // When open tag uses auto-generated ID, closing tag can omit the ID
         var source = """
-            §M{m001:Test}
+            §M{Test}
               §F{Hello:pub}
                 §O{void}
                 §R
@@ -295,9 +295,9 @@ public class CompactSyntaxTests
     [Fact]
     public void OptionalId_Class_NameOnly()
     {
-        // §CL{Person} instead of §CL{c001:Person}
+        // §CL{Person} instead of §CL{Person}
         var source = """
-            §M{m001:Test}
+            §M{Test}
               §CL{Person}
                 §FLD{str:Name:pub}
             """;
@@ -313,11 +313,11 @@ public class CompactSyntaxTests
     [Fact]
     public void OptionalId_Interface_NameOnly()
     {
-        // §IFACE{IShape} instead of §IFACE{i001:IShape}
+        // §IFACE{IShape} instead of §IFACE{IShape}
         var source = """
-            §M{m001:Test}
+            §M{Test}
               §IFACE{IShape}
-                §MT{m001:Area}
+                §MT{Area}
                   §O{f64}
             """;
 
@@ -334,9 +334,9 @@ public class CompactSyntaxTests
     {
         // §IFACE{IChild:IParent} — no explicit ID, with base interface
         var source = """
-            §M{m001:Test}
+            §M{Test}
               §IFACE{IChild:IParent}
-                §MT{m001:DoWork}
+                §MT{DoWork}
                   §O{void}
             """;
 
@@ -358,9 +358,9 @@ public class CompactSyntaxTests
     public void Interface_BaseInterface_FromThirdAttribute()
     {
         var source = """
-            §M{m001:Test}
-              §IFACE{i001:IChild:IParent}
-                §MT{m001:DoWork}
+            §M{Test}
+              §IFACE{IChild:IParent}
+                §MT{DoWork}
                   §O{void}
             """;
 
@@ -382,9 +382,9 @@ public class CompactSyntaxTests
     public void Interface_MultipleBaseInterfaces_FromThirdAttribute()
     {
         var source = """
-            §M{m001:Test}
-              §IFACE{i001:IChild:IParent,IDisposable}
-                §MT{m001:DoWork}
+            §M{Test}
+              §IFACE{IChild:IParent,IDisposable}
+                §MT{DoWork}
                   §O{void}
             """;
 
@@ -406,9 +406,9 @@ public class CompactSyntaxTests
     public void Interface_BaseInterface_RoundTrip()
     {
         var source = """
-            §M{m001:Test}
-              §IFACE{i001:IChild:IParent}
-                §MT{m001:DoWork}
+            §M{Test}
+              §IFACE{IChild:IParent}
+                §MT{DoWork}
                   §O{void}
             """;
 
@@ -431,9 +431,9 @@ public class CompactSyntaxTests
     [Fact]
     public void OptionalId_Enum_NameOnly()
     {
-        // §EN{Color} instead of §EN{e001:Color}
+        // §EN{Color} instead of §EN{Color}
         var source = """
-            §M{m001:Test}
+            §M{Test}
               §EN{Color}
               Red = 0
               Green = 1
@@ -453,10 +453,10 @@ public class CompactSyntaxTests
     [Fact]
     public void OptionalId_Constructor_VisibilityOnly()
     {
-        // §CTOR{pub} instead of §CTOR{ctor1:pub}
+        // §CTOR{pub} instead of §CTOR{pub}
         var source = """
-            §M{m001:Test}
-              §CL{c001:Widget}
+            §M{Test}
+              §CL{Widget}
                 §CTOR{pub}
                 §I{str:name}
                 §/CTOR
@@ -475,11 +475,11 @@ public class CompactSyntaxTests
     [Fact]
     public void OptionalId_Method_WithVisibilityKeywordDetection()
     {
-        // §MT{DoWork:pub} instead of §MT{m001:DoWork:pub}
+        // §MT{DoWork:pub} instead of §MT{DoWork:pub}
         // The parser detects "pub" as a visibility keyword and shifts
         var source = """
-            §M{m001:Test}
-              §CL{c001:Worker}
+            §M{Test}
+              §CL{Worker}
                 §MT{DoWork:pub}
                   §O{void}
                   §R
@@ -500,7 +500,7 @@ public class CompactSyntaxTests
     {
         // Under indent-only form, dedent terminates the block — no closer needed
         var source = """
-            §M{m001:Test}
+            §M{Test}
               §F{Hello:pub}
                 §O{void}
                 §R
@@ -521,8 +521,8 @@ public class CompactSyntaxTests
     public void InlineSig_Function_SingleParam()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Square:pub} (i32:x) -> i32
+            §M{Test}
+              §F{Square:pub} (i32:x) -> i32
                 §R (* x x)
             """;
 
@@ -542,8 +542,8 @@ public class CompactSyntaxTests
     public void InlineSig_Function_MultipleParams()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Add:pub} (i32:a, i32:b) -> i32
+            §M{Test}
+              §F{Add:pub} (i32:a, i32:b) -> i32
                 §R (+ a b)
             """;
 
@@ -562,8 +562,8 @@ public class CompactSyntaxTests
     public void InlineSig_Function_GenericParam()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:First:pub} (List<i32>:items) -> i32
+            §M{Test}
+              §F{First:pub} (List<i32>:items) -> i32
                 §R 0
             """;
 
@@ -580,8 +580,8 @@ public class CompactSyntaxTests
     public void InlineSig_Function_NullableParam()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:OrDefault:pub} (i32?:value) -> i32
+            §M{Test}
+              §F{OrDefault:pub} (i32?:value) -> i32
                 §R 0
             """;
 
@@ -600,8 +600,8 @@ public class CompactSyntaxTests
     public void InlineSig_Function_ArrayParam()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Sum:pub} ([i32]:values) -> i32
+            §M{Test}
+              §F{Sum:pub} ([i32]:values) -> i32
                 §R 0
             """;
 
@@ -617,8 +617,8 @@ public class CompactSyntaxTests
     public void InlineSig_Function_NoReturnType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:PrintHello:pub} ()
+            §M{Test}
+              §F{PrintHello:pub} ()
                 §E{cw}
                 §C{Console.WriteLine} "hello"
             """;
@@ -637,9 +637,9 @@ public class CompactSyntaxTests
     public void InlineSig_Method_InClassContext()
     {
         var source = """
-            §M{m001:Test}
-              §CL{c001:Calculator}
-                §MT{m001:Add:pub} (i32:a, i32:b) -> i32
+            §M{Test}
+              §CL{Calculator}
+                §MT{Add:pub} (i32:a, i32:b) -> i32
                   §R (+ a b)
             """;
 
@@ -658,12 +658,12 @@ public class CompactSyntaxTests
     public void InlineSig_Constructor_WithParams()
     {
         var source = """
-            §M{m001:Test}
-              §CL{c001:Person}
+            §M{Test}
+              §CL{Person}
                 §FLD{str:_name:priv}
-                §CTOR{ctor1:pub} (str:name)
+                §CTOR{pub} (str:name)
                 §C{Console.WriteLine} name
-                §/CTOR{ctor1}
+                §/CTOR
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -680,8 +680,8 @@ public class CompactSyntaxTests
     public void InlineSig_EmptyParamsWithReturn()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:GetZero:pub} () -> i32
+            §M{Test}
+              §F{GetZero:pub} () -> i32
                 §R 0
             """;
 
@@ -698,8 +698,8 @@ public class CompactSyntaxTests
     public void InlineSig_WithContracts()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Divide:pub} (i32:a, i32:b) -> i32
+            §M{Test}
+              §F{Divide:pub} (i32:a, i32:b) -> i32
                 §Q (!= b 0)
                 §S (>= result 0)
                 §R (/ a b)
@@ -720,8 +720,8 @@ public class CompactSyntaxTests
     {
         // Verbose form with §I/§O tags
         var source = """
-            §M{m001:Test}
-              §F{f001:Add:pub}
+            §M{Test}
+              §F{Add:pub}
                 §I{i32:a}
                 §I{i32:b}
                 §O{i32}
@@ -752,14 +752,14 @@ public class CompactSyntaxTests
     public void InlineSig_RoundTrip_Constructor()
     {
         var source = """
-            §M{m001:Test}
-              §CL{c001:Widget}
+            §M{Test}
+              §CL{Widget}
                 §FLD{str:_name:priv}
-                §CTOR{ctor1:pub}
+                §CTOR{pub}
                 §I{str:name}
                 §I{i32:count}
                 §C{Console.WriteLine} name
-                §/CTOR{ctor1}
+                §/CTOR
             """;
 
         var (original, formatted, reparsed) = FormatAndReparse(source);
@@ -783,7 +783,7 @@ public class CompactSyntaxTests
     {
         // Combines: optional ID, inline signature, compact auto-property
         var source = """
-            §M{m001:Test}
+            §M{Test}
               §CL{MyClass}
                 §PROP{Name:str:pub:get,priset}
                 §PROP{Count:i32:pub:get,set} = 0
@@ -828,21 +828,21 @@ public class CompactSyntaxTests
     {
         // Verbose old-format source
         var source = """
-            §M{m001:Test}
-              §CL{c001:DataHolder}
+            §M{Test}
+              §CL{DataHolder}
                 §FLD{str:_label:priv}
-                §PROP{p001:Value:i32:pub}
+                §PROP{Value:i32:pub}
                 §GET
                 §/GET
                 §SET
                 §/SET
-                §/PROP{p001}
-                §CTOR{ctor1:pub}
+                §/PROP
+                §CTOR{pub}
                 §I{str:label}
                 §I{i32:value}
                 §C{Console.WriteLine} label
-                §/CTOR{ctor1}
-                §MT{m001:GetLabel:pub}
+                §/CTOR
+                §MT{GetLabel:pub}
                   §O{str}
                   §R "label"
             """;
@@ -877,21 +877,21 @@ public class CompactSyntaxTests
     {
         // Verbose source with lots of redundancy
         var source = """
-            §M{m001:Test}
-              §CL{c001:Item}
-                §PROP{p001:Name:string:pub}
+            §M{Test}
+              §CL{Item}
+                §PROP{Name:string:pub}
                 §GET
                 §/GET
                 §SET{priv}
                 §/SET
-                §/PROP{p001}
-                §PROP{p002:Value:int:pub}
+                §/PROP
+                §PROP{Value:int:pub}
                 §GET
                 §/GET
                 §SET
                 §/SET
-                §/PROP{p002}
-              §F{f001:Main:pub}
+                §/PROP
+              §F{Main:pub}
                 §I{string:name}
                 §I{int:count}
                 §O{void}

@@ -18,9 +18,9 @@ public class ExceptionHandlingTests
     public void CatchFilter_RequiresCanonicalMarker(string marker, bool hasError)
     {
         var source = $$"""
-            §M{m1:Filters}
-              §F{f1:Run:pub} () -> void
-                §TR{t1}
+            §M{Filters}
+              §F{Run:pub} () -> void
+                §TR
                   §TH §NEW{Exception} §/NEW
                 §CA{Exception:e} {{marker}} true
                   §P "caught"
@@ -38,16 +38,16 @@ public class ExceptionHandlingTests
     public void CodeGen_BasicTryCatch_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:SafeDivide:pub}
+§M{Test}
+  §F{SafeDivide:pub}
     §I{i32:a}
     §I{i32:b}
     §O{i32}
-    §TR{t1}
+    §TR
     §R (/ a b)
     §CA{DivideByZeroException:ex}
     §R 0
-    §/TR{t1}
+    §/TR
 ";
 
         var result = ParseAndEmit(source);
@@ -62,17 +62,17 @@ public class ExceptionHandlingTests
     public void CodeGen_TryCatchFinally_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:WithFinally:pub}
+§M{Test}
+  §F{WithFinally:pub}
     §O{void}
     §E{cw}
-    §TR{t1}
+    §TR
     §P ""try""
     §CA{Exception:e}
     §P ""catch""
     §FI
     §P ""finally""
-    §/TR{t1}
+    §/TR
 ";
 
         var result = ParseAndEmit(source);
@@ -86,19 +86,19 @@ public class ExceptionHandlingTests
     public void CodeGen_NestedTryCatch_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Nested:pub}
+§M{Test}
+  §F{Nested:pub}
     §I{i32:x}
     §O{i32}
-    §TR{t1}
-    §TR{t2}
+    §TR
+    §TR
     §R (/ 100 x)
     §CA{DivideByZeroException:inner}
     §R -1
-    §/TR{t2}
+    §/TR
     §CA{Exception:outer}
     §R -2
-    §/TR{t1}
+    §/TR
 ";
 
         var result = ParseAndEmit(source);
@@ -116,11 +116,11 @@ public class ExceptionHandlingTests
     public void CodeGen_MultipleCatchClauses_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:MultiCatch:pub}
+§M{Test}
+  §F{MultiCatch:pub}
     §I{i32:x}
     §O{str}
-    §TR{t1}
+    §TR
     §R (/ 100 x)
     §CA{DivideByZeroException:e1}
     §R ""divide by zero""
@@ -128,7 +128,7 @@ public class ExceptionHandlingTests
     §R ""arithmetic error""
     §CA{Exception:e3}
     §R ""general error""
-    §/TR{t1}
+    §/TR
 ";
 
         var result = ParseAndEmit(source);
@@ -142,15 +142,15 @@ public class ExceptionHandlingTests
     public void CodeGen_CatchAll_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:CatchAll:pub}
+§M{Test}
+  §F{CatchAll:pub}
     §O{void}
     §E{cw}
-    §TR{t1}
+    §TR
     §P ""try""
     §CA
     §P ""caught""
-    §/TR{t1}
+    §/TR
 ";
 
         var result = ParseAndEmit(source);
@@ -164,17 +164,17 @@ public class ExceptionHandlingTests
     public void CodeGen_WhenFilter_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Filtered:pub}
+§M{Test}
+  §F{Filtered:pub}
     §I{i32:code}
     §O{str}
-    §TR{t1}
+    §TR
     §TH ""Error""
     §CA{Exception:ex} §WHEN (== code 42)
     §R ""special""
     §CA{Exception:ex}
     §R ""general""
-    §/TR{t1}
+    §/TR
 ";
 
         var result = ParseAndEmit(source);
@@ -186,16 +186,16 @@ public class ExceptionHandlingTests
     public void CodeGen_Rethrow_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Rethrow:pub}
+§M{Test}
+  §F{Rethrow:pub}
     §O{void}
     §E{cw}
-    §TR{t1}
+    §TR
     §TH ""Error""
     §CA{Exception:ex}
     §P ""caught""
     §RT
-    §/TR{t1}
+    §/TR
 ";
 
         var result = ParseAndEmit(source);
@@ -209,8 +209,8 @@ public class ExceptionHandlingTests
     public void CodeGen_ThrowStatement_StringWrapsInException()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Throw:pub}
+§M{Test}
+  §F{Throw:pub}
     §O{void}
     §TH ""error message""
 ";
@@ -224,8 +224,8 @@ public class ExceptionHandlingTests
     public void CodeGen_ThrowStatement_IntLiteralWrapsInException()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Throw:pub}
+§M{Test}
+  §F{Throw:pub}
     §O{void}
     §TH 42
 ";
@@ -239,8 +239,8 @@ public class ExceptionHandlingTests
     public void CodeGen_ThrowStatement_BoolLiteralWrapsInException()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Throw:pub}
+§M{Test}
+  §F{Throw:pub}
     §O{void}
     §TH true
 ";
@@ -254,8 +254,8 @@ public class ExceptionHandlingTests
     public void CodeGen_ThrowStatement_NewExceptionPassesThrough()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Throw:pub}
+§M{Test}
+  §F{Throw:pub}
     §O{void}
     §TH §NEW{ArgumentException} §A ""bad arg"" §/NEW
 ";
@@ -270,8 +270,8 @@ public class ExceptionHandlingTests
     public void CodeGen_ThrowStatement_VariablePassesThrough()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Throw:pub}
+§M{Test}
+  §F{Throw:pub}
     §O{void}
     §B{~ex} §NEW{InvalidOperationException} §A ""oops"" §/NEW
     §TH ex
@@ -287,8 +287,8 @@ public class ExceptionHandlingTests
     public void CodeGen_ThrowStatement_FloatLiteralWrapsInException()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Throw:pub}
+§M{Test}
+  §F{Throw:pub}
     §O{void}
     §TH 3.14
 ";
@@ -302,8 +302,8 @@ public class ExceptionHandlingTests
     public void CodeGen_ThrowStatement_DecimalLiteralWrapsInException()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Throw:pub}
+§M{Test}
+  §F{Throw:pub}
     §O{void}
     §TH 18.00M
 ";
@@ -317,8 +317,8 @@ public class ExceptionHandlingTests
     public void CodeGen_ThrowStatement_CharLiteralWrapsInException()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Throw:pub}
+§M{Test}
+  §F{Throw:pub}
     §O{void}
     §TH (char-lit ""x"")
 ";
@@ -332,8 +332,8 @@ public class ExceptionHandlingTests
     public void CodeGen_ThrowStatement_InterpolatedStringWrapsInException()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Throw:pub}
+§M{Test}
+  §F{Throw:pub}
     §I{str:name}
     §O{void}
     §TH §INTERP ""Hello, "" §EXP name ""!"" §/INTERP
@@ -348,15 +348,15 @@ public class ExceptionHandlingTests
     public void CodeGen_TryOnlyFinally_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:TryFinally:pub}
+§M{Test}
+  §F{TryFinally:pub}
     §O{void}
     §E{cw}
-    §TR{t1}
+    §TR
     §P ""try""
     §FI
     §P ""finally""
-    §/TR{t1}
+    §/TR
 ";
 
         var result = ParseAndEmit(source);
@@ -376,12 +376,12 @@ public class ExceptionHandlingTests
     public void Parse_MismatchedTryId_ReportsError()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Bad:pub}
+§M{Test}
+  §F{Bad:pub}
     §O{void}
-    §TR{t1}
+    §TR
     §P ""try""
-    §/TR{t2}
+    §/TR
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -395,8 +395,8 @@ public class ExceptionHandlingTests
     public void Parse_MissingTryId_ReportsError()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Bad:pub}
+§M{Test}
+  §F{Bad:pub}
     §O{void}
     §TR
     §P ""try""
@@ -415,13 +415,13 @@ public class ExceptionHandlingTests
     {
         // Empty try blocks are syntactically valid (though semantically questionable)
         var source = @"
-§M{m1:Test}
-  §F{f1:Empty:pub}
+§M{Test}
+  §F{Empty:pub}
     §O{void}
-    §TR{t1}
+    §TR
     §CA{Exception:e}
     §P ""catch""
-    §/TR{t1}
+    §/TR
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -434,13 +434,13 @@ public class ExceptionHandlingTests
     {
         // Try without catch or finally - syntactically allowed
         var source = @"
-§M{m1:Test}
-  §F{f1:NoHandler:pub}
+§M{Test}
+  §F{NoHandler:pub}
     §O{void}
     §E{cw}
-    §TR{t1}
+    §TR
     §P ""try only""
-    §/TR{t1}
+    §/TR
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -454,14 +454,14 @@ public class ExceptionHandlingTests
     {
         // Parser accepts any identifier as exception type (type checking is separate)
         var source = @"
-§M{m1:Test}
-  §F{f1:Bad:pub}
+§M{Test}
+  §F{Bad:pub}
     §O{void}
-    §TR{t1}
+    §TR
     §P ""try""
     §CA{NonExistentException:e}
     §P ""catch""
-    §/TR{t1}
+    §/TR
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -476,15 +476,15 @@ public class ExceptionHandlingTests
         // The parser now has a fallback for unknown Lisp operators (treats them as calls),
         // so (invalid.operator x) parses without errors.
         var source = @"
-§M{m1:Test}
-  §F{f1:Bad:pub}
+§M{Test}
+  §F{Bad:pub}
     §I{i32:x}
     §O{void}
-    §TR{t1}
+    §TR
     §P ""try""
     §CA{Exception:e} §WHEN (invalid.operator x)
     §P ""catch""
-    §/TR{t1}
+    §/TR
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -497,8 +497,8 @@ public class ExceptionHandlingTests
     {
         // Parser allows rethrow anywhere, but it's semantically invalid outside catch
         var source = @"
-§M{m1:Test}
-  §F{f1:Bad:pub}
+§M{Test}
+  §F{Bad:pub}
     §O{void}
     §RT
 ";
@@ -517,17 +517,17 @@ public class ExceptionHandlingTests
     public void RoundTrip_TryCatchFinally_FormatsAndReparses()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:RoundTrip:pub}
+§M{Test}
+  §F{RoundTrip:pub}
     §O{void}
     §E{cw}
-    §TR{t1}
+    §TR
     §P ""try""
     §CA{Exception:e}
     §P ""catch""
     §FI
     §P ""finally""
-    §/TR{t1}
+    §/TR
 ";
 
         // Parse original
@@ -547,17 +547,17 @@ public class ExceptionHandlingTests
     public void RoundTrip_WhenFilter_FormatsAndReparses()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:WhenRoundTrip:pub}
+§M{Test}
+  §F{WhenRoundTrip:pub}
     §I{i32:code}
     §O{str}
-    §TR{t1}
+    §TR
     §TH ""Error""
     §CA{Exception:ex} §WHEN (== code 42)
     §R ""special""
     §CA{Exception:ex}
     §R ""general""
-    §/TR{t1}
+    §/TR
 ";
 
         // Parse original
@@ -580,16 +580,16 @@ public class ExceptionHandlingTests
     public void RoundTrip_Rethrow_FormatsAndReparses()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:RethrowRoundTrip:pub}
+§M{Test}
+  §F{RethrowRoundTrip:pub}
     §O{void}
     §E{cw}
-    §TR{t1}
+    §TR
     §TH ""Error""
     §CA
     §P ""caught""
     §RT
-    §/TR{t1}
+    §/TR
 ";
 
         // Parse original
@@ -661,14 +661,14 @@ public class ExceptionHandlingTests
     public void CodeGen_UsingStatement_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:ReadFile:pub}
+§M{Test}
+  §F{ReadFile:pub}
     §I{str:path}
     §O{void}
     §E{cw}
-    §USE{u1:reader:StreamReader} §NEW{StreamReader} §A path
+    §USE{reader:StreamReader} §NEW{StreamReader} §A path
       §P ""inside using""
-    §/USE{u1}
+    §/USE
 ";
 
         var result = ParseAndEmit(source);
@@ -681,14 +681,14 @@ public class ExceptionHandlingTests
     public void CodeGen_UsingStatementNoType_UsesVar()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:ReadFile:pub}
+§M{Test}
+  §F{ReadFile:pub}
     §I{str:path}
     §O{void}
     §E{cw}
-    §USE{u1:reader} §NEW{StreamReader} §A path
+    §USE{reader} §NEW{StreamReader} §A path
       §P ""inside using""
-    §/USE{u1}
+    §/USE
 ";
 
         var result = ParseAndEmit(source);
@@ -700,14 +700,14 @@ public class ExceptionHandlingTests
     public void CodeGen_UsingStatementWithMethodCallResource_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Process:pub}
+§M{Test}
+  §F{Process:pub}
     §I{str:path}
     §O{void}
     §E{cw}
-    §USE{u1:stream:FileStream} §C{File.OpenRead} §A path §/C
+    §USE{stream:FileStream} §C{File.OpenRead} §A path §/C
       §P ""reading""
-    §/USE{u1}
+    §/USE
 ";
 
         var result = ParseAndEmit(source);

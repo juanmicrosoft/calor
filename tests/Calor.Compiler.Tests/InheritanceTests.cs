@@ -16,11 +16,11 @@ public class InheritanceTests
     public void CodeGen_AbstractClass_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Shape:pub:abs}
-      §MT{mt1:Area:pub:abs}
+§M{Test}
+  §CL{Shape:pub:abs}
+      §MT{Area:pub:abs}
           §O{double}
-      §MT{mt2:Name:pub:abs}
+      §MT{Name:pub:abs}
           §O{str}
 ";
 
@@ -35,14 +35,14 @@ public class InheritanceTests
     public void CodeGen_DerivedClass_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Shape:pub:abs}
-      §MT{mt1:Area:pub:abs}
+§M{Test}
+  §CL{Shape:pub:abs}
+      §MT{Area:pub:abs}
           §O{double}
-  §CL{c2:Circle:pub}
+  §CL{Circle:pub}
       §EXT{Shape}
       §FLD{f64:radius:priv}
-      §MT{mt1:Area:pub:over}
+      §MT{Area:pub:over}
           §O{double}
           §R (* 3.14159 (* radius radius))
 ";
@@ -58,9 +58,9 @@ public class InheritanceTests
     public void CodeGen_VirtualMethod_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Animal:pub}
-      §MT{mt1:Speak:pub:virt}
+§M{Test}
+  §CL{Animal:pub}
+      §MT{Speak:pub:virt}
           §O{str}
           §R ""...""
 ";
@@ -75,14 +75,14 @@ public class InheritanceTests
     public void CodeGen_SealedOverride_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Base:pub}
-      §MT{mt1:Compute:pub:virt}
+§M{Test}
+  §CL{Base:pub}
+      §MT{Compute:pub:virt}
           §O{i32}
           §R 0
-  §CL{c2:Derived:pub}
+  §CL{Derived:pub}
       §EXT{Base}
-      §MT{mt1:Compute:pub:seal over}
+      §MT{Compute:pub:seal over}
           §O{i32}
           §R 42
 ";
@@ -97,14 +97,14 @@ public class InheritanceTests
     public void CodeGen_BaseMethodCall_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Base:pub}
-      §MT{mt1:GetValue:pub:virt}
+§M{Test}
+  §CL{Base:pub}
+      §MT{GetValue:pub:virt}
           §O{i32}
           §R 10
-  §CL{c2:Derived:pub}
+  §CL{Derived:pub}
       §EXT{Base}
-      §MT{mt1:GetValue:pub:over}
+      §MT{GetValue:pub:over}
           §O{i32}
           §R (+ §C{base.GetValue} §/C 5)
 ";
@@ -120,22 +120,22 @@ public class InheritanceTests
     public void CodeGen_ConstructorWithBaseCall_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Animal:pub}
+§M{Test}
+  §CL{Animal:pub}
       §FLD{str:_name:prot}
-      §CTOR{ctor1:pub}
+      §CTOR{pub}
         §I{str:name}
         §ASSIGN §THIS._name name
-      §/CTOR{ctor1}
-  §CL{c2:Dog:pub}
+      §/CTOR
+  §CL{Dog:pub}
       §EXT{Animal}
       §FLD{str:_breed:priv}
-      §CTOR{ctor1:pub}
+      §CTOR{pub}
         §I{str:name}
         §I{str:breed}
         §BASE §A name §/BASE
         §ASSIGN §THIS._breed breed
-      §/CTOR{ctor1}
+      §/CTOR
 ";
 
         var result = ParseAndEmit(source);
@@ -149,19 +149,19 @@ public class InheritanceTests
     public void CodeGen_MultipleInterfaceImplementation_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §IFACE{i1:IMovable}
-      §MT{mt1:Move}
+§M{Test}
+  §IFACE{IMovable}
+      §MT{Move}
           §O{void}
-  §IFACE{i2:IDrawable}
-      §MT{mt1:Draw}
+  §IFACE{IDrawable}
+      §MT{Draw}
           §O{void}
-  §CL{c1:GameObject:pub}
+  §CL{GameObject:pub}
       §IMPL{IMovable}
       §IMPL{IDrawable}
-      §MT{mt1:Move:pub}
+      §MT{Move:pub}
           §O{void}
-      §MT{mt2:Draw:pub}
+      §MT{Draw:pub}
           §O{void}
 ";
 
@@ -175,9 +175,9 @@ public class InheritanceTests
     {
         // This test verifies static methods in a non-static class (class uses :pub, not :static)
         var source = @"
-§M{m1:Test}
-  §CL{c1:MathUtils:pub}
-      §MT{mt1:Square:pub:stat}
+§M{Test}
+  §CL{MathUtils:pub}
+      §MT{Square:pub:stat}
           §I{i32:x}
           §O{i32}
           §R (* x x)
@@ -193,9 +193,9 @@ public class InheritanceTests
     public void CodeGen_PartialClass_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:DataService:pub:partial}
-      §MT{mt1:GetData:pub}
+§M{Test}
+  §CL{DataService:pub:partial}
+      §MT{GetData:pub}
           §O{str}
           §R ""data""
 ";
@@ -209,9 +209,9 @@ public class InheritanceTests
     public void CodeGen_SealedClass_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:FinalClass:pub:seal}
-      §MT{mt1:DoWork:pub}
+§M{Test}
+  §CL{FinalClass:pub:seal}
+      §MT{DoWork:pub}
           §O{void}
 ";
 
@@ -224,8 +224,8 @@ public class InheritanceTests
     public void CodeGen_GenericInterfaceImplementation_PreservesGenericSyntax()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyOption:pub}<T>
+§M{Test}
+  §CL{MyOption:pub}<T>
       §IMPL{IEquatable<MyOption<T>>}
 ";
 
@@ -238,8 +238,8 @@ public class InheritanceTests
     public void CodeGen_GenericBaseClass_PreservesGenericSyntax()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:StringList:pub}
+§M{Test}
+  §CL{StringList:pub}
       §EXT{List<string>}
 ";
 
@@ -252,8 +252,8 @@ public class InheritanceTests
     public void CodeGen_InterfaceExtendsGenericInterface_PreservesGenericSyntax()
     {
         var source = @"
-§M{m1:Test}
-  §IFACE{i1:IMyCollection}<T>
+§M{Test}
+  §IFACE{IMyCollection}<T>
       §EXT{IEnumerable<T>}
 ";
 
@@ -266,8 +266,8 @@ public class InheritanceTests
     public void CodeGen_DeeplyNestedGenericInheritance_PreservesGenericSyntax()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyMapper:pub}<TKey,TValue>
+§M{Test}
+  §CL{MyMapper:pub}<TKey,TValue>
       §IMPL{IEquatable<Dictionary<TKey,List<TValue>>>}
 ";
 
@@ -280,8 +280,8 @@ public class InheritanceTests
     public void CodeGen_EmittedCode_ContainsNullableEnable()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Foo:pub}
+§M{Test}
+  §CL{Foo:pub}
 ";
 
         var result = ParseAndEmit(source);
@@ -293,8 +293,8 @@ public class InheritanceTests
     public void CodeGen_NullableEnable_AppearsBeforeUsings()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Foo:pub}
+§M{Test}
+  §CL{Foo:pub}
 ";
 
         var result = ParseAndEmit(source);
@@ -314,9 +314,9 @@ public class InheritanceTests
     public void Parser_AbstractClass_ParsesCorrectly()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:AbstractBase:abs}
-      §MT{mt1:Method:pub:abs}
+§M{Test}
+  §CL{AbstractBase:abs}
+      §MT{Method:pub:abs}
           §O{void}
 ";
 
@@ -332,8 +332,8 @@ public class InheritanceTests
     public void Parser_SealedClass_ParsesCorrectly()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:SealedClass:seal}
+§M{Test}
+  §CL{SealedClass:seal}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -348,10 +348,10 @@ public class InheritanceTests
     public void Parser_BaseClass_ParsesCorrectly()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Parent:pub}
+§M{Test}
+  §CL{Parent:pub}
     §FLD{i32:Dummy:priv}
-  §CL{c2:Child:pub}
+  §CL{Child:pub}
       §EXT{Parent}
 ";
 
@@ -367,9 +367,9 @@ public class InheritanceTests
     public void Parser_VirtualMethod_ParsesModifiersCorrectly()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Base:pub}
-      §MT{mt1:VirtualMethod:pub:virt}
+§M{Test}
+  §CL{Base:pub}
+      §MT{VirtualMethod:pub:virt}
           §O{void}
 ";
 
@@ -387,9 +387,9 @@ public class InheritanceTests
     public void Parser_OverrideMethod_ParsesModifiersCorrectly()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Derived:pub}
-      §MT{mt1:Method:pub:over}
+§M{Test}
+  §CL{Derived:pub}
+      §MT{Method:pub:over}
           §O{void}
 ";
 
@@ -407,9 +407,9 @@ public class InheritanceTests
     public void Parser_AbstractMethod_ParsesModifiersCorrectly()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Abstract:abs}
-      §MT{mt1:Method:pub:abs}
+§M{Test}
+  §CL{Abstract:abs}
+      §MT{Method:pub:abs}
           §O{void}
 ";
 
@@ -429,9 +429,9 @@ public class InheritanceTests
         // Class modifiers: space-separated in 3rd position
         // Method modifiers: space-separated in 4th position
         var source = @"
-§M{m1:Test}
-  §CL{c1:Base:abs seal}
-      §MT{mt1:Method:pub:stat virt}
+§M{Test}
+  §CL{Base:abs seal}
+      §MT{Method:pub:stat virt}
           §O{void}
 ";
 
@@ -457,9 +457,9 @@ public class InheritanceTests
     {
         // Parser accepts this; semantic analysis would catch the error
         var source = @"
-§M{m1:Test}
-  §CL{c1:NonAbstract:pub}
-      §MT{mt1:AbstractMethod:pub:abs}
+§M{Test}
+  §CL{NonAbstract:pub}
+      §MT{AbstractMethod:pub:abs}
           §O{void}
 ";
 
@@ -475,10 +475,10 @@ public class InheritanceTests
         // §/CL is removed closer-form syntax (Phase 4d): rejected with
         // Calor0830, not the obsolete id-mismatch diagnostic (Calor0101).
         var source = @"
-§M{m1:Test}
-§CL{c1:MyClass:pub}
-§/CL{c2}
-§/M{m1}
+§M{Test}
+§CL{MyClass:pub}
+§/CL
+§/M
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -492,8 +492,8 @@ public class InheritanceTests
     public void Parse_InvalidVisibility_ReportsError()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyClass:invalid}
+§M{Test}
+  §CL{MyClass:invalid}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -510,11 +510,11 @@ public class InheritanceTests
     public void RoundTrip_AbstractClass_FormatsAndReparses()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Shape:abs}
-      §MT{mt1:Area:pub:abs}
+§M{Test}
+  §CL{Shape:abs}
+      §MT{Area:pub:abs}
           §O{double}
-      §MT{mt2:Perimeter:pub:abs}
+      §MT{Perimeter:pub:abs}
           §O{double}
 ";
 
@@ -546,14 +546,14 @@ public class InheritanceTests
     public void RoundTrip_InheritanceHierarchy_FormatsAndReparses()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Animal:pub}
-      §MT{mt1:Speak:pub:virt}
+§M{Test}
+  §CL{Animal:pub}
+      §MT{Speak:pub:virt}
           §O{str}
           §R ""...""
-  §CL{c2:Dog:pub}
+  §CL{Dog:pub}
       §EXT{Animal}
-      §MT{mt1:Speak:pub:over}
+      §MT{Speak:pub:over}
           §O{str}
           §R ""Woof!""
 ";
@@ -620,14 +620,14 @@ public class InheritanceTests
     public void DocSyntax_BaseMethodCall_UsesLowercase()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Base:pub}
-      §MT{mt1:GetValue:pub:virt}
+§M{Test}
+  §CL{Base:pub}
+      §MT{GetValue:pub:virt}
           §O{i32}
           §R 10
-  §CL{c2:Derived:pub}
+  §CL{Derived:pub}
       §EXT{Base}
-      §MT{mt1:GetValue:pub:over}
+      §MT{GetValue:pub:over}
           §O{i32}
           §R (+ §C{base.GetValue} §/C 5)
 ";
@@ -644,12 +644,12 @@ public class InheritanceTests
     public void DocSyntax_ThisMethodCall_UsesLowercase()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Service:pub}
-      §MT{mt1:Helper:priv}
+§M{Test}
+  §CL{Service:pub}
+      §MT{Helper:priv}
           §O{str}
           §R ""done""
-      §MT{mt2:Process:pub}
+      §MT{Process:pub}
           §O{str}
           §R §C{this.Helper} §/C
 ";
@@ -666,14 +666,14 @@ public class InheritanceTests
     public void DocSyntax_CombinedModifiers_UseSpaceSeparation()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Base:pub}
-      §MT{mt1:Compute:pub:virt}
+§M{Test}
+  §CL{Base:pub}
+      §MT{Compute:pub:virt}
           §O{i32}
           §R 0
-  §CL{c2:Final:pub}
+  §CL{Final:pub}
       §EXT{Base}
-      §MT{mt1:Compute:pub:seal over}
+      §MT{Compute:pub:seal over}
           §O{i32}
           §R 42
 ";
@@ -685,17 +685,17 @@ public class InheritanceTests
 
     /// <summary>
     /// Verifies the documented syntax for class modifiers (3 parts).
-    /// Documentation says: §CL{id:Name:modifiers} with 3 parts
+    /// Documentation says: §CL{Name:modifiers} with 3 parts
     /// </summary>
     [Fact]
     public void DocSyntax_ClassModifiers_Uses3Parts()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyAbstract:abs}
-      §MT{mt1:DoWork:pub:abs}
+§M{Test}
+  §CL{MyAbstract:abs}
+      §MT{DoWork:pub:abs}
           §O{void}
-  §CL{c2:MySealed:seal}
+  §CL{MySealed:seal}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -710,19 +710,19 @@ public class InheritanceTests
 
     /// <summary>
     /// Verifies the documented syntax for method modifiers (4 parts).
-    /// Documentation says: §MT{id:Name:visibility:modifiers}
+    /// Documentation says: §MT{Name:visibility:modifiers}
     /// </summary>
     [Fact]
     public void DocSyntax_MethodModifiers_Uses4Parts()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Test:pub}
-      §MT{mt1:VirtualMethod:pub:virt}
+§M{Test}
+  §CL{Test:pub}
+      §MT{VirtualMethod:pub:virt}
           §O{void}
-      §MT{mt2:StaticMethod:pub:stat}
+      §MT{StaticMethod:pub:stat}
           §O{void}
-      §MT{mt3:PrivateMethod:priv}
+      §MT{PrivateMethod:priv}
           §O{void}
 ";
 
@@ -739,13 +739,13 @@ public class InheritanceTests
     public void DocSyntax_NewExpression_NoEndTag()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Item:pub}
-      §CTOR{ctor1:pub}
+§M{Test}
+  §CL{Item:pub}
+      §CTOR{pub}
         §I{i32:val}
-      §/CTOR{ctor1}
-  §CL{c2:Factory:pub}
-      §MT{mt1:Create:pub:stat}
+      §/CTOR
+  §CL{Factory:pub}
+      §MT{Create:pub:stat}
           §O{Item}
           §R §NEW{Item} §A 42
 ";
@@ -761,13 +761,13 @@ public class InheritanceTests
     public void DocSyntax_Assignment_UsesAssign()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Person:pub}
+§M{Test}
+  §CL{Person:pub}
       §FLD{str:_name:priv}
-      §CTOR{ctor1:pub}
+      §CTOR{pub}
         §I{str:name}
         §ASSIGN §THIS._name name
-      §/CTOR{ctor1}
+      §/CTOR
 ";
 
         var result = ParseAndEmit(source);

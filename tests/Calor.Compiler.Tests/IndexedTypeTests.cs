@@ -91,8 +91,8 @@ public sealed class IndexedTypeTests
     public void Parse_IndexedTypeWithoutConstraint_ParsesCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedList:List:n}
+            §M{Test}
+              §ITYPE{SizedList:List:n}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -113,8 +113,8 @@ public sealed class IndexedTypeTests
     public void Parse_IndexedTypeWithConstraint_ParsesCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it2:NonEmptyArr:IntArr:n} (> # INT:0)
+            §M{Test}
+              §ITYPE{NonEmptyArr:IntArr:n} (> # INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -136,9 +136,9 @@ public sealed class IndexedTypeTests
     public void Parse_MultipleIndexedTypes_ParsesAll()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedList:List:n}
-              §ITYPE{it2:NonEmptyArr:IntArr:m} (> # INT:0)
+            §M{Test}
+              §ITYPE{SizedList:List:n}
+              §ITYPE{NonEmptyArr:IntArr:m} (> # INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -154,8 +154,8 @@ public sealed class IndexedTypeTests
     public void Parse_IndexedTypeWithAndConstraint_ParsesCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:BoundedArr:IntArr:n} (&& (> # INT:0) (< # INT:1000))
+            §M{Test}
+              §ITYPE{BoundedArr:IntArr:n} (&& (> # INT:0) (< # INT:1000))
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -175,9 +175,9 @@ public sealed class IndexedTypeTests
     public void CSharpEmit_IndexedTypeDefinition_ErasesToNothing()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedList:List:n}
-              §F{f001:Main:pub}
+            §M{Test}
+              §ITYPE{SizedList:List:n}
+              §F{Main:pub}
                   §O{void}
             """;
 
@@ -194,9 +194,9 @@ public sealed class IndexedTypeTests
     public void CSharpEmit_IndexedTypeWithConstraint_ErasesToNothing()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:NonEmptyArr:IntArr:n} (> # INT:0)
-              §F{f001:Main:pub}
+            §M{Test}
+              §ITYPE{NonEmptyArr:IntArr:n} (> # INT:0)
+              §F{Main:pub}
                   §O{void}
             """;
 
@@ -213,26 +213,26 @@ public sealed class IndexedTypeTests
     public void CalorEmit_IndexedTypeWithoutConstraint_RoundTrips()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedList:List:n}
+            §M{Test}
+              §ITYPE{SizedList:List:n}
             """;
 
         var calor = ParseAndEmitCalor(source);
 
-        Assert.Contains("§ITYPE{it1:SizedList:List:n}", calor);
+        Assert.Contains("§ITYPE{SizedList:List:n}", calor);
     }
 
     [Fact]
     public void CalorEmit_IndexedTypeWithConstraint_RoundTrips()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it2:NonEmptyArr:IntArr:n} (> # INT:0)
+            §M{Test}
+              §ITYPE{NonEmptyArr:IntArr:n} (> # INT:0)
             """;
 
         var calor = ParseAndEmitCalor(source);
 
-        Assert.Contains("§ITYPE{it2:NonEmptyArr:IntArr:n}", calor);
+        Assert.Contains("§ITYPE{NonEmptyArr:IntArr:n}", calor);
         Assert.Contains("#", calor);
     }
 
@@ -242,8 +242,8 @@ public sealed class IndexedTypeTests
     public void IdScanner_IndexedType_CollectsId()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedList:List:n}
+            §M{Test}
+              §ITYPE{SizedList:List:n}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -275,9 +275,9 @@ public sealed class IndexedTypeTests
     public void Generate_ArrayAccessOnIndexedType_CreatesIndexBoundsObligation()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedList:IntArr:n}
-              §F{f001:Sum:priv}
+            §M{Test}
+              §ITYPE{SizedList:IntArr:n}
+              §F{Sum:priv}
                   §I{SizedList:items}
                   §I{i32:i}
                   §O{i32}
@@ -302,8 +302,8 @@ public sealed class IndexedTypeTests
     public void Generate_ArrayAccessOnNonIndexedType_CreatesRuntimeBoundsObligation()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Sum:priv}
+            §M{Test}
+              §F{Sum:priv}
                   §I{[i32]:items}
                   §I{i32:i}
                   §O{i32}
@@ -328,9 +328,9 @@ public sealed class IndexedTypeTests
     public void Generate_PublicFunctionIndexBounds_SetsBoundaryStatus()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedList:IntArr:n}
-              §F{f001:Sum:pub}
+            §M{Test}
+              §ITYPE{SizedList:IntArr:n}
+              §F{Sum:pub}
                   §I{SizedList:items}
                   §I{i32:i}
                   §O{i32}
@@ -360,9 +360,9 @@ public sealed class IndexedTypeTests
         // Inline refinement constrains i to [0, n).
         // The IndexBounds obligation checks (>= i 0) && (< i n), which matches.
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedList:IntArr:n}
-              §F{f001:Sum:priv}
+            §M{Test}
+              §ITYPE{SizedList:IntArr:n}
+              §F{Sum:priv}
                   §I{SizedList:items}
                   §I{i32:n}
                   §I{i32:i} | (&& (>= # INT:0) (< # n))
@@ -403,9 +403,9 @@ public sealed class IndexedTypeTests
 
         // No precondition on i, so the access can't be proven safe
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedList:IntArr:n}
-              §F{f001:BadAccess:priv}
+            §M{Test}
+              §ITYPE{SizedList:IntArr:n}
+              §F{BadAccess:priv}
                   §I{SizedList:items}
                   §I{i32:n}
                   §I{i32:i}
@@ -437,12 +437,12 @@ public sealed class IndexedTypeTests
     public void FactCollector_ForLoop_ExtractsLoopBounds()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedList:IntArr:n}
-              §F{f001:Sum:priv}
+            §M{Test}
+              §ITYPE{SizedList:IntArr:n}
+              §F{Sum:priv}
                   §I{SizedList:items}
                   §O{i32}
-                  §L{l1:i:0:n:1}
+                  §L{i:0:n:1}
                       §R §IDX items i
             """;
 
@@ -468,9 +468,9 @@ public sealed class IndexedTypeTests
     public async Task BoundsCheckTool_BasicSource_ReturnsResult()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedList:IntArr:n}
-              §F{f001:Sum:priv}
+            §M{Test}
+              §ITYPE{SizedList:IntArr:n}
+              §F{Sum:priv}
                   §I{SizedList:items}
                   §I{i32:i}
                   §O{i32}
@@ -492,10 +492,10 @@ public sealed class IndexedTypeTests
     public void Parse_IndexedAndRefinementTypes_ParseBoth()
     {
         var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NatInt:i32} (>= # INT:0)
-              §ITYPE{it1:SizedList:List:n}
-              §F{f001:Main:pub}
+            §M{Test}
+              §RTYPE{NatInt:i32} (>= # INT:0)
+              §ITYPE{SizedList:List:n}
+              §F{Main:pub}
                   §O{void}
             """;
 
@@ -513,8 +513,8 @@ public sealed class IndexedTypeTests
     public void Parse_IndexedTypeWithArrayBrackets_ParsesCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedArr:i32[]:n}
+            §M{Test}
+              §ITYPE{SizedArr:i32[]:n}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -532,8 +532,8 @@ public sealed class IndexedTypeTests
     public void Parse_IndexedTypeWithArrayBracketsAndConstraint_ParsesCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:NonEmptyArr:i32[]:n} (> # INT:0)
+            §M{Test}
+              §ITYPE{NonEmptyArr:i32[]:n} (> # INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -552,9 +552,9 @@ public sealed class IndexedTypeTests
     public void CSharpEmit_IndexedTypeParameter_ErasesToBaseType()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedList:List:n}
-              §F{f001:Sum:pub}
+            §M{Test}
+              §ITYPE{SizedList:List:n}
+              §F{Sum:pub}
                   §I{SizedList:items}
                   §O{void}
             """;
@@ -570,9 +570,9 @@ public sealed class IndexedTypeTests
     public void CSharpEmit_GenericIndexedTypeParameter_ErasesWithGenericArgs()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedList:List:n}
-              §F{f001:Sum:pub}
+            §M{Test}
+              §ITYPE{SizedList:List:n}
+              §F{Sum:pub}
                   §I{SizedList<i32>:items}
                   §O{void}
             """;
@@ -590,9 +590,9 @@ public sealed class IndexedTypeTests
     public void ContractVerifier_PreconditionWithSizeParam_NoError()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedList:IntArr:n}
-              §F{f001:Sum:priv}
+            §M{Test}
+              §ITYPE{SizedList:IntArr:n}
+              §F{Sum:priv}
                   §I{SizedList:items}
                   §I{i32:i}
                   §O{i32}
@@ -618,9 +618,9 @@ public sealed class IndexedTypeTests
     public void Generate_ArrayAccessInsideCallArg_CreatesObligation()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedList:IntArr:n}
-              §F{f001:Sum:priv}
+            §M{Test}
+              §ITYPE{SizedList:IntArr:n}
+              §F{Sum:priv}
                   §I{SizedList:items}
                   §I{i32:i}
                   §O{void}
@@ -644,13 +644,13 @@ public sealed class IndexedTypeTests
     public void Generate_ArrayAccessInsideWhileLoop_CreatesObligation()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedList:IntArr:n}
-              §F{f001:Loop:priv}
+            §M{Test}
+              §ITYPE{SizedList:IntArr:n}
+              §F{Loop:priv}
                   §I{SizedList:items}
                   §I{i32:i}
                   §O{void}
-                  §WH{w1} (< i n)
+                  §WH (< i n)
                       §B{x:i32} §IDX items i
             """;
 
@@ -671,13 +671,13 @@ public sealed class IndexedTypeTests
     public void FactCollector_IfGuard_ExtractsCondition()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedList:IntArr:n}
-              §F{f001:SafeGet:priv}
+            §M{Test}
+              §ITYPE{SizedList:IntArr:n}
+              §F{SafeGet:priv}
                   §I{SizedList:items}
                   §I{i32:i}
                   §O{i32}
-                  §IF{if1} (< i n)
+                  §IF (< i n)
                       §R §IDX items i
                   §R INT:0
             """;
@@ -701,8 +701,8 @@ public sealed class IndexedTypeTests
     public async Task BoundsCheckTool_NoIndexedTypes_ReturnsEmptyAccessSites()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
             """;
 
@@ -723,8 +723,8 @@ public sealed class IndexedTypeTests
     public async Task BoundsCheckTool_WithFunctionIdFilter_AcceptsParameter()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
             """;
 

@@ -103,12 +103,12 @@ public class EnumExtensionTests
     public void Parser_ParsesBasicEnum()
     {
         var source = """
-            §M{m001:Test}
-              §EN{e001:Color}
+            §M{Test}
+              §EN{Color}
               Red
               Green
               Blue
-              §/EN{e001}
+              §/EN
             """;
         var module = Parse(source, out var diagnostics);
 
@@ -127,12 +127,12 @@ public class EnumExtensionTests
     public void Parser_ParsesEnumWithValues()
     {
         var source = """
-            §M{m001:Test}
-              §EN{e001:StatusCode}
+            §M{Test}
+              §EN{StatusCode}
               Ok = 200
               NotFound = 404
               Error = 500
-              §/EN{e001}
+              §/EN
             """;
         var module = Parse(source, out var diagnostics);
 
@@ -149,12 +149,12 @@ public class EnumExtensionTests
     public void Parser_ParsesEnumWithUnderlyingType()
     {
         var source = """
-            §M{m001:Test}
-              §EN{e001:Flags:u8}
+            §M{Test}
+              §EN{Flags:u8}
               None = 0
               Read = 1
               Write = 2
-              §/EN{e001}
+              §/EN
             """;
         var module = Parse(source, out var diagnostics);
 
@@ -168,13 +168,13 @@ public class EnumExtensionTests
     public void Parser_ParsesEnumExtension_SingleMethod()
     {
         var source = """
-            §M{m001:Test}
-              §EEXT{ext001:Color}
-                §F{f001:ToHex:pub}
+            §M{Test}
+              §EEXT{Color}
+                §F{ToHex:pub}
                     §I{Color:self}
                     §O{str}
                     §R "hex"
-              §/EEXT{ext001}
+              §/EEXT
             """;
         var module = Parse(source, out var diagnostics);
 
@@ -191,17 +191,17 @@ public class EnumExtensionTests
     public void Parser_ParsesEnumExtension_MultipleMethods()
     {
         var source = """
-            §M{m001:Test}
-              §EEXT{ext001:Color}
-                §F{f001:ToHex:pub}
+            §M{Test}
+              §EEXT{Color}
+                §F{ToHex:pub}
                     §I{Color:self}
                     §O{str}
                     §R "#000000"
-                §F{f002:IsPrimary:pub}
+                §F{IsPrimary:pub}
                     §I{Color:self}
                     §O{bool}
                     §R true
-              §/EEXT{ext001}
+              §/EEXT
             """;
         var module = Parse(source, out var diagnostics);
 
@@ -220,12 +220,12 @@ public class EnumExtensionTests
     public void Emit_Enum_GeneratesEnumDeclaration()
     {
         var source = """
-            §M{m001:Test}
-              §EN{e001:Color}
+            §M{Test}
+              §EN{Color}
               Red
               Green
               Blue
-              §/EN{e001}
+              §/EN
             """;
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors);
@@ -243,11 +243,11 @@ public class EnumExtensionTests
     public void Emit_EnumWithValues_GeneratesEnumWithValues()
     {
         var source = """
-            §M{m001:Test}
-              §EN{e001:StatusCode}
+            §M{Test}
+              §EN{StatusCode}
               Ok = 200
               NotFound = 404
-              §/EN{e001}
+              §/EN
             """;
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors);
@@ -263,13 +263,13 @@ public class EnumExtensionTests
     public void Emit_EnumExtension_GeneratesStaticExtensionClass()
     {
         var source = """
-            §M{m001:Test}
-              §EEXT{ext001:Color}
-                §F{f001:ToHex:pub}
+            §M{Test}
+              §EEXT{Color}
+                §F{ToHex:pub}
                     §I{Color:self}
                     §O{str}
                     §R "#FF0000"
-              §/EEXT{ext001}
+              §/EEXT
             """;
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors);
@@ -290,11 +290,11 @@ public class EnumExtensionTests
     public void CalorEmitter_Enum_EmitsNewSyntax()
     {
         var source = """
-            §M{m001:Test}
-              §EN{e001:Color}
+            §M{Test}
+              §EN{Color}
               Red
               Green
-              §/EN{e001}
+              §/EN
             """;
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors);
@@ -302,8 +302,8 @@ public class EnumExtensionTests
         var emitter = new CalorEmitter();
         var code = emitter.Emit(module);
 
-        Assert.Contains("§EN{e001:Color:pub}", code);
-        Assert.DoesNotContain("§/EN{e001}", code);
+        Assert.Contains("§EN{Color:pub}", code);
+        Assert.DoesNotContain("§/EN", code);
         // Should NOT contain old ENUM syntax
         Assert.DoesNotContain("§ENUM", code);
     }
@@ -312,13 +312,13 @@ public class EnumExtensionTests
     public void CalorEmitter_EnumExtension_RoundTrips()
     {
         var source = """
-            §M{m001:Test}
-              §EEXT{ext001:Color}
-                §F{f001:ToHex:pub}
+            §M{Test}
+              §EEXT{Color}
+                §F{ToHex:pub}
                     §I{Color:self}
                     §O{str}
                     §R "hex"
-              §/EEXT{ext001}
+              §/EEXT
             """;
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors);
@@ -326,8 +326,8 @@ public class EnumExtensionTests
         var emitter = new CalorEmitter();
         var code = emitter.Emit(module);
 
-        Assert.Contains("§EEXT{ext001:Color}", code);
-        Assert.DoesNotContain("§/EEXT{ext001}", code);
+        Assert.Contains("§EEXT{Color}", code);
+        Assert.DoesNotContain("§/EEXT", code);
     }
 
     #endregion
@@ -338,13 +338,13 @@ public class EnumExtensionTests
     public void Parser_EnumExtension_MissingEnumParameter_ReportsError()
     {
         var source = """
-            §M{m001:Test}
-              §EEXT{ext001:Color}
-                §F{f001:BadMethod:pub}
+            §M{Test}
+              §EEXT{Color}
+                §F{BadMethod:pub}
                     §I{i32:x}
                     §O{str}
                     §R "bad"
-              §/EEXT{ext001}
+              §/EEXT
             """;
         var module = Parse(source, out var diagnostics);
 
@@ -379,13 +379,13 @@ public class EnumExtensionTests
     public void Parser_EnumExtension_MissingId_ReportsError()
     {
         var source = """
-            §M{m001:Test}
+            §M{Test}
               §EEXT{:Color}
-                §F{f001:ToHex:pub}
+                §F{ToHex:pub}
                     §I{Color:self}
                     §O{str}
                     §R "hex"
-              §/EEXT{}
+              §/EEXT
             """;
         var module = Parse(source, out var diagnostics);
 
@@ -397,13 +397,13 @@ public class EnumExtensionTests
     public void Parser_EnumExtension_MissingEnumName_ReportsError()
     {
         var source = """
-            §M{m001:Test}
+            §M{Test}
               §EEXT{ext001}
-                §F{f001:ToHex:pub}
+                §F{ToHex:pub}
                     §I{Color:self}
                     §O{str}
                     §R "hex"
-              §/EEXT{ext001}
+              §/EEXT
             """;
         var module = Parse(source, out var diagnostics);
 
@@ -415,17 +415,17 @@ public class EnumExtensionTests
     public void Parser_EnumExtension_MultipleMethods_OneMissingEnumParam_ReportsOneError()
     {
         var source = """
-            §M{m001:Test}
-              §EEXT{ext001:Color}
-                §F{f001:ToHex:pub}
+            §M{Test}
+              §EEXT{Color}
+                §F{ToHex:pub}
                     §I{Color:self}
                     §O{str}
                     §R "hex"
-                §F{f002:BadMethod:pub}
+                §F{BadMethod:pub}
                     §I{i32:value}
                     §O{bool}
                     §R true
-              §/EEXT{ext001}
+              §/EEXT
             """;
         var module = Parse(source, out var diagnostics);
 
@@ -439,11 +439,11 @@ public class EnumExtensionTests
     public void Parser_Enum_MismatchedCloseId_ReportsError()
     {
         var source = """
-            §M{m001:Test}
-              §EN{e001:Color}
+            §M{Test}
+              §EN{Color}
               Red
               Green
-              §/EN{e002}
+              §/EN
             """;
         var module = Parse(source, out var diagnostics);
 
@@ -456,9 +456,9 @@ public class EnumExtensionTests
     {
         // Empty extension is allowed (unusual but valid)
         var source = """
-            §M{m001:Test}
-              §EEXT{ext001:Color}
-              §/EEXT{ext001}
+            §M{Test}
+              §EEXT{Color}
+              §/EEXT
             """;
         var module = Parse(source, out var diagnostics);
 
@@ -473,13 +473,13 @@ public class EnumExtensionTests
     public void Parser_EnumExtension_RequiresExactEnumTypeMatch(string parameterType, bool hasError)
     {
         var source = $$"""
-            §M{m001:Test}
-              §EEXT{ext001:Color}
-                §F{f001:ToHex:pub}
+            §M{Test}
+              §EEXT{Color}
+                §F{ToHex:pub}
                     §I{{{parameterType}}:self}
                     §O{str}
                     §R "hex"
-              §/EEXT{ext001}
+              §/EEXT
             """;
         var module = Parse(source, out var diagnostics);
 

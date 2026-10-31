@@ -222,7 +222,7 @@ public sealed class EditScriptIdentityTests : IDisposable
         // declares §E{alloc, mut} and was not edited — the cross-module charge
         // now names an effect it does not declare. UseImpure declares `cw`
         // and stays clean.
-        // …at `§F{f003:UsePure:pub}` (12,5) — the declaration in the file that
+        // …at `§F{UsePure:pub}` (12,5) — the declaration in the file that
         // was NOT edited, reported as an ERROR under the shipped 0.15 rule.
         ["app.calr: error Calor0410@12,5"],
         // step-02-callee-row-erased: Map loses `<eff e>` and its parameter's

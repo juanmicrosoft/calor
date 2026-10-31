@@ -57,8 +57,8 @@ public class BugPatternTests
     public void DivisionByZero_LiteralZeroDivisor_ReportsError()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:x}
       §O{i32}
       §R (/ x INT:0)";
@@ -78,8 +78,8 @@ public class BugPatternTests
     public void DivisionByZero_NonZeroLiteralDivisor_NoError()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:x}
       §O{i32}
       §R (/ x INT:2)";
@@ -98,8 +98,8 @@ public class BugPatternTests
     public void DivisionByZero_VariableDivisor_NoGuard_ReportsWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -120,12 +120,12 @@ public class BugPatternTests
     public void DivisionByZero_VariableDivisor_WithGuard_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeDivide:pub}
+§M{Test}
+  §F{SafeDivide:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
-      §IF{if1} (!= y INT:0)
+      §IF (!= y INT:0)
           §R (/ x y)
       §R INT:0";
 
@@ -153,8 +153,8 @@ public class BugPatternTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeDivide:pub}
+§M{Test}
+  §F{SafeDivide:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -180,8 +180,8 @@ public class BugPatternTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{u32:x}
       §I{u32:y}
       §O{u32}
@@ -205,8 +205,8 @@ public class BugPatternTests
         // The signed path is untouched by the unsigned refusal: an unguarded
         // signed variable divisor still warns under the Z3 path.
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -228,8 +228,8 @@ public class BugPatternTests
         // The literal-zero path is pre-solver and type-agnostic: refusal of
         // unsigned VARIABLES must not lose the hard error on a literal 0.
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
       §I{u32:x}
       §O{u32}
       §R (/ x INT:0)";
@@ -249,8 +249,8 @@ public class BugPatternTests
     public void DivisionByZero_InNestedExpression_Detected()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Nested:pub}
+§M{Test}
+  §F{Nested:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -270,8 +270,8 @@ public class BugPatternTests
     public void DivisionByZero_Modulo_AlsoChecked()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Modulo:pub}
+§M{Test}
+  §F{Modulo:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -296,8 +296,8 @@ public class BugPatternTests
     public void Overflow_Addition_WithPotentialOverflow_ReportsWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
+§M{Test}
+  §F{Add:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -318,8 +318,8 @@ public class BugPatternTests
     public void Overflow_Multiplication_HighRisk_ReportsWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Multiply:pub}
+§M{Test}
+  §F{Multiply:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -342,8 +342,8 @@ public class BugPatternTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeAdd:pub}
+§M{Test}
+  §F{SafeAdd:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -370,8 +370,8 @@ public class BugPatternTests
     public void NullDeref_ArrayLengthWithoutCheck_ReportsWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Unwrap:pub}
+§M{Test}
+  §F{Unwrap:pub}
       §O{i32}
       §B{items:i32[]} null
       §R §LEN items";
@@ -391,8 +391,8 @@ public class BugPatternTests
     public void NullDeref_Coalesce_Safe()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Safe:pub}
+§M{Test}
+  §F{Safe:pub}
       §I{?i32:value}
       §O{i32}
       §R (?? value INT:0)";
@@ -420,8 +420,8 @@ public class BugPatternTests
     public void BugPatternRunner_RunsAllCheckers()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Risky:pub}
+§M{Test}
+  §F{Risky:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -442,8 +442,8 @@ public class BugPatternTests
     public void BugPatternRunner_SafeCode_NoWarnings()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Safe:pub}
+§M{Test}
+  §F{Safe:pub}
       §I{i32:x}
       §O{i32}
       §R (+ x INT:1)";
@@ -468,8 +468,8 @@ public class BugPatternTests
     public void DivisionByZero_NestedDivision_Detected()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:NestedDiv:pub}
+§M{Test}
+  §F{NestedDiv:pub}
       §I{i32:a}
       §I{i32:b}
       §I{i32:c}
@@ -494,8 +494,8 @@ public class BugPatternTests
     public void DivisionByZero_DivisionInExpression_Detected()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:ExprDiv:pub}
+§M{Test}
+  §F{ExprDiv:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -516,8 +516,8 @@ public class BugPatternTests
     public void DivisionByZero_ConstantNonZeroDivisor_Safe()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeDiv:pub}
+§M{Test}
+  §F{SafeDiv:pub}
       §I{i32:x}
       §O{i32}
       §R (/ x INT:5)";
@@ -540,8 +540,8 @@ public class BugPatternTests
     public void DivisionByZero_NegativeConstantDivisor_Safe()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:NegDiv:pub}
+§M{Test}
+  §F{NegDiv:pub}
       §I{i32:x}
       §O{i32}
       §R (/ x INT:-3)";
@@ -564,8 +564,8 @@ public class BugPatternTests
     public void DivisionByZero_MultipleOperations_AllChecked()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:MultiOp:pub}
+§M{Test}
+  §F{MultiOp:pub}
       §I{i32:a}
       §I{i32:b}
       §I{i32:c}
@@ -596,8 +596,8 @@ public class BugPatternTests
     public void Overflow_LargeConstantAddition_Detected()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:LargeAdd:pub}
+§M{Test}
+  §F{LargeAdd:pub}
       §I{i32:x}
       §O{i32}
       §R (+ x INT:2147483647)";
@@ -617,8 +617,8 @@ public class BugPatternTests
     public void Overflow_SmallConstantAddition_Safe()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SmallAdd:pub}
+§M{Test}
+  §F{SmallAdd:pub}
       §I{i32:x}
       §O{i32}
       §R (+ x INT:1)";
@@ -638,8 +638,8 @@ public class BugPatternTests
     public void Overflow_Subtraction_Checked()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Sub:pub}
+§M{Test}
+  §F{Sub:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -664,8 +664,8 @@ public class BugPatternTests
     public void SafeCode_OnlyAddition_NoDivisionWarnings()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:OnlyAdd:pub}
+§M{Test}
+  §F{OnlyAdd:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -689,8 +689,8 @@ public class BugPatternTests
     public void SafeCode_ReturnConstant_NoWarnings()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Const:pub}
+§M{Test}
+  §F{Const:pub}
       §O{i32}
       §R INT:42";
 
@@ -712,8 +712,8 @@ public class BugPatternTests
     public void SafeCode_SimpleArithmetic_MinimalWarnings()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Arith:pub}
+§M{Test}
+  §F{Arith:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -740,12 +740,12 @@ public class BugPatternTests
     public void GuardDetection_GreaterThanZero_ProtectsDivision()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:GuardGT:pub}
+§M{Test}
+  §F{GuardGT:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
-      §IF{if1} (> y INT:0)
+      §IF (> y INT:0)
           §R (/ x y)
       §R INT:0";
 
@@ -767,12 +767,12 @@ public class BugPatternTests
     public void GuardDetection_LessThanZero_ProtectsDivision()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:GuardLT:pub}
+§M{Test}
+  §F{GuardLT:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
-      §IF{if1} (< y INT:0)
+      §IF (< y INT:0)
           §R (/ x y)
       §R INT:0";
 
@@ -795,8 +795,8 @@ public class BugPatternTests
     public void EdgeCase_DivisionByParameter_Warns()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DivByParam:pub}
+§M{Test}
+  §F{DivByParam:pub}
       §I{i32:divisor}
       §O{i32}
       §R (/ INT:100 divisor)";
@@ -816,14 +816,14 @@ public class BugPatternTests
     public void EdgeCase_DivisionInBothBranches_BothChecked()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:BothBranches:pub}
+§M{Test}
+  §F{BothBranches:pub}
       §I{i32:x}
       §I{i32:y}
       §I{i32:z}
       §I{bool:cond}
       §O{i32}
-      §IF{if1} cond
+      §IF cond
           §R (/ x y)
       §EL
           §R (/ x z)";
@@ -846,8 +846,8 @@ public class BugPatternTests
     public void EdgeCase_ModuloByZero_AlsoDetected()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:ModZero:pub}
+§M{Test}
+  §F{ModZero:pub}
       §O{i32}
       §R (% INT:10 INT:0)";
 
@@ -866,8 +866,8 @@ public class BugPatternTests
     public void DivisionByZero_LiteralCastThatTruncatesToZero_ReportsError()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub} () -> i32
+§M{Test}
+  §F{Divide:pub} () -> i32
     §R (/ INT:100 (cast i32 FLOAT:0.5))";
 
         var func = GetFunction(source, out var parseDiagnostics);

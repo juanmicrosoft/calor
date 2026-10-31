@@ -29,8 +29,8 @@ public class StringOperationsE2ETests
     public void E2E_StringUpper_ReturnsUppercased(string input, string expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:ToUpperCase:pub}
+            §M{Test}
+              §F{ToUpperCase:pub}
                   §I{string:s}
                   §O{string}
                   §R (upper s)
@@ -48,8 +48,8 @@ public class StringOperationsE2ETests
     public void E2E_StringLower_ReturnsLowercased(string input, string expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:ToLowerCase:pub}
+            §M{Test}
+              §F{ToLowerCase:pub}
                   §I{string:s}
                   §O{string}
                   §R (lower s)
@@ -67,8 +67,8 @@ public class StringOperationsE2ETests
     public void E2E_StringTrim_ReturnsTrimmed(string input, string expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:TrimString:pub}
+            §M{Test}
+              §F{TrimString:pub}
                   §I{string:s}
                   §O{string}
                   §R (trim s)
@@ -87,8 +87,8 @@ public class StringOperationsE2ETests
     public void E2E_StringContains_ReturnsCorrectResult(string input, string search, bool expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:ContainsString:pub}
+            §M{Test}
+              §F{ContainsString:pub}
                   §I{string:s}
                   §I{string:search}
                   §O{bool}
@@ -107,8 +107,8 @@ public class StringOperationsE2ETests
     public void E2E_StringSubstring_ReturnsSubstring(string input, int start, int length, string expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:GetSubstring:pub}
+            §M{Test}
+              §F{GetSubstring:pub}
                   §I{string:s}
                   §I{i32:start}
                   §I{i32:len}
@@ -133,8 +133,8 @@ public class StringOperationsE2ETests
     public void E2E_StringContainsIgnoreCase_ReturnsCorrectResult(string input, string search, bool expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:ContainsIgnoreCase:pub}
+            §M{Test}
+              §F{ContainsIgnoreCase:pub}
                   §I{string:s}
                   §I{string:search}
                   §O{bool}
@@ -154,8 +154,8 @@ public class StringOperationsE2ETests
     public void E2E_StringEqualsIgnoreCase_ReturnsCorrectResult(string a, string b, bool expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:EqualsIgnoreCase:pub}
+            §M{Test}
+              §F{EqualsIgnoreCase:pub}
                   §I{string:a}
                   §I{string:b}
                   §O{bool}
@@ -174,8 +174,8 @@ public class StringOperationsE2ETests
     public void E2E_StringEqualsOrdinal_ReturnsCorrectResult(string a, string b, bool expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:EqualsOrdinal:pub}
+            §M{Test}
+              §F{EqualsOrdinal:pub}
                   §I{string:a}
                   §I{string:b}
                   §O{bool}
@@ -195,8 +195,8 @@ public class StringOperationsE2ETests
     public void E2E_StringContainsInvariantIgnoreCase_ReturnsCorrectResult(string input, string search, bool expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:ContainsInvariant:pub}
+            §M{Test}
+              §F{ContainsInvariant:pub}
                   §I{string:s}
                   §I{string:search}
                   §O{bool}
@@ -215,8 +215,8 @@ public class StringOperationsE2ETests
     public void E2E_StringStartsWithOrdinal_ReturnsCorrectResult(string input, string prefix, bool expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:StartsOrdinal:pub}
+            §M{Test}
+              §F{StartsOrdinal:pub}
                   §I{string:s}
                   §I{string:prefix}
                   §O{bool}
@@ -235,8 +235,8 @@ public class StringOperationsE2ETests
     public void E2E_StringEndsWithIgnoreCase_ReturnsCorrectResult(string input, string suffix, bool expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:EndsIgnoreCase:pub}
+            §M{Test}
+              §F{EndsIgnoreCase:pub}
                   §I{string:s}
                   §I{string:suffix}
                   §O{bool}
@@ -255,8 +255,8 @@ public class StringOperationsE2ETests
     public void E2E_StringIndexOfIgnoreCase_ReturnsCorrectResult(string input, string search, int expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:IndexOfIgnoreCase:pub}
+            §M{Test}
+              §F{IndexOfIgnoreCase:pub}
                   §I{string:s}
                   §I{string:search}
                   §O{i32}
@@ -282,8 +282,8 @@ public class StringOperationsE2ETests
         // Escape backslashes for Calor string literal (Calor needs \\ for a literal \)
         var escapedPattern = pattern.Replace("\\", "\\\\");
         var source = """
-            §M{m001:Test}
-              §F{f001:TestRegex:pub}
+            §M{Test}
+              §F{TestRegex:pub}
                   §I{string:s}
                   §O{bool}
                   §R (regex-test s "PATTERN")
@@ -303,8 +303,8 @@ public class StringOperationsE2ETests
         // Escape backslashes for Calor string literal (Calor needs \\ for a literal \)
         var escapedPattern = pattern.Replace("\\", "\\\\");
         var source = """
-            §M{m001:Test}
-              §F{f001:ReplaceRegex:pub}
+            §M{Test}
+              §F{ReplaceRegex:pub}
                   §I{string:s}
                   §O{string}
                   §R (regex-replace s "PATTERN" "REPLACEMENT")
@@ -324,8 +324,8 @@ public class StringOperationsE2ETests
         // regex-match returns a Match object; test via Match.Success property
         var escapedPattern = pattern.Replace("\\", "\\\\");
         var source = """
-            §M{m001:Test}
-              §F{f001:MatchRegex:pub}
+            §M{Test}
+              §F{MatchRegex:pub}
                   §I{string:s}
                   §O{object}
                   §R (regex-match s "PATTERN")
@@ -343,8 +343,8 @@ public class StringOperationsE2ETests
     public void E2E_RegexSplit_ReturnsSplitArray()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:SplitRegex:pub}
+            §M{Test}
+              §F{SplitRegex:pub}
                   §I{string:s}
                   §O{i32}
                   §R (len (regex-split s ","))
@@ -367,8 +367,8 @@ public class StringOperationsE2ETests
     public void E2E_CharAt_ReturnsCorrectChar(string input, int index, char expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:GetCharAt:pub}
+            §M{Test}
+              §F{GetCharAt:pub}
                   §I{string:s}
                   §I{i32:idx}
                   §O{char}
@@ -389,8 +389,8 @@ public class StringOperationsE2ETests
     public void E2E_IsLetter_ReturnsCorrectResult(char input, bool expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:CheckIsLetter:pub}
+            §M{Test}
+              §F{CheckIsLetter:pub}
                   §I{char:c}
                   §O{bool}
                   §R (is-letter c)
@@ -410,8 +410,8 @@ public class StringOperationsE2ETests
     public void E2E_IsDigit_ReturnsCorrectResult(char input, bool expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:CheckIsDigit:pub}
+            §M{Test}
+              §F{CheckIsDigit:pub}
                   §I{char:c}
                   §O{bool}
                   §R (is-digit c)
@@ -430,8 +430,8 @@ public class StringOperationsE2ETests
     public void E2E_CharUpper_ReturnsUppercased(char input, char expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:ToUpperChar:pub}
+            §M{Test}
+              §F{ToUpperChar:pub}
                   §I{char:c}
                   §O{char}
                   §R (char-upper c)
@@ -450,8 +450,8 @@ public class StringOperationsE2ETests
     public void E2E_CharCode_ReturnsAsciiCode(char input, int expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:GetCharCode:pub}
+            §M{Test}
+              §F{GetCharCode:pub}
                   §I{char:c}
                   §O{i32}
                   §R (char-code c)
@@ -470,8 +470,8 @@ public class StringOperationsE2ETests
     public void E2E_CharFromCode_ReturnsChar(int input, char expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:CharFromCode:pub}
+            §M{Test}
+              §F{CharFromCode:pub}
                   §I{i32:code}
                   §O{char}
                   §R (char-from-code code)
@@ -492,8 +492,8 @@ public class StringOperationsE2ETests
     public void E2E_IsWhiteSpace_ReturnsCorrectResult(char input, bool expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:CheckIsWhiteSpace:pub}
+            §M{Test}
+              §F{CheckIsWhiteSpace:pub}
                   §I{char:c}
                   §O{bool}
                   §R (is-whitespace c)
@@ -513,8 +513,8 @@ public class StringOperationsE2ETests
     public void E2E_IsUpper_ReturnsCorrectResult(char input, bool expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:CheckIsUpper:pub}
+            §M{Test}
+              §F{CheckIsUpper:pub}
                   §I{char:c}
                   §O{bool}
                   §R (is-upper c)
@@ -534,8 +534,8 @@ public class StringOperationsE2ETests
     public void E2E_IsLower_ReturnsCorrectResult(char input, bool expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:CheckIsLower:pub}
+            §M{Test}
+              §F{CheckIsLower:pub}
                   §I{char:c}
                   §O{bool}
                   §R (is-lower c)
@@ -554,8 +554,8 @@ public class StringOperationsE2ETests
     public void E2E_CharLower_ReturnsLowercased(char input, char expected)
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:ToLowerChar:pub}
+            §M{Test}
+              §F{ToLowerChar:pub}
                   §I{char:c}
                   §O{char}
                   §R (char-lower c)
@@ -575,8 +575,8 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderNew_CreatesEmptyBuilder()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:CreateBuilder:pub}
+            §M{Test}
+              §F{CreateBuilder:pub}
                   §O{string}
                   §R (sb-tostring (sb-new))
             """;
@@ -591,8 +591,8 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderAppend_AppendsText()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:BuildString:pub}
+            §M{Test}
+              §F{BuildString:pub}
                   §O{string}
                   §R (sb-tostring (sb-append (sb-append (sb-new) "Hello") " World"))
             """;
@@ -607,8 +607,8 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderWithInit_InitializesWithValue()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:BuildWithInit:pub}
+            §M{Test}
+              §F{BuildWithInit:pub}
                   §O{string}
                   §R (sb-tostring (sb-append (sb-new "Start: ") "End"))
             """;
@@ -623,8 +623,8 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderLength_ReturnsLength()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:GetLength:pub}
+            §M{Test}
+              §F{GetLength:pub}
                   §O{i32}
                   §R (sb-length (sb-append (sb-new) "Hello"))
             """;
@@ -639,8 +639,8 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderClear_ClearsContent()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:ClearBuilder:pub}
+            §M{Test}
+              §F{ClearBuilder:pub}
                   §O{i32}
                   §R (sb-length (sb-clear (sb-append (sb-new) "Hello")))
             """;
@@ -655,8 +655,8 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderAppendLine_AppendsWithNewline()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:BuildWithLines:pub}
+            §M{Test}
+              §F{BuildWithLines:pub}
                   §O{string}
                   §R (sb-tostring (sb-appendline (sb-appendline (sb-new) "Line1") "Line2"))
             """;
@@ -673,8 +673,8 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderInsert_InsertsAtPosition()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:InsertText:pub}
+            §M{Test}
+              §F{InsertText:pub}
                   §O{string}
                   §R (sb-tostring (sb-insert (sb-append (sb-new) "HelloWorld") 5 " "))
             """;
@@ -689,8 +689,8 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderRemove_RemovesCharacters()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:RemoveText:pub}
+            §M{Test}
+              §F{RemoveText:pub}
                   §O{string}
                   §R (sb-tostring (sb-remove (sb-append (sb-new) "Hello World") 5 6))
             """;
@@ -710,8 +710,8 @@ public class StringOperationsE2ETests
     {
         // Test: is first char of uppercased string a letter?
         var source = """
-            §M{m001:Test}
-              §F{f001:IsFirstCharLetter:pub}
+            §M{Test}
+              §F{IsFirstCharLetter:pub}
                   §I{string:s}
                   §O{bool}
                   §R (is-letter (char-at (upper s) 0))
@@ -729,8 +729,8 @@ public class StringOperationsE2ETests
         // Test: does trimmed string contain digits?
         // Raw string \\d becomes Calor source "\\d", Calor parses as \d regex
         var source = """
-            §M{m001:Test}
-              §F{f001:TrimmedHasDigits:pub}
+            §M{Test}
+              §F{TrimmedHasDigits:pub}
                   §I{string:s}
                   §O{bool}
                   §R (regex-test (trim s) "\\d")
@@ -749,8 +749,8 @@ public class StringOperationsE2ETests
         // This tests multiple operations working together
         // Use unique names for each binding since Calor generates new 'var' for each
         var source = """
-            §M{m001:Test}
-              §F{f001:Capitalize:pub}
+            §M{Test}
+              §F{Capitalize:pub}
                   §I{string:s}
                   §O{string}
                   §B{sb1} (sb-new)
@@ -773,8 +773,8 @@ public class StringOperationsE2ETests
     public void E2E_CharAt_IndexOutOfBounds_ThrowsException()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:GetCharAt:pub}
+            §M{Test}
+              §F{GetCharAt:pub}
                   §I{string:s}
                   §O{char}
                   §R (char-at s 100)
@@ -790,8 +790,8 @@ public class StringOperationsE2ETests
     public void E2E_CharAt_NegativeIndex_ThrowsException()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:GetCharAt:pub}
+            §M{Test}
+              §F{GetCharAt:pub}
                   §I{string:s}
                   §O{char}
                   §R (char-at s (- 0 1))
@@ -807,8 +807,8 @@ public class StringOperationsE2ETests
     public void E2E_Substring_IndexOutOfBounds_ThrowsException()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:GetSubstr:pub}
+            §M{Test}
+              §F{GetSubstr:pub}
                   §I{string:s}
                   §O{string}
                   §R (substr s 10 5)
@@ -824,8 +824,8 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderRemove_InvalidRange_ThrowsException()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:RemoveText:pub}
+            §M{Test}
+              §F{RemoveText:pub}
                   §O{string}
                   §R (sb-tostring (sb-remove (sb-append (sb-new) "Hi") 0 100))
             """;
@@ -840,8 +840,8 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderInsert_NegativeIndex_ThrowsException()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:InsertText:pub}
+            §M{Test}
+              §F{InsertText:pub}
                   §O{string}
                   §R (sb-tostring (sb-insert (sb-new) (- 0 1) "x"))
             """;
@@ -857,8 +857,8 @@ public class StringOperationsE2ETests
     {
         // Invalid regex pattern: unclosed bracket
         var source = """
-            §M{m001:Test}
-              §F{f001:TestRegex:pub}
+            §M{Test}
+              §F{TestRegex:pub}
                   §I{string:s}
                   §O{bool}
                   §R (regex-test s "[invalid")
@@ -874,8 +874,8 @@ public class StringOperationsE2ETests
     public void E2E_CharFromCode_NegativeCode_Traps()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:CharFromCode:pub}
+            §M{Test}
+              §F{CharFromCode:pub}
                   §I{i32:code}
                   §O{char}
                   §R (char-from-code code)
@@ -894,8 +894,8 @@ public class StringOperationsE2ETests
     public void E2E_StringUpper_EmptyString_ReturnsEmpty()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:ToUpper:pub}
+            §M{Test}
+              §F{ToUpper:pub}
                   §I{string:s}
                   §O{string}
                   §R (upper s)
@@ -911,8 +911,8 @@ public class StringOperationsE2ETests
     public void E2E_StringLen_EmptyString_ReturnsZero()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:GetLen:pub}
+            §M{Test}
+              §F{GetLen:pub}
                   §I{string:s}
                   §O{i32}
                   §R (len s)
@@ -928,8 +928,8 @@ public class StringOperationsE2ETests
     public void E2E_StringContains_EmptySearch_ReturnsTrue()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:ContainsEmpty:pub}
+            §M{Test}
+              §F{ContainsEmpty:pub}
                   §I{string:s}
                   §O{bool}
                   §R (contains s "")
@@ -945,8 +945,8 @@ public class StringOperationsE2ETests
     public void E2E_RegexSplit_NoMatches_ReturnsSingleElement()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:SplitRegex:pub}
+            §M{Test}
+              §F{SplitRegex:pub}
                   §I{string:s}
                   §O{i32}
                   §R (len (regex-split s "NOMATCH"))
@@ -962,8 +962,8 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderNew_EmptyToString_ReturnsEmpty()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:EmptyBuilder:pub}
+            §M{Test}
+              §F{EmptyBuilder:pub}
                   §O{string}
                   §R (sb-tostring (sb-new))
             """;
@@ -978,8 +978,8 @@ public class StringOperationsE2ETests
     public void E2E_IndexOf_NotFound_ReturnsNegativeOne()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:FindIndex:pub}
+            §M{Test}
+              §F{FindIndex:pub}
                   §I{string:s}
                   §O{i32}
                   §R (indexof s "xyz")

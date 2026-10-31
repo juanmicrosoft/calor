@@ -44,8 +44,8 @@ public class CharLiteralTests
         Assert.Equal(expected, Assert.IsType<char>(token.Value));
 
         var source = $$"""
-            §M{m1:Characters}
-              §F{f1:Probe:pub} () -> char
+            §M{Characters}
+              §F{Probe:pub} () -> char
                 §E{}
                 §B{value:char} {{literal}}
                 §R value
@@ -99,19 +99,19 @@ public class CharLiteralTests
     public void NumericPromotionAndPatterns_PreserveCharacterSemantics()
     {
         const string source = """
-            §M{m1:Characters}
-              §F{f1:Offset:pub} (char:c) -> i32
+            §M{Characters}
+              §F{Offset:pub} (char:c) -> i32
                 §E{}
                 §R (- c '0')
-              §F{f2:Sum:pub} () -> i32
+              §F{Sum:pub} () -> i32
                 §E{}
                 §R (+ '0' '1')
-              §F{f3:IsDigit:pub} (char:c) -> bool
+              §F{IsDigit:pub} (char:c) -> bool
                 §E{}
                 §R (&& (>= c '0') (<= c '9'))
-              §F{f4:Match:pub} (char:c) -> i32
+              §F{Match:pub} (char:c) -> i32
                 §E{}
-                §R §W{w1} c
+                §R §W c
                   §K 'x' → 1
                   §K _ → 2
             """;
@@ -131,8 +131,8 @@ public class CharLiteralTests
     public void StringLiteral_RemainsDistinctFromCharacterLiteral()
     {
         var result = Program.Compile("""
-            §M{m1:Characters}
-              §F{f1:Offset:pub} (char:c) -> i32
+            §M{Characters}
+              §F{Offset:pub} (char:c) -> i32
                 §E{}
                 §R (- c "0")
             """, "characters.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
@@ -145,8 +145,8 @@ public class CharLiteralTests
     public void StringPadding_AcceptsCharacterArguments(string operation, string expected)
     {
         var source = $$"""
-            §M{m1:Characters}
-              §F{f1:Probe:pub} () -> str
+            §M{Characters}
+              §F{Probe:pub} () -> str
                 §E{}
                 §R ({{operation}} "7" 3 '0')
             """;
@@ -162,8 +162,8 @@ public class CharLiteralTests
     public void CharacterValues_WidenToDecimal(string expression)
     {
         var source = $$"""
-            §M{m1:Characters}
-              §F{f1:Probe:pub} () -> decimal
+            §M{Characters}
+              §F{Probe:pub} () -> decimal
                 §E{}
                 §B{value:decimal} {{expression}}
                 §R value
@@ -176,8 +176,8 @@ public class CharLiteralTests
     public void EnumInitializers_PreserveCharacterConstantsAndCasts()
     {
         const string source = """
-            §M{m1:Characters}
-              §EN{e1:Letters:pub}
+            §M{Characters}
+              §EN{Letters:pub}
                 A = 'A'
                 Newline = '\n'
                 Cast = (int)'B'
@@ -200,8 +200,8 @@ public class CharLiteralTests
     public void LoopAttributes_PreserveCharacterBounds(string bound)
     {
         var source = $$"""
-            §M{m1:Characters}
-              §F{f1:Probe:pub} () -> i32
+            §M{Characters}
+              §F{Probe:pub} () -> i32
                 §E{}
                 §B{~sum:i32} 0
                 §L{for1:i:0:{{bound}}:1}
@@ -216,9 +216,9 @@ public class CharLiteralTests
     public void CSharpAttributeArguments_PreserveCharacterType()
     {
         const string source = """
-            §M{m1:Characters}
-              §CL{c1:AttributeCarrier}
-                §MT{mt1:Probe:pub:stat}[@System.ComponentModel.DefaultValue('x')]
+            §M{Characters}
+              §CL{AttributeCarrier}
+                §MT{Probe:pub:stat}[@System.ComponentModel.DefaultValue('x')]
                   §O{char}
                   §E{}
                   §R 'x'
@@ -240,10 +240,10 @@ public class CharLiteralTests
         string whenTrue, string whenFalse, int trueValue, int falseValue)
     {
         var source = $$"""
-            §M{m1:Characters}
-              §F{f1:Probe:pub} (bool:flag) -> i32
+            §M{Characters}
+              §F{Probe:pub} (bool:flag) -> i32
                 §E{}
-                §R §W{w1} flag
+                §R §W flag
                   §K true → {{whenTrue}}
                   §K _ → {{whenFalse}}
             """;

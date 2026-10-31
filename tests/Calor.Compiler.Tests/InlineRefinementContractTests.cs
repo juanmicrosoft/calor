@@ -24,8 +24,8 @@ public sealed class InlineRefinementContractTests
     public void EntryAndReassignmentGuards_SurviveProofAndElision(bool verify, bool reassign)
     {
         var source = $$"""
-            §M{m1:Refined}
-              §F{f1:Upper:pub} (i32:lo, i32:hi | (> # lo)) -> i32
+            §M{Refined}
+              §F{Upper:pub} (i32:lo, i32:hi | (> # lo)) -> i32
                 §E{}
                 §S (> result lo)
                 {{(reassign ? "§ASSIGN hi lo" : "")}}
@@ -46,12 +46,12 @@ public sealed class InlineRefinementContractTests
     public void InheritedRefinement_RenamesBothParametersAndKeepsRuntimeGuard(bool verify)
     {
         var assembly = Compile("""
-            §M{m1:Refined}
-              §IFACE{i1:IRange}
-                §MT{im1:Upper} (i32:lo, i32:hi | (> # lo)) -> i32
-              §CL{c1:Range:pub}
+            §M{Refined}
+              §IFACE{IRange}
+                §MT{Upper} (i32:lo, i32:hi | (> # lo)) -> i32
+              §CL{Range:pub}
                 §IMPL{IRange}
-                §MT{mt1:Upper:pub} (i32:a, i32:b) -> i32
+                §MT{Upper:pub} (i32:a, i32:b) -> i32
                   §E{}
                   §R b
             """, verify);
@@ -69,8 +69,8 @@ public sealed class InlineRefinementContractTests
     public void ReassigningDependency_DoesNotLeaveAUsableStaleEntryFact(bool verify)
     {
         var assembly = Compile("""
-            §M{m1:Refined}
-              §F{f1:Upper:pub} (i32:lo, i32:hi | (> # lo)) -> i32
+            §M{Refined}
+              §F{Upper:pub} (i32:lo, i32:hi | (> # lo)) -> i32
                 §S (> result lo)
                 §ASSIGN lo hi
                 §R hi
@@ -88,10 +88,10 @@ public sealed class InlineRefinementContractTests
     public void CallerObligations_SubstituteArgumentsSimultaneously(string call, ObligationStatus expected)
     {
         var source = $$"""
-            §M{m1:Refined}
-              §F{f1:Upper:pub} (i32:lo, i32:hi | (> # lo)) -> i32
+            §M{Refined}
+              §F{Upper:pub} (i32:lo, i32:hi | (> # lo)) -> i32
                 §R hi
-              §F{f2:Caller:pub} (i32:lo | (> # hi), i32:hi) -> i32
+              §F{Caller:pub} (i32:lo | (> # hi), i32:hi) -> i32
                 §R {{call}}
             """;
         var module = Parse(source);
@@ -107,10 +107,10 @@ public sealed class InlineRefinementContractTests
     public void EffectfulCallArgument_IsExplicitlyUnsupported()
     {
         var tracker = Solve(Parse("""
-            §M{m1:Refined}
-              §F{f1:Positive:pub} (i32:x | (> # 0)) -> i32
+            §M{Refined}
+              §F{Positive:pub} (i32:x | (> # 0)) -> i32
                 §R x
-              §F{f2:Caller:pub} (i32:x) -> i32
+              §F{Caller:pub} (i32:x) -> i32
                 §R §C{Positive} §A §C{Get} §/C §/C
             """));
         var obligation = Assert.Single(tracker.Obligations.Where(o => o.Description.StartsWith("Call to")));
@@ -122,10 +122,10 @@ public sealed class InlineRefinementContractTests
     public void CallRequiringNumericConversion_IsNotProvenInTheWrongWidth()
     {
         var tracker = Solve(Parse("""
-            §M{m1:Refined}
-              §F{f1:Positive:pub} (i64:x | (> # 2147483647)) -> i64
+            §M{Refined}
+              §F{Positive:pub} (i64:x | (> # 2147483647)) -> i64
                 §R x
-              §F{f2:Caller:pub} (i32:x) -> i64
+              §F{Caller:pub} (i32:x) -> i64
                 §R §C{Positive} §A x §/C
             """));
         Assert.Equal(ObligationStatus.Unsupported,
@@ -136,10 +136,10 @@ public sealed class InlineRefinementContractTests
     public void CapturedCallerRefinement_DoesNotManufactureAnInconsistentFact()
     {
         var module = Parse("""
-            §M{m1:Refined}
-              §F{f1:Positive:pub} (i32:value | (> # 0)) -> i32
+            §M{Refined}
+              §F{Positive:pub} (i32:value | (> # 0)) -> i32
                 §R value
-              §F{f2:Caller:pub} (i32:x | (exists ((x i32)) (== # x))) -> i32
+              §F{Caller:pub} (i32:x | (exists ((x i32)) (== # x))) -> i32
                 §R §C{Positive} §A -1 §/C
             """);
         var collector = new FactCollector();
@@ -153,8 +153,8 @@ public sealed class InlineRefinementContractTests
     public void InlinePredicate_RoundTripsOnSignatureWithoutLegacyParameterTag()
     {
         var module = Parse("""
-            §M{m1:Refined}
-              §F{f1:Upper:pub} (i32:lo, i32:hi | (> # lo)) -> i32
+            §M{Refined}
+              §F{Upper:pub} (i32:lo, i32:hi | (> # lo)) -> i32
                 §R hi
             """);
         var emitted = new CalorEmitter().Emit(module);
@@ -169,8 +169,8 @@ public sealed class InlineRefinementContractTests
     public void InvalidRefinement_UsesPredicateSourceSpan(string predicate, string code)
     {
         var source = $$"""
-            §M{m1:Refined}
-              §F{f1:Upper:pub} (i32:x | {{predicate}}) -> i32
+            §M{Refined}
+              §F{Upper:pub} (i32:x | {{predicate}}) -> i32
                 §R x
             """;
         var result = Program.Compile(source, "invalid.calr");
@@ -187,8 +187,8 @@ public sealed class InlineRefinementContractTests
     public void NonProvenOutcome_KeepsEntryAndPostconditionGuards(string status)
     {
         var module = Parse("""
-            §M{m1:Refined}
-              §F{f1:Upper:pub} (i32:x | (> # 0)) -> i32
+            §M{Refined}
+              §F{Upper:pub} (i32:x | (> # 0)) -> i32
                 §S (< result 0)
                 §R x
             """);
@@ -215,10 +215,10 @@ public sealed class InlineRefinementContractTests
             VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
         };
         var result = Program.Compile("""
-            §M{m1:Refined}
-              §F{f1:Positive:priv} (i32:x | (> # 0)) -> i32
+            §M{Refined}
+              §F{Positive:priv} (i32:x | (> # 0)) -> i32
                 §R x
-              §F{f2:Caller:pub} () -> i32
+              §F{Caller:pub} () -> i32
                 §R §C{Positive} §A 1 §/C
             """, "private.calr", options);
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));

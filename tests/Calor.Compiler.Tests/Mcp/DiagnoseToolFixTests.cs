@@ -17,7 +17,7 @@ public class DiagnoseToolFixTests
         var args = JsonDocument.Parse("""
             {
                 "action": "diagnose",
-                "source": "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\")"
+                "source": "§M{Test} §F{Fn} §O{i32} §R (cotains \"hello\" \"h\")"
             }
             """).RootElement;
 
@@ -39,7 +39,7 @@ public class DiagnoseToolFixTests
         var args = JsonDocument.Parse("""
             {
                 "action": "diagnose",
-                "source": "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\")"
+                "source": "§M{Test} §F{Fn} §O{i32} §R (cotains \"hello\" \"h\")"
             }
             """).RootElement;
 
@@ -69,7 +69,7 @@ public class DiagnoseToolFixTests
         var args = JsonDocument.Parse("""
             {
                 "action": "diagnose",
-                "source": "§M{m001:Test} §F{f001:Fn} (i32:x) -> str §R (nameof x)"
+                "source": "§M{Test} §F{Fn} (i32:x) -> str §R (nameof x)"
             }
             """).RootElement;
 
@@ -87,7 +87,7 @@ public class DiagnoseToolFixTests
         var args = JsonDocument.Parse("""
             {
                 "action": "diagnose",
-                "source": "§M{m001:Test} §F{f001:Add} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b)"
+                "source": "§M{Test} §F{Add} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b)"
             }
             """).RootElement;
 
@@ -111,7 +111,7 @@ public class DiagnoseToolFixTests
             {
                 "action": "diagnose",
                 "apply": true,
-                "source": "§M{m1:Calc}\n  §F{f1:Add:i32:pub}\n    §R (+ 1 2)"
+                "source": "§M{Calc}\n  §F{Add:i32:pub}\n    §R (+ 1 2)"
             }
             """).RootElement;
 
@@ -127,7 +127,7 @@ public class DiagnoseToolFixTests
 
         Assert.True(json.TryGetProperty("fixedSource", out var fixedSourceEl));
         var healed = fixedSourceEl.GetString()!;
-        Assert.Contains("§F{f1:Add:pub} () -> i32", healed);
+        Assert.Contains("§F{Add:pub} () -> i32", healed);
         Assert.DoesNotContain("i32:pub", healed);
         Assert.True(json.GetProperty("fixesApplied").GetInt32() >= 1);
 
@@ -168,7 +168,7 @@ public class DiagnoseToolFixTests
     }
 
     private const string LegacyCloserSource =
-        "§M{m1:Calc}\n  §F{f1:Add:pub}\n    §I{i32:a}\n    §I{i32:b}\n    §O{i32}\n    §R (+ a b)\n  §/F{f1}\n§/M{m1}";
+        "§M{Calc}\n  §F{Add:pub}\n    §I{i32:a}\n    §I{i32:b}\n    §O{i32}\n    §R (+ a b)\n  §/F\n§/M";
 
     [Fact]
     public async Task ExecuteAsync_WithLegacyClosers_ReportsCalor0830WithFix()
@@ -207,7 +207,7 @@ public class DiagnoseToolFixTests
             {
                 "action": "diagnose",
                 "apply": true,
-                "source": "§M{m1:Calc}\n  §F{f1:Add:pub}\n    §I{i32:a}\n    §I{i32:b}\n    §O{i32}\n    §R (+ a b)\n  §/F{f1}\n§/M{m1}"
+                "source": "§M{Calc}\n  §F{Add:pub}\n    §I{i32:a}\n    §I{i32:b}\n    §O{i32}\n    §R (+ a b)\n  §/F\n§/M"
             }
             """).RootElement;
 

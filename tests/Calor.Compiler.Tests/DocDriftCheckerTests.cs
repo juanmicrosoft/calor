@@ -91,7 +91,7 @@ public class DocDriftCheckerTests
     public void MethodFragment_IsNotMisclassifiedAsModuleExample()
     {
         var doc = new DocFile("docs/semantics/inheritance.md",
-            "```calor\n§MT{method:Example:pub} () -> i32\n  §R 1\n```\n");
+            "```calor\n§MT{Example:pub} () -> i32\n  §R 1\n```\n");
         Assert.Empty(DocDriftChecker.Check(BaseInputs(parseExampleDocs: [doc])));
     }
 
@@ -175,8 +175,8 @@ public class DocDriftCheckerTests
             Semantics Version: 1.0.0
             Use §BOGUS.
             ```calor
-            §M{m:BadExample}
-              §F{f:Probe:pub} () -> i32
+            §M{BadExample}
+              §F{Probe:pub} () -> i32
                 §R (+ 1)
             ```
             """);
@@ -227,7 +227,7 @@ public class DocDriftCheckerTests
     // --- Mirror-doc drift (AGENTS.md single-sourced from CLAUDE.md, #708) ---
 
     private const string SampleClaude =
-        "# CLAUDE.md — Calor Compiler\n\nBuild with `dotnet build`. Use `§F{id:Name:pub}`.\n";
+        "# CLAUDE.md — Calor Compiler\n\nBuild with `dotnet build`. Use `§F{Name:pub}`.\n";
 
     [Fact]
     public void AgentsMdTransform_SwapsTitle_AddsBanner_IsIdempotent()
@@ -237,7 +237,7 @@ public class DocDriftCheckerTests
         Assert.Contains("Generated from CLAUDE.md", once);
         Assert.DoesNotContain("# CLAUDE.md — Calor Compiler", once);
         // Body is preserved verbatim after the swapped head.
-        Assert.Contains("Build with `dotnet build`. Use `§F{id:Name:pub}`.", once);
+        Assert.Contains("Build with `dotnet build`. Use `§F{Name:pub}`.", once);
         // Regenerating from CLAUDE.md yields the same bytes (deterministic).
         Assert.Equal(once, DocDriftChecker.AgentsMdFromClaudeMd(SampleClaude));
     }
@@ -607,7 +607,7 @@ public class DocDriftCheckerTests
     {
         // §FOREACH does not lex; a doc example using it has rotted.
         var doc = new DocFile("fake.md",
-            "Example:\n\n```calor\n§M{m1:Loops}\n  §F{f1:Sum:pub} (i32[]:items) -> void\n    §FOREACH{e1:x} items\n      §P x\n```\n");
+            "Example:\n\n```calor\n§M{Loops}\n  §F{Sum:pub} (i32[]:items) -> void\n    §FOREACH{e1:x} items\n      §P x\n```\n");
         var findings = DocDriftChecker.Check(BaseInputs(parseExampleDocs: [doc]));
 
         Assert.NotEmpty(findings);
@@ -632,7 +632,7 @@ public class DocDriftCheckerTests
     public void SuppressionMarkerBeforeFenceExemptsTheExample()
     {
         var doc = new DocFile("fake.md",
-            "<!-- drift:ignore -->\n```calor\n§M{m1:Hypothetical}\n  §FUTURE syntax sketch\n```\n");
+            "<!-- drift:ignore -->\n```calor\n§M{Hypothetical}\n  §FUTURE syntax sketch\n```\n");
         var findings = DocDriftChecker.Check(BaseInputs(parseExampleDocs: [doc]));
 
         Assert.Empty(findings);
@@ -642,7 +642,7 @@ public class DocDriftCheckerTests
     public void NonCalorFencesAreNotParseChecked()
     {
         var doc = new DocFile("fake.md",
-            "```\n§M{m1:Bare}\n  §FOREACH{e1:x} items\n```\n\n```text\n§M{m2:Text}\n  §FOREACH{e2:x} items\n```\n");
+            "```\n§M{Bare}\n  §FOREACH{e1:x} items\n```\n\n```text\n§M{Text}\n  §FOREACH{e2:x} items\n```\n");
         var findings = DocDriftChecker.Check(BaseInputs(parseExampleDocs: [doc]));
 
         Assert.Empty(findings);

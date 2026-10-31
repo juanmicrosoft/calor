@@ -25,9 +25,9 @@ public class SiblingRebindCodegenTests
     {
         var modifier = mutable ? "~" : "";
         var source = $$"""
-            §M{m:SwitchScope}
-              §F{f:Probe:pub} (i32:x) -> i32
-                §W{w} x
+            §M{SwitchScope}
+              §F{Probe:pub} (i32:x) -> i32
+                §W x
                   §K 1
                     §B{ {{modifier}}v:i32} 10
                     §R v
@@ -56,11 +56,11 @@ public class SiblingRebindCodegenTests
     {
         var modifier = mutable ? "~" : "";
         var source = $$"""
-            §M{m:NestedSwitchScope}
-              §F{f:Probe:pub} (i32:x, i32:y) -> i32
-                §W{outer} x
+            §M{NestedSwitchScope}
+              §F{Probe:pub} (i32:x, i32:y) -> i32
+                §W x
                   §K 1
-                    §W{inner1} y
+                    §W y
                       §K 1
                         §B{ {{modifier}}v:i32} 10
                         §R v
@@ -68,7 +68,7 @@ public class SiblingRebindCodegenTests
                         §B{ {{modifier}}v:i32} 20
                         §R v
                   §K _
-                    §W{inner2} y
+                    §W y
                       §K 1
                         §B{ {{modifier}}v:i32} 30
                         §R v
@@ -89,10 +89,10 @@ public class SiblingRebindCodegenTests
     {
         var modifier = mutable ? "~" : "";
         var source = $$"""
-            §M{m:AfterSwitchScope}
-              §F{f:Probe:pub} (i32:x) -> i32
+            §M{AfterSwitchScope}
+              §F{Probe:pub} (i32:x) -> i32
                 §B{~total:i32} 0
-                §W{w} x
+                §W x
                   §K 1
                     §B{ {{modifier}}v:i32} 10
                     §B{~total} v
@@ -100,7 +100,7 @@ public class SiblingRebindCodegenTests
                     §B{ {{modifier}}v:i32} 20
                     §B{~total} v
                 §B{after:i32} 3
-                §IF{i} true
+                §IF true
                   §B{ {{modifier}}v:i32} 7
                   §B{~total} (+ total v)
                 §R (+ total after)
@@ -114,9 +114,9 @@ public class SiblingRebindCodegenTests
     public void StatementMatch_ArmBindingCannotEscapeSwitch()
     {
         var result = Program.Compile("""
-            §M{m:SwitchScope}
-              §F{f:Probe:pub} (i32:x) -> i32
-                §W{w} x
+            §M{SwitchScope}
+              §F{Probe:pub} (i32:x) -> i32
+                §W x
                   §K 1
                     §B{v:i32} 10
                   §K _
@@ -139,9 +139,9 @@ public class SiblingRebindCodegenTests
     public void SiblingMutableRebind_ReDeclaresInEachBlock()
     {
         var cs = Emit(
-            "§M{m:S}\n  §F{f:Do:pub} (bool:a, bool:b) -> i32\n" +
-            "    §IF{i1} (== a true)\n      §B{~x:i32} 1\n      §R x\n" +
-            "    §IF{i2} (== b true)\n      §B{~x:i32} 2\n      §R x\n    §R 0\n");
+            "§M{S}\n  §F{Do:pub} (bool:a, bool:b) -> i32\n" +
+            "    §IF (== a true)\n      §B{~x:i32} 1\n      §R x\n" +
+            "    §IF (== b true)\n      §B{~x:i32} 2\n      §R x\n    §R 0\n");
 
         // Two independent declarations in the two sibling blocks — not a reassignment
         // of an out-of-scope local.
@@ -152,8 +152,8 @@ public class SiblingRebindCodegenTests
     public void AccumulatorRebind_StaysAReassignment()
     {
         var cs = Emit(
-            "§M{m:S}\n  §F{f:Fact:pub} (i32:n) -> i32\n    §B{~result} 1\n    §B{~i} 2\n" +
-            "    §WH{w1} (<= i n)\n      §B{~result} (* result i)\n      §B{~i} (+ i 1)\n    §R result\n");
+            "§M{S}\n  §F{Fact:pub} (i32:n) -> i32\n    §B{~result} 1\n    §B{~i} 2\n" +
+            "    §WH (<= i n)\n      §B{~result} (* result i)\n      §B{~i} (+ i 1)\n    §R result\n");
 
         // Declared once, reassigned inside the loop (no shadowing re-declaration).
         Assert.Single(Regex.Matches(cs, @"\b(var|int) result = 1"));

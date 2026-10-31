@@ -22,11 +22,11 @@ public sealed class S2NestedQuantifierChannelTests
         // The nested precondition entails n > 0 over non-empty bounds; it must not be used.
         Assert.True(Z3ContextFactory.IsAvailable, "these witnesses need Z3");
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:priv} (i32:n) -> i32
+            §M{M}
+              §F{Probe:priv} (i32:n) -> i32
                 §E{}
                 §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i INT:1)) (forall ((j i32)) (-> (&& (>= j INT:0) (< j INT:1)) (> n INT:0)))))
-                §PROOF{p1:claim} (> n INT:0)
+                §PROOF{claim} (> n INT:0)
                 §R n
             """;
         var options = new CompilationOptions
@@ -46,11 +46,11 @@ public sealed class S2NestedQuantifierChannelTests
         // so it must not make the earlier obligation Unsupported.
         Assert.True(Z3ContextFactory.IsAvailable, "these witnesses need Z3");
         const string source = """
-            §M{m1:M}
-              §F{f1:Probe:priv} (i32:n) -> i32
+            §M{M}
+              §F{Probe:priv} (i32:n) -> i32
                 §E{}
-                §PROOF{p1:claim} (>= (* n INT:0) INT:0)
-                §IF{if1} (forall ((i i32)) (-> (&& (>= i INT:0) (< i INT:1)) (cast bool (forall ((j i32)) (-> (&& (>= j INT:0) (< j INT:1)) (< j INT:2))))))
+                §PROOF{claim} (>= (* n INT:0) INT:0)
+                §IF (forall ((i i32)) (-> (&& (>= i INT:0) (< i INT:1)) (cast bool (forall ((j i32)) (-> (&& (>= j INT:0) (< j INT:1)) (< j INT:2))))))
                   §R INT:1
                 §R INT:0
             """;
@@ -70,10 +70,10 @@ public sealed class S2NestedQuantifierChannelTests
         // Proving only "i >= 0" must not report the whole invariant, nested part included.
         Assert.True(Z3ContextFactory.IsAvailable, "these witnesses need Z3");
         const string source = """
-            §M{m001:Test}
-              §F{f001:Loop:pub}
+            §M{Test}
+              §F{Loop:pub}
                   §O{i32}
-                  §L{l1:i:0:3:1}
+                  §L{i:0:3:1}
                       §P i
                   §R INT:0
             """;

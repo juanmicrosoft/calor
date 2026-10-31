@@ -144,7 +144,7 @@ public class W1Slice2TrustSurfaceTests
     {
         using var env = WithEnv("CALOR_EXPERIMENTAL_FORMAT_WRITE", null);
         var file = Path.Combine(Path.GetTempPath(), $"calor-w1s2-{Guid.NewGuid():N}.calr");
-        await File.WriteAllTextAsync(file, "§M{m001:T}   \n");
+        await File.WriteAllTextAsync(file, "§M{T}   \n");
         try
         {
             var command = Calor.Compiler.Commands.FormatCommand.Create();
@@ -152,7 +152,7 @@ public class W1Slice2TrustSurfaceTests
             var exit = await command.InvokeAsync(["--write", file]);
 
             Assert.Equal(0, exit);
-            Assert.Equal("§M{m001:T}\n", await File.ReadAllTextAsync(file));
+            Assert.Equal("§M{T}\n", await File.ReadAllTextAsync(file));
         }
         finally
         {
@@ -165,7 +165,7 @@ public class W1Slice2TrustSurfaceTests
     {
         using var env = WithEnv("CALOR_EXPERIMENTAL_FORMAT_WRITE", null);
         var file = Path.Combine(Path.GetTempPath(), $"calor-w1s2-{Guid.NewGuid():N}.calr");
-        await File.WriteAllTextAsync(file, "§M{m001:T}\n");
+        await File.WriteAllTextAsync(file, "§M{T}\n");
         try
         {
             var command = Calor.Compiler.Commands.FormatCommand.Create();
@@ -185,7 +185,7 @@ public class W1Slice2TrustSurfaceTests
     {
         using var env = WithEnv("CALOR_EXPERIMENTAL_FORMAT_WRITE", null);
         var file = Path.Combine(Path.GetTempPath(), $"calor-w1s2-{Guid.NewGuid():N}.calr");
-        await File.WriteAllTextAsync(file, "§M{m001:T}   \n");
+        await File.WriteAllTextAsync(file, "§M{T}   \n");
         try
         {
             var command = Calor.Compiler.Commands.LintCommand.Create();
@@ -193,7 +193,7 @@ public class W1Slice2TrustSurfaceTests
             var exit = await command.InvokeAsync(["--fix", file]);
 
             Assert.Equal(0, exit);
-            Assert.Equal("§M{m001:T}\n", await File.ReadAllTextAsync(file));
+            Assert.Equal("§M{T}\n", await File.ReadAllTextAsync(file));
         }
         finally
         {
@@ -206,7 +206,7 @@ public class W1Slice2TrustSurfaceTests
     {
         using var env = WithEnv("CALOR_EXPERIMENTAL_FORMAT_WRITE", null);
         var file = Path.Combine(Path.GetTempPath(), $"calor-w1s2-{Guid.NewGuid():N}.calr");
-        await File.WriteAllTextAsync(file, "§M{m001:T}\n");
+        await File.WriteAllTextAsync(file, "§M{T}\n");
         try
         {
             var command = Calor.Compiler.Commands.LintCommand.Create();

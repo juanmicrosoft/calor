@@ -75,7 +75,7 @@ public class ProductionOverflowRuntimeTests
     {
         var result = Program.Compile($$"""
             §M{m1:Overflow:overflow={{policy}}}
-              §F{f1:Probe:pub} (i32:value) -> i32
+              §F{Probe:pub} (i32:value) -> i32
                 §R (+ value 1)
             """, "overflow.calr", Options());
         Assert.True(result.HasErrors);
@@ -120,8 +120,8 @@ public class ProductionOverflowRuntimeTests
     public void OverflowPolicy_RoundTripsAndSeparatesWarmProofCaches()
     {
         const string source = """
-            §M{m1:Overflow:overflow=unchecked}
-              §F{f1:Probe:pub} (i32:value) -> i32
+            §M{Overflow:overflow=unchecked}
+              §F{Probe:pub} (i32:value) -> i32
                 §E{}
                 §S (== (- (+ value 1) 1) value)
                 §R value
@@ -180,8 +180,8 @@ public class ProductionOverflowRuntimeTests
     public void UnsignedConditional_BodySafetyCannotExcludeValidNormalReturns()
     {
         const string source = """
-            §M{m1:Overflow}
-              §F{f1:Probe:pub} (u32:value) -> u32
+            §M{Overflow}
+              §F{Probe:pub} (u32:value) -> u32
                 §E{}
                 §S (&& (== result result) (!= value 2147483647))
                 §R (+ (? true value value) 1)
@@ -201,8 +201,8 @@ public class ProductionOverflowRuntimeTests
     public void UnsignedConditional_IdentityCannotElideOverflowingCheck()
     {
         const string source = """
-            §M{m1:Overflow}
-              §F{f1:Probe:pub} (u32:value) -> u32
+            §M{Overflow}
+              §F{Probe:pub} (u32:value) -> u32
                 §E{}
                 §S (== (+ (? true value value) 1) (+ value 1))
                 §R value
@@ -220,12 +220,12 @@ public class ProductionOverflowRuntimeTests
             "§B{one:i32} 1\n    §B{unused} (+ value one)",
             "§B{one} 1\n    §B{unused} (+ value one)",
             "§B{one:i32} 1\n    §B{alias:i32} one\n    §B{unused} (+ value alias)",
-            "§B{one:i32} 1\n    §IF{i1} (> value 0)\n      §B{unused} (+ value one)"
+            "§B{one:i32} 1\n    §IF (> value 0)\n      §B{unused} (+ value one)"
         })
         {
             var source = $$"""
-                §M{m1:Overflow}
-                  §F{f1:Probe:pub} (u32:value) -> i32
+                §M{Overflow}
+                  §F{Probe:pub} (u32:value) -> i32
                     §E{}
                     §S (&& (== result 0) (!= value 4294967295))
                     {{binding}}
@@ -251,8 +251,8 @@ public class ProductionOverflowRuntimeTests
     public void Verification_CannotElideOverflowingIdentityGuard(string predicate, int boundary)
     {
         var source = $$"""
-            §M{m1:Overflow}
-              §F{f1:Probe:pub} (i32:value) -> i32
+            §M{Overflow}
+              §F{Probe:pub} (i32:value) -> i32
                 §E{}
                 §S {{predicate}}
                 §R value
@@ -273,8 +273,8 @@ public class ProductionOverflowRuntimeTests
     public void VerifiedBody_NormalReturnProofDoesNotSuppressBodyOverflow()
     {
         const string source = """
-            §M{m1:Overflow}
-              §F{f1:Probe:pub} (i32:value) -> i32
+            §M{Overflow}
+              §F{Probe:pub} (i32:value) -> i32
                 §E{}
                 §Q (>= value 0)
                 §S (>= result 0)
@@ -296,8 +296,8 @@ public class ProductionOverflowRuntimeTests
     public void QuantifiedIdentity_KeepsOverflowingRuntimePredicate(string predicate)
     {
         var source = $$"""
-            §M{m1:Overflow}
-              §F{f1:Probe:pub} (i32:value) -> i32
+            §M{Overflow}
+              §F{Probe:pub} (i32:value) -> i32
                 §E{}
                 §S {{predicate}}
                 §R value
@@ -321,8 +321,8 @@ public class ProductionOverflowRuntimeTests
     public void GuardedArithmetic_ProvesWithoutEvaluatingUnselectedOverflow(string predicate)
     {
         var source = $$"""
-            §M{m1:Overflow}
-              §F{f1:Probe:pub} (i32:value) -> i32
+            §M{Overflow}
+              §F{Probe:pub} (i32:value) -> i32
                 §E{}
                 §S {{predicate}}
                 §R value
@@ -347,10 +347,10 @@ public class ProductionOverflowRuntimeTests
     public void ObligationSolver_CannotElideOverflowingIdentity()
     {
         const string source = """
-            §M{m1:Overflow}
-              §F{f1:Probe:pub} (i32:value) -> i32
+            §M{Overflow}
+              §F{Probe:pub} (i32:value) -> i32
                 §E{}
-                §PROOF{p1:checked} (== (- (+ value 1) 1) value)
+                §PROOF{checked} (== (- (+ value 1) 1) value)
                 §R value
             """;
         var options = VerifiedOptions();
@@ -368,8 +368,8 @@ public class ProductionOverflowRuntimeTests
         string operation, int overflowLeft, int overflowRight, int safeLeft, int safeRight, int expected)
     {
         var source = $$"""
-            §M{m1:Overflow}
-              §F{f1:Probe:pub} (i32:left, i32:right) -> i32
+            §M{Overflow}
+              §F{Probe:pub} (i32:left, i32:right) -> i32
                 §E{}
                 §R ({{operation}} left right)
             """;
@@ -388,8 +388,8 @@ public class ProductionOverflowRuntimeTests
         string inputType, string outputType, object overflow, object safeInput, object expected)
     {
         var source = $$"""
-            §M{m1:Overflow}
-              §F{f1:Probe:pub} ({{inputType}}:value) -> {{outputType}}
+            §M{Overflow}
+              §F{Probe:pub} ({{inputType}}:value) -> {{outputType}}
                 §E{}
                 §R (cast {{outputType}} value)
             """;
@@ -403,14 +403,14 @@ public class ProductionOverflowRuntimeTests
     public void NegationAndCharacterNarrowing_Trap()
     {
         AssertOverflow("""
-            §M{m1:Overflow}
-              §F{f1:Probe:pub} (i32:value) -> i32
+            §M{Overflow}
+              §F{Probe:pub} (i32:value) -> i32
                 §E{}
                 §R (- value)
             """, [int.MinValue]);
         AssertOverflow("""
-            §M{m1:Overflow}
-              §F{f1:Probe:pub} (i32:value) -> char
+            §M{Overflow}
+              §F{Probe:pub} (i32:value) -> char
                 §E{}
                 §R (char-from-code value)
             """, [65536]);
@@ -422,8 +422,8 @@ public class ProductionOverflowRuntimeTests
     public void IncrementAndDecrement_Trap(string operation, int input)
     {
         AssertOverflow($$"""
-            §M{m1:Overflow}
-              §F{f1:Probe:pub} (i32:input) -> i32
+            §M{Overflow}
+              §F{Probe:pub} (i32:input) -> i32
                 §E{mut}
                 §B{~value:i32} input
                 §R ({{operation}} value)
@@ -434,8 +434,8 @@ public class ProductionOverflowRuntimeTests
     public async Task ShippedExecutionProject_TrapsNativeOverflowAndPreservesCSharpInterop()
     {
         const string source = """
-            §M{m1:Overflow}
-              §F{f1:Probe:pub} (i32:value) -> i32
+            §M{Overflow}
+              §F{Probe:pub} (i32:value) -> i32
                 §E{}
                 §R (+ value INT:1)
             """;

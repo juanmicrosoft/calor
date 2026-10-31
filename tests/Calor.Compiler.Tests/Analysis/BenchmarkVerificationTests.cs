@@ -66,8 +66,8 @@ public class BenchmarkVerificationTests
     public void SqlInjection_VulnerableQuery_DetectsInjection()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:VulnerableQuery:pub}
+§M{Test}
+  §F{VulnerableQuery:pub}
       §I{string:user_input}
       §O{string}
       §B{query:string} (+ STR:""SELECT * FROM users WHERE name = '"" user_input)
@@ -88,8 +88,8 @@ public class BenchmarkVerificationTests
     public void SqlInjection_SafeParameterizedQuery_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeQuery:pub}
+§M{Test}
+  §F{SafeQuery:pub}
       §I{string:user_input}
       §O{string}
       §B{query:string} STR:""SELECT * FROM users WHERE name = ?""
@@ -110,8 +110,8 @@ public class BenchmarkVerificationTests
     public void SqlInjection_EscapedInput_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeEscaped:pub}
+§M{Test}
+  §F{SafeEscaped:pub}
       §I{string:user_input}
       §O{string}
       §B{escaped:string} (CALL sql_escape user_input)
@@ -134,8 +134,8 @@ public class BenchmarkVerificationTests
     {
         // db.execute_with_param_logging should NOT be excluded — it's a real sink
         var source = @"
-§M{m001:Test}
-  §F{f001:ParamLogging:pub}
+§M{Test}
+  §F{ParamLogging:pub}
       §I{string:user_input}
       §O{string}
       §B{query:string} (+ STR:""SELECT * FROM users WHERE name = '"" user_input)
@@ -156,8 +156,8 @@ public class BenchmarkVerificationTests
     {
         // db.execute_param should still be excluded — it's a parameterized query
         var source = @"
-§M{m001:Test}
-  §F{f001:ExecuteParam:pub}
+§M{Test}
+  §F{ExecuteParam:pub}
       §I{string:user_input}
       §O{string}
       §B{query:string} STR:""SELECT * FROM users WHERE name = ?""
@@ -181,8 +181,8 @@ public class BenchmarkVerificationTests
     public void CommandInjection_VulnerableShellExec_DetectsInjection()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:VulnerableShell:pub}
+§M{Test}
+  §F{VulnerableShell:pub}
       §I{string:user_input}
       §O{i32}
       §B{cmd:string} (+ STR:""ls -la "" user_input)
@@ -202,8 +202,8 @@ public class BenchmarkVerificationTests
     public void CommandInjection_SafeWhitelisted_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeWhitelist:pub}
+§M{Test}
+  §F{SafeWhitelist:pub}
       §I{i32:option}
       §O{i32}
       §IF (== option INT:1)
@@ -230,8 +230,8 @@ public class BenchmarkVerificationTests
     public void PathTraversal_VulnerableFileRead_DetectsTraversal()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:VulnerableRead:pub}
+§M{Test}
+  §F{VulnerableRead:pub}
       §I{string:user_path}
       §O{string}
       §B{content:string} (CALL file.read user_path)
@@ -250,8 +250,8 @@ public class BenchmarkVerificationTests
     public void PathTraversal_SafeConstantPath_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeConstant:pub}
+§M{Test}
+  §F{SafeConstant:pub}
       §O{string}
       §B{path:string} STR:""/etc/config.json""
       §B{content:string} (CALL file.read path)
@@ -274,8 +274,8 @@ public class BenchmarkVerificationTests
     public void DivByZero_VulnerableDivision_DetectsRisk()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:VulnerableDiv:pub}
+§M{Test}
+  §F{VulnerableDiv:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -294,12 +294,12 @@ public class BenchmarkVerificationTests
     public void DivByZero_SafeWithGuard_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeDiv:pub}
+§M{Test}
+  §F{SafeDiv:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
-      §IF{i1} (!= y INT:0)
+      §IF (!= y INT:0)
         §R (/ x y)
       §EL
         §R INT:0";
@@ -317,8 +317,8 @@ public class BenchmarkVerificationTests
     public void DivByZero_DivisionByLiteral_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeLiteralDiv:pub}
+§M{Test}
+  §F{SafeLiteralDiv:pub}
       §I{i32:x}
       §O{i32}
       §R (/ x INT:2)";
@@ -340,8 +340,8 @@ public class BenchmarkVerificationTests
     public void NullDeref_VulnerableAccess_DetectsRisk()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:VulnerableNull:pub}
+§M{Test}
+  §F{VulnerableNull:pub}
       §O{i32}
       §B{maybeNull:i32[]} null
       §R §LEN maybeNull";
@@ -360,11 +360,11 @@ public class BenchmarkVerificationTests
     public void NullDeref_SafeNullCheck_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeNull:pub}
+§M{Test}
+  §F{SafeNull:pub}
       §I{i32[]?:maybeNull}
       §O{i32}
-      §IF{i1} (== maybeNull null)
+      §IF (== maybeNull null)
         §R INT:0
       §R §LEN maybeNull";
 
@@ -385,8 +385,8 @@ public class BenchmarkVerificationTests
     public void Bounds_VulnerableArrayAccess_DetectsRisk()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:VulnerableBounds:pub}
+§M{Test}
+  §F{VulnerableBounds:pub}
       §I{i32[]:items}
       §I{i32:index}
       §O{i32}
@@ -406,14 +406,14 @@ public class BenchmarkVerificationTests
     public void Bounds_SafeBoundsCheck_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeBounds:pub}
+§M{Test}
+  §F{SafeBounds:pub}
       §I{i32[]:items}
       §I{i32:index}
       §O{i32}
-      §IF{i1} (< index INT:0)
+      §IF (< index INT:0)
         §R INT:-1
-      §IF{i2} (>= index §LEN items)
+      §IF (>= index §LEN items)
         §R INT:-1
       §R §IDX items index";
 
@@ -434,8 +434,8 @@ public class BenchmarkVerificationTests
     public void Integration_SafeFunction_NoWarnings()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:CompletelySecure:pub}
+§M{Test}
+  §F{CompletelySecure:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -464,8 +464,8 @@ public class BenchmarkVerificationTests
     public void Integration_VulnerableFunction_MultipleWarnings()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:InsecureFunction:pub}
+§M{Test}
+  §F{InsecureFunction:pub}
       §I{string:user_input}
       §I{i32:divisor}
       §O{i32}

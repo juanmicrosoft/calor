@@ -32,13 +32,13 @@ public sealed class StageBDelegateReturnTests
         var call = $"§C{{reader{(invoke ? ".Invoke" : "")}}} §/C";
         var value = inferred ? "produced" : call;
         var source = $$"""
-            §M{m:DelegateReturns}
+            §M{DelegateReturns}
               §U{System.Collections.Generic}
-              §DEL{readerType:Reader:pub}
+              §DEL{Reader:pub}
                 §O{ {{sourceType}} }
-              §F{take:Take:pub} ({{targetType}}:value) -> void
+              §F{Take:pub} ({{targetType}}:value) -> void
                 §E{}
-              §F{probe:Probe:pub} (Reader:reader) -> {{(boundary == "return" ? targetType : "void")}}
+              §F{Probe:pub} (Reader:reader) -> {{(boundary == "return" ? targetType : "void")}}
             {{(inferred ? $"    §B{{produced}} {call}" : "")}}
                 {{Sink(boundary, targetType, value)}}
             """;
@@ -60,13 +60,13 @@ public sealed class StageBDelegateReturnTests
     {
         var expression = coalesce ? "(?? value fallback)" : "(? flag value fallback)";
         var source = $$"""
-            §M{m:GuardedGenericJoin}
+            §M{GuardedGenericJoin}
               §U{System.Collections.Generic}
-              §F{take:Take:pub} (List<str>:value) -> void
+              §F{Take:pub} (List<str>:value) -> void
                 §E{}
-              §F{probe:Probe:pub} (List<{{(nullable ? "?str" : "str")}}>:value, List<str>:fallback, bool:flag) -> {{(boundary == "return" ? "List<str>" : "void")}}
+              §F{Probe:pub} (List<{{(nullable ? "?str" : "str")}}>:value, List<str>:fallback, bool:flag) -> {{(boundary == "return" ? "List<str>" : "void")}}
                 §B{joined} {{expression}}
-                §IF{guard} (!= joined null)
+                §IF (!= joined null)
                   {{Sink(boundary, "List<str>", "joined")}}
             {{(boundary == "return" ? "    §R fallback" : "")}}
             """;

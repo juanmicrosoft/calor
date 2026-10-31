@@ -135,8 +135,8 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_StackAllocSized_EmitsStackallocExpression()
     {
         var calorSource = """
-            §M{m001:StackAllocTest}
-                §F{f001:Alloc:pub}
+            §M{StackAllocTest}
+                §F{Alloc:pub}
                     §O{i32}
                     §B{~sum:i32} INT:0
                     §R sum
@@ -150,9 +150,9 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_StackAllocSized_InBinding_EmitsStackalloc()
     {
         var calorSource = """
-            §M{m001:StackAllocTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:Alloc:pub:unsafe}
+            §M{StackAllocTest}
+                §CL{Test:pub}
+                    §MT{Alloc:pub:unsafe}
                         §O{void}
                         §B{span:Span<i32>} §SALLOC{i32:10}
             """;
@@ -165,8 +165,8 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_SizeOf_EmitsSizeofExpression()
     {
         var calorSource = """
-            §M{m001:SizeOfTest}
-                §F{f001:GetSize:pub}
+            §M{SizeOfTest}
+                §F{GetSize:pub}
                     §O{i32}
                     §R §SIZEOF{i32}
             """;
@@ -179,9 +179,9 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_AddressOf_EmitsAmpersand()
     {
         var calorSource = """
-            §M{m001:AddrTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:GetAddr:pub:unsafe}
+            §M{AddrTest}
+                §CL{Test:pub}
+                    §MT{GetAddr:pub:unsafe}
                         §O{void}
                         §B{~x:i32} INT:42
                         §B{ptr:i32*} §ADDR x
@@ -195,9 +195,9 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_PointerDereference_EmitsStar()
     {
         var calorSource = """
-            §M{m001:DerefTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:ReadPtr:pub:unsafe}
+            §M{DerefTest}
+                §CL{Test:pub}
+                    §MT{ReadPtr:pub:unsafe}
                         §I{ptr:i32*}
                         §O{i32}
                         §R §DEREF ptr
@@ -215,13 +215,13 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_UnsafeBlock_EmitsUnsafeKeyword()
     {
         var calorSource = """
-            §M{m001:UnsafeBlockTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:DoUnsafe:pub}
+            §M{UnsafeBlockTest}
+                §CL{Test:pub}
+                    §MT{DoUnsafe:pub}
                         §O{void}
-                        §UNSAFE{u1}
+                        §UNSAFE
                           §B{~x:i32} INT:42
-                        §/UNSAFE{u1}
+                        §/UNSAFE
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -233,14 +233,14 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_FixedStatement_EmitsFixedBlock()
     {
         var calorSource = """
-            §M{m001:FixedTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:DoFixed:pub:unsafe}
+            §M{FixedTest}
+                §CL{Test:pub}
+                    §MT{DoFixed:pub:unsafe}
                         §I{arr:[i32]}
                         §O{void}
-                        §FIXED{f1:ptr:i32*:arr}
+                        §FIXED{ptr:i32*:arr}
                           §B{val:i32} §DEREF ptr
-                        §/FIXED{f1}
+                        §/FIXED
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -255,11 +255,11 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_MultiDimArraySized_EmitsNewWithDimensions()
     {
         var calorSource = """
-            §M{m001:ArrayTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:Create:pub}
+            §M{ArrayTest}
+                §CL{Test:pub}
+                    §MT{Create:pub}
                         §O{void}
-                        §B{grid:i32} §ARR2D{a1:grid:i32:3:4}
+                        §B{grid:i32} §ARR2D{i32:3:4}
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -270,14 +270,14 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_MultiDimArrayInitializer_EmitsNewWithInitializer()
     {
         var calorSource = """
-            §M{m001:ArrayInitTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:Create:pub}
+            §M{ArrayInitTest}
+                §CL{Test:pub}
+                    §MT{Create:pub}
                         §O{void}
-                        §B{grid:i32} §ARR2D{a1:grid:i32}
+                        §B{grid:i32} §ARR2D{i32}
                           §ROW INT:1 INT:2
                           §ROW INT:3 INT:4
-                        §/ARR2D{a1}
+                        §/ARR2D
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -290,9 +290,9 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_MultiDimArrayAccess_EmitsIndexing()
     {
         var calorSource = """
-            §M{m001:IndexTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:Get:pub}
+            §M{IndexTest}
+                §CL{Test:pub}
+                    §MT{Get:pub}
                         §I{grid:i32}
                         §O{i32}
                         §R §IDX2D grid INT:1 INT:2
@@ -521,9 +521,9 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_UnsafeMethodModifier_FromCalor()
     {
         var calorSource = """
-            §M{m001:UnsafeMethodTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:DoStuff:pub:stat,unsafe}
+            §M{UnsafeMethodTest}
+                §CL{Test:pub}
+                    §MT{DoStuff:pub:stat,unsafe}
                         §O{void}
             """;
 
@@ -536,9 +536,9 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_ExternMethodModifier_FromCalor()
     {
         var calorSource = """
-            §M{m001:ExternMethodTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:NativeCall:pub:stat,ext}
+            §M{ExternMethodTest}
+                §CL{Test:pub}
+                    §MT{NativeCall:pub:stat,ext}
                         §O{void}
             """;
 
@@ -678,9 +678,9 @@ public class UnsafeLowLevelRoundtripTests
     {
         // Verifies that (cast i32* expr) parses correctly with pointer type
         var calorSource = """
-            §M{m001:CastTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:CastPtr:pub:unsafe}
+            §M{CastTest}
+                §CL{Test:pub}
+                    §MT{CastPtr:pub:unsafe}
                         §O{i32*}
                         §R (cast i32* 0)
             """;

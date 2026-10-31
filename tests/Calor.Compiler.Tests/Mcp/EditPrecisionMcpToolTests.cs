@@ -13,18 +13,18 @@ namespace Calor.Compiler.Tests.Mcp;
 public class EditPrecisionMcpToolTests
 {
     private static readonly string SampleSource = @"
-§M{m001:MathModule}
-  §F{f001:add:pub}
+§M{MathModule}
+  §F{add:pub}
       §I{i32:x, i32:y}
       §O{i32}
       §Q (>= x INT:0)
       §S (>= result INT:0)
       §R (+ x y)
-  §F{f002:multiply:pub}
+  §F{multiply:pub}
       §I{i32:a, i32:b}
       §O{i32}
       §R (* a b)
-  §F{f003:computeTotal:pub}
+  §F{computeTotal:pub}
       §I{i32:x, i32:y, i32:z}
       §O{i32}
       §B{partial:i32} §C{add} §A x §A y §/C
@@ -32,17 +32,17 @@ public class EditPrecisionMcpToolTests
 ";
 
     private static readonly string SampleSourceWithEffects = @"
-§M{m002:IoModule}
-  §F{f010:readInput:pub}
+§M{IoModule}
+  §F{readInput:pub}
       §O{str}
       §E{cr}
       §R STR:""hello""
-  §F{f011:processAndPrint:pub}
+  §F{processAndPrint:pub}
       §I{str:input}
       §O{void}
       §E{cw}
       §P input
-  §F{f012:main:pub}
+  §F{main:pub}
       §O{void}
       §E{cw, cr}
       §B{data:str} §C{readInput} §/C
@@ -69,7 +69,7 @@ public class EditPrecisionMcpToolTests
     public async Task ImpactAnalysis_WithPosition_ResolvesSymbol()
     {
         var tool = new StructureTool();
-        // Line 2 contains §F{f001:add:pub} — "add" starts at column 11
+        // Line 2 contains §F{add:pub} — "add" starts at column 11
         var args = CreateImpactArgsWithPosition(SampleSource, 2, 11);
 
         var result = await tool.ExecuteAsync(args);
@@ -238,7 +238,7 @@ public class EditPrecisionMcpToolTests
     {
         var tool = new EditPreviewTool();
         // Introduce a syntax error
-        var modified = "§M{m001:MathModule}\n  §F{f001:add:pub\n  invalid syntax here";
+        var modified = "§M{MathModule}\n  §F{f001:add:pub\n  invalid syntax here";
 
         var args = CreateEditPreviewArgs(SampleSource, modified);
         var result = await tool.ExecuteAsync(args);
@@ -452,7 +452,7 @@ public class EditPrecisionMcpToolTests
     public async Task FindReferences_ByPosition_StillWorks()
     {
         var tool = new NavigateTool();
-        // "add" on function definition line 2: §F{f001:add:pub}
+        // "add" on function definition line 2: §F{add:pub}
         var args = CreateArgs(SampleSource, 2, 11, "references");
 
         var result = await tool.ExecuteAsync(args);

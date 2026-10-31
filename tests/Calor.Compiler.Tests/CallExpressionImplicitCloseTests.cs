@@ -43,8 +43,8 @@ public class CallExpressionImplicitCloseTests
     {
         // §B{x} §C{Identity} INT:1   ← NEW: no §/C
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §O{i32}
       §B{x} §C{Identity} INT:1
       §R x
@@ -64,8 +64,8 @@ public class CallExpressionImplicitCloseTests
     {
         // §B{x} §C{Identity} INT:1 §/C   ← LEGACY: still accepted
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §O{i32}
       §B{x} §C{Identity} INT:1 §/C
       §R x
@@ -84,8 +84,8 @@ public class CallExpressionImplicitCloseTests
     {
         // §B{x} §C{Vec.empty}   ← NEW: zero-arg, no §/C
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §B{x} §C{Vec.empty}
 """;
         var module = Parse(source, out var diags);
@@ -102,8 +102,8 @@ public class CallExpressionImplicitCloseTests
     {
         // §B{x} §C{Vec.empty} §/C   ← LEGACY zero-arg with closer
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §B{x} §C{Vec.empty} §/C
 """;
         var module = Parse(source, out var diags);
@@ -123,8 +123,8 @@ public class CallExpressionImplicitCloseTests
         // Note: the lexer treats `obj.Length` (with bare dot) as a single dotted
         // identifier, so we use `?.` to force a parser-level disambiguation.
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §B{obj:string} STR:"hi"
       §B{n} §C{Identity} obj?.Length
 """;
@@ -153,8 +153,8 @@ public class CallExpressionImplicitCloseTests
         // The ?.Length should attach to the (zero-arg) call result, not be
         // parsed as a malformed inline argument.
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §B{n} §C{Maybe}?.Length
 """;
         var module = Parse(source, out var diags);
@@ -172,8 +172,8 @@ public class CallExpressionImplicitCloseTests
     {
         // §B{n} §C{Maybe}.Length — dot member after zero-arg implicit close.
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §B{n} §C{Maybe}.Length
 """;
         var module = Parse(source, out var diags);
@@ -191,8 +191,8 @@ public class CallExpressionImplicitCloseTests
     {
         // §B{x} §C{Foo.bar} §C{Baz.qux} y   ← RFC §3.2 case C
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §B{y:i32} INT:1
       §B{x} §C{Foo.bar} §C{Baz.qux} y
 """;
@@ -217,8 +217,8 @@ public class CallExpressionImplicitCloseTests
     {
         // §C{outer} §A §C{inner} INT:1 §/C   ← one §/C goes to outer; inner elided
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §B{x} §C{outer} §A §C{inner} INT:1 §/C
 """;
         var module = Parse(source, out var diags);
@@ -240,8 +240,8 @@ public class CallExpressionImplicitCloseTests
     {
         // §C{outer} §A §C{inner} INT:1 §/C §/C   ← LEGACY both explicit
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §B{x} §C{outer} §A §C{inner} INT:1 §/C §/C
 """;
         var module = Parse(source, out var diags);
@@ -263,8 +263,8 @@ public class CallExpressionImplicitCloseTests
     {
         // §C{o1} §A §C{o2} §A §C{i} x §/C §/C §/C   ← all three explicit
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §B{x:i32} INT:1
       §B{r} §C{o1} §A §C{o2} §A §C{i} x §/C §/C §/C
 """;
@@ -287,8 +287,8 @@ public class CallExpressionImplicitCloseTests
     {
         // §C{o1} §A §C{o2} §A §C{i} x §/C §/C   ← exactly two §/C, i elided
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §B{x:i32} INT:1
       §B{r} §C{o1} §A §C{o2} §A §C{i} x §/C §/C
 """;
@@ -310,8 +310,8 @@ public class CallExpressionImplicitCloseTests
         // §C{f} INT:1 INT:2   ← two consecutive expression-start tokens
         // Per RFC §3.2 case B → Calor0150.
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §B{x} §C{f} INT:1 INT:2
 """;
         Parse(source, out var diags);
@@ -324,8 +324,8 @@ public class CallExpressionImplicitCloseTests
         // §C{f} a §C{g} b   ← a is f's inline arg; §C{g} is a second
         // expression-start token on f. Per RFC §3.2 case B → Calor0150.
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §B{a:i32} INT:1
       §B{b:i32} INT:2
       §B{x} §C{f} a §C{g} b
@@ -343,12 +343,12 @@ public class CallExpressionImplicitCloseTests
         // §C{pred}. Mirrors the conversion-scorecard test 093 (Delegates):
         // `§B{_pre} §C{pred} §IDX{numbers} i / §IF _pre ...`.
         var source = """
-§M{m001:Test}
-  §F{f001:Filter:pub} (i32[]:numbers, F:pred) -> i32
+§M{Test}
+  §F{Filter:pub} (i32[]:numbers, F:pred) -> i32
       §B{~count:i32} 0
-      §L{for010:i:0:(- (len numbers) 1):1}
+      §L{i:0:(- (len numbers) 1):1}
           §B{_pre} §C{pred} §IDX{numbers} i
-          §IF{if011} _pre
+          §IF _pre
               §ASSIGN count (+ count 1)
       §R count
 """;
@@ -362,8 +362,8 @@ public class CallExpressionImplicitCloseTests
     {
         // §B{xs} §C{Array.Empty<i32>}   ← generic target, zero-arg, no §/C
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §B{xs} §C{Array.Empty<i32>}
 """;
         var module = Parse(source, out var diags);
@@ -383,8 +383,8 @@ public class CallExpressionImplicitCloseTests
         // Regression check: the existing statement-context implicit close
         // at Parser.cs:1376 is unaffected by the expression-context change.
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §C{Console.WriteLine} STR:"hello"
 """;
         var module = Parse(source, out var diags);
@@ -404,8 +404,8 @@ public class CallExpressionImplicitCloseTests
         // Per rubber-duck review: requires _inOuterCallArgDepth to be bumped
         // in ParseCallStatement's §A loop, not just ParseCallExpression's.
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §B{x:i32} INT:1
       §C{outer} §A §C{inner} x §/C
 """;
@@ -428,8 +428,8 @@ public class CallExpressionImplicitCloseTests
         // covers this confusion: the inline form already consumed one arg
         // and cannot accept a second.
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §B{x:i32} INT:1
       §B{y:i32} INT:2
       §B{r} §C{f} x §A y §/C
@@ -444,8 +444,8 @@ public class CallExpressionImplicitCloseTests
         // Inside Lisp expressions, the canonical §A + §/C form must still
         // parse cleanly. The closer-elision change must not regress this.
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §O{i32}
       §B{x} (+ §C{f} §A INT:1 §/C §C{g} §A INT:2 §/C)
       §R x
@@ -496,9 +496,9 @@ public class CallExpressionImplicitCloseTests
         // parser would treat the §IF as the call's inline argument and emit
         // Calor0104. RFC v0.6 §3.2 / v0.6.1.
         var source = @"§M{Demo}
-  §F{run:bool:pub}
+  §F{bool:pub}
     §B{x} §C{items.Any}
-    §IF{cond} x
+    §IF x
       §R x
     §EL
       §R false
@@ -527,10 +527,10 @@ public class CallExpressionImplicitCloseTests
         // method body terminator vanished, and the next sibling member
         // would fail to parse. RFC v0.6 §3.2 / v0.6.1.
         var source = @"§M{Demo}
-  §CL{c:C:pub}
-    §MT{m1:M1:pub}
+  §CL{C:pub}
+    §MT{M1:pub}
       §C{Foo}
-    §MT{m2:M2:pub}
+    §MT{M2:pub}
       §C{Bar}
 ";
         var module = Parse(source, out var diags);
@@ -718,8 +718,8 @@ public class CallExpressionImplicitCloseTests
         Assert.Equal("§C{Identity} 1", emitted);
 
         var source = $$"""
-§M{m001:Test}
-  §F{f001:Bar:pub}
+§M{Test}
+  §F{Bar:pub}
       §B{x} {{emitted}}
 """;
         var module = Parse(source, out var diags);
@@ -745,8 +745,8 @@ public class CallExpressionImplicitCloseTests
 
         // Wrap in a binding so we can re-parse it.
         var source = $$"""
-§M{m001:Test}
-  §F{f001:Bar:pub}
+§M{Test}
+  §F{Bar:pub}
       §B{x} {{emitted}}
 """;
         var module = Parse(source, out var diags);
@@ -793,8 +793,8 @@ public class CallExpressionImplicitCloseTests
 
         // Wrap in a binding context to round-trip through the parser.
         var source = $$"""
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §B{x:i32} {{emitted}}
 """;
         var module = Parse(source, out var diags);
@@ -829,8 +829,8 @@ public class CallExpressionImplicitCloseTests
         Assert.Contains("§C{A} §/C", emitted);
 
         var source = $$"""
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §B{x:T} {{emitted}}
 """;
         var module = Parse(source, out var diags);
@@ -882,11 +882,11 @@ public class CallExpressionImplicitCloseTests
         // Parse a small module with a §DICT containing call key/values, then
         // re-emit with flag=true and verify §C{...} §/C survives.
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §DICT{d:str:i32}
         §KV §C{K} §/C §C{V} §/C
-      §/DICT{d}
+      §/DICT
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -909,8 +909,8 @@ public class CallExpressionImplicitCloseTests
         // parser's zero-arg implicit-close path at Parser.cs:1409-1413
         // handles the next-line sibling unambiguously.
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §C{Bar} §/C
       §C{Baz} §/C
 """;
@@ -983,8 +983,8 @@ public class CallExpressionImplicitCloseTests
         // round-trip; we don't construct EventSubscribeNode directly
         // because it appends to the emitter buffer (returns "").
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §SUB §C{Foo} §/C h
 """;
         var module = Parse(source, out var diags);
@@ -1040,7 +1040,7 @@ public class CallExpressionImplicitCloseTests
             // contain a zero-arg §C call.
             // (See CalorEmitter.Visit(ForallExpressionNode) / ExistsExpressionNode)
 
-            // Lambda expression-body emits `§LAM{header} {body} §/LAM{id}`.
+            // Lambda expression-body emits `§LAM{header} {body} §/LAM`.
             // The token after `{body}` is `§/LAM` (LambdaEnd) which is NOT
             // in Parser.IsExpressionStart(), so an elided zero-arg §C body
             // cannot absorb it as an inline arg. Loop-5 verified.
@@ -1127,8 +1127,8 @@ public class CallExpressionImplicitCloseTests
         // previously used raw node.Operand.Accept(this). Re-emit could
         // produce (is §C{Foo} str) which re-parses with str as inline arg.
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §O{bool}
       §B{x} (is §C{Foo} §/C str)
       §R x
@@ -1234,8 +1234,8 @@ public class CallExpressionImplicitCloseTests
         // string literals are in IsExpressionStart and the call's inline-arg
         // branch absorbs the member name.
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §O{i32}
       §B{x} (?. §C{Get} §/C "Length")
       §R x.unwrap

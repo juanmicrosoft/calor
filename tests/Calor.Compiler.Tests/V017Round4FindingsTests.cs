@@ -32,14 +32,14 @@ public class V017Round4FindingsTests
     public void CyclicTypeParameterConstraints_Report_InsteadOfOverflowingTheStack()
     {
         var result = Compile("""
-            §M{m001:Cyc}
-              §CL{c001:Box:pub}<T,U>
+            §M{Cyc}
+              §CL{Box:pub}<T,U>
                 §WHERE T : U
                 §WHERE U : T
-                §MT{mt001:Take:pub} (str:s) -> i32
+                §MT{Take:pub} (str:s) -> i32
                   §E{}
                   §R INT:1
-                §MT{mt002:Go:pub} (T:a) -> i32
+                §MT{Go:pub} (T:a) -> i32
                   §E{}
                   §R §C{Take} §A a §/C
             """);
@@ -73,11 +73,11 @@ public class V017Round4FindingsTests
     public void DecoratedBuiltinArgument_StillReportsNoMatchingOverload(string calorType)
     {
         var result = Compile($$"""
-            §M{m001:Probe}
-              §F{f001:Take:pub} (str:s) -> i32
+            §M{Probe}
+              §F{Take:pub} (str:s) -> i32
                 §E{}
                 §R INT:1
-              §F{f002:Go:pub} ({{calorType}}:x) -> i32
+              §F{Go:pub} ({{calorType}}:x) -> i32
                 §E{}
                 §R §C{Take} §A x §/C
             """);
@@ -96,11 +96,11 @@ public class V017Round4FindingsTests
     public void UndeclaredNominalArgument_IsStillSuppressed()
     {
         var result = Compile("""
-            §M{m001:Probe}
-              §F{f001:Take:pub} (str:s) -> i32
+            §M{Probe}
+              §F{Take:pub} (str:s) -> i32
                 §E{}
                 §R INT:1
-              §F{f002:Go:pub} (NotDeclaredAnywhere:x) -> i32
+              §F{Go:pub} (NotDeclaredAnywhere:x) -> i32
                 §E{}
                 §R §C{Take} §A x §/C
             """);
@@ -125,12 +125,12 @@ public class V017Round4FindingsTests
     public void ModuleLevelGenericFunction_ResolvesThroughItsOwnConstraint()
     {
         var result = Compile("""
-            §M{m001:Reach}
-              §IFACE{i001:INote:pub}
-              §F{f001:Accept:pub} (INote:n) -> i32
+            §M{Reach}
+              §IFACE{INote:pub}
+              §F{Accept:pub} (INote:n) -> i32
                 §E{}
                 §R INT:1
-              §F{f002:Publish:pub}<TNote> (TNote:n) -> i32
+              §F{Publish:pub}<TNote> (TNote:n) -> i32
                 §WHERE TNote : INote
                 §E{}
                 §R §C{Accept} §A n §/C
@@ -158,14 +158,14 @@ public class V017Round4FindingsTests
     public void PatternVariable_ShadowsModuleFunction_AndIsNotQualified()
     {
         var result = Compile("""
-            §M{m001:RefProbe}
-              §F{f001:value:pub} () -> i32
+            §M{RefProbe}
+              §F{value:pub} () -> i32
                 §E{}
                 §R INT:7
-              §CL{c001:Holder:pub}
-                §MT{mt001:Use:pub} (any:o) -> i32
+              §CL{Holder:pub}
+                §MT{Use:pub} (any:o) -> i32
                   §E{}
-                  §IF{i1} (is o i32 value)
+                  §IF (is o i32 value)
                     §R value
                   §R INT:0
             """);
@@ -187,13 +187,13 @@ public class V017Round4FindingsTests
     /// and without the parse error that used to make it visible.
     /// </summary>
     [Theory]
-    [InlineData("§PROP{p001:Name:str:pub:get,set} §E{cw}")]
-    [InlineData("§PROP{p001:Name:str:pub} §E{cw}")]
+    [InlineData("§PROP{Name:str:pub:get,set} §E{cw}")]
+    [InlineData("§PROP{Name:str:pub} §E{cw}")]
     public void PropertyRow_SurvivesACalorToCalorReEmit(string propertyLine)
     {
         var source = """
-            §M{m001:Holder}
-              §CL{c001:Box:pub}
+            §M{Holder}
+              §CL{Box:pub}
 
             """ + "    " + propertyLine + "\n";
 
@@ -209,9 +209,9 @@ public class V017Round4FindingsTests
     public void PropertyWithoutRow_GainsNoneOnReEmit()
     {
         var reemitted = ReEmit("""
-            §M{m001:Holder}
-              §CL{c001:Box:pub}
-                §PROP{p001:Name:str:pub:get,set}
+            §M{Holder}
+              §CL{Box:pub}
+                §PROP{Name:str:pub:get,set}
             """);
 
         Assert.DoesNotContain("§E{", reemitted);

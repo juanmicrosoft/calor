@@ -29,14 +29,14 @@ public class EmptyInterfaceSiblingParsingTests
             string.Join("\n", diagnostics.Errors.Select(d => $"{d.Code}: {d.Message}")));
 
     [Theory]
-    [InlineData("§CL{c002:Impl:pub}\n    §IMPL{IMarker}")]
-    [InlineData("§IFACE{i002:IOther}\n    §MT{m003:Run} () -> void")]
-    [InlineData("§EN{e002:Mode:pub}\n    Fast\n    Slow")]
-    [InlineData("§DEL{d002:Handler:pub}\n    §I{i32:x}\n    §O{bool}")]
+    [InlineData("§CL{Impl:pub}\n    §IMPL{IMarker}")]
+    [InlineData("§IFACE{IOther}\n    §MT{Run} () -> void")]
+    [InlineData("§EN{Mode:pub}\n    Fast\n    Slow")]
+    [InlineData("§DEL{Handler:pub}\n    §I{i32:x}\n    §O{bool}")]
     [InlineData("§CSHARP{public class Sibling { }}§/CSHARP")]
     public void EmptyInterface_FollowedBySameColumnSibling_Parses(string sibling)
     {
-        var source = "§M{m001:Markers}\n  §IFACE{i001:IMarker}\n  " + sibling + "\n";
+        var source = "§M{Markers}\n  §IFACE{IMarker}\n  " + sibling + "\n";
 
         var (module, diagnostics) = Parse(source);
 
@@ -50,11 +50,11 @@ public class EmptyInterfaceSiblingParsingTests
     public void EmptyInterface_FollowedBySiblingClass_SiblingIsNotNested()
     {
         const string source = """
-            §M{m001:Markers}
-              §IFACE{i001:IMarker}
-              §CL{c002:Impl:pub}
+            §M{Markers}
+              §IFACE{IMarker}
+              §CL{Impl:pub}
                 §IMPL{IMarker}
-                §MT{m003:Run:pub} () -> void
+                §MT{Run:pub} () -> void
                   §R
             """;
 
@@ -71,12 +71,12 @@ public class EmptyInterfaceSiblingParsingTests
     public void ConsecutiveEmptyInterfaces_EachParsesAsASibling()
     {
         const string source = """
-            §M{m001:Markers}
-              §IFACE{i001:IA}
-              §IFACE{i002:IB:IA}
-              §IFACE{i003:IC}
-                §PROP{p004:Name:str:pub:get}
-              §IFACE{i004:ID}
+            §M{Markers}
+              §IFACE{IA}
+              §IFACE{IB:IA}
+              §IFACE{IC}
+                §PROP{Name:str:pub:get}
+              §IFACE{ID}
             """;
 
         var (module, diagnostics) = Parse(source);
@@ -92,10 +92,10 @@ public class EmptyInterfaceSiblingParsingTests
     public void EmptyInterface_InsideClass_FollowedByNestedSiblingType_Parses()
     {
         const string source = """
-            §M{m001:Markers}
-              §CL{c001:Outer:pub}
-                §IFACE{i002:IInner}
-                §CL{c003:Inner:pub}
+            §M{Markers}
+              §CL{Outer:pub}
+                §IFACE{IInner}
+                §CL{Inner:pub}
                   §IMPL{IInner}
             """;
 
@@ -114,12 +114,12 @@ public class EmptyInterfaceSiblingParsingTests
     /// It must still report Calor0100, exactly as before #903 cluster 2.
     /// </summary>
     [Theory]
-    [InlineData("    §CL{c002:Nested:pub}")]
-    [InlineData("    §IFACE{i002:INested}")]
-    [InlineData("    §EN{e002:Nested:pub}\n      Fast")]
+    [InlineData("    §CL{Nested:pub}")]
+    [InlineData("    §IFACE{INested}")]
+    [InlineData("    §EN{Nested:pub}\n      Fast")]
     public void EmptyInterface_WithIndentedTypeOpener_IsStillAnError(string indentedOpener)
     {
-        var source = "§M{m001:Markers}\n  §IFACE{i001:IMarker}\n" + indentedOpener + "\n";
+        var source = "§M{Markers}\n  §IFACE{IMarker}\n" + indentedOpener + "\n";
 
         var (_, diagnostics) = Parse(source);
 
@@ -136,10 +136,10 @@ public class EmptyInterfaceSiblingParsingTests
     public void EmptyInterface_InsideClass_IndentedOpener_IsStillAnError()
     {
         const string source = """
-            §M{m001:Markers}
-              §CL{c001:Outer:pub}
-                §IFACE{i002:IInner}
-                  §CL{c003:TooDeep:pub}
+            §M{Markers}
+              §CL{Outer:pub}
+                §IFACE{IInner}
+                  §CL{TooDeep:pub}
             """;
 
         var (_, diagnostics) = Parse(source);
@@ -151,7 +151,7 @@ public class EmptyInterfaceSiblingParsingTests
     [Fact]
     public void EmptyInterface_AtEndOfModule_StillParses()
     {
-        var (module, diagnostics) = Parse("§M{m001:Markers}\n  §IFACE{i001:IMarker}\n");
+        var (module, diagnostics) = Parse("§M{Markers}\n  §IFACE{IMarker}\n");
 
         AssertNoErrors(diagnostics);
         Assert.Single(module.Interfaces);
@@ -161,10 +161,10 @@ public class EmptyInterfaceSiblingParsingTests
     public void Interface_WithMembers_ThenSibling_MembersStayOnTheInterface()
     {
         const string source = """
-            §M{m001:Markers}
-              §IFACE{i001:IShape}
-                §MT{m002:Area} () -> f64
-              §CL{c003:Square:pub}
+            §M{Markers}
+              §IFACE{IShape}
+                §MT{Area} () -> f64
+              §CL{Square:pub}
                 §IMPL{IShape}
             """;
 

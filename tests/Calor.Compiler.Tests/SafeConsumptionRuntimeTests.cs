@@ -24,19 +24,19 @@ public sealed class SafeConsumptionRuntimeTests
         // Reduced from MediatR/Internal/ObjectDetails.Compare: early-return
         // guards are not a supported non-null transfer to the later call.
         const string source = """
-            §M{m1:NominalMigration}
-              §CL{c1:Widget:pub}
-                §MT{id:Id:pub} () -> i32
+            §M{NominalMigration}
+              §CL{Widget:pub}
+                §MT{Id:pub} () -> i32
                   §E{}
                   §R 0
-              §F{take:Take:pub} (Widget:x, Widget:y) -> i32
+              §F{Take:pub} (Widget:x, Widget:y) -> i32
                 §E{}
                 §R 0
-              §F{compare:Compare:pub} (?Widget:x, ?Widget:y) -> i32
+              §F{Compare:pub} (?Widget:x, ?Widget:y) -> i32
                 §E{throw}
-                §IF{ix} (== x null)
+                §IF (== x null)
                   §R 1
-                §IF{iy} (== y null)
+                §IF (== y null)
                   §R -1
                 §R §C{Take} §A x §A y §/C
             """;
@@ -168,11 +168,11 @@ public sealed class SafeConsumptionRuntimeTests
         var expression = throwing ? "(?? input §TH \"missing\")" : "(?? input \"fallback\")";
         var call = $"§C{{Take}} §A[number] INT:7 §A[value] {expression} §/C";
         var source = $$"""
-            §M{m1:Consumption}
-              §F{f1:Take:pub} (str:value, i32:number) -> str
+            §M{Consumption}
+              §F{Take:pub} (str:value, i32:number) -> str
                 §E{}
                 §R value
-              §F{f2:Probe:pub} (?str:input) -> str
+              §F{Probe:pub} (?str:input) -> str
                 §E{throw}
                 {{(statement ? call + "\n    §R \"done\"" : "§R " + call)}}
             """;
@@ -249,17 +249,17 @@ public sealed class SafeConsumptionRuntimeTests
     public void SuccessfulTypedPattern_IsNonNullAndDoesNotNarrowTheInput(bool match)
     {
         var source = match ? """
-            §M{m1:Consumption}
-              §F{f1:Probe:pub} (?str:input) -> str
+            §M{Consumption}
+              §F{Probe:pub} (?str:input) -> str
                 §E{}
-                §R §W{w1:expr} input
+                §R §W input
                   §K §PTYPE{str:text} → text
                   §K _ → "fallback"
             """ : """
-            §M{m1:Consumption}
-              §F{f1:Probe:pub} (?str:input) -> str
+            §M{Consumption}
+              §F{Probe:pub} (?str:input) -> str
                 §E{}
-                §IF{if1} (is input str text)
+                §IF (is input str text)
                   §B{value:str} text
                   §R value
                 §R "fallback"
@@ -285,10 +285,10 @@ public sealed class SafeConsumptionRuntimeTests
     public void PatternBinding_DoesNotEscapeSuccessfulBranch(string tail)
     {
         var source = """
-            §M{m1:Consumption}
-              §F{f1:Probe:pub} (?str:input) -> str
+            §M{Consumption}
+              §F{Probe:pub} (?str:input) -> str
                 §E{}
-                §IF{if1} (is input str text)
+                §IF (is input str text)
                   §R text
             """ + "\n    " + tail;
         var (_, diagnostics) = Bind(source);
@@ -302,8 +302,8 @@ public sealed class SafeConsumptionRuntimeTests
     public void BothThrowingArms_AreNeverAndExecuteTheSelectedException()
     {
         const string source = """
-            §M{m1:Consumption}
-              §F{f1:Probe:pub} (bool:flag) -> str
+            §M{Consumption}
+              §F{Probe:pub} (bool:flag) -> str
                 §E{throw}
                 §B{value:str} (? flag §TH "left" §TH "right")
                 §R value
@@ -358,10 +358,10 @@ public sealed class SafeConsumptionRuntimeTests
     public void NominalCoalesce_PreservesIdentityAndNullableFallbackEvidence()
     {
         const string source = """
-            §M{m1:Consumption}
-              §CL{c1:Foo:pub}
+            §M{Consumption}
+              §CL{Foo:pub}
                 §FLD{i32:value:pub}
-              §F{f1:Probe:pub} (?Foo:input, ?Foo:fallback) -> Foo
+              §F{Probe:pub} (?Foo:input, ?Foo:fallback) -> Foo
                 §E{throw}
                 §R (?? input fallback)
             """;
@@ -387,10 +387,10 @@ public sealed class SafeConsumptionRuntimeTests
     public void Conjunction_PreservesTheSuccessfulPatternInRhsAndBody(string condition)
     {
         var source = $$"""
-            §M{m1:Consumption}
-              §F{f1:Probe:pub} (?str:input) -> str
+            §M{Consumption}
+              §F{Probe:pub} (?str:input) -> str
                 §E{}
-                §IF{if1} {{condition}}
+                §IF {{condition}}
                   §R text
                 §R "fallback"
             """;
@@ -424,17 +424,17 @@ public sealed class SafeConsumptionRuntimeTests
         };
         var condition = branch switch
         {
-            "if" => "§IF{if1} (is input str text)",
-            "while" => "§WH{wh1} (is input str text)",
-            "while-conjunction" => "§WH{wh1} (&& (is input str text) (== text \"value\"))",
+            "if" => "§IF (is input str text)",
+            "while" => "§WH (is input str text)",
+            "while-conjunction" => "§WH (&& (is input str text) (== text \"value\"))",
             _ => throw new ArgumentOutOfRangeException(nameof(branch))
         };
         var source = $$"""
-            §M{m1:Consumption}
-              §F{f1:Take:pub} (str:value) -> str
+            §M{Consumption}
+              §F{Take:pub} (str:value) -> str
                 §E{}
                 §R value
-              §F{f2:Probe:pub} (?object:input) -> str
+              §F{Probe:pub} (?object:input) -> str
                 §E{}
                 {{condition}}
                   {{body}}
@@ -457,10 +457,10 @@ public sealed class SafeConsumptionRuntimeTests
         foreach (var condition in new[] { "(is input str text)", "(! (is input str text))", "(|| (is input str text) true)" })
         {
             var source = $$"""
-                §M{m1:Consumption}
-                  §F{f1:Probe:pub} (?object:input) -> str
+                §M{Consumption}
+                  §F{Probe:pub} (?object:input) -> str
                     §E{}
-                    §WH{wh1} {{condition}}
+                    §WH {{condition}}
                       §R text
                     §R text
                 """;
@@ -481,11 +481,11 @@ public sealed class SafeConsumptionRuntimeTests
     public void MatchGuardPattern_IsAvailableOnlyInItsSuccessfulCase(bool expression)
     {
         var match = expression ? """
-            §R §W{w1:expr} input
+            §R §W input
                   §K _ §WHEN (is input str text) → §C{Take} §A text §/C
                   §K _ → "fallback"
             """ : """
-            §W{w1} input
+            §W input
                   §K §VAR{candidate} §WHEN (is input str text)
                     §B{value:str} text
                     §R §C{Take} §A value §/C
@@ -493,11 +493,11 @@ public sealed class SafeConsumptionRuntimeTests
                     §R "fallback"
             """;
         var source = $$"""
-            §M{m1:Consumption}
-              §F{f1:Take:pub} (str:value) -> str
+            §M{Consumption}
+              §F{Take:pub} (str:value) -> str
                 §E{}
                 §R value
-              §F{f2:Probe:pub} (?object:input) -> str
+              §F{Probe:pub} (?object:input) -> str
                 §E{}
                 {{match}}
             """;
@@ -531,8 +531,8 @@ public sealed class SafeConsumptionRuntimeTests
     public void ExplicitNullableFailure_ThrowsTheDeclaredException()
     {
         const string source = """
-            §M{m1:Consumption}
-              §F{f1:Probe:pub} (bool:present) -> str
+            §M{Consumption}
+              §F{Probe:pub} (bool:present) -> str
                 §E{alloc,throw}
                 §B{value:?str} (? present "value" null)
                 §R (?? value §TH §NEW{InvalidOperationException} §A "missing" §/NEW)
@@ -557,10 +557,10 @@ public sealed class SafeConsumptionRuntimeTests
         foreach (var pattern in new[] { "(not §VAR{text})", "(or §VAR{text} _)" })
         {
             var source = $$"""
-                §M{m1:Consumption}
-                  §F{f1:Probe:pub} (?str:input) -> str
+                §M{Consumption}
+                  §F{Probe:pub} (?str:input) -> str
                     §E{}
-                    §R §W{w1:expr} input
+                    §R §W input
                       §K {{pattern}} → text
                       §K _ → "fallback"
                 """;
@@ -575,8 +575,8 @@ public sealed class SafeConsumptionRuntimeTests
     public void VarPattern_PreservesNullableOperandAndIsRejectedOnNonNullableReturn()
     {
         const string source = """
-            §M{m1:Consumption}
-              §F{f1:Probe:pub} (?str:input) -> str
+            §M{Consumption}
+              §F{Probe:pub} (?str:input) -> str
                 §E{}
                 §R (? (is input var text) text "fallback")
             """;
@@ -604,15 +604,15 @@ public sealed class SafeConsumptionRuntimeTests
     public void OverloadedExceptionFactory_DoesNotUseAnUnselectedReturnType()
     {
         const string source = """
-            §M{m1:Consumption}
-              §F{f1:Make:pub} (i32:value) -> System.Exception
+            §M{Consumption}
+              §F{Make:pub} (i32:value) -> System.Exception
                 §E{alloc}
                 §B{exception:System.Exception} §NEW{System.Exception}
                 §R exception
-              §F{f2:Make:pub} (str:value) -> str
+              §F{Make:pub} (str:value) -> str
                 §E{}
                 §R value
-              §F{f3:Probe:pub} (?str:input) -> str
+              §F{Probe:pub} (?str:input) -> str
                 §E{alloc,throw}
                 §R (?? input §TH §C{Make} §A INT:1 §/C)
             """;
@@ -630,10 +630,10 @@ public sealed class SafeConsumptionRuntimeTests
         foreach (var rightType in new[] { "Foo", "?Foo" })
         {
             var source = $$"""
-                §M{m1:Consumption}
-                  §CL{c1:Foo:pub}
+                §M{Consumption}
+                  §CL{Foo:pub}
                     §FLD{i32:value:pub}
-                  §F{f1:Probe:pub} (bool:choose, Foo:left, {{rightType}}:right) -> {{rightType}}
+                  §F{Probe:pub} (bool:choose, Foo:left, {{rightType}}:right) -> {{rightType}}
                     §E{}
                     §B{first} (? choose left right)
                     §B{second} first
@@ -683,11 +683,11 @@ public sealed class SafeConsumptionRuntimeTests
             _ => throw new ArgumentOutOfRangeException(nameof(consumer))
         };
         return $$"""
-            §M{m1:Consumption}
-              §F{f1:Take:pub} (str:value) -> str
+            §M{Consumption}
+              §F{Take:pub} (str:value) -> str
                 §E{}
                 §R value
-              §F{f2:Probe:pub} (?str:input{{(extraParameter == null ? "" : ", " + extraParameter)}}) -> str
+              §F{Probe:pub} (?str:input{{(extraParameter == null ? "" : ", " + extraParameter)}}) -> str
                 §E{throw}
                 {{body}}
             """;

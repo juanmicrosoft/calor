@@ -23,8 +23,8 @@ public class CodegenBatchFixTests
     {
         // §B{var:myList} should produce "var myList = ..." not "myList var = ..."
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{var:myList} §NEW{List<i32>} §/NEW
 ";
@@ -40,8 +40,8 @@ public class CodegenBatchFixTests
     {
         // §B{str:name} should still work as type:name format
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{str:name} ""hello""
 ";
@@ -56,8 +56,8 @@ public class CodegenBatchFixTests
     {
         // §B{myVar} with inferred type should still work
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{myVar} 42
 ";
@@ -74,12 +74,12 @@ public class CodegenBatchFixTests
     {
         // Collections.Generic using is conditionally emitted when collection types are referenced
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §LIST{result:i32}
         1
-      §/LIST{result}
+      §/LIST
 ";
 
         var result = ParseAndEmit(source);
@@ -92,8 +92,8 @@ public class CodegenBatchFixTests
     {
         // System.Linq is only emitted when LINQ methods are actually used
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
 ";
 
@@ -109,8 +109,8 @@ public class CodegenBatchFixTests
     {
         // DEC:21.35 in Calor should produce 21.35m in C#
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~price} DEC:21.35
 ";
@@ -125,8 +125,8 @@ public class CodegenBatchFixTests
     {
         // DEC:18 should produce 18m in C#
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~amount} DEC:18
 ";
@@ -141,8 +141,8 @@ public class CodegenBatchFixTests
     {
         // FLOAT:3.14 should still produce 3.14 (no m suffix)
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~pi} FLOAT:3.14
 ";
@@ -158,8 +158,8 @@ public class CodegenBatchFixTests
     {
         // DEC:21.35 should parse, then CalorEmitter should produce DEC:21.35
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~price} DEC:21.35
 ";
@@ -179,8 +179,8 @@ public class CodegenBatchFixTests
         // §NEW{Customer} §INIT{Name} STR:"John" §INIT{Age} 30 §/NEW
         // should produce new Customer() { Name = "John", Age = 30 }
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~c} §NEW{Customer} §INIT{Name} STR:""John"" §INIT{Age} 30 §/NEW
 ";
@@ -197,8 +197,8 @@ public class CodegenBatchFixTests
     {
         // §NEW{Customer} §/NEW should still produce new Customer()
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~c} §NEW{Customer} §/NEW
 ";
@@ -213,8 +213,8 @@ public class CodegenBatchFixTests
     {
         // §NEW{Person} §A STR:"base" §INIT{Name} STR:"John" §/NEW
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~p} §NEW{Person} §A STR:""base"" §INIT{Name} STR:""John"" §/NEW
 ";
@@ -230,8 +230,8 @@ public class CodegenBatchFixTests
     {
         // Parse §INIT tags, then CalorEmitter should produce §INIT tags
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~c} §NEW{Customer} §INIT{Name} STR:""John"" §/NEW
 ";
@@ -251,10 +251,10 @@ public class CodegenBatchFixTests
         // When CalorEmitter emits an array with initializers, it should use §ARR block syntax
         // Parse a Calor source with initialized array, then re-emit with CalorEmitter
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
-      §B{[i32]:nums} §ARR{i32:nums} §A 1 §A 2 §A 3 §/ARR{nums}
+      §B{[i32]:nums} §ARR{nums} §A 1 §A 2 §A 3 §/ARR
 ";
         var module = ParseModule(source);
         var calorEmitter = new Migration.CalorEmitter();
@@ -270,12 +270,12 @@ public class CodegenBatchFixTests
     [Fact]
     public void Fix5_ArrayInitializer_RoundtripThroughParser()
     {
-        // §ARR{i32:nums} §A 1 §A 2 §A 3 §/ARR{nums} should parse and generate correct C#
+        // §ARR{i32:nums} §A 1 §A 2 §A 3 §/ARR should parse and generate correct C#
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
-      §B{[i32]:nums} §ARR{i32:nums} §A 1 §A 2 §A 3 §/ARR{nums}
+      §B{[i32]:nums} §ARR{nums} §A 1 §A 2 §A 3 §/ARR
 ";
 
         var result = ParseAndEmit(source);
@@ -392,8 +392,8 @@ public class CodegenBatchFixTests
     {
         // §INIT inside §NEW that is inside a §C argument should parse correctly
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §C{Process}
         §A §NEW{Widget} §INIT{Name} STR:""test"" §/NEW
@@ -414,8 +414,8 @@ public class CodegenBatchFixTests
     {
         // Multiple §INIT inside §NEW inside §C
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §C{Save}
         §A §NEW{Config} §INIT{Host} STR:""localhost"" §INIT{Port} 8080 §/NEW
@@ -436,8 +436,8 @@ public class CodegenBatchFixTests
     {
         // Common monetary/business values should roundtrip without precision loss
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~a} DEC:0.01
       §B{~b} DEC:99.99
@@ -455,8 +455,8 @@ public class CodegenBatchFixTests
     public void Gap_DecimalNegativeValue_RoundtripsCorrectly()
     {
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~x} DEC:-42.5
 ";
@@ -473,8 +473,8 @@ public class CodegenBatchFixTests
     {
         // FLOAT:1.0 should produce 1.0, not bare 1 (which would be int)
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~x:f64} FLOAT:1.0
 ";
@@ -490,13 +490,13 @@ public class CodegenBatchFixTests
     {
         // Float literals inside §LIST{:object} should emit with decimal point
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §LIST{l1:object}
         FLOAT:1.0
         FLOAT:2.0
-      §/LIST{l1}
+      §/LIST
 ";
 
         var result = ParseAndEmit(source);
@@ -510,8 +510,8 @@ public class CodegenBatchFixTests
     {
         // FLOAT:3.14 should stay 3.14 (already has decimal point)
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~x:f64} FLOAT:3.14
 ";
@@ -527,8 +527,8 @@ public class CodegenBatchFixTests
     {
         // FLOAT:-1.0 should produce -1.0, not bare -1
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~x:f64} FLOAT:-1.0
 ";
@@ -544,8 +544,8 @@ public class CodegenBatchFixTests
     {
         // Scientific notation like 1E10 should stay as-is (already a double in C#)
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
       §B{~x:f64} FLOAT:1E10
 ";
@@ -609,19 +609,19 @@ public class CodegenBatchFixTests
     public void ModuleFunctionCall_FromClassWithLocalBase_IsQualified()
     {
         var emitted = ParseAndEmit("""
-§M{m001:ExtProbe}
-  §F{f001:Helper:pub} (i32:x) -> i32
+§M{ExtProbe}
+  §F{Helper:pub} (i32:x) -> i32
     §E{}
     §R (* x INT:2)
 
-  §CL{c000:BaseThing:pub}
-    §MT{mt000:Tag:pub} () -> i32
+  §CL{BaseThing:pub}
+    §MT{Tag:pub} () -> i32
       §E{}
       §R INT:0
 
-  §CL{c001:Derived:pub}
+  §CL{Derived:pub}
     §EXT{BaseThing}
-    §MT{mt001:Use:pub} (i32:v) -> i32
+    §MT{Use:pub} (i32:v) -> i32
       §E{}
       §R §C{Helper} §A v §/C
 """);
@@ -640,14 +640,14 @@ public class CodegenBatchFixTests
     public void ModuleFunctionCall_FromClassWithOpaqueBase_StaysUnqualified()
     {
         var emitted = ParseAndEmit("""
-§M{m001:OpaqueProbe}
-  §F{f001:Helper:pub} (i32:x) -> i32
+§M{OpaqueProbe}
+  §F{Helper:pub} (i32:x) -> i32
     §E{}
     §R (* x INT:2)
 
-  §CL{c001:Derived:pub}
+  §CL{Derived:pub}
     §EXT{SomeExternalBase}
-    §MT{mt001:Use:pub} (i32:v) -> i32
+    §MT{Use:pub} (i32:v) -> i32
       §E{}
       §R §C{Helper} §A v §/C
 """);
@@ -666,17 +666,17 @@ public class CodegenBatchFixTests
     public void ModuleFunctionMethodGroup_FromClassBody_IsQualified()
     {
         var emitted = ParseAndEmit("""
-§M{m001:MgProbe}
-  §F{f001:Shout:pub} (i32:x) -> i32
+§M{MgProbe}
+  §F{Shout:pub} (i32:x) -> i32
     §E{}
     §R x
 
-  §F{f002:Apply:pub} (Func<i32,i32>:f, i32:v) -> i32
+  §F{Apply:pub} (Func<i32,i32>:f, i32:v) -> i32
     §E{}
     §R §C{f} §A v §/C
 
-  §CL{c001:Holder:pub}
-    §MT{mt001:Use:pub} (i32:v) -> i32
+  §CL{Holder:pub}
+    §MT{Use:pub} (i32:v) -> i32
       §E{}
       §R §C{Apply} §A Shout §A v §/C
 """);

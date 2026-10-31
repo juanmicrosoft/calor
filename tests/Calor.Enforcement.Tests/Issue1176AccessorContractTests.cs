@@ -44,19 +44,19 @@ public class Issue1176AccessorContractTests
     public void ReadingAGetterChargesTheReaderWithEffectsTheContractPermits()
     {
         const string source = """
-            §M{m001:GetterCharge}
+            §M{GetterCharge}
               §U{System.Collections.Generic}
 
-              §CL{c001:Box:pub}
+              §CL{Box:pub}
                 §FLD{List<i32>:_items:priv}
 
-                §PROP{p001:Items:List<i32>:pub}
+                §PROP{Items:List<i32>:pub}
                   §GET
-                    §IF{if1} (== this._items null)
+                    §IF (== this._items null)
                       §ASSIGN this._items §NEW{List<i32>} §/NEW
                     §R this._items
 
-                §MT{mt001:Peek:pub} () -> List<i32>
+                §MT{Peek:pub} () -> List<i32>
                   §E{}
                   §R this.Items
             """;
@@ -79,11 +79,11 @@ public class Issue1176AccessorContractTests
     public void AnAllocatingGetterIsWithinTheContract()
     {
         const string source = """
-            §M{m001:AllocGetter}
+            §M{AllocGetter}
               §U{System.Collections.Generic}
 
-              §CL{c001:Box:pub}
-                §PROP{p001:Items:List<i32>:pub}
+              §CL{Box:pub}
+                §PROP{Items:List<i32>:pub}
                   §GET
                     §R §NEW{List<i32>} §/NEW
             """;
@@ -104,15 +104,15 @@ public class Issue1176AccessorContractTests
     public void AMemoisingGetterMutatesAndAllocatesAndIsStillWithinTheContract()
     {
         const string source = """
-            §M{m001:Memoise}
+            §M{Memoise}
               §U{System.Collections.Generic}
 
-              §CL{c001:Box:pub}
+              §CL{Box:pub}
                 §FLD{List<i32>:_items:priv}
 
-                §PROP{p001:Items:List<i32>:pub}
+                §PROP{Items:List<i32>:pub}
                   §GET
-                    §IF{if1} (== this._items null)
+                    §IF (== this._items null)
                       §ASSIGN this._items §NEW{List<i32>} §/NEW
                     §R this._items
             """;
@@ -134,9 +134,9 @@ public class Issue1176AccessorContractTests
     public void AGetterThatWritesToTheConsoleIsStillRejected()
     {
         const string source = """
-            §M{m001:LoudGetter}
-              §CL{c001:Box:pub}
-                §PROP{p001:Value:i32:pub}
+            §M{LoudGetter}
+              §CL{Box:pub}
+                §PROP{Value:i32:pub}
                   §GET
                     §P "side effect"
                     §R INT:1
@@ -158,13 +158,13 @@ public class Issue1176AccessorContractTests
     public void AnAllocatingSetterIsWithinTheContract()
     {
         const string source = """
-            §M{m001:AllocSetter}
+            §M{AllocSetter}
               §U{System.Collections.Generic}
 
-              §CL{c001:Box:pub}
+              §CL{Box:pub}
                 §FLD{List<i32>:_items:priv}
 
-                §PROP{p001:Items:List<i32>:pub}
+                §PROP{Items:List<i32>:pub}
                   §SET
                     §ASSIGN this._items §NEW{List<i32>} §/NEW
             """;

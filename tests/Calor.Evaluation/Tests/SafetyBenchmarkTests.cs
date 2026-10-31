@@ -12,8 +12,8 @@ namespace Calor.Evaluation.Tests;
 public class SafetyBenchmarkTests
 {
     private const string SafeDivideCalor = @"
-§M{m001:Test}
-  §F{f001:SafeDivide:pub}
+§M{Test}
+  §F{SafeDivide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}

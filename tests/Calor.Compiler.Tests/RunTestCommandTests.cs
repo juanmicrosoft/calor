@@ -51,8 +51,8 @@ public class RunTestCommandTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "exitcoder.calr");
         File.WriteAllText(file, """
-            §M{m001:ExitCoder}
-              §F{f001:Main:pub} () -> i32
+            §M{ExitCoder}
+              §F{Main:pub} () -> i32
                 §R INT:3
             """);
 
@@ -66,8 +66,8 @@ public class RunTestCommandTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "broken.calr");
         File.WriteAllText(file, """
-            §M{m001:Broken}
-              §F{f001:Main:pub} () -> void
+            §M{Broken}
+              §F{Main:pub} () -> void
                 §P undefined_variable_xyz
             """);
 
@@ -91,8 +91,8 @@ public class RunTestCommandTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "hello.calr");
         File.WriteAllText(file, """
-            §M{m001:Hello}
-              §F{f001:Main:pub} () -> void
+            §M{Hello}
+              §F{Main:pub} () -> void
                 §E{cw}
                 §P "hello from calor run"
             """);
@@ -118,15 +118,15 @@ public class RunTestCommandTests : IDisposable
         // A genuine ∀-proof (x in [0, 46340] ⇒ x*x >= 0) on a function that Main calls.
         var file = Path.Combine(_tempDir, "square.calr");
         File.WriteAllText(file, """
-            §M{m001:SquareApp}
-              §F{f002:Square:pub}
+            §M{SquareApp}
+              §F{Square:pub}
                 §I{i32:x}
                 §O{i32}
                 §Q (>= x 0)
                 §Q (<= x 46340)
                 §S (>= result 0)
                 §R (* x x)
-              §F{f001:Main:pub} () -> void
+              §F{Main:pub} () -> void
                 §E{cw}
                 §P §C{Square} §A INT:7 §/C
             """);
@@ -201,14 +201,14 @@ public class RunTestCommandTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "unknowncharger.calr");
         File.WriteAllText(file, """
-            §M{m001:UnknownCharger}
-              §F{f001:RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
+            §M{UnknownCharger}
+              §F{RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
                 §E{e}
                 §R (+ §C{stage} §/C §C{stage} §/C)
 
-              §CL{c001:Holder:pub}
+              §CL{Holder:pub}
                 §FLD{Func<i32>:stage:priv} §E{cw}
-                §MT{mt001:Twice:pub} () -> i32
+                §MT{Twice:pub} () -> i32
                   §E{}
                   §R §C{RunTwice} §A this.stage §/C
             """);
@@ -220,8 +220,8 @@ public class RunTestCommandTests : IDisposable
         // Declares §E{} (pure) but prints — a forbidden 'cw' effect.
         var file = Path.Combine(_tempDir, "pureviolator.calr");
         File.WriteAllText(file, """
-            §M{m001:PureViolator}
-              §F{f001:Main:pub} () -> void
+            §M{PureViolator}
+              §F{Main:pub} () -> void
                 §E{}
                 §P "side effect!"
             """);
@@ -291,8 +291,8 @@ public class RunTestCommandTests : IDisposable
         Directory.CreateDirectory(Path.Combine(dir, "tests"));
 
         File.WriteAllText(Path.Combine(dir, "mathutil.calr"), $$"""
-            §M{m001:MathUtil}
-              §F{f001:Add:pub} (i32:a, i32:b) -> i32
+            §M{MathUtil}
+              §F{Add:pub} (i32:a, i32:b) -> i32
                 §R (+ a {{(withBug ? "(+ b INT:1)" : "b")}})
             """);
 
@@ -339,8 +339,8 @@ public class RunTestCommandTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "lib.calr");
         File.WriteAllText(file, """
-            §M{m001:LibOnly}
-              §F{f001:Double:pub} (i32:x) -> i32
+            §M{LibOnly}
+              §F{Double:pub} (i32:x) -> i32
                 §R (* x INT:2)
             """);
 

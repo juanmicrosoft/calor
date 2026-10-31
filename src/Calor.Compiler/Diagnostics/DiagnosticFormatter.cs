@@ -51,9 +51,9 @@ internal static class DiagnosticText
             "Remove legacy closer '$1'; blocks end at dedent",
             "Structural closing tags are not accepted. Blocks end when their bodies dedent. Remove the closer, not its surrounding code or comments. The diagnostic carries a safe deletion patch; call and block-lambda closers remain valid."),
         [DiagnosticCode.MalformedFunctionHeader] = new(
-            "^'([^']+)' header has four fields \\(([^)]+)\\), but §F/§AF headers take at most \\{id:name:visibility\\}\\. The third field '([^']+)' is a return type -- declare it in the signature as '\\(\\.\\.\\.\\) -> [^']+', not in the header\\. A four-field header silently drops the return type and emits a void method\\.$",
+            "^'([^']+)' header has three fields \\(([^)]+)\\), but §F/§AF headers take at most \\{name:visibility\\}\\. The second field '([^']+)' is a return type -- declare it in the signature as '\\(\\.\\.\\.\\) -> [^']+', not in the header\\. A return type belongs in the inline signature, not the header\\.$",
             "'$1' header $2: move return type '$3' to the signature",
-            "Function headers have at most {id:name:visibility}. The return type belongs in the inline signature, for example §F{f1:Add:pub} () -> i32. A structured patch moves the return type out of a malformed four-field header."),
+            "Function headers have at most {name:visibility}. The return type belongs in the inline signature, for example §F{Add:pub} () -> i32. A structured patch moves the return type out of a malformed three-field header."),
         [DiagnosticCode.TabIndentation] = new(
             "^Leading whitespace uses tabs on ([0-9]+) line\\(s\\)\\. Calor indentation is canonically 2 spaces per level\\.$",
             "Tab indentation on $1 line(s); use 2 spaces per level",

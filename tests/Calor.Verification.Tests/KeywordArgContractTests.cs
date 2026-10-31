@@ -18,8 +18,8 @@ public class KeywordArgContractTests
     [Theory]
     // The original #874 repro: capitalized C# spelling parses as a generic call.
     [InlineData(@"
-§M{m001:Repro}
-  §F{f001:Check:pub} (str:s) -> bool
+§M{Repro}
+  §F{Check:pub} (str:s) -> bool
     §Q (StartsWith s STR:""hello"" :ignore-case)
     §R true", "ignore-case")]
     // Same shape in the postcondition position. Note: this must be a MULTI-WORD C#
@@ -28,40 +28,40 @@ public class KeywordArgContractTests
     // keyword is legal mode consumption, not an escape); only spellings absent from
     // the table (`StartsWith` vs its key `starts`) reach the generic-call path.
     [InlineData(@"
-§M{m001:Repro}
-  §F{f001:Check:pub} (str:s) -> bool
+§M{Repro}
+  §F{Check:pub} (str:s) -> bool
     §S (EndsWith s STR:""x"" :ignore-case)
     §R true", "ignore-case")]
     // Binary operand: was 'Value cannot be null (Parameter right)' pre-choke-point.
     [InlineData(@"
-§M{m001:Repro}
-  §F{f001:Check:pub} (i32:x) -> bool
+§M{Repro}
+  §F{Check:pub} (i32:x) -> bool
     §Q (>= x :foo)
     §R true", "foo")]
     // Mid-position keyword on a genuine string op: only the trailing slot is legal.
     [InlineData(@"
-§M{m001:Repro}
-  §F{f001:Check:pub} (str:s) -> bool
+§M{Repro}
+  §F{Check:pub} (str:s) -> bool
     §Q (contains s :ignore-case STR:""x"")
     §R true", "ignore-case")]
     // Doubled trailing keywords: the last is the mode, the second-to-last is rejected.
     [InlineData(@"
-§M{m001:Repro}
-  §F{f001:Check:pub} (str:s) -> bool
+§M{Repro}
+  §F{Check:pub} (str:s) -> bool
     §Q (contains s STR:""x"" :ordinal :ignore-case)
     §R true", "ordinal")]
     // Ternary operand: was 'Value cannot be null (Parameter whenTrue)'.
     [InlineData(@"
-§M{m001:Repro}
-  §F{f001:Check:pub} (i32:x) -> bool
+§M{Repro}
+  §F{Check:pub} (i32:x) -> bool
     §Q (== (? (> x 0) :foo false) false)
     §R true", "foo")]
     // Implication consequent: ParseImplicationExpression consumes ParseLispArgument
     // DIRECTLY, bypassing the operator-loop choke point — the side-entrance route that
     // survived the first choke-point fix ('Value cannot be null (Parameter consequent)').
     [InlineData(@"
-§M{m001:Repro}
-  §F{f001:Check:pub} (i32:x) -> bool
+§M{Repro}
+  §F{Check:pub} (i32:x) -> bool
     §Q (-> (> x 0) :foo)
     §R true", "foo")]
     public void KeywordArgOutsideStringOpMode_ProducesDiagnosticNamingKeyword_NotCrash(
@@ -80,8 +80,8 @@ public class KeywordArgContractTests
         // Pre-choke-point, this compiled "successfully" and emitted `bool b = x >= ;` —
         // broken C# with zero diagnostics, worse than the crash.
         const string source = @"
-§M{m001:Repro}
-  §F{f001:Check:pub} (i32:x) -> void
+§M{Repro}
+  §F{Check:pub} (i32:x) -> void
     §B{b:bool} (>= x :foo)
     §P b";
 
@@ -96,8 +96,8 @@ public class KeywordArgContractTests
         // The one legal position must keep working: no keyword-argument diagnostic, and
         // the mode reaches the emitted C# as a StringComparison overload.
         const string source = @"
-§M{m001:Repro}
-  §F{f001:Check:pub} (str:s) -> bool
+§M{Repro}
+  §F{Check:pub} (str:s) -> bool
     §R (contains s STR:""x"" :ignore-case)";
 
         var result = Program.Compile(source, "test.calr", NoCache());

@@ -20,8 +20,8 @@ public class NullableCastTests
     private static string WrapInFunction(string body)
     {
         return $$"""
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{object:value}
                   §O{object}
                   {{body}}

@@ -27,11 +27,11 @@ public sealed class ObligationTests
     public void Generate_ProofObligation_CreatesObligation()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{i32:x}
                   §O{void}
-                  §PROOF{p1:positive} (>= x INT:0)
+                  §PROOF{positive} (>= x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -53,12 +53,12 @@ public sealed class ObligationTests
     public void Generate_NestedProofObligation_CreatesObligation()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{i32:x}
                   §O{void}
-                  §IF{i1} (> x INT:0)
-                    §PROOF{p1:positive} (> x INT:0)
+                  §IF (> x INT:0)
+                    §PROOF{positive} (> x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -76,8 +76,8 @@ public sealed class ObligationTests
     public void Generate_InlineRefinement_CreatesRefinementEntryObligation()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{i32:age} | (>= # INT:0)
                   §O{void}
             """;
@@ -101,8 +101,8 @@ public sealed class ObligationTests
     public void Generate_PrivateFunctionInlineRefinement_IsBoundary()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Helper:priv}
+            §M{Test}
+              §F{Helper:priv}
                   §I{i32:age} | (>= # INT:0)
                   §O{void}
             """;
@@ -124,12 +124,12 @@ public sealed class ObligationTests
     public void Generate_MultipleObligations_TracksAll()
     {
         var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NatInt:i32} (>= # INT:0)
-              §F{f001:Main:pub}
+            §M{Test}
+              §RTYPE{NatInt:i32} (>= # INT:0)
+              §F{Main:pub}
                   §I{i32:x} | (>= # INT:0)
                   §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
+                  §PROOF{check} (>= x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -149,8 +149,8 @@ public sealed class ObligationTests
     public void Generate_NoRefinements_NoObligations()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{i32:x}
                   §O{void}
             """;
@@ -218,12 +218,12 @@ public sealed class ObligationTests
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = """
-            §M{m001:Test}
-              §F{f001:Add:priv}
+            §M{Test}
+              §F{Add:priv}
                   §I{i32:x}
                   §O{void}
                   §Q (>= x INT:0)
-                  §PROOF{p1:non-neg} (>= x INT:0)
+                  §PROOF{non-neg} (>= x INT:0)
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -259,11 +259,11 @@ public sealed class ObligationTests
         // so the solver proves it too. The proof is still carried by the string theory (null
         // strings are unmodeled), so it must stay Assumed, never Discharged.
         var source = """
-            §M{m001:Test}
-              §F{f001:Check:priv}
+            §M{Test}
+              §F{Check:priv}
                   §I{i32:x}
                   §O{void}
-                  §PROOF{p1:bytelen} (== (len STR:"\u00e9") INT:1)
+                  §PROOF{bytelen} (== (len STR:"\u00e9") INT:1)
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -289,11 +289,11 @@ public sealed class ObligationTests
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = """
-            §M{m001:Test}
-              §F{f001:Check:priv}
+            §M{Test}
+              §F{Check:priv}
                   §I{i32:x}
                   §O{void}
-                  §PROOF{p1:numeric} (== (+ INT:1 INT:1) INT:2)
+                  §PROOF{numeric} (== (+ INT:1 INT:1) INT:2)
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -312,11 +312,11 @@ public sealed class ObligationTests
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = """
-            §M{m001:Test}
-              §F{f001:Check:priv}
+            §M{Test}
+              §F{Check:priv}
                   §I{i32:x}
                   §O{void}
-                  §PROOF{p1:always-positive} (> x INT:0)
+                  §PROOF{always-positive} (> x INT:0)
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -343,8 +343,8 @@ public sealed class ObligationTests
         // Private function with precondition that guarantees the inline refinement.
         // The # in (>= # INT:0) should resolve to 'age' via PushSelfVariable.
         var source = """
-            §M{m001:Test}
-              §F{f001:Validate:priv}
+            §M{Test}
+              §F{Validate:priv}
                   §I{i32:age} | (>= # INT:0)
                   §O{void}
                   §Q (>= age INT:0)
@@ -370,8 +370,8 @@ public sealed class ObligationTests
 
         // A private declaration does not universally claim that every input is valid.
         var source = """
-            §M{m001:Test}
-              §F{f001:Validate:priv}
+            §M{Test}
+              §F{Validate:priv}
                   §I{i32:age} | (>= # INT:0)
                   §O{void}
             """;
@@ -395,8 +395,8 @@ public sealed class ObligationTests
     public void Generate_SetsParameterNameOnRefinementEntry()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{i32:myParam} | (>= # INT:0)
                   §O{void}
             """;
@@ -416,11 +416,11 @@ public sealed class ObligationTests
     public void Generate_SetsSourceProofIdOnProofObligation()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{i32:x}
                   §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
+                  §PROOF{check} (>= x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -440,12 +440,12 @@ public sealed class ObligationTests
     public void CompilePipeline_WithVerifyRefinements_PopulatesObligationResults()
     {
         var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NatInt:i32} (>= # INT:0)
-              §F{f001:Main:pub}
+            §M{Test}
+              §RTYPE{NatInt:i32} (>= # INT:0)
+              §F{Main:pub}
                   §I{i32:x} | (>= # INT:0)
                   §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
+                  §PROOF{check} (>= x INT:0)
             """;
 
         var options = new CompilationOptions
@@ -467,9 +467,9 @@ public sealed class ObligationTests
     public void CompilePipeline_WithoutVerifyRefinements_NoObligations()
     {
         var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NatInt:i32} (>= # INT:0)
-              §F{f001:Main:pub}
+            §M{Test}
+              §RTYPE{NatInt:i32} (>= # INT:0)
+              §F{Main:pub}
                   §I{i32:x}
                   §O{void}
             """;
@@ -491,11 +491,11 @@ public sealed class ObligationTests
     public void CSharpEmit_DischargedProofObligation_EmitsProvenComment()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{i32:x}
                   §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
+                  §PROOF{check} (>= x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -528,11 +528,11 @@ public sealed class ObligationTests
     public void CSharpEmit_PolicyAlwaysGuard_OverridesProvenGuardElision()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{i32:x}
                   §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
+                  §PROOF{check} (>= x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -568,13 +568,13 @@ public sealed class ObligationTests
     {
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
         var source = """
-            §M{m001:Test}
-              §F{f001:Bad:pub}
+            §M{Test}
+              §F{Bad:pub}
                   §O{void}
                   §B{~x:i32} INT:1
-                  §IF{i1} (> x INT:0)
+                  §IF (> x INT:0)
                     §ASSIGN x INT:-1
-                    §PROOF{p1} (> x INT:0)
+                    §PROOF{} (> x INT:0)
             """;
         var options = new CompilationOptions
         {
@@ -598,9 +598,9 @@ public sealed class ObligationTests
     {
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
         var source = """
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:Assign:priv}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §F{Assign:priv}
                   §I{Positive:value}
                   §O{i32}
                   §Q (> value INT:0)
@@ -622,11 +622,11 @@ public sealed class ObligationTests
     }
 
     private const string DischargedObligationSource = """
-        §M{m001:Test}
-          §F{f001:Main:pub}
+        §M{Test}
+          §F{Main:pub}
               §I{i32:x}
               §O{void}
-              §PROOF{p1:check} (>= x INT:0)
+              §PROOF{check} (>= x INT:0)
         """;
 
     private static ObligationTracker DischargedTracker(ModuleNode module)
@@ -681,11 +681,11 @@ public sealed class ObligationTests
     public void CSharpEmit_FailedProofObligation_EmitsRuntimeGuard()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{i32:x}
                   §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
+                  §PROOF{check} (>= x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -714,11 +714,11 @@ public sealed class ObligationTests
         // #879 ride-along: an obligation the solver cannot model keeps its runtime
         // check. Pre-fix, Unsupported fell through to the no-guard TODO comment.
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{i32:x}
                   §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
+                  §PROOF{check} (>= x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -749,11 +749,11 @@ public sealed class ObligationTests
         // Z3 unavailable attaches the tracker without solving) and must keep its guard.
         // The no-guard TODO now means exactly "no tracker ran".
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{i32:x}
                   §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
+                  §PROOF{check} (>= x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -775,11 +775,11 @@ public sealed class ObligationTests
     public void CSharpEmit_NoTracker_EmitsRuntimeGuard()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{i32:x}
                   §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
+                  §PROOF{check} (>= x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -812,8 +812,8 @@ public sealed class ObligationTests
     public void CSharpEmit_InlineRefinedParameter_EmitsEntryGuard()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Use:pub}
+            §M{Test}
+              §F{Use:pub}
                   §I{i32:age} | (>= # INT:0)
                   §O{void}
             """;
@@ -831,9 +831,9 @@ public sealed class ObligationTests
     public void CSharpEmit_NamedRefinedParameter_ErasesTypeAndEmitsEntryGuard()
     {
         var source = """
-            §M{m001:Test}
-              §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §F{f001:Use:pub}
+            §M{Test}
+              §RTYPE{Nat:i32} (>= # INT:0)
+              §F{Use:pub}
                   §I{Nat:value}
                   §O{void}
             """;
@@ -851,9 +851,9 @@ public sealed class ObligationTests
     public void Generate_NamedRefinedReturn_CreatesReturnObligation()
     {
         var source = """
-            §M{m001:Test}
-              §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §F{f001:Get:pub}
+            §M{Test}
+              §RTYPE{Nat:i32} (>= # INT:0)
+              §F{Get:pub}
                   §O{Nat}
                   §R INT:1
             """;
@@ -873,9 +873,9 @@ public sealed class ObligationTests
     public void CSharpEmit_NamedRefinedReturn_ErasesTypeAndEmitsGuard()
     {
         var source = """
-            §M{m001:Test}
-              §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §F{f001:Get:pub}
+            §M{Test}
+              §RTYPE{Nat:i32} (>= # INT:0)
+              §F{Get:pub}
                   §O{Nat}
                   §R INT:1
             """;
@@ -894,9 +894,9 @@ public sealed class ObligationTests
     public void Generate_RefinedBinding_CreatesSubtypeObligation()
     {
         var source = """
-            §M{m001:Test}
-              §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §F{f001:Use:pub}
+            §M{Test}
+              §RTYPE{Nat:i32} (>= # INT:0)
+              §F{Use:pub}
                   §O{void}
                   §B{value:Nat} INT:1
             """;
@@ -916,9 +916,9 @@ public sealed class ObligationTests
     public void Generate_RefinedAssignment_CreatesSubtypeTransitionObligation()
     {
         var source = """
-            §M{m001:Test}
-              §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §F{f001:Use:pub}
+            §M{Test}
+              §RTYPE{Nat:i32} (>= # INT:0)
+              §F{Use:pub}
                   §O{i32}
                   §B{~value:Nat} INT:1
                   §ASSIGN value INT:-1
@@ -946,9 +946,9 @@ public sealed class ObligationTests
     public void CSharpEmit_RefinedBinding_ErasesTypeAndEmitsGuard()
     {
         var source = """
-            §M{m001:Test}
-              §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §F{f001:Use:pub}
+            §M{Test}
+              §RTYPE{Nat:i32} (>= # INT:0)
+              §F{Use:pub}
                   §O{void}
                   §B{value:Nat} INT:1
             """;
@@ -967,8 +967,8 @@ public sealed class ObligationTests
     public void CSharpEmit_RefinedParameterGuard_RejectsInvalidRuntimeValue()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §F{f001:RequirePositive:pub}
+            §M{Test}
+              §F{RequirePositive:pub}
                   §I{i32:value} | (> # INT:0)
                   §O{i32}
                   §R value
@@ -983,9 +983,9 @@ public sealed class ObligationTests
     public void CSharpEmit_NamedAndInlineParameterRefinements_AreConjoined()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:Use:pub}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §F{Use:pub}
                   §I{Positive:value} | (< # INT:10)
                   §O{i32}
                   §R value
@@ -1001,10 +1001,10 @@ public sealed class ObligationTests
     public void NestedNamedRefinements_EraseAndEnforceAllInheritedPredicates()
     {
         const string source = """
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §RTYPE{r2:Small:Positive} (< # INT:10)
-              §F{f001:Use:pub}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §RTYPE{Small:Positive} (< # INT:10)
+              §F{Use:pub}
                   §I{Small:value}
                   §O{i32}
                   §R value
@@ -1038,10 +1038,10 @@ public sealed class ObligationTests
             Verification.Z3.Z3ContextFactory.IsAvailable,
             "Z3 not available");
         const string source = """
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §RTYPE{r2:Small:Positive} (< # INT:10)
-              §F{f001:Use:priv}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §RTYPE{Small:Positive} (< # INT:10)
+              §F{Use:priv}
                   §I{Small:value}
                   §O{void}
                   §Q (> value INT:0)
@@ -1064,10 +1064,10 @@ public sealed class ObligationTests
     public void UnboundedInheritedQuantifier_IsRejectedBeforeRuntime()
     {
         const string source = """
-            §M{m001:Test}
-              §RTYPE{r1:NonNegative:i32} (forall ((i i32)) (>= # INT:0))
-              §RTYPE{r2:Small:NonNegative} (< # INT:10)
-              §F{f001:Use:pub}
+            §M{Test}
+              §RTYPE{NonNegative:i32} (forall ((i i32)) (>= # INT:0))
+              §RTYPE{Small:NonNegative} (< # INT:10)
+              §F{Use:pub}
                   §I{Small:value}
                   §O{i32}
                   §R value
@@ -1135,9 +1135,9 @@ public sealed class ObligationTests
     public void RefinementElision_RequiresAllConstraintsAndRuntimeAssumptions()
     {
         const string combinedSource = """
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:Mutate:pub}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §F{Mutate:pub}
                   §I{Positive:value} | (< # INT:10)
                   §O{i32}
                   §ASSIGN value INT:20
@@ -1164,9 +1164,9 @@ public sealed class ObligationTests
                 StringComparison.Ordinal));
 
         const string contractOffSource = """
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:Mutate:pub}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §F{Mutate:pub}
                   §I{Positive:value}
                   §I{i32:next}
                   §O{i32}
@@ -1205,10 +1205,10 @@ public sealed class ObligationTests
     public void OperatorOverload_EnforcesRefinedReturnBoundary()
     {
         const string source = """
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §CL{c001:MyType:pub}
-                §OP{op001:implicit:pub}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §CL{MyType:pub}
+                §OP{implicit:pub}
                   §I{MyType:value}
                   §O{Positive}
                   §R INT:-1
@@ -1240,10 +1240,10 @@ public sealed class ObligationTests
         Assert.IsType<InvalidOperationException>(invocation.InnerException);
 
         var legacyCSharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §CL{c001:LegacyType:pub}
-                §MT{m001:op_Implicit:pub:stat}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §CL{LegacyType:pub}
+                §MT{op_Implicit:pub:stat}
                   §I{LegacyType:value}
                   §O{Positive}
                   §R INT:-1
@@ -1267,13 +1267,13 @@ public sealed class ObligationTests
     public void LambdaReturn_DoesNotInheritEnclosingRefinedReturnGuard()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:Test:pub}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §F{Test:pub}
                   §I{bool:early}
                   §O{Positive}
-                  §B{f:Func<i32>} §LAM{l1} §R INT:-1 §/LAM{l1}
-                  §IF{i1} early
+                  §B{f:Func<i32>} §LAM{} §R INT:-1 §/LAM
+                  §IF early
                     §R INT:1
                   §B{x:i32} §C{f} §/C
                   §R INT:1
@@ -1292,12 +1292,12 @@ public sealed class ObligationTests
     public void EnumExtension_EnforcesRefinedReturnBoundary()
     {
         const string source = """
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §EN{e001:Color}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §EN{Color}
                 Red
-              §EEXT{x001:Color}
-                §F{f001:Bad:pub}
+              §EEXT{Color}
+                §F{Bad:pub}
                   §I{Color:self}
                   §O{Positive}
                   §R INT:-1
@@ -1335,15 +1335,15 @@ public sealed class ObligationTests
     public void SiblingRefinementBindings_DoNotElideLiveAssignmentGuard()
     {
         const string source = """
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §RTYPE{r2:Negative:i32} (< # INT:0)
-              §F{f001:Bad:pub}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §RTYPE{Negative:i32} (< # INT:0)
+              §F{Bad:pub}
                   §I{bool:flag}
                   §O{i32}
-                  §IF{i1} flag
+                  §IF flag
                     §B{~x:Positive} INT:1
-                  §IF{i2} (== flag BOOL:false)
+                  §IF (== flag BOOL:false)
                     §B{~x:Negative} INT:-1
                     §ASSIGN x INT:1
                     §R x
@@ -1373,9 +1373,9 @@ public sealed class ObligationTests
     public void CSharpEmit_RefinedReturnGuard_RejectsInvalidRuntimeValue()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:BadReturn:pub}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §F{BadReturn:pub}
                   §O{Positive}
                   §R INT:-1
             """);
@@ -1389,12 +1389,12 @@ public sealed class ObligationTests
     public void CSharpEmit_NestedRefinedReturnGuard_RejectsInvalidRuntimeValue()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:BadNestedReturn:pub}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §F{BadNestedReturn:pub}
                   §I{bool:takeBadPath}
                   §O{Positive}
-                  §IF{i1} takeBadPath
+                  §IF takeBadPath
                     §R INT:-1
                   §R INT:1
             """);
@@ -1408,9 +1408,9 @@ public sealed class ObligationTests
     public void CSharpEmit_RefinedBindingGuard_RejectsInvalidRuntimeValue()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:BadBinding:pub}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §F{BadBinding:pub}
                   §O{i32}
                   §B{value:Positive} INT:-1
                   §R value
@@ -1425,9 +1425,9 @@ public sealed class ObligationTests
     public void CSharpEmit_RefinedAssignmentGuard_RejectsInvalidRuntimeValue()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:BadAssignment:pub}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §F{BadAssignment:pub}
                   §O{i32}
                   §B{~value:Positive} INT:1
                   §ASSIGN value INT:-1
@@ -1443,9 +1443,9 @@ public sealed class ObligationTests
     public void CSharpEmit_UnannotatedRefinedRebind_RejectsInvalidRuntimeValue()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:BadRebind:pub}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §F{BadRebind:pub}
                   §O{i32}
                   §B{~value:Positive} INT:1
                   §B{~value} INT:-1
@@ -1461,8 +1461,8 @@ public sealed class ObligationTests
     public void CSharpEmit_InlineRefinedParameterAssignment_RejectsInvalidRuntimeValue()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §F{f001:BadParameterWrite:pub}
+            §M{Test}
+              §F{BadParameterWrite:pub}
                   §I{i32:value} | (> # INT:0)
                   §O{i32}
                   §ASSIGN value INT:-1
@@ -1478,9 +1478,9 @@ public sealed class ObligationTests
     public void CSharpEmit_NestedSelfReference_CompilesAndRejectsInvalidValue()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:NonEmpty:str} (> (len #) INT:0)
-              §F{f001:Use:pub}
+            §M{Test}
+              §RTYPE{NonEmpty:str} (> (len #) INT:0)
+              §F{Use:pub}
                   §I{NonEmpty:value}
                   §O{void}
             """);
@@ -1495,9 +1495,9 @@ public sealed class ObligationTests
     public void CSharpEmit_AsyncRefinedReturn_RejectsInvalidRuntimeValue()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §AF{f001:BadAsyncReturn:pub}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §AF{BadAsyncReturn:pub}
                   §O{Positive}
                   §R INT:-1
             """);
@@ -1511,8 +1511,8 @@ public sealed class ObligationTests
     public void CSharpEmit_RefinedOutParameter_GuardsAfterAssignment()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §F{f001:SetBad:pub}
+            §M{Test}
+              §F{SetBad:pub}
                   §I{i32:value:out} | (> # INT:0)
                   §O{void}
                   §ASSIGN value INT:-1
@@ -1527,9 +1527,9 @@ public sealed class ObligationTests
     public void CSharpEmit_IndexedRead_EnforcesLogicalBoundAtRuntime()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §ITYPE{it1:Sized:i32[]:n}
-              §F{f001:Read:pub}
+            §M{Test}
+              §ITYPE{Sized:i32[]:n}
+              §F{Read:pub}
                   §I{Sized:items}
                   §I{i32:n}
                   §I{i32:index}
@@ -1551,9 +1551,9 @@ public sealed class ObligationTests
     public void CSharpEmit_IndexedWrite_EnforcesLogicalBoundAtRuntime()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §ITYPE{it1:Sized:i32[]:n}
-              §F{f001:Write:pub}
+            §M{Test}
+              §ITYPE{Sized:i32[]:n}
+              §F{Write:pub}
                   §I{Sized:items}
                   §I{i32:n}
                   §I{i32:index}
@@ -1575,9 +1575,9 @@ public sealed class ObligationTests
     public void CSharpEmit_ArrayAccessAssignmentTarget_EnforcesLogicalBound()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §ITYPE{it1:Sized:i32[]:n}
-              §F{f001:Write:pub}
+            §M{Test}
+              §ITYPE{Sized:i32[]:n}
+              §F{Write:pub}
                   §I{Sized:items}
                   §I{i32:n}
                   §I{i32:index}
@@ -1599,9 +1599,9 @@ public sealed class ObligationTests
     public void CSharpEmit_IndexedAlias_PreservesLogicalBoundAtRuntime()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §ITYPE{it1:Sized:i32[]:n}
-              §F{f001:ReadAlias:pub}
+            §M{Test}
+              §ITYPE{Sized:i32[]:n}
+              §F{ReadAlias:pub}
                   §I{Sized:items}
                   §I{i32:n}
                   §I{i32:index}
@@ -1625,9 +1625,9 @@ public sealed class ObligationTests
     {
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
         var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NonEmpty:str} (> (len #) INT:0)
-              §F{f001:Assign:priv}
+            §M{Test}
+              §RTYPE{NonEmpty:str} (> (len #) INT:0)
+              §F{Assign:priv}
                   §I{NonEmpty:value}
                   §I{str:other}
                   §O{void}
@@ -1651,17 +1651,17 @@ public sealed class ObligationTests
     public void SiblingIndexedAliases_DoNotShareLogicalSizeFacts()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedN:i32[]:n}
-              §ITYPE{it2:SizedM:i32[]:m}
-              §F{f001:Read:priv}
+            §M{Test}
+              §ITYPE{SizedN:i32[]:n}
+              §ITYPE{SizedM:i32[]:m}
+              §F{Read:priv}
                   §I{SizedN:left}
                   §I{SizedM:right}
                   §I{i32:n}
                   §I{i32:m}
                   §I{i32:index}
                   §O{i32}
-                  §IF{i1} (> n INT:0)
+                  §IF (> n INT:0)
                     §B{alias:i32[]} left
                     §B{x:i32} §IDX alias index
                   §EL
@@ -1691,13 +1691,13 @@ public sealed class ObligationTests
     {
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
         var source = """
-            §M{m001:Test}
-              §CL{c001:Checker:pub}
-                §MT{m001:Check:pub}
+            §M{Test}
+              §CL{Checker:pub}
+                §MT{Check:pub}
                   §I{i32:x}
                   §O{void}
-                  §IF{if1} (> x INT:0)
-                    §PROOF{p1} (> x INT:0)
+                  §IF (> x INT:0)
+                    §PROOF{} (> x INT:0)
             """;
         var options = new CompilationOptions
         {
@@ -1717,9 +1717,9 @@ public sealed class ObligationTests
     public void CSharpEmit_MissingIndexedSizeWitness_FailsClosed()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §ITYPE{it1:Sized:i32[]:n}
-              §F{f001:Read:pub}
+            §M{Test}
+              §ITYPE{Sized:i32[]:n}
+              §F{Read:pub}
                   §I{Sized:items}
                   §I{i32:index}
                   §O{i32}
@@ -1740,9 +1740,9 @@ public sealed class ObligationTests
     public void CSharpEmit_LocalIndexedBindingWithoutWitness_FailsClosed()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §ITYPE{it1:Sized:i32[]:n}
-              §F{f001:Read:pub}
+            §M{Test}
+              §ITYPE{Sized:i32[]:n}
+              §F{Read:pub}
                   §I{i32:index}
                   §O{i32}
                   §B{items:Sized} §ARR{i32} INT:3
@@ -1759,9 +1759,9 @@ public sealed class ObligationTests
     public void CSharpEmit_IndexedIncrement_EnforcesLogicalBound()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §ITYPE{it1:Sized:i32[]:n}
-              §F{f001:Increment:pub}
+            §M{Test}
+              §ITYPE{Sized:i32[]:n}
+              §F{Increment:pub}
                   §I{Sized:items}
                   §I{i32:n}
                   §I{i32:index}
@@ -1783,9 +1783,9 @@ public sealed class ObligationTests
     public void CSharpEmit_RefinedDecrement_RechecksInvariant()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:Bad:pub}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §F{Bad:pub}
                   §O{i32}
                   §B{~value:Positive} INT:1
                   (dec value)
@@ -1801,9 +1801,9 @@ public sealed class ObligationTests
     public void CSharpEmit_UninitializedRefinedBinding_RejectsInvalidDefault()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:Bad:pub}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §F{Bad:pub}
                   §O{i32}
                   §B{value:Positive}
                   §R value
@@ -1818,9 +1818,9 @@ public sealed class ObligationTests
     public void CSharpEmit_NestedRefinedDecrement_RechecksInvariant()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:Bad:pub}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §F{Bad:pub}
                   §O{i32}
                   §B{~value:Positive} INT:1
                   §B{old:i32} (post-dec value)
@@ -1836,9 +1836,9 @@ public sealed class ObligationTests
     public void CSharpEmit_RefinedIterator_GuardsYieldedValues()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:Get:pub}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §F{Get:pub}
                   §O{Positive}
                   §YIELD INT:-1
             """);
@@ -1853,10 +1853,10 @@ public sealed class ObligationTests
     public void CSharpEmit_PublicRefinedConstructor_RejectsInvalidValue()
     {
         var source = """
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §CL{c001:Box:pub}
-                §CTOR{ctor1:pub} (Positive:value)
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §CL{Box:pub}
+                §CTOR{pub} (Positive:value)
             """;
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors,
@@ -1881,8 +1881,8 @@ public sealed class ObligationTests
     public void CSharpEmit_RefinedRefParameterMutation_CompilesAndThrows()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §F{f001:Mutate:pub}
+            §M{Test}
+              §F{Mutate:pub}
                   §I{i32:value:ref} | (> # INT:0)
                   §O{void}
                   (dec value)
@@ -1897,8 +1897,8 @@ public sealed class ObligationTests
     public void CSharpEmit_FailedRefinedWrites_DoNotCommitInvalidState()
     {
         var assignment = Emit("""
-            §M{m001:Test}
-              §F{f001:Mutate:pub}
+            §M{Test}
+              §F{Mutate:pub}
                   §I{i32:value:ref} | (> # INT:0)
                   §O{void}
                   §ASSIGN value INT:-1
@@ -1914,8 +1914,8 @@ public sealed class ObligationTests
         Assert.Equal(1, assignmentArguments[0]);
 
         var decrement = Emit("""
-            §M{m001:Test}
-              §F{f001:Mutate:pub}
+            §M{Test}
+              §F{Mutate:pub}
                   §I{i32:value:ref} | (> # INT:0)
                   §O{void}
                   (dec value)
@@ -1935,10 +1935,10 @@ public sealed class ObligationTests
     public void CSharpEmit_FailedTypedRebind_RollsBackNestedTargetMutation()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:NonNegative:i32} (>= # INT:0)
-              §RTYPE{r2:Negative:i32} (< # INT:0)
-              §F{f001:Mutate:pub}
+            §M{Test}
+              §RTYPE{NonNegative:i32} (>= # INT:0)
+              §RTYPE{Negative:i32} (< # INT:0)
+              §F{Mutate:pub}
                   §I{NonNegative:value:ref}
                   §O{void}
                   §B{~value:Negative} (post-dec value)
@@ -1955,13 +1955,13 @@ public sealed class ObligationTests
     public void CSharpEmit_TypedRebind_PreservesPriorContractAndSupportsOutInitialization()
     {
         const string caughtRebindSource = """
-            §M{m001:Test}
-              §RTYPE{r1:NonNegative:i32} (>= # INT:0)
-              §RTYPE{r2:Negative:i32} (< # INT:0)
-              §F{f001:Mutate:pub}
+            §M{Test}
+              §RTYPE{NonNegative:i32} (>= # INT:0)
+              §RTYPE{Negative:i32} (< # INT:0)
+              §F{Mutate:pub}
                   §I{NonNegative:value:ref}
                   §O{void}
-                  §TR{t1}
+                  §TR
                     §B{~value:Negative} (post-dec value)
                   §CA{Exception:ex}
                     §ASSIGN value INT:-1
@@ -1988,9 +1988,9 @@ public sealed class ObligationTests
                 StringComparison.Ordinal));
 
         var outInitialization = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:Set:pub}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §F{Set:pub}
                   §I{Positive:value:out}
                   §O{void}
                   §B{~value:Positive} INT:1
@@ -2003,14 +2003,14 @@ public sealed class ObligationTests
         Assert.DoesNotContain("__refinementSnapshot", outInitialization);
 
         var initializedOut = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §RTYPE{r2:Negative:i32} (< # INT:0)
-              §F{f001:Set:pub}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §RTYPE{Negative:i32} (< # INT:0)
+              §F{Set:pub}
                   §I{Positive:value:out}
                   §O{void}
                   §B{~value:Positive} INT:2
-                  §TR{t1}
+                  §TR
                     §B{~value:Negative} (post-dec value)
                   §CA{Exception:ex}
                     §ASSIGN value INT:2
@@ -2028,9 +2028,9 @@ public sealed class ObligationTests
             Assert.Equal(2, initializedOutArguments[0]);
 
             var establishingRebind = Emit("""
-                §M{m001:Test}
-                  §RTYPE{r1:Positive:i32} (> # INT:0)
-                  §F{f001:Mutate:pub}
+                §M{Test}
+                  §RTYPE{Positive:i32} (> # INT:0)
+                  §F{Mutate:pub}
                       §O{i32}
                       §B{~value:i32} INT:1
                       §B{~value:Positive} INT:2
@@ -2049,11 +2049,11 @@ public sealed class ObligationTests
     public void CSharpEmit_ConstructorInitializerChecksBeforeForwarding()
     {
         var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NonEmpty:str} (> (len #) INT:0)
-              §CL{c001:AppException:pub}
+            §M{Test}
+              §RTYPE{NonEmpty:str} (> (len #) INT:0)
+              §CL{AppException:pub}
                 §EXT{Exception}
-                §CTOR{ctor1:pub}
+                §CTOR{pub}
                   §I{NonEmpty:message}
                   §BASE
                     §A message
@@ -2079,11 +2079,11 @@ public sealed class ObligationTests
     public void CSharpEmit_ZeroArgumentConstructorInitializerWithRefinement_FailsClosed()
     {
         var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NonEmpty:str} (> (len #) INT:0)
-              §CL{c001:AppException:pub}
+            §M{Test}
+              §RTYPE{NonEmpty:str} (> (len #) INT:0)
+              §CL{AppException:pub}
                 §EXT{Exception}
-                §CTOR{ctor1:pub}
+                §CTOR{pub}
                   §I{NonEmpty:message}
                   §BASE
             """;
@@ -2119,14 +2119,14 @@ public sealed class ObligationTests
     public void CSharpEmit_LambdaParameterShadowsOuterIndexedBound()
     {
         var source = """
-            §M{m001:Test}
-              §ITYPE{it1:Sized:i32[]:n}
-              §F{f001:Shadow:pub}
+            §M{Test}
+              §ITYPE{Sized:i32[]:n}
+              §F{Shadow:pub}
                   §I{Sized:items}
                   §I{i32:n}
                   §I{i32:index}
                   §O{void}
-                  §B{read:Func<i32[], i32>} §LAM{l1:items:i32[]} §IDX items index §/LAM{l1}
+                  §B{read:Func<i32[], i32>} §LAM{items:i32[]} §IDX items index §/LAM
             """;
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors,
@@ -2185,10 +2185,10 @@ public sealed class ObligationTests
     public void CSharpEmit_ElidesAllDischargedGuardKindsWhenOptedIn()
     {
         var source = """
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §ITYPE{it1:Sized:i32[]:n}
-              §F{f001:All:priv}
+            §M{Test}
+              §RTYPE{Positive:i32} (> # INT:0)
+              §ITYPE{Sized:i32[]:n}
+              §F{All:priv}
                   §I{Positive:value}
                   §I{Sized:items}
                   §I{i32:n}

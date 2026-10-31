@@ -413,8 +413,8 @@ public class KInductionTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:NoLoop:pub}
+§M{Test}
+  §F{NoLoop:pub}
       §I{i32:x}
       §O{i32}
       §R (+ x INT:1)";
@@ -436,12 +436,12 @@ public class KInductionTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:Sum:pub}
+§M{Test}
+  §F{Sum:pub}
       §I{i32:n}
       §O{i32}
       §B{sum:i32} INT:0
-      §L{l1:i:0:10:1}
+      §L{i:0:10:1}
           §C{Console.WriteLine}
             §A i
           §/C
@@ -465,12 +465,12 @@ public class KInductionTests
 
         // Use FOR loop which has built-in iteration
         var source = @"
-§M{m001:Test}
-  §F{f001:Count:pub}
+§M{Test}
+  §F{Count:pub}
       §I{i32:n}
       §O{i32}
       §B{count:i32} INT:0
-      §L{l1:i:0:10:1}
+      §L{i:0:10:1}
           §C{Console.WriteLine}
             §A i
           §/C
@@ -519,10 +519,10 @@ public class KInductionTests
         // unsigned bound became -1, both yielding Proven over a substituted transition.
         Assert.True(Z3ContextFactory.IsAvailable, "this witness needs Z3");
         var source = @"
-§M{m001:Test}
-  §F{f001:Probe:pub}
+§M{Test}
+  §F{Probe:pub}
     §O{i32}
-    §L{l1:i:0:10:1}
+    §L{i:0:10:1}
       §B{t:i32} i
     §R INT:0";
         var func = GetFunction(source, out var parseDiag);
@@ -548,13 +548,13 @@ public class KInductionTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:Sum:pub}
+§M{Test}
+  §F{Sum:pub}
       §I{i32:n}
       §O{i32}
       §Q (>= n INT:0)
       §B{sum:i32} INT:0
-      §L{l1:i:0:10:1}
+      §L{i:0:10:1}
           §C{Console.WriteLine}
             §A i
           §/C

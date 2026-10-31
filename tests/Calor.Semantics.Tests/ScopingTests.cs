@@ -17,12 +17,12 @@ public class ScopingTests
     {
         // Inner scope can use outer variable in return
         var source = @"
-§M{m001:Test}
-  §F{f001:testAccess:pub}
+§M{Test}
+  §F{testAccess:pub}
       §I{bool:cond}
       §O{i32}
       §B{x} INT:42
-      §IF{if1} cond
+      §IF cond
           §R (+ x INT:1)
       §R x
 ";
@@ -47,11 +47,11 @@ public class ScopingTests
         // Return statement inside if block should return from function
 
         var source = @"
-§M{m001:Test}
-  §F{f001:testReturn:pub}
+§M{Test}
+  §F{testReturn:pub}
       §I{bool:condition}
       §O{i32}
-      §IF{if1} condition
+      §IF condition
           §R INT:42
       §R INT:0
 ";
@@ -75,14 +75,14 @@ public class ScopingTests
     {
         // Access variable from outer scope in deeply nested scope
         var source = @"
-§M{m001:Test}
-  §F{f001:testLookup:pub}
+§M{Test}
+  §F{testLookup:pub}
       §I{bool:a}
       §I{bool:b}
       §O{i32}
       §B{outer} INT:100
-      §IF{if1} a
-          §IF{if2} b
+      §IF a
+          §IF b
               §R outer
           §R (+ outer INT:10)
       §R (+ outer INT:20)
@@ -111,8 +111,8 @@ public class ScopingTests
     public void Scope_FunctionParameters_Accessible()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:useParams:pub}
+§M{Test}
+  §F{useParams:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -132,8 +132,8 @@ public class ScopingTests
     public void Scope_VariableInitialization_InCNF()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:test:pub}
+§M{Test}
+  §F{test:pub}
       §O{i32}
       §B{x} INT:5
       §B{y} (* x INT:2)
@@ -157,8 +157,8 @@ public class ScopingTests
     public void Scope_SameLevel_DifferentNames()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:test:pub}
+§M{Test}
+  §F{test:pub}
       §O{i32}
       §B{a} INT:1
       §B{b} INT:2

@@ -19,9 +19,9 @@ public sealed class ProofLocalObligationTests
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
         var source = $$"""
-            §M{m001:Test}
+            §M{Test}
               {{prelude}}
-              §F{f001:Check:priv}
+              §F{Check:priv}
                 {{parameters}}
                 §O{void}
             {{Indent(body)}}
@@ -64,14 +64,14 @@ public sealed class ProofLocalObligationTests
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
         var source = """
-            §M{m001:Banking}
-              §F{f001:Transfer:pub}
+            §M{Banking}
+              §F{Transfer:pub}
                 §I{i32:balance}
                 §I{i32:amount} | (> # INT:0)
                 §O{i32}
                 §Q (>= balance amount)
                 §B{newBalance:i32} (- balance amount)
-                §PROOF{p1:non-negative} (>= newBalance INT:0)
+                §PROOF{non-negative} (>= newBalance INT:0)
                 §R newBalance
             """;
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -86,7 +86,7 @@ public sealed class ProofLocalObligationTests
     public void LiteralLocal_Discharges()
         => Assert.Equal(ObligationStatus.Discharged, SolveProof("""
             §B{k:i32} INT:5
-            §PROOF{p1} (== k INT:5)
+            §PROOF{} (== k INT:5)
             """).Status);
 
     [SkippableFact]
@@ -96,7 +96,7 @@ public sealed class ProofLocalObligationTests
             §Q (< x INT:1000)
             §B{a:i32} (+ x INT:1)
             §B{b:i32} (* a INT:2)
-            §PROOF{p1} (> b x)
+            §PROOF{} (> b x)
             """).Status);
 
     [SkippableFact]
@@ -104,23 +104,23 @@ public sealed class ProofLocalObligationTests
         => Assert.Equal(ObligationStatus.Discharged, SolveProof("""
             §Q (> x INT:0)
             §B{positive} (> x INT:0)
-            §PROOF{p1} positive
+            §PROOF{} positive
             """).Status);
 
     [SkippableFact]
     public void LocalBoundBeforeBranch_ProvesInsideIt()
         => Assert.Equal(ObligationStatus.Discharged, SolveProof("""
             §B{k:i32} (- INT:0 INT:3)
-            §IF{i1} (> x k)
-              §PROOF{p1} (> x (- k INT:1))
+            §IF (> x k)
+              §PROOF{} (> x (- k INT:1))
             """).Status);
 
     [SkippableFact]
     public void LocalBoundInsideGuardedBody_ProvesInSameBody()
         => Assert.Equal(ObligationStatus.Discharged, SolveProof("""
-            §IF{i1} (> x INT:0)
+            §IF (> x INT:0)
               §B{y:i32} x
-              §PROOF{p1} (> y INT:0)
+              §PROOF{} (> y INT:0)
             """).Status);
 
     // ───── Soundness negatives: never Discharged ─────
@@ -129,7 +129,7 @@ public sealed class ProofLocalObligationTests
     public void MutableLocal_IsRefused()
         => AssertNotDischarged(SolveProof("""
             §B{~m:i32} INT:5
-            §PROOF{p1} (== m INT:5)
+            §PROOF{} (== m INT:5)
             """), "local 'm' is mutable");
 
     [SkippableFact]
@@ -137,7 +137,7 @@ public sealed class ProofLocalObligationTests
         => AssertNotDischarged(SolveProof("""
             §B{~m:i32} INT:5
             §ASSIGN m INT:-1
-            §PROOF{p1} (>= m INT:0)
+            §PROOF{} (>= m INT:0)
             """), "local 'm'");
 
     [SkippableFact]
@@ -145,7 +145,7 @@ public sealed class ProofLocalObligationTests
         => AssertNotDischarged(SolveProof("""
             §B{y:i32} x
             §ASSIGN x (+ x INT:1)
-            §PROOF{p1} (== y x)
+            §PROOF{} (== y x)
             """), "is defined from 'x'");
 
     [SkippableFact]
@@ -153,30 +153,30 @@ public sealed class ProofLocalObligationTests
         => AssertNotDischarged(SolveProof("""
             §B{y:i32} INT:1
             §C{Mutate} §A{ref} y §/C
-            §PROOF{p1} (== y INT:1)
+            §PROOF{} (== y INT:1)
             """), "local 'y' is reassigned");
 
     [SkippableFact]
     public void LocalBoundInBranchNotEnclosingProof_IsRefused()
         => AssertNotDischarged(SolveProof("""
-            §IF{i1} (> x INT:0)
+            §IF (> x INT:0)
               §B{y:i32} INT:1
             §EL
-              §PROOF{p1} (== y INT:1)
+              §PROOF{} (== y INT:1)
             """), "is not bound on every path to the proof");
 
     [SkippableFact]
     public void LocalBoundAfterProof_IsRefused()
         => AssertNotDischarged(SolveProof("""
-            §PROOF{p1} (== y INT:1)
+            §PROOF{} (== y INT:1)
             §B{y:i32} INT:1
             """), "is not bound on every path to the proof");
 
     [SkippableFact]
     public void LocalBoundInEarlierLoopIteration_IsRefused()
         => AssertNotDischarged(SolveProof("""
-            §WH{w1} (> x INT:0)
-              §PROOF{p1} (== y INT:1)
+            §WH (> x INT:0)
+              §PROOF{} (== y INT:1)
               §B{y:i32} INT:1
             """), "is not bound on every path to the proof");
 
@@ -185,7 +185,7 @@ public sealed class ProofLocalObligationTests
         => AssertNotDischarged(SolveProof("""
             §Q (> x INT:0)
             §B{x:i32} INT:-1
-            §PROOF{p1} (> x INT:0)
+            §PROOF{} (> x INT:0)
             """), "shares its name with a parameter");
 
     // Review round 1: the emitter sanitizes `a-b` to `ab`, so the mutable `ab` rebinds it.
@@ -204,34 +204,34 @@ public sealed class ProofLocalObligationTests
     public void LocalWithStateChangingRefinementGuard_IsRefused()
         => AssertNotDischarged(SolveProof("""
             §B{k:Bump} INT:1
-            §PROOF{p1} (== k INT:1)
-            """, prelude: "§RTYPE{r1:Bump:i32} (== (inc #) INT:2)"), "refinement guards may change state");
+            §PROOF{} (== k INT:1)
+            """, prelude: "§RTYPE{Bump:i32} (== (inc #) INT:2)"), "refinement guards may change state");
 
     [SkippableFact]
     public void LocalWithPureRefinementType_Discharges()
         => Assert.Equal(ObligationStatus.Discharged, SolveProof("""
             §B{k:Pos} INT:1
-            §PROOF{p1} (== k INT:1)
-            """, prelude: "§RTYPE{r1:Pos:i32} (> # INT:0)").Status);
+            §PROOF{} (== k INT:1)
+            """, prelude: "§RTYPE{Pos:i32} (> # INT:0)").Status);
 
     // Review round 3: the refinement guard reads a property, whose getter writes the storage the
     // by-reference parameter x aliases.
     [SkippableFact]
     public void LocalWithGetterReadingRefinementGuard_IsRefused()
         => AssertNotDischarged(SolveModule("""
-            §M{m1:Test}
-              §RTYPE{r1:Guard:i32} (== Heap.Next INT:1)
-              §CL{c1:Heap:pub}
+            §M{Test}
+              §RTYPE{Guard:i32} (== Heap.Next INT:1)
+              §CL{Heap:pub}
                 §FLD{i32:State:pub:stat} INT:1
-                §PROP{pr1:Next:i32:pub:stat}
+                §PROP{Next:i32:pub:stat}
                   §GET
                     §ASSIGN State INT:2
                     §R INT:1
-              §F{f1:Check:priv}
+              §F{Check:priv}
                 §I{i32:x:ref}
                 §O{void}
                 §B{saved:Guard} x
-                §PROOF{p1} (== saved x)
+                §PROOF{} (== saved x)
             """), "refinement guards may change state");
 
     // Review round 3: an `in` argument exposes the local's storage to the callee.
@@ -240,37 +240,37 @@ public sealed class ProofLocalObligationTests
         => AssertNotDischarged(SolveProof("""
             §B{k:i32} INT:1
             §C{Mutate} §A{in} k §/C
-            §PROOF{p1} (== k INT:1)
+            §PROOF{} (== k INT:1)
             """), "local 'k' is reassigned, passed by reference");
 
     [SkippableFact]
     public void LocalInModuleWithOperatorOverloads_IsRefused()
         => AssertNotDischarged(SolveModule("""
-            §M{m1:Test}
-              §CL{c1:Probe:pub}
-                §OP{op1:==:pub}
+            §M{Test}
+              §CL{Probe:pub}
+                §OP{==:pub}
                   §I{Probe:a}
                   §I{Probe:b}
                   §O{bool}
                   §R true
-                §OP{op2:!=:pub}
+                §OP{!=:pub}
                   §I{Probe:a}
                   §I{Probe:b}
                   §O{bool}
                   §R false
-              §F{f1:Check:priv}
+              §F{Check:priv}
                 §I{i32:x}
                 §O{void}
                 §B{k:i32} INT:1
-                §PROOF{p1} (== k INT:1)
+                §PROOF{} (== k INT:1)
             """), "operator overloads");
 
     [SkippableFact]
     public void LocalBoundTwice_IsRefused()
         => AssertNotDischarged(SolveProof("""
-            §IF{i1} (> x INT:0)
+            §IF (> x INT:0)
               §B{y:i32} INT:1
-              §PROOF{p1} (== y INT:1)
+              §PROOF{} (== y INT:1)
             §EL
               §B{y:i32} INT:-1
             """), "is bound more than once");
@@ -278,9 +278,9 @@ public sealed class ProofLocalObligationTests
     [SkippableFact]
     public void LocalDefinedFromLoopVariable_IsRefused()
         => AssertNotDischarged(SolveProof("""
-            §L{l1:i:0:10:1}
+            §L{i:0:10:1}
               §B{d:i32} i
-              §PROOF{p1} (>= d INT:0)
+              §PROOF{} (>= d INT:0)
             """), "is defined from 'i'");
 
     [SkippableFact]
@@ -288,7 +288,7 @@ public sealed class ProofLocalObligationTests
     {
         var proof = SolveProof("""
             §B{positive:bool} (> x INT:0)
-            §PROOF{p1} positive
+            §PROOF{} positive
             """);
         Assert.Equal(ObligationStatus.Failed, proof.Status);
     }
@@ -299,7 +299,7 @@ public sealed class ProofLocalObligationTests
             §Q (>= x INT:0)
             §Q (< x INT:100)
             §B{k:i32} (+ x INT:1)
-            §PROOF{p1} (< k x)
+            §PROOF{} (< k x)
             """));
 
     [SkippableFact]
@@ -309,7 +309,7 @@ public sealed class ProofLocalObligationTests
         // to complete, so the guard stays.
         var proof = SolveProof("""
             §B{k:i32} (+ x INT:1)
-            §PROOF{p1} (> k x)
+            §PROOF{} (> k x)
             """);
         Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
     }
@@ -318,21 +318,21 @@ public sealed class ProofLocalObligationTests
     public void WideningLocal_IsRefused()
         => AssertNotDischarged(SolveProof("""
             §B{w:i64} x
-            §PROOF{p1} (== w x)
+            §PROOF{} (== w x)
             """), "the conversion is not modeled");
 
     [SkippableFact]
     public void LocalDefinedByCall_IsRefused()
         => AssertNotDischarged(SolveProof("""
             §B{y:i32} §C{Next} §A x §/C
-            §PROOF{p1} (> y x)
+            §PROOF{} (> y x)
             """), "has a defining expression the verifier does not model");
 
     [SkippableFact]
     public void LocalDefinedFromField_IsRefused()
         => AssertNotDischarged(SolveProof("""
             §B{y:i32} count
-            §PROOF{p1} (== y count)
+            §PROOF{} (== y count)
             """), "is defined from 'count'");
 
     [SkippableFact]
@@ -340,7 +340,7 @@ public sealed class ProofLocalObligationTests
         => AssertNotDischarged(SolveProof("""
             §B{y:i32} INT:1
             §B{sink:i32} §CS{(y = -5)}
-            §PROOF{p1} (== y INT:1)
+            §PROOF{} (== y INT:1)
             """), "raw C#");
 
     // ───── Genuinely untranslatable proofs still report Unsupported ─────
@@ -349,7 +349,7 @@ public sealed class ProofLocalObligationTests
     public void ProofWithCall_StillUnsupported()
     {
         var proof = SolveProof("""
-            §PROOF{p1} (> §C{Next} §A x §/C x)
+            §PROOF{} (> §C{Next} §A x §/C x)
             """);
         Assert.Equal(ObligationStatus.Unsupported, proof.Status);
     }
@@ -357,6 +357,6 @@ public sealed class ProofLocalObligationTests
     [SkippableFact]
     public void ProofOverUnboundName_StillReportsUnknownVariable()
         => AssertNotDischarged(SolveProof("""
-            §PROOF{p1} (> missing INT:0)
+            §PROOF{} (> missing INT:0)
             """), "Unknown variable 'missing'");
 }

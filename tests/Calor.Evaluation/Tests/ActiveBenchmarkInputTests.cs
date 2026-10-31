@@ -79,7 +79,7 @@ public class ActiveBenchmarkInputTests
         try
         {
             if (!missingCalor)
-                await File.WriteAllTextAsync(Path.Combine(benchmarks, "Required.calr"), "§M{m:Required}\n");
+                await File.WriteAllTextAsync(Path.Combine(benchmarks, "Required.calr"), "§M{Required}\n");
             else
                 await File.WriteAllTextAsync(Path.Combine(benchmarks, "Required.cs"), "public class Required {}");
             var entry = new BenchmarkEntry
@@ -107,7 +107,7 @@ public class ActiveBenchmarkInputTests
         var testData = Path.Combine(root, "tests/TestData");
         var benchmarks = Path.Combine(testData, "Benchmarks");
         Directory.CreateDirectory(benchmarks);
-        const string calor = "§M{m:Fallback}\n";
+        const string calor = "§M{Fallback}\n";
         const string csharp = "public class Fallback {}";
         try
         {
@@ -138,7 +138,7 @@ public class ActiveBenchmarkInputTests
         Directory.CreateDirectory(directory);
         var calor = Path.Combine(directory, "Visitor.calr");
         var csharp = Path.Combine(directory, "Visitor.cs");
-        const string source = "§M{m:External}\n  §CL{c:Visitor:pub,stat}\n";
+        const string source = "§M{External}\n  §CL{Visitor:pub,stat}\n";
         try
         {
             await File.WriteAllTextAsync(calor, source);
@@ -240,7 +240,7 @@ public class ActiveBenchmarkInputTests
         Directory.CreateDirectory(benchmarks);
         try
         {
-            await File.WriteAllTextAsync(Path.Combine(benchmarks, "Unregistered.calr"), "§M{m:Unregistered}\n");
+            await File.WriteAllTextAsync(Path.Combine(benchmarks, "Unregistered.calr"), "§M{Unregistered}\n");
             await File.WriteAllTextAsync(Path.Combine(benchmarks, "Unregistered.cs"), "public class Unregistered {}");
             const string registered = "DesignPatterns/Visitor.calr";
             var bug = new BugEntry
@@ -285,7 +285,7 @@ public class ActiveBenchmarkInputTests
                     if (role + extension == missing)
                         continue;
                     await File.WriteAllTextAsync(Path.Combine(benchmarks, role + extension),
-                        extension == ".calr" ? "§M{m:Input}\n" : "public class Input {}");
+                        extension == ".calr" ? "§M{Input}\n" : "public class Input {}");
                 }
             var bug = new BugEntry
             {

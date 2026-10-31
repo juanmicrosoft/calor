@@ -141,12 +141,12 @@ public partial class BclMemberAnnotationTests(ITestOutputHelper output)
         string boundary, string statement)
     {
         string Source(bool guarded) => $$"""
-            §M{m1:GuardedLegacy}
-              §F{take:Take:pub} (System.IO.DirectoryInfo:value) -> System.IO.DirectoryInfo
+            §M{GuardedLegacy}
+              §F{Take:pub} (System.IO.DirectoryInfo:value) -> System.IO.DirectoryInfo
                 §R value
-              §F{probe:Probe:pub} (N5Fixture.Legacy:value) -> System.IO.DirectoryInfo
+              §F{Probe:pub} (N5Fixture.Legacy:value) -> System.IO.DirectoryInfo
                 §B{legacy} value.DirectoryField
-                {{(guarded ? "§IF{guard} (!= legacy null)\n      " : "")}}{{statement}}
+                {{(guarded ? "§IF (!= legacy null)\n      " : "")}}{{statement}}
             """;
 
         var (_, guardedDiagnostics, _) = Bind(Source(guarded: true), FixtureContext.Value);
@@ -358,8 +358,8 @@ public partial class BclMemberAnnotationTests(ITestOutputHelper output)
             _ => throw new ArgumentOutOfRangeException(nameof(boundary))
         };
         return $$"""
-            §M{m1:BclMembers}
-              §F{probe:Probe:pub} ({{parameters}}) -> {{(boundary == "return" ? receivingType : "void")}}
+            §M{BclMembers}
+              §F{Probe:pub} ({{parameters}}) -> {{(boundary == "return" ? receivingType : "void")}}
                 {{body}}
             """;
     }

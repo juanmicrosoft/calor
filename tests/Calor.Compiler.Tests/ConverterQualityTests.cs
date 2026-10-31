@@ -41,8 +41,8 @@ public class ConverterQualityTests
         var expression = fallback.Accept(new CalorEmitter());
         Assert.Equal($"§CS{{{original}}}", expression);
         Assert.DoesNotContain("§ERR", expression);
-        var source = "§M{m1:FallbackRoundTrip}\n"
-            + "  §F{f1:Probe:pub} () -> str\n    §R " + expression;
+        var source = "§M{FallbackRoundTrip}\n"
+            + "  §F{Probe:pub} () -> str\n    §R " + expression;
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
@@ -82,8 +82,8 @@ public class ConverterQualityTests
     public void FallbackExpression_ParsesWithoutCascadingErrors()
     {
         var calorSource = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{x:i32} §CS{checked(1 + 2)}
             """;
@@ -100,8 +100,8 @@ public class ConverterQualityTests
     public void FallbackExpression_InReturn_ParsesCleanly()
     {
         var calorSource = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{str}
                   §R §CS{throw new Exception()}
             """;
@@ -118,8 +118,8 @@ public class ConverterQualityTests
     public void FallbackExpression_MultipleInFile_NoParserCascade()
     {
         var calorSource = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{x:i32} §CS{checked(1 + 2)}
                   §B{y:str} §CS{string.Empty}
@@ -320,8 +320,8 @@ public class ConverterQualityTests
     public void NamedArgs_CalorParsesCorrectly()
     {
         var calorSource = """
-            §M{m001:Test}
-              §F{f001:Configure:pub}
+            §M{Test}
+              §F{Configure:pub}
                   §O{void}
                   §C{Register} §A[name] "en-US" §A[flag] true §/C
             """;
@@ -1083,7 +1083,7 @@ public class Foo
     [Fact]
     public void ScientificNotation_ParsesCorrectly()
     {
-        var source = "§M{m1:Test}\n  §CL{c1:Foo:pub}\n    §MT{m1:Foo:pub} () -> f64\n      §B{f64:epsilon} 2.2204460492503131E-16\n      §R epsilon\n\n\n";
+        var source = "§M{Test}\n  §CL{Foo:pub}\n    §MT{Foo:pub} () -> f64\n      §B{f64:epsilon} 2.2204460492503131E-16\n      §R epsilon\n\n\n";
         var diag = new DiagnosticBag();
         var tokens = new Lexer(source, diag).TokenizeAll();
         // Check lexer recognized the scientific notation as a float literal

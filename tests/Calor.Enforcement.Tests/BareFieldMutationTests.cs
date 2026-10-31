@@ -51,7 +51,7 @@ public sealed class BareFieldMutationTests
     public void NestedLocalShadow_DoesNotHideAFieldWriteAfterItsScope()
     {
         var source = Source("""
-            §IF{i1} true
+            §IF true
               §B{~n:i32} 0
               §ASSIGN n 1
             §ASSIGN n 5
@@ -77,17 +77,17 @@ public sealed class BareFieldMutationTests
         });
 
     private static string Source(string statement, bool isStatic, bool inherited) => $$"""
-        §M{m1:FieldEffects}
-          §F{f1:Bump:pub} (i32:value:ref) -> void
+        §M{FieldEffects}
+          §F{Bump:pub} (i32:value:ref) -> void
             §ASSIGN value (+ value 1)
-          §F{f2:Set:pub} (i32:value:out) -> void
+          §F{Set:pub} (i32:value:out) -> void
             §ASSIGN value 5
-          §F{f3:Read:pub} (i32:value:in) -> void
+          §F{Read:pub} (i32:value:in) -> void
             §R
-          §CL{c1:Parent:pub}
+          §CL{Parent:pub}
             §FLD{i32:n:pub{{(isStatic ? ":stat" : "")}}}
-          {{(inherited ? "§CL{c2:Child:pub}\n    §EXT{Parent}" : "")}}
-            §MT{mt1:Write:pub{{(isStatic ? ":stat" : "")}}} () -> void
+          {{(inherited ? "§CL{Child:pub}\n    §EXT{Parent}" : "")}}
+            §MT{Write:pub{{(isStatic ? ":stat" : "")}}} () -> void
               §E{}
               {{statement}}
         """;

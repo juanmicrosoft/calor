@@ -15,12 +15,12 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:CreateInt:pub}
+            §M{Test}
+              §F{CreateInt:pub}
                 §O{void}
                 §E{alloc,cw}
                 §B{w:Example.Widget} §NEW{Example.Widget} §A INT:1 §/NEW
-              §F{f2:CreateString:pub}
+              §F{CreateString:pub}
                 §O{void}
                 §E{alloc,fs:r}
                 §B{w:Example.Widget} §NEW{Example.Widget} §A STR:"x" §/NEW
@@ -48,8 +48,8 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:Create:pub}
+            §M{Test}
+              §F{Create:pub}
                 §O{void}
                 §E{alloc}
                 §B{x:Missing.Widget} §NEW{Missing.Widget} §/NEW
@@ -68,14 +68,14 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §CL{c1:Person:pub}
+            §M{Test}
+              §CL{Person:pub}
                 §FLD{str:_name:priv}
-                §CTOR{ctor1:pub}
+                §CTOR{pub}
                   §I{str:name}
                   §ASSIGN §THIS._name name
-                §/CTOR{ctor1}
-              §F{f1:Create:pub}
+                §/CTOR
+              §F{Create:pub}
                 §O{void}
                 §E{alloc,mut}
                 §B{p:Person} §NEW{Person} §A STR:"Ada" §/NEW
@@ -91,11 +91,11 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §CL{c1:Reporter:pub}
-                §CTOR{ctor1:pub}
+            §M{Test}
+              §CL{Reporter:pub}
+                §CTOR{pub}
                   §P "created"
-                §/CTOR{ctor1}
+                §/CTOR
             """);
 
         Assert.Contains(diagnostics.Errors,
@@ -108,8 +108,8 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:Create:pub}
+            §M{Test}
+              §F{Create:pub}
                 §O{void}
                 §E{alloc,mut}
                 §B{p:Example.Person} §NEW{Example.Person}
@@ -139,10 +139,10 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §CL{c1:Person:pub}
-                §PROP{p1:Name:str:pub:get,set}
-              §F{f1:Create:pub}
+            §M{Test}
+              §CL{Person:pub}
+                §PROP{Name:str:pub:get,set}
+              §F{Create:pub}
                 §O{void}
                 §E{alloc}
                 §B{p:Person} §NEW{Person}
@@ -162,14 +162,14 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §CL{c1:Person:pub}
-                §PROP{p1:Name:str:pub}
+            §M{Test}
+              §CL{Person:pub}
+                §PROP{Name:str:pub}
                   §SET
                     §P "setting"
                   §/SET
-                §/PROP{p1}
-              §F{f1:Create:pub}
+                §/PROP
+              §F{Create:pub}
                 §O{void}
                 §E{alloc,mut}
                 §B{p:Person} §NEW{Person}
@@ -190,12 +190,12 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:Use:pub}
+            §M{Test}
+              §F{Use:pub}
                 §O{void}
                 §E{alloc}
-                §USE{u1:r:Example.Resource} §NEW{Example.Resource} §/NEW
-                §/USE{u1}
+                §USE{r:Example.Resource} §NEW{Example.Resource} §/NEW
+                §/USE
             """,
             """
             {
@@ -220,13 +220,13 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:Use:pub}
+            §M{Test}
+              §F{Use:pub}
                 §I{Missing.Resource:r}
                 §O{void}
                 §E{}
-                §USE{u1:x:Missing.Resource} r
-                §/USE{u1}
+                §USE{x:Missing.Resource} r
+                §/USE
             """);
 
         Assert.Contains(diagnostics,
@@ -242,16 +242,16 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §CL{c1:Publisher:pub}
-                §EVT{e1:Changed:pub:EventHandler}
+            §M{Test}
+              §CL{Publisher:pub}
+                §EVT{Changed:pub:EventHandler}
                   §EADD
                     §P "adding"
                   §/EADD
                   §EREM
                   §/EREM
-                §/EVT{e1}
-              §F{f1:Subscribe:pub}
+                §/EVT
+              §F{Subscribe:pub}
                 §I{Publisher:p}
                 §I{EventHandler:h}
                 §O{void}
@@ -272,10 +272,10 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §CL{c1:Publisher:pub}
-                §EVT{e1:Changed:pub:EventHandler}
-              §F{f1:Subscribe:pub}
+            §M{Test}
+              §CL{Publisher:pub}
+                §EVT{Changed:pub:EventHandler}
+              §F{Subscribe:pub}
                 §I{Publisher:p}
                 §I{EventHandler:h}
                 §O{void}
@@ -294,16 +294,16 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §CL{c1:Publisher:pub}
-                §EVT{e1:Changed:pub:EventHandler}
+            §M{Test}
+              §CL{Publisher:pub}
+                §EVT{Changed:pub:EventHandler}
                   §EADD
                   §/EADD
                   §EREM
                     §P "removing"
                   §/EREM
-                §/EVT{e1}
-              §F{f1:Unsubscribe:pub}
+                §/EVT
+              §F{Unsubscribe:pub}
                 §I{Publisher:p}
                 §I{EventHandler:h}
                 §O{void}
@@ -324,8 +324,8 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Parse(
             """
-            §M{m1:Test}
-              §F{f1:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                 §O{void}
                 §E{fs:x}
             """,
@@ -354,7 +354,7 @@ public sealed class Issue785ClosureTests
             Assert.Contains(code, effectSet.ToDisplayString());
 
             var sourceDiagnostics = Parse(
-                $"§M{{m1:Test}}\n  §F{{f1:Run:pub}}\n    §O{{void}}\n    §E{{{code}}}\n",
+                $"§M{{Test}}\n  §F{{Run:pub}}\n    §O{{void}}\n    §E{{{code}}}\n",
                 out var module);
             Assert.DoesNotContain(sourceDiagnostics.Errors,
                 diagnostic => diagnostic.Code == DiagnosticCode.UnknownEffectCode);
@@ -386,11 +386,11 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:WriteLine:pub}
+            §M{Test}
+              §F{WriteLine:pub}
                 §O{void}
                 §E{}
-              §F{f2:Run:pub}
+              §F{Run:pub}
                 §O{void}
                 §E{}
                 §C{Console.WriteLine} §A STR:"external" §/C
@@ -406,15 +406,15 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §CL{c1:Base:pub}
-                §CTOR{ctor1:pub}
+            §M{Test}
+              §CL{Base:pub}
+                §CTOR{pub}
                   §P "base"
-                §/CTOR{ctor1}
-              §CL{c2:Derived:Base:pub}
-                §CTOR{ctor2:pub}
-                §/CTOR{ctor2}
-              §F{f1:Create:pub}
+                §/CTOR
+              §CL{Derived:Base:pub}
+                §CTOR{pub}
+                §/CTOR
+              §F{Create:pub}
                 §O{void}
                 §E{alloc}
                 §B{x:Derived} §NEW{Derived} §/NEW
@@ -466,8 +466,8 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:Run:pub}
+            §M{Test}
+              §F{Run:pub}
                 §O{void}
                 §E{alloc}
                 §C{Example.Api.Transform}
@@ -503,29 +503,29 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:Use:pub}
+            §M{Test}
+              §F{Use:pub}
                 §I{Derived:x}
                 §I{EventHandler:h}
                 §O{void}
                 §E{mut,cw}
                 §SUB x.Changed h
-                §USE{u1:r:Derived} x
-                §/USE{u1}
-              §F{f2:Create:pub}
+                §USE{r:Derived} x
+                §/USE
+              §F{Create:pub}
                 §O{void}
                 §E{alloc,mut}
                 §B{x:Derived} §NEW{Derived}
                   §INIT{Name} STR:"ok"
                 §/NEW
-              §CL{c1:Base:pub}
-                §PROP{p1:Name:str:pub:get,set}
-                §EVT{e1:Changed:pub:EventHandler}
-                §MT{m1:Dispose:pub}
+              §CL{Base:pub}
+                §PROP{Name:str:pub:get,set}
+                §EVT{Changed:pub:EventHandler}
+                §MT{Dispose:pub}
                   §O{void}
                   §E{cw}
                   §P "dispose"
-              §CL{c2:Derived:Base:pub}
+              §CL{Derived:Base:pub}
             """);
 
         Assert.DoesNotContain(diagnostics,
@@ -537,20 +537,20 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:Read:pub}
+            §M{Test}
+              §F{Read:pub}
                 §I{Derived:x}
                 §O{void}
                 §E{}
                 §B{value:str} x.Name
-              §CL{c1:Base:pub}
-                §PROP{p1:Name:str:pub}
+              §CL{Base:pub}
+                §PROP{Name:str:pub}
                   §GET
                     §P "get"
                     §R STR:"value"
                   §/GET
-                §/PROP{p1}
-              §CL{c2:Derived:Base:pub}
+                §/PROP
+              §CL{Derived:Base:pub}
             """);
 
         Assert.Contains(diagnostics.Errors,
@@ -563,14 +563,14 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §CL{c1:Base:pub}
-                §CTOR{ctor1:pub}
+            §M{Test}
+              §CL{Base:pub}
+                §CTOR{pub}
                   §P "instance"
-                §/CTOR{ctor1}
-              §CL{c2:Derived:Base:pub}
-                §CTOR{ctor2:stat}
-                §/CTOR{ctor2}
+                §/CTOR
+              §CL{Derived:Base:pub}
+                §CTOR{stat}
+                §/CTOR
             """);
 
         Assert.DoesNotContain(diagnostics.Errors,
@@ -631,8 +631,8 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:Use:pub}
+            §M{Test}
+              §F{Use:pub}
                 §I{Vendor.Widget:w}
                 §O{void}
                 §E{mut}
@@ -663,11 +663,11 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:Create:pub}
+            §M{Test}
+              §F{Create:pub}
                 §O{void}
                 §E{}
-                §B{[i32]:items} §ARR{i32:items:1}
+                §B{[i32]:items} §ARR{items:1}
             """);
 
         Assert.Contains(diagnostics.Errors,

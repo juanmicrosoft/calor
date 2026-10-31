@@ -52,13 +52,13 @@ public class LocalReferenceAnnotationTests
             : boundary == "argument" ? isBcl ? "System.Security.AccessControl.DirectorySecurity" : "i32"
             : "void";
         var source = $$"""
-            §M{m1:LocalReferences}
-              §CL{c1:Foo:pub}
-                §MT{get:Get:pub:static} ({{(nullable ? "?Foo" : "Foo")}}:input) -> {{(nullable ? "?Foo" : "Foo")}}
+            §M{LocalReferences}
+              §CL{Foo:pub}
+                §MT{Get:pub:static} ({{(nullable ? "?Foo" : "Foo")}}:input) -> {{(nullable ? "?Foo" : "Foo")}}
                   §R input
-                §MT{consume:Consume:pub:static} ({{receivingType}}:value) -> i32
+                §MT{Consume:pub:static} ({{receivingType}}:value) -> i32
                   §R 0
-                §MT{probe:Probe:pub:static} ({{(nullable ? "?Foo" : "Foo")}}:input) -> {{output}}
+                §MT{Probe:pub:static} ({{(nullable ? "?Foo" : "Foo")}}:input) -> {{output}}
                   {{body}}
             """;
         var (module, diagnostics) = Bind(source);
@@ -113,13 +113,13 @@ public class LocalReferenceAnnotationTests
             : $"§PROP{{p1:Value:{typeName}:pub:get,set}}";
         var receivingType = typeName.TrimStart('?');
         var source = $$"""
-            §M{m1:NativeMemberAnnotations}
-              §CL{c1:Foo:pub}
-              §CL{c2:Parent:pub}
+            §M{NativeMemberAnnotations}
+              §CL{Foo:pub}
+              §CL{Parent:pub}
                 {{member}}
-              §CL{c3:Child:pub}
+              §CL{Child:pub}
                 §EXT{Parent}
-                §MT{probe:Probe:pub} () -> void
+                §MT{Probe:pub} () -> void
                   §B{bare:{{receivingType}}} Value
                   §B{viaThis:{{receivingType}}} §THIS.Value
                   §B{viaBase:{{receivingType}}} §BASE.Value
@@ -153,15 +153,15 @@ public class LocalReferenceAnnotationTests
         string receivingType, bool nullable, bool expectedFinding)
     {
         var sourceA = $$"""
-            §M{m1:Namespaces}
-              §CL{c1:Foo:pub}
-                §MT{get:Get:pub:static} () -> {{(nullable ? "?Foo" : "Foo")}}
+            §M{Namespaces}
+              §CL{Foo:pub}
+                §MT{Get:pub:static} () -> {{(nullable ? "?Foo" : "Foo")}}
                   §R §NEW{Foo}
             """;
         var sourceB = $$"""
-            §M{m1:Namespaces}
-              §CL{c2:Foo:pub}
-                §MT{probe:Probe:pub:static} () -> void
+            §M{Namespaces}
+              §CL{Foo:pub}
+                §MT{Probe:pub:static} () -> void
                   §B{first} §C{A.Foo.Get} §/C
                   §B{second} first
                   §B{result:{{receivingType}}} second
@@ -197,9 +197,9 @@ public class LocalReferenceAnnotationTests
         string declaredType, NullableAnnotation expected)
     {
         var source = $$"""
-            §M{m1:DeclaredReferences}
-              §CL{c1:Foo:pub}
-                §MT{probe:Probe:pub:static} () -> void
+            §M{DeclaredReferences}
+              §CL{Foo:pub}
+                §MT{Probe:pub:static} () -> void
                   §B{first:{{declaredType}}} §NEW{Foo}
                   §B{second} first
                   §B{third} second
@@ -219,9 +219,9 @@ public class LocalReferenceAnnotationTests
         string rightType, NullableAnnotation expected)
     {
         var source = $$"""
-            §M{m1:ConditionalLimit}
-              §CL{c1:Foo:pub}
-                §MT{probe:Probe:pub:static} (bool:choose, Foo:left, {{rightType}}:right) -> void
+            §M{ConditionalLimit}
+              §CL{Foo:pub}
+                §MT{Probe:pub:static} (bool:choose, Foo:left, {{rightType}}:right) -> void
                   §B{first} (? choose left right)
                   §B{second} first
             """;
@@ -244,9 +244,9 @@ public class LocalReferenceAnnotationTests
     public void ValueAndUnresolvedSources_DoNotAcquireReferenceIdentity(string expression)
     {
         var source = $$"""
-            §M{m1:ExcludedSources}
-              §CL{c1:Holder:pub}
-                §MT{probe:Probe:pub:static} () -> void
+            §M{ExcludedSources}
+              §CL{Holder:pub}
+                §MT{Probe:pub:static} () -> void
                   §B{first} {{expression}}
                   §B{second} first
             """;
@@ -267,9 +267,9 @@ public class LocalReferenceAnnotationTests
             ? "§C{System.Environment.GetEnvironmentVariable} §A STR:\"CALOR_N0_UNSET\" §/C"
             : "§C{System.IO.Directory.GetCurrentDirectory} §/C";
         var source = $$"""
-            §M{m1:StringLocalRegression}
-              §CL{c1:Holder:pub}
-                §MT{probe:Probe:pub:static} () -> string
+            §M{StringLocalRegression}
+              §CL{Holder:pub}
+                §MT{Probe:pub:static} () -> string
                   §B{first} {{call}}
                   §B{second} first
                   §R second
@@ -298,11 +298,11 @@ public class LocalReferenceAnnotationTests
         // nullable-interface field reads. The local interface makes resolution
         // explicit; the original per-file corpus still has an unresolved interface.
         var source = $$"""
-            §M{m1:EnricherFieldReduction}
-              §IFACE{i1:ILogEventEnricher:pub}
-              §CL{c1:Holder:pub}
+            §M{EnricherFieldReduction}
+              §IFACE{ILogEventEnricher:pub}
+              §CL{Holder:pub}
                 §FLD{ {{(nullable ? "?ILogEventEnricher" : "ILogEventEnricher")}}:{{memberName}}:priv}
-                §MT{probe:Probe:pub} () -> ILogEventEnricher
+                §MT{Probe:pub} () -> ILogEventEnricher
                   §B{first} §THIS.{{memberName}}
                   §B{second} first
                   §R second
@@ -338,12 +338,12 @@ public class LocalReferenceAnnotationTests
         }
         statements.Add($"§R §C{{Holder.Consume}} §A {value} §/C");
         var source = $$"""
-            §M{m1:RetainedNativeInputLimit}
-              §CL{c1:Holder:pub}
-                §MT{consume:Consume:pub:static} (System.IO.DirectoryInfo:value) -> i32
+            §M{RetainedNativeInputLimit}
+              §CL{Holder:pub}
+                §MT{Consume:pub:static} (System.IO.DirectoryInfo:value) -> i32
                   §E{}
                   §R 0
-                §MT{probe:Probe:pub:static} () -> i32
+                §MT{Probe:pub:static} () -> i32
                   §E{fs:{{(nullable ? "r" : "w")}}}
                   {{string.Join("\n      ", statements)}}
             """;
@@ -386,12 +386,12 @@ public class LocalReferenceAnnotationTests
             ? $"§FLD{{{typeName}:Value:pub}}"
             : $"§PROP{{p1:Value:{typeName}:pub:get,set}}";
         var source = $$"""
-            §M{m1:StringMemberInference}
-              §CL{c1:Parent:pub}
+            §M{StringMemberInference}
+              §CL{Parent:pub}
                 {{member}}
-              §CL{c2:Child:pub}
+              §CL{Child:pub}
                 §EXT{Parent}
-                §MT{probe:Probe:pub} () -> void
+                §MT{Probe:pub} () -> void
                   §B{bareFirst} Value
                   §B{bareSecond} bareFirst
                   §B{bareResult:string} bareSecond
@@ -429,11 +429,11 @@ public class LocalReferenceAnnotationTests
         bool returned, string typeName)
     {
         var source = $$"""
-            §M{m1:StringSourceInference}
-              §CL{c1:Holder:pub}
-                §MT{get:Get:pub:static} ({{typeName}}:input) -> {{typeName}}
+            §M{StringSourceInference}
+              §CL{Holder:pub}
+                §MT{Get:pub:static} ({{typeName}}:input) -> {{typeName}}
                   §R input
-                §MT{probe:Probe:pub:static} ({{typeName}}:input) -> void
+                §MT{Probe:pub:static} ({{typeName}}:input) -> void
                   §B{first} {{(returned ? "§C{Holder.Get} §A input §/C" : "input")}}
                   §B{second} first
                   §B{result:string} second
@@ -458,9 +458,9 @@ public class LocalReferenceAnnotationTests
     public void NullableReference_InferredChainRetainsNullableAnnotation()
     {
         const string source = """
-            §M{m1:OptionInference}
-              §CL{c1:Holder:pub}
-                §MT{probe:Probe:pub:static} () -> void
+            §M{OptionInference}
+              §CL{Holder:pub}
+                §MT{Probe:pub:static} () -> void
                   §B{first:?str} null
                   §B{second} first
                   §B{result:string} second

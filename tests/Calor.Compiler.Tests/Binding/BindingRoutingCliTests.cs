@@ -7,10 +7,10 @@ namespace Calor.Compiler.Tests;
 public class BindingRoutingCliTests : IDisposable
 {
     private const string Duplicate = """
-        §M{m1:Routing}
-          §F{f1:Probe:pub} () -> i32
+        §M{Routing}
+          §F{Probe:pub} () -> i32
             §R 1
-          §F{f2:Probe:pub} () -> i32
+          §F{Probe:pub} () -> i32
             §R 2
         """;
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "calor-routing-" + Guid.NewGuid().ToString("N"));
@@ -84,11 +84,11 @@ public class BindingRoutingCliTests : IDisposable
     public void NativeStringInput_KeepsRejectionWithTheCorrectCode(bool expression, int mode)
     {
         var source = $$"""
-            §M{m1:Routing}
-              §F{take:Take:pub} (str:value) -> i32
+            §M{Routing}
+              §F{Take:pub} (str:value) -> i32
                 §E{}
                 §R 1
-              §F{caller:Caller:pub} (?str:value) -> i32
+              §F{Caller:pub} (?str:value) -> i32
                 §E{}
                 {{(expression ? "§R " : "")}}§C{Take} §A value §/C
                 {{(expression ? "" : "§R 0")}}
@@ -152,9 +152,9 @@ public class BindingRoutingCliTests : IDisposable
         _ = boundary;
         var file = Path.Combine(_directory, "input.calr");
         var source = code == DiagnosticCode.NullableArgumentToNonNullableParameter
-            ? "§M{m1:Routing}\n  §F{take:Take:pub} (str:value) -> i32\n    §R 1\n"
-                + "  §F{probe:Probe:pub} (?str:value) -> i32\n    §R §C{Take} §A value §/C\n"
-            : $"§M{{m1:Routing}}\n  §F{{f1:Probe:pub}} () -> {returnType}\n    §E{{env}}\n    {body}\n";
+            ? "§M{Routing}\n  §F{Take:pub} (str:value) -> i32\n    §R 1\n"
+                + "  §F{Probe:pub} (?str:value) -> i32\n    §R §C{Take} §A value §/C\n"
+            : $"§M{{Routing}}\n  §F{{Probe:pub}} () -> {returnType}\n    §E{{env}}\n    {body}\n";
         File.WriteAllText(file, source);
         var result = CliTestHarness.RunCli(_directory, "-i", file, "--format", "json", "--no-cache", "--no-telemetry");
         Assert.Equal(1, result.ExitCode);
@@ -180,8 +180,8 @@ public class BindingRoutingCliTests : IDisposable
         Directory.CreateDirectory(projectDirectory);
         var sourcePath = Path.Combine(projectDirectory, "input.calr");
         File.WriteAllText(sourcePath, """
-            §M{m1:Installed}
-              §F{f1:Probe:pub} () -> void
+            §M{Installed}
+              §F{Probe:pub} () -> void
                 §E{env}
                 §B{value:str} §C{System.Environment.GetEnvironmentVariable} §A "CALOR_INSTALLED_ABSENT" §/C
             """);

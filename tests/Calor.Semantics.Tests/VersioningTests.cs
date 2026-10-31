@@ -81,9 +81,9 @@ public class VersioningTests
     private static CompilationResult CompileModule(string semverLine)
     {
         var source = $$"""
-            §M{m001:Test}
+            §M{Test}
             {{semverLine}}
-              §F{f001:Answer:pub} () -> int
+              §F{Answer:pub} () -> int
                 §E{}
                 §R INT:42
             """;

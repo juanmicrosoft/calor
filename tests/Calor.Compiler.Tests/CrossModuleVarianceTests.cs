@@ -45,22 +45,22 @@ public sealed class CrossModuleVarianceTests : IDisposable
     public void InterfaceVarianceChecksDirectAndInheritedImplementations(bool inherited)
     {
         Write("interface", """
-            §M{m1:Shared}
-              §IFACE{i1:IQuiet}
-                §MT{mt1:Render} () -> void
+            §M{Shared}
+              §IFACE{IQuiet}
+                §MT{Render} () -> void
                   §E{}
             """);
         Write("implementation", """
-            §M{m2:Shared}
-              §CL{c1:Writer:pub}
-                §MT{mt2:Render:pub} () -> void
+            §M{Shared}
+              §CL{Writer:pub}
+                §MT{Render:pub} () -> void
                   §E{cw}
             """ + (inherited ? "" : "\n    §IMPL{IQuiet}\n"));
         if (inherited)
         {
             Write("derived", """
-                §M{m3:Shared}
-                  §CL{c2:Derived:Writer:pub}
+                §M{Shared}
+                  §CL{Derived:Writer:pub}
                     §IMPL{IQuiet}
                 """);
         }
@@ -103,7 +103,7 @@ public sealed class CrossModuleVarianceTests : IDisposable
     {
         Write("base", Base("").Replace("Shared", "Contracts"));
         Write("decoy", Base("cw").Replace("Shared", "Unrelated"));
-        Write("derived", Derived.Replace("§M{m2:Shared}\n", "§M{m2:Consumer}\n" + imports)
+        Write("derived", Derived.Replace("§M{Shared}\n", "§M{Consumer}\n" + imports)
             .Replace(":Derived:Base:pub", ":Derived:" + reference + ":pub"));
 
         var (_, diagnostics) = Compile();
@@ -120,8 +120,8 @@ public sealed class CrossModuleVarianceTests : IDisposable
         Write("base", Base(""));
         Write("other", duplicateIdentity ? Base("cw") : Base("cw").Replace("Shared", "Other"));
         Write("derived", duplicateIdentity ? Derived
-            : Derived.Replace("§M{m2:Shared}\n",
-                "§M{m2:Consumer}\n  §U{Shared}\n  §U{Other}\n"));
+            : Derived.Replace("§M{Shared}\n",
+                "§M{Consumer}\n  §U{Shared}\n  §U{Other}\n"));
 
         var (_, diagnostics) = Compile();
 
@@ -133,15 +133,15 @@ public sealed class CrossModuleVarianceTests : IDisposable
     public void GenericBaseArgumentsAreSubstitutedBeforeMatchingMethods()
     {
         Write("base", """
-            §M{m1:Shared}
-              §CL{c1:Base:pub}<T>
-                §MT{mt1:Render:pub:virt} (T:value) -> void
+            §M{Shared}
+              §CL{Base:pub}<T>
+                §MT{Render:pub:virt} (T:value) -> void
                   §E{}
             """);
         Write("derived", """
-            §M{m2:Shared}
-              §CL{c2:Derived:Base<i32>:pub}
-                §MT{mt2:Render:pub:over} (i32:value) -> void
+            §M{Shared}
+              §CL{Derived:Base<i32>:pub}
+                §MT{Render:pub:over} (i32:value) -> void
                   §E{cw}
             """);
 
@@ -156,8 +156,8 @@ public sealed class CrossModuleVarianceTests : IDisposable
     {
         Write("base", Base("").Replace(":Base:pub}", ":Base:pub:partial}"));
         Write("other", """
-            §M{m3:Shared}
-              §CL{c3:Base:pub:partial}
+            §M{Shared}
+              §CL{Base:pub:partial}
             """);
         Write("derived", Derived);
 
@@ -171,25 +171,25 @@ public sealed class CrossModuleVarianceTests : IDisposable
     public void GenericInterfaceAndImplementationChainsPreserveTypeArguments()
     {
         Write("parent", """
-            §M{m1:Shared}
-              §IFACE{i1:IQuiet}<T>
-                §MT{mt1:Render} (T:value) -> void
+            §M{Shared}
+              §IFACE{IQuiet}<T>
+                §MT{Render} (T:value) -> void
                   §E{}
             """);
         Write("child", """
-            §M{m2:Shared}
-              §IFACE{i2:IChild}<U>
+            §M{Shared}
+              §IFACE{IChild}<U>
                 §EXT{IQuiet<U>}
             """);
         Write("base", """
-            §M{m3:Shared}
-              §CL{c1:Writer:pub}<V>
-                §MT{mt2:Render:pub} (V:value) -> void
+            §M{Shared}
+              §CL{Writer:pub}<V>
+                §MT{Render:pub} (V:value) -> void
                   §E{cw}
             """);
         Write("derived", """
-            §M{m4:Shared}
-              §CL{c2:Derived:Writer<i32>:pub}
+            §M{Shared}
+              §CL{Derived:Writer<i32>:pub}
                 §IMPL{IChild<i32>}
             """);
 
@@ -205,16 +205,16 @@ public sealed class CrossModuleVarianceTests : IDisposable
         Write("base", Base("").Replace("Shared", "Contracts"));
         Write("other", Base("cw").Replace("Shared", "Other"));
         Write("derived", """
-            §M{m2:Consumer}
-              §NS{ns1:Consumer}
+            §M{Consumer}
+              §NS{Consumer}
                 §U{Contracts}
-                §CL{c2:First:Base:pub}
-                  §MT{mt2:Render:pub:over} () -> void
+                §CL{First:Base:pub}
+                  §MT{Render:pub:over} () -> void
                     §E{cw}
-              §NS{ns2:Consumer}
+              §NS{Consumer}
                 §U{Other}
-                §CL{c3:Second:Base:pub}
-                  §MT{mt3:Render:pub:over} () -> void
+                §CL{Second:Base:pub}
+                  §MT{Render:pub:over} () -> void
                     §E{cw}
             """);
 
@@ -230,16 +230,16 @@ public sealed class CrossModuleVarianceTests : IDisposable
     public void ClosedGenericTypeAliasCarriesItsArguments()
     {
         Write("base", """
-            §M{m1:Shared}
-              §CL{c1:Base:pub}<T>
-                §MT{mt1:Render:pub:virt} (T:value) -> void
+            §M{Shared}
+              §CL{Base:pub}<T>
+                §MT{Render:pub:virt} (T:value) -> void
                   §E{}
             """);
         Write("derived", """
-            §M{m2:Consumer}
+            §M{Consumer}
               §U{Chosen:Shared.Base<i32>}
-              §CL{c2:Derived:Chosen:pub}
-                §MT{mt2:Render:pub:over} (i32:value) -> void
+              §CL{Derived:Chosen:pub}
+                §MT{Render:pub:over} (i32:value) -> void
                   §E{cw}
             """);
 
@@ -269,15 +269,15 @@ public sealed class CrossModuleVarianceTests : IDisposable
     public void CrossFileEffectVariablesAreComparedByOrdinal(string baseRow, bool violation)
     {
         Write("base", $$"""
-            §M{m1:Shared}
-              §CL{c1:Base:pub}
-                §MT{mt1:Render:pub:virt}<eff e> () -> void
+            §M{Shared}
+              §CL{Base:pub}
+                §MT{Render:pub:virt}<eff e> () -> void
                   §E{ {{baseRow}} }
             """);
         Write("derived", """
-            §M{m2:Shared}
-              §CL{c2:Derived:Base:pub}
-                §MT{mt2:Render:pub:over}<eff renamed> () -> void
+            §M{Shared}
+              §CL{Derived:Base:pub}
+                §MT{Render:pub:over}<eff renamed> () -> void
                   §E{renamed}
             """);
 
@@ -293,18 +293,18 @@ public sealed class CrossModuleVarianceTests : IDisposable
     public void AmbiguousInterfaceContractsRemainUnknown()
     {
         const string contract = """
-            §M{m1:Shared}
-              §IFACE{i1:IQuiet}
-                §MT{mt1:Render} () -> void
+            §M{Shared}
+              §IFACE{IQuiet}
+                §MT{Render} () -> void
                   §E{}
             """;
         Write("first", contract);
         Write("second", contract);
         Write("implementation", """
-            §M{m2:Shared}
-              §CL{c1:Writer:pub}
+            §M{Shared}
+              §CL{Writer:pub}
                 §IMPL{IQuiet}
-                §MT{mt2:Render:pub} () -> void
+                §MT{Render:pub} () -> void
                   §E{cw}
             """);
 
@@ -318,10 +318,10 @@ public sealed class CrossModuleVarianceTests : IDisposable
     public void NominalParameterTypesAreNotMatchedByTheirBareNames()
     {
         Write("base", Base("").Replace("() ->", "(Thing:value) ->")
-            + "\n  §CL{c3:Thing:pub}\n");
-        Write("derived", Derived.Replace("§M{m2:Shared}", "§M{m2:Other}")
+            + "\n  §CL{Thing:pub}\n");
+        Write("derived", Derived.Replace("§M{Shared}", "§M{Other}")
             .Replace(":Derived:Base:pub", ":Derived:Shared.Base:pub")
-            .Replace("() ->", "(Thing:value) ->") + "\n  §CL{c4:Thing:pub}\n");
+            .Replace("() ->", "(Thing:value) ->") + "\n  §CL{Thing:pub}\n");
 
         var (_, diagnostics) = Compile();
 
@@ -345,16 +345,16 @@ public sealed class CrossModuleVarianceTests : IDisposable
     }
 
     private static string Base(string effects) => $$"""
-        §M{m1:Shared}
-          §CL{c1:Base:pub}
-            §MT{mt1:Render:pub:virt} () -> void
+        §M{Shared}
+          §CL{Base:pub}
+            §MT{Render:pub:virt} () -> void
               §E{ {{effects}} }
         """;
 
     private const string Derived = """
-        §M{m2:Shared}
-          §CL{c2:Derived:Base:pub}
-            §MT{mt2:Render:pub:over} () -> void
+        §M{Shared}
+          §CL{Derived:Base:pub}
+            §MT{Render:pub:over} () -> void
               §E{cw}
         """;
 

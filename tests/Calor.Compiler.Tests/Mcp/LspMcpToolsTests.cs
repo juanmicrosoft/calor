@@ -12,19 +12,19 @@ namespace Calor.Compiler.Tests.Mcp;
 public class LspMcpToolsTests
 {
     private static readonly string SampleSource = """
-        §M{m001:UserModule}
-          §F{f001:calculateTotal:pub}
+        §M{UserModule}
+          §F{calculateTotal:pub}
             §I{f64:total}
             §O{f64}
             §R total
 
 
-          §CL{c001:Item:pub}
+          §CL{Item:pub}
             §FLD{f64:Price:pub}
             §FLD{str:Name:pub}
 
 
-          §F{f002:greet:pub}
+          §F{greet:pub}
             §I{str:name}
             §O{str}
             §R name

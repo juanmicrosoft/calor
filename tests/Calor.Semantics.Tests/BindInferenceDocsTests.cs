@@ -43,8 +43,8 @@ public class BindInferenceDocsTests
     public void IntLiteralInitializer_InfersInt()
     {
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §O{i32}
       §B{x} INT:42
       §R x
@@ -59,8 +59,8 @@ public class BindInferenceDocsTests
     public void StringLiteralInitializer_InfersString()
     {
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §O{str}
       §B{s} STR:"hello"
       §R s
@@ -75,8 +75,8 @@ public class BindInferenceDocsTests
     public void BoolLiteralInitializer_InfersBool()
     {
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §O{bool}
       §B{b} BOOL:true
       §R b
@@ -91,8 +91,8 @@ public class BindInferenceDocsTests
     public void FloatLiteralInitializer_InfersFloat()
     {
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §O{f64}
       §B{x} FLOAT:3.14
       §R x
@@ -111,8 +111,8 @@ public class BindInferenceDocsTests
         // uppercase canonical name ("INT") that bound literals use.
         // This is the behavior the RFC §1.2 table footnote calls out.
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §O{i32}
       §B{x:i32} INT:0
       §R x
@@ -138,8 +138,8 @@ public class BindInferenceDocsTests
     public void NoTypeNoInitializer_SilentlyDefaultsToInt()
     {
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §O{i32}
       §B{x}
       §R INT:0
@@ -162,8 +162,8 @@ public class BindInferenceDocsTests
     public void NoTypeNoInitializer_ReportsCalor0250()
     {
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §O{i32}
       §B{counter}
       §R INT:0
@@ -181,8 +181,8 @@ public class BindInferenceDocsTests
     public void MutableBinding_WithInferredType_IsMutable()
     {
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §O{i32}
       §B{~counter} INT:0
       §R counter

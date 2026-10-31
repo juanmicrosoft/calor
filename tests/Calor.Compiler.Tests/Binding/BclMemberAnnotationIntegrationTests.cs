@@ -35,8 +35,8 @@ public partial class BclMemberAnnotationTests
     {
         var value = depth == 1 ? "first" : "second";
         var source = $$"""
-            §M{m1:JointLocals}
-              §F{probe:Probe:pub} ({{parameters}}) -> {{(boundary == "return" ? receivingType : "void")}}
+            §M{JointLocals}
+              §F{Probe:pub} ({{parameters}}) -> {{(boundary == "return" ? receivingType : "void")}}
                 §B{first} {{expression}}
                 {{(depth == 2 ? "§B{second} first" : "")}}
                 {{(boundary == "return" ? "§R" : $"§B{{result:{receivingType}}}")}} {{value}}
@@ -80,10 +80,10 @@ public partial class BclMemberAnnotationTests
     public void JointNativeNamedInput_UsesRetainedMemberIdentity(bool expression, bool nullable)
     {
         var source = $$"""
-            §M{m1:JointNativeMap}
-              §F{take:Take:pub} (System.IO.DirectoryInfo:required, System.IO.DirectoryInfo:safe) -> i32
+            §M{JointNativeMap}
+              §F{Take:pub} (System.IO.DirectoryInfo:required, System.IO.DirectoryInfo:safe) -> i32
                 §R 1
-              §F{probe:Probe:pub} (System.IO.DirectoryInfo:directory) -> void
+              §F{Probe:pub} (System.IO.DirectoryInfo:directory) -> void
                 §B{first} directory.{{(nullable ? "Parent" : "Root")}}
                 §B{second} first
                 {{(expression ? "§B{result} " : "")}}§C{Take} §A[safe] directory §A[required] second §/C
@@ -119,8 +119,8 @@ public partial class BclMemberAnnotationTests
             ? "§A STR:\"a\" §A STR:\"b\" §A STR:\"c\" §A STR:\"d\" §A second"
             : "§A[path2] STR:\"safe\" §A[path1] second";
         var source = $$"""
-            §M{m1:JointBclMap}
-              §F{probe:Probe:pub} () -> void
+            §M{JointBclMap}
+              §F{Probe:pub} () -> void
                 §B{first} {{(nullable ? "System.Environment.ProcessPath" : "System.String.Empty")}}
                 §B{second} first
                 {{(expression ? "§B{result} " : "")}}§C{System.IO.Path.Combine} {{arguments}} §/C
@@ -165,8 +165,8 @@ public partial class BclMemberAnnotationTests
     public void JointControlledReferenceContext_IsSharedByMemberAndSelectedCall(bool expression, bool nullable)
     {
         var source = $$"""
-            §M{m1:JointContext}
-              §F{probe:Probe:pub} (N5Fixture.Derived:value) -> void
+            §M{JointContext}
+              §F{Probe:pub} (N5Fixture.Derived:value) -> void
                 §B{first} value.{{(nullable ? "Nullable" : "NonNull")}}DirectoryField
                 §B{second} first
                 {{(expression ? "§B{result} " : "")}}§C{System.N5MemberSink.Take} §A[optional] first §A[required] second §/C
@@ -199,8 +199,8 @@ public partial class BclMemberAnnotationTests
     public void JointActualBclMember_PreservesSelectedTaintRoles(bool expression, bool taintedPath)
     {
         var source = $$"""
-            §M{m1:JointTaint}
-              §F{probe:Probe:pub} (string:user_input) -> void
+            §M{JointTaint}
+              §F{Probe:pub} (string:user_input) -> void
                 §B{first} System.Text.Encoding.UTF8
                 §B{second} first
                 {{(expression ? "§B{result} " : "")}}§C{System.IO.File.ReadAllText} §A[encoding] second §A[path] {{(taintedPath ? "user_input" : "STR:\"safe.txt\"")}} §/C

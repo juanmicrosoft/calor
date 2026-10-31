@@ -114,14 +114,14 @@ public class OperatorOverloadTests
     public void Parse_BinaryOperator_CreatesCorrectAstNode()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{+:pub}
         §I{MyType:left}
         §I{MyType:right}
         §O{MyType}
         §R left
-      §/OP{op001}
+      §/OP
 ";
 
         var module = ParseModule(source);
@@ -143,13 +143,13 @@ public class OperatorOverloadTests
     public void Parse_UnaryOperator_CreatesCorrectAstNode()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:-:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{-:pub}
         §I{MyType:value}
         §O{MyType}
         §R value
-      §/OP{op001}
+      §/OP
 ";
 
         var module = ParseModule(source);
@@ -167,13 +167,13 @@ public class OperatorOverloadTests
     public void Parse_ImplicitConversion_CreatesCorrectAstNode()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:implicit:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{implicit:pub}
         §I{MyType:value}
         §O{i32}
         §R 0
-      §/OP{op001}
+      §/OP
 ";
 
         var module = ParseModule(source);
@@ -191,13 +191,13 @@ public class OperatorOverloadTests
     public void Parse_ExplicitConversion_CreatesCorrectAstNode()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:explicit:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{explicit:pub}
         §I{i32:value}
         §O{MyType}
         §R value
-      §/OP{op001}
+      §/OP
 ";
 
         var module = ParseModule(source);
@@ -213,16 +213,16 @@ public class OperatorOverloadTests
     public void Parse_OperatorWithContracts_PreservesContracts()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{+:pub}
         §I{MyType:left}
         §I{MyType:right}
         §O{MyType}
         §Q (>= left 0)
         §S (>= result 0)
         §R left
-      §/OP{op001}
+      §/OP
 ";
 
         var module = ParseModule(source);
@@ -237,14 +237,14 @@ public class OperatorOverloadTests
     public void Parse_MismatchedId_ReportsDiagnostic()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{+:pub}
         §I{MyType:left}
         §I{MyType:right}
         §O{MyType}
         §R left
-      §/OP{op002}
+      §/OP
 ";
 
         var diagnostics = new DiagnosticBag();
@@ -276,8 +276,8 @@ public class OperatorOverloadTests
     public void Parse_AllBinaryOperators(string operatorSymbol, OperatorOverloadKind expectedKind)
     {
         var source = $@"
-§M{{m1:Test}}
-  §CL{{c1:MyType}}
+§M{{Test}}
+  §CL{{MyType}}
     §OP{{op001:{operatorSymbol}:pub}}
       §I{{MyType:left}}
       §I{{MyType:right}}
@@ -300,8 +300,8 @@ public class OperatorOverloadTests
     public void Parse_UnaryOperators_LogicalNotAndBitwiseNot(string operatorSymbol, OperatorOverloadKind expectedKind)
     {
         var source = $@"
-§M{{m1:Test}}
-  §CL{{c1:MyType}}
+§M{{Test}}
+  §CL{{MyType}}
     §OP{{op001:{operatorSymbol}:pub}}
       §I{{MyType:value}}
       §O{{MyType}}
@@ -324,8 +324,8 @@ public class OperatorOverloadTests
     public void Parse_TrueFalseOperators(string operatorSymbol, OperatorOverloadKind expectedKind)
     {
         var source = $@"
-§M{{m1:Test}}
-  §CL{{c1:MyType}}
+§M{{Test}}
+  §CL{{MyType}}
     §OP{{op001:{operatorSymbol}:pub}}
       §I{{MyType:value}}
       §O{{bool}}
@@ -348,8 +348,8 @@ public class OperatorOverloadTests
     public void Parse_IncrementDecrementOperators(string operatorSymbol, OperatorOverloadKind expectedKind)
     {
         var source = $@"
-§M{{m1:Test}}
-  §CL{{c1:MyType}}
+§M{{Test}}
+  §CL{{MyType}}
     §OP{{op001:{operatorSymbol}:pub}}
       §I{{MyType:value}}
       §O{{MyType}}
@@ -374,14 +374,14 @@ public class OperatorOverloadTests
     public void CodeGen_BinaryAdd_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{+:pub}
         §I{MyType:left}
         §I{MyType:right}
         §O{MyType}
         §R left
-      §/OP{op001}
+      §/OP
 ";
 
         var result = ParseAndEmit(source);
@@ -393,13 +393,13 @@ public class OperatorOverloadTests
     public void CodeGen_UnaryNegate_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:-:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{-:pub}
         §I{MyType:value}
         §O{MyType}
         §R value
-      §/OP{op001}
+      §/OP
 ";
 
         var result = ParseAndEmit(source);
@@ -411,14 +411,14 @@ public class OperatorOverloadTests
     public void CodeGen_Equality_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:==:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{==:pub}
         §I{MyType:left}
         §I{MyType:right}
         §O{bool}
         §R true
-      §/OP{op001}
+      §/OP
 ";
 
         var result = ParseAndEmit(source);
@@ -430,13 +430,13 @@ public class OperatorOverloadTests
     public void CodeGen_ImplicitConversion_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:implicit:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{implicit:pub}
         §I{MyType:value}
         §O{i32}
         §R 0
-      §/OP{op001}
+      §/OP
 ";
 
         var result = ParseAndEmit(source);
@@ -448,13 +448,13 @@ public class OperatorOverloadTests
     public void CodeGen_ExplicitConversion_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:explicit:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{explicit:pub}
         §I{i32:value}
         §O{MyType}
         §R value
-      §/OP{op001}
+      §/OP
 ";
 
         var result = ParseAndEmit(source);
@@ -466,15 +466,15 @@ public class OperatorOverloadTests
     public void CodeGen_OperatorWithPreconditions_EmitsGuards()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{+:pub}
         §I{i32:left}
         §I{i32:right}
         §O{i32}
         §Q (>= left 0)
         §R (+ left right)
-      §/OP{op001}
+      §/OP
 ";
 
         var result = ParseAndEmit(source);
@@ -488,26 +488,26 @@ public class OperatorOverloadTests
     public void CodeGen_MultipleOperators_InClass()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{+:pub}
         §I{MyType:left}
         §I{MyType:right}
         §O{MyType}
         §R left
-      §/OP{op001}
-      §OP{op002:-:pub}
+      §/OP
+      §OP{-:pub}
         §I{MyType:left}
         §I{MyType:right}
         §O{MyType}
         §R left
-      §/OP{op002}
-      §OP{op003:==:pub}
+      §/OP
+      §OP{==:pub}
         §I{MyType:left}
         §I{MyType:right}
         §O{bool}
         §R true
-      §/OP{op003}
+      §/OP
 ";
 
         var result = ParseAndEmit(source);
@@ -521,15 +521,15 @@ public class OperatorOverloadTests
     public void CodeGen_OperatorWithPostconditions_EmitsResultCapture()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{+:pub}
         §I{i32:left}
         §I{i32:right}
         §O{i32}
         §S (>= result 0)
         §R (+ left right)
-      §/OP{op001}
+      §/OP
 ";
 
         var result = ParseAndEmit(source);
@@ -544,13 +544,13 @@ public class OperatorOverloadTests
     public void CodeGen_LogicalNot_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:!:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{!:pub}
         §I{MyType:value}
         §O{MyType}
         §R value
-      §/OP{op001}
+      §/OP
 ";
 
         var result = ParseAndEmit(source);
@@ -562,13 +562,13 @@ public class OperatorOverloadTests
     public void CodeGen_BitwiseNot_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:~:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{~:pub}
         §I{MyType:value}
         §O{MyType}
         §R value
-      §/OP{op001}
+      §/OP
 ";
 
         var result = ParseAndEmit(source);
@@ -580,13 +580,13 @@ public class OperatorOverloadTests
     public void CodeGen_TrueFalseOperator_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:true:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{true:pub}
         §I{MyType:value}
         §O{bool}
         §R true
-      §/OP{op001}
+      §/OP
 ";
 
         var result = ParseAndEmit(source);
@@ -598,13 +598,13 @@ public class OperatorOverloadTests
     public void CodeGen_UnaryPlus_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{+:pub}
         §I{MyType:value}
         §O{MyType}
         §R value
-      §/OP{op001}
+      §/OP
 ";
 
         var module = ParseModule(source);
@@ -623,14 +623,14 @@ public class OperatorOverloadTests
     public void CodeGen_PrivateOperator_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:priv}
+§M{Test}
+  §CL{MyType}
+      §OP{+:priv}
         §I{MyType:left}
         §I{MyType:right}
         §O{MyType}
         §R left
-      §/OP{op001}
+      §/OP
 ";
 
         var module = ParseModule(source);
@@ -648,13 +648,13 @@ public class OperatorOverloadTests
     public void CodeGen_IncrementOperator_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:++:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{++:pub}
         §I{MyType:value}
         §O{MyType}
         §R value
-      §/OP{op001}
+      §/OP
 ";
 
         var result = ParseAndEmit(source);
@@ -866,14 +866,14 @@ public class Wrapper
     public void Roundtrip_ParseEmitReparse_PreservesOperatorOverload()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{+:pub}
         §I{MyType:left}
         §I{MyType:right}
         §O{MyType}
         §R left
-      §/OP{op001}
+      §/OP
 ";
 
         // Parse original
@@ -900,16 +900,16 @@ public class Wrapper
     public void Roundtrip_WithContracts_PreservesContracts()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{+:pub}
         §I{i32:left}
         §I{i32:right}
         §O{i32}
         §Q (>= left 0)
         §S (>= result 0)
         §R (+ left right)
-      §/OP{op001}
+      §/OP
 ";
 
         // Parse original
@@ -938,13 +938,13 @@ public class Wrapper
     public void Roundtrip_ImplicitConversion_PreservesKind()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:implicit:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{implicit:pub}
         §I{MyType:value}
         §O{i32}
         §R 0
-      §/OP{op001}
+      §/OP
 ";
 
         var module1 = ParseModule(source);
@@ -966,16 +966,16 @@ public class Wrapper
     public void Formatter_OperatorWithContracts_EmitsContracts()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{+:pub}
         §I{i32:left}
         §I{i32:right}
         §O{i32}
         §Q (>= left 0)
         §S (>= result 0)
         §R (+ left right)
-      §/OP{op001}
+      §/OP
 ";
 
         var module = ParseModule(source);
@@ -992,16 +992,16 @@ public class Wrapper
     public void Formatter_Output_CanBeReparsed()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
+§M{Test}
+  §CL{MyType}
+      §OP{+:pub}
         §I{i32:left}
         §I{i32:right}
         §O{i32}
         §Q (>= left 0)
         §S (>= result 0)
         §R (+ left right)
-      §/OP{op001}
+      §/OP
 ";
 
         var module = ParseModule(source);
@@ -1179,15 +1179,15 @@ public class Wrapper
     public void CalorParser_GenericClassOperator_ParsesCorrectly()
     {
         var calor = """
-            §M{m001:TestModule}
-                §CL{c001:Vector<T>:pub}
+            §M{TestModule}
+                §CL{Vector<T>:pub}
                     §WHERE T : struct
-                    §OP{op001:+:pub}
+                    §OP{+:pub}
                       §I{Vector<T>:a}
                       §I{Vector<T>:b}
                       §O{Vector<T>}
                       §R §NEW{Vector<T>} §/NEW
-                    §/OP{op001}
+                    §/OP
             """;
 
         var diagnostics = new DiagnosticBag();

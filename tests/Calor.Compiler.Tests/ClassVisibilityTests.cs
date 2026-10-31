@@ -201,8 +201,8 @@ public class ClassVisibilityTests
     public void Parser_ClassWithVisibility_Parsed()
     {
         var calorSource = """
-            §M{m1:Test}
-                §M{c1:Foo:int}
+            §M{Test}
+                §M{Foo:int}
             """;
 
         var compilationResult = Program.Compile(
@@ -222,8 +222,8 @@ public class ClassVisibilityTests
     {
         // Private visibility can appear in hand-written Calor (e.g., nested class scenarios)
         var calorSource = """
-            §M{m1:Test}
-                §CL{c1:Inner:priv}
+            §M{Test}
+                §CL{Inner:priv}
             """;
 
         var compilationResult = Program.Compile(
@@ -280,7 +280,7 @@ public class ClassVisibilityTests
         var emitter = new CalorEmitter();
         var output = emitter.Emit(module);
 
-        Assert.Contains("§CL{c1:Program:int}", output);
+        Assert.Contains("§CL{Program:int}", output);
     }
 
     #endregion

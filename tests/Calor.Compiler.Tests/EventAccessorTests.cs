@@ -79,9 +79,9 @@ public class EventAccessorTests
     public void Parser_SimpleEventField_StillWorks()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyClass:pub}
-                §EVT{e001:Click:pub:EventHandler}
+            §M{Test}
+              §CL{MyClass:pub}
+                §EVT{Click:pub:EventHandler}
             """;
 
         var diag = new DiagnosticBag();
@@ -106,16 +106,16 @@ public class EventAccessorTests
     public void Parser_EventWithAccessors_ParsesCorrectly()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyClass:pub}
-                §EVT{e001:Click:pub:EventHandler}
+            §M{Test}
+              §CL{MyClass:pub}
+                §EVT{Click:pub:EventHandler}
                 §EADD
                 §R INT:0
                 §/EADD
                 §EREM
                 §R INT:1
                 §/EREM
-                §/EVT{e001}
+                §/EVT
             """;
 
         var diag = new DiagnosticBag();
@@ -142,13 +142,13 @@ public class EventAccessorTests
     public void Parser_EventWithAddOnly_ParsesCorrectly()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyClass:pub}
-                §EVT{e001:Click:pub:EventHandler}
+            §M{Test}
+              §CL{MyClass:pub}
+                §EVT{Click:pub:EventHandler}
                 §EADD
                 §R INT:0
                 §/EADD
-                §/EVT{e001}
+                §/EVT
             """;
 
         var diag = new DiagnosticBag();
@@ -364,9 +364,9 @@ public class EventAccessorTests
     public void RoundTrip_SimpleEventField_ParseAndEmit()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyClass:pub}
-                §EVT{e001:Click:pub:EventHandler}
+            §M{Test}
+              §CL{MyClass:pub}
+                §EVT{Click:pub:EventHandler}
             """;
 
         var diag = new DiagnosticBag();
@@ -387,16 +387,16 @@ public class EventAccessorTests
     public void RoundTrip_EventWithAccessors_ParseAndEmit()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyClass:pub}
-                §EVT{e001:Click:pub:EventHandler}
+            §M{Test}
+              §CL{MyClass:pub}
+                §EVT{Click:pub:EventHandler}
                 §EADD
                 §R INT:0
                 §/EADD
                 §EREM
                 §R INT:1
                 §/EREM
-                §/EVT{e001}
+                §/EVT
             """;
 
         var diag = new DiagnosticBag();

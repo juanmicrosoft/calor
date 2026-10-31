@@ -28,14 +28,14 @@ public class ExpressionRegistrationTests
             [TokenKind.Identifier] = ("value", nameof(ReferenceNode)),
             [TokenKind.OpenParen] = ("(+ 1 2)", nameof(BinaryOperationNode)),
             [TokenKind.OpenBrace] = ("{1, 2}", nameof(ArrayCreationNode)),
-            [TokenKind.If] = ("§IF{i} true → 1 §EL → 2 §/I{i}", nameof(ConditionalExpressionNode)),
-            [TokenKind.Match] = ("§W{w} value §K _ → 1 §/W{w}", nameof(MatchExpressionNode)),
-            [TokenKind.Array] = ("§ARR{a:i32} §/ARR{a}", nameof(ArrayCreationNode)),
+            [TokenKind.If] = ("§IF true → 1 §EL → 2 §/I", nameof(ConditionalExpressionNode)),
+            [TokenKind.Match] = ("§W value §K _ → 1 §/W", nameof(MatchExpressionNode)),
+            [TokenKind.Array] = ("§ARR{a:i32} §/ARR", nameof(ArrayCreationNode)),
             [TokenKind.Index] = ("§IDX values 0", nameof(ArrayAccessNode)),
             [TokenKind.Length] = ("§LEN values", nameof(ArrayLengthNode)),
-            [TokenKind.List] = ("§LIST{l:i32} §/LIST{l}", nameof(ListCreationNode)),
-            [TokenKind.Dict] = ("§DICT{d:str:i32} §/DICT{d}", nameof(DictionaryCreationNode)),
-            [TokenKind.HashSet] = ("§HSET{s:i32} §/HSET{s}", nameof(SetCreationNode)),
+            [TokenKind.List] = ("§LIST{l:i32} §/LIST", nameof(ListCreationNode)),
+            [TokenKind.Dict] = ("§DICT{d:str:i32} §/DICT", nameof(DictionaryCreationNode)),
+            [TokenKind.HashSet] = ("§HSET{s:i32} §/HSET", nameof(SetCreationNode)),
             [TokenKind.Has] = ("§HAS{values} 1", nameof(CollectionContainsNode)),
             [TokenKind.Count] = ("§CNT{values}", nameof(CollectionCountNode)),
             [TokenKind.New] = ("§NEW{object} §/NEW", nameof(NewExpressionNode)),
@@ -43,7 +43,7 @@ public class ExpressionRegistrationTests
             [TokenKind.This] = ("§THIS", nameof(ThisExpressionNode)),
             [TokenKind.Base] = ("§BASE", nameof(BaseExpressionNode)),
             [TokenKind.Call] = ("§C{GetValue} §/C", nameof(CallExpressionNode)),
-            [TokenKind.Lambda] = ("§LAM{l:x:i32} x §/LAM{l}", nameof(LambdaExpressionNode)),
+            [TokenKind.Lambda] = ("§LAM{l:x:i32} x §/LAM", nameof(LambdaExpressionNode)),
             [TokenKind.Await] = ("§AWAIT §C{GetValueAsync} §/C", nameof(AwaitExpressionNode)),
             [TokenKind.Interpolate] = ("§INTERP \"x\" §/INTERP", nameof(InterpolatedStringNode)),
             [TokenKind.NullCoalesce] = ("§?? value 0", nameof(NullCoalesceNode)),
@@ -55,7 +55,7 @@ public class ExpressionRegistrationTests
             [TokenKind.AddressOf] = ("§ADDR value", nameof(AddressOfNode)),
             [TokenKind.Deref] = ("§DEREF pointer", nameof(PointerDereferenceNode)),
             [TokenKind.SizeOf] = ("§SIZEOF{i32}", nameof(SizeOfNode)),
-            [TokenKind.Array2D] = ("§ARR2D{a:grid:i32:2:2}", nameof(MultiDimArrayCreationNode)),
+            [TokenKind.Array2D] = ("§ARR2D{i32:2:2}", nameof(MultiDimArrayCreationNode)),
             [TokenKind.Index2D] = ("§IDX2D grid 0 1", nameof(MultiDimArrayAccessNode)),
             [TokenKind.Throw] = ("§TH §NEW{Exception} §/NEW", nameof(ThrowExpressionNode)),
             [TokenKind.RawCSharpExpression] = ("§CS{DateTime.Now}", nameof(RawCSharpExpressionNode)),
@@ -83,8 +83,8 @@ public class ExpressionRegistrationTests
         // collection-initializer argument. (§B got the same fix with the OpenBrace
         // unification; §W and §LAM headers are covered by the same one-group rule.)
         const string source = """
-            §M{m:Test}
-              §F{f:Test:pub}
+            §M{Test}
+              §F{Test:pub}
                 §O{object}
                 §C{Sink} {1, 2} §/C
             """;
@@ -167,8 +167,8 @@ public class ExpressionRegistrationTests
             _ => throw new ArgumentOutOfRangeException(nameof(context), context, null),
         };
         var source = $$"""
-            §M{m:Test}
-              §F{f:Test:pub}
+            §M{Test}
+              §F{Test:pub}
                 §O{object}
                 {{statement}}
             """;

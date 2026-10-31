@@ -22,7 +22,7 @@ public class HookCommandTests : IDisposable
     public async Task CodexWriteHook_AllowsCalorAddedByApplyPatch()
     {
         var envelope = """
-            {"tool_input":{"command":"*** Begin Patch\n*** Add File: NewThing.calr\n+§M{m001:NewThing}\n*** End Patch"}}
+            {"tool_input":{"command":"*** Begin Patch\n*** Add File: NewThing.calr\n+§M{NewThing}\n*** End Patch"}}
             """;
 
         var result = await HookCommand.RunCodexWriteHookAsync(envelope, "pre");

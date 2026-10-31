@@ -220,8 +220,8 @@ public static class Test
     public void CodeExecutor_CompileCalor_SimpleFunction_Succeeds()
     {
         using var executor = new CodeExecutor();
-        var result = executor.CompileCalor(@"§M{m001:Math}
-  §F{f001:Add:pub}
+        var result = executor.CompileCalor(@"§M{Math}
+  §F{Add:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -246,8 +246,8 @@ public static class Test
     public void CodeExecutor_CompileAndExecuteCalor_Works()
     {
         using var executor = new CodeExecutor();
-        var result = executor.CompileAndExecuteCalor(@"§M{m001:Math}
-  §F{f001:Multiply:pub}
+        var result = executor.CompileAndExecuteCalor(@"§M{Math}
+  §F{Multiply:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}

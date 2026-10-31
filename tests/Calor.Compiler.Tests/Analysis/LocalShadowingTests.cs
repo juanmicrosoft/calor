@@ -33,10 +33,10 @@ public class LocalShadowingTests
         // The #727 repro: an immutable §B inside a block reusing an outer local's
         // name → the emitter re-declares → CS0136.
         Assert.True(HasShadow(
-            "§M{m:S}\n" +
-            "  §F{f:Do:pub} (bool:flag) -> i32\n" +
+            "§M{S}\n" +
+            "  §F{Do:pub} (bool:flag) -> i32\n" +
             "    §B{~x:i32} 0\n" +
-            "    §IF{i1} (== flag true)\n" +
+            "    §IF (== flag true)\n" +
             "      §B{x:str} \"hi\"\n" +
             "      §P x\n" +
             "    §R x\n"));
@@ -49,11 +49,11 @@ public class LocalShadowingTests
         // assignment (`x = …`), not a re-declaration — valid C#, so no Calor0255.
         // (This is the Factorial/Fibonacci accumulator idiom.)
         Assert.False(HasShadow(
-            "§M{m:S}\n" +
-            "  §F{f:Fact:pub} (i32:n) -> i32\n" +
+            "§M{S}\n" +
+            "  §F{Fact:pub} (i32:n) -> i32\n" +
             "    §B{~result} 1\n" +
             "    §B{~i} 2\n" +
-            "    §WH{w1} (<= i n)\n" +
+            "    §WH (<= i n)\n" +
             "      §B{~result} (* result i)\n" +
             "      §B{~i} (+ i 1)\n" +
             "    §R result\n"));
@@ -64,12 +64,12 @@ public class LocalShadowingTests
     {
         // Two non-nested blocks may each declare `x` — sibling scopes, no CS0136.
         Assert.False(HasShadow(
-            "§M{m:S}\n" +
-            "  §F{f:Do:pub} (bool:a, bool:b) -> i32\n" +
-            "    §IF{i1} (== a true)\n" +
+            "§M{S}\n" +
+            "  §F{Do:pub} (bool:a, bool:b) -> i32\n" +
+            "    §IF (== a true)\n" +
             "      §B{x:i32} 1\n" +
             "      §P x\n" +
-            "    §IF{i2} (== b true)\n" +
+            "    §IF (== b true)\n" +
             "      §B{x:i32} 2\n" +
             "      §P x\n" +
             "    §R 0\n"));
@@ -80,10 +80,10 @@ public class LocalShadowingTests
     {
         // C# allows a local to shadow a field (the local wins); not CS0136.
         Assert.False(HasShadow(
-            "§M{m:S}\n" +
-            "  §CL{c1:Box:pub}\n" +
+            "§M{S}\n" +
+            "  §CL{Box:pub}\n" +
             "    §FLD{i32:x:priv}\n" +
-            "    §MT{mt1:Do:pub} () -> i32\n" +
+            "    §MT{Do:pub} () -> i32\n" +
             "      §B{x:i32} 5\n" +
             "      §R x\n"));
     }
@@ -94,9 +94,9 @@ public class LocalShadowingTests
         // #730 review finding 1: the loop variable is in scope for the body, so a
         // §B reusing its name is CS0136 (for (int i…) { int i; }).
         Assert.True(HasShadow(
-            "§M{m:S}\n" +
-            "  §F{f:Do:pub} () -> i32\n" +
-            "    §L{l1:i:0:3:1}\n" +
+            "§M{S}\n" +
+            "  §F{Do:pub} () -> i32\n" +
+            "    §L{i:0:3:1}\n" +
             "      §B{i:i32} 9\n" +
             "      §P i\n" +
             "    §R 0\n"));
@@ -107,9 +107,9 @@ public class LocalShadowingTests
     {
         // A nested local reusing a parameter name is CS0136.
         Assert.True(HasShadow(
-            "§M{m:S}\n" +
-            "  §F{f:Do:pub} (i32:x) -> i32\n" +
-            "    §IF{i1} (> x 0)\n" +
+            "§M{S}\n" +
+            "  §F{Do:pub} (i32:x) -> i32\n" +
+            "    §IF (> x 0)\n" +
             "      §B{x:i32} 9\n" +
             "      §P x\n" +
             "    §R x\n"));
@@ -123,10 +123,10 @@ public class LocalShadowingTests
         // Previously accepted (the loop var was seeded into a fresh scope with no
         // shadowing check), producing broken C#.
         Assert.True(HasShadow(
-            "§M{m:S}\n" +
-            "  §F{f:Do:pub} () -> i32\n" +
+            "§M{S}\n" +
+            "  §F{Do:pub} () -> i32\n" +
             "    §B{~x} 0\n" +
-            "    §L{l1:x:0:3:1}\n" +
+            "    §L{x:0:3:1}\n" +
             "      §ASSIGN x (+ x 1)\n" +
             "    §R x\n"));
     }
@@ -135,12 +135,12 @@ public class LocalShadowingTests
     public void ForeachVariableShadowingEnclosingLocal_IsRejected()
     {
         Assert.True(HasShadow(
-            "§M{m:S}\n" +
-            "  §F{f:Do:pub} (str:path) -> i32\n" +
+            "§M{S}\n" +
+            "  §F{Do:pub} (str:path) -> i32\n" +
             "    §E{fs:r}\n" +
             "    §B{~x:str} \"a\"\n" +
             "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §EACH{e1:x} arr\n" +
+            "    §EACH{x} arr\n" +
             "      §P x\n" +
             "    §R 0\n"));
     }
@@ -150,10 +150,10 @@ public class LocalShadowingTests
     {
         // A loop variable whose name is not otherwise in scope is fine.
         Assert.False(HasShadow(
-            "§M{m:S}\n" +
-            "  §F{f:Do:pub} () -> i32\n" +
+            "§M{S}\n" +
+            "  §F{Do:pub} () -> i32\n" +
             "    §B{~s} 0\n" +
-            "    §L{l1:i:0:3:1}\n" +
+            "    §L{i:0:3:1}\n" +
             "      §ASSIGN s (+ s i)\n" +
             "    §R s\n"));
     }

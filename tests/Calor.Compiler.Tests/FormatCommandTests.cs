@@ -87,8 +87,8 @@ public class FormatCommandTests : IDisposable
     public void Format_SingleFile_ProducesFormattedOutput()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
 ";
         var filePath = CreateTestFile("test.calr", source);
@@ -105,8 +105,8 @@ public class FormatCommandTests : IDisposable
     public void Format_SingleFile_OutputIsDeterministic()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
+§M{Test}
+  §F{Add:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -131,8 +131,8 @@ public class FormatCommandTests : IDisposable
     {
         // Format the same source twice
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
 ";
         var filePath1 = CreateTestFile("test1.calr", source);
@@ -152,8 +152,8 @@ public class FormatCommandTests : IDisposable
     public void Format_NotFormatted_OriginalDiffersFromFormatted()
     {
         // Source with inconsistent formatting (extra whitespace, etc.)
-        var source = @"§M{m001:Test}
-  §F{f001:Main:pub}
+        var source = @"§M{Test}
+  §F{Main:pub}
     §O{void}";
         var filePath = CreateTestFile("test.calr", source);
 
@@ -173,8 +173,8 @@ public class FormatCommandTests : IDisposable
     public void Format_WriteMode_ModifiesFile()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
 ";
         var filePath = CreateTestFile("test.calr", source);
@@ -194,8 +194,8 @@ public class FormatCommandTests : IDisposable
     public void Format_WriteMode_PreservesSemantics()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
+§M{Test}
+  §F{Add:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -235,8 +235,8 @@ public class FormatCommandTests : IDisposable
     public void Format_InvalidSyntax_ReportsParseErrors()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
         §INVALID_TOKEN
 ";
@@ -268,7 +268,7 @@ public class FormatCommandTests : IDisposable
     public void Format_CalorExtension_Processes()
     {
         var source = @"
-§M{m001:Test}
+§M{Test}
 ";
         var filePath = CreateTestFile("test.calr", source);
 
@@ -293,7 +293,7 @@ public class FormatCommandTests : IDisposable
     public void Format_CaseInsensitiveExtension_Processes()
     {
         var source = @"
-§M{m001:Test}
+§M{Test}
 ";
         // Test with uppercase extension
         var filePath = CreateTestFile("test.CALR", source);
@@ -314,13 +314,13 @@ public class FormatCommandTests : IDisposable
     public void Format_MultipleFiles_AllProcessed()
     {
         var source1 = @"
-§M{m001:Test1}
+§M{Test1}
 ";
         var source2 = @"
-§M{m002:Test2}
+§M{Test2}
 ";
         var source3 = @"
-§M{m003:Test3}
+§M{Test3}
 ";
         var file1 = CreateTestFile("test1.calr", source1);
         var file2 = CreateTestFile("test2.calr", source2);
@@ -354,9 +354,9 @@ public class FormatCommandTests : IDisposable
     public async Task FormatCheck_LegacySemver_ExitsNonZero_WithCalor0701()
     {
         var file = CreateTestFile("legacy.calr", """
-            §M{m001:Legacy}
+            §M{Legacy}
               §SEMVER{1.0.0}
-              §F{f001:Answer:pub} () -> i32
+              §F{Answer:pub} () -> i32
                 §E{}
                 §R INT:42
 

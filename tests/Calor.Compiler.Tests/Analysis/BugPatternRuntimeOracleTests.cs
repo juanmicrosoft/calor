@@ -18,8 +18,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Throws(
             "DivisionUnsafe",
             """
-            §M{m:DivisionUnsafe}
-              §F{f:Run:pub} () -> i32
+            §M{DivisionUnsafe}
+              §F{Run:pub} () -> i32
                 §B{~divisor:i32} INT:1
                 §ASSIGN divisor INT:0
                 §R (/ INT:10 divisor)
@@ -29,8 +29,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.ThrowsWithArguments(
             "NonNegativePreconditionAllowsZero",
             """
-            §M{m:NonNegativePreconditionAllowsZero}
-              §F{f:Run:pub} (i32:divisor) -> i32
+            §M{NonNegativePreconditionAllowsZero}
+              §F{Run:pub} (i32:divisor) -> i32
                 §Q (>= divisor INT:0)
                 §R (/ INT:10 divisor)
             """,
@@ -40,8 +40,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Returns(
             "DivisionSafe",
             """
-            §M{m:DivisionSafe}
-              §F{f:Run:pub} () -> i32
+            §M{DivisionSafe}
+              §F{Run:pub} () -> i32
                 §B{divisor:i32} INT:2
                 §R (/ INT:10 divisor)
             """,
@@ -50,10 +50,10 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Returns(
             "DivisionInConstantFalseBranch",
             """
-            §M{m:DivisionInConstantFalseBranch}
-              §F{f:Run:pub} () -> i32
+            §M{DivisionInConstantFalseBranch}
+              §F{Run:pub} () -> i32
                 §B{divisor:i32} INT:0
-                §IF{i1} (< INT:1 INT:0)
+                §IF (< INT:1 INT:0)
                   §R (/ INT:10 divisor)
                 §R INT:7
             """,
@@ -62,8 +62,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Returns(
             "ConditionalDeadArm",
             """
-            §M{m:ConditionalDeadArm}
-              §F{f:Run:pub} () -> i32
+            §M{ConditionalDeadArm}
+              §F{Run:pub} () -> i32
                 §B{divisor:i32} INT:0
                 §R (? BOOL:true INT:7 (/ INT:10 divisor))
             """,
@@ -72,8 +72,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.ThrowsWithArguments(
             "ConditionalVariableBugArm",
             """
-            §M{m:ConditionalVariableBugArm}
-              §F{f:Run:pub} (bool:condition) -> i32
+            §M{ConditionalVariableBugArm}
+              §F{Run:pub} (bool:condition) -> i32
                 §B{divisor:i32} INT:0
                 §R (? condition INT:7 (/ INT:10 divisor))
             """,
@@ -83,8 +83,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Returns(
             "ShortCircuitFalseAnd",
             """
-            §M{m:ShortCircuitFalseAnd}
-              §F{f:Run:pub} () -> bool
+            §M{ShortCircuitFalseAnd}
+              §F{Run:pub} () -> bool
                 §B{divisor:i32} INT:0
                 §R (&& BOOL:false (== (/ INT:10 divisor) INT:0))
             """,
@@ -93,8 +93,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Returns(
             "ShortCircuitTrueOr",
             """
-            §M{m:ShortCircuitTrueOr}
-              §F{f:Run:pub} () -> bool
+            §M{ShortCircuitTrueOr}
+              §F{Run:pub} () -> bool
                 §B{divisor:i32} INT:0
                 §R (|| BOOL:true (== (/ INT:10 divisor) INT:0))
             """,
@@ -103,8 +103,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.ThrowsWithArguments(
             "ShortCircuitVariableAnd",
             """
-            §M{m:ShortCircuitVariableAnd}
-              §F{f:Run:pub} (bool:condition) -> bool
+            §M{ShortCircuitVariableAnd}
+              §F{Run:pub} (bool:condition) -> bool
                 §B{divisor:i32} INT:0
                 §R (&& condition (== (/ INT:10 divisor) INT:0))
             """,
@@ -114,8 +114,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Returns(
             "DecimalDivisionSafe",
             """
-            §M{m:DecimalDivisionSafe}
-              §F{f:Run:pub} () -> dec
+            §M{DecimalDivisionSafe}
+              §F{Run:pub} () -> dec
                 §B{divisor:dec} (- DEC:0.5 DEC:0.2)
                 §R (/ DEC:1 divisor)
             """,
@@ -124,8 +124,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Throws(
             "DecimalDivisionUnsafe",
             """
-            §M{m:DecimalDivisionUnsafe}
-              §F{f:Run:pub} () -> dec
+            §M{DecimalDivisionUnsafe}
+              §F{Run:pub} () -> dec
                 §B{divisor:dec} (- DEC:0.5 DEC:0.5)
                 §R (/ DEC:1 divisor)
             """,
@@ -134,9 +134,9 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Throws(
             "BoundsUnsafe",
             """
-            §M{m:BoundsUnsafe}
-              §F{f:Run:pub} () -> i32
-                §B{[i32]:items} §ARR{i32:items:2}
+            §M{BoundsUnsafe}
+              §F{Run:pub} () -> i32
+                §B{[i32]:items} §ARR{items:2}
                 §R §IDX items INT:2
             """,
             DiagnosticCode.IndexOutOfBounds,
@@ -144,9 +144,9 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Returns(
             "BoundsSafe",
             """
-            §M{m:BoundsSafe}
-              §F{f:Run:pub} () -> i32
-                §B{[i32]:items} §ARR{i32:items} §A INT:4 §A INT:7 §/ARR{items}
+            §M{BoundsSafe}
+              §F{Run:pub} () -> i32
+                §B{[i32]:items} §ARR{items} §A INT:4 §A INT:7 §/ARR
                 §R §IDX items INT:1
             """,
             DiagnosticCode.IndexOutOfBounds,
@@ -154,8 +154,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Throws(
             "OverflowUnsafe",
             """
-            §M{m:OverflowUnsafe}
-              §F{f:Run:pub} () -> i32
+            §M{OverflowUnsafe}
+              §F{Run:pub} () -> i32
                 §B{~value:i32} INT:2147483647
                 §ASSIGN value (+ value INT:1)
                 §R value
@@ -165,8 +165,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Returns(
             "OverflowSafe",
             """
-            §M{m:OverflowSafe}
-              §F{f:Run:pub} () -> i32
+            §M{OverflowSafe}
+              §F{Run:pub} () -> i32
                 §B{value:i32} (+ INT:40 INT:2)
                 §R value
             """,
@@ -175,8 +175,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Throws(
             "MinValueRemainderOverflow",
             """
-            §M{m:MinValueRemainderOverflow}
-              §F{f:Run:pub} () -> i32
+            §M{MinValueRemainderOverflow}
+              §F{Run:pub} () -> i32
                 §B{value:i32} INT:-2147483648
                 §B{divisor:i32} INT:-1
                 §R (% value divisor)
@@ -186,8 +186,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Throws(
             "DecimalToIntCastOverflow",
             """
-            §M{m:DecimalToIntCastOverflow}
-              §F{f:Run:pub} () -> i32
+            §M{DecimalToIntCastOverflow}
+              §F{Run:pub} () -> i32
                 §B{value:dec} DEC:79228162514264337593543950335
                 §R (cast i32 value)
             """,
@@ -196,8 +196,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Throws(
             "NarrowingIntegralCastTraps",
             """
-            §M{m:NarrowingIntegralCastTraps}
-              §F{f:Run:pub} () -> i32
+            §M{NarrowingIntegralCastTraps}
+              §F{Run:pub} () -> i32
                 §B{value:i64} INT:2147483648
                 §R (cast i32 value)
             """,
@@ -206,8 +206,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.ReturnsWithArguments(
             "SameSymbolSubtraction",
             """
-            §M{m:SameSymbolSubtraction}
-              §F{f:Run:pub} (i32:value) -> i32
+            §M{SameSymbolSubtraction}
+              §F{Run:pub} (i32:value) -> i32
                 §R (- value value)
             """,
             DiagnosticCode.IntegerOverflow,
@@ -216,8 +216,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.ThrowsWithArguments(
             "SameSymbolZeroDivisor",
             """
-            §M{m:SameSymbolZeroDivisor}
-              §F{f:Run:pub} (i32:value) -> i32
+            §M{SameSymbolZeroDivisor}
+              §F{Run:pub} (i32:value) -> i32
                 §R (/ INT:1 (- value value))
             """,
             DiagnosticCode.DivisionByZero,
@@ -226,8 +226,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Returns(
             "ShiftCountMaskedToZero",
             """
-            §M{m:ShiftCountMaskedToZero}
-              §F{f:Run:pub} () -> i32
+            §M{ShiftCountMaskedToZero}
+              §F{Run:pub} () -> i32
                 §R (<< INT:2147483647 INT:32)
             """,
             DiagnosticCode.IntegerOverflow,
@@ -235,8 +235,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Wraps(
             "ShiftCountMaskedToOne",
             """
-            §M{m:ShiftCountMaskedToOne}
-              §F{f:Run:pub} () -> i32
+            §M{ShiftCountMaskedToOne}
+              §F{Run:pub} () -> i32
                 §R (<< INT:2147483647 INT:33)
             """,
             DiagnosticCode.IntegerOverflow,
@@ -244,8 +244,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Wraps(
             "NegativeShiftCountUsesLowBits",
             """
-            §M{m:NegativeShiftCountUsesLowBits}
-              §F{f:Run:pub} () -> i32
+            §M{NegativeShiftCountUsesLowBits}
+              §F{Run:pub} () -> i32
                 §R (<< INT:2147483647 INT:-1)
             """,
             DiagnosticCode.IntegerOverflow,
@@ -253,8 +253,8 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Throws(
             "NullableArrayUnsafe",
             """
-            §M{m:NullableArrayUnsafe}
-              §F{f:Run:pub} () -> i32
+            §M{NullableArrayUnsafe}
+              §F{Run:pub} () -> i32
                 §B{items:i32[]} null
                 §R §LEN items
             """,
@@ -263,9 +263,9 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Returns(
             "NullableArraySafe",
             """
-            §M{m:NullableArraySafe}
-              §F{f:Run:pub} () -> i32
-                §B{items:i32[]} §ARR{i32:items} §A INT:1 §/ARR{items}
+            §M{NullableArraySafe}
+              §F{Run:pub} () -> i32
+                §B{items:i32[]} §ARR{items} §A INT:1 §/ARR
                 §R §LEN items
             """,
             DiagnosticCode.NullDereference,
@@ -273,10 +273,10 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Returns(
             "NullFirstArrayGuardSafe",
             """
-            §M{m:NullFirstArrayGuardSafe}
-              §F{f:Run:pub} () -> i32
-                §B{items:i32[]} §ARR{i32:items} §A INT:1 §/ARR{items}
-                §IF{i1} (== null items)
+            §M{NullFirstArrayGuardSafe}
+              §F{Run:pub} () -> i32
+                §B{items:i32[]} §ARR{items} §A INT:1 §/ARR
+                §IF (== null items)
                   §R INT:0
                 §R §LEN items
             """,
@@ -285,11 +285,11 @@ public class BugPatternRuntimeOracleTests
         OracleCase.ThrowsWithArguments(
             "UnknownNullableArrayConditionalArm",
             """
-            §M{m:UnknownNullableArrayConditionalArm}
-              §F{make:Make:priv} () -> i32[]
+            §M{UnknownNullableArrayConditionalArm}
+              §F{Make:priv} () -> i32[]
                 §R null
-              §F{run:Run:pub} (bool:condition) -> i32
-                §B{known:i32[]} §ARR{i32:known} §A INT:1 §/ARR{known}
+              §F{Run:pub} (bool:condition) -> i32
+                §B{known:i32[]} §ARR{known} §A INT:1 §/ARR
                 §B{items:i32[]} (? condition known §C{Make} §/C)
                 §R §LEN items
             """,
@@ -299,9 +299,9 @@ public class BugPatternRuntimeOracleTests
         OracleCase.ThrowsWithArguments(
             "ExcludedZeroDivisionOverflow",
             """
-            §M{m:ExcludedZeroDivisionOverflow}
-              §F{f:Run:pub} (i32:divisor) -> i32
-                §IF{i1} (== divisor INT:0)
+            §M{ExcludedZeroDivisionOverflow}
+              §F{Run:pub} (i32:divisor) -> i32
+                §IF (== divisor INT:0)
                   §R INT:0
                 §R (+ (/ INT:-2147483648 divisor) INT:1)
             """,
@@ -311,12 +311,12 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Throws(
             "OffByOneUnsafe",
             """
-            §M{m:OffByOneUnsafe}
-              §F{f:Run:pub} () -> i32
-                §B{[i32]:items} §ARR{i32:items} §A INT:1 §A INT:2 §/ARR{items}
+            §M{OffByOneUnsafe}
+              §F{Run:pub} () -> i32
+                §B{[i32]:items} §ARR{items} §A INT:1 §A INT:2 §/ARR
                 §B{length:i32} §LEN items
                 §B{~sum:i32} INT:0
-                §L{l:i:0:length:1}
+                §L{i:0:length:1}
                   §ASSIGN sum (+ sum §IDX items i)
                 §R sum
             """,
@@ -325,13 +325,13 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Returns(
             "OffByOneSafe",
             """
-            §M{m:OffByOneSafe}
-              §F{f:Run:pub} () -> i32
-                §B{[i32]:items} §ARR{i32:items} §A INT:1 §A INT:2 §/ARR{items}
+            §M{OffByOneSafe}
+              §F{Run:pub} () -> i32
+                §B{[i32]:items} §ARR{items} §A INT:1 §A INT:2 §/ARR
                 §B{length:i32} §LEN items
                 §B{upper:i32} (- length INT:1)
                 §B{~sum:i32} INT:0
-                §L{l:i:0:upper:1}
+                §L{i:0:upper:1}
                   §ASSIGN sum (+ sum §IDX items i)
                 §R sum
             """,
@@ -340,12 +340,12 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Throws(
             "ComputedNegativeStepUnsafe",
             """
-            §M{m:ComputedNegativeStepUnsafe}
-              §F{f:Run:pub} () -> i32
-                §B{[i32]:items} §ARR{i32:items} §A INT:1 §A INT:2 §A INT:3 §/ARR{items}
+            §M{ComputedNegativeStepUnsafe}
+              §F{Run:pub} () -> i32
+                §B{[i32]:items} §ARR{items} §A INT:1 §A INT:2 §A INT:3 §/ARR
                 §B{length:i32} §LEN items
                 §B{~sum:i32} INT:0
-                §L{l:i:length:0:(- 0 1)}
+                §L{i:length:0:(- 0 1)}
                   §ASSIGN sum (+ sum §IDX items i)
                 §R sum
             """,
@@ -354,13 +354,13 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Returns(
             "ComputedNegativeStepSafe",
             """
-            §M{m:ComputedNegativeStepSafe}
-              §F{f:Run:pub} () -> i32
-                §B{[i32]:items} §ARR{i32:items} §A INT:1 §A INT:2 §A INT:3 §/ARR{items}
+            §M{ComputedNegativeStepSafe}
+              §F{Run:pub} () -> i32
+                §B{[i32]:items} §ARR{items} §A INT:1 §A INT:2 §A INT:3 §/ARR
                 §B{length:i32} §LEN items
                 §B{upper:i32} (- length INT:1)
                 §B{~sum:i32} INT:0
-                §L{l:i:upper:0:(- 0 1)}
+                §L{i:upper:0:(- 0 1)}
                   §ASSIGN sum (+ sum §IDX items i)
                 §R sum
             """,
@@ -369,12 +369,12 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Returns(
             "StepTwoSkipsEndpoint",
             """
-            §M{m:StepTwoSkipsEndpoint}
-              §F{f:Run:pub} () -> i32
-                §B{[i32]:items} §ARR{i32:items} §A INT:1 §A INT:2 §A INT:3 §/ARR{items}
+            §M{StepTwoSkipsEndpoint}
+              §F{Run:pub} () -> i32
+                §B{[i32]:items} §ARR{items} §A INT:1 §A INT:2 §A INT:3 §/ARR
                 §B{length:i32} §LEN items
                 §B{~sum:i32} INT:0
-                §L{l:i:0:length:2}
+                §L{i:0:length:2}
                   §ASSIGN sum (+ sum §IDX items i)
                 §R sum
             """,
@@ -383,12 +383,12 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Throws(
             "StepTwoReachesEndpoint",
             """
-            §M{m:StepTwoReachesEndpoint}
-              §F{f:Run:pub} () -> i32
-                §B{[i32]:items} §ARR{i32:items} §A INT:1 §A INT:2 §A INT:3 §A INT:4 §/ARR{items}
+            §M{StepTwoReachesEndpoint}
+              §F{Run:pub} () -> i32
+                §B{[i32]:items} §ARR{items} §A INT:1 §A INT:2 §A INT:3 §A INT:4 §/ARR
                 §B{length:i32} §LEN items
                 §B{~sum:i32} INT:0
-                §L{l:i:0:length:2}
+                §L{i:0:length:2}
                   §ASSIGN sum (+ sum §IDX items i)
                 §R sum
             """,
@@ -397,12 +397,12 @@ public class BugPatternRuntimeOracleTests
         OracleCase.ReturnsWithArguments(
             "CanonicalEmptyArrayLoop",
             """
-            §M{m:CanonicalEmptyArrayLoop}
-              §F{f:Run:pub} (i32[]:items) -> i32
+            §M{CanonicalEmptyArrayLoop}
+              §F{Run:pub} (i32[]:items) -> i32
                 §B{length:i32} §LEN items
                 §B{upper:i32} (- length INT:1)
                 §B{~sum:i32} INT:0
-                §L{l:i:0:upper:1}
+                §L{i:0:upper:1}
                   §ASSIGN sum (+ sum §IDX items i)
                 §R sum
             """,
@@ -412,11 +412,11 @@ public class BugPatternRuntimeOracleTests
         OracleCase.ThrowsWithArguments(
             "CanonicalUpperAdjacentUnsafe",
             """
-            §M{m:CanonicalUpperAdjacentUnsafe}
-              §F{f:Run:pub} (i32[]:items) -> i32
+            §M{CanonicalUpperAdjacentUnsafe}
+              §F{Run:pub} (i32[]:items) -> i32
                 §B{length:i32} §LEN items
                 §B{~sum:i32} INT:0
-                §L{l:i:0:length:1}
+                §L{i:0:length:1}
                   §ASSIGN sum (+ sum §IDX items i)
                 §R sum
             """,
@@ -426,12 +426,12 @@ public class BugPatternRuntimeOracleTests
         OracleCase.ThrowsWithArguments(
             "CanonicalLowerAdjacentUnsafe",
             """
-            §M{m:CanonicalLowerAdjacentUnsafe}
-              §F{f:Run:pub} (i32[]:items) -> i32
+            §M{CanonicalLowerAdjacentUnsafe}
+              §F{Run:pub} (i32[]:items) -> i32
                 §B{length:i32} §LEN items
                 §B{upper:i32} (- length INT:1)
                 §B{~sum:i32} INT:0
-                §L{l:i:-1:upper:1}
+                §L{i:-1:upper:1}
                   §ASSIGN sum (+ sum §IDX items i)
                 §R sum
             """,

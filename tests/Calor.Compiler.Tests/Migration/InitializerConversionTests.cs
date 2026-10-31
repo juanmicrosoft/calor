@@ -30,14 +30,14 @@ public class InitializerConversionTests
     public void ClassLevelCollectionBlock_IsAHardError_AndLaterMembersSurvive(string block, string tag)
     {
         var source = $$"""
-            §M{m001:Repro}
-              §CL{c001:Holder:pub}
+            §M{Repro}
+              §CL{Holder:pub}
                 §FLD{i32:Before:pub} = 1
                 {{block.Replace("\n        ", "\n      ", StringComparison.Ordinal)}}
                 §FLD{i32:After:pub} = 2
-                §MT{m002:Get:pub} () -> i32
+                §MT{Get:pub} () -> i32
                   §R After
-              §CL{c003:Other:pub}
+              §CL{Other:pub}
                 §FLD{i32:Y:pub} = 3
             """;
         var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
@@ -77,7 +77,7 @@ public class InitializerConversionTests
         Assert.Empty(result.Context.Losses);
         var calor = result.CalorSource!;
         Assert.DoesNotContain("§CS{", calor, StringComparison.Ordinal);
-        Assert.Contains("§LIST{list003:i32} 1 §/LIST{list003}", calor, StringComparison.Ordinal);
+        Assert.Contains("§LIST{list003:i32} 1 §/LIST", calor, StringComparison.Ordinal);
         Assert.Contains("= §NEW{StringBuilder} Capacity = 64 §/NEW", calor, StringComparison.Ordinal);
         Assert.DoesNotContain("§A 5", calor, StringComparison.Ordinal);
         var csharp = Compile(calor, enforceEffects: false).GeneratedCode;
@@ -452,16 +452,16 @@ public class InitializerConversionTests
     public void NegativeControl_PreFixConversion_RunsDifferently()
     {
         const string preFix = """
-            §M{m001:Repro:overflow=unchecked}
+            §M{Repro:overflow=unchecked}
               §U{System.Collections.Generic}
               §U{System.Text}
               §NS{ns_global:_global:global}
-                §CL{c001:Holder:pub}
+                §CL{Holder:pub}
                   §FLD{List<i32>:Xs:pub} = §NEW{List<i32>} §A 5 §/NEW
-                  §PROP{p002:Sb:StringBuilder:pub:get,set} = (sb-new)
+                  §PROP{Sb:StringBuilder:pub:get,set} = (sb-new)
                   §FLD{i32:After:pub} = 2
-                §M{c003:Probe:pub}
-                  §MT{m004:Run:pub:stat} () -> str
+                §M{Probe:pub}
+                  §MT{Run:pub:stat} () -> str
                     §B{h} §NEW{Holder} §/NEW
                     §R (+ (+ (+ (+ (+ (+ h.Xs.Count ":") (join "," h.Xs)) "|") h.Sb.Capacity) "|") h.After)
             """;
@@ -488,16 +488,16 @@ public class InitializerConversionTests
     public void NegativeControl_PreFixClassLevelHoist_FailsLoudly()
     {
         const string preFix = """
-            §M{m001:g:overflow=unchecked}
+            §M{g:overflow=unchecked}
               §U{System.Collections.Generic}
               §NS{ns_global:_global:global}
-                §CL{c001:Holder:pub}
+                §CL{Holder:pub}
                   §FLD{i32:Before:pub} = 1
                   §LIST{list003:i32}
                     1
                   §FLD{List<List<i32>>:X:pub} = §NEW{List<List<i32>>} §A  §/NEW
                   §FLD{i32:After:pub} = 2
-                §CL{c005:Other:pub}
+                §CL{Other:pub}
                   §FLD{i32:Y:pub} = 3
             """;
         var result = Compile(preFix, enforceEffects: false);

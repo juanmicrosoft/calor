@@ -12,16 +12,16 @@ namespace Calor.Compiler.Tests;
 public class OptionContextRuntimeTests
 {
     [Theory]
-    [InlineData("§IF{if1} (> value 0)\n      §R value\n    §EL\n      §R null")]
-    [InlineData("§L{for1:i:0:1:1}\n      §IF{if1} (> value 0)\n        §R value\n    §R null")]
-    [InlineData("§R §IF{if1} (> value 0) → value §EL → null")]
-    [InlineData("§S true\n    §IF{if1} (> value 0)\n      §R value\n    §R null")]
-    [InlineData("§W{w1} value\n      §K 7\n        §R value\n      §K _\n        §R null")]
+    [InlineData("§IF (> value 0)\n      §R value\n    §EL\n      §R null")]
+    [InlineData("§L{i:0:1:1}\n      §IF (> value 0)\n        §R value\n    §R null")]
+    [InlineData("§R §IF (> value 0) → value §EL → null")]
+    [InlineData("§S true\n    §IF (> value 0)\n      §R value\n    §R null")]
+    [InlineData("§W value\n      §K 7\n        §R value\n      §K _\n        §R null")]
     public void NestedReturns_UseDeclaredNullableElementType(string body)
     {
         var source = """
-            §M{m1:OptionContext}
-              §F{f1:Probe:pub} (i32:value) -> ?i64
+            §M{OptionContext}
+              §F{Probe:pub} (i32:value) -> ?i64
                 §E{alloc}
             """ + "\n    " + body;
         foreach (var text in RoundTrip(source))
@@ -37,8 +37,8 @@ public class OptionContextRuntimeTests
     public void NullableCoalesce_EvaluatesProducerOnceAndFallbackOnlyForNull()
     {
         const string source = """
-            §M{m1:OptionContext}
-              §F{f1:Probe:pub} (Func<i32?>:produce §E{throw}, Func<i32>:fallback §E{throw}) -> i64
+            §M{OptionContext}
+              §F{Probe:pub} (Func<i32?>:produce §E{throw}, Func<i32>:fallback §E{throw}) -> i64
                 §E{throw}
                 §R (?? §C{produce} §/C §C{fallback} §/C)
             """;
@@ -75,10 +75,10 @@ public class OptionContextRuntimeTests
     public void NestedOptionPayloads_AreRejectedRatherThanFlattened()
     {
         const string source = """
-            §M{m1:OptionContext}
-              §F{f1:Probe:pub} (i32:value) -> Option<Option<i32>>
+            §M{OptionContext}
+              §F{Probe:pub} (i32:value) -> Option<Option<i32>>
                 §E{alloc}
-                §IF{if1} (> value 0)
+                §IF (> value 0)
                   §R §SM §SM value
                 §EI (== value 0)
                   §R §SM §NN
@@ -94,8 +94,8 @@ public class OptionContextRuntimeTests
     public void ExplicitNoneAnnotation_IsRejected()
     {
         var result = Program.Compile("""
-            §M{m1:OptionContext}
-              §F{f1:Probe:pub} () -> Option<i32>
+            §M{OptionContext}
+              §F{Probe:pub} () -> Option<i32>
                 §E{alloc}
                 §R §NN{str}
             """, "option-context.calr", new CompilationOptions { StatusWriter = TextWriter.Null });

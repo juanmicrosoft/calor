@@ -36,7 +36,7 @@ public class CompileToolTests
     // v0.15 (PR #1088): the MCP compile tool inherits default-on elision and must
     // expose the same opt-out the CLI has (`keepProvenGuards` ⇔ --keep-proven-guards).
     private const string ProvenSquareSource =
-        "§M{m001:Test}\n  §CL{c001:Calc:pub}\n    §MT{mt001:Square:pub}\n      §I{i32:x}\n      §O{i32}\n" +
+        "§M{Test}\n  §CL{Calc:pub}\n    §MT{Square:pub}\n      §I{i32:x}\n      §O{i32}\n" +
         "      §Q (>= x 0)\n      §Q (<= x 46340)\n      §S (>= result 0)\n      §R (* x x)\n";
 
     private async Task<string> CompileProvenSquare(string options)
@@ -87,7 +87,7 @@ public class CompileToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "source": "§M{m001:Test}\n§F{f001:Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n"
+                "source": "§M{Test}\n§F{Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n"
             }
             """).RootElement;
 
@@ -108,7 +108,7 @@ public class CompileToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "source": "§M{m001:Test}\n§F{f001:Main:pub}\n§O{void}\n§P \"undeclared console write\"\n"
+                "source": "§M{Test}\n§F{Main:pub}\n§O{void}\n§P \"undeclared console write\"\n"
             }
             """).RootElement;
 
@@ -124,7 +124,7 @@ public class CompileToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "source": "§M{m001:Test}\n§F{f001:Bad} invalid syntax"
+                "source": "§M{Test}\n§F{Bad} invalid syntax"
             }
             """).RootElement;
 
@@ -176,7 +176,7 @@ public class CompileToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "source": "§M{m001:Test}\n§F{f001:Div:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§Q (!= b 0)\n§R (/ a b)\n\n",
+                "source": "§M{Test}\n§F{Div:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§Q (!= b 0)\n§R (/ a b)\n\n",
                 "options": {
                     "contractMode": "off"
                 }
@@ -195,7 +195,7 @@ public class CompileToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "source": "§M{m001:Test}\n§F{f001:Div:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§Q (!= b 0)\n§R (/ a b)\n\n",
+                "source": "§M{Test}\n§F{Div:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§Q (!= b 0)\n§R (/ a b)\n\n",
                 "options": {
                     "contractMode": "release"
                 }

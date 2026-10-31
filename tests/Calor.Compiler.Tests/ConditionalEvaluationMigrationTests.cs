@@ -246,8 +246,8 @@ public class ConditionalEvaluationMigrationTests
     public void UnsupportedArgumentModifiers_AreDiagnosed(string statement)
     {
         var source = $$"""
-            §M{m:Probe}
-              §F{f:Run:pub} () -> void
+            §M{Probe}
+              §F{Run:pub} () -> void
                 {{statement}}
             """;
         var diagnostics = new DiagnosticBag();
@@ -264,12 +264,12 @@ public class ConditionalEvaluationMigrationTests
     public void NativeConditionalArraySizes_SurvivePrettyRoundTrip(string gate, string size, int expected)
     {
         var source = $$"""
-            §M{m:Probe}
-              §F{s:Size:pub} () -> i32
+            §M{Probe}
+              §F{Size:pub} () -> i32
                 §R 3
-              §F{r:Run:pub} () -> i32
+              §F{Run:pub} () -> i32
                 §B{n:i32} 2
-                §B{values} (? {{gate}} §ARR{a:i32:"{{size}}"} §ARR{b:i32:0})
+                §B{values} (? {{gate}} §ARR{i32:"{{size}}"} §ARR{i32:0})
                 §R (len values)
             """;
         var options = new Calor.Compiler.CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null };

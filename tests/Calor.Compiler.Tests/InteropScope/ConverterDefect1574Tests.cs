@@ -166,7 +166,7 @@ public class ConverterDefect1574Tests
         Assert.DoesNotContain(CSharpDiagnostics(compiled.GeneratedCode), id => id == "CS8600");
         // Control: the same program with `default` raises CS8600.
         Assert.Contains(CSharpDiagnostics(compiled.GeneratedCode.Replace("default!;", "default;")), id => id == "CS8600");
-        var ints = Program.Compile("§M{m1:P}\n  §F{f1:Run:pub} () -> i32\n    §E{}\n    §B{~n:i32} `default`\n    §R n\n",
+        var ints = Program.Compile("§M{P}\n  §F{Run:pub} () -> i32\n    §E{}\n    §B{~n:i32} `default`\n    §R n\n",
             "i.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.Contains("int n = default;", ints.GeneratedCode);
     }
@@ -191,7 +191,7 @@ public class ConverterDefect1574Tests
     [InlineData("    §B{~n:i32} §C{System.Math.Abs} §A -7 §/C\n", false)]   // control: same line
     public void BareBindingNextLineInitializer_WarnsWithoutChangingMeaning(string binding, bool warns)
     {
-        var result = Program.Compile("§M{m1:P}\n  §F{f1:Run:pub} () -> i32\n    §E{}\n" + binding + "    §R n\n",
+        var result = Program.Compile("§M{P}\n  §F{Run:pub} () -> i32\n    §E{}\n" + binding + "    §R n\n",
             "next.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
         Assert.Equal(warns, result.Diagnostics.Any(d => d.Code == DiagnosticCode.BareBindingNextLineInitializer && !d.IsError));
@@ -201,7 +201,7 @@ public class ConverterDefect1574Tests
     [Fact]
     public void ExplicitDefaultInitializer_DoesNotWarn()
     {
-        var result = Program.Compile("§M{m1:P}\n  §F{f1:Run:pub} () -> i32\n    §E{}\n    §B{~n:i32} `default`\n    §ASSIGN n 7\n    §R n\n",
+        var result = Program.Compile("§M{P}\n  §F{Run:pub} () -> i32\n    §E{}\n    §B{~n:i32} `default`\n    §ASSIGN n 7\n    §R n\n",
             "default.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.BareBindingNextLineInitializer);

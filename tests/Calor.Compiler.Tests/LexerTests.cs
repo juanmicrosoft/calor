@@ -312,15 +312,15 @@ public class LexerTests
     public void Tokenize_HelloWorldProgram_ReturnsCorrectTokens()
     {
         var source = """
-            §M{m001:Hello}
-            §F{f001:Main:pub}
+            §M{Hello}
+            §F{Main:pub}
               §O{void}
               §E{cw}
               §C{Console.WriteLine}
                 §A "Hello from Calor!"
               §/C
-            §/F{f001}
-            §/M{m001}
+            §/F
+            §/M
             """;
 
         var tokens = Tokenize(source, out var diagnostics);

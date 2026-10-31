@@ -22,7 +22,7 @@ public class ContractEnforcementTests
 
         var ex = (ContractViolationException)result.Exception;
         Assert.Equal(ContractKind.Requires, ex.Kind);
-        Assert.Equal("f001", ex.FunctionId);
+        Assert.Equal(Assert.Single(TestHarness.Compile(source).Ast!.Functions).Id, ex.FunctionId);
     }
 
     [Fact]
@@ -120,7 +120,7 @@ public class ContractEnforcementTests
         Assert.IsType<ContractViolationException>(result.Exception);
 
         var ex = (ContractViolationException)result.Exception;
-        Assert.Equal("f002", ex.FunctionId);  // Should match the function ID in the source
+        Assert.Equal(Assert.Single(TestHarness.Compile(source).Ast!.Functions).Id, ex.FunctionId);
     }
 
     [Fact]
@@ -161,7 +161,7 @@ public class ContractEnforcementTests
 
         var ex = (ContractViolationException)result.Exception;
         // Release mode has minimal info
-        Assert.Equal("f001", ex.FunctionId);
+        Assert.Equal(Assert.Single(TestHarness.Compile(source, options).Ast!.Functions).Id, ex.FunctionId);
         Assert.Equal(ContractKind.Requires, ex.Kind);
         // Release mode may not have condition
         Assert.Null(ex.Condition);
@@ -172,8 +172,8 @@ public class ContractEnforcementTests
     {
         // B1 scenario: Function with contracts but no effects is valid
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeAdd:pub}
+§M{Test}
+  §F{SafeAdd:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}

@@ -16,8 +16,8 @@ public class NumericTests
     {
         // Adding 1 to int.MaxValue should overflow
         var source = @"
-§M{m001:Test}
-  §F{f001:overflow:pub}
+§M{Test}
+  §F{overflow:pub}
       §O{i32}
       §B{max} INT:2147483647
       §R (+ max INT:1)
@@ -43,8 +43,8 @@ public class NumericTests
         // Assigning int to float should work (implicit widening)
         // Using simple approach without typed bindings
         var source = @"
-§M{m001:Test}
-  §F{f001:convert:pub}
+§M{Test}
+  §F{convert:pub}
       §I{i32:i}
       §O{f64}
       §R i
@@ -64,8 +64,8 @@ public class NumericTests
     public void Division_ByZero_ThrowsException()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:divZero:pub}
+§M{Test}
+  §F{divZero:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -88,13 +88,13 @@ public class NumericTests
     public void Arithmetic_BasicOperations()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:add:pub}
+§M{Test}
+  §F{add:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
       §R (+ a b)
-  §F{f002:mul:pub}
+  §F{mul:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -117,13 +117,13 @@ public class NumericTests
     public void Comparison_Operators()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:lessThan:pub}
+§M{Test}
+  §F{lessThan:pub}
       §I{i32:a}
       §I{i32:b}
       §O{bool}
       §R (< a b)
-  §F{f002:equals:pub}
+  §F{equals:pub}
       §I{i32:a}
       §I{i32:b}
       §O{bool}
@@ -146,8 +146,8 @@ public class NumericTests
     public void Modulo_Operation()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:mod:pub}
+§M{Test}
+  §F{mod:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}

@@ -128,8 +128,8 @@ public class TypeSystemTests
     public void Parser_ParsesNullableValue()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:GetValue:pub}
+§M{Test}
+  §F{GetValue:pub}
       §O{?i32}
       §R INT:42
 ";
@@ -151,8 +151,8 @@ public class TypeSystemTests
     public void Parser_ParsesNull()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:GetNothing:pub}
+§M{Test}
+  §F{GetNothing:pub}
       §O{?i32}
       §R null
 ";
@@ -336,8 +336,8 @@ public class TypeSystemTests
     public void Emitter_NullableReturnType_EmitsNullable()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:FindValue:pub}
+            §M{Test}
+              §F{FindValue:pub}
                   §I{i32:id}
                   §O{?i32}
                   §R INT:42
@@ -357,8 +357,8 @@ public class TypeSystemTests
     public void Emitter_NullableStringReturnType_EmitsNullable()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:FindName:pub}
+            §M{Test}
+              §F{FindName:pub}
                   §O{?str}
                   §R STR:"hello"
             """;
@@ -377,8 +377,8 @@ public class TypeSystemTests
     public void Emitter_NullableParameter_EmitsNullable()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Process:pub}
+            §M{Test}
+              §F{Process:pub}
                   §I{?i32:value}
                   §O{void}
             """;
@@ -399,8 +399,8 @@ public class TypeSystemTests
     public void RemovedResultShorthand_DoesNotExpandOrCompile(string typeName)
     {
         var source = $$"""
-            §M{m001:Test}
-              §F{f001:TryParse:pub}
+            §M{Test}
+              §F{TryParse:pub}
                   §I{str:input}
                   §O{{{typeName}}}
                   §R INT:42
@@ -419,8 +419,8 @@ public class TypeSystemTests
     public void Emitter_SizedIntReturnType_EmitsCorrectType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:GetLong:pub}
+            §M{Test}
+              §F{GetLong:pub}
                   §O{i64}
                   §R INT:100
             """;
@@ -439,8 +439,8 @@ public class TypeSystemTests
     public void Emitter_SizedFloatReturnType_EmitsFloat()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:GetFloat:pub}
+            §M{Test}
+              §F{GetFloat:pub}
                   §O{f32}
                   §R FLOAT:1.5
             """;

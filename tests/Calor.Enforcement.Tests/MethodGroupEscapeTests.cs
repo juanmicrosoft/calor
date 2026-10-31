@@ -9,7 +9,7 @@ public sealed class MethodGroupEscapeTests
     [Theory]
     [InlineData("§B{chosen:Func<i32>} (?? fallback Loud)", "")]
     [InlineData("§B{chosen:Func<i32>} (? condition fallback Loud)", "")]
-    [InlineData("§B{created:Func<i32>[]} §ARR{Func<i32>:values} Loud", "alloc")]
+    [InlineData("§B{created:Func<i32>[]} §ARR{Func<i32>} Loud", "alloc")]
     [InlineData("§ASSIGN holder.Saved Loud", "mut")]
     [InlineData("§ASSIGN §IDX items 0 Loud", "mut")]
     [InlineData("§B{chosen:Func<i32>} (?? fallback Helpers.LoudStatic)", "")]
@@ -51,16 +51,16 @@ public sealed class MethodGroupEscapeTests
     public void MethodBody_UsesItsOwnMethodGroupBeforeAModuleFunction(bool shadowsModuleFunction)
     {
         var source = $$"""
-            §M{m1:MethodScope}
-              §F{f1:Loud:pub} () -> i32
+            §M{MethodScope}
+              §F{Loud:pub} () -> i32
                 §E{cw}
                 §P "loud"
                 §R 1
-              §CL{c1:Owner:pub}
-                §MT{mt1:{{(shadowsModuleFunction ? "Loud" : "Quiet")}}:pub} () -> i32
+              §CL{Owner:pub}
+                §MT{ {{(shadowsModuleFunction ? "Loud" : "Quiet")}}:pub} () -> i32
                   §E{}
                   §R 2
-                §MT{mt2:Choose:pub} (Func<i32>:fallback) -> void
+                §MT{Choose:pub} (Func<i32>:fallback) -> void
                   §E{}
                   §B{chosen:Func<i32>} (?? fallback Loud)
             """;
@@ -81,23 +81,23 @@ public sealed class MethodGroupEscapeTests
         });
 
     private static string Source(string statement, string effects) => $$"""
-        §M{m1:MethodGroups}
-          §F{f1:Loud:pub} () -> i32
+        §M{MethodGroups}
+          §F{Loud:pub} () -> i32
             §E{cw}
             §P "loud"
             §R 1
-          §CL{c1:Holder:pub}
+          §CL{Holder:pub}
             §FLD{Func<i32>:Saved:pub} §E{}
-            §MT{mt2:LoudInstance:pub} () -> i32
+            §MT{LoudInstance:pub} () -> i32
               §E{cw}
               §P "loud"
               §R 1
-          §CL{c2:Helpers:pub}
-            §MT{mt1:LoudStatic:pub:stat} () -> i32
+          §CL{Helpers:pub}
+            §MT{LoudStatic:pub:stat} () -> i32
               §E{cw}
               §P "loud"
               §R 1
-          §F{f2:Make:pub} (Func<i32>:fallback, bool:condition, Holder:holder, Func<i32>[]:items) -> void
+          §F{Make:pub} (Func<i32>:fallback, bool:condition, Holder:holder, Func<i32>[]:items) -> void
             §E{ {{effects}} }
             {{statement}}
         """;

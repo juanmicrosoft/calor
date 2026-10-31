@@ -403,15 +403,15 @@ public sealed class LosslessConversionContractTests
         await File.WriteAllTextAsync(
             libraryPath,
             """
-            §M{m001:Library}
-              §F{f001:Square:pub} (i32:x) -> i32
+            §M{Library}
+              §F{Square:pub} (i32:x) -> i32
                 §R (* x x)
             """);
         await File.WriteAllTextAsync(
             consumerPath,
             """
-            §M{m002:Consumer}
-              §F{f002:UseSquare:pub} (i32:x) -> i32
+            §M{Consumer}
+              §F{UseSquare:pub} (i32:x) -> i32
                 §R §C{Square} §A x §/C
             """);
 
@@ -479,8 +479,8 @@ public sealed class LosslessConversionContractTests
         await File.WriteAllTextAsync(
             sourcePath,
             """
-            §M{m001:Consumer}
-              §CL{c001:Factory:pub}
+            §M{Consumer}
+              §CL{Factory:pub}
                 §CSHARP{public Existing Create() => new Existing();}§/CSHARP
             """);
         await RestoreAsync(projectPath);
@@ -531,8 +531,8 @@ public sealed class LosslessConversionContractTests
         await File.WriteAllTextAsync(
             sourcePath,
             """
-            §M{m001:Consumer}
-              §F{f001:Read:pub} () -> i32
+            §M{Consumer}
+              §F{Read:pub} () -> i32
                 §R INT:42
             """);
         var plan = new MigrationPlan
@@ -592,13 +592,13 @@ public sealed class LosslessConversionContractTests
         await File.WriteAllTextAsync(
             sourcePath,
             """
-            §M{m001:Unsafe}
-              §CL{c001:Worker:pub}
-                §MT{m001:Run:pub} () -> void
+            §M{Unsafe}
+              §CL{Worker:pub}
+                §MT{Run:pub} () -> void
                   §E{unsafe}
-                  §UNSAFE{u001}
+                  §UNSAFE
                     §B{~x:i32} INT:42
-                  §/UNSAFE{u001}
+                  §/UNSAFE
             """);
         await RestoreAsync(projectPath);
         var plan = new MigrationPlan

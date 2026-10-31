@@ -31,8 +31,8 @@ public class CliEnforceEffectsDefaultTests : IDisposable
     {
         var path = Path.Combine(_tempDir, "violation.calr");
         File.WriteAllText(path, """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                 §O{void}
                 §P "undeclared console write"
             """);
@@ -73,8 +73,8 @@ public class CliEnforceEffectsDefaultTests : IDisposable
 
         var result = Program.Compile(
             """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                 §O{void}
                 §P "undeclared console write"
             """,

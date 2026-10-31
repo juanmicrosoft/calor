@@ -65,13 +65,13 @@ public class MalformedNewExpressionTests
     {
         const string source =
             """
-            §M{m001:ValidNew}
-              §NS{ns1:Alpha}
-                §CL{c1:Box:pub}<T>
-                  §CTOR{ctor1:pub} ()
+            §M{ValidNew}
+              §NS{Alpha}
+                §CL{Box:pub}<T>
+                  §CTOR{pub} ()
                     §P STR:"created"
-              §NS{ns2:Beta}
-                §F{f1:Make:pub} () -> Alpha.Box<i32>
+              §NS{Beta}
+                §F{Make:pub} () -> Alpha.Box<i32>
                   §R §NEW{global::Alpha.Box<i32>} §/NEW
             """;
         var diagnostics = new DiagnosticBag();
@@ -103,8 +103,8 @@ public class MalformedNewExpressionTests
 
     private static string Wrap(string expression) =>
         $$"""
-        §M{m001:MalformedNew}
-          §F{f1:Make:pub} () -> object
+        §M{MalformedNew}
+          §F{Make:pub} () -> object
             §R {{expression}}
         """;
 }

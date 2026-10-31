@@ -18,7 +18,7 @@ public class MetricCalculatorTests
         var calculator = new TokenEconomicsCalculator();
         // Using realistic Calor/C# comparison - C# has more verbose boilerplate
         var context = CreateContext(
-            calor: @"§M{m:Calc} §F{f:Add} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b) §/F §/M",
+            calor: @"§M{Calc} §F{Add} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b) §/F §/M",
             csharp: @"using System;
 namespace Calculator
 {
@@ -62,7 +62,7 @@ namespace Calculator
         // Arrange
         var calculator = new TokenEconomicsCalculator();
         var context = CreateContext(
-            calor: "§M{m001:Test} §F{f001:Foo} §R 42 §/F §/M",
+            calor: "§M{Test} §F{Foo} §R 42 §/F §/M",
             csharp: "namespace Test { class C { int Foo() { return 42; } } }");
 
         // Act
@@ -85,8 +85,8 @@ namespace Calculator
         // Arrange
         var calculator = new GenerationAccuracyCalculator();
         var context = CreateContext(
-            calor: @"§M{m001:Test}
-  §F{f001:Add:pub}
+            calor: @"§M{Test}
+  §F{Add:pub}
       §I{i32:a} §I{i32:b}
       §O{i32}
       §R (+ a b)",
@@ -128,8 +128,8 @@ namespace Calculator
         // Arrange
         var calculator = new ComprehensionCalculator();
         var context = CreateContext(
-            calor: @"§M{m001:Math}
-  §F{f001:Divide:pub}
+            calor: @"§M{Math}
+  §F{Divide:pub}
       §I{i32:a} §I{i32:b}
       §O{i32}
       §REQ (> b 0)
@@ -156,10 +156,10 @@ namespace Calculator
         // Arrange
         var calculator = new EditPrecisionCalculator();
         var context = CreateContext(
-            calor: @"§M{m001:App}
-  §F{f001:Method1:pub}
+            calor: @"§M{App}
+  §F{Method1:pub}
       §O{void}
-  §F{f002:Method2:pub}
+  §F{Method2:pub}
       §O{void}",
             csharp: @"namespace App { public class AppModule { public void Method1() { } public void Method2() { } } }");
 
@@ -178,8 +178,8 @@ namespace Calculator
         // Arrange
         var calculator = new EditPrecisionCalculator();
 
-        var calorBefore = "§F{f001:Foo} §R 1 §/F";
-        var calorAfter = "§F{f001:Foo} §R 2 §/F";
+        var calorBefore = "§F{Foo} §R 1 §/F";
+        var calorAfter = "§F{Foo} §R 2 §/F";
         var csharpBefore = "int Foo() { return 1; }";
         var csharpAfter = "int Foo() { return 2; }";
 
@@ -205,8 +205,8 @@ namespace Calculator
         // Arrange
         var calculator = new ErrorDetectionCalculator();
         var context = CreateContext(
-            calor: @"§M{m001:Safe}
-  §F{f001:Divide:pub}
+            calor: @"§M{Safe}
+  §F{Divide:pub}
       §I{i32:a} §I{i32:b}
       §O{i32}
       §REQ (!= b 0)
@@ -232,8 +232,8 @@ namespace Calculator
         // Arrange
         var calculator = new InformationDensityCalculator();
         var context = CreateContext(
-            calor: @"§M{m001:Dense}
-  §F{f001:Process:pub}
+            calor: @"§M{Dense}
+  §F{Process:pub}
       §I{i32:x}
       §O{i32}
       §E{pure}
@@ -316,8 +316,8 @@ namespace Calculator
         // Arrange - AsyncConcurrency program using §AF{ markers
         var calculator = new RefactoringStabilityCalculator();
         var context = CreateContext(
-            calor: @"§M{m001:AsyncApp}
-  §AF{af001:FetchData:pub}
+            calor: @"§M{AsyncApp}
+  §AF{FetchData:pub}
       §I{str:url}
       §O{Task_str}
       §R (await (httpGet url))",
@@ -342,14 +342,14 @@ namespace Calculator
         // Arrange - OOP program using §CL{, §MT{, §CTOR{, §PROP{ markers
         var calculator = new RefactoringStabilityCalculator();
         var context = CreateContext(
-            calor: @"§M{m001:Shapes}
-  §CL{cl001:Circle}
-      §PROP{p001:Radius:pub} §O{f64}
-      §CTOR{ct001:New:pub}
+            calor: @"§M{Shapes}
+  §CL{Circle}
+      §PROP{Radius:pub} §O{f64}
+      §CTOR{New:pub}
         §I{f64:radius}
         §R (set this.Radius radius)
-      §/CTOR{ct001}
-      §MT{mt001:Area:pub}
+      §/CTOR
+      §MT{Area:pub}
           §O{f64}
           §R (* 3.14159 (* this.Radius this.Radius))",
             csharp: @"namespace Shapes { public class Circle { public double Radius { get; set; } public Circle(double radius) { Radius = radius; } public double Area() { return 3.14159 * Radius * Radius; } } }");
@@ -373,16 +373,16 @@ namespace Calculator
         // Arrange - program using only original markers (§M{, §F{, §V{, §LOOP{, §IF{)
         var calculator = new RefactoringStabilityCalculator();
         var context = CreateContext(
-            calor: @"§M{m001:Math}
-  §F{f001:SumPositive:pub}
+            calor: @"§M{Math}
+  §F{SumPositive:pub}
       §I{arr_i32:nums}
       §O{i32}
       §V{v001:total} 0
       §LOOP{l001:each} nums
-        §IF{if001:positive}
+        §IF
           (> item 0)
           (set total (+ total item))
-        §/IF{if001}
+        §/IF
       §/LOOP{l001}
       §R total",
             csharp: @"namespace Math { public class MathOps { public int SumPositive(int[] nums) { int total = 0; foreach (var item in nums) { if (item > 0) total += item; } return total; } } }");
@@ -407,15 +407,15 @@ namespace Calculator
         // Arrange - program using §FLD{ and §OP{ markers
         var calculator = new RefactoringStabilityCalculator();
         var context = CreateContext(
-            calor: @"§M{m001:Vector}
-  §CL{cl001:Vec2}
+            calor: @"§M{Vector}
+  §CL{Vec2}
       §FLD{fld001:X:pub} §O{f64}
       §FLD{fld002:Y:pub} §O{f64}
-      §OP{op001:Add:pub}
+      §OP{Add:pub}
         §I{Vec2:a} §I{Vec2:b}
         §O{Vec2}
         §R (new Vec2 (+ a.X b.X) (+ a.Y b.Y))
-      §/OP{op001}",
+      §/OP",
             csharp: @"namespace Vector { public struct Vec2 { public double X; public double Y; public static Vec2 operator +(Vec2 a, Vec2 b) => new Vec2 { X = a.X + b.X, Y = a.Y + b.Y }; } }");
 
         // Act

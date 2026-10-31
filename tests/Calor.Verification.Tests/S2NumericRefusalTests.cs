@@ -36,8 +36,8 @@ public sealed class S2NumericRefusalTests
     public void NarrowArithmetic_IsRefused(string t1, string t2, string op, string relation, string bound)
     {
         var source = $$"""
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} ({{t1}}:x, {{t2}}:y) -> i32
+            §M{R1Case}
+              §F{Probe:pub} ({{t1}}:x, {{t2}}:y) -> i32
                 §E{}
                 §S ({{relation}} ({{op}} x y) {{bound}})
                 §R INT:0
@@ -49,8 +49,8 @@ public sealed class S2NumericRefusalTests
     public void Control_NarrowComparison_StaysProven()
     {
         const string source = """
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} (i8:x) -> i32
+            §M{R1Case}
+              §F{Probe:pub} (i8:x) -> i32
                 §E{}
                 §S (<= x INT:127)
                 §R INT:0
@@ -65,8 +65,8 @@ public sealed class S2NumericRefusalTests
     {
         Assert.True(long.Parse(big) is > int.MaxValue or < int.MinValue);
         var source = $$"""
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} (i64:x) -> i32
+            §M{R1Case}
+              §F{Probe:pub} (i64:x) -> i32
                 §E{}
                 §S ({{relation}} x INT:{{big}})
                 §R INT:0
@@ -78,8 +78,8 @@ public sealed class S2NumericRefusalTests
     public void Control_SameValueSpelledLong_StaysProven()
     {
         const string source = """
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} (i64:x) -> i32
+            §M{R1Case}
+              §F{Probe:pub} (i64:x) -> i32
                 §E{}
                 §S (<= x LONG:9223372036854775807)
                 §R INT:0
@@ -94,8 +94,8 @@ public sealed class S2NumericRefusalTests
     public void OverflowSensitiveCheckedArithmetic_IsAssumed(string type, string lower, string claim)
     {
         var source = $$"""
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} ({{type}}:x) -> i32
+            §M{R1Case}
+              §F{Probe:pub} ({{type}}:x) -> i32
                 §E{}
                 §Q (>= x {{lower}})
                 §S {{claim}}
@@ -112,8 +112,8 @@ public sealed class S2NumericRefusalTests
     public void Control_ArithmeticThatCannotOverflow_StaysProven(string type, string claim)
     {
         var source = $$"""
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} ({{type}}:x) -> i32
+            §M{R1Case}
+              §F{Probe:pub} ({{type}}:x) -> i32
                 §E{}
                 §S {{claim}}
                 §R INT:0
@@ -148,8 +148,8 @@ public sealed class S2NumericRefusalTests
         // #1413 (S2 R-NUM, amendment 1.3.1): when the promoted result type always holds the
         // result, no solver query decides it, so the verdict cannot depend on solver time.
         var source = $$"""
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} ({{leftType}}:x, {{rightType}}:y) -> i32
+            §M{R1Case}
+              §F{Probe:pub} ({{leftType}}:x, {{rightType}}:y) -> i32
                 §E{}
                 §S (== {{arithmetic}} {{arithmetic}})
                 §R INT:0
@@ -167,8 +167,8 @@ public sealed class S2NumericRefusalTests
         // Review round 2: the simplifier folded the conditional to LONG:0 == LONG:0 before the
         // translator saw the refused INT: literal.
         const string source = """
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} () -> i32
+            §M{R1Case}
+              §F{Probe:pub} () -> i32
                 §E{}
                 §S (== (? BOOL:true LONG:0 INT:3000000000) LONG:0)
                 §R INT:0
@@ -204,8 +204,8 @@ public sealed class S2NumericRefusalTests
     {
         // Review round 2: warming one spelling must not change the other's verdict, in either order.
         const string intSource = """
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} (i64:x) -> i32
+            §M{R1Case}
+              §F{Probe:pub} (i64:x) -> i32
                 §E{}
                 §S (<= x INT:9223372036854775807)
                 §R INT:0
@@ -254,8 +254,8 @@ public sealed class S2NumericRefusalTests
         // Review round 3: an entry written before R-NUM (format 1.20 or 1.21) may hold Proven for an
         // overflow-sensitive shape that is now Assumed.
         const string source = """
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} (u32:x) -> i32
+            §M{R1Case}
+              §F{Probe:pub} (u32:x) -> i32
                 §E{}
                 §Q (>= x UINT:1702287129)
                 §S (< (- x INT:1) x)
@@ -335,8 +335,8 @@ public sealed class S2NumericRefusalTests
     public void EntailedCheckedArithmetic_IsAssumedWithTheCheckedArithmeticAssumption()
     {
         const string source = """
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} (u32:x) -> i32
+            §M{R1Case}
+              §F{Probe:pub} (u32:x) -> i32
                 §E{}
                 §Q (>= x UINT:1702287129)
                 §S (< (- x INT:1) x)

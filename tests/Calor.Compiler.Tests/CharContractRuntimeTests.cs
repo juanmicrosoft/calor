@@ -21,8 +21,8 @@ public class CharContractRuntimeTests
         string operation, char valid, char invalid)
     {
         var source = $$"""
-            §M{m1:CharContracts}
-              §F{f1:Probe:pub} (char:input, char:output) -> char
+            §M{CharContracts}
+              §F{Probe:pub} (char:input, char:output) -> char
                 §E{}
                 §Q ({{operation}} input)
                 §S ({{operation}} result)
@@ -49,8 +49,8 @@ public class CharContractRuntimeTests
     public void CharacterContracts_StillRejectNonBooleanAndUnknownReferences(string expression, string code)
     {
         var result = Program.Compile($$"""
-            §M{m1:CharContracts}
-              §F{f1:Probe:pub} (char:input) -> char
+            §M{CharContracts}
+              §F{Probe:pub} (char:input) -> char
                 §E{}
                 §Q {{expression}}
                 §R input

@@ -36,8 +36,8 @@ public class EffectVariableTests
         // cascade starting "Expected Greater but found Identifier" — `eff e` is new
         // syntax (§7.2).
         var module = Parse("""
-            §M{m001:X6}
-              §F{f001:Map:pub}<T, U, eff e> (Func<i32,i32>:f §E{e}, i32:v) -> i32
+            §M{X6}
+              §F{Map:pub}<T, U, eff e> (Func<i32,i32>:f §E{e}, i32:v) -> i32
                 §E{e}
                 §R INT:0
             """, out var diagnostics);
@@ -58,11 +58,11 @@ public class EffectVariableTests
     public void TypeParamNamedEff_StillWorks()
     {
         // §14 Q2, the one v3 decision that rested on reasoning rather than execution.
-        // Z4 (`§F{f001:M:pub}<eff> (eff:x) -> void`) compiles on main; the one-token
+        // Z4 (`§F{M:pub}<eff> (eff:x) -> void`) compiles on main; the one-token
         // lookahead in ParseOptionalTypeParameterList must keep it compiling.
         var module = Parse("""
-            §M{m001:Z4}
-              §F{f001:M:pub}<eff> (eff:x) -> void
+            §M{Z4}
+              §F{M:pub}<eff> (eff:x) -> void
                 §E{}
             """, out var diagnostics);
 
@@ -79,8 +79,8 @@ public class EffectVariableTests
         // §7.2(c): variables resolve before the taxonomy, so `eff cw` would make the
         // console-write code unwritable inside this declaration.
         Parse("""
-            §M{m001:N}
-              §F{f001:M:pub}<T, eff cw> (T:a) -> void
+            §M{N}
+              §F{M:pub}<T, eff cw> (T:a) -> void
                 §E{}
             """, out var diagnostics);
 
@@ -97,8 +97,8 @@ public class EffectVariableTests
     public void OrdinaryTypeParameterNamedLikeACode_StaysGreen(string name)
     {
         var source = $$"""
-            §M{m001:Z6}
-              §F{f001:M:pub}<T, {{name}}> (T:a, {{name}}:b) -> void
+            §M{Z6}
+              §F{M:pub}<T, {{name}}> (T:a, {{name}}:b) -> void
                 §E{}
             """;
 
@@ -116,9 +116,9 @@ public class EffectVariableTests
         // which §7.3 already permits, which is why §9's seventh insertion point
         // stayed at zero cost.
         var module = Parse("""
-            §M{m001:W1}
-              §IFACE{i001:IH}
-                §MT{mt001:Handle}<eff e> (Func<i32>:next §E{e}) -> i32
+            §M{W1}
+              §IFACE{IH}
+                §MT{Handle}<eff e> (Func<i32>:next §E{e}) -> i32
                   §E{e}
             """, out var diagnostics);
 
@@ -138,8 +138,8 @@ public class EffectVariableTests
         // §7.2(b): the variable resolves BEFORE EffectCodes.TryParseCompact, so a
         // bound name never reaches the taxonomy lookup.
         var module = Parse("""
-            §M{m001:S}
-              §F{f001:M:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+            §M{S}
+              §F{M:pub}<eff e> (Func<i32>:g §E{e}) -> i32
                 §E{cw, e}
                 §R INT:0
             """, out var diagnostics);
@@ -161,8 +161,8 @@ public class EffectVariableTests
         // binder, which this slice does not have — §7.2(b)'s second half is E3's.
         // Pinned so the boundary is observed rather than assumed.
         Parse("""
-            §M{m001:X5}
-              §F{f001:M:pub} () -> void
+            §M{X5}
+              §F{M:pub} () -> void
                 §E{e}
             """, out var diagnostics);
 
@@ -178,11 +178,11 @@ public class EffectVariableTests
         // replace. A scope stack means 'e' is unknown in the sibling, not silently
         // still bound.
         var module = Parse("""
-            §M{m001:S}
-              §F{f001:Bound:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+            §M{S}
+              §F{Bound:pub}<eff e> (Func<i32>:g §E{e}) -> i32
                 §E{e}
                 §R INT:0
-              §F{f002:Sibling:pub} () -> void
+              §F{Sibling:pub} () -> void
                 §E{e}
             """, out var diagnostics);
 
@@ -196,23 +196,23 @@ public class EffectVariableTests
     // §7.3's partition. Each case binds `eff e` on an enclosing declaration that MAY
     // bind it, then mentions it at a position that may not carry one.
     [InlineData("""
-        §M{m001:R}
-          §F{f001:M:pub}<eff e> (Func<i32>:g §E{e}) -> Func<i32> §E{e}
+        §M{R}
+          §F{M:pub}<eff e> (Func<i32>:g §E{e}) -> Func<i32> §E{e}
             §E{e}
             §R g
         """, "a return row")]
     [InlineData("""
-        §M{m001:R}
-          §F{f001:M:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+        §M{R}
+          §F{M:pub}<eff e> (Func<i32>:g §E{e}) -> i32
             §E{e}
             §B{h:Func<i32>} §E{e} g
             §R INT:0
         """, "a binding's row")]
     [InlineData("""
-        §M{m001:R}
-          §F{f001:M:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+        §M{R}
+          §F{M:pub}<eff e> (Func<i32>:g §E{e}) -> i32
             §E{e}
-            §B{f} §LAM{lam1:x:i32} §E{e} x §/LAM{lam1}
+            §B{f} §LAM{x:i32} §E{e} x §/LAM
             §R INT:0
         """, "a lambda literal's row")]
     public void Rejected_AtAForbiddenPosition_IsCalor0404(string source, string expectedReason)
@@ -237,10 +237,10 @@ public class EffectVariableTests
     public void Rejected_InFieldRow_TheNameIsNotBound()
     {
         Parse("""
-            §M{m001:R}
-              §CL{c001:C:pub}
+            §M{R}
+              §CL{C:pub}
                 §FLD{Action<i32>:onChange:priv} §E{e}
-                §MT{mt001:M:pub}<eff e> (Func<i32>:g §E{e}) -> void
+                §MT{M:pub}<eff e> (Func<i32>:g §E{e}) -> void
                   §E{e}
             """, out var diagnostics);
 
@@ -252,12 +252,12 @@ public class EffectVariableTests
     public void Rejected_InDelegateRow_TheNameIsNotBound()
     {
         Parse("""
-            §M{m001:R}
-              §DEL{d001:H}
+            §M{R}
+              §DEL{H}
                 §I{i32:x}
                 §O{void}
                 §E{e}
-              §F{f001:Main:pub} () -> void
+              §F{Main:pub} () -> void
                 §E{}
             """, out var diagnostics);
 
@@ -267,15 +267,15 @@ public class EffectVariableTests
 
     [Theory]
     [InlineData("""
-        §M{m001:R}
-          §CL{c001:C:pub}<T, eff e>
-            §MT{mt001:M:pub} () -> void
+        §M{R}
+          §CL{C:pub}<T, eff e>
+            §MT{M:pub} () -> void
               §E{}
         """, "a class")]
     [InlineData("""
-        §M{m001:R}
-          §IFACE{i001:I}<T, eff e>
-            §MT{mt001:M} () -> void
+        §M{R}
+          §IFACE{I}<T, eff e>
+            §MT{M} () -> void
               §E{}
         """, "an interface")]
     public void Rejected_ClassOrInterfaceLevel_IsCalor0404(string source, string owner)
@@ -287,7 +287,7 @@ public class EffectVariableTests
 
         var error = Assert.Single(ScopeErrors(diagnostics));
         Assert.Contains($"cannot be declared on {owner}", error.Message);
-        Assert.Contains("§MT{mt001:Handle:pub}<eff e>", error.Message);
+        Assert.Contains("§MT{Handle:pub}<eff e>", error.Message);
     }
 
     [Fact]
@@ -298,8 +298,8 @@ public class EffectVariableTests
         // all. The honest pin is that no row is produced — not a Calor0404 the
         // compiler has no way to reach.
         var module = Parse("""
-            §M{m001:R}
-              §F{f001:M:pub}<eff e> (List<Func<i32,i32>>:fs §E{e}) -> i32
+            §M{R}
+              §F{M:pub}<eff e> (List<Func<i32,i32>>:fs §E{e}) -> i32
                 §E{e}
                 §R INT:0
             """, out var diagnostics);
@@ -325,11 +325,11 @@ public class EffectVariableTests
         // to slice a's boolean `IsEffectVariableInScope`) and both rows read -1,
         // which unifies with nothing.
         var module = Parse("""
-            §M{m001:Alpha}
-              §F{f001:A:pub}<eff e> (Func<i32>:f §E{e}) -> i32
+            §M{Alpha}
+              §F{A:pub}<eff e> (Func<i32>:f §E{e}) -> i32
                 §E{e}
                 §R INT:0
-              §F{f002:B:pub}<eff zzz> (Func<i32>:f §E{zzz}) -> i32
+              §F{B:pub}<eff zzz> (Func<i32>:f §E{zzz}) -> i32
                 §E{zzz}
                 §R INT:0
             """, out var diagnostics);
@@ -359,14 +359,14 @@ public class EffectVariableTests
         // SpikeVerdictTests.A3Fixtures_AreExactlyZeroCalor0418_PostE4,
         // which compiles the frozen fixture and asserts zero Calor0421.
         var module = Parse("""
-            §M{m001:MiddlewareAlpha}
-              §IFACE{i001:IPipelineBehavior}
-                §MT{mt001:Handle}<eff e> (i32:request, Func<i32>:next §E{e}) -> i32
+            §M{MiddlewareAlpha}
+              §IFACE{IPipelineBehavior}
+                §MT{Handle}<eff e> (i32:request, Func<i32>:next §E{e}) -> i32
                   §E{e}
 
-              §CL{c001:PassThroughBehavior:pub}
+              §CL{PassThroughBehavior:pub}
                 §IMPL{IPipelineBehavior}
-                §MT{mt002:Handle:pub}<eff f> (i32:request, Func<i32>:next §E{f}) -> i32
+                §MT{Handle:pub}<eff f> (i32:request, Func<i32>:next §E{f}) -> i32
                   §E{f}
                   §R §C{next} §/C
             """, out var diagnostics);
@@ -391,11 +391,11 @@ public class EffectVariableTests
         // it did, `<T, eff e>` (combined position 1) and `<eff e>` (position 0)
         // would stop unifying for a reason that has nothing to do with effects.
         var module = Parse("""
-            §M{m001:Mixed}
-              §F{f001:A:pub}<T, eff e> (Func<i32>:f §E{e}) -> i32
+            §M{Mixed}
+              §F{A:pub}<T, eff e> (Func<i32>:f §E{e}) -> i32
                 §E{e}
                 §R INT:0
-              §F{f002:B:pub}<eff e> (Func<i32>:f §E{e}) -> i32
+              §F{B:pub}<eff e> (Func<i32>:f §E{e}) -> i32
                 §E{e}
                 §R INT:0
             """, out var diagnostics);

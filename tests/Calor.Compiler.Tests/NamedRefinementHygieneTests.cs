@@ -62,9 +62,9 @@ public sealed class NamedRefinementHygieneTests
     public void UnusedNamedRefinement_IsStillValidated()
     {
         var result = Program.Compile("""
-            §M{m1:Hygiene}
-              §RTYPE{r1:Unused:i32} (> # n)
-              §F{f1:Take:pub} (i32:n) -> i32
+            §M{Hygiene}
+              §RTYPE{Unused:i32} (> # n)
+              §F{Take:pub} (i32:n) -> i32
                 §R n
             """, "hygiene.calr");
         Assert.Contains(result.Diagnostics.Errors,
@@ -78,15 +78,15 @@ public sealed class NamedRefinementHygieneTests
     public void ResolvableGlobalAndReceiverState_DoesNotBecomeADeclarationInput(string predicate)
     {
         var result = Program.Compile($$"""
-            §M{m1:Hygiene}
-              §RTYPE{r1:Above:i32} {{predicate}}
-              §CL{c1:Limits:pub}
+            §M{Hygiene}
+              §RTYPE{Above:i32} {{predicate}}
+              §CL{Limits:pub}
                 §FLD{i32:Min:pub:stat} 0
-              §CL{c2:Consumer:pub}
+              §CL{Consumer:pub}
                 §FLD{i32:Minimum:pub} 0
-                §MT{mt1:Check:pub} (i32:value) -> bool
+                §MT{Check:pub} (i32:value) -> bool
                   §R (> value 0)
-                §MT{mt2:Take:pub} (Above:x) -> i32
+                §MT{Take:pub} (Above:x) -> i32
                   §R x
             """, "hygiene.calr");
         Assert.Contains(result.Diagnostics.Errors,
@@ -149,9 +149,9 @@ public sealed class NamedRefinementHygieneTests
     public void NativeStringAndCharacterOperations_AreNotFreeCallNames(string predicate)
     {
         var result = Program.Compile($$"""
-            §M{m1:Hygiene}
-              §RTYPE{r1:Text:str} {{predicate}}
-              §F{f1:Take:pub} (Text:x) -> str
+            §M{Hygiene}
+              §RTYPE{Text:str} {{predicate}}
+              §F{Take:pub} (Text:x) -> str
                 §R x
             """, "hygiene.calr");
         Assert.False(result.HasErrors, Errors(result));
@@ -159,7 +159,6 @@ public sealed class NamedRefinementHygieneTests
     }
 
     [Theory]
-    [InlineData("(== (inc #) 1)")]
     [InlineData("(== §CS{n} 1)")]
     [InlineData("(== (upper \"a\") \"A\")")]
     [InlineData("(starts \"abc\" \"a\")")]
@@ -167,6 +166,19 @@ public sealed class NamedRefinementHygieneTests
     {
         var result = Compile(predicate);
         Assert.Contains(result.Diagnostics.Errors,
+            error => error.Code == DiagnosticCode.NamedRefinementNotClosed);
+    }
+
+    [Fact]
+    public void RemovedUpdateSyntaxIsRejectedBeforeNamedRefinementHygiene()
+    {
+        const string predicate = "(== (inc #) 1)";
+        var result = Compile(predicate);
+        var diagnostic = Assert.Single(result.Diagnostics.Errors.Where(
+            error => error.Code == DiagnosticCode.UnexpectedToken));
+        Assert.Equal("Update operator 'inc' is removed. Use §ASSIGN with an explicit value instead.", diagnostic.Message);
+        Assert.Equal("(inc #)", Source(predicate).Substring(diagnostic.Span.Start, diagnostic.Span.Length));
+        Assert.DoesNotContain(result.Diagnostics.Errors,
             error => error.Code == DiagnosticCode.NamedRefinementNotClosed);
     }
 
@@ -184,6 +196,7 @@ public sealed class NamedRefinementHygieneTests
             new FieldAccessNode(span, new SelfRefNode(span), "Minimum"),
             new CallExpressionNode(span, "predicate", [new SelfRefNode(span)]),
             new RawCSharpExpressionNode(span, "n > 0"),
+            new UnaryOperationNode(span, UnaryOperator.PreIncrement, new SelfRefNode(span)),
             new ForallExpressionNode(span, [new QuantifierVariableNode(span, "Limits.Min", "i32")],
                 new ReferenceNode(span, "Limits.Min")),
             new ForallExpressionNode(span, [new QuantifierVariableNode(span, "n", "ReceiverType")],
@@ -194,7 +207,7 @@ public sealed class NamedRefinementHygieneTests
         ];
         foreach (var expression in expressions)
         {
-            var module = Parse("§M{m1:Hygiene}\n").With(update =>
+            var module = Parse("§M{Hygiene}\n").With(update =>
                 update.RefinementTypes =
                 [new RefinementTypeNode(span, "r1", "Closed", "i32", expression, new AttributeCollection())]);
             var diagnostics = new DiagnosticBag();
@@ -212,10 +225,10 @@ public sealed class NamedRefinementHygieneTests
     public void ComposedNamedRefinements_KeepTheirRuntimeGuards()
     {
         var result = Program.Compile("""
-            §M{m1:Hygiene}
-              §RTYPE{r1:Nat:i32} (>= # 0)
-              §RTYPE{r2:Small:Nat} (< # 10)
-              §F{f1:Take:pub} (Small:x) -> i32
+            §M{Hygiene}
+              §RTYPE{Nat:i32} (>= # 0)
+              §RTYPE{Small:Nat} (< # 10)
+              §F{Take:pub} (Small:x) -> i32
                 §R x
             """, "hygiene.calr");
         Assert.False(result.HasErrors, Errors(result));
@@ -232,8 +245,8 @@ public sealed class NamedRefinementHygieneTests
     public void InlineCrossParameterPredicate_StillCompilesAndExecutes(bool typeCheck)
     {
         var result = Program.Compile("""
-            §M{m1:Hygiene}
-              §F{f1:Take:pub} (i32:n, i32:x | (> # n)) -> i32
+            §M{Hygiene}
+              §F{Take:pub} (i32:n, i32:x | (> # n)) -> i32
                 §R x
             """, "hygiene.calr", Options(typeCheck));
         Assert.False(result.HasErrors, Errors(result));
@@ -245,9 +258,9 @@ public sealed class NamedRefinementHygieneTests
     }
 
     private static string Source(string predicate) => $$"""
-        §M{m1:Hygiene}
-          §RTYPE{r1:Above:i32} {{predicate}}
-          §F{f1:Take:pub} (i32:n, Above:x) -> i32
+        §M{Hygiene}
+          §RTYPE{Above:i32} {{predicate}}
+          §F{Take:pub} (i32:n, Above:x) -> i32
             §E{}
             §R x
         """;

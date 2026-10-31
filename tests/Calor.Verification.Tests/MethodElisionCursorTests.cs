@@ -24,9 +24,9 @@ public class MethodElisionCursorTests
         // Same contract shape the §F form has always elided (VerifierTests square
         // pattern); pre-fix the §MT form emitted a runtime guard with id "unknown".
         const string source = @"
-§M{m001:Test}
-  §CL{c001:Calc:pub}
-    §MT{mt001:Square:pub}
+§M{Test}
+  §CL{Calc:pub}
+    §MT{Square:pub}
       §I{i32:x}
       §O{i32}
       §Q (>= x 0)
@@ -49,9 +49,9 @@ public class MethodElisionCursorTests
         // No Z3 needed: with no verification result the guard is always kept, and its
         // reported function id comes straight from the cursor — pre-fix, "unknown".
         const string source = @"
-§M{m001:Test}
-  §CL{c001:Calc:pub}
-    §MT{mt001:Half:pub}
+§M{Test}
+  §CL{Calc:pub}
+    §MT{Half:pub}
       §I{i32:x}
       §O{i32}
       §S (> result 10)
@@ -61,7 +61,8 @@ public class MethodElisionCursorTests
 
         Assert.False(result.HasErrors);
         // Anchored to the exception's function-id argument position, not any occurrence.
-        Assert.Contains("\"mt001\", Calor.Runtime.ContractKind", result.GeneratedCode);
+        var method = Assert.Single(Assert.Single(result.Ast!.Classes).Methods);
+        Assert.Contains($"\"{method.Id}\", Calor.Runtime.ContractKind", result.GeneratedCode);
         Assert.DoesNotContain("\"unknown\"", result.GeneratedCode);
     }
 
@@ -75,18 +76,18 @@ public class MethodElisionCursorTests
         // postcondition index at 0 — without the operator's own cursor reset, the
         // operator's FALSE §S elides on Pick's proof. It must keep its guard.
         const string source = @"
-§M{m001:Test}
-  §CL{c001:Calc:pub}
-    §MT{mt001:Pick:pub}
+§M{Test}
+  §CL{Calc:pub}
+    §MT{Pick:pub}
       §I{i32:x}
       §O{i32}
       §Q (>= x 0)
       §S (>= result 0)
-      §IF{if1} (>= x 5)
+      §IF (>= x 5)
         §R x
       §EL
         §R INT:0
-    §OP{op001:+:pub}
+    §OP{+:pub}
       §I{i32:left}
       §I{i32:right}
       §O{i32}
@@ -117,24 +118,27 @@ public class MethodElisionCursorTests
         // Second's constructor guard (pre-#879 it was "unknown"; the first fix upgraded
         // it to a confidently WRONG id). The constructor's own id is the honest key.
         const string source = @"
-§M{m001:Test}
-  §CL{c001:First:pub}
-    §MT{mt001:Inc:pub}
+§M{Test}
+  §CL{First:pub}
+    §MT{Inc:pub}
       §I{i32:x}
       §O{i32}
       §Q (>= x 0)
       §S (>= result 1)
       §R (+ x 1)
-  §CL{c002:Second:pub}
-    §CTOR{ct001:pub}
+  §CL{Second:pub}
+    §CTOR{pub}
       §I{i32:size}
       §Q (> size 0)";
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions());
 
         Assert.False(result.HasErrors);
-        Assert.Contains("\"ct001\", Calor.Runtime.ContractKind", result.GeneratedCode);
-        Assert.DoesNotContain("size > 0\", \"mt001\"", result.GeneratedCode);
+        var constructor = Assert.Single(result.Ast!.Classes.Single(c => c.Name == "Second").Constructors);
+        var foreignMethod = Assert.Single(result.Ast.Classes.Single(c => c.Name == "First").Methods);
+        Assert.NotEqual(foreignMethod.Id, constructor.Id);
+        Assert.Contains($"\"{constructor.Id}\", Calor.Runtime.ContractKind", result.GeneratedCode);
+        Assert.DoesNotContain($"size > 0\", \"{foreignMethod.Id}\"", result.GeneratedCode);
     }
 
     [SkippableFact]
@@ -147,9 +151,9 @@ public class MethodElisionCursorTests
         // REFUSED at translation (Calor0718 — `(len x)` models string length, not array
         // length), which keeps the guard: the new surface must not over-elide it.
         const string source = @"
-§M{m001:Test}
-  §CL{c001:Calc:pub}
-    §MT{mt001:Count:pub}
+§M{Test}
+  §CL{Calc:pub}
+    §MT{Count:pub}
       §I{i32[]:arr}
       §O{i32}
       §S (>= result 0)
@@ -175,9 +179,9 @@ public class MethodElisionCursorTests
         // Assumed on the §MT form too — the cursor fix must not turn a demoted proof
         // into an elision on class methods.
         const string source = @"
-§M{m001:Test}
-  §CL{c001:Fmt:pub}
-    §MT{mt001:Chk:pub}
+§M{Test}
+  §CL{Fmt:pub}
+    §MT{Chk:pub}
       §I{str:s}
       §O{str}
       §Q (== s STR:""abc"")
@@ -196,9 +200,9 @@ public class MethodElisionCursorTests
     // Same Proven source for both default/opt-out pins below: a genuine ∀-proof
     // (x in [0, 46340] ⇒ x*x >= 0), not vacuous.
     private const string ProvenSquareSource = @"
-§M{m001:Test}
-  §CL{c001:Calc:pub}
-    §MT{mt001:Square:pub}
+§M{Test}
+  §CL{Calc:pub}
+    §MT{Square:pub}
       §I{i32:x}
       §O{i32}
       §Q (>= x 0)

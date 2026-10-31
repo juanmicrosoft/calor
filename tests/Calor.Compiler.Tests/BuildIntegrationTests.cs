@@ -15,8 +15,8 @@ public class BuildIntegrationTests
         {
             var sourceFile = Path.Combine(tempDir, "test.calr");
             var source = @"
-§M{m001:Test}
-  §F{f001:Hello:pub}
+§M{Test}
+  §F{Hello:pub}
       §O{void}
       §E{cw}
       §C{Console.WriteLine}
@@ -45,8 +45,8 @@ public class BuildIntegrationTests
     {
         // Arrange - Invalid Calor source
         var source = @"
-§M{m001:Test}
-  §F{f001:Hello:pub}
+§M{Test}
+  §F{Hello:pub}
       §O{void}
         §INVALID_SYNTAX
 ";
@@ -63,8 +63,8 @@ public class BuildIntegrationTests
     {
         // Arrange
         var source = @"
-§M{m001:Calculator}
-  §F{f001:Add:pub}
+§M{Calculator}
+  §F{Add:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -86,14 +86,14 @@ public class BuildIntegrationTests
     {
         // Arrange
         var source = @"
-§M{m001:Math}
-  §F{f001:Add:pub}
+§M{Math}
+  §F{Add:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
       §R (+ a b)
 
-  §F{f002:Subtract:pub}
+  §F{Subtract:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -114,8 +114,8 @@ public class BuildIntegrationTests
     {
         // Arrange
         var source = @"
-§M{m001:Safe}
-  §F{f001:Divide:pub}
+§M{Safe}
+  §F{Divide:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}

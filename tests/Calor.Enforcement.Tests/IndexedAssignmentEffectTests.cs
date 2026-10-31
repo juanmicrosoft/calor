@@ -105,16 +105,16 @@ public sealed class IndexedAssignmentEffectTests
     };
 
     private static string Source(string statement, string effects) => $$"""
-        §M{m1:IndexedEffects}
-          §F{f1:Index:pub} () -> i32
+        §M{IndexedEffects}
+          §F{Index:pub} () -> i32
             §E{cw}
             §P "index"
             §R INT:0
-          §F{f2:Receiver:pub} (i32[]:items) -> i32[]
+          §F{Receiver:pub} (i32[]:items) -> i32[]
             §E{cw}
             §P "receiver"
             §R items
-          §F{f3:Write:pub} (i32[]:items) -> void
+          §F{Write:pub} (i32[]:items) -> void
             §E{ {{effects}} }
             {{statement}}
         """;

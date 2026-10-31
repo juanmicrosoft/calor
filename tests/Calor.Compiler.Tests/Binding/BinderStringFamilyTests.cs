@@ -143,8 +143,8 @@ public class BinderStringFamilyTests
         // The family's span-anchored e2e pin: /0 nested in a string-op argument must
         // produce the real Calor0920 pointing at the right line. ((str x) = ToString.)
         const string source = @"
-§M{m001:Test}
-  §F{f001:Trap:pub} () -> void
+§M{Test}
+  §F{Trap:pub} () -> void
     §E{cw}
     §P (contains STR:""ab"" (str (/ 10 0)))";
 

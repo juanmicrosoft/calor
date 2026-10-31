@@ -297,18 +297,18 @@ public class BoundTypeArchitectureTests
     /// </summary>
     [Theory]
     [InlineData(
-        "§B{f} §LAM{l1:x:i32} (+ x INT:1)",
+        "§B{f} §LAM{x:i32} (+ x INT:1)",
         "LAMBDA(i32)->INT")]
     [InlineData(
-        "§B{g} §LAM{l2}",
+        "§B{g} §LAM{}",
         "LAMBDA()->VOID")]
     public void LambdaExpression_BindsToFunctionBoundType_WithUnchangedDisplayString(
         string bindingLine,
         string expectedDisplay)
     {
         var source = string.Join("\n", [
-            "§M{m1:LambdaTypeProbe}",
-            "  §F{f1:Main:pub} () -> void",
+            "§M{LambdaTypeProbe}",
+            "  §F{Main:pub} () -> void",
             "    §E{}",
             $"    {bindingLine}",
             "",
@@ -332,10 +332,10 @@ public class BoundTypeArchitectureTests
     public void LambdaFunctionBoundType_CarriesParameterAndReturnTypes()
     {
         var source = string.Join("\n", [
-            "§M{m1:LambdaShapeProbe}",
-            "  §F{f1:Main:pub} () -> void",
+            "§M{LambdaShapeProbe}",
+            "  §F{Main:pub} () -> void",
             "    §E{}",
-            "    §B{f} §LAM{l1:x:i32:y:str} (+ x INT:1)",
+            "    §B{f} §LAM{x:i32:y:str} (+ x INT:1)",
             "",
         ]);
 
@@ -371,8 +371,8 @@ public class BoundTypeArchitectureTests
     public void CallGraphSideChannel_CarriesBoundReceiverTypesPerCallSite()
     {
         var source = string.Join("\n", [
-            "§M{m001:ReceiverChannelProbe}",
-            "  §F{f001:Go:pub}",
+            "§M{ReceiverChannelProbe}",
+            "  §F{Go:pub}",
             "      §I{i32:n}",
             "      §O{void}",
             "      §E{}",

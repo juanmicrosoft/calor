@@ -84,9 +84,9 @@ public class StructuralControlFlowTests
     {
         var assembly = Compile(
             """
-            §M{m001:GuardedMatch}
-              §F{f001:Classify:pub} (i32 value) -> str
-                §W{m001} value
+            §M{GuardedMatch}
+              §F{Classify:pub} (i32 value) -> str
+                §W value
                   §K §VAR{n} §WHEN (> n INT:10)
                     §R STR:"large"
                   §K §VAR{n} §WHEN (> n INT:0)
@@ -114,33 +114,33 @@ public class StructuralControlFlowTests
     {
         var assembly = Compile(
             """
-            §M{m001:StructuralLoops}
-              §F{f001:Encode:pub} (i32 from, i32 to, i32 step) -> i32
+            §M{StructuralLoops}
+              §F{Encode:pub} (i32 from, i32 to, i32 step) -> i32
                 §B{~value:i32} INT:0
-                §L{l001:i:from:to:step}
+                §L{i:from:to:step}
                   §B{~value:i32} (+ (* value INT:10) i)
                 §R value
 
-              §F{f002:ExpressionStep:pub} () -> i32
+              §F{ExpressionStep:pub} () -> i32
                 §B{one:i32} INT:1
                 §B{~value:i32} INT:0
-                §L{l002:i:1:5:(+ one one)}
+                §L{i:1:5:(+ one one)}
                   §B{~value:i32} (+ (* value INT:10) i)
                 §R value
 
-              §F{f003:ExactOnce:pub} () -> i32
+              §F{ExactOnce:pub} () -> i32
                 §B{~fromCalls:i32} INT:0
                 §B{~toCalls:i32} INT:0
                 §B{~stepCalls:i32} INT:0
                 §B{~value:i32} INT:0
-                §L{l003:i:(pre-inc fromCalls):(+ (pre-inc toCalls) INT:2):(pre-inc stepCalls)}
+                §L{i:(pre-inc fromCalls):(+ (pre-inc toCalls) INT:2):(pre-inc stepCalls)}
                   §B{~value:i32} (+ (* value INT:10) i)
                 §R (+ (* value INT:1000) (+ (* fromCalls INT:100) (+ (* toCalls INT:10) stepCalls)))
 
-              §F{f004:Collision:pub} () -> i32
+              §F{Collision:pub} () -> i32
                 §B{__calorForFrom:i32} INT:7
                 §B{~value:i32} INT:0
-                §L{l004:i:1:1:1}
+                §L{i:1:1:1}
                   §B{~value:i32} (+ value i)
                 §R (+ value __calorForFrom)
             """,
@@ -303,8 +303,8 @@ public class StructuralControlFlowTests
     {
         var assembly = Compile(
             """
-            §M{m001:RawLoopCollision}
-              §F{f001:Run:pub} () -> i32
+            §M{RawLoopCollision}
+              §F{Run:pub} () -> i32
                 §B{~result:i32} INT:0
                 §RAW
                 int __calorForFrom = 10;
@@ -317,7 +317,7 @@ public class StructuralControlFlowTests
                 result += __calorForFrom + __calorForTo + __calorForStep
                     + __calorForAscending + __calorForFirst;
                 §/RAW
-                §L{l001:i:1:2:1}
+                §L{i:1:2:1}
                   §RAW
                   if (i == 1) continue;
                   §/RAW
@@ -339,8 +339,8 @@ public class StructuralControlFlowTests
     {
         var defaultAssembly = Compile(
             """
-            §M{m001:RawConditionalCollision}
-              §F{f001:Run:pub} () -> i32
+            §M{RawConditionalCollision}
+              §F{Run:pub} () -> i32
                 §B{~result:i32} INT:0
                 §RAW
                 #if BROKEN
@@ -368,7 +368,7 @@ public class StructuralControlFlowTests
                 string lexicalNoise = "__calorForTo_1 __calorForStep_1";
                 _ = lexicalNoise;
                 §/RAW
-                §L{l001:i:1:2:1}
+                §L{i:1:2:1}
                   §B{~result:i32} (+ result i)
                 §R result
             """,
@@ -667,8 +667,8 @@ public class StructuralControlFlowTests
     {
         var result = Program.Compile(
             $$"""
-            §M{m001:IteratorParameters}
-              §F{f001:Values:pub}
+            §M{IteratorParameters}
+              §F{Values:pub}
                 §I{i32:value:{{modifier}}}
                 §O{i32}
                 §YIELD value
@@ -689,8 +689,8 @@ public class StructuralControlFlowTests
     {
         var result = Program.Compile(
             """
-            §M{m001:IteratorParameters}
-              §F{f001:Values:pub}
+            §M{IteratorParameters}
+              §F{Values:pub}
                 §I{i32:value}
                 §O{i32}
                 §YIELD value
@@ -708,16 +708,16 @@ public class StructuralControlFlowTests
         foreach (var source in new[]
                  {
                      """
-                     §M{m001:AsyncIteratorParameters}
-                       §AF{f001:Values:pub}
+                     §M{AsyncIteratorParameters}
+                       §AF{Values:pub}
                          §I{i32:value:ref}
                          §O{i32}
                          §YIELD value
                      """,
                      """
-                     §M{m001:GenericIteratorParameters}
-                       §CL{c001:Container:pub}
-                         §MT{m001:Values:pub:stat}<T>
+                     §M{GenericIteratorParameters}
+                       §CL{Container:pub}
+                         §MT{Values:pub:stat}<T>
                            §I{T:value:ref}
                            §O{T}
                            §YIELD value
@@ -887,8 +887,8 @@ public class StructuralControlFlowTests
     {
         var result = Program.Compile(
             """
-            §M{m001:ValuelessYield}
-              §F{f001:Values:pub} () -> i32
+            §M{ValuelessYield}
+              §F{Values:pub} () -> i32
                 §YIELD
             """);
 

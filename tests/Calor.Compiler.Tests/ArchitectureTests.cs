@@ -282,19 +282,19 @@ public class ArchitectureTests
     {
         var first = ParseModule(
             """
-            §M{m001:First}
-              §F{f001:Run:pub} () -> void
+            §M{First}
+              §F{Run:pub} () -> void
                 §E{cw}
-                §L{loop:i:1:3:1}
-                  §IF{branch} (== (% i 2) 0)
+                §L{i:1:3:1}
+                  §IF (== (% i 2) 0)
                     §P "even"
                   §EL
                     §P i
             """);
         var second = ParseModule(
             """
-            §M{m002:Second}
-              §F{f002:Run:pub} () -> int
+            §M{Second}
+              §F{Run:pub} () -> int
                 §E{}
                 §B{value:int} 42
                 §R value

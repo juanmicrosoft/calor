@@ -38,10 +38,10 @@ public class MultilineCallExpressionTests
     public void NestedArgumentLists_LeaveLoopAndFollowingFunctionIntact()
     {
         const string source = """
-            §M{m1:Calls}
-              §F{f1:Probe:pub} (List<i32>:trace) -> void
+            §M{Calls}
+              §F{Probe:pub} (List<i32>:trace) -> void
                 §E{mut}
-                §L{l1:i:0:2:1}
+                §L{i:0:2:1}
                   §C{trace.Add}
                     §A §C{Math.Max}
                       §A i
@@ -49,7 +49,7 @@ public class MultilineCallExpressionTests
                     §/C
                   §/C
                 §C{trace.Add} §A 99 §/C
-              §F{f2:Other:pub} () -> i32
+              §F{Other:pub} () -> i32
                 §R 42
             """;
         var module = Parse(source, out var diagnostics);
@@ -70,26 +70,26 @@ public class MultilineCallExpressionTests
     public void ElidedHeaderAndLispCalls_LeaveStatementsAndSiblingOperandsIntact()
     {
         const string source = """
-            §M{m1:Calls}
-              §F{f1:Truth:pub} () -> bool
+            §M{Calls}
+              §F{Truth:pub} () -> bool
                 §E{}
                 §R true
-              §F{f2:Text:pub} () -> str
+              §F{Text:pub} () -> str
                 §E{}
                 §R "12"
-              §F{f3:Never:pub} () -> bool
+              §F{Never:pub} () -> bool
                 §E{}
                 §R false
-              §F{f4:One:pub} () -> i32
+              §F{One:pub} () -> i32
                 §E{}
                 §R 1
-              §F{f5:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 §B{~value:i32} 0
-                §EACH{each1:ch} §C{Text}
-                  §IF{if1} §C{Truth}
+                §EACH{ch} §C{Text}
+                  §IF §C{Truth}
                     (inc value)
-                §WH{w1} §C{Never}
+                §WH §C{Never}
                   §C{Math.Abs} §A 9 §/C
                 §R (+ value (+ §C{One}
                   3))
@@ -105,11 +105,11 @@ public class MultilineCallExpressionTests
     public void ElidedZeroArgumentCall_DoesNotTakeConstructorSiblingArguments()
     {
         const string source = """
-            §M{m1:Calls}
-              §F{f1:One:pub} () -> i32
+            §M{Calls}
+              §F{One:pub} () -> i32
                 §E{}
                 §R 1
-              §F{f2:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{alloc}
                 §B{pair:Tuple<i32,i32>} §NEW{Tuple<i32,i32>}
                   §A §C{One}
@@ -139,8 +139,8 @@ public class MultilineCallExpressionTests
     public void ExplicitInnerArgumentList_KeepsSameIndentContinuationArguments()
     {
         const string source = """
-            §M{m1:Calls}
-              §F{f1:Probe:pub} () -> i32
+            §M{Calls}
+              §F{Probe:pub} () -> i32
                 §E{alloc}
                 §B{pair:Tuple<i32,i32>} §NEW{Tuple<i32,i32>}
                   §A §C{Math.Max} §A 3
@@ -185,8 +185,8 @@ public class MultilineCallExpressionTests
     public void OriginalFileReadRepro_ExecutesAndRoundTrips()
     {
         const string source = """
-            §M{m1:Calls}
-              §F{f1:ReadFile:pub} (str:path) -> str
+            §M{Calls}
+              §F{ReadFile:pub} (str:path) -> str
                 §E{fs:r}
                 §B{str:content} §C{File.ReadAllText}
                   §A path
@@ -214,7 +214,7 @@ public class MultilineCallExpressionTests
     [InlineData("§B{value:i32} §C{Math.Abs}\n§A 3\n§R value", "§/C")]
     public void MalformedArguments_NameTheCauseWithoutLosingFunctionScope(string body, string requiredToken)
     {
-        var source = ProgramSource(body) + "\n  §F{f2:Other:pub} () -> i32\n    §R 42\n";
+        var source = ProgramSource(body) + "\n  §F{Other:pub} () -> i32\n    §R 42\n";
         var module = Parse(source, out var diagnostics);
         var error = Assert.Single(diagnostics.Errors);
         Assert.Equal(5, error.Span.Line);
@@ -238,7 +238,7 @@ public class MultilineCallExpressionTests
     }
 
     private static string ProgramSource(string body) =>
-        "§M{m1:Calls}\n  §F{f1:Probe:pub} () -> i32\n    §E{}\n"
+        "§M{Calls}\n  §F{Probe:pub} () -> i32\n    §E{}\n"
         + string.Join("\n", body.Split('\n').Select(line => "    " + line)) + "\n";
 
     private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)

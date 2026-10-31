@@ -67,7 +67,7 @@ public sealed class LiteralRawSemanticsTests
             diagnostic => diagnostic.Code == DiagnosticCode.SignedIntegerLiteralOverflow);
 
         var compilation = Program.Compile(
-            $"§M{{m:Overflow}}\n  §F{{f:Value:pub}} () -> object\n    §R {source}",
+            $"§M{{Overflow}}\n  §F{{Value:pub}} () -> object\n    §R {source}",
             "signed-long-overflow.calr",
             new CompilationOptions { EnforceEffects = false });
         Assert.True(compilation.HasErrors);
@@ -244,7 +244,7 @@ public sealed class LiteralRawSemanticsTests
             Assert.Equal(TokenKind.Error, tokens[0].Kind);
 
             var result = Program.Compile(
-                $"§M{{m:Utf8}}\n  §F{{f:Value:pub}} (i32:value) -> object\n    §R {literal}",
+                $"§M{{Utf8}}\n  §F{{Value:pub}} (i32:value) -> object\n    §R {literal}",
                 "interpolated-u8.calr",
                 new CompilationOptions { EnforceEffects = false });
             Assert.True(result.HasErrors);
@@ -718,7 +718,7 @@ public sealed class LiteralRawSemanticsTests
     {
         diagnostics = new DiagnosticBag();
         var parser = new Parser(
-            new Lexer($"§M{{m:Test}}\n  §F{{f:Value:pub}} () -> object\n    §R {source}", diagnostics)
+            new Lexer($"§M{{Test}}\n  §F{{Value:pub}} () -> object\n    §R {source}", diagnostics)
                 .TokenizeAllForParser(),
             diagnostics);
         var module = parser.Parse();

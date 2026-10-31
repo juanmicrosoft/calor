@@ -21,9 +21,9 @@ public class ParameterPoststateTests
         foreach (var mutation in new[]
         {
             "§ASSIGN x INT:-1",
-            "§IF{i1} (> x 0)\n      §ASSIGN x INT:-1",
-            "§B{first:i32} (pre-dec x)\n    §B{second:i32} (pre-dec x)",
-            "§B{first:i32} (post-dec x)\n    §B{second:i32} (post-dec x)"
+            "§IF (> x 0)\n      §ASSIGN x INT:-1",
+            "§ASSIGN x (- x 1)\n    §B{first:i32} x\n    §ASSIGN x (- x 1)\n    §B{second:i32} x",
+            "§B{first:i32} x\n    §ASSIGN x (- x 1)\n    §B{second:i32} x\n    §ASSIGN x (- x 1)"
         })
         {
             var result = Compile(Source(isVoid, mutation), verify);
@@ -79,14 +79,14 @@ public class ParameterPoststateTests
     public void PropertyGetterMutatingRefAlias_KeepsRuntimeGuard()
     {
         const string source = """
-            §M{m1:HiddenMutation}
-              §CL{c1:Counter:pub}
+            §M{HiddenMutation}
+              §CL{Counter:pub}
                 §FLD{i32:Value:pub}
-                §PROP{p1:Mutate:i32:pub}
+                §PROP{Mutate:i32:pub}
                   §GET
                     §ASSIGN Value INT:-1
                     §R Value
-                §MT{mt1:Change:pub}
+                §MT{Change:pub}
                   §I{i32:x:ref}
                   §O{i32}
                   §E{}
@@ -119,7 +119,7 @@ public class ParameterPoststateTests
     public void ImplicitBindingConversionMutatingRefAlias_KeepsRuntimeGuard()
     {
         const string source = """
-            §M{m1:ConversionMutation}
+            §M{ConversionMutation}
               §CSHARP{public class Evil
               {
                   public static int Value = 1;
@@ -129,8 +129,8 @@ public class ParameterPoststateTests
                       return new Evil();
                   }
               }}§/CSHARP
-              §CL{c1:Counter:pub}
-                §MT{mt1:Change:pub}
+              §CL{Counter:pub}
+                §MT{Change:pub}
                   §I{i32:x:ref}
                   §O{i32}
                   §E{}
@@ -166,8 +166,8 @@ public class ParameterPoststateTests
     }
 
     private static string Source(bool isVoid, string mutation) => $$"""
-        §M{m1:ParameterPoststate}
-          §F{f1:Change:pub} (i32:x) -> {{(isVoid ? "void" : "i32")}}
+        §M{ParameterPoststate}
+          §F{Change:pub} (i32:x) -> {{(isVoid ? "void" : "i32")}}
             §E{}
             §Q (>= x 0)
             §S (>= x 0)

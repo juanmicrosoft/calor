@@ -22,8 +22,8 @@ public sealed class ValidationLoopTests : IDisposable
     private void WriteFixture(bool failing = false, string? contract = null, string? testBody = null)
     {
         File.WriteAllText(SourcePath, $$"""
-            §M{m001:MathUtil}
-              §F{f001:Add:pub} (i32:a, i32:b) -> i32
+            §M{MathUtil}
+              §F{Add:pub} (i32:a, i32:b) -> i32
                 {{contract ?? ""}}
                 §R (+ a {{(failing ? "(+ b 1)" : "b")}})
             """);
@@ -78,7 +78,7 @@ public sealed class ValidationLoopTests : IDisposable
         WriteFixture();
         File.AppendAllText(SourcePath, """
 
-              §F{f002:Identity:pub} (i32:x) -> i32
+              §F{Identity:pub} (i32:x) -> i32
                 §S (== result x)
                 §R x
             """);
@@ -128,7 +128,7 @@ public sealed class ValidationLoopTests : IDisposable
     {
         WriteFixture();
         File.WriteAllText(SourcePath, """
-            §M{m001:Broken}
+            §M{Broken}
               §CSHARP{
               public class Bad { public int Get() => "not an integer"; }
               }§/CSHARP
@@ -245,10 +245,10 @@ public sealed class ValidationLoopTests : IDisposable
         WriteFixture();
         File.AppendAllText(SourcePath, """
 
-              §F{f002:FloatIdentity:pub} (f64:x) -> f64
+              §F{FloatIdentity:pub} (f64:x) -> f64
                 §S (>= result FLOAT:0.0)
                 §R x
-              §F{f003:Vacuous:pub} (i32:x) -> i32
+              §F{Vacuous:pub} (i32:x) -> i32
                 §Q (> x 0)
                 §Q (< x 0)
                 §S (== result x)
@@ -293,8 +293,8 @@ public sealed class ValidationLoopTests : IDisposable
     {
         WriteFixture();
         File.WriteAllText(Path.Combine(_directory, "other.calr"), """
-            §M{m002:Other}
-              §F{f002:Sum:pub} () -> i32
+            §M{Other}
+              §F{Sum:pub} () -> i32
                 §R §C{Add} §A 2 §A 3 §/C
             """);
         var result = await RunAsync(mcp: true);

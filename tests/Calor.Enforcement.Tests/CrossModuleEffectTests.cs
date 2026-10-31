@@ -68,13 +68,13 @@ public class CrossModuleEffectTests
     public void CrossModule_BareNameCall_UndeclaredEffect_Error()
     {
         // b.calr calls SaveOrder (bare name) without declaring db:w
-        var a = @"§M{m1:OrderService}
-  §F{f001:SaveOrder:pub}
+        var a = @"§M{OrderService}
+  §F{SaveOrder:pub}
       §O{void}
       §E{db:w}
 ";
-        var b = @"§M{m2:Handler}
-  §F{f001:HandleRequest:pub}
+        var b = @"§M{Handler}
+  §F{HandleRequest:pub}
       §O{void}
       §C{SaveOrder}
       §/C
@@ -92,13 +92,13 @@ public class CrossModuleEffectTests
     [Fact]
     public void CrossModule_QualifiedCall_UndeclaredEffect_Error()
     {
-        var a = @"§M{m1:OrderService}
-  §F{f001:SaveOrder:pub}
+        var a = @"§M{OrderService}
+  §F{SaveOrder:pub}
       §O{void}
       §E{db:w}
 ";
-        var b = @"§M{m2:Handler}
-  §F{f001:HandleRequest:pub}
+        var b = @"§M{Handler}
+  §F{HandleRequest:pub}
       §O{void}
       §C{OrderService.SaveOrder}
       §/C
@@ -115,13 +115,13 @@ public class CrossModuleEffectTests
     [Fact]
     public void CrossModule_DeclaredEffect_Passes()
     {
-        var a = @"§M{m1:OrderService}
-  §F{f001:SaveOrder:pub}
+        var a = @"§M{OrderService}
+  §F{SaveOrder:pub}
       §O{void}
       §E{db:w}
 ";
-        var b = @"§M{m2:Handler}
-  §F{f001:HandleRequest:pub}
+        var b = @"§M{Handler}
+  §F{HandleRequest:pub}
       §O{void}
       §E{db:w}
       §C{SaveOrder}
@@ -137,22 +137,22 @@ public class CrossModuleEffectTests
     public void CrossModule_OneHopPerBoundary()
     {
         // A→B→C: each caller must declare its immediate callee's effects.
-        var a = @"§M{m1:AMod}
-  §F{f001:FromA:pub}
+        var a = @"§M{AMod}
+  §F{FromA:pub}
       §O{void}
       §E{db:w}
       §C{FromB}
       §/C
 ";
-        var b = @"§M{m2:BMod}
-  §F{f001:FromB:pub}
+        var b = @"§M{BMod}
+  §F{FromB:pub}
       §O{void}
       §E{db:w}
       §C{FromC}
       §/C
 ";
-        var c = @"§M{m3:CMod}
-  §F{f001:FromC:pub}
+        var c = @"§M{CMod}
+  §F{FromC:pub}
       §O{void}
       §E{db:w}
 ";
@@ -166,8 +166,8 @@ public class CrossModuleEffectTests
     public void CrossModule_SingleFile_NoOp()
     {
         // Single module → cross-module pass does nothing (no boundaries).
-        var a = @"§M{m1:Alone}
-  §F{f001:Foo:pub}
+        var a = @"§M{Alone}
+  §F{Foo:pub}
       §O{void}
       §E{cw}
       §P STR:""hi""
@@ -184,13 +184,13 @@ public class CrossModuleEffectTests
     {
         // Private functions are not in the registry — a caller using a private callee's
         // name should not resolve cross-module.
-        var a = @"§M{m1:A}
-  §F{f001:Helper:priv}
+        var a = @"§M{A}
+  §F{Helper:priv}
       §O{void}
       §E{db:w}
 ";
-        var b = @"§M{m2:B}
-  §F{f001:Caller:pub}
+        var b = @"§M{B}
+  §F{Caller:pub}
       §O{void}
       §C{Helper}
       §/C
@@ -206,14 +206,14 @@ public class CrossModuleEffectTests
     public void CrossModule_ClassMethod_Propagation()
     {
         // Public class method effects propagate via ClassName.MethodName qualified call.
-        var a = @"§M{m1:Domain}
-  §CL{c1:OrderRepo:pub}
-    §MT{m001:Save:pub}
+        var a = @"§M{Domain}
+  §CL{OrderRepo:pub}
+    §MT{Save:pub}
         §O{void}
         §E{db:w}
 ";
-        var b = @"§M{m2:Handler}
-  §F{f001:Handle:pub}
+        var b = @"§M{Handler}
+  §F{Handle:pub}
       §O{void}
       §C{OrderRepo.Save}
       §/C
@@ -232,18 +232,18 @@ public class CrossModuleEffectTests
     {
         // Two modules both define a public function named 'Emit'. A caller using
         // the bare name should NOT resolve either (ambiguous → skipped).
-        var a = @"§M{m1:LoggerA}
-  §F{f001:Emit:pub}
+        var a = @"§M{LoggerA}
+  §F{Emit:pub}
       §O{void}
       §E{cw}
 ";
-        var b = @"§M{m2:LoggerB}
-  §F{f001:Emit:pub}
+        var b = @"§M{LoggerB}
+  §F{Emit:pub}
       §O{void}
       §E{fs:w}
 ";
-        var c = @"§M{m3:App}
-  §F{f001:Run:pub}
+        var c = @"§M{App}
+  §F{Run:pub}
       §O{void}
       §C{Emit}
       §/C
@@ -258,18 +258,18 @@ public class CrossModuleEffectTests
     [Fact]
     public void CrossModule_QualifiedName_ResolvesWhenBareAmbiguous()
     {
-        var a = @"§M{m1:LoggerA}
-  §F{f001:Emit:pub}
+        var a = @"§M{LoggerA}
+  §F{Emit:pub}
       §O{void}
       §E{cw}
 ";
-        var b = @"§M{m2:LoggerB}
-  §F{f001:Emit:pub}
+        var b = @"§M{LoggerB}
+  §F{Emit:pub}
       §O{void}
       §E{fs:w}
 ";
-        var c = @"§M{m3:App}
-  §F{f001:Run:pub}
+        var c = @"§M{App}
+  §F{Run:pub}
       §O{void}
       §C{LoggerB.Emit}
       §/C
@@ -288,13 +288,13 @@ public class CrossModuleEffectTests
     {
         // Caller does cross-module call + .NET call. The cross-module check fires only
         // for the cross-module call; the .NET call is handled by the per-module pass.
-        var a = @"§M{m1:Repo}
-  §F{f001:Save:pub}
+        var a = @"§M{Repo}
+  §F{Save:pub}
       §O{void}
       §E{db:w}
 ";
-        var b = @"§M{m2:App}
-  §F{f001:Run:pub}
+        var b = @"§M{App}
+  §F{Run:pub}
       §O{void}
       §C{Save}
       §/C
@@ -316,13 +316,13 @@ public class CrossModuleEffectTests
         // against a known Calor callee's declared effects — there is no uncertainty to
         // forgive — so it unconditionally reports errors regardless of the per-file policy
         // the caller was compiled with.
-        var a = @"§M{m1:A}
-  §F{f001:DoWrite:pub}
+        var a = @"§M{A}
+  §F{DoWrite:pub}
       §O{void}
       §E{db:w}
 ";
-        var b = @"§M{m2:B}
-  §F{f001:Run:pub}
+        var b = @"§M{B}
+  §F{Run:pub}
       §O{void}
       §C{DoWrite}
       §/C
@@ -353,13 +353,13 @@ public class CrossModuleEffectTests
     public void CrossModule_EffectSuperset_Passes()
     {
         // Caller declares MORE effects than callee — still a valid subset relationship.
-        var a = @"§M{m1:A}
-  §F{f001:Write:pub}
+        var a = @"§M{A}
+  §F{Write:pub}
       §O{void}
       §E{db:w}
 ";
-        var b = @"§M{m2:B}
-  §F{f001:Run:pub}
+        var b = @"§M{B}
+  §F{Run:pub}
       §O{void}
       §E{db:w, cw, fs:w}
       §C{Write}
@@ -375,12 +375,12 @@ public class CrossModuleEffectTests
     public void CrossModule_UndeclaredPublicFunction_Warning()
     {
         // Public function without §E declaration → Calor0417 warning.
-        var a = @"§M{m1:A}
-  §F{f001:Mystery:pub}
+        var a = @"§M{A}
+  §F{Mystery:pub}
       §O{void}
 ";
-        var b = @"§M{m2:B}
-  §F{f001:Caller:pub}
+        var b = @"§M{B}
+  §F{Caller:pub}
       §O{void}
       §C{Mystery}
       §/C
@@ -398,13 +398,13 @@ public class CrossModuleEffectTests
     {
         // If one file fails to compile, the cross-module pass should still run over
         // the files that did compile. We skip the broken file and check the rest.
-        var good = @"§M{m1:A}
-  §F{f001:Save:pub}
+        var good = @"§M{A}
+  §F{Save:pub}
       §O{void}
       §E{db:w}
 ";
-        var caller = @"§M{m2:B}
-  §F{f001:Run:pub}
+        var caller = @"§M{B}
+  §F{Run:pub}
       §O{void}
       §C{Save}
       §/C
@@ -434,13 +434,13 @@ public class CrossModuleEffectTests
     public void CrossModule_EffectSubtyping_RwEncompassesR_Passes()
     {
         // Caller declares fs:rw; callee declares fs:r. rw encompasses r → valid.
-        var a = @"§M{m1:A}
-  §F{f001:ReadFile:pub}
+        var a = @"§M{A}
+  §F{ReadFile:pub}
       §O{void}
       §E{fs:r}
 ";
-        var b = @"§M{m2:B}
-  §F{f001:Run:pub}
+        var b = @"§M{B}
+  §F{Run:pub}
       §O{void}
       §E{fs:rw}
       §C{ReadFile}
@@ -456,13 +456,13 @@ public class CrossModuleEffectTests
     public void CrossModule_EffectSubtyping_RDoesNotEncompassW_Fails()
     {
         // Caller declares fs:r; callee declares fs:w. r does NOT encompass w → violation.
-        var a = @"§M{m1:A}
-  §F{f001:WriteFile:pub}
+        var a = @"§M{A}
+  §F{WriteFile:pub}
       §O{void}
       §E{fs:w}
 ";
-        var b = @"§M{m2:B}
-  §F{f001:Run:pub}
+        var b = @"§M{B}
+  §F{Run:pub}
       §O{void}
       §E{fs:r}
       §C{WriteFile}
@@ -485,15 +485,15 @@ public class CrossModuleEffectTests
         // the bare-name extraction of "Save" would match B's internal name and
         // silently skip the cross-module check. Now the qualified registry match
         // is authoritative for dotted targets.
-        var a = @"§M{m1:OrderService}
-  §F{f001:Save:pub}
+        var a = @"§M{OrderService}
+  §F{Save:pub}
       §O{void}
       §E{db:w}
 ";
-        var b = @"§M{m2:App}
-  §F{f001:Save:priv}
+        var b = @"§M{App}
+  §F{Save:priv}
       §O{void}
-  §F{f002:Run:pub}
+  §F{Run:pub}
       §O{void}
       §C{OrderService.Save}
       §/C
@@ -514,15 +514,15 @@ public class CrossModuleEffectTests
         // shadow cross-module exports (standard scoping). Module B has an internal
         // `Save` and calls `§C{Save}` (bare). It resolves to B's internal version,
         // NOT to A's cross-module `Save`, so no cross-module violation is reported.
-        var a = @"§M{m1:Writer}
-  §F{f001:Save:pub}
+        var a = @"§M{Writer}
+  §F{Save:pub}
       §O{void}
       §E{db:w}
 ";
-        var b = @"§M{m2:App}
-  §F{f001:Save:priv}
+        var b = @"§M{App}
+  §F{Save:priv}
       §O{void}
-  §F{f002:Run:pub}
+  §F{Run:pub}
       §O{void}
       §C{Save}
       §/C
@@ -539,13 +539,13 @@ public class CrossModuleEffectTests
         // §E{} (empty declaration) is an explicit "no effects" contract — distinct from
         // having no §E at all. It should NOT trigger Calor0417 and SHOULD be registered
         // as a callable with EffectSet.Empty.
-        var a = @"§M{m1:PureLib}
-  §F{f001:Identity:pub}
+        var a = @"§M{PureLib}
+  §F{Identity:pub}
       §O{void}
       §E{}
 ";
-        var b = @"§M{m2:Caller}
-  §F{f001:Run:pub}
+        var b = @"§M{Caller}
+  §F{Run:pub}
       §O{void}
       §E{}
       §C{Identity}
@@ -577,14 +577,14 @@ public class CrossModuleEffectTests
     {
         // Coverage for a class method (not a top-level function) being the CALLER of a
         // cross-module call. Diagnostic wording should say "Method" for dotted callers.
-        var a = @"§M{m1:Repo}
-  §F{f001:Persist:pub}
+        var a = @"§M{Repo}
+  §F{Persist:pub}
       §O{void}
       §E{db:w}
 ";
-        var b = @"§M{m2:Services}
-  §CL{c1:OrderService:pub}
-    §MT{m001:Handle:pub}
+        var b = @"§M{Services}
+  §CL{OrderService:pub}
+    §MT{Handle:pub}
         §O{void}
         §C{Persist}
         §/C
@@ -734,15 +734,15 @@ public class CrossModuleEffectTests
         // Both sides of the cross-module boundary are class methods: a method in module A
         // exposes db:w; a method in module B calls it (bare-qualified class name), must
         // declare db:w. Exercises both call-site directions for class methods simultaneously.
-        var a = @"§M{m1:Repo}
-  §CL{c1:OrderRepo:pub}
-    §MT{m001:Save:pub}
+        var a = @"§M{Repo}
+  §CL{OrderRepo:pub}
+    §MT{Save:pub}
         §O{void}
         §E{db:w}
 ";
-        var b = @"§M{m2:Services}
-  §CL{c1:OrderService:pub}
-    §MT{m001:Handle:pub}
+        var b = @"§M{Services}
+  §CL{OrderService:pub}
+    §MT{Handle:pub}
         §O{void}
         §C{OrderRepo.Save}
         §/C
@@ -764,13 +764,13 @@ public class CrossModuleEffectTests
         // .NET manifest lookup — verified here by the fact that the pass produces
         // a cross-module diagnostic citing the Calor function's full declared effects
         // rather than any partial .NET-manifest-derived set.
-        var a = @"§M{m1:Worker}
-  §F{f001:Process:pub}
+        var a = @"§M{Worker}
+  §F{Process:pub}
       §O{void}
       §E{db:w, net:w}
 ";
-        var b = @"§M{m2:App}
-  §F{f001:Run:pub}
+        var b = @"§M{App}
+  §F{Run:pub}
       §O{void}
       §C{Process}
       §/C
@@ -825,13 +825,13 @@ public class CrossModuleEffectTests
         // not fit the caller's is still Calor0410 — §6.2: this site is the
         // cross-module leg of the body-vs-declaration rule, so it keeps
         // Calor0410 semantics even though the relation underneath it changed.
-        var callee = @"§M{m1:Worker}
-  §F{f001:Process:pub}
+        var callee = @"§M{Worker}
+  §F{Process:pub}
       §O{void}
       §E{cw}
 ";
-        var caller = @"§M{m2:App}
-  §F{f001:Run:pub}
+        var caller = @"§M{App}
+  §F{Run:pub}
       §O{void}
       §E{}
       §C{Process}
@@ -852,13 +852,13 @@ public class CrossModuleEffectTests
         // One relation means one answer: §4.1's family/narrow widening — a bare
         // `db` encompassing `db:w` — reaches the cross-module site because it
         // reaches EffectRow.Fits, without that site knowing anything about it.
-        var callee = @"§M{m1:Worker}
-  §F{f001:Process:pub}
+        var callee = @"§M{Worker}
+  §F{Process:pub}
       §O{void}
       §E{db:w}
 ";
-        var caller = @"§M{m2:App}
-  §F{f001:Run:pub}
+        var caller = @"§M{App}
+  §F{Run:pub}
       §O{void}
       §E{db}
       §C{Process}

@@ -90,8 +90,8 @@ public sealed class WatchSessionIntegrationTests : IDisposable
     }
 
     private static string TransitionalNullableAssignmentViolation() => """
-        §M{m001:N0}
-          §F{f001:Probe:pub} () -> void
+        §M{N0}
+          §F{Probe:pub} () -> void
             §E{}
             §B{x:?str} null
             §B{y:str} x
@@ -387,7 +387,7 @@ public sealed class WatchSessionIntegrationTests : IDisposable
         var results = await RunScriptAsync(rebuildCount: 3, drive: (session, step) =>
         {
             File.WriteAllText(source, step == 1
-                ? safe + "  §F{f2:answer:pub} () -> i32\n    §R 2\n"
+                ? safe + "  §F{answer:pub} () -> i32\n    §R 2\n"
                 : safe);
             session.InjectChange(source);
         });

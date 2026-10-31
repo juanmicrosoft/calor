@@ -26,7 +26,7 @@ public class IndexerTests
     [Fact]
     public void Lexer_EndIndexer_TokenizesCorrectly()
     {
-        var source = "§/IXER{ix1}";
+        var source = "§/IXER";
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
         var tokens = lexer.TokenizeAllForParser();
@@ -43,8 +43,8 @@ public class IndexerTests
     public void Parser_FullFormIndexer_ParsesCorrectly()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyClass:pub}
+            §M{Test}
+              §CL{MyClass:pub}
                 §IXER{ix1:int:pub}
                 §I{int:index}
                 §GET
@@ -52,7 +52,7 @@ public class IndexerTests
                 §/GET
                 §SET
                 §/SET
-                §/IXER{ix1}
+                §/IXER
             """;
 
         var diag = new DiagnosticBag();
@@ -78,8 +78,8 @@ public class IndexerTests
     public void Parser_CompactAutoIndexer_ParsesCorrectly()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyClass:pub}
+            §M{Test}
+              §CL{MyClass:pub}
                 §IXER{ix1:int:pub:get,set} (int:index)
             """;
 
@@ -106,8 +106,8 @@ public class IndexerTests
     public void Parser_MultiParameterIndexer_ParsesCorrectly()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyClass:pub}
+            §M{Test}
+              §CL{MyClass:pub}
                 §IXER{ix1:int:pub:get,set} (int:row, int:col)
             """;
 
@@ -129,8 +129,8 @@ public class IndexerTests
     public void Parser_InterfaceIndexer_ParsesCorrectly()
     {
         var source = """
-            §M{m1:Test}
-              §IFACE{i1:IMyCollection}
+            §M{Test}
+              §IFACE{IMyCollection}
                 §IXER{ix1:int:pub:get,set} (int:index)
             """;
 
@@ -151,8 +151,8 @@ public class IndexerTests
     public void Parser_VirtualIndexer_ParsesModifiers()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyClass:pub}
+            §M{Test}
+              §CL{MyClass:pub}
                 §IXER{ix1:int:pub:virt:get,set} (int:index)
             """;
 
@@ -171,9 +171,9 @@ public class IndexerTests
     public void Parser_CompactGenericTypeParam_ParsesCorrectly()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyDict:pub}
-                §IXER{ix1:List<str>:pub:get,set} (Dictionary<str,i32>:lookup)
+            §M{Test}
+              §CL{MyDict:pub}
+                §IXER{List<str>:pub:get,set} (Dictionary<str,i32>:lookup)
             """;
 
         var diag = new DiagnosticBag();
@@ -502,8 +502,8 @@ public class IndexerTests
     public void RoundTrip_CalorParseEmitReparse_PreservesIndexer()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyClass:pub}
+            §M{Test}
+              §CL{MyClass:pub}
                 §IXER{ix1:int:pub:get,set} (int:index)
             """;
 

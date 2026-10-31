@@ -52,8 +52,8 @@ public class CompilerGapFixTests
     public void Struct_BasicDeclaration()
     {
         var source = @"
-§M{m1:TestMod}
-  §CL{c1:MyPoint:pub:struct}
+§M{TestMod}
+  §CL{MyPoint:pub:struct}
       §FLD{i32:X:pub}
       §FLD{i32:Y:pub}
 ";
@@ -67,10 +67,10 @@ public class CompilerGapFixTests
     [Fact]
     public void Struct_MultiPositionModifiers()
     {
-        // §CL{c1:Name:pub:struct} — modifiers span _pos2 and _pos3
+        // §CL{Name:pub:struct} — modifiers span _pos2 and _pos3
         var source = @"
-§M{m1:TestMod}
-  §CL{c1:MyPoint:pub:struct}
+§M{TestMod}
+  §CL{MyPoint:pub:struct}
       §FLD{i32:X:pub}
 ";
 
@@ -83,8 +83,8 @@ public class CompilerGapFixTests
     public void Struct_BackwardCompat()
     {
         var source = @"
-§M{m1:TestMod}
-  §CL{c1:MyClass:pub}
+§M{TestMod}
+  §CL{MyClass:pub}
 ";
 
         var result = ParseAndEmit(source);
@@ -98,8 +98,8 @@ public class CompilerGapFixTests
     {
         // C# structs are implicitly sealed, so "sealed" is correctly omitted from output
         var source = @"
-§M{m1:TestMod}
-  §CL{c1:MyVal:pub:struct seal}
+§M{TestMod}
+  §CL{MyVal:pub:struct seal}
 ";
 
         var result = ParseAndEmit(source);
@@ -113,8 +113,8 @@ public class CompilerGapFixTests
     public void Struct_AbstractStruct_ReportsDiagnostic()
     {
         var source = @"
-§M{m1:TestMod}
-  §CL{c1:Bad:struct abs}
+§M{TestMod}
+  §CL{Bad:struct abs}
 ";
 
         var diagnostics = ParseWithDiagnostics(source);
@@ -131,8 +131,8 @@ public class CompilerGapFixTests
     public void StaticField_EmitsStaticKeyword()
     {
         var source = @"
-§M{m1:TestMod}
-  §CL{c1:Counter:pub}
+§M{TestMod}
+  §CL{Counter:pub}
       §FLD{i32:Count:pub:stat}
 ";
 
@@ -145,8 +145,8 @@ public class CompilerGapFixTests
     public void StaticField_BackwardCompat()
     {
         var source = @"
-§M{m1:TestMod}
-  §CL{c1:MyClass:pub}
+§M{TestMod}
+  §CL{MyClass:pub}
       §FLD{str:_name:priv}
 ";
 
@@ -164,8 +164,8 @@ public class CompilerGapFixTests
     public void GlobalNamespace_SuppressesWrapper()
     {
         var source = @"
-§M{m1:_global}
-  §CL{c1:MyClass:pub}
+§M{_global}
+  §CL{MyClass:pub}
 ";
 
         var result = ParseAndEmit(source);
@@ -178,8 +178,8 @@ public class CompilerGapFixTests
     public void GlobalNamespace_BackwardCompat()
     {
         var source = @"
-§M{m1:MyApp}
-  §CL{c1:MyClass:pub}
+§M{MyApp}
+  §CL{MyClass:pub}
 ";
 
         var result = ParseAndEmit(source);
@@ -195,8 +195,8 @@ public class CompilerGapFixTests
     public void Increment_Prefix()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f001:Main:pub}
+§M{TestMod}
+  §F{Main:pub}
       §O{void}
       §B{~x:i32} 0
       (inc x)
@@ -211,8 +211,8 @@ public class CompilerGapFixTests
     public void Increment_PostFix()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f001:Main:pub}
+§M{TestMod}
+  §F{Main:pub}
       §O{void}
       §B{~x:i32} 0
       (post-inc x)
@@ -227,8 +227,8 @@ public class CompilerGapFixTests
     public void Decrement_Prefix()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f001:Main:pub}
+§M{TestMod}
+  §F{Main:pub}
       §O{void}
       §B{~x:i32} 0
       (dec x)
@@ -243,8 +243,8 @@ public class CompilerGapFixTests
     public void Decrement_PostFix()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f001:Main:pub}
+§M{TestMod}
+  §F{Main:pub}
       §O{void}
       §B{~x:i32} 0
       (post-dec x)
@@ -263,12 +263,12 @@ public class CompilerGapFixTests
     public void Integration_AllFixes()
     {
         var source = @"
-§M{m1:_global}
-  §CL{c1:Vector2:pub:struct}
+§M{_global}
+  §CL{Vector2:pub:struct}
       §FLD{i32:X:pub}
       §FLD{i32:Y:pub}
       §FLD{i32:InstanceCount:pub:stat}
-      §MT{m001:Advance:pub}
+      §MT{Advance:pub}
           §O{void}
           (inc X)
           (post-inc InstanceCount)

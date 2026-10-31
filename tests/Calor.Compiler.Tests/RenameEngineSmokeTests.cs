@@ -26,11 +26,11 @@ public sealed class RenameEngineSmokeTests : IDisposable
     public void RenamesFunctionAcrossFiles()
     {
         var a = Write("a.calr", """
-            §M{m001:Alpha}
-              §F{f001:Compute:pub} () -> i32
+            §M{Alpha}
+              §F{Compute:pub} () -> i32
                 §E{}
                 §R INT:42
-              §F{f002:Use:pub} () -> i32
+              §F{Use:pub} () -> i32
                 §E{}
                 §R §C{Compute} §/C
             """);
@@ -58,12 +58,12 @@ public sealed class RenameEngineSmokeTests : IDisposable
     public void RenamesLocalWithoutTouchingSameNamedLocalInAnotherFunction()
     {
         var a = Write("shadow.calr", """
-            §M{m001:Shadow}
-              §F{f001:First:pub} () -> i32
+            §M{Shadow}
+              §F{First:pub} () -> i32
                 §E{}
                 §B{value:i32} INT:1
                 §R value
-              §F{f002:Second:pub} () -> i32
+              §F{Second:pub} () -> i32
                 §E{}
                 §B{value:i32} INT:2
                 §R value
@@ -92,11 +92,11 @@ public sealed class RenameEngineSmokeTests : IDisposable
     public void RefusesRenameThatWouldCollideWithAnExistingName()
     {
         var a = Write("collide.calr", """
-            §M{m001:Collide}
-              §F{f001:First:pub} () -> i32
+            §M{Collide}
+              §F{First:pub} () -> i32
                 §E{}
                 §R INT:1
-              §F{f002:Second:pub} () -> i32
+              §F{Second:pub} () -> i32
                 §E{}
                 §R INT:2
             """);
@@ -115,14 +115,14 @@ public sealed class RenameEngineSmokeTests : IDisposable
     public void RefusesModuleDeclaredInSeveralFiles()
     {
         var a = Write("part-a.calr", """
-            §M{m001:Split}
-              §F{f001:One:pub} () -> i32
+            §M{Split}
+              §F{One:pub} () -> i32
                 §E{}
                 §R INT:1
             """);
         var b = Write("part-b.calr", """
-            §M{m002:Split}
-              §F{f001:Two:pub} () -> i32
+            §M{Split}
+              §F{Two:pub} () -> i32
                 §E{}
                 §R INT:2
             """);

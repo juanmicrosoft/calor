@@ -54,8 +54,8 @@ public class EffectRowSyntaxTests
         // declares no effects of its own. On main the §F section loop reads the
         // §E as the DECLARATION's row, so `Apply` would be declared `cw`.
         const string source = """
-            §M{m001:P1}
-              §F{f001:Apply:pub}
+            §M{P1}
+              §F{Apply:pub}
                 §I{Func<i32,i32>:transform} §E{cw}
                 §I{i32:value}
                 §O{i32}
@@ -107,8 +107,8 @@ public class EffectRowSyntaxTests
     public void SameLineRow_AttachesToItsType_NotTheDeclaration(string line, string _)
     {
         var source = $$"""
-            §M{m001:P}
-              §F{f001:F:pub}
+            §M{P}
+              §F{F:pub}
                 {{line}}
                 §R INT:0
             """;
@@ -125,16 +125,16 @@ public class EffectRowSyntaxTests
 
     [Theory]
     [InlineData("""
-        §M{m001:A}
-          §F{f001:Log:pub}
+        §M{A}
+          §F{Log:pub}
             §I{str:m}
             §O{void}
             §E{cw}
             §P m
         """)]
     [InlineData("""
-        §M{m001:A}
-          §F{f001:Log:pub} (str:m) -> void
+        §M{A}
+          §F{Log:pub} (str:m) -> void
             §E{cw}
             §P m
         """)]
@@ -157,25 +157,25 @@ public class EffectRowSyntaxTests
     [Theory]
     // Z1 — §FLD ⏎ §E, four Calor0100 on main
     [InlineData("""
-        §M{m001:Z1}
-          §CL{c001:C:pub}
+        §M{Z1}
+          §CL{C:pub}
             §FLD{i32:x:priv}
             §E{cw}
-            §MT{mt001:M:pub} () -> void
+            §MT{M:pub} () -> void
               §E{}
         """, "'x' field")]
     // Z2 — §B ⏎ §E, four Calor0100 on main
     [InlineData("""
-        §M{m001:Z2}
-          §F{f001:Main:pub} () -> void
+        §M{Z2}
+          §F{Main:pub} () -> void
             §E{}
             §B{y:i32} INT:1
             §E{cw}
         """, "'y' §B")]
     // Z3 — a wrapped inline signature, eight Calor0100 on main
     [InlineData("""
-        §M{m001:Z3}
-          §F{f001:Apply:pub} (
+        §M{Z3}
+          §F{Apply:pub} (
               Func<i32,i32>:transform
               §E{cw}
             ) -> i32
@@ -204,8 +204,8 @@ public class EffectRowSyntaxTests
     public void Position1_DeclarationRow_Parses()
     {
         var module = Parse("""
-            §M{m001:P}
-              §F{f001:F:pub} () -> void
+            §M{P}
+              §F{F:pub} () -> void
                 §E{cw}
                 §P "x"
             """, out var diagnostics);
@@ -218,10 +218,10 @@ public class EffectRowSyntaxTests
     public void Position2_LambdaRow_Parses()
     {
         var module = Parse("""
-            §M{m001:P}
-              §F{f001:Main:pub} () -> void
+            §M{P}
+              §F{Main:pub} () -> void
                 §E{}
-                §B{f} §LAM{lam1:x:i32} §E{} (+ x INT:1) §/LAM{lam1}
+                §B{f} §LAM{x:i32} §E{} (+ x INT:1) §/LAM
             """, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
@@ -234,12 +234,12 @@ public class EffectRowSyntaxTests
     public void Position3_DelegateRow_Parses()
     {
         var module = Parse("""
-            §M{m001:P}
-              §DEL{d001:Handler}
+            §M{P}
+              §DEL{Handler}
                 §I{i32:x}
                 §O{void}
                 §E{cw}
-              §F{f001:Main:pub} () -> void
+              §F{Main:pub} () -> void
                 §E{}
             """, out var diagnostics);
 
@@ -252,8 +252,8 @@ public class EffectRowSyntaxTests
     public void Position4_ParameterTagRow_Parses()
     {
         var module = Parse("""
-            §M{m001:P}
-              §F{f001:Apply:pub}
+            §M{P}
+              §F{Apply:pub}
                 §I{Func<i32,i32>:transform} §E{cw}
                 §O{i32}
                 §E{cw}
@@ -270,8 +270,8 @@ public class EffectRowSyntaxTests
         // Executed baseline X9c: twelve Calor0100 on main, starting
         // "Expected CloseParen but found Effects".
         var module = Parse("""
-            §M{m001:P}
-              §F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
+            §M{P}
+              §F{Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
                 §E{cw}
                 §R INT:0
             """, out var diagnostics);
@@ -287,20 +287,20 @@ public class EffectRowSyntaxTests
     public void Position6_ReturnRow_ParsesInBothSpellings()
     {
         var tagged = Parse("""
-            §M{m001:P}
-              §F{f001:Make:pub}
+            §M{P}
+              §F{Make:pub}
                 §O{Func<i32>} §E{cw}
                 §E{cw}
-                §R §LAM{lam1} INT:0 §/LAM{lam1}
+                §R §LAM{} INT:0 §/LAM
             """, out var d1);
         Assert.False(d1.HasErrors);
         Assert.NotNull(Assert.Single(tagged.Functions).Output!.Row);
 
         var arrowed = Parse("""
-            §M{m001:P}
-              §F{f001:Make:pub} () -> Func<i32> §E{cw}
+            §M{P}
+              §F{Make:pub} () -> Func<i32> §E{cw}
                 §E{cw}
-                §R §LAM{lam1} INT:0 §/LAM{lam1}
+                §R §LAM{} INT:0 §/LAM
             """, out var d2);
         Assert.False(d2.HasErrors);
         Assert.NotNull(Assert.Single(arrowed.Functions).Output!.Row);
@@ -311,10 +311,10 @@ public class EffectRowSyntaxTests
     {
         // Executed baseline Y3a: sixteen Calor0100 on main.
         var module = Parse("""
-            §M{m001:P}
-              §F{f001:Main:pub} () -> void
+            §M{P}
+              §F{Main:pub} () -> void
                 §E{}
-                §B{f:Func<i32,i32>} §E{cw} §LAM{lam1:x:i32} (+ x INT:1) §/LAM{lam1}
+                §B{f:Func<i32,i32>} §E{cw} §LAM{x:i32} (+ x INT:1) §/LAM
             """, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
@@ -328,10 +328,10 @@ public class EffectRowSyntaxTests
         // Executed baseline X9b: four Calor0100 on main, which is what disproved
         // Draft v1's claim that §FLD already parsed a row (§14.1).
         var module = Parse("""
-            §M{m001:P}
-              §CL{c001:C:pub}
+            §M{P}
+              §CL{C:pub}
                 §FLD{Action<i32>:onChange:priv} §E{cw}
-                §MT{mt001:M:pub} () -> void
+                §MT{M:pub} () -> void
                   §E{}
             """, out var diagnostics);
 
@@ -343,11 +343,11 @@ public class EffectRowSyntaxTests
     [Theory]
     // Z10 — the single-line spelling the design doc names.
     [InlineData("""
-        §M{m001:Z10}
-          §F{f001:Helper:pub} (i32:n) -> i32
+        §M{Z10}
+          §F{Helper:pub} (i32:n) -> i32
             §E{}
             §R n
-          §F{f002:Main:pub} () -> void
+          §F{Main:pub} () -> void
             §E{}
             §R §C{Helper} §A INT:1 §E{cw} §/C
         """)]
@@ -358,11 +358,11 @@ public class EffectRowSyntaxTests
     // while the single-line Z10 above stayed green and hid it. Anchoring the recovery to
     // the §B / §FLD production that owns the row is what actually closes it.
     [InlineData("""
-        §M{m001:Z10b}
-          §F{f001:Helper:pub} (i32:n) -> i32
+        §M{Z10b}
+          §F{Helper:pub} (i32:n) -> i32
             §E{}
             §R n
-          §F{f002:Main:pub} () -> void
+          §F{Main:pub} () -> void
             §E{}
             §R §C{Helper}
               §A INT:1
@@ -387,8 +387,8 @@ public class EffectRowSyntaxTests
         // the recovery to §B / §FLD means it cannot fire here at all, and X4's committed
         // transcript is unchanged by this slice.
         Parse("""
-            §M{m001:X4}
-              §F{f001:M:pub} (i32:x) -> str!str
+            §M{X4}
+              §F{M:pub} (i32:x) -> str!str
                 §E{}
                 §R "x"
             """, out var diagnostics);
@@ -406,14 +406,14 @@ public class EffectRowSyntaxTests
         // onto a field line in class C. The subject is now the declaration in hand, so
         // a §E with no §B or §FLD before it produces no Calor0405 at all.
         Parse("""
-            §M{m001:F5}
-              §CL{c001:C:pub}
+            §M{F5}
+              §CL{C:pub}
                 §FLD{i32:x:priv}
-                §MT{mt001:M:pub} () -> void
+                §MT{M:pub} () -> void
                   §E{}
-              §CL{c002:D:pub}
+              §CL{D:pub}
                 §E{cw}
-                §MT{mt002:N:pub} () -> void
+                §MT{N:pub} () -> void
                   §E{}
             """, out var diagnostics);
 
@@ -426,16 +426,16 @@ public class EffectRowSyntaxTests
     // DECLARATION's row — two meanings from one line, reported only as a downstream
     // Calor0410 about an effect the author plainly declared.
     [InlineData("""
-        §M{m001:F7}
-          §F{f001:Log:pub}
+        §M{F7}
+          §F{Log:pub}
             §I{str:m} §E{cw} §E{net}
             §O{void}
             §P m
         """)]
     // Inline form. On main this is a 12-diagnostic cascade.
     [InlineData("""
-        §M{m001:F7}
-          §F{f001:Apply:pub} (Func<i32,i32>:f §E{cw} §E{net}, i32:v) -> i32
+        §M{F7}
+          §F{Apply:pub} (Func<i32,i32>:f §E{cw} §E{net}, i32:v) -> i32
             §E{cw}
             §R INT:0
         """)]
@@ -459,8 +459,8 @@ public class EffectRowSyntaxTests
         // meanings, so the parser must keep them distinguishable even though this
         // slice does not yet act on the difference.
         var module = Parse("""
-            §M{m001:P}
-              §F{f001:Apply:pub} (Func<i32,i32>:a §E{}, Func<i32,i32>:b) -> i32
+            §M{P}
+              §F{Apply:pub} (Func<i32,i32>:a §E{}, Func<i32,i32>:b) -> i32
                 §E{}
                 §R INT:0
             """, out var diagnostics);

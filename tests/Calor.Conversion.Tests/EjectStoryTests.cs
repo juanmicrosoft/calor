@@ -26,31 +26,31 @@ public class EjectStoryTests
     // Fixtures — representative wedge-shaped modules
     // ------------------------------------------------------------------
 
-    private const string ContractsModule = @"§M{m001:Pricing}
-  §F{f001:ClampToCap:pub} (i32:amount, i32:cap) -> i32
+    private const string ContractsModule = @"§M{Pricing}
+  §F{ClampToCap:pub} (i32:amount, i32:cap) -> i32
     §Q (>= cap 0)
     §S (<= result cap)
     §R §C{Math.Min} §A amount §A cap §/C
 ";
 
-    private const string EarlyReturnContractsModule = @"§M{m001:Pricing}
-  §F{f001:ClampToCap:pub} (i32:amount, i32:cap) -> i32
+    private const string EarlyReturnContractsModule = @"§M{Pricing}
+  §F{ClampToCap:pub} (i32:amount, i32:cap) -> i32
     §Q (>= cap 0)
     §S (<= result cap)
-    §IF{if1} (> amount cap)
+    §IF (> amount cap)
       §R cap
     §R amount
 ";
 
-    private const string EffectsModule = @"§M{m001:Greeter}
-  §F{f001:Greet:pub} (str:name) -> void
+    private const string EffectsModule = @"§M{Greeter}
+  §F{Greet:pub} (str:name) -> void
     §E{cw}
     §P name
 ";
 
-    private const string NullableModule = @"§M{m001:Ejected}
-  §F{f001:PickOrDefault:pub} (i32:x, bool:take) -> i32
-    §IF{if1} take
+    private const string NullableModule = @"§M{Ejected}
+  §F{PickOrDefault:pub} (i32:x, bool:take) -> i32
+    §IF take
       §B{value:?i32} x
       §R (?? value 0)
     §B{missing:?i32} null

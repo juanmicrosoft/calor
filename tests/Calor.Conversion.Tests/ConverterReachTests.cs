@@ -20,7 +20,7 @@ namespace Calor.Conversion.Tests;
 /// the test is red.</para>
 ///
 /// <para>#1097: a lambda parameter whose type inference fails was written as
-/// <c>§LAM{id:x:?}</c>; the binder's canonicalizer throws on <c>?</c> and the
+/// <c>§LAM{x:?}</c>; the binder's canonicalizer throws on <c>?</c> and the
 /// member is abandoned with an AnalysisICE (Calor0932). The (b) fixture binds the
 /// converted output and asserts no Calor0932 — the roadmap's discriminating line
 /// ("revert (b) → the ICE fixture test is red").</para>
@@ -206,7 +206,7 @@ public class ConverterReachTests
         var rt = ConvertAndParse(csharp, "Cluster1Nested");
 
         AssertParsesClean(rt);
-        Assert.Equal(2, Regex.Matches(rt.Calor, @"§/LAM\{").Count);
+        Assert.Equal(2, Regex.Matches(rt.Calor, @"§/LAM(?=\s|$)").Count);
     }
 
     /// <summary>

@@ -40,8 +40,8 @@ public class ConvertFormatEnvelopeTests : IDisposable
     /// <summary>Unformatted but valid (trailing whitespace forces a reformat).</summary>
     private string WriteUnformattedCalr(string name = "unformatted.calr")
         => WriteFile(name,
-            "§M{m1:Demo}\n" +
-            "  §F{f1:Main:pub} () -> void\n" +
+            "§M{Demo}\n" +
+            "  §F{Main:pub} () -> void\n" +
             "    §E{cw}\n" +
             "    §P \"hi\"   \n");
 
@@ -75,7 +75,7 @@ public class ConvertFormatEnvelopeTests : IDisposable
         Assert.True(entry.GetProperty("changed").GetBoolean());
         Assert.Equal("formatted", entry.GetProperty("status").GetString());
         // Preview mode (neither --write nor --check) embeds the formatted source
-        Assert.Contains("§M{m1:Demo}", entry.GetProperty("formatted").GetString());
+        Assert.Contains("§M{Demo}", entry.GetProperty("formatted").GetString());
         Assert.False(entry.TryGetProperty("conservativeFallbackReason", out _));
 
         var totals = root.GetProperty("data").GetProperty("totals");
@@ -138,7 +138,7 @@ public class ConvertFormatEnvelopeTests : IDisposable
     [Fact]
     public void Format_Json_ParseError_SurfacesRealParserDiagnostics()
     {
-        var file = WriteFile("broken.calr", "§M{m1:Bad}\n  §F{f1:Main:pub () -> void\n");
+        var file = WriteFile("broken.calr", "§M{Bad}\n  §F{f1:Main:pub () -> void\n");
 
         var (exitCode, stdOut, _) = RunCli("format", file, "--format", "json");
 
@@ -166,7 +166,7 @@ public class ConvertFormatEnvelopeTests : IDisposable
         var (exitCode, stdOut, _) = RunCli("format", file);
 
         Assert.Equal(0, exitCode);
-        Assert.Contains("§M{m1:Demo}", stdOut);
+        Assert.Contains("§M{Demo}", stdOut);
         Assert.DoesNotContain("\"diagnostics\"", stdOut);
     }
 
@@ -174,8 +174,8 @@ public class ConvertFormatEnvelopeTests : IDisposable
     public void Lint_ReadOnlySemanticError_ReportsIssuesWithoutParseFailure()
     {
         var source =
-            "§M{m1:LintReadOnly}\n" +
-            "  §F{f1:Main:pub} () -> void\n" +
+            "§M{LintReadOnly}\n" +
+            "  §F{Main:pub} () -> void\n" +
             "    §P \"missing effect\"   \n";
         var file = WriteFile("lint-read-only.calr", source);
 
@@ -202,8 +202,8 @@ public class ConvertFormatEnvelopeTests : IDisposable
     public void LintFix_SemanticError_SuppressesWriteWithWarningAndExitOne()
     {
         var source =
-            "§M{m1:LintFix}\n" +
-            "  §F{f1:Main:pub} () -> void\n" +
+            "§M{LintFix}\n" +
+            "  §F{Main:pub} () -> void\n" +
             "    §P \"missing effect\"   \n";
         var file = WriteFile("lint-fix.calr", source);
 
@@ -341,8 +341,8 @@ public class ConvertFormatEnvelopeTests : IDisposable
     {
         // §B{x} with no type and no initializer → deterministic Calor0250 at line 3.
         var calrFile = WriteFile("bad.calr",
-            "§M{m1:Bad}\n" +
-            "  §F{f1:Main:pub} () -> void\n" +
+            "§M{Bad}\n" +
+            "  §F{Main:pub} () -> void\n" +
             "    §B{x}\n");
 
         var (exitCode, stdOut, _) = RunCli("convert", calrFile, "--format", "json");

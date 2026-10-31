@@ -21,20 +21,20 @@ public sealed class TolerantParseTests : IDisposable
     private FileWriteTool WriteTool => new(_manager, _root);
 
     private const string MathSource = """
-        §M{m001:MathModule}
-          §F{f001:add:pub}
+        §M{MathModule}
+          §F{add:pub}
             §I{i32:x, i32:y}
             §O{i32}
             §R (+ x y)
-          §F{f002:multiply:pub}
+          §F{multiply:pub}
             §I{i32:a, i32:b}
             §O{i32}
             §R (* a b)
         """;
 
     private const string MathSourceWithoutAdd = """
-        §M{m001:MathModule}
-          §F{f002:multiply:pub}
+        §M{MathModule}
+          §F{multiply:pub}
             §I{i32:a, i32:b}
             §O{i32}
             §R (* a b)
@@ -42,12 +42,12 @@ public sealed class TolerantParseTests : IDisposable
 
     /// <summary>First function is intact; the second has a broken body.</summary>
     private const string PartiallyBrokenSource = """
-        §M{m010:PartModule}
-          §F{f040:good:pub}
+        §M{PartModule}
+          §F{good:pub}
             §I{i32:x}
             §O{i32}
             §R (+ x INT:1)
-          §F{f041:broken:pub}
+          §F{broken:pub}
             §I{i32:y}
             §O{i32}
             §R (+ y
@@ -163,13 +163,13 @@ public sealed class TolerantParseTests : IDisposable
         // call so the removal is still rejected.
         var mathPath = WriteFile("math.calr", MathSource);
         WriteFile("broken-caller.calr", """
-            §M{m011:BrokenCaller}
-              §F{f050:usesAdd:pub}
+            §M{BrokenCaller}
+              §F{usesAdd:pub}
                 §I{i32:x}
                 §O{i32}
                 §B{total:i32} §C{add} §A x §A INT:1 §/C
                 §R total
-              §F{f051:broken:pub}
+              §F{broken:pub}
                 §I{i32:y}
                 §O{i32}
                 §R (+ y
@@ -195,11 +195,11 @@ public sealed class TolerantParseTests : IDisposable
         // check uses call targets, not raw text.
         var mathPath = WriteFile("math.calr", MathSource);
         WriteFile("broken-prose.calr", """
-            §M{m012:BrokenProse}
-              §F{f060:label:pub}
+            §M{BrokenProse}
+              §F{label:pub}
                 §O{str}
                 §R STR:"mentions add in prose only"
-              §F{f061:broken:pub}
+              §F{broken:pub}
                 §I{i32:y}
                 §O{i32}
                 §R (+ y
@@ -224,7 +224,7 @@ public sealed class TolerantParseTests : IDisposable
         var nested = string.Concat(Enumerable.Repeat("(+ ", 50_000))
                      + "INT:1 INT:2"
                      + new string(')', 50_000);
-        var source = "§M{m020:Deep}\n  §F{f070:deep:pub}\n    §O{i32}\n    §R " + nested + "\n";
+        var source = "§M{Deep}\n  §F{deep:pub}\n    §O{i32}\n    §R " + nested + "\n";
 
         var result = CalorSourceHelper.ParseTolerant(source, "deep.calr");
 
@@ -238,7 +238,7 @@ public sealed class TolerantParseTests : IDisposable
         var nested = string.Concat(Enumerable.Repeat("(+ ", 50_000))
                      + "INT:1 INT:2"
                      + new string(')', 50_000);
-        var source = "§M{m021:Deep}\n  §F{f071:deep:pub}\n    §O{i32}\n    §R " + nested + "\n";
+        var source = "§M{Deep}\n  §F{deep:pub}\n    §O{i32}\n    §R " + nested + "\n";
 
         var result = CalorSourceHelper.Parse(source, "deep-strict.calr");
 
@@ -252,7 +252,7 @@ public sealed class TolerantParseTests : IDisposable
         // Deep §IF nesting recurses through the statement parser, outside
         // the expression depth counter — the stack backstop must turn an
         // imminent overflow into a catchable failure, never a process abort.
-        var builder = new System.Text.StringBuilder("§M{m022:DeepIf}\n  §F{f072:deep:pub}\n    §O{void}\n");
+        var builder = new System.Text.StringBuilder("§M{DeepIf}\n  §F{deep:pub}\n    §O{void}\n");
         var indent = "    ";
         for (var i = 0; i < 4000; i++)
         {

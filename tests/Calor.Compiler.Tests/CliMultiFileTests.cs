@@ -34,14 +34,14 @@ public class CliMultiFileTests : IDisposable
         var aPath = Path.Combine(_tempDir, "a.calr");
         var bPath = Path.Combine(_tempDir, "b.calr");
         File.WriteAllText(aPath, """
-            §M{m001:OrderService}
-              §F{f001:SaveOrder:pub}
+            §M{OrderService}
+              §F{SaveOrder:pub}
                 §O{void}
                 §E{db:w}
             """);
         File.WriteAllText(bPath, """
-            §M{m002:Handler}
-              §F{f001:HandleRequest:pub}
+            §M{Handler}
+              §F{HandleRequest:pub}
                 §O{void}
                 §C{SaveOrder}
                 §/C
@@ -85,14 +85,14 @@ public class CliMultiFileTests : IDisposable
         var aPath = Path.Combine(_tempDir, "a.calr");
         var bPath = Path.Combine(_tempDir, "b.calr");
         File.WriteAllText(aPath, """
-            §M{m001:OrderService}
-              §F{f001:SaveOrder:pub}
+            §M{OrderService}
+              §F{SaveOrder:pub}
                 §O{void}
                 §E{db:w}
             """);
         File.WriteAllText(bPath, """
-            §M{m002:Handler}
-              §F{f001:HandleRequest:pub}
+            §M{Handler}
+              §F{HandleRequest:pub}
                 §O{void}
                 §E{db:w}
                 §C{SaveOrder}
@@ -113,13 +113,13 @@ public class CliMultiFileTests : IDisposable
         var bPath = Path.Combine(_tempDir, "b.calr");
         var outPath = Path.Combine(_tempDir, "out.cs");
         File.WriteAllText(aPath, """
-            §M{m1:A}
-              §F{f001:Foo:pub}
+            §M{A}
+              §F{Foo:pub}
                 §O{void}
             """);
         File.WriteAllText(bPath, """
-            §M{m2:B}
-              §F{f001:Bar:pub}
+            §M{B}
+              §F{Bar:pub}
                 §O{void}
             """);
 
@@ -141,14 +141,14 @@ public class CliMultiFileTests : IDisposable
         var storePath = Path.Combine(_tempDir, "store.calr");
         var catalogPath = Path.Combine(_tempDir, "catalog.calr");
         File.WriteAllText(storePath, """
-            §M{m001:Store}
-              §F{f001:SaveSnapshot:pub} (str:path, str:name) -> void
+            §M{Store}
+              §F{SaveSnapshot:pub} (str:path, str:name) -> void
                 §E{fs:w}
                 §C{File.WriteAllText} §A path §A name §/C
             """);
         File.WriteAllText(catalogPath, """
-            §M{m002:Catalog}
-              §F{f001:Ping:pub} (str:path) -> void
+            §M{Catalog}
+              §F{Ping:pub} (str:path) -> void
                 §E{fs:w}
                 §C{SaveSnapshot} §A path §A "x" §/C
             """);
@@ -173,17 +173,17 @@ public class CliMultiFileTests : IDisposable
         var topologyPath = Path.Combine(_tempDir, "topology.calr");
         var unrelatedPath = Path.Combine(_tempDir, "unrelated.calr");
         File.WriteAllText(topologyPath, """
-            §M{m001:Topology}
-              §NS{ns1:Alpha}
-                §F{f001:Foo:pub} () -> i32
+            §M{Topology}
+              §NS{Alpha}
+                §F{Foo:pub} () -> i32
                   §R INT:41
-              §NS{ns2:Beta}
-                §F{f002:Caller:pub} () -> i32
+              §NS{Beta}
+                §F{Caller:pub} () -> i32
                   §R §C{Foo}
             """);
         File.WriteAllText(unrelatedPath, """
-            §M{m002:Unrelated}
-              §F{f003:Foo:pub} () -> i32
+            §M{Unrelated}
+              §F{Foo:pub} () -> i32
                 §R INT:99
             """);
 
@@ -235,18 +235,18 @@ public class CliMultiFileTests : IDisposable
         var betaPath = Path.Combine(_tempDir, "beta.calr");
         var consumerPath = Path.Combine(_tempDir, "consumer.calr");
         File.WriteAllText(alphaPath, """
-            §M{m001:Alpha}
-              §F{f001:Emit:pub} () -> i32
+            §M{Alpha}
+              §F{Emit:pub} () -> i32
                 §R INT:1
             """);
         File.WriteAllText(betaPath, """
-            §M{m002:Beta}
-              §F{f002:Emit:pub} () -> i32
+            §M{Beta}
+              §F{Emit:pub} () -> i32
                 §R INT:2
             """);
         File.WriteAllText(consumerPath, """
-            §M{m003:Consumer}
-              §F{f003:Read:pub} () -> i32
+            §M{Consumer}
+              §F{Read:pub} () -> i32
                 §R §C{Alpha.Emit} §/C
             """);
         var map = CompilationDriver.BuildCrossModuleFunctionMap(
@@ -320,20 +320,20 @@ public class CliMultiFileTests : IDisposable
         var bPath = Path.Combine(_tempDir, "b.calr");
         var cPath = Path.Combine(_tempDir, "c.calr");
         File.WriteAllText(aPath, """
-            §M{m001:Alpha}
-              §F{f001:Emit:pub} () -> void
+            §M{Alpha}
+              §F{Emit:pub} () -> void
                 §E{cw}
                 §P "alpha"
             """);
         File.WriteAllText(bPath, """
-            §M{m002:Beta}
-              §F{f001:Emit:pub} () -> void
+            §M{Beta}
+              §F{Emit:pub} () -> void
                 §E{cw}
                 §P "beta"
             """);
         File.WriteAllText(cPath, """
-            §M{m003:Caller}
-              §F{f001:Run:pub} () -> void
+            §M{Caller}
+              §F{Run:pub} () -> void
                 §E{cw}
                 §C{Emit}
                 §/C
@@ -363,18 +363,18 @@ public class CliMultiFileTests : IDisposable
         var aPath = Path.Combine(_tempDir, "self.calr");
         var bPath = Path.Combine(_tempDir, "other.calr");
         File.WriteAllText(aPath, """
-            §M{m001:SelfMod}
-              §F{f001:Helper:pub} () -> void
+            §M{SelfMod}
+              §F{Helper:pub} () -> void
                 §E{cw}
                 §P "hi"
-              §F{f002:Run:pub} () -> void
+              §F{Run:pub} () -> void
                 §E{cw}
                 §C{Helper}
                 §/C
             """);
         File.WriteAllText(bPath, """
-            §M{m002:OtherMod}
-              §F{f001:Unrelated:pub} () -> void
+            §M{OtherMod}
+              §F{Unrelated:pub} () -> void
                 §E{}
             """);
 
@@ -394,18 +394,18 @@ public class CliMultiFileTests : IDisposable
         var mathPath = Path.Combine(_tempDir, "math.calr");
         var appPath = Path.Combine(_tempDir, "app.calr");
         File.WriteAllText(mathPath, """
-            §M{m001:MathMod}
-              §F{f001:Clamp:pub} (i32:x) -> i32
+            §M{MathMod}
+              §F{Clamp:pub} (i32:x) -> i32
                 §Q (>= x (- 0 1000))
                 §S (>= result 0)
-                §IF{if1} (< x 0)
+                §IF (< x 0)
                   §R 0
                 §EL
                   §R x
             """);
         File.WriteAllText(appPath, """
-            §M{m002:AppMod}
-              §F{f001:Use:pub} (i32:v) -> void
+            §M{AppMod}
+              §F{Use:pub} (i32:v) -> void
                 §C{Clamp} §A v §/C
             """);
 
@@ -427,19 +427,19 @@ public class CliMultiFileTests : IDisposable
         var aPath = Path.Combine(_tempDir, "alpha.calr");
         var bPath = Path.Combine(_tempDir, "beta.calr");
         File.WriteAllText(aPath, """
-            §M{m001:Alpha}
-              §CL{c001:Keeper:pub}
-                §MT{t001:Save:pub} () -> void
+            §M{Alpha}
+              §CL{Keeper:pub}
+                §MT{Save:pub} () -> void
                   §E{cw}
                   §P "keeper-save"
-                §MT{t002:Other:pub} () -> void
+                §MT{Other:pub} () -> void
                   §E{cw}
                   §C{Save}
                   §/C
             """);
         File.WriteAllText(bPath, """
-            §M{m002:Beta}
-              §F{f001:Save:pub} () -> void
+            §M{Beta}
+              §F{Save:pub} () -> void
                 §E{cw}
                 §P "beta-save"
             """);
@@ -463,14 +463,14 @@ public class CliMultiFileTests : IDisposable
         var aPath = Path.Combine(_tempDir, "caller.calr");
         var bPath = Path.Combine(_tempDir, "lib.calr");
         File.WriteAllText(aPath, """
-            §M{m001:CallerMod}
-              §F{f001:Run:pub} (Func<i32,i32>:Notify) -> void
+            §M{CallerMod}
+              §F{Run:pub} (Func<i32,i32>:Notify) -> void
                 §E{cw}
                 §C{Notify} §A INT:42 §/C
             """);
         File.WriteAllText(bPath, """
-            §M{m002:Lib}
-              §F{f001:Notify:pub} (i32:x) -> void
+            §M{Lib}
+              §F{Notify:pub} (i32:x) -> void
                 §E{cw}
                 §P x
             """);
@@ -499,14 +499,14 @@ public class CliMultiFileTests : IDisposable
         var storePath = Path.Combine(_tempDir, "istore.calr");
         var catalogPath = Path.Combine(_tempDir, "icatalog.calr");
         File.WriteAllText(storePath, """
-            §M{m001:IStore}
-              §F{f001:Stash:int} (str:path) -> void
+            §M{IStore}
+              §F{Stash:int} (str:path) -> void
                 §E{fs:w}
                 §C{File.WriteAllText} §A path §A "x" §/C
             """);
         File.WriteAllText(catalogPath, """
-            §M{m002:ICatalog}
-              §F{f001:Ping:pub} (str:path) -> void
+            §M{ICatalog}
+              §F{Ping:pub} (str:path) -> void
                 §E{fs:w}
                 §C{Stash} §A path §/C
             """);
@@ -527,20 +527,20 @@ public class CliMultiFileTests : IDisposable
         var aPath = Path.Combine(_tempDir, "nest.calr");
         var bPath = Path.Combine(_tempDir, "nbeta.calr");
         File.WriteAllText(aPath, """
-            §M{m001:NAlpha}
-              §CL{c001:Outer:pub}
-                §MT{t001:Save:pub:stat} () -> void
+            §M{NAlpha}
+              §CL{Outer:pub}
+                §MT{Save:pub:stat} () -> void
                   §E{cw}
                   §P "outer-static-save"
-                §CL{c002:Inner:pub}
-                  §MT{t002:Go:pub} () -> void
+                §CL{Inner:pub}
+                  §MT{Go:pub} () -> void
                     §E{cw}
                     §C{Save}
                     §/C
             """);
         File.WriteAllText(bPath, """
-            §M{m002:NBeta}
-              §F{f001:Save:pub} () -> void
+            §M{NBeta}
+              §F{Save:pub} () -> void
                 §E{cw}
                 §P "beta-save"
             """);
@@ -562,20 +562,20 @@ public class CliMultiFileTests : IDisposable
         var aPath = Path.Combine(_tempDir, "derived.calr");
         var bPath = Path.Combine(_tempDir, "dlib.calr");
         File.WriteAllText(aPath, """
-            §M{m001:DApp}
-              §CL{c001:Base:pub}
-                §MT{t001:Ping:pub} () -> void
+            §M{DApp}
+              §CL{Base:pub}
+                §MT{Ping:pub} () -> void
                   §E{cw}
                   §P "base-ping"
-              §CL{c002:Derived:Base}
-                §MT{t002:Go:pub} () -> void
+              §CL{Derived:Base}
+                §MT{Go:pub} () -> void
                   §E{cw}
                   §C{Ping}
                   §/C
             """);
         File.WriteAllText(bPath, """
-            §M{m002:DLib}
-              §F{f001:Ping:pub} () -> void
+            §M{DLib}
+              §F{Ping:pub} () -> void
                 §E{cw}
                 §P "lib-ping"
             """);

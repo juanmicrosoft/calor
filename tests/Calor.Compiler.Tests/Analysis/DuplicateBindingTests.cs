@@ -35,7 +35,7 @@ public class DuplicateBindingTests
     public void DuplicateImmutableBindingInSameScope_IsRejected()
     {
         Assert.True(HasDuplicate(
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{x:i32} 1\n    §B{x:i32} 2\n    §R x\n"));
+            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{x:i32} 1\n    §B{x:i32} 2\n    §R x\n"));
     }
 
     [Fact]
@@ -43,9 +43,9 @@ public class DuplicateBindingTests
     {
         // Distinct scopes — each block's `x` is independent, no CS0128.
         Assert.False(HasDuplicate(
-            "§M{m:S}\n  §F{f:Do:pub} (bool:a, bool:b) -> i32\n" +
-            "    §IF{i1} (== a true)\n      §B{x:i32} 1\n      §R x\n" +
-            "    §IF{i2} (== b true)\n      §B{x:i32} 2\n      §R x\n    §R 0\n"));
+            "§M{S}\n  §F{Do:pub} (bool:a, bool:b) -> i32\n" +
+            "    §IF (== a true)\n      §B{x:i32} 1\n      §R x\n" +
+            "    §IF (== b true)\n      §B{x:i32} 2\n      §R x\n    §R 0\n"));
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public class DuplicateBindingTests
     {
         // A mutable §B reusing a live name is a reassignment (`x = 2`), not a duplicate.
         Assert.False(HasDuplicate(
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~x} 1\n    §B{~x} 2\n    §R x\n"));
+            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~x} 1\n    §B{~x} 2\n    §R x\n"));
     }
 
     [Fact]
@@ -61,8 +61,8 @@ public class DuplicateBindingTests
     {
         // Reusing an ENCLOSING-scope name is Calor0255 (CS0136), not Calor0258 (CS0128).
         Assert.False(HasDuplicate(
-            "§M{m:S}\n  §F{f:Do:pub} (bool:flag) -> i32\n    §B{~x:i32} 0\n" +
-            "    §IF{i1} (== flag true)\n      §B{x:str} \"hi\"\n      §R 0\n    §R x\n"));
+            "§M{S}\n  §F{Do:pub} (bool:flag) -> i32\n    §B{~x:i32} 0\n" +
+            "    §IF (== flag true)\n      §B{x:str} \"hi\"\n      §R 0\n    §R x\n"));
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public class DuplicateBindingTests
         // A body-top-level local reusing a parameter name is CS0136 shadowing (params live
         // in an enclosing scope), not a same-scope CS0128 duplicate.
         Assert.False(HasDuplicate(
-            "§M{m:S}\n  §F{f:Do:pub} (i32:x) -> i32\n    §B{x:i32} 9\n    §R x\n"));
+            "§M{S}\n  §F{Do:pub} (i32:x) -> i32\n    §B{x:i32} 9\n    §R x\n"));
     }
 
     // The converter side of #731: a `x = new …` reassignment must NOT round-trip to a

@@ -30,8 +30,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void CoalesceWithNonNullFallback_HasTheReferentType()
     {
         var accepted = Program.Compile("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> str
+            §M{SafeConsumption}
+              §F{Probe:pub} (?str:input) -> str
                 §E{}
                 §B{value:str} (?? input "fallback")
                 §R value
@@ -40,8 +40,8 @@ public sealed class SafeConsumptionTypeCheckerTests
         Assert.Contains("input ?? \"fallback\"", accepted.GeneratedCode);
 
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (?str:input) -> void
                 §E{}
                 §B{value:i32} (?? input "fallback")
             """);
@@ -55,8 +55,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void CoalesceWithThrow_HasTheReferentType()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (?str:input) -> void
                 §E{alloc,throw}
                 §B{value:i32} (?? input §TH §NEW{ArgumentNullException})
             """);
@@ -70,8 +70,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void CoalesceWithNullableFallback_StaysNullable()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (?str:input) -> void
                 §E{}
                 §B{fallback:?str} null
                 §B{value:Option<str>} (?? input fallback)
@@ -86,8 +86,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void CoalesceWithNullFallback_StaysNullable()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (?str:input) -> void
                 §E{}
                 §B{value:Option<str>} (?? input null)
             """);
@@ -101,8 +101,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void UnknownGenericCoalesce_DoesNotIntroduceOptionSemantics()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (Option<str>:opt) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (Option<str>:opt) -> void
                 §E{alloc}
                 §B{value:str} (?? opt "fallback")
             """);
@@ -118,8 +118,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ConditionalWithOneThrowingArm_HasTheOtherArmType()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (bool:flag) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (bool:flag) -> void
                 §E{throw}
                 §B{value:i32} (? flag §TH "missing" "fallback")
             """);
@@ -133,8 +133,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ConditionalWithBothThrowingArms_HasNeverType()
     {
         var accepted = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (bool:flag) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (bool:flag) -> void
                 §E{throw}
                 §B{value:i32} (?? (? flag §TH "left" §TH "right") "fallback")
             """);
@@ -146,8 +146,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ConditionalValidatesItsCondition()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{value:str} (? INT:1 "yes" "no")
             """);
@@ -160,8 +160,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ConditionalReportsUnrelatedArmMismatch()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (bool:flag) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (bool:flag) -> void
                 §E{}
                 §B{value:str} (? flag INT:1 "fallback")
             """);
@@ -175,8 +175,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ThrowExpressionRejectsKnownNonExceptionReference()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (bool:flag, str:message) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (bool:flag, str:message) -> void
                 §E{throw}
                 §B{value:i32} (? flag §TH message INT:1)
             """);
@@ -190,10 +190,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void IsPatternConditionBindsNonNullVariableOnlyInTrueBranch()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (?str:input) -> void
                 §E{}
-                §IF{if1} (is input str text)
+                §IF (is input str text)
                   §B{ok:str} text
                 §B{leak:str} text
             """);
@@ -208,8 +208,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void IsPatternConditionalArmBindsNonNullVariableOnlyInTrueArm()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (?str:input) -> void
                 §E{}
                 §B{value:i32} (? (is input str text) text "fallback")
             """);
@@ -223,10 +223,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void NegatedIsPatternDoesNotBindInTrueBranch()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (?str:input) -> void
                 §E{}
-                §IF{if1} (! (is input str text))
+                §IF (! (is input str text))
                   §B{value:str} text
             """);
 
@@ -240,10 +240,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MatchExpressionTypePatternBindingHasTheTestedNonNullType()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (?str:input) -> void
                 §E{}
-                §B{value:i32} §W{sw1:expr} input
+                §B{value:i32} §W input
                   §K §PTYPE{str:text} → text
                   §K _ → "fallback"
             """);
@@ -257,10 +257,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void NegatedMatchTypePatternDoesNotBind()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (?str:input) -> void
                 §E{}
-                §B{value:str} §W{sw1:expr} input
+                §B{value:str} §W input
                   §K (not §PTYPE{str:text}) → text
                   §K _ → "fallback"
             """);
@@ -275,8 +275,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void IsPatternRejectsKnownImpossibleInputType()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{value:bool} (is INT:1 str text)
             """);
@@ -288,18 +288,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Theory]
-    [InlineData("§IF{if1} (is input Widget text)\n      §R true")]
-    [InlineData("§IF{if1} false\n      §R true\n    §EI (is input Widget text)\n      §R true")]
+    [InlineData("§IF (is input Widget text)\n      §R true")]
+    [InlineData("§IF false\n      §R true\n    §EI (is input Widget text)\n      §R true")]
     [InlineData("§R (? (is input Widget text) true false)")]
-    [InlineData("§IF{if1} (&& (is input Widget text) true)\n      §R true")]
-    [InlineData("§WH{wh1} (is input Widget text)\n      §R true")]
-    [InlineData("§W{w1} input\n      §K _ §WHEN (is input Widget text)\n        §R true")]
-    [InlineData("§R §W{w1:expr} input\n      §K _ §WHEN (is input Widget text) → true\n      §K _ → false")]
+    [InlineData("§IF (&& (is input Widget text) true)\n      §R true")]
+    [InlineData("§WH (is input Widget text)\n      §R true")]
+    [InlineData("§W input\n      §K _ §WHEN (is input Widget text)\n        §R true")]
+    [InlineData("§R §W input\n      §K _ §WHEN (is input Widget text) → true\n      §K _ → false")]
     public void UnknownPatternType_IsDiagnosedOnceWhenItsBindingIsTransferred(string body)
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?object:input) -> bool
+            §M{SafeConsumption}
+              §F{Probe:pub} (?object:input) -> bool
                 §E{}
             """ + "\n    " + body + "\n    §R false");
 
@@ -314,10 +314,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void UnknownPatternType_DiagnosesEachDistinctSourceOccurrence()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?object:input) -> bool
+            §M{SafeConsumption}
+              §F{Probe:pub} (?object:input) -> bool
                 §E{}
-                §IF{if1} (is input Widget first)
+                §IF (is input Widget first)
                   §R true
                 §EI (is input Widget second)
                   §R true
@@ -341,11 +341,11 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void KnownInvalidOperands_AreRejectedBeforeGeneratedValidation(string expression)
     {
         var source = $$"""
-            §M{m1:SafeConsumption}
-              §F{f1:MakeString:pub} () -> str
+            §M{SafeConsumption}
+              §F{MakeString:pub} () -> str
                 §E{}
                 §R "not an exception"
-              §F{f2:Probe:pub} () -> object
+              §F{Probe:pub} () -> object
                 §E{alloc,throw}
                 §R {{expression}}
             """;
@@ -369,23 +369,23 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void CallExpressions_ValidateChildrenWithoutAssumingASelectedReturnType(string target, string argument)
     {
         var source = $$"""
-            §M{m1:SafeConsumption}
-              §F{f1:Take:pub} (i32:value) -> i32
+            §M{SafeConsumption}
+              §F{Take:pub} (i32:value) -> i32
                 §E{}
                 §R value
-              §F{f2:MakeString:pub} () -> str
+              §F{MakeString:pub} () -> str
                 §E{}
                 §R "not an exception"
-              §F{f3:Overloaded:pub} (i32:value) -> i32
+              §F{Overloaded:pub} (i32:value) -> i32
                 §E{}
                 §R value
-              §F{f4:Overloaded:pub} (str:value) -> str
+              §F{Overloaded:pub} (str:value) -> str
                 §E{}
                 §R value
-              §F{f5:Generic:pub}<T> (T:value) -> T
+              §F{Generic:pub}<T> (T:value) -> T
                 §E{}
                 §R value
-              §F{f6:Probe:pub} {{(target == "Shadowed" ? "(i32:Shadowed)" : "()")}} -> i32
+              §F{Probe:pub} {{(target == "Shadowed" ? "(i32:Shadowed)" : "()")}} -> i32
                 §E{throw}
                 §R §C{{{target}}} §A {{argument}} §/C
             """;
@@ -400,14 +400,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void CallExpressions_RecognizeFunctionArguments()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Double:pub} (i32:value) -> i32
+            §M{SafeConsumption}
+              §F{Double:pub} (i32:value) -> i32
                 §E{}
                 §R (* value 2)
-              §F{f2:Map:pub} (Func<i32,i32>:transform §E{}) -> i32
+              §F{Map:pub} (Func<i32,i32>:transform §E{}) -> i32
                 §E{}
                 §R §C{transform} §A 1 §/C
-              §F{f3:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 §R §C{Map} §A Double §/C
             """);
@@ -419,14 +419,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ExpressionCalls_ValidateNestedArguments()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Double:pub} (i32:value) -> i32
+            §M{SafeConsumption}
+              §F{Double:pub} (i32:value) -> i32
                 §E{}
                 §R (* value 2)
-              §F{f2:GetTransform:pub} () -> Func<i32,i32>
+              §F{GetTransform:pub} () -> Func<i32,i32>
                 §E{}
                 §R Double
-              §F{f3:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 §R §C §C{GetTransform} §/C §A (?? INT:1 INT:2) §/C
             """);
@@ -439,14 +439,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ResolvedOverloadReturnType_IsCheckedByOuterConsumer()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (i32:value) -> i32
+            §M{SafeConsumption}
+              §F{Pick:pub} (i32:value) -> i32
                 §E{}
                 §R value
-              §F{f2:Pick:pub} (str:value) -> str
+              §F{Pick:pub} (str:value) -> str
                 §E{}
                 §R value
-              §F{f3:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 §R (?? §C{Pick} §A 1 §/C 2)
             """);
@@ -459,8 +459,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void NullableValueBindings_AcceptValuesAndConditionalNull()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (bool:flag) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (bool:flag) -> void
                 §E{}
                 §B{direct:?i32} INT:1
                 §B{conditional:?i32} (? flag null INT:1)
@@ -473,13 +473,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MatchExpressions_UnifyThrowingAndNullArms()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (i32:value) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (i32:value) -> void
                 §E{throw}
-                §B{text:str} §W{m1:expr} value
+                §B{text:str} §W value
                   §K 0 → "ok"
                   §K _ → §TH "bad"
-                §B{nullable:?str} §W{m2:expr} value
+                §B{nullable:?str} §W value
                   §K 0 → "ok"
                   §K _ → null
             """);
@@ -491,14 +491,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void FunctionReferences_AreMatchedAgainstDelegateTargetsAndOverloads()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (str:value) -> str
+            §M{SafeConsumption}
+              §F{Pick:pub} (str:value) -> str
                 §E{}
                 §R value
-              §F{f2:Pick:pub} (i32:value) -> i32
+              §F{Pick:pub} (i32:value) -> i32
                 §E{}
                 §R value
-              §F{f3:Probe:pub} () -> void
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{picker:Func<i32,i32>} Pick
             """);
@@ -510,14 +510,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void NamedArguments_SelectTheMappedOverloadReturnType()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (str:value, i32:number) -> str
+            §M{SafeConsumption}
+              §F{Pick:pub} (str:value, i32:number) -> str
                 §E{}
                 §R value
-              §F{f2:Pick:pub} (i32:value, str:number) -> i32
+              §F{Pick:pub} (i32:value, str:number) -> i32
                 §E{}
                 §R value
-              §F{f3:Probe:pub} () -> str
+              §F{Probe:pub} () -> str
                 §E{}
                 §R (?? §C{Pick} §A[number] 7 §A[value] "ok" §/C "fallback")
             """);
@@ -529,11 +529,11 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericCallReturnType_IsCheckedByOuterConsumer()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Identity:pub}<T> (T:value) -> T
+            §M{SafeConsumption}
+              §F{Identity:pub}<T> (T:value) -> T
                 §E{}
                 §R value
-              §F{f2:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 §R (?? §C{Identity<i32>} §A 1 §/C 2)
             """);
@@ -546,16 +546,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void DelegateCalls_ValidateArgumentsAndExposeReturnType()
     {
         var wrongArgument = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (Func<i32,i32>:transform) -> i32
+            §M{SafeConsumption}
+              §F{Probe:pub} (Func<i32,i32>:transform) -> i32
                 §E{}
                 §R §C{transform} §A "wrong" §/C
             """);
         Assert.True(wrongArgument.HasErrors);
 
         var invalidConsumer = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (Func<i32,i32>:transform) -> i32
+            §M{SafeConsumption}
+              §F{Probe:pub} (Func<i32,i32>:transform) -> i32
                 §E{}
                 §R (?? §C{transform} §A 1 §/C 2)
             """);
@@ -567,14 +567,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericAndVariantMethodGroups_ConvertToDelegateTargets()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Identity:pub}<T> (T:value) -> T
+            §M{SafeConsumption}
+              §F{Identity:pub}<T> (T:value) -> T
                 §E{}
                 §R value
-              §F{f2:GetText:pub} () -> str
+              §F{GetText:pub} () -> str
                 §E{}
                 §R "text"
-              §F{f3:Probe:pub} () -> void
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{identity:Func<i32,i32>} Identity
                 §B{textFactory:Func<object>} GetText
@@ -587,17 +587,17 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void OverloadedMethodGroups_UseCallArgumentDelegateContext()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (str:value) -> str
+            §M{SafeConsumption}
+              §F{Pick:pub} (str:value) -> str
                 §E{}
                 §R value
-              §F{f2:Pick:pub} (i32:value) -> i32
+              §F{Pick:pub} (i32:value) -> i32
                 §E{}
                 §R value
-              §F{f3:Map:pub} (Func<i32,i32>:transform) -> i32
+              §F{Map:pub} (Func<i32,i32>:transform) -> i32
                 §E{}
                 §R §C{transform} §A 1 §/C
-              §F{f4:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 §R §C{Map} §A Pick §/C
             """);
@@ -609,17 +609,17 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void UserDeclaredDelegate_ProvidesMethodGroupContext()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §DEL{d1:Picker:pub}
+            §M{SafeConsumption}
+              §DEL{Picker:pub}
                 §I{i32:value}
                 §O{i32}
-              §F{f1:Pick:pub} (str:value) -> str
+              §F{Pick:pub} (str:value) -> str
                 §E{}
                 §R value
-              §F{f2:Pick:pub} (i32:value) -> i32
+              §F{Pick:pub} (i32:value) -> i32
                 §E{}
                 §R value
-              §F{f3:Probe:pub} () -> void
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{picker:Picker} Pick
             """);
@@ -631,8 +631,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void NullableValueCommonType_IsIndependentOfArmOrder()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (bool:flag, ?i32:maybe) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (bool:flag, ?i32:maybe) -> void
                 §E{}
                 §B{value:?f64} (? flag maybe FLOAT:1.5)
                 §B{reverse:?f64} (? flag FLOAT:1.5 maybe)
@@ -645,10 +645,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MatchExpression_RejectsUnrelatedInferredArmTypes()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (i32:value) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (i32:value) -> void
                 §E{}
-                §B{mixed} §W{m:expr} value
+                §B{mixed} §W value
                   §K 0 → 1
                   §K _ → "text"
             """);
@@ -661,8 +661,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void UnmodeledStructuralWrappers_StillValidateNestedExpressions()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> str
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> str
                 §E{}
                 §R §INTERP "value=" §EXP (?? 1 2) §/INTERP
             """);
@@ -675,11 +675,11 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void InlineGenericFunctionNames_AreCallableMethodGroups()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Identity<T>:pub} (T:value) -> T
+            §M{SafeConsumption}
+              §F{Identity<T>:pub} (T:value) -> T
                 §E{}
                 §R value
-              §F{f2:Probe:pub} () -> void
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{identity:Func<i32,i32>} Identity
             """);
@@ -691,11 +691,11 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericInference_MergesAllArgumentBounds()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Choose:pub}<T> (T:first, T:second) -> T
+            §M{SafeConsumption}
+              §F{Choose:pub}<T> (T:first, T:second) -> T
                 §E{}
                 §R second
-              §F{f2:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 §R (?? §C{Choose} §A (cast char INT:65) §A 1 §/C 2)
             """);
@@ -708,12 +708,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void NamedUserDelegateCalls_MapArgumentsByName()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §DEL{d1:Picker:pub}
+            §M{SafeConsumption}
+              §DEL{Picker:pub}
                 §I{i32:number}
                 §I{str:text}
                 §O{str}
-              §F{f1:Probe:pub} (Picker:pick) -> str
+              §F{Probe:pub} (Picker:pick) -> str
                 §E{}
                 §R §C{pick} §A[text] "x" §A[number] 1 §/C
             """);
@@ -725,11 +725,11 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ExpandedParamsCalls_ExposeTheirReturnType()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:First:pub} (i32[]:values:params) -> i32
+            §M{SafeConsumption}
+              §F{First:pub} (i32[]:values:params) -> i32
                 §E{}
                 §R §IDX values 0
-              §F{f2:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 §R (?? §C{First} §A 1 §A 2 §/C 3)
             """);
@@ -742,11 +742,11 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void DuplicateNamedParameters_DoNotCrashTypeChecking()
     {
         var exception = Record.Exception(() => Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Take:pub} (i32:value, i32:value) -> i32
+            §M{SafeConsumption}
+              §F{Take:pub} (i32:value, i32:value) -> i32
                 §E{}
                 §R value
-              §F{f2:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 §R §C{Take} §A[value] 1 §/C
             """));
@@ -758,8 +758,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void NullableCoalesce_UsesTheWiderUnderlyingType()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?i32:left, ?f64:right) -> ?f64
+            §M{SafeConsumption}
+              §F{Probe:pub} (?i32:left, ?f64:right) -> ?f64
                 §E{}
                 §R (?? left right)
             """);
@@ -771,11 +771,11 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericExpandedParams_InferFromEveryElement()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:First:pub}<T> (T[]:values:params) -> T
+            §M{SafeConsumption}
+              §F{First:pub}<T> (T[]:values:params) -> T
                 §E{}
                 §R §IDX values 0
-              §F{f2:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 §R (?? §C{First} §A 1 §A 2 §/C 3)
             """);
@@ -788,14 +788,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericCalls_InferFromMethodGroupArguments()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:GetInt:pub} () -> i32
+            §M{SafeConsumption}
+              §F{GetInt:pub} () -> i32
                 §E{}
                 §R 1
-              §F{f2:Make:pub}<T> (Func<T>:factory) -> T
+              §F{Make:pub}<T> (Func<T>:factory) -> T
                 §E{}
                 §R §C{factory} §/C
-              §F{f3:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 §R (?? §C{Make} §A GetInt §/C 2)
             """);
@@ -808,8 +808,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void AnonymousObjectHolders_ExposeNestedExpressions()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> object
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> object
                 §E{}
                 §R §ANON Age = (?? 1 2) §/ANON
             """);
@@ -822,10 +822,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MatchExpression_UsesExplicitObjectTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (i32:value) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (i32:value) -> void
                 §E{}
-                §B{mixed:object} §W{m:expr} value
+                §B{mixed:object} §W value
                   §K 0 → 1
                   §K _ → "text"
             """);
@@ -847,23 +847,23 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MatchExpression_UsesReturnAndCallParameterTargets()
     {
         var returnResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (i32:value) -> object
+            §M{SafeConsumption}
+              §F{Probe:pub} (i32:value) -> object
                 §E{}
-                §R §W{m:expr} value
+                §R §W value
                   §K 0 → 1
                   §K _ → "text"
             """);
         AssertNoErrors(returnResult);
 
         var argumentResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Take:pub} (object:value) -> object
+            §M{SafeConsumption}
+              §F{Take:pub} (object:value) -> object
                 §E{}
                 §R value
-              §F{f2:Probe:pub} (i32:value) -> object
+              §F{Probe:pub} (i32:value) -> object
                 §E{}
-                §R §C{Take} §A §W{m:expr} value
+                §R §C{Take} §A §W value
                   §K 0 → 1
                   §K _ → "text"
                 §/C
@@ -875,14 +875,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void OverloadInference_PrefersIdentityConversion()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (i32:value) -> i32
+            §M{SafeConsumption}
+              §F{Pick:pub} (i32:value) -> i32
                 §E{}
                 §R value
-              §F{f2:Pick:pub} (f64:value) -> str
+              §F{Pick:pub} (f64:value) -> str
                 §E{}
                 §R "wide"
-              §F{f3:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 §R (?? §C{Pick} §A 1 §/C 2)
             """);
@@ -891,14 +891,14 @@ public sealed class SafeConsumptionTypeCheckerTests
         Assert.Contains("Null-coalescing requires", diagnostic.Message);
 
         var categoryResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (object:value) -> str
+            §M{SafeConsumption}
+              §F{Pick:pub} (object:value) -> str
                 §E{}
                 §R "boxed"
-              §F{f2:Pick:pub} (f64:value) -> i32
+              §F{Pick:pub} (f64:value) -> i32
                 §E{}
                 §R 1
-              §F{f3:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 §R (?? §C{Pick} §A 1 §/C 2)
             """);
@@ -906,14 +906,14 @@ public sealed class SafeConsumptionTypeCheckerTests
         Assert.Contains("Null-coalescing requires", categoryDiagnostic.Message);
 
         var namedResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (i32:x, object:y) -> i32
+            §M{SafeConsumption}
+              §F{Pick:pub} (i32:x, object:y) -> i32
                 §E{}
                 §R x
-              §F{f2:Pick:pub} (object:y, f64:x) -> str
+              §F{Pick:pub} (object:y, f64:x) -> str
                 §E{}
                 §R "wide"
-              §F{f3:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 §R (?? §C{Pick} §A[x] 1 §A[y] "s" §/C 2)
             """);
@@ -921,14 +921,14 @@ public sealed class SafeConsumptionTypeCheckerTests
         Assert.Contains("Null-coalescing requires", namedDiagnostic.Message);
 
         var paramsResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (i32:value) -> i32
+            §M{SafeConsumption}
+              §F{Pick:pub} (i32:value) -> i32
                 §E{}
                 §R value
-              §F{f2:Pick:pub} (i32[]:values:params) -> str
+              §F{Pick:pub} (i32[]:values:params) -> str
                 §E{}
                 §R "expanded"
-              §F{f3:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 §R (?? §C{Pick} §A 1 §/C 2)
             """);
@@ -936,14 +936,14 @@ public sealed class SafeConsumptionTypeCheckerTests
         Assert.Contains("Null-coalescing requires", paramsDiagnostic.Message);
 
         var charResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (i32:value) -> i32
+            §M{SafeConsumption}
+              §F{Pick:pub} (i32:value) -> i32
                 §E{}
                 §R value
-              §F{f2:Pick:pub} (f64:value) -> str
+              §F{Pick:pub} (f64:value) -> str
                 §E{}
                 §R "wide"
-              §F{f3:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 §R (?? §C{Pick} §A (cast char INT:65) §/C 2)
             """);
@@ -951,14 +951,14 @@ public sealed class SafeConsumptionTypeCheckerTests
         Assert.Contains("Null-coalescing requires", charDiagnostic.Message);
 
         var optionalResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (i32:value) -> i32
+            §M{SafeConsumption}
+              §F{Pick:pub} (i32:value) -> i32
                 §E{}
                 §R value
-              §F{f2:Pick:pub} (i32:value, i32:other = 0) -> str
+              §F{Pick:pub} (i32:value, i32:other = 0) -> str
                 §E{}
                 §R "optional"
-              §F{f3:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 §R (?? §C{Pick} §A 1 §/C 2)
             """);
@@ -970,11 +970,11 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MethodGroupConversion_RejectsBoxingReturnsAndModifierMismatches()
     {
         var boxingResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:GetInt:pub} () -> i32
+            §M{SafeConsumption}
+              §F{GetInt:pub} () -> i32
                 §E{}
                 §R 1
-              §F{f2:Probe:pub} () -> void
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{factory:Func<object>} GetInt
             """);
@@ -982,11 +982,11 @@ public sealed class SafeConsumptionTypeCheckerTests
             diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
 
         var modifierResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Bump:pub} (i32:value:ref) -> i32
+            §M{SafeConsumption}
+              §F{Bump:pub} (i32:value:ref) -> i32
                 §E{}
                 §R value
-              §F{f2:Probe:pub} () -> void
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{f:Func<i32,i32>} Bump
             """);
@@ -998,8 +998,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void DelegateCalls_ReportShapeErrorsAndPreserveNamedResults()
     {
         var arityResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (Func<i32,i32>:transform) -> i32
+            §M{SafeConsumption}
+              §F{Probe:pub} (Func<i32,i32>:transform) -> i32
                 §E{}
                 §R §C{transform} §A 1 §A 2 §/C
             """);
@@ -1007,8 +1007,8 @@ public sealed class SafeConsumptionTypeCheckerTests
             diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
 
         var namedResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (Func<i32,i32>:transform) -> i32
+            §M{SafeConsumption}
+              §F{Probe:pub} (Func<i32,i32>:transform) -> i32
                 §E{}
                 §R (?? §C{transform} §A[arg] 1 §/C 2)
             """);
@@ -1020,17 +1020,17 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericMethodGroupInference_IsIndependentOfDeclarationOrder()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Get:pub} (object:value) -> str
+            §M{SafeConsumption}
+              §F{Get:pub} (object:value) -> str
                 §E{}
                 §R "wide"
-              §F{f2:Get:pub} (str:value) -> i32
+              §F{Get:pub} (str:value) -> i32
                 §E{}
                 §R 1
-              §F{f3:Choose:pub}<T> (Func<str,T>:factory, T:fallback) -> T
+              §F{Choose:pub}<T> (Func<str,T>:factory, T:fallback) -> T
                 §E{}
                 §R fallback
-              §F{f4:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 §R (?? §C{Choose} §A Get §A 1 §/C 2)
             """);
@@ -1043,14 +1043,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_UsesItsDelegateReturnTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (i32:value) -> i32
+            §M{SafeConsumption}
+              §F{Probe:pub} (i32:value) -> i32
                 §E{}
-                §B{factory:Func<object>} §LAM{l1}
-                  §R §W{m:expr} value
+                §B{factory:Func<object>} §LAM{}
+                  §R §W value
                     §K 0 → 1
                     §K _ → "text"
-                §/LAM{l1}
+                §/LAM
                 §R 0
             """);
 
@@ -1061,10 +1061,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void DelegateCalls_ContextuallyTypeMatchArguments()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (Func<object,object>:transform, i32:value) -> object
+            §M{SafeConsumption}
+              §F{Probe:pub} (Func<object,object>:transform, i32:value) -> object
                 §E{}
-                §R §C{transform} §A §W{m:expr} value
+                §R §C{transform} §A §W value
                   §K 0 → 1
                   §K _ → "text"
                 §/C
@@ -1077,17 +1077,17 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericLambdaContext_UsesOrdinaryArgumentInferenceFirst()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Choose:pub}<T> (Func<T>:factory, T:fallback) -> T
+            §M{SafeConsumption}
+              §F{Choose:pub}<T> (Func<T>:factory, T:fallback) -> T
                 §E{}
                 §R fallback
-              §F{f2:Probe:pub} (i32:value, object:fallback) -> object
+              §F{Probe:pub} (i32:value, object:fallback) -> object
                 §E{}
-                §R §C{Choose} §A §LAM{l1}
-                  §R §W{m:expr} value
+                §R §C{Choose} §A §LAM{}
+                  §R §W value
                     §K 0 → 1
                     §K _ → "text"
-                §/LAM{l1} §A fallback §/C
+                §/LAM §A fallback §/C
             """);
 
         AssertNoErrors(result);
@@ -1097,16 +1097,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void InapplicableOverload_DoesNotEraseCallArgumentTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Take:pub} (object:value) -> object
+            §M{SafeConsumption}
+              §F{Take:pub} (object:value) -> object
                 §E{}
                 §R value
-              §F{f2:Take:pub} (i32:value, i32:other) -> object
+              §F{Take:pub} (i32:value, i32:other) -> object
                 §E{}
                 §R value
-              §F{f3:Probe:pub} (i32:value) -> object
+              §F{Probe:pub} (i32:value) -> object
                 §E{}
-                §R §C{Take} §A §W{m:expr} value
+                §R §C{Take} §A §W value
                   §K 0 → 1
                   §K _ → "text"
                 §/C
@@ -1119,16 +1119,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void NonContextualArguments_NarrowTheContextualCandidateSet()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Take:pub} (object:value, i32:tag) -> object
+            §M{SafeConsumption}
+              §F{Take:pub} (object:value, i32:tag) -> object
                 §E{}
                 §R value
-              §F{f2:Take:pub} (str:value, str:tag) -> object
+              §F{Take:pub} (str:value, str:tag) -> object
                 §E{}
                 §R value
-              §F{f3:Probe:pub} (i32:value) -> object
+              §F{Probe:pub} (i32:value) -> object
                 §E{}
-                §R §C{Take} §A §W{m:expr} value
+                §R §C{Take} §A §W value
                   §K 0 → 1
                   §K _ → "text"
                 §A 1 §/C
@@ -1141,19 +1141,19 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ContextualLambda_ValidatesItsDeclaredSignatureAndReturnType()
     {
         var returnResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1} "wrong" §/LAM{l1}
+                §B{factory:Func<i32>} §LAM{} "wrong" §/LAM
             """);
         Assert.Contains(returnResult.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
 
         var parameterResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{map:Func<i32,i32>} §LAM{l1:value:str} 1 §/LAM{l1}
+                §B{map:Func<i32,i32>} §LAM{value:str} 1 §/LAM
             """);
         Assert.Contains(parameterResult.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
@@ -1163,8 +1163,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void CallStatements_UseSignatureAwareDelegateValidation()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (Action<i32>:consume) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (Action<i32>:consume) -> void
                 §E{}
                 §C{consume} §/C
             """);
@@ -1177,11 +1177,11 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void DelegateInvocationAndMethodGroups_RespectByRefAndEnumValueSemantics()
     {
         var modifierResult = Check("""
-            §M{m1:SafeConsumption}
-              §DEL{d1:Mutator:pub}
+            §M{SafeConsumption}
+              §DEL{Mutator:pub}
                 §I{i32:value:ref}
                 §O{i32}
-              §F{f1:Probe:pub} (Mutator:mutate, i32:value) -> i32
+              §F{Probe:pub} (Mutator:mutate, i32:value) -> i32
                 §E{}
                 §R §C{mutate} §A value §/C
             """);
@@ -1189,14 +1189,14 @@ public sealed class SafeConsumptionTypeCheckerTests
             diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
 
         var enumResult = Check("""
-            §M{m1:SafeConsumption}
-              §EN{e1:Color}
+            §M{SafeConsumption}
+              §EN{Color}
               Red
-              §/EN{e1}
-              §F{f1:GetColor:pub} () -> Color
+              §/EN
+              §F{GetColor:pub} () -> Color
                 §E{}
                 §R Color.Red
-              §F{f2:Probe:pub} () -> void
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{factory:Func<object>} GetColor
             """);
@@ -1204,11 +1204,11 @@ public sealed class SafeConsumptionTypeCheckerTests
             diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
 
         var identityResult = Check("""
-            §M{m1:SafeConsumption}
-              §DEL{d1:Mutator:pub}
+            §M{SafeConsumption}
+              §DEL{Mutator:pub}
                 §I{f64:value:ref}
                 §O{void}
-              §F{f1:Probe:pub} (Mutator:mutate, i32:value:ref) -> void
+              §F{Probe:pub} (Mutator:mutate, i32:value:ref) -> void
                 §E{}
                 §C{mutate} §A{ref} value §/C
             """);
@@ -1220,10 +1220,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void UncontextualizedLambda_StillTraversesNestedConsumers()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §C{System.Threading.Tasks.Task.Run} §A §LAM{l1} (?? 1 2) §/LAM{l1} §/C
+                §C{System.Threading.Tasks.Task.Run} §A §LAM{} (?? 1 2) §/LAM §/C
             """);
 
         var diagnostic = SingleErrorAt(result, 4);
@@ -1234,13 +1234,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ContextualInference_HandlesParamsAndVariableGenericBounds()
     {
         var paramsResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Take:pub} (object[]:values:params) -> object
+            §M{SafeConsumption}
+              §F{Take:pub} (object[]:values:params) -> object
                 §E{}
                 §R values
-              §F{f2:Probe:pub} (i32:value) -> object
+              §F{Probe:pub} (i32:value) -> object
                 §E{}
-                §R §C{Take} §A §W{m:expr} value
+                §R §C{Take} §A §W value
                   §K 0 → 1
                   §K _ → "text"
                 §/C
@@ -1248,13 +1248,13 @@ public sealed class SafeConsumptionTypeCheckerTests
         AssertNoErrors(paramsResult);
 
         var variableResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Choose:pub}<T> (T:first, T:second) -> T
+            §M{SafeConsumption}
+              §F{Choose:pub}<T> (T:first, T:second) -> T
                 §E{}
                 §R first
-              §F{f2:Probe:pub} (i32:value, object:fallback) -> object
+              §F{Probe:pub} (i32:value, object:fallback) -> object
                 §E{}
-                §R §C{Choose} §A fallback §A §W{m:expr} value
+                §R §C{Choose} §A fallback §A §W value
                   §K 0 → 1
                   §K _ → "text"
                 §/C
@@ -1266,17 +1266,17 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void OverloadedMethodGroupInference_UsesTheBestMember()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Value:pub} (object:value) -> i32
+            §M{SafeConsumption}
+              §F{Value:pub} (object:value) -> i32
                 §E{}
                 §R 1
-              §F{f2:Value:pub} (str:value) -> str
+              §F{Value:pub} (str:value) -> str
                 §E{}
                 §R value
-              §F{f3:Use:pub}<T> (Func<str,T>:factory) -> T
+              §F{Use:pub}<T> (Func<str,T>:factory) -> T
                 §E{}
                 §R §C{factory} §A "x" §/C
-              §F{f4:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 §R §C{Use} §A Value §/C
             """);
@@ -1289,29 +1289,29 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void LosingLambdaOverloads_DoNotLeakDiagnostics()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (Func<i32,i32>:map) -> i32
+            §M{SafeConsumption}
+              §F{Pick:pub} (Func<i32,i32>:map) -> i32
                 §E{}
                 §R §C{map} §A 1 §/C
-              §F{f2:Pick:pub} (Func<str,str>:map) -> str
+              §F{Pick:pub} (Func<str,str>:map) -> str
                 §E{}
                 §R §C{map} §A "x" §/C
-              §F{f3:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
-                §R §C{Pick} §A §LAM{l1:x:i32} x §/LAM{l1} §/C
+                §R §C{Pick} §A §LAM{x:i32} x §/LAM §/C
             """);
         AssertNoErrors(result);
 
         var actionResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Identity:pub} (i32:value) -> i32
+            §M{SafeConsumption}
+              §F{Identity:pub} (i32:value) -> i32
                 §E{}
                 §R value
-              §F{f2:Probe:pub} () -> void
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{action:Action<i32>} §LAM{l1:x:i32}
+                §B{action:Action<i32>} §LAM{x:i32}
                   §C{Identity} §A x §/C
-                §/LAM{l1}
+                §/LAM
             """);
         AssertNoErrors(actionResult);
     }
@@ -1320,11 +1320,11 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void NestedMatchExpressions_InheritTheOuterTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (i32:value) -> object
+            §M{SafeConsumption}
+              §F{Probe:pub} (i32:value) -> object
                 §E{}
-                §R §W{outer:expr} value
-                  §K 0 → §W{inner:expr} value
+                §R §W value
+                  §K 0 → §W value
                     §K 0 → 1
                     §K _ → "text"
                   §K _ → "fallback"
@@ -1337,10 +1337,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void UncontextualizedMatch_StillTraversesNestedConsumers()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (i32:key) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (i32:key) -> void
                 §E{}
-                §C{System.Console.WriteLine} §A §W{m:expr} key
+                §C{System.Console.WriteLine} §A §W key
                   §K 0 → (?? 1 2)
                   §K _ → "text"
                 §/C
@@ -1354,13 +1354,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ContextualCandidateProbes_DiscardNestedDiagnostics()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Take:pub} (object:value) -> object
+            §M{SafeConsumption}
+              §F{Take:pub} (object:value) -> object
                 §E{}
                 §R value
-              §F{f2:Probe:pub} (i32:key) -> object
+              §F{Probe:pub} (i32:key) -> object
                 §E{}
-                §R §C{Take} §A §W{m:expr} key
+                §R §C{Take} §A §W key
                   §K 0 → (?? 1 2)
                   §K _ → "text"
                 §/C
@@ -1370,16 +1370,16 @@ public sealed class SafeConsumptionTypeCheckerTests
         Assert.Contains("Null-coalescing requires", diagnostic.Message);
 
         var divergentResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (Func<i32,i32>:map) -> i32
+            §M{SafeConsumption}
+              §F{Pick:pub} (Func<i32,i32>:map) -> i32
                 §E{}
                 §R §C{map} §A 1 §/C
-              §F{f2:Pick:pub} (Func<str,str>:map) -> str
+              §F{Pick:pub} (Func<str,str>:map) -> str
                 §E{}
                 §R §C{map} §A "x" §/C
-              §F{f3:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
-                §R §C{Pick} §A §LAM{l1:x:i32} (?? x 2) §/LAM{l1} §/C
+                §R §C{Pick} §A §LAM{x:i32} (?? x 2) §/LAM §/C
             """);
         Assert.Single(divergentResult.Diagnostics.Errors.Where(
             error => error.Message.Contains("Null-coalescing requires", StringComparison.Ordinal)));
@@ -1389,20 +1389,20 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericMethodGroupCosts_UseSubstitutedSignatures()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Map:pub}<T> (T:value) -> T
+            §M{SafeConsumption}
+              §F{Map:pub}<T> (T:value) -> T
                 §E{}
                 §R value
-              §F{f2:Map:pub} (object:value) -> object
+              §F{Map:pub} (object:value) -> object
                 §E{}
                 §R value
-              §F{f3:Use:pub} (Func<str,str>:map) -> i32
+              §F{Use:pub} (Func<str,str>:map) -> i32
                 §E{}
                 §R 1
-              §F{f4:Use:pub} (Func<object,object>:map) -> str
+              §F{Use:pub} (Func<object,object>:map) -> str
                 §E{}
                 §R "wide"
-              §F{f5:Probe:pub} () -> str
+              §F{Probe:pub} () -> str
                 §E{}
                 §R (?? §C{Use} §A Map §/C "fallback")
             """);
@@ -1415,10 +1415,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void DirectCalls_RejectByRefWideningAndInvalidNamedOrdering()
     {
         var refResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Mutate:pub} (f64:value:ref) -> void
+            §M{SafeConsumption}
+              §F{Mutate:pub} (f64:value:ref) -> void
                 §E{}
-              §F{f2:Probe:pub} (i32:value:ref) -> void
+              §F{Probe:pub} (i32:value:ref) -> void
                 §E{}
                 §C{Mutate} §A{ref} value §/C
             """);
@@ -1426,11 +1426,11 @@ public sealed class SafeConsumptionTypeCheckerTests
             diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
 
         var namedResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Take:pub} (i32:left, i32:right) -> i32
+            §M{SafeConsumption}
+              §F{Take:pub} (i32:left, i32:right) -> i32
                 §E{}
                 §R left
-              §F{f2:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 §R §C{Take} §A[right] 2 §A 1 §/C
             """);
@@ -1442,16 +1442,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void FailedContextualOverloads_ReportNoMatchingOverload()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (Func<i32,i32>:map) -> i32
+            §M{SafeConsumption}
+              §F{Pick:pub} (Func<i32,i32>:map) -> i32
                 §E{}
                 §R §C{map} §A 1 §/C
-              §F{f2:Pick:pub} (Func<str,i32>:map) -> i32
+              §F{Pick:pub} (Func<str,i32>:map) -> i32
                 §E{}
                 §R 1
-              §F{f3:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
-                §R §C{Pick} §A §LAM{l1:x:i32} "wrong" §/LAM{l1} §/C
+                §R §C{Pick} §A §LAM{x:i32} "wrong" §/LAM §/C
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -1462,13 +1462,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericCalls_InferTypeArgumentsFromLambdaResults()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Make:pub}<T> (Func<T>:factory) -> T
+            §M{SafeConsumption}
+              §F{Make:pub}<T> (Func<T>:factory) -> T
                 §E{}
                 §R §C{factory} §/C
-              §F{f2:Probe:pub} () -> str
+              §F{Probe:pub} () -> str
                 §E{}
-                §R §C{Make} §A §LAM{l1} 1 §/LAM{l1} §/C
+                §R §C{Make} §A §LAM{} 1 §/LAM §/C
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -1479,15 +1479,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ForFuncRequiresAReturnValue()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Identity:pub} (i32:value) -> i32
+            §M{SafeConsumption}
+              §F{Identity:pub} (i32:value) -> i32
                 §E{}
                 §R value
-              §F{f2:Probe:pub} () -> void
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
+                §B{factory:Func<i32>} §LAM{}
                   §C{Identity} §A 1 §/C
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -1498,13 +1498,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ForFuncRequiresAllPathsToReturn()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<bool,i32>} §LAM{l1:flag:bool}
-                  §IF{if1} flag
+                §B{factory:Func<bool,i32>} §LAM{flag:bool}
+                  §IF flag
                     §R 1
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -1515,13 +1515,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericCalls_InferLambdaResultsInsideParameterScope()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Apply:pub}<T,U> (T:value, Func<T,U>:map) -> U
+            §M{SafeConsumption}
+              §F{Apply:pub}<T,U> (T:value, Func<T,U>:map) -> U
                 §E{}
                 §R §C{map} §A value §/C
-              §F{f2:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
-                §R §C{Apply} §A 1 §A §LAM{l1:x} x §/LAM{l1} §/C
+                §R §C{Apply} §A 1 §A §LAM{x} x §/LAM §/C
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1531,16 +1531,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericCalls_InferLambdaResultsFromLocalBindings()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Make:pub}<T> (Func<T>:factory) -> T
+            §M{SafeConsumption}
+              §F{Make:pub}<T> (Func<T>:factory) -> T
                 §E{}
                 §R §C{factory} §/C
-              §F{f2:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
-                §R §C{Make} §A §LAM{l1}
+                §R §C{Make} §A §LAM{}
                   §B{x:i32} 1
                   §R x
-                §/LAM{l1} §/C
+                §/LAM §/C
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1550,18 +1550,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericCalls_ExcludeNestedLambdaReturnsFromOuterInference()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Make:pub}<T> (Func<T>:factory) -> T
+            §M{SafeConsumption}
+              §F{Make:pub}<T> (Func<T>:factory) -> T
                 §E{}
                 §R §C{factory} §/C
-              §F{f2:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
-                §R §C{Make} §A §LAM{l1}
-                  §B{nested:Func<str>} §LAM{l2}
+                §R §C{Make} §A §LAM{}
+                  §B{nested:Func<str>} §LAM{}
                     §R "nested"
-                  §/LAM{l2}
+                  §/LAM
                   §R 1
-                §/LAM{l1} §/C
+                §/LAM §/C
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1571,16 +1571,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ExhaustiveMatchCanDefinitelyReturn()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<i32,i32>} §LAM{l1:value:i32}
-                  §W{m1} value
+                §B{factory:Func<i32,i32>} §LAM{value:i32}
+                  §W value
                     §K 0
                       §R 1
                     §K _
                       §R 2
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1590,15 +1590,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ReturningTryWithFinallyCanDefinitelyReturn()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §TR{t1}
+                §B{factory:Func<i32>} §LAM{}
+                  §TR
                     §R 1
                   §FI
                     §P "cleanup"
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1608,13 +1608,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_UnconditionalLoopCanDefinitelyNotReturn()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
+                §B{factory:Func<i32>} §LAM{}
+                  §WH true
                     §P "loop"
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1624,14 +1624,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_UnconditionalDoWhileCanDefinitelyNotReturn()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §DO{d1}
+                §B{factory:Func<i32>} §LAM{}
+                  §DO
                     §P "loop"
-                  §/DO{d1} true
-                §/LAM{l1}
+                  §/DO true
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1641,14 +1641,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_DoWhileWithReturningBodyDefinitelyReturns()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §DO{d1}
+                §B{factory:Func<i32>} §LAM{}
+                  §DO
                     §R 1
-                  §/DO{d1} false
-                §/LAM{l1}
+                  §/DO false
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1658,14 +1658,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_UnconditionalLoopWithNestedBreakMustReturn()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
-                    §UNSAFE{u1}
+                §B{factory:Func<i32>} §LAM{}
+                  §WH true
+                    §UNSAFE
                       §BK
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -1676,14 +1676,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_UnreachableLoopExitAfterReturnDoesNotFallThrough()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
+                §B{factory:Func<i32>} §LAM{}
+                  §WH true
                     §R 1
                     §BK
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1693,14 +1693,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ReturnAfterReachableLoopExitIsUnreachable()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
+                §B{factory:Func<i32>} §LAM{}
+                  §WH true
                     §BK
                     §R 1
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -1711,15 +1711,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_UnconditionalLoopWithGotoMustReturn()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
+                §B{factory:Func<i32>} §LAM{}
+                  §WH true
                     §GOTO{done}
                   §LABEL{done}
                   §P "done"
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -1730,21 +1730,21 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoAcrossDeeplyNestedLoopsMustReturn()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
-                    §WH{w2} true
-                      §WH{w3} true
-                        §WH{w4} true
-                          §WH{w5} true
-                            §WH{w6} true
-                              §WH{w7} true
+                §B{factory:Func<i32>} §LAM{}
+                  §WH true
+                    §WH true
+                      §WH true
+                        §WH true
+                          §WH true
+                            §WH true
+                              §WH true
                                 §GOTO{done}
                   §LABEL{done}
                   §P "done"
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -1755,14 +1755,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_UnconditionalLoopWithInternalGotoDoesNotReturn()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
+                §B{factory:Func<i32>} §LAM{}
+                  §WH true
                     §LABEL{again}
                     §GOTO{again}
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1772,15 +1772,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ForwardGotoWithinLoopRemainsInsideLoop()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
+                §B{factory:Func<i32>} §LAM{}
+                  §WH true
                     §GOTO{again}
                     §LABEL{again}
                     §P "loop"
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1790,14 +1790,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ForwardGotoFollowsLocalReturnTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
+                §B{factory:Func<i32>} §LAM{}
                   §GOTO{done}
                   §LABEL{done}
                   §R 1
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1807,15 +1807,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ForwardGotoDoesNotResumeAtSkippedReturn()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
+                §B{factory:Func<i32>} §LAM{}
                   §GOTO{done}
                   §R 1
                   §LABEL{done}
                   §P "done"
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -1826,16 +1826,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_NestedGotoFollowsEnclosingReturnTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<bool,i32>} §LAM{l1:flag:bool}
-                  §IF{if1} flag
+                §B{factory:Func<bool,i32>} §LAM{flag:bool}
+                  §IF flag
                     §GOTO{done}
                   §R 1
                   §LABEL{done}
                   §R 2
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1845,17 +1845,17 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoCaseInsideLoopMatchDoesNotExitLoop()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
-                    §W{m1} 1
+                §B{factory:Func<i32>} §LAM{}
+                  §WH true
+                    §W 1
                       §K 1
                         §GOTO{CASE:2}
                       §K 2
                         §P "loop"
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1865,18 +1865,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoCaseFollowsReturningTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §W{m1} 1
+                §B{factory:Func<i32>} §LAM{}
+                  §W 1
                     §K 1
                       §GOTO{CASE:2}
                     §K 2
                       §R 2
                     §K _
                       §R 0
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1886,18 +1886,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoCharacterCaseFollowsReturningTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §W{m1} 'a'
+                §B{factory:Func<i32>} §LAM{}
+                  §W 'a'
                     §K 'a'
                       §GOTO{CASE:'b'}
                     §K 'b'
                       §R 2
                     §K _
                       §R 0
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1907,18 +1907,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoNullCaseFollowsReturningTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (?str:input) -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §W{m1} input
+                §B{factory:Func<i32>} §LAM{}
+                  §W input
                     §K "x"
                       §GOTO{CASE:null}
                     §K null
                       §R 2
                     §K _
                       §R 0
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1928,18 +1928,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoBooleanCaseFollowsReturningTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (bool:input) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (bool:input) -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §W{m1} input
+                §B{factory:Func<i32>} §LAM{}
+                  §W input
                     §K false
                       §GOTO{CASE:true}
                     §K true
                       §R 2
                     §K _
                       §R 0
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1949,18 +1949,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoCaseUsesConvertedIntegralValue()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (u32:input) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (u32:input) -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §W{m1} input
+                §B{factory:Func<i32>} §LAM{}
+                  §W input
                     §K UINT:1
                       §GOTO{CASE:2}
                     §K UINT:2
                       §R 2
                     §K _
                       §R 0
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1970,18 +1970,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoCaseConvertsIntegralValueToCharacter()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §W{m1} 'a'
+                §B{factory:Func<i32>} §LAM{}
+                  §W 'a'
                     §K 'a'
                       §GOTO{CASE:98}
                     §K 'b'
                       §R 2
                     §K _
                       §R 0
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1991,18 +1991,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoCaseConvertsIntegralValueToNullableCharacter()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?char:input) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (?char:input) -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §W{m1} input
+                §B{factory:Func<i32>} §LAM{}
+                  §W input
                     §K 'a'
                       §GOTO{CASE:98}
                     §K 'b'
                       §R 2
                     §K _
                       §R 0
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -2012,18 +2012,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoCaseConvertsCharacterLabelToIntegralValue()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (i32:input) -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} (i32:input) -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §W{m1} input
+                §B{factory:Func<i32>} §LAM{}
+                  §W input
                     §K 1
                       §GOTO{CASE:98}
                     §K 'b'
                       §R 2
                     §K _
                       §R 0
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -2033,13 +2033,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_NestedMatchUsesCachedLocalTargetType()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<bool,i32>} §LAM{l1:flag:bool}
-                  §IF{i1} flag
+                §B{factory:Func<bool,i32>} §LAM{flag:bool}
+                  §IF flag
                     §B{c:char} 'a'
-                    §W{m1} c
+                    §W c
                       §K 'a'
                         §GOTO{CASE:98}
                       §K 'b'
@@ -2048,7 +2048,7 @@ public sealed class SafeConsumptionTypeCheckerTests
                         §R 0
                   §EL
                     §R 2
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -2058,12 +2058,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_TryMatchUsesCachedTargetType()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §TR{t1}
-                    §W{m1} 'a'
+                §B{factory:Func<i32>} §LAM{}
+                  §TR
+                    §W 'a'
                       §K 'a'
                         §GOTO{CASE:98}
                       §K 'b'
@@ -2072,7 +2072,7 @@ public sealed class SafeConsumptionTypeCheckerTests
                         §R 0
                   §FI
                     §P "finally"
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -2082,18 +2082,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoCaseCannotTargetGuardedArm()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §W{m1} 1
+                §B{factory:Func<i32>} §LAM{}
+                  §W 1
                     §K 1
                       §GOTO{CASE:2}
                     §K 2 §WHEN false
                       §R 2
                     §K _
                       §R 0
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2104,18 +2104,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void VoidStatementLambda_ReportsGuardedGotoCaseTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{action:Action<i32>} §LAM{l1:x:i32}
-                  §W{m1} x
+                §B{action:Action<i32>} §LAM{x:i32}
+                  §W x
                     §K 1
                       §GOTO{CASE:2}
                     §K 2 §WHEN false
                       §P "two"
                     §K _
                       §P "other"
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2126,15 +2126,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_BreakInsideLoopMatchDoesNotExitLoop()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
-                    §W{m1} 1
+                §B{factory:Func<i32>} §LAM{}
+                  §WH true
+                    §W 1
                       §K 1
                         §BK
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -2144,15 +2144,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ReturnAfterMatchBreakIsUnreachable()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §W{m1} 1
+                §B{factory:Func<i32>} §LAM{}
+                  §W 1
                     §K _
                       §BK
                       §R 1
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2163,12 +2163,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ContinueOutsideLoopDoesNotCompleteLambda()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
+                §B{factory:Func<i32>} §LAM{}
                   §CN
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2179,12 +2179,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void VoidStatementLambda_ContinueOutsideLoopIsInvalid()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{action:Action<i32>} §LAM{l1:x:i32}
+                §B{action:Action<i32>} §LAM{x:i32}
                   §CN
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2195,12 +2195,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void VoidStatementLambda_BreakOutsideLoopIsInvalid()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{action:Action<i32>} §LAM{l1:x:i32}
+                §B{action:Action<i32>} §LAM{x:i32}
                   §BK
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2211,12 +2211,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_RethrowOutsideCatchIsInvalid()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
+                §B{factory:Func<i32>} §LAM{}
                   §RT
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2227,13 +2227,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void VoidStatementLambda_RethrowInsideForIsInvalid()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{action:Action<i32>} §LAM{l1:x:i32}
-                  §L{loop:i:0:1:1}
+                §B{action:Action<i32>} §LAM{x:i32}
+                  §L{i:0:1:1}
                     §RT
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2244,12 +2244,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void UncontextualizedLambda_RethrowOutsideCatchIsInvalid()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §C{System.Threading.Tasks.Task.Run} §A §LAM{l1}
+                §C{System.Threading.Tasks.Task.Run} §A §LAM{}
                   §RT
-                §/LAM{l1} §/C
+                §/LAM §/C
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2260,12 +2260,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void UncontextualizedLambda_ContinueOutsideLoopIsInvalid()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §C{System.Threading.Tasks.Task.Run} §A §LAM{l1}
+                §C{System.Threading.Tasks.Task.Run} §A §LAM{}
                   §CN
-                §/LAM{l1} §/C
+                §/LAM §/C
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2276,17 +2276,17 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void NestedLambdaInsideTry_PreservesControlFlowDiagnostic()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{cw}
-                §B{outer:Action<i32>} §LAM{l1:x:i32}
-                  §TR{t1}
-                    §B{inner:Action<i32>} §LAM{l2:y:i32}
+                §B{outer:Action<i32>} §LAM{x:i32}
+                  §TR
+                    §B{inner:Action<i32>} §LAM{y:i32}
                       §RT
-                    §/LAM{l2}
+                    §/LAM
                   §FI
                     §P "finally"
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2300,18 +2300,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ContextualLambdaReturnInsideTry_IsValidated()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Make:pub}<T> (Func<T>:factory) -> T
+            §M{SafeConsumption}
+              §F{Make:pub}<T> (Func<T>:factory) -> T
                 §E{}
                 §R §C{factory} §/C
-              §F{f2:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{cw}
-                §R §C{Make} §A §LAM{l1}
-                  §TR{t1}
+                §R §C{Make} §A §LAM{}
+                  §TR
                     §R "bad"
                   §FI
                     §P "done"
-                §/LAM{l1} §/C
+                §/LAM §/C
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2322,15 +2322,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void VoidStatementLambda_CatchFilterMustBeBoolean()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{cw}
-                §B{action:Action<i32>} §LAM{l1:x:i32}
-                  §TR{t1}
+                §B{action:Action<i32>} §LAM{x:i32}
+                  §TR
                     §P "try"
                   §CA{Exception:ex} §WHEN 1
                     §P "catch"
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2341,17 +2341,17 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoCannotLeaveFinally()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §TR{t1}
+                §B{factory:Func<i32>} §LAM{}
+                  §TR
                     §P "try"
                   §FI
                     §GOTO{done}
                   §LABEL{done}
                   §R 1
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2362,15 +2362,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ReturnCannotLeaveFinally()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §TR{t1}
+                §B{factory:Func<i32>} §LAM{}
+                  §TR
                     §P "try"
                   §FI
                     §R 1
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2381,15 +2381,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ThrowCanTerminateFinally()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §TR{t1}
+                §B{factory:Func<i32>} §LAM{}
+                  §TR
                     §P "try"
                   §FI
                     §TH STR:"boom"
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -2399,16 +2399,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ContinueCannotLeaveFinally()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
-                    §TR{t1}
+                §B{factory:Func<i32>} §LAM{}
+                  §WH true
+                    §TR
                       §P "try"
                     §FI
                       §CN
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2419,16 +2419,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_BreakCannotLeaveFinally()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+            §M{SafeConsumption}
+              §F{Probe:pub} () -> void
                 §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
-                    §TR{t1}
+                §B{factory:Func<i32>} §LAM{}
+                  §WH true
+                    §TR
                       §P "try"
                     §FI
                       §BK
-                §/LAM{l1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2439,10 +2439,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MethodGroupParameters_SupportReferenceDelegateVariance()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Use:pub} (Func<object>:factory) -> void
+            §M{SafeConsumption}
+              §F{Use:pub} (Func<object>:factory) -> void
                 §E{}
-              §F{f2:Probe:pub} () -> void
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{action:Action<Func<str>>} Use
             """);
@@ -2454,10 +2454,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MethodGroupParameters_SupportNestedDelegateReturnVariance()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Use:pub} (Func<Func<object>>:factory) -> void
+            §M{SafeConsumption}
+              §F{Use:pub} (Func<Func<object>>:factory) -> void
                 §E{}
-              §F{f2:Probe:pub} () -> void
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{action:Action<Func<Func<str>>>} Use
             """);
@@ -2469,16 +2469,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MethodGroupParameters_RejectDistinctNamedDelegates()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §DEL{d1:First:pub}
+            §M{SafeConsumption}
+              §DEL{First:pub}
                 §I{str:value}
                 §O{void}
-              §DEL{d2:Second:pub}
+              §DEL{Second:pub}
                 §I{str:value}
                 §O{void}
-              §F{f1:Use:pub} (First:callback) -> void
+              §F{Use:pub} (First:callback) -> void
                 §E{}
-              §F{f2:Probe:pub} () -> void
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{action:Action<Second>} Use
             """);
@@ -2491,10 +2491,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MethodGroupParameters_RejectWideningAndBoxing()
     {
         var widening = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Widen:pub} (f64:value) -> void
+            §M{SafeConsumption}
+              §F{Widen:pub} (f64:value) -> void
                 §E{}
-              §F{f2:Probe:pub} () -> void
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{action:Action<i32>} Widen
             """);
@@ -2502,10 +2502,10 @@ public sealed class SafeConsumptionTypeCheckerTests
             diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
 
         var boxing = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Box:pub} (object:value) -> void
+            §M{SafeConsumption}
+              §F{Box:pub} (object:value) -> void
                 §E{}
-              §F{f2:Probe:pub} () -> void
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{action:Action<i32>} Box
             """);
@@ -2517,16 +2517,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MethodGroupRanking_RejectsParetoIncomparableCandidates()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (str:left, object:right) -> i32
+            §M{SafeConsumption}
+              §F{Pick:pub} (str:left, object:right) -> i32
                 §E{}
                 §R left.Length
-              §F{f2:Pick:pub} (object:left, str:right) -> i32
+              §F{Pick:pub} (object:left, str:right) -> i32
                 §E{}
                 §R right.Length
-              §F{f3:Take:pub} (Func<str,str,i32>:picker) -> void
+              §F{Take:pub} (Func<str,str,i32>:picker) -> void
                 §E{}
-              §F{f4:Probe:pub} () -> void
+              §F{Probe:pub} () -> void
                 §E{}
                 §C{Take} §A Pick §/C
             """);
@@ -2539,8 +2539,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void DelegateCalls_RejectPositionalArgumentsAfterOutOfPositionNamedArguments()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (Func<i32,i32,i32>:combine) -> i32
+            §M{SafeConsumption}
+              §F{Probe:pub} (Func<i32,i32,i32>:combine) -> i32
                 §E{}
                 §R §C{combine} §A[arg2] 2 §A 1 §/C
             """);
@@ -2553,14 +2553,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MethodGroupRanking_DoesNotUseReturnTypeIdentity()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Value:pub} (f64:value) -> object
+            §M{SafeConsumption}
+              §F{Value:pub} (f64:value) -> object
                 §E{}
                 §R value
-              §F{f2:Value:pub} (decimal:value) -> str
+              §F{Value:pub} (decimal:value) -> str
                 §E{}
                 §R "value"
-              §F{f3:Probe:pub} () -> void
+              §F{Probe:pub} () -> void
                 §E{}
                 §B{factory:Func<char,object>} Value
             """);
@@ -2573,16 +2573,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ImplicitLambda_UsesAnonymousFunctionBetterConversion()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (Func<object,i32>:map) -> str
+            §M{SafeConsumption}
+              §F{Pick:pub} (Func<object,i32>:map) -> str
                 §E{}
                 §R "object"
-              §F{f2:Pick:pub} (Func<str,i32>:map) -> i32
+              §F{Pick:pub} (Func<str,i32>:map) -> i32
                 §E{}
                 §R 1
-              §F{f3:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
-                §R §C{Pick} §A §LAM{l1:x} 1 §/LAM{l1} §/C
+                §R §C{Pick} §A §LAM{x} 1 §/LAM §/C
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2596,11 +2596,11 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void InvalidCoalesce_HasTheSameOwnedDiagnosticAcrossConsumers(string body)
     {
         var source = $$"""
-            §M{m:M}
-              §F{take:Take:pub} (i32:value) -> i32
+            §M{M}
+              §F{Take:pub} (i32:value) -> i32
                 §E{}
                 §R value
-              §F{probe:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §E{}
                 {{body}}
             """;
@@ -2615,11 +2615,11 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void CallArgumentPattern_DoesNotLeakIntoTheEnclosingScope()
     {
         var result = Check("""
-            §M{m:M}
-              §F{take:Take:pub} (bool:value) -> bool
+            §M{M}
+              §F{Take:pub} (bool:value) -> bool
                 §E{}
                 §R value
-              §F{probe:Probe:pub} (?str:input) -> str
+              §F{Probe:pub} (?str:input) -> str
                 §E{}
                 §B{result} §C{Take} §A (is input str text) §/C
                 §R text

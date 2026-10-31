@@ -124,8 +124,8 @@ public class NegativeVerificationTests
     public void SafeCode_ConstantSqlQuery_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeQuery:pub}
+§M{Test}
+  §F{SafeQuery:pub}
       §O{string}
       §E{db:w}
       §B{query:string} STR:""SELECT * FROM users WHERE id = 1""
@@ -141,8 +141,8 @@ public class NegativeVerificationTests
     public void SafeCode_ParameterizedQuery_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeParameterizedQuery:pub}
+§M{Test}
+  §F{SafeParameterizedQuery:pub}
       §I{string:user_input}
       §O{string}
       §E{db:w}
@@ -167,8 +167,8 @@ public class NegativeVerificationTests
         // Major>=2 and the §R query trips Calor0273 — either would send
         // this test silently through Skip.If. Preserves the taint intent.
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeSanitized:pub}
+§M{Test}
+  §F{SafeSanitized:pub}
       §I{string:user_input}
       §O{?string}
       §E{db:w}
@@ -188,8 +188,8 @@ public class NegativeVerificationTests
     {
         // §B target + §O relaxed :string → :?string; see SafeCode_SanitizedInput.
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeHtml:pub}
+§M{Test}
+  §F{SafeHtml:pub}
       §I{string:user_input}
       §O{?string}
       §E{net:w}
@@ -206,8 +206,8 @@ public class NegativeVerificationTests
     public void SafeCode_NoUserInput_NoTaintWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeNoUserInput:pub}
+§M{Test}
+  §F{SafeNoUserInput:pub}
       §I{i32:count}
       §O{i32}
       §R count";
@@ -220,8 +220,8 @@ public class NegativeVerificationTests
     public void SafeCode_InternalDataOnly_NoTaintWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeInternalData:pub}
+§M{Test}
+  §F{SafeInternalData:pub}
       §O{string}
       §E{db:w}
       §B{name:string} STR:""admin""
@@ -243,12 +243,12 @@ public class NegativeVerificationTests
     public void SafeCode_DivisionWithGuard_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeDivWithGuard:pub}
+§M{Test}
+  §F{SafeDivWithGuard:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
-      §IF{if1} (!= y INT:0)
+      §IF (!= y INT:0)
           §R (/ x y)
       §EL
           §R INT:0";
@@ -260,8 +260,8 @@ public class NegativeVerificationTests
     public void SafeCode_DivisionByLiteralNonZero_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeDivByLiteral:pub}
+§M{Test}
+  §F{SafeDivByLiteral:pub}
       §I{i32:x}
       §O{i32}
       §R (/ x INT:2)";
@@ -277,8 +277,8 @@ public class NegativeVerificationTests
         // is always non-zero. The current analysis is conservative and warns about
         // any variable division without explicit guards.
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeDivByConstant:pub}
+§M{Test}
+  §F{SafeDivByConstant:pub}
       §I{i32:x}
       §O{i32}
       §B{divisor} INT:10
@@ -292,8 +292,8 @@ public class NegativeVerificationTests
     public void SafeCode_ModuloByLiteralNonZero_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeModulo:pub}
+§M{Test}
+  §F{SafeModulo:pub}
       §I{i32:x}
       §O{i32}
       §R (% x INT:7)";
@@ -306,11 +306,11 @@ public class NegativeVerificationTests
     {
         // Note: Using constant bound (10) because parser doesn't support variable bounds
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeDivInLoop:pub}
+§M{Test}
+  §F{SafeDivInLoop:pub}
       §O{i32}
       §B{result} INT:0
-      §L{l1:i:1:10:1}
+      §L{i:1:10:1}
           §B{result:i32} (+ result (/ INT:100 i))
       §R result";
 
@@ -323,13 +323,13 @@ public class NegativeVerificationTests
     public void SafeCode_DivisionAfterAbsoluteValue_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeDivAfterAbs:pub}
+§M{Test}
+  §F{SafeDivAfterAbs:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
       §B{absY:i32} (CALL math.abs y)
-      §IF{if1} (> absY INT:0)
+      §IF (> absY INT:0)
           §R (/ x absY)
       §EL
           §R INT:0";
@@ -345,11 +345,11 @@ public class NegativeVerificationTests
     public void SafeCode_NullCheckBeforeUse_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeNullCheck:pub}
+§M{Test}
+  §F{SafeNullCheck:pub}
       §I{string:maybeNull}
       §O{i32}
-      §IF{if1} (!= maybeNull null)
+      §IF (!= maybeNull null)
           §R (CALL string.length maybeNull)
       §EL
           §R INT:0";
@@ -362,12 +362,12 @@ public class NegativeVerificationTests
     {
         // Note: This test verifies null checking doesn't produce warnings
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeOptionMatch:pub}
+§M{Test}
+  §F{SafeOptionMatch:pub}
       §I{i32:value}
       §O{i32}
       §B{opt:i32} value
-      §IF{if1} (!= opt INT:0)
+      §IF (!= opt INT:0)
           §R opt
       §EL
           §R INT:0";
@@ -379,8 +379,8 @@ public class NegativeVerificationTests
     public void SafeCode_NonNullableParameter_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeNonNullable:pub}
+§M{Test}
+  §F{SafeNonNullable:pub}
       §I{i32:x}
       §O{i32}
       §R (+ x INT:1)";
@@ -394,8 +394,8 @@ public class NegativeVerificationTests
     {
         // §B target + §O relaxed :string → :?string; see SafeCode_SanitizedInput.
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeDefaultValue:pub}
+§M{Test}
+  §F{SafeDefaultValue:pub}
       §I{string:input}
       §O{?string}
       §B{result:?string} (CALL coalesce input STR:""default"")
@@ -414,11 +414,11 @@ public class NegativeVerificationTests
     {
         // Note: Using constant bound (10) because parser doesn't support variable bounds
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeLoopBounds:pub}
+§M{Test}
+  §F{SafeLoopBounds:pub}
       §O{i32}
       §B{sum} INT:0
-      §L{l1:i:0:10:1}
+      §L{i:0:10:1}
           §B{sum:i32} (+ sum i)
       §R sum";
 
@@ -430,12 +430,12 @@ public class NegativeVerificationTests
     public void SafeCode_BoundsCheckFirst_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeBoundsCheck:pub}
+§M{Test}
+  §F{SafeBoundsCheck:pub}
       §I{i32:index}
       §I{i32:len}
       §O{i32}
-      §IF{if1} (&& (>= index INT:0) (< index len))
+      §IF (&& (>= index INT:0) (< index len))
           §R index
       §EL
           §R INT:-1";
@@ -448,8 +448,8 @@ public class NegativeVerificationTests
     public void SafeCode_LiteralIndex_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeLiteralIndex:pub}
+§M{Test}
+  §F{SafeLiteralIndex:pub}
       §I{i32:x}
       §O{i32}
       §B{arr} INT:10
@@ -463,8 +463,8 @@ public class NegativeVerificationTests
     public void SafeCode_ClampedIndex_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeClampedIndex:pub}
+§M{Test}
+  §F{SafeClampedIndex:pub}
       §I{i32:index}
       §I{i32:maxLen}
       §O{i32}
@@ -485,8 +485,8 @@ public class NegativeVerificationTests
     {
         // Test that code initializing variables before use parses and binds correctly
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeInitialized:pub}
+§M{Test}
+  §F{SafeInitialized:pub}
       §I{i32:x}
       §O{i32}
       §B{result} INT:0
@@ -504,12 +504,12 @@ public class NegativeVerificationTests
     {
         // Test that code with all paths initializing variables parses correctly
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeAllPathsInit:pub}
+§M{Test}
+  §F{SafeAllPathsInit:pub}
       §I{i32:x}
       §O{i32}
       §B{result} INT:0
-      §IF{if1} (> x INT:0)
+      §IF (> x INT:0)
           §B{result} INT:1
       §EL
           §B{result} INT:-1
@@ -525,8 +525,8 @@ public class NegativeVerificationTests
     {
         // Test that parameters are always considered initialized
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeParameterInit:pub}
+§M{Test}
+  §F{SafeParameterInit:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -541,11 +541,11 @@ public class NegativeVerificationTests
     public void Binding_NullExpression_ProducesBoundNullLiteral()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:TestNone:pub}
+§M{Test}
+  §F{TestNone:pub}
       §I{string:maybeNull}
       §O{i32}
-      §IF{if1} (!= maybeNull null)
+      §IF (!= maybeNull null)
           §R INT:1
       §EL
           §R INT:0";
@@ -591,8 +591,8 @@ public class NegativeVerificationTests
         // The call must appear directly as the divisor so Z3 can translate it
         // (the translator doesn't follow variable initializers)
         var source = @"
-§M{m001:Test}
-  §F{f001:ClampDiv:pub}
+§M{Test}
+  §F{ClampDiv:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -607,12 +607,12 @@ public class NegativeVerificationTests
         // math.sign(y) can be zero when y == 0, so a guard is needed
         // The call must appear directly as the divisor so Z3 can translate it
         var source = @"
-§M{m001:Test}
-  §F{f001:SignDiv:pub}
+§M{Test}
+  §F{SignDiv:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
-      §IF{if1} (!= y INT:0)
+      §IF (!= y INT:0)
           §R (/ x (CALL math.sign y))
       §EL
           §R INT:0";
@@ -625,13 +625,13 @@ public class NegativeVerificationTests
     {
         // Constant declared inside an if block — requires deep constant propagation
         var source = @"
-§M{m001:Test}
-  §F{f001:DeepConst:pub}
+§M{Test}
+  §F{DeepConst:pub}
       §I{i32:x}
       §I{i32:flag}
       §O{i32}
       §B{result} INT:0
-      §IF{if1} (> flag INT:0)
+      §IF (> flag INT:0)
           §B{divisor:i32} INT:5
           §B{result:i32} (/ x divisor)
       §R result";
@@ -644,12 +644,12 @@ public class NegativeVerificationTests
     {
         // Constant declared inside a for-loop body — requires recursive FindVariableInitializer
         var source = @"
-§M{m001:Test}
-  §F{f001:LoopConst:pub}
+§M{Test}
+  §F{LoopConst:pub}
       §I{i32:x}
       §O{i32}
       §B{result} INT:0
-      §L{l1:i:0:3:1}
+      §L{i:0:3:1}
           §B{divisor:i32} INT:7
           §B{result:i32} (+ result (/ x divisor))
       §R result";
@@ -665,19 +665,19 @@ public class NegativeVerificationTests
     public void SafeCode_ComplexControlFlow_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeComplexFlow:pub}
+§M{Test}
+  §F{SafeComplexFlow:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
       §B{result} INT:0
-      §IF{if1} (> x INT:0)
-          §IF{if2} (> y INT:0)
+      §IF (> x INT:0)
+          §IF (> y INT:0)
               §B{result:i32} (+ x y)
           §EL
               §B{result:i32} x
       §EL
-          §IF{if3} (> y INT:0)
+          §IF (> y INT:0)
               §B{result:i32} y
           §EL
               §B{result} INT:0
@@ -704,12 +704,12 @@ public class NegativeVerificationTests
     {
         // Note: Using constant bounds because parser doesn't support variable bounds
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeNestedLoops:pub}
+§M{Test}
+  §F{SafeNestedLoops:pub}
       §O{i32}
       §B{sum} INT:0
-      §L{l1:i:1:5:1}
-          §L{l2:j:1:5:1}
+      §L{i:1:5:1}
+          §L{j:1:5:1}
               §B{sum:i32} (+ sum (* i j))
       §R sum";
 
@@ -732,8 +732,8 @@ public class NegativeVerificationTests
     public void SafeCode_MixedOperations_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeMixedOps:pub}
+§M{Test}
+  §F{SafeMixedOps:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -764,8 +764,8 @@ public class NegativeVerificationTests
     public void SafeCode_EmptyFunction_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:EmptyFunc:pub}
+§M{Test}
+  §F{EmptyFunc:pub}
       §O{void}";
 
         var bound = Bind(source, out var parseDiag);
@@ -782,8 +782,8 @@ public class NegativeVerificationTests
     public void SafeCode_SingleStatement_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SingleStmt:pub}
+§M{Test}
+  §F{SingleStmt:pub}
       §I{i32:x}
       §O{i32}
       §R x";
@@ -802,13 +802,13 @@ public class NegativeVerificationTests
     public void SafeCode_MultipleReturns_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:MultiReturn:pub}
+§M{Test}
+  §F{MultiReturn:pub}
       §I{i32:x}
       §O{i32}
-      §IF{if1} (< x INT:0)
+      §IF (< x INT:0)
           §R INT:0
-      §IF{if2} (> x INT:100)
+      §IF (> x INT:100)
           §R INT:100
       §R x";
 

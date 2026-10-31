@@ -35,29 +35,29 @@ public class ShadowingDifferentialTests
     {
         // Mutable-rebind accumulator (the reason #727 mirrors the emitter).
         new object[] { "accumulator",
-            "§M{m:S}\n  §F{f:Fact:pub} (i32:n) -> i32\n    §B{~result} 1\n    §B{~i} 2\n" +
-            "    §WH{w1} (<= i n)\n      §B{~result} (* result i)\n      §B{~i} (+ i 1)\n    §R result\n" },
+            "§M{S}\n  §F{Fact:pub} (i32:n) -> i32\n    §B{~result} 1\n    §B{~i} 2\n" +
+            "    §WH (<= i n)\n      §B{~result} (* result i)\n      §B{~i} (+ i 1)\n    §R result\n" },
         // Sibling (non-nested) blocks each declaring an immutable local of the same name.
         new object[] { "sibling-immutable",
-            "§M{m:S}\n  §F{f:Do:pub} (bool:a, bool:b) -> i32\n" +
-            "    §IF{i1} (== a true)\n      §B{x:i32} 1\n      §R x\n" +
-            "    §IF{i2} (== b true)\n      §B{x:i32} 2\n      §R x\n    §R 0\n" },
+            "§M{S}\n  §F{Do:pub} (bool:a, bool:b) -> i32\n" +
+            "    §IF (== a true)\n      §B{x:i32} 1\n      §R x\n" +
+            "    §IF (== b true)\n      §B{x:i32} 2\n      §R x\n    §R 0\n" },
         // A local legally shadowing a field.
         new object[] { "local-shadows-field",
-            "§M{m:S}\n  §CL{c1:Box:pub}\n    §FLD{i32:x:priv}\n" +
-            "    §MT{mt1:Do:pub} () -> i32\n      §B{x:i32} 5\n      §R x\n" },
+            "§M{S}\n  §CL{Box:pub}\n    §FLD{i32:x:priv}\n" +
+            "    §MT{Do:pub} () -> i32\n      §B{x:i32} 5\n      §R x\n" },
         // A loop variable used normally (no reuse).
         new object[] { "loop-var-ok",
-            "§M{m:S}\n  §F{f:Sum:pub} (i32:n) -> i32\n    §B{~acc} 0\n" +
-            "    §L{l1:i:0:n:1}\n      §B{~acc} (+ acc i)\n    §R acc\n" },
+            "§M{S}\n  §F{Sum:pub} (i32:n) -> i32\n    §B{~acc} 0\n" +
+            "    §L{i:0:n:1}\n      §B{~acc} (+ acc i)\n    §R acc\n" },
         // Mutable §B reusing a name across sibling blocks — each re-declares (#732).
         new object[] { "sibling-mutable-rebind",
-            "§M{m:S}\n  §F{f:Do:pub} (bool:a, bool:b) -> i32\n" +
-            "    §IF{i1} (== a true)\n      §B{~x:i32} 1\n      §R x\n" +
-            "    §IF{i2} (== b true)\n      §B{~x:i32} 2\n      §R x\n    §R 0\n" },
+            "§M{S}\n  §F{Do:pub} (bool:a, bool:b) -> i32\n" +
+            "    §IF (== a true)\n      §B{~x:i32} 1\n      §R x\n" +
+            "    §IF (== b true)\n      §B{~x:i32} 2\n      §R x\n    §R 0\n" },
         // Mutable §B rebinding a parameter — parameters are reassignable, so `x = 9;`.
         new object[] { "parameter-rebind",
-            "§M{m:S}\n  §F{f:Do:pub} (i32:x) -> i32\n    §B{~x:i32} 9\n    §R x\n" },
+            "§M{S}\n  §F{Do:pub} (i32:x) -> i32\n    §B{~x:i32} 9\n    §R x\n" },
     };
 
     [Theory]
@@ -76,53 +76,53 @@ public class ShadowingDifferentialTests
     public static IEnumerable<object[]> RejectedIdioms() => new[]
     {
         new object[] { "immutable-inner-shadow",
-            "§M{m:S}\n  §F{f:Do:pub} (bool:flag) -> i32\n    §B{~x:i32} 0\n" +
-            "    §IF{i1} (== flag true)\n      §B{x:str} \"hi\"\n      §R 0\n    §R x\n" },
+            "§M{S}\n  §F{Do:pub} (bool:flag) -> i32\n    §B{~x:i32} 0\n" +
+            "    §IF (== flag true)\n      §B{x:str} \"hi\"\n      §R 0\n    §R x\n" },
         new object[] { "loop-var-shadow",
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §L{l1:i:0:3:1}\n      §B{i:i32} 9\n      §R i\n    §R 0\n" },
+            "§M{S}\n  §F{Do:pub} () -> i32\n    §L{i:0:3:1}\n      §B{i:i32} 9\n      §R i\n    §R 0\n" },
         new object[] { "param-reuse",
-            "§M{m:S}\n  §F{f:Do:pub} (i32:x) -> i32\n    §IF{i1} (> x 0)\n      §B{x:i32} 9\n      §R x\n    §R x\n" },
+            "§M{S}\n  §F{Do:pub} (i32:x) -> i32\n    §IF (> x 0)\n      §B{x:i32} 9\n      §R x\n    §R x\n" },
         new object[] { "array-to-list",
-            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+            "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
             "    §B{lines:List<str>} §C{File.ReadAllLines} §A path §/C\n    §R (len lines)\n" },
         // Type-changing mutable rebind (#733): rejected with Calor0256 instead of
         // emitting `int x = 0; x = "hi";` (CS0029).
         new object[] { "type-changing-mutable-rebind",
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x:str} \"hi\"\n    §R 0\n" },
+            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x:str} \"hi\"\n    §R 0\n" },
         // Rebinding a §EACH iteration variable (#738): read-only in C#, so rejected
         // with Calor0257 instead of emitting `x = "y";` inside the foreach (CS1656).
         new object[] { "foreach-var-rebind",
-            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+            "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
             "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §EACH{e1:x} arr\n      §B{~x:str} \"y\"\n    §R 0\n" },
+            "    §EACH{x} arr\n      §B{~x:str} \"y\"\n    §R 0\n" },
         // Same defect via §ASSIGN rather than §B (#743 review): a write to a §EACH
         // iteration variable is CS1656 whichever assignment form spells it (Calor0257).
         new object[] { "foreach-var-assign",
-            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+            "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
             "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §EACH{e1:x} arr\n      §ASSIGN x \"y\"\n    §R 0\n" },
+            "    §EACH{x} arr\n      §ASSIGN x \"y\"\n    §R 0\n" },
         // Construct-variable-shaped row (#743 review finding 4): the LOOP variable is
         // the shadower — `int x = 0;` then `for (var x = …)` is CS0136 (Calor0255).
         new object[] { "loop-var-shadows-enclosing",
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~x} 0\n" +
-            "    §L{l1:x:0:3:1}\n      §ASSIGN x (+ x 1)\n    §R x\n" },
+            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~x} 0\n" +
+            "    §L{x:0:3:1}\n      §ASSIGN x (+ x 1)\n    §R x\n" },
         // Unannotated non-literal rebind of a mismatched value (#740): value-type
         // inference resolves the string-returning call, so `x = File.ReadAllText(p)`
         // (string → int, CS0029) is rejected with Calor0256 instead of exiting 0.
         new object[] { "unannotated-nonliteral-rebind",
-            "§M{m:S}\n  §F{f:Do:pub} (str:p) -> i32\n    §E{fs:r}\n" +
+            "§M{S}\n  §F{Do:pub} (str:p) -> i32\n    §E{fs:r}\n" +
             "    §B{~x:i32} 0\n    §B{~x} §C{File.ReadAllText} §A p §/C\n    §R 0\n" },
         // Same-scope duplicate §B (#731): `int x = 1; int x = 2;` is CS0128, rejected with
         // Calor0258 instead of exiting 0. (Safe now the converter emits reassignments as
         // §ASSIGN, not a fresh same-name §B.)
         new object[] { "same-scope-duplicate",
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{x:i32} 1\n    §B{x:i32} 2\n    §R x\n" },
+            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{x:i32} 1\n    §B{x:i32} 2\n    §R x\n" },
         // Mutable §B rebinding a §L for-loop variable (#1550): a §L loop variable is
         // read-only in Calor (only the loop advances it), so `i = 9;` is Calor0213. Before
         // 0.27 this was accepted and silently changed the iteration.
         new object[] { "for-loop-var-rebind",
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~s} 0\n" +
-            "    §L{l1:i:0:3:1}\n      §B{~i:i32} 9\n      §ASSIGN s (+ s i)\n    §R s\n" },
+            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~s} 0\n" +
+            "    §L{i:0:3:1}\n      §B{~i:i32} 9\n      §ASSIGN s (+ s i)\n    §R s\n" },
     };
 
     [Theory]
@@ -166,7 +166,7 @@ public class ShadowingDifferentialTests
         // — this miss is the same cast-needed bucket as numeric narrowing. Pins the gap
         // the AreDefinitelyIncompatible doc names.
         var (accepted, roslynErrors) = Compile(
-            "§M{m:S}\n  §F{f:Do:pub} (decimal:d) -> i32\n" +
+            "§M{S}\n  §F{Do:pub} (decimal:d) -> i32\n" +
             "    §B{~x:f64} 0.0\n    §B{~x} d\n    §R 0\n");
 
         Assert.True(accepted);

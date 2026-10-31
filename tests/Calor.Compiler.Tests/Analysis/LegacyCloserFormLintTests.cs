@@ -37,13 +37,13 @@ public class LegacyCloserFormLintTests
     [Fact]
     public void FlagsLegacyClosersWithIdPayload()
     {
-        const string src = "§M{m1:Calc}\n§/M{m1}\n";
+        const string src = "§M{Calc}\n§/M\n";
         var findings = LegacyCloserFormLint.Scan(src, "c.calr");
 
         var f = Assert.Single(findings);
         Assert.Equal("M", f.Keyword);
         Assert.Equal(2, f.Line);
-        // RemovedLength should cover §/M{m1} (8 bytes UTF-8: § is 2 bytes
+        // RemovedLength should cover §/M (8 bytes UTF-8: § is 2 bytes
         // in UTF-8, but we measure in chars internally so length is 7).
         Assert.Equal(7, f.RemovedLength);
     }
@@ -72,7 +72,7 @@ public class LegacyCloserFormLintTests
     [Fact]
     public void DoesNotFlagCollectionLiteralClosers()
     {
-        const string src = "§LIST{xs:i32}\n  §PUSH{xs} INT:1\n§/LIST{xs}\n";
+        const string src = "§LIST{xs:i32}\n  §PUSH{xs} INT:1\n§/LIST\n";
         var findings = LegacyCloserFormLint.Scan(src, "f.calr");
 
         Assert.Empty(findings);
@@ -81,7 +81,7 @@ public class LegacyCloserFormLintTests
     [Fact]
     public void DoesNotFlagPureIndentSource()
     {
-        const string src = "§M{Calc}\n  §F{add:vis=pub}\n    §I{a:i32}\n    §R a\n";
+        const string src = "§M{Calc}\n  §F{vis=pub}\n    §I{a:i32}\n    §R a\n";
         var findings = LegacyCloserFormLint.Scan(src, "g.calr");
 
         Assert.Empty(findings);

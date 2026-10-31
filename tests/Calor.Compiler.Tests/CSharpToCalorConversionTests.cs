@@ -2561,9 +2561,9 @@ public class CSharpToCalorConversionTests
     public void Parse_MethodWithVrAbbreviation_SetsVirtual()
     {
         var calorSource = """
-            §M{m1:TestModule}
-                §CL{c001:Base:pub}
-                    §MT{m001:GetName:pub:vr}
+            §M{TestModule}
+                §CL{Base:pub}
+                    §MT{GetName:pub:vr}
                         §O{str}
                         §R "base"
             """;
@@ -2584,10 +2584,10 @@ public class CSharpToCalorConversionTests
     public void Parse_MethodWithOvAbbreviation_SetsOverride()
     {
         var calorSource = """
-            §M{m1:TestModule}
-                §CL{c001:Derived:pub}
+            §M{TestModule}
+                §CL{Derived:pub}
                     §EXT{Base}
-                    §MT{m001:GetName:pub:ov}
+                    §MT{GetName:pub:ov}
                         §O{str}
                         §R "derived"
             """;
@@ -2608,9 +2608,9 @@ public class CSharpToCalorConversionTests
     public void Parse_MethodWithStAbbreviation_SetsStatic()
     {
         var calorSource = """
-            §M{m1:TestModule}
-                §M{c001:Utils:pub}
-                    §MT{m001:Add:pub:st}
+            §M{TestModule}
+                §M{Utils:pub}
+                    §MT{Add:pub:st}
                         §I{i32:a}
                         §I{i32:b}
                         §O{i32}
@@ -2659,10 +2659,10 @@ public class CSharpToCalorConversionTests
     public void Parse_ClassWithStAbbreviation_SetsIsStaticTrue()
     {
         var calorSource = """
-            §M{m1:TestModule}
-                §F{main:Main:pub}
+            §M{TestModule}
+                §F{Main:pub}
                     §O{void}
-                §M{c001:Foo:pub}
+                §M{Foo:pub}
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -3788,7 +3788,7 @@ public class CSharpToCalorConversionTests
     {
         // Directly test the lexer with a large hex value
         var diagnostics = new DiagnosticBag();
-        var source = "§EN{e1:Test}\nVal = 0xFFFFFFFF\n§/EN{e1}";
+        var source = "§EN{Test}\nVal = 0xFFFFFFFF\n§/EN";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));

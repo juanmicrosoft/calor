@@ -51,8 +51,8 @@ public class DataflowAnalysisTests
     public void CFG_SimpleFunction_HasEntryAndExit()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Simple:pub}
+§M{Test}
+  §F{Simple:pub}
       §I{i32:x}
       §O{i32}
       §R x";
@@ -69,11 +69,11 @@ public class DataflowAnalysisTests
     public void CFG_IfStatement_CreatesBranches()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Conditional:pub}
+§M{Test}
+  §F{Conditional:pub}
       §I{i32:x}
       §O{i32}
-      §IF{if1} (> x INT:0)
+      §IF (> x INT:0)
           §R INT:1
       §EL
           §R INT:0";
@@ -90,12 +90,12 @@ public class DataflowAnalysisTests
     {
         // Use FOR loop since it has built-in iteration without needing ASSIGN
         var source = @"
-§M{m001:Test}
-  §F{f001:Loop:pub}
+§M{Test}
+  §F{Loop:pub}
       §I{i32:n}
       §O{i32}
       §B{sum:i32} INT:0
-      §L{l1:i:0:10:1}
+      §L{i:0:10:1}
           §C{Console.WriteLine}
             §A i
           §/C
@@ -111,12 +111,12 @@ public class DataflowAnalysisTests
     public void CFG_ForLoop_CreatesProperStructure()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:ForLoop:pub}
+§M{Test}
+  §F{ForLoop:pub}
       §I{i32:n}
       §O{i32}
       §B{sum:i32} INT:0
-      §L{l1:i:0:10:1}
+      §L{i:0:10:1}
           §C{Console.WriteLine}
             §A i
           §/C
@@ -132,8 +132,8 @@ public class DataflowAnalysisTests
     public void CFG_Blocks_HaveUniqueIds()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Multi:pub}
+§M{Test}
+  §F{Multi:pub}
       §I{i32:x}
       §O{i32}
       §B{y:i32} (+ x INT:1)
@@ -154,8 +154,8 @@ public class DataflowAnalysisTests
     public void ReachingDefinitions_SingleAssignment_Reaches()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Single:pub}
+§M{Test}
+  §F{Single:pub}
       §O{i32}
       §B{x:i32} INT:42
       §R x";
@@ -174,8 +174,8 @@ public class DataflowAnalysisTests
         // Test multiple independent bindings instead of redefinition
         // since Calor doesn't support general variable reassignment
         var source = @"
-§M{m001:Test}
-  §F{f001:MultiBind:pub}
+§M{Test}
+  §F{MultiBind:pub}
       §O{i32}
       §B{x:i32} INT:1
       §B{y:i32} INT:2
@@ -195,8 +195,8 @@ public class DataflowAnalysisTests
     public void ReachingDefinitions_AllDefinitions_CollectsAll()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Multi:pub}
+§M{Test}
+  §F{Multi:pub}
       §O{i32}
       §B{x:i32} INT:1
       §B{y:i32} INT:2
@@ -214,8 +214,8 @@ public class DataflowAnalysisTests
     public void ReachingDefinitions_GetByVariable_FiltersCorrectly()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Filter:pub}
+§M{Test}
+  §F{Filter:pub}
       §O{i32}
       §B{x:i32} INT:1
       §B{y:i32} INT:2
@@ -238,8 +238,8 @@ public class DataflowAnalysisTests
     public void LiveVariables_UsedVariable_IsLive()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Used:pub}
+§M{Test}
+  §F{Used:pub}
       §I{i32:x}
       §O{i32}
       §R x";
@@ -256,12 +256,12 @@ public class DataflowAnalysisTests
     public void LiveVariables_ForLoopVariable_Analysis()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Loop:pub}
+§M{Test}
+  §F{Loop:pub}
       §I{i32:n}
       §O{i32}
       §B{sum:i32} INT:0
-      §L{l1:i:0:10:1}
+      §L{i:0:10:1}
           §C{Console.WriteLine}
             §A i
           §/C
@@ -279,8 +279,8 @@ public class DataflowAnalysisTests
     public void LiveVariables_ExitBoundary_IsEmpty()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Exit:pub}
+§M{Test}
+  §F{Exit:pub}
       §I{i32:x}
       §O{i32}
       §R x";
@@ -301,8 +301,8 @@ public class DataflowAnalysisTests
     public void UninitializedVariables_Parameter_IsInitialized()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Param:pub}
+§M{Test}
+  §F{Param:pub}
       §I{i32:x}
       §O{i32}
       §R x";
@@ -320,8 +320,8 @@ public class DataflowAnalysisTests
     public void UninitializedVariables_LocalWithInit_IsInitialized()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Local:pub}
+§M{Test}
+  §F{Local:pub}
       §O{i32}
       §B{x:i32} INT:42
       §R x";
@@ -339,8 +339,8 @@ public class DataflowAnalysisTests
     public void UninitializedVariables_ReportDiagnostics_Works()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Report:pub}
+§M{Test}
+  §F{Report:pub}
       §I{i32:x}
       §O{i32}
       §R x";
@@ -520,8 +520,8 @@ public class DataflowAnalysisTests
     public void CFG_EmptyFunction_HasEntryAndExit()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Empty:pub}
+§M{Test}
+  §F{Empty:pub}
       §O{void}";
 
         var func = GetFunction(source);
@@ -537,13 +537,13 @@ public class DataflowAnalysisTests
     public void CFG_NestedIfStatements_CreatesCorrectStructure()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Nested:pub}
+§M{Test}
+  §F{Nested:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
-      §IF{if1} (> x INT:0)
-          §IF{if2} (> y INT:0)
+      §IF (> x INT:0)
+          §IF (> y INT:0)
               §R INT:1
           §EL
               §R INT:2
@@ -561,11 +561,11 @@ public class DataflowAnalysisTests
     public void CFG_EarlyReturn_CreatesSeparateBlocks()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Early:pub}
+§M{Test}
+  §F{Early:pub}
       §I{i32:x}
       §O{i32}
-      §IF{if1} (< x INT:0)
+      §IF (< x INT:0)
           §R INT:0
       §R x";
 
@@ -580,8 +580,8 @@ public class DataflowAnalysisTests
     public void CFG_ReversePostOrder_ReturnsTopologicalOrder()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Simple:pub}
+§M{Test}
+  §F{Simple:pub}
       §I{i32:x}
       §O{i32}
       §B{y:i32} (+ x INT:1)
@@ -600,8 +600,8 @@ public class DataflowAnalysisTests
     public void CFG_ToDot_GeneratesValidOutput()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Simple:pub}
+§M{Test}
+  §F{Simple:pub}
       §I{i32:x}
       §O{i32}
       §R x";
@@ -623,13 +623,13 @@ public class DataflowAnalysisTests
     public void ReachingDefinitions_DefinitionInIfBranch_ReachesAfterMerge()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Branch:pub}
+§M{Test}
+  §F{Branch:pub}
       §I{i32:x}
       §I{bool:cond}
       §O{i32}
       §B{y:i32} INT:0
-      §IF{if1} cond
+      §IF cond
           §B{z:i32} INT:1
       §EL
           §B{z:i32} INT:2
@@ -648,12 +648,12 @@ public class DataflowAnalysisTests
     public void ReachingDefinitions_LoopDefinition_ReachesLoopHeader()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Loop:pub}
+§M{Test}
+  §F{Loop:pub}
       §I{i32:n}
       §O{i32}
       §B{sum:i32} INT:0
-      §L{l1:i:0:10:1}
+      §L{i:0:10:1}
           §C{Console.WriteLine}
             §A sum
           §/C
@@ -672,8 +672,8 @@ public class DataflowAnalysisTests
     public void ReachingDefinitions_MultipleVariables_TrackedSeparately()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Multi:pub}
+§M{Test}
+  §F{Multi:pub}
       §O{i32}
       §B{a:i32} INT:1
       §B{b:i32} INT:2
@@ -696,8 +696,8 @@ public class DataflowAnalysisTests
     public void LiveVariables_ParameterUsedInReturn_IsLiveAtEntry()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:UseParam:pub}
+§M{Test}
+  §F{UseParam:pub}
       §I{i32:x}
       §O{i32}
       §R x";
@@ -714,11 +714,11 @@ public class DataflowAnalysisTests
     public void LiveVariables_VariableUsedInCondition_IsLive()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Cond:pub}
+§M{Test}
+  §F{Cond:pub}
       §I{i32:x}
       §O{i32}
-      §IF{if1} (> x INT:0)
+      §IF (> x INT:0)
           §R INT:1
       §R INT:0";
 
@@ -734,8 +734,8 @@ public class DataflowAnalysisTests
     public void LiveVariables_MultipleUses_AllTracked()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Multi:pub}
+§M{Test}
+  §F{Multi:pub}
       §I{i32:x}
       §O{i32}
       §B{a:i32} x
@@ -758,8 +758,8 @@ public class DataflowAnalysisTests
     public void UninitializedVariables_ReportDiagnostics_EmptyForSafeCode()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Safe:pub}
+§M{Test}
+  §F{Safe:pub}
       §I{i32:x}
       §O{i32}
       §B{y:i32} (+ x INT:1)

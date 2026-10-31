@@ -89,14 +89,14 @@ public sealed class RowEscapeTableTests
     // that the only thing varying between rows is the ARGUMENT SHAPE.
     // ---------------------------------------------------------------------
     private const string Preamble = """
-        §M{m001:RowTable}
-          §F{f001:RunTwice:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+        §M{RowTable}
+          §F{RunTwice:pub}<eff e> (Func<i32>:g §E{e}) -> i32
             §E{e}
             §B{first:i32} §C{g}
             §B{second:i32} §C{g}
             §R (+ first second)
 
-          §F{f002:Beat:pub} () -> i32
+          §F{Beat:pub} () -> i32
             §E{cw}
             §P "beat"
             §R INT:1
@@ -116,64 +116,64 @@ public sealed class RowEscapeTableTests
         // ---- CHARGED on v0.15.0 — the seven controls ----
 
         data.Add(new Shape(1, "module function by simple name (module scope)", Frozen.Charged, Src("""
-          §F{f003:Twice:pub} () -> i32
+          §F{Twice:pub} () -> i32
             §E{}
             §R §C{RunTwice} §A Beat §/C
         """)));
 
         data.Add(new Shape(2, "module function module-qualified (module scope)", Frozen.Charged, Src("""
-          §F{f003:Twice:pub} () -> i32
+          §F{Twice:pub} () -> i32
             §E{}
             §R §C{RunTwice} §A RowTableModule.Beat §/C
         """)));
 
         data.Add(new Shape(3, "own rowed §FLD by simple name", Frozen.Charged, Src("""
-          §CL{c001:Holder:pub}
+          §CL{Holder:pub}
             §FLD{Func<i32>:stage:priv} §E{cw}
-            §CTOR{ctor001:pub} ()
+            §CTOR{pub} ()
               §ASSIGN stage RowTableModule.Beat
-            §MT{mt001:Twice:pub} () -> i32
+            §MT{Twice:pub} () -> i32
               §E{}
               §R §C{RunTwice} §A stage §/C
         """)));
 
         data.Add(new Shape(4, "static rowed §FLD by simple name", Frozen.Charged, Src("""
-          §CL{c001:Holder:pub}
+          §CL{Holder:pub}
             §FLD{Func<i32>:stage:priv:stat} §E{cw}
-            §CTOR{ctor001:pub} ()
+            §CTOR{pub} ()
               §ASSIGN stage RowTableModule.Beat
-            §MT{mt001:Twice:pub} () -> i32
+            §MT{Twice:pub} () -> i32
               §E{}
               §R §C{RunTwice} §A stage §/C
         """)));
 
         data.Add(new Shape(5, "local bound from such a field", Frozen.Charged, Src("""
-          §CL{c001:Holder:pub}
+          §CL{Holder:pub}
             §FLD{Func<i32>:stage:priv} §E{cw}
-            §CTOR{ctor001:pub} ()
+            §CTOR{pub} ()
               §ASSIGN stage RowTableModule.Beat
-            §MT{mt001:Twice:pub} () -> i32
+            §MT{Twice:pub} () -> i32
               §E{}
               §B{s:Func<i32>} stage
               §R §C{RunTwice} §A s §/C
         """), FrozenFixture: "W-001-middleware-stage/seeded/unregistered-resolvable-alias-control-b"));
 
         data.Add(new Shape(6, "§B-bound §LAM with its row omitted", Frozen.Charged, Src("""
-          §F{f003:Twice:pub} () -> i32
+          §F{Twice:pub} () -> i32
             §E{}
-            §B{report:Func<i32>} §LAM{lam1}
+            §B{report:Func<i32>} §LAM{}
               §P "beat"
               §R INT:1
-            §/LAM{lam1}
+            §/LAM
             §R §C{RunTwice} §A report §/C
         """), FrozenFixture: "W-002-map-and-report/seeded/unregistered-rowless-lambda-control-b"));
 
         data.Add(new Shape(7, "direct invocation of a this.-qualified field", Frozen.Charged, Src("""
-          §CL{c001:Holder:pub}
+          §CL{Holder:pub}
             §FLD{Func<i32>:stage:priv} §E{cw}
-            §CTOR{ctor001:pub} ()
+            §CTOR{pub} ()
               §ASSIGN stage RowTableModule.Beat
-            §MT{mt001:Twice:pub} () -> i32
+            §MT{Twice:pub} () -> i32
               §E{}
               §R §C{this.stage} §/C
         """), FrozenFixture: "W-004-counter-peek/seeded/unregistered-this-qualified-escape-b"));
@@ -181,55 +181,55 @@ public sealed class RowEscapeTableTests
         // ---- ESCAPED on v0.15.0 — the five S1 had to close ----
 
         data.Add(new Shape(8, "own §FLD via this.", Frozen.Escaped, Src("""
-          §CL{c001:Holder:pub}
+          §CL{Holder:pub}
             §FLD{Func<i32>:stage:priv} §E{cw}
-            §CTOR{ctor001:pub} ()
+            §CTOR{pub} ()
               §ASSIGN stage RowTableModule.Beat
-            §MT{mt001:Twice:pub} () -> i32
+            §MT{Twice:pub} () -> i32
               §E{}
               §R §C{RunTwice} §A this.stage §/C
         """), FrozenFixture: "W-001-middleware-stage/seeded/unregistered-this-qualified-escape-b"));
 
         data.Add(new Shape(9, "§PROP by simple name — no receiver at all", Frozen.Escaped, Src("""
-          §CL{c001:Holder:pub}
-            §PROP{p001:Stage:Func<i32>:pub:get,set}
-            §CTOR{ctor001:pub} ()
+          §CL{Holder:pub}
+            §PROP{Stage:Func<i32>:pub:get,set}
+            §CTOR{pub} ()
               §ASSIGN Stage RowTableModule.Beat
-            §MT{mt001:Twice:pub} () -> i32
+            §MT{Twice:pub} () -> i32
               §E{}
               §R §C{RunTwice} §A Stage §/C
         """), FrozenFixture: "W-001-middleware-stage/seeded/unregistered-property-backed-escape-b"));
 
         data.Add(new Shape(10, "own §FLD via a local alias of this", Frozen.Escaped, Src("""
-          §CL{c001:Holder:pub}
+          §CL{Holder:pub}
             §FLD{Func<i32>:stage:priv} §E{cw}
-            §CTOR{ctor001:pub} ()
+            §CTOR{pub} ()
               §ASSIGN stage RowTableModule.Beat
-            §MT{mt001:Twice:pub} () -> i32
+            §MT{Twice:pub} () -> i32
               §E{}
               §B{me:Holder} this
               §R §C{RunTwice} §A me.stage §/C
         """)));
 
         data.Add(new Shape(11, "§FLD on another instance of the same class", Frozen.Escaped, Src("""
-          §CL{c001:Holder:pub}
+          §CL{Holder:pub}
             §FLD{Func<i32>:stage:priv} §E{cw}
-            §CTOR{ctor001:pub} ()
+            §CTOR{pub} ()
               §ASSIGN stage RowTableModule.Beat
-            §MT{mt002:TwiceOf:pub} (Holder:other) -> i32
+            §MT{TwiceOf:pub} (Holder:other) -> i32
               §E{}
               §R §C{RunTwice} §A other.stage §/C
         """), FrozenFixture: "W-001-middleware-stage/seeded/unregistered-other-receiver-escape-b"));
 
         data.Add(new Shape(12, "instance method group with a parameter receiver", Frozen.Escaped, Src("""
-          §CL{c002:Ticker:pub}
-            §MT{mt010:Beat:pub} () -> i32
+          §CL{Ticker:pub}
+            §MT{Beat:pub} () -> i32
               §E{cw}
               §P "beat"
               §R INT:1
 
-          §CL{c001:Holder:pub}
-            §MT{mt002:TwiceOf:pub} (Ticker:ticker) -> i32
+          §CL{Holder:pub}
+            §MT{TwiceOf:pub} (Ticker:ticker) -> i32
               §E{}
               §R §C{RunTwice} §A ticker.Beat §/C
         """), FrozenFixture: "W-001-middleware-stage/seeded/unregistered-method-group-receiver-escape-b"));
@@ -328,12 +328,12 @@ public sealed class RowEscapeTableTests
     {
         // Disclosure 1 — inherited field, unqualified. Blocked end-to-end pre-#1137.
         var inheritedField = TestHarness.Compile(Src("""
-          §CL{c000:Base:pub}
+          §CL{Base:pub}
             §FLD{Func<i32>:stage:prot} §E{cw}
 
-          §CL{c001:Holder:pub}
+          §CL{Holder:pub}
             §EXT{Base}
-            §MT{mt001:Twice:pub} () -> i32
+            §MT{Twice:pub} () -> i32
               §E{}
               §R §C{RunTwice} §A stage §/C
         """));
@@ -342,8 +342,8 @@ public sealed class RowEscapeTableTests
         // Charged in module scope (shape 2); from a class body it additionally drew
         // a Calor0425.
         var moduleQualifiedInClass = TestHarness.Compile(Src("""
-          §CL{c001:Holder:pub}
-            §MT{mt001:Twice:pub} () -> i32
+          §CL{Holder:pub}
+            §MT{Twice:pub} () -> i32
               §E{}
               §R §C{RunTwice} §A RowTableModule.Beat §/C
         """));

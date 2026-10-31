@@ -88,8 +88,8 @@ public sealed class AgentGuidanceTests
     public void GuardDiscovery_FailedRefinementEntry_SuggestsPreconditionAndGuard()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:priv}
+            §M{Test}
+              §F{Main:priv}
                   §I{i32:x} | (>= # INT:0)
                   §O{void}
             """;
@@ -118,11 +118,11 @@ public sealed class AgentGuidanceTests
     public void GuardDiscovery_FailedProofObligation_SuggestsGuards()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{i32:x}
                   §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
+                  §PROOF{check} (>= x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -162,8 +162,8 @@ public sealed class AgentGuidanceTests
     public void TypeSuggester_ParameterUsedAsDivisor_SuggestsNonZero()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Divide:pub}
+            §M{Test}
+              §F{Divide:pub}
                   §I{i32:x}
                   §I{i32:y}
                   §O{i32}
@@ -186,8 +186,8 @@ public sealed class AgentGuidanceTests
     public void TypeSuggester_ParameterAlreadyRefined_NoSuggestion()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Divide:pub}
+            §M{Test}
+              §F{Divide:pub}
                   §I{i32:x}
                   §I{i32:y} | (!= # INT:0)
                   §O{i32}
@@ -208,8 +208,8 @@ public sealed class AgentGuidanceTests
     public void TypeSuggester_ParameterWithPrecondition_NoSuggestion()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Divide:pub}
+            §M{Test}
+              §F{Divide:pub}
                   §I{i32:x}
                   §I{i32:y}
                   §O{i32}
@@ -231,8 +231,8 @@ public sealed class AgentGuidanceTests
     public void TypeSuggester_NoPatterns_NoSuggestions()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{i32:x}
                   §O{i32}
                   §R (+ x INT:1)
@@ -275,8 +275,8 @@ public sealed class AgentGuidanceTests
     {
         var tool = new RefineTool();
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{i32:x} | (>= # INT:0)
                   §O{void}
             """;
@@ -297,8 +297,8 @@ public sealed class AgentGuidanceTests
     {
         var tool = new RefineTool();
         var source = """
-            §M{m001:Test}
-              §F{f001:Divide:pub}
+            §M{Test}
+              §F{Divide:pub}
                   §I{i32:x}
                   §I{i32:y}
                   §O{i32}
@@ -323,12 +323,12 @@ public sealed class AgentGuidanceTests
     {
         var tool = new RefineTool();
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{i32:x} | (>= # INT:0)
                   §I{i32:y}
                   §O{i32}
-                  §PROOF{p1:positive} (> x INT:0)
+                  §PROOF{positive} (> x INT:0)
                   §R (/ x y)
             """;
 
@@ -351,8 +351,8 @@ public sealed class AgentGuidanceTests
     {
         var tool = new RefineTool();
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §I{i32:x}
                   §O{void}
             """;
@@ -400,8 +400,8 @@ public sealed class AgentGuidanceTests
     {
         // Test that a compound predicate like (&& (>= # INT:0) (<= # INT:100)) formats correctly
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:priv}
+            §M{Test}
+              §F{Main:priv}
                   §I{i32:x} | (&& (>= # INT:0) (<= # INT:100))
                   §O{void}
             """;
@@ -432,8 +432,8 @@ public sealed class AgentGuidanceTests
     public void GuardDiscovery_SelfRefInPredicate_ReplacedWithParamName()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:priv}
+            §M{Test}
+              §F{Main:priv}
                   §I{i32:age} | (>= # INT:0)
                   §O{void}
             """;
@@ -465,8 +465,8 @@ public sealed class AgentGuidanceTests
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:priv}
+            §M{Test}
+              §F{Main:priv}
                   §I{i32:x} | (>= # INT:0)
                   §O{void}
             """;
@@ -505,11 +505,11 @@ public sealed class AgentGuidanceTests
     public void Pipeline_PermissivePolicy_FailedIsWarningNotError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Check:priv}
+            §M{Test}
+              §F{Check:priv}
                   §I{i32:x}
                   §O{void}
-                  §PROOF{p1:always-positive} (> x INT:0)
+                  §PROOF{always-positive} (> x INT:0)
             """;
 
         var options = new CompilationOptions
@@ -537,11 +537,11 @@ public sealed class AgentGuidanceTests
     public void Pipeline_DefaultPolicy_FailedIsError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Check:priv}
+            §M{Test}
+              §F{Check:priv}
                   §I{i32:x}
                   §O{void}
-                  §PROOF{p1:always-positive} (> x INT:0)
+                  §PROOF{always-positive} (> x INT:0)
             """;
 
         var options = new CompilationOptions

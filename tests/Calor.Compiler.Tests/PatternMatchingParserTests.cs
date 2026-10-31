@@ -38,11 +38,11 @@ public class PatternMatchingParserTests
     public void Parse_MatchWithArrowSyntax_CreatesMatchExpression()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §O{str}
-      §R §W{sw1} x
+      §R §W x
           §K 1 → ""one""
           §K 2 → ""two""
           §K _ → ""other""";
@@ -63,11 +63,11 @@ public class PatternMatchingParserTests
     public void Parse_MatchWithBlockSyntax_CreatesMatchExpression()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §O{str}
-      §R §W{sw1} x
+      §R §W x
           §K 1
             §R ""one""
           §/K
@@ -88,11 +88,11 @@ public class PatternMatchingParserTests
     public void Parse_MatchMixedSyntax_AllowsBothStyles()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §O{str}
-      §R §W{sw1} x
+      §R §W x
           §K 1 → ""one""
           §K 2
             §P ""two""
@@ -124,11 +124,11 @@ public class PatternMatchingParserTests
     public void Parse_VarPattern_CreatesVarPatternNode()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §O{str}
-      §R §W{sw1} x
+      §R §W x
           §K §VAR{n} → ""captured""";
 
         var module = Parse(source, out var diagnostics);
@@ -145,11 +145,11 @@ public class PatternMatchingParserTests
     public void Parse_VarPatternWithGuard_CreatesVarPatternAndGuard()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §O{str}
-      §R §W{sw1} x
+      §R §W x
           §K §VAR{n} §WHEN (> n 0) → ""positive""
           §K _ → ""non-positive""";
 
@@ -172,11 +172,11 @@ public class PatternMatchingParserTests
     public void Parse_RelationalPattern_CreatesRelationalPatternNode()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Grade:pub}
+§M{Test}
+  §F{Grade:pub}
       §I{i32:score}
       §O{str}
-      §R §W{sw1} score
+      §R §W score
           §K §PREL{gte} 90 → ""A""
           §K §PREL{gte} 80 → ""B""
           §K _ → ""F""";
@@ -195,11 +195,11 @@ public class PatternMatchingParserTests
     public void Parse_AllRelationalOperators_ParsesCorrectly()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §O{str}
-      §R §W{sw1} x
+      §R §W x
           §K §PREL{gte} 100 → ""gte100""
           §K §PREL{gt} 50 → ""gt50""
           §K §PREL{lte} 10 → ""lte10""
@@ -225,11 +225,11 @@ public class PatternMatchingParserTests
     public void Parse_SomeNonePattern_IsRejected()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{bool:opt}
       §O{i32}
-      §R §W{sw1} opt
+      §R §W opt
           §K §SM §VAR{v} → v
           §K §NN → 0";
 
@@ -241,11 +241,11 @@ public class PatternMatchingParserTests
     public void Parse_OkErrPattern_IsRejected()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:res}
       §O{str}
-      §R §W{sw1} res
+      §R §W res
           §K §OK §VAR{v} → ""ok""
           §K §ERR §VAR{e} → ""err""";
 
@@ -261,11 +261,11 @@ public class PatternMatchingParserTests
     public void Compile_MatchExpression_GeneratesValidCSharp()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:GetDay:pub}
+§M{Test}
+  §F{GetDay:pub}
       §I{i32:day}
       §O{str}
-      §R §W{sw1} day
+      §R §W day
           §K 1 → ""Monday""
           §K 2 → ""Tuesday""
           §K _ → ""Unknown""";
@@ -282,11 +282,11 @@ public class PatternMatchingParserTests
     public void Compile_RelationalPatterns_GeneratesCSharpOperators()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Grade:pub}
+§M{Test}
+  §F{Grade:pub}
       §I{i32:score}
       §O{str}
-      §R §W{sw1} score
+      §R §W score
           §K §PREL{gte} 90 → ""A""
           §K §PREL{lt} 60 → ""F""
           §K _ → ""C""";
@@ -301,11 +301,11 @@ public class PatternMatchingParserTests
     public void Compile_GuardClause_GeneratesWhenExpression()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Sign:pub}
+§M{Test}
+  §F{Sign:pub}
       §I{i32:x}
       §O{str}
-      §R §W{sw1} x
+      §R §W x
           §K §VAR{n} §WHEN (> n 0) → ""positive""
           §K §VAR{n} §WHEN (< n 0) → ""negative""
           §K _ → ""zero""";
@@ -323,11 +323,11 @@ public class PatternMatchingParserTests
     public void Check_WithWildcard_NoExhaustivenessWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §O{str}
-      §R §W{sw1} x
+      §R §W x
           §K 1 → ""one""
           §K _ → ""other""";
 
@@ -346,11 +346,11 @@ public class PatternMatchingParserTests
     public void Check_BoolWithoutWildcard_BothCases_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{bool:flag}
       §O{str}
-      §R §W{sw1} flag
+      §R §W flag
           §K true → ""yes""
           §K false → ""no""";
 
@@ -372,11 +372,11 @@ public class PatternMatchingParserTests
     {
         // Use block syntax to create MatchStatementNode (not wrapped in return)
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{?i32:opt}
       §O{i32}
-        §W{m1} opt
+        §W opt
             §K true
               §R 0";
 
@@ -398,11 +398,11 @@ public class PatternMatchingParserTests
     {
         // Use block syntax to create MatchStatementNode (not wrapped in return)
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §O{i32}
-        §W{m1} x
+        §W x
             §K _
               §R 0
             §K 1
@@ -427,11 +427,11 @@ public class PatternMatchingParserTests
     public void RoundTrip_MatchExpression_PreservesSemantics()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §O{str}
-      §R §W{sw1} x
+      §R §W x
           §K 1 → ""one""
           §K _ → ""other""";
 
@@ -453,15 +453,15 @@ public class PatternMatchingParserTests
     public void Parse_MismatchedMatchId_ReportsError()
     {
         var source = @"
-§M{m001:Test}
-§F{f001:Test:pub}
+§M{Test}
+§F{Test:pub}
   §I{i32:x}
   §O{str}
-  §R §W{sw1} x
+  §R §W x
     §K 1 → ""one""
-  §/W{sw999}
-§/F{f001}
-§/M{m001}";
+  §/W
+§/F
+§/M";
 
         var module = Parse(source, out var diagnostics);
         Assert.Contains(diagnostics, d => d.IsError);
@@ -471,11 +471,11 @@ public class PatternMatchingParserTests
     public void Parse_EmptyMatch_HasNoCases()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
+§M{Test}
+  §F{Test:pub}
       §I{i32:x}
       §O{str}
-      §R §W{sw1} x";
+      §R §W x";
 
         var module = Parse(source, out var diagnostics);
         // Parse should succeed but match should have no cases

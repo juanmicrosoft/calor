@@ -27,9 +27,9 @@ namespace Calor.Compiler.Tests.Analysis;
 public class RefinementIdentityAndInferenceTests
 {
     private const string Header = """
-        §M{m:Rt}
-          §RTYPE{r1:Nat:i32} (>= # INT:0)
-          §RTYPE{r2:Pos:i32} (> # INT:0)
+        §M{Rt}
+          §RTYPE{Nat:i32} (>= # INT:0)
+          §RTYPE{Pos:i32} (> # INT:0)
         """;
 
     private static CompilationResult Compile(string body, CompilationOptions? options = null)
@@ -82,47 +82,47 @@ public class RefinementIdentityAndInferenceTests
     // ───────────────────────── #1529: inferred locals carry the refinement ─────────────────────────
 
     private const string InferredLocals = """
-          §F{f1:FromParam:pub} (Nat:a, i32:v) -> i32
+          §F{FromParam:pub} (Nat:a, i32:v) -> i32
             §B{~x} a
             §ASSIGN x v
             §R x
-          §F{f2:WriteBack:pub} (Nat:a, i32:d) -> i32
+          §F{WriteBack:pub} (Nat:a, i32:d) -> i32
             §B{~x} a
             §ASSIGN x (- x d)
             §R x
-          §F{f3:Decrement:pub} (Nat:a) -> i32
+          §F{Decrement:pub} (Nat:a) -> i32
             §B{~x} a
             (dec x)
             §R x
-          §F{f4:GetNat:pub} (i32:v) -> Nat
+          §F{GetNat:pub} (i32:v) -> Nat
             §R v
-          §F{f5:FromCall:pub} (i32:seed, i32:v) -> i32
+          §F{FromCall:pub} (i32:seed, i32:v) -> i32
             §B{~x} §C{GetNat} §A seed §/C
             §ASSIGN x v
             §R x
-          §F{f6:Chained:pub} (Nat:a, i32:v) -> i32
+          §F{Chained:pub} (Nat:a, i32:v) -> i32
             §B{~x} a
             §B{~y} x
             §ASSIGN y v
             §R y
-          §F{f7:FromBase:pub} (i32:a, i32:v) -> i32
+          §F{FromBase:pub} (i32:a, i32:v) -> i32
             §B{~x} a
             §ASSIGN x v
             §R x
-          §F{f8:FromInline:pub}
+          §F{FromInline:pub}
             §I{i32:a} | (>= # INT:0)
             §I{i32:v}
             §O{i32}
             §B{~x} a
             §ASSIGN x v
             §R x
-          §F{f9:Rebound:pub} (Nat:a, i32:v) -> i32
+          §F{Rebound:pub} (Nat:a, i32:v) -> i32
             §B{~x:i32} INT:1
             §B{~x} a
             §ASSIGN x v
             §R x
-          §CL{c1:Holder:pub}
-            §MT{mt1:InMethod:pub} (Nat:a, i32:v) -> i32
+          §CL{Holder:pub}
+            §MT{InMethod:pub} (Nat:a, i32:v) -> i32
               §E{}
               §B{~x} a
               §ASSIGN x v
@@ -185,13 +185,13 @@ public class RefinementIdentityAndInferenceTests
     public void Emit_InferredLocal_GetsTheSameAssignmentGuardAsAnAnnotatedOne()
     {
         var annotated = Compile("""
-              §F{f1:Write:pub} (Nat:a, i32:v) -> i32
+              §F{Write:pub} (Nat:a, i32:v) -> i32
                 §B{~x:Nat} a
                 §ASSIGN x v
                 §R x
             """);
         var inferred = Compile("""
-              §F{f1:Write:pub} (Nat:a, i32:v) -> i32
+              §F{Write:pub} (Nat:a, i32:v) -> i32
                 §B{~x} a
                 §ASSIGN x v
                 §R x
@@ -208,7 +208,7 @@ public class RefinementIdentityAndInferenceTests
     public void TypeChecker_RecordsOnlyUnannotatedBindsInferredAsANamedRefinement()
     {
         var result = Compile("""
-              §F{f1:Mix:pub} (Nat:a, i32:b) -> i32
+              §F{Mix:pub} (Nat:a, i32:b) -> i32
                 §B{~x} a
                 §B{~y} b
                 §B{~z:Nat} a
@@ -234,7 +234,7 @@ public class RefinementIdentityAndInferenceTests
             ObligationPolicy = ObligationPolicy.Permissive,
         };
         var result = Compile("""
-              §F{f1:Bad:priv} (Nat:a) -> i32
+              §F{Bad:priv} (Nat:a) -> i32
                 §B{~x} a
                 §ASSIGN x INT:-5
                 §R x
@@ -272,14 +272,14 @@ public class RefinementIdentityAndInferenceTests
     public void Bind_DifferentNamedRefinement_IsRejected_SameOneIsAccepted()
     {
         var rejected = Compile("""
-              §F{f1:Bad:pub} (Nat:a) -> i32
+              §F{Bad:pub} (Nat:a) -> i32
                 §B{y:Pos} a
                 §R y
             """);
         AssertDistinctRefinementError(rejected, "Nat", "Pos");
 
         var accepted = Compile("""
-              §F{f1:Good:pub} (Nat:a) -> i32
+              §F{Good:pub} (Nat:a) -> i32
                 §B{y:Nat} a
                 §R y
             """);
@@ -290,17 +290,17 @@ public class RefinementIdentityAndInferenceTests
     public void Call_DifferentNamedRefinementArgument_IsRejected_SameOneIsAccepted()
     {
         var rejected = Compile("""
-              §F{f1:TakeNat:pub} (Nat:n) -> i32
+              §F{TakeNat:pub} (Nat:n) -> i32
                 §R n
-              §F{f2:Bad:pub} (Pos:p) -> i32
+              §F{Bad:pub} (Pos:p) -> i32
                 §R §C{TakeNat} §A p §/C
             """);
         AssertDistinctRefinementError(rejected, "Pos", "Nat");
 
         var accepted = Compile("""
-              §F{f1:TakeNat:pub} (Nat:n) -> i32
+              §F{TakeNat:pub} (Nat:n) -> i32
                 §R n
-              §F{f2:Good:pub} (Nat:a) -> i32
+              §F{Good:pub} (Nat:a) -> i32
                 §R §C{TakeNat} §A a §/C
             """);
         Assert.False(accepted.HasErrors, Errors(accepted));
@@ -310,16 +310,16 @@ public class RefinementIdentityAndInferenceTests
     public void Return_DifferentNamedRefinement_IsRejected_BaseValueStaysGuarded()
     {
         var rejected = Compile("""
-              §F{f1:Bad:pub} (Pos:p) -> Nat
+              §F{Bad:pub} (Pos:p) -> Nat
                 §R p
             """);
         AssertDistinctRefinementError(rejected, "Pos", "Nat");
 
         // Unchanged: returning a plain base value into a refined return is accepted and guarded.
         var accepted = Compile("""
-              §F{f1:Good:pub} (Nat:a, i32:v) -> Nat
+              §F{Good:pub} (Nat:a, i32:v) -> Nat
                 §R v
-              §F{f2:Same:pub} (Nat:a) -> Nat
+              §F{Same:pub} (Nat:a) -> Nat
                 §R a
             """);
         Assert.False(accepted.HasErrors, Errors(accepted));
@@ -330,7 +330,7 @@ public class RefinementIdentityAndInferenceTests
     public void Assign_DifferentNamedRefinement_IsRejected_ArithmeticResultStaysGuarded()
     {
         var rejected = Compile("""
-              §F{f1:Bad:pub} (Nat:a, Pos:p) -> i32
+              §F{Bad:pub} (Nat:a, Pos:p) -> i32
                 §B{~n:Nat} a
                 §ASSIGN n p
                 §R n
@@ -338,7 +338,7 @@ public class RefinementIdentityAndInferenceTests
         AssertDistinctRefinementError(rejected, "Pos", "Nat");
 
         var accepted = Compile("""
-              §F{f1:Good:pub} (Nat:a, Pos:p) -> i32
+              §F{Good:pub} (Nat:a, Pos:p) -> i32
                 §B{~n:Nat} a
                 §ASSIGN n (+ n p)
                 §ASSIGN n a
@@ -352,14 +352,14 @@ public class RefinementIdentityAndInferenceTests
     {
         // The join holds neither predicate, so it is the erased base: usable as i32, not as Nat.
         var asBase = Compile("""
-              §F{f1:Pick:pub} (bool:c, Nat:a, Pos:p) -> i32
+              §F{Pick:pub} (bool:c, Nat:a, Pos:p) -> i32
                 §B{j} (? c a p)
                 §R (+ j INT:1)
             """);
         Assert.False(asBase.HasErrors, Errors(asBase));
 
         var asNat = Compile("""
-              §F{f1:Pick:pub} (bool:c, Nat:a, Pos:p) -> i32
+              §F{Pick:pub} (bool:c, Nat:a, Pos:p) -> i32
                 §B{j:Nat} (? c a p)
                 §R j
             """);
@@ -372,9 +372,9 @@ public class RefinementIdentityAndInferenceTests
         // The documented way to turn one refinement into another: a function that takes the base
         // type and returns the target refinement. Its return guard checks the value.
         var assembly = CompileAndLoad("""
-              §F{f1:ToPos:pub} (i32:v) -> Pos
+              §F{ToPos:pub} (i32:v) -> Pos
                 §R v
-              §F{f2:Convert:pub} (Nat:a) -> i32
+              §F{Convert:pub} (Nat:a) -> i32
                 §B{p:Pos} §C{ToPos} §A a §/C
                 §R p
             """, out var code);
@@ -393,7 +393,7 @@ public class RefinementIdentityAndInferenceTests
     public void Rebind_ThatChangesTheNamedRefinement_IsRejected_SameRefinementIsAccepted()
     {
         var rejected = Compile("""
-              §F{f1:Bad:pub} (Nat:a, Pos:p) -> i32
+              §F{Bad:pub} (Nat:a, Pos:p) -> i32
                 §B{~x} a
                 §B{~x} p
                 §ASSIGN x INT:0
@@ -403,7 +403,7 @@ public class RefinementIdentityAndInferenceTests
             && d.Message.Contains("Cannot rebind 'x' of type Nat as Pos"));
 
         var accepted = Compile("""
-              §F{f1:Good:pub} (Nat:a, Nat:b) -> i32
+              §F{Good:pub} (Nat:a, Nat:b) -> i32
                 §B{~x} a
                 §B{~x} b
                 §R x
@@ -420,8 +420,8 @@ public class RefinementIdentityAndInferenceTests
         // CSharpEmit_TypedRebind_PreservesPriorContract...): the rebind checks both refinements,
         // and later writes keep the first one, Nat.
         const string Body = """
-              §CL{c1:Holder:pub}
-                §MT{mt1:Rebind:pub} (Nat:a, Pos:p, i32:v) -> i32
+              §CL{Holder:pub}
+                §MT{Rebind:pub} (Nat:a, Pos:p, i32:v) -> i32
                   §E{}
                   §B{~x} a
                   §B{~x} p
@@ -447,7 +447,7 @@ public class RefinementIdentityAndInferenceTests
     public void OutArgument_IntoARefinedLocal_IsRejected(string bind)
     {
         var rejected = Compile($$"""
-              §F{f1:Bad:pub} (Nat:a, str:s) -> i32
+              §F{Bad:pub} (Nat:a, str:s) -> i32
                 {{bind}}
                 §C{int.TryParse} §A s §A{out} x §/C
                 §R x
@@ -460,7 +460,7 @@ public class RefinementIdentityAndInferenceTests
     public void Runtime_OutArgumentThroughABaseTypedTemporary_IsGuardedOnAssignBack()
     {
         var assembly = CompileAndLoad("""
-              §F{f1:Parse:pub} (Nat:a, str:s) -> i32
+              §F{Parse:pub} (Nat:a, str:s) -> i32
                 §B{~x} a
                 §B{~t:i32} INT:0
                 §C{int.TryParse} §A s §A{out} t §/C
@@ -476,14 +476,14 @@ public class RefinementIdentityAndInferenceTests
     public void Runtime_LambdaParameterTypedByARefinedDelegate_IsGuarded()
     {
         var assembly = CompileAndLoad("""
-              §DEL{d1:Mapper:pub}
+              §DEL{Mapper:pub}
                 §I{Nat:p}
                 §O{i32}
-              §F{f1:Apply:pub} (Nat:a) -> i32
-                §B{f:Mapper} §LAM{l1:p}
+              §F{Apply:pub} (Nat:a) -> i32
+                §B{f:Mapper} §LAM{p}
                   §ASSIGN p (- p INT:10)
                   §R p
-                §/LAM{l1}
+                §/LAM
                 §R §C{f} §A a §/C
             """, out _);
 
@@ -495,8 +495,8 @@ public class RefinementIdentityAndInferenceTests
     public void TypePattern_OnARefinementType_IsRejected_BaseTypePatternIsAccepted()
     {
         var rejected = Compile("""
-              §F{f1:Bad:pub} (Nat:a) -> i32
-                §IF{i1} (is a Pos p)
+              §F{Bad:pub} (Nat:a) -> i32
+                §IF (is a Pos p)
                   §R p
                 §R INT:1
             """);
@@ -504,8 +504,8 @@ public class RefinementIdentityAndInferenceTests
             && d.Message.Contains("A type pattern cannot test the refinement type Pos"));
 
         var accepted = Compile("""
-              §F{f1:Good:pub} (Nat:a) -> i32
-                §IF{i1} (is a i32 p)
+              §F{Good:pub} (Nat:a) -> i32
+                §IF (is a i32 p)
                   §R p
                 §R INT:1
             """);
@@ -519,9 +519,9 @@ public class RefinementIdentityAndInferenceTests
     {
         // The call is nested in an assignment's right-hand side, which the checker used to skip.
         var rejected = Compile($$"""
-              §F{f1:TakePos:pub} (Pos:p) -> i32
+              §F{TakePos:pub} (Pos:p) -> i32
                 §R p
-              §F{f2:Bad:pub} (Nat:a) -> i32
+              §F{Bad:pub} (Nat:a) -> i32
                 {{bind}}
                 §ASSIGN x §C{TakePos} §A a §/C
                 §R x
@@ -561,22 +561,22 @@ public class RefinementIdentityAndInferenceTests
         // Overload trials type the lambda against each candidate. Only the selected candidate's
         // typing (PosMapper, so p: Pos) may decide the guard; NatMapper's must be rolled back.
         var assembly = CompileAndLoad("""
-              §DEL{d1:PosMapper:pub}
+              §DEL{PosMapper:pub}
                 §I{Pos:p}
                 §O{i32}
-              §DEL{d2:NatMapper:pub}
+              §DEL{NatMapper:pub}
                 §I{Nat:p}
                 §O{i32}
-              §F{f1:Pick:pub} (PosMapper:fn, Pos:tag) -> i32
+              §F{Pick:pub} (PosMapper:fn, Pos:tag) -> i32
                 §R §C{fn} §A tag §/C
-              §F{f2:Pick:pub} (NatMapper:fn, str:tag) -> i32
+              §F{Pick:pub} (NatMapper:fn, str:tag) -> i32
                 §R INT:0
-              §F{f3:Use:pub} (Pos:a, i32:v) -> i32
+              §F{Use:pub} (Pos:a, i32:v) -> i32
                 §R §C{Pick}
-                  §A §LAM{l1:p}
+                  §A §LAM{p}
                     §ASSIGN p v
                     §R p
-                  §/LAM{l1}
+                  §/LAM
                   §A a
                 §/C
             """, out _, new CompilationOptions
@@ -602,8 +602,8 @@ public class RefinementIdentityAndInferenceTests
         // #1676: the checker now visits class members and rejects the rebind (Calor0202), so the
         // guard is exercised with the checker off.
         const string Body = """
-              §CL{c1:Holder:pub}
-                §MT{mt1:Run:pub} (Pos:x, Nat:a, i32:v) -> i32
+              §CL{Holder:pub}
+                §MT{Run:pub} (Pos:x, Nat:a, i32:v) -> i32
                   §E{}
                   §B{~x} a
                   §B{~y} x
@@ -622,16 +622,16 @@ public class RefinementIdentityAndInferenceTests
     public void Runtime_Verified_LambdaParameterShadowingARefinedLocal_KeepsItsOwnGuard()
     {
         var assembly = CompileAndLoadVerified("""
-              §DEL{d1:Mapper:pub}
+              §DEL{Mapper:pub}
                 §I{Pos:p}
                 §O{i32}
-              §F{f1:Run:pub} (Nat:a, Pos:b, i32:v) -> i32
-                §IF{i1} (> a INT:0)
+              §F{Run:pub} (Nat:a, Pos:b, i32:v) -> i32
+                §IF (> a INT:0)
                   §B{n:Nat} a
-                §B{fn:Mapper} §LAM{l1:n}
+                §B{fn:Mapper} §LAM{n}
                   §ASSIGN n v
                   §R n
-                §/LAM{l1}
+                §/LAM
                 §R §C{fn} §A b §/C
             """);
 
@@ -643,17 +643,17 @@ public class RefinementIdentityAndInferenceTests
     public void Runtime_LambdaAssignedToARefinedDelegateVariable_IsGuarded()
     {
         var assembly = CompileAndLoad("""
-              §DEL{d1:Mapper:pub}
+              §DEL{Mapper:pub}
                 §I{Pos:p}
                 §O{i32}
-              §F{f1:Run:pub} (Pos:a, i32:v) -> i32
-                §B{~fn:Mapper} §LAM{l1:p}
+              §F{Run:pub} (Pos:a, i32:v) -> i32
+                §B{~fn:Mapper} §LAM{p}
                   §R p
-                §/LAM{l1}
-                §ASSIGN fn §LAM{l2:p}
+                §/LAM
+                §ASSIGN fn §LAM{p}
                   §ASSIGN p v
                   §R p
-                §/LAM{l2}
+                §/LAM
                 §R §C{fn} §A a §/C
             """, out _);
 
@@ -665,13 +665,13 @@ public class RefinementIdentityAndInferenceTests
     public void Assign_NestedDelegateCallWithADifferentRefinement_IsRejected()
     {
         var rejected = Compile("""
-              §DEL{d1:Mapper:pub}
+              §DEL{Mapper:pub}
                 §I{Pos:p}
                 §O{i32}
-              §F{f1:Run:pub} (Nat:a) -> i32
-                §B{fn:Mapper} §LAM{l1:p}
+              §F{Run:pub} (Nat:a) -> i32
+                §B{fn:Mapper} §LAM{p}
                   §R p
-                §/LAM{l1}
+                §/LAM
                 §B{~x:i32} INT:0
                 §ASSIGN x §C{fn} §A a §/C
                 §R x
@@ -683,9 +683,9 @@ public class RefinementIdentityAndInferenceTests
     public void Assign_NestedNamedArgumentWithADifferentRefinement_IsRejected()
     {
         var rejected = Compile("""
-              §F{f1:TakePos:pub} (Pos:p) -> i32
+              §F{TakePos:pub} (Pos:p) -> i32
                 §R p
-              §F{f2:Run:pub} (Nat:a) -> i32
+              §F{Run:pub} (Nat:a) -> i32
                 §B{~x:i32} INT:0
                 §ASSIGN x §C{TakePos} §A[p] a §/C
                 §R x
@@ -697,7 +697,7 @@ public class RefinementIdentityAndInferenceTests
     public void Rebind_ThroughABaseTypedIntermediate_StillCannotChangeTheRefinement()
     {
         var rejected = Compile("""
-              §F{f1:Bad:pub} (Nat:a, Pos:p) -> i32
+              §F{Bad:pub} (Nat:a, Pos:p) -> i32
                 §B{~x} a
                 §B{~x:i32} a
                 §B{~x} p
@@ -712,7 +712,7 @@ public class RefinementIdentityAndInferenceTests
     public void Rebind_OfAnInlineRefinedParameterAsANamedRefinement_IsRejected()
     {
         var rejected = Compile("""
-              §F{f1:Bad:pub}
+              §F{Bad:pub}
                 §I{i32:a} | (>= # INT:0)
                 §I{Pos:p}
                 §O{i32}
@@ -727,9 +727,9 @@ public class RefinementIdentityAndInferenceTests
     public void Runtime_MatchOfBaseValuesAssignedToARefinedLocal_IsAcceptedAndGuarded()
     {
         var assembly = CompileAndLoad("""
-              §F{f1:Run:pub} (Nat:a, i32:b) -> i32
+              §F{Run:pub} (Nat:a, i32:b) -> i32
                 §B{~x} a
-                §ASSIGN x §W{w1} b
+                §ASSIGN x §W b
                   §K INT:0 → INT:1
                   §K _ → b
                 §R x
@@ -746,8 +746,8 @@ public class RefinementIdentityAndInferenceTests
         // The checker's flow cache drops ordinary diagnostics inside structural statements;
         // refinement-soundness errors are preserved.
         var rejected = Compile("""
-              §F{f1:Bad:pub} (Nat:a) -> i32
-                §TR{t1}
+              §F{Bad:pub} (Nat:a) -> i32
+                §TR
                   §B{y:Pos} a
                   §R y
                 §CA{Exception:ex}
@@ -762,29 +762,29 @@ public class RefinementIdentityAndInferenceTests
     public void Assign_LambdaReturningADifferentRefinement_IsRejected_SameRefinementIsAccepted()
     {
         var rejected = Compile("""
-              §DEL{d1:Factory:pub}
+              §DEL{Factory:pub}
                 §O{Pos}
-              §F{f1:Run:pub} (Nat:a, Pos:p) -> i32
-                §B{~fn:Factory} §LAM{l1}
+              §F{Run:pub} (Nat:a, Pos:p) -> i32
+                §B{~fn:Factory} §LAM{}
                   §R p
-                §/LAM{l1}
-                §ASSIGN fn §LAM{l2}
+                §/LAM
+                §ASSIGN fn §LAM{}
                   §R a
-                §/LAM{l2}
+                §/LAM
                 §R §C{fn} §/C
             """);
         AssertDistinctRefinementError(rejected, "Nat", "Pos");
 
         var accepted = Compile("""
-              §DEL{d1:Factory:pub}
+              §DEL{Factory:pub}
                 §O{Pos}
-              §F{f1:Run:pub} (Nat:a, Pos:p) -> i32
-                §B{~fn:Factory} §LAM{l1}
+              §F{Run:pub} (Nat:a, Pos:p) -> i32
+                §B{~fn:Factory} §LAM{}
                   §R p
-                §/LAM{l1}
-                §ASSIGN fn §LAM{l2}
+                §/LAM
+                §ASSIGN fn §LAM{}
                   §R p
-                §/LAM{l2}
+                §/LAM
                 §R §C{fn} §/C
             """);
         Assert.False(accepted.HasErrors, Errors(accepted));
@@ -794,10 +794,10 @@ public class RefinementIdentityAndInferenceTests
     public void Return_DifferentRefinementFromACallInsideATryBody_IsRejected()
     {
         var rejected = Compile("""
-              §F{f1:GetPos:pub} () -> Pos
+              §F{GetPos:pub} () -> Pos
                 §R INT:1
-              §F{f2:Bad:pub} () -> Nat
-                §TR{t1}
+              §F{Bad:pub} () -> Nat
+                §TR
                   §R §C{GetPos} §/C
                 §CA{Exception:ex}
                   §R INT:0
@@ -811,23 +811,23 @@ public class RefinementIdentityAndInferenceTests
         // Typing the lambda against the rejected NatMapper would make `§B{q:Pos} p` a mismatch;
         // that speculative diagnostic must not survive the try body's flow cache.
         var result = Compile("""
-              §DEL{d1:PosMapper:pub}
+              §DEL{PosMapper:pub}
                 §I{Pos:p}
                 §O{i32}
-              §DEL{d2:NatMapper:pub}
+              §DEL{NatMapper:pub}
                 §I{Nat:p}
                 §O{i32}
-              §F{f1:Pick:pub} (PosMapper:fn, Pos:tag) -> i32
+              §F{Pick:pub} (PosMapper:fn, Pos:tag) -> i32
                 §R INT:1
-              §F{f2:Pick:pub} (NatMapper:fn, str:tag) -> i32
+              §F{Pick:pub} (NatMapper:fn, str:tag) -> i32
                 §R INT:0
-              §F{f3:Use:pub} (Pos:a) -> i32
-                §TR{t1}
+              §F{Use:pub} (Pos:a) -> i32
+                §TR
                   §R §C{Pick}
-                    §A §LAM{l1:p}
+                    §A §LAM{p}
                       §B{q:Pos} p
                       §R q
-                    §/LAM{l1}
+                    §/LAM
                     §A a
                   §/C
                 §CA{Exception:ex}
@@ -845,7 +845,7 @@ public class RefinementIdentityAndInferenceTests
     public void Rebind_WithABaseAnnotationAndADifferentRefinementInitializer_IsRejected()
     {
         var rejected = Compile("""
-              §F{f1:Run:pub} (Nat:a, Pos:p) -> i32
+              §F{Run:pub} (Nat:a, Pos:p) -> i32
                 §B{~x} a
                 §B{~x:i32} p
                 §R x
@@ -854,7 +854,7 @@ public class RefinementIdentityAndInferenceTests
             && d.Message.Contains("Cannot rebind 'x' of type Nat as Pos"));
 
         var accepted = Compile("""
-              §F{f1:Run:pub} (Nat:a, Nat:b) -> i32
+              §F{Run:pub} (Nat:a, Nat:b) -> i32
                 §B{~x} a
                 §B{~x:i32} b
                 §R x
@@ -866,17 +866,17 @@ public class RefinementIdentityAndInferenceTests
     public void LambdaParameter_ShadowingAnInlineRefinedParameter_CanBeRebound()
     {
         var accepted = Compile("""
-              §DEL{d1:Mapper:pub}
+              §DEL{Mapper:pub}
                 §I{i32:a}
                 §O{i32}
-              §F{f1:Run:pub}
+              §F{Run:pub}
                 §I{i32:a} | (>= # INT:0)
                 §I{Pos:p}
                 §O{i32}
-                §B{fn:Mapper} §LAM{l1:a}
+                §B{fn:Mapper} §LAM{a}
                   §B{~a} p
                   §R a
-                §/LAM{l1}
+                §/LAM
                 §R §C{fn} §A INT:1 §/C
             """);
         Assert.False(accepted.HasErrors, Errors(accepted));

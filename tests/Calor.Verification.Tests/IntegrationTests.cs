@@ -87,8 +87,8 @@ public class IntegrationTests
         // (The unbounded form is genuinely refutable — x*x wraps negative —
         // and lives in the outcome corpus as refuted-overflow.calr.)
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
+§M{Test}
+  §F{Square:pub}
       §I{i32:x}
       §O{i32}
       §Q (>= x 0)
@@ -128,8 +128,8 @@ public class IntegrationTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:Echo:pub} (str:s) -> str
+§M{Test}
+  §F{Echo:pub} (str:s) -> str
     §E{}
     §Q (== s STR:""abc"")
     §S (! (equals result STR:""ABC"" :ignore-case))
@@ -176,8 +176,8 @@ public class IntegrationTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         const string source = @"
-§M{m001:Test}
-  §F{f001:Chk:pub} (str:s) -> str
+§M{Test}
+  §F{Chk:pub} (str:s) -> str
     §E{}
     §Q (== s STR:""abc"")
     §S (! (starts result STR:""\u200dabc""))
@@ -225,8 +225,8 @@ public class IntegrationTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         const string source = @"
-§M{m001:Test}
-  §F{f001:ByteLen:pub} () -> i32
+§M{Test}
+  §F{ByteLen:pub} () -> i32
     §E{}
     §S (== result INT:1)
     §R (len STR:""\u00e9"")";
@@ -245,8 +245,8 @@ public class IntegrationTests
         // Control: the same shape with no string in the body at all is still genuinely proved and
         // elided, so this pins the trigger rather than a verifier that stopped proving.
         var numeric = Program.Compile(@"
-§M{m001:Test}
-  §F{f001:Two:pub} () -> i32
+§M{Test}
+  §F{Two:pub} () -> i32
     §E{}
     §S (== result INT:2)
     §R INT:2", "test.calr", NoCache());
@@ -272,8 +272,8 @@ public class IntegrationTests
         // "Proven" is a satisfiability result (∃), not validity (∀) — a caller
         // can still violate it, so the emitted C# must always carry the guard.
         var source = @"
-§M{m001:Test}
-  §F{f001:Half:pub}
+§M{Test}
+  §F{Half:pub}
       §I{i32:x}
       §O{i32}
       §Q (> x 0)
@@ -300,8 +300,8 @@ public class IntegrationTests
         // D-G1.3 elision-soundness pin: Proven(vacuous) — unsatisfiable §Q set —
         // must not elide the postcondition check and must warn loudly.
         var source = @"
-§M{m001:Test}
-  §F{f001:Impossible:pub}
+§M{Test}
+  §F{Impossible:pub}
       §I{i32:x}
       §O{i32}
       §Q (> x 10)
@@ -329,8 +329,8 @@ public class IntegrationTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:Bad:pub}
+§M{Test}
+  §F{Bad:pub}
       §I{i32:x}
       §O{i32}
       §S (> result x)
@@ -356,8 +356,8 @@ public class IntegrationTests
     public void WithoutVerifyFlag_BehaviorIdentical()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
+§M{Test}
+  §F{Square:pub}
       §I{i32:x}
       §O{i32}
       §Q (>= x 0)
@@ -383,8 +383,8 @@ public class IntegrationTests
         // If Z3 is unavailable, it should still compile successfully
 
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
+§M{Test}
+  §F{Square:pub}
       §I{i32:x}
       §O{i32}
       §Q (>= x 0)
@@ -415,8 +415,8 @@ public class IntegrationTests
     {
         // Basic contract compilation without --verify should work as before
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
+§M{Test}
+  §F{Add:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -432,8 +432,8 @@ public class IntegrationTests
     public void ContractModeOff_NoChecks()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
+§M{Test}
+  §F{Square:pub}
       §I{i32:x}
       §O{i32}
       §Q (>= x 0)
@@ -466,8 +466,8 @@ public class IntegrationTests
 
         // LONG:/UINT: literals appear in the pre/postconditions and the body.
         var source = @"
-§M{m001:Test}
-  §F{f001:Clamp:pub}
+§M{Test}
+  §F{Clamp:pub}
       §I{i64:x}
       §O{i64}
       §Q (>= x LONG:0)
@@ -488,8 +488,8 @@ public class IntegrationTests
     {
         // End-to-end Calor-source → C#: the typed literals emit the right suffix.
         var source = @"
-§M{m001:Test}
-  §F{f001:Widths:pub}
+§M{Test}
+  §F{Widths:pub}
       §O{i64}
       §B{a:i64} LONG:5
       §B{b:u32} UINT:7

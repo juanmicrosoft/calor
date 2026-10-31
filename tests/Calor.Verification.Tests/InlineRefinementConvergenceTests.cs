@@ -25,8 +25,8 @@ public sealed class InlineRefinementConvergenceTests
         ModuleVerificationResult Run(bool refined)
         {
             var source = $$"""
-                §M{m1:Test}
-                  §F{f1:Identity:pub} ({{type}}:x{{(refined ? " | " + inline : "")}}) -> {{type}}
+                §M{Test}
+                  §F{Identity:pub} ({{type}}:x{{(refined ? " | " + inline : "")}}) -> {{type}}
                     {{(refined ? "" : "§Q " + legacy)}}
                     §S {{postcondition}}
                     §R x
@@ -56,8 +56,8 @@ public sealed class InlineRefinementConvergenceTests
         string predicate, string postcondition, ContractVerificationStatus expected)
     {
         var source = $$"""
-            §M{m1:Test}
-              §F{f1:Identity:pub} (i32:x | {{predicate}}) -> i32
+            §M{Test}
+              §F{Identity:pub} (i32:x | {{predicate}}) -> i32
                 §S {{postcondition}}
                 §R x
             """;
@@ -77,8 +77,8 @@ public sealed class InlineRefinementConvergenceTests
     public void LaterParameterRelationship_IsAssumedWithBothParameterNames()
     {
         var module = Parse("""
-            §M{m1:Test}
-              §F{f1:Upper:pub} (i32:lo, i32:hi | (> # lo)) -> i32
+            §M{Test}
+              §F{Upper:pub} (i32:lo, i32:hi | (> # lo)) -> i32
                 §S (> result lo)
                 §R hi
             """, out var diagnostics);
@@ -95,12 +95,12 @@ public sealed class InlineRefinementConvergenceTests
         string predicate, ContractInheritanceStatus expected)
     {
         var module = Parse($$"""
-            §M{m1:Test}
-              §IFACE{i1:IRange}
-                §MT{im1:Upper} (i32:lo, i32:hi | (> # lo)) -> i32
-              §CL{c1:Range:pub}
+            §M{Test}
+              §IFACE{IRange}
+                §MT{Upper} (i32:lo, i32:hi | (> # lo)) -> i32
+              §CL{Range:pub}
                 §IMPL{IRange}
-                §MT{mt1:Upper:pub} (i32:a, i32:b | {{predicate}}) -> i32
+                §MT{Upper:pub} (i32:a, i32:b | {{predicate}}) -> i32
                   §E{}
                   §R b
             """, out var diagnostics);
@@ -118,12 +118,12 @@ public sealed class InlineRefinementConvergenceTests
     public void UnsupportedOverrideImplication_DoesNotClaimValidInheritance()
     {
         var module = Parse("""
-            §M{m1:Test}
-              §IFACE{i1:IValue}
-                §MT{im1:Get} (str:s | (contains # "a")) -> str
-              §CL{c1:Value:pub}
+            §M{Test}
+              §IFACE{IValue}
+                §MT{Get} (str:s | (contains # "a")) -> str
+              §CL{Value:pub}
                 §IMPL{IValue}
-                §MT{mt1:Get:pub} (str:value | (contains # "")) -> str
+                §MT{Get:pub} (str:value | (contains # "")) -> str
                   §R value
             """, out var diagnostics);
         using var checker = new ContractInheritanceChecker(diagnostics);
@@ -138,12 +138,12 @@ public sealed class InlineRefinementConvergenceTests
     public void OverrideWithSwappedParameterNames_UsesSimultaneousRebinding()
     {
         var module = Parse("""
-            §M{m1:Test}
-              §IFACE{i1:IRange}
-                §MT{im1:Upper} (i32:lo, i32:hi | (> # lo)) -> i32
-              §CL{c1:Range:pub}
+            §M{Test}
+              §IFACE{IRange}
+                §MT{Upper} (i32:lo, i32:hi | (> # lo)) -> i32
+              §CL{Range:pub}
                 §IMPL{IRange}
-                §MT{mt1:Upper:pub} (i32:hi, i32:lo | (> # hi)) -> i32
+                §MT{Upper:pub} (i32:hi, i32:lo | (> # hi)) -> i32
                   §R lo
             """, out var diagnostics);
         using var checker = new ContractInheritanceChecker(diagnostics);
@@ -155,8 +155,8 @@ public sealed class InlineRefinementConvergenceTests
     public void UninhabitedRefinement_ReportsAtPredicateSpan()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Impossible:pub} (i32:x | (< # -2147483648)) -> i32
+            §M{Test}
+              §F{Impossible:pub} (i32:x | (< # -2147483648)) -> i32
                 §R x
             """;
         var module = Parse(source, out var diagnostics);
@@ -170,8 +170,8 @@ public sealed class InlineRefinementConvergenceTests
     public void CapturedSelfSubstitution_DoesNotManufactureVacuity()
     {
         var module = Parse("""
-            §M{m1:Test}
-              §F{f1:Captured:pub} (i32:x | (exists ((x i32)) (== # x))) -> i32
+            §M{Test}
+              §F{Captured:pub} (i32:x | (exists ((x i32)) (== # x))) -> i32
                 §S (== result x)
                 §R x
             """, out var diagnostics);
@@ -184,8 +184,8 @@ public sealed class InlineRefinementConvergenceTests
     public void OutRefinement_IsNotAssumedOnEntry()
     {
         var module = Parse("""
-            §M{m1:Test}
-              §F{f1:Out:pub} (i32:x:out | (> # 0)) -> i32
+            §M{Test}
+              §F{Out:pub} (i32:x:out | (> # 0)) -> i32
                 §S (> result 0)
                 §ASSIGN x -1
                 §R x

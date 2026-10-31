@@ -30,12 +30,12 @@ public class JsonVerboseStdoutTests : IDisposable
         "}\n";
 
     private const string CalorSource =
-        "§M{m1:Demo}\n" +
-        "  §F{f1:Add:pub} (i32:a, i32:b) -> i32\n" +
+        "§M{Demo}\n" +
+        "  §F{Add:pub} (i32:a, i32:b) -> i32\n" +
         "    §Q (>= a 0)\n" +
         "    §E{}\n" +
         "    §R (+ a b)\n" +
-        "  §F{f2:Main:pub} () -> void\n" +
+        "  §F{Main:pub} () -> void\n" +
         "    §E{cw}\n" +
         "    §P \"hi\"\n";
 

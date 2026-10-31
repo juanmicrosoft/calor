@@ -35,8 +35,8 @@ public class CallStatementImplicitCloseTests
         // The implicit-close form: §C{Target} expr (no §A, no §/C)
         // is legal for STATEMENT context per Parser.cs:1374-1382.
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §C{Console.WriteLine} STR:"hello"
 """;
         var module = Parse(source, out var diags);
@@ -54,8 +54,8 @@ public class CallStatementImplicitCloseTests
     {
         // The canonical form: §C{Target} §A expr §/C
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §C{Console.WriteLine} §A STR:"hello" §/C
 """;
         var module = Parse(source, out var diags);
@@ -72,8 +72,8 @@ public class CallStatementImplicitCloseTests
     {
         // Zero-arg form requires §/C today.
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §C{DoWork} §/C
 """;
         var module = Parse(source, out var diags);
@@ -90,8 +90,8 @@ public class CallStatementImplicitCloseTests
     {
         // Multi-arg form: §C{Target} §A x §A y §/C
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §C{Math.Max} §A INT:1 §A INT:2 §/C
 """;
         var module = Parse(source, out var diags);
@@ -112,8 +112,8 @@ public class CallStatementImplicitCloseTests
         //
         // This passes today because §/C is present:
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §B{x:str} §C{Greeting} §/C
 """;
         var module = Parse(source, out var diags);
@@ -147,8 +147,8 @@ public class CallStatementImplicitCloseTests
     public void V062_ZeroArgStmt_FlagOn_ElidesCloser()
     {
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §C{DoWork} §/C
 """;
         var emitted = EmitModule(source);
@@ -160,8 +160,8 @@ public class CallStatementImplicitCloseTests
     public void V062_ZeroArgStmt_FlagOff_KeepsCloser()
     {
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §C{DoWork} §/C
 """;
         var emitted = EmitModule(source, useImplicitCallCloser: false);
@@ -172,8 +172,8 @@ public class CallStatementImplicitCloseTests
     public void V062_OneArgStmt_LiteralArg_FlagOn_ElidesAAndCloser()
     {
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §C{Console.WriteLine} §A STR:"hello" §/C
 """;
         var emitted = EmitModule(source);
@@ -187,8 +187,8 @@ public class CallStatementImplicitCloseTests
     public void V062_OneArgStmt_IdentifierArg_FlagOn_ElidesAAndCloser()
     {
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub} (str:msg)
+§M{Test}
+  §F{Foo:pub} (str:msg)
       §C{Console.WriteLine} §A msg §/C
 """;
         var emitted = EmitModule(source);
@@ -202,8 +202,8 @@ public class CallStatementImplicitCloseTests
         // Inner zero-arg call is visited in inline-sibling context, so it
         // must keep §/C; outer stmt call elides because it's at top level.
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §C{Outer} §A §C{Inner} §/C §/C
 """;
         var emitted = EmitModule(source);
@@ -219,9 +219,9 @@ public class CallStatementImplicitCloseTests
     {
         // §NEW{T} on the same line — IsExpressionStart accepts §NEW.
         var source = """
-§M{m001:Test}
+§M{Test}
   §U{System.Text}
-  §F{f001:Foo:pub}
+  §F{Foo:pub}
       §C{Process} §A §NEW{StringBuilder} §/NEW §/C
 """;
         var emitted = EmitModule(source);
@@ -233,8 +233,8 @@ public class CallStatementImplicitCloseTests
     {
         // Named one-arg cannot use the inline form (§A[name] is required).
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §C{Greet} §A[who] STR:"world" §/C
 """;
         var emitted = EmitModule(source);
@@ -246,8 +246,8 @@ public class CallStatementImplicitCloseTests
     public void V062_MultiArgStmt_StaysStandardForm()
     {
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §C{Math.Max} §A INT:1 §A INT:2 §/C
 """;
         var emitted = EmitModule(source);
@@ -261,8 +261,8 @@ public class CallStatementImplicitCloseTests
         // Source has standard form; emit-then-reparse must produce the
         // same logical AST as the original.
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §C{Console.WriteLine} §A STR:"hello" §/C
       §C{Process} §A INT:42 §/C
 """;
@@ -289,8 +289,8 @@ public class CallStatementImplicitCloseTests
     {
         // emit(parse(emit(parse(src)))) == emit(parse(src))
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub} (str:msg)
+§M{Test}
+  §F{Foo:pub} (str:msg)
       §C{Console.WriteLine} §A msg §/C
       §C{DoWork} §/C
 """;
@@ -341,10 +341,10 @@ public class CallStatementImplicitCloseTests
         // it to a temp var. After hoist the arg is a single identifier,
         // which IS in IsExpressionStart, so the outer one-arg call elides.
         var source = """
-§M{m001:Test}
-  §CL{c001:Person:pub}
-    §PROP{p002:Name:str:pub:get,set}
-  §F{f002:Foo:pub}
+§M{Test}
+  §CL{Person:pub}
+    §PROP{Name:str:pub:get,set}
+  §F{Foo:pub}
       §C{Process} §A §NEW{Person}
         Name = STR:"x"
       §/NEW §/C
@@ -359,8 +359,8 @@ public class CallStatementImplicitCloseTests
     {
         // Last statement in a function body — followed by Dedent, not a sibling.
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
+§M{Test}
+  §F{Foo:pub}
       §C{Setup} §/C
       §C{Run} §/C
 """;
@@ -393,11 +393,11 @@ public class CallStatementImplicitCloseTests
     public void V064_ZeroArgStmt_LastInBody_BeforeSiblingFunc_Parses()
     {
         var source = """
-§M{m001:T}
-  §F{f001:Main:pub} () -> void
+§M{T}
+  §F{Main:pub} () -> void
     §E{cw}
     §C{Helper}
-  §F{f002:Helper:priv} () -> void
+  §F{Helper:priv} () -> void
     §E{cw}
     §C{Console.WriteLine} "hi"
 """;
@@ -413,11 +413,11 @@ public class CallStatementImplicitCloseTests
     public void V064_OneArgStmtViaA_LastInBody_BeforeSiblingFunc_Parses()
     {
         var source = """
-§M{m001:T}
-  §F{f001:Main:pub} () -> void
+§M{T}
+  §F{Main:pub} () -> void
     §E{cw}
     §C{Helper} §A 1
-  §F{f002:Helper:priv} (a:i32) -> void
+  §F{Helper:priv} (a:i32) -> void
     §E{cw}
     §C{Console.WriteLine} "hi"
 """;
@@ -436,11 +436,11 @@ public class CallStatementImplicitCloseTests
         // Inline single-arg form (no §A): exercises the early-return branch
         // in ParseCallStatement, not the post-§A end-handling branch.
         var source = """
-§M{m001:T}
-  §F{f001:Main:pub} () -> void
+§M{T}
+  §F{Main:pub} () -> void
     §E{cw}
     §C{Helper} 42
-  §F{f002:Helper:priv} (a:i32) -> void
+  §F{Helper:priv} (a:i32) -> void
     §E{cw}
     §C{Console.WriteLine} "hi"
 """;
@@ -457,8 +457,8 @@ public class CallStatementImplicitCloseTests
         // The lexer emits Dedent then §/C; the parser must still consume
         // the Dedent + §/C run (legacy form), not bail out early.
         var source = """
-§M{m001:Test}
-  §F{f001:Print:pub}
+§M{Test}
+  §F{Print:pub}
       §O{void}
       §E{cw}
       §C{Console.WriteLine}

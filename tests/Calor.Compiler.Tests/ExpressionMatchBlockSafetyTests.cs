@@ -12,15 +12,15 @@ public class ExpressionMatchBlockSafetyTests
     [InlineData("§P \"must execute\"\n§R INT:7")]
     [InlineData("§C{trace.Add} §A INT:1 §/C\n§R INT:7")]
     [InlineData("§B{answer:i32} INT:7\n§R answer")]
-    [InlineData("§IF{if1} (> x INT:0)\n  §R INT:7\n§EL\n  §R INT:8")]
+    [InlineData("§IF (> x INT:0)\n  §R INT:7\n§EL\n  §R INT:8")]
     [InlineData("§P \"must not become default\"")]
     public void UnsupportedExpressionArms_AreRejectedWithoutDiscardingStatements(string body)
     {
         var source = $$"""
-            §M{m1:MatchSafety}
-              §F{f1:Probe:pub} (i32:x, List<i32>:trace) -> i32
+            §M{MatchSafety}
+              §F{Probe:pub} (i32:x, List<i32>:trace) -> i32
                 §E{cw,mut}
-                §R §W{w1} x
+                §R §W x
                   §K 1
             {{Indent(body, 8)}}
                   §K _ → INT:0
@@ -40,15 +40,15 @@ public class ExpressionMatchBlockSafetyTests
     public void LambdaNestedArms_AreRejectedEvenWithoutOptionalTypeChecking(bool typeChecking)
     {
         const string source = """
-            §M{m1:MatchSafety}
-              §F{f1:Factory:pub} () -> Func<i32>
-                §R §LAM{l1}
-                  §R §W{w1} INT:1
+            §M{MatchSafety}
+              §F{Factory:pub} () -> Func<i32>
+                §R §LAM{}
+                  §R §W INT:1
                     §K 1
                       §P "must execute"
                       §R INT:7
                     §K _ → INT:0
-                §/LAM{l1}
+                §/LAM
             """;
         var result = Program.Compile(source, "lambda-match.calr", new CompilationOptions
         {
@@ -82,10 +82,10 @@ public class ExpressionMatchBlockSafetyTests
     public void SingleReturnExpressionArms_ExecuteBothSourceForms()
     {
         const string source = """
-            §M{m1:MatchSafety}
-              §F{f1:Probe:pub} (i32:x) -> i32
+            §M{MatchSafety}
+              §F{Probe:pub} (i32:x) -> i32
                 §E{}
-                §R §W{w1} x
+                §R §W x
                   §K 1
                     §R INT:7
                   §K _ → INT:0
@@ -102,15 +102,15 @@ public class ExpressionMatchBlockSafetyTests
     public void StatementMatchBlocks_KeepPrintMutationBindingsAndNestedReturns()
     {
         const string source = """
-            §M{m1:MatchSafety}
-              §F{f1:Probe:pub} (i32:x, List<i32>:trace) -> i32
+            §M{MatchSafety}
+              §F{Probe:pub} (i32:x, List<i32>:trace) -> i32
                 §E{cw,mut}
-                §W{w1} x
+                §W x
                   §K 1
                     §P "must execute"
                     §C{trace.Add} §A x §/C
                     §B{answer:i32} INT:7
-                    §IF{if1} (> x INT:0)
+                    §IF (> x INT:0)
                       §R answer
                     §EL
                       §R INT:8

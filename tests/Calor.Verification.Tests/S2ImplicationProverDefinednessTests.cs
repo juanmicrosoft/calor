@@ -17,8 +17,8 @@ public sealed class S2ImplicationProverDefinednessTests
     private static IReadOnlyList<EnsuresNode> Postconditions(string postconditions)
     {
         var source = $$"""
-            §M{m1:M}
-              §F{f1:P:pub} (i32:x, i32:y) -> i32
+            §M{M}
+              §F{P:pub} (i32:x, i32:y) -> i32
                 §E{}
             {{postconditions}}
                 §R INT:1
@@ -81,8 +81,8 @@ public sealed class S2ImplicationProverDefinednessTests
         Assert.True(string.IsNullOrEmpty(s) && s != "");
 
         var source = """
-            §M{m1:M}
-              §F{f1:P:pub} (str:s, i32:x) -> i32
+            §M{M}
+              §F{P:pub} (str:s, i32:x) -> i32
                 §E{}
                 §Q (&& (isempty s) (!= s STR:""))
                 §Q (> x INT:0)
@@ -109,8 +109,8 @@ public sealed class S2ImplicationProverDefinednessTests
         // Review round 3 witnesses: no input completes these antecedents, so A -> false holds
         // at runtime; the solver's total select/extract must not yield a counterexample.
         var source = $$"""
-            §M{m1:M}
-              §F{f1:P:pub} (i32[]:arr, str:s) -> i32
+            §M{M}
+              §F{P:pub} (i32[]:arr, str:s) -> i32
                 §E{}
                 §Q {{antecedent}}
                 §R INT:1

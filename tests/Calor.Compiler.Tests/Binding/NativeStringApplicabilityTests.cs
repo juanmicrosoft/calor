@@ -72,7 +72,7 @@ public sealed class NativeStringApplicabilityTests
     public void SelectedScalarOverload_ActivatesWithoutInventingPriorRejection(bool expression, string alias)
     {
         var source = Source(expression, alias, NullableProducer, """
-              §F{object:Take:pub} (object:value) -> i32
+              §F{Take:pub} (object:value) -> i32
                 §E{}
                 §R 2
             """);
@@ -92,7 +92,7 @@ public sealed class NativeStringApplicabilityTests
     public void NativeNullableReturn_ReachesTheSameArgumentPredicate(bool expression, string alias)
     {
         var source = Source(expression, alias, "§C{Get} §/C", $$"""
-              §F{get:Get:pub} () -> ?{{alias}}
+              §F{Get:pub} () -> ?{{alias}}
                 §E{env}
                 §R {{NullableProducer}}
             """);
@@ -109,11 +109,11 @@ public sealed class NativeStringApplicabilityTests
     public void NamedInputs_KeepN2LocalTransferAndN3FormalMapping(bool expression)
     {
         var source = $$"""
-            §M{m1:NativeString}
-              §F{take:Take:pub} (str:required,?str:optional) -> i32
+            §M{NativeString}
+              §F{Take:pub} (str:required,?str:optional) -> i32
                 §E{}
                 §R 1
-              §F{caller:Caller:pub} (?str:maybe,str:sure) -> i32
+              §F{Caller:pub} (?str:maybe,str:sure) -> i32
                 §E{}
                 §B{first} maybe
                 §B{second} first
@@ -151,7 +151,7 @@ public sealed class NativeStringApplicabilityTests
     public void GenuineAmbiguityAndUnknownNames_KeepTheirDiagnostics(bool expression)
     {
         var ambiguous = Source(expression, "i64", "1", """
-              §F{double:Take:pub} (f64:value) -> i32
+              §F{Take:pub} (f64:value) -> i32
                 §E{}
                 §R 2
             """);
@@ -167,11 +167,11 @@ public sealed class NativeStringApplicabilityTests
     public void InvisibleSiblingArgument_DoesNotChangeScalarActivationProvenance()
     {
         const string source = """
-            §M{m1:NativeString}
-              §F{take:Take:pub} (str:value,Invisible:other) -> i32
+            §M{NativeString}
+              §F{Take:pub} (str:value,Invisible:other) -> i32
                 §E{}
                 §R 1
-              §F{caller:Caller:pub} (?str:value,Invisible:other) -> i32
+              §F{Caller:pub} (?str:value,Invisible:other) -> i32
                 §E{}
                 §R §C{Take} §A value §A other §/C
             """;
@@ -369,12 +369,12 @@ public sealed class NativeStringApplicabilityTests
     }
 
     private static string Source(bool expression, string target, string argument, string extra = "") => $$"""
-        §M{m1:NativeString}
-          §F{take:Take:pub} ({{target}}:value) -> i32
+        §M{NativeString}
+          §F{Take:pub} ({{target}}:value) -> i32
             §E{}
             §R 1
         {{extra}}
-          §F{caller:Caller:pub} () -> i32
+          §F{Caller:pub} () -> i32
             §E{env}
             {{(expression ? "§R " : "")}}§C{Take} §A {{argument}} §/C
             {{(expression ? "" : "§R 0")}}

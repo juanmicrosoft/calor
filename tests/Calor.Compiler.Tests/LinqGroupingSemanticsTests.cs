@@ -65,9 +65,9 @@ public class LinqGroupingSemanticsTests
     {
         var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
         var source = """
-            §M{m1:InlineCalls}
-              §F{f1:Build:pub} () -> void
-                §B{action} §LAM{lam1} §C{First} §/C §C{Second} §/C §/LAM{lam1}
+            §M{InlineCalls}
+              §F{Build:pub} () -> void
+                §B{action} §LAM{} §C{First} §/C §C{Second} §/C §/LAM
             """;
         var tokens = new Parsing.Lexer(source, diagnostics).TokenizeAll();
         var module = new Parsing.Parser(tokens, diagnostics).Parse();

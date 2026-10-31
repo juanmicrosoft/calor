@@ -324,8 +324,8 @@ public class TelemetryUpgradeTests
     #region Integration: Program.Compile Emits Telemetry Events
 
     private const string ValidCalorSource = @"
-§M{m001:Calculator}
-  §F{f001:Add:pub}
+§M{Calculator}
+  §F{Add:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -333,8 +333,8 @@ public class TelemetryUpgradeTests
 ";
 
     private const string InvalidCalorSource = @"
-§M{m001:Test}
-  §F{f001:Hello:pub}
+§M{Test}
+  §F{Hello:pub}
       §O{void}
         §INVALID_SYNTAX
 ";
@@ -387,8 +387,8 @@ public class TelemetryUpgradeTests
 
         var result = Program.Compile(
             """
-            §M{m001:Invalid}
-              §F{f001:Main:pub} () -> void
+            §M{Invalid}
+              §F{Main:pub} () -> void
                 §B{x:i32} STR:"not an int"
             """,
             "invalid.calr",
@@ -414,8 +414,8 @@ public class TelemetryUpgradeTests
         File.WriteAllText(
             path,
             """
-            §M{m001:Invalid}
-              §F{f001:Main:pub} () -> i32
+            §M{Invalid}
+              §F{Main:pub} () -> i32
                 §R missing
             """);
 
@@ -451,8 +451,8 @@ public class TelemetryUpgradeTests
         File.WriteAllText(
             path,
             """
-            §M{m001:Invalid}
-              §F{f001:Main:pub} () -> void
+            §M{Invalid}
+              §F{Main:pub} () -> void
                 §B{x:i32} STR:"not an int"
             """);
 
@@ -492,16 +492,16 @@ public class TelemetryUpgradeTests
         File.WriteAllText(
             libraryPath,
             """
-            §M{m001:Library}
-              §F{f001:Write:pub} () -> void
+            §M{Library}
+              §F{Write:pub} () -> void
                 §E{cw}
                 §P "written"
             """);
         File.WriteAllText(
             consumerPath,
             """
-            §M{m002:Consumer}
-              §F{f002:Run:pub} () -> void
+            §M{Consumer}
+              §F{Run:pub} () -> void
                 §C{Write} §/C
             """);
 

@@ -19,26 +19,26 @@ public class EmptyClauseBodyTests
 {
     // The 0.25 R0 witness X-TRYCATCH-01, as the converter emitted it (CLI default).
     private const string XTryCatch01 = """
-        §M{m001:X-TRYCATCH-01:overflow=unchecked}
+        §M{X-TRYCATCH-01:overflow=unchecked}
           §U{System}
 
           §NS{ns_global:_global:global}
-            §M{c001:Probe:pub}
+            §M{Probe:pub}
               §FLD{i32:counter:priv:stat} = 0
 
-              §MT{m002:Work:pub:stat} (bool:fail)
+              §MT{Work:pub:stat} (bool:fail)
                 §E{throw,alloc}
-                §IF{if003} fail
+                §IF fail
                   §TH §NEW{InvalidOperationException} §A "x" §/NEW
 
-              §MT{m004:Step:pub:stat} (bool:fail)
+              §MT{Step:pub:stat} (bool:fail)
                 §E{throw,alloc}
-                §TR{try005}
+                §TR
                   §C{Work} fail
                 §CA{InvalidOperationException:}
                 §ASSIGN counter (+ counter 1)
 
-              §MT{m006:Run:pub:stat} () -> str
+              §MT{Run:pub:stat} () -> str
                 §E{throw,alloc}
                 §C{Step} false
                 §C{Step} true
@@ -89,11 +89,11 @@ public class EmptyClauseBodyTests
     public void EmptyCatch_SameColumnStatement_FollowsTheTry()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:Step:pub} (i32:x) -> i32
+            §M{T}
+              §F{Step:pub} (i32:x) -> i32
                 §E{throw}
                 §B{~n:i32} 0
-                §TR{t1}
+                §TR
                   §ASSIGN n (/ 10 x)
                 §CA{DivideByZeroException:}
                 §ASSIGN n (+ n 1)
@@ -111,11 +111,11 @@ public class EmptyClauseBodyTests
     public void EmptyFinally_SameColumnStatement_FollowsTheTry()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:Step:pub} (i32:x) -> i32
+            §M{T}
+              §F{Step:pub} (i32:x) -> i32
                 §E{throw}
                 §B{~n:i32} 0
-                §TR{t1}
+                §TR
                   §ASSIGN n x
                 §FI
                 §ASSIGN n (+ n 1)
@@ -133,11 +133,11 @@ public class EmptyClauseBodyTests
     public void MultipleCatches_FirstEmpty_SecondKeepsItsBody_StatementFollows()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:Step:pub} (i32:x) -> i32
+            §M{T}
+              §F{Step:pub} (i32:x) -> i32
                 §E{throw}
                 §B{~n:i32} 0
-                §TR{t1}
+                §TR
                   §ASSIGN n (/ 10 x)
                 §CA{DivideByZeroException:}
                 §CA{Exception:e}
@@ -158,12 +158,12 @@ public class EmptyClauseBodyTests
     public void NestedTry_EmptyInnerCatch_DoesNotStealOuterCatch()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:Step:pub} (i32:x) -> i32
+            §M{T}
+              §F{Step:pub} (i32:x) -> i32
                 §E{throw}
                 §B{~n:i32} 0
-                §TR{t1}
-                  §TR{t2}
+                §TR
+                  §TR
                     §ASSIGN n (/ 10 x)
                   §CA{DivideByZeroException:}
                 §CA{Exception:}
@@ -184,12 +184,12 @@ public class EmptyClauseBodyTests
     public void NestedTry_EmptyInnerCatch_SiblingInOuterTryBody()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:Step:pub} (i32:x) -> i32
+            §M{T}
+              §F{Step:pub} (i32:x) -> i32
                 §E{throw}
                 §B{~n:i32} 0
-                §TR{t1}
-                  §TR{t2}
+                §TR
+                  §TR
                     §ASSIGN n (/ 10 x)
                   §CA{DivideByZeroException:}
                   §ASSIGN n (+ n 1)
@@ -210,13 +210,13 @@ public class EmptyClauseBodyTests
     public void EmptyCatch_AtEndOfMethod_LeavesNextFunctionIntact()
     {
         var module = Parse("""
-            §M{m1:T}
-              §F{f1:A:pub} (i32:x) -> void
+            §M{T}
+              §F{A:pub} (i32:x) -> void
                 §E{throw}
-                §TR{t1}
+                §TR
                   §B{y:i32} (/ 10 x)
                 §CA{DivideByZeroException:}
-              §F{f2:B:pub} () -> i32
+              §F{B:pub} () -> i32
                 §E{}
                 §R 2
             """);
@@ -230,15 +230,15 @@ public class EmptyClauseBodyTests
     public void EmptyClauses_ExecuteWithCorrectStructure()
     {
         var type = Compile("""
-            §M{m1:T}
-              §F{f1:Step:pub} (i32:x) -> i32
+            §M{T}
+              §F{Step:pub} (i32:x) -> i32
                 §E{throw}
                 §B{~n:i32} 0
-                §TR{t1}
+                §TR
                   §ASSIGN n (/ 10 x)
                 §CA{DivideByZeroException:}
                 §ASSIGN n (+ n 1)
-                §TR{t2}
+                §TR
                   §ASSIGN n (+ n 10)
                 §FI
                 §ASSIGN n (+ n 100)
@@ -279,22 +279,22 @@ public class EmptyClauseBodyTests
 
     public static IEnumerable<object[]> EmptyClauseCases() => new[]
     {
-        new object[] { "if-then", "§IF{i1} b" },
-        new object[] { "elseif", "§IF{i1} b\n      §B{a:i32} 1\n    §EI (== n 2)" },
-        new object[] { "else", "§IF{i1} b\n      §B{a:i32} 1\n    §EL" },
-        new object[] { "block-if-else", "§IF{i1} b\n      §B{a:i32} 1\n    §EL" },
-        new object[] { "for", "§L{l1:i:0:3:1}" },
-        new object[] { "while", "§WH{w1} b" },
-        new object[] { "foreach", "§EACH{e1:x:i32} xs" },
-        new object[] { "eachkv", "§EACHKV{k1:k:v} d" },
-        new object[] { "using", "§USE{u1:s:MemoryStream} §NEW{MemoryStream} §/NEW" },
-        new object[] { "sync", "§SYNC{s1} (o)" },
-        new object[] { "unsafe", "§UNSAFE{s1}" },
-        new object[] { "fixed", "§FIXED{fx1:p:i32*:xs}" },
+        new object[] { "if-then", "§IF b" },
+        new object[] { "elseif", "§IF b\n      §B{a:i32} 1\n    §EI (== n 2)" },
+        new object[] { "else", "§IF b\n      §B{a:i32} 1\n    §EL" },
+        new object[] { "block-if-else", "§IF b\n      §B{a:i32} 1\n    §EL" },
+        new object[] { "for", "§L{i:0:3:1}" },
+        new object[] { "while", "§WH b" },
+        new object[] { "foreach", "§EACH{x:i32} xs" },
+        new object[] { "eachkv", "§EACHKV{k:v} d" },
+        new object[] { "using", "§USE{s:MemoryStream} §NEW{MemoryStream} §/NEW" },
+        new object[] { "sync", "§SYNC (o)" },
+        new object[] { "unsafe", "§UNSAFE" },
+        new object[] { "fixed", "§FIXED{p:i32*:xs}" },
         new object[] { "preprocessor", "§PP{DEBUG}" },
-        new object[] { "try-empty-catch", "§TR{t1}\n      §B{a:i32} 1\n    §CA{Exception:}" },
-        new object[] { "try-empty-finally", "§TR{t1}\n      §B{a:i32} 1\n    §FI" },
-        new object[] { "match-last-case", "§W{m1} n\n      §K 1\n        §B{a:i32} 1\n      §K _" },
+        new object[] { "try-empty-catch", "§TR\n      §B{a:i32} 1\n    §CA{Exception:}" },
+        new object[] { "try-empty-finally", "§TR\n      §B{a:i32} 1\n    §FI" },
+        new object[] { "match-last-case", "§W n\n      §K 1\n        §B{a:i32} 1\n      §K _" },
     };
 
     [Theory]
@@ -302,12 +302,12 @@ public class EmptyClauseBodyTests
     public void EmptyClause_DoesNotSwallowSameColumnSibling(string name, string clause)
     {
         _ = name;
-        var source = "§M{m1:T}\n"
-            + "  §F{f1:A:pub} (bool:b, i32:n, [i32]:xs, Dict<str, i32>:d, object:o) -> i32\n"
+        var source = "§M{T}\n"
+            + "  §F{A:pub} (bool:b, i32:n, [i32]:xs, Dict<str, i32>:d, object:o) -> i32\n"
             + "    §E{}\n"
             + "    " + clause + "\n"
             + "    §R 7\n"
-            + "  §F{f2:B:pub} () -> i32\n"
+            + "  §F{B:pub} () -> i32\n"
             + "    §E{}\n"
             + "    §R 8\n";
         var module = Parse(source);
@@ -326,10 +326,10 @@ public class EmptyClauseBodyTests
         _ = name;
         // The empty clause is the last statement of a loop body; the
         // statement after it is at the loop's column, so it follows the loop.
-        var source = "§M{m1:T}\n"
-            + "  §F{f1:A:pub} (bool:b, i32:n, [i32]:xs, Dict<str, i32>:d, object:o) -> i32\n"
+        var source = "§M{T}\n"
+            + "  §F{A:pub} (bool:b, i32:n, [i32]:xs, Dict<str, i32>:d, object:o) -> i32\n"
             + "    §E{}\n"
-            + "    §L{outer:j:0:1:1}\n"
+            + "    §L{j:0:1:1}\n"
             + "      " + clause.Replace("\n    ", "\n      ") + "\n"
             + "    §R 7\n";
         var module = Parse(source);
@@ -345,11 +345,11 @@ public class EmptyClauseBodyTests
     public void EmptyThen_InsideOuterIf_DoesNotStealOuterElse()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:A:pub} (bool:a, bool:b) -> i32
+            §M{T}
+              §F{A:pub} (bool:a, bool:b) -> i32
                 §E{}
-                §IF{i1} a
-                  §IF{i2} b
+                §IF a
+                  §IF b
                 §EL
                   §R 2
                 §R 1
@@ -366,21 +366,21 @@ public class EmptyClauseBodyTests
     public void EmptyClauses_RunWithCorrectControlFlow()
     {
         var type = Compile("""
-            §M{m1:T}
-              §F{f1:A:pub} (i32:x) -> i32
+            §M{T}
+              §F{A:pub} (i32:x) -> i32
                 §E{}
                 §B{~n:i32} 0
-                §IF{i1} (> x 100)
+                §IF (> x 100)
                 §ASSIGN n (+ n 1)
-                §L{l1:i:0:3:1}
+                §L{i:0:3:1}
                 §ASSIGN n (+ n 10)
-                §WH{w1} false
+                §WH false
                 §ASSIGN n (+ n 100)
-                §IF{i2} (> x 0)
+                §IF (> x 0)
                   §ASSIGN n (+ n 1000)
                 §EL
                 §ASSIGN n (+ n 10000)
-                §W{m1} x
+                §W x
                   §K 1
                     §ASSIGN n (+ n 100000)
                   §K _
@@ -396,8 +396,8 @@ public class EmptyClauseBodyTests
     public void EmptyPreprocessorBlock_DoesNotSwallowSameColumnSibling()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:A:pub} () -> i32
+            §M{T}
+              §F{A:pub} () -> i32
                 §E{}
                 §PP{DEBUG}
                 §R 7
@@ -412,10 +412,10 @@ public class EmptyClauseBodyTests
     public void EmptyPreprocessorBlock_InsideIf_DoesNotStealOuterElse()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:A:pub} (bool:b) -> i32
+            §M{T}
+              §F{A:pub} (bool:b) -> i32
                 §E{}
-                §IF{i1} b
+                §IF b
                   §PP{DEBUG}
                 §EL
                   §R 2
@@ -432,10 +432,10 @@ public class EmptyClauseBodyTests
     public void BlockLambda_WithoutCloser_DoesNotSwallowFollowingStatements()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:A:pub} () -> i32
+            §M{T}
+              §F{A:pub} () -> i32
                 §E{}
-                §B{a:Action} §LAM{lam1}
+                §B{a:Action} §LAM{}
                 §R 7
             """);
 
@@ -448,15 +448,15 @@ public class EmptyClauseBodyTests
     public void EmptyGetter_DoesNotStealPropertyDedent()
     {
         var module = Parse("""
-            §M{m1:T}
-              §CL{c1:C:pub}
-                §PROP{p1:P:i32:pub}
+            §M{T}
+              §CL{C:pub}
+                §PROP{P:i32:pub}
                   §GET
                   §SET
-                §MT{m1:B:pub} () -> i32
+                §MT{B:pub} () -> i32
                   §E{}
                   §R 7
-              §CL{c2:D:pub}
+              §CL{D:pub}
             """);
 
         Assert.Equal(2, module.Classes.Count);
@@ -468,10 +468,10 @@ public class EmptyClauseBodyTests
     public void MultilineHeader_BodyOnHeaderLastLine_StaysInBody()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:A:pub} (bool:b) -> void
+            §M{T}
+              §F{A:pub} (bool:b) -> void
                 §E{cw}
-                §IF{i1} (==
+                §IF (==
                   1 2
                 ) §P "then"
                 §P "after"
@@ -485,7 +485,7 @@ public class EmptyClauseBodyTests
     [Fact]
     public void MultilineFunctionHeader_BodyOnHeaderLastLine_StaysInBody()
     {
-        var module = Parse("§M{m:T}\n  §F{f1:A:pub} (\n    bool:x\n  ) -> i32 §R 1\n");
+        var module = Parse("§M{T}\n  §F{A:pub} (\n    bool:x\n  ) -> i32 §R 1\n");
 
         Assert.IsType<ReturnStatementNode>(Assert.Single(Assert.Single(module.Functions).Body));
     }
@@ -495,13 +495,13 @@ public class EmptyClauseBodyTests
     {
         // Inside braces the lexer emits no Dedent; the §EL column decides.
         var type = Compile("""
-            §M{m1:T}
-              §F{f1:A:pub} () -> i32
+            §M{T}
+              §F{A:pub} () -> i32
                 §E{}
                 §B{~n:i32} 0
                 §B{a:Action} () → {
-                  §IF{outer} false
-                    §IF{inner} true
+                  §IF false
+                    §IF true
                   §EL
                     §ASSIGN n 1
                 }
@@ -516,14 +516,14 @@ public class EmptyClauseBodyTests
     public void BracedLambda_OuterCaseAfterInnerMatch_BelongsToOuterMatch()
     {
         var type = Compile("""
-            §M{m:T}
-              §F{f:A:pub} (i32:x) -> i32
+            §M{T}
+              §F{A:pub} (i32:x) -> i32
                 §E{}
                 §B{~n:i32} 0
                 §B{a:Action} () → {
-                  §W{outer} x
+                  §W x
                     §K 1
-                      §W{inner} x
+                      §W x
                         §K 2
                     §K _
                       §ASSIGN n 7
@@ -539,8 +539,8 @@ public class EmptyClauseBodyTests
     [Fact]
     public void FlatCloserScan_IgnoresBracketContinuationLines()
     {
-        var body = ParseSingleFunctionBody("§M{m:T}\n  §F{f:A:pub} () -> void\n    §E{cw}\n"
-            + "    §UNSAFE{u1}\n    §P \"first\"\n    §B{x:i32} (+\n1 2\n    )\n    §/UNSAFE{u1}\n    §P \"after\"\n");
+        var body = ParseSingleFunctionBody("§M{T}\n  §F{A:pub} () -> void\n    §E{cw}\n"
+            + "    §UNSAFE\n    §P \"first\"\n    §B{x:i32} (+\n1 2\n    )\n    §/UNSAFE\n    §P \"after\"\n");
 
         Assert.Equal(2, body.Count);
         Assert.Equal(2, Assert.IsType<UnsafeBlockNode>(body[0]).Body.Count);
@@ -550,11 +550,11 @@ public class EmptyClauseBodyTests
     public void BlockLambda_WithoutCloser_DoesNotTakeNextLineAsExpressionBody()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:A:pub} () -> i32
+            §M{T}
+              §F{A:pub} () -> i32
                 §E{}
                 §B{~n:i32} 0
-                §B{a:Func<i32>} §LAM{lam1}
+                §B{a:Func<i32>} §LAM{}
                 (inc n)
                 §R n
             """);
@@ -568,11 +568,11 @@ public class EmptyClauseBodyTests
     public void FlatCloserScan_TracksNestedOpenerOnHeaderLine()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:A:pub} (object:a, object:b) -> void
+            §M{T}
+              §F{A:pub} (object:a, object:b) -> void
                 §E{cw}
-                §SYNC{s1} (a) §SYNC{s2} (b) §P "inside"
-                §/SYNC{s2}
+                §SYNC (a) §SYNC (b) §P "inside"
+                §/SYNC
                 §P "after"
             """);
 
@@ -586,7 +586,7 @@ public class EmptyClauseBodyTests
     public void ManyEmptyBlocksWithoutClosers_ParseWithoutErrors()
     {
         var lines = string.Join("\n", Enumerable.Range(0, 3000).Select(i => $"    §UNSAFE{{u{i}}}"));
-        var module = Parse("§M{m1:T}\n  §F{f1:A:pub} () -> void\n    §E{}\n" + lines + "\n");
+        var module = Parse("§M{T}\n  §F{A:pub} () -> void\n    §E{}\n" + lines + "\n");
 
         Assert.Equal(3000, Assert.Single(module.Functions).Body.Count);
     }
@@ -599,10 +599,10 @@ public class EmptyClauseBodyTests
     public void EmptyClass_DoesNotAdoptSameColumnSiblingClass()
     {
         var module = Parse("""
-            §M{m1:T}
-              §CL{c1:K:pub}
-              §CL{c2:L:pub}
-                §MT{m1:B:pub} () -> i32
+            §M{T}
+              §CL{K:pub}
+              §CL{L:pub}
+                §MT{B:pub} () -> i32
                   §E{}
                   §R 2
             """);
@@ -617,10 +617,10 @@ public class EmptyClauseBodyTests
     public void EmptyNestedClass_DoesNotAdoptFollowingMethod()
     {
         var module = Parse("""
-            §M{m1:T}
-              §CL{c1:Outer:pub}
-                §CL{c2:Inner:pub}
-                §MT{m1:B:pub} () -> i32
+            §M{T}
+              §CL{Outer:pub}
+                §CL{Inner:pub}
+                §MT{B:pub} () -> i32
                   §E{}
                   §R 2
             """);
@@ -635,9 +635,9 @@ public class EmptyClauseBodyTests
     public void EmptyFunction_DoesNotSwallowSiblingFunction()
     {
         var module = Parse("""
-            §M{m1:T}
-              §F{f1:A:pub} () -> void
-              §F{f2:B:pub} () -> i32
+            §M{T}
+              §F{A:pub} () -> void
+              §F{B:pub} () -> i32
                 §E{}
                 §R 2
             """);
@@ -651,10 +651,10 @@ public class EmptyClauseBodyTests
     public void EmptyMemberPreprocessorBlock_DoesNotSwallowSiblingMethod()
     {
         var module = Parse("""
-            §M{m1:T}
-              §CL{c1:C:pub}
+            §M{T}
+              §CL{C:pub}
                 §PP{DEBUG}
-                §MT{m1:A:pub:stat} () -> i32
+                §MT{A:pub:stat} () -> i32
                   §E{}
                   §R 7
             """);
@@ -667,10 +667,10 @@ public class EmptyClauseBodyTests
     public void EmptyTypePreprocessorBlock_DoesNotSwallowSiblingClass()
     {
         var module = Parse("""
-            §M{m1:T}
+            §M{T}
               §PP{DEBUG}
-              §CL{c1:C:pub}
-                §MT{m1:A:pub:stat} () -> i32
+              §CL{C:pub}
+                §MT{A:pub:stat} () -> i32
                   §E{}
                   §R 7
             """);
@@ -682,11 +682,11 @@ public class EmptyClauseBodyTests
     public void EmptyEnumExtension_DoesNotAdoptSiblingFunction()
     {
         var module = Parse("""
-            §M{m:T}
+            §M{T}
               §EN{e:Color}
                 Red
               §EEXT{x:Color}
-              §F{f:A:pub} (Color:self) -> i32
+              §F{A:pub} (Color:self) -> i32
                 §E{}
                 §R 1
             """);
@@ -699,12 +699,12 @@ public class EmptyClauseBodyTests
     public void Documentation_DoesNotSwallowSiblingFunction()
     {
         var module = Parse("""
-            §M{m:T}
+            §M{T}
               /// First function.
-              §F{f1:A:pub} () -> i32
+              §F{A:pub} () -> i32
                 §E{}
                 §R 1
-              §F{f2:B:pub} () -> i32
+              §F{B:pub} () -> i32
                 §E{}
                 §R 2
             """);
@@ -720,8 +720,8 @@ public class EmptyClauseBodyTests
     {
         var module = Parse("""
             /// Partial view; Secret.calr is not loaded.
-            §M{m:T}
-              §F{f1:A:pub} () -> i32
+            §M{T}
+              §F{A:pub} () -> i32
                 §E{}
                 §R 1
             """);
@@ -735,9 +735,9 @@ public class EmptyClauseBodyTests
     public void EmptyEnum_DoesNotSwallowSiblingEnum()
     {
         var module = Parse("""
-            §M{m1:T}
-              §EN{e1:Color}
-              §EN{e2:Size}
+            §M{T}
+              §EN{Color}
+              §EN{Size}
                 Small
                 Large
             """);
@@ -755,16 +755,16 @@ public class EmptyClauseBodyTests
     public void FlatCloserForm_TryBodyAtOpenerColumn_StillOwnedUntilCloser()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:Test}
-              §F{f1:SafeDivide:pub}
+            §M{Test}
+              §F{SafeDivide:pub}
                 §I{i32:a}
                 §I{i32:b}
                 §O{i32}
-                §TR{t1}
+                §TR
                 §R (/ a b)
                 §CA{DivideByZeroException:ex}
                 §R 0
-                §/TR{t1}
+                §/TR
                 §R 5
             """);
 
@@ -779,7 +779,7 @@ public class EmptyClauseBodyTests
     {
         // Every line at column 1 and no closers: the function body sits at the
         // §F's own column. It ends at the next sibling declaration.
-        var module = Parse("§M{m001:Test}\n§F{f001:A:pub}\n§O{i32}\n§R 1\n§F{f002:B:pub}\n§O{i32}\n§R 2\n");
+        var module = Parse("§M{Test}\n§F{A:pub}\n§O{i32}\n§R 1\n§F{B:pub}\n§O{i32}\n§R 2\n");
 
         Assert.Equal(2, module.Functions.Count);
         Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions[0].Body));
@@ -790,12 +790,12 @@ public class EmptyClauseBodyTests
     public void FlatCloserForm_BodyStartingOnOpenerLine_ContinuesUntilCloser()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:A:pub} () -> void
+            §M{T}
+              §F{A:pub} () -> void
                 §E{cw}
-                §SYNC{s1} (this) §P "first"
+                §SYNC (this) §P "first"
                 §P "second"
-                §/SYNC{s1}
+                §/SYNC
                 §P "after"
             """);
 
@@ -807,11 +807,11 @@ public class EmptyClauseBodyTests
     public void EmptyBlock_FollowedByNestedSameKindBlockWithIdlessCloser_IsNotFlat()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:A:pub} () -> void
+            §M{T}
+              §F{A:pub} () -> void
                 §E{cw}
-                §UNSAFE{u1}
-                §UNSAFE{u2}
+                §UNSAFE
+                §UNSAFE
                   §P "inner"
                 §/UNSAFE
                 §P "after"
@@ -827,15 +827,15 @@ public class EmptyClauseBodyTests
     public void ExplicitCloserAfterEmptyIndentedCatch_KeepsCloserFormMeaning()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:A:pub} (i32:x) -> i32
+            §M{T}
+              §F{A:pub} (i32:x) -> i32
                 §E{throw}
                 §B{~n:i32} 0
-                §TR{t1}
+                §TR
                   §ASSIGN n (/ 10 x)
                 §CA{DivideByZeroException:}
                 §ASSIGN n -1
-                §/TR{t1}
+                §/TR
                 §R n
             """);
 

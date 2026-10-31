@@ -32,11 +32,11 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
         var targetType = ArraySpelling(targetShape);
         var supplied = locals ? "second" : "values";
         var source = $$"""
-            §M{m1:ArrayInputs}
-              §F{take:Take:pub} ({{targetType}}:items) -> i32
+            §M{ArrayInputs}
+              §F{Take:pub} ({{targetType}}:items) -> i32
                 §E{}
                 §R 1
-              §F{caller:Caller:pub} ({{sourceType}}:values) -> i32
+              §F{Caller:pub} ({{sourceType}}:values) -> i32
                 §E{}
                 {{(locals ? "§B{first} values\n    §B{second} first" : "")}}
                 {{(expression ? "§R " : "")}}§C{Take} §A[items] {{supplied}} §/C
@@ -101,11 +101,11 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     public void StageB_NullGuardNarrowsOnlyArrayContainer(string sourceType, bool elementMismatch)
     {
         var source = $$"""
-            §M{m1:GuardedArray}
-              §F{take:Take:pub} ([str]:items) -> i32
+            §M{GuardedArray}
+              §F{Take:pub} ([str]:items) -> i32
                 §R 1
-              §F{probe:Probe:pub} ({{sourceType}}:items) -> i32
-                §IF{guard} (!= items null)
+              §F{Probe:pub} ({{sourceType}}:items) -> i32
+                §IF (!= items null)
                   §R §C{Take} §A items §/C
                 §R 0
             """;
@@ -129,14 +129,14 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
             ? $"(&& (&& (!= value null) (!= other null)) §C{{Mutate}} §A{{{modifier}}} value §/C)"
             : $"(&& (!= value null) §C{{Mutate}} §A{{{modifier}}} value §/C)";
         var source = $$"""
-            §M{m1:InvalidatedArrayGuard}
-              §F{mutate:Mutate:pub} (?[str]:value:{{modifier}}) -> bool
+            §M{InvalidatedArrayGuard}
+              §F{Mutate:pub} (?[str]:value:{{modifier}}) -> bool
                 §ASSIGN value null
                 §R true
-              §F{take:Take:pub} ([str]:value) -> void
+              §F{Take:pub} ([str]:value) -> void
                 §E{}
-              §F{probe:Probe:pub} (?[str]:value, ?[str]:other) -> void
-                §IF{guard} {{condition}}
+              §F{Probe:pub} (?[str]:value, ?[str]:other) -> void
+                §IF {{condition}}
                   {{(nested ? "§C{Take} §A other §/C\n      " : "")}}§C{Take} §A value §/C
             """;
         var result = Program.Compile(source, "invalidated-array-guard.calr");
@@ -162,13 +162,13 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
         var mutation = $"§C{{MutateBoth}} {argument} first {argument} second §/C";
         var right = wrapped ? $"(== {mutation} true)" : mutation;
         var source = $$"""
-            §M{m1:OpaqueInvalidation}
-              §CL{c1:Holder:pub}
+            §M{OpaqueInvalidation}
+              §CL{Holder:pub}
                 {{interop}}
-                §MT{take:Take:pub} ([str]:value) -> void
+                §MT{Take:pub} ([str]:value) -> void
                   §E{}
-                §MT{probe:Probe:pub} (?[str]:first, ?[str]:second) -> void
-                  §IF{guard} (&& (&& (!= first null) (!= second null)) {{right}})
+                §MT{Probe:pub} (?[str]:first, ?[str]:second) -> void
+                  §IF (&& (&& (!= first null) (!= second null)) {{right}})
                     §C{Take} §A first §/C
                     §C{Take} §A second §/C
             """;
@@ -209,13 +209,13 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
             : "§CSHARP{public void Mutate(out string[]? value) { value = null; }}§/CSHARP";
         var argument = modifier == "ref" ? "§A{ref}" : "§A{out}";
         var source = $$"""
-            §M{m1:GuardedOpaqueInvalidation}
-              §CL{c1:Holder:pub}
+            §M{GuardedOpaqueInvalidation}
+              §CL{Holder:pub}
                 {{interop}}
-                §MT{take:Take:pub} ([str]:value) -> void
+                §MT{Take:pub} ([str]:value) -> void
                   §E{}
-                §MT{probe:Probe:pub} (?[str]:value) -> void
-                  §IF{guard} (!= value null)
+                §MT{Probe:pub} (?[str]:value) -> void
+                  §IF (!= value null)
                     §C{Mutate} {{argument}} value §/C
                     §C{Take} §A value §/C
             """;
@@ -232,15 +232,15 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     {
         var argument = modifier == "ref" ? "§A{ref}" : "§A{out}";
         var source = $$"""
-            §M{m1:EnclosingGuardInvalidation}
-              §F{mutate:Mutate:pub} (?[str]:value:{{modifier}}) -> bool
+            §M{EnclosingGuardInvalidation}
+              §F{Mutate:pub} (?[str]:value:{{modifier}}) -> bool
                 §ASSIGN value null
                 §R true
-              §F{take:Take:pub} ([str]:value) -> void
+              §F{Take:pub} ([str]:value) -> void
                 §E{}
-              §F{probe:Probe:pub} (?[str]:value) -> void
-                §IF{outer} (!= value null)
-                  §IF{inner} (&& (!= value null) §C{Mutate} {{argument}} value §/C)
+              §F{Probe:pub} (?[str]:value) -> void
+                §IF (!= value null)
+                  §IF (&& (!= value null) §C{Mutate} {{argument}} value §/C)
                     §P "mutated"
                   §C{Take} §A value §/C
             """;
@@ -262,14 +262,14 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     {
         var argument = modifier == "ref" ? "§A{ref}" : "§A{out}";
         var source = $$"""
-            §M{m1:DeferredMutation}
-              §F{mutate:Mutate:pub} ({{nullableType}}:value:{{modifier}}) -> void
+            §M{DeferredMutation}
+              §F{Mutate:pub} ({{nullableType}}:value:{{modifier}}) -> void
                 §ASSIGN value null
-              §F{take:Take:pub} ({{nonNullableType}}:value) -> void
+              §F{Take:pub} ({{nonNullableType}}:value) -> void
                 §E{}
-              §F{probe:Probe:pub} ({{nullableType}}:value) -> void
-                §IF{guard} (!= value null)
-                  §B{later:Action} §LAM{lam1} §C{Mutate} {{argument}} value §/C §/LAM{lam1}
+              §F{Probe:pub} ({{nullableType}}:value) -> void
+                §IF (!= value null)
+                  §B{later:Action} §LAM{} §C{Mutate} {{argument}} value §/C §/LAM
                   §C{Take} §A value §/C
             """;
 
@@ -290,16 +290,16 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     {
         var argument = modifier == "ref" ? "§A{ref}" : "§A{out}";
         var source = $$"""
-            §M{m1:DeferredConjunction}
-              §F{mutate:Mutate:pub} ({{nullableType}}:value:{{modifier}}) -> bool
+            §M{DeferredConjunction}
+              §F{Mutate:pub} ({{nullableType}}:value:{{modifier}}) -> bool
                 §ASSIGN value null
                 §R true
-              §F{ignore:Ignore:pub} (Action:action) -> bool
+              §F{Ignore:pub} (Action:action) -> bool
                 §R true
-              §F{take:Take:pub} ({{nonNullableType}}:value) -> void
+              §F{Take:pub} ({{nonNullableType}}:value) -> void
                 §E{}
-              §F{probe:Probe:pub} ({{nullableType}}:value) -> void
-                §IF{guard} (&& (!= value null) §C{Ignore} §A §LAM{lam1} §C{Mutate} {{argument}} value §/C §/LAM{lam1} §/C)
+              §F{Probe:pub} ({{nullableType}}:value) -> void
+                §IF (&& (!= value null) §C{Ignore} §A §LAM{} §C{Mutate} {{argument}} value §/C §/LAM §/C)
                   §C{Take} §A value §/C
             """;
 
@@ -320,14 +320,14 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     {
         var argument = modifier == "ref" ? "§A{ref}" : "§A{out}";
         var source = $$"""
-            §M{m1:InvokedDeferredMutation}
-              §F{mutate:Mutate:pub} ({{nullableType}}:value:{{modifier}}) -> void
+            §M{InvokedDeferredMutation}
+              §F{Mutate:pub} ({{nullableType}}:value:{{modifier}}) -> void
                 §ASSIGN value null
-              §F{take:Take:pub} ({{nonNullableType}}:value) -> void
+              §F{Take:pub} ({{nonNullableType}}:value) -> void
                 §E{}
-              §F{probe:Probe:pub} ({{nullableType}}:value) -> void
-                §IF{guard} (!= value null)
-                  §B{later:Action} §LAM{lam1} §C{Mutate} {{argument}} value §/C §/LAM{lam1}
+              §F{Probe:pub} ({{nullableType}}:value) -> void
+                §IF (!= value null)
+                  §B{later:Action} §LAM{} §C{Mutate} {{argument}} value §/C §/LAM
                   §C{later} §/C
                   §C{Take} §A value §/C
             """;
@@ -354,8 +354,8 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
         var sourceType = ArraySpelling((nullableContainer ? 1 : 0) | (nullableElements ? 2 : 0));
         var supplied = locals ? "second" : "values";
         var source = $$"""
-            §M{m1:ArrayBcl}
-              §F{caller:Caller:pub} ({{sourceType}}:values) -> void
+            §M{ArrayBcl}
+              §F{Caller:pub} ({{sourceType}}:values) -> void
                 {{(locals ? "§B{first} values\n    §B{second} first" : "")}}
                 §C{System.IO.File.WriteAllLines} §A[contents] {{supplied}} §A[path] STR:"not-executed.txt" §/C
             """;
@@ -492,8 +492,8 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     public void A4_RealBclExpandedLaterScalar_IsNotAnArrayReceivingShape(bool nullable)
     {
         var source = $$"""
-            §M{m1:ExpandedArrays}
-              §F{caller:Caller:pub} ({{(nullable ? "?str" : "str")}}:later) -> str
+            §M{ExpandedArrays}
+              §F{Caller:pub} ({{(nullable ? "?str" : "str")}}:later) -> str
                 §R §C{System.IO.Path.Combine} §A "a" §A "b" §A "c" §A "d" §A later §/C
             """;
         var (module, diagnostics) = Bind(source);
@@ -517,15 +517,15 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     public void A4_RealBclGenericArrayReturn_PreservesElementsAcrossActiveBoundaries(bool nullable)
     {
         var source = $$"""
-            §M{m1:GenericArrayProducer}
-              §F{take:Take:pub} ([str]:items) -> i32
+            §M{GenericArrayProducer}
+              §F{Take:pub} ([str]:items) -> i32
                 §R 1
-              §F{caller:Caller:pub} ({{ArraySpelling(nullable ? 2 : 0)}}:values) -> i32
+              §F{Caller:pub} ({{ArraySpelling(nullable ? 2 : 0)}}:values) -> i32
                 §B{legacy:[str]} §C{System.Linq.Enumerable.ToArray} §A values §/C
                 §B{first} §C{System.Linq.Enumerable.ToArray} §A values §/C
                 §B{second} first
                 §R §C{Take} §A second §/C
-              §F{return:LegacyReturn:pub} ({{ArraySpelling(nullable ? 2 : 0)}}:values) -> [str]
+              §F{LegacyReturn:pub} ({{ArraySpelling(nullable ? 2 : 0)}}:values) -> [str]
                 §R §C{System.Linq.Enumerable.ToArray} §A values §/C
             """;
         var (module, diagnostics) = Bind(source);
@@ -551,10 +551,10 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     public void A4_ValueArrayContainer_IsAReferenceButItsElementsStayValues(bool nullable, bool bcl)
     {
         var source = $$"""
-            §M{m1:ValueArrays}
-              §F{take:Take:pub} (i32[]:items) -> void
+            §M{ValueArrays}
+              §F{Take:pub} (i32[]:items) -> void
                 §E{}
-              §F{caller:Caller:pub} (i32[]{{(nullable ? "?" : "")}}:values) -> void
+              §F{Caller:pub} (i32[]{{(nullable ? "?" : "")}}:values) -> void
                 §C{{{(bcl ? "System.Array.Sort" : "Take")}}} §A values §/C
             """;
         var (module, diagnostics) = Bind(source);
@@ -611,12 +611,12 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     public void A4_ArrayAndRankIdentity_AreNotErasedByNativeClassConversion(string sourceType, string targetType)
     {
         var source = $$"""
-            §M{m1:ArrayRanks}
-              §CL{c1:Foo:pub}
+            §M{ArrayRanks}
+              §CL{Foo:pub}
                 §FLD{i32:Value:pub}
-              §F{take:Take:pub} ({{targetType}}:items) -> i32
+              §F{Take:pub} ({{targetType}}:items) -> i32
                 §R 1
-              §F{caller:Caller:pub} ({{sourceType}}:value) -> i32
+              §F{Caller:pub} ({{sourceType}}:value) -> i32
                 §R §C{Take} §A value §/C
             """;
         var (module, diagnostics) = Bind(source);
@@ -638,10 +638,10 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     public void A4_IncompatibleOrUnsupportedInputs_DoNotAcquireAnArrayMatch(string sourceType, string targetType)
     {
         var source = $$"""
-            §M{m1:ArrayBoundaries}
-              §F{take:Take:pub} ({{targetType}}:items) -> i32
+            §M{ArrayBoundaries}
+              §F{Take:pub} ({{targetType}}:items) -> i32
                 §R 1
-              §F{caller:Caller:pub} ({{sourceType}}:value) -> i32
+              §F{Caller:pub} ({{sourceType}}:value) -> i32
                 §R §C{Take} §A value §/C
             """;
         var (module, diagnostics) = Bind(source);

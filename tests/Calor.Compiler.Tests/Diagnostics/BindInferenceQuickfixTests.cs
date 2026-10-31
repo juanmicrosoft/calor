@@ -18,8 +18,8 @@ public class BindInferenceQuickfixTests
     public void RemovedNone_DoesNotSuggestRemovedType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{x} §NN
             """;
@@ -36,8 +36,8 @@ public class BindInferenceQuickfixTests
     public void Calor0251_Null_AttachesNullableFix()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{x} null
             """;
@@ -58,8 +58,8 @@ public class BindInferenceQuickfixTests
     public void Calor0252_VecEmpty_AttachesVecFix()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{xs} §C{Vec.empty}
             """;
@@ -80,8 +80,8 @@ public class BindInferenceQuickfixTests
     public void Calor0252_MapEmpty_AttachesMapFixWithTwoParams()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{m} §C{Map.empty}
             """;
@@ -99,8 +99,8 @@ public class BindInferenceQuickfixTests
     public void Calor0253_AmbiguousNumeric_AttachesF64Fix()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{x} (+ INT:0 FLOAT:0.0)
             """;
@@ -123,8 +123,8 @@ public class BindInferenceQuickfixTests
         // The fix's insertion column must account for the leading '~' on
         // mutable bindings; column math is (Span.Column + 3 + 1 + name.Length).
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{~items} null
             """;
@@ -142,8 +142,8 @@ public class BindInferenceQuickfixTests
     public void MultipleBindings_EachGetsItsOwnFix()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{a} null
                   §B{b} §C{Vec.empty}
@@ -167,8 +167,8 @@ public class BindInferenceQuickfixTests
     public void NoStrict_NoDiagnosticAndNoFix()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
                   §B{x} null
             """;

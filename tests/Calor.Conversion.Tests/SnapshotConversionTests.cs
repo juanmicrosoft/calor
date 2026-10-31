@@ -188,7 +188,7 @@ public class SnapshotConversionTests
         var exception = Record.Exception(() => VerifySnapshot(
             "missing.approved.calr",
             approved: null,
-            actual: "§M{m001:Missing}",
+            actual: "§M{Missing}",
             updateMode: false,
             (_, _) => writeAttempted = true));
 

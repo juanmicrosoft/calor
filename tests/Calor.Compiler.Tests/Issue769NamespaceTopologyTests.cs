@@ -49,15 +49,15 @@ public class Issue769NamespaceTopologyTests
     {
         const string source =
             """
-            §M{m001:Topology}
-              §NS{ns1:Example}
-                §EN{e1:Mode:pub}
+            §M{Topology}
+              §NS{Example}
+                §EN{Mode:pub}
                   None = 0
                   First = 1
                   Second = 2
                   All = First
                     | Second
-                §CL{c1:Survivor:pub}
+                §CL{Survivor:pub}
             """;
 
         var module = ParseCalor(source);
@@ -702,17 +702,17 @@ public class Issue769NamespaceTopologyTests
     {
         var module = ParseCalor(
             """
-            §M{m001:Test}
-              §NS{ns1:Alpha}
-                §F{f1:Compute:pub} () -> i32
+            §M{Test}
+              §NS{Alpha}
+                §F{Compute:pub} () -> i32
                   §Q (> INT:2 INT:1)
                   §R INT:42
-                §CL{c1:Worker:pub}
-                  §MT{m1:Run:pub} () -> i32
+                §CL{Worker:pub}
+                  §MT{Run:pub} () -> i32
                     §Q (> INT:2 INT:1)
                     §R INT:42
-                §IFACE{i1:IWorker}
-                  §MT{m2:Run}
+                §IFACE{IWorker}
+                  §MT{Run}
                     §O{i32}
                     §Q (> INT:2 INT:1)
             """);
@@ -763,13 +763,13 @@ public class Issue769NamespaceTopologyTests
     {
         var module = ParseCalor(
             """
-            §M{m001:Test}
-              §NS{ns1:Alpha}
-                §F{f1:Value:pub} () -> i32
+            §M{Test}
+              §NS{Alpha}
+                §F{Value:pub} () -> i32
                   §Q (> INT:2 INT:1)
                   §R INT:1
-              §NS{ns2:Beta}
-                §F{f2:Value:pub} () -> i32
+              §NS{Beta}
+                §F{Value:pub} () -> i32
                   §Q (> INT:3 INT:2)
                   §R INT:2
             """);
@@ -794,11 +794,11 @@ public class Issue769NamespaceTopologyTests
     {
         var module = ParseCalor(
             """
-            §M{m001:Test}
-              §NS{ns1:Alpha}
-                §CL{c1:One:pub}
-              §NS{ns2:Beta}
-                §CL{c2:Two:pub}
+            §M{Test}
+              §NS{Alpha}
+                §CL{One:pub}
+              §NS{Beta}
+                §CL{Two:pub}
             """);
         foreach (var type in module.Classes)
             type.NamespaceScopeId = null;
@@ -836,9 +836,9 @@ public class Issue769NamespaceTopologyTests
     {
         var module = ParseCalor(
             """
-            §M{m001:Test}
-              §NS{ns1:Alpha}
-                §CL{c1:Malformed:pub}
+            §M{Test}
+              §NS{Alpha}
+                §CL{Malformed:pub}
             """);
         var type = Assert.Single(module.Classes);
         type.NamespaceScopeId = null;
@@ -888,10 +888,10 @@ public class Issue769NamespaceTopologyTests
     {
         const string source =
             """
-            §M{m001:Mixed}
-              §NS{ns1:Alpha}
-                §CL{c1:Namespaced:pub}
-              §CL{c2:DirectGlobal:pub}
+            §M{Mixed}
+              §NS{Alpha}
+                §CL{Namespaced:pub}
+              §CL{DirectGlobal:pub}
             """;
 
         var parsed = ParseCalor(source);
@@ -936,28 +936,28 @@ public class Issue769NamespaceTopologyTests
             File.WriteAllText(
                 namespacedPath,
                 """
-                §M{m001:StorageFile}
-                  §NS{ns1:Company.Storage}
-                    §F{f1:Save:pub} () -> i32
+                §M{StorageFile}
+                  §NS{Company.Storage}
+                    §F{Save:pub} () -> i32
                       §R INT:41
                 """);
             File.WriteAllText(
                 globalPath,
                 """
-                §M{m002:GlobalFile}
-                  §NS{ns2:_global:global}
-                    §F{f2:Ping:pub} () -> i32
+                §M{GlobalFile}
+                  §NS{_global:global}
+                    §F{Ping:pub} () -> i32
                       §R INT:1
                 """);
             File.WriteAllText(
                 callerPath,
                 """
-                §M{m003:Consumer}
-                  §F{f3:ReadNamespaced:pub} () -> i32
+                §M{Consumer}
+                  §F{ReadNamespaced:pub} () -> i32
                     §R §C{Save}
-                  §F{f4:ReadGlobal:pub} () -> i32
+                  §F{ReadGlobal:pub} () -> i32
                     §R §C{Ping}
-                  §F{f5:ReadExplicitNamespace:pub} () -> i32
+                  §F{ReadExplicitNamespace:pub} () -> i32
                     §R §C{Company.Storage.Save}
                 """);
 
@@ -1020,14 +1020,14 @@ public class Issue769NamespaceTopologyTests
     {
         const string source =
             """
-            §M{m001:LocalModule}
-              §NS{ns1:Alpha}
-                §F{f1:Pick:priv} (i32:value) -> i32
+            §M{LocalModule}
+              §NS{Alpha}
+                §F{Pick:priv} (i32:value) -> i32
                   §R INT:7
-                §F{f2:Pick:priv} (str:value) -> i32
+                §F{Pick:priv} (str:value) -> i32
                   §R INT:8
-              §NS{ns2:Beta}
-                §F{f3:Run:pub} () -> i32
+              §NS{Beta}
+                §F{Run:pub} () -> i32
                   §R §C{Pick} §A INT:1 §/C
             """;
 
@@ -1066,11 +1066,11 @@ public class Issue769NamespaceTopologyTests
     {
         const string source =
             """
-            §M{m001:LocalModule}
-              §NS{ns1:Alpha}
-                §F{f1:Pick:priv} () -> i32
+            §M{LocalModule}
+              §NS{Alpha}
+                §F{Pick:priv} () -> i32
                   §R INT:7
-                §F{f2:Run:pub} () -> i32
+                §F{Run:pub} () -> i32
                   §R §C{Pick}
             """;
 
@@ -1117,20 +1117,20 @@ public class Issue769NamespaceTopologyTests
             File.WriteAllText(
                 localPath,
                 """
-                §M{m001:LocalModule}
-                  §NS{ns1:Alpha}
-                    §F{f1:Pick:priv} (i32:value) -> i32
+                §M{LocalModule}
+                  §NS{Alpha}
+                    §F{Pick:priv} (i32:value) -> i32
                       §R INT:7
-                  §NS{ns2:Beta}
-                    §F{f2:Run:pub} () -> i32
+                  §NS{Beta}
+                    §F{Run:pub} () -> i32
                       §R §C{Pick} §A INT:1 §/C
                 """);
             File.WriteAllText(
                 externalPath,
                 """
-                §M{m002:ExternalModule}
-                  §NS{ns3:Gamma}
-                    §F{f3:Pick:pub} (i32:value) -> i32
+                §M{ExternalModule}
+                  §NS{Gamma}
+                    §F{Pick:pub} (i32:value) -> i32
                       §R INT:99
                 """);
 
@@ -1192,19 +1192,19 @@ public class Issue769NamespaceTopologyTests
     {
         const string localSource =
             """
-            §M{m001:LocalModule}
-              §NS{ns1:Alpha}
-                §F{f1:Pick:priv} (str:value) -> i32
+            §M{LocalModule}
+              §NS{Alpha}
+                §F{Pick:priv} (str:value) -> i32
                   §R INT:7
-              §NS{ns2:Beta}
-                §F{f2:Run:pub} () -> i32
+              §NS{Beta}
+                §F{Run:pub} () -> i32
                   §R §C{Pick} §A INT:1 §/C
             """;
         const string externalSource =
             """
-            §M{m002:ExternalModule}
-              §NS{ns3:Gamma}
-                §F{f3:Pick:pub} (i32:value) -> i32
+            §M{ExternalModule}
+              §NS{Gamma}
+                §F{Pick:pub} (i32:value) -> i32
                   §R INT:99
             """;
 
@@ -1244,16 +1244,16 @@ public class Issue769NamespaceTopologyTests
     {
         const string source =
             """
-            §M{m001:LocalModule}
-              §NS{ns1:Alpha}
-                §F{f1:Pick:priv} (i32:value) -> i32
+            §M{LocalModule}
+              §NS{Alpha}
+                §F{Pick:priv} (i32:value) -> i32
                   §R value
-                §F{f2:Pick:priv} (str:value) -> i32
+                §F{Pick:priv} (str:value) -> i32
                   §R INT:1
-                §F{f3:Clash:priv} () -> i32
+                §F{Clash:priv} () -> i32
                   §R INT:2
-              §NS{ns2:Beta}
-                §F{f4:Clash:priv} () -> i32
+              §NS{Beta}
+                §F{Clash:priv} () -> i32
                   §R INT:3
             """;
 
@@ -1272,22 +1272,22 @@ public class Issue769NamespaceTopologyTests
     {
         const string localSource =
             """
-            §M{m001:LocalModule}
-              §NS{ns1:Alpha}
-                §F{f1:Pick:priv} () -> i32
+            §M{LocalModule}
+              §NS{Alpha}
+                §F{Pick:priv} () -> i32
                   §R INT:7
-              §NS{ns2:Beta}
-                §F{f2:Pick:priv} () -> i32
+              §NS{Beta}
+                §F{Pick:priv} () -> i32
                   §R INT:8
-              §NS{ns3:Consumer}
-                §F{f3:Run:pub} () -> i32
+              §NS{Consumer}
+                §F{Run:pub} () -> i32
                   §R §C{Pick}
             """;
         const string externalSource =
             """
-            §M{m002:ExternalModule}
-              §NS{ns4:Gamma}
-                §F{f4:Pick:pub} () -> i32
+            §M{ExternalModule}
+              §NS{Gamma}
+                §F{Pick:pub} () -> i32
                   §R INT:99
             """;
 
@@ -1316,33 +1316,33 @@ public class Issue769NamespaceTopologyTests
     {
         const string source =
             """
-            §M{m001:Binding}
-              §NS{ns1:Alpha}
-                §CL{c1:Widget:pub}
-                  §CTOR{ctor1:pub} (i32:value)
+            §M{Binding}
+              §NS{Alpha}
+                §CL{Widget:pub}
+                  §CTOR{pub} (i32:value)
                     §P STR:"alpha"
-                  §MT{m1:Create:pub:stat} (i32:value) -> i32
+                  §MT{Create:pub:stat} (i32:value) -> i32
                     §R value
-                §CL{c2:Receiver:pub}
-                  §MT{m2:Read:pub} (i32:value) -> i32
+                §CL{Receiver:pub}
+                  §MT{Read:pub} (i32:value) -> i32
                     §R value
-                §F{f1:UseStatic:pub} () -> i32
+                §F{UseStatic:pub} () -> i32
                   §R §C{Widget.Create} §A INT:41 §/C
-                §F{f2:UseReceiver:pub} (Receiver:receiver) -> i32
+                §F{UseReceiver:pub} (Receiver:receiver) -> i32
                   §R §C{receiver.Read} §A INT:42 §/C
-                §F{f3:Make:pub} () -> Widget
+                §F{Make:pub} () -> Widget
                   §R §NEW{Widget} §A INT:43 §/NEW
-                §F{f4:WrongStatic:pub} () -> i32
+                §F{WrongStatic:pub} () -> i32
                   §R §C{Widget.Create} §A BOOL:true §/C
-                §F{f5:WrongConstructor:pub} () -> Widget
+                §F{WrongConstructor:pub} () -> Widget
                   §R §NEW{Widget} §A BOOL:true §/NEW
-              §NS{ns2:Beta}
-                §CL{c3:Widget:pub}
-                  §CTOR{ctor2:pub} (str:value)
+              §NS{Beta}
+                §CL{Widget:pub}
+                  §CTOR{pub} (str:value)
                     §P STR:"beta"
-                  §MT{m3:Create:pub:stat} (str:value) -> str
+                  §MT{Create:pub:stat} (str:value) -> str
                     §R value
-                §F{f6:UseFullyQualified:pub} () -> i32
+                §F{UseFullyQualified:pub} () -> i32
                   §R §C{Alpha.Widget.Create} §A INT:44 §/C
             """;
 
@@ -1400,27 +1400,27 @@ public class Issue769NamespaceTopologyTests
     {
         const string source =
             """
-            §M{m001:GenericBinding}
-              §NS{ns1:Alpha}
-                §CL{c1:Box:pub}<T>
-                  §CTOR{ctor1:pub} (i32:value)
+            §M{GenericBinding}
+              §NS{Alpha}
+                §CL{Box:pub}<T>
+                  §CTOR{pub} (i32:value)
                     §B{copy:i32} value
-                  §MT{m1:Instance:pub} (i32:value) -> i32
+                  §MT{Instance:pub} (i32:value) -> i32
                     §R value
-                  §MT{m2:Static:pub:stat} (i32:value) -> i32
+                  §MT{Static:pub:stat} (i32:value) -> i32
                     §R value
-              §NS{ns2:Beta}
-                §F{f1:UseInstance:pub} (Alpha.Box<i32>:box) -> i32
+              §NS{Beta}
+                §F{UseInstance:pub} (Alpha.Box<i32>:box) -> i32
                   §R §C{box.Instance} §A INT:41 §/C
-                §F{f2:UseStatic:pub} () -> i32
+                §F{UseStatic:pub} () -> i32
                   §R §C{Alpha.Box<i32>.Static} §A INT:42 §/C
-                §F{f3:Make:pub} () -> Alpha.Box<i32>
+                §F{Make:pub} () -> Alpha.Box<i32>
                   §R §NEW{Alpha.Box<i32>} §A INT:43 §/NEW
-                §F{f4:WrongInstance:pub} (Alpha.Box<i32>:box) -> i32
+                §F{WrongInstance:pub} (Alpha.Box<i32>:box) -> i32
                   §R §C{box.Instance} §A BOOL:true §/C
-                §F{f5:WrongStatic:pub} () -> i32
+                §F{WrongStatic:pub} () -> i32
                   §R §C{Alpha.Box<i32>.Static} §A BOOL:true §/C
-                §F{f6:WrongConstructor:pub} () -> Alpha.Box<i32>
+                §F{WrongConstructor:pub} () -> Alpha.Box<i32>
                   §R §NEW{Alpha.Box<i32>} §A BOOL:true §/NEW
             """;
 
@@ -1474,24 +1474,24 @@ public class Issue769NamespaceTopologyTests
     {
         const string source =
             """
-            §M{m001:GenericArity}
-              §CL{c1:Box:pub}<T>
-                §CTOR{ctor1:pub} (i32:value)
+            §M{GenericArity}
+              §CL{Box:pub}<T>
+                §CTOR{pub} (i32:value)
                   §B{copy1:i32} value
-                §MT{m1:Pick:pub} () -> i32
+                §MT{Pick:pub} () -> i32
                   §R INT:1
-              §CL{c2:Box:pub}<TFirst,TSecond>
-                §CTOR{ctor2:pub} (str:value)
+              §CL{Box:pub}<TFirst,TSecond>
+                §CTOR{pub} (str:value)
                   §B{copy2:?str} value
-                §MT{m2:Pick:pub} () -> i32
+                §MT{Pick:pub} () -> i32
                   §R INT:2
-              §F{f1:UseOne:pub} (Box<i32>:box) -> i32
+              §F{UseOne:pub} (Box<i32>:box) -> i32
                 §R §C{box.Pick}
-              §F{f2:UseTwo:pub} (Box<i32,str>:box) -> i32
+              §F{UseTwo:pub} (Box<i32,str>:box) -> i32
                 §R §C{box.Pick}
-              §F{f3:MakeOne:pub} () -> Box<i32>
+              §F{MakeOne:pub} () -> Box<i32>
                 §R §NEW{Box<i32>} §A INT:1 §/NEW
-              §F{f4:MakeTwo:pub} () -> Box<i32,str>
+              §F{MakeTwo:pub} () -> Box<i32,str>
                 §R §NEW{Box<i32,str>} §A STR:"two" §/NEW
             """;
 
@@ -1531,12 +1531,12 @@ public class Issue769NamespaceTopologyTests
     {
         const string effectSource =
             """
-            §M{m001:GenericEffects}
-              §CL{c1:Box:pub}<T>
-                §MT{m1:Write:pub} (str:value) -> void
+            §M{GenericEffects}
+              §CL{Box:pub}<T>
+                §MT{Write:pub} (str:value) -> void
                   §E{cw}
                   §P value
-              §F{f1:Use:pub} (Box<i32>:box, str:value) -> void
+              §F{Use:pub} (Box<i32>:box, str:value) -> void
                 §E{}
                 §C{box.Write} §A value §/C
             """;
@@ -1551,13 +1551,13 @@ public class Issue769NamespaceTopologyTests
 
         const string taintSource =
             """
-            §M{m002:GenericTaint}
-              §NS{ns1:Alpha}
-                §CL{c2:Box:pub}<T>
-                  §MT{m2:Danger:pub} (str:value) -> void
+            §M{GenericTaint}
+              §NS{Alpha}
+                §CL{Box:pub}<T>
+                  §MT{Danger:pub} (str:value) -> void
                     §B{copy:?str} value
-              §NS{ns2:Beta}
-                §F{f2:Use:pub} (Alpha.Box<i32>:box, str:user_input) -> void
+              §NS{Beta}
+                §F{Use:pub} (Alpha.Box<i32>:box, str:user_input) -> void
                   §C{box.Danger} §A user_input §/C
             """;
         var module = ParseCalor(taintSource);
@@ -1592,31 +1592,31 @@ public class Issue769NamespaceTopologyTests
     {
         const string source =
             """
-            §M{m001:Topology}
-              §NS{ns1:Alpha}
-                §F{f1:Foo:pub} (i32:value) -> i32
+            §M{Topology}
+              §NS{Alpha}
+                §F{Foo:pub} (i32:value) -> i32
                   §R (+ value INT:1)
-                §F{f2:Over:pub} (i32:value) -> i32
+                §F{Over:pub} (i32:value) -> i32
                   §R (+ value INT:2)
-                §F{f3:Over:pub} (str:value) -> i32
+                §F{Over:pub} (str:value) -> i32
                   §R INT:7
-              §NS{ns2:Beta}
-                §F{f4:BetaLocal:pub} () -> i32
+              §NS{Beta}
+                §F{BetaLocal:pub} () -> i32
                   §R INT:5
-                §F{f5:FromBare:pub} () -> i32
+                §F{FromBare:pub} () -> i32
                   §R §C{Foo} §A INT:40 §/C
-                §F{f6:FromQualified:pub} () -> i32
+                §F{FromQualified:pub} () -> i32
                   §R §C{Alpha.Foo} §A INT:41 §/C
-                §F{f7:FromOverload:pub} () -> i32
+                §F{FromOverload:pub} () -> i32
                   §R §C{Alpha.Over} §A INT:40 §/C
-                §F{f8:FromSameNamespace:pub} () -> i32
+                §F{FromSameNamespace:pub} () -> i32
                   §R §C{BetaLocal}
-                §F{f9:FromGlobal:pub} () -> i32
+                §F{FromGlobal:pub} () -> i32
                   §R §C{GlobalValue}
-              §NS{ns3:_global:global}
-                §F{f10:GlobalValue:pub} () -> i32
+              §NS{_global:global}
+                §F{GlobalValue:pub} () -> i32
                   §R INT:3
-                §F{f11:FromAlpha:pub} () -> i32
+                §F{FromAlpha:pub} () -> i32
                   §R §C{Alpha.Foo} §A INT:9 §/C
             """;
 
@@ -1704,17 +1704,17 @@ public class Issue769NamespaceTopologyTests
     {
         const string source =
             """
-            §M{m001:Topology}
-              §NS{ns1:Alpha}
-                §F{f1:Shared:pub} () -> i32
+            §M{Topology}
+              §NS{Alpha}
+                §F{Shared:pub} () -> i32
                   §R INT:1
-              §NS{ns2:Beta}
-                §F{f2:Shared:pub} () -> i32
+              §NS{Beta}
+                §F{Shared:pub} () -> i32
                   §R INT:2
-              §NS{ns3:Gamma}
-                §F{f3:FromBare:pub} () -> i32
+              §NS{Gamma}
+                §F{FromBare:pub} () -> i32
                   §R §C{Shared}
-                §F{f4:FromQualified:pub} () -> i32
+                §F{FromQualified:pub} () -> i32
                   §R §C{Alpha.Shared}
             """;
 
@@ -1767,14 +1767,14 @@ public class Issue769NamespaceTopologyTests
     {
         var module = ParseCalor(
             """
-            §M{m001:Legacy}
-              §NS{ns1:_global}
-                §CL{c1:Thing:pub}
+            §M{Legacy}
+              §NS{_global}
+                §CL{Thing:pub}
             """);
 
         Assert.True(Assert.Single(module.NamespaceScopes).IsGlobal);
         var emitted = new CalorEmitter().Emit(module);
-        Assert.Contains("§NS{ns1:_global:global}", emitted);
+        Assert.Contains("§NS{_global:global}", emitted);
         var reparsed = ParseCalor(emitted);
         Assert.True(Assert.Single(reparsed.NamespaceScopes).IsGlobal);
     }

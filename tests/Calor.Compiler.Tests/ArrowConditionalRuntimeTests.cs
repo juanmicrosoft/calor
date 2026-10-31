@@ -16,10 +16,10 @@ public class ArrowConditionalRuntimeTests
     public void InlineConditionalReturn_DoesNotConsumeMethodDedentBeforeInteropSibling()
     {
         const string source = """
-            §M{m1:Arrow}
-              §CL{c1:C:pub}
-                §MT{m1:Native:pub:stat} (bool:b) -> i32
-                  §R §IF{tern1} b → 1 §EL → 2
+            §M{Arrow}
+              §CL{C:pub}
+                §MT{Native:pub:stat} (bool:b) -> i32
+                  §R §IF b → 1 §EL → 2
                 §CSHARP{public static int Other() => 3;}§/CSHARP
             """;
         var module = Parse(source);
@@ -32,11 +32,11 @@ public class ArrowConditionalRuntimeTests
     public void BlockReturn_DoesNotStealLoopDedent()
     {
         const string source = """
-            §M{m1:Arrow}
-              §F{f1:HasNegative:pub} ([i32]:arr) -> bool
+            §M{Arrow}
+              §F{HasNegative:pub} ([i32]:arr) -> bool
                 §E{}
-                §L{for1:i:0:(- (len arr) 1):1}
-                  §IF{if1} (< arr{i} 0)
+                §L{i:0:(- (len arr) 1):1}
+                  §IF (< arr{i} 0)
                     §R true
                 §R false
             """;
@@ -51,18 +51,18 @@ public class ArrowConditionalRuntimeTests
     }
 
     [Theory]
-    [InlineData("§IF{if1} (< i 0)\n        §R\n")]
-    [InlineData("§IF{if1} (&&\n        (< i 0)\n        (> i -10))\n        §R\n")]
-    [InlineData("§IF{if1} (< i 0)\n        §R\n      §EI (&&\n        (> i 9)\n        (< i 20))\n        §R\n")]
-    [InlineData("§IF{if1} (< i 0)\n        §R\n      §EI (> i 9)\n        §R\n")]
-    [InlineData("§IF{if1} (< i 0)\n        §R\n      §EL\n        §C{trace.Add} §A i §/C\n")]
+    [InlineData("§IF (< i 0)\n        §R\n")]
+    [InlineData("§IF (&&\n        (< i 0)\n        (> i -10))\n        §R\n")]
+    [InlineData("§IF (< i 0)\n        §R\n      §EI (&&\n        (> i 9)\n        (< i 20))\n        §R\n")]
+    [InlineData("§IF (< i 0)\n        §R\n      §EI (> i 9)\n        §R\n")]
+    [InlineData("§IF (< i 0)\n        §R\n      §EL\n        §C{trace.Add} §A i §/C\n")]
     public void FollowingNonReturnStatement_ExecutesOnceAfterLoop(string branch)
     {
         var source = """
-            §M{m1:Arrow}
-              §F{f1:Probe:pub} (List<i32>:trace) -> void
+            §M{Arrow}
+              §F{Probe:pub} (List<i32>:trace) -> void
                 §E{mut}
-                §L{for1:i:0:2:1}
+                §L{i:0:2:1}
                   §C{trace.Add} §A i §/C
             """ + "\n      " + branch + "    §C{trace.Add} §A 99 §/C\n";
         var module = Parse(source);
@@ -84,18 +84,18 @@ public class ArrowConditionalRuntimeTests
     public void NestedInlineIf_LeavesOuterElseAndNextFunctionIntact()
     {
         var type = Compile("""
-            §M{m1:Arrow}
-              §F{f1:Probe:pub} (i32:x) -> i32
+            §M{Arrow}
+              §F{Probe:pub} (i32:x) -> i32
                 §E{}
-                §IF{if1} (> x 0)
-                  §IF{if2} (> x 1)
+                §IF (> x 0)
+                  §IF (> x 1)
                     §R 2
                 §EL
                   §R -1
                 §R 1
-              §F{f2:Other:pub} () -> i32
+              §F{Other:pub} () -> i32
                 §E{}
-                §IF{if3} true
+                §IF true
                   §R 3
                 §R 4
             """);
@@ -106,15 +106,15 @@ public class ArrowConditionalRuntimeTests
     }
 
     [Theory]
-    [InlineData("§IF{if1} true → §IF{if2} true →\n        §C{trace.Add} §A i §/C")]
-    [InlineData("§IF{if1} false → §R §EL →\n        §C{trace.Add} §A i §/C")]
+    [InlineData("§IF true → §IF true →\n        §C{trace.Add} §A i §/C")]
+    [InlineData("§IF false → §R §EL →\n        §C{trace.Add} §A i §/C")]
     public void MidLineStatementClauses_AreRejected(string branch)
     {
         var source = """
-            §M{m1:Arrow}
-              §F{f1:Probe:pub} (List<i32>:trace) -> void
+            §M{Arrow}
+              §F{Probe:pub} (List<i32>:trace) -> void
                 §E{mut}
-                §L{for1:i:0:2:1}
+                §L{i:0:2:1}
             """ + "\n      " + branch + "\n      §C{trace.Add} §A 99 §/C\n";
         var diagnostics = new DiagnosticBag();
         new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();

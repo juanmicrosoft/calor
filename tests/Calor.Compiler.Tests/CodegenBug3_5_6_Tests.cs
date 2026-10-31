@@ -20,8 +20,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug6_Parser_NamedModule_SetsIsStatic()
     {
         var source = @"
-§M{m1:Test}
-  §M{c1:Helper}
+§M{Test}
+  §M{Helper}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -34,8 +34,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug6_ParseAndEmit_StaticClass_EmitsStaticKeyword()
     {
         var source = @"
-§M{m1:Test}
-  §M{c1:Helper:pub}
+§M{Test}
+  §M{Helper:pub}
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("public static class Helper", result);
@@ -66,8 +66,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug6_PartialClass_EmitsPartialKeyword()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:DataService:pub:partial}
+§M{Test}
+  §CL{DataService:pub:partial}
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("public partial class DataService", result);
@@ -98,8 +98,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug6_StaticPartialClass_EmitsCombinedModifiers()
     {
         var source = @"
-§M{m1:Test}
-  §M{c1:Helper:pub:partial}
+§M{Test}
+  §M{Helper:pub:partial}
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("public static partial class Helper", result);
@@ -109,8 +109,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug6_Parser_PartialModifier_SetsIsPartial()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyClass:partial}
+§M{Test}
+  §CL{MyClass:partial}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -121,8 +121,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug6_Parser_NamedModule_KeepsModuleIdentity()
     {
         var source = @"
-§M{m1:Test}
-  §M{c1:Helper}
+§M{Test}
+  §M{Helper}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -134,8 +134,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug6_ParseAndEmit_PublicModule_EmitsStaticKeyword()
     {
         var source = @"
-§M{m1:Test}
-  §M{c1:Helper:pub}
+§M{Test}
+  §M{Helper:pub}
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("public static class Helper", result);
@@ -145,8 +145,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug6_Parser_PartialModule_KeepsBothFlags()
     {
         var source = @"
-§M{m1:Test}
-  §M{c1:Helper:partial}
+§M{Test}
+  §M{Helper:partial}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -160,8 +160,8 @@ public class CodegenBug3_5_6_Tests
     {
         // An unrecognized modifier like "foo" should not set any known flags
         var source = @"
-§M{m1:Test}
-  §CL{c1:Helper:foo}
+§M{Test}
+  §CL{Helper:foo}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -178,10 +178,10 @@ public class CodegenBug3_5_6_Tests
     [Fact]
     public void Bug3_Parser_FourPositionals_ParsesBaseClassAndModifiers()
     {
-        // §CL{id:name:BaseClass:modifiers}
+        // §CL{name:BaseClass:modifiers}
         var source = @"
-§M{m1:Test}
-  §CL{c1:Child:Parent:sealed}
+§M{Test}
+  §CL{Child:Parent:sealed}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -192,10 +192,10 @@ public class CodegenBug3_5_6_Tests
     [Fact]
     public void Bug3_Parser_ThreePositionals_ModifiersOnly_BackwardCompat()
     {
-        // §CL{id:name:abs} — original 3-positional format
+        // §CL{name:abs} — original 3-positional format
         var source = @"
-§M{m1:Test}
-  §CL{c1:Shape:abs}
+§M{Test}
+  §CL{Shape:abs}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -208,8 +208,8 @@ public class CodegenBug3_5_6_Tests
     {
         // §EXT{Parent} as child tag
         var source = @"
-§M{m1:Test}
-  §CL{c1:Child}
+§M{Test}
+  §CL{Child}
     §EXT{Parent}
 ";
         var module = ParseModule(source);
@@ -281,10 +281,10 @@ public class CodegenBug3_5_6_Tests
     [Fact]
     public void Bug3_FourPositionals_VisibilityInPos2_IgnoredCorrectly()
     {
-        // §CL{c0:Foo:pub:abs} — pos2 is visibility keyword, should be ignored; pos3 is modifiers
+        // §CL{Foo:pub:abs} — pos2 is visibility keyword, should be ignored; pos3 is modifiers
         var source = @"
-§M{m1:Test}
-  §CL{c0:Foo:pub:abs}
+§M{Test}
+  §CL{Foo:pub:abs}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -295,10 +295,10 @@ public class CodegenBug3_5_6_Tests
     [Fact]
     public void Bug3_FourPositionals_BaseClassInPos2_ParsedCorrectly()
     {
-        // §CL{c0:Foo:MyBase:sealed} — pos2 is base class, pos3 is modifiers
+        // §CL{Foo:MyBase:sealed} — pos2 is base class, pos3 is modifiers
         var source = @"
-§M{m1:Test}
-  §CL{c0:Foo:MyBase:sealed}
+§M{Test}
+  §CL{Foo:MyBase:sealed}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -309,10 +309,10 @@ public class CodegenBug3_5_6_Tests
     [Fact]
     public void Bug3_ThreePositionals_SpaceSeparatedModifiers()
     {
-        // §CL{c1:Base:abs seal} — space-separated modifiers in 3-positional format
+        // §CL{Base:abs seal} — space-separated modifiers in 3-positional format
         var source = @"
-§M{m1:Test}
-  §CL{c1:Base:abs seal}
+§M{Test}
+  §CL{Base:abs seal}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -329,8 +329,8 @@ public class CodegenBug3_5_6_Tests
         // This only affects legacy Calor files; the new CalorEmitter uses §EXT tags,
         // and old files with base classes always used 4 positionals.
         var source = @"
-§M{m1:Test}
-  §CL{c1:Foo:partial}
+§M{Test}
+  §CL{Foo:partial}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -342,10 +342,10 @@ public class CodegenBug3_5_6_Tests
     [Fact]
     public void Bug3_ThreePositionals_NonKeywordPos2_TreatedAsBaseClass()
     {
-        // §CL{c1:Child:ParentWidget} — "ParentWidget" is not a known modifier → treated as base class
+        // §CL{Child:ParentWidget} — "ParentWidget" is not a known modifier → treated as base class
         var source = @"
-§M{m1:Test}
-  §CL{c1:Child:ParentWidget}
+§M{Test}
+  §CL{Child:ParentWidget}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -362,8 +362,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_DottedAccess_InterpolatedCorrectly()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Greet:pub}
+            §M{Test}
+              §F{Greet:pub}
                   §O{str}
                   §B{~result:str} STR:"Hello ${p.Name}"
             """;
@@ -376,8 +376,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_MultiLevelDottedAccess()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
+            §M{Test}
+              §F{Get:pub}
                   §O{str}
                   §B{~result:str} STR:"${a.B.C}"
             """;
@@ -390,8 +390,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_NullConditionalAccess()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
+            §M{Test}
+              §F{Get:pub}
                   §O{str}
                   §B{~result:str} STR:"${x?.Y}"
             """;
@@ -404,8 +404,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_SimpleInterpolation_BackwardCompat()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
+            §M{Test}
+              §F{Get:pub}
                   §O{str}
                   §B{~result:str} STR:"Hello ${name}"
             """;
@@ -418,8 +418,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_IndexerAccess()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
+            §M{Test}
+              §F{Get:pub}
                   §O{str}
                   §B{~result:str} STR:"${arr[0]}"
             """;
@@ -432,8 +432,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_MethodCall()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
+            §M{Test}
+              §F{Get:pub}
                   §O{str}
                   §B{~result:str} STR:"${obj.Method()}"
             """;
@@ -446,8 +446,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_ChainedIndexerProperty()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
+            §M{Test}
+              §F{Get:pub}
                   §O{str}
                   §B{~result:str} STR:"${list[i].Name}"
             """;
@@ -460,8 +460,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_MethodWithArgument()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
+            §M{Test}
+              §F{Get:pub}
                   §O{str}
                   §B{~result:str} STR:"${obj.GetValue(x)}"
             """;
@@ -474,8 +474,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_ArithmeticExpression()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
+            §M{Test}
+              §F{Get:pub}
                   §O{str}
                   §B{~result:str} STR:"${a + b}"
             """;
@@ -488,8 +488,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_FormatPlaceholder_BackwardCompat()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
+            §M{Test}
+              §F{Get:pub}
                   §O{str}
                   §B{~result:str} STR:"${0}"
             """;
@@ -504,8 +504,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_MultipleInterpolations()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
+            §M{Test}
+              §F{Get:pub}
                   §O{str}
                   §B{~result:str} STR:"${a} and ${b[0]}"
             """;
@@ -518,8 +518,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_NestedBraces()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
+            §M{Test}
+              §F{Get:pub}
                   §O{str}
                   §B{~result:str} STR:"${dict.GetOrAdd(key, () => new V { P = 1 })}"
             """;
@@ -532,8 +532,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_UnmatchedDollarBrace()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
+            §M{Test}
+              §F{Get:pub}
                   §O{str}
                   §B{~result:str} STR:"${incomplete"
             """;

@@ -177,8 +177,8 @@ public sealed class GeneratedProductionPipelinePropertyTests(ITestOutputHelper o
         var source = Render(sample);
         var mutant = construct switch
         {
-            "loop" => source.Replace("§L{loop:i:1:3:1}", "§L{loop:i:0:3:1}", StringComparison.Ordinal),
-            "match" => source.Replace("§W{match} 0", "§W{match} 1", StringComparison.Ordinal),
+            "loop" => source.Replace("§L{i:1:3:1}", "§L{i:0:3:1}", StringComparison.Ordinal),
+            "match" => source.Replace("§W 0", "§W 1", StringComparison.Ordinal),
             "conditional" => source.Replace(RenderTerm(sample.Expression),
                 RenderTerm(sample.Expression with
                 {
@@ -282,10 +282,10 @@ public sealed class GeneratedProductionPipelinePropertyTests(ITestOutputHelper o
     public async Task MalformedGenerator_ReportsRejectionsWithBoundedTermination()
     {
         var malformed = Gen.Elements(
-            "§M{m:Bad}\n  §NO_SUCH_KEYWORD\n",
-            "§M{m:Bad}\n  §F{f:Probe:pub} () -> i32\n    §R (+ 1)\n",
-            "§M{m:Bad}\n  §F{f:Probe:pub} () -> str\n    §R \"unterminated\n",
-            "§M{m:Bad}\n  §/M{m}\n");
+            "§M{Bad}\n  §NO_SUCH_KEYWORD\n",
+            "§M{Bad}\n  §F{Probe:pub} () -> i32\n    §R (+ 1)\n",
+            "§M{Bad}\n  §F{Probe:pub} () -> str\n    §R \"unterminated\n",
+            "§M{Bad}\n  §/M\n");
         var rejected = 0;
         foreach (var source in Gen.Sample(4, 32, malformed))
         {
@@ -502,16 +502,16 @@ public sealed class GeneratedProductionPipelinePropertyTests(ITestOutputHelper o
         {
             "expression" => $"    §R {expression}\n",
             "loop" => $"    §B{{~total:i32}} 0\n    §L{{loop:i:1:{sample.Count}:1}}\n      §B{{~total}} (+ total {expression})\n    §R total\n",
-            "match" => $"    §W{{match}} {sample.Count}\n      §K 0\n        §R {expression}\n      §K _\n        §R {RenderTerm(sample.Alternative)}\n",
+            "match" => $"    §W {sample.Count}\n      §K 0\n        §R {expression}\n      §K _\n        §R {RenderTerm(sample.Alternative)}\n",
             _ => throw new NotSupportedException(sample.Mode)
         };
         return """
-            §M{module:GeneratedPipeline}
-              §F{tap:Tap:pub} (List<i32>:trace, i32:tag, i32:value) -> i32
+            §M{GeneratedPipeline}
+              §F{Tap:pub} (List<i32>:trace, i32:tag, i32:value) -> i32
                 §E{mut}
                 §C{trace.Add} §A tag §/C
                 §R value
-              §F{probe:Probe:pub} (List<i32>:trace) -> i32
+              §F{Probe:pub} (List<i32>:trace) -> i32
                 §E{mut,cw}
             """ + $"\n    §P {sample.Printed.ToString(CultureInfo.InvariantCulture)}\n" + body;
     }

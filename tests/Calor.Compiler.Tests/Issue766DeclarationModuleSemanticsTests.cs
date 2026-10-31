@@ -21,7 +21,7 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var module = Parse(
             """
-            §M{m001:UsingCases}
+            §M{UsingCases}
               §U{global:System.Threading}
               §U{global:Tasks:System.Threading.Tasks}
               §U{global:static:System.Math}
@@ -29,7 +29,7 @@ public class Issue766DeclarationModuleSemanticsTests
               §U{System.Text}
               §U{Alias:System.Collections.Generic}
               §U{static:System.Math}
-              §F{f001:Value:pub} () -> i32
+              §F{Value:pub} () -> i32
                 §R INT:1
             """);
 
@@ -82,7 +82,7 @@ public class Issue766DeclarationModuleSemanticsTests
 
         var conditional = new CSharpEmitter().Emit(Parse(
             """
-            §M{m002:ConditionalUsing}
+            §M{ConditionalUsing}
               §PP{FEATURE}
                 §U{global:System.Text}
                 §U{Buffers:System.Buffers}
@@ -288,24 +288,24 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var result = Program.Compile(
             """
-            §M{m001:NestedElseTypes}
+            §M{NestedElseTypes}
               §PP{OUTER}
-                §CL{c001:OuterSelected:pub}
-                  §MT{m001:Value:pub:stat} () -> i32
+                §CL{OuterSelected:pub}
+                  §MT{Value:pub:stat} () -> i32
                     §R INT:1
               §PPE
-                §CL{c002:ElseDirect:pub}
+                §CL{ElseDirect:pub}
                   §FLD{i32:Value:pub}
                 §PP{INNER}
-                  §CL{c003:InnerSelected:pub}
-                    §MT{m003:Value:pub:stat} () -> i32
+                  §CL{InnerSelected:pub}
+                    §MT{Value:pub:stat} () -> i32
                       §R INT:2
                 §PPE
-                  §CL{c004:InnerFallback:pub}
-                    §MT{m004:Value:pub:stat} () -> i32
+                  §CL{InnerFallback:pub}
+                    §MT{Value:pub:stat} () -> i32
                       §R INT:3
                 §/PP{INNER}
-                §IFACE{i005:IElseTail}
+                §IFACE{IElseTail}
               §/PP{OUTER}
             """,
             null,
@@ -713,22 +713,22 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var result = Program.Compile(
             """
-            §M{m001:ElifNestedTypes}
+            §M{ElifNestedTypes}
               §PP{FIRST}
-                §CL{c001:FirstSelected:pub}
+                §CL{FirstSelected:pub}
                   §FLD{i32:Value:pub}
               §PPE
                 §PP{SECOND}
-                  §IFACE{i002:ISecondBefore}
-                    §PROP{p002:Value:i32:pub:get}
+                  §IFACE{ISecondBefore}
+                    §PROP{Value:i32:pub:get}
                   §PP{DEEP}
-                    §CL{c003:DeepSelected:pub}
+                    §CL{DeepSelected:pub}
                       §FLD{i32:Value:pub}
                   §/PP{DEEP}
-                  §CL{c004:SecondAfter:pub}
+                  §CL{SecondAfter:pub}
                     §FLD{i32:Value:pub}
                 §PPE
-                  §CL{c005:FinalFallback:pub}
+                  §CL{FinalFallback:pub}
                     §FLD{i32:Value:pub}
                 §/PP{SECOND}
             """,
@@ -782,7 +782,7 @@ public class Issue766DeclarationModuleSemanticsTests
         {
             var canonical = creation.Accept(new CalorEmitter());
             var module = Parse(
-                $"§M{{m1:RecordMigration}}\n  §F{{f1:Create:pub}} () -> Pair\n    §R {canonical}");
+                $"§M{{RecordMigration}}\n  §F{{Create:pub}} () -> Pair\n    §R {canonical}");
             var replay = Assert.IsType<ReturnStatementNode>(module.Functions[0].Body[0]).Expression!;
             expression = replay.Accept(new CSharpEmitter());
         }
@@ -831,8 +831,8 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var module = Parse(
             $$"""
-            §M{m1:NamedConstruction}
-              §F{f1:Create:pub} () -> Pair
+            §M{NamedConstruction}
+              §F{Create:pub} () -> Pair
                 §R §NEW{Pair} {{arguments}}
             """);
         var creation = Assert.IsType<NewExpressionNode>(
@@ -868,11 +868,11 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var module = Parse(
             """
-            §M{m1:ConstructorResolution}
-              §CL{c1:Pair:pub}
-                §CTOR{ctor1:pub} (i32:Left, str:Right)
-                §CTOR{ctor2:pub} (str:Left, i32:Right)
-              §F{f1:Create:pub} () -> Pair
+            §M{ConstructorResolution}
+              §CL{Pair:pub}
+                §CTOR{pub} (i32:Left, str:Right)
+                §CTOR{pub} (str:Left, i32:Right)
+              §F{Create:pub} () -> Pair
                 §R §NEW{Pair} §A[Right] "right" §A[Left] 1
             """);
         var diagnostics = new DiagnosticBag();
@@ -939,8 +939,8 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var module = Parse(
             """
-            §M{m1:ConstructorSimplification}
-              §F{f1:Create:pub} () -> Pair
+            §M{ConstructorSimplification}
+              §F{Create:pub} () -> Pair
                 §R §NEW{Pair} §A[Right] (+ 1 2) §A[Left] 4
             """);
         var creation = Assert.IsType<NewExpressionNode>(
@@ -990,8 +990,8 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var module = Parse(
             """
-            §M{m001:Variance}
-              §IFACE{i001:IVariant}<out TOut, in TIn, TUnmanaged, TNotNull, TDerived>
+            §M{Variance}
+              §IFACE{IVariant}<out TOut, in TIn, TUnmanaged, TNotNull, TDerived>
                 §WHERE TOut : class?
                 §WHERE TIn : class, new()
                 §WHERE TUnmanaged : unmanaged
@@ -1029,8 +1029,8 @@ public class Issue766DeclarationModuleSemanticsTests
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(
             """
-            §M{m001:InvalidVariance}
-              §CL{c001:Box:pub}<out T>
+            §M{InvalidVariance}
+              §CL{Box:pub}<out T>
             """,
             diagnostics);
         var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
@@ -1078,9 +1078,9 @@ public class Issue766DeclarationModuleSemanticsTests
 
         var parsed = Parse(
             """
-            §M{m001:ConstraintParsing}
-              §IFACE{i001:IConstraintHost}
-                §MT{m001:Apply}<T>
+            §M{ConstraintParsing}
+              §IFACE{IConstraintHost}
+                §MT{Apply}<T>
                   §WHERE T : allows ref struct
             """);
         Assert.Equal(
@@ -1143,30 +1143,30 @@ public class Issue766DeclarationModuleSemanticsTests
         string[] invalidSources =
         [
             """
-            §M{m001:BadFunction}
-              §F{f001:Bad:pub}<T>
+            §M{BadFunction}
+              §F{Bad:pub}<T>
                 §WHERE T : default
             """,
             """
-            §M{m001:BadClass}
-              §CL{c001:Bad:pub}<T>
+            §M{BadClass}
+              §CL{Bad:pub}<T>
                 §WHERE T : default
             """,
             """
-            §M{m001:BadInterface}
-              §IFACE{i001:IBad}<T>
+            §M{BadInterface}
+              §IFACE{IBad}<T>
                 §WHERE T : default
             """,
             """
-            §M{m001:BadMethod}
-              §CL{c001:Host:pub}
-                §MT{m001:Bad:pub}<T>
+            §M{BadMethod}
+              §CL{Host:pub}
+                §MT{Bad:pub}<T>
                   §WHERE T : default
             """,
             """
-            §M{m001:BadInterfaceMethod}
-              §IFACE{i001:IHost}
-                §MT{m001:Bad}<T>
+            §M{BadInterfaceMethod}
+              §IFACE{IHost}
+                §MT{Bad}<T>
                   §WHERE T : default
             """
         ];
@@ -1381,9 +1381,9 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var result = Program.Compile(
             """
-            §M{m001:AliasBases}
+            §M{AliasBases}
               §U{Alias:External}
-              §CL{c001:Derived:pub}
+              §CL{Derived:pub}
                 §EXT{Alias.Base<i32>}
                 §IMPL{Alias.IFace<str>}
             """,
@@ -1415,8 +1415,8 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var result = Program.Compile(
             """
-            §M{m001:namespace.123bad.class}
-              §F{f001:event:pub} (i32:class) -> i32
+            §M{namespace.123bad.class}
+              §F{event:pub} (i32:class) -> i32
                 §R class
             """);
 
@@ -1457,13 +1457,13 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var indexedModule = Parse(
             """
-            §M{m001:First}
-              §ITYPE{it001:Leaky:i32[]:n}
+            §M{First}
+              §ITYPE{Leaky:i32[]:n}
             """);
         var unrelatedModule = Parse(
             """
-            §M{m002:Second}
-              §F{f002:Echo:pub} (Leaky:value) -> Leaky
+            §M{Second}
+              §F{Echo:pub} (Leaky:value) -> Leaky
                 §R value
             """);
 
@@ -1482,10 +1482,10 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var result = Program.Compile(
             """
-            §M{m001:Standalone}
-              §F{f001:Echo:pub}<T> (List<T>:items) -> List<T>
+            §M{Standalone}
+              §F{Echo:pub}<T> (List<T>:items) -> List<T>
                 §R items
-              §AF{f002:EchoAsync:pub} (i32:value) -> i32
+              §AF{EchoAsync:pub} (i32:value) -> i32
                 §R value
             """,
             null,
@@ -1533,8 +1533,8 @@ public class Issue766DeclarationModuleSemanticsTests
             var body = type == "void" ? "" : "    §R value";
             var result = Program.Compile(
                 $$"""
-                  §M{m001:BuiltInMatrix}
-                    §F{f001:Echo:pub} {{signature}}
+                  §M{BuiltInMatrix}
+                    §F{Echo:pub} {{signature}}
                   {{body}}
                   """,
                 null,

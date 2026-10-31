@@ -99,11 +99,11 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     public void CatchVariables_AreKnownNonNullAcrossReceivingBoundaries(string statement)
     {
         var source = $$"""
-            §M{m1:CatchNullability}
-              §F{take:Take:pub} (Exception:value) -> Exception
+            §M{CatchNullability}
+              §F{Take:pub} (Exception:value) -> Exception
                 §R value
-              §F{probe:Probe:pub} () -> Exception
-                §TR{try1}
+              §F{Probe:pub} () -> Exception
+                §TR
                   §P "try"
                 §CA{Exception:ex}
                   {{statement}}
@@ -122,11 +122,11 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     public void InferredUsingResources_PreserveNonNullInitializerIdentity(string statement)
     {
         var source = $$"""
-            §M{m1:UsingNullability}
-              §F{take:TakeStream:pub} (System.IO.MemoryStream:value) -> System.IO.MemoryStream
+            §M{UsingNullability}
+              §F{TakeStream:pub} (System.IO.MemoryStream:value) -> System.IO.MemoryStream
                 §R value
-              §F{probe:Probe:pub} () -> System.IO.MemoryStream
-                §USE{use1:stream} §NEW{System.IO.MemoryStream}
+              §F{Probe:pub} () -> System.IO.MemoryStream
+                §USE{stream} §NEW{System.IO.MemoryStream}
                   {{statement}}
             """;
         var (_, diagnostics) = Bind(source);
@@ -142,9 +142,9 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     public void ThisExpression_IsKnownNonNullThroughReferenceJoins(string expression)
     {
         var source = $$"""
-            §M{m1:ThisNullability}
-              §CL{c1:Foo:pub}
-                §MT{probe:Probe:pub} (?Foo:other, bool:flag) -> Foo
+            §M{ThisNullability}
+              §CL{Foo:pub}
+                §MT{Probe:pub} (?Foo:other, bool:flag) -> Foo
                   §R {{expression}}
             """;
         var (_, diagnostics) = Bind(source);
@@ -165,9 +165,9 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     public void ExplicitNullableUsingResource_RemainsNullable()
     {
         const string source = """
-            §M{m1:NullableUsing}
-              §F{probe:Probe:pub} (?System.IO.MemoryStream:input) -> void
-                §USE{use1:stream:?System.IO.MemoryStream} input
+            §M{NullableUsing}
+              §F{Probe:pub} (?System.IO.MemoryStream:input) -> void
+                §USE{stream:?System.IO.MemoryStream} input
                   §B{copy:System.IO.MemoryStream} stream
             """;
         var (_, diagnostics) = Bind(source);
@@ -180,9 +180,9 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     public void ExplicitNonNullableUsingResource_RejectsNullableInitializer()
     {
         const string source = """
-            §M{m1:NullableUsingInitializer}
-              §F{probe:Probe:pub} (?System.IO.MemoryStream:input) -> void
-                §USE{use1:stream:System.IO.MemoryStream} input
+            §M{NullableUsingInitializer}
+              §F{Probe:pub} (?System.IO.MemoryStream:input) -> void
+                §USE{stream:System.IO.MemoryStream} input
                   §B{copy:?System.IO.MemoryStream} stream
             """;
         var (_, diagnostics) = Bind(source);
@@ -195,11 +195,11 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     public void InferredNullableUsingResource_RetainsNativeTypeForArgumentValidation()
     {
         const string source = """
-            §M{m1:InferredNullableUsing}
-              §F{take:Take:pub} (System.IO.MemoryStream:value) -> System.IO.MemoryStream
+            §M{InferredNullableUsing}
+              §F{Take:pub} (System.IO.MemoryStream:value) -> System.IO.MemoryStream
                 §R value
-              §F{probe:Probe:pub} (?System.IO.MemoryStream:input) -> System.IO.MemoryStream
-                §USE{use1:stream} input
+              §F{Probe:pub} (?System.IO.MemoryStream:input) -> System.IO.MemoryStream
+                §USE{stream} input
                   §R §C{Take} §A stream §/C
             """;
         var (_, diagnostics) = Bind(source);
@@ -259,15 +259,15 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
         string receivingType, bool expected, string callerClassName)
     {
         const string sourceA = """
-            §M{m1:Namespaces}
-              §CL{c1:Foo:pub}
-                §MT{get:Get:pub:static} () -> ?Foo
+            §M{Namespaces}
+              §CL{Foo:pub}
+                §MT{Get:pub:static} () -> ?Foo
                   §R §NEW{Foo}
             """;
         var sourceB = $$"""
-            §M{m1:Namespaces}
+            §M{Namespaces}
               §CL{c2:{{callerClassName}}:pub}
-                §MT{probe:Probe:pub:static} () -> void
+                §MT{Probe:pub:static} () -> void
                   §B{value:{{receivingType}}} §C{A.Foo.Get} §/C
             """;
         var diagnostics = new DiagnosticBag();
@@ -380,8 +380,8 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     public void InferredObjectFallback_DoesNotGainResolvedReferenceIdentity()
     {
         const string source = """
-            §M{m1:Unknown}
-              §F{probe:Probe:pub} () -> void
+            §M{Unknown}
+              §F{Probe:pub} () -> void
                 §B{value} §C{Missing} §/C
                 §B{copy} value
             """;
@@ -401,9 +401,9 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     public void UnsupportedBclReceiver_IsNotRelabeledResolved(string target)
     {
         var source = $$"""
-            §M{m1:UnsupportedReceiver}
+            §M{UnsupportedReceiver}
               §U{System.IO}
-              §F{probe:Probe:pub} (System.IO.DirectoryInfo:directory) -> void
+              §F{Probe:pub} (System.IO.DirectoryInfo:directory) -> void
                 §B{value:System.IO.DirectoryInfo} §C{ {{target}} } §A STR:"/" §/C
             """;
         var (module, diagnostics) = Bind(source);
@@ -448,8 +448,8 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
             ? $"§B{{value:System.IO.DirectoryInfo}} {call}"
             : $"§R {call}";
         var source = $$"""
-            §M{m1:NominalMetadata}
-              §F{f1:Probe:pub} () -> {{(boundary == "binding" ? "void" : "System.IO.DirectoryInfo")}}
+            §M{NominalMetadata}
+              §F{Probe:pub} () -> {{(boundary == "binding" ? "void" : "System.IO.DirectoryInfo")}}
                 {{body}}
             """;
         var (module, diagnostics) = Bind(source, out var binder);
@@ -488,8 +488,8 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     public void NullableBclNominalReturn_ReachesResolvedBclParameter()
     {
         const string source = """
-            §M{m1:NominalBclArgument}
-              §F{probe:Probe:pub} () -> void
+            §M{NominalBclArgument}
+              §F{Probe:pub} () -> void
                 §B{permissions:System.Security.AccessControl.DirectorySecurity} §C{System.IO.FileSystemAclExtensions.GetAccessControl} §A §C{System.IO.Directory.GetParent} §A STR:"/" §/C §/C
             """;
         var (module, diagnostics) = Bind(source);
@@ -522,13 +522,13 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
             _ => "i32"
         };
         return $$"""
-            §M{m1:NominalNative}
-              §CL{c1:Foo:pub}
-                §MT{get:Get:pub:static} ({{sourceType}}:input) -> {{sourceType}}
+            §M{NominalNative}
+              §CL{Foo:pub}
+                §MT{Get:pub:static} ({{sourceType}}:input) -> {{sourceType}}
                   §R input
-                §MT{consume:Consume:pub:static} (Foo:input) -> i32
+                §MT{Consume:pub:static} (Foo:input) -> i32
                   §R 0
-                §MT{probe:Probe:pub:static} ({{sourceType}}:input) -> {{output}}
+                §MT{Probe:pub:static} ({{sourceType}}:input) -> {{output}}
                   {{body}}
             """;
     }
@@ -542,14 +542,14 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
             _ => "§R §C{Foo.Consume} §A §C{Foo.Get} §/C §/C"
         };
         return $$"""
-            §M{m1:ExpandedNative}
-              §CL{c1:Foo:pub}
-                §MT{get:Get:pub:static}
+            §M{ExpandedNative}
+              §CL{Foo:pub}
+                §MT{Get:pub:static}
                   §O{?Foo}
                   §R §NEW{Foo}
-                §MT{consume:Consume:pub:static} (Foo:value) -> i32
+                §MT{Consume:pub:static} (Foo:value) -> i32
                   §R 0
-                §MT{probe:Probe:pub:static} () -> {{(boundary == "binding" ? "void" : boundary == "return" ? "Foo" : "i32")}}
+                §MT{Probe:pub:static} () -> {{(boundary == "binding" ? "void" : boundary == "return" ? "Foo" : "i32")}}
                   {{body}}
             """;
     }

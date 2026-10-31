@@ -183,7 +183,7 @@ public class MigrateToolTests
         var tempDir = Path.Combine(Path.GetTempPath(), $"calor-migrate-invalid-fix-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
         var path = Path.Combine(tempDir, "Invalid.calr");
-        const string source = "§M{m1:Test}\n§B{b1:value:StringBuilder} §NEW{object}§/NEW";
+        const string source = "§M{Test}\n§B{b1:value:StringBuilder} §NEW{object}§/NEW";
         await File.WriteAllTextAsync(path, source);
 
         try
@@ -353,7 +353,7 @@ public class MigrateToolTests
         {
             // Structural closer tags are a hard parser error (Calor0830)
             File.WriteAllText(Path.Combine(tempDir, "Bad.calr"),
-                "§M{m001:Test}\n  §F{f001:Foo:pub} () -> void\n    §P \"hi\"\n  §/F{f001}\n");
+                "§M{Test}\n  §F{Foo:pub} () -> void\n    §P \"hi\"\n  §/F\n");
 
             var args = JsonDocument.Parse($$"""{"projectPath": "{{tempDir.Replace("\\", "\\\\")}}", "phase": "compile"}""").RootElement;
             var result = await _tool.ExecuteAsync(args);
@@ -415,9 +415,9 @@ public class MigrateToolTests
         File.WriteAllText(
             Path.Combine(tempDir, "Test.calr"),
             """
-            §M{m1:TestModule}
+            §M{TestModule}
               §C{c1:Foo:public}
-                §F{f1:Bar:pub} §O{Int32}
+                §F{Bar:pub} §O{Int32}
                     → §R 42
               §/C{c1}
             """);
@@ -436,7 +436,7 @@ public class MigrateToolTests
         try
         {
             File.WriteAllText(Path.Combine(tempDir, "BindError.calr"),
-                "§M{m001:Test}\n  §F{f001:Foo:pub} () -> void\n    §B{x}\n");
+                "§M{Test}\n  §F{Foo:pub} () -> void\n    §B{x}\n");
 
             var args = JsonDocument.Parse($$"""{"projectPath": {{JsonSerializer.Serialize(tempDir)}}, "phase": "compile"}""").RootElement;
             var result = await _tool.ExecuteAsync(args);

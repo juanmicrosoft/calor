@@ -10,8 +10,8 @@ namespace Calor.Compiler.Tests;
 public class GeneratedOutputValidationTests
 {
     private const string TypeInvalidSource = """
-        §M{m001:Validation}
-          §F{f001:Main:pub} () -> void
+        §M{Validation}
+          §F{Main:pub} () -> void
             §B{x:i32} STR:"not an int"
         """;
 
@@ -73,14 +73,14 @@ public class GeneratedOutputValidationTests
             var callee = Path.Combine(workspace, "callee.calr");
             var caller = Path.Combine(workspace, "caller.calr");
             File.WriteAllText(callee, """
-                §M{m001:Lib}
-                  §F{f001:Ping:pub} () -> i32
+                §M{Lib}
+                  §F{Ping:pub} () -> i32
                     §E{}
                     §R INT:1
                 """);
             File.WriteAllText(caller, """
-                §M{m002:App}
-                  §F{f001:Main:pub} () -> i32
+                §M{App}
+                  §F{Main:pub} () -> i32
                     §E{}
                     §R §C{Ping} §/C
                 """);
@@ -92,8 +92,8 @@ public class GeneratedOutputValidationTests
 
             // The callee now fails effect enforcement; the caller is untouched.
             File.WriteAllText(callee, """
-                §M{m001:Lib}
-                  §F{f001:Ping:pub} () -> i32
+                §M{Lib}
+                  §F{Ping:pub} () -> i32
                     §E{}
                     §P "ping"
                     §R INT:1
@@ -130,8 +130,8 @@ public class GeneratedOutputValidationTests
         try
         {
             File.WriteAllText(Path.Combine(workspace, "ok.calr"), """
-                §M{m001:Ok}
-                  §F{f001:One:pub} () -> i32
+                §M{Ok}
+                  §F{One:pub} () -> i32
                     §E{}
                     §R INT:1
                 """);
@@ -175,15 +175,15 @@ public class GeneratedOutputValidationTests
         try
         {
             File.WriteAllText(Path.Combine(workspace, "broken.calr"), """
-                §M{m001:Broken}
-                  §F{f001:Boom:pub} () -> i32
+                §M{Broken}
+                  §F{Boom:pub} () -> i32
                     §E{}
                     §P "x"
                     §R INT:1
                 """);
             File.WriteAllText(Path.Combine(workspace, "interop.calr"), """
-                §M{m002:Interop}
-                  §F{f001:Use:pub} () -> void
+                §M{Interop}
+                  §F{Use:pub} () -> void
                     §E{}
                     §B{x:i32} STR:"not an int"
                 """);
@@ -216,15 +216,15 @@ public class GeneratedOutputValidationTests
         try
         {
             File.WriteAllText(Path.Combine(workspace, "callee.calr"), """
-                §M{m001:Lib}
-                  §F{f001:Ping:pub} () -> i32
+                §M{Lib}
+                  §F{Ping:pub} () -> i32
                     §E{}
                     §P "ping"
                     §R INT:1
                 """);
             File.WriteAllText(Path.Combine(workspace, "caller.calr"), """
-                §M{m002:App}
-                  §F{f001:Main:pub} () -> i32
+                §M{App}
+                  §F{Main:pub} () -> i32
                     §E{}
                     §R §C{Ping} §/C
                 """);
@@ -257,14 +257,14 @@ public class GeneratedOutputValidationTests
         {
             var callee = Path.Combine(workspace, "callee.calr");
             File.WriteAllText(callee, """
-                §M{m001:Lib}
-                  §F{f001:Ping:pub} () -> i32
+                §M{Lib}
+                  §F{Ping:pub} () -> i32
                     §E{}
                     §R INT:1
                 """);
             File.WriteAllText(Path.Combine(workspace, "caller.calr"), """
-                §M{m002:App}
-                  §F{f001:Main:pub} () -> i32
+                §M{App}
+                  §F{Main:pub} () -> i32
                     §E{}
                     §R §C{Ping} §/C
                 """);
@@ -273,8 +273,8 @@ public class GeneratedOutputValidationTests
             Assert.Empty(clean.Codes);
 
             File.WriteAllText(callee, """
-                §M{m001:Lib}
-                  §F{f001:Ping:pub} () -> i32
+                §M{Lib}
+                  §F{Ping:pub} () -> i32
                     §E{}
                     §P "ping"
                     §R INT:1
@@ -301,7 +301,7 @@ public class GeneratedOutputValidationTests
     /// still carries an AST, so it does not reach that branch.
     /// </summary>
     private const string UnlexableSource = """
-        §M{m001:Broken}
+        §M{Broken}
           §ZZQ{bogus}
             §E{}
         """;
@@ -327,8 +327,8 @@ public class GeneratedOutputValidationTests
             // the branch where the compiler cannot see what the failed file owns.
             File.WriteAllText(Path.Combine(workspace, "broken.calr"), UnlexableSource);
             File.WriteAllText(Path.Combine(workspace, "interop.calr"), """
-                §M{m002:Interop}
-                  §F{f001:Use:pub} () -> void
+                §M{Interop}
+                  §F{Use:pub} () -> void
                     §E{}
                     §B{x:i32} STR:"not an int"
                 """);
@@ -364,8 +364,8 @@ public class GeneratedOutputValidationTests
             var interop = Path.Combine(directory, "interop.calr");
             File.WriteAllText(broken, UnlexableSource);
             File.WriteAllText(interop, """
-                §M{m002:Interop}
-                  §F{f001:Use:pub} () -> void
+                §M{Interop}
+                  §F{Use:pub} () -> void
                     §E{}
                     §B{x:i32} STR:"not an int"
                 """);
@@ -396,8 +396,8 @@ public class GeneratedOutputValidationTests
     {
         var module = Program.Compile(
             """
-            §M{m001:Lib}
-              §F{f001:Map:pub} () -> i32
+            §M{Lib}
+              §F{Map:pub} () -> i32
                 §E{}
                 §R INT:1
             """,
@@ -441,7 +441,7 @@ public class GeneratedOutputValidationTests
     {
         var module = Program.Compile(
             $$"""
-            §M{m001:Lib}
+            §M{Lib}
               §CSHARP{
                 {{interopDeclaration}}
               }§/CSHARP
@@ -481,8 +481,8 @@ public class GeneratedOutputValidationTests
         {
             File.WriteAllText(Path.Combine(workspace, "broken.calr"), UnlexableSource);
             File.WriteAllText(Path.Combine(workspace, "good.calr"), """
-                §M{m002:Good}
-                  §F{f001:One:pub} () -> i32
+                §M{Good}
+                  §F{One:pub} () -> i32
                     §E{}
                     §R INT:1
                 """);
@@ -568,8 +568,8 @@ public class GeneratedOutputValidationTests
     {
         var result = Program.Compile(
             """
-            §M{m001:Defaults}
-              §F{f001:Read:pub} () -> i32
+            §M{Defaults}
+              §F{Read:pub} () -> i32
                 §B{default:i32} INT:42
                 §R default
             """,
@@ -586,13 +586,13 @@ public class GeneratedOutputValidationTests
     public void Compile_UnsafeBlock_UsesConfiguredUnsafeSetting()
     {
         const string source = """
-            §M{m001:UnsafeBlock}
-              §CL{c001:Worker:pub}
-                §MT{m001:Run:pub} () -> void
+            §M{UnsafeBlock}
+              §CL{Worker:pub}
+                §MT{Run:pub} () -> void
                   §E{unsafe}
-                  §UNSAFE{u1}
+                  §UNSAFE
                     §B{~x:i32} INT:42
-                  §/UNSAFE{u1}
+                  §/UNSAFE
             """;
 
         var accepted = Program.Compile(source, "unsafe.calr");
@@ -795,8 +795,8 @@ public class GeneratedOutputValidationTests
             File.WriteAllText(
                 sourcePath,
                 """
-                §M{m001:Consumer}
-                  §CL{c001:Reader:pub}
+                §M{Consumer}
+                  §CL{Reader:pub}
                     §CSHARP{
                       public int Read() => External.Library.Api.Value;
                     }§/CSHARP
@@ -831,8 +831,8 @@ public class GeneratedOutputValidationTests
             File.WriteAllText(
                 sourcePath,
                 """
-                §M{m001:Validation}
-                  §F{f001:Read:pub} () -> i32
+                §M{Validation}
+                  §F{Read:pub} () -> i32
                     §R INT:42
                 """);
             var successful = CliTestHarness.RunCli(directory, "--input", sourcePath);

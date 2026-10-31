@@ -24,8 +24,8 @@ public class PostConversionFixerTests
     public void Fix_OrphanedClosingNewTag_RemovesAndParses()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{i32}
                   §R 42
               §/NEW{n1}
@@ -43,8 +43,8 @@ public class PostConversionFixerTests
     public void Fix_OrphanedClosingCTag_RemovesAndParses()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{i32}
                   §R 42
               §/C{c1}
@@ -65,8 +65,8 @@ public class PostConversionFixerTests
     public void Fix_ExtraClosingParen_BalancesAndParses()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §I{i32:n}
                   §O{i32}
                   §R (+ n 1))
@@ -91,8 +91,8 @@ public class PostConversionFixerTests
     public void Fix_CommaInLispExpression_StripsAndParses()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §I{i32:a}
                   §I{i32:b}
                   §O{i32}
@@ -118,13 +118,13 @@ public class PostConversionFixerTests
         // because '<' is parsed as a comparison operator inside the call name.
         // The fixer converts <T> to {of:T} which avoids the lexer conflict.
         var source =
-            "§M{m001:Test}\n" +
-            "§F{f001:Foo:pub}\n" +
+            "§M{Test}\n" +
+            "§F{Foo:pub}\n" +
             "  §O{i32}\n" +
             "  §B{x} §C{Option<int>.Some} §A 42 §/C\n" +
             "  §R x\n" +
-            "§/F{f001}\n" +
-            "§/M{m001}";
+            "§/F\n" +
+            "§/M";
 
         var result = _fixer.Fix(source);
 
@@ -145,8 +145,8 @@ public class PostConversionFixerTests
     public void Fix_RemovedErrConstructor_IsNotRewrittenAsValidSyntax()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{i32}
                   §C{Bar} §A §ERR{e1} "oops" §/C
                   §R 0
@@ -167,11 +167,11 @@ public class PostConversionFixerTests
     public void Fix_InlineConditionalStatement_DoesNotIntroduceRemovedArrow()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Abs:pub}
+            §M{Test}
+              §F{Abs:pub}
                   §I{i32:n}
                   §O{i32}
-                  §IF{if1} (< n 0) §R (- 0 n)
+                  §IF (< n 0) §R (- 0 n)
                   §EL
                     §R n
             """;
@@ -190,8 +190,8 @@ public class PostConversionFixerTests
     public void Fix_AlreadyValidSource_ReturnsUnmodified()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Add:pub}
+            §M{Test}
+              §F{Add:pub}
                   §I{i32:a}
                   §I{i32:b}
                   §O{i32}
@@ -210,8 +210,8 @@ public class PostConversionFixerTests
     {
         // Source with two problems: extra paren AND comma
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §I{i32:a}
                   §I{i32:b}
                   §O{i32}
@@ -238,8 +238,8 @@ public class PostConversionFixerTests
         // The converter sometimes leaks C# null-conditional into Calor output.
         // If the fixer can't handle it perfectly, it should at least not crash.
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §I{str:name}
                   §O{i32}
                   §R (len name)
@@ -256,8 +256,8 @@ public class PostConversionFixerTests
     {
         // Combines orphaned closing tag + extra paren — realistic multi-error scenario
         var source = """
-            §M{m001:Test}
-              §F{f001:Process:pub}
+            §M{Test}
+              §F{Process:pub}
                   §I{i32:x}
                   §O{i32}
                   §B{y} (* x 2))

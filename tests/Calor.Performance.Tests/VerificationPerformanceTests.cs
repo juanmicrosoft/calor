@@ -546,11 +546,11 @@ public class VerificationPerformanceTests
     public void CFGConstruction_SmallFunction_IsTimingSmokeTest()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SmallFunc:pub}
+§M{Test}
+  §F{SmallFunc:pub}
     §I{i32:x}
     §O{i32}
-    §IF{if1} (> x INT:0)
+    §IF (> x INT:0)
       §R x
     §EL
       §R (- INT:0 x)";

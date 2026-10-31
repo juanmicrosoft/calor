@@ -14,22 +14,22 @@ public class PostconditionReturnLoweringRuntimeTests
     public void NestedIfLoopTryFinallyUsing_PreservesTraceAndChecksOnce()
     {
         const string source = """
-            §M{m001:ReturnFlow}
-              §F{f001:Record:priv} (List<i32>:trace, i32:value) -> i32
+            §M{ReturnFlow}
+              §F{Record:priv} (List<i32>:trace, i32:value) -> i32
                 §C{trace.Add} §A value §/C
                 §R value
-              §F{f002:Choose:pub} (List<i32>:trace, bool:early) -> i32
+              §F{Choose:pub} (List<i32>:trace, bool:early) -> i32
                 §S (== §C{Record} §A trace §A result §/C result)
-                §TR{t1}
-                  §IF{i1} early
-                    §L{l1:i:0:0:1}
-                      §USE{u1:stream:MemoryStream} §NEW{MemoryStream} §/NEW
+                §TR
+                  §IF early
+                    §L{i:0:0:1}
+                      §USE{stream:MemoryStream} §NEW{MemoryStream} §/NEW
                         §C{trace.Add} §A INT:10 §/C
                         §R §C{Record} §A trace §A INT:7 §/C
                         §C{trace.Add} §A INT:99 §/C
                   §FI
                     §C{trace.Add} §A INT:20 §/C
-                §/TR{t1}
+                §/TR
                 §C{trace.Add} §A INT:30 §/C
                 §R INT:3
             """;
@@ -46,17 +46,17 @@ public class PostconditionReturnLoweringRuntimeTests
     public void ExceptionalExit_DoesNotRunPostcondition()
     {
         const string source = """
-            §M{m001:Exceptional}
-              §F{f001:Record:priv} (List<i32>:trace, i32:value) -> i32
+            §M{Exceptional}
+              §F{Record:priv} (List<i32>:trace, i32:value) -> i32
                 §C{trace.Add} §A value §/C
                 §R value
-              §F{f002:Boom:pub} (List<i32>:trace) -> i32
+              §F{Boom:pub} (List<i32>:trace) -> i32
                 §S (== §C{Record} §A trace §A result §/C result)
-                §TR{t1}
+                §TR
                   §R INT:5
                 §FI
                   §TH STR:"boom"
-                §/TR{t1}
+                §/TR
             """;
         var assembly = Compile(source, out _);
         var trace = new List<int>();
@@ -72,8 +72,8 @@ public class PostconditionReturnLoweringRuntimeTests
     public void ResultPseudoVariable_DoesNotAlterIdentifiersOrStrings()
     {
         const string source = """
-            §M{m001:ResultSafety}
-              §F{f001:Echo:pub} (i32:resultCode, str:myresult) -> i32
+            §M{ResultSafety}
+              §F{Echo:pub} (i32:resultCode, str:myresult) -> i32
                 §S{"result stays literal"} (&& (== result resultCode) (== myresult STR:"result"))
                 §R resultCode
             """;
@@ -97,16 +97,16 @@ public class PostconditionReturnLoweringRuntimeTests
     public async Task AsyncTaskAndTaskOfT_UseValueResultsAndCheckOnce()
     {
         const string source = """
-            §M{m001:AsyncReturns}
-              §F{f001:Record:priv} (List<i32>:trace, i32:value) -> i32
+            §M{AsyncReturns}
+              §F{Record:priv} (List<i32>:trace, i32:value) -> i32
                 §C{trace.Add} §A value §/C
                 §R value
-              §AF{f002:Get:pub} (List<i32>:trace, bool:first) -> i32
+              §AF{Get:pub} (List<i32>:trace, bool:first) -> i32
                 §S (== §C{Record} §A trace §A result §/C result)
-                §IF{i1} first
+                §IF first
                   §R INT:5
                 §R INT:6
-              §AF{f003:Done:pub} (List<i32>:trace) -> void
+              §AF{Done:pub} (List<i32>:trace) -> void
                 §S (== §C{Record} §A trace §A INT:1 §/C INT:1)
                 §R
             """;
@@ -145,8 +145,8 @@ public class PostconditionReturnLoweringRuntimeTests
     public void IteratorPostcondition_IsRejectedExplicitly()
     {
         const string source = """
-            §M{m001:IteratorContracts}
-              §F{f001:Values:pub} () -> i32
+            §M{IteratorContracts}
+              §F{Values:pub} () -> i32
                 §S (>= result 0)
                 §YIELD INT:1
             """;
@@ -167,16 +167,16 @@ public class PostconditionReturnLoweringRuntimeTests
     public void ClassMethodAndOperatorMethod_ShareReturnLowering()
     {
         const string source = """
-            §M{m001:MethodOwners}
-              §CL{c001:Legacy:pub}
-                §MT{m001:Pick:pub} (bool:first) -> i32
+            §M{MethodOwners}
+              §CL{Legacy:pub}
+                §MT{Pick:pub} (bool:first) -> i32
                   §S (>= result 0)
-                  §IF{i1} first
+                  §IF first
                     §R INT:4
                   §R INT:5
-                §MT{m002:op_Implicit:pub:stat} (Legacy:value) -> i32
+                §MT{op_Implicit:pub:stat} (Legacy:value) -> i32
                   §S (>= result 0)
-                  §IF{i2} (!= value null)
+                  §IF (!= value null)
                     §R INT:8
                   §R INT:9
             """;
@@ -195,17 +195,17 @@ public class PostconditionReturnLoweringRuntimeTests
     public void OperatorOverload_UsesSharedReturnLowering()
     {
         const string source = """
-            §M{m001:OperatorOwner}
-              §CL{c001:Box:pub}
-                §OP{op001:+:pub}
+            §M{OperatorOwner}
+              §CL{Box:pub}
+                §OP{+:pub}
                   §I{Box:left}
                   §I{Box:right}
                   §O{Box}
                   §S (!= result null)
-                  §IF{i1} (!= left null)
+                  §IF (!= left null)
                     §R left
                   §R right
-                §/OP{op001}
+                §/OP
             """;
         var assembly = Compile(source, out _);
         var type = GetType(assembly, "Box");
@@ -221,18 +221,18 @@ public class PostconditionReturnLoweringRuntimeTests
     public void EnumExtension_UsesSharedReturnLowering()
     {
         const string source = """
-            §M{m001:EnumOwner}
-              §EN{e001:Color}
+            §M{EnumOwner}
+              §EN{Color}
               Red
               Blue
-              §/EN{e001}
-              §EEXT{x001:Color}
-                §F{f001:Code:pub} (Color:self, bool:primary) -> i32
+              §/EN
+              §EEXT{Color}
+                §F{Code:pub} (Color:self, bool:primary) -> i32
                   §S (>= result 0)
-                  §IF{i1} primary
+                  §IF primary
                     §R INT:1
                   §R INT:2
-              §/EEXT{x001}
+              §/EEXT
             """;
         var assembly = Compile(source, out _);
         var enumType = GetType(assembly, "Color");
@@ -250,10 +250,10 @@ public class PostconditionReturnLoweringRuntimeTests
     public void StatementLambda_ReturnDoesNotInheritOuterLowering()
     {
         const string source = """
-            §M{m001:LambdaOwner}
-              §F{f001:Make:pub} () -> Func<i32>
+            §M{LambdaOwner}
+              §F{Make:pub} () -> Func<i32>
                 §S (== result result)
-                §R §LAM{l1} §R INT:42 §/LAM{l1}
+                §R §LAM{} §R INT:42 §/LAM
             """;
         var assembly = Compile(source, out var generatedCode);
 
@@ -268,10 +268,10 @@ public class PostconditionReturnLoweringRuntimeTests
     public void NonVoidFallthrough_RemainsACompilerErrorWithoutDefaultResult()
     {
         const string source = """
-            §M{m001:MissingReturn}
-              §F{f001:Maybe:pub} (bool:take) -> i32
+            §M{MissingReturn}
+              §F{Maybe:pub} (bool:take) -> i32
                 §S (>= result 0)
-                §IF{i1} take
+                §IF take
                   §R INT:1
             """;
 
@@ -296,15 +296,15 @@ public class PostconditionReturnLoweringRuntimeTests
     public void OpaqueCSharp_InEitherPreprocessorBranch_IsRejected()
     {
         const string source = """
-            §M{m001:OpaquePreprocessor}
-              §F{f001:InBody:pub} () -> i32
+            §M{OpaquePreprocessor}
+              §F{InBody:pub} () -> i32
                 §S (>= result 0)
                 §PP{DEBUG}
                   §RAW
                   return 1;
                   §/RAW
                 §/PP{DEBUG}
-              §F{f002:InElse:pub} () -> i32
+              §F{InElse:pub} () -> i32
                 §S (>= result 0)
                 §PP{DEBUG}
                   §R INT:1
@@ -339,7 +339,7 @@ public class PostconditionReturnLoweringRuntimeTests
         {
             "using",
             """
-            §USE{u1:stream:MemoryStream} §NEW{MemoryStream} §/NEW
+            §USE{stream:MemoryStream} §NEW{MemoryStream} §/NEW
               §YIELD INT:1
             """
         },
@@ -364,7 +364,7 @@ public class PostconditionReturnLoweringRuntimeTests
         {
             "match",
             """
-            §W{w1} value
+            §W value
               §K _
                 §YIELD INT:1
             """
@@ -372,60 +372,60 @@ public class PostconditionReturnLoweringRuntimeTests
         {
             "dictionary-foreach",
             """
-            §EACHKV{e1:key:item} items
+            §EACHKV{key:item} items
               §YIELD item
             """
         },
         {
             "try",
             """
-            §TR{t1}
+            §TR
               §YIELD INT:1
-            §/TR{t1}
+            §/TR
             """
         },
         {
             "catch",
             """
-            §TR{t1}
+            §TR
               §P INT:0
             §CA{Exception:ex}
               §YIELD INT:1
-            §/TR{t1}
+            §/TR
             """
         },
         {
             "finally",
             """
-            §TR{t1}
+            §TR
               §P INT:0
             §FI
               §YIELD INT:1
-            §/TR{t1}
+            §/TR
             """
         },
         {
             "unsafe",
             """
-            §UNSAFE{u1}
+            §UNSAFE
               §YIELD INT:1
-            §/UNSAFE{u1}
+            §/UNSAFE
             """
         },
         {
             "fixed",
             """
-            §FIXED{f1:pointer:i32*:array}
+            §FIXED{pointer:i32*:array}
               §YIELD INT:1
-            §/FIXED{f1}
+            §/FIXED
             """
         },
         {
             "sync",
             """
-            §SYNC{s1} (gate)
+            §SYNC (gate)
               §YIELD INT:1
-            §/SYNC{s1}
+            §/SYNC
             """
         },
     };
@@ -437,8 +437,8 @@ public class PostconditionReturnLoweringRuntimeTests
         string nestedBody)
     {
         var source = $$"""
-            §M{m001:NestedYield}
-              §F{f001:Values:pub} (i32:value, Dictionary<str,i32>:items, [i32]:array, object:gate) -> i32
+            §M{NestedYield}
+              §F{Values:pub} (i32:value, Dictionary<str,i32>:items, [i32]:array, object:gate) -> i32
                 §S (>= result 0)
             {{Indent(nestedBody, 4)}}
             """;
@@ -459,8 +459,8 @@ public class PostconditionReturnLoweringRuntimeTests
     public void ResultPseudoVariable_RespectsLexicalBinders()
     {
         const string source = """
-            §M{m001:QuantifiedResult}
-              §F{f001:Zero:pub} () -> i32
+            §M{QuantifiedResult}
+              §F{Zero:pub} () -> i32
                 §S (forall ((result i32)) (-> (&& (>= result INT:0) (< result INT:1)) (== result INT:0)))
                 §S (exists ((result i32)) (&& (>= result INT:0) (< result INT:1) (== result INT:0)))
                 §S (-> (is result i32 result) (>= result INT:0))
@@ -493,8 +493,8 @@ public class PostconditionReturnLoweringRuntimeTests
     public void PatternBinder_DoesNotShadowResultOnFalseBranch()
     {
         const string source = """
-            §M{m001:PatternResult}
-              §F{f001:Maybe:pub} (object:fallback) -> object
+            §M{PatternResult}
+              §F{Maybe:pub} (object:fallback) -> object
                 §S (|| (is result i32 result) (== result fallback))
                 §R fallback
             """;
@@ -516,8 +516,8 @@ public class PostconditionReturnLoweringRuntimeTests
     public void Disjunction_BindsResultOnlyWhenEveryTruePathDoes()
     {
         const string source = """
-            §M{m001:PatternTruthFlow}
-              §F{f001:Value:pub} () -> object
+            §M{PatternTruthFlow}
+              §F{Value:pub} () -> object
                 §S (&& (|| (is result i32 result) false) (> result INT:0))
                 §R INT:1
             """;
@@ -538,8 +538,8 @@ public class PostconditionReturnLoweringRuntimeTests
     public void NegatedPattern_BindsResultOnFalseContinuation()
     {
         const string source = """
-            §M{m001:NegatedPattern}
-              §F{f001:Value:pub} () -> object
+            §M{NegatedPattern}
+              §F{Value:pub} () -> object
                 §S (|| (! (is result i32 result)) (> result INT:0))
                 §R INT:1
             """;
@@ -560,21 +560,21 @@ public class PostconditionReturnLoweringRuntimeTests
     public void ContractModeOff_SkipsPostconditionRefusalsButKeepsRefinements()
     {
         const string source = """
-            §M{m001:ContractsOff}
-              §RTYPE{r001:NonNegative:i32} (>= # INT:0)
-              §F{f001:Iterator:pub} () -> NonNegative
+            §M{ContractsOff}
+              §RTYPE{NonNegative:i32} (>= # INT:0)
+              §F{Iterator:pub} () -> NonNegative
                 §S (>= result 0)
                 §PP{DEBUG}
                   §YIELD INT:1
                 §/PP{DEBUG}
-              §F{f002:Opaque:pub} () -> i32
+              §F{Opaque:pub} () -> i32
                 §S (>= result 0)
                 §PP{DEBUG}
                   §RAW
                   return 1;
                   §/RAW
                 §/PP{DEBUG}
-              §F{f003:Refined:pub} () -> NonNegative
+              §F{Refined:pub} () -> NonNegative
                 §S (>= result 0)
                 §R INT:1
             """;
@@ -603,12 +603,12 @@ public class PostconditionReturnLoweringRuntimeTests
     public void SynthesizedReturnNames_AvoidParametersLocalsAndLabels()
     {
         const string source = """
-            §M{m001:Hygiene}
-              §F{f001:ParameterCollision:pub} (i32:__calorPostconditionResult0) -> i32
+            §M{Hygiene}
+              §F{ParameterCollision:pub} (i32:__calorPostconditionResult0) -> i32
                 §S (>= result 0)
                 §LABEL{__calorPostconditionExit0}
                 §R __calorPostconditionResult0
-              §F{f002:LocalCollision:pub} () -> i32
+              §F{LocalCollision:pub} () -> i32
                 §S (>= result 0)
                 §B{__calorPostconditionResult1:i32} INT:2
                 §LABEL{__calorPostconditionExit1}
@@ -638,8 +638,8 @@ public class PostconditionReturnLoweringRuntimeTests
     public void SynthesizedReturnNames_AvoidPostconditionBinders()
     {
         const string source = """
-            §M{m001:PostconditionHygiene}
-              §F{f001:Value:pub} () -> object
+            §M{PostconditionHygiene}
+              §F{Value:pub} () -> object
                 §S (-> (is result i32 __calorPostconditionResult0) (is result object))
                 §R INT:1
             """;
@@ -663,8 +663,8 @@ public class PostconditionReturnLoweringRuntimeTests
     public void SynthesizedReturnNames_AvoidMethodTypeParameters()
     {
         const string source = """
-            §M{m001:GenericHygiene}
-              §F{f001:Value:pub}<__calorPostconditionResult0> () -> i32
+            §M{GenericHygiene}
+              §F{Value:pub}<__calorPostconditionResult0> () -> i32
                 §S (>= result INT:0)
                 §R INT:1
             """;

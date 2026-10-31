@@ -1,3 +1,4 @@
+using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
 using Xunit;
 
@@ -34,20 +35,22 @@ public class EffectRowLambdaTests
         // is DoesNotFit, which is Calor0410 at the §E SPAN, per effect, in
         // today's shape. This is executed case X7 becoming audible.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Run:pub} () -> void
+            §M{M}
+              §F{Run:pub} () -> void
                 §E{cw}
-                §B{f:Func<i32,i32>} §LAM{lam1:x:i32} §E{}
+                §B{f:Func<i32,i32>} §LAM{x:i32} §E{}
                   §P x
                   §R x
-                §/LAM{lam1}
+                §/LAM
                 §P INT:1
             """);
 
         var reported = Assert.Single(result.Diagnostics,
             d => d.Code == DiagnosticCode.ForbiddenEffect);
+        var lambda = Assert.IsType<LambdaExpressionNode>(
+            Assert.IsType<BindStatementNode>(Assert.Single(result.Ast!.Functions).Body[0]).Initializer);
         Assert.Equal(
-            "Lambda 'lam1' in 'Run' uses effect 'cw' but does not declare it",
+            $"Lambda '{lambda.Id}' in 'Run' uses effect 'cw' but does not declare it",
             reported.Message);
         // The span is the §E's, not the function's: the contract the author broke
         // is the lambda's, and pointing at `Run` would name the wrong declaration.
@@ -59,13 +62,13 @@ public class EffectRowLambdaTests
     {
         // The `_Compiles` polarity: same body, honest declaration.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Run:pub} () -> void
+            §M{M}
+              §F{Run:pub} () -> void
                 §E{cw}
-                §B{f:Func<i32,i32>} §LAM{lam1:x:i32} §E{cw}
+                §B{f:Func<i32,i32>} §LAM{x:i32} §E{cw}
                   §P x
                   §R x
-                §/LAM{lam1}
+                §/LAM
                 §P INT:1
             """);
 
@@ -82,17 +85,19 @@ public class EffectRowLambdaTests
         // ρ_body is Unknown, so `fits` is CannotTell — and CannotTell is
         // Calor0425 at every site, including this one. Never a silent pass.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Run:pub} () -> void
+            §M{M}
+              §F{Run:pub} () -> void
                 §E{}
-                §B{f:Func<i32,i32>} §LAM{lam1:x:i32} §E{}
+                §B{f:Func<i32,i32>} §LAM{x:i32} §E{}
                   §R §C{SomeUnresolvableThing.Compute} §A x §/C
-                §/LAM{lam1}
+                §/LAM
             """);
 
+        var lambda = Assert.IsType<LambdaExpressionNode>(
+            Assert.IsType<BindStatementNode>(Assert.Single(result.Ast!.Functions).Body[0]).Initializer);
         Assert.Contains(result.Diagnostics,
             d => d.Code == DiagnosticCode.EffectRowUnknown
-              && d.Message.Contains("Lambda 'lam1' in 'Run'")
+              && d.Message.Contains($"Lambda '{lambda.Id}' in 'Run'")
               && d.Message.Contains("inferred body row"));
     }
 
@@ -103,13 +108,13 @@ public class EffectRowLambdaTests
         // Slice a made this Unknown, which fits nothing, so a §B taking a
         // row-less lambda could never be decided. It can now.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Run:pub} () -> void
+            §M{M}
+              §F{Run:pub} () -> void
                 §E{cw}
-                §B{f:Func<i32,i32>} §E{cw} §LAM{lam1:x:i32}
+                §B{f:Func<i32,i32>} §E{cw} §LAM{x:i32}
                   §P x
                   §R x
-                §/LAM{lam1}
+                §/LAM
                 §P INT:1
             """);
 
@@ -128,13 +133,13 @@ public class EffectRowLambdaTests
         // the pin that proves the inferred row is really the SOURCE row and not
         // merely an absence of Unknown.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Run:pub} () -> void
+            §M{M}
+              §F{Run:pub} () -> void
                 §E{cw}
-                §B{f:Func<i32,i32>} §E{} §LAM{lam1:x:i32}
+                §B{f:Func<i32,i32>} §E{} §LAM{x:i32}
                   §P x
                   §R x
-                §/LAM{lam1}
+                §/LAM
                 §P INT:1
             """);
 
@@ -153,12 +158,12 @@ public class EffectRowLambdaTests
         // carried ρ_body the site would be a silent Fits — it must be a
         // Calor0424, because the declaration is the contract.
         var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Run:pub} () -> void
+            §M{M}
+              §F{Run:pub} () -> void
                 §E{}
-                §B{f:Func<i32,i32>} §E{} §LAM{lam1:x:i32} §E{cw}
+                §B{f:Func<i32,i32>} §E{} §LAM{x:i32} §E{cw}
                   §R x
-                §/LAM{lam1}
+                §/LAM
             """);
 
         Assert.Contains(result.Diagnostics,

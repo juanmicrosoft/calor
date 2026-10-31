@@ -439,8 +439,8 @@ public sealed class QueryToolTests : IDisposable
         var foreign = Path.Combine(parent, "foreign");
         Directory.CreateDirectory(foreign);
         File.WriteAllText(Path.Combine(foreign, "other.calr"), """
-            §M{m001:Other}
-              §F{f001:OtherOnly:pub} () -> i32
+            §M{Other}
+              §F{OtherOnly:pub} () -> i32
                 §E{}
                 §R INT:7
             """);
@@ -599,8 +599,8 @@ public sealed class QueryToolTests : IDisposable
     {
         var dir = TempDir();
         File.WriteAllText(Path.Combine(dir, "broken.calr"), """
-            §M{m002:Broken}
-              §F{f001:Uses:pub} () -> i32
+            §M{Broken}
+              §F{Uses:pub} () -> i32
                 §E{}
                 §R (+ undefinedName INT:1)
             """);

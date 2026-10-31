@@ -40,8 +40,8 @@ public class CliTypeCheckDefaultTests : IDisposable
     {
         var path = Path.Combine(_tempDir, "violation.calr");
         File.WriteAllText(path, """
-            §M{m001:Test}
-              §F{f001:Main:pub} () -> void
+            §M{Test}
+              §F{Main:pub} () -> void
                 §E{}
                 §B{x:i32} STR:"not an int"
                 §R
@@ -59,8 +59,8 @@ public class CliTypeCheckDefaultTests : IDisposable
     {
         var path = Path.Combine(_tempDir, "nullable-reference.calr");
         const string safe = """
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} () -> ?str
+            §M{NullableTyping}
+              §F{Probe:pub} () -> ?str
                 §E{alloc}
                 §R "safe"
             """;

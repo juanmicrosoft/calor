@@ -31,9 +31,9 @@ public class CliElisionDefaultTests : IDisposable
     {
         var path = Path.Combine(_tempDir, "square.calr");
         File.WriteAllText(path, """
-            §M{m001:Test}
-              §CL{c001:Calc:pub}
-                §MT{mt001:Square:pub}
+            §M{Test}
+              §CL{Calc:pub}
+                §MT{Square:pub}
                   §I{i32:x}
                   §O{i32}
                   §Q (>= x 0)

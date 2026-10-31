@@ -18,16 +18,16 @@ namespace Calor.Compiler.Tests;
 public sealed class S2ImplicationDefinednessTests
 {
     private const string StringSourceTemplate = """
-        §M{m1:R1Case}
-          §IFACE{i1:IProbe}
-            §MT{m1:Run}
+        §M{R1Case}
+          §IFACE{IProbe}
+            §MT{Run}
               §I{i32:x}
               §I{str:s}
               §O{i32}
               §Q (>= x INT:0)
-          §CL{c1:Impl:pub}
+          §CL{Impl:pub}
             §IMPL{IProbe}
-            §MT{mt1:Run:pub}
+            §MT{Run:pub}
               §I{i32:x}
               §I{str:s}
               §O{i32}
@@ -36,16 +36,16 @@ public sealed class S2ImplicationDefinednessTests
         """;
 
     private const string DivisionSource = """
-        §M{m1:R1Case}
-          §IFACE{i1:IProbe}
-            §MT{m1:Run}
+        §M{R1Case}
+          §IFACE{IProbe}
+            §MT{Run}
               §I{i32:x}
               §O{i32}
               §I{i32:y}
               §Q (== x INT:3)
-          §CL{c1:Impl:pub}
+          §CL{Impl:pub}
             §IMPL{IProbe}
-            §MT{mt1:Run:pub}
+            §MT{Run:pub}
               §I{i32:x}
               §I{i32:y}
               §O{i32}
@@ -113,16 +113,16 @@ public sealed class S2ImplicationDefinednessTests
     }
 
     private const string IntegerTemplate = """
-        §M{m1:M}
-          §IFACE{i1:IProbe}
-            §MT{m1:Run}
+        §M{M}
+          §IFACE{IProbe}
+            §MT{Run}
               §I{i32:x}
               §I{i32:y}
               §O{i32}
               §Q IFACEPRE
-          §CL{c1:Impl:pub}
+          §CL{Impl:pub}
             §IMPL{IProbe}
-            §MT{mt1:Run:pub}
+            §MT{Run:pub}
               §I{i32:x}
               §I{i32:y}
               §O{i32}
@@ -134,7 +134,7 @@ public sealed class S2ImplicationDefinednessTests
     {
         var source = IntegerTemplate.Replace("IFACEPRE", ifacePre).Replace("IMPLPRE", implPre);
         if (overflow != null)
-            source = source.Replace("§M{m1:M}", $"§M{{m1:M:overflow={overflow}}}");
+            source = source.Replace("§M{M}", $"§M{{m1:M:overflow={overflow}}}");
         return Compile(source);
     }
 
@@ -221,16 +221,16 @@ public sealed class S2ImplicationDefinednessTests
         // Review round 2 witness: the interface precondition throws at x = int.MaxValue; that
         // input is never accepted, so it creates no postcondition obligation.
         const string source = """
-            §M{m1:M}
-              §IFACE{i1:IProbe}
-                §MT{m1:Run}
+            §M{M}
+              §IFACE{IProbe}
+                §MT{Run}
                   §I{i32:x}
                   §O{i32}
                   §Q (> (+ x INT:1) INT:0)
                   §S (== result INT:0)
-              §CL{c1:Impl:pub}
+              §CL{Impl:pub}
                 §IMPL{IProbe}
-                §MT{mt1:Run:pub}
+                §MT{Run:pub}
                   §I{i32:x}
                   §O{i32}
                   §Q (> (+ x INT:1) INT:0)
@@ -250,21 +250,21 @@ public sealed class S2ImplicationDefinednessTests
         string? result = null;
         Assert.True(string.IsNullOrEmpty(result) && result != "");
         const string source = """
-            §M{m1:M}
-              §IFACE{i1:IA}
-                §MT{m1:Run}
+            §M{M}
+              §IFACE{IA}
+                §MT{Run}
                   §I{i32:x}
                   §O{str}
                   §S (isempty result)
-              §IFACE{i2:IB}
-                §MT{m2:Run}
+              §IFACE{IB}
+                §MT{Run}
                   §I{i32:x}
                   §O{str}
                   §S (!= result STR:"")
-              §CL{c1:Impl:pub}
+              §CL{Impl:pub}
                 §IMPL{IA}
                 §IMPL{IB}
-                §MT{mt1:Run:pub}
+                §MT{Run:pub}
                   §I{i32:x}
                   §O{str}
                   §R STR:""
@@ -292,16 +292,16 @@ public sealed class S2ImplicationDefinednessTests
     public void UnusedStringParameter_DoesNotDemoteAnIntegerImplication()
     {
         const string source = """
-            §M{m1:M}
-              §IFACE{i1:IProbe}
-                §MT{m1:Run}
+            §M{M}
+              §IFACE{IProbe}
+                §MT{Run}
                   §I{i32:x}
                   §I{str:s}
                   §O{i32}
                   §Q (>= x INT:1)
-              §CL{c1:Impl:pub}
+              §CL{Impl:pub}
                 §IMPL{IProbe}
-                §MT{mt1:Run:pub}
+                §MT{Run:pub}
                   §I{i32:x}
                   §I{str:s}
                   §O{i32}
@@ -318,21 +318,21 @@ public sealed class S2ImplicationDefinednessTests
     public void IncompatibleInheritedGuarantees_StillReportedWithAStringParameter()
     {
         const string source = """
-            §M{m1:M}
-              §IFACE{i1:IA}
-                §MT{m1:Run}
+            §M{M}
+              §IFACE{IA}
+                §MT{Run}
                   §I{str:s}
                   §O{i32}
                   §S (== result INT:0)
-              §IFACE{i2:IB}
-                §MT{m2:Run}
+              §IFACE{IB}
+                §MT{Run}
                   §I{str:s}
                   §O{i32}
                   §S (== result INT:1)
-              §CL{c1:Impl:pub}
+              §CL{Impl:pub}
                 §IMPL{IA}
                 §IMPL{IB}
-                §MT{mt1:Run:pub}
+                §MT{Run:pub}
                   §I{str:s}
                   §O{i32}
                   §R INT:0
@@ -352,16 +352,16 @@ public sealed class S2ImplicationDefinednessTests
         var pre = QuantifiedPredicate.Replace("VAR", "x");
         var post = QuantifiedPredicate.Replace("VAR", "result");
         var source = $$"""
-            §M{m1:M}
-              §IFACE{i1:IProbe}
-                §MT{m1:Run}
+            §M{M}
+              §IFACE{IProbe}
+                §MT{Run}
                   §I{i32:x}
                   §O{i32}
                   §Q {{pre}}
                   §S {{post}}
-              §CL{c1:Impl:pub}
+              §CL{Impl:pub}
                 §IMPL{IProbe}
-                §MT{mt1:Run:pub}
+                §MT{Run:pub}
                   §I{i32:x}
                   §O{i32}
                   §Q {{pre}}
@@ -381,21 +381,21 @@ public sealed class S2ImplicationDefinednessTests
         // both. The conditional divisor is not modeled: the check must say it could not decide.
         Assert.Throws<DivideByZeroException>(() => { var y = 0; return 100 / y == -1; });
         const string source = """
-            §M{m1:M}
-              §IFACE{i1:IA}
-                §MT{m1:Run}
+            §M{M}
+              §IFACE{IA}
+                §MT{Run}
                   §I{i32:y}
                   §O{i32}
                   §S (== y INT:0)
-              §IFACE{i2:IB}
-                §MT{m2:Run}
+              §IFACE{IB}
+                §MT{Run}
                   §I{i32:y}
                   §O{i32}
                   §S (== (/ INT:100 y) INT:-1)
-              §CL{c1:Impl:pub}
+              §CL{Impl:pub}
                 §IMPL{IA}
                 §IMPL{IB}
-                §MT{mt1:Run:pub}
+                §MT{Run:pub}
                   §I{i32:y}
                   §O{i32}
                   §R INT:0
@@ -410,8 +410,8 @@ public sealed class S2ImplicationDefinednessTests
     public void WeakeningCheck_DifferentOverflowPolicies_AreIndeterminate()
     {
         const string frozen = """
-            §M{m1:M}
-              §F{f1:Run:pub} (i32:x) -> i32
+            §M{M}
+              §F{Run:pub} (i32:x) -> i32
                 §Q (> (* x INT:2) INT:0)
                 §R x
             """;
@@ -422,7 +422,7 @@ public sealed class S2ImplicationDefinednessTests
             var frozenPath = Path.Combine(dir, "frozen.calr");
             var finalPath = Path.Combine(dir, "final.calr");
             File.WriteAllText(frozenPath, frozen);
-            File.WriteAllText(finalPath, frozen.Replace("§M{m1:M}", "§M{m1:M:overflow=unchecked}"));
+            File.WriteAllText(finalPath, frozen.Replace("§M{M}", "§M{M:overflow=unchecked}"));
             var (exit, stdOut, _) = CliTestHarness.RunCli(dir, "verify", frozenPath, finalPath, "--weakening-check", "f1");
             Assert.Equal(0, exit);
             var line = stdOut.Split('\n').First(l => l.TrimStart().StartsWith('{'));

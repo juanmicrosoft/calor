@@ -50,8 +50,8 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_CastExpression_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:CastTest:pub}
+§M{Test}
+  §F{CastTest:pub}
     §I{object:x}
     §O{i32}
     §R (cast i32 x)
@@ -65,8 +65,8 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_IsExpression_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:IsTest:pub}
+§M{Test}
+  §F{IsTest:pub}
     §I{object:x}
     §O{bool}
     §R (is x str)
@@ -80,8 +80,8 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_AsExpression_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:AsTest:pub}
+§M{Test}
+  §F{AsTest:pub}
     §I{object:x}
     §O{str}
     §R (as x str)
@@ -95,8 +95,8 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_NestedCast_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:NestedCast:pub}
+§M{Test}
+  §F{NestedCast:pub}
     §I{object:x}
     §O{i32}
     §R (cast i32 (cast f64 x))
@@ -113,8 +113,8 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_AsyncFunction_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §AF{f001:GetDataAsync:pub}
+§M{Test}
+  §AF{GetDataAsync:pub}
     §O{str}
     §R ""data""
 ";
@@ -131,11 +131,11 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_MatchStatement_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:MatchTest:pub}
+§M{Test}
+  §F{MatchTest:pub}
     §I{i32:x}
     §O{str}
-    §W{m1} x
+    §W x
     §K 1
       §R ""one""
     §K 2
@@ -153,11 +153,11 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_MatchWithNullablePatterns_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:OptMatch:pub}
+§M{Test}
+  §F{OptMatch:pub}
     §I{i32:x}
     §O{i32}
-    §W{m1} x
+    §W x
     §K null
       §R 1
     §K _
@@ -177,8 +177,8 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_PreconditionAndPostcondition_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
+§M{Test}
+  §F{Divide:pub}
     §I{i32:a}
     §I{i32:b}
     §O{i32}
@@ -200,11 +200,11 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_ForLoop_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:LoopTest:pub}
+§M{Test}
+  §F{LoopTest:pub}
     §O{void}
     §E{cw}
-    §L{l1:i:0:10:1}
+    §L{i:0:10:1}
       §C{Console.WriteLine} i
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
@@ -216,12 +216,12 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_WhileLoop_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:WhileTest:pub}
+§M{Test}
+  §F{WhileTest:pub}
     §I{bool:running}
     §O{void}
     §E{cw}
-    §WH{w1} running
+    §WH running
       §P ""working""
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
@@ -233,12 +233,12 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_NestedLoops_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:NestedLoop:pub}
+§M{Test}
+  §F{NestedLoop:pub}
     §O{void}
     §E{cw}
-    §L{l1:i:0:5:1}
-      §L{l2:j:0:5:1}
+    §L{i:0:5:1}
+      §L{j:0:5:1}
         §C{Console.WriteLine} (+ i j)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
@@ -253,13 +253,13 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_NestedIfElse_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:NestedIf:pub}
+§M{Test}
+  §F{NestedIf:pub}
     §I{bool:a}
     §I{bool:b}
     §O{i32}
-    §IF{if1} a
-      §IF{if2} b
+    §IF a
+      §IF b
         §R 2
       §EL
         §R 1
@@ -279,8 +279,8 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_FunctionWithEffects_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:PrintAll:pub}
+§M{Test}
+  §F{PrintAll:pub}
     §I{str:msg}
     §O{void}
     §E{cw}
@@ -299,11 +299,11 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_NullableExpressions_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SomeTest:pub}
+§M{Test}
+  §F{SomeTest:pub}
     §O{?i32}
     §R 42
-  §F{f002:NoneTest:pub}
+  §F{NoneTest:pub}
     §O{?i32}
     §R null
 ";
@@ -317,11 +317,11 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_ReturnAndThrow_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:OkTest:pub}
+§M{Test}
+  §F{OkTest:pub}
     §O{i32}
     §R 42
-  §F{f002:ErrTest:pub}
+  §F{ErrTest:pub}
     §O{str}
     §TH §NEW{Exception} §A ""error"" §/NEW
 ";
@@ -339,14 +339,14 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_LiteralInReturn_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:IntLiteral:pub}
+§M{Test}
+  §F{IntLiteral:pub}
     §O{i32}
     §R 42
-  §F{f002:BoolLiteral:pub}
+  §F{BoolLiteral:pub}
     §O{bool}
     §R true
-  §F{f003:StringLiteral:pub}
+  §F{StringLiteral:pub}
     §O{str}
     §R ""hello""
 ";
@@ -365,18 +365,18 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_MultipleFunctions_FormatsAndReparses()
     {
         var source = @"
-§M{m001:MathLib}
-  §F{f001:Add:pub}
+§M{MathLib}
+  §F{Add:pub}
     §I{i32:a}
     §I{i32:b}
     §O{i32}
     §R (+ a b)
-  §F{f002:Subtract:pub}
+  §F{Subtract:pub}
     §I{i32:a}
     §I{i32:b}
     §O{i32}
     §R (- a b)
-  §F{f003:Multiply:priv}
+  §F{Multiply:priv}
     §I{i32:a}
     §I{i32:b}
     §O{i32}
@@ -397,14 +397,14 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_FunctionWithContractsEffectsAndControlFlow_FormatsAndReparses()
     {
         var source = @"
-§M{m001:ComplexTest}
-  §F{f001:Process:pub}
+§M{ComplexTest}
+  §F{Process:pub}
     §I{i32:input}
     §O{i32}
     §E{cw}
     §Q (> input 0)
     §S (>= result 0)
-    §IF{if1} (> input 10)
+    §IF (> input 10)
       §C{Console.WriteLine} ""big""
       §R (* input 2)
     §EL
@@ -426,8 +426,8 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_BindStatements_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:BindTest:pub}
+§M{Test}
+  §F{BindTest:pub}
     §I{i32:a}
     §I{i32:b}
     §O{i32}
@@ -446,8 +446,8 @@ public class NewFeatureRoundTripTests
     {
         // Typed immutable: {type:name}, typed mutable: {~name:type}
         var source = @"
-§M{m001:Test}
-  §F{f001:TypedBindTest:pub}
+§M{Test}
+  §F{TypedBindTest:pub}
     §I{i32:x}
     §O{i32}
     §B{i32:count} 0
@@ -481,8 +481,8 @@ public class NewFeatureRoundTripTests
     {
         // Legacy CalorEmitter format: {name:const} should parse as immutable, no type
         var source = @"
-§M{m001:Test}
-  §F{f001:LegacyTest:pub}
+§M{Test}
+  §F{LegacyTest:pub}
     §O{i32}
     §B{count:const} 42
     §R count
@@ -503,8 +503,8 @@ public class NewFeatureRoundTripTests
     {
         // Legacy format: {type:name:const} should parse as immutable with type
         var source = @"
-§M{m001:Test}
-  §F{f001:LegacyTypedTest:pub}
+§M{Test}
+  §F{LegacyTypedTest:pub}
     §O{i32}
     §B{i32:count:const} 42
     §R count
@@ -528,10 +528,10 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_ArrayInitialized_FormatsAndReparses()
     {
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
-      §ARR{nums:i32} 1 2 3 §/ARR{nums}
+      §ARR{nums:i32} 1 2 3 §/ARR
 ";
         var (_, formatted, _) = FormatAndReparse(source);
         Assert.Contains("§ARR", formatted);
@@ -542,10 +542,10 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_ArraySized_FormatsAndReparses()
     {
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
-      §B{[i32]:arr1} §ARR{i32:arr1:10}
+      §B{[i32]:arr1} §ARR{arr1:10}
 ";
         var (_, formatted, _) = FormatAndReparse(source);
         Assert.Contains("§ARR", formatted);
@@ -591,34 +591,34 @@ public class NewFeatureRoundTripTests
     [Theory]
     // position 1 — the declaration's own row
     [InlineData("""
-        §M{m001:R}
-          §F{f001:F:pub} () -> void
+        §M{R}
+          §F{F:pub} () -> void
             §E{cw}
             §P "x"
         """, "\n    §E{cw}\n")]
     // position 2 — lambda literal. The emitter did not write this tag back before
     // this slice, so the row was silently dropped on every round trip.
     [InlineData("""
-        §M{m001:R}
-          §F{f001:Main:pub} () -> void
+        §M{R}
+          §F{Main:pub} () -> void
             §E{}
-            §B{f} §LAM{lam1:x:i32} §E{cw} (+ x INT:1) §/LAM{lam1}
-        """, "§LAM{lam1:x:i32} §E{cw}")]
+            §B{f} §LAM{x:i32} §E{cw} (+ x INT:1) §/LAM
+        """, "§LAM{x:i32} §E{cw}")]
     // position 3 — delegate declaration. Emitted as `§E{[console, write]}` before
     // this slice: a stringified KeyValuePair that did not re-parse.
     [InlineData("""
-        §M{m001:R}
-          §DEL{d001:Handler}
+        §M{R}
+          §DEL{Handler}
             §I{i32:x}
             §O{void}
             §E{cw}
-          §F{f001:Main:pub} () -> void
+          §F{Main:pub} () -> void
             §E{}
         """, "\n    §E{cw}\n")]
     // position 4 — parameter, tag form
     [InlineData("""
-        §M{m001:R}
-          §F{f001:Apply:pub}
+        §M{R}
+          §F{Apply:pub}
             §I{Func<i32,i32>:transform} §E{cw}
             §I{i32:value} = INT:1
             §O{i32}
@@ -627,59 +627,59 @@ public class NewFeatureRoundTripTests
         """, "§I{Func<i32, i32>:transform} §E{cw}")]
     // position 5 — parameter, inline form
     [InlineData("""
-        §M{m001:R}
-          §F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
+        §M{R}
+          §F{Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
             §E{cw}
             §R INT:0
         """, "Func<i32, i32>:transform §E{cw}")]
     // position 6 — return, §O spelling
     [InlineData("""
-        §M{m001:R}
-          §F{f001:Make:pub}
+        §M{R}
+          §F{Make:pub}
             §O{Func<i32>} §E{cw}
             §E{cw}
-            §R §LAM{lam1} INT:0 §/LAM{lam1}
+            §R §LAM{} INT:0 §/LAM
         """, "-> Func<i32> §E{cw}")]
     // position 6 — return, arrow spelling
     [InlineData("""
-        §M{m001:R}
-          §F{f001:Make:pub} () -> Func<i32> §E{cw}
+        §M{R}
+          §F{Make:pub} () -> Func<i32> §E{cw}
             §E{cw}
-            §R §LAM{lam1} INT:0 §/LAM{lam1}
+            §R §LAM{} INT:0 §/LAM
         """, "-> Func<i32> §E{cw}")]
     // position 7 — binding
     [InlineData("""
-        §M{m001:R}
-          §F{f001:Main:pub} () -> void
+        §M{R}
+          §F{Main:pub} () -> void
             §E{}
-            §B{f:Func<i32,i32>} §E{cw} §LAM{lam1:x:i32} (+ x INT:1) §/LAM{lam1}
+            §B{f:Func<i32,i32>} §E{cw} §LAM{x:i32} (+ x INT:1) §/LAM
         """, "§B{Func<i32, i32>:f} §E{cw}")]
     // position 8 — field
     [InlineData("""
-        §M{m001:R}
-          §CL{c001:C:pub}
+        §M{R}
+          §CL{C:pub}
             §FLD{Action<i32>:onChange:priv} §E{cw}
-            §MT{mt001:M:pub} () -> void
+            §MT{M:pub} () -> void
               §E{}
         """, "§FLD{Action<i32>:onChange:priv} §E{cw}")]
     // an empty row is not the same as no row (§3.5) and must survive
     [InlineData("""
-        §M{m001:R}
-          §F{f001:Apply:pub} (Func<i32,i32>:a §E{}, Func<i32,i32>:b) -> i32
+        §M{R}
+          §F{Apply:pub} (Func<i32,i32>:a §E{}, Func<i32,i32>:b) -> i32
             §E{}
             §R INT:0
         """, "Func<i32, i32>:a §E{}")]
     // the `eff` binder, written last in the type-parameter list
     [InlineData("""
-        §M{m001:R}
-          §F{f001:Map:pub}<T, eff e> (Func<i32,i32>:f §E{e}) -> i32
+        §M{R}
+          §F{Map:pub}<T, eff e> (Func<i32,i32>:f §E{e}) -> i32
             §E{e}
             §R INT:0
         """, "<T,eff e>")]
     // …and written FIRST, which is why EffectParameterInfo carries an Ordinal
     [InlineData("""
-        §M{m001:R}
-          §F{f001:Map:pub}<eff e, T> (Func<i32,i32>:f §E{e}) -> i32
+        §M{R}
+          §F{Map:pub}<eff e, T> (Func<i32,i32>:f §E{e}) -> i32
             §E{e}
             §R INT:0
         """, "<eff e,T>")]

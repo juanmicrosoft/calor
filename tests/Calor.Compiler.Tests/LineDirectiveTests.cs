@@ -11,11 +11,11 @@ namespace Calor.Compiler.Tests;
 public class LineDirectiveTests
 {
     private const string FizzBuzzSource = """
-§M{m001:FizzBuzz}
-  §F{f001:Main:pub} () -> void
+§M{FizzBuzz}
+  §F{Main:pub} () -> void
     §E{cw}
-    §L{for1:i:1:100:1}
-      §IF{if1} (== (% i 15) 0)
+    §L{i:1:100:1}
+      §IF (== (% i 15) 0)
         §P "FizzBuzz"
       §EI (== (% i 3) 0)
         §P "Fizz"

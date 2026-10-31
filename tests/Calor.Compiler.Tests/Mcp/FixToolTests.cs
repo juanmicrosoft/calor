@@ -94,21 +94,21 @@ public class FixToolTests
     [Fact]
     public void FixIdConflicts_RenumbersDuplicates()
     {
-        var source = "§F{f1:Foo:pub}\n§R 1\n\n§F{f1:Bar:pub}\n§R 2\n";
+        var source = "§F{Foo:pub}\n§R 1\n\n§F{Bar:pub}\n§R 2\n";
         var (result, fixes) = FixTool.FixIdConflicts(source);
 
         // First f1 should remain, second should be renumbered
         Assert.Single(fixes);
         Assert.Equal("id_conflicts", fixes[0].Rule);
         // The renamed ID should appear in both opening and closing tags
-        Assert.Contains("§F{f1:Foo:pub}", result);
+        Assert.Contains("§F{Foo:pub}", result);
         Assert.DoesNotContain("§F{f1:Bar", result);
     }
 
     [Fact]
     public void FixIdConflicts_NoConflictsNoChange()
     {
-        var source = "§F{f1:Foo:pub}\n\n§F{f2:Bar:pub}\n";
+        var source = "§F{Foo:pub}\n\n§F{Bar:pub}\n";
         var (result, fixes) = FixTool.FixIdConflicts(source);
 
         Assert.Equal(source, result);
@@ -166,7 +166,7 @@ public class FixToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "source": "§M{m1:Test}\n§F{f1:Foo:pub}\n§O{void}\n\n"
+                "source": "§M{Test}\n§F{Foo:pub}\n§O{void}\n\n"
             }
             """).RootElement;
 

@@ -43,11 +43,11 @@ public class PreprocessorBindingTests
         string.Join("\n", body.Split('\n').Select(line => prefix + line));
 
     private static string Fn(string body, string signature = "() -> i32") =>
-        "§M{m1:T}\n  §F{f1:Run:pub} " + signature + "\n" + Indent(body, "    ") + "\n";
+        "§M{T}\n  §F{Run:pub} " + signature + "\n" + Indent(body, "    ") + "\n";
 
     /// <summary>A method on a class with a writable field <c>x</c>.</summary>
     private static string MethodWithField(string body) =>
-        "§M{m1:T}\n  §CL{c1:K:pub}\n    §FLD{i32:x:pub}\n    §MT{m2:Run:pub} () -> i32\n      §E{mut}\n" +
+        "§M{T}\n  §CL{K:pub}\n    §FLD{i32:x:pub}\n    §MT{Run:pub} () -> i32\n      §E{mut}\n" +
         Indent(body, "      ") + "\n";
 
     [Theory]
@@ -59,8 +59,8 @@ public class PreprocessorBindingTests
         string naturalName, string positiveName, bool returnNatural)
     {
         var branch = $"      §B{{{naturalName}:Nat}} a\n      §B{{{positiveName}:Pos}} b\n";
-        var source = "§M{m:T}\n  §RTYPE{r1:Nat:i32} (>= # 0)\n  §RTYPE{r2:Pos:Nat} (> # 0)\n" +
-            "  §F{f:Run:pub} (Nat:a, Pos:b) -> Pos\n    §PP{DEBUG}\n" + branch +
+        var source = "§M{T}\n  §RTYPE{Nat:i32} (>= # 0)\n  §RTYPE{Pos:Nat} (> # 0)\n" +
+            "  §F{Run:pub} (Nat:a, Pos:b) -> Pos\n    §PP{DEBUG}\n" + branch +
             "    §PPE\n" + branch + $"    §R {(returnNatural ? naturalName : positiveName)}\n";
 
         var result = Compile(source);
@@ -159,7 +159,7 @@ public class PreprocessorBindingTests
     [InlineData("§B{y:i32} 1\n§PP{DEBUG}\n  §B{a:i32} 0\n§PPE\n  §ASSIGN y 2\n§R y")]
     [InlineData("§B{y:i32} 1\n§PP{DEBUG}\n  §ASSIGN y 2\n§PPE\n  §B{a:i32} 0\n§R y")]
     [InlineData("§PP{DEBUG}\n  §B{a:i32} 0\n§PPE\n  §B{z:i32} 1\n  §ASSIGN z 2\n§R 0")]
-    [InlineData("§PP{DEBUG}\n  §B{a:i32} 0\n§PPE\n  §L{l1:j:0:3:1}\n    §ASSIGN j 2\n§R 0")]
+    [InlineData("§PP{DEBUG}\n  §B{a:i32} 0\n§PPE\n  §L{j:0:3:1}\n    §ASSIGN j 2\n§R 0")]
     [InlineData("§B{y:i32} 1\n§PP{A}\n  §B{a:i32} 0\n§PPE\n  §PP{B}\n    §B{b:i32} 0\n  §PPE\n    §ASSIGN y 2\n§R y")]
     public void Binder_WriteToReadOnlyLocalInEitherBranch_IsCalor0213(string body)
     {
@@ -217,7 +217,7 @@ public class PreprocessorBindingTests
     [InlineData("§PP{A}\n  §B{x:str} \"a\"\n§PPE\n  §B{x:i32} 2\n§R 0")]
     public void Binder_BranchesDeclaringOneNameWithDifferentTypes_AreCalor0201(string body)
     {
-        var source = "§M{m1:T}\n  §RTYPE{r1:Nat:i32} (>= # 0)\n  §F{f1:Run:pub} (Nat:n) -> i32\n" +
+        var source = "§M{T}\n  §RTYPE{Nat:i32} (>= # 0)\n  §F{Run:pub} (Nat:n) -> i32\n" +
             Indent(body, "    ") + "\n";
         var diagnostics = Bind(source);
 
@@ -256,20 +256,20 @@ public class PreprocessorBindingTests
 
     // Review round 1: a call through a binding hoisted from §PP may run either branch's value.
     [Theory]
-    [InlineData("§B{later:Action} Noop", "§B{later:Action} §LAM{mut} §C{Mutate} §A{ref} value §/C §/LAM{mut}")]
-    [InlineData("§B{later:Action} §LAM{mut} §C{Mutate} §A{ref} value §/C §/LAM{mut}", "§B{later:Action} Noop")]
+    [InlineData("§B{later:Action} Noop", "§B{later:Action} §LAM{mut} §C{Mutate} §A{ref} value §/C §/LAM")]
+    [InlineData("§B{later:Action} §LAM{mut} §C{Mutate} §A{ref} value §/C §/LAM", "§B{later:Action} Noop")]
     public void Binder_CallThroughHoistedCallable_SeesEveryBranchMutation(string first, string second)
     {
         var source = $$"""
-            §M{m:PpCallable}
-              §F{noop:Noop:pub} () -> void
+            §M{PpCallable}
+              §F{Noop:pub} () -> void
                 §E{}
-              §F{mutate:Mutate:pub} (?str:value:ref) -> void
+              §F{Mutate:pub} (?str:value:ref) -> void
                 §ASSIGN value null
-              §F{take:Take:pub} (str:value) -> void
+              §F{Take:pub} (str:value) -> void
                 §E{}
-              §F{probe:Probe:pub} (?str:value) -> void
-                §IF{guard} (!= value null)
+              §F{Probe:pub} (?str:value) -> void
+                §IF (!= value null)
                   §PP{A}
                     {{first}}
                   §PPE
@@ -288,15 +288,15 @@ public class PreprocessorBindingTests
     public void Binder_BranchNarrowingOfAHoistedBinding_SurvivesWhenEveryBranchEstablishesIt()
     {
         var diagnostics = Bind(NarrowingProbe(
-            "§PP{A}\n  §B{x:?str} input\n  §IF{g1} (isempty x)\n    §R\n§PPE\n  §B{x:?str} input\n  §IF{g2} (isempty x)\n    §R"));
+            "§PP{A}\n  §B{x:?str} input\n  §IF (isempty x)\n    §R\n§PPE\n  §B{x:?str} input\n  §IF (isempty x)\n    §R"));
 
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
     }
 
     [Theory]
-    [InlineData("§PP{A}\n  §B{x:?str} input\n  §IF{g1} (isempty x)\n    §R\n§PPE\n  §B{x:?str} input")]
-    [InlineData("§PP{A}\n  §B{x:?str} input\n§PPE\n  §B{x:?str} input\n  §IF{g2} (isempty x)\n    §R")]
-    [InlineData("§PP{A}\n  §B{~x:?str} input\n  §IF{g1} (isempty x)\n    §R\n§PPE\n  §B{~x:?str} input\n  §IF{g2} (isempty x)\n    §R\n§ASSIGN x null")]
+    [InlineData("§PP{A}\n  §B{x:?str} input\n  §IF (isempty x)\n    §R\n§PPE\n  §B{x:?str} input")]
+    [InlineData("§PP{A}\n  §B{x:?str} input\n§PPE\n  §B{x:?str} input\n  §IF (isempty x)\n    §R")]
+    [InlineData("§PP{A}\n  §B{~x:?str} input\n  §IF (isempty x)\n    §R\n§PPE\n  §B{~x:?str} input\n  §IF (isempty x)\n    §R\n§ASSIGN x null")]
     public void Binder_BranchNarrowingNotEstablishedEverywhereOrInvalidated_IsCalor0274(string body)
     {
         var diagnostics = Bind(NarrowingProbe(body));
@@ -305,7 +305,7 @@ public class PreprocessorBindingTests
     }
 
     private static string NarrowingProbe(string body) =>
-        "§M{m:P}\n  §F{take:Take:pub} (str:value) -> void\n    §E{}\n  §F{probe:Probe:pub} (?str:input) -> void\n" +
+        "§M{P}\n  §F{Take:pub} (str:value) -> void\n    §E{}\n  §F{Probe:pub} (?str:input) -> void\n" +
         Indent(body + "\n§C{Take} §A x §/C", "    ") + "\n";
 
     // Review round 2: a write inside a §PP inside a deferred callable is part of its summary.
@@ -315,10 +315,10 @@ public class PreprocessorBindingTests
     [InlineData("§PP{A}\n  §B{k:i32} 0\n§PPE\n  §PP{B}\n    §ASSIGN value null")]
     public void Binder_WriteInsidePreprocessorInsideLambda_ReachesTheCallSite(string lambdaBody)
     {
-        var source = "§M{m:P}\n  §F{take:Take:pub} (str:value) -> i32\n    §R (len value)\n" +
-            "  §F{probe:Probe:pub} (?str:input) -> void\n    §B{~value:?str} input\n" +
-            "    §IF{guard} (!= value null)\n      §B{later:Action} §LAM{mut}\n" +
-            Indent(lambdaBody, "        ") + "\n      §/LAM{mut}\n      §C{later} §/C\n      §C{Take} §A value §/C\n";
+        var source = "§M{P}\n  §F{Take:pub} (str:value) -> i32\n    §R (len value)\n" +
+            "  §F{Probe:pub} (?str:input) -> void\n    §B{~value:?str} input\n" +
+            "    §IF (!= value null)\n      §B{later:Action} §LAM{mut}\n" +
+            Indent(lambdaBody, "        ") + "\n      §/LAM\n      §C{later} §/C\n      §C{Take} §A value §/C\n";
         var module = Parse(source, out var diagnostics);
         new Binder(diagnostics).Bind(module);
 
@@ -329,7 +329,7 @@ public class PreprocessorBindingTests
     [Fact]
     public void Emitter_ElseBranchRebind_IsNotGuardedByTheIfBranchRefinement()
     {
-        var result = Compile("§M{m:T}\n  §RTYPE{r:Nat:i32} (>= # 0)\n  §F{f:Run:pub} (Nat:n) -> i32\n" +
+        var result = Compile("§M{T}\n  §RTYPE{Nat:i32} (>= # 0)\n  §F{Run:pub} (Nat:n) -> i32\n" +
             "    §B{~x:i32} 0\n    §PP{A}\n      §B{~x:Nat} n\n    §PPE\n      §B{~x:i32} -1\n    §R x\n");
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors.Select(e => $"{e.Code}: {e.Message}")));
@@ -343,7 +343,7 @@ public class PreprocessorBindingTests
     [Fact]
     public void Emitter_RefinementInstalledByOneBranch_StillGuardsWritesAfterTheBlock()
     {
-        var result = Compile("§M{m:T}\n  §RTYPE{r:Nat:i32} (>= # 0)\n  §F{f:Run:pub} (Nat:n) -> i32\n" +
+        var result = Compile("§M{T}\n  §RTYPE{Nat:i32} (>= # 0)\n  §F{Run:pub} (Nat:n) -> i32\n" +
             "    §B{~x:i32} 0\n    §PP{A}\n      §B{~x:i32} 1\n    §PPE\n      §B{~x:Nat} n\n    §ASSIGN x -2\n    §R x\n");
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors.Select(e => $"{e.Code}: {e.Message}")));
@@ -380,8 +380,8 @@ public class PreprocessorBindingTests
     [InlineData("§PP{A}\n  §B{k:i32} 0\n§PPE\n  §B{x:str} \"safe\"\n§R 0")]
     public void Binder_BranchBindingHidingAMemberOnSomePaths_IsCalor0201(string body)
     {
-        var source = "§M{m:T}\n  §CL{c1:K:pub}\n    §FLD{?str:x:pub}\n    §MT{take:Take:pub} (str:value) -> i32\n      §R (len value)\n" +
-            "    §MT{probe:Run:pub} () -> i32\n" + Indent(body, "      ") + "\n";
+        var source = "§M{T}\n  §CL{K:pub}\n    §FLD{?str:x:pub}\n    §MT{Take:pub} (str:value) -> i32\n      §R (len value)\n" +
+            "    §MT{Run:pub} () -> i32\n" + Indent(body, "      ") + "\n";
         var diagnostics = Bind(source);
 
         Assert.Contains(diagnostics.Errors, e => e.Code == DiagnosticCode.DuplicateDefinition && e.Message.Contains("not every branch"));
@@ -398,8 +398,8 @@ public class PreprocessorBindingTests
     [Fact]
     public void Binder_BranchBindingsHidingAMemberOnEveryPath_AreAccepted()
     {
-        var source = "§M{m:T}\n  §CL{c1:K:pub}\n    §FLD{?str:x:pub}\n    §MT{take:Take:pub} (str:value) -> i32\n      §R (len value)\n" +
-            "    §MT{probe:Run:pub} () -> i32\n      §PP{A}\n        §B{x:str} \"a\"\n      §PPE\n        §B{x:str} \"b\"\n      §R §C{Take} §A x §/C\n";
+        var source = "§M{T}\n  §CL{K:pub}\n    §FLD{?str:x:pub}\n    §MT{Take:pub} (str:value) -> i32\n      §R (len value)\n" +
+            "    §MT{Run:pub} () -> i32\n      §PP{A}\n        §B{x:str} \"a\"\n      §PPE\n        §B{x:str} \"b\"\n      §R §C{Take} §A x §/C\n";
         var diagnostics = Bind(source);
 
         Assert.DoesNotContain(diagnostics.Errors, e => e.Code == DiagnosticCode.DuplicateDefinition);
@@ -413,11 +413,11 @@ public class PreprocessorBindingTests
     [InlineData(false)]
     public void Binder_CallableCapturedInEitherBranch_InvalidatesTheHoistedNarrowing(bool captureInElse)
     {
-        var capture = "§ASSIGN later §LAM{mut}\n  §ASSIGN x null\n§/LAM{mut}";
-        var ifBranch = "§B{~x:?str} input\n§IF{g1} (isempty x)\n  §R 0" + (captureInElse ? "" : "\n" + capture);
-        var elseBranch = "§B{~x:?str} input\n§IF{g2} (isempty x)\n  §R 0" + (captureInElse ? "\n" + capture : "");
-        var source = "§M{m:T}\n  §F{take:Take:pub} (str:value) -> i32\n    §E{}\n    §R (len value)\n" +
-            "  §F{probe:Probe:pub} (?str:input) -> i32\n    §B{~later:Action} §LAM{nop}\n      §B{k:i32} 0\n    §/LAM{nop}\n" +
+        var capture = "§ASSIGN later §LAM{mut}\n  §ASSIGN x null\n§/LAM";
+        var ifBranch = "§B{~x:?str} input\n§IF (isempty x)\n  §R 0" + (captureInElse ? "" : "\n" + capture);
+        var elseBranch = "§B{~x:?str} input\n§IF (isempty x)\n  §R 0" + (captureInElse ? "\n" + capture : "");
+        var source = "§M{T}\n  §F{Take:pub} (str:value) -> i32\n    §E{}\n    §R (len value)\n" +
+            "  §F{Probe:pub} (?str:input) -> i32\n    §B{~later:Action} §LAM{nop}\n      §B{k:i32} 0\n    §/LAM\n" +
             "    §PP{A}\n" + Indent(ifBranch, "      ") + "\n    §PPE\n" + Indent(elseBranch, "      ") + "\n" +
             "    §C{later} §/C\n    §R §C{Take} §A x §/C\n";
         var diagnostics = Bind(source);
@@ -429,8 +429,8 @@ public class PreprocessorBindingTests
     [Fact]
     public void Emitter_SameInheritedRefinementInBothBranches_Compiles()
     {
-        var result = Compile("§M{m:T}\n  §RTYPE{r1:Nat:i32} (>= # 0)\n  §RTYPE{r2:Pos:Nat} (> # 0)\n" +
-            "  §F{f:Run:pub} (Pos:n) -> i32\n    §PP{A}\n      §B{x:Pos} n\n    §PPE\n      §B{x:Pos} n\n    §R x\n");
+        var result = Compile("§M{T}\n  §RTYPE{Nat:i32} (>= # 0)\n  §RTYPE{Pos:Nat} (> # 0)\n" +
+            "  §F{Run:pub} (Pos:n) -> i32\n    §PP{A}\n      §B{x:Pos} n\n    §PPE\n      §B{x:Pos} n\n    §R x\n");
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors.Select(e => $"{e.Code}: {e.Message}")));
     }
@@ -444,7 +444,7 @@ public class PreprocessorBindingTests
     [InlineData("§PP{DEBUG}\n  §B{~x:i32} 1\n§PPE\n  §B{~x:i32} 2\n§ASSIGN x 3\n§R x", "int x = 2;")]
     [InlineData("§PP{A}\n  §B{~x:i32} 1\n§PPE\n  §PP{B}\n    §B{~x:i32} 2\n  §PPE\n    §B{~x:i32} 3\n§ASSIGN x 4\n§B{~x} 5\n§R x", "int x = 3;")]
     [InlineData("§B{~n:i32} 0\n§PP{DEBUG}\n  §ASSIGN n 1\n§PPE\n  §B{~n} 2\n§R n", "n = 2;")]
-    [InlineData("§L{l1:i:0:3:1}\n  §PP{DEBUG}\n    §B{k:i32} i\n  §PPE\n    §B{k:i32} 0\n§R 0", "int k = 0;")]
+    [InlineData("§L{i:0:3:1}\n  §PP{DEBUG}\n    §B{k:i32} i\n  §PPE\n    §B{k:i32} 0\n§R 0", "int k = 0;")]
     public void Compile_ValidPreprocessorCode_CompilesWithBothBranches(string body, string elseBranchCode)
     {
         var result = Compile(Fn(body));
