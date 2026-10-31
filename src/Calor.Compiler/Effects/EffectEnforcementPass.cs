@@ -3849,8 +3849,17 @@ public sealed class EffectEnforcementPass
                 var ambiguous = false;
                 if (declaration is { } declared)
                 {
-                    bind = bindings.FirstOrDefault(b => b.Span.Start <= declared.Start && declared.Start <= b.Span.End)
-                        ?? bindings.FirstOrDefault(b => b.Span.Start == declared.Start);
+                    var matches = bindings.Where(b => b.IdentifierSpan.Equals(declared)).ToList();
+                    if (matches.Count == 0)
+                    {
+                        // Synthetic ASTs may use the whole node span as the
+                        // identifier span. Parsed declarations use exact identity.
+                        matches = bindings.Where(b => b.IdentifierSpan.Equals(b.Span)
+                            && b.Span.Start <= declared.Start && declared.Start <= b.Span.End).ToList();
+                    }
+                    ambiguous = matches.Count > 1;
+                    if (matches.Count == 1)
+                        bind = matches[0];
                     // A resolved declaration that is not any `§B` is the parameter
                     // (its span is in the signature) or a field; fall through.
                 }
@@ -3871,7 +3880,7 @@ public sealed class EffectEnforcementPass
                 {
                     return (PolyRow.Unknown,
                         $"more than one declaration named '{name}' is visible in '{ownerName}' and the "
-                        + "binder did not resolve this reference to one of them");
+                        + "reference does not uniquely identify one of them");
                 }
 
                 if (bind != null)

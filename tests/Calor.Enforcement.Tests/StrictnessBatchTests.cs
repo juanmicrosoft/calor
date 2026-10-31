@@ -2018,20 +2018,22 @@ var x = 1;
         }
     }
 
-    [Fact]
-    public void Invocation_ShadowingInANestedScope_IsRejectedByTheBinder()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Invocation_ShadowingInANestedScope_IsRejectedByTheBinder(bool initialized)
     {
         // F2's third shape. A `§B{f}` shadowing a parameter `f` in a nested
         // scope never reaches the effect pass: the binder rejects it (Calor0255)
         // and Program.Compile stops on binder errors, which is fail-closed by
         // construction. Pinned so the day the binder admits shadowing, this
         // test says the invocation charge must be re-checked for it.
-        var result = TestHarness.Compile("""
+        var result = TestHarness.Compile($$"""
             §M{F2c}
               §F{Go:pub} (Func<i32,i32>:f §E{}) -> i32
                 §E{}
                 §IF true
-                  §B{f:Func<i32,i32>} §E{cw} §LAM{x:i32} §P x §R x §/LAM
+                  §B{f:Func<i32,i32>} §E{cw} {{(initialized ? "§LAM{x:i32} §P x §R x §/LAM" : "")}}
                   §R §C{f} §A INT:1 §/C
                 §R §C{f} §A INT:2 §/C
             """);
@@ -2041,6 +2043,151 @@ var x = 1;
             d.Code == DiagnosticCode.ForbiddenEffect
             || d.Code == DiagnosticCode.EffectRowUnknown
             || d.Code == DiagnosticCode.DelegateInvocation);
+    }
+
+    [Theory]
+    [InlineData("", false, false)]
+    [InlineData("", true, false)]
+    [InlineData("", false, true)]
+    [InlineData("", true, true)]
+    [InlineData("cw", false, false)]
+    [InlineData("cw", true, false)]
+    [InlineData("cw", false, true)]
+    [InlineData("cw", true, true)]
+    public void Invocation_ExplicitBindingRow_UsesIdentifierIdentity(
+        string row, bool initialized, bool captured)
+    {
+        var result = TestHarness.Compile($$"""
+            §M{BindingIdentity}
+              §F{Go:pub} (Func<i32,i32>:source §E{ {{row}}}) -> i32
+                §E{}
+                §B{~f:Func<i32,i32>} §E{ {{row}}} {{(initialized ? "source" : "")}}
+                {{(initialized ? "" : "§ASSIGN f source")}}
+                {{(captured ? "§B{g:Func<i32,i32>} §LAM{x:i32} §C{f} §A x §/C §/LAM" : "")}}
+                §R §C{ {{(captured ? "g" : "f")}}} §A 1 §/C
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code is
+            DiagnosticCode.EffectRowUnknown or DiagnosticCode.EffectRowMismatch or DiagnosticCode.DelegateInvocation);
+        var binding = Assert.Single(Assert.Single(result.Ast!.Functions).Body.OfType<BindStatementNode>(),
+            bind => bind.Name == "f");
+        if (!initialized)
+            Assert.True(binding.IdentifierSpan.Start > binding.Span.End);
+        if (row.Length == 0)
+            Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
+        else
+            Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect
+                && d.Message.Contains("charged by invoking 'f' (row: cw)"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Invocation_RowlessBinding_OnlyAnInitializerProvidesEvidence(bool initialized)
+    {
+        var result = TestHarness.Compile($$"""
+            §M{BindingUnknown}
+              §F{Go:pub} (Func<i32,i32>:source §E{}) -> i32
+                §E{}
+                §B{~f:Func<i32,i32>} {{(initialized ? "source" : "")}}
+                {{(initialized ? "" : "§ASSIGN f source")}}
+                §R §C{f} §A 1 §/C
+            """);
+
+        if (initialized)
+        {
+            Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
+            Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.EffectRowUnknown);
+        }
+        else
+        {
+            Assert.Contains(result.Diagnostics.Warnings, d => d.Code == DiagnosticCode.EffectRowUnknown
+                && d.Message.StartsWith("Invocation of 'f'", StringComparison.Ordinal));
+            Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect
+                && d.Message.Contains("'unknown'"));
+        }
+    }
+
+    [Theory]
+    [InlineData("", "cw", false)]
+    [InlineData("cw", "", false)]
+    [InlineData("", "cw", true)]
+    [InlineData("cw", "", true)]
+    public void Invocation_BareSiblingBindingsAndCapturedScopes_UseOnlyTheirOwnRow(
+        string firstRow, string secondRow, bool captured)
+    {
+        var result = TestHarness.Compile($$"""
+            §M{SiblingIdentity}
+              §F{Go:pub} (bool:b, Func<i32,i32>:first §E{ {{firstRow}}}, Func<i32,i32>:second §E{ {{secondRow}}}) -> i32
+                §E{}
+                §IF b
+                  §B{~f:Func<i32,i32>} §E{ {{firstRow}}}
+                  §ASSIGN f first
+                  §R 0
+                §EL
+                  §B{~f:Func<i32,i32>} §E{ {{secondRow}}}
+                  §ASSIGN f second
+                  {{(captured ? "§B{g:Func<i32,i32>} §LAM{x:i32} §C{f} §A x §/C §/LAM" : "")}}
+                  §R §C{ {{(captured ? "g" : "f")}}} §A 1 §/C
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code is
+            DiagnosticCode.EffectRowUnknown or DiagnosticCode.EffectRowMismatch or DiagnosticCode.DelegateInvocation);
+        if (secondRow.Length == 0)
+            Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
+        else
+            Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect
+                && d.Message.Contains("charged by invoking 'f' (row: cw)"));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Invocation_SyntheticBindingIdentity_IsPreservedButAmbiguityIsNotEvidence(
+        bool ambiguous, bool impure)
+    {
+        var row = impure ? "cw" : "";
+        var parsed = TestHarness.Compile($$"""
+            §M{SyntheticIdentity}
+              §F{Go:pub} (bool:b, Func<i32,i32>:source §E{ {{row}}}) -> i32
+                §E{}
+                §IF b
+                  §B{~f:Func<i32,i32>} §E{}
+                  §R 0
+                §EL
+                  §B{~f:Func<i32,i32>} §E{ {{row}}}
+                  §ASSIGN f source
+                  §R §C{f} §A 1 §/C
+            """);
+        var module = parsed.Ast!;
+        var branch = Assert.IsType<IfStatementNode>(Assert.Single(Assert.Single(module.Functions).Body));
+        foreach (var statements in new[] { branch.ThenBody, branch.ElseBody! })
+        {
+            var body = Assert.IsAssignableFrom<IList<StatementNode>>(statements);
+            var bind = Assert.IsType<BindStatementNode>(body[0]);
+            body[0] = new BindStatementNode(ambiguous ? TextSpan.Empty : bind.IdentifierSpan,
+                bind.Name, bind.TypeName, bind.IsMutable, bind.Initializer, bind.Attributes, row: bind.Row);
+        }
+        var diagnostics = new DiagnosticBag();
+        new EffectEnforcementPass(diagnostics).Enforce(module);
+
+        if (ambiguous)
+        {
+            Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.EffectRowUnknown
+                && d.Message.Contains("more than one declaration named 'f'"));
+            Assert.Contains(diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect
+                && d.Message.Contains("'unknown'"));
+        }
+        else
+        {
+            Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.EffectRowUnknown);
+            Assert.Equal(impure, diagnostics.HasErrors);
+            if (impure)
+                Assert.Contains(diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect
+                    && d.Message.Contains("charged by invoking 'f' (row: cw)"));
+        }
     }
 
     [Fact]
