@@ -65,6 +65,7 @@ STATUSES = SUCCESS + ("known-failure", "failed", "unexpected-pass",
                       "unclassified", "invalid", "crashed",
                       "TimeoutOrUnavailable")
 CS_CODE = re.compile(r"\((CS\d{4})\)")
+DECLARATION_URI = re.compile(r"calor://declaration/([A-Za-z0-9_]+)")
 
 
 def errors_of(diagnostics: list[dict]) -> list[dict]:
@@ -77,7 +78,8 @@ def signature(diagnostics: list[dict],
     """One `file|code|declaration|message` entry per error, sorted, with
     duplicates kept, so an error with another location, declaration, or
     cause, or one more error, changes the signature. Fresh scratch-sidecar
-    IDs resolve to exact file/kind/container/name/signature descriptors.
+    IDs, including candidate references in messages, resolve to exact
+    file/kind/container/name/signature descriptors.
     `file` is the base
     name; Calor1002 carries its Roslyn code; whitespace is collapsed.
     """
@@ -89,6 +91,13 @@ def signature(diagnostics: list[dict],
             code = f"Calor1002:{m.group(1)}" if m else "Calor1002"
         where = Path(str((d.get("location") or {}).get("file") or "-")).name
         msg = " ".join(str(d.get("message", "")).split())
+        if declaration_keys is not None:
+            def candidate_reference(match: re.Match[str]) -> str:
+                identity = match.group(1)
+                if identity not in declaration_keys:
+                    raise ValueError(f"unresolved diagnostic declaration {identity}")
+                return "calor://declaration/" + declaration_keys[identity]
+            msg = DECLARATION_URI.sub(candidate_reference, msg)
         declaration = d.get("declarationId") or "-"
         if declaration != "-" and declaration_keys is not None:
             if declaration not in declaration_keys:

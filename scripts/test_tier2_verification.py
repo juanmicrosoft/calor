@@ -163,6 +163,33 @@ class ScratchDeclarationControls(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "invalid"):
             self.keys(dict(self.declaration, Kind=True))
 
+    def test_candidate_references_keep_exact_identity_and_cause(self):
+        def diagnostic(identity, arguments="OBJECT"):
+            return {"code": "Calor0208", "severity": "error",
+                    "message": f"No overload matches ({arguments}). Candidates: "
+                               f"F(str) [calor://declaration/{identity}]"}
+
+        first_id, second_id = "f_000000000001", "f_000000000002"
+        keys = self.keys(self.declaration)
+        first = fcc.signature([diagnostic(first_id)], keys)
+        fresh = self.keys(dict(self.declaration, Id=second_id))
+        self.assertEqual(first, fcc.signature([diagnostic(second_id)], fresh))
+        self.assertIn("calor://declaration/" + keys[first_id], first[0])
+        self.assertNotEqual(first, fcc.signature([diagnostic(first_id, "i32")], keys))
+        self.assertNotEqual(first, fcc.signature(
+            [diagnostic(first_id), diagnostic(first_id)], keys))
+        for field, value in (("Kind", 2), ("Container", "Other"),
+                             ("Name", "Other"), ("Signature", "different")):
+            changed = self.keys(dict(self.declaration, **{field: value}))
+            self.assertNotEqual(first, fcc.signature([diagnostic(first_id)], changed))
+
+    def test_unknown_candidate_reference_fails_closed_without_owner_identity(self):
+        diagnostic = {"code": "Calor0208", "severity": "error",
+                      "message": "Candidates: F(str) [calor://declaration/f_missing]",
+                      "declarationId": None}
+        with self.assertRaisesRegex(ValueError, "unresolved"):
+            fcc.signature([diagnostic], self.keys(self.declaration))
+
     def test_missing_diagnostic_identity_is_not_normalized_away(self):
         diagnostic = {"code": "Calor0410", "severity": "error",
                       "message": "controlled", "declarationId": "f_missing"}
@@ -630,6 +657,60 @@ class RepositoryGuards(unittest.TestCase):
                 self.assertEqual(group["mode"], "each")
                 self.assertEqual(group.get("options", []), [])
                 self.assertNotIn("errors", group)
+
+    def test_current_latency_project_keeps_all_modules_and_compile_obligation(self):
+        prefix = "bench/phase0-agent-native/latency/fixture-10k/src/"
+        mapping = fcc.current_input_paths(REPO_ROOT, self.manifest)
+        expected = {prefix + "main.calr"} | {
+            f"{prefix}l{layer}m{module:02}.calr"
+            for layer in range(1, 4) for module in range(1, 36)}
+        self.assertEqual({original for original in mapping
+                          if original.startswith(prefix)}, expected)
+        groups = [g for g in self.manifest["groups"]
+                  if set(g["files"]) & {mapping[original] for original in expected}]
+        self.assertEqual(len(groups), 1)
+        group = groups[0]
+        self.assertEqual(set(group["files"]), {mapping[original] for original in expected})
+        self.assertEqual(group["mode"], "together")
+        self.assertEqual(group["expect"], "compile")
+        self.assertEqual(group.get("options", []), [])
+        self.assertNotIn("errors", group)
+        self.assertNotIn("defect", group)
+
+    def test_added_historical_roles_keep_frozen_formatter_intent(self):
+        baseline = json.loads((REPO_ROOT / "tests/TestData/Formatting/"
+                               "formatter-corpus-baseline.json").read_text())
+        semantic = set(baseline["conservativeFallbacks"]["semanticErrors"])
+        generated = set(baseline["conservativeFallbacks"]["generatedCSharpErrors"])
+        parse = set(baseline["parseFailurePaths"])
+        originals = {current: original for original, current in
+                     fcc.current_input_paths(REPO_ROOT, self.manifest).items()}
+        groups = [g for g in self.manifest["groups"]
+                  if g["id"].startswith("active:historical-role:")]
+        self.assertEqual(sum(len(g["files"]) for g in groups), 345)
+        self.assertEqual(sum(len(g["files"]) for g in groups
+                             if g["expect"] == "reject"), 16)
+        for group in groups:
+            self.assertEqual(group.get("options", []), [])
+            self.assertNotEqual(group["expect"], "known-failure")
+            for current in group["files"]:
+                original = originals[current]
+                with self.subTest(current=current):
+                    self.assertNotIn(original, parse)
+                    if group["mode"] == "together":
+                        self.assertEqual(group["expect"], "compile")
+                    elif original in semantic:
+                        self.assertEqual(group["expect"], "reject")
+                        self.assertEqual(group["negativeKind"], "designed")
+                        self.assertTrue(group["errors"])
+                        allowed = ("Calor0410",) if "/pairs/" in original else (
+                            "Calor0213", "Calor0208")
+                        self.assertTrue(all(error.split("|", 2)[1] in allowed
+                                            for error in group["errors"]))
+                    else:
+                        self.assertNotIn(original, generated)
+                        self.assertEqual(group["expect"], "compile")
+                        self.assertEqual(group["mode"], "each")
 
     def test_codegen_only_failures_are_not_incidental_negatives(self):
         for g in self.manifest["groups"]:
