@@ -1,4 +1,6 @@
 using Calor.Compiler.CodeGen;
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Parsing;
 using Calor.Evaluation.LlmTasks;
 using Calor.Evaluation.LlmTasks.Execution;
 using Calor.Runtime;
@@ -86,9 +88,16 @@ public class SafetyBenchmarkTests
     public void CodeExecutor_DebugMode_CapturesSafetyAnalysis()
     {
         using var executor = new CodeExecutor(timeoutMs: 5000, contractMode: EmitContractMode.Debug);
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parser(new Lexer(SafeDivideCalor, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+        var declaration = Assert.Single(ast.Functions);
+        Assert.Equal("SafeDivide", declaration.Name);
 
         var compileResult = executor.CompileCalor(SafeDivideCalor);
+        Assert.True(compileResult.Success);
         var csharpResult = executor.CompileCSharp(compileResult.GeneratedCSharp!);
+        Assert.True(csharpResult.Success);
         var execResult = executor.Execute(csharpResult.AssemblyBytes!, "SafeDivide", new object[] { 10, 0 });
 
         Assert.NotNull(execResult.SafetyAnalysis);
@@ -96,7 +105,7 @@ public class SafetyBenchmarkTests
         Assert.True(execResult.SafetyAnalysis.HasLocation);
         Assert.True(execResult.SafetyAnalysis.HasCondition);
         Assert.Equal("b != 0", execResult.SafetyAnalysis.Condition);
-        Assert.Equal("f001", execResult.SafetyAnalysis.FunctionId);
+        Assert.Equal(declaration.Id, execResult.SafetyAnalysis.FunctionId);
         Assert.True(execResult.SafetyAnalysis.Line > 0);
     }
 

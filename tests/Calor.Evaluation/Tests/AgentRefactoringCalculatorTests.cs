@@ -211,15 +211,17 @@ public class AgentRefactoringCalculatorTests
 
     #endregion
 
-    #region Refactoring Evaluation Tests
+    #region Historical Source-ID Refactoring Evaluation Tests
+
+    // Preserve the frozen lexical producer's inputs, including nonempty ID-loss controls.
 
     [Fact]
     public void EvaluateRefactoring_DetectsContractPreservation_WhenContractsMaintained()
     {
         // Arrange
         var calculator = new AgentRefactoringCalculator(quickMode: true);
-        var before = "§F{Test} §Q (>= x 0) §S (>= result 0) §R x §/F";
-        var after = "§F{Test} §Q (>= x 0) §S (>= result 0) §R x §/F §F{Helper} §Q (>= y 0) §R y §/F";
+        var before = "§F{f001:Test} §Q (>= x 0) §S (>= result 0) §R x §/F";
+        var after = "§F{f001:Test} §Q (>= x 0) §S (>= result 0) §R x §/F §F{f002:Helper} §Q (>= y 0) §R y §/F";
 
         // Act
         var result = calculator.EvaluateRefactoring("test-scenario", before, after, "", "");
@@ -233,8 +235,8 @@ public class AgentRefactoringCalculatorTests
     {
         // Arrange
         var calculator = new AgentRefactoringCalculator(quickMode: true);
-        var before = "§F{Test} §Q (>= x 0) §S (>= result 0) §R x §/F";
-        var after = "§F{Test} §R x §/F"; // Contracts removed
+        var before = "§F{f001:Test} §Q (>= x 0) §S (>= result 0) §R x §/F";
+        var after = "§F{f001:Test} §R x §/F"; // Contracts removed
 
         // Act
         var result = calculator.EvaluateRefactoring("test-scenario", before, after, "", "");
@@ -248,8 +250,8 @@ public class AgentRefactoringCalculatorTests
     {
         // Arrange
         var calculator = new AgentRefactoringCalculator(quickMode: true);
-        var before = "§F{Log} §E{cw} §R 0 §/F";
-        var after = "§F{Log} §E{cw} §R 0 §/F §F{Helper} §E{cw} §R 1 §/F";
+        var before = "§F{f001:Log} §E{cw} §R 0 §/F";
+        var after = "§F{f001:Log} §E{cw} §R 0 §/F §F{f002:Helper} §E{cw} §R 1 §/F";
 
         // Act
         var result = calculator.EvaluateRefactoring("test-scenario", before, after, "", "");
@@ -263,8 +265,8 @@ public class AgentRefactoringCalculatorTests
     {
         // Arrange
         var calculator = new AgentRefactoringCalculator(quickMode: true);
-        var before = "§F{Test} §R x §/F §F{Other} §R y §/F";
-        var after = "§F{Test} §R x §/F §F{Other} §R y §/F §F{New} §R z §/F";
+        var before = "§F{f001:Test} §R x §/F §F{f002:Other} §R y §/F";
+        var after = "§F{f001:Test} §R x §/F §F{f002:Other} §R y §/F §F{f003:New} §R z §/F";
 
         // Act
         var result = calculator.EvaluateRefactoring("test-scenario", before, after, "", "");
@@ -278,8 +280,8 @@ public class AgentRefactoringCalculatorTests
     {
         // Arrange
         var calculator = new AgentRefactoringCalculator(quickMode: true);
-        var before = "§F{Test} §R x §/F §F{Other} §R y §/F";
-        var after = "§F{Test} §R x §/F"; // f002 removed
+        var before = "§F{f001:Test} §R x §/F §F{f002:Other} §R y §/F";
+        var after = "§F{f001:Test} §R x §/F"; // f002 removed
 
         // Act
         var result = calculator.EvaluateRefactoring("test-scenario", before, after, "", "");
@@ -293,8 +295,8 @@ public class AgentRefactoringCalculatorTests
     {
         // Arrange
         var calculator = new AgentRefactoringCalculator(quickMode: true);
-        var before = "§F{Test} §Q (>= x 0) §E{cw} §R x §/F";
-        var after = "§F{Test} §Q (>= x 0) §E{cw} §R x §/F";
+        var before = "§F{f001:Test} §Q (>= x 0) §E{cw} §R x §/F";
+        var after = "§F{f001:Test} §Q (>= x 0) §E{cw} §R x §/F";
 
         // Act
         var result = calculator.EvaluateRefactoring("test-scenario", before, after, "", "");

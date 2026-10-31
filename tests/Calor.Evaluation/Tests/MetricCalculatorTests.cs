@@ -308,7 +308,9 @@ namespace Calculator
 
     #endregion
 
-    #region Refactoring Stability Tests
+    #region Historical Source-ID Refactoring Stability Tests
+
+    // Frozen heuristic controls, not accepted current syntax or measured sidecar stability.
 
     [Fact]
     public async Task RefactoringStability_AsyncFunction_ScoresOnIdPreservation()
@@ -316,8 +318,8 @@ namespace Calculator
         // Arrange - AsyncConcurrency program using §AF{ markers
         var calculator = new RefactoringStabilityCalculator();
         var context = CreateContext(
-            calor: @"§M{AsyncApp}
-  §AF{FetchData:pub}
+            calor: @"§M{m001:AsyncApp}
+  §AF{af001:FetchData:pub}
       §I{str:url}
       §O{Task_str}
       §R (await (httpGet url))",
@@ -342,14 +344,14 @@ namespace Calculator
         // Arrange - OOP program using §CL{, §MT{, §CTOR{, §PROP{ markers
         var calculator = new RefactoringStabilityCalculator();
         var context = CreateContext(
-            calor: @"§M{Shapes}
-  §CL{Circle}
-      §PROP{Radius:pub} §O{f64}
-      §CTOR{New:pub}
+            calor: @"§M{m001:Shapes}
+  §CL{cl001:Circle}
+      §PROP{p001:Radius:pub} §O{f64}
+      §CTOR{ct001:New:pub}
         §I{f64:radius}
         §R (set this.Radius radius)
-      §/CTOR
-      §MT{Area:pub}
+      §/CTOR{ct001}
+      §MT{mt001:Area:pub}
           §O{f64}
           §R (* 3.14159 (* this.Radius this.Radius))",
             csharp: @"namespace Shapes { public class Circle { public double Radius { get; set; } public Circle(double radius) { Radius = radius; } public double Area() { return 3.14159 * Radius * Radius; } } }");
@@ -373,16 +375,16 @@ namespace Calculator
         // Arrange - program using only original markers (§M{, §F{, §V{, §LOOP{, §IF{)
         var calculator = new RefactoringStabilityCalculator();
         var context = CreateContext(
-            calor: @"§M{Math}
-  §F{SumPositive:pub}
+            calor: @"§M{m001:Math}
+  §F{f001:SumPositive:pub}
       §I{arr_i32:nums}
       §O{i32}
       §V{v001:total} 0
       §LOOP{l001:each} nums
-        §IF
+        §IF{if001:positive}
           (> item 0)
           (set total (+ total item))
-        §/IF
+        §/IF{if001}
       §/LOOP{l001}
       §R total",
             csharp: @"namespace Math { public class MathOps { public int SumPositive(int[] nums) { int total = 0; foreach (var item in nums) { if (item > 0) total += item; } return total; } } }");
@@ -407,15 +409,15 @@ namespace Calculator
         // Arrange - program using §FLD{ and §OP{ markers
         var calculator = new RefactoringStabilityCalculator();
         var context = CreateContext(
-            calor: @"§M{Vector}
-  §CL{Vec2}
+            calor: @"§M{m001:Vector}
+  §CL{cl001:Vec2}
       §FLD{fld001:X:pub} §O{f64}
       §FLD{fld002:Y:pub} §O{f64}
-      §OP{Add:pub}
+      §OP{op001:Add:pub}
         §I{Vec2:a} §I{Vec2:b}
         §O{Vec2}
         §R (new Vec2 (+ a.X b.X) (+ a.Y b.Y))
-      §/OP",
+      §/OP{op001}",
             csharp: @"namespace Vector { public struct Vec2 { public double X; public double Y; public static Vec2 operator +(Vec2 a, Vec2 b) => new Vec2 { X = a.X + b.X, Y = a.Y + b.Y }; } }");
 
         // Act
