@@ -1,0 +1,13 @@
+§M{Queue}
+  §F{IsEmpty:pub} (i32:count) -> bool
+    §R (== count 0)
+
+  §F{Size:pub} (i32:count) -> i32
+    §R count
+
+  §F{NewCount:pub} (i32:oldCount, bool:isEnqueue) -> i32
+    §IF isEnqueue
+      §R (+ oldCount 1)
+    §EL
+      §R (- oldCount 1)
+

@@ -1,0 +1,16 @@
+§M{ExhaustiveMatch}
+  §F{CardSuit:pub} (i32:suit) -> i32
+    §IF (== suit 0)
+      §R 0
+    §EI (== suit 1)
+      §R 1
+    §EI (== suit 2)
+      §R 2
+    §EI (== suit 3)
+      §R 3
+    §EL
+      §R (- 0 1)
+
+  §F{IsRed:pub} (i32:suit) -> bool
+    §R (|| (== suit 1) (== suit 2))
+

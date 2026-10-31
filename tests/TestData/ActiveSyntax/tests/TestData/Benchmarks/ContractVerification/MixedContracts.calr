@@ -1,0 +1,20 @@
+§M{MixedMath}
+  §F{GoodSquare:pub} (i32:x) -> i32
+    §S (>= result 0)
+    §R (* x x)
+
+  §F{BadNegate:pub} (i32:x) -> i32
+    §S (< result 0)
+    §R (- 0 x)
+
+  §F{SafeDivide:pub} (i32:a, i32:b) -> i32
+    §Q{"divisor must not be zero"} (!= b 0)
+    §S (== result (/ a b))
+    §R (/ a b)
+
+  §F{ComplexCondition:pub} (i32:x, i32:y) -> i32
+    §Q{"x must be positive"} (> x 0)
+    §Q{"y must be positive"} (> y 0)
+    §S (> result 0)
+    §R (+ x y)
+

@@ -1,0 +1,13 @@
+§M{CompoundInterest}
+  §F{SimpleInterest:pub} (f32:principal, f32:rate, i32:years) -> f32
+    §Q (> principal 0)
+    §Q (>= rate 0)
+    §Q (> years 0)
+    §S (>= result principal)
+    §R (* principal (+ 1 (* rate (cast f64 years))))
+
+  §F{YearlyGrowth:pub} (f32:amount, f32:rate) -> f32
+    §Q (> amount 0)
+    §Q (>= rate 0)
+    §R (* amount (+ 1 rate))
+

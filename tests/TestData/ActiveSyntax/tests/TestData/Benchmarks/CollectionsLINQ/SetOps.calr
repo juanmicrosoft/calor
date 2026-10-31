@@ -1,0 +1,12 @@
+§M{SetOps}
+  §F{Contains:pub} (bool:found) -> bool
+    §R found
+
+  §F{SetSize:pub} (i32:size) -> i32
+    §S (>= result 0)
+    §R size
+
+  §F{UnionSize:pub} (i32:sizeA, i32:sizeB, i32:overlapCount) -> i32
+    §S (>= result 0)
+    §R (- (+ sizeA sizeB) overlapCount)
+

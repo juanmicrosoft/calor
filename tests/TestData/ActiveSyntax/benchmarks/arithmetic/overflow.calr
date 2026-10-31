@@ -1,0 +1,74 @@
+// Arithmetic Benchmark: Integer Overflow Detection
+// Tests bug pattern analysis for integer overflow vulnerabilities
+
+§M{OverflowBenchmark}
+
+  §F{VulnerableAddition:pub}
+    // BUG: Unchecked addition may overflow
+    // EXPECTED: Calor0923 Integer Overflow
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (+ a b)
+
+  §F{SafeCheckedAddition:pub}
+    // SAFE: Addition with overflow check
+    // EXPECTED: No warnings
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §B{result:i32} §CS{checked(a + b)}
+    §R result
+
+  §F{VulnerableMultiplication:pub}
+    // BUG: Unchecked multiplication may overflow
+    // EXPECTED: Calor0923 Integer Overflow
+    §I{i32:x}
+    §I{i32:y}
+    §O{i32}
+    §R (* x y)
+
+  §F{SafeSmallValues:pub}
+    // SAFE: Values known to be small
+    // EXPECTED: No warnings
+    §I{i32:x}
+    §O{i32}
+    §Q (< x INT:1000)
+    §Q (> x INT:0)
+    §R (* x INT:100)
+
+  §F{VulnerableLeftShift:pub}
+    // BUG: Left shift may overflow
+    // EXPECTED: Calor0923 Integer Overflow
+    §I{i32:x}
+    §I{i32:n}
+    §O{i32}
+    §R (<< x n)
+
+  §F{SafeBoundedShift:pub}
+    // SAFE: Both the operand and shift amount are bounded
+    // EXPECTED: No warnings
+    §I{i32:x}
+    §O{i32}
+    §Q (>= x INT:-536870912)
+    §Q (<= x INT:536870911)
+    §R (<< x INT:2)
+
+  §F{VulnerableAccumulator:pub}
+    // BUG: Accumulator in loop may overflow
+    // EXPECTED: Calor0923 Integer Overflow
+    §I{i32:n}
+    §O{i32}
+    §B{~sum:i32} INT:0
+    §L{i:1:n:1}
+      §ASSIGN sum (+ sum i)
+    §R sum
+
+  §F{SafeBoundedAccumulator:pub}
+    // SAFE: Loop bound prevents overflow
+    // EXPECTED: No warnings
+    §O{i32}
+    §B{~sum:i32} INT:0
+    §L{i:1:100:1}
+      §ASSIGN sum (+ sum i)
+    §R sum

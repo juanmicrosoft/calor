@@ -1,13 +1,13 @@
-§M{m001:Test_01_03:overflow=unchecked}
-  §CL{c001:Account:pub}
+§M{Test_01_03:overflow=unchecked}
+  §CL{Account:pub}
     §FLD{str:_id:priv:readonly}
     §FLD{dec:_balance:priv}
 
-    §CTOR{ctor002:pub} (str:id, dec:initialBalance)
+    §CTOR{pub} (str:id, dec:initialBalance)
       §ASSIGN _id id
       §ASSIGN _balance initialBalance
 
-    §MT{m003:GetBalance:pub} () -> dec
+    §MT{GetBalance:pub} () -> dec
       §R _balance
 
 

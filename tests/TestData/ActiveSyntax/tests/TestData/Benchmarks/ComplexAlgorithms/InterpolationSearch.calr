@@ -1,0 +1,12 @@
+§M{InterpolationSearch}
+  §F{EstimatePosition:pub} (i32:low, i32:high, i32:target, i32:lowVal, i32:highVal) -> i32
+    §Q (<= low high)
+    §Q (< lowVal highVal)
+    §B{range} (- high low)
+    §B{valRange} (- highVal lowVal)
+    §B{offset} (- target lowVal)
+    §R (+ low (/ (* offset range) valRange))
+
+  §F{InRange:pub} (i32:target, i32:lowVal, i32:highVal) -> bool
+    §R (&& (>= target lowVal) (<= target highVal))
+

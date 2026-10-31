@@ -1,0 +1,7 @@
+§M{MultipleCatch}
+  §F{ParseInt:pub} (str:input, i32:defaultVal) -> i32
+    §R defaultVal
+
+  §F{IsNumeric:pub} (i32:charCode) -> bool
+    §R (&& (>= charCode 48) (<= charCode 57))
+

@@ -1,73 +1,73 @@
-§M{m001:DesignPatterns}
-  §CL{c001:DataProcessor:int:abs}
-    §MT{mt001:Process:pub} () -> str
+§M{DesignPatterns}
+  §CL{DataProcessor:int:abs}
+    §MT{Process:pub} () -> str
       §B{str:data} §C{this.ReadData}
-      §IF{if1} (== data "")
+      §IF (== data "")
         §R "Validation failed"
       §B{str:processed} §C{this.ProcessData} data
       §R §C{this.SaveResults} processed
 
-    §MT{mt002:ReadData:priv:abs} () -> str
+    §MT{ReadData:priv:abs} () -> str
 
-    §MT{mt003:ProcessData:priv:abs} (str:data) -> str
+    §MT{ProcessData:priv:abs} (str:data) -> str
 
-    §MT{mt004:SaveResults:priv:abs} (str:data) -> str
+    §MT{SaveResults:priv:abs} (str:data) -> str
 
-    §MT{mt005:ValidateData:priv:virt} (str:data) -> bool
+    §MT{ValidateData:priv:virt} (str:data) -> bool
       §R (!= data "")
 
 
-  §CL{c002:CsvProcessor:pub}
+  §CL{CsvProcessor:pub}
     §EXT{DataProcessor}
 
     §FLD{str:_inputPath:priv}
     §FLD{str:_outputPath:priv}
 
-    §CTOR{ctor001:pub} (str:inputPath, str:outputPath)
+    §CTOR{pub} (str:inputPath, str:outputPath)
       §ASSIGN this._inputPath inputPath
       §ASSIGN this._outputPath outputPath
 
-    §MT{mt001:ReadData:priv:over} () -> str
+    §MT{ReadData:priv:over} () -> str
       §R "CSV data from input"
 
-    §MT{mt002:ProcessData:priv:over} (str:data) -> str
+    §MT{ProcessData:priv:over} (str:data) -> str
       §R §C{data.Replace} §A "," §A "|" §/C
 
-    §MT{mt003:SaveResults:priv:over} (str:data) -> str
+    §MT{SaveResults:priv:over} (str:data) -> str
       §R "Saved CSV"
 
-    §MT{mt004:ValidateData:priv:over} (str:data) -> bool
+    §MT{ValidateData:priv:over} (str:data) -> bool
       §B{~_hoist000} §C{base.ValidateData} data
       §B{~_hoist001} §C{data.Contains} "CSV"
       §R (&& _hoist000 _hoist001)
 
 
-  §CL{c003:JsonProcessor:pub}
+  §CL{JsonProcessor:pub}
     §EXT{DataProcessor}
 
     §FLD{str:_endpoint:priv}
     §FLD{str:_outputPath:priv}
 
-    §CTOR{ctor001:pub} (str:endpoint, str:outputPath)
+    §CTOR{pub} (str:endpoint, str:outputPath)
       §ASSIGN this._endpoint endpoint
       §ASSIGN this._outputPath outputPath
 
-    §MT{mt001:ReadData:priv:over} () -> str
+    §MT{ReadData:priv:over} () -> str
       §R "JSON content"
 
-    §MT{mt002:ProcessData:priv:over} (str:data) -> str
+    §MT{ProcessData:priv:over} (str:data) -> str
       §R §C{data.Replace} §A "JSON" §A "PROCESSED_JSON" §/C
 
-    §MT{mt003:SaveResults:priv:over} (str:data) -> str
+    §MT{SaveResults:priv:over} (str:data) -> str
       §R "Saved JSON"
 
 
-  §M{c004:TemplateMethodDemo:int}
-    §F{mt001:ProcessCsv:pub} (str:input, str:output) -> str
+  §M{TemplateMethodDemo:int}
+    §F{ProcessCsv:pub} (str:input, str:output) -> str
       §B{CsvProcessor:processor} §NEW{CsvProcessor} §A input §A output §/NEW
       §R §C{processor.Process}
 
-    §F{mt002:ProcessJson:pub} (str:endpoint, str:output) -> str
+    §F{ProcessJson:pub} (str:endpoint, str:output) -> str
       §B{JsonProcessor:processor} §NEW{JsonProcessor} §A endpoint §A output §/NEW
       §R §C{processor.Process}
 

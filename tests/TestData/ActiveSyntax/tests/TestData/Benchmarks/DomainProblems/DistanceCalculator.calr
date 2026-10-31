@@ -1,0 +1,19 @@
+§M{DistanceCalculator}
+  §F{DistanceSquared:pub} (f32:x1, f32:y1, f32:x2, f32:y2) -> f32
+    §S (>= result 0)
+    §B{dx} (- x2 x1)
+    §B{dy} (- y2 y1)
+    §R (+ (* dx dx) (* dy dy))
+
+  §F{ManhattanDist:pub} (f32:x1, f32:y1, f32:x2, f32:y2) -> f32
+    §S (>= result 0)
+    §B{dx} (- x2 x1)
+    §B{dy} (- y2 y1)
+    §B{absDx} dx
+    §IF (< absDx 0)
+      §ASSIGN absDx (- 0 absDx)
+    §B{absDy} dy
+    §IF (< absDy 0)
+      §ASSIGN absDy (- 0 absDy)
+    §R (+ absDx absDy)
+

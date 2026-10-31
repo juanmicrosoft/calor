@@ -1,10 +1,10 @@
-§M{m001:Test_04_01:overflow=unchecked}
-  §CL{c001:Box<T>:pub}
+§M{Test_04_01:overflow=unchecked}
+  §CL{Box<T>:pub}
     §WHERE T : notnull
 
-    §PROP{p002:Value:T:pub:get,set}
+    §PROP{Value:T:pub:get,set}
 
-    §CTOR{ctor003:pub} (T:value)
+    §CTOR{pub} (T:value)
       §ASSIGN Value value
 
 

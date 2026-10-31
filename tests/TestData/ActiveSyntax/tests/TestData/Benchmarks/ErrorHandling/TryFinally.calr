@@ -1,0 +1,7 @@
+§M{TryFinally}
+  §F{Cleanup:pub} (bool:resourceOpen) -> bool
+    §R false
+
+  §F{Process:pub} (i32:input) -> i32
+    §R (* input 2)
+

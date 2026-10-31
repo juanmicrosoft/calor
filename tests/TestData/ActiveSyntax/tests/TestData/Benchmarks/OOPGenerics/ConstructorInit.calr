@@ -1,0 +1,15 @@
+§M{ConstructorInit}
+  §F{ValidateWidth:pub} (f32:width) -> f32
+    §Q (> width 0)
+    §R width
+
+  §F{ValidateHeight:pub} (f32:height) -> f32
+    §Q (> height 0)
+    §R height
+
+  §F{Area:pub} (f32:width, f32:height) -> f32
+    §Q (> width 0)
+    §Q (> height 0)
+    §S (> result 0)
+    §R (* width height)
+

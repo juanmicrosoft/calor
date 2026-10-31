@@ -1,0 +1,20 @@
+§M{AbsoluteContracts}
+  §F{AbsNonNeg:pub} (i32:x) -> i32
+    §Q (> x (- 0 2147483647))
+    §S (>= result 0)
+    §IF (>= x 0)
+      §R x
+    §EL
+      §R (- 0 x)
+
+  §F{AbsIdempotent:pub} (i32:x) -> i32
+    §Q (>= x 0)
+    §S (== result x)
+    §R x
+
+  §F{TriangleInequality:pub} (i32:absA, i32:absB, i32:absSum) -> bool
+    §Q (>= absA 0)
+    §Q (>= absB 0)
+    §Q (>= absSum 0)
+    §R (<= absSum (+ absA absB))
+

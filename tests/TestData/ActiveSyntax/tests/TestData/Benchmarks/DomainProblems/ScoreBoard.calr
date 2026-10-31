@@ -1,0 +1,15 @@
+§M{ScoreBoard}
+  §F{UpdateScore:pub} (i32:current, i32:points) -> i32
+    §R (+ current points)
+
+  §F{IsHighScore:pub} (i32:score, i32:highScore) -> bool
+    §R (> score highScore)
+
+  §F{Rank:pub} (i32:winsAbove) -> i32
+    §S (>= result 1)
+    §R (+ winsAbove 1)
+
+  §F{AverageScore:pub} (i32:totalScore, i32:games) -> f32
+    §Q (> games 0)
+    §R (/ (cast f64 totalScore) (cast f64 games))
+

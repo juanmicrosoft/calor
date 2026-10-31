@@ -1,13 +1,13 @@
-§M{m001:Test_12_02:overflow=unchecked}
-  §CL{c001:Parser:pub}
-    §MT{m002:TryParse:pub} (str:input, i32:result:out) -> bool
+§M{Test_12_02:overflow=unchecked}
+  §CL{Parser:pub}
+    §MT{TryParse:pub} (str:input, i32:result:out) -> bool
       §ASSIGN result 0
-      §IF{if003} (isempty input)
+      §IF (isempty input)
         §R false
       §ASSIGN result §C{int.Parse} input
       §R true
 
-    §MT{m004:Increment:pub} (i32:value:ref)
+    §MT{Increment:pub} (i32:value:ref)
       §ASSIGN value (+ value 1)
 
 

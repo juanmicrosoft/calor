@@ -1,5 +1,5 @@
-§M{m001:TypeSystem}
-  §F{f001:Main:pub} () -> void
+§M{TypeSystem}
+  §F{Main:pub} () -> void
     §E{cw,alloc,throw}
     §C{Console.WriteLine} "Testing nullable values and exceptions..."
     §C{TestPresent}
@@ -7,24 +7,24 @@
     §C{TestSuccess}
     §C{TestFailure}
 
-  §F{f002:TestPresent:priv} () -> void
+  §F{TestPresent:priv} () -> void
     §E{cw}
     §B{value:?i32} 42
     §C{Console.WriteLine} (?? value 0)
 
-  §F{f003:TestMissing:priv} () -> void
+  §F{TestMissing:priv} () -> void
     §E{cw}
     §B{value:?i32} null
     §C{Console.WriteLine} (?? value -1)
 
-  §F{f004:TestSuccess:priv} () -> void
+  §F{TestSuccess:priv} () -> void
     §E{cw}
     §B{value:i32} 100
     §C{Console.WriteLine} value
 
-  §F{f005:TestFailure:priv} () -> void
+  §F{TestFailure:priv} () -> void
     §E{cw,alloc,throw}
-    §TR{try1}
+    §TR
       §TH §NEW{InvalidOperationException} §A "Something went wrong" §/NEW
     §CA{InvalidOperationException:error}
       §C{Console.WriteLine} error.Message

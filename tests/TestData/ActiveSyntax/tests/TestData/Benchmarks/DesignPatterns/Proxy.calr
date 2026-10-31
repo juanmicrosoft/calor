@@ -1,0 +1,15 @@
+§M{Proxy}
+  §F{HasAccess:pub} (i32:userRole, i32:requiredRole) -> bool
+    §R (>= userRole requiredRole)
+
+  §F{LogAccess:pub} (i32:userId, bool:granted) -> i32
+    §E{cw}
+    §IF granted
+      §P "Access granted"
+    §EL
+      §P "Access denied"
+    §R userId
+
+  §F{CacheHit:pub} (bool:isCached) -> bool
+    §R isCached
+

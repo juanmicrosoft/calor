@@ -1,0 +1,41 @@
+§M{OverflowSafe}
+  §F{IncrementSafe:pub} (i32:x) -> i32
+    §Q (< x 2147483647)
+    §S (> result x)
+    §R (+ x 1)
+
+  §F{DecrementSafe:pub} (i32:x) -> i32
+    §Q (> x -2147483648)
+    §S (< result x)
+    §R (- x 1)
+
+  §F{DoubleSafe:pub} (i32:x) -> i32
+    §Q (> x 0)
+    §Q (< x 1073741824)
+    §S (> result x)
+    §R (* x 2)
+
+  §F{SquareSafe:pub} (i32:x) -> i32
+    §Q (>= x 0)
+    §Q (<= x 46340)
+    §S (>= result 0)
+    §R (* x x)
+
+  §F{NegateSafe:pub} (i32:x) -> i32
+    §Q (< x 0)
+    §Q (> x -2147483648)
+    §S (> result 0)
+    §R (- 0 x)
+
+  §F{AddPositivesSafe:pub} (i32:x, i32:y) -> i32
+    §Q (> x 0)
+    §Q (< x 1073741824)
+    §Q (> y 0)
+    §Q (< y 1073741824)
+    §S (> result 0)
+    §R (+ x y)
+
+  §F{UnsignedNonNegative:pub} (u32:x) -> bool
+    §S (== result true)
+    §R (>= x 0)
+

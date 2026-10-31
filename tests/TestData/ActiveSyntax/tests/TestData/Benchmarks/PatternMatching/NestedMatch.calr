@@ -1,0 +1,11 @@
+§M{NestedMatch}
+  §F{ClassifyPair:pub} (bool:aPositive, bool:bPositive) -> i32
+    §IF (&& aPositive bPositive)
+      §R 1
+    §EI (&& (! aPositive) (! bPositive))
+      §R 3
+    §EI aPositive
+      §R 4
+    §EL
+      §R 2
+

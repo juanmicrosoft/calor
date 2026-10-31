@@ -1,0 +1,10 @@
+§M{Builder}
+  §F{IsComplete:pub} (bool:hasName, bool:hasAge) -> bool
+    §R (&& hasName hasAge)
+
+  §F{SetStep:pub} (i32:currentStep) -> i32
+    §R (+ currentStep 1)
+
+  §F{CanBuild:pub} (i32:requiredSteps, i32:completedSteps) -> bool
+    §R (>= completedSteps requiredSteps)
+

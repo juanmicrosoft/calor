@@ -1,0 +1,13 @@
+§M{Zip}
+  §F{Add:pub} (i32:a, i32:b) -> i32
+    §R (+ a b)
+
+  §F{Multiply:pub} (i32:a, i32:b) -> i32
+    §R (* a b)
+
+  §F{ZipLength:pub} (i32:lenA, i32:lenB) -> i32
+    §IF (< lenA lenB)
+      §R lenA
+    §EL
+      §R lenB
+

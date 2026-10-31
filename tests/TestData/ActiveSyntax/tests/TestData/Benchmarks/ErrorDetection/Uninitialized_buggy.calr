@@ -1,0 +1,6 @@
+§M{UninitExample}
+  §F{Process:pub} (i32:n) -> i32
+    §IF (> n 0)
+      §R n
+    §R (- 0 n)
+

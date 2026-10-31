@@ -1,0 +1,15 @@
+§M{QuickSort}
+  §F{ChoosePivot:pub} (i32:low, i32:high) -> i32
+    §Q (>= low 0)
+    §Q (<= low high)
+    §R high
+
+  §F{ShouldSwap:pub} (i32:value, i32:pivot) -> bool
+    §R (<= value pivot)
+
+  §F{NextPartitionIndex:pub} (i32:current) -> i32
+    §R (+ current 1)
+
+  §F{IsSortedPair:pub} (i32:a, i32:b) -> bool
+    §R (<= a b)
+

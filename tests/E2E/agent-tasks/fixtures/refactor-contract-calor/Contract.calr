@@ -1,14 +1,14 @@
-§M{m001:ContractExamples}
-  §F{f001:Sqrt:pub} (i32:x) -> i32
+§M{ContractExamples}
+  §F{Sqrt:pub} (i32:x) -> i32
     §R x
 
-  §F{f002:Abs:pub} (i32:x) -> i32
+  §F{Abs:pub} (i32:x) -> i32
     §R (? (< x 0) (- 0 x) x)
 
-  §F{f003:GetElement:pub} (i32:index, i32:length) -> i32
+  §F{GetElement:pub} (i32:index, i32:length) -> i32
     §R (? (&& (>= index 0) (< index length)) index (- 0 1))
 
-  §F{f004:PrintValue:pub} (i32:x) -> void
+  §F{PrintValue:pub} (i32:x) -> void
     §E{cw}
     §C{Console.WriteLine} §A x §/C
 

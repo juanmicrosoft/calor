@@ -1,44 +1,44 @@
-§M{m001:Generics}
-  §IFACE{i001:IRepository<T>}
+§M{Generics}
+  §IFACE{IRepository<T>}
     §WHERE T : class
-    §MT{mt001:Add} (T:item) -> void
-    §MT{mt002:GetAll} () -> ReadList<T>
+    §MT{Add} (T:item) -> void
+    §MT{GetAll} () -> ReadList<T>
 
-  §CL{c001:Pair<T,U>:pub}
+  §CL{Pair<T,U>:pub}
     §FLD{T:First:pub}
     §FLD{U:Second:pub}
 
-    §CTOR{ctor001:pub} (T:first, U:second)
+    §CTOR{pub} (T:first, U:second)
       §ASSIGN First first
       §ASSIGN Second second
 
 
-  §CL{c002:Repository<T>:pub}
+  §CL{Repository<T>:pub}
     §WHERE T : class
 
     §FLD{List<T>:_items:priv}
 
-    §CTOR{ctor002:pub}
+    §CTOR{pub}
       §ASSIGN _items §NEW{List<T>} §/NEW
 
-    §MT{mt101:Add:pub} (T:item) -> void
+    §MT{Add:pub} (T:item) -> void
       §E{mut}
       §C{_items.Add} item
 
-    §MT{mt102:GetAll:pub} () -> ReadList<T>
+    §MT{GetAll:pub} () -> ReadList<T>
       §R _items
 
-    §MT{mt103:Count:pub} () -> i32
+    §MT{Count:pub} () -> i32
       §R _items.Count
 
 
-  §F{f001:Identity<T>:pub} (T:value) -> T
+  §F{Identity<T>:pub} (T:value) -> T
     §R value
 
-  §F{f002:GetCount<T>:pub} (List<T>:items) -> i32
+  §F{GetCount<T>:pub} (List<T>:items) -> i32
     §R items.Count
 
-  §F{f003:Main:pub} () -> void
+  §F{Main:pub} () -> void
     §E{cw}
     §P "Generics sample - compilation test"
     §P "Features demonstrated:"

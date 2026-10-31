@@ -1,0 +1,11 @@
+§M{GuardClause}
+  §F{ValidatePositive:pub} (i32:value) -> bool
+    §R (> value 0)
+
+  §F{ValidateRange:pub} (i32:value, i32:min, i32:max) -> bool
+    §Q (<= min max)
+    §R (&& (>= value min) (<= value max))
+
+  §F{ValidateNotEmpty:pub} (i32:length) -> bool
+    §R (> length 0)
+

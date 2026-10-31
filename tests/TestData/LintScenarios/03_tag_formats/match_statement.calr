@@ -1,6 +1,6 @@
-§M{m1:MatchTest}
-  §F{f1:Describe:pub} (i32:n) -> str
-    §W{m1} n
+§M{MatchTest}
+  §F{Describe:pub} (i32:n) -> str
+    §W n
       §K 0
         §R "zero"
       §K 1

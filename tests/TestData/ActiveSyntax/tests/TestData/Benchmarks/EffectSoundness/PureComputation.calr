@@ -1,0 +1,14 @@
+§M{PureComputation}
+  §F{Add:pub} (i32:a, i32:b) -> i32
+    §R (+ a b)
+
+  §F{Multiply:pub} (i32:a, i32:b) -> i32
+    §R (* a b)
+
+  §F{Negate:pub} (i32:x) -> i32
+    §R (- 0 x)
+
+  §F{Square:pub} (i32:x) -> i32
+    §S (>= result 0)
+    §R (* x x)
+

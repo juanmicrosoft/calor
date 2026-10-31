@@ -1,0 +1,30 @@
+§M{BitSet}
+  §F{PowerOfTwo:pub} (i32:pos) -> i32
+    §Q (>= pos 0)
+    §Q (< pos 32)
+    §S (> result 0)
+    §IF (== pos 0)
+      §R 1
+    §B{sub} §C{PowerOfTwo} (- pos 1)
+    §R (* 2 sub)
+
+  §F{SetBit:pub} (i32:bits, i32:pos) -> i32
+    §Q (>= pos 0)
+    §Q (< pos 32)
+    §B{mask} §C{PowerOfTwo} pos
+    §R (+ bits mask)
+
+  §F{TestBit:pub} (i32:bits, i32:pos) -> bool
+    §Q (>= pos 0)
+    §Q (< pos 32)
+    §B{mask} §C{PowerOfTwo} pos
+    §B{div} (/ bits mask)
+    §R (!= (% div 2) 0)
+
+  §F{PopCount:pub} (i32:bits) -> i32
+    §S (>= result 0)
+    §IF (== bits 0)
+      §R 0
+    §B{rest} §C{PopCount} (/ bits 2)
+    §R (+ (% bits 2) rest)
+

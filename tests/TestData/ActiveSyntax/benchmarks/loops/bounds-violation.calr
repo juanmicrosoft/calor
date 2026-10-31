@@ -1,0 +1,94 @@
+// Loop Benchmark: Array Bounds Violation Detection
+// Tests bug pattern analysis for array index out of bounds
+
+§M{BoundsViolationBenchmark}
+
+  §F{VulnerableArrayAccess:pub}
+    // BUG: Array access with unchecked index
+    // EXPECTED: Calor0921 Index Out of Bounds
+    §I{i32:index}
+    §I{i32[]:items}
+    §O{i32}
+    §R §IDX items index
+
+  §F{SafeBoundsCheck:pub}
+    // SAFE: Bounds check before access
+    // EXPECTED: No warnings
+    §I{i32:index}
+    §I{i32[]:items}
+    §O{i32}
+    §B{len:i32} §LEN items
+    §IF (&& (>= index INT:0) (< index len))
+      §R §IDX items index
+    §EL
+      §R INT:-1
+
+  §F{VulnerableLoopBeyondLength:pub}
+    // BUG: Loop can exceed array bounds
+    // EXPECTED: Calor0921 Index Out of Bounds
+    §I{i32:n}
+    §I{i32[]:items}
+    §O{i32}
+    §B{~sum:i32} INT:0
+    §L{i:0:n:1}
+      §B{val:i32} §IDX items i
+      §ASSIGN sum (+ sum val)
+    §R sum
+
+  §F{SafeLoopWithinBounds:pub}
+    // SAFE: Loop bounded by array length
+    // EXPECTED: No warnings
+    §I{i32[]:items}
+    §O{i32}
+    §B{len:i32} §LEN items
+    §B{upper:i32} (- len INT:1)
+    §B{~sum:i32} INT:0
+    §L{i:0:upper:1}
+      §B{val:i32} §IDX items i
+      §ASSIGN sum (+ sum val)
+    §R sum
+
+  §F{VulnerableNegativeIndex:pub}
+    // BUG: Index can be negative
+    // EXPECTED: Calor0921 Index Out of Bounds
+    §I{i32:offset}
+    §I{i32:startIndex}
+    §I{i32[]:items}
+    §O{i32}
+    §B{index:i32} (- startIndex offset)
+    §R §IDX items index
+
+  §F{SafeClampedIndex:pub}
+    // SAFE: Index clamped to valid range
+    // EXPECTED: No warnings
+    §I{i32:index}
+    §I{i32[]:items}
+    §O{i32}
+    §Q (> §LEN items INT:0)
+    §B{len:i32} §LEN items
+    §B{minIdx:i32} §C{System.Math.Max} §A index §A INT:0 §/C
+    §B{safeIdx:i32} §C{System.Math.Min} §A minIdx §A (- len INT:1) §/C
+    §R §IDX items safeIdx
+
+  §F{VulnerableOffByOne:pub}
+    // BUG: Classic off-by-one error
+    // EXPECTED: Calor0921 Index Out of Bounds
+    §I{i32[]:items}
+    §O{i32}
+    §B{len:i32} §LEN items
+    §B{~sum:i32} INT:0
+    §B{end:i32} (+ len INT:1)
+    §L{i:0:end:1}
+      §B{val:i32} §IDX items i
+      §ASSIGN sum (+ sum val)
+    §R sum
+
+  §F{SafeWithPrecondition:pub}
+    // SAFE: Precondition guarantees valid index
+    // EXPECTED: No warnings
+    §I{i32:index}
+    §I{i32[]:items}
+    §O{i32}
+    §Q (>= index INT:0)
+    §Q (< index §LEN items)
+    §R §IDX items index

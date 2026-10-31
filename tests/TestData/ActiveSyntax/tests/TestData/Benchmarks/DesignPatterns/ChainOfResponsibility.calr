@@ -1,0 +1,15 @@
+§M{ChainOfResponsibility}
+  §F{CanApprove:pub} (f32:amount, f32:limit) -> bool
+    §Q (> amount 0)
+    §Q (> limit 0)
+    §R (<= amount limit)
+
+  §F{ManagerLimit:pub} () -> f32
+    §R 1000
+
+  §F{DirectorLimit:pub} () -> f32
+    §R 10000
+
+  §F{VPLimit:pub} () -> f32
+    §R 100000
+

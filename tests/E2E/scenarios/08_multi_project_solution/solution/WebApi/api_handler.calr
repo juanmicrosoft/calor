@@ -1,11 +1,11 @@
-§M{m001:ApiHandler}
-  §F{f001:HandleRequest:pub} (i32:statusCode) -> i32
+§M{ApiHandler}
+  §F{HandleRequest:pub} (i32:statusCode) -> i32
     §E{cw}
     §Q (>= statusCode 100)
     §S (>= result 0)
     §C{Console.WriteLine} §A "Handling request..." §/C
     §R (+ statusCode 1)
 
-  §F{f002:ValidateStatus:pub} (i32:code) -> bool
+  §F{ValidateStatus:pub} (i32:code) -> bool
     §R (&& (>= code 200) (< code 300))
 

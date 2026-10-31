@@ -1,0 +1,7 @@
+§M{Encapsulation}
+  §F{GetBalance:pub} (f32:balance) -> f32
+    §R balance
+
+  §F{IsValidDeposit:pub} (f32:amount) -> bool
+    §R (> amount 0)
+

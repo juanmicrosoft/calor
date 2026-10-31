@@ -1,0 +1,8 @@
+§M{GenericClass}
+  §F{HasValue:pub} (bool:isPresent) -> bool
+    §R isPresent
+
+  §F{Count:pub} (i32:count) -> i32
+    §S (>= result 0)
+    §R count
+

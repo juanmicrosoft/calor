@@ -1,0 +1,18 @@
+§M{Inventory}
+  §F{Restock:pub} (i32:current, i32:quantity) -> i32
+    §Q (> quantity 0)
+    §S (> result current)
+    §R (+ current quantity)
+
+  §F{Sell:pub} (i32:current, i32:quantity) -> i32
+    §Q (> quantity 0)
+    §Q (>= current quantity)
+    §S (>= result 0)
+    §R (- current quantity)
+
+  §F{InStock:pub} (i32:quantity) -> bool
+    §R (> quantity 0)
+
+  §F{NeedsReorder:pub} (i32:quantity, i32:threshold) -> bool
+    §R (<= quantity threshold)
+

@@ -1,0 +1,13 @@
+§M{Command}
+  §F{Execute:pub} (i32:value, i32:delta) -> i32
+    §R (+ value delta)
+
+  §F{Undo:pub} (i32:value, i32:delta) -> i32
+    §R (- value delta)
+
+  §F{CanUndo:pub} (i32:historySize) -> bool
+    §R (> historySize 0)
+
+  §F{HistoryPush:pub} (i32:historySize) -> i32
+    §R (+ historySize 1)
+

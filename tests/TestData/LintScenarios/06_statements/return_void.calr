@@ -1,10 +1,10 @@
-§M{m1:ReturnVoid}
-  §F{f1:DoNothing:pub} () -> void
+§M{ReturnVoid}
+  §F{DoNothing:pub} () -> void
     §R
 
-  §F{f2:EarlyExit:pub} (bool:condition) -> void
+  §F{EarlyExit:pub} (bool:condition) -> void
     §E{cw}
-    §IF{i1} condition
+    §IF condition
       §R
     §P "continuing"
 

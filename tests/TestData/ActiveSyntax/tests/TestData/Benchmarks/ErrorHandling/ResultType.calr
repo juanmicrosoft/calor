@@ -1,0 +1,10 @@
+§M{ResultType}
+  §F{IsSuccess:pub} (bool:succeeded) -> bool
+    §R succeeded
+
+  §F{ValueOrDefault:pub} (i32:value, i32:defaultVal, bool:hasValue) -> i32
+    §IF hasValue
+      §R value
+    §EL
+      §R defaultVal
+

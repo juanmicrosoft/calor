@@ -1,6 +1,6 @@
-§M{m001:Fixture:overflow=unchecked}
-  §M{c001:InterpolationHole:pub}
-    §F{m002:Verify:pub} () -> i32
+§M{Fixture:overflow=unchecked}
+  §M{InterpolationHole:pub}
+    §F{Verify:pub} () -> i32
       §E{alloc}
       §ARR{items:i32}
         3

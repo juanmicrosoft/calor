@@ -1,9 +1,9 @@
-§M{m006:Collections}
+§M{Collections}
   §U{System}
   §U{Calor.Runtime}
 
-  §M{c001:CollectionsModule:int}
-    §F{m002:Main:pub}
+  §M{CollectionsModule:int}
+    §F{Main:pub}
       §LIST{numbers:i32}
         1
         2

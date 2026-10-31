@@ -1,0 +1,13 @@
+§M{StringUtils}
+  §F{GetLength:pub} (str:s) -> i32
+    §R (len s)
+
+  §F{ToUpper:pub} (str:s) -> str
+    §R (upper s)
+
+  §F{ToLower:pub} (str:s) -> str
+    §R (lower s)
+
+  §F{Concat:pub} (str:a, str:b) -> str
+    §R (concat a b)
+

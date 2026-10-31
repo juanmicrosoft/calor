@@ -1,5 +1,5 @@
-§M{m001:Test_10_01:overflow=unchecked}
-  §M{c001:SizeTest:pub}
-    §F{m002:GetSizeOfInt:pub} () -> i32
+§M{Test_10_01:overflow=unchecked}
+  §M{SizeTest:pub}
+    §F{GetSizeOfInt:pub} () -> i32
       §R §SIZEOF{i32}
 

@@ -1,9 +1,9 @@
-§M{m001:Fixture:overflow=unchecked}
-  §M{c001:InterpolationToString:pub}
-    §F{m002:Describe:pub} (i32:count, str:name) -> str
+§M{Fixture:overflow=unchecked}
+  §M{InterpolationToString:pub}
+    §F{Describe:pub} (i32:count, str:name) -> str
       §R "${name}:${count,4}|${count:D3}"
 
-    §F{m003:Verify:pub} () -> i32
+    §F{Verify:pub} () -> i32
       §B{str:s} §C{Describe} §A 7 §A "ab" §/C
       §B{str:wrapped} "<${s}>"
       §R (+ (? (== s "ab:   7|007") 1000 0) (len wrapped))

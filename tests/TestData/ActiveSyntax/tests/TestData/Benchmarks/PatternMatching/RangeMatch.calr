@@ -1,0 +1,12 @@
+§M{RangeMatch}
+  §F{AgeGroup:pub} (i32:age) -> i32
+    §Q (>= age 0)
+    §IF (< age 13)
+      §R 0
+    §EI (< age 20)
+      §R 1
+    §EI (< age 65)
+      §R 2
+    §EL
+      §R 3
+

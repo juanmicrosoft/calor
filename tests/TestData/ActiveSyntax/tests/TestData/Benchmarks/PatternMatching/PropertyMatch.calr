@@ -1,0 +1,11 @@
+§M{PropertyMatch}
+  §F{ClassifyTemp:pub} (f32:temp, str:unit) -> i32
+    §IF (< temp 0)
+      §R 0
+    §EI (< temp 15)
+      §R 1
+    §EI (< temp 30)
+      §R 2
+    §EL
+      §R 3
+

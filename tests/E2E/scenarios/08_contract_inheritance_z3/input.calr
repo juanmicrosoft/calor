@@ -1,21 +1,21 @@
-§M{m001:ContractZ3Test}
-  §IFACE{i001:IService}
-    §MT{m001:Process} (i32:value) -> i32
+§M{ContractZ3Test}
+  §IFACE{IService}
+    §MT{Process} (i32:value) -> i32
       §Q (>= value 0)
 
-  §CL{c001:ValidService:pub}
+  §CL{ValidService:pub}
     §IMPL{IService}
 
-    §MT{mt001:Process:pub} (i32:value) -> i32
+    §MT{Process:pub} (i32:value) -> i32
       §Q (>= value -10)
       §S (>= result 1)
       §R (+ value 1)
 
 
-  §CL{c002:AnotherValidService:pub}
+  §CL{AnotherValidService:pub}
     §IMPL{IService}
 
-    §MT{mt002:Process:pub} (i32:value) -> i32
+    §MT{Process:pub} (i32:value) -> i32
       §Q (>= value 0)
       §S (>= result 10)
       §R (+ value 10)

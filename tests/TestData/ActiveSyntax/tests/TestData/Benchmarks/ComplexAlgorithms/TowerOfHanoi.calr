@@ -1,0 +1,22 @@
+§M{TowerOfHanoi}
+  §F{MovesForDisks:pub} (i32:disks) -> i32
+    §Q (> disks 0)
+    §S (> result 0)
+    §IF (== disks 1)
+      §R 1
+    §EI (== disks 2)
+      §R 3
+    §EI (== disks 3)
+      §R 7
+    §EI (== disks 4)
+      §R 15
+    §EL
+      §R (- (* (* 2 disks) disks) 1)
+
+  §F{IsBaseCase:pub} (i32:disks) -> bool
+    §R (== disks 1)
+
+  §F{SubProblemSize:pub} (i32:disks) -> i32
+    §Q (> disks 1)
+    §R (- disks 1)
+

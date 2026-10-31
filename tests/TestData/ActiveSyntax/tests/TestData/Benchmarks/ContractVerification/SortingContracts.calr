@@ -1,0 +1,13 @@
+§M{SortingContracts}
+  §F{IsSorted:pub} (i32:a, i32:b) -> bool
+    §R (<= a b)
+
+  §F{IsPartitioned:pub} (i32:left, i32:pivot, i32:right) -> bool
+    §R (&& (<= left pivot) (>= right pivot))
+
+  §F{MergePreserves:pub} (i32:lenA, i32:lenB) -> i32
+    §Q (>= lenA 0)
+    §Q (>= lenB 0)
+    §S (== result (+ lenA lenB))
+    §R (+ lenA lenB)
+

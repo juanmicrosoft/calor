@@ -1,0 +1,10 @@
+§M{MethodOverriding}
+  §F{BaseSpeak:pub} () -> i32
+    §R 0
+
+  §F{DogSpeak:pub} () -> i32
+    §R 1
+
+  §F{CatSpeak:pub} () -> i32
+    §R 2
+

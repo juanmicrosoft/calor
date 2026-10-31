@@ -1,0 +1,6 @@
+§M{CelsiusToKelvin}
+  §F{ToKelvin:pub} (f32:celsius) -> f32
+    §Q (>= celsius -273.15)
+    §S (>= result 0)
+    §R (+ celsius 273.15)
+

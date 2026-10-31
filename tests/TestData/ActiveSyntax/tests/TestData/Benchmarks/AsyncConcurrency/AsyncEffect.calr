@@ -1,0 +1,10 @@
+§M{AsyncEffect}
+  §AF{FetchData:pub} (str:url) -> str
+    §E{net}
+    §R url
+
+  §AF{LogAndFetch:pub} (str:url) -> str
+    §E{cw}
+    §P url
+    §R url
+

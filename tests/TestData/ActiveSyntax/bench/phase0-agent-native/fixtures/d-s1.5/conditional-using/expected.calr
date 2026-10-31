@@ -1,15 +1,15 @@
-§M{m001:Fixture:overflow=unchecked}
+§M{Fixture:overflow=unchecked}
   §PP{FEATURE}
     §U{Number:System.Int32}
-    §M{c001:ConditionalValue:pub}
-      §F{m002:Get:pub} () -> Number
+    §M{ConditionalValue:pub}
+      §F{Get:pub} () -> Number
         §R 41
 
 
   §PPE
     §U{Number:System.Int32}
-    §M{c003:ConditionalValue:pub}
-      §F{m004:Get:pub} () -> Number
+    §M{ConditionalValue:pub}
+      §F{Get:pub} () -> Number
         §R 42
 
 

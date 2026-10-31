@@ -1,0 +1,15 @@
+§M{Dijkstra}
+  §F{Relax:pub} (i32:currentDist, i32:edgeWeight, i32:neighborDist) -> bool
+    §Q (>= currentDist 0)
+    §Q (> edgeWeight 0)
+    §R (< (+ currentDist edgeWeight) neighborDist)
+
+  §F{NewDist:pub} (i32:currentDist, i32:edgeWeight) -> i32
+    §Q (>= currentDist 0)
+    §Q (> edgeWeight 0)
+    §S (> result currentDist)
+    §R (+ currentDist edgeWeight)
+
+  §F{Infinity:pub} () -> i32
+    §R 2147483647
+

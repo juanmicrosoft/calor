@@ -1,0 +1,21 @@
+§M{BMICalculator}
+  §F{CalculateBMI:pub} (f32:weightKg, f32:heightM) -> f32
+    §Q (> weightKg 0)
+    §Q (> heightM 0)
+    §S (> result 0)
+    §R (/ weightKg (* heightM heightM))
+
+  §F{Category:pub} (f32:bmi) -> i32
+    §Q (> bmi 0)
+    §IF (< bmi 18.5)
+      §R 0
+    §EI (< bmi 25)
+      §R 1
+    §EI (< bmi 30)
+      §R 2
+    §EL
+      §R 3
+
+  §F{IsHealthy:pub} (f32:bmi) -> bool
+    §R (&& (>= bmi 18.5) (< bmi 25))
+

@@ -1,0 +1,14 @@
+§M{LogService}
+  §F{LogMessage:pub} (str:message) -> void
+    §E{cw}
+    §P message
+
+  §F{ComputeSum:pub} (i32:a, i32:b) -> i32
+    §R (+ a b)
+
+  §F{LogAndCompute:pub} (str:label, i32:x, i32:y) -> i32
+    §E{cw}
+    §P label
+    §B{result} (+ x y)
+    §R result
+

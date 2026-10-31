@@ -1,63 +1,63 @@
-§M{m001:KvJournal}
-  §F{f001:Set:pub} (str:path, str:key, str:value) -> void
+§M{KvJournal}
+  §F{Set:pub} (str:path, str:key, str:value) -> void
     §E{fs:w}
     §C{File.AppendAllText} §A path §A (+ key (+ "=" (+ value "\n"))) §/C
 
-  §F{f002:KeyOf:priv} (str:line) -> str
+  §F{KeyOf:priv} (str:line) -> str
     §E{}
     §B{eq:i32} (indexof line "=" :ordinal)
-    §IF{if1} (< eq 0)
+    §IF (< eq 0)
       §R line
     §R (substr line 0 eq)
 
-  §F{f003:ValueOf:priv} (str:line) -> str
+  §F{ValueOf:priv} (str:line) -> str
     §E{}
     §B{eq:i32} (indexof line "=" :ordinal)
-    §IF{if2} (< eq 0)
+    §IF (< eq 0)
       §R ""
     §R (substr line (+ eq 1) (- (len line) (+ eq 1)))
 
-  §F{f004:Get:pub} (str:path, str:key) -> str
+  §F{Get:pub} (str:path, str:key) -> str
     §E{fs:r}
     §B{exists:bool} §C{File.Exists} §A path §/C
-    §IF{if3} (! exists)
+    §IF (! exists)
       §R ""
     §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
     §B{~found:str} ""
-    §EACH{e1:ln} lines
+    §EACH{ln} lines
       §B{k:str} §C{KeyOf} §A ln §/C
-      §IF{if4} (== k key)
+      §IF (== k key)
         §ASSIGN found §C{ValueOf} §A ln §/C
     §R found
 
-  §F{f005:CountKeys:pub} (str:path) -> i32
+  §F{CountKeys:pub} (str:path) -> i32
     §E{fs:r,mut,alloc}
     §B{exists:bool} §C{File.Exists} §A path §/C
-    §IF{if5} (! exists)
+    §IF (! exists)
       §R 0
     §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
     §LIST{seen:str}
-    §/LIST{seen}
-    §EACH{e2:ln} lines
+    §/LIST
+    §EACH{ln} lines
       §B{k:str} §C{KeyOf} §A ln §/C
-      §IF{if6} (! §HAS{seen} k)
+      §IF (! §HAS{seen} k)
         §PUSH{seen} k
     §R §CNT{seen}
 
-  §F{f006:Compact:pub} (str:path) -> void
+  §F{Compact:pub} (str:path) -> void
     §E{fs:rw,mut,alloc}
     §B{exists:bool} §C{File.Exists} §A path §/C
-    §IF{if7} (! exists)
+    §IF (! exists)
       §R
     §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
     §LIST{order:str}
-    §/LIST{order}
-    §EACH{e3:ln} lines
+    §/LIST
+    §EACH{ln} lines
       §B{k:str} §C{KeyOf} §A ln §/C
-      §IF{if8} (! §HAS{order} k)
+      §IF (! §HAS{order} k)
         §PUSH{order} k
     §B{~text:str} ""
-    §EACH{e4:k2} order
+    §EACH{k2} order
       §B{v:str} §C{Get} §A path §A k2 §/C
       §ASSIGN text (+ text (+ k2 (+ "=" (+ v "\n"))))
     §C{File.WriteAllText} §A path §A text §/C

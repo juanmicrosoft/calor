@@ -1,13 +1,13 @@
-§M{m1:Types}
-  §F{f1:GetVoid:pub} () -> void
+§M{Types}
+  §F{GetVoid:pub} () -> void
     §R
 
-  §F{f2:GetInt:pub} () -> i32
+  §F{GetInt:pub} () -> i32
     §R 42
 
-  §F{f3:GetString:pub} () -> str
+  §F{GetString:pub} () -> str
     §R "hello"
 
-  §F{f4:GetBool:pub} () -> bool
+  §F{GetBool:pub} () -> bool
     §R true
 

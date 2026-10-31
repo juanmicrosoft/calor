@@ -1,0 +1,11 @@
+§M{TypeMatch}
+  §F{Describe:pub} (i32:typeCode) -> i32
+    §IF (== typeCode 0)
+      §R 0
+    §EI (== typeCode 1)
+      §R 1
+    §EI (== typeCode 2)
+      §R 2
+    §EL
+      §R (- 0 1)
+

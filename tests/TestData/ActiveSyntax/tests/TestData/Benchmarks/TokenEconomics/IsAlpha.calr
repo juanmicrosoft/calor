@@ -1,0 +1,10 @@
+§M{IsAlpha}
+  §F{IsUpper:pub} (i32:charCode) -> bool
+    §R (&& (>= charCode 65) (<= charCode 90))
+
+  §F{IsLower:pub} (i32:charCode) -> bool
+    §R (&& (>= charCode 97) (<= charCode 122))
+
+  §F{IsAlpha:pub} (i32:charCode) -> bool
+    §R (|| (&& (>= charCode 65) (<= charCode 90)) (&& (>= charCode 97) (<= charCode 122)))
+

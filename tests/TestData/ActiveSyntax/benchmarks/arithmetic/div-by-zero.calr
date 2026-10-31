@@ -1,0 +1,76 @@
+// Arithmetic Benchmark: Division by Zero Detection
+// Tests bug pattern analysis for division by zero vulnerabilities
+
+§M{DivByZeroBenchmark}
+
+  §F{VulnerableDivision:pub}
+    // BUG: Division by unchecked parameter
+    // EXPECTED: Calor0920 Division by Zero
+    §I{i32:x}
+    §I{i32:y}
+    §O{i32}
+    §R (/ x y)
+
+  §F{SafeDivisionWithGuard:pub}
+    // SAFE: Division with zero check
+    // EXPECTED: No warnings
+    §I{i32:x}
+    §I{i32:y}
+    §O{i32}
+    §IF (!= y INT:0)
+      §R (/ x y)
+    §EL
+      §R INT:0
+
+  §F{VulnerableModulo:pub}
+    // BUG: Modulo by unchecked parameter
+    // EXPECTED: Calor0920 Division by Zero
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (% a b)
+
+  §F{SafeDivisionByLiteral:pub}
+    // SAFE: Division by non-zero literal
+    // EXPECTED: No warnings
+    §I{i32:x}
+    §O{i32}
+    §R (/ x INT:2)
+
+  §F{VulnerableDivisionInLoop:pub}
+    // BUG: Division in loop where counter can be zero
+    // EXPECTED: Calor0920 Division by Zero
+    §I{i32:n}
+    §O{i32}
+    §B{~result:i32} INT:0
+    §L{i:0:n:1}
+      §ASSIGN result (+ result (/ INT:100 i))
+    §R result
+
+  §F{SafeDivisionInLoopFromOne:pub}
+    // SAFE: Loop starts from 1
+    // EXPECTED: No warnings
+    §I{i32:n}
+    §O{i32}
+    §B{~result:i32} INT:0
+    §L{i:1:n:1}
+      §ASSIGN result (+ result (/ INT:100 i))
+    §R result
+
+  §F{VulnerableDivisionAfterDecrement:pub}
+    // BUG: Division after value can become zero
+    // EXPECTED: Calor0920 Division by Zero
+    §I{i32:x}
+    §I{i32:y}
+    §O{i32}
+    §B{divisor:i32} (- y INT:1)
+    §R (/ x divisor)
+
+  §F{SafeDivisionWithContract:pub}
+    // SAFE: Precondition guarantees non-zero
+    // EXPECTED: No warnings
+    §I{i32:x}
+    §I{i32:y}
+    §Q (> y INT:0)
+    §O{i32}
+    §R (/ x y)

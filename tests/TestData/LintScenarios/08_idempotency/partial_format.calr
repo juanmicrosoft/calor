@@ -1,5 +1,5 @@
-§M{m1:Partial}
-  §F{f001:Main:pub} () -> void
+§M{Partial}
+  §F{Main:pub} () -> void
     §E{cw}
     §P "Hello"
 

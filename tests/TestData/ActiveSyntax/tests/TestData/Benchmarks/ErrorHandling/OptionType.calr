@@ -1,0 +1,14 @@
+§M{OptionType}
+  §F{HasValue:pub} (bool:isSome) -> bool
+    §R isSome
+
+  §F{Unwrap:pub} (i32:value, bool:isSome) -> i32
+    §Q (== isSome true)
+    §R value
+
+  §F{GetOrElse:pub} (i32:value, i32:fallback, bool:isSome) -> i32
+    §IF isSome
+      §R value
+    §EL
+      §R fallback
+

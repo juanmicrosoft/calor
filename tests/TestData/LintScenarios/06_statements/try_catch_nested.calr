@@ -1,17 +1,17 @@
-§M{m1:NestedTry}
-  §F{f1:OuterHandler:pub} (i32:x) -> i32
-    §TR{t1}
-      §TR{t2}
+§M{NestedTry}
+  §F{OuterHandler:pub} (i32:x) -> i32
+    §TR
+      §TR
         §R (/ 100 x)
       §CA{DivideByZeroException:inner}
         §R -1
     §CA{Exception:outer}
       §R -2
 
-  §F{f2:DeepNesting:pub} (i32:a, i32:b) -> i32
-    §TR{t1}
-      §TR{t2}
-        §TR{t3}
+  §F{DeepNesting:pub} (i32:a, i32:b) -> i32
+    §TR
+      §TR
+        §TR
           §R (/ (/ a b) b)
         §CA{DivideByZeroException:e3}
           §R -3

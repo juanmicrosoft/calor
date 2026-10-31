@@ -1,6 +1,6 @@
-§M{m001:Test_09_02:overflow=unchecked}
-  §CL{c001:IndexDemo:pub}
-    §MT{m002:GetLast:pub} (i32[]:items) -> i32
+§M{Test_09_02:overflow=unchecked}
+  §CL{IndexDemo:pub}
+    §MT{GetLast:pub} (i32[]:items) -> i32
       §R §IDX{items} §^ 1
 
 

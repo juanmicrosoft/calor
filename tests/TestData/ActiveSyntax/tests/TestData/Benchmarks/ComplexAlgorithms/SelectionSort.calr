@@ -1,0 +1,11 @@
+§M{SelectionSort}
+  §F{IsNewMin:pub} (i32:current, i32:currentMin) -> bool
+    §R (< current currentMin)
+
+  §F{LastUnsorted:pub} (i32:length) -> i32
+    §Q (> length 0)
+    §R (- length 1)
+
+  §F{SearchStart:pub} (i32:sortedCount) -> i32
+    §R (+ sortedCount 1)
+

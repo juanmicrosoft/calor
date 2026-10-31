@@ -1,4 +1,4 @@
-§M{m1:Single}
-  §F{f1:One:pub} () -> i32
+§M{Single}
+  §F{One:pub} () -> i32
     §R 1
 

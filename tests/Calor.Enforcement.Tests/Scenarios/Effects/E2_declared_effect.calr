@@ -1,5 +1,5 @@
-§M{m1:Test}
-  §F{f001:PrintHello:pub} () -> void
+§M{Test}
+  §F{PrintHello:pub} () -> void
     §E{cw}
     §P "Hello, World!"
 

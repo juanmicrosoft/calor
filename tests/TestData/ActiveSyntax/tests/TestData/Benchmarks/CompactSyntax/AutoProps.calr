@@ -1,0 +1,10 @@
+§M{AutoProps}
+  §F{GetX:pub} (i32:x) -> i32
+    §R x
+
+  §F{GetY:pub} (i32:y) -> i32
+    §R y
+
+  §F{Sum:pub} (i32:x, i32:y) -> i32
+    §R (+ x y)
+

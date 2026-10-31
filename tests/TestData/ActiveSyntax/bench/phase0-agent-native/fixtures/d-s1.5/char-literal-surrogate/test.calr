@@ -1,0 +1,6 @@
+§M{SurrogateValueTest}
+  §F{Verify:pub} () -> i32
+    §S (== result 167935)
+    §B{high:char} '\ud800'
+    §B{low:char} '\udfff'
+    §R (+ (* (char-code high) 2) (char-code low))

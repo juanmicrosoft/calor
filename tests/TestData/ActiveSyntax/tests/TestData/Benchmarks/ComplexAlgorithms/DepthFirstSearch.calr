@@ -1,0 +1,10 @@
+§M{DepthFirstSearch}
+  §F{IsVisited:pub} (i32:node, i32:visitedBitmask) -> bool
+    §R (!= visitedBitmask 0)
+
+  §F{MarkVisited:pub} (i32:visitedCount) -> i32
+    §R (+ visitedCount 1)
+
+  §F{AllVisited:pub} (i32:visitedCount, i32:totalNodes) -> bool
+    §R (== visitedCount totalNodes)
+

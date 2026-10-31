@@ -1,0 +1,12 @@
+§M{CollectionLib}
+  §F{ListLength:pub} (i32:count) -> i32
+    §S (>= result 0)
+    §R count
+
+  §F{IsInBounds:pub} (i32:index, i32:count) -> bool
+    §R (&& (>= index 0) (< index count))
+
+  §F{AfterAdd:pub} (i32:count) -> i32
+    §S (> result count)
+    §R (+ count 1)
+

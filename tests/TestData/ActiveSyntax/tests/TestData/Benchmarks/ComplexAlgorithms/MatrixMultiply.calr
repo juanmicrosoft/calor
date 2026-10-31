@@ -1,0 +1,12 @@
+§M{MatrixMultiply}
+  §F{DotProduct:pub} (i32:a1, i32:b1, i32:a2, i32:b2) -> i32
+    §R (+ (* a1 b1) (* a2 b2))
+
+  §F{ValidDimensions:pub} (i32:aCols, i32:bRows) -> bool
+    §R (== aCols bRows)
+
+  §F{ResultSize:pub} (i32:aRows, i32:bCols) -> i32
+    §Q (> aRows 0)
+    §Q (> bCols 0)
+    §R (* aRows bCols)
+

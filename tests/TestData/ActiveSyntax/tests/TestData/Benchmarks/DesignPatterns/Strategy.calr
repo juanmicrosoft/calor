@@ -1,0 +1,13 @@
+§M{Strategy}
+  §F{CompareAsc:pub} (i32:a, i32:b) -> bool
+    §R (< a b)
+
+  §F{CompareDesc:pub} (i32:a, i32:b) -> bool
+    §R (> a b)
+
+  §F{ShouldSwap:pub} (i32:a, i32:b, bool:ascending) -> bool
+    §IF ascending
+      §R (> a b)
+    §EL
+      §R (< a b)
+

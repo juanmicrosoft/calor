@@ -1,0 +1,12 @@
+§M{ValueOps}
+  §F{Clamp:pub} (i32:value, i32:min, i32:max) -> i32
+    §Q (<= min max)
+    §S (>= result min)
+    §S (<= result max)
+    §IF (< value min)
+      §R min
+    §EI (> value max)
+      §R max
+    §EL
+      §R value
+

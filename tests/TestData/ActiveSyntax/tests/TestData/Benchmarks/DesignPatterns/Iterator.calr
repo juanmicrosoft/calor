@@ -1,0 +1,14 @@
+§M{Iterator}
+  §F{HasNext:pub} (i32:current, i32:end) -> bool
+    §R (< current end)
+
+  §F{Next:pub} (i32:current, i32:step) -> i32
+    §Q (> step 0)
+    §R (+ current step)
+
+  §F{Current:pub} (i32:value) -> i32
+    §R value
+
+  §F{Reset:pub} (i32:start) -> i32
+    §R start
+

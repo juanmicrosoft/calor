@@ -1,0 +1,13 @@
+§M{Calculator}
+  §F{Add:pub} (i32:a, i32:b) -> i32
+    §R (+ a b)
+
+  §F{Subtract:pub} (i32:a, i32:b) -> i32
+    §R (- a b)
+
+  §F{Multiply:pub} (i32:a, i32:b) -> i32
+    §R (* a b)
+
+  §F{Divide:pub} (i32:a, i32:b) -> i32
+    §R (/ a b)
+

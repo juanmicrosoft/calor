@@ -1,0 +1,15 @@
+§M{CurrencyConverter}
+  §F{Convert:pub} (f32:amount, f32:rate) -> f32
+    §Q (>= amount 0)
+    §Q (> rate 0)
+    §S (>= result 0)
+    §R (* amount rate)
+
+  §F{RoundToTwo:pub} (f32:value) -> f32
+    §B{shifted} (* value 100)
+    §R (/ (cast f64 (cast i32 (+ shifted 0.5))) 100)
+
+  §F{InverseRate:pub} (f32:rate) -> f32
+    §Q (> rate 0)
+    §R (/ 1 rate)
+

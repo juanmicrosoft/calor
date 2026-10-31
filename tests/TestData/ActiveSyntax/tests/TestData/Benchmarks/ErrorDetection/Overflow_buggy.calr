@@ -1,0 +1,4 @@
+§M{UnsafeAdd}
+  §F{AddLarge:pub} (i32:a, i32:b) -> i32
+    §R (+ a b)
+

@@ -1,0 +1,10 @@
+§M{Mediator}
+  §F{ShouldDeliver:pub} (i32:senderId, i32:recipientId) -> bool
+    §R (!= senderId recipientId)
+
+  §F{MessageCount:pub} (i32:current) -> i32
+    §R (+ current 1)
+
+  §F{UserCount:pub} (i32:count) -> i32
+    §R count
+

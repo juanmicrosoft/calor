@@ -1,0 +1,13 @@
+§M{BitContracts}
+  §F{PowerOfTwo:pub} (i32:n) -> bool
+    §Q (> n 0)
+    §R (== (& n (- n 1)) 0)
+
+  §F{IsAligned:pub} (i32:value, i32:alignment) -> bool
+    §Q (> alignment 0)
+    §R (== (% value alignment) 0)
+
+  §F{ClearLowest:pub} (i32:n) -> i32
+    §Q (> n 0)
+    §R (& n (- n 1))
+

@@ -1,0 +1,7 @@
+§M{SealedClass}
+  §F{GetValue:pub} (i32:value) -> i32
+    §R value
+
+  §F{IsImmutable:pub} () -> bool
+    §R true
+

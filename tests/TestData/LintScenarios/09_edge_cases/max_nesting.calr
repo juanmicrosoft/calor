@@ -1,10 +1,10 @@
-§M{m1:MaxNest}
-  §F{f1:Deep:pub} (i32:n) -> i32
-    §IF{i1} (> n 0)
-      §IF{i2} (> n 1)
-        §IF{i3} (> n 2)
-          §IF{i4} (> n 3)
-            §IF{i5} (> n 4)
+§M{MaxNest}
+  §F{Deep:pub} (i32:n) -> i32
+    §IF (> n 0)
+      §IF (> n 1)
+        §IF (> n 2)
+          §IF (> n 3)
+            §IF (> n 4)
               §R n
             §R 4
           §R 3

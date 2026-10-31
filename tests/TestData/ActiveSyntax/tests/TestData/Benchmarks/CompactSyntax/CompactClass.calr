@@ -1,0 +1,18 @@
+§M{CompactClass}
+  §F{Greet:pub} (str:name) -> str
+    §E{cw}
+    §P name
+    §R name
+
+  §F{Square:pub} (i32:x) -> i32
+    §S (>= result 0)
+    §R (* x x)
+
+  §F{Max:pub} (i32:a, i32:b) -> i32
+    §S (>= result a)
+    §S (>= result b)
+    §IF (> a b)
+      §R a
+    §EL
+      §R b
+

@@ -1,0 +1,11 @@
+§M{Capitalize}
+  §F{ShouldCapitalize:pub} (i32:charCode) -> bool
+    §R (&& (>= charCode 97) (<= charCode 122))
+
+  §F{ToUpper:pub} (i32:charCode) -> i32
+    §Q (&& (>= charCode 97) (<= charCode 122))
+    §R (- charCode 32)
+
+  §F{IsEmpty:pub} (i32:length) -> bool
+    §R (== length 0)
+

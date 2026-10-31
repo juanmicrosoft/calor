@@ -1,0 +1,12 @@
+§M{CountOccurrences}
+  §F{CountOccurrences:pub} (i32:length, i32:matchCount) -> i32
+    §S (>= result 0)
+    §S (<= result length)
+    §R matchCount
+
+  §F{IncrementIf:pub} (i32:count, bool:matches) -> i32
+    §IF matches
+      §R (+ count 1)
+    §EL
+      §R count
+

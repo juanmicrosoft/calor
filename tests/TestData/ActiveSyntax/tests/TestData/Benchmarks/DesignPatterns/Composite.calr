@@ -1,0 +1,12 @@
+§M{Composite}
+  §F{FileSize:pub} (i32:size) -> i32
+    §Q (>= size 0)
+    §R size
+
+  §F{TotalSize:pub} (i32:ownSize, i32:childrenSize) -> i32
+    §S (>= result ownSize)
+    §R (+ ownSize childrenSize)
+
+  §F{IsLeaf:pub} (i32:childCount) -> bool
+    §R (== childCount 0)
+

@@ -1,0 +1,13 @@
+§M{LCS}
+  §F{CharsMatch:pub} (i32:charA, i32:charB) -> bool
+    §R (== charA charB)
+
+  §F{ExtendMatch:pub} (i32:prevLen) -> i32
+    §R (+ prevLen 1)
+
+  §F{BestOfTwo:pub} (i32:a, i32:b) -> i32
+    §IF (> a b)
+      §R a
+    §EL
+      §R b
+

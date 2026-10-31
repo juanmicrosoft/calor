@@ -1,0 +1,7 @@
+§M{AsyncLoop}
+  §AF{ProcessItem:pub} (i32:item) -> i32
+    §R (* item 2)
+
+  §F{HasMore:pub} (i32:index, i32:count) -> bool
+    §R (< index count)
+

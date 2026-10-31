@@ -1,0 +1,9 @@
+§M{CustomException}
+  §F{Validate:pub} (i32:value, i32:min, i32:max) -> bool
+    §R (&& (>= value min) (<= value max))
+
+  §F{ThrowIfInvalid:pub} (i32:value, i32:min, i32:max) -> i32
+    §Q (>= value min)
+    §Q (<= value max)
+    §R value
+

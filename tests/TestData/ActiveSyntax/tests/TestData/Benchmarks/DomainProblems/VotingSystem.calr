@@ -1,0 +1,15 @@
+§M{VotingSystem}
+  §F{AddVote:pub} (i32:currentVotes) -> i32
+    §R (+ currentVotes 1)
+
+  §F{HasMajority:pub} (i32:votes, i32:totalVotes) -> bool
+    §Q (> totalVotes 0)
+    §R (> (* votes 2) totalVotes)
+
+  §F{Percentage:pub} (i32:votes, i32:totalVotes) -> f32
+    §Q (> totalVotes 0)
+    §R (* (/ (cast f64 votes) (cast f64 totalVotes)) 100)
+
+  §F{IsValid:pub} (i32:totalVotes, i32:eligibleVoters) -> bool
+    §R (<= totalVotes eligibleVoters)
+

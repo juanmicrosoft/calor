@@ -1,0 +1,13 @@
+§M{FileService}
+  §F{ReadFile:pub} (str:path) -> str
+    §E{fr}
+    §R path
+
+  §F{WriteFile:pub} (str:path, str:content) -> void
+    §E{fw}
+    §P content
+
+  §F{ProcessFile:pub} (str:input, str:output) -> void
+    §E{fw}
+    §P input
+

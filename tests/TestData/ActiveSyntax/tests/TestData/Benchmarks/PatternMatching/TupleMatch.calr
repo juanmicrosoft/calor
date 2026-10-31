@@ -1,0 +1,13 @@
+§M{TupleMatch}
+  §F{RockPaperScissors:pub} (i32:player1, i32:player2) -> i32
+    §IF (== player1 player2)
+      §R 0
+    §EI (&& (== player1 0) (== player2 2))
+      §R 1
+    §EI (&& (== player1 1) (== player2 0))
+      §R 1
+    §EI (&& (== player1 2) (== player2 1))
+      §R 1
+    §EL
+      §R 2
+

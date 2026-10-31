@@ -1,0 +1,20 @@
+§M{Inheritance}
+  §F{AnimalSound:pub} (i32:animalType) -> i32
+    §IF (== animalType 0)
+      §R 0
+    §EI (== animalType 1)
+      §R 1
+    §EL
+      §R 2
+
+  §F{CanFly:pub} (i32:animalType) -> bool
+    §R (== animalType 2)
+
+  §F{Legs:pub} (i32:animalType) -> i32
+    §IF (== animalType 0)
+      §R 4
+    §EI (== animalType 1)
+      §R 4
+    §EL
+      §R 2
+

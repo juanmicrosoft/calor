@@ -1,0 +1,13 @@
+§M{MixedSyntax}
+  §F{Compact:pub} (i32:x) -> i32
+    §R (* x 2)
+
+  §F{Verbose:pub} (i32:x) -> i32
+    §Q (> x 0)
+    §S (> result x)
+    §R (* x 3)
+
+  §F{CompactWithContract:pub} (i32:a, i32:b) -> i32
+    §Q (!= b 0)
+    §R (/ a b)
+

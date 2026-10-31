@@ -1,0 +1,5 @@
+§M{DeadCodeExample}
+  §F{GetStatus:pub} (i32:code) -> i32
+    §R code
+    §B{i32:unused} 42
+

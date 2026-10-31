@@ -1,0 +1,16 @@
+§M{PrimeCheck}
+  §F{IsPrime:pub} (i32:n) -> bool
+    §Q (> n 0)
+    §IF (<= n 1)
+      §R false
+    §IF (<= n 3)
+      §R true
+    §IF (== (% n 2) 0)
+      §R false
+    §L{i:3:1000:2}
+      §IF (> (* i i) n)
+        §R true
+      §IF (== (% n i) 0)
+        §R false
+    §R true
+

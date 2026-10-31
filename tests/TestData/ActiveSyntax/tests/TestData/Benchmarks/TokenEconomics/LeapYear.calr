@@ -1,0 +1,11 @@
+§M{DateUtils}
+  §F{IsLeapYear:pub} (i32:year) -> bool
+    §IF (== (% year 400) 0)
+      §R true
+    §EI (== (% year 100) 0)
+      §R false
+    §EI (== (% year 4) 0)
+      §R true
+    §EL
+      §R false
+

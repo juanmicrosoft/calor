@@ -1,0 +1,18 @@
+§M{StateMachine}
+  §F{NextState:pub} (i32:current) -> i32
+    §IF (== current 0)
+      §R 1
+    §EI (== current 1)
+      §R 2
+    §EL
+      §R 0
+
+  §F{IsGreen:pub} (i32:state) -> bool
+    §R (== state 0)
+
+  §F{IsYellow:pub} (i32:state) -> bool
+    §R (== state 1)
+
+  §F{IsRed:pub} (i32:state) -> bool
+    §R (== state 2)
+

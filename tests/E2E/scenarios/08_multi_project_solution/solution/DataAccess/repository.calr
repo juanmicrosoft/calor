@@ -1,10 +1,10 @@
-§M{m001:Repository}
-  §F{f001:GetById:pub} (i32:id) -> i32
+§M{Repository}
+  §F{GetById:pub} (i32:id) -> i32
     §Q (> id 0)
     §S (>= result 0)
     §R (* id 10)
 
-  §F{f002:Count:pub} () -> i32
+  §F{Count:pub} () -> i32
     §S (>= result 0)
     §R 42
 

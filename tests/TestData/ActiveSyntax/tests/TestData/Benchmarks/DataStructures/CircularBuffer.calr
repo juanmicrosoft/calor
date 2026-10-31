@@ -1,0 +1,17 @@
+§M{CircularBuffer}
+  §F{NextIndex:pub} (i32:current, i32:capacity) -> i32
+    §Q (> capacity 0)
+    §S (>= result 0)
+    §S (< result capacity)
+    §R (% (+ current 1) capacity)
+
+  §F{IsFull:pub} (i32:count, i32:capacity) -> bool
+    §R (== count capacity)
+
+  §F{IsEmpty:pub} (i32:count) -> bool
+    §R (== count 0)
+
+  §F{WriteIndex:pub} (i32:head, i32:count, i32:capacity) -> i32
+    §Q (> capacity 0)
+    §R (% (+ head count) capacity)
+

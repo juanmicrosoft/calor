@@ -1,0 +1,30 @@
+§M{OverflowUnsafe}
+  §F{IncrementUnsafe:pub} (i32:x) -> i32
+    §S (> result x)
+    §R (+ x 1)
+
+  §F{DecrementUnsafe:pub} (i32:x) -> i32
+    §S (< result x)
+    §R (- x 1)
+
+  §F{DoubleUnsafe:pub} (i32:x) -> i32
+    §Q (> x 0)
+    §S (> result x)
+    §R (* x 2)
+
+  §F{SquareUnsafe:pub} (i32:x) -> i32
+    §Q (>= x 0)
+    §S (>= result 0)
+    §R (* x x)
+
+  §F{NegateUnsafe:pub} (i32:x) -> i32
+    §Q (< x 0)
+    §S (> result 0)
+    §R (- 0 x)
+
+  §F{AddPositivesUnsafe:pub} (i32:x, i32:y) -> i32
+    §Q (> x 0)
+    §Q (> y 0)
+    §S (> result 0)
+    §R (+ x y)
+

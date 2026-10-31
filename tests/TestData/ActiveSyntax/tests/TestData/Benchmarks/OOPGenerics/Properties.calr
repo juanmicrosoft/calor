@@ -1,0 +1,12 @@
+§M{Properties}
+  §F{GetName:pub} (str:name) -> str
+    §R name
+
+  §F{ValidateAge:pub} (i32:age) -> i32
+    §Q (>= age 0)
+    §Q (<= age 150)
+    §R age
+
+  §F{ValidateEmail:pub} (str:email, i32:length) -> bool
+    §R (> length 0)
+

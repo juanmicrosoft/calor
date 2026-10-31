@@ -1,0 +1,17 @@
+§M{PropertyAccess}
+  §F{GetX:pub} (i32:x) -> i32
+    §R x
+
+  §F{GetY:pub} (i32:y) -> i32
+    §R y
+
+  §F{GetName:pub} (str:name) -> str
+    §R name
+
+  §F{GetAge:pub} (i32:age) -> i32
+    §Q (>= age 0)
+    §R age
+
+  §F{GetEmail:pub} (str:email) -> str
+    §R email
+

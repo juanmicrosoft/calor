@@ -1,6 +1,6 @@
-§M{m1:Test}
-  §F{f001:RecursivePrint:pub} (i32:n) -> void
-    §IF{i1} (> n 0)
+§M{Test}
+  §F{RecursivePrint:pub} (i32:n) -> void
+    §IF (> n 0)
       §P n
       §C{RecursivePrint} §A (- n 1) §/C
 

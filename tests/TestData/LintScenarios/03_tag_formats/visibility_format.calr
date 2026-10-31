@@ -1,10 +1,10 @@
-§M{m1:Visibility}
-  §F{f1:PublicFunc:pub} () -> void
+§M{Visibility}
+  §F{PublicFunc:pub} () -> void
     §R
 
-  §F{f2:PrivateFunc:priv} () -> void
+  §F{PrivateFunc:priv} () -> void
     §R
 
-  §F{f3:AnotherPublic:pub} (i32:x) -> i32
+  §F{AnotherPublic:pub} (i32:x) -> i32
     §R x
 

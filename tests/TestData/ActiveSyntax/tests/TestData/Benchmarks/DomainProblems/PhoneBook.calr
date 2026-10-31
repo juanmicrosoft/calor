@@ -1,0 +1,16 @@
+§M{PhoneBook}
+  §F{EntryCount:pub} (i32:count) -> i32
+    §S (>= result 0)
+    §R count
+
+  §F{AddEntry:pub} (i32:count) -> i32
+    §R (+ count 1)
+
+  §F{RemoveEntry:pub} (i32:count) -> i32
+    §Q (> count 0)
+    §S (>= result 0)
+    §R (- count 1)
+
+  §F{IsEmpty:pub} (i32:count) -> bool
+    §R (== count 0)
+

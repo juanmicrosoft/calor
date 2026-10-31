@@ -1,8 +1,8 @@
-§M{m1:WhileTest}
-  §F{f1:CountDown:pub} (i32:n) -> void
+§M{WhileTest}
+  §F{CountDown:pub} (i32:n) -> void
     §E{cw}
     §B{~x} n
-    §WH{w1} (> x 0)
+    §WH (> x 0)
       §P x
       §B{~x} (- x 1)
 

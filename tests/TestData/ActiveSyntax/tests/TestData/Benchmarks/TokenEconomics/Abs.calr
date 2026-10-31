@@ -1,0 +1,8 @@
+§M{AbsModule}
+  §F{Abs:pub} (i32:x) -> i32
+    §S (>= result 0)
+    §IF (>= x 0)
+      §R x
+    §EL
+      §R (- 0 x)
+

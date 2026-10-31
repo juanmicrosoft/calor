@@ -1,5 +1,5 @@
-§M{m1:Test}
-  §F{f001:PureFunctionWithUnknownCall:pub} (i32:x) -> i32
+§M{Test}
+  §F{PureFunctionWithUnknownCall:pub} (i32:x) -> i32
     §C{UnknownLib.Calculate} §A x §/C
     §R x
 

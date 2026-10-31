@@ -1,0 +1,10 @@
+§M{InsertionSort}
+  §F{ShouldShift:pub} (i32:current, i32:key) -> bool
+    §R (> current key)
+
+  §F{InsertPosition:pub} (i32:j) -> i32
+    §R (+ j 1)
+
+  §F{NeedsSorting:pub} (i32:length) -> bool
+    §R (> length 1)
+

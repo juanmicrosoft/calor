@@ -1,8 +1,8 @@
-§M{m001:MixedTest}
-  §F{f001:Process:pub} (i32:n) -> void
+§M{MixedTest}
+  §F{Process:pub} (i32:n) -> void
     §E{cw}
-    §L{for1:i:1:n:1}
-      §IF{if1} (== (% i 2) 0)
+    §L{i:1:n:1}
+      §IF (== (% i 2) 0)
         §P "even"
       §EL
         §P "odd"

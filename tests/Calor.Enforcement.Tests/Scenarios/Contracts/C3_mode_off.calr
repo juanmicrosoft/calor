@@ -1,5 +1,5 @@
-§M{m1:Test}
-  §F{f001:Divide:pub} (i32:a, i32:b) -> i32
+§M{Test}
+  §F{Divide:pub} (i32:a, i32:b) -> i32
     §Q (!= b 0)
     §R (/ a b)
 

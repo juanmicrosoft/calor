@@ -1,77 +1,77 @@
-§M{m001:DesignPatterns}
-  §IFACE{i001:IExpressionVisitor}
-    §MT{m001:VisitNumber} (NumberExpression:expr) -> f32
-    §MT{m002:VisitAdd} (AddExpression:expr) -> f32
-    §MT{m003:VisitMultiply} (MultiplyExpression:expr) -> f32
+§M{DesignPatterns}
+  §IFACE{IExpressionVisitor}
+    §MT{VisitNumber} (NumberExpression:expr) -> f32
+    §MT{VisitAdd} (AddExpression:expr) -> f32
+    §MT{VisitMultiply} (MultiplyExpression:expr) -> f32
 
-  §CL{c001:Expression:int:abs}
-    §MT{mt001:Accept:priv} (IExpressionVisitor:visitor) -> f32
+  §CL{Expression:int:abs}
+    §MT{Accept:priv} (IExpressionVisitor:visitor) -> f32
       §R
 
 
-  §CL{c002:NumberExpression:pub}
+  §CL{NumberExpression:pub}
     §EXT{Expression}
 
     §FLD{f64:Value:pub}
 
-    §CTOR{ctor001:pub} (f32:value)
+    §CTOR{pub} (f32:value)
       §ASSIGN this.Value value
 
-    §MT{mt001:Accept:pub:over} (IExpressionVisitor:visitor) -> f32
+    §MT{Accept:pub:over} (IExpressionVisitor:visitor) -> f32
       §R §C{visitor.VisitNumber} §THIS
 
 
-  §CL{c003:AddExpression:pub}
+  §CL{AddExpression:pub}
     §EXT{Expression}
 
     §FLD{Expression:Left:pub}
     §FLD{Expression:Right:pub}
 
-    §CTOR{ctor001:pub} (Expression:left, Expression:right)
+    §CTOR{pub} (Expression:left, Expression:right)
       §ASSIGN this.Left left
       §ASSIGN this.Right right
 
-    §MT{mt001:Accept:pub:over} (IExpressionVisitor:visitor) -> f32
+    §MT{Accept:pub:over} (IExpressionVisitor:visitor) -> f32
       §R §C{visitor.VisitAdd} §THIS
 
 
-  §CL{c004:MultiplyExpression:pub}
+  §CL{MultiplyExpression:pub}
     §EXT{Expression}
 
     §FLD{Expression:Left:pub}
     §FLD{Expression:Right:pub}
 
-    §CTOR{ctor001:pub} (Expression:left, Expression:right)
+    §CTOR{pub} (Expression:left, Expression:right)
       §ASSIGN this.Left left
       §ASSIGN this.Right right
 
-    §MT{mt001:Accept:pub:over} (IExpressionVisitor:visitor) -> f32
+    §MT{Accept:pub:over} (IExpressionVisitor:visitor) -> f32
       §R §C{visitor.VisitMultiply} §THIS
 
 
-  §CL{c005:EvaluatorVisitor:pub}
+  §CL{EvaluatorVisitor:pub}
     §IMPL{IExpressionVisitor}
 
-    §MT{mt001:VisitNumber:pub} (NumberExpression:expr) -> f32
+    §MT{VisitNumber:pub} (NumberExpression:expr) -> f32
       §R expr.Value
 
-    §MT{mt002:VisitAdd:pub} (AddExpression:expr) -> f32
+    §MT{VisitAdd:pub} (AddExpression:expr) -> f32
       §B{~_hoist000} §C{expr.Left.Accept} §THIS
       §B{~_hoist001} §C{expr.Right.Accept} §THIS
       §R (+ _hoist000 _hoist001)
 
-    §MT{mt003:VisitMultiply:pub} (MultiplyExpression:expr) -> f32
+    §MT{VisitMultiply:pub} (MultiplyExpression:expr) -> f32
       §B{~_hoist002} §C{expr.Left.Accept} §THIS
       §B{~_hoist003} §C{expr.Right.Accept} §THIS
       §R (* _hoist002 _hoist003)
 
 
-  §M{c006:VisitorDemo:int}
-    §F{mt001:Evaluate:pub} (Expression:expr) -> f32
+  §M{VisitorDemo:int}
+    §F{Evaluate:pub} (Expression:expr) -> f32
       §B{EvaluatorVisitor:visitor} §NEW{EvaluatorVisitor} §/NEW
       §R §C{expr.Accept} visitor
 
-    §F{mt002:BuildSampleExpression:pub} () -> Expression
+    §F{BuildSampleExpression:pub} () -> Expression
       §B{NumberExpression:two} §NEW{NumberExpression} §A 2 §/NEW
       §B{NumberExpression:three} §NEW{NumberExpression} §A 3 §/NEW
       §B{NumberExpression:four} §NEW{NumberExpression} §A 4 §/NEW

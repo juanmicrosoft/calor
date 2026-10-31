@@ -1,0 +1,13 @@
+§M{Reduce}
+  §F{Sum:pub} (i32:acc, i32:value) -> i32
+    §R (+ acc value)
+
+  §F{Product:pub} (i32:acc, i32:value) -> i32
+    §R (* acc value)
+
+  §F{Max:pub} (i32:acc, i32:value) -> i32
+    §IF (> value acc)
+      §R value
+    §EL
+      §R acc
+

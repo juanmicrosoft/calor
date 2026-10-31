@@ -1,19 +1,19 @@
-§M{m1:Compare}
-  §F{f1:IsEqual:pub} (i32:a, i32:b) -> bool
+§M{Compare}
+  §F{IsEqual:pub} (i32:a, i32:b) -> bool
     §R (== a b)
 
-  §F{f2:IsNotEqual:pub} (i32:a, i32:b) -> bool
+  §F{IsNotEqual:pub} (i32:a, i32:b) -> bool
     §R (!= a b)
 
-  §F{f3:IsLess:pub} (i32:a, i32:b) -> bool
+  §F{IsLess:pub} (i32:a, i32:b) -> bool
     §R (< a b)
 
-  §F{f4:IsGreater:pub} (i32:a, i32:b) -> bool
+  §F{IsGreater:pub} (i32:a, i32:b) -> bool
     §R (> a b)
 
-  §F{f5:IsLessEqual:pub} (i32:a, i32:b) -> bool
+  §F{IsLessEqual:pub} (i32:a, i32:b) -> bool
     §R (<= a b)
 
-  §F{f6:IsGreaterEqual:pub} (i32:a, i32:b) -> bool
+  §F{IsGreaterEqual:pub} (i32:a, i32:b) -> bool
     §R (>= a b)
 

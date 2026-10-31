@@ -1,5 +1,5 @@
-§M{m001:Pipeline}
-  §F{f001:FetchAndStore:pub} (str:url) -> i32
+§M{Pipeline}
+  §F{FetchAndStore:pub} (str:url) -> i32
     §B{~closed} false
     §B{data} §C{FetchRemote} §A url §/C
     §B{rc} §C{WriteRecord} §A data §/C

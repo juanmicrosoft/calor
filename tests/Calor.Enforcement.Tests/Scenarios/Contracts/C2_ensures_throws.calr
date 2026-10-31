@@ -1,5 +1,5 @@
-§M{m1:Test}
-  §F{f001:GetPositive:pub} (i32:n) -> i32
+§M{Test}
+  §F{GetPositive:pub} (i32:n) -> i32
     §S (> result 0)
     §R n
 

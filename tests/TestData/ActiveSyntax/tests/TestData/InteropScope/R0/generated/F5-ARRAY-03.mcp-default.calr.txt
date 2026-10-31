@@ -1,15 +1,15 @@
-§M{m001:ConvertedModule:overflow=unchecked}
+§M{ConvertedModule:overflow=unchecked}
   §U{System}
 
-  §NS{ns_global:_global:global}
-    §M{c001:Probe:pub}
-      §F{m002:Run:pub} () -> str
+  §NS{_global:global}
+    §M{Probe:pub}
+      §F{Run:pub} () -> str
         §E{alloc}
         §ARR{one:i32}
           3
           1
           2
-        §B{i32[,]:two} §ARR2D{arr2d004:two:i32}
+        §B{i32[,]:two} §ARR2D{i32}
           §ROW 1 2
           §ROW 3 4
         §R (+ (+ (+ (+ (+ (+ §IDX{one} 0 "|") one.Length) "|") §IDX2D two 1 0) "|") two.Length)

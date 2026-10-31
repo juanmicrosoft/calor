@@ -18,30 +18,30 @@
   ],
   "preludes": {
     "fn": [
-      "§M{m1:P}",
-      "  §F{f0:Bump:pub} (i32:x:ref) -> void",
+      "§M{P}",
+      "  §F{Bump:pub} (i32:x:ref) -> void",
       "    §ASSIGN x (+ x 1)",
-      "  §F{f9:SetOut:pub} (i32:x:out) -> void",
+      "  §F{SetOut:pub} (i32:x:out) -> void",
       "    §ASSIGN x 7",
-      "  §F{f8:Twice:pub} (i32:x:in) -> i32",
+      "  §F{Twice:pub} (i32:x:in) -> i32",
       "    §R (* x 2)",
-      "  §F{f7:BumpGet:pub} (i32:x:ref) -> i32",
+      "  §F{BumpGet:pub} (i32:x:ref) -> i32",
       "    §ASSIGN x (+ x 1)",
       "    §R (* x 100)",
-      "  §F{f6:SetNeg:pub} (i32:x:out) -> void",
+      "  §F{SetNeg:pub} (i32:x:out) -> void",
       "    §ASSIGN x -5"
     ],
     "cls": [
-      "§M{m1:P}",
-      "  §M{c1:K:pub}",
-      "    §F{m0:Bp:pub} (i32:x:ref)",
+      "§M{P}",
+      "  §M{K:pub}",
+      "    §F{Bp:pub} (i32:x:ref)",
       "      §ASSIGN x (+ x 1)",
-      "    §F{m9:So:pub} (i32:x:out)",
+      "    §F{So:pub} (i32:x:out)",
       "      §ASSIGN x 7"
     ],
     "inst": [
-      "§M{m1:P}",
-      "  §F{f0:Bump:pub} (i32:x:ref) -> void",
+      "§M{P}",
+      "  §F{Bump:pub} (i32:x:ref) -> void",
       "    §ASSIGN x (+ x 1)"
     ]
   },
@@ -59,7 +59,7 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} () -> i32",
+        "  §F{Run:pub} () -> i32",
         "    §B{~v:i32} 1",
         "    §C{Bump} §A{ref} v §/C",
         "    §R v"
@@ -88,7 +88,7 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} () -> i32",
+        "  §F{Run:pub} () -> i32",
         "    §B{~v:i32} 0",
         "    §C{SetOut} §A{out}[x] v §/C",
         "    §R v"
@@ -117,7 +117,7 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} () -> i32",
+        "  §F{Run:pub} () -> i32",
         "    §B{v:i32} 4",
         "    §R §C{Twice} §A{in} v §/C"
       ],
@@ -144,7 +144,7 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} () -> i32",
+        "  §F{Run:pub} () -> i32",
         "    §B{~v:i32} 1",
         "    §C{Bump} §A{byref} v §/C",
         "    §R v"
@@ -173,10 +173,10 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §CL{c1:H:pub}",
-        "    §CTOR{k1:pub} (i32:x:out)",
+        "  §CL{H:pub}",
+        "    §CTOR{pub} (i32:x:out)",
         "      §ASSIGN x 1",
-        "  §F{f1:Run:pub} () -> void",
+        "  §F{Run:pub} () -> void",
         "    §B{~v:i32} 0",
         "    §B{h} §NEW{H} §A{out} v §/NEW"
       ],
@@ -204,7 +204,7 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} () -> i32",
+        "  §F{Run:pub} () -> i32",
         "    §B{~v:i32} 1",
         "    §R (+ §C{BumpGet} §A{ref} v §/C v)"
       ],
@@ -231,7 +231,7 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} () -> i32",
+        "  §F{Run:pub} () -> i32",
         "    §B{~v:i32} 1",
         "    §C{Bump} §A v §/C",
         "    §R v"
@@ -259,7 +259,7 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} () -> i32",
+        "  §F{Run:pub} () -> i32",
         "    §B{~v:i32} 1",
         "    §C{SetOut} §A{ref} v §/C",
         "    §R v"
@@ -288,7 +288,7 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} () -> i32",
+        "  §F{Run:pub} () -> i32",
         "    §B{~v:i32} 1",
         "    §C{Bump} §A{in} v §/C",
         "    §R v"
@@ -316,11 +316,11 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §F{f1:Pick:pub} (i32:x) -> i32",
+        "  §F{Pick:pub} (i32:x) -> i32",
         "    §R 1",
-        "  §F{f2:Pick:pub} (i32:x:ref) -> i32",
+        "  §F{Pick:pub} (i32:x:ref) -> i32",
         "    §R 2",
-        "  §F{f3:Run:pub} () -> i32",
+        "  §F{Run:pub} () -> i32",
         "    §B{~v:i32} 0",
         "    §R §C{Pick} §A{ref} v §/C"
       ],
@@ -348,7 +348,7 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} () -> i32",
+        "  §F{Run:pub} () -> i32",
         "    §R §C{Twice} §A 7 §/C"
       ],
       "verify": false,
@@ -374,7 +374,7 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} () -> void",
+        "  §F{Run:pub} () -> void",
         "    §C{Bump} §A{ref} 5 §/C"
       ],
       "verify": false,
@@ -401,7 +401,7 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} () -> i32",
+        "  §F{Run:pub} () -> i32",
         "    §B{~v:i32} 1",
         "    §C{Bump} §A{ref} (+ v 1) §/C",
         "    §R v"
@@ -429,11 +429,11 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §CL{c1:K:pub}",
-        "    §PROP{p1:N:i32:pub}",
+        "  §CL{K:pub}",
+        "    §PROP{N:i32:pub}",
         "      §GET",
         "      §SET",
-        "    §MT{m1:Run:pub} () -> void",
+        "    §MT{Run:pub} () -> void",
         "      §E{}",
         "      §C{Bump} §A{ref} N §/C"
       ],
@@ -461,7 +461,7 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} (i32:p:in) -> void",
+        "  §F{Run:pub} (i32:p:in) -> void",
         "    §C{Bump} §A{ref} p §/C"
       ],
       "verify": false,
@@ -487,9 +487,9 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §CL{c1:K:pub}",
+        "  §CL{K:pub}",
         "    §FLD{i32:n:pub:readonly}",
-        "    §MT{m1:Run:pub} () -> void",
+        "    §MT{Run:pub} () -> void",
         "      §C{Bump} §A{ref} n §/C"
       ],
       "verify": false,
@@ -515,7 +515,7 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} () -> i32",
+        "  §F{Run:pub} () -> i32",
         "    §B{v:i32} 1",
         "    §C{Bump} §A{ref} v §/C",
         "    §R v"
@@ -544,7 +544,7 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} () -> i32",
+        "  §F{Run:pub} () -> i32",
         "    §B{v:i32} 1",
         "    §ASSIGN v 2",
         "    §R v"
@@ -573,8 +573,8 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} () -> void",
-        "    §L{l1:i:0:3:1}",
+        "  §F{Run:pub} () -> void",
+        "    §L{i:0:3:1}",
         "      §C{Bump} §A{ref} i §/C"
       ],
       "verify": false,
@@ -602,9 +602,9 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §CL{c1:K:pub}",
+        "  §CL{K:pub}",
         "    §FLD{i32:n:pub}",
-        "    §MT{m1:Run:pub} () -> void",
+        "    §MT{Run:pub} () -> void",
         "      §E{}",
         "      §C{Bump} §A{ref} n §/C"
       ],
@@ -633,7 +633,7 @@
       ],
       "prelude": "cls",
       "source": [
-        "    §MT{m1:Run:pub:stat} () -> i32",
+        "    §MT{Run:pub:stat} () -> i32",
         "      §E{alloc,mut}",
         "      §ARR{arr:i32}",
         "        1",
@@ -664,7 +664,7 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} () -> i32",
+        "  §F{Run:pub} () -> i32",
         "    §E{alloc,mut}",
         "    §ARR{arr:i32}",
         "      1",
@@ -697,9 +697,9 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §CL{c1:K:pub}",
+        "  §CL{K:pub}",
         "    §FLD{i32:n:pub}",
-        "  §F{f1:Run:pub} (K:k) -> void",
+        "  §F{Run:pub} (K:k) -> void",
         "    §E{mut}",
         "    §C{Bump} §A{ref} k.n §/C"
       ],
@@ -727,7 +727,7 @@
       ],
       "prelude": "cls",
       "source": [
-        "    §MT{m2:Run:pub:stat} () -> i32",
+        "    §MT{Run:pub:stat} () -> i32",
         "      §C{So} §A{out} _ §/C",
         "      §R 0"
       ],
@@ -754,7 +754,7 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} () -> i32",
+        "  §F{Run:pub} () -> i32",
         "    §C{SetOut} §A{out} _ §/C",
         "    §R 0"
       ],
@@ -782,7 +782,7 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} () -> void",
+        "  §F{Run:pub} () -> void",
         "    §C{Bump} §A{ref} _ §/C"
       ],
       "verify": false,
@@ -809,7 +809,7 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} (i32:_) -> i32",
+        "  §F{Run:pub} (i32:_) -> i32",
         "    §C{SetOut} §A{out} _ §/C",
         "    §R _"
       ],
@@ -837,11 +837,11 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §F{f1:Pick:pub} (i32:x) -> i32",
+        "  §F{Pick:pub} (i32:x) -> i32",
         "    §R 1",
-        "  §F{f2:Pick:pub} (i32:x:ref) -> i32",
+        "  §F{Pick:pub} (i32:x:ref) -> i32",
         "    §R 2",
-        "  §F{f3:Run:pub} () -> i32",
+        "  §F{Run:pub} () -> i32",
         "    §B{~v:i32} 0",
         "    §R §C{Pick} §A v §/C"
       ],
@@ -869,9 +869,9 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §CL{c1:K:pub}",
+        "  §CL{K:pub}",
         "    §FLD{i32:n:pub:readonly}",
-        "    §CTOR{k1:pub} ()",
+        "    §CTOR{pub} ()",
         "      §ASSIGN n 1",
         "      §C{Bump} §A{ref} n §/C"
       ],
@@ -898,9 +898,9 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §F{f2:Set:pub} (?str:s:ref) -> void",
+        "  §F{Set:pub} (?str:s:ref) -> void",
         "    §ASSIGN s null",
-        "  §F{f1:Run:pub} () -> bool",
+        "  §F{Run:pub} () -> bool",
         "    §B{~t:?str} \"x\"",
         "    §C{Set} §A{ref} t §/C",
         "    §R (== t null)"
@@ -929,9 +929,9 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §F{f2:Set:pub} (?str:s:ref) -> void",
+        "  §F{Set:pub} (?str:s:ref) -> void",
         "    §ASSIGN s null",
-        "  §F{f1:Run:pub} () -> i32",
+        "  §F{Run:pub} () -> i32",
         "    §B{~t:str} \"x\"",
         "    §C{Set} §A{ref} t §/C",
         "    §R (len t)"
@@ -959,9 +959,9 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §F{f2:Get:pub} (?str:s:out) -> void",
+        "  §F{Get:pub} (?str:s:out) -> void",
         "    §ASSIGN s null",
-        "  §F{f1:Run:pub} () -> str",
+        "  §F{Run:pub} () -> str",
         "    §B{~t:str} \"x\"",
         "    §C{Get} §A{out} t §/C",
         "    §R t"
@@ -989,9 +989,9 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §F{f2:Get:pub} (str:s:out) -> void",
+        "  §F{Get:pub} (str:s:out) -> void",
         "    §ASSIGN s \"y\"",
-        "  §F{f1:Run:pub} () -> bool",
+        "  §F{Run:pub} () -> bool",
         "    §B{~t:?str} null",
         "    §C{Get} §A{out} t §/C",
         "    §R (== t null)"
@@ -1020,11 +1020,11 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §F{f2:Set:pub} (?str:s:ref) -> void",
+        "  §F{Set:pub} (?str:s:ref) -> void",
         "    §ASSIGN s null",
-        "  §F{f1:Run:pub} (?str:p) -> i32",
+        "  §F{Run:pub} (?str:p) -> i32",
         "    §B{~s:?str} p",
-        "    §IF{i1} (!= s null)",
+        "    §IF (!= s null)",
         "      §C{Set} §A{ref} s §/C",
         "      §B{str:u} s",
         "      §R (len u)",
@@ -1058,8 +1058,8 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §F{f1:Two:pub} (?str:a:ref, ?str:b:ref) -> i32",
-        "    §IF{i1} (!= a null)",
+        "  §F{Two:pub} (?str:a:ref, ?str:b:ref) -> i32",
+        "    §IF (!= a null)",
         "      §ASSIGN b null",
         "      §B{str:u} a",
         "      §R (len u)",
@@ -1090,10 +1090,10 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §F{f2:Clear:pub} (?str:s:ref) -> void",
+        "  §F{Clear:pub} (?str:s:ref) -> void",
         "    §ASSIGN s null",
-        "  §F{f1:Two:pub} (?str:a:ref, ?str:b:ref) -> i32",
-        "    §IF{i1} (!= a null)",
+        "  §F{Two:pub} (?str:a:ref, ?str:b:ref) -> i32",
+        "    §IF (!= a null)",
         "      §C{Clear} §A{ref} b §/C",
         "      §B{str:u} a",
         "      §R (len u)",
@@ -1123,7 +1123,7 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §F{f1:Run:pub} (Dict<i32, str>:d) -> str",
+        "  §F{Run:pub} (Dict<i32, str>:d) -> str",
         "    §B{~v:str} \"keep\"",
         "    §B{bool:ok} §C{d.TryGetValue} §A 2 §A{out} v §/C",
         "    §B{str:w} v",
@@ -1153,12 +1153,12 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §M{c1:K:pub}",
+        "  §M{K:pub}",
         "    §FLD{?str:slot:pub:stat}",
-        "    §F{m1:ClearSlot:pub} ()",
+        "    §F{ClearSlot:pub} ()",
         "      §ASSIGN slot null",
-        "    §F{m2:Check:pub} (?str:a:ref) -> i32",
-        "      §IF{i1} (!= a null)",
+        "    §F{Check:pub} (?str:a:ref) -> i32",
+        "      §IF (!= a null)",
         "        §C{ClearSlot} §/C",
         "        §B{str:u} a",
         "        §R (len u)",
@@ -1188,15 +1188,15 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §CL{c1:Box:pub}",
+        "  §CL{Box:pub}",
         "    §FLD{?str:Name:pub}",
-        "    §PROP{pr1:Trigger:i32:pub}",
+        "    §PROP{Trigger:i32:pub}",
         "      §GET",
         "        §ASSIGN this.Name null",
         "        §R INT:0",
-        "    §MT{mt1:Probe:pub} (?str:a:ref) -> i32",
+        "    §MT{Probe:pub} (?str:a:ref) -> i32",
         "      §E{mut}",
-        "      §IF{i1} (!= a null)",
+        "      §IF (!= a null)",
         "        §B{sink:i32} this.Trigger",
         "        §B{str:u} a",
         "        §R (len u)",
@@ -1226,9 +1226,9 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §F{f2:Read:pub} (str:s:in) -> i32",
+        "  §F{Read:pub} (str:s:in) -> i32",
         "    §R (len s)",
-        "  §F{f1:Run:pub} (?str:p) -> i32",
+        "  §F{Run:pub} (?str:p) -> i32",
         "    §B{~t:?str} p",
         "    §R §C{Read} §A{in} t §/C"
       ],
@@ -1255,9 +1255,9 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §F{f2:Read:pub} (?str:s:in) -> bool",
+        "  §F{Read:pub} (?str:s:in) -> bool",
         "    §R (== s null)",
-        "  §F{f1:Run:pub} () -> bool",
+        "  §F{Run:pub} () -> bool",
         "    §B{~t:str} \"x\"",
         "    §R §C{Read} §A{in} t §/C"
       ],
@@ -1284,9 +1284,9 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §F{f1:Run:pub} (?str:p) -> i32",
+        "  §F{Run:pub} (?str:p) -> i32",
         "    §B{~s:?str} p",
-        "    §IF{i1} (!= s null)",
+        "    §IF (!= s null)",
         "      §B{str:u} s",
         "      §R (len u)",
         "    §R 0"
@@ -1311,7 +1311,7 @@
       ],
       "prelude": "cls",
       "source": [
-        "    §MT{m1:Run:pub:stat} () -> i32",
+        "    §MT{Run:pub:stat} () -> i32",
         "      §E{alloc}",
         "      §ARR{arr:i32}",
         "        1",
@@ -1346,7 +1346,7 @@
       ],
       "prelude": "cls",
       "source": [
-        "    §MT{m1:Run:pub:stat} () -> i32",
+        "    §MT{Run:pub:stat} () -> i32",
         "      §E{alloc}",
         "      §ARR{arr:i32}",
         "        1",
@@ -1380,7 +1380,7 @@
       ],
       "prelude": "cls",
       "source": [
-        "    §MT{m1:Run:pub:stat} () -> i32",
+        "    §MT{Run:pub:stat} () -> i32",
         "      §E{alloc}",
         "      §ARR{arr:i32}",
         "        1",
@@ -1413,7 +1413,7 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} () -> i32",
+        "  §F{Run:pub} () -> i32",
         "    §E{}",
         "    §B{~v:i32} 1",
         "    §C{Bump} §A{ref} v §/C",
@@ -1445,9 +1445,9 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §CL{c1:K:pub}",
+        "  §CL{K:pub}",
         "    §FLD{i32:n:pub}",
-        "    §MT{m1:Run:pub} () -> void",
+        "    §MT{Run:pub} () -> void",
         "      §E{}",
         "      §ASSIGN n 3"
       ],
@@ -1475,7 +1475,7 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §F{f1:Run:pub} () -> i32",
+        "  §F{Run:pub} () -> i32",
         "    §E{}",
         "    §B{~v:i32} 1",
         "    §C{Mystery.Mutate} §A{ref} v §/C",
@@ -1509,7 +1509,7 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §F{f1:Run:pub} (str:s) -> i32",
+        "  §F{Run:pub} (str:s) -> i32",
         "    §E{}",
         "    §B{~n:i32} 0",
         "    §C{Int32.TryParse} §A s §A{out} n §/C",
@@ -1543,10 +1543,10 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} (i32:x) -> i32",
+        "  §F{Run:pub} (i32:x) -> i32",
         "    §Q (> x 0)",
         "    §C{Bump} §A{ref} x §/C",
-        "    §PROOF{pr1} (> x 0)",
+        "    §PROOF{} (> x 0)",
         "    §R x"
       ],
       "verify": true,
@@ -1575,10 +1575,10 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} (i32:x) -> i32",
+        "  §F{Run:pub} (i32:x) -> i32",
         "    §Q (> x 0)",
         "    §C{SetNeg} §A{out} x §/C",
-        "    §PROOF{pr1} (> x 0)",
+        "    §PROOF{} (> x 0)",
         "    §R x"
       ],
       "verify": true,
@@ -1607,10 +1607,10 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} (i32:x) -> i32",
+        "  §F{Run:pub} (i32:x) -> i32",
         "    §Q (> x 0)",
         "    §B{d:i32} §C{Twice} §A{in} x §/C",
-        "    §PROOF{pr1} (> x 0)",
+        "    §PROOF{} (> x 0)",
         "    §R d"
       ],
       "verify": true,
@@ -1639,10 +1639,10 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §F{f1:Two:pub} (i32:a:ref, i32:b:ref) -> i32",
+        "  §F{Two:pub} (i32:a:ref, i32:b:ref) -> i32",
         "    §Q (> a 0)",
         "    §ASSIGN b 0",
-        "    §PROOF{pr1} (> a 0)",
+        "    §PROOF{} (> a 0)",
         "    §R a"
       ],
       "verify": true,
@@ -1672,14 +1672,14 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §F{f2:Set:pub} (i32:x) -> void",
+        "  §F{Set:pub} (i32:x) -> void",
         "    §R",
-        "  §F{f3:Set:pub} (i32:x:out) -> void",
+        "  §F{Set:pub} (i32:x:out) -> void",
         "    §ASSIGN x -5",
-        "  §F{f1:Run:pub} (i32:x) -> i32",
+        "  §F{Run:pub} (i32:x) -> i32",
         "    §Q (> x 0)",
         "    §C{Set} §A{out} x §/C",
-        "    §PROOF{pr1} (> x 0)",
+        "    §PROOF{} (> x 0)",
         "    §R x"
       ],
       "verify": true,
@@ -1697,14 +1697,14 @@
       ],
       "note": "The test first compiles `warmup` (the same body passing `§A x` to the by-value overload, whose proof is discharged) into the same verification cache directory, then this case.",
       "warmup": [
-        "  §F{f2:Set:pub} (i32:x) -> void",
+        "  §F{Set:pub} (i32:x) -> void",
         "    §R",
-        "  §F{f3:Set:pub} (i32:x:out) -> void",
+        "  §F{Set:pub} (i32:x:out) -> void",
         "    §ASSIGN x -5",
-        "  §F{f1:Run:pub} (i32:x) -> i32",
+        "  §F{Run:pub} (i32:x) -> i32",
         "    §Q (> x 0)",
         "    §C{Set} §A x §/C",
-        "    §PROOF{pr1} (> x 0)",
+        "    §PROOF{} (> x 0)",
         "    §R x"
       ]
     },
@@ -1719,10 +1719,10 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} (i32:x) -> i32",
+        "  §F{Run:pub} (i32:x) -> i32",
         "    §C{Bump} §A{ref} x §/C",
-        "    §IF{i1} (> x 0)",
-        "      §PROOF{pr1} (> x 0)",
+        "    §IF (> x 0)",
+        "      §PROOF{} (> x 0)",
         "    §R x"
       ],
       "verify": true,
@@ -1752,10 +1752,10 @@
       ],
       "prelude": "fn",
       "source": [
-        "  §F{f1:Run:pub} (i32:x:ref) -> i32",
+        "  §F{Run:pub} (i32:x:ref) -> i32",
         "    §C{Bump} §A{ref} x §/C",
-        "    §IF{i1} (> x 0)",
-        "      §PROOF{pr1} (> x 0)",
+        "    §IF (> x 0)",
+        "      §PROOF{} (> x 0)",
         "    §R x"
       ],
       "verify": true,
@@ -1785,19 +1785,19 @@
       ],
       "prelude": "inst",
       "source": [
-        "  §CL{c1:Box:pub}",
+        "  §CL{Box:pub}",
         "    §FLD{i32:Value:pub}",
-        "    §PROP{pr1:Trigger:i32:pub}",
+        "    §PROP{Trigger:i32:pub}",
         "      §GET",
         "        §ASSIGN this.Value INT:-5",
         "        §R INT:0",
-        "    §MT{mt1:Probe:pub}",
+        "    §MT{Probe:pub}",
         "      §I{i32:x:ref}",
         "      §O{i32}",
         "      §E{mut}",
         "      §Q (> x INT:0)",
         "      §B{sink:i32} this.Trigger",
-        "      §PROOF{pr1} (> x INT:0)",
+        "      §PROOF{} (> x INT:0)",
         "      §R x"
       ],
       "verify": true,

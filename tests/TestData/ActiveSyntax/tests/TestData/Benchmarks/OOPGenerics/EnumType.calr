@@ -1,0 +1,14 @@
+§M{EnumType}
+  §F{DaysInSeason:pub} (i32:season) -> i32
+    §IF (== season 0)
+      §R 92
+    §EI (== season 1)
+      §R 92
+    §EI (== season 2)
+      §R 91
+    §EL
+      §R 90
+
+  §F{IsWarm:pub} (i32:season) -> bool
+    §R (|| (== season 1) (== season 0))
+

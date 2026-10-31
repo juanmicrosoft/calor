@@ -1,4 +1,4 @@
-§M{m001:ConditionalDeclarationFixture}
-  §M{c001:FixtureOracle:pub}
-    §F{m001:Get:pub} () -> i32
+§M{ConditionalDeclarationFixture}
+  §M{FixtureOracle:pub}
+    §F{Get:pub} () -> i32
       §R 127

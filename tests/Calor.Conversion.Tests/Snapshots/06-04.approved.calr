@@ -1,7 +1,7 @@
-§M{m001:Test_06_04:overflow=unchecked}
-  §CL{c001:Combinators:pub}
-    §MT{m002:Check:pub} (any:obj) -> str
-      §IF{if003} (!= obj null)
+§M{Test_06_04:overflow=unchecked}
+  §CL{Combinators:pub}
+    §MT{Check:pub} (any:obj) -> str
+      §IF (!= obj null)
         §R "has value"
       §R "null"
 

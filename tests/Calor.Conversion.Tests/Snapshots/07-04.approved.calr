@@ -1,17 +1,17 @@
-§M{m001:Test_07_04:overflow=unchecked}
+§M{Test_07_04:overflow=unchecked}
   §U{System}
   §U{System.Linq}
 
-  §M{c001:BlockLambdaDemo:pub}
-    §F{m002:Run:pub}
-      §B{_lam005} §LAM{lam003}
+  §M{BlockLambdaDemo:pub}
+    §F{Run:pub}
+      §B{_lam005} §LAM{}
         §B{_chainRange004} §C{Enumerable.Range} §A 1 §A 5 §/C
         §B{nums} §C{_chainRange004.ToArray}
         §B{i32:total} §C{nums.Sum}
         §R total
-      §/LAM{lam003}
+      §/LAM
       §C{Handle} §A "/x" §A _lam005 §/C
 
-    §F{m006:Handle:pub} (str:route, Func<i32>:handler)
+    §F{Handle:pub} (str:route, Func<i32>:handler)
       §R
 

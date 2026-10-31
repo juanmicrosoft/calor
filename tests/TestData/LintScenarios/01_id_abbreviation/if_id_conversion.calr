@@ -1,6 +1,6 @@
-§M{m1:IfTest}
-  §F{f1:Check:pub} (i32:x) -> str
-    §IF{if1} (> x 0)
+§M{IfTest}
+  §F{Check:pub} (i32:x) -> str
+    §IF (> x 0)
       §R "positive"
     §EL
       §R "non-positive"

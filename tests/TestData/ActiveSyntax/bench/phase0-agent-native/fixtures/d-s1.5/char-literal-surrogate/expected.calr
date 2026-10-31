@@ -1,6 +1,6 @@
-§M{m001:Fixture:overflow=unchecked}
-  §M{c001:SurrogateValues:pub}
-    §F{m002:Verify:pub} () -> i32
+§M{Fixture:overflow=unchecked}
+  §M{SurrogateValues:pub}
+    §F{Verify:pub} () -> i32
       §B{char:high} '\ud800'
       §B{char:low} '\udfff'
       §R (+ (* (cast i32 high) 2) (cast i32 low))

@@ -1,0 +1,15 @@
+§M{StringAnalysis}
+  §F{IsVowel:pub} (str:ch) -> bool
+    §IF (== ch "a")
+      §R true
+    §EI (== ch "e")
+      §R true
+    §EI (== ch "i")
+      §R true
+    §EI (== ch "o")
+      §R true
+    §EI (== ch "u")
+      §R true
+    §EL
+      §R false
+

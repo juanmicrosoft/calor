@@ -1,0 +1,13 @@
+§M{ComposedService}
+  §F{FetchAndLog:pub} (str:url) -> str
+    §E{cw}
+    §P url
+    §R url
+
+  §F{ReadAndStore:pub} (str:path) -> void
+    §E{db}
+    §P path
+
+  §F{PureHelper:pub} (str:data) -> i32
+    §R 0
+

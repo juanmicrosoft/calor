@@ -1,0 +1,12 @@
+§M{TruncateString}
+  §F{NeedsTruncation:pub} (i32:strLen, i32:maxLen) -> bool
+    §Q (> maxLen 0)
+    §R (> strLen maxLen)
+
+  §F{TruncatedLength:pub} (i32:strLen, i32:maxLen) -> i32
+    §Q (> maxLen 0)
+    §IF (> strLen maxLen)
+      §R maxLen
+    §EL
+      §R strLen
+

@@ -1,0 +1,12 @@
+§M{NetService}
+  §F{FetchUrl:pub} (str:url) -> str
+    §E{net}
+    §R url
+
+  §F{PostData:pub} (str:url, str:body) -> i32
+    §E{net}
+    §R 200
+
+  §F{BuildUrl:pub} (str:base, str:path) -> str
+    §R base
+

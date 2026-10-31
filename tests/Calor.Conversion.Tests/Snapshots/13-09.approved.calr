@@ -1,12 +1,12 @@
-§M{m001:Test_13_09:overflow=unchecked}
-  §CL{c001:AnonDemo:pub}
-    §MT{m002:GetHtmlAttributes:pub} () -> any
+§M{Test_13_09:overflow=unchecked}
+  §CL{AnonDemo:pub}
+    §MT{GetHtmlAttributes:pub} () -> any
       §R §ANON
         class = "container"
         id = "main"
       §/ANON
 
-    §MT{m003:GetConfig:pub} (str:name) -> any
+    §MT{GetConfig:pub} (str:name) -> any
       §R §ANON
         name = name
         value = 42

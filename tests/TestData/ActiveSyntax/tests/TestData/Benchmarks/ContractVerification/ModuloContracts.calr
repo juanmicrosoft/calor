@@ -1,0 +1,24 @@
+§M{ModuloContracts}
+  §F{ModBounded:pub} (i32:a, i32:b) -> i32
+    §Q (> b 0)
+    §Q (>= a 0)
+    §S (>= result 0)
+    §S (< result b)
+    §R (% a b)
+
+  §F{ModEvenOdd:pub} (i32:n) -> i32
+    §S (>= result 0)
+    §S (<= result 1)
+    §B{r} (% n 2)
+    §IF (< r 0)
+      §R (- 0 r)
+    §EL
+      §R r
+
+  §F{WrapAround:pub} (i32:index, i32:size) -> i32
+    §Q (> size 0)
+    §Q (>= index 0)
+    §S (>= result 0)
+    §S (< result size)
+    §R (% index size)
+

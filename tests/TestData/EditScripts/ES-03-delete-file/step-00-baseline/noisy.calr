@@ -1,4 +1,4 @@
-§M{m005:Noisy}
-  §F{f001:Silent:pub} () -> void
+§M{Noisy}
+  §F{Silent:pub} () -> void
     §E{}
     §P "noisy"

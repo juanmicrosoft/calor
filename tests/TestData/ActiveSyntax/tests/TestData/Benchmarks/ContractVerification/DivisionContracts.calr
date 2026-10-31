@@ -1,0 +1,14 @@
+§M{DivisionContracts}
+  §F{SafeDiv:pub} (i32:a, i32:b) -> i32
+    §Q (!= b 0)
+    §R (/ a b)
+
+  §F{SafeMod:pub} (i32:a, i32:b) -> i32
+    §Q (!= b 0)
+    §S (>= result 0)
+    §R (% a b)
+
+  §F{DivRemainder:pub} (i32:a, i32:b) -> i32
+    §Q (!= b 0)
+    §R (- a (* (/ a b) b))
+

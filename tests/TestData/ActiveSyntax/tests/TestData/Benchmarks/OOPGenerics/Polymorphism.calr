@@ -1,0 +1,9 @@
+§M{Polymorphism}
+  §F{ProcessShape:pub} (i32:shapeType, f32:param1, f32:param2) -> f32
+    §IF (== shapeType 0)
+      §R (* 3.14159 (* param1 param1))
+    §EI (== shapeType 1)
+      §R (* param1 param2)
+    §EL
+      §R (/ (* param1 param2) 2)
+

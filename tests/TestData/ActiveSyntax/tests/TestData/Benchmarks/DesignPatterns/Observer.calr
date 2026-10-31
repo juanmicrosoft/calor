@@ -1,0 +1,10 @@
+§M{Observer}
+  §F{ShouldNotify:pub} (i32:subscriberCount) -> bool
+    §R (> subscriberCount 0)
+
+  §F{NextId:pub} (i32:currentId) -> i32
+    §R (+ currentId 1)
+
+  §F{IsSubscribed:pub} (i32:subscriberId, i32:targetId) -> bool
+    §R (== subscriberId targetId)
+

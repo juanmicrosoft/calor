@@ -1,0 +1,13 @@
+§M{MinStack}
+  §F{NewMin:pub} (i32:value, i32:currentMin) -> i32
+    §IF (< value currentMin)
+      §R value
+    §EL
+      §R currentMin
+
+  §F{IsNewMin:pub} (i32:value, i32:currentMin) -> bool
+    §R (<= value currentMin)
+
+  §F{CanPop:pub} (i32:size) -> bool
+    §R (> size 0)
+

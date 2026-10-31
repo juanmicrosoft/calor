@@ -1,0 +1,11 @@
+§M{Hypotenuse}
+  §F{HypotenuseSquared:pub} (f32:a, f32:b) -> f32
+    §Q (> a 0)
+    §Q (> b 0)
+    §S (> result 0)
+    §R (+ (* a a) (* b b))
+
+  §F{SumOfSquares:pub} (f32:x, f32:y) -> f32
+    §S (>= result 0)
+    §R (+ (* x x) (* y y))
+

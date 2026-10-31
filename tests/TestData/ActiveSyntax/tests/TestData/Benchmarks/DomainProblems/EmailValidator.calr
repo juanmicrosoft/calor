@@ -1,0 +1,13 @@
+§M{EmailValidator}
+  §F{HasAtSign:pub} (bool:containsAt) -> bool
+    §R containsAt
+
+  §F{HasDot:pub} (bool:containsDot) -> bool
+    §R containsDot
+
+  §F{IsValidLength:pub} (i32:length) -> bool
+    §R (&& (>= length 5) (<= length 254))
+
+  §F{IsValid:pub} (bool:hasAt, bool:hasDot, i32:length) -> bool
+    §R (&& (&& hasAt hasDot) (&& (>= length 5) (<= length 254)))
+

@@ -1,0 +1,96 @@
+// Security Benchmark: SQL Injection Detection
+// Tests taint analysis for SQL injection vulnerabilities
+
+§M{SqlInjectionBenchmark}
+
+  // Inject a provider using standard SQL literals (no backslash escapes).
+  // execute_param binds value separately; it must not interpolate it into query.
+  §IFACE{db}
+    §MT{execute} (string:query) -> void
+      §E{db:w}
+    §MT{execute_param} (string:query, string:value) -> void
+      §E{db:w}
+    §MT{query} (string:query) -> void
+      §E{db:w}
+
+  §CL{SqlEscaping:pub}
+    // Double SQL literal delimiters; the regression harness models this exact symbol.
+    §MT{Escape:pub:stat} (string:value) -> string
+      §R §C{value.Replace} §A STR:"'" §A STR:"''" §/C
+
+  §F{VulnerableQuery:pub}
+    // BUG: Direct SQL concatenation with user input
+    // EXPECTED: Calor0981 SQL Injection
+    §I{string:user_input}
+    §I{db:connection}
+    §O{string}
+    §E{db:w}
+    §B{~query:string} (+ STR:"SELECT * FROM users WHERE name = '" user_input)
+    §ASSIGN query (+ query STR:"'")
+    §C{connection.execute} §A query §/C
+    §R query
+
+  §F{SafeParameterizedQuery:pub}
+    // SAFE: Parameterized query with placeholders
+    // EXPECTED: No warnings
+    §I{string:user_input}
+    §I{db:connection}
+    §O{string}
+    §E{db:w}
+    §B{query:string} STR:"SELECT * FROM users WHERE name = ?"
+    §C{connection.execute_param} §A query §A user_input §/C
+    §R query
+
+  §F{VulnerableMultipleConcatenation:pub}
+    // BUG: Multiple concatenations with user input
+    // EXPECTED: Calor0981 SQL Injection
+    §I{string:user_input}
+    §I{string:user_data}
+    §I{db:connection}
+    §O{string}
+    §E{db:w}
+    §B{~query:string} STR:"INSERT INTO users (name, email) VALUES ('"
+    §ASSIGN query (+ query user_input)
+    §ASSIGN query (+ query STR:"', '")
+    §ASSIGN query (+ query user_data)
+    §ASSIGN query (+ query STR:"')")
+    §C{connection.execute} §A query §/C
+    §R query
+
+  §F{SafeEscapedInput:pub}
+    // SAFE: Input properly escaped before concatenation
+    // EXPECTED: No warnings
+    §I{string:user_input}
+    §I{db:connection}
+    §O{string}
+    §E{db:w}
+    §B{escaped:string} §C{SqlEscaping.Escape} §A user_input §/C
+    §B{~query:string} (+ STR:"SELECT * FROM users WHERE name = '" escaped)
+    §ASSIGN query (+ query STR:"'")
+    §C{connection.execute} §A query §/C
+    §R query
+
+  §F{VulnerableIndirectTaint:pub}
+    // BUG: Taint propagates through intermediate variable
+    // EXPECTED: Calor0981 SQL Injection
+    §I{string:user_input}
+    §I{db:connection}
+    §O{string}
+    §E{db:w}
+    §B{name:string} user_input
+    §B{search:string} name
+    §B{~query:string} (+ STR:"SELECT * FROM users WHERE name LIKE '%" search)
+    §ASSIGN query (+ query STR:"%'")
+    §C{connection.query} §A query §/C
+    §R query
+
+  §F{SafeConstantQuery:pub}
+    // SAFE: Query uses only constants
+    // EXPECTED: No warnings
+    §I{db:connection}
+    §O{string}
+    §E{db:w}
+    §B{tableName:string} STR:"users"
+    §B{query:string} (+ STR:"SELECT COUNT(*) FROM " tableName)
+    §C{connection.execute} §A query §/C
+    §R query

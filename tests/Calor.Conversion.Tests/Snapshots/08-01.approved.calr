@@ -1,7 +1,7 @@
-§M{m001:Test_08_01:overflow=unchecked}
-  §CL{c001:UserDto:pub}
-    §PROP{p002:Name:str:pub:req:get,set}
-    §PROP{p003:Age:i32:pub:req:get,set}
-    §PROP{p004:Email:?str:pub:get,set}
+§M{Test_08_01:overflow=unchecked}
+  §CL{UserDto:pub}
+    §PROP{Name:str:pub:req:get,set}
+    §PROP{Age:i32:pub:req:get,set}
+    §PROP{Email:?str:pub:get,set}
 
 

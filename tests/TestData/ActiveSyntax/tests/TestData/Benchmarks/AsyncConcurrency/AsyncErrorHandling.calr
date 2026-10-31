@@ -1,0 +1,8 @@
+§M{AsyncErrorHandling}
+  §AF{SafeFetch:pub} (str:url) -> str
+    §E{net}
+    §R url
+
+  §F{IsError:pub} (bool:succeeded) -> bool
+    §R (! succeeded)
+

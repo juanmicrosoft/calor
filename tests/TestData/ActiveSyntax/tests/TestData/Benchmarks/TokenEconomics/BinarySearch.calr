@@ -1,0 +1,11 @@
+§M{Search}
+  §F{Find:pub} (i32:target, i32:val1, i32:val2, i32:val3) -> i32
+    §IF (== val1 target)
+      §R 0
+    §EI (== val2 target)
+      §R 1
+    §EI (== val3 target)
+      §R 2
+    §EL
+      §R -1
+

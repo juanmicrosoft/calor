@@ -1,8 +1,8 @@
-§M{m1:References}
-  §F{f1:Identity:pub} (i32:x) -> i32
+§M{References}
+  §F{Identity:pub} (i32:x) -> i32
     §R x
 
-  §F{f2:UseVars:pub} (i32:a, i32:b) -> i32
+  §F{UseVars:pub} (i32:a, i32:b) -> i32
     §B{temp} (+ a b)
     §R temp
 

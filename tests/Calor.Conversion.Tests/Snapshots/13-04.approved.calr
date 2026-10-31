@@ -1,27 +1,27 @@
-§M{m001:Test_13_04:overflow=unchecked}
-  §CL{c001:Result<T>:pub:abs}
+§M{Test_13_04:overflow=unchecked}
+  §CL{Result<T>:pub:abs}
 
-  §CL{c002:Ok<T>:pub}
+  §CL{Ok<T>:pub}
     §EXT{Result<T>}
 
-    §PROP{p003:Value:T:pub:get}
+    §PROP{Value:T:pub:get}
 
-    §CTOR{ctor004:pub} (T:value)
+    §CTOR{pub} (T:value)
       §ASSIGN Value value
 
 
-  §CL{c005:Error<T>:pub}
+  §CL{Error<T>:pub}
     §EXT{Result<T>}
 
-    §PROP{p006:Message:str:pub:get}
+    §PROP{Message:str:pub:get}
 
-    §CTOR{ctor007:pub} (str:message)
+    §CTOR{pub} (str:message)
       §ASSIGN Message message
 
 
-  §M{c008:ResultExtensions:pub}
-    §F{m009:Describe<T>:pub} (Result<T>:result) -> str
-      §R §W{match010} result
+  §M{ResultExtensions:pub}
+    §F{Describe<T>:pub} (Result<T>:result) -> str
+      §R §W result
         §K §PTYPE{Ok<T>:ok} → "Success: ${ok.Value}"
         §K §PTYPE{Error<T>:err} → "Error: ${err.Message}"
         §K _ → "Unknown"

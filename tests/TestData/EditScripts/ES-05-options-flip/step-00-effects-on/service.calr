@@ -1,4 +1,4 @@
-§M{m001:Ledger}
-  §F{f001:Post:pub} () -> void
+§M{Ledger}
+  §F{Post:pub} () -> void
     §E{}
     §P "posting"

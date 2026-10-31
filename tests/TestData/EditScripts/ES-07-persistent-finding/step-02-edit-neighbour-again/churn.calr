@@ -1,6 +1,6 @@
 /// documented, edited every step to keep the build warm
-§M{m003:Churn}
-  §F{f001:Tick:pub} () -> void
+§M{Churn}
+  §F{Tick:pub} () -> void
     §AS{doc} "prints one fixed line"
     §E{cw}
     §P "tick 2"

@@ -1,0 +1,10 @@
+§M{BreadthFirstSearch}
+  §F{IsGoal:pub} (i32:current, i32:target) -> bool
+    §R (== current target)
+
+  §F{QueueEmpty:pub} (i32:queueSize) -> bool
+    §R (== queueSize 0)
+
+  §F{Distance:pub} (i32:parentDist) -> i32
+    §R (+ parentDist 1)
+

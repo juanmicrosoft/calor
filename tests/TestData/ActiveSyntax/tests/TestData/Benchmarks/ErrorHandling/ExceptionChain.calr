@@ -1,0 +1,8 @@
+§M{ExceptionChain}
+  §F{WrapError:pub} (i32:code) -> i32
+    §R code
+
+  §F{ErrorLevel:pub} (i32:depth) -> i32
+    §S (>= result 0)
+    §R depth
+

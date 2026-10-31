@@ -1,5 +1,5 @@
-§M{m1:Print}
-  §F{f1:Main:pub} () -> void
+§M{Print}
+  §F{Main:pub} () -> void
     §E{cw}
     §P "Hello World"
     §P 42

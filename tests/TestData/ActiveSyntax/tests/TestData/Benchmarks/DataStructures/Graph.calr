@@ -1,0 +1,19 @@
+§M{Graph}
+  §F{IsConnected:pub} (i32:edgeCount) -> bool
+    §R (> edgeCount 0)
+
+  §F{Degree:pub} (i32:neighborCount) -> i32
+    §S (>= result 0)
+    §R neighborCount
+
+  §F{HasEdge:pub} (i32:from, i32:to, i32:nodeCount) -> bool
+    §Q (>= from 0)
+    §Q (>= to 0)
+    §Q (< from nodeCount)
+    §Q (< to nodeCount)
+    §R (!= from to)
+
+  §F{NodeCount:pub} (i32:count) -> i32
+    §S (>= result 0)
+    §R count
+

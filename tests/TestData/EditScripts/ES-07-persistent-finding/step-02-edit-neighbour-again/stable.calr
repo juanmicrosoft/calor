@@ -1,6 +1,6 @@
 /// documented, and never edited: this file is the cache hit
-§M{m002:Stable}
-  §F{f001:Wave:pub} () -> void
+§M{Stable}
+  §F{Wave:pub} () -> void
     §AS{doc} "prints one fixed line"
     §E{cw}
     §P "wave"

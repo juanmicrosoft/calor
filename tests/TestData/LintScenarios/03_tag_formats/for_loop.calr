@@ -1,6 +1,6 @@
-§M{m1:ForTest}
-  §F{f1:Main:pub} () -> void
+§M{ForTest}
+  §F{Main:pub} () -> void
     §E{cw}
-    §L{for1:i:1:10:1}
+    §L{i:1:10:1}
       §P i
 

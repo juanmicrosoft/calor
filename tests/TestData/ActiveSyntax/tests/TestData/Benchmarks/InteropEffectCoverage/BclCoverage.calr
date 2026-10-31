@@ -1,0 +1,14 @@
+§M{BclUsage}
+  §F{LogMessage:pub} (str:message) -> void
+    §E{cw}
+    §P message
+
+  §F{ConcatStrings:pub} (str:a, str:b) -> str
+    §R (concat a b)
+
+  §F{GetLength:pub} (str:s) -> i32
+    §R (len s)
+
+  §F{ToUpperCase:pub} (str:s) -> str
+    §R (upper s)
+

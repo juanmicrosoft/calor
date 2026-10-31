@@ -1,0 +1,13 @@
+§M{InlineSigs}
+  §F{Add:pub} (i32:a, i32:b) -> i32
+    §R (+ a b)
+
+  §F{Multiply:pub} (i32:a, i32:b) -> i32
+    §R (* a b)
+
+  §F{Negate:pub} (i32:x) -> i32
+    §R (- 0 x)
+
+  §F{IsZero:pub} (i32:x) -> bool
+    §R (== x 0)
+

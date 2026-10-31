@@ -1,5 +1,5 @@
-§M{m1:Test}
-  §F{f001:SpanTest:pub} (i32:x) -> i32
+§M{Test}
+  §F{SpanTest:pub} (i32:x) -> i32
     §B{i32:result} (* x 2)
     §P "The result is: "
     §R result

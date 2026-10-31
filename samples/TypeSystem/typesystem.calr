@@ -1,24 +1,24 @@
-§M{m001:TypeSystem}
-  §F{f001:Main:pub} () -> void
+§M{TypeSystem}
+  §F{Main:pub} () -> void
     §E{cw,throw,alloc}
     §C{Console.WriteLine} "=== Calor Type System Demo ==="
     §C{TestNullable}
     §B{quotient:i32} §C{Divide} §A 100 §A 2 §/C
     §C{Console.WriteLine} quotient
-    §TR{t001}
+    §TR
       §C{Divide} §A 100 §A 0 §/C
     §CA{ArgumentException}
       §C{Console.WriteLine} "Division by zero was caught"
 
-  §F{f002:TestNullable:priv} () -> void
+  §F{TestNullable:priv} () -> void
     §E{cw}
     §B{present:?str} "hello"
     §B{missing:?str} null
     §C{Console.WriteLine} (?? present "fallback")
     §C{Console.WriteLine} (?? missing "fallback")
 
-  §F{f003:Divide:priv} (i32:a, i32:b) -> i32
+  §F{Divide:priv} (i32:a, i32:b) -> i32
     §E{throw,alloc}
-    §IF{if001} (== b 0)
+    §IF (== b 0)
       §TH §NEW{ArgumentException} §A "Division by zero" §/NEW
     §R (/ a b)

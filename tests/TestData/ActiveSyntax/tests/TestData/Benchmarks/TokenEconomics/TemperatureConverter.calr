@@ -1,0 +1,10 @@
+§M{TempConvert}
+  §F{CelsiusToFahrenheit:pub} (f32:c) -> f32
+    §R (+ (* c 1.8) 32)
+
+  §F{FahrenheitToCelsius:pub} (f32:f) -> f32
+    §R (/ (- f 32) 1.8)
+
+  §F{CelsiusToKelvin:pub} (f32:c) -> f32
+    §R (+ c 273.15)
+

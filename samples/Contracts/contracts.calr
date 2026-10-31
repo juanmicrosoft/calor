@@ -1,5 +1,5 @@
-§M{m001:Contracts}
-  §F{f001:Main:pub} () -> void
+§M{Contracts}
+  §F{Main:pub} () -> void
     §E{cw}
     §P "=== Calor Contracts Demo ==="
     §P ""
@@ -12,12 +12,12 @@
     §P ""
     §P "Contracts are enforced at runtime with clear error messages."
 
-  §F{f002:Square:pub} (i32:x) -> i32
+  §F{Square:pub} (i32:x) -> i32
     §Q (>= x 0)
     §S (>= result 0)
     §R (* x x)
 
-  §F{f003:Divide:pub} (i32:a, i32:b) -> i32
+  §F{Divide:pub} (i32:a, i32:b) -> i32
     §Q{"message= "divisor must not be zero""} (!= b 0)
     §R (/ a b)
 

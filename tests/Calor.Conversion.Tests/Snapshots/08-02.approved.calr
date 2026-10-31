@@ -1,6 +1,6 @@
-§M{m001:Test_08_02:overflow=unchecked}
-  §CL{c001:TupleDemo:pub}
-    §MT{m002:GetPair:pub} () -> (i32, str)
+§M{Test_08_02:overflow=unchecked}
+  §CL{TupleDemo:pub}
+    §MT{GetPair:pub} () -> (i32, str)
       §R (42, "hello")
 
 

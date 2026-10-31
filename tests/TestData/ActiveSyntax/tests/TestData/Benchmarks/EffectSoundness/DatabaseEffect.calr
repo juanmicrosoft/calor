@@ -1,0 +1,12 @@
+§M{DbService}
+  §F{QueryCount:pub} (str:table) -> i32
+    §E{db}
+    §R 0
+
+  §F{Insert:pub} (str:table, str:data) -> void
+    §E{db}
+    §P data
+
+  §F{PureTransform:pub} (str:data) -> str
+    §R data
+

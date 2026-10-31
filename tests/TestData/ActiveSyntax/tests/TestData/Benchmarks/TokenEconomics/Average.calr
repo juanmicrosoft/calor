@@ -1,0 +1,8 @@
+§M{Average}
+  §F{Average:pub} (i32:count, i32:total) -> f32
+    §Q (> count 0)
+    §R (/ (cast f64 total) (cast f64 count))
+
+  §F{Sum:pub} (i32:a, i32:b) -> i32
+    §R (+ a b)
+

@@ -1,0 +1,8 @@
+§M{SumRange}
+  §F{SumRange:pub} (i32:n) -> i32
+    §Q (> n 0)
+    §B{sum} 0
+    §L{i:1:n:1}
+      §ASSIGN sum (+ sum i)
+    §R sum
+

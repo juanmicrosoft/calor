@@ -1,0 +1,11 @@
+§M{TypeAlias}
+  §F{UserId:pub} (i32:id) -> i32
+    §Q (> id 0)
+    §R id
+
+  §F{IsValidId:pub} (i32:id) -> bool
+    §R (> id 0)
+
+  §F{NextId:pub} (i32:id) -> i32
+    §R (+ id 1)
+

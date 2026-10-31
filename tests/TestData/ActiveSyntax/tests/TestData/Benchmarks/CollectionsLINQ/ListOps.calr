@@ -1,0 +1,14 @@
+§M{ListOps}
+  §F{Sum:pub} (i32:a, i32:b) -> i32
+    §R (+ a b)
+
+  §F{Count:pub} (i32:n) -> i32
+    §S (>= result 0)
+    §R n
+
+  §F{FirstOrDefault:pub} (i32:value, i32:defaultVal, bool:hasElements) -> i32
+    §IF hasElements
+      §R value
+    §EL
+      §R defaultVal
+

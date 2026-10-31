@@ -1,0 +1,25 @@
+§M{ExpressionBodied}
+  §F{Double:pub} (i32:x) -> i32
+    §R (* x 2)
+
+  §F{Triple:pub} (i32:x) -> i32
+    §R (* x 3)
+
+  §F{Square:pub} (i32:x) -> i32
+    §R (* x x)
+
+  §F{Increment:pub} (i32:x) -> i32
+    §R (+ x 1)
+
+  §F{Decrement:pub} (i32:x) -> i32
+    §R (- x 1)
+
+  §F{IsPositive:pub} (i32:x) -> bool
+    §R (> x 0)
+
+  §F{IsNegative:pub} (i32:x) -> bool
+    §R (< x 0)
+
+  §F{Negate:pub} (i32:x) -> i32
+    §R (- 0 x)
+

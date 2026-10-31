@@ -1,0 +1,21 @@
+§M{UnitConverter}
+  §F{InchesToCm:pub} (f32:inches) -> f32
+    §Q (>= inches 0)
+    §R (* inches 2.54)
+
+  §F{CmToInches:pub} (f32:cm) -> f32
+    §Q (>= cm 0)
+    §R (/ cm 2.54)
+
+  §F{PoundsToKg:pub} (f32:pounds) -> f32
+    §Q (>= pounds 0)
+    §R (* pounds 0.453592)
+
+  §F{KgToPounds:pub} (f32:kg) -> f32
+    §Q (>= kg 0)
+    §R (/ kg 0.453592)
+
+  §F{GallonsToLiters:pub} (f32:gallons) -> f32
+    §Q (>= gallons 0)
+    §R (* gallons 3.78541)
+

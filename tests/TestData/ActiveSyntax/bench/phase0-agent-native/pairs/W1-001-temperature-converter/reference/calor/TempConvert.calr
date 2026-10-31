@@ -1,12 +1,12 @@
-§M{m001:TempConvert}
-  §F{f005:ClampToCeiling:priv} (i32:value, i32:ceiling) -> i32
+§M{TempConvert}
+  §F{ClampToCeiling:priv} (i32:value, i32:ceiling) -> i32
     §E{}
     §S (<= result ceiling)
-    §IF{if4} (> value ceiling)
+    §IF (> value ceiling)
       §R ceiling
     §R value
 
-  §F{f001:CelsiusToFahrenheit:pub} (i32:celsius) -> i32
+  §F{CelsiusToFahrenheit:pub} (i32:celsius) -> i32
     §E{}
     §Q (>= celsius -273)
     §S (>= result -459)
@@ -14,7 +14,7 @@
     §B{c:i32} §C{ClampToCeiling} §A celsius §A 5000 §/C
     §R (+ (/ (* c 9) 5) 32)
 
-  §F{f002:CelsiusToKelvin:pub} (i32:celsius) -> i32
+  §F{CelsiusToKelvin:pub} (i32:celsius) -> i32
     §E{}
     §Q (>= celsius -273)
     §S (>= result 0)
@@ -22,7 +22,7 @@
     §B{c:i32} §C{ClampToCeiling} §A celsius §A 5000 §/C
     §R (+ c 273)
 
-  §F{f003:FahrenheitToCelsius:pub} (i32:fahrenheit) -> i32
+  §F{FahrenheitToCelsius:pub} (i32:fahrenheit) -> i32
     §E{}
     §Q (>= fahrenheit -459)
     §S (>= result -273)
@@ -30,7 +30,7 @@
     §B{f:i32} §C{ClampToCeiling} §A fahrenheit §A 9032 §/C
     §R (/ (* (- f 32) 5) 9)
 
-  §F{f004:KelvinToCelsius:pub} (i32:kelvin) -> i32
+  §F{KelvinToCelsius:pub} (i32:kelvin) -> i32
     §E{}
     §Q (>= kelvin 0)
     §S (>= result -273)

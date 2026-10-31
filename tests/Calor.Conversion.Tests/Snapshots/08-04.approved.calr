@@ -1,6 +1,6 @@
-§M{m001:Test_08_04:overflow=unchecked}
-  §CL{c001:NullDemo:pub}
-    §MT{m002:GetValue:pub} (?str:input) -> str
+§M{Test_08_04:overflow=unchecked}
+  §CL{NullDemo:pub}
+    §MT{GetValue:pub} (?str:input) -> str
       §R (?? input "default")
 
 

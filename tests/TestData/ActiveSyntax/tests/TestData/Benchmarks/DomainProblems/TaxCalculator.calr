@@ -1,0 +1,24 @@
+§M{TaxCalculator}
+  §F{TaxRate:pub} (f32:income) -> f32
+    §Q (>= income 0)
+    §IF (<= income 10000)
+      §R 0.1
+    §EI (<= income 40000)
+      §R 0.2
+    §EI (<= income 85000)
+      §R 0.3
+    §EL
+      §R 0.37
+
+  §F{SimpleTax:pub} (f32:income, f32:rate) -> f32
+    §Q (>= income 0)
+    §Q (>= rate 0)
+    §Q (<= rate 1)
+    §R (* income rate)
+
+  §F{AfterTax:pub} (f32:income, f32:tax) -> f32
+    §Q (>= income 0)
+    §Q (>= tax 0)
+    §S (>= result 0)
+    §R (- income tax)
+

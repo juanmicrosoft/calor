@@ -1,9 +1,9 @@
-§M{m001:Test_12_01:overflow=unchecked}
-  §CL{c001:Formatter:pub}
-    §MT{m002:Format:priv} (i32:value) -> str
+§M{Test_12_01:overflow=unchecked}
+  §CL{Formatter:pub}
+    §MT{Format:priv} (i32:value) -> str
       §R (str value)
 
-    §MT{m003:Describe:pub} (i32:x, str[]:labels) -> str
+    §MT{Describe:pub} (i32:x, str[]:labels) -> str
       §R "The value is ${Format(x)} with label ${§CS{labels[0]}}"
 
 

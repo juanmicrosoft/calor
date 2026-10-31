@@ -1,5 +1,5 @@
-§M{m1:Formatted}
-  §F{f1:Main:pub} () -> void
+§M{Formatted}
+  §F{Main:pub} () -> void
     §E{cw}
     §P "Hello"
 

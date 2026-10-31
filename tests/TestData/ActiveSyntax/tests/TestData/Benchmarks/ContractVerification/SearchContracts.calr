@@ -1,0 +1,20 @@
+§M{SearchContracts}
+  §F{MidIndex:pub} (i32:low, i32:high) -> i32
+    §Q (<= low high)
+    §Q (>= low 0)
+    §S (>= result low)
+    §S (<= result high)
+    §R (+ low (/ (- high low) 2))
+
+  §F{NarrowLeft:pub} (i32:mid, i32:high) -> i32
+    §Q (< mid high)
+    §S (> result mid)
+    §S (<= result high)
+    §R (+ mid 1)
+
+  §F{NarrowRight:pub} (i32:low, i32:mid) -> i32
+    §Q (< low mid)
+    §S (>= result low)
+    §S (< result mid)
+    §R (- mid 1)
+

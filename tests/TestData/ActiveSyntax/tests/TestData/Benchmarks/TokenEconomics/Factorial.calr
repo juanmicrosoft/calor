@@ -1,0 +1,9 @@
+§M{Factorial}
+  §F{Calculate:pub} (i32:n) -> i32
+    §B{~result} 1
+    §B{~i} 2
+    §WH (<= i n)
+      §B{~result} (* result i)
+      §B{~i} (+ i 1)
+    §R result
+

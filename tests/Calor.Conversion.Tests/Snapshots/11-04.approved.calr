@@ -1,7 +1,7 @@
-§M{m001:Test_11_04:overflow=unchecked}
+§M{Test_11_04:overflow=unchecked}
   §PP{NET6_0_OR_GREATER}
-    §CL{c001:NetSixFeature:pub}
-      §PROP{p002:Name:str:pub:get,set}
+    §CL{NetSixFeature:pub}
+      §PROP{Name:str:pub:get,set}
 
 
   §/PP{NET6_0_OR_GREATER}

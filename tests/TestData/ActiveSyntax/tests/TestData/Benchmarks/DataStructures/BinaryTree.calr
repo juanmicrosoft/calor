@@ -1,0 +1,18 @@
+§M{BinaryTree}
+  §F{CompareValues:pub} (i32:a, i32:b) -> i32
+    §IF (< a b)
+      §R -1
+    §EI (> a b)
+      §R 1
+    §EL
+      §R 0
+
+  §F{ShouldGoLeft:pub} (i32:value, i32:nodeValue) -> bool
+    §R (< value nodeValue)
+
+  §F{ShouldGoRight:pub} (i32:value, i32:nodeValue) -> bool
+    §R (> value nodeValue)
+
+  §F{IsMatch:pub} (i32:value, i32:nodeValue) -> bool
+    §R (== value nodeValue)
+

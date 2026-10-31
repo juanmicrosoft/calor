@@ -1,0 +1,7 @@
+§M{BasicTryCatch}
+  §F{SafeDivide:pub} (i32:a, i32:b) -> i32
+    §IF (== b 0)
+      §R 0
+    §EL
+      §R (/ a b)
+

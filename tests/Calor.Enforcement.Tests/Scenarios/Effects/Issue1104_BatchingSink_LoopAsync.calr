@@ -22,10 +22,10 @@
 // .calr it declines to reformat because the source has semantic errors.
 // The receiver field is load-bearing: a receiver that does not resolve to a type
 // returns before the arguments are typed and the cycle is never entered.
-§M{m001:Calor0425Leg}
-  §CL{c002:BatchingSink:int:seal}
+§M{Calor0425Leg}
+  §CL{BatchingSink:int:seal}
     §FLD{FailureAwareBatchScheduler:_batchScheduler:priv:readonly}
 
-    §AMT{m018:LoopAsync:priv}
+    §AMT{LoopAsync:priv}
       §B{~shouldDropQueue}
       §C{_batchScheduler.MarkFailure} §A shouldDropBatch §A shouldDropQueue §/C

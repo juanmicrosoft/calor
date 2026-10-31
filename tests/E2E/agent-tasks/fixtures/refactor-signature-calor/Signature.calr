@@ -1,16 +1,16 @@
-§M{m001:SignatureExamples}
-  §F{f001:Greet:pub} (str:name) -> str
+§M{SignatureExamples}
+  §F{Greet:pub} (str:name) -> str
     §R name
 
-  §F{f002:TryParse:pub} (str:input) -> i32
+  §F{TryParse:pub} (str:input) -> i32
     §R 0
 
-  §F{f003:CreateRange:pub} (i32:start, i32:end, i32:step) -> i32
+  §F{CreateRange:pub} (i32:start, i32:end, i32:step) -> i32
     §Q (<= start end)
     §Q (> step 0)
     §R (/ (- end start) step)
 
-  §F{f004:CountSteps:pub} (i32:max) -> i32
+  §F{CountSteps:pub} (i32:max) -> i32
     §Q (> max 0)
     §R §C{CreateRange} §A 0 §A max §A 1 §/C
 

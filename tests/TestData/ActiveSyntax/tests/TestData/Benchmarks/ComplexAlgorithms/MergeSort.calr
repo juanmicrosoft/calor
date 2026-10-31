@@ -1,0 +1,11 @@
+§M{MergeSort}
+  §F{MidPoint:pub} (i32:low, i32:high) -> i32
+    §Q (<= low high)
+    §R (+ low (/ (- high low) 2))
+
+  §F{ShouldTakeLeft:pub} (i32:leftVal, i32:rightVal) -> bool
+    §R (<= leftVal rightVal)
+
+  §F{IsBaseCase:pub} (i32:low, i32:high) -> bool
+    §R (>= low high)
+

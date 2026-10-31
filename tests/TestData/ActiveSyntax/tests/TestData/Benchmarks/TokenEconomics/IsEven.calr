@@ -1,0 +1,4 @@
+§M{IsEven}
+  §F{IsEven:pub} (i32:n) -> bool
+    §R (== (% n 2) 0)
+

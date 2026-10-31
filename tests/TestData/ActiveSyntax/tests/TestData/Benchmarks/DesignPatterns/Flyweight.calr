@@ -1,0 +1,13 @@
+§M{Flyweight}
+  §F{PoolSize:pub} (i32:uniqueCount) -> i32
+    §S (>= result 0)
+    §R uniqueCount
+
+  §F{MemorySaved:pub} (i32:totalObjects, i32:uniqueObjects, i32:objectSize) -> i32
+    §Q (>= totalObjects uniqueObjects)
+    §S (>= result 0)
+    §R (* (- totalObjects uniqueObjects) objectSize)
+
+  §F{IsPooled:pub} (i32:objectId, i32:poolSize) -> bool
+    §R (< objectId poolSize)
+

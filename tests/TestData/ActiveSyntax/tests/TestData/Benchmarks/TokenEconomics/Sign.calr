@@ -1,0 +1,9 @@
+§M{SignModule}
+  §F{Sign:pub} (i32:x) -> i32
+    §IF (> x 0)
+      §R 1
+    §EI (< x 0)
+      §R (- 0 1)
+    §EL
+      §R 0
+

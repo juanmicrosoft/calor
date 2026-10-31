@@ -1,0 +1,12 @@
+§M{WildcardMatch}
+  §F{DefaultValue:pub} (i32:typeCode) -> i32
+    §IF (== typeCode 0)
+      §R 0
+    §EI (== typeCode 1)
+      §R 1
+    §EL
+      §R (- 0 1)
+
+  §F{IsKnown:pub} (i32:typeCode) -> bool
+    §R (&& (>= typeCode 0) (<= typeCode 1))
+

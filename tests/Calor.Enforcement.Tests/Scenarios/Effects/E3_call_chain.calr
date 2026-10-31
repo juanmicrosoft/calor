@@ -1,8 +1,8 @@
-§M{m1:Test}
-  §F{f001:Caller:pub} () -> void
+§M{Test}
+  §F{Caller:pub} () -> void
     §C{Callee} §/C
 
-  §F{f002:Callee:pub} () -> void
+  §F{Callee:pub} () -> void
     §E{cw}
     §P "Hello from Callee"
 

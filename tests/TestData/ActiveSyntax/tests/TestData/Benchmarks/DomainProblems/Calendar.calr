@@ -1,0 +1,36 @@
+§M{Calendar}
+  §F{IsLeapYear:pub} (i32:year) -> bool
+    §Q (> year 0)
+    §IF (== (% year 400) 0)
+      §R true
+    §EI (&& (== (% year 4) 0) (!= (% year 100) 0))
+      §R true
+    §EL
+      §R false
+
+  §F{DaysInMonth:pub} (i32:month, bool:isLeap) -> i32
+    §Q (>= month 1)
+    §Q (<= month 12)
+    §S (> result 0)
+    §IF (== month 2)
+      §IF isLeap
+        §R 29
+      §EL
+        §R 28
+    §EI (== month 4)
+      §R 30
+    §EI (== month 6)
+      §R 30
+    §EI (== month 9)
+      §R 30
+    §EI (== month 11)
+      §R 30
+    §EL
+      §R 31
+
+  §F{DaysInYear:pub} (bool:isLeap) -> i32
+    §IF isLeap
+      §R 366
+    §EL
+      §R 365
+

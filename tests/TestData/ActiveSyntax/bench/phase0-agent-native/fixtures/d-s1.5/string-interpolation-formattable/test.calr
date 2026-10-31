@@ -1,14 +1,14 @@
-§M{m001:InterpolationFormattableTest}
+§M{InterpolationFormattableTest}
   §U{System}
 
-  §M{c001:FormattableProbe:pub}
-    §F{m002:Kind:pub} (FormattableString:f) -> i32
+  §M{FormattableProbe:pub}
+    §F{Kind:pub} (FormattableString:f) -> i32
       §R 1
 
-    §F{m003:Kind:pub} (any:o) -> i32
+    §F{Kind:pub} (any:o) -> i32
       §R (- 1)
 
-    §F{m004:Verify:pub} () -> i32
+    §F{Verify:pub} () -> i32
       §S (== result 107)
       §B{x:i32} 42
       §B{s:str} "k=${x},${(+ x 1)}"

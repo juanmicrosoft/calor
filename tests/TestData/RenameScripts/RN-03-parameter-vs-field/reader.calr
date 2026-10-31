@@ -1,4 +1,4 @@
-§M{m002:Reader}
-  §F{f001:ReadCount:pub} (Holder.Box:box) -> i32
+§M{Reader}
+  §F{ReadCount:pub} (Holder.Box:box) -> i32
     §E{}
     §R box.count

@@ -1,14 +1,14 @@
-§M{m001:Test_09_03:overflow=unchecked}
-  §CL{c001:ListPatternDemo:pub}
-    §MT{m002:Classify:pub} (i32[]:list) -> str
-      §R §W{match003} list
+§M{Test_09_03:overflow=unchecked}
+  §CL{ListPatternDemo:pub}
+    §MT{Classify:pub} (i32[]:list) -> str
+      §R §W list
         §K §PLIST  → "empty"
         §K §PLIST §VAR{single} → "one: ${single}"
         §K §PLIST §VAR{first} §REST{rest} → "starts with ${first}"
         §K §PLIST 1 2 §REST{_} → "starts with 1,2"
 
-    §MT{m004:IsFirstAndLast:pub} (i32[]:list) -> bool
-      §R §W{lp005} list
+    §MT{IsFirstAndLast:pub} (i32[]:list) -> bool
+      §R §W list
         §K §PLIST §VAR{first} §REST{_} §VAR{last} → true
         §K _ → false
 

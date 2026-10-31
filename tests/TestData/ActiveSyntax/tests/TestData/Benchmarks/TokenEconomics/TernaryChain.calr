@@ -1,0 +1,29 @@
+§M{TernaryChain}
+  §F{Classify:pub} (i32:score) -> i32
+    §IF (>= score 90)
+      §R 4
+    §EI (>= score 80)
+      §R 3
+    §EI (>= score 70)
+      §R 2
+    §EI (>= score 60)
+      §R 1
+    §EL
+      §R 0
+
+  §F{Signum:pub} (i32:x) -> i32
+    §IF (> x 0)
+      §R 1
+    §EI (< x 0)
+      §R (- 0 1)
+    §EL
+      §R 0
+
+  §F{Clamp100:pub} (i32:x) -> i32
+    §IF (< x 0)
+      §R 0
+    §EI (> x 100)
+      §R 100
+    §EL
+      §R x
+

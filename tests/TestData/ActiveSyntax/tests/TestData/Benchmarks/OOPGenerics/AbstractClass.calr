@@ -1,0 +1,7 @@
+§M{AbstractClass}
+  §F{BaseProcess:pub} (i32:input, i32:factor) -> i32
+    §R (* input factor)
+
+  §F{Validate:pub} (i32:value, i32:min, i32:max) -> bool
+    §R (&& (>= value min) (<= value max))
+

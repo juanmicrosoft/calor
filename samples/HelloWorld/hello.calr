@@ -1,5 +1,5 @@
-§M{m001:Hello}
-  §F{f001:Main:pub} () -> void
+§M{Hello}
+  §F{Main:pub} () -> void
     §E{cw}
     §P "Hello from Calor!"
 

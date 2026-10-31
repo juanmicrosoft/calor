@@ -1,0 +1,17 @@
+§M{TimerService}
+  §F{ElapsedMs:pub} (i32:startMs, i32:endMs) -> i32
+    §Q (>= endMs startMs)
+    §S (>= result 0)
+    §R (- endMs startMs)
+
+  §F{ShouldTimeout:pub} (i32:elapsedMs, i32:timeoutMs) -> bool
+    §R (>= elapsedMs timeoutMs)
+
+  §F{RemainingMs:pub} (i32:timeoutMs, i32:elapsedMs) -> i32
+    §Q (>= timeoutMs 0)
+    §B{remaining} (- timeoutMs elapsedMs)
+    §IF (< remaining 0)
+      §R 0
+    §EL
+      §R remaining
+

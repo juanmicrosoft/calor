@@ -1,0 +1,14 @@
+§M{CsvParser}
+  §F{FieldCount:pub} (i32:commaCount) -> i32
+    §S (> result 0)
+    §R (+ commaCount 1)
+
+  §F{IsQuoted:pub} (i32:firstChar) -> bool
+    §R (== firstChar 34)
+
+  §F{IsDelimiter:pub} (i32:charCode) -> bool
+    §R (== charCode 44)
+
+  §F{IsNewline:pub} (i32:charCode) -> bool
+    §R (|| (== charCode 10) (== charCode 13))
+

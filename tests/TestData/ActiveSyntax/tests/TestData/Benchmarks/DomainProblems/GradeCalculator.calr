@@ -1,0 +1,23 @@
+§M{GradeCalculator}
+  §F{WeightedScore:pub} (f32:score, f32:weight) -> f32
+    §Q (>= score 0)
+    §Q (<= score 100)
+    §Q (> weight 0)
+    §Q (<= weight 1)
+    §R (* score weight)
+
+  §F{LetterGrade:pub} (f32:score) -> i32
+    §IF (>= score 90)
+      §R 4
+    §EI (>= score 80)
+      §R 3
+    §EI (>= score 70)
+      §R 2
+    §EI (>= score 60)
+      §R 1
+    §EL
+      §R 0
+
+  §F{IsPassing:pub} (f32:score) -> bool
+    §R (>= score 60)
+

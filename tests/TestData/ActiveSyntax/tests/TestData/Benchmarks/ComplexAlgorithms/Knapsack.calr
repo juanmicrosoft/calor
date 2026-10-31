@@ -1,0 +1,17 @@
+§M{Knapsack}
+  §F{BetterValue:pub} (i32:withItem, i32:withoutItem) -> i32
+    §IF (> withItem withoutItem)
+      §R withItem
+    §EL
+      §R withoutItem
+
+  §F{Fits:pub} (i32:weight, i32:capacity) -> bool
+    §Q (> weight 0)
+    §Q (>= capacity 0)
+    §R (<= weight capacity)
+
+  §F{RemainingCapacity:pub} (i32:capacity, i32:weight) -> i32
+    §Q (>= capacity weight)
+    §S (>= result 0)
+    §R (- capacity weight)
+

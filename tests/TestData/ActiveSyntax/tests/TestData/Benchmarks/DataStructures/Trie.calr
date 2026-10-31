@@ -1,0 +1,17 @@
+§M{Trie}
+  §F{CharIndex:pub} (i32:charCode) -> i32
+    §Q (>= charCode 97)
+    §Q (<= charCode 122)
+    §S (>= result 0)
+    §S (< result 26)
+    §R (- charCode 97)
+
+  §F{IsValidChar:pub} (i32:charCode) -> bool
+    §R (&& (>= charCode 97) (<= charCode 122))
+
+  §F{IsEndOfWord:pub} (bool:flag) -> bool
+    §R flag
+
+  §F{AlphabetSize:pub} () -> i32
+    §R 26
+

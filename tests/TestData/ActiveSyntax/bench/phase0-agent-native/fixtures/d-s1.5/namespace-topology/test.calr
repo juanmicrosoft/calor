@@ -1,7 +1,7 @@
-§M{m001:FixtureTest}
-  §NS{ns1:Alpha}
-    §M{c1:Marker:pub}
-  §NS{ns2:Beta}
-    §M{c2:Value:pub}
-      §F{m1:Get:pub} () -> i32
+§M{FixtureTest}
+  §NS{Alpha}
+    §M{Marker:pub}
+  §NS{Beta}
+    §M{Value:pub}
+      §F{Get:pub} () -> i32
         §R INT:42

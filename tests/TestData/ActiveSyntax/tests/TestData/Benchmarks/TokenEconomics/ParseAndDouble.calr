@@ -1,0 +1,7 @@
+§M{ParseAndDouble}
+  §F{Parse:pub} (str:s) -> i32
+    §R 42
+
+  §F{Compute:pub} (str:input) -> i32
+    §B{n} §C{Parse} input
+    §R (* n 2)

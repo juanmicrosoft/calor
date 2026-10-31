@@ -1,0 +1,10 @@
+§M{Singleton}
+  §F{IsInitialized:pub} (bool:hasInstance) -> bool
+    §R hasInstance
+
+  §F{GetValue:pub} (i32:value) -> i32
+    §R value
+
+  §F{SetValue:pub} (i32:oldValue, i32:newValue) -> i32
+    §R newValue
+

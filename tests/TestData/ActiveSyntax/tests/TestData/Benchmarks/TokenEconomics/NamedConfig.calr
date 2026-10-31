@@ -1,0 +1,6 @@
+§M{NamedConfig}
+  §F{Build:pub} (i32:port, str:host) -> i32
+    §R port
+
+  §F{Run:pub} () -> i32
+    §R §C{Build} §A[port] INT:8080 §A[host] STR:"localhost" §/C

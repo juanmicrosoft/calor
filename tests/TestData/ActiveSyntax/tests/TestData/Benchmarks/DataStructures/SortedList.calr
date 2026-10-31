@@ -1,0 +1,11 @@
+§M{SortedList}
+  §F{FindInsertPos:pub} (i32:value, i32:existingValue) -> bool
+    §R (<= value existingValue)
+
+  §F{IsInOrder:pub} (i32:a, i32:b) -> bool
+    §R (<= a b)
+
+  §F{SizeAfterInsert:pub} (i32:currentSize) -> i32
+    §S (> result currentSize)
+    §R (+ currentSize 1)
+

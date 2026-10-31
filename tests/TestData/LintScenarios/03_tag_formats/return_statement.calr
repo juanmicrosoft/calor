@@ -1,7 +1,7 @@
-§M{m1:Returns}
-  §F{f1:GetValue:pub} () -> i32
+§M{Returns}
+  §F{GetValue:pub} () -> i32
     §R 42
 
-  §F{f2:GetDouble:pub} (i32:x) -> i32
+  §F{GetDouble:pub} (i32:x) -> i32
     §R (* x 2)
 

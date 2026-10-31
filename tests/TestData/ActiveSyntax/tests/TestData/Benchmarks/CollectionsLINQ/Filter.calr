@@ -1,0 +1,10 @@
+§M{Filter}
+  §F{IsPositive:pub} (i32:value) -> bool
+    §R (> value 0)
+
+  §F{IsEven:pub} (i32:value) -> bool
+    §R (== (% value 2) 0)
+
+  §F{InRange:pub} (i32:value, i32:min, i32:max) -> bool
+    §R (&& (>= value min) (<= value max))
+

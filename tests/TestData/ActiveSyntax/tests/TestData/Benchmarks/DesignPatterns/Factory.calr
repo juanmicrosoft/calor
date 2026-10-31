@@ -1,0 +1,28 @@
+§M{ShapeFactory}
+  §F{CircleArea:pub} (f32:radius) -> f32
+    §Q (> radius 0)
+    §S (>= result 0)
+    §R (* 3.14159 (* radius radius))
+
+  §F{RectangleArea:pub} (f32:width, f32:height) -> f32
+    §Q (> width 0)
+    §Q (> height 0)
+    §S (>= result 0)
+    §R (* width height)
+
+  §F{SquareArea:pub} (f32:side) -> f32
+    §Q (> side 0)
+    §S (>= result 0)
+    §R (* side side)
+
+  §F{CirclePerimeter:pub} (f32:radius) -> f32
+    §Q (> radius 0)
+    §S (>= result 0)
+    §R (* 2 (* 3.14159 radius))
+
+  §F{RectanglePerimeter:pub} (f32:width, f32:height) -> f32
+    §Q (> width 0)
+    §Q (> height 0)
+    §S (>= result 0)
+    §R (* 2 (+ width height))
+

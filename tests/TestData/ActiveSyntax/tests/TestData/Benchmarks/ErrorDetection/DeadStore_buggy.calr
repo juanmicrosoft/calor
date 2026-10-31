@@ -1,0 +1,6 @@
+§M{DeadStoreExample}
+  §F{Compute:pub} (i32:x) -> i32
+    §B{~temp:i32} (+ x 1)
+    §B{~temp:i32} (* x 2)
+    §R temp
+

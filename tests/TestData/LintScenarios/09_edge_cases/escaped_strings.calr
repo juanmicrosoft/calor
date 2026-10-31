@@ -1,5 +1,5 @@
-§M{m1:Escaped}
-  §F{f1:Escapes:pub} () -> void
+§M{Escaped}
+  §F{Escapes:pub} () -> void
     §E{cw}
     §P "line1\nline2"
     §P "tab\there"

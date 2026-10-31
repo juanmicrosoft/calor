@@ -1,0 +1,17 @@
+§M{Decorator}
+  §F{BasePrice:pub} (f32:price) -> f32
+    §Q (> price 0)
+    §R price
+
+  §F{WithTax:pub} (f32:price, f32:taxRate) -> f32
+    §Q (> price 0)
+    §Q (>= taxRate 0)
+    §S (>= result price)
+    §R (* price (+ 1 taxRate))
+
+  §F{WithDiscount:pub} (f32:price, f32:discount) -> f32
+    §Q (> price 0)
+    §Q (>= discount 0)
+    §Q (<= discount 1)
+    §R (* price (- 1 discount))
+

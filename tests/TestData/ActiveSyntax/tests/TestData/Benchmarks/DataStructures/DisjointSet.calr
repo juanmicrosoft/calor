@@ -1,0 +1,13 @@
+§M{DisjointSet}
+  §F{IsRoot:pub} (i32:node, i32:parent) -> bool
+    §R (== node parent)
+
+  §F{ShouldMerge:pub} (i32:rootA, i32:rootB) -> bool
+    §R (!= rootA rootB)
+
+  §F{PickRoot:pub} (i32:rankA, i32:rankB, i32:rootA, i32:rootB) -> i32
+    §IF (>= rankA rankB)
+      §R rootA
+    §EL
+      §R rootB
+

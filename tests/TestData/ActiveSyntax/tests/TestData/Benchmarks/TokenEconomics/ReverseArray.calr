@@ -1,0 +1,13 @@
+§M{ReverseArray}
+  §F{SwapIndex:pub} (i32:length, i32:i) -> i32
+    §Q (>= i 0)
+    §Q (< i length)
+    §R (- (- length 1) i)
+
+  §F{ShouldSwap:pub} (i32:left, i32:right) -> bool
+    §R (< left right)
+
+  §F{MidPoint:pub} (i32:length) -> i32
+    §Q (> length 0)
+    §R (/ length 2)
+

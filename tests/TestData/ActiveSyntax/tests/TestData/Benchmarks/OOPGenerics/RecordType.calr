@@ -1,0 +1,13 @@
+§M{RecordType}
+  §F{CreatePoint:pub} (f32:x, f32:y) -> f32
+    §R x
+
+  §F{DistanceSquared:pub} (f32:x1, f32:y1, f32:x2, f32:y2) -> f32
+    §S (>= result 0)
+    §B{dx} (- x2 x1)
+    §B{dy} (- y2 y1)
+    §R (+ (* dx dx) (* dy dy))
+
+  §F{AreEqual:pub} (f32:x1, f32:y1, f32:x2, f32:y2) -> bool
+    §R (&& (== x1 x2) (== y1 y2))
+

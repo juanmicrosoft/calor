@@ -1,0 +1,13 @@
+§M{UnsafeService}
+  §F{SilentLog:pub} (str:message) -> void
+    §E{cw}
+    §P message
+
+  §F{UndeclaredWrite:pub} (str:path, str:content) -> void
+    §E{cw}
+    §P path
+    §P content
+
+  §F{HiddenNetwork:pub} (str:url) -> str
+    §R url
+

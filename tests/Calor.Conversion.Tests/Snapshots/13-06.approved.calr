@@ -1,7 +1,7 @@
-§M{m001:Test_13_06:overflow=unchecked}
+§M{Test_13_06:overflow=unchecked}
   §U{System}
 
-  §EN{e001:ThreadAccess:pub:u32}[@Flags]
+  §EN{ThreadAccess:pub:u32}[@Flags]
     TERMINATE = (0x0001)
     SUSPEND_RESUME = (0x0002)
     GET_CONTEXT = (0x0008)

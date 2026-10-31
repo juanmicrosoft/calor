@@ -1,6 +1,6 @@
-§M{m001:Fixture:overflow=unchecked}
-  §M{c001:LocalFunctionFixture:pub}
-    §F{m002:Add:pub} (i32:x) -> i32
+§M{Fixture:overflow=unchecked}
+  §M{LocalFunctionFixture:pub}
+    §F{Add:pub} (i32:x) -> i32
       §R (+ x 1000)
 
     §CSHARP{
@@ -32,6 +32,6 @@
     }
 }§/CSHARP
 
-  §F{check:CheckCurrentRun:pub} () -> i32
+  §F{CheckCurrentRun:pub} () -> i32
     §S (== result 31620)
     §R §C{LocalFunctionFixture.Run}

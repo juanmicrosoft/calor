@@ -1,5 +1,5 @@
-§M{m1:Test}
-  §F{f1:Main:pub} () -> void
+§M{Test}
+  §F{Main:pub} () -> void
     §E{cw}
     §P "deep"
     §R

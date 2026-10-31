@@ -1,7 +1,7 @@
-§M{m1:MultiCatch}
-  §F{f1:MultiHandler:pub} (str:input) -> i32
+§M{MultiCatch}
+  §F{MultiHandler:pub} (str:input) -> i32
     §E{cw}
-    §TR{t1}
+    §TR
       §R §C{Int32.Parse} §A input §/C
     §CA{ArgumentNullException:e1}
       §R -1
@@ -14,8 +14,8 @@
     §FI
       §P "Done"
 
-  §F{f2:OrderedCatches:pub} (i32:x) -> str
-    §TR{t1}
+  §F{OrderedCatches:pub} (i32:x) -> str
+    §TR
       §R (/ 100 x)
     §CA{DivideByZeroException:e1}
       §R "divide by zero"
@@ -26,9 +26,9 @@
     §CA{Exception:e4}
       §R "general error"
 
-  §F{f3:CatchAllWithFinally:pub} () -> void
+  §F{CatchAllWithFinally:pub} () -> void
     §E{cw}
-    §TR{t1}
+    §TR
       §TH "error"
     §CA{Exception}
       §P "caught"

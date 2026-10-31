@@ -1,8 +1,8 @@
-§M{m001:PatternMatchingDemo}
-  §F{f001:Main:pub} () -> void
+§M{PatternMatchingDemo}
+  §F{Main:pub} () -> void
     §E{cw}
     §B{score} 85
-    §B{grade} §W{sw1:expr} score
+    §B{grade} §W score
       §K §PREL{gte} 90 → "A"
       §K §PREL{gte} 80 → "B"
       §K §PREL{gte} 70 → "C"
@@ -10,7 +10,7 @@
       §K _ → "F"
     §P (+ "Grade: " grade)
     §B{statusCode} 404
-    §B{status} §W{sw2:expr} statusCode
+    §B{status} §W statusCode
       §K 200 → "OK"
       §K 201 → "Created"
       §K 400 → "Bad Request"
@@ -19,7 +19,7 @@
       §K _ → "Unknown Status"
     §P (+ "HTTP Status: " status)
     §B{value} -5
-    §B{desc} §W{sw3:expr} value
+    §B{desc} §W value
       §K §VAR{n} §WHEN (> n 100) → "large positive"
       §K §VAR{n} §WHEN (> n 0) → "small positive"
       §K 0 → "zero"
@@ -27,7 +27,7 @@
       §K _ → "large negative"
     §P (+ "Description: " desc)
     §B{dayNum} 3
-    §B{day} §W{sw4:expr} dayNum
+    §B{day} §W dayNum
       §K 0 → "Sunday"
       §K 1 → "Monday"
       §K 2 → "Tuesday"
@@ -38,7 +38,7 @@
       §K _ → "Invalid day"
     §P (+ "Day: " day)
     §B{temp} 25
-    §B{tempDesc} §W{sw5:expr} temp
+    §B{tempDesc} §W temp
       §K §PREL{lt} 0 → "freezing"
       §K §PREL{lt} 10 → "cold"
       §K §PREL{lt} 20 → "cool"

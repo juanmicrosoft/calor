@@ -1,0 +1,13 @@
+§M{LinkedList}
+  §F{IsEmpty:pub} (i32:size) -> bool
+    §R (== size 0)
+
+  §F{Size:pub} (i32:count) -> i32
+    §R count
+
+  §F{NewSize:pub} (i32:oldSize, bool:isAdd) -> i32
+    §IF isAdd
+      §R (+ oldSize 1)
+    §EL
+      §R (- oldSize 1)
+

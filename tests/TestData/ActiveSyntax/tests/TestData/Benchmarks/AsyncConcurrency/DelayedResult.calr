@@ -1,0 +1,9 @@
+§M{DelayedResult}
+  §AF{DelayedValue:pub} (i32:value, i32:delayMs) -> i32
+    §E{net}
+    §Q (> delayMs 0)
+    §R value
+
+  §F{ImmediateValue:pub} (i32:value) -> i32
+    §R value
+

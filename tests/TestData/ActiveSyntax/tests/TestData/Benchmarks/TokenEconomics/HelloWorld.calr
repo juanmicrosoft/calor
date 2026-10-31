@@ -1,0 +1,5 @@
+§M{Hello}
+  §F{Main:pub} () -> void
+    §E{cw}
+    §P "Hello from Calor!"
+

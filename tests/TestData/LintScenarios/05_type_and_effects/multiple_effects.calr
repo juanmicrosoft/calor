@@ -1,9 +1,9 @@
-§M{m1:MultiEffect}
-  §F{f1:ProcessFile:pub} (str:path) -> void
+§M{MultiEffect}
+  §F{ProcessFile:pub} (str:path) -> void
     §E{fr,fw,cw}
     §P path
 
-  §F{f2:NetworkOp:pub} () -> void
+  §F{NetworkOp:pub} () -> void
     §E{net,cw}
     §P "network"
 

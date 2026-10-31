@@ -1,8 +1,8 @@
-§M{m001:Test_05_01:overflow=unchecked}
+§M{Test_05_01:overflow=unchecked}
   §U{System.Threading.Tasks}
 
-  §CL{c001:DataService:pub}
-    §AMT{m002:FetchDataAsync:pub} () -> str
+  §CL{DataService:pub}
+    §AMT{FetchDataAsync:pub} () -> str
       §B{_} §AWAIT §C{Task.Delay} 100
       §R "data"
 

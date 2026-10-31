@@ -1,0 +1,14 @@
+§M{BuggyMath}
+  §F{BadAbs:pub} (i32:x) -> i32
+    §S (>= result 0)
+    §R x
+
+  §F{BadMax:pub} (i32:a, i32:b) -> i32
+    §S (>= result a)
+    §S (>= result b)
+    §R a
+
+  §F{BadDivide:pub} (i32:a, i32:b) -> i32
+    §S (== result (/ a b))
+    §R 0
+

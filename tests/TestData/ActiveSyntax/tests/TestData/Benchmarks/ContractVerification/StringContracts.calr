@@ -1,0 +1,28 @@
+§M{StringContracts}
+  §F{NonEmptyLength:pub} (str:s) -> i32
+    §Q (! (isempty s))
+    §S (> result 0)
+    §R (len s)
+
+  §F{EmptyStringLength:pub} (str:s) -> bool
+    §S (== result (== (len s) 0))
+    §R (isempty s)
+
+  §F{ConcatLonger:pub} (str:a, str:b) -> str
+    §Q (! (isempty a))
+    §S (> (len result) (len b))
+    §R (concat a b)
+
+  §F{ContainsImpliesLength:pub} (str:haystack, str:needle) -> bool
+    §Q (! (isempty needle))
+    §S (|| (! result) (>= (len haystack) (len needle)))
+    §R (contains haystack needle)
+
+  §F{PrefixLength:pub} (str:s, str:prefix) -> bool
+    §S (|| (! result) (>= (len s) (len prefix)))
+    §R (starts s prefix)
+
+  §F{SuffixLength:pub} (str:s, str:suffix) -> bool
+    §S (|| (! result) (>= (len s) (len suffix)))
+    §R (ends s suffix)
+

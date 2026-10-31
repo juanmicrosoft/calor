@@ -1,0 +1,20 @@
+§M{ListInvariant}
+  §F{AddLength:pub} (i32:len) -> i32
+    §Q (>= len 0)
+    §S (> result len)
+    §S (== result (+ len 1))
+    §R (+ len 1)
+
+  §F{RemoveLength:pub} (i32:len) -> i32
+    §Q (> len 0)
+    §S (< result len)
+    §S (>= result 0)
+    §R (- len 1)
+
+  §F{ConcatLength:pub} (i32:lenA, i32:lenB) -> i32
+    §Q (>= lenA 0)
+    §Q (>= lenB 0)
+    §S (>= result lenA)
+    §S (>= result lenB)
+    §R (+ lenA lenB)
+

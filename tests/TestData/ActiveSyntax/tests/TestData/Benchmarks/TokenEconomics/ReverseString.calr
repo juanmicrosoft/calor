@@ -1,0 +1,7 @@
+§M{StringOps}
+  §F{Swap:pub} (str:a, str:b) -> str
+    §R (+ b a)
+
+  §F{Identity:pub} (str:s) -> str
+    §R s
+

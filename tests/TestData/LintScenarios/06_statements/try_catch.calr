@@ -1,13 +1,13 @@
-§M{m1:TryCatch}
-  §F{f1:SafeDivide:pub} (i32:a, i32:b) -> i32
-    §TR{t1}
+§M{TryCatch}
+  §F{SafeDivide:pub} (i32:a, i32:b) -> i32
+    §TR
       §R (/ a b)
     §CA{Exception:ex}
       §R 0
 
-  §F{f2:WithFinally:pub} () -> void
+  §F{WithFinally:pub} () -> void
     §E{cw}
-    §TR{t2}
+    §TR
       §P "try"
     §CA{Exception:e}
       §P "catch"

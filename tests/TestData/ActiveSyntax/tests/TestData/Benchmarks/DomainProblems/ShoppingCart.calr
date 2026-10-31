@@ -1,0 +1,27 @@
+§M{ShoppingCart}
+  §F{ItemTotal:pub} (f32:price, i32:quantity) -> f32
+    §Q (> price 0)
+    §Q (> quantity 0)
+    §S (>= result 0)
+    §R (* price quantity)
+
+  §F{CartSubtotal:pub} (f32:itemTotal1, f32:itemTotal2) -> f32
+    §Q (>= itemTotal1 0)
+    §Q (>= itemTotal2 0)
+    §S (>= result 0)
+    §R (+ itemTotal1 itemTotal2)
+
+  §F{TotalWithTax:pub} (f32:subtotal, f32:taxRate) -> f32
+    §Q (>= subtotal 0)
+    §Q (>= taxRate 0)
+    §Q (<= taxRate 1)
+    §S (>= result subtotal)
+    §R (+ subtotal (* subtotal taxRate))
+
+  §F{NewQuantity:pub} (i32:oldQuantity, i32:change) -> i32
+    §B{result} (+ oldQuantity change)
+    §IF (< result 0)
+      §R 0
+    §EL
+      §R result
+

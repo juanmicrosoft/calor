@@ -1,0 +1,7 @@
+§M{StaticMembers}
+  §F{NextId:pub} (i32:current) -> i32
+    §R (+ current 1)
+
+  §F{InstanceCount:pub} (i32:count) -> i32
+    §R count
+

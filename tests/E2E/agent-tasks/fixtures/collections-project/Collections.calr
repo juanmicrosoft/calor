@@ -1,14 +1,14 @@
-§M{m001:Collections}
+§M{Collections}
 
-  §F{f001:SumList:pub}
+  §F{SumList:pub}
     §O{i32}
     §E{alloc}
     §LIST{numbers:i32}
       10
       20
       30
-    §/LIST{numbers}
+    §/LIST
     §B{~sum} 0
-    §EACH{e1:n} numbers
+    §EACH{n} numbers
       §B{~sum} (+ sum n)
     §R sum

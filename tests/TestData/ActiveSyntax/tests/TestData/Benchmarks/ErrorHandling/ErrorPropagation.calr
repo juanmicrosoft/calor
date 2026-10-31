@@ -1,0 +1,13 @@
+§M{ErrorPropagation}
+  §F{Layer1:pub} (i32:input) -> i32
+    §Q (> input 0)
+    §R (* input 2)
+
+  §F{Layer2:pub} (i32:input) -> i32
+    §Q (> input 0)
+    §R (+ input 10)
+
+  §F{Pipeline:pub} (i32:input) -> i32
+    §Q (> input 0)
+    §R (+ (* input 2) 10)
+

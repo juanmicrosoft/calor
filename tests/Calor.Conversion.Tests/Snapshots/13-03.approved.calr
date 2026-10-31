@@ -1,11 +1,11 @@
-§M{m001:Test_13_03:overflow=unchecked}
+§M{Test_13_03:overflow=unchecked}
   §U{System}
   §U{System.Collections.Generic}
 
-  §CL{c001:NullableGenericDemo:pub}
-    §MT{m002:GetPairs:pub} () -> KeyValuePair<str, ?any>[]
+  §CL{NullableGenericDemo:pub}
+    §MT{GetPairs:pub} () -> KeyValuePair<str, ?any>[]
       §E{alloc}
-      §R §ARR{arrKeyValuePairstrany003:KeyValuePair<str, ?any>} §NEW{KeyValuePair<str, ?any>} §A "key" §A null §/NEW §NEW{KeyValuePair<str, ?any>} §A "key2" §A "value" §/NEW §/ARR{arrKeyValuePairstrany003}
+      §R §ARR{KeyValuePair<str, ?any>} §NEW{KeyValuePair<str, ?any>} §A "key" §A null §/NEW §NEW{KeyValuePair<str, ?any>} §A "key2" §A "value" §/NEW §/ARR
 
-    §MT{m004:GetComparer:pub} () -> Func<?any, ?any, bool>
-      §R §LAM{lam005:a:?any:b:?any} §C{Equals} §A a §A b §/C §/LAM{lam005}
+    §MT{GetComparer:pub} () -> Func<?any, ?any, bool>
+      §R §LAM{a:?any:b:?any} §C{Equals} §A a §A b §/C §/LAM

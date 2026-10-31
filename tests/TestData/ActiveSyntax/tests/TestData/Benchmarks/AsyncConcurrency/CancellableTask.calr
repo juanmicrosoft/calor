@@ -1,0 +1,7 @@
+§M{CancellableTask}
+  §F{IsCancelled:pub} (bool:token) -> bool
+    §R token
+
+  §F{ShouldContinue:pub} (bool:cancelled, i32:iteration, i32:maxIterations) -> bool
+    §R (&& (! cancelled) (< iteration maxIterations))
+

@@ -1,0 +1,69 @@
+// Security Benchmark: Path Traversal Detection
+// Tests taint analysis for path traversal vulnerabilities
+
+§M{PathTraversalBenchmark}
+
+  §F{VulnerableFileRead:pub}
+    // BUG: Direct file read with user-provided path
+    // EXPECTED: Calor0983 Path Traversal
+    §I{string:user_path}
+    §O{string}
+    §E{fs:r}
+    §B{content:string} §C{System.IO.File.ReadAllText} §A user_path §/C
+    §R content
+
+  §F{SafeWhitelistedPath:pub}
+    // SAFE: Only whitelisted paths allowed
+    // EXPECTED: No warnings
+    §I{string:user_input}
+    §O{string}
+    §E{fs:r}
+    §IF (== user_input STR:"index.html")
+      §R §C{System.IO.File.ReadAllText} §A STR:"/app/public/index.html" §/C
+    §IF (== user_input STR:"about.html")
+      §R §C{System.IO.File.ReadAllText} §A STR:"/app/public/about.html" §/C
+    §R STR:""
+
+  §F{VulnerablePathJoin:pub}
+    // BUG: User input used in path.join
+    // EXPECTED: Calor0983 Path Traversal
+    §I{string:user_path}
+    §O{string}
+    §E{fs:r}
+    §B{basePath:string} STR:"/var/data"
+    §B{fullPath:string} §C{System.IO.Path.Combine} §A basePath §A user_path §/C
+    §B{content:string} §C{System.IO.File.ReadAllText} §A fullPath §/C
+    §R content
+
+  §F{SafeSanitizedPath:pub}
+    // SAFE: Path properly sanitized
+    // EXPECTED: No warnings
+    §I{string:user_input}
+    §O{string}
+    §E{fs:r}
+    §B{sanitized:string} (?? §C{System.IO.Path.GetFileName} §A user_input §/C STR:"")
+    §IF (|| (== sanitized STR:".") (== sanitized STR:".."))
+      §R STR:""
+    §B{basePath:string} STR:"/safe/directory/"
+    §B{fullPath:string} (+ basePath sanitized)
+    §B{content:string} §C{System.IO.File.ReadAllText} §A fullPath §/C
+    §R content
+
+  §F{VulnerableFileWrite:pub}
+    // BUG: Writing to user-controlled path
+    // EXPECTED: Calor0983 Path Traversal
+    §I{string:user_input}
+    §I{string:content}
+    §O{void}
+    §E{fs:w}
+    §B{path:string} (+ STR:"/uploads/" user_input)
+    §C{System.IO.File.WriteAllText} §A path §A content §/C
+
+  §F{SafeConstantPath:pub}
+    // SAFE: Path is a constant
+    // EXPECTED: No warnings
+    §O{string}
+    §E{fs:r}
+    §B{path:string} STR:"/etc/app/config.json"
+    §B{content:string} §C{System.IO.File.ReadAllText} §A path §/C
+    §R content

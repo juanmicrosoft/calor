@@ -1,0 +1,15 @@
+§M{BankAccount}
+  §F{Deposit:pub} (f32:balance, f32:amount) -> f32
+    §Q (> amount 0)
+    §S (> result balance)
+    §R (+ balance amount)
+
+  §F{Withdraw:pub} (f32:balance, f32:amount) -> f32
+    §Q (> amount 0)
+    §Q (>= balance amount)
+    §S (< result balance)
+    §R (- balance amount)
+
+  §F{CanWithdraw:pub} (f32:balance, f32:amount) -> bool
+    §R (&& (> amount 0) (>= balance amount))
+

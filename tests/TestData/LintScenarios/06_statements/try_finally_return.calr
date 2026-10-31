@@ -1,15 +1,15 @@
-§M{m1:FinallyReturn}
-  §F{f1:WithFinally:pub} (i32:x) -> i32
+§M{FinallyReturn}
+  §F{WithFinally:pub} (i32:x) -> i32
     §B{~result} 0
-    §TR{t1}
+    §TR
       §B{~result} (+ x 10)
       §R result
     §FI
       §P "cleanup"
 
-  §F{f2:FinallyNoReturn:pub} (i32:x) -> i32
+  §F{FinallyNoReturn:pub} (i32:x) -> i32
     §B{~result} 0
-    §TR{t1}
+    §TR
       §B{~result} (+ x 10)
     §CA{Exception:e}
       §B{~result} -1
@@ -17,9 +17,9 @@
       §P "finally executed"
     §R result
 
-  §F{f3:TryOnlyFinally:pub} () -> void
+  §F{TryOnlyFinally:pub} () -> void
     §E{cw}
-    §TR{t1}
+    §TR
       §P "try block"
     §FI
       §P "finally block"

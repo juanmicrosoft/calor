@@ -1,8 +1,8 @@
-§M{m1:LoopTest}
-  §F{f1:Main:pub} () -> void
+§M{LoopTest}
+  §F{Main:pub} () -> void
     §E{cw}
-    §L{for1:i:1:10:1}
+    §L{i:1:10:1}
       §P i
-      §L{for2:j:1:5:1}
+      §L{j:1:5:1}
         §P j
 

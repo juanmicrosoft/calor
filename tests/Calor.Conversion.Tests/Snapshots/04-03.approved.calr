@@ -1,20 +1,20 @@
-§M{m001:Test_04_03:overflow=unchecked}
+§M{Test_04_03:overflow=unchecked}
   §U{System}
 
-  §CL{c001:Shape:pub}
-    §MT{m002:Area:pub:virt} () -> f64
+  §CL{Shape:pub}
+    §MT{Area:pub:virt} () -> f64
       §R 0
 
 
-  §CL{c003:Circle:pub}
+  §CL{Circle:pub}
     §EXT{Shape}
 
-    §PROP{p004:Radius:f64:pub:get}
+    §PROP{Radius:f64:pub:get}
 
-    §CTOR{ctor005:pub} (f64:radius)
+    §CTOR{pub} (f64:radius)
       §ASSIGN Radius radius
 
-    §MT{m006:Area:pub:over} () -> f64
+    §MT{Area:pub:over} () -> f64
       §R (* (* Math.PI Radius) Radius)
 
 

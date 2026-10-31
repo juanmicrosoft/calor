@@ -1,0 +1,13 @@
+§M{StringCheck}
+  §F{IsPalindrome3:pub} (str:a, str:b, str:c) -> bool
+    §IF (== a c)
+      §R true
+    §EL
+      §R false
+
+  §F{AreEqual:pub} (str:a, str:b) -> bool
+    §IF (== a b)
+      §R true
+    §EL
+      §R false
+

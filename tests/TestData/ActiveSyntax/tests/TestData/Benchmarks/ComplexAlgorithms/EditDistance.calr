@@ -1,0 +1,16 @@
+§M{EditDistance}
+  §F{MinOfThree:pub} (i32:a, i32:b, i32:c) -> i32
+    §B{minAB} a
+    §IF (< b minAB)
+      §ASSIGN minAB b
+    §IF (< c minAB)
+      §R c
+    §EL
+      §R minAB
+
+  §F{SubstitutionCost:pub} (i32:charA, i32:charB) -> i32
+    §IF (== charA charB)
+      §R 0
+    §EL
+      §R 1
+

@@ -1,0 +1,11 @@
+§M{StringLib}
+  §F{StringLength:pub} (i32:length) -> i32
+    §S (>= result 0)
+    §R length
+
+  §F{IsEmpty:pub} (i32:length) -> bool
+    §R (== length 0)
+
+  §F{Concat:pub} (str:a, str:b) -> str
+    §R a
+

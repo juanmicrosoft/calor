@@ -1,0 +1,10 @@
+§M{LinearSearch}
+  §F{IsMatch:pub} (i32:value, i32:target) -> bool
+    §R (== value target)
+
+  §F{NotFound:pub} () -> i32
+    §R (- 0 1)
+
+  §F{HasMore:pub} (i32:index, i32:length) -> bool
+    §R (< index length)
+

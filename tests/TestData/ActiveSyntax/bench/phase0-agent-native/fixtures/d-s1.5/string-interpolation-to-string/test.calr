@@ -1,0 +1,9 @@
+§M{InterpolationToStringTest}
+  §F{Describe:pub} (i32:count, str:name) -> str
+    §R "${name}:${count,4}|${count:D3}"
+
+  §F{Verify:pub} () -> i32
+    §S (== result 1013)
+    §B{s:str} §C{Describe} §A 7 §A "ab" §/C
+    §B{wrapped:str} "<${s}>"
+    §R (+ (? (== s "ab:   7|007") 1000 0) (len wrapped))

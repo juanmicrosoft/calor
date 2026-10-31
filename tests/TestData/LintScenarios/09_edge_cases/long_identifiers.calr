@@ -1,5 +1,5 @@
-§M{m1:LongIds}
-  §F{f1:ProcessValue:pub} (i32:inputValue) -> i32
+§M{LongIds}
+  §F{ProcessValue:pub} (i32:inputValue) -> i32
     §B{localVariable} inputValue
     §R localVariable
 

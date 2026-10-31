@@ -1,7 +1,7 @@
-§M{m1:Test}
-  §F{f001:Abs:pub} (i32:n) -> i32
+§M{Test}
+  §F{Abs:pub} (i32:n) -> i32
     §S (>= result 0)
-    §IF{i1} (< n 0)
+    §IF (< n 0)
       §R (- 0 n)
     §R n
 

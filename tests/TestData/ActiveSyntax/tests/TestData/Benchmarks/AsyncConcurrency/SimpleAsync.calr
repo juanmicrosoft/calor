@@ -1,0 +1,8 @@
+§M{SimpleAsync}
+  §AF{GetValue:pub} () -> i32
+    §E{net}
+    §R 42
+
+  §F{Fallback:pub} () -> i32
+    §R 0
+

@@ -1,0 +1,17 @@
+§M{DateDiff}
+  §F{DaysBetween:pub} (i32:dayA, i32:dayB) -> i32
+    §S (>= result 0)
+    §B{diff} (- dayB dayA)
+    §IF (< diff 0)
+      §R (- 0 diff)
+    §EL
+      §R diff
+
+  §F{WeeksBetween:pub} (i32:days) -> i32
+    §Q (>= days 0)
+    §R (/ days 7)
+
+  §F{RemainingDays:pub} (i32:days) -> i32
+    §Q (>= days 0)
+    §R (% days 7)
+

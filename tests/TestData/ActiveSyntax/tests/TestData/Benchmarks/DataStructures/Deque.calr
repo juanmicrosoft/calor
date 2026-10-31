@@ -1,0 +1,16 @@
+§M{Deque}
+  §F{CanRemove:pub} (i32:size) -> bool
+    §R (> size 0)
+
+  §F{NewSizeAfterAdd:pub} (i32:size) -> i32
+    §S (> result size)
+    §R (+ size 1)
+
+  §F{NewSizeAfterRemove:pub} (i32:size) -> i32
+    §Q (> size 0)
+    §S (< result size)
+    §R (- size 1)
+
+  §F{IsEmpty:pub} (i32:size) -> bool
+    §R (== size 0)
+

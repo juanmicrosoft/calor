@@ -1,0 +1,10 @@
+§M{MathPower}
+  §F{Power:pub} (i32:base, i32:exp) -> i32
+    §Q (>= exp 0)
+    §B{~result} 1
+    §B{~i} 0
+    §WH (< i exp)
+      §B{~result} (* result base)
+      §B{~i} (+ i 1)
+    §R result
+

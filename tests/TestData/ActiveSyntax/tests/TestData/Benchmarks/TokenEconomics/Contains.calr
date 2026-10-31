@@ -1,0 +1,7 @@
+§M{Contains}
+  §F{Matches:pub} (i32:value, i32:target) -> bool
+    §R (== value target)
+
+  §F{IsInRange:pub} (i32:index, i32:length) -> bool
+    §R (&& (>= index 0) (< index length))
+

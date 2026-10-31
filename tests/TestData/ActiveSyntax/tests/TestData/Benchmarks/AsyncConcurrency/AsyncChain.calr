@@ -1,0 +1,10 @@
+§M{AsyncChain}
+  §AF{Step1:pub} (i32:input) -> i32
+    §R (+ input 1)
+
+  §AF{Step2:pub} (i32:input) -> i32
+    §R (* input 2)
+
+  §F{SyncPipeline:pub} (i32:input) -> i32
+    §R (* (+ input 1) 2)
+

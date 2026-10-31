@@ -1,5 +1,5 @@
-§M{m1:Unicode}
-  §F{f1:Greet:pub} () -> void
+§M{Unicode}
+  §F{Greet:pub} () -> void
     §E{cw}
     §P "Hello World"
     §P "Bonjour le monde"

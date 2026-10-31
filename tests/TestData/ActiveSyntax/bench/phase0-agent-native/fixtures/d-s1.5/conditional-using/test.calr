@@ -1,14 +1,14 @@
-§M{m001:FixtureTest}
+§M{FixtureTest}
   §PP{FEATURE}
     §U{Number:System.Int32}
-    §M{c001:ConditionalValue:pub}
-      §F{m001:Get:pub} () -> Number
+    §M{ConditionalValue:pub}
+      §F{Get:pub} () -> Number
         §S (== result INT:41)
         §R INT:41
   §PPE
     §U{Number:System.Int32}
-    §M{c002:ConditionalValue:pub}
-      §F{m002:Get:pub} () -> Number
+    §M{ConditionalValue:pub}
+      §F{Get:pub} () -> Number
         §S (== result INT:42)
         §R INT:42
   §/PP{FEATURE}

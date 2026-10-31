@@ -1,10 +1,10 @@
-§M{m001:Test_13_10:overflow=unchecked}
+§M{Test_13_10:overflow=unchecked}
   §U{System.Collections.Generic}
 
-  §CL{c001:MatchListDemo:pub}
-    §MT{m002:GetItems:pub} (i32:category) -> List<str>
+  §CL{MatchListDemo:pub}
+    §MT{GetItems:pub} (i32:category) -> List<str>
       §E{alloc}
-      §R §W{match003} category
+      §R §W category
         §K 1
           §LIST{_listStr005:str}
             "a"

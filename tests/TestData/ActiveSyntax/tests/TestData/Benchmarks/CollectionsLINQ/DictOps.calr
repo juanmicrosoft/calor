@@ -1,0 +1,14 @@
+§M{DictOps}
+  §F{ContainsKey:pub} (bool:found) -> bool
+    §R found
+
+  §F{EntryCount:pub} (i32:count) -> i32
+    §S (>= result 0)
+    §R count
+
+  §F{GetOrDefault:pub} (i32:value, i32:defaultVal, bool:exists) -> i32
+    §IF exists
+      §R value
+    §EL
+      §R defaultVal
+

@@ -1,0 +1,14 @@
+§M{EnumWithMethods}
+  §F{Priority:pub} (i32:level) -> i32
+    §IF (== level 0)
+      §R 1
+    §EI (== level 1)
+      §R 2
+    §EI (== level 2)
+      §R 3
+    §EL
+      §R 4
+
+  §F{IsUrgent:pub} (i32:level) -> bool
+    §R (>= level 2)
+

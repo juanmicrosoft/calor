@@ -1,0 +1,28 @@
+§M{SumDigits}
+  §F{LastDigit:pub} (i32:n) -> i32
+    §S (>= result 0)
+    §B{r} (% n 10)
+    §IF (< r 0)
+      §R (- 0 r)
+    §EL
+      §R r
+
+  §F{RemoveLastDigit:pub} (i32:n) -> i32
+    §R (/ n 10)
+
+  §F{SumDigitsPositive:pub} (i32:n) -> i32
+    §Q (>= n 0)
+    §S (>= result 0)
+    §IF (== n 0)
+      §R 0
+    §B{digit} §C{LastDigit} n
+    §B{remaining} §C{SumDigitsPositive} (/ n 10)
+    §R (+ digit remaining)
+
+  §F{SumDigits:pub} (i32:n) -> i32
+    §S (>= result 0)
+    §IF (< n 0)
+      §B{posN} (- 0 n)
+      §R §C{SumDigitsPositive} posN
+    §R §C{SumDigitsPositive} n
+

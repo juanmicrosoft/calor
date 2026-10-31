@@ -1,0 +1,38 @@
+§M{ArrayContracts}
+  §F{ValidIndex:pub} (i32:length, i32:index) -> bool
+    §Q (> length 0)
+    §S (== result (&& (>= index 0) (< index length)))
+    §R (&& (>= index 0) (< index length))
+
+  §F{LastValidIndex:pub} (i32:length) -> i32
+    §Q (> length 0)
+    §S (>= result 0)
+    §S (< result length)
+    §R (- length 1)
+
+  §F{LengthNonNegative:pub} (i32:length) -> bool
+    §Q (>= length 0)
+    §S (== result true)
+    §R (>= length 0)
+
+  §F{SafeIndexRange:pub} (i32:length, i32:start, i32:count) -> bool
+    §Q (> length 0)
+    §Q (>= start 0)
+    §Q (> count 0)
+    §S (== result (<= (+ start count) length))
+    §R (<= (+ start count) length)
+
+  §F{MidpointIndex:pub} (i32:low, i32:high) -> i32
+    §Q (>= low 0)
+    §Q (> high low)
+    §S (>= result low)
+    §S (< result high)
+    §R (+ low (/ (- high low) 2))
+
+  §F{BinarySearchBounds:pub} (i32:length, i32:low, i32:high) -> bool
+    §Q (> length 0)
+    §Q (>= low 0)
+    §Q (<= high length)
+    §S (== result (<= low high))
+    §R (<= low high)
+

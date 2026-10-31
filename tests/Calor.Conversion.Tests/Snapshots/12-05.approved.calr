@@ -1,10 +1,10 @@
-§M{m001:Test_12_05:overflow=unchecked}
-  §M{c001:LiteralShapes:pub}
-    §F{m002:NegativeHex:pub} () -> i64
+§M{Test_12_05:overflow=unchecked}
+  §M{LiteralShapes:pub}
+    §F{NegativeHex:pub} () -> i64
       §R (- LONG:0x2A)
 
-    §F{m003:Separated:pub} () -> u32
+    §F{Separated:pub} () -> u32
       §R UINT:4294967295
 
-    §F{m004:Format:pub} (i32:value) -> str
+    §F{Format:pub} (i32:value) -> str
       §R "{literal} ${value,8:X4}"
