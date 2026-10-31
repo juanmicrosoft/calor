@@ -22,6 +22,92 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class Issue1173ConverterEffectRowTests
 {
+    [Fact]
+    public void ReparsedRows_ReturnToTheirExactEmittedDeclarations()
+    {
+        var conversion = Convert(
+            """
+            using System;
+            using System.Collections.Generic;
+            public class Left
+            {
+                public int Work(int value) => value;
+                public int Work(List<int> values) { values.Add(1); return values.Count; }
+                public void Echo() { Console.WriteLine("done"); }
+                public int Last() => 7;
+            }
+            public class Right
+            {
+                public object Work() => new object();
+                public int Last() => 9;
+            }
+            """);
+        var reparsed = Parse(conversion.CalorSource!);
+        Assert.Contains("§MT{Work:pub}", conversion.CalorSource);
+        foreach (var module in new[] { conversion.Ast!, reparsed })
+        {
+            var left = Assert.Single(module.Classes.Where(cls => cls.Name == "Left"));
+            var right = Assert.Single(module.Classes.Where(cls => cls.Name == "Right"));
+            var pureOverload = Assert.Single(left.Methods.Where(method =>
+                method.Name == "Work" && method.Parameters[0].TypeName == "i32"));
+            var mutatingOverload = Assert.Single(left.Methods.Where(method =>
+                method.Name == "Work" && method != pureOverload));
+            Assert.Empty(EffectEnforcementPass.GetDeclaredEffects(pureOverload.Effects).Effects);
+            Assert.Equal("mut", EffectEnforcementPass.GetDeclaredEffects(mutatingOverload.Effects).ToDisplayString());
+            Assert.Equal("cw", EffectEnforcementPass.GetDeclaredEffects(
+                Assert.Single(left.Methods.Where(method => method.Name == "Echo")).Effects).ToDisplayString());
+            Assert.Equal("alloc", EffectEnforcementPass.GetDeclaredEffects(
+                Assert.Single(right.Methods.Where(method => method.Name == "Work")).Effects).ToDisplayString());
+            Assert.All(new[] { left, right }, cls => Assert.Empty(EffectEnforcementPass.GetDeclaredEffects(
+                Assert.Single(cls.Methods.Where(method => method.Name == "Last")).Effects).Effects));
+        }
+        Assert.NotEqual(conversion.Ast!.Classes[0].Methods[0].Id, reparsed.Classes[0].Methods[0].Id);
+        Assert.Empty(EffectErrors(conversion.CalorSource!));
+        var stripped = string.Join("\n", conversion.CalorSource!.Split('\n')
+            .Where(line => !line.TrimStart().StartsWith("§E{", StringComparison.Ordinal)));
+        Assert.NotEmpty(EffectErrors(stripped));
+    }
+
+    [Fact]
+    public void ReorderedNamespaceScopes_DoNotExchangeSameNamedMethodRows()
+    {
+        var conversion = Convert(
+            """
+            using System.Collections.Generic;
+            namespace Outer
+            {
+                public class Worker
+                {
+                    public void Run(List<int> values) { }
+                }
+                namespace Inner
+                {
+                    public class Worker
+                    {
+                        public void Run(List<int> values) { values.Add(1); }
+                    }
+                }
+            }
+            """);
+        foreach (var module in new[] { conversion.Ast!, Parse(conversion.CalorSource!) })
+        {
+            Assert.Equal(2, module.Classes.Count);
+            foreach (var cls in module.Classes)
+            {
+                var scope = Assert.Single(module.NamespaceScopes.Where(scope => scope.Id == cls.NamespaceScopeId));
+                var row = EffectEnforcementPass.GetDeclaredEffects(Assert.Single(cls.Methods).Effects);
+                if (scope.FullName == "Outer.Inner")
+                    Assert.Equal("mut", row.ToDisplayString());
+                else
+                {
+                    Assert.Equal("Outer", scope.FullName);
+                    Assert.Empty(row.Effects);
+                }
+            }
+        }
+        Assert.Empty(EffectErrors(conversion.CalorSource!));
+    }
+
     public static TheoryData<string, string, string, string> UnderDeclaredConstructs => new()
     {
         {
@@ -359,6 +445,7 @@ public class Issue1173ConverterEffectRowTests
             conversion.Success,
             string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
         Assert.NotNull(conversion.CalorSource);
+        Assert.DoesNotContain(conversion.Issues, issue => issue.Feature == "effect-row-synthesis");
         return conversion;
     }
 

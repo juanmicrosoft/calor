@@ -58,6 +58,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public IReadOnlyList<ConversionIssue> Issues => _context.Issues;
 
+    internal Action<AstNode, int>? EffectRowDeclarationEmitted { get; init; }
+
     public string Emit(ModuleNode module)
     {
         _builder.Clear();
@@ -98,6 +100,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
             _builder.Append(new string(' ', _indentLevel * 2));
             _builder.AppendLine(line);
         }
+    }
+
+    private void AppendEffectRowDeclaration(AstNode declaration, string line)
+    {
+        FlushHoistedLines();
+        EffectRowDeclarationEmitted?.Invoke(declaration, _builder.Length + _indentLevel * 2);
+        AppendLine(line);
     }
 
     private void Append(string text)
@@ -875,11 +884,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
             var inlineReturn = node.Output != null ? $" -> {TypeMapper.CSharpToCalor(node.Output.TypeName)}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendLine($"§MT{{{node.Name}}}{attrs}{typeParams}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
+            AppendEffectRowDeclaration(node, $"§MT{{{node.Name}}}{attrs}{typeParams}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendLine($"§MT{{{node.Name}}}{attrs}{typeParams}{typeParamsAfterGroup}");
+            AppendEffectRowDeclaration(node, $"§MT{{{node.Name}}}{attrs}{typeParams}{typeParamsAfterGroup}");
             Indent();
             EmitParameterLines(node.Parameters);
             EmitOutputLine(node.Output);
@@ -1517,11 +1526,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
             var inlineReturn = node.Output != null ? $" -> {output}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendLine($"§{methodTag}{{{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}{modStr}}}{attrs}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
+            AppendEffectRowDeclaration(node, $"§{methodTag}{{{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}{modStr}}}{attrs}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendLine($"§{methodTag}{{{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}{modStr}}}{attrs}{typeParamsAfterGroup}");
+            AppendEffectRowDeclaration(node, $"§{methodTag}{{{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}{modStr}}}{attrs}{typeParamsAfterGroup}");
         }
         Indent();
 
@@ -1607,11 +1616,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
             var inlineReturn = node.Output != null ? $" -> {output}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendLine($"§{funcTag}{{{EscapeCalorIdentifier(functionName)}{typeParams}{visibilitySegment}}}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
+            AppendEffectRowDeclaration(node, $"§{funcTag}{{{EscapeCalorIdentifier(functionName)}{typeParams}{visibilitySegment}}}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendLine($"§{funcTag}{{{EscapeCalorIdentifier(functionName)}{typeParams}{visibilitySegment}}}{typeParamsAfterGroup}");
+            AppendEffectRowDeclaration(node, $"§{funcTag}{{{EscapeCalorIdentifier(functionName)}{typeParams}{visibilitySegment}}}{typeParamsAfterGroup}");
         }
         Indent();
 

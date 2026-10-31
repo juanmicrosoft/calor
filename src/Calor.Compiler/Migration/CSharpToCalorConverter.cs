@@ -965,8 +965,9 @@ public sealed class CSharpToCalorConverter
     ///
     /// <para>The probe emit goes to a scratch context so the loss ledger sees
     /// exactly one emit, the real one in step 3. Rows travel back onto the tree in
-    /// hand by declaration id, which survives the round trip, and step 3 then
-    /// emits once with them.</para>
+    /// hand by the exact header offsets recorded by that probe emitter. Parser-local
+    /// identities do not survive a text round trip. Step 3 emits once with the
+    /// correlated rows; the correlation never becomes public syntax.</para>
     ///
     /// <para>Resolution must see what the later compile will see, or the two agree
     /// about the body and disagree about the manifests — see
@@ -992,7 +993,12 @@ public sealed class CSharpToCalorConverter
         var resolver = RentSynthesisResolver(_options.ProjectDirectory, _options.SolutionDirectory, context.UserManifestRoot);
         try
         {
-            var probe = new CalorEmitter(CreateContext(sourceFile)).Emit(module);
+            var declarationOffsets = new Dictionary<AstNode, int>(ReferenceEqualityComparer.Instance);
+            var emitter = new CalorEmitter(CreateContext(sourceFile))
+            {
+                EffectRowDeclarationEmitted = declarationOffsets.Add
+            };
+            var probe = emitter.Emit(module);
             var reparsed = TryParseModule(probe);
             if (reparsed == null)
             {
@@ -1003,7 +1009,7 @@ public sealed class CSharpToCalorConverter
             }
 
             var converged = EffectEnforcementPass.SynthesizeDeclaredRows(reparsed, resolver);
-            CopyEffectRows(reparsed, module);
+            CopyEffectRows(reparsed, module, declarationOffsets);
 
             if (!converged)
             {
@@ -1050,45 +1056,54 @@ public sealed class CSharpToCalorConverter
 
     /// <summary>
     /// Copies synthesised <c>§E</c> rows from the re-parsed module onto the tree
-    /// the converter holds, matching declarations by the id they carry through the
-    /// round trip (<c>f001</c>, <c>Class.m002</c>, <c>IFace.mt003</c>). A
-    /// declaration the round trip did not preserve simply keeps the row it has.
+    /// the converter holds, matching the probe's parsed header spans to the original
+    /// nodes that emitted them. This distinguishes overloads, namespaces and conditional
+    /// branches without depending on transient identities or declaration ordering.
+    /// Every target must match before any rows are copied.
     /// </summary>
-    private static void CopyEffectRows(ModuleNode source, ModuleNode target)
+    private static void CopyEffectRows(
+        ModuleNode source, ModuleNode target, IReadOnlyDictionary<AstNode, int> declarationOffsets)
     {
-        var rows = new Dictionary<string, EffectsNode?>(StringComparer.Ordinal);
-        foreach (var (key, effects, _) in EnumerateRowSites(source))
-            rows[key] = effects;
+        var rows = EnumerateRowSites(source)
+            .ToDictionary(site => site.Declaration.Span.Start, site => site.Effects);
+        var assignments = new List<(Action<EffectsNode> Assign, EffectsNode Effects)>();
 
-        foreach (var (key, _, assign) in EnumerateRowSites(target))
+        foreach (var (declaration, _, assign) in EnumerateRowSites(target))
         {
-            if (rows.TryGetValue(key, out var synthesized) && synthesized != null)
-                assign(synthesized);
+            if (!declarationOffsets.TryGetValue(declaration, out var offset)
+                || !rows.TryGetValue(offset, out var synthesized))
+            {
+                throw new InvalidOperationException(
+                    $"Effect-row declaration at {declaration.Span} did not survive the probe emit/reparse.");
+            }
+            if (synthesized != null)
+                assignments.Add((assign, synthesized));
         }
+        foreach (var (assign, effects) in assignments)
+            assign(effects);
     }
 
     /// <summary>
     /// Every declaration in a module that can carry a <c>§E</c> row, as
-    /// (key, current row, setter). Uses the same enumerators the effect pass keys
-    /// its facts with, so the two cannot disagree about what a declaration is
-    /// called.
+    /// (declaration, current row, setter). Uses the same reach as the effect pass,
+    /// while leaving parser-local identities inside their own trees.
     /// </summary>
-    private static IEnumerable<(string Key, EffectsNode? Effects, Action<EffectsNode> Assign)>
+    private static IEnumerable<(AstNode Declaration, EffectsNode? Effects, Action<EffectsNode> Assign)>
         EnumerateRowSites(ModuleNode module)
     {
         foreach (var function in module.Functions)
-            yield return ($"F:{function.Id}", function.Effects, row => function.Effects = row);
+            yield return (function, function.Effects, row => function.Effects = row);
 
         foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
         {
             foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))
-                yield return ($"M:{cls.Name}.{method.Id}", method.Effects, row => method.Effects = row);
+                yield return (method, method.Effects, row => method.Effects = row);
         }
 
         foreach (var iface in CallGraphAnalysis.EnumerateInterfaces(module))
         {
             foreach (var signature in iface.Methods)
-                yield return ($"S:{iface.Name}.{signature.Id}", signature.Effects, row => signature.Effects = row);
+                yield return (signature, signature.Effects, row => signature.Effects = row);
         }
     }
 
