@@ -204,7 +204,7 @@ public class CharLiteralTests
               §F{Probe:pub} () -> i32
                 §E{}
                 §B{~sum:i32} 0
-                §L{for1:i:0:{{bound}}:1}
+                §L{i:0: {{bound}}:1}
                   §ASSIGN sum (+ sum i)
                 §R sum
             """;

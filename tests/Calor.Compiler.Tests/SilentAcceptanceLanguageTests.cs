@@ -85,7 +85,7 @@ public class SilentAcceptanceLanguageTests
     [InlineData("priv-prot", Visibility.PrivateProtected)]
     public void Parser_EveryValidVisibilityWord_ParsesToItsLevel(string word, Visibility expected)
     {
-        var module = Parse($"§M{{V}}\n  §CL{{K:pub}}\n    §MT{{m2:A:{word}}} () -> i32\n      §R 1\n", out var diagnostics);
+        var module = Parse($"§M{{V}}\n  §CL{{K:pub}}\n    §MT{{A:{word}}} () -> i32\n      §R 1\n", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(e => e.Message)));
         Assert.Equal(expected, module.Classes.Single().Methods.Single().Visibility);
@@ -104,16 +104,16 @@ public class SilentAcceptanceLanguageTests
     [InlineData("Priv")]
     public void Parser_VisibilitySynonymsAndCaseVariants_AreErrors(string word)
     {
-        Parse($"§M{{V}}\n  §CL{{K:pub}}\n    §MT{{m2:A:{word}}} () -> i32\n      §R 1\n",
+        Parse($"§M{{V}}\n  §CL{{K:pub}}\n    §MT{{A:{word}}} () -> i32\n      §R 1\n",
             out var diagnostics);
         Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnknownVisibility);
     }
 
     // Review round 1: compact headers must not swallow an unknown visibility word.
     [Theory]
-    [InlineData("§MT{prv} () -> i32\n      §R 1")]
-    [InlineData("§MT{prv:virt} () -> i32\n      §R 1")]
-    [InlineData("§MT{prv:} () -> i32\n      §R 1")]
+    [InlineData("§MT{Run:prv} () -> i32\n      §R 1")]
+    [InlineData("§MT{Run:prv:virt} () -> i32\n      §R 1")]
+    [InlineData("§MT{Run:prv:} () -> i32\n      §R 1")]
     [InlineData("§CTOR{prv}")]
     public void Parser_CompactHeaderWithUnknownVisibility_IsCalor0122(string member)
     {
@@ -125,7 +125,7 @@ public class SilentAcceptanceLanguageTests
     [Theory]
     [InlineData("§MT{Run:bogus} () -> i32")]
     [InlineData("§MT{Run:priv} () -> i32")]
-    [InlineData("§MT{prv} () -> i32")]
+    [InlineData("§MT{Run:prv} () -> i32")]
     public void Parser_InterfaceMethodNonPublicOrUnknownVisibility_IsCalor0122(string member)
     {
         Parse($"§M{{V}}\n  §IFACE{{IRun}}\n    {member}\n", out var diagnostics);
@@ -147,7 +147,7 @@ public class SilentAcceptanceLanguageTests
     [Fact]
     public void Parser_CompactAbstractMethodWithUnknownVisibility_IsCalor0122()
     {
-        Parse("§M{V}\n  §CL{K:pub:abs}\n    §AMT{prv} () -> i32\n", out var diagnostics);
+        Parse("§M{V}\n  §CL{K:pub:abs}\n    §AMT{Run:prv} () -> i32\n", out var diagnostics);
 
         Assert.Contains(DiagnosticCode.UnknownVisibility, ErrorCodes(diagnostics));
     }
@@ -156,6 +156,7 @@ public class SilentAcceptanceLanguageTests
     [InlineData("§MT{Run:pub} () -> i32\n      §R 1", "Run", Visibility.Public)]
     [InlineData("§MT{Run} () -> i32\n      §R 1", "Run", Visibility.Private)]
     [InlineData("§MT{Run:prot:virt} () -> i32\n      §R 1", "Run", Visibility.Protected)]
+    [InlineData("§MT{prv} () -> i32\n      §R 1", "prv", Visibility.Private)]
     public void Parser_CompactMethodHeaders_PositiveControls(string member, string name, Visibility visibility)
     {
         var module = Parse($"§M{{V}}\n  §CL{{K:pub}}\n    {member}\n", out var diagnostics);
@@ -311,11 +312,11 @@ public class SilentAcceptanceLanguageTests
     [Theory]
     [InlineData("§B{x:i32} 1\n§ASSIGN x 2\n§R x")]
     [InlineData("§B{x} 1\n§ASSIGN x (+ x 1)\n§R x")]
-    [InlineData("§B{x:i32} 1\n§B{y} (inc x)\n§R x")]
-    [InlineData("§B{x:i32} 1\n§B{y} (post-dec x)\n§R x")]
+    [InlineData("§B{x:i32} 1\n§ASSIGN x (+ x 1)\n§B{y} x\n§R x")]
+    [InlineData("§B{x:i32} 1\n§B{y} x\n§ASSIGN x (- x 1)\n§R x")]
     [InlineData("§L{i:0:3:1}\n  §ASSIGN i 5\n§R 0")]
     [InlineData("§L{i:0:3:1}\n  §B{~i:i32} 9\n§R 0")]
-    [InlineData("§L{i:0:3:1}\n  §B{y} (inc i)\n§R 0")]
+    [InlineData("§L{i:0:3:1}\n  §ASSIGN i (+ i 1)\n  §B{y} i\n§R 0")]
     public void Binder_WriteToReadOnlyLocal_IsCalor0213(string body)
     {
         var diagnostics = Bind(Fn(body));
@@ -329,7 +330,7 @@ public class SilentAcceptanceLanguageTests
     [InlineData("§L{i:0:3:1}\n  §PP{DEBUG}\n    §ASSIGN i 5\n§R 0")]
     // #1678: `§B{x} 1` then `§PP` `§B{~x} 2` is now bound, so it is Calor0260 like the same
     // rebind outside §PP (PreprocessorBindingTests.Binder_MutableRebindOfPreprocessorImmutableBinding_IsCalor0260).
-    [InlineData("§E{mut}\n§B{x:i32} 1\n§B{~xs:List<i32>} §NEW{List<i32>}\n§PUSH{xs} (inc x)\n§R x")]
+    [InlineData("§E{mut}\n§B{x:i32} 1\n§B{~xs:List<i32>} §NEW{List<i32>}\n§PP{DEBUG}\n  §ASSIGN x (+ x 1)\n  §PUSH{xs} x\n§R x")]
     public void Binder_WriteInsideUnboundStatement_IsCalor0213(string body)
     {
         var diagnostics = Bind(Fn(body));
@@ -404,7 +405,7 @@ public class SilentAcceptanceLanguageTests
     // Review round 3: `#if` opens no C# scope, so a §PP binding stays visible after the block.
     [Theory]
     [InlineData("§PP{DEBUG}\n  §B{x:i32} 1\n§ASSIGN x 2\n§R 0")]
-    [InlineData("§PP{DEBUG}\n  §B{x:i32} 1\n§B{y} (inc x)\n§R 0")]
+    [InlineData("§PP{DEBUG}\n  §B{x:i32} 1\n§ASSIGN x (+ x 1)\n§B{y} x\n§R 0")]
     [InlineData("§PP{DEBUG}\n  §B{v:i32} 1\n§C{Bump} §A{ref} v §/C\n§R 0")]
     public void Binder_WriteAfterPreprocessorBlockToItsImmutableBinding_IsCalor0213(string body)
     {
@@ -449,7 +450,7 @@ public class SilentAcceptanceLanguageTests
     [Theory]
     [InlineData("§B{~x:i32} 1\n§PP{DEBUG}\n  §ASSIGN x 2\n§R x")]
     [InlineData("§B{x:i32} 1\n§PP{DEBUG}\n  §B{~y:i32} 0\n  §ASSIGN y x\n§R x")]
-    [InlineData("§E{mut}\n§B{~x:i32} 1\n§B{~xs:List<i32>} §NEW{List<i32>}\n§PUSH{xs} (inc x)\n§R x")]
+    [InlineData("§E{mut}\n§B{~x:i32} 1\n§B{~xs:List<i32>} §NEW{List<i32>}\n§PP{DEBUG}\n  §ASSIGN x (+ x 1)\n  §PUSH{xs} x\n§R x")]
     public void Binder_WriteInsideUnboundStatementToMutableLocal_IsAccepted(string body)
     {
         var diagnostics = Bind(Fn(body));
@@ -460,7 +461,7 @@ public class SilentAcceptanceLanguageTests
     [Theory]
     [InlineData("§B{~x:i32} 1\n§ASSIGN x 2\n§R x")]
     [InlineData("§B{~x} 1\n§ASSIGN x (+ x 1)\n§R x")]
-    [InlineData("§B{~x:i32} 1\n§B{y} (inc x)\n§R x")]
+    [InlineData("§B{~x:i32} 1\n§ASSIGN x (+ x 1)\n§B{y} x\n§R x")]
     [InlineData("§B{~x:i32} 1\n§B{~x} 5\n§R x")]
     [InlineData("§B{~s} 0\n§L{i:0:3:1}\n  §ASSIGN s (+ s i)\n§R s")]
     [InlineData("§LIST{xs:i32}\n  1\n§ASSIGN xs xs\n§R 0")]

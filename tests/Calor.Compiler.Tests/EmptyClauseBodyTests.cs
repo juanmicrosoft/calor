@@ -17,12 +17,12 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class EmptyClauseBodyTests
 {
-    // The 0.25 R0 witness X-TRYCATCH-01, as the converter emitted it (CLI default).
+    // Active-syntax copy of the 0.25 R0 witness X-TRYCATCH-01.
     private const string XTryCatch01 = """
         §M{X-TRYCATCH-01:overflow=unchecked}
           §U{System}
 
-          §NS{ns_global:_global:global}
+          §NS{global}
             §M{Probe:pub}
               §FLD{i32:counter:priv:stat} = 0
 
@@ -555,11 +555,15 @@ public class EmptyClauseBodyTests
                 §E{}
                 §B{~n:i32} 0
                 §B{a:Func<i32>} §LAM{}
-                (inc n)
+                (+ n 1)
                 §R n
             """);
 
         Assert.Equal(4, body.Count);
+        var binding = Assert.IsType<BindStatementNode>(body[1]);
+        var lambda = Assert.IsType<LambdaExpressionNode>(binding.Initializer);
+        Assert.Null(lambda.ExpressionBody);
+        Assert.Null(lambda.StatementBody);
         Assert.IsType<ExpressionStatementNode>(body[2]);
         Assert.IsType<ReturnStatementNode>(body[3]);
     }
@@ -585,7 +589,7 @@ public class EmptyClauseBodyTests
     [Fact]
     public void ManyEmptyBlocksWithoutClosers_ParseWithoutErrors()
     {
-        var lines = string.Join("\n", Enumerable.Range(0, 3000).Select(i => $"    §UNSAFE{{u{i}}}"));
+        var lines = string.Join("\n", Enumerable.Repeat("    §UNSAFE", 3000));
         var module = Parse("§M{T}\n  §F{A:pub} () -> void\n    §E{}\n" + lines + "\n");
 
         Assert.Equal(3000, Assert.Single(module.Functions).Body.Count);
@@ -683,9 +687,9 @@ public class EmptyClauseBodyTests
     {
         var module = Parse("""
             §M{T}
-              §EN{e:Color}
+              §EN{Color}
                 Red
-              §EEXT{x:Color}
+              §EEXT{Color}
               §F{A:pub} (Color:self) -> i32
                 §E{}
                 §R 1

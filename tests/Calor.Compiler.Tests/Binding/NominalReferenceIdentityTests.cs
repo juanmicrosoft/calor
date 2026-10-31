@@ -266,7 +266,7 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
             """;
         var sourceB = $$"""
             §M{Namespaces}
-              §CL{c2:{{callerClassName}}:pub}
+              §CL{{{callerClassName}}:pub}
                 §MT{Probe:pub:static} () -> void
                   §B{value:{{receivingType}}} §C{A.Foo.Get} §/C
             """;

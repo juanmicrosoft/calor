@@ -38,7 +38,7 @@ public class LspMcpToolsTests
     public async Task GotoDefinition_FindsFunction()
     {
         var tool = new NavigateTool();
-        var args = CreateArgs(SampleSource, line: 13, column: 15, action: "definition"); // "greet" on function definition
+        var args = CreateArgs(SampleSource, line: 13, column: 6, action: "definition"); // "greet" on function definition
 
         var result = await tool.ExecuteAsync(args);
 
@@ -68,7 +68,7 @@ public class LspMcpToolsTests
     public async Task GotoDefinition_FindsClass()
     {
         var tool = new NavigateTool();
-        var args = CreateArgs(SampleSource, line: 8, column: 15, action: "definition"); // "Item" class
+        var args = CreateArgs(SampleSource, line: 8, column: 7, action: "definition"); // "Item" class
 
         var result = await tool.ExecuteAsync(args);
 
@@ -129,7 +129,7 @@ public class LspMcpToolsTests
     public async Task SymbolInfo_ReturnsClassInfo()
     {
         var tool = new NavigateTool();
-        var args = CreateArgs(SampleSource, line: 8, column: 15, action: "info"); // "Item" class
+        var args = CreateArgs(SampleSource, line: 8, column: 7, action: "info"); // "Item" class
 
         var result = await tool.ExecuteAsync(args);
 
