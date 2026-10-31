@@ -47,9 +47,9 @@
       "path": "tests/Calor.Ids.Tests/Calor.Ids.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 394,
+      "expectedTotal": 383,
       "expectedSkipped": 0,
-      "note": "#1420: 390 -> 394, +4 Z3ConsumerGuardTests cases (tests/Shared, linked into every registered test host): the host RID is a supported Z3 RID, Z3 loads at the pinned version, and the output-root and runtimes/<rid>/native libz3 plus Microsoft.Z3.dll match their committed SHA-256 pins. They fail rather than skip. No new skipped cases."
+      "note": "#1420: 390 -> 394, +4 Z3ConsumerGuardTests cases (tests/Shared, linked into every registered test host): the host RID is a supported Z3 RID, Z3 loads at the pinned version, and the output-root and runtimes/<rid>/native libz3 plus Microsoft.Z3.dll match their committed SHA-256 pins. They fail rather than skip. #1600 source-ID retirement: 394 -> 383, verified by the complete executed suite. Remove 10 tests for the retired source-rewriting IdAssigner API; replace 7 source-ID workflow scenarios with 4 persisted-sidecar scenarios (-3); replace 9 scanner cases with 10 effective-sidecar cases (+1), including exact enumeration of all 8 declaration kinds; replace 8 hook cases with 9 current identity cases (+1), including corrupt storage and ambiguous edits with no source/sidecar writes. No new skipped cases."
     },
     {
       "path": "tests/Calor.ILAnalysis.Tests/Calor.ILAnalysis.Tests.csproj",
