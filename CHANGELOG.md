@@ -41,8 +41,13 @@ no substitute tokenizer or estimated result is reported here.
 
 - **C# conversion preserves indexer parameters and generic array element types.**
   Both cases now survive the full C# → Calor → C# pipeline. The 100-snippet
-  scorecard reaches 100 round-trip compilations, with 97 fully native conversions.
+  scorecard reaches 100 round-trip compilations, with 98 fully native conversions.
   Preserved C# does not count as native conversion.
+- **Pure scalar local self-recursion converts through existing lambdas.**
+  Conversion declares and initializes a typed mutable delegate at the original
+  declaration. It proves the complete body uses only built-in scalar operations
+  and direct self-calls, preserving overflow behavior. Captures, mutual recursion
+  and other unproved shapes remain preserved C#; no new syntax is introduced.
 - **Generic member references map Calor type aliases correctly.**
   `ImmutableDictionary<str, i32>.Empty` now emits
   `ImmutableDictionary<string, int>.Empty`. Namespace, member and generic-method
