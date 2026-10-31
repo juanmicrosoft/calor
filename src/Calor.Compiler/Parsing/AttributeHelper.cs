@@ -675,8 +675,8 @@ public static class AttributeHelper
 
         foreach (var c in argsStr)
         {
-            if (c == '<') depth++;
-            else if (c == '>') depth--;
+            if (c is '<' or '(' or '[') depth++;
+            else if (c is '>' or ')' or ']') depth--;
             else if (c == ',' && depth == 0)
             {
                 args.Add(current.ToString().Trim());

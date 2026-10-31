@@ -43,4 +43,41 @@ public class ToSurfaceSpellingTests
             Assert.Equal(compact, AttributeHelper.ToSurfaceSpelling(AttributeHelper.ExpandType(compact)));
         }
     }
+
+    [Theory]
+    [InlineData(
+        "System.Func<i32, i32[,]>",
+        "System.Func<INT, INT[,]>",
+        "System.Func<int, int[,]>")]
+    [InlineData(
+        "System.Func<(int, string), i32[,]>",
+        "System.Func<(int, string), INT[,]>",
+        "System.Func<(int, string), int[,]>")]
+    [InlineData(
+        "System.Tuple<System.Func<i32[,], i32[,,]>, str[]>",
+        "System.Tuple<System.Func<INT[,], INT[,,]>, STRING[]>",
+        "System.Tuple<System.Func<int[,], int[,,]>, string[]>")]
+    [InlineData(
+        "System.Collections.Generic.Dictionary<str, i64[,][]>",
+        "System.Collections.Generic.Dictionary<STRING, INT[bits=64][signed=true][,][]>",
+        "System.Collections.Generic.Dictionary<string, long[,][]>")]
+    [InlineData(
+        "System.Func<[i32], i32[,]>",
+        "System.Func<ARRAY[element=INT], INT[,]>",
+        "System.Func<int[], int[,]>")]
+    [InlineData(
+        "System.Func<i32[,], (int, string)>",
+        "System.Func<INT[,], (int, string)>",
+        "System.Func<int[,], (int, string)>")]
+    public void GenericArguments_PreserveNestedCommasAcrossExpansionAndSurfaceRoundTrip(
+        string surface,
+        string expanded,
+        string csharp)
+    {
+        Assert.Equal(expanded, AttributeHelper.ExpandType(surface));
+        Assert.Equal(surface, AttributeHelper.ToSurfaceSpelling(expanded));
+        Assert.Equal(expanded,
+            AttributeHelper.ExpandType(AttributeHelper.ToSurfaceSpelling(expanded)));
+        Assert.Equal(csharp, Migration.TypeMapper.CalorToCSharp(expanded));
+    }
 }
