@@ -661,6 +661,81 @@ class CredentialCheckTests(unittest.TestCase):
         code, out = self.f.run(live=False)
         self.assertEqual(0, code, out)
 
+    def test_count_environment_is_recognized_only_in_its_own_job_and_workflow(self) -> None:
+        path = self.f.workflow("syntax-token-count.yml")
+        original = path.read_text(encoding="utf-8")
+        self.assertIn("    environment: anthropic-count-tokens\n", original)
+        path.write_text(original.replace("  count:\n", "  another-count:\n"), encoding="utf-8")
+        self.assert_codes({"W004"})
+        path.write_text(original, encoding="utf-8")
+        copied = self.f.workflow("another-count.yml")
+        copied.write_text(original, encoding="utf-8")
+        self.assert_codes({"W004"})
+        copied.unlink()
+        publish = self.f.workflow("publish-nuget.yml")
+        text = publish.read_text(encoding="utf-8")
+        publish.write_text(text.replace("    environment: nuget-release\n",
+                                       "    environment: anthropic-count-tokens\n"), encoding="utf-8")
+        self.assert_codes({"W006"})
+
+    def test_count_environment_unknown_dynamic_or_release_values_fail_closed(self) -> None:
+        path = self.f.workflow("syntax-token-count.yml")
+        original = path.read_text(encoding="utf-8")
+        marker = "    environment: anthropic-count-tokens\n"
+        for value in ("unknown-count", "${{ inputs.environment }}", "nuget-release",
+                      "NUGET-RELEASE", "ANTHROPIC-COUNT-TOKENS",
+                      "{name: anthropic-count-tokens}",
+                      "${{ format('anthropic-{0}', 'count-tokens') }}"):
+            with self.subTest(value=value):
+                path.write_text(original.replace(marker, f"    environment: {value}\n"), encoding="utf-8")
+                self.assert_codes({"W004"})
+
+    def test_count_environment_does_not_allow_nuget_secret_or_login_output_references(self) -> None:
+        path = self.f.workflow("syntax-token-count.yml")
+        original = path.read_text(encoding="utf-8")
+        marker = "    environment: anthropic-count-tokens\n"
+        for reference, codes in (
+            ("${{ secrets.NUGET_API_KEY }}", {"W002"}),
+            ("${{ secrets.NUGET_RELEASE_API_KEY }}", {"W002"}),
+            ("${{ secrets['nuget_release_api_key'] }}", {"W002"}),
+            (cred.KEY_REF, {"W002", "W003"}),
+            ("${{ steps.NUGET-LOGIN.outputs.key }}", {"W003"}),
+        ):
+            with self.subTest(reference=reference):
+                path.write_text(original.replace(marker, marker + f"    env:\n      K: {reference}\n"),
+                                encoding="utf-8")
+                self.assert_codes(codes)
+
+    def test_count_environment_does_not_allow_nuget_login_or_credentialed_push(self) -> None:
+        path = self.f.workflow("syntax-token-count.yml")
+        original = path.read_text(encoding="utf-8")
+        before, count = original.split("  count:\n", 1)
+        for step, codes in (
+            (f"      - uses: {cred.LOGIN_ACTION}\n", {"W003"}),
+            ("      - name: Push to NuGet\n"
+             f"        env:\n          {cred.KEY_ENV}: {cred.KEY_REF}\n"
+             '        run: dotnet nuget push package.nupkg --api-key "$NUGET_OIDC_KEY"\n',
+             {"W002", "W003"}),
+        ):
+            with self.subTest(step=step):
+                path.write_text(before + "  count:\n" + count.replace("    steps:\n", "    steps:\n" + step, 1),
+                                encoding="utf-8")
+                self.assert_codes(codes)
+
+    def test_count_environment_secrets_remain_in_the_nuget_inventory(self) -> None:
+        self.f.write("environments", {"total_count": 3, "environments": [
+            *CLOSED["environments"]["environments"], {"name": "anthropic-count-tokens"}]})
+        key = "environment-secrets/anthropic-count-tokens"
+        self.f.write(key, secrets("ANTHROPIC_API_KEY"))
+        code, out = self.f.run()
+        self.assertEqual(0, code, out)
+        for name in ("NUGET_API_KEY", "NUGET_RELEASE_API_KEY", "other_nuget_key"):
+            with self.subTest(name=name):
+                self.f.write(key, secrets("ANTHROPIC_API_KEY", name))
+                self.assert_codes({"S007"})
+        self.f.unreadable(key)
+        self.assert_codes({"U004"}, verdict="UNKNOWN")
+
     def test_suppressed_moved_or_conditional_guard_is_open(self) -> None:
         guard = "      - name: Require the Trusted Publishing NuGet key (#1545)\n"
         path = self.f.workflow("publish-nuget.yml")
