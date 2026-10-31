@@ -392,7 +392,9 @@ public class SyntaxTests
         var module = parser.Parse();
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-        Assert.Equal("m001", module.Id);
+        Assert.NotEmpty(module.LocalId);
+        Assert.Null(module.ToolingId);
+        Assert.Equal(module.LocalId, module.Id);
         Assert.Equal("Hello", module.Name);
     }
 

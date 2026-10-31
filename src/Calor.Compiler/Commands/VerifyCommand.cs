@@ -141,7 +141,24 @@ public static class VerifyCommand
         // every contract is proven or merely unknown/timeout/unsupported —
         // inconclusive is not failure (runtime checks are kept). Applies to
         // both text and JSON modes.
-        var hasErrors = false;
+        var identityDiagnostics = new DiagnosticBag();
+        try
+        {
+            Ids.DeclarationIdentityStore.SyncActiveInputs(files
+                .Where(file => file.Exists && file.Extension.Equals(".calr", StringComparison.OrdinalIgnoreCase))
+                .Select(file => file.FullName));
+        }
+        catch (Ids.DeclarationIdentityParseException ex)
+        {
+            identityDiagnostics.AddRange(ex.Diagnostics);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException
+            or System.Text.Json.JsonException or UnauthorizedAccessException)
+        {
+            identityDiagnostics.Report(TextSpan.Empty, DiagnosticCode.DeclarationIdentityUnavailable, ex.Message);
+        }
+        aggregatedDiagnostics.AddRange(identityDiagnostics);
+        var hasErrors = identityDiagnostics.HasErrors;
 
         // JSON (the only machine-readable format; FormatOutput renders every
         // other value as text): --verbose compiler phase lines go to stderr so
@@ -167,6 +184,13 @@ public static class VerifyCommand
             if (!file.Extension.Equals(".calr", StringComparison.OrdinalIgnoreCase))
             {
                 Console.Error.WriteLine($"Warning: Skipping non-Calor file: {file.Name}");
+                continue;
+            }
+
+            if (identityDiagnostics.HasErrors)
+            {
+                results.Add(new FileVerificationResult(file.Name, file.FullName,
+                    new VerificationSummary(0, 0, 0, 0, 0), [], identityDiagnostics));
                 continue;
             }
 
@@ -240,9 +264,6 @@ public static class VerifyCommand
         TextWriter? statusWriter)
     {
         var source = await File.ReadAllTextAsync(file.FullName);
-        var diagnostics = new DiagnosticBag();
-        diagnostics.SetFilePath(file.FullName);
-
         var cacheOptions = new VerificationCacheOptions
         {
             Enabled = !noCache,

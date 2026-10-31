@@ -11,7 +11,7 @@ public class NestedDelegateTests
     [Fact]
     public void NestedDelegate_InClass_ParsesSuccessfully()
     {
-        var source = "§M{Test}\n§CL{Foo:pub}\n  §DEL{MyHandler:pub}\n    §I{str:input}\n    §O{bool}\n  §/DEL\n\n";
+        var source = "§M{Test}\n§CL{Foo:pub}\n  §DEL{MyHandler}\n    §I{str:input}\n    §O{bool}\n  §/DEL\n\n";
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
@@ -24,7 +24,8 @@ public class NestedDelegateTests
         Assert.Equal("Foo", cls.Name);
         var del = Assert.Single(cls.NestedDelegates);
         Assert.Equal("MyHandler", del.Name);
-        Assert.Equal("d001", del.Id);
+        Assert.NotEmpty(del.Id);
+        Assert.Null(del.ToolingId);
         Assert.Single(del.Parameters);
         Assert.NotNull(del.Output);
     }
@@ -63,8 +64,8 @@ public class NestedDelegateTests
         var emitter = new CalorEmitter();
         var result = emitter.Emit(module);
 
-        Assert.Contains("DEL{d001:MyHandler}", result);
-        Assert.DoesNotContain("/DEL{d001}", result);
+        Assert.Contains("§DEL{MyHandler}", result);
+        Assert.DoesNotContain("§/DEL", result);
     }
 
     [Fact]

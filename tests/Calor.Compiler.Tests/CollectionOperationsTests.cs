@@ -121,7 +121,8 @@ public class CollectionOperationsTests
 
         var listCreation = bindStmt.Initializer as ListCreationNode;
         Assert.NotNull(listCreation);
-        Assert.Equal("list1", listCreation.Id);
+        Assert.NotEmpty(listCreation.Id);
+        Assert.Null(listCreation.ToolingId);
         Assert.Equal("i32", listCreation.ElementType);
         Assert.Empty(listCreation.Elements);
     }
@@ -178,7 +179,8 @@ public class CollectionOperationsTests
 
         var dictCreation = bindStmt.Initializer as DictionaryCreationNode;
         Assert.NotNull(dictCreation);
-        Assert.Equal("dict1", dictCreation.Id);
+        Assert.NotEmpty(dictCreation.Id);
+        Assert.Null(dictCreation.ToolingId);
         Assert.Equal("str", dictCreation.KeyType);
         Assert.Equal("i32", dictCreation.ValueType);
         Assert.Empty(dictCreation.Entries);
@@ -235,7 +237,8 @@ public class CollectionOperationsTests
 
         var setCreation = bindStmt.Initializer as SetCreationNode;
         Assert.NotNull(setCreation);
-        Assert.Equal("set1", setCreation.Id);
+        Assert.NotEmpty(setCreation.Id);
+        Assert.Null(setCreation.ToolingId);
         Assert.Equal("str", setCreation.ElementType);
         Assert.Empty(setCreation.Elements);
     }
@@ -514,7 +517,8 @@ public class CollectionOperationsTests
 
         var foreachNode = func.Body[0] as DictionaryForeachNode;
         Assert.NotNull(foreachNode);
-        Assert.Equal("e1", foreachNode.Id);
+        Assert.NotEmpty(foreachNode.Id);
+        Assert.Null(foreachNode.ToolingId);
         Assert.Equal("k", foreachNode.KeyName);
         Assert.Equal("v", foreachNode.ValueName);
         Assert.Single(foreachNode.Body);
@@ -1335,7 +1339,8 @@ public class CollectionOperationsTests
         // Verify structure
         var foreachNode = reparsed.Functions[0].Body[0] as DictionaryForeachNode;
         Assert.NotNull(foreachNode);
-        Assert.Equal("e1", foreachNode.Id);
+        Assert.NotEmpty(foreachNode.Id);
+        Assert.Null(foreachNode.ToolingId);
         Assert.Equal("k", foreachNode.KeyName);
         Assert.Equal("v", foreachNode.ValueName);
     }

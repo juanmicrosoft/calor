@@ -253,9 +253,8 @@ public class CompactSyntaxTests
     }
 
     [Fact]
-    public void OptionalId_Function_ThreePartOldFormatPreserved()
+    public void IdentityFree_Function_UsesParserLocalIdentity()
     {
-        // Old format §F{name:vis} should still work
         var source = """
             §M{Test}
               §F{Add:pub}
@@ -269,7 +268,9 @@ public class CompactSyntaxTests
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
 
         var func = Assert.Single(module.Functions);
-        Assert.Equal("f001", func.Id);
+        Assert.NotEmpty(func.LocalId);
+        Assert.Null(func.ToolingId);
+        Assert.Equal(func.LocalId, func.Id);
         Assert.Equal("Add", func.Name);
         Assert.Equal(Visibility.Public, func.Visibility);
     }

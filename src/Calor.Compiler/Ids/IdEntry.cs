@@ -125,7 +125,7 @@ public sealed class DeclarationIdentityStore
 
     public static void AttachIfRegistered(string? file, string source, ModuleNode module)
     {
-        if (file == null || !file.EndsWith(".calr", StringComparison.Ordinal) || !File.Exists(file)) return;
+        if (file == null || !file.EndsWith(".calr", StringComparison.OrdinalIgnoreCase) || !File.Exists(file)) return;
         file = Path.GetFullPath(file);
         try
         {
@@ -141,7 +141,7 @@ public sealed class DeclarationIdentityStore
 
     public static void SyncIfRegistered(string? file)
     {
-        if (file == null || !file.EndsWith(".calr", StringComparison.Ordinal) || !Path.IsPathFullyQualified(file)) return;
+        if (file == null || !file.EndsWith(".calr", StringComparison.OrdinalIgnoreCase) || !Path.IsPathFullyQualified(file)) return;
         var store = Find(file);
         if (store == null || !store.IncludesRegistration(file)) return;
         store.Recover();
@@ -150,7 +150,7 @@ public sealed class DeclarationIdentityStore
 
     public static void SyncActiveFileInExistingProject(string file)
     {
-        if (!file.EndsWith(".calr", StringComparison.Ordinal)) return;
+        if (!file.EndsWith(".calr", StringComparison.OrdinalIgnoreCase)) return;
         var store = FindForActiveInput(file);
         if (store == null) return;
         store.Recover();
@@ -232,7 +232,7 @@ public sealed class DeclarationIdentityStore
     {
         var relative = Path.GetRelativePath(Root, Path.GetFullPath(file)).Replace('\\', '/');
         if (relative == ".." || relative.StartsWith("../", StringComparison.Ordinal) || Path.IsPathRooted(relative)
-            || !relative.EndsWith(".calr", StringComparison.Ordinal))
+            || !relative.EndsWith(".calr", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException($"Identity source must be a .calr file under '{Root}': {file}");
         ValidatePath(relative);
         return relative;
@@ -328,7 +328,7 @@ public sealed class DeclarationIdentityStore
         foreach (var file in state.Files)
         {
             ValidatePath(file);
-            if (!file.EndsWith(".calr", StringComparison.Ordinal))
+            if (!file.EndsWith(".calr", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException($"Not a Calor identity source: {file}");
         }
         if (state.Declarations.Any(d => d == null))
@@ -464,7 +464,7 @@ public sealed class DeclarationIdentityStore
         // Preflight every artifact before writing any: never clobber an external edit.
         foreach (var change in journal.Changes)
         {
-            if (!change.File.EndsWith(".calr", StringComparison.Ordinal))
+            if (!change.File.EndsWith(".calr", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("Identity transaction can only change .calr sources.");
             var path = ValidatePath(change.File);
             var current = File.Exists(path) ? File.ReadAllText(path) : null;

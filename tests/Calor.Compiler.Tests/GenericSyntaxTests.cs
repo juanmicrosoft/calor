@@ -530,7 +530,7 @@ public class GenericSyntaxTests
         var emitter = new CalorEmitter();
         var calorOutput = emitter.Emit(module);
 
-        Assert.Contains("§CL{c001:Repository<T>", calorOutput);
+        Assert.Contains("§CL{Repository<T>", calorOutput);
         Assert.Contains("§WHERE T : class", calorOutput);
     }
 

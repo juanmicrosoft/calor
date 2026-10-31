@@ -31,7 +31,7 @@ public class CalorFormatterTests
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        Assert.Contains("m001", result);
+        Assert.Contains("§M{Test}", result);
         Assert.Contains("Test", result);
     }
 
@@ -231,7 +231,7 @@ public class CalorFormatterTests
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        Assert.Contains("§W{", result);
+        Assert.Contains("§W ", result);
         Assert.Contains("§K", result);
     }
 
@@ -382,8 +382,8 @@ public class CalorFormatterTests
         var formatted = formatter.Format(module);
 
         // Verify the formatted output contains key elements
-        Assert.Contains("m001", formatted);
-        Assert.Contains("f001", formatted);
+        Assert.Contains("§M{Test}", formatted);
+        Assert.Contains("§F{Add:pub}", formatted);
         Assert.Contains("Test", formatted);
         Assert.Contains("Add", formatted);
         Assert.Contains("pub", formatted);

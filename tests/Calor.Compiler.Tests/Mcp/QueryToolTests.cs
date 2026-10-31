@@ -157,9 +157,9 @@ public sealed class QueryToolTests : IDisposable
         var result = Assert.IsType<McpToolResult>(call.Result);
         Assert.False(result.IsError);
         Assert.Equal(
-            "  app.calr:2:11 function Run" + Environment.NewLine
-                + "  math.calr:5:11 function ScaleTwice" + Environment.NewLine
-                + "query: 2 caller(s) of math.calr:2:11 function Scale" + Environment.NewLine,
+            "  app.calr:2:6 function Run" + Environment.NewLine
+                + "  math.calr:5:6 function ScaleTwice" + Environment.NewLine
+                + "query: 2 caller(s) of math.calr:2:6 function Scale" + Environment.NewLine,
             Text(result));
     }
 
@@ -573,13 +573,13 @@ public sealed class QueryToolTests : IDisposable
         Assert.True(result.IsError);
         Assert.Equal(
             "Error: 'Shared' is declared in 2 places; narrow it with --in-file:" + Environment.NewLine
-                + "  ambiguous.calr:2:11 function Shared" + Environment.NewLine
-                + "  ambiguous2.calr:2:11 function Shared" + Environment.NewLine,
+                + "  ambiguous.calr:2:6 function Shared" + Environment.NewLine
+                + "  ambiguous2.calr:2:6 function Shared" + Environment.NewLine,
             Text(result));
 
         var narrowed = await Call(Args(dir, "callers", "Shared", ", \"inFile\": \"ambiguous2.calr\", \"format\": \"text\""));
         Assert.False(narrowed.IsError);
-        Assert.StartsWith("  ambiguous2.calr:5:11 function AsksShared", Text(narrowed));
+        Assert.StartsWith("  ambiguous2.calr:5:6 function AsksShared", Text(narrowed));
         Assert.Contains("query: PARTIAL", Text(narrowed));
     }
 
@@ -606,7 +606,7 @@ public sealed class QueryToolTests : IDisposable
             """);
         var text = await Call(Args(dir, "effects", "Uses", ", \"format\": \"text\""));
         Assert.True(text.IsError);
-        Assert.StartsWith("query: no effect row for broken.calr:2:11 function Uses — ", Text(text));
+        Assert.StartsWith("query: no effect row for broken.calr:2:6 function Uses — ", Text(text));
 
         // The JSON form is the CLI's: an envelope with empty rows, not an error.
         var json = await Call(Args(dir, "effects", "Uses"));

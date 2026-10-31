@@ -84,7 +84,11 @@ proved nothing exits `0` exactly like a run that proved everything.
 ## Reporting, Not Rewriting
 
 The command compiles its inputs before reporting contract results. Active
-receiving-boundary errors (`Calor0272`–`Calor0274`) therefore fail verification
+input files receive tooling-maintained declaration identities automatically.
+If identity metadata is corrupt or ambiguous, verification fails with exit
+`1` rather than reporting parser-local IDs as durable identities.
+
+Active receiving-boundary errors (`Calor0272`–`Calor0274`) also fail verification
 with exit `1`; enabling verification does not bypass them. The text report
 lists their messages under `Errors`, rather than displaying the root compile
 command's diagnostic code and source span. Use the root compile command to

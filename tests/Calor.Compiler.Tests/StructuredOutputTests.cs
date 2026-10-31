@@ -528,7 +528,10 @@ public class StructuredOutputTests : IDisposable
         var root = doc.RootElement;
         var functions = root.GetProperty("data").GetProperty("files")[0].GetProperty("functions");
         Assert.Equal(1, functions.GetArrayLength());
-        Assert.Equal("f001", functions[0].GetProperty("functionId").GetString());
+        var identity = Assert.Single(
+            Ids.DeclarationIdentityStore.Find(file)!.Sync().Declarations,
+            declaration => declaration.Kind == Ids.IdKind.Function);
+        Assert.Equal(identity.Id, functions[0].GetProperty("functionId").GetString());
 
         var contracts = functions[0].GetProperty("contracts");
         Assert.Equal(1, contracts.GetArrayLength());
@@ -546,6 +549,100 @@ public class StructuredOutputTests : IDisposable
             Assert.False(string.IsNullOrEmpty(cex.GetProperty("rendered").GetString()));
             Assert.Equal(JsonValueKind.Array, cex.GetProperty("bindings").ValueKind);
         }
+    }
+
+    [Theory]
+    [InlineData(".calr")]
+    [InlineData(".CALR")]
+    public void Verify_FormatJson_PreservesPersistedIdentityAcrossEarlierDeclarationInsertion(string extension)
+    {
+        var file = Path.Combine(_tempDir, "identity" + extension);
+        const string source = """
+            §M{Identity}
+              §F{Answer:pub} (i32:value) -> i32
+                §S (== result value)
+                §R value
+            """;
+        File.WriteAllText(file, source);
+        var first = RunCli("verify", file, "--format", "json");
+        Assert.Equal(0, first.ExitCode);
+        var store = Ids.DeclarationIdentityStore.Find(file)!;
+        var id = Assert.Single(store.Sync().Declarations, declaration => declaration.Name == "Answer").Id;
+
+        File.WriteAllText(file, source.Replace("  §F{Answer", """
+              §F{Earlier:priv} () -> void
+                §E{}
+              §F{Answer
+            """, StringComparison.Ordinal));
+        var second = RunCli("verify", file, "--format", "json");
+        Assert.Equal(0, second.ExitCode);
+        using var document = JsonDocument.Parse(second.StdOut);
+        var functions = document.RootElement.GetProperty("data").GetProperty("files")[0].GetProperty("functions");
+        var answer = Assert.Single(functions.EnumerateArray(),
+            function => function.GetProperty("functionName").GetString() == "Answer");
+        Assert.Equal(id, answer.GetProperty("functionId").GetString());
+    }
+
+    [Fact]
+    public void Verify_FormatJson_CorruptIdentityIsAnErrorWithoutTransientFunctionIds()
+    {
+        var file = Path.Combine(_tempDir, "identity.calr");
+        File.WriteAllText(file, """
+            §M{Identity}
+              §F{Answer:pub} (i32:value) -> i32
+                §S (== result value)
+                §R value
+            """);
+        Assert.Equal(0, RunCli("verify", file, "--format", "json").ExitCode);
+        var sidecar = Ids.DeclarationIdentityStore.Find(file)!.SidecarPath;
+        File.WriteAllText(sidecar, "{ broken");
+
+        var result = RunCli("verify", file, "--format", "json");
+
+        Assert.Equal(1, result.ExitCode);
+        using var document = JsonDocument.Parse(result.StdOut);
+        var root = document.RootElement;
+        var diagnostic = Assert.Single(root.GetProperty("diagnostics").EnumerateArray());
+        Assert.Equal(Calor.Compiler.Diagnostics.DiagnosticCode.DeclarationIdentityUnavailable, diagnostic.GetProperty("code").GetString());
+        Assert.False(diagnostic.TryGetProperty("declarationId", out _));
+        Assert.Empty(root.GetProperty("data").GetProperty("files")[0].GetProperty("functions").EnumerateArray());
+        Assert.Equal("{ broken", File.ReadAllText(sidecar));
+    }
+
+    [Fact]
+    public void Verify_FormatJson_MultiDirectoryInputsShareTheActualInputRoot()
+    {
+        var files = new[] { "a", "b" }.Select(name =>
+        {
+            var directory = Path.Combine(_tempDir, name);
+            Directory.CreateDirectory(directory);
+            var file = Path.Combine(directory, "input.calr");
+            File.WriteAllText(file, $$"""
+                §M{{{name}}}
+                  §F{Answer:pub} (i32:value) -> i32
+                    §S (== result value)
+                    §R value
+                """);
+            return file;
+        }).ToArray();
+
+        var result = RunCli("verify", files[0], files[1], "--format", "json");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(Ids.DeclarationIdentityStore.Find(files[0])!.SidecarPath,
+            Ids.DeclarationIdentityStore.Find(files[1])!.SidecarPath);
+        Assert.True(File.Exists(Path.Combine(_tempDir, ".calor", "ids.json")));
+        Assert.All(files, file =>
+            Assert.False(File.Exists(Path.Combine(Path.GetDirectoryName(file)!, ".calor", "ids.json"))));
+        using var document = JsonDocument.Parse(result.StdOut);
+        var outputs = document.RootElement.GetProperty("data").GetProperty("files").EnumerateArray().ToArray();
+        Assert.Equal(2, outputs.Length);
+        var expected = Ids.DeclarationIdentityStore.Find(files[0])!.Sync().Declarations
+            .Where(declaration => declaration.Kind == Ids.IdKind.Function)
+            .Select(declaration => declaration.Id).Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal(expected, outputs.Select(output =>
+            Assert.Single(output.GetProperty("functions").EnumerateArray()).GetProperty("functionId").GetString()!)
+            .Order(StringComparer.Ordinal).ToArray());
     }
 
     [Fact]

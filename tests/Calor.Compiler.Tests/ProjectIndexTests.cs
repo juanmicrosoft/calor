@@ -287,10 +287,10 @@ public sealed class ProjectIndexTests : IDisposable
         var sb = new System.Text.StringBuilder("§M{M}\n");
         for (var i = 1; i <= n; i++)
         {
-            sb.Append($"  §F{{f{i:D4}:A{i}:pub}} (i32:n) -> i32\n    §E{{cw}}\n");
+            sb.Append($"  §F{{A{i}:pub}} (i32:n) -> i32\n    §E{{cw}}\n");
             if (i == 1)
                 sb.Append("    §C{Console.WriteLine} §A \"x\" §/C\n");
-            sb.Append($"    §IF{{if{i}}} (> n 0)\n");
+            sb.Append("    §IF (> n 0)\n");
             if (i < n)
                 sb.Append($"      §B{{u{i}:i32}} §C{{A{i + 1}}} §A (- n 1) §/C\n");
             sb.Append(i > 1 ? $"      §R §C{{A{i - 1}}} §A (- n 1) §/C\n" : "      §R 0\n");

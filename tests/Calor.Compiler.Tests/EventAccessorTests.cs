@@ -93,7 +93,8 @@ public class EventAccessorTests
         Assert.Empty(diag);
         var cls = Assert.Single(module.Classes);
         var evt = Assert.Single(cls.Events);
-        Assert.Equal("e001", evt.Id);
+        Assert.NotEmpty(evt.Id);
+        Assert.Null(evt.ToolingId);
         Assert.Equal("Click", evt.Name);
         Assert.Equal(Visibility.Public, evt.Visibility);
         Assert.Equal("EventHandler", evt.DelegateType);
@@ -127,7 +128,8 @@ public class EventAccessorTests
         Assert.Empty(diag);
         var cls = Assert.Single(module.Classes);
         var evt = Assert.Single(cls.Events);
-        Assert.Equal("e001", evt.Id);
+        Assert.NotEmpty(evt.Id);
+        Assert.Null(evt.ToolingId);
         Assert.Equal("Click", evt.Name);
         Assert.Equal(Visibility.Public, evt.Visibility);
         Assert.Equal("EventHandler", evt.DelegateType);
