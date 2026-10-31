@@ -11,17 +11,19 @@ namespace Calor.Compiler.Binding;
 /// </summary>
 public readonly record struct SymbolId
 {
-    private readonly string? _value;
+    private readonly IdentityPath? _path;
 
-    public string Value => _value ?? string.Empty;
-    public bool IsNone => string.IsNullOrEmpty(_value);
+    public string Value => _path?.Value ?? string.Empty;
+    public bool IsNone => _path == null;
     public static SymbolId None => default;
 
     public SymbolId(string value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
-        _value = value;
+        _path = new IdentityPath(null, value);
     }
+
+    private SymbolId(IdentityPath path) => _path = path;
 
     public static SymbolId Create(params string[] components)
     {
@@ -40,10 +42,91 @@ public readonly record struct SymbolId
         if (IsNone)
             return Create(components);
 
-        return new SymbolId(Value + "/" + string.Join("/", components.Select(Escape)));
+        var suffix = components.Length switch
+        {
+            1 => string.Concat("/", Escape(components[0])),
+            2 => string.Concat("/", Escape(components[0]), "/", Escape(components[1])),
+            3 => string.Concat("/", Escape(components[0]), "/", Escape(components[1]), "/", Escape(components[2])),
+            _ => "/" + string.Join("/", components.Select(Escape))
+        };
+        return new SymbolId(new IdentityPath(_path, suffix));
+    }
+
+    internal SymbolId AppendEscapedSuffix(string suffix)
+    {
+        if (IsNone || !suffix.StartsWith("/", StringComparison.Ordinal))
+            throw new InvalidOperationException("An escaped identity suffix requires a parent and separator.");
+        return new SymbolId(new IdentityPath(_path, suffix));
     }
 
     public override string ToString() => IsNone ? "<none>" : Value;
+
+    public bool Equals(SymbolId other)
+    {
+        if (ReferenceEquals(_path, other._path)) return true;
+        if (_path == null || other._path == null
+            || _path.Length != other._path.Length || _path.Hash != other._path.Hash) return false;
+        var left = _path;
+        var right = other._path;
+        var leftIndex = left.Segment.Length - 1;
+        var rightIndex = right.Segment.Length - 1;
+        while (left != null && right != null)
+        {
+            if (ReferenceEquals(left, right) && leftIndex == rightIndex) return true;
+            if (left.Segment[leftIndex--] != right.Segment[rightIndex--]) return false;
+            if (leftIndex < 0)
+            {
+                left = left.Parent;
+                if (left != null) leftIndex = left.Segment.Length - 1;
+            }
+            if (rightIndex < 0)
+            {
+                right = right.Parent;
+                if (right != null) rightIndex = right.Segment.Length - 1;
+            }
+        }
+        return left == null && right == null;
+    }
+
+    public override int GetHashCode() => _path?.Hash ?? 0;
+
+    private sealed class IdentityPath
+    {
+        public IdentityPath? Parent { get; }
+        public string Segment { get; }
+        public int Length { get; }
+        public int Hash { get; }
+        private string? _value;
+
+        public IdentityPath(IdentityPath? parent, string segment)
+        {
+            Parent = parent;
+            Segment = segment;
+            Length = checked((parent?.Length ?? 0) + segment.Length);
+            var hash = parent?.Hash ?? unchecked((int)2166136261);
+            foreach (var character in segment) hash = unchecked((hash ^ character) * 16777619);
+            Hash = hash;
+            if (parent == null) _value = segment;
+        }
+
+        public string Value
+        {
+            get
+            {
+                if (_value != null) return _value;
+                var value = string.Create(Length, this, static (target, path) =>
+                {
+                    var end = target.Length;
+                    for (IdentityPath? current = path; current != null; current = current.Parent)
+                    {
+                        end -= current.Segment.Length;
+                        current.Segment.AsSpan().CopyTo(target[end..]);
+                    }
+                });
+                return Interlocked.CompareExchange(ref _value, value, null) ?? value;
+            }
+        }
+    }
 
     private static string Escape(string component) =>
         Uri.EscapeDataString(component ?? throw new ArgumentNullException(nameof(component)));

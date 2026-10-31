@@ -110,10 +110,13 @@ public sealed class Binder
     // enumeration order equal to declaration order without copying the whole
     // map at every loop.
     private readonly List<SymbolId> _symbolOrder = new();
-    private readonly Dictionary<string, int> _declarationIdOccurrences = new(StringComparer.Ordinal);
+    private readonly Dictionary<SymbolId, int> _declarationIdOccurrences = new();
+    private readonly Dictionary<(SymbolId Context, string Kind), SymbolId> _snapshotLocalContexts = new();
+    private readonly System.Buffers.ArrayBufferWriter<byte> _localIdentityBytes = new(256);
+    private System.Text.Json.Utf8JsonWriter? _localIdentityWriter;
     // While a loop body is bound for discovery, each declaration-id counter
     // change is journaled (previous value, 0 = absent) so it can be undone.
-    private List<(string Key, int Previous)>? _declarationOccurrenceJournal;
+    private List<(SymbolId Key, int Previous)>? _declarationOccurrenceJournal;
     private IReadOnlySet<string> _declaredReferenceTypes = new HashSet<string>(StringComparer.Ordinal);
     private SymbolId _moduleSymbolId;
     private HashSet<string> _toolingIds = new(StringComparer.Ordinal);
@@ -759,13 +762,16 @@ public sealed class Binder
         _symbolsById.Clear();
         _symbolOrder.Clear();
         _declarationIdOccurrences.Clear();
+        _snapshotLocalContexts.Clear();
         _localFunctionSymbols.Clear();
         _boundLocalFunctions.Clear();
         _delegateTypeNames.Clear();
         _misplacedRowsReported.Clear();
         _currentNamespaceIdentity = null;
-        _transientBindingId = SnapshotIdentityKey(module);
-        _toolingIds = Ids.DeclarationIdentityStore.ToolingIds(module).ToHashSet(StringComparer.Ordinal);
+        _transientBindingId = CreateSnapshotIdentityKey(module, out var hasToolingIdentity);
+        _toolingIds = hasToolingIdentity
+            ? Ids.DeclarationIdentityStore.ToolingIds(module).ToHashSet(StringComparer.Ordinal)
+            : new HashSet<string>(StringComparer.Ordinal);
         _moduleSymbolId = module.ToolingId != null
             ? SymbolId.Create("declaration", module.ToolingId)
             : SymbolId.Create("source", _sourceIdentity, "module", module.Name);
@@ -1437,9 +1443,14 @@ public sealed class Binder
         BoundTypes.GenericInstantiationBoundType? genericNullabilityType = null)
     {
         var context = _declarationContext.IsNone ? _moduleSymbolId : _declarationContext;
+        if (!_snapshotLocalContexts.TryGetValue((context, kind), out var snapshotContext))
+        {
+            snapshotContext = context.Append("snapshot", _transientBindingId, kind);
+            _snapshotLocalContexts.Add((context, kind), snapshotContext);
+        }
         return CreateVariable(
-            CreateDeclarationId(context.Append("snapshot", _transientBindingId), kind, stableAstId: null,
-                System.Text.Json.JsonSerializer.Serialize(new { name, typeName, declarationSpan.Start })),
+            RegisterDeclarationOccurrence(snapshotContext.AppendEscapedSuffix(
+                LocalIdentitySuffix(name, typeName, declarationSpan.Start))),
             name,
             typeName,
             isMutable,
@@ -1455,64 +1466,270 @@ public sealed class Binder
             genericNullabilityType: genericNullabilityType);
     }
 
-    private static string SnapshotIdentityKey(ModuleNode module)
+    private string LocalIdentitySuffix(string name, string typeName, int start)
+    {
+        _localIdentityBytes.Clear();
+        _localIdentityWriter ??= new System.Text.Json.Utf8JsonWriter(_localIdentityBytes);
+        var writer = _localIdentityWriter;
+        writer.Reset(_localIdentityBytes);
+        writer.WriteStartObject();
+        writer.WriteString("name"u8, name);
+        writer.WriteString("typeName"u8, typeName);
+        writer.WriteNumber("Start"u8, start);
+        writer.WriteEndObject();
+        writer.Flush();
+        static bool Unescaped(byte value) => value is >= (byte)'a' and <= (byte)'z'
+            or >= (byte)'A' and <= (byte)'Z' or >= (byte)'0' and <= (byte)'9'
+            or (byte)'-' or (byte)'_' or (byte)'.' or (byte)'~';
+        var length = 8; // /name%3A
+        foreach (var value in _localIdentityBytes.WrittenSpan) length += Unescaped(value) ? 1 : 3;
+        return string.Create(length, _localIdentityBytes.WrittenMemory, static (result, bytes) =>
+        {
+            "/name%3A".AsSpan().CopyTo(result);
+            var index = 8;
+            const string hex = "0123456789ABCDEF";
+            foreach (var value in bytes.Span)
+            {
+                if (Unescaped(value)) result[index++] = (char)value;
+                else
+                {
+                    result[index++] = '%';
+                    result[index++] = hex[value >> 4];
+                    result[index++] = hex[value & 15];
+                }
+            }
+        });
+    }
+
+    private static string SnapshotIdentityKey(ModuleNode module) =>
+        CreateSnapshotIdentityKey(module, out _);
+
+    private static string CreateSnapshotIdentityKey(ModuleNode module, out bool hasToolingIdentity)
     {
         // Snapshot-local handles must change after edits, not between identical compilations.
         // Tooling and parser identities are metadata, not part of the syntax fingerprint.
-        var text = new System.Text.StringBuilder();
+        using var text = new SnapshotHashWriter();
         var pending = new Stack<AstNode>();
-        var visited = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
-        pending.Push(module);
-        while (pending.TryPop(out var node))
+        var visited = System.Threading.Interlocked.Exchange(ref SnapshotVisited, null)
+            ?? new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+        var children = new List<AstNode>();
+        hasToolingIdentity = false;
+        try
         {
-            if (!visited.Add(node)) continue;
-            text.Append(node.GetType().FullName).Append(':').Append(node.Span.Start).Append(':').Append(node.Span.Length);
-            foreach (var property in node.GetType().GetProperties().OrderBy(property => property.Name, StringComparer.Ordinal))
+            pending.Push(module);
+            while (pending.TryPop(out var node))
             {
-                if (!property.CanRead || property.GetIndexParameters().Length != 0
-                    || property.Name is "Id" or "LocalId" or "ToolingId") continue;
-                var type = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
-                var value = property.GetValue(node);
-                var encoded = value == null ? "null"
-                    : type.IsPrimitive || type.IsEnum || type == typeof(string) || type == typeof(decimal)
-                        ? System.Text.Json.JsonSerializer.Serialize(Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture))
-                        : SnapshotMetadataValue(value);
-                if (encoded == null)
+                if (!visited.Add(node)) continue;
+                // Separate callable bodies and type-kind validation retain the declaration inventory.
+                hasToolingIdentity |= node.ToolingId != null
+                    || node is LocalFunctionStatementNode or TypeDefinitionNode;
+                text.Append(node.GetType().FullName!);
+                text.Append(":");
+                text.Append(node.Span.Start);
+                text.Append(":");
+                text.Append(node.Span.Length);
+                foreach (var plan in SnapshotProperties.GetOrAdd(node.GetType(), static type =>
                 {
-                    if (value is AstNode or IEnumerable<AstNode>
-                        || RecursiveAstWalker.GetAllChildProperties(node.GetType()).Contains(property)) continue;
-                    throw new InvalidOperationException($"Unsupported identity snapshot metadata: {node.GetType().Name}.{property.Name} ({type.Name}).");
+                    var children = RecursiveAstWalker.GetAllChildProperties(type);
+                    return type.GetProperties().Where(property => property.CanRead
+                        && property.GetIndexParameters().Length == 0
+                        && property.Name is not ("Id" or "LocalId" or "ToolingId"))
+                        .OrderBy(property => property.Name, StringComparer.Ordinal)
+                        .Select(property =>
+                        {
+                            var valueType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
+                            return new SnapshotProperty(property,
+                                valueType.IsPrimitive || valueType.IsEnum || valueType == typeof(string) || valueType == typeof(decimal),
+                                children.Contains(property));
+                        }).ToArray();
+                }))
+                {
+                    var property = plan.Property;
+                    if (property.Name == nameof(AstNode.Span) && property.DeclaringType == typeof(AstNode))
+                    {
+                        text.ResetJson();
+                        WriteSnapshotSpan(text.Json, node.Span);
+                        text.Append("|Span=");
+                        text.AppendJson();
+                        continue;
+                    }
+                    var value = property.GetValue(node);
+                    text.ResetJson();
+                    if (value == null) text.Json.WriteNullValue();
+                    else if (plan.Scalar)
+                        text.Json.WriteStringValue(Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture));
+                    else if (!WriteSnapshotMetadata(text.Json, value, text.MapEntries))
+                    {
+                        if (value is AstNode or IEnumerable<AstNode>
+                            || plan.Child) continue;
+                        var valueType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
+                        throw new InvalidOperationException($"Unsupported identity snapshot metadata: {node.GetType().Name}.{property.Name} ({valueType.Name}).");
+                    }
+                    text.Append("|");
+                    text.Append(property.Name);
+                    text.Append("=");
+                    text.AppendJson();
                 }
-                text.Append('|').Append(property.Name).Append('=').Append(encoded);
+                text.Append(Environment.NewLine);
+                children.Clear();
+                foreach (var property in RecursiveAstWalker.GetAllChildProperties(node.GetType()))
+                    CollectSnapshotChildren(property.GetValue(node), children);
+                // The global visited set preserves first-visit order without per-node deduplication.
+                for (var index = children.Count - 1; index >= 0; index--) pending.Push(children[index]);
             }
-            text.AppendLine();
-            foreach (var child in RecursiveAstWalker.GetAllChildren(node).Reverse()) pending.Push(child);
+            return text.Finish();
         }
-        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text.ToString())));
+        finally
+        {
+            visited.Clear();
+            // Retain one small scratch set, never ASTs or large-module working storage.
+            if (visited.EnsureCapacity(0) <= 4096)
+                System.Threading.Interlocked.CompareExchange(ref SnapshotVisited, visited, null);
+        }
     }
 
-    private static string? SnapshotMetadataValue(object value) => value switch
+    private static void CollectSnapshotChildren(object? value, List<AstNode> children)
     {
-        AttributeCollection attributes => System.Text.Json.JsonSerializer.Serialize(
-            attributes.All().OrderBy(pair => pair.Key, StringComparer.Ordinal)),
-        IReadOnlyDictionary<string, string> map => System.Text.Json.JsonSerializer.Serialize(
-            map.OrderBy(pair => pair.Key, StringComparer.Ordinal)),
-        IReadOnlyList<string> strings => System.Text.Json.JsonSerializer.Serialize(strings),
-        IReadOnlyList<int> ordinals => System.Text.Json.JsonSerializer.Serialize(ordinals),
-        IReadOnlyList<EffectParameterInfo> parameters => System.Text.Json.JsonSerializer.Serialize(parameters),
-        IReadOnlyList<NamespaceScopeInfo> scopes => System.Text.Json.JsonSerializer.Serialize(
-            scopes.Select(scope => new { scope.Name, scope.FullName, scope.IsFileScoped, scope.Span, scope.Kind })),
-        IReadOnlyList<TextSpan> spans => System.Text.Json.JsonSerializer.Serialize(spans),
-        IReadOnlyList<ObjectInitializerAssignment> initializers => System.Text.Json.JsonSerializer.Serialize(
-            initializers.Select(initializer => initializer.PropertyName)),
-        IReadOnlyList<CalorAttributeArgument> arguments => System.Text.Json.JsonSerializer.Serialize(
-            arguments.Select(argument => new { argument.Name, Value = argument.GetCalorFormattedValue() })),
-        InlineRefinementInfo refinement => System.Text.Json.JsonSerializer.Serialize(refinement.BaseTypeName),
-        TextSpan span => System.Text.Json.JsonSerializer.Serialize(span),
-        DateOnly date => System.Text.Json.JsonSerializer.Serialize(date),
-        DateTime date => System.Text.Json.JsonSerializer.Serialize(date),
-        _ => null
-    };
+        switch (value)
+        {
+            case AstNode node: children.Add(node); break;
+            case ObjectInitializerAssignment initializer: children.Add(initializer.Value); break;
+            case InlineRefinementInfo refinement: children.Add(refinement.Predicate); break;
+            case IReadOnlyList<AstNode> nodes:
+                for (var index = 0; index < nodes.Count; index++)
+                    if (nodes[index] is { } child) children.Add(child);
+                break;
+            case System.Collections.IEnumerable sequence when value is not string:
+                foreach (var item in sequence) CollectSnapshotChildren(item, children);
+                break;
+        }
+    }
+
+    private sealed record SnapshotProperty(System.Reflection.PropertyInfo Property, bool Scalar, bool Child);
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, SnapshotProperty[]> SnapshotProperties = new();
+    private static HashSet<AstNode>? SnapshotVisited;
+
+    private sealed class SnapshotHashWriter : IDisposable
+    {
+        private readonly System.Security.Cryptography.IncrementalHash _hash =
+            System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
+        private readonly System.Text.Encoder _encoder = System.Text.Encoding.UTF8.GetEncoder();
+        private readonly byte[] _bytes = new byte[4096];
+        private readonly System.Buffers.ArrayBufferWriter<byte> _jsonBytes = new(512);
+        public System.Text.Json.Utf8JsonWriter Json { get; }
+        public List<KeyValuePair<string, string>> MapEntries { get; } = new();
+        public SnapshotHashWriter() => Json = new(_jsonBytes);
+
+        public void Append(ReadOnlySpan<char> text)
+        {
+            while (!text.IsEmpty)
+            {
+                _encoder.Convert(text, _bytes, false, out var characters, out var bytes, out _);
+                _hash.AppendData(_bytes.AsSpan(0, bytes));
+                text = text[characters..];
+            }
+        }
+
+        public void Append(int value)
+        {
+            Span<char> text = stackalloc char[32];
+            if (!value.TryFormat(text, out var length))
+            {
+                Append(value.ToString());
+                return;
+            }
+            Append(text[..length]);
+        }
+
+        public void ResetJson()
+        {
+            _jsonBytes.Clear();
+            Json.Reset(_jsonBytes);
+        }
+
+        public void AppendJson()
+        {
+            Json.Flush();
+            _hash.AppendData(_jsonBytes.WrittenSpan);
+        }
+
+        public string Finish()
+        {
+            _encoder.Convert(ReadOnlySpan<char>.Empty, _bytes, true, out _, out var bytes, out _);
+            _hash.AppendData(_bytes.AsSpan(0, bytes));
+            return Convert.ToHexString(_hash.GetHashAndReset());
+        }
+
+        public void Dispose()
+        {
+            Json.Dispose();
+            _hash.Dispose();
+        }
+    }
+
+    private static bool WriteSnapshotMetadata(System.Text.Json.Utf8JsonWriter writer, object value,
+        List<KeyValuePair<string, string>> mapEntries)
+    {
+        switch (value)
+        {
+            case AttributeCollection attributes:
+                WriteSnapshotMap(writer, attributes.All(), mapEntries); break;
+            case IReadOnlyDictionary<string, string> map:
+                WriteSnapshotMap(writer, map, mapEntries); break;
+            case IReadOnlyList<string> strings:
+                System.Text.Json.JsonSerializer.Serialize(writer, strings); break;
+            case IReadOnlyList<int> ordinals:
+                System.Text.Json.JsonSerializer.Serialize(writer, ordinals); break;
+            case IReadOnlyList<EffectParameterInfo> parameters:
+                System.Text.Json.JsonSerializer.Serialize(writer, parameters); break;
+            case IReadOnlyList<NamespaceScopeInfo> scopes:
+                System.Text.Json.JsonSerializer.Serialize(writer, scopes.Select(scope => new { scope.Name, scope.FullName, scope.IsFileScoped, scope.Span, scope.Kind })); break;
+            case IReadOnlyList<TextSpan> spans:
+                System.Text.Json.JsonSerializer.Serialize(writer, spans); break;
+            case IReadOnlyList<ObjectInitializerAssignment> initializers:
+                System.Text.Json.JsonSerializer.Serialize(writer, initializers.Select(initializer => initializer.PropertyName)); break;
+            case IReadOnlyList<CalorAttributeArgument> arguments:
+                System.Text.Json.JsonSerializer.Serialize(writer, arguments.Select(argument => new { argument.Name, Value = argument.GetCalorFormattedValue() })); break;
+            case InlineRefinementInfo refinement:
+                System.Text.Json.JsonSerializer.Serialize(writer, refinement.BaseTypeName); break;
+            case TextSpan span:
+                WriteSnapshotSpan(writer, span); break;
+            case DateOnly date:
+                System.Text.Json.JsonSerializer.Serialize(writer, date); break;
+            case DateTime date:
+                System.Text.Json.JsonSerializer.Serialize(writer, date); break;
+            default: return false;
+        }
+        return true;
+    }
+
+    private static void WriteSnapshotSpan(System.Text.Json.Utf8JsonWriter writer, TextSpan span)
+    {
+        writer.WriteStartObject();
+        writer.WriteNumber("Start"u8, span.Start);
+        writer.WriteNumber("Length"u8, span.Length);
+        writer.WriteNumber("Line"u8, span.Line);
+        writer.WriteNumber("Column"u8, span.Column);
+        writer.WriteNumber("End"u8, span.End);
+        writer.WriteEndObject();
+    }
+
+    private static void WriteSnapshotMap(System.Text.Json.Utf8JsonWriter writer,
+        IEnumerable<KeyValuePair<string, string>> map, List<KeyValuePair<string, string>> entries)
+    {
+        entries.Clear();
+        foreach (var pair in map) entries.Add(pair);
+        entries.Sort(static (left, right) => StringComparer.Ordinal.Compare(left.Key, right.Key));
+        writer.WriteStartArray();
+        foreach (var pair in entries)
+        {
+            writer.WriteStartObject();
+            writer.WriteString("Key"u8, pair.Key);
+            writer.WriteString("Value"u8, pair.Value);
+            writer.WriteEndObject();
+        }
+        writer.WriteEndArray();
+    }
 
     private static string CallableIdentityKey(
         string name,
@@ -1543,7 +1760,12 @@ public sealed class Binder
         var baseId = stableAstId != null && _toolingIds.Contains(stableAstId)
             ? SymbolId.Create("declaration", stableAstId)
             : parent.Append(kind, $"name:{fallbackName}");
-        var key = baseId.Value;
+        return RegisterDeclarationOccurrence(baseId);
+    }
+
+    private SymbolId RegisterDeclarationOccurrence(SymbolId baseId)
+    {
+        var key = baseId;
         if (!_declarationIdOccurrences.TryGetValue(key, out var occurrence))
         {
             _declarationOccurrenceJournal?.Add((key, 0));
@@ -2095,7 +2317,7 @@ public sealed class Binder
         // Copying both module-wide maps here made binding quadratic in module
         // size (one full copy per loop).
         var symbolCount = _symbolOrder.Count;
-        var declarationJournal = new List<(string Key, int Previous)>();
+        var declarationJournal = new List<(SymbolId Key, int Previous)>();
         _declarationOccurrenceJournal = declarationJournal;
         var expressionsBound = ExpressionsBound;
         var misplacedRows = _misplacedRowsReported.ToArray();
