@@ -89,16 +89,12 @@
     },
     {
       "id": "conversion-snapshots:08-03.approved",
-      "expect": "known-failure",
+      "expect": "compile",
       "mode": "each",
       "options": [
         "--permissive-effects"
       ],
-      "errors": [
-        "08-03.approved.g.cs|Calor1002:CS0029|-|Generated C# failed compilation (CS0029): Cannot implicitly convert type 'string[]' to 'System.Collections.Generic.List<string>'"
-      ],
-      "defect": "Front end accepts the source; generated C# (CS0029): Cannot implicitly convert type 'string[]' to 'System.Collections.Generic.List<string>'",
-      "evidence": "Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
+      "evidence": "Current approved converter output explicitly preserves public List<string> Items { get; set; } = []; in raw C#. The former string[]-to-List<string> CS0029 cause is absent on this input; this is interop preservation, not a native conversion claim. Checkout CLI compilation and generated-C# runtime witnesses verify distinct empty List<string> instances, Add, getter and setter behavior. The existing --permissive-effects policy is unchanged. Historical failure reports are not rewritten.",
       "files": [
         "tests/Calor.Conversion.Tests/Snapshots/08-03.approved.calr"
       ]
@@ -1087,16 +1083,12 @@
     },
     {
       "id": "benchmarks:unregistered:NullDeref_buggy",
-      "expect": "known-failure",
+      "expect": "compile",
       "mode": "each",
       "options": [
         "--no-enforce-effects"
       ],
-      "errors": [
-        "NullDeref_buggy.calr|Calor1002:CS1061|f001|Generated C# failed compilation (CS1061): 'Option<int>' does not contain a definition for 'unwrap' and no accessible extension method 'unwrap' accepting a first argument of type 'Option<int>' could be found (are you missing a using directive or an assembly reference?)"
-      ],
-      "defect": "Front end accepts the source; generated C# (CS1061): 'Option<int>' does not contain a definition for 'unwrap' and no accessible extension method 'unwrap' accepting a first argument of type 'Option<int>' could be found (are you missing a using directive or an assembly reference?)",
-      "evidence": "Benchmark-directory files not listed in tests/TestData/Benchmarks/manifest.json; no test compiles them. Compiled with the same options as the registered benchmarks. Not in Benchmarks/manifest.json, so no test compiles it.",
+      "evidence": "The explicit current-input registry resolves this original subject to its nullable/exception semantic copy, which already has an intended-compile registration. That copy contains no Option.unwrap call, so the archived CS1061 cause does not apply to the current lane. Checkout CLI compilation and generated-C# runtime witnesses verify unchanged return values for int.MinValue, -1, 0, 1 and int.MaxValue, and InvalidOperationException(\"Missing value\") for null. The effects-off benchmark policy, original file registration, frozen original bytes and historical reports remain unchanged.",
       "files": [
         "tests/TestData/Benchmarks/ErrorDetection/NullDeref_buggy.calr"
       ]
@@ -1738,10 +1730,10 @@
       "negativeKind": "designed",
       "mode": "each",
       "errors": [
-        "mismatched_ids.calr|Calor0830|f1|Legacy structural closing tag '§/F' was removed in Phase 4d and is no longer accepted. A block now ends at the dedent of its body, so delete the closer line -- the indentation already marks where the block ends.",
-        "mismatched_ids.calr|Calor0830|m1|Legacy structural closing tag '§/M' was removed in Phase 4d and is no longer accepted. A block now ends at the dedent of its body, so delete the closer line -- the indentation already marks where the block ends."
+        "mismatched_ids.calr|Calor0830|-|Legacy structural closing tag '§/F' was removed in Phase 4d and is no longer accepted. A block now ends at the dedent of its body, so delete the closer line -- the indentation already marks where the block ends.",
+        "mismatched_ids.calr|Calor0830|-|Legacy structural closing tag '§/M' was removed in Phase 4d and is no longer accepted. A block now ends at the dedent of its body, so delete the closer line -- the indentation already marks where the block ends."
       ],
-      "evidence": "Inputs for the lint tests (LintTestDataLoader); no test compiles them. Compiled with default options. LintScenarios/10_error_cases holds deliberately malformed inputs for the lint error path; the parse/lex error is the fixture's purpose.",
+      "evidence": "Inputs for the lint tests (LintTestDataLoader); no test compiles them. Compiled with default options. LintScenarios/10_error_cases holds deliberately malformed inputs for the lint error path. Actual checkout CLI output retains exactly both registered Calor0830 causes and messages. Invalid source has no authoritative declaration sidecar, and parser/local IDs are not public declaration identities, so only the former f1/m1 slots become '-'; file, code, message and multiplicity remain exact. Unknown nonnull diagnostic IDs still fail closed.",
       "files": [
         "tests/TestData/LintScenarios/10_error_cases/mismatched_ids.calr"
       ]
@@ -2401,7 +2393,7 @@
       "options": [
         "--no-enforce-effects"
       ],
-      "evidence": "Current nullable/exception replacement for the archived Option.unwrap example; ActiveSyntaxInputTests requires current parsing, and Tier 2 requires generated C# with the benchmark consumer's effects-off policy. The original known-failure registration remains unchanged.",
+      "evidence": "Current nullable/exception replacement for the archived Option.unwrap example; ActiveSyntaxInputTests requires current parsing, and Tier 2 requires generated C# with the benchmark consumer's effects-off policy. Both this copy and the original subject routed to it now carry the same stronger compile obligation; the frozen original and historical failure reports remain unchanged.",
       "files": [
         "tests/TestData/ActiveSyntax/tests/TestData/Benchmarks/ErrorDetection/NullDeref_buggy.calr"
       ]

@@ -184,6 +184,20 @@ class ScratchDeclarationControls(unittest.TestCase):
         other = self.keys(dict(self.declaration, File="nested/fixture.calr"))
         self.assertNotEqual(first, other["f_000000000001"])
 
+    def test_unavailable_parser_identity_preserves_exact_error_causes(self):
+        diagnostic = {"code": "Calor0830", "severity": "error",
+                      "location": {"file": "broken.calr"},
+                      "message": "retired closer", "declarationId": None}
+        expected = ["broken.calr|Calor0830|-|retired closer"]
+        self.assertEqual(fcc.signature([diagnostic], {}), expected)
+        for field, value in (("code", "Calor0100"), ("message", "another cause"),
+                             ("location", {"file": "other.calr"})):
+            self.assertNotEqual(fcc.signature([dict(diagnostic, **{field: value})], {}),
+                                expected)
+        self.assertNotEqual(fcc.signature([diagnostic, diagnostic], {}), expected)
+        with self.assertRaisesRegex(ValueError, "unresolved"):
+            fcc.signature([dict(diagnostic, declarationId="f_parser_local")], {})
+
 
 class CurrentInputControls(unittest.TestCase):
     def setUp(self):
@@ -564,11 +578,8 @@ class RepositoryGuards(unittest.TestCase):
         self.assertTrue(mapping)
         groups = {f: g for g in self.manifest["groups"] for f in g["files"]}
         self.assertTrue(set(mapping.values()) <= groups.keys())
-        nullable = "tests/TestData/Benchmarks/ErrorDetection/NullDeref_buggy.calr"
-        self.assertEqual(groups[nullable]["expect"], "known-failure")
-        self.assertEqual(groups[mapping[nullable]]["expect"], "compile")
         for original, current in mapping.items():
-            if original not in groups or original == nullable:
+            if original not in groups:
                 continue
             with self.subTest(original=original):
                 self.assertEqual(groups[original]["expect"], groups[current]["expect"])
@@ -580,6 +591,30 @@ class RepositoryGuards(unittest.TestCase):
         self.assertEqual(set(ds15[0]["options"]),
                          {"--no-enforce-effects", "--permissive-effects"})
         self.assertEqual(ds15[0]["expect"], "compile")
+
+    def test_proven_current_defect_resolutions_require_compilation(self):
+        groups = {g["id"]: g for g in self.manifest["groups"]}
+        for identifier, files, options in [
+            ("conversion-snapshots:08-03.approved",
+             ["tests/Calor.Conversion.Tests/Snapshots/08-03.approved.calr"],
+             ["--permissive-effects"]),
+            ("benchmarks:unregistered:NullDeref_buggy",
+             ["tests/TestData/Benchmarks/ErrorDetection/NullDeref_buggy.calr"],
+             ["--no-enforce-effects"]),
+        ]:
+            with self.subTest(group=identifier):
+                current = groups[identifier]
+                self.assertEqual(current["expect"], "compile")
+                self.assertEqual(current["mode"], "each")
+                self.assertEqual(current["files"], files)
+                self.assertEqual(current["options"], options)
+                self.assertNotIn("errors", current)
+                self.assertNotIn("defect", current)
+        malformed = groups["lint-scenarios:mismatched_ids"]
+        self.assertEqual(malformed["expect"], "reject")
+        self.assertEqual(len(malformed["errors"]), 2)
+        self.assertTrue(all(error.split("|", 3)[1:3] == ["Calor0830", "-"]
+                            for error in malformed["errors"]))
 
     def test_codegen_only_failures_are_not_incidental_negatives(self):
         for g in self.manifest["groups"]:
