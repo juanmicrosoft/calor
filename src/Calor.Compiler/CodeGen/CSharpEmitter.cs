@@ -3801,6 +3801,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             return node.Name;
         }
+        if (node.Name == "this" && _currentClassName != null
+            && !IsVarDeclaredInScope(node.Name)
+            && !_currentClassMemberNames.Contains(node.Name)
+            && !_classMemberScopes.Any(scope => scope.Members.Contains(node.Name)))
+        {
+            return node.Name;
+        }
         if (node.Name == "default")
         {
             return IsVarDeclaredInScope(node.Name) ||

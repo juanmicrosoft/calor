@@ -169,6 +169,21 @@ public class MigrationLearningFixTests
     }
 
     [Fact]
+    public void PlainThisReference_InClassMethod_PreservesInstanceReceiver()
+    {
+        var result = Program.Compile(
+            """
+            §M{Receivers}
+              §CL{Holder:pub}
+                §MT{Self:pub} () -> Holder
+                  §R this
+            """);
+
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));
+        Assert.Contains("return this;", result.GeneratedCode);
+    }
+
+    [Fact]
     public void ReceiverKeywords_RemainDistinctFromEscapedIdentifierSegments()
     {
         var emitter = new CSharpEmitter();
