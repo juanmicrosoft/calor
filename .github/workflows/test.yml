@@ -103,6 +103,7 @@ jobs:
           python3 scripts/test_benchmark_publication_gate.py
           python3 scripts/test_reproducible_builds.py
           python3 scripts/test_release_checks.py
+          python3 scripts/test_count_tokens.py
 
       # #1421 (0.24 G2): the determinism protocol's gate. The validator checks this step
       # structurally (D014): its own step, no condition, unmasked. With --baseline-ref it also
