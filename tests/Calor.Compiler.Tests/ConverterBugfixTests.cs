@@ -1161,7 +1161,7 @@ public class Test
         var calor = ConvertToCalor(csharp);
 
         // Lock is now converted to §SYNC block with body inside
-        var syncIdx = calor.IndexOf("§SYNC{");
+        var syncIdx = calor.IndexOf("§SYNC ");
         var bindIdx = calor.IndexOf("§B{", syncIdx > 0 ? syncIdx : 0);
         Assert.True(syncIdx >= 0, "§SYNC block not found");
         Assert.True(bindIdx > syncIdx, "Body statement should appear inside §SYNC block");
@@ -1209,8 +1209,8 @@ public class Test
 }";
         var calor = ConvertToCalor(csharp);
 
-        Assert.True(calor.IndexOf("§B{", StringComparison.Ordinal) < calor.IndexOf("§WH{", StringComparison.Ordinal));
-        Assert.Contains("§WH{", calor);
+        Assert.True(calor.IndexOf("§B{", StringComparison.Ordinal) < calor.IndexOf("§WH ", StringComparison.Ordinal));
+        Assert.Contains("§WH ", calor);
         Assert.DoesNotContain("§RAW", calor);
     }
 
@@ -1232,8 +1232,8 @@ public class Test
 }";
         var calor = ConvertToCalor(csharp);
 
-        Assert.True(calor.IndexOf("§ASSIGN", StringComparison.Ordinal) < calor.IndexOf("§WH{", StringComparison.Ordinal));
-        Assert.Contains("§WH{", calor);
+        Assert.True(calor.IndexOf("§ASSIGN", StringComparison.Ordinal) < calor.IndexOf("§WH ", StringComparison.Ordinal));
+        Assert.Contains("§WH ", calor);
         Assert.DoesNotContain("§RAW", calor);
     }
 

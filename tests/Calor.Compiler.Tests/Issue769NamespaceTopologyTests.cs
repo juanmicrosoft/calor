@@ -62,10 +62,12 @@ public class Issue769NamespaceTopologyTests
 
         var module = ParseCalor(source);
 
-        Assert.Equal("ns1", Assert.Single(module.Enums).NamespaceScopeId);
+        var scope = Assert.Single(module.NamespaceScopes);
+        Assert.Equal("Example", scope.FullName);
+        Assert.Equal(scope.Id, Assert.Single(module.Enums).NamespaceScopeId);
         var survivor = Assert.Single(module.Classes);
         Assert.Equal("Example", survivor.NamespaceIdentity);
-        Assert.Equal("ns1", survivor.NamespaceScopeId);
+        Assert.Equal(scope.Id, survivor.NamespaceScopeId);
 
         var compilation = Program.Compile(
             source,
@@ -201,7 +203,7 @@ public class Issue769NamespaceTopologyTests
 
         var result = ConvertLossy(derivedSource);
         Assert.Contains(
-            $":GetSelector:{calorVisibility}:over}}",
+            $"§MT{{GetSelector:{calorVisibility}:over}}",
             result.CalorSource);
 
         var generated = new CSharpEmitter().Emit(ParseCalor(result.CalorSource!));
@@ -1753,7 +1755,7 @@ public class Issue769NamespaceTopologyTests
         var type = Assert.Single(result.Ast.Classes);
         Assert.Equal("_global", type.NamespaceIdentity);
         Assert.Equal("global::_global.Thing", type.FullyQualifiedSymbolIdentity);
-        Assert.Contains(":_global:named}", result.CalorSource);
+        Assert.Contains("§NS{_global:named}", result.CalorSource);
 
         var generated = CompileConverted(result);
         var compilation = CreateCompilation(generated);

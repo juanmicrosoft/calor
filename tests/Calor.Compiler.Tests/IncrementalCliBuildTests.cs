@@ -808,7 +808,8 @@ public class IncrementalCliEndToEndTests : IDisposable
 
         var summary = EffectSummaryBuilder.Build(module!);
         Assert.Equal(
-            new[] { "Box.m001", "Box.m002" },
+            Assert.Single(module.Classes).Methods.Select(method => $"Box.{method.Id}")
+                .OrderBy(id => id, StringComparer.Ordinal).ToArray(),
             summary.Callers.Select(caller => caller.CallerId).OrderBy(id => id, StringComparer.Ordinal).ToArray());
         Assert.All(summary.Callers, caller => Assert.Equal("Box.Run", caller.DisplayName));
         Assert.All(summary.Callers, caller => Assert.Single(caller.Calls));

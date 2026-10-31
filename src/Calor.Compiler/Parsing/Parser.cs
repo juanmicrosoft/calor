@@ -9230,9 +9230,9 @@ public sealed class Parser
                 var collectionSpan = Current.Span;
                 _ = Current.Kind switch
                 {
-                    TokenKind.List => (ExpressionNode)ParseListCreation(),
-                    TokenKind.Dict => ParseDictionaryCreation(),
-                    _ => ParseSetCreation()
+                    TokenKind.List => (ExpressionNode)ParseListCreation(declaration: true),
+                    TokenKind.Dict => ParseDictionaryCreation(declaration: true),
+                    _ => ParseSetCreation(declaration: true)
                 };
                 _diagnostics.ReportError(collectionSpan, DiagnosticCode.UnexpectedToken,
                     $"{tag} is a statement and cannot appear in a class body; declare a field or property " +

@@ -123,11 +123,11 @@ public class LinqSupportTests
     [Fact]
     public void ArrayInitializer_TypeFirst_EmitsCorrectly()
     {
-        // Type-first format: §ARR{type:id:size}
+        // The binding carries the name; the value header carries only type and size.
         var source = @"
 §M{TestMod}
   §F{Test:pub}
-      §B{[i32]:nums} §ARR{nums:3}
+      §B{nums:[i32]} §ARR{i32:3}
 ";
 
         var result = ParseAndEmit(source);
@@ -221,7 +221,7 @@ public class LinqSupportTests
         Assert.DoesNotContain("§ERR", result.CalorSource);
         // #1132: an empty initializer is a fresh zero-length array, not the shared
         // Array.Empty<T>() (`new int[0] == new int[0]` is false in C#).
-        Assert.Contains("§ARR{i32:arr:0}", result.CalorSource);
+        Assert.Contains("§ARR{i32:0}", result.CalorSource);
         Assert.DoesNotContain("Array.Empty", result.CalorSource);
     }
 
@@ -238,7 +238,7 @@ public class LinqSupportTests
         Assert.NotNull(result.CalorSource);
         // Element type should be inferred from the int[,] declaration. #1132: a bare
         // initializer of a declared int[,] is a rectangular §ARR2D, not a 1-D §ARR of rows.
-        Assert.Matches(@"§ARR2D\{\w+:matrix:i32\}", result.CalorSource);
+        Assert.Contains("§ARR2D{i32}", result.CalorSource);
         Assert.Contains("§ROW 1 2", result.CalorSource);
         Assert.DoesNotContain("§ARR{matrix", result.CalorSource);
     }

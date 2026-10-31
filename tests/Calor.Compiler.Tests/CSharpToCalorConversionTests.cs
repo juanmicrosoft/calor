@@ -349,7 +349,7 @@ public class CSharpToCalorConversionTests
         Assert.NotNull(result.CalorSource);
 
         // Should contain the main function marker
-        Assert.Contains("main", result.CalorSource);
+        Assert.Contains("§F{Main:pub}", result.CalorSource);
         Assert.Contains("Main", result.CalorSource);
 
         // Should contain variable binding
@@ -2258,7 +2258,7 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.Contains("§LAM{", result.CalorSource);
-        Assert.Contains("§/LAM{", result.CalorSource);
+        Assert.Contains("§/LAM", result.CalorSource);
         // Should NOT contain arrow notation
         Assert.DoesNotContain("→", result.CalorSource);
     }
@@ -2282,7 +2282,7 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.Contains("§LAM{", result.CalorSource);
-        Assert.Contains("§/LAM{", result.CalorSource);
+        Assert.Contains("§/LAM", result.CalorSource);
         Assert.DoesNotContain("→", result.CalorSource);
     }
 
@@ -2333,7 +2333,7 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.Contains("§LAM{", result.CalorSource);
-        Assert.Contains("§/LAM{", result.CalorSource);
+        Assert.Contains("§/LAM", result.CalorSource);
         Assert.DoesNotContain("→", result.CalorSource);
     }
 
@@ -2520,7 +2520,7 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.Contains("§LAM{", result.CalorSource);
-        Assert.Contains("§/LAM{", result.CalorSource);
+        Assert.Contains("§/LAM", result.CalorSource);
         Assert.Contains("async", result.CalorSource);
         Assert.DoesNotContain("→", result.CalorSource);
     }
@@ -3126,8 +3126,8 @@ public class CSharpToCalorConversionTests
         // Verify emitter output contains both classes as §CL blocks
         Assert.NotNull(result.CalorSource);
         Assert.Contains("§CL{", result.CalorSource);
-        Assert.Contains(":Outer", result.CalorSource);
-        Assert.Contains(":Inner", result.CalorSource);
+        Assert.Contains("§CL{Outer:", result.CalorSource);
+        Assert.Contains("§CL{Inner:", result.CalorSource);
     }
 
     [Fact]

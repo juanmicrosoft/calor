@@ -77,7 +77,7 @@ public class InitializerConversionTests
         Assert.Empty(result.Context.Losses);
         var calor = result.CalorSource!;
         Assert.DoesNotContain("§CS{", calor, StringComparison.Ordinal);
-        Assert.Contains("§LIST{list003:i32} 1 §/LIST", calor, StringComparison.Ordinal);
+        Assert.Contains("§LIST{i32} 1 §/LIST", calor, StringComparison.Ordinal);
         Assert.Contains("= §NEW{StringBuilder} Capacity = 64 §/NEW", calor, StringComparison.Ordinal);
         Assert.DoesNotContain("§A 5", calor, StringComparison.Ordinal);
         var csharp = Compile(calor, enforceEffects: false).GeneratedCode;
@@ -455,7 +455,7 @@ public class InitializerConversionTests
             §M{Repro:overflow=unchecked}
               §U{System.Collections.Generic}
               §U{System.Text}
-              §NS{ns_global:_global:global}
+              §NS{_global:global}
                 §CL{Holder:pub}
                   §FLD{List<i32>:Xs:pub} = §NEW{List<i32>} §A 5 §/NEW
                   §PROP{Sb:StringBuilder:pub:get,set} = (sb-new)

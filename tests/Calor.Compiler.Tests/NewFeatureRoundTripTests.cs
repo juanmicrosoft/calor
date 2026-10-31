@@ -144,7 +144,7 @@ public class NewFeatureRoundTripTests
       §R ""other""
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§W{", formatted);
+        Assert.Contains("§W ", formatted);
         Assert.Contains("§K", formatted);
         Assert.Single(reparsed.Functions);
     }
@@ -267,7 +267,7 @@ public class NewFeatureRoundTripTests
       §R 0
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§IF{", formatted);
+        Assert.Contains("§IF ", formatted);
         Assert.Single(reparsed.Functions);
     }
 
@@ -414,7 +414,7 @@ public class NewFeatureRoundTripTests
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("§Q", formatted);
         Assert.Contains("§S", formatted);
-        Assert.Contains("§IF{", formatted);
+        Assert.Contains("§IF ", formatted);
         Assert.Single(reparsed.Functions);
     }
 

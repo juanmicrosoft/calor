@@ -516,7 +516,7 @@ public class ConverterQualityTests
         // Should NOT contain (? ... §C ...) inline
         Assert.DoesNotContain("(? flag §C", result.CalorSource);
         // Should contain the decomposed form
-        Assert.Contains("§IF{", result.CalorSource);
+        Assert.Contains("§IF ", result.CalorSource);
         Assert.Contains("§EL", result.CalorSource);
 
         // Should parse and compile
@@ -546,7 +546,7 @@ public class ConverterQualityTests
         Assert.NotNull(result.CalorSource);
 
         // If §NEW is in the ternary branches, it should be decomposed
-        if (result.CalorSource.Contains("§NEW") && result.CalorSource.Contains("§IF{"))
+        if (result.CalorSource.Contains("§NEW") && result.CalorSource.Contains("§IF "))
         {
             Assert.DoesNotContain("(? flag §NEW", result.CalorSource);
         }

@@ -57,7 +57,7 @@ public class Issue774ForLoopNonAdditiveIncrementorTests
         var forNodes = method.Body.OfType<ForStatementNode>().ToList();
 
         Assert.Empty(forNodes);
-        Assert.Contains("§WH{", result.CalorSource);
+        Assert.Contains("§WH ", result.CalorSource);
     }
 
     [Fact]

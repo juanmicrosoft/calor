@@ -389,7 +389,7 @@ public class BoundTypeArchitectureTests
         var analysis = Calor.Compiler.Analysis.CallGraphAnalysis.Build(module);
 
         Assert.True(analysis.IsBoundResolutionComplete);
-        var receivers = analysis.BoundValueTypes("f001");
+        var receivers = analysis.BoundValueTypes(Assert.Single(module.Functions).Id);
 
         // Anti-vacuity: the probe has two dotted call sites.
         Assert.True(

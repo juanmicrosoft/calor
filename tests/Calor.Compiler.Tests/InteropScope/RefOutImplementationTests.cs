@@ -369,7 +369,7 @@ public class RefOutImplementationTests
     [InlineData("§C{Inc} §A{ref} (+ x 1) §/C", "§E{alloc}", "Calor0212", null)]
     [InlineData("§C{Inc} §A{ref} §IDX{arr} 0 §/C", "§E{alloc}", "Calor0410", null)]
     [InlineData("§C{Inc} §A{ref} §IDX{arr} 0 §/C", "§E{alloc,mut}", "", "Discharged")]
-    public void LocalFunction_ByReferenceArguments_FollowTheContract(string call, string effects, string error, string? proof)
+    public void PrivateHelper_ByReferenceArguments_FollowTheContract(string call, string effects, string error, string? proof)
     {
         var options = new CompilationOptions
         {
@@ -386,8 +386,8 @@ public class RefOutImplementationTests
                 {{call}}
                 §PROOF{} (> x 0)
                 §R x
-                §F{Inc} (i32:v:ref) -> void
-                  §ASSIGN v (+ v 1)
+              §F{Inc:priv} (i32:v:ref) -> void
+                §ASSIGN v (+ v 1)
             """, "local.calr", options);
         var errors = result.Diagnostics.Where(d => d.IsError).Select(d => d.Code).Distinct().ToArray();
         Assert.Equal(error.Length == 0 ? [] : [error], errors);

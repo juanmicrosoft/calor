@@ -47,7 +47,7 @@ public sealed class FactScopingTests
         var module = Parse($$"""
             §M{Test}
               §F{Probe:pub} (i32:start, i32:end) -> void
-                §L{l1:i:start:end:{{step}}}
+                §L{i:start:end:{{step}}}
                   §PROOF{} (== i i)
                 §PROOF{} (== start start)
             """, out var diagnostics);
@@ -194,7 +194,7 @@ public sealed class FactScopingTests
     }
 
     [Fact]
-    public void BranchGuard_Killed_WhenBodyMutatesVariableWithUnaryOperator()
+    public void BranchGuard_Killed_WhenBodyMutatesVariableWithExplicitUpdate()
     {
         var source = """
             §M{Test}
@@ -202,7 +202,7 @@ public sealed class FactScopingTests
                 §I{i32:x}
                 §O{void}
                 §IF (> x INT:0)
-                  (dec x)
+                  §ASSIGN x (- x INT:1)
                   §PROOF{} (> x INT:0)
             """;
 
