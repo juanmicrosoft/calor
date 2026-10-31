@@ -1612,7 +1612,7 @@
         "range expression"
       ],
       "calorSyntax": "§IDX{array} §RANGE start end / §IDX{array} §^ n",
-      "description": "C# range expressions (start..end) and index-from-end (^n) are fully supported. Use §RANGE for slicing and §^ for indexing from the end.",
+      "description": "C# range expressions (start..end) and index-from-end (^n) have native Calor forms. Use §RANGE for slicing and §^ for indexing from the end.",
       "programs": [
         "complete_ranges"
       ],
@@ -1638,7 +1638,7 @@
         "positional property pattern"
       ],
       "calorSyntax": "Supported in C# → Calor migration. Decompose to §IF chains for hand-written Calor.",
-      "description": "Positional patterns (tuple deconstruction) and property patterns are fully supported during C# → Calor migration — the converter preserves them inline. For hand-written Calor, decompose complex patterns into §IF/§EI chains with explicit comparisons.",
+      "description": "During C# → Calor migration, positional patterns (tuple deconstruction) and property patterns stay inline. For hand-written Calor, decompose complex patterns into §IF/§EI chains with explicit comparisons.",
       "programs": [
         "complete_patterns"
       ],

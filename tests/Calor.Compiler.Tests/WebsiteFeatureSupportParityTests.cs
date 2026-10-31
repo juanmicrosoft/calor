@@ -59,7 +59,8 @@ public sealed class WebsiteFeatureSupportParityTests
 
     /// <summary>Passages whose level words state no support level for a feature: (page, Markdown
     /// source of the passage, reason). The passage is read with the same parser as the page, and
-    /// only its own words are excused, not the rest of its statement. Every entry must be used.</summary>
+    /// only its own words are excused, not the rest of its statement. A <c>##</c> passage applies
+    /// only to headings. Every entry must be used.</summary>
     internal static readonly (string Page, string Passage, string Why)[] NotClaims =
     [
         ("cli/convert.mdx", "claiming a fully successful\nconversion", "a successful conversion, not a level"),
@@ -115,7 +116,7 @@ public sealed class WebsiteFeatureSupportParityTests
             "accessor bodies rather than shorthand, not a converter level"),
         ("syntax-reference/current-language.mdx", "abs, seal, partial, stat, struct, and readonly",
             "Calor class modifiers, not converter levels"),
-        ("syntax-reference/current-language.mdx", "partial class definition",
+        ("syntax-reference/current-language.mdx", "## partial class",
             "a class declaration with the partial modifier, not a converter level"),
         ("syntax-reference/current-language.mdx", "Uses the 'partial' modifier",
             "Calor's class modifier, not a converter level"),
@@ -435,6 +436,16 @@ public sealed class WebsiteFeatureSupportParityTests
         Assert.Single(result.UsedExcuses);
     }
 
+    [Theory]
+    [InlineData("Partial class is Full.")]
+    [InlineData("```text\npartial class is Full\n```")]
+    public void ModifierHeadingException_DoesNotExcuseProseOrCodeClaims(string claim)
+    {
+        var result = Scan("syntax-reference/current-language.mdx", $"## partial class\n\n{claim}\n");
+        Assert.Contains(result.Findings, finding => finding.Message.Contains("states a support level", StringComparison.Ordinal));
+        Assert.Single(result.UsedExcuses);
+    }
+
     [Fact]
     public void AnMdxCommentRendersNothingAndStatesNothing()
     {
@@ -653,6 +664,8 @@ public sealed class WebsiteFeatureSupportParityTests
             var hits = new List<(int Statement, string Form)>();
             for (var i = 0; i < statements.Count; i++)
             {
+                if (passage.StartsWith("## ", StringComparison.Ordinal) && !statements[i].Heading)
+                    continue;
                 var forms = statements[i].Raw ? [Normalize(passage)] : PassageForms(passage);
                 foreach (var form in forms.Distinct())
                 {
