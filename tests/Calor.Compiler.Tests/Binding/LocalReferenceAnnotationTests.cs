@@ -110,7 +110,7 @@ public class LocalReferenceAnnotationTests
     {
         var member = kind == "field"
             ? $"§FLD{{{typeName}:Value:pub}}"
-            : $"§PROP{{p1:Value:{typeName}:pub:get,set}}";
+            : $"§PROP{{Value:{typeName}:pub:get,set}}";
         var receivingType = typeName.TrimStart('?');
         var source = $$"""
             §M{NativeMemberAnnotations}
@@ -384,7 +384,7 @@ public class LocalReferenceAnnotationTests
         var nullable = typeName.Contains('?');
         var member = kind == "field"
             ? $"§FLD{{{typeName}:Value:pub}}"
-            : $"§PROP{{p1:Value:{typeName}:pub:get,set}}";
+            : $"§PROP{{Value:{typeName}:pub:get,set}}";
         var source = $$"""
             §M{StringMemberInference}
               §CL{Parent:pub}

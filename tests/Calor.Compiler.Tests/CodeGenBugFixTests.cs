@@ -99,12 +99,12 @@ public class CodeGenBugFixTests
     [Fact]
     public void Bug4_ArrayCreationWithTypeFirst_GeneratesCorrectType()
     {
-        // §ARR{char:buf1:100} should generate new char[100], NOT new buf1[100]
+        // The array value carries the element type, not the binding name.
         var source = @"
 §M{Test}
   §F{Main:pub}
       §O{void}
-      §B{[char]:buf1} §ARR{buf1:100}
+      §B{[char]:buf1} §ARR{char:100}
 ";
 
         var result = ParseAndEmit(source);
@@ -114,9 +114,8 @@ public class CodeGenBugFixTests
     }
 
     [Fact]
-    public void Bug4_ArrayCreationWithIdFirst_StillWorks()
+    public void Bug4_ArrayCreationWithSeparateBindingName_StillWorks()
     {
-        // Backward compat: §ARR{arr1:i32:10} should still work
         var source = @"
 §M{Test}
   §F{Main:pub}
@@ -340,11 +339,8 @@ public class CodeGenBugFixTests
     }
 
     [Fact]
-    public void Bug4_ArrayCreationBothPascalCase_FallsToIdTypeFormat()
+    public void Bug4_ArrayCreationWithUserType_IsUnambiguous()
     {
-        // §ARR{MyArray:Buffer:10} — both PascalCase
-        // Both pass IsLikelyType, so !IsLikelyType(pos1) is false,
-        // falls to {id:type:size} format: MyArray is id, Buffer is type
         var source = @"
 §M{Test}
   §F{Main:pub}
@@ -367,7 +363,7 @@ public class CodeGenBugFixTests
         // Bug 1: §IDX{args} shorthand
         // Bug 2: §NEW{Dictionary<char,str>} angle-bracket generics
         // Bug 3: §B{ConsoleKeyInfo:keyPressed} PascalCase type binding
-        // Bug 4: §ARR{char:buf:256} type-first array creation
+        // Bug 4: §ARR{char:256} type-first array value
         // Bug 5: §PROP{...:over} override modifier on property
         // Bug 6: §C{fn} §A §NEW{X} §A §NEW{Y} §/C multiple NEWs in call
         // Bug 7: (char-lit "Y") char literal
@@ -405,7 +401,7 @@ public class CodeGenBugFixTests
           §E{cw,cr}
 
           §B{~dict} §NEW{Dictionary<char,str>}
-          §B{[char]:buf} §ARR{buf:256}
+          §B{[char]:buf} §ARR{char:256}
           §B{~sb} §NEW{StringBuilder}
           §B{ConsoleKeyInfo:keyPressed} §C{Console.ReadKey} §/C
 
@@ -444,7 +440,7 @@ public class CodeGenBugFixTests
         // Bug 3: §B{ConsoleKeyInfo:keyPressed} → ConsoleKeyInfo keyPressed
         Assert.Contains("ConsoleKeyInfo keyPressed", result);
 
-        // Bug 4: §ARR{char:buf:256} → new char[256]
+        // Bug 4: §ARR{char:256} → new char[256]
         Assert.Contains("new char[256]", result);
         Assert.DoesNotContain("new buf[256]", result);
 
@@ -583,28 +579,47 @@ public class CodeGenBugFixTests
     }
 
     [Theory]
-    // {type:id:size} format — type-first when type is recognized and id isn't
-    [InlineData("char", "buf1", "char")]     // Bug 4 pattern: char is type, buf1 is id
-    [InlineData("i32", "arr1", "int")]       // Primitive type first
-    [InlineData("str", "names", "string")]   // str type first → maps to string
-    // {id:type:size} format — fallback when pos0 isn't a type
-    [InlineData("arr1", "i32", "int")]       // Original format: arr1 is id, i32 is type
-    [InlineData("buf", "char", "char")]      // name first, type second
-    public void ArrayCreation_DetectsCorrectTypeIdOrder(
-        string pos0, string pos1, string expectedCSharpType)
+    [InlineData("buf1", "char", "char")]
+    [InlineData("arr1", "i32", "int")]
+    [InlineData("names", "str", "string")]
+    [InlineData("arr2", "i32", "int")]
+    [InlineData("buf", "char", "char")]
+    public void ArrayCreation_SeparatesBindingNameAndElementType(
+        string name, string elementType, string expectedCSharpType)
     {
-        // Parse a §ARR with these attributes and check the resulting array type
         var source = $@"
 §M{{Test}}
   §F{{Main:pub}}
     §O{{void}}
-    §B{{~x}} §ARR{{{pos0}:{pos1}:10}}
+    §B{{~{name}}} §ARR{{{elementType}:10}}
 ";
 
         var result = ParseAndEmit(source);
 
         // The generated code should contain the correct C# type
         Assert.Contains($"new {expectedCSharpType}[10]", result);
+        Assert.Contains($"{name} =", result);
+    }
+
+    [Theory]
+    [InlineData("char:buf1:10")]
+    [InlineData("i32:arr1:10")]
+    [InlineData("str:names:10")]
+    [InlineData("arr1:i32:10")]
+    [InlineData("buf:char:10")]
+    public void ArrayCreation_RejectsLegacyIdentityFieldsInsteadOfGuessing(string header)
+    {
+        var source = $$"""
+            §M{Test}
+              §F{Main:pub} () -> void
+                §B{~x} §ARR{{{header}}}
+            """;
+
+        var diagnostics = ParseWithDiagnostics(source);
+
+        Assert.Contains(diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnexpectedToken
+            && diagnostic.Message.Contains("Source IDs are removed from '§ARR'", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -639,9 +654,9 @@ public class CodeGenBugFixTests
         var classModifier = modifier == "abs" ? "abs" : "pub";
         var source = $@"
 §M{{Test}}
-  §CL{{c1:MyClass:{classModifier}}}
+  §CL{{MyClass:{classModifier}}}
     {(modifier == "over" ? "§EXT{BaseClass}" : "")}
-    §PROP{{p001:Count:i32:pub:{modifier}}}
+    §PROP{{Count:i32:pub:{modifier}}}
       §GET
       §/GET
       §SET
@@ -925,7 +940,7 @@ public class CodeGenBugFixTests
 §M{Test}
   §F{Main:pub}
       §O{void}
-      §B{[i32]:nums} §ARR{nums} §A 1 §A 2 §A 3 §/ARR
+      §B{[i32]:nums} §ARR{i32} §A 1 §A 2 §A 3 §/ARR
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("new int[]", result);
@@ -954,12 +969,11 @@ public class CodeGenBugFixTests
     [Fact]
     public void Array_SizedArray_StillWorks()
     {
-        // §ARR{a1:i32:10} unchanged behavior
         var source = @"
 §M{Test}
   §F{Main:pub}
       §O{void}
-      §B{[i32]:arr1} §ARR{arr1:10}
+      §B{[i32]:arr1} §ARR{i32:10}
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("new int[10]", result);

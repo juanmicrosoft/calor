@@ -44,7 +44,7 @@ public sealed class ObligationTests
         Assert.Single(tracker.Obligations);
         var obl = tracker.Obligations[0];
         Assert.Equal(ObligationKind.ProofObligation, obl.Kind);
-        Assert.Equal("f001", obl.FunctionId);
+        Assert.Equal(Assert.Single(module.Functions).Id, obl.FunctionId);
         Assert.Contains("positive", obl.Description);
         Assert.Equal(ObligationStatus.Pending, obl.Status);
     }
@@ -69,7 +69,10 @@ public sealed class ObligationTests
 
         var obligation = Assert.Single(tracker.Obligations);
         Assert.Equal(ObligationKind.ProofObligation, obligation.Kind);
-        Assert.Equal("p1", obligation.SourceProofId);
+        var proof = Assert.Single(
+            Calor.Compiler.Analysis.RecursiveAstWalker.DescendantsAndSelf(module).OfType<ProofObligationNode>());
+        Assert.Equal(proof.Id, obligation.SourceProofId);
+        Assert.Equal(proof.Span, obligation.Span);
     }
 
     [Fact]
@@ -92,7 +95,7 @@ public sealed class ObligationTests
         Assert.Single(tracker.Obligations);
         var obl = tracker.Obligations[0];
         Assert.Equal(ObligationKind.RefinementEntry, obl.Kind);
-        Assert.Equal("f001", obl.FunctionId);
+        Assert.Equal(Assert.Single(module.Functions).Id, obl.FunctionId);
         // Public function -> Boundary status
         Assert.Equal(ObligationStatus.Boundary, obl.Status);
     }
@@ -431,7 +434,10 @@ public sealed class ObligationTests
         generator.Generate(module);
 
         var obl = Assert.Single(tracker.Obligations);
-        Assert.Equal("p1", obl.SourceProofId);
+        var proof = Assert.Single(
+            Calor.Compiler.Analysis.RecursiveAstWalker.DescendantsAndSelf(module).OfType<ProofObligationNode>());
+        Assert.Equal(proof.Id, obl.SourceProofId);
+        Assert.Equal(proof.Span, obl.Span);
     }
 
     // ───── Full Pipeline Integration ─────
@@ -589,7 +595,11 @@ public sealed class ObligationTests
             options.ObligationResults!.Obligations,
             obligation => obligation.Kind == ObligationKind.ProofObligation);
         Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
-        Assert.Contains("Proof obligation [p1] violated", result.GeneratedCode);
+        var sourceProof = Assert.Single(
+            Calor.Compiler.Analysis.RecursiveAstWalker.DescendantsAndSelf(result.Ast!).OfType<ProofObligationNode>());
+        Assert.Equal(sourceProof.Id, proof.SourceProofId);
+        Assert.Equal(sourceProof.Span, proof.Span);
+        Assert.Contains($"Proof obligation [{sourceProof.Id}] violated", result.GeneratedCode);
         Assert.DoesNotContain("// PROVEN:", result.GeneratedCode);
     }
 
@@ -655,7 +665,9 @@ public sealed class ObligationTests
         var csharp = emitter.Emit(module);
 
         Assert.DoesNotContain("throw new InvalidOperationException", csharp);
-        Assert.Contains("// PROVEN: proof obligation [p1: check]", csharp);
+        var proof = Assert.Single(
+            Calor.Compiler.Analysis.RecursiveAstWalker.DescendantsAndSelf(module).OfType<ProofObligationNode>());
+        Assert.Contains($"// PROVEN: proof obligation [{proof.Id}: check]", csharp);
     }
 
     [Fact]
@@ -1225,7 +1237,7 @@ public sealed class ObligationTests
 
         Assert.Contains(
             tracker.Obligations,
-            obligation => obligation.FunctionId == "op001"
+            obligation => obligation.FunctionId == Assert.Single(Assert.Single(module.Classes).OperatorOverloads).Id
                 && obligation.Kind == ObligationKind.RefinementReturn);
         var assembly = CompileGenerated(csharp);
         var type = Assert.Single(
@@ -1326,7 +1338,8 @@ public sealed class ObligationTests
 
         Assert.Contains(
             tracker.Obligations,
-            obligation => obligation.FunctionId == "f001"
+            obligation => obligation.FunctionId == Assert.Single(
+                Calor.Compiler.Analysis.RecursiveAstWalker.DescendantsAndSelf(module).OfType<FunctionNode>()).Id
                 && obligation.Kind == ObligationKind.RefinementReturn);
         Assert.IsType<InvalidOperationException>(invocation.InnerException);
     }
@@ -1766,7 +1779,9 @@ public sealed class ObligationTests
                   §I{i32:n}
                   §I{i32:index}
                   §O{void}
-                  (inc §IDX items index)
+                  §B{capturedItems:Sized} items
+                  §B{capturedIndex} index
+                  §ASSIGN §IDX capturedItems capturedIndex (+ (§IDX{capturedItems} capturedIndex) INT:1)
             """);
 
         var exception = InvokeGenerated(
@@ -1788,7 +1803,7 @@ public sealed class ObligationTests
               §F{Bad:pub}
                   §O{i32}
                   §B{~value:Positive} INT:1
-                  (dec value)
+                  §ASSIGN value (- value INT:1)
                   §R value
             """);
 
@@ -1815,7 +1830,7 @@ public sealed class ObligationTests
     }
 
     [Fact]
-    public void CSharpEmit_NestedRefinedDecrement_RechecksInvariant()
+    public void CSharpEmit_StagedRefinedDecrement_RechecksInvariant()
     {
         var csharp = Emit("""
             §M{Test}
@@ -1823,8 +1838,14 @@ public sealed class ObligationTests
               §F{Bad:pub}
                   §O{i32}
                   §B{~value:Positive} INT:1
-                  §B{old:i32} (post-dec value)
+                  §B{~staged:i32} value
+                  §B{old:i32} §C{PostDecrement} §A{ref} staged §/C
+                  §ASSIGN value staged
                   §R value
+              §F{PostDecrement:priv} (i32:value:ref) -> i32
+                §B{prior} value
+                §ASSIGN value (- value INT:1)
+                §R prior
             """);
 
         var exception = InvokeGenerated(csharp, "Bad");
@@ -1885,7 +1906,7 @@ public sealed class ObligationTests
               §F{Mutate:pub}
                   §I{i32:value:ref} | (> # INT:0)
                   §O{void}
-                  (dec value)
+                  §ASSIGN value (- value INT:1)
             """);
 
         var exception = InvokeGenerated(csharp, "Mutate", 1);
@@ -1918,7 +1939,7 @@ public sealed class ObligationTests
               §F{Mutate:pub}
                   §I{i32:value:ref} | (> # INT:0)
                   §O{void}
-                  (dec value)
+                  §ASSIGN value (- value INT:1)
             """);
         object?[] decrementArguments = [1];
 
@@ -1932,7 +1953,7 @@ public sealed class ObligationTests
     }
 
     [Fact]
-    public void CSharpEmit_FailedTypedRebind_RollsBackNestedTargetMutation()
+    public void CSharpEmit_FailedTypedRebind_DoesNotCommitStagedNestedMutation()
     {
         var csharp = Emit("""
             §M{Test}
@@ -1941,7 +1962,13 @@ public sealed class ObligationTests
               §F{Mutate:pub}
                   §I{NonNegative:value:ref}
                   §O{void}
-                  §B{~value:Negative} (post-dec value)
+                  §B{~staged:i32} value
+                  §B{~value:Negative} §C{PostDecrement} §A{ref} staged §/C
+                  §ASSIGN value staged
+              §F{PostDecrement:priv} (i32:value:ref) -> i32
+                §B{prior} value
+                §ASSIGN value (- value INT:1)
+                §R prior
             """);
         object?[] arguments = [1];
 
@@ -1962,9 +1989,15 @@ public sealed class ObligationTests
                   §I{NonNegative:value:ref}
                   §O{void}
                   §TR
-                    §B{~value:Negative} (post-dec value)
+                    §B{~staged:i32} value
+                    §B{~value:Negative} §C{PostDecrement} §A{ref} staged §/C
+                    §ASSIGN value staged
                   §CA{Exception:ex}
                     §ASSIGN value INT:-1
+              §F{PostDecrement:priv} (i32:value:ref) -> i32
+                §B{prior} value
+                §ASSIGN value (- value INT:1)
+                §R prior
             """;
         var caughtRebind = Emit(caughtRebindSource);
         object?[] caughtArguments = [1];
@@ -2011,9 +2044,15 @@ public sealed class ObligationTests
                   §O{void}
                   §B{~value:Positive} INT:2
                   §TR
-                    §B{~value:Negative} (post-dec value)
+                    §B{~staged:i32} value
+                    §B{~value:Negative} §C{PostDecrement} §A{ref} staged §/C
+                    §ASSIGN value staged
                   §CA{Exception:ex}
                     §ASSIGN value INT:2
+              §F{PostDecrement:priv} (i32:value:ref) -> i32
+                §B{prior} value
+                §ASSIGN value (- value INT:1)
+                §R prior
             """);
         object?[] initializedOutArguments = [null];
 
