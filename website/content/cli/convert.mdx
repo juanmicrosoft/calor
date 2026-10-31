@@ -22,6 +22,11 @@ The `convert` command performs bidirectional conversion between C# and Calor:
 
 The conversion direction is automatically detected from the input file extension.
 
+Preserved C# retains its source text and behavior. Generated files use UTF-8.
+UTF-16/UTF-32 inputs do **not** retain their original encoding or bytes.
+Exact-byte controls cover preserved UTF-8 sources with BOMs, CRLF, and EOF comments.
+Malformed input encodings fail explicitly.
+
 ---
 
 ## Quick Start
@@ -50,10 +55,9 @@ calor convert MyService.cs --benchmark
 | `--benchmark` | `-b` | `false` | Include benchmark metrics comparison |
 | `--verbose` | `-v` | `false` | Enable verbose output |
 | `--explain` | `-e` | `false` | Explain unsupported features in detail |
-| `--no-fallback` | — | `false` | Fail on unsupported constructs instead of emitting fallback TODOs |
+| `--no-fallback` | — | `false` | Disable TODO substitution; default faithful C# preservation still applies |
 | `--validate` | — | `false` | Parse generated Calor before writing and report errors |
 | `--passthrough` | — | `false` | Widen the set of C# members preserved as `§CSHARP` interop blocks. Since 0.16 `calor convert` already rescues a member it cannot convert this way; see [What Changed in 0.16](#what-changed-in-0-16) |
-| `--lossy` | — | `false` | Allow reported semantic substitutions and drops. Without it, conversion is lossless: a construct with no exact Calor form is preserved as C# or refused. The output is still compiled back to C#; if that fails, it is written but reported `unverified` and the command exits `2` |
 | `--timeout` | `-t` | `0` | Conversion timeout in seconds; 0 disables it |
 | `--explicit-call-closers` | — | `false` | Emit explicit `§/C` for every `§C` call (v0.6.0-compatible output). |
 | `--format` | — | `text` | `text` or schema 2.0 `json`; there is no `-f` alias |
@@ -86,6 +90,14 @@ default, without `--passthrough`, which widens it further. "Conversion
 successful" is printed only when there are no recorded losses and requested
 validation passed.
 
+Default conversion follows a native → member → type → whole-file preservation
+ladder. If generated Calor or C# validation fails, it keeps the original C# at a
+sound boundary, without a generated preamble for whole-file passthrough. Reports
+retain each reason and distinguish writing from native conversion, compilation,
+and tests. Missing, malformed, unreadable inputs and failed writes remain errors.
+The destructive `--lossy` and `--select-active-preprocessor-branch-lossy` flags
+are no longer available.
+
 In the unreleased 0.27 converter, collection expressions convert natively only for
 array targets without spreads or a single array-to-array spread. Other collection
 targets and mixed spreads stay C# to retain their runtime type and enumeration order.
@@ -103,7 +115,7 @@ fired when a rescue or passthrough did the work:
 | `interop` | The converter does not support this construct, so it kept the C#. No trigger. |
 | `rescue` | Automatic rescue. The member converted, but its Calor failed to parse (`parse-failure`) or failed to round-trip back to compiling C# (`round-trip-failure`), so the original C# was kept. You did not have to ask for it. |
 | `passthrough` | The C# was kept only because you asked for passthrough (`--passthrough`, or `passthroughOnError` in MCP). |
-| `lossy` / `dropped` | A substitution or removal that `--lossy` allowed. |
+| `lossy` / `dropped` | Substitutions or removals in historical API consumers; current CLI output does not take these paths. |
 
 `enabledBy` names the default or option that made a rescue possible:
 `lossless-fidelity` (parse failures are always rescued in the default lossless
@@ -111,10 +123,8 @@ mode), `interop-mode` (the library's and MCP's interop conversion mode),
 `rescueUnusableMembers` (on by default in `calor convert`), or
 `passthroughOnError`. When both rescue and passthrough could have fired, the
 report says `rescue`, because the member would have been rescued without the
-flag. Under `--lossy`, C# kept only because you passed `--passthrough` is
-reported as `passthrough`; C# the converter keeps in every mode stays `interop`.
-So on the command line `--passthrough` rarely changes the report unless you also
-pass `--lossy`.
+flag. Default lossless conversion also escalates to exact whole-file preservation
+if the member or type boundary cannot recover the output.
 
 Private static properties with accessor bodies now convert natively. Previously,
 redundant accessor visibility made the generated C# invalid and triggered rescue:
@@ -184,8 +194,8 @@ Calor, then compiles the C# that Calor produces.
 | `roundTrip` | Meaning |
 |:------------|:--------|
 | `verified` | Both compiles succeeded. |
-| `failed` | A compile failed. A lossless conversion is then refused, and so is one with `--select-active-preprocessor-branch-lossy`. A plain `--lossy` conversion is written with `outcome: "unverified"`. |
-| `deferred` | The caller compiles the C# itself. `calor migrate` and the MCP project tools do this for the whole project at once; a failure there refuses the file. |
+| `failed` | The check failed. Exact preserved C# can still be written as `unverified`, for example when standalone references are missing. This is not a passed build. |
+| `deferred` | The caller compiles the C# itself. Project migration replaces this with the result of its combined check. |
 | `not-run` | Conversion stopped before the check, so the file is refused. |
 
 Schema version 2 (0.26) added `roundTrip` and the `unverified` outcome. Before
@@ -213,15 +223,12 @@ So `nativeConversionCount > 0` does not mean the file is native. Read
 
 - **Preserved** (`outcome: "preserved"`, exit `0`): the file is written, and some
   members, statements, or holes are still C#.
-- **Refused** (`outcome: "refused"`, exit `1`): nothing is written. This happens when
-  `--no-fallback` meets a construct with no Calor form, or when no rescue applies.
-- **Unverified** (`outcome: "unverified"`, exit `2`, plain `--lossy` only): the file is
-  written, but its C# does not compile. The report prints
-  `✗ Round-trip check failed` with the first compiler errors. Fix the output by hand,
-  or rerun without `--lossy`: the default lossless mode keeps a failing type as C#
-  where it can. The check compiles the file on its own, so a file that uses a type
-  declared in another file of your project is also `unverified`. `--passthrough` does
-  not change this outcome under `--lossy`.
+- **Refused** (`outcome: "refused"`, exit `1`): nothing is written. Missing,
+  malformed, unreadable inputs and write failures remain explicit errors.
+- **Unverified** (`outcome: "unverified"`, exit `2`): exact original C# is written,
+  but its standalone compile failed. The report retains the compiler diagnostics.
+  Validate with the original project references and configuration. Writing is not
+  evidence of a successful build or test run.
 
 A rescue keeps the original C# of the whole top-level type, not only the member that
 failed. The [C# interoperability guide](/docs/guides/csharp-interoperability/) lists, per
@@ -288,8 +295,8 @@ converts to:
 
 If a member has any local function outside the slice (capturing, generic, async,
 iterator, and so on), the whole member is preserved as a `§CSHARP` block, reported as
-a `local-function` issue and counted as a loss, exactly as before. `--no-fallback`
-refuses it by name. The language rules are in
+a `local-function` issue and counted as preservation. `--no-fallback`
+does not disable faithful preservation. The language rules are in
 [Local Functions](/syntax-reference/structure-tags#local-functions).
 
 ### Iterator Properties and Indexers
@@ -343,8 +350,8 @@ exception surfaces on the `MoveNext` call that reaches it.
 
 This happens in the converter itself. It is the same on `calor convert` (with or
 without `--passthrough`), `calor migrate`, the MCP `calor_convert` tool (with or
-without `passthroughOnError`), and the library API. With `--no-fallback` the
-conversion fails and names `iterator-accessor` instead.
+without `passthroughOnError`), and the library API. `--no-fallback` does not
+authorize dropping the member: default preservation still keeps its C# and reason.
 
 To make the member native Calor, move the loop into an iterator method and have
 the getter return its result. Calling an iterator method also defers the work, so
@@ -437,10 +444,9 @@ can contain `§CSHARP` blocks even when you did not pass `--passthrough`, and th
 report tells you how many. Partly converted beats nothing converted, but treat
 each block as work still to do.
 
-The rescue is not a guarantee. It fires when the generated Calor fails to parse
-or fails to round-trip back to C#; output that parses but that Calor's own
-compiler then rejects still fails the conversion, with nothing written and exit
-`1`. `--passthrough` does not change that outcome.
+Member rescue is not the final boundary. If Calor compilation or the generated
+C# check still fails, default conversion escalates to exact whole-file passthrough.
+The report records why the native candidate was rejected.
 
 ### Array Expressions
 
@@ -576,8 +582,8 @@ assuming it reproduces the website headline.
 | Code | Meaning |
 |:-----|:--------|
 | `0` | Conversion completed; inspect the loss report to distinguish fully native from preserved interop |
-| `1` | Missing input, unsupported construct with `--no-fallback`, timeout, or a refused conversion (`outcome: "refused"`; no file written) |
-| `2` | Plain `--lossy` only: the file was written, but its C# failed the round-trip compile check (`outcome: "unverified"`). With `--select-active-preprocessor-branch-lossy` the same failure is a refusal (exit `1`) |
+| `1` | Invalid or missing input, filesystem failure, timeout, or a refused conversion (`outcome: "refused"`; no file written) |
+| `2` | Exact original C# was preserved and written, but standalone compilation failed (`outcome: "unverified"`). Verify with the original project context. |
 
 ---
 

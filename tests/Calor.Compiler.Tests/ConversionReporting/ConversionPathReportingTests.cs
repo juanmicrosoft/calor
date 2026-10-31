@@ -114,7 +114,7 @@ public class ConversionPathReportingTests : IDisposable
     // ── Library (F6-REPORT-07, -08, -09, -11, -12 library cells) ──────────
 
     [Fact]
-    public void F6_REPORT_07_LibraryDefault_RefusesRoundTripFailure_AndSaysRescueWasOff()
+    public void F6_REPORT_07_LibraryDefault_PreservesRoundTripFailure_WithoutOptIn()
     {
         var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
             .Split(Path.PathSeparator).Select(path => MetadataReference.CreateFromFile(path));
@@ -126,11 +126,12 @@ public class ConversionPathReportingTests : IDisposable
         Assert.True(compiled.Success, string.Join("\n", compiled.Diagnostics));
         var result = Convert(RoundTripFailure, new ConversionOptions());
 
-        Assert.False(result.Success);
-        Assert.Equal("refused", result.Paths.Outcome);
+        Assert.True(result.Success);
+        Assert.Equal("preserved", result.Paths.Outcome);
         Assert.False(result.Paths.RescueUnusableMembers);
         Assert.False(result.Paths.PassthroughOnError);
-        Assert.Equal(0, result.Paths.Rescue + result.Paths.Passthrough);
+        AssertPaths(result, ConversionPath.Rescue, ConversionTrigger.RoundTripFailure,
+            ConversionEnabledBy.LosslessFidelity, 1);
     }
 
     [Fact]
@@ -214,9 +215,9 @@ public class ConversionPathReportingTests : IDisposable
     }
 
     [Fact]
-    public void Library_RoundTripFailure_DiscriminatesRefusedPassthroughAndRescue()
+    public void Library_RoundTripFailure_DefaultPreservationAndRequestedPaths()
     {
-        Assert.Equal("refused", Convert(RoundTripFailure, new ConversionOptions()).Paths.Outcome);
+        Assert.Equal("preserved", Convert(RoundTripFailure, new ConversionOptions()).Paths.Outcome);
         AssertPaths(Convert(RoundTripFailure, new ConversionOptions { PassthroughOnError = true }),
             ConversionPath.Passthrough, ConversionTrigger.RoundTripFailure, ConversionEnabledBy.PassthroughOnError, 1);
         AssertPaths(Convert(RoundTripFailure, new ConversionOptions { RescueUnusableMembers = true }),
@@ -432,20 +433,13 @@ public class ConversionPathReportingTests : IDisposable
     }
 
     [Fact]
-    public void F6_REPORT_10_CliLossy_RoundTripIsReported_ButNoRescueFires()
+    public void F6_REPORT_10_CliRejectsRemovedLossyFlags()
     {
-        // #1514: --lossy now runs the round trip, but only to report it. No rescue
-        // fires (with or without --passthrough), so the output is written and
-        // reported unverified (exit 2): no rescue, no trigger.
-        foreach (var flags in new[] { new[] { "--lossy", "--format", "json" }, new[] { "--lossy", "--passthrough", "--format", "json" } })
+        foreach (var flag in new[] { "--lossy", "--select-active-preprocessor-branch-lossy" })
         {
-            var (exit, stdout, stderr) = Cli(RoundTripFailure, flags);
-            Assert.True(exit == 2, stderr);
-            var paths = Data(stdout).GetProperty("conversionPaths");
-            Assert.Equal("unverified", paths.GetProperty("outcome").GetString());
-            Assert.Equal("failed", paths.GetProperty("roundTrip").GetString());
-            Assert.Equal(0, paths.GetProperty("rescue").GetInt32() + paths.GetProperty("passthrough").GetInt32());
-            Assert.Empty(paths.GetProperty("triggers").EnumerateObject());
+            var (exit, _, stderr) = Cli(RoundTripFailure, flag);
+            Assert.Equal(1, exit);
+            Assert.Contains($"Unrecognized command or argument '{flag}'", stderr);
         }
     }
 
@@ -499,7 +493,7 @@ public class ConversionPathReportingTests : IDisposable
     }
 
     [Fact]
-    public async Task F6_REPORT_03_McpDefault_RefusesAndSaysRescueWasOff_PassthroughRescues()
+    public async Task F6_REPORT_03_McpDefault_PreservesWithoutPassthrough()
     {
         var (interopError, interopPayload) = await Mcp("calor_convert", new { source = Fixture("F4-ITER-01") });
         Assert.False(interopError);
@@ -509,9 +503,9 @@ public class ConversionPathReportingTests : IDisposable
         Assert.Equal(0, iteratorPaths.GetProperty("rescue").GetInt32() + iteratorPaths.GetProperty("passthrough").GetInt32());
 
         var (defaultError, defaultPayload) = await Mcp("calor_convert", new { source = RoundTripFailure });
-        Assert.True(defaultError);
+        Assert.False(defaultError);
         var defaultPaths = defaultPayload.GetProperty("lossSummary").GetProperty("paths");
-        Assert.Equal("refused", defaultPaths.GetProperty("outcome").GetString());
+        Assert.Equal("preserved", defaultPaths.GetProperty("outcome").GetString());
         Assert.False(defaultPaths.GetProperty("rescueUnusableMembers").GetBoolean());
 
         var (ptError, ptPayload) = await Mcp("calor_convert", new { source = RoundTripFailure, passthroughOnError = true });
@@ -628,18 +622,16 @@ public class ConversionPathReportingTests : IDisposable
                 .EndsWith(fixtureId.Replace("-", "") + ".cs", StringComparison.Ordinal));
 
     [Fact]
-    public void F6_REPORT_04_CliMigrate_ReportsParseFailureRescue_AndRefusesRoundTripFailure()
+    public void F6_REPORT_04_CliMigrate_ReportsBothValidationRescues()
     {
         var dir = ProjectWithRoundTripFailure("F5-ARRAY-02");
 
         var (exit, stdout, _) = CliTestHarness.RunCli(dir, "migrate", dir, "--skip-verify", "--skip-analyze");
 
-        // RoundTripFailure.cs fails (project migration has no round-trip rescue), and
-        // lossless project migration then writes nothing, so both files fail; the
-        // parse-failure rescue that happened during conversion is still reported.
-        Assert.Equal(1, exit);
-        Assert.Contains("Preservation paths: 1 by automatic rescue (parse-failure: 1; no passthrough request needed)", stdout);
-        Assert.Contains("Failed: 2", stdout);
+        Assert.Equal(0, exit);
+        Assert.Contains("Preservation paths: 2 by automatic rescue (parse-failure: 1, round-trip-failure: 1; no passthrough request needed)", stdout);
+        Assert.DoesNotContain("Failed: 2", stdout);
+        Assert.Equal(2, Directory.GetFiles(dir, "*.calr").Length);
     }
 
     [Fact]
@@ -680,38 +672,38 @@ public class ConversionPathReportingTests : IDisposable
 
         var (_, payload) = await Mcp("calor_batch", new { action = "convert", projectPath = dir, dryRun = true, summary = true });
 
-        Assert.Equal("Preservation paths: 1 by automatic rescue (parse-failure: 1; no passthrough request needed)",
+        Assert.Equal("Preservation paths: 2 by automatic rescue (parse-failure: 1, round-trip-failure: 1; no passthrough request needed)",
             payload.GetProperty("preservationPaths").GetString());
-        Assert.All(payload.GetProperty("failedFiles").EnumerateArray(), f =>
-            Assert.Equal("refused", f.GetProperty("conversionPaths").GetProperty("outcome").GetString()));
+        Assert.Empty(payload.GetProperty("failedFiles").EnumerateArray());
     }
 
     [Fact]
     public async Task F6_REPORT_06_McpBatchAbort_KeepsPreservationPaths()
     {
         var dir = ProjectWithRoundTripFailure("F5-ARRAY-02");
+        File.WriteAllText(Path.Combine(dir, "Malformed.cs"), "public class Malformed { void M( }");
 
         var (isError, payload) = await Mcp("calor_batch", new { action = "convert", projectPath = dir, dryRun = true, skipOnError = false });
 
         Assert.True(isError);
         Assert.StartsWith("Batch aborted (skipOnError=false)", payload.GetProperty("error").GetString());
-        Assert.Equal("Preservation paths: 1 by automatic rescue (parse-failure: 1; no passthrough request needed)",
+        Assert.Equal("Preservation paths: 2 by automatic rescue (parse-failure: 1, round-trip-failure: 1; no passthrough request needed)",
             payload.GetProperty("preservationPaths").GetString());
         var rescued = FileEntry(payload.GetProperty("files"), "F5-ARRAY-02").GetProperty("conversionPaths");
         Assert.Equal(1, rescued.GetProperty("rescue").GetInt32());
-        Assert.Equal("refused", rescued.GetProperty("outcome").GetString());
+        Assert.Equal("preserved", rescued.GetProperty("outcome").GetString());
     }
 
     [Fact]
-    public void F6_REPORT_04_CliMigrateMarkdown_NamesEachFilesPaths_EvenWhenRefused()
+    public void F6_REPORT_04_CliMigrateMarkdown_NamesEachPreservationPath()
     {
         var dir = ProjectWithRoundTripFailure("F5-ARRAY-02");
         var md = Path.Combine(_tempDir, $"r{Guid.NewGuid():N}.md");
 
-        Assert.Equal(1, CliTestHarness.RunCli(dir, "migrate", dir, "--skip-verify", "--skip-analyze", "--report", md).ExitCode);
+        Assert.Equal(0, CliTestHarness.RunCli(dir, "migrate", dir, "--skip-verify", "--skip-analyze", "--report", md).ExitCode);
 
         var report = File.ReadAllText(md);
-        Assert.Contains("### Failed", report);
+        Assert.Contains("round-trip-failure", report);
         Assert.Contains("  - rescue (parse-failure, enabled by lossless-fidelity): Converted Calor for 'global::ProbeF5ARRAY02'", report);
     }
 
@@ -749,7 +741,7 @@ public class ConversionPathReportingTests : IDisposable
         Assert.Equal("lossless-fidelity", loss.GetProperty("enabledBy").GetString());
 
         var refused = FileEntry(files, "RoundTripFailure");
-        Assert.Equal("refused", refused.GetProperty("conversionPaths").GetProperty("outcome").GetString());
+        Assert.Equal("preserved", refused.GetProperty("conversionPaths").GetProperty("outcome").GetString());
     }
 
     [Fact]
@@ -761,7 +753,7 @@ public class ConversionPathReportingTests : IDisposable
         {
             var (isError, payload) = await Mcp("calor_batch",
                 new { action = "convert", projectPath = dir, dryRun = true, passthroughOnError });
-            Assert.True(isError); // one failed file
+            Assert.False(isError);
             var files = payload.GetProperty("files");
 
             var rescued = FileEntry(files, "F5-ARRAY-02").GetProperty("conversionPaths");
@@ -769,16 +761,12 @@ public class ConversionPathReportingTests : IDisposable
             Assert.Equal(1, rescued.GetProperty("triggers").GetProperty("parse-failure").GetInt32());
             Assert.Equal(passthroughOnError, rescued.GetProperty("passthroughOnError").GetBoolean());
 
-            // Documented difference: project migration does not run the per-file
-            // round-trip rescue, so passthroughOnError does not rescue this file.
             var refused = FileEntry(files, "RoundTripFailure").GetProperty("conversionPaths");
-            Assert.Equal("refused", refused.GetProperty("outcome").GetString());
+            Assert.Equal("preserved", refused.GetProperty("outcome").GetString());
 
-            // Lossless project migration is all-or-nothing: one failed file means no
-            // file is written, so every file reports refused while keeping its counts.
-            Assert.Equal("refused", rescued.GetProperty("outcome").GetString());
+            Assert.Equal("preserved", rescued.GetProperty("outcome").GetString());
             var native = FileEntry(files, "F1-REFOUT-01").GetProperty("conversionPaths");
-            Assert.Equal("refused", native.GetProperty("outcome").GetString());
+            Assert.Equal("native", native.GetProperty("outcome").GetString());
             Assert.Equal(0, native.GetProperty("interop").GetInt32() + native.GetProperty("rescue").GetInt32());
         }
     }

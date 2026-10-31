@@ -2,11 +2,13 @@
 """Truth checks for the default-path migration report."""
 
 import copy
+import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
-from default_migrate_report import markdown, summarize
+from default_migrate_report import main, markdown, summarize
 
 
 class DefaultMigrateReportTests(unittest.TestCase):
@@ -111,6 +113,43 @@ class DefaultMigrateReportTests(unittest.TestCase):
         before = copy.deepcopy(self.envelope)
         summarize(self.envelope, self.root)
         self.assertEqual(before, self.envelope)
+
+    def run_report_command(self, result):
+        output = self.root / "reports"
+        output.mkdir(exist_ok=True)
+        result = {**result, "project": "Fixture", "migrate_exit_code": 0}
+        with patch("sys.argv", [
+            "default_migrate_report.py", "--compiler", str(self.root / "compiler.dll"),
+            "--output", str(output)
+        ]), patch("default_migrate_report.measure", return_value=[result]):
+            main()
+        return output
+
+    def test_runner_accepts_complete_writing_without_claiming_build_or_native(self):
+        result = summarize(self.envelope, self.root)
+        result.update(written=4, genuinely_failed=0, converted_but_blocked=0)
+        output = self.run_report_command(result)
+        recorded = json.loads((output / "default-migrate.json").read_text())["projects"][0]
+        self.assertEqual(recorded["written"], recorded["total"])
+        self.assertEqual(recorded["native_file_fraction"], 0.25)
+        self.assertEqual(recorded["build"]["status"], "not-run")
+        self.assertEqual(recorded["tests"]["status"], "not-run")
+
+    def test_runner_rejects_zero_partial_and_skipped_writes_but_retains_reports(self):
+        for written, failed, blocked, skipped in (
+            (0, 1, 3, 0), (2, 1, 1, 0), (3, 0, 0, 1)
+        ):
+            with self.subTest(written=written):
+                result = summarize(self.envelope, self.root)
+                result.update(written=written, genuinely_failed=failed,
+                              converted_but_blocked=blocked, skipped=skipped)
+                with self.assertRaisesRegex(SystemExit, f"Fixture {written}/4 written"):
+                    self.run_report_command(result)
+                recorded = json.loads(
+                    (self.root / "reports/default-migrate.json").read_text())["projects"][0]
+                self.assertEqual(recorded["written"], written)
+                self.assertEqual(recorded["build"]["status"], "not-run")
+                self.assertTrue((self.root / "reports/default-migrate.md").is_file())
 
 
 if __name__ == "__main__":

@@ -51,7 +51,7 @@ public class ConvertToolTests
         Assert.True(props.TryGetProperty("source", out _));
         Assert.True(props.TryGetProperty("moduleName", out _));
         Assert.True(props.TryGetProperty("fidelity", out _));
-        Assert.True(props.TryGetProperty(
+        Assert.False(props.TryGetProperty(
             "selectActivePreprocessorBranchLossy",
             out _));
         Assert.True(props.TryGetProperty("definedSymbols", out _));
@@ -152,13 +152,13 @@ public class ConvertToolTests
             source = "public interface IEvents { event System.EventHandler Changed; }",
             moduleName = "Events",
             mode = "validate",
-            fidelity = "lossy"
+            fidelity = "lossless"
         });
 
         var result = await _tool.ExecuteAsync(args);
 
         var root = JsonDocument.Parse(result.Content[0].Text!).RootElement;
-        Assert.Equal("lossy", root.GetProperty("fidelity").GetString());
+        Assert.Equal("lossless", root.GetProperty("fidelity").GetString());
         var lossSummary = root.GetProperty("lossSummary");
         Assert.Equal(0, lossSummary.GetProperty("drops").GetInt32());
         Assert.Equal(
@@ -169,7 +169,7 @@ public class ConvertToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_SelectedBranch_ReportsEffectiveMetadata()
+    public async Task ExecuteAsync_AllBranches_ReportsEffectiveMetadata()
     {
         var args = JsonSerializer.SerializeToElement(new
         {
@@ -180,7 +180,6 @@ public class ConvertToolTests
                 public class Fallback { }
                 #endif
                 """,
-            selectActivePreprocessorBranchLossy = true,
             definedSymbols = new[] { "FEATURE" },
             configuration = "Release",
             targetFramework = "net10.0",
@@ -194,7 +193,7 @@ public class ConvertToolTests
 
         Assert.False(result.IsError);
         var root = JsonDocument.Parse(result.Content[0].Text!).RootElement;
-        Assert.Equal("lossy", root.GetProperty("fidelity").GetString());
+        Assert.Equal("lossless", root.GetProperty("fidelity").GetString());
         var metadata = root.GetProperty("metadata");
         Assert.Equal("Release", metadata.GetProperty("configuration").GetString());
         Assert.Equal("net10.0", metadata.GetProperty("targetFramework").GetString());
@@ -212,11 +211,11 @@ public class ConvertToolTests
             metadata.GetProperty("features")
                 .GetProperty("test_feature").GetString());
         Assert.Contains("Selected", root.GetProperty("calorSource").GetString());
-        Assert.DoesNotContain("Fallback", root.GetProperty("calorSource").GetString());
+        Assert.Contains("Fallback", root.GetProperty("calorSource").GetString());
     }
 
     [Fact]
-    public async Task ExecuteAsync_LegacyStripTrue_ForcesEffectiveLossyFidelity()
+    public async Task ExecuteAsync_LegacyStripTrue_IsRejectedInsteadOfDroppingBranches()
     {
         var args = JsonSerializer.SerializeToElement(new
         {
@@ -232,11 +231,19 @@ public class ConvertToolTests
 
         var result = await _tool.ExecuteAsync(args);
 
-        Assert.False(result.IsError);
-        var root = JsonDocument.Parse(result.Content[0].Text!).RootElement;
-        Assert.Equal("lossy", root.GetProperty("fidelity").GetString());
-        Assert.Contains("Live", root.GetProperty("calorSource").GetString());
-        Assert.DoesNotContain("Dead", root.GetProperty("calorSource").GetString());
+        Assert.True(result.IsError);
+        Assert.Contains("Removed conversion parameter: stripPreprocessor", result.Content[0].Text);
+    }
+
+    [Theory]
+    [InlineData("""{"source":"public class C {}","fidelity":"lossy"}""", "Only lossless")]
+    [InlineData("""{"source":"public class C {}","selectActivePreprocessorBranchLossy":true}""",
+        "Removed conversion parameter")]
+    public async Task ExecuteAsync_DestructiveModes_AreRejected(string json, string reason)
+    {
+        var result = await _tool.ExecuteAsync(JsonDocument.Parse(json).RootElement);
+        Assert.True(result.IsError);
+        Assert.Contains(reason, result.Content[0].Text);
     }
 
     [Fact]

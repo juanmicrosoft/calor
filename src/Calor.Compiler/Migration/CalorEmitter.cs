@@ -5344,7 +5344,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
             _builder.Append(
                 CSharpInteropBlockNode.CompilationUnitPassthroughMarker);
         _builder.Append(node.CSharpCode);
-        if (!node.CSharpCode.EndsWith('\n')
+        if (!node.IsCompilationUnitPassthrough
+            && !node.CSharpCode.EndsWith('\n')
             && !node.CSharpCode.EndsWith('\r')
             && node.CSharpCode[
                      (node.CSharpCode.LastIndexOfAny(['\r', '\n']) + 1)..]

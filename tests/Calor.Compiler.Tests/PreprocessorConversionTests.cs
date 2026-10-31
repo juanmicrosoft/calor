@@ -2955,8 +2955,11 @@ public class Test
             var preserveAmbiguousFile = Assert.Single(
                 preserveAmbiguous.FileResults);
             Assert.Equal(
-                FileMigrationStatus.Failed,
+                FileMigrationStatus.Partial,
                 preserveAmbiguousFile.Status);
+            Assert.Equal("preserved", preserveAmbiguousFile.ConversionPaths!.Outcome);
+            Assert.Equal("verified", preserveAmbiguousFile.ConversionPaths.RoundTrip);
+            Assert.True(File.Exists(outputPath));
             Assert.Contains(
                 preserveAmbiguousFile.Issues,
                 issue => issue.Feature == "preprocessor-project-selection"

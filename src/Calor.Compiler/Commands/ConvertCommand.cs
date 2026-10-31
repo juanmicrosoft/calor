@@ -23,7 +23,7 @@ public static class ConvertCommand
     internal static readonly AsyncLocal<Action<ConversionOptions>?> ConversionOptionsObserver = new();
 
     /// <summary>
-    /// #1514: exit code for a <c>--lossy</c> conversion whose output was written but
+    /// Exit code for preserved output that was written but
     /// failed the round-trip compile check (<c>conversionPaths.outcome: "unverified"</c>).
     /// </summary>
     internal const int UnverifiedExitCode = 2;
@@ -52,7 +52,7 @@ public static class ConvertCommand
 
         var noFallbackOption = new Option<bool>(
             aliases: new[] { "--no-fallback" },
-            description: "Fail conversion when encountering unsupported constructs (instead of emitting TODO comments)");
+            description: "Disable TODO fallback; default lossless conversion still preserves unsupported C#.");
 
         var validateOption = new Option<bool>(
             aliases: new[] { "--validate" },
@@ -62,13 +62,6 @@ public static class ConvertCommand
             aliases: new[] { "--passthrough" },
             description: "Preserve unconvertible members as §CSHARP interop blocks so the output always parses (C# → Calor). If a member's emitted Calor would be invalid, its original C# is kept verbatim instead of writing broken output.");
 
-        var lossyOption = new Option<bool>(
-            aliases: new[] { "--lossy" },
-            description: "Explicitly allow reported semantic substitutions or drops. The default is lossless conversion.");
-
-        var selectBranchOption = new Option<bool>(
-            aliases: new[] { "--select-active-preprocessor-branch-lossy" },
-            description: "Explicitly lossy: evaluate conditional compilation with Roslyn and keep only the active branch.");
         var defineOption = new Option<string[]>(
             aliases: new[] { "--define" },
             description: "Conditional-compilation symbol. Repeat for multiple symbols.")
@@ -133,8 +126,6 @@ public static class ConvertCommand
             noFallbackOption,
             validateOption,
             passthroughOption,
-            lossyOption,
-            selectBranchOption,
             defineOption,
             configurationOption,
             targetFrameworkOption,
@@ -158,8 +149,6 @@ public static class ConvertCommand
             var noFallback = ctx.ParseResult.GetValueForOption(noFallbackOption);
             var validate = ctx.ParseResult.GetValueForOption(validateOption);
             var passthrough = ctx.ParseResult.GetValueForOption(passthroughOption);
-            var lossy = ctx.ParseResult.GetValueForOption(lossyOption);
-            var selectBranch = ctx.ParseResult.GetValueForOption(selectBranchOption);
             var definedSymbols = ctx.ParseResult.GetValueForOption(defineOption) ?? [];
             var configuration = ctx.ParseResult.GetValueForOption(configurationOption);
             var targetFramework = ctx.ParseResult.GetValueForOption(targetFrameworkOption);
@@ -175,7 +164,7 @@ public static class ConvertCommand
             // Environment.ExitCode is overwritten by Main's InvokeAsync return.
             ctx.ExitCode = await ExecuteAsync(
                 input, output, benchmark, verbose, explain, noFallback, validate,
-                passthrough, lossy, selectBranch, definedSymbols, configuration,
+                passthrough, definedSymbols, configuration,
                 targetFramework, languageVersion, timeoutSeconds,
                 documentationMode, sourceKind, features,
                 references, explicitCallClosers, format);
@@ -187,7 +176,7 @@ public static class ConvertCommand
     private static async Task<int> ExecuteAsync(
         FileInfo input, FileInfo? output, bool benchmark, bool verbose,
         bool explain, bool noFallback, bool validate, bool passthrough,
-        bool lossy, bool selectBranch, IReadOnlyCollection<string> definedSymbols,
+        IReadOnlyCollection<string> definedSymbols,
         string? configuration, string? targetFramework, string? languageVersion,
         int timeoutSeconds, string documentationMode, string sourceKind,
         IReadOnlyCollection<string> features,
@@ -247,7 +236,7 @@ public static class ConvertCommand
             {
                 (exitCode, conversionResult) = await ConvertCSharpToCalorAsync(
                     input.FullName, outputPath, benchmark, verbose, explain,
-                    noFallback, validate, passthrough, lossy, selectBranch,
+                    noFallback, validate, passthrough,
                     definedSymbols, configuration, targetFramework,
                     languageVersion, documentationMode, sourceKind,
                     features, references, timeoutSeconds, explicitCallClosers,
@@ -458,7 +447,6 @@ public static class ConvertCommand
     private static async Task<(int ExitCode, ConversionResult? Result)> ConvertCSharpToCalorAsync(
         string inputPath, string outputPath, bool benchmark, bool verbose,
         bool explain, bool noFallback, bool validate, bool passthrough,
-        bool lossy, bool selectBranch,
         IReadOnlyCollection<string> definedSymbols,
         string? configuration, string? targetFramework, string? languageVersion,
         string documentationMode, string sourceKind,
@@ -470,9 +458,9 @@ public static class ConvertCommand
 
         var conversionOptions = BuildCSharpToCalorOptions(
             benchmark, verbose, explain, noFallback, passthrough,
-            explicitCallClosers, lossy, selectBranch, definedSymbols,
-            configuration, targetFramework, languageVersion,
-            documentationMode, sourceKind, features, references);
+            explicitCallClosers, definedSymbols: definedSymbols,
+            configuration: configuration, targetFramework: targetFramework, languageVersion: languageVersion,
+            documentationMode: documentationMode, sourceKind: sourceKind, features: features, references: references);
         // Envelope mode: the converter's --verbose progress lines go to stderr
         // with the rest of the human-readable report, so stdout stays one
         // JSON document. Text mode keeps them on stdout.
@@ -629,8 +617,7 @@ public static class ConvertCommand
         // locations is printed instead.
         var losses = result.Context.Losses;
         envelope?.SetConversionSummary(result);
-        // #1514: under --lossy the converter keeps output whose generated C# failed
-        // the round-trip compile check. It is written, but never reported as clean.
+        // Writing exact preserved source is independent of standalone compilation.
         var unverified = result.Context.RoundTrip == ConversionRoundTrip.Failed;
         if (losses.Count == 0 && validationErrors.Count == 0 && !unverified)
         {
@@ -664,12 +651,12 @@ public static class ConvertCommand
                 .ToList();
             statusOut.WriteLine(
                 $"✗ Round-trip check failed: the generated C# does not compile ({roundTripFailures.Count} error(s)). " +
-                "The output was written because --lossy was passed; it is unverified (exit 2).");
+                "Exact original C# was preserved; its build is unverified (exit 2).");
             foreach (var failure in roundTripFailures.Take(5))
                 statusOut.WriteLine($"    {failure.Message}");
             if (roundTripFailures.Count > 5)
                 statusOut.WriteLine($"    ... and {roundTripFailures.Count - 5} more");
-            statusOut.WriteLine("  Fix the output by hand, or rerun without --lossy: lossless mode keeps a failing type as C# where it can.");
+            statusOut.WriteLine("  Validate with the original project references and configuration.");
         }
 
         // #736/#717: report §CSHARP interop blocks in the output — members preserved as

@@ -1676,6 +1676,22 @@ public sealed class Lexer
         var contentStart = _position;
         const string endMarker = "}§/CSHARP";
         var depth = 1;
+        if (_source.AsSpan(contentStart).StartsWith(
+                Ast.CSharpInteropBlockNode.CompilationUnitPassthroughMarker,
+                StringComparison.Ordinal))
+        {
+            // Exact whole-unit transport is terminal. Its final delimiter can
+            // follow an EOF line comment without inserting a source newline.
+            var end = _source.LastIndexOf(endMarker, StringComparison.Ordinal);
+            if (end >= contentStart
+                && _source.AsSpan(end + endMarker.Length).Trim().IsEmpty)
+            {
+                var rawContent = _source[contentStart..end];
+                while (_position < end + endMarker.Length)
+                    Advance();
+                return MakeToken(TokenKind.CSharpInterop, rawContent);
+            }
+        }
 
         while (!IsAtEnd)
         {

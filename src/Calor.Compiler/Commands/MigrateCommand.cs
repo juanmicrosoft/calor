@@ -67,12 +67,6 @@ public static class MigrateCommand
             description: "Emit explicit §/C for every §C call (v0.6.0-compatible output); disables zero-arg §/C elision",
             getDefaultValue: () => false);
 
-        var lossyOption = new Option<bool>(
-            aliases: new[] { "--lossy" },
-            description: "Explicitly allow reported semantic substitutions or drops. The default is lossless migration.");
-        var selectBranchOption = new Option<bool>(
-            aliases: new[] { "--select-active-preprocessor-branch-lossy" },
-            description: "Explicitly lossy: select Roslyn's active conditional-compilation branch.");
         var defineOption = new Option<string[]>(
             aliases: new[] { "--define" },
             description: "Additional conditional-compilation symbol. Repeat for multiple symbols.")
@@ -114,8 +108,6 @@ public static class MigrateCommand
             skipVerifyOption,
             verificationTimeoutOption,
             explicitCallClosersOption,
-            lossyOption,
-            selectBranchOption,
             defineOption,
             configurationOption,
             targetFrameworkOption,
@@ -137,8 +129,6 @@ public static class MigrateCommand
             var skipVerify = ctx.ParseResult.GetValueForOption(skipVerifyOption);
             var verificationTimeout = ctx.ParseResult.GetValueForOption(verificationTimeoutOption);
             var explicitCallClosers = ctx.ParseResult.GetValueForOption(explicitCallClosersOption);
-            var lossy = ctx.ParseResult.GetValueForOption(lossyOption);
-            var selectBranch = ctx.ParseResult.GetValueForOption(selectBranchOption);
             var definedSymbols = ctx.ParseResult.GetValueForOption(defineOption) ?? [];
             var configuration = ctx.ParseResult.GetValueForOption(configurationOption) ?? "Debug";
             var targetFramework = ctx.ParseResult.GetValueForOption(targetFrameworkOption);
@@ -150,7 +140,7 @@ public static class MigrateCommand
             // Environment.ExitCode is overwritten by Main's InvokeAsync return.
             ctx.ExitCode = await ExecuteAsync(path, dryRun, benchmark, direction, parallel,
                 reportPath, verbose, skipAnalyze, skipVerify, (uint)verificationTimeout,
-                explicitCallClosers, lossy, selectBranch, definedSymbols,
+                explicitCallClosers, definedSymbols,
                 configuration, targetFramework, languageVersion,
                 documentationMode, parseFeatures);
         });
@@ -170,8 +160,6 @@ public static class MigrateCommand
         bool skipVerify,
         uint verificationTimeout,
         bool explicitCallClosers,
-        bool lossy,
-        bool selectBranch,
         IReadOnlyCollection<string> definedSymbols,
         string configuration,
         string? targetFramework,
@@ -209,12 +197,8 @@ public static class MigrateCommand
             SkipAnalyze = skipAnalyze,
             SkipVerify = skipVerify,
             VerificationTimeoutMs = verificationTimeout,
-            Fidelity = lossy || selectBranch
-                ? ConversionFidelity.Lossy
-                : ConversionFidelity.Lossless,
-            PreprocessorMode = selectBranch
-                ? PreprocessorConversionMode.SelectActiveBranchLossy
-                : PreprocessorConversionMode.PreserveAllBranches,
+            Fidelity = ConversionFidelity.Lossless,
+            PreprocessorMode = PreprocessorConversionMode.PreserveAllBranches,
             Configuration = configuration,
             TargetFramework = targetFramework,
             DefinedSymbols = definedSymbols.ToList(),

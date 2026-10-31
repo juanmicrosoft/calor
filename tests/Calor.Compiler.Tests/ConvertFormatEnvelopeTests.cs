@@ -465,7 +465,7 @@ public class ConvertFormatEnvelopeTests : IDisposable
     }
 
     [Fact]
-    public void Convert_Json_LossyOptInReportsExactDrop()
+    public void Convert_Json_DefaultPreservesDestructorInsteadOfDroppingIt()
     {
         var csFile = WriteFile("LossyDtor.cs", """
             public class D
@@ -474,16 +474,16 @@ public class ConvertFormatEnvelopeTests : IDisposable
             }
             """);
 
-        var (exitCode, stdOut, _) = RunCli("convert", csFile, "--lossy", "--format", "json");
+        var (exitCode, stdOut, _) = RunCli("convert", csFile, "--format", "json");
 
         Assert.Equal(0, exitCode);
         var data = ParseAndValidate(stdOut, "convert").GetProperty("data");
-        Assert.Equal("lossy", data.GetProperty("fidelity").GetString());
-        Assert.Equal(1, data.GetProperty("dropCount").GetInt32());
+        Assert.Equal("lossless", data.GetProperty("fidelity").GetString());
+        Assert.Equal(0, data.GetProperty("dropCount").GetInt32());
         var loss = Assert.Single(data.GetProperty("losses").EnumerateArray());
-        Assert.Equal("Dropped", loss.GetProperty("kind").GetString());
+        Assert.Equal("InteropPreserved", loss.GetProperty("kind").GetString());
         Assert.EndsWith("LossyDtor.cs", loss.GetProperty("file").GetString());
-        Assert.Equal(3, loss.GetProperty("line").GetInt32());
+        Assert.True(loss.GetProperty("line").GetInt32() > 0);
     }
 
     [Fact]

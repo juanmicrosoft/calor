@@ -25,6 +25,11 @@ The `convert` command performs bidirectional conversion between C# and Calor:
 
 The conversion direction is automatically detected from the input file extension.
 
+Preserved C# retains its source text and behavior. Generated files use UTF-8.
+UTF-16/UTF-32 inputs therefore do **not** retain their original encoding or bytes.
+Exact-byte controls cover preserved UTF-8 sources, including BOMs, CRLF, and EOF comments.
+Malformed input encodings fail explicitly rather than using replacement text.
+
 ---
 
 ## Quick Start
@@ -60,8 +65,6 @@ calor convert MyService.cs --benchmark
 | `--output` | `-o` | Auto-detected | Output file path |
 | `--benchmark` | `-b` | `false` | Include benchmark metrics comparison |
 | `--verbose` | `-v` | `false` | Enable verbose output |
-| `--lossy` | — | `false` | Explicitly allow reported substitutions or drops. Without this flag, unsupported code is preserved verbatim and both generated Calor and round-tripped C# must validate before the destination is replaced. |
-| `--select-active-preprocessor-branch-lossy` | — | `false` | Explicitly lossy: evaluate conditional compilation through Roslyn and retain only the active branch. This implies lossy fidelity. |
 | `--define` | — | — | Add a conditional-compilation symbol. Repeat or provide multiple values. |
 | `--configuration` | — | — | Configuration recorded in conversion metadata. |
 | `--framework` | — | — | Target framework recorded in conversion metadata. |
@@ -119,7 +122,7 @@ timeout, crash). Exit codes are unchanged.
   construct, and stripped preprocessor directive, each with
   `kind`, `feature`, `file`, `line`, and `description`. `lossCount: 0` means
   the output is fully native Calor. Interop preservation is lossless but not
-  native; substitutions and drops require `--lossy`. In text mode a conversion with losses
+  native; the CLI does not allow substitutions or drops. In text mode a conversion with losses
   prints a located loss summary instead of the `✓ Conversion successful` line.
 - `data.benchmark` — present with `--benchmark`: token/line/character counts
   before and after, reduction percentages, and `compactnessRatio`. The legacy
@@ -163,16 +166,18 @@ When converting C# to Calor, the converter:
 5. Adds effect declarations based on detected side effects
 6. Suggests contracts based on validation patterns
 
-The default contract is **lossless**: unsupported descendants bubble to the
-nearest complete member or type and are preserved verbatim as C# interop.
-Success means the emitted Calor parses and compiles, and its generated C#
-compiles through Roslyn. Output files are replaced atomically only after these
-checks pass. `--lossy` permits substitutions or drops, but every occurrence is
-reported with its source location. Lossy output still goes through the same
-round-trip compile check (#1514). When it fails, the file is written but
-`conversionPaths.outcome` is `unverified`, `conversionPaths.roundTrip` is
-`failed`, each compiler error is a warning, and the command exits `2`.
-(`--select-active-preprocessor-branch-lossy` still refuses on a failed check.)
+The contract is **lossless**: try native conversion, then preserve unsupported
+code at a complete member, type, or whole-file boundary. Failed generated-Calor
+or C# validation escalates preservation rather than discarding a buildable input.
+Whole-file passthrough reproduces the original C# without a generated preamble.
+Reports retain the reasons for escalation and never count passthrough as native.
+
+Writing and building are separate outcomes. Exact original C# can be written
+when a standalone file lacks its project references; that result is
+`unverified`, with `roundTrip: "failed"` and exit `2`, not a passed build.
+Use the original project references and configuration to verify it. Malformed,
+missing, unreadable inputs and write failures remain errors. The destructive
+`--lossy` and `--select-active-preprocessor-branch-lossy` options were removed.
 
 ### Conditional compilation and compiler directives
 
@@ -413,9 +418,9 @@ Review the warnings and manually adjust as needed.
 
 | Code | Meaning |
 |:-----|:--------|
-| `0` | Conversion completed; read `conversionPaths.outcome` to tell native from preserved or lossy output |
-| `1` | Missing input, timeout, `--no-fallback` refusal, or any refused conversion (`outcome: "refused"`; nothing written) |
-| `2` | Plain `--lossy` output was written, but its C# failed the round-trip compile check (`outcome: "unverified"`). With `--select-active-preprocessor-branch-lossy` the same failure is a refusal (exit `1`) |
+| `0` | Conversion completed; read `conversionPaths.outcome` to distinguish native from preserved output |
+| `1` | Invalid or missing input, timeout, filesystem failure, or any refused conversion (`outcome: "refused"`; nothing written) |
+| `2` | Exact original C# was preserved and written, but standalone compilation failed (`outcome: "unverified"`). Validate with the original project context. |
 
 ---
 

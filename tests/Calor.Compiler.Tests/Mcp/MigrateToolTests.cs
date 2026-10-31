@@ -34,6 +34,8 @@ public class MigrateToolTests
         Assert.True(props.TryGetProperty("phase", out _));
         Assert.True(props.TryGetProperty("maxFiles", out _));
         Assert.True(props.TryGetProperty("autoFix", out _));
+        Assert.Equal(new[] { "lossless" }, props.GetProperty("fidelity").GetProperty("enum")
+            .EnumerateArray().Select(value => value.GetString()).ToArray());
 
         // projectPath is required
         Assert.True(schema.TryGetProperty("required", out var required));
@@ -73,6 +75,15 @@ public class MigrateToolTests
 
         Assert.True(result.IsError);
         Assert.Contains("not found", result.Content[0].Text!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DestructiveFidelity_IsRejected()
+    {
+        var result = await _tool.ExecuteAsync(JsonDocument.Parse(
+            """{"projectPath":".","fidelity":"lossy"}""").RootElement);
+        Assert.True(result.IsError);
+        Assert.Contains("Only lossless", result.Content[0].Text);
     }
 
     [Fact]

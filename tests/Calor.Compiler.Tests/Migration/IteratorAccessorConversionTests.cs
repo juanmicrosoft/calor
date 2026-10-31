@@ -233,16 +233,17 @@ public class IteratorAccessorConversionTests
     [Theory]
     [InlineData("F4-ITER-01")]
     [InlineData("F4-ITER-02")]
-    public void NoFallback_RefusesExplicitly(string row)
+    public void NoFallback_PreservesExplicitlyAndRetainsReason(string row)
     {
         // `calor convert --no-fallback` turns every unsupported feature into an error.
         // The iterator accessor is refused by name; no Calor is produced to mislead.
         var result = new CSharpToCalorConverter(ConvertCommand.BuildCSharpToCalorOptions(
             benchmark: false, verbose: false, explain: false, noFallback: true,
             passthrough: false, explicitCallClosers: false)).Convert(R0Fixture(row));
-        Assert.False(result.Success);
+        Assert.True(result.Success);
         Assert.Contains(result.Issues, issue => issue.Feature == "iterator-accessor"
-            && issue.Severity == ConversionIssueSeverity.Error);
+            && issue.Severity == ConversionIssueSeverity.Warning);
+        Assert.Contains(result.Losses, loss => loss.Feature == "whole-file-preservation");
     }
 
     [Fact]

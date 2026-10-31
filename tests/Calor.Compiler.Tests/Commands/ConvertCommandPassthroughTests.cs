@@ -95,7 +95,7 @@ public class ConvertCommandPassthroughTests
     }
 
     [Fact]
-    public void PassthroughGiveUp_FailsLoudly_NotSilentSuccess()
+    public void MemberRescueGiveUp_PreservesWholeFileAndRetainsReason()
     {
         // #745 review finding 2: pin the "never ship broken output" contract the CLI's
         // fail-loudly branch surfaces. Top-level statements become a synthetic Main with
@@ -112,7 +112,12 @@ public class ConvertCommandPassthroughTests
 
         var result = converter.Convert("System.Console.WriteLine(\"hi\");");
 
-        Assert.False(result.Success);
+        Assert.True(result.Success);
+        Assert.Equal("preserved", result.Paths.Outcome);
+        Assert.Contains(result.Losses, loss => loss.Feature == "whole-file-preservation");
+        Assert.Equal("System.Console.WriteLine(\"hi\");",
+            Program.Compile(result.CalorSource!, "preserved.calr",
+                new CompilationOptions { DeferGeneratedOutputValidation = true }).GeneratedCode);
         Assert.True(result.HasWarnings);
         Assert.Contains(result.Issues, i =>
             i.Severity == ConversionIssueSeverity.Warning && i.Feature == "post-validation-fallback");

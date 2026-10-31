@@ -59,8 +59,8 @@ public sealed class FileMigrationResult
     public required string? OutputPath { get; set; }
     public required FileMigrationStatus Status { get; set; }
     public TimeSpan Duration { get; init; }
-    public List<ConversionIssue> Issues { get; init; } = new();
-    public IReadOnlyList<ConversionLoss> Losses { get; init; } = Array.Empty<ConversionLoss>();
+    public List<ConversionIssue> Issues { get; set; } = new();
+    public IReadOnlyList<ConversionLoss> Losses { get; set; } = Array.Empty<ConversionLoss>();
 
     /// <summary>
     /// #1144: the paths this file's conversion took; null when the file was not
@@ -76,11 +76,11 @@ public sealed class FileMigrationResult
     }
     private ConversionPathSummary? _conversionPaths;
     public ConversionMetadata? Metadata { get; init; }
-    public FileMetrics? Metrics { get; init; }
+    public FileMetrics? Metrics { get; set; }
     public FileAnalysisResult? Analysis { get; init; }
     public FileVerificationSummary? Verification { get; set; }
-    internal string? ConvertedSource { get; init; }
-    internal string? GeneratedCSharp { get; init; }
+    internal string? ConvertedSource { get; set; }
+    internal string? GeneratedCSharp { get; set; }
 }
 
 /// <summary>

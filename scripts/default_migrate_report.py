@@ -185,6 +185,19 @@ def main() -> None:
     (args.output / "default-migrate.json").write_text(
         json.dumps({"schema_version": 1, "projects": results}, indent=2) + "\n", encoding="utf-8")
     (args.output / "default-migrate.md").write_text(markdown(results), encoding="utf-8")
+    incomplete = [
+        result for result in results
+        if result["written"] != result["total"]
+        or any(result[key] for key in (
+            "genuinely_failed", "converted_but_blocked", "skipped"))
+        or result["migrate_exit_code"] != 0
+    ]
+    if incomplete:
+        raise SystemExit(
+            "Default migrate did not write every discovered input: "
+            + ", ".join(
+                f"{result['project']} {result['written']}/{result['total']} written"
+                for result in incomplete))
 
 
 if __name__ == "__main__":

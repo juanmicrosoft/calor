@@ -620,13 +620,14 @@ public class LocalFunctionConversionTests
     [InlineData("F3-LOCAL-04")]
     [InlineData("F3-LOCAL-05")]
     [InlineData("F3-LOCAL-03")]
-    public void NoFallback_RefusesOutsideTheSlice_ByName(string row)
+    public void NoFallback_PreservesOutsideTheSlice_ByName(string row)
     {
         var result = new CSharpToCalorConverter(NoFallbackOptions())
             .Convert(row == "F3-LOCAL-05" ? AsyncLocal : R0Fixture(row));
-        Assert.False(result.Success);
+        Assert.True(result.Success);
         Assert.Contains(result.Issues, issue => issue.Feature == "local-function"
-            && issue.Severity == ConversionIssueSeverity.Error);
+            && issue.Severity == ConversionIssueSeverity.Warning);
+        Assert.Contains(result.Losses, loss => loss.Feature == "whole-file-preservation");
     }
 
     [Theory]

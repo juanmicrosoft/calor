@@ -67,8 +67,8 @@ public sealed class ConvertTool : McpToolBase
                 },
                 "fidelity": {
                     "type": "string",
-                    "enum": ["lossless", "lossy"],
-                    "description": "Fidelity contract. 'lossless' is the default; 'lossy' explicitly permits reported substitutions or drops."
+                    "enum": ["lossless"],
+                    "description": "Native conversion with exact C# preservation at member, type, or whole-file boundaries."
                 },
                 "mode": {
                     "type": "string",
@@ -99,14 +99,6 @@ public sealed class ConvertTool : McpToolBase
                             "description": "Stage 1 only: static analysis without conversion attempt (faster, for assess mode)"
                         }
                     }
-                },
-                "selectActivePreprocessorBranchLossy": {
-                    "type": "boolean",
-                    "description": "Explicitly lossy opt-in: keep only the branch Roslyn activates for the supplied symbols (default: false; requires lossy fidelity)"
-                },
-                "stripPreprocessor": {
-                    "type": "boolean",
-                    "description": "Deprecated compatibility alias for selectActivePreprocessorBranchLossy. Omitted callers preserve every branch."
                 },
                 "definedSymbols": {
                     "type": "array",
@@ -171,6 +163,13 @@ public sealed class ConvertTool : McpToolBase
 
     public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
+        if (GetString(arguments, "fidelity") is { } fidelity
+            && !fidelity.Equals("lossless", StringComparison.OrdinalIgnoreCase))
+            return Task.FromResult(McpToolResult.Error(
+                "Only lossless conversion is supported; unsupported C# is preserved, not dropped."));
+        foreach (var removed in new[] { "selectActivePreprocessorBranchLossy", "stripPreprocessor" })
+            if (arguments is { } supplied && supplied.TryGetProperty(removed, out _))
+                return Task.FromResult(McpToolResult.Error($"Removed conversion parameter: {removed}. Every branch is preserved."));
         var modeParam = GetString(arguments, "mode") ?? "convert";
 
         return modeParam.ToLowerInvariant() switch
@@ -200,7 +199,8 @@ public sealed class ConvertTool : McpToolBase
 
             try
             {
-                source = File.ReadAllText(inputPath);
+                source = CSharpToCalorConverter.ReadSourceFileAsync(inputPath, cancellationToken)
+                    .GetAwaiter().GetResult();
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -208,7 +208,7 @@ public sealed class ConvertTool : McpToolBase
             }
         }
 
-        if (string.IsNullOrEmpty(source))
+        if (source == null)
         {
             return Task.FromResult(McpToolResult.Error("Either 'source' or 'inputPath' must be provided"));
         }
@@ -221,18 +221,10 @@ public sealed class ConvertTool : McpToolBase
         }
         var fallback = GetBool(arguments, "fallback", defaultValue: true);
         var explain = GetBool(arguments, "explain", defaultValue: false);
-        var selectActivePreprocessorBranchLossy = GetBool(
-            arguments,
-            "selectActivePreprocessorBranchLossy",
-            defaultValue: false);
-        var legacyStripPreprocessor = GetBool(
-            arguments,
-            "stripPreprocessor",
-            defaultValue: false);
         var passthroughOnError = GetBool(arguments, "passthroughOnError", defaultValue: false);
         var explicitCallClosers = GetBool(arguments, "explicitCallClosers", defaultValue: false);
         var conversionMode = ResolveConversionMode(arguments);
-        var fidelity = ResolveFidelity(arguments);
+        var fidelity = ConversionFidelity.Lossless;
 
         try
         {
@@ -243,15 +235,9 @@ public sealed class ConvertTool : McpToolBase
                 AutoGenerateIds = true,
                 GracefulFallback = fallback,
                 Explain = explain,
-                Fidelity = legacyStripPreprocessor
-                    || selectActivePreprocessorBranchLossy
-                    ? ConversionFidelity.Lossy
-                    : fidelity,
+                Fidelity = fidelity,
                 Mode = conversionMode,
-                PreprocessorMode = selectActivePreprocessorBranchLossy
-                    || legacyStripPreprocessor
-                    ? PreprocessorConversionMode.SelectActiveBranchLossy
-                    : PreprocessorConversionMode.PreserveAllBranches,
+                PreprocessorMode = PreprocessorConversionMode.PreserveAllBranches,
                 DefinedSymbols = GetStringArray(arguments, "definedSymbols"),
                 Configuration = GetString(arguments, "configuration"),
                 TargetFramework = GetString(arguments, "targetFramework"),
@@ -420,7 +406,7 @@ public sealed class ConvertTool : McpToolBase
                 Tip = "Use calor_help with feature='overview' to see all available Calor syntax before writing or editing .calr files."
             };
 
-            // #1514: lossy output that failed the round-trip compile check is returned
+            // Exact preserved output that failed the round-trip compile check is returned
             // (and written), but flagged as an error so it never reads as clean.
             var unverified = output.LossSummary.Paths.Outcome == ConversionPathSummary.UnverifiedOutcome;
             return Task.FromResult(McpToolResult.Json(output, isError: !success || unverified));
@@ -449,7 +435,8 @@ public sealed class ConvertTool : McpToolBase
 
             try
             {
-                source = File.ReadAllText(inputPath);
+                source = CSharpToCalorConverter.ReadSourceFileAsync(inputPath, cancellationToken)
+                    .GetAwaiter().GetResult();
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -457,7 +444,7 @@ public sealed class ConvertTool : McpToolBase
             }
         }
 
-        if (string.IsNullOrEmpty(source))
+        if (source == null)
         {
             return Task.FromResult(McpToolResult.Error("Either 'source' or 'inputPath' must be provided"));
         }
@@ -469,7 +456,7 @@ public sealed class ConvertTool : McpToolBase
             moduleName = Path.GetFileNameWithoutExtension(inputPath);
         }
         var conversionMode = ResolveConversionMode(arguments);
-        var fidelity = ResolveFidelity(arguments);
+        var fidelity = ConversionFidelity.Lossless;
         var expectedNamespace = GetString(arguments, "expectedNamespace");
         var expectedPatterns = GetStringArray(arguments, "expectedPatterns");
         var forbiddenPatterns = GetStringArray(arguments, "forbiddenPatterns");
@@ -484,14 +471,6 @@ public sealed class ConvertTool : McpToolBase
             var compatIssues = new List<string>();
 
             // Stage 1: Convert
-            var legacyStripPreprocessor = GetBool(
-                arguments,
-                "stripPreprocessor",
-                defaultValue: false);
-            var selectActivePreprocessorBranchLossy = GetBool(
-                arguments,
-                "selectActivePreprocessorBranchLossy",
-                defaultValue: false);
             var options = new ConversionOptions
             {
                 ModuleName = moduleName,
@@ -499,15 +478,9 @@ public sealed class ConvertTool : McpToolBase
                 AutoGenerateIds = true,
                 GracefulFallback = true,
                 Explain = false,
-                Fidelity = legacyStripPreprocessor
-                    || selectActivePreprocessorBranchLossy
-                    ? ConversionFidelity.Lossy
-                    : fidelity,
+                Fidelity = fidelity,
                 Mode = conversionMode,
-                PreprocessorMode = selectActivePreprocessorBranchLossy
-                    || legacyStripPreprocessor
-                    ? PreprocessorConversionMode.SelectActiveBranchLossy
-                    : PreprocessorConversionMode.PreserveAllBranches,
+                PreprocessorMode = PreprocessorConversionMode.PreserveAllBranches,
                 DefinedSymbols = GetStringArray(arguments, "definedSymbols"),
                 Configuration = GetString(arguments, "configuration"),
                 TargetFramework = GetString(arguments, "targetFramework"),
@@ -744,7 +717,7 @@ public sealed class ConvertTool : McpToolBase
     private Task<McpToolResult> HandleRoundtrip(JsonElement? arguments, CancellationToken cancellationToken)
     {
         var source = GetString(arguments, "source");
-        if (string.IsNullOrEmpty(source))
+        if (source == null)
         {
             return Task.FromResult(McpToolResult.Error("Missing required parameter: 'source'"));
         }
@@ -763,29 +736,15 @@ public sealed class ConvertTool : McpToolBase
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            var legacyStripPreprocessor = GetBool(
-                arguments,
-                "stripPreprocessor",
-                defaultValue: false);
-            var selectActivePreprocessorBranchLossy = GetBool(
-                arguments,
-                "selectActivePreprocessorBranchLossy",
-                defaultValue: false);
             var options = new ConversionOptions
             {
                 ModuleName = moduleName,
                 PreserveDocumentationComments = true,
                 AutoGenerateIds = true,
                 GracefulFallback = true,
-                Fidelity = legacyStripPreprocessor
-                    || selectActivePreprocessorBranchLossy
-                    ? ConversionFidelity.Lossy
-                    : ResolveFidelity(arguments),
+                Fidelity = ConversionFidelity.Lossless,
                 Mode = ConversionMode.Interop,
-                PreprocessorMode = selectActivePreprocessorBranchLossy
-                    || legacyStripPreprocessor
-                    ? PreprocessorConversionMode.SelectActiveBranchLossy
-                    : PreprocessorConversionMode.PreserveAllBranches,
+                PreprocessorMode = PreprocessorConversionMode.PreserveAllBranches,
                 DefinedSymbols = GetStringArray(arguments, "definedSymbols"),
                 Configuration = GetString(arguments, "configuration"),
                 TargetFramework = GetString(arguments, "targetFramework"),
@@ -969,14 +928,6 @@ public sealed class ConvertTool : McpToolBase
         }
         return modeStr.Equals("interop", StringComparison.OrdinalIgnoreCase)
             ? ConversionMode.Interop : ConversionMode.Standard;
-    }
-
-    private static ConversionFidelity ResolveFidelity(JsonElement? arguments)
-    {
-        var fidelity = GetString(arguments, "fidelity") ?? "lossless";
-        return fidelity.Equals("lossy", StringComparison.OrdinalIgnoreCase)
-            ? ConversionFidelity.Lossy
-            : ConversionFidelity.Lossless;
     }
 
     private static Microsoft.CodeAnalysis.CSharp.CSharpParseOptions?

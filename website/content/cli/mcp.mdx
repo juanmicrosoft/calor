@@ -147,18 +147,21 @@ Partial results look like this:
 
 - **`calor_convert`:** `isError: false` with `outcome: "preserved"` means usable
   output with some C# kept. `isError: true` with `outcome: "refused"` means no
-  usable output. With `fidelity: "lossy"`, `isError: true` with
+  usable output. `isError: true` with
   `outcome: "unverified"` and `paths.roundTrip: "failed"` means `calorSource` is
   returned (and written to `outputPath`), but its C# does not compile. `issues[]`
-  lists the compiler errors. Before 0.26 lossy mode skipped this check and could
-  return such output with `isError: false`.
-- **`calor_batch` and `calor_migrate`:** in the default lossless mode, one failed
-  file means no file is written. Every file then reports `outcome: "refused"` with
-  its counts, and the result has `isError: true`. With `skipOnError: false`,
+  lists the compiler errors. The destructive lossy fidelity and branch-selection
+  parameters are no longer supported.
+- **`calor_batch` and `calor_migrate`:** default conversion preserves unsupported
+  C# at member, type, or whole-file boundaries and writes every buildable discovered
+  input. One malformed or unwritable input does not discard unrelated outputs.
+  Failed inputs report `outcome: "refused"` and the result has `isError: true`.
+  With `skipOnError: false`,
   the response also carries `error`,
   naming the first failed file, and a `preservationPaths` line. Their
-  `conversionPaths.roundTrip` is `deferred`: the project-wide compile does the
-  round-trip check, and a failure there refuses the file. The current two-file
+  `conversionPaths.roundTrip` records the project-wide compile result. Exact
+  preserved loose-directory sources can remain `unverified` when references are
+  missing; writing is not a passed build. The current two-file
   `W1-F6-project` fixture succeeds after the private-property accessor fix:
   both files report `native`, and `calor_batch` reports `failedFiles: 0`.
 

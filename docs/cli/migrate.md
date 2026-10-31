@@ -62,8 +62,14 @@ Passing a directory instead selects loose-directory mode: files are discovered
 recursively without adopting a nearby project, and nested project directories
 are excluded. Output-path collisions (for
 example, `Foo.cs` and `Foo.csx` both mapping to `Foo.calr`) fail before writes.
-For project mode, generated C# is validated once with its converted siblings
-and the effective project references/options before any output is written.
+For project mode, generated C# is validated with its converted siblings and
+effective project references/options. Failures escalate native conversion through
+member, type, and exact whole-file C# preservation, then validation runs again.
+Buildable discovered inputs are written without needing a passthrough flag.
+One malformed or unwritable input does not discard unrelated valid outputs.
+Loose directories can lack references: exact preserved sources are still written,
+with failed compilation reported as `unverified`, not a passed build.
+Writing, native fraction, project compilation, and test execution are distinct results.
 
 ---
 
@@ -77,11 +83,9 @@ and the effective project references/options before any output is written.
 | `--parallel` | `-p` | `true` | Run conversions in parallel |
 | `--report` | `-r` | None | Save migration report to file (`.md` or `.json`) |
 | `--verbose` | `-v` | `false` | Enable verbose output |
-| `--lossy` | — | `false` | Allow explicitly reported semantic loss. |
-| `--select-active-preprocessor-branch-lossy` | — | `false` | Select Roslyn's active conditional branch. Implies lossy fidelity and requires an unambiguous project configuration/target framework. |
 | `--define` | — | — | Add a conditional-compilation symbol. |
 | `--configuration` | — | `Debug` | MSBuild configuration used to resolve parse options and symbols. |
-| `--framework` | — | — | Select one target framework. Required whenever a file belongs to multiple target frameworks with different language versions or symbol sets; symbols are never unioned. |
+| `--framework` | — | — | Select one target framework. Without selection, configuration-sensitive files are preserved exactly and checked under each target; symbols are never unioned. |
 | `--language-version` | — | Project value | Override the C# language version. |
 | `--documentation-mode` | — | `parse` | Roslyn documentation mode: `none`, `parse`, or `diagnose`. |
 | `--feature` | — | — | Roslyn parse feature in `key=value` form. |

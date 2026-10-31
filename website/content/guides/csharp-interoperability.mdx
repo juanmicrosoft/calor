@@ -464,7 +464,7 @@ none (`§YIELD` inside a getter is error `Calor0209`), so the converter keeps th
 The C# compiler still builds the iterator, so laziness, `finally` on dispose, and the
 timing of exceptions do not change. The result is the same on every surface, with or
 without passthrough, because the converter does it itself (feature `iterator-accessor`).
-`--no-fallback` refuses the file instead. To make the member native, move the loop into an
+`--no-fallback` disables TODO substitution, not faithful C# preservation. To make the member native, move the loop into an
 iterator method and return its result from the getter; see
 [Iterator Properties and Indexers](/docs/cli/convert/#iterator-properties-and-indexers).
 Iterators in ordinary methods already convert to `§YIELD`.
@@ -492,8 +492,9 @@ not compile.
 | `yield` in a property or indexer getter; partial properties | Member preserved | `iterator-accessor`, `partial-property` |
 
 The reason is the same each time: Calor has no form that keeps the C# meaning exactly, or
-the converter's Calor for it does not survive the C# round trip. So the C# is kept, or the
-file is refused, rather than converted to Calor that would behave differently.
+the converter's Calor for it does not survive the C# round trip. Default conversion
+keeps the original C# at a member, type, or whole-file boundary instead of changing its behavior.
+Invalid input and filesystem failures remain explicit failures.
 
 **Reading the counts.** `nativeConversionCount` (CLI JSON) and `nativeConversions` (MCP)
 count constructs the converter wrote as Calor, not members. They still include the
@@ -502,8 +503,9 @@ constructs of a type that a rescue later replaced with its original C#. The hist
 and 0 rescues after the accessor-visibility fix. To distinguish native output from preservation,
 read `conversionPaths.outcome` (`native`,
 `preserved`, `lossy`, `unverified` or `refused`) and the per-path counts next to it.
-`unverified` appears only with `--lossy`: the file was written, but its C# does not
-compile.
+`unverified` means exact preserved C# was written, but standalone compilation
+failed. Supply the original project references and configuration; writing does
+not prove that a build or tests passed.
 
 ---
 
@@ -524,9 +526,9 @@ reports in `conversionPaths`:
 | Surface | Rescues a round-trip failure by default? | Option that adds passthrough |
 |:--------|:-----------------------------------------|:-----------------------------|
 | `calor convert` | Yes (`rescueUnusableMembers: true`) | `--passthrough` |
-| MCP `calor_convert` | No: the call fails with `isError: true` and `outcome: "refused"` | `passthroughOnError: true` |
-| `calor migrate`, MCP `calor_migrate`, MCP `calor_batch` | No: the file fails | none that rescues it |
-| `CSharpToCalorConverter` (library) | No | `PassthroughOnError` |
+| MCP `calor_convert` | Yes: default lossless preservation | `passthroughOnError: true` |
+| `calor migrate`, MCP `calor_migrate`, MCP `calor_batch` | Yes: validate siblings together, escalate preservation, and recheck | no flag needed |
+| `CSharpToCalorConverter` (library) | Yes: default lossless preservation | `PassthroughOnError` |
 
 A member whose Calor does not parse is rescued on every surface in the default lossless
 mode. The private-property example `W1-F6-rescue` no longer needs rescue: every

@@ -236,22 +236,10 @@ public sealed class ConversionOptions
     public bool PassthroughOnError { get; set; } = false;
 
     /// <summary>
-    /// When the emitted Calor PARSES but does not survive the C# round trip,
-    /// preserve the offending member's original C# as a §CSHARP interop block
-    /// (#717's rewrap, extended by review C1(b)) instead of letting round-trip
-    /// validation fail the whole conversion — and only in a C#-preserving mode
-    /// (<see cref="ConversionContext.ShouldPreserveCSharp"/>: Lossless fidelity,
-    /// Interop mode, or <see cref="PassthroughOnError"/>). Setting this flag alone
-    /// in a mode that does not preserve C# changes nothing: there is no original
-    /// C# kept to rewrap with, so the conversion still reports the failure.
-    ///
-    /// <para>The axis is what the CALLER does on failure, not the mode it asked
-    /// for. The CLI discards the output entirely when conversion fails, so
-    /// rewrapping one member is strictly better than writing nothing, and no
-    /// consumer is left holding a degraded tree — <c>ConvertCommand</c> therefore
-    /// sets this true. Library callers read <see cref="ConversionResult.Ast"/>
-    /// even when <see cref="ConversionResult.Success"/> is false and must keep the
-    /// natively converted tree, so the default is false.</para>
+    /// Explicit rescue preference, recorded separately from fidelity.
+    /// Lossless conversion already rescues unusable output at member, type,
+    /// and whole-file boundaries without requiring this flag.
+    /// Historical lossy producers may request rescue in C#-preserving modes.
     /// </summary>
     public bool RescueUnusableMembers { get; set; } = false;
 
@@ -336,6 +324,169 @@ public sealed class CSharpToCalorConverter
     /// Converts C# source code to Calor source code with cooperative cancellation.
     /// </summary>
     public ConversionResult Convert(
+        string csharpSource,
+        string? sourceFile,
+        CancellationToken cancellationToken)
+    {
+        var result = ConvertCore(csharpSource, sourceFile, cancellationToken);
+        if (_options.Fidelity != ConversionFidelity.Lossless
+            || (result.Success && !result.Losses.Any(loss => loss.IsSemanticLoss)))
+            return result;
+
+        return PreserveOriginal(csharpSource, sourceFile, result, cancellationToken);
+    }
+
+    internal ConversionResult PreserveOriginal(
+        string source,
+        string? sourceFile,
+        ConversionResult attempted,
+        CancellationToken cancellationToken,
+        IEnumerable<ConversionIssue>? validationIssues = null)
+    {
+        var preservationStart = DateTime.UtcNow;
+        cancellationToken.ThrowIfCancellationRequested();
+        var parseOptions = GetEffectiveParseOptions(sourceFile);
+        var tree = CSharpSyntaxTree.ParseText(
+            source, parseOptions, sourceFile ?? "", cancellationToken: cancellationToken);
+        if (tree.GetDiagnostics(cancellationToken).Any(
+                diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            || _options.References.Any(reference => !File.Exists(reference.Path))
+            || _options.PreprocessorMode != PreprocessorConversionMode.PreserveAllBranches)
+        {
+            if (!attempted.Success)
+                return attempted;
+            attempted.Context.AddError(
+                "Original C# cannot be preserved: malformed source, missing references, or destructive preprocessor options.",
+                "original-csharp-validation");
+            return new ConversionResult
+            {
+                Success = false,
+                CalorSource = attempted.CalorSource,
+                Ast = attempted.Ast,
+                Context = attempted.Context,
+                Duration = attempted.Duration + (DateTime.UtcNow - preservationStart)
+            };
+        }
+
+        var context = CreateContext(sourceFile);
+        context.Metadata = attempted.Metadata;
+        context.OriginalSource = source;
+        context.UserManifestRoot = ResolveUserManifestRoot();
+        context.Stats.TotalNodes = attempted.Context.Stats.TotalNodes;
+        context.Stats.InteropBlocksEmitted = 1;
+        foreach (var issue in attempted.Issues.Concat(validationIssues ?? []))
+            context.AddWarning(
+                $"Before whole-file preservation ({issue.Severity}): {issue.Message}",
+                issue.Feature, issue.Line, issue.Column, issue.Suggestion);
+        foreach (var loss in attempted.Losses)
+            context.AddWarning(
+                $"Before whole-file preservation ({loss.Kind}): {loss.Description}",
+                loss.Feature, loss.Line);
+        var trigger = validationIssues != null || attempted.Context.RoundTrip == ConversionRoundTrip.Failed
+            ? ConversionTrigger.RoundTripFailure
+            : attempted.Issues.Any(issue => issue.Feature is "generated-calor-validation" or "post-validation-fallback")
+                ? ConversionTrigger.ParseFailure : ConversionTrigger.UnsupportedConstruct;
+        context.RecordLoss(
+            ConversionLossKind.InteropPreserved,
+            "whole-file-preservation",
+            "Original compilation unit preserved exactly after native/member/type conversion or validation failed.",
+            1, ConversionPath.Rescue, trigger,
+            ConversionEnabledBy.LosslessFidelity);
+
+        var module = PreserveCompilationUnit(source, "whole-file-preservation",
+            "Native/member/type conversion or validation failed; preserve the original compilation unit.");
+        var calorSource = new CalorEmitter(context).Emit(module);
+        var compiled = Program.Compile(calorSource, sourceFile ?? "preserved.calr",
+            new CompilationOptions
+            {
+                DeferGeneratedOutputValidation = true,
+                CancellationToken = cancellationToken
+            });
+        if (compiled.HasErrors || !string.Equals(source, compiled.GeneratedCode, StringComparison.Ordinal))
+        {
+            foreach (var error in compiled.Diagnostics.Errors)
+                context.AddError(error.Message, "whole-file-preservation", error.Span.Line, error.Span.Column);
+            if (!compiled.HasErrors)
+                context.AddError("Whole-file preservation did not reproduce the original C# exactly.",
+                    "whole-file-preservation");
+        }
+        else
+        {
+            var originalValidation = GeneratedCSharpCompiler.Validate(
+                [new GeneratedCSharpSource(source, sourceFile ?? "original.cs")],
+                new GeneratedCSharpCompilationContext
+                {
+                    LanguageVersion = parseOptions.LanguageVersion,
+                    DocumentationMode = parseOptions.DocumentationMode,
+                    SourceCodeKind = parseOptions.Kind,
+                    Features = parseOptions.Features,
+                    PreprocessorSymbols = parseOptions.PreprocessorSymbolNames,
+                    References = _options.References.Select(reference =>
+                        new GeneratedCSharpReference(reference.Path, reference.Aliases)),
+                    AdditionalSources = parseOptions.Kind == SourceCodeKind.Script
+                        ? null : _options.AdditionalSemanticSyntaxTrees
+                            .Where(sibling => !IsSameSyntaxTree(sibling, tree))
+                            .Select(sibling => new GeneratedCSharpSource(
+                                sibling.GetText(cancellationToken).ToString(), sibling.FilePath)),
+                    OutputKind = Enum.TryParse<OutputKind>(attempted.Metadata.OutputKind, out var originalKind)
+                        ? originalKind : _options.OutputKind,
+                    NullableContextOptions = _options.NullableContextOptions ?? NullableContextOptions.Disable
+                });
+            var originalErrors = originalValidation.SyntaxErrors
+                .Concat(originalValidation.CompilationErrors).ToList();
+            var incompleteContext = originalErrors.Any(error => error.Id is
+                "CS0246" or "CS0234" or "CS0103" or "CS0012" or "CS0518"
+                or "CS1069" or "CS0115" or "CS1061" or "CS0117"
+                or "CS8795" or "CS0759"
+                || (error.Id == "CS5001" && !_options.ReferencesAreComplete));
+            if (originalErrors.Any(error => error.Id is
+                    "CS0006" or "CS1504" or "CS8915"
+                    || HasIntrinsicConversionError(error))
+                || (originalErrors.Count > 0 && !incompleteContext))
+                foreach (var error in originalErrors)
+                    context.AddError($"Original C# failed validation ({error.Id}): {error.GetMessage()}",
+                        "original-csharp-validation",
+                        error.Location.GetLineSpan().StartLinePosition.Line + 1);
+            // Exact source is faithful even when a standalone file lacks its project
+            // references. Keep that compile failure visible, never label it verified.
+            ValidateLosslessRoundTrip(
+                calorSource, context, _options.ValidateRoundTripCSharp,
+                parseOptions, Enum.TryParse<OutputKind>(attempted.Metadata.OutputKind, out var outputKind)
+                    ? outputKind : _options.OutputKind,
+                _options.NullableContextOptions ?? NullableContextOptions.Disable,
+                cancellationToken, refuseOnFailure: false);
+        }
+        return new ConversionResult
+        {
+            Success = !context.HasErrors,
+            Ast = module,
+            CalorSource = calorSource,
+            Context = context,
+            Duration = attempted.Duration + (DateTime.UtcNow - preservationStart)
+        };
+    }
+
+    private static bool HasIntrinsicConversionError(Diagnostic error)
+    {
+        if (error.Id is not ("CS0029" or "CS0266" or "CS0031")
+            || error.Location.SourceTree is not { } tree
+            || tree.GetRoot().FindNode(error.Location.SourceSpan,
+                getInnermostNodeForTie: true) is not ExpressionSyntax expression)
+            return false;
+
+        // Missing project types/generators can cause conversion and return-flow
+        // errors. Only a conversion between known built-in types is independent
+        // of that missing context.
+        var model = CSharpCompilation.Create(
+            "PreservationSourceValidation", [tree],
+            [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)])
+            .GetSemanticModel(tree);
+        var types = model.GetTypeInfo(expression);
+        return types.Type is { SpecialType: not SpecialType.None, TypeKind: not TypeKind.Error }
+            && types.ConvertedType is { SpecialType: not SpecialType.None, TypeKind: not TypeKind.Error };
+    }
+
+    private ConversionResult ConvertCore(
         string csharpSource,
         string? sourceFile,
         CancellationToken cancellationToken)
@@ -482,18 +633,10 @@ public sealed class CSharpToCalorConverter
 
             // Check for parse errors. Unexpected or unmatched directives are
             // never globally suppressed; callers receive an explicit parse error.
-            List<Microsoft.CodeAnalysis.Diagnostic> diagnostics;
-            try
-            {
-                diagnostics = root.GetDiagnostics()
+            var diagnostics = root.GetDiagnostics()
                     .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error
                              && d.Id != "CS1029")
                     .ToList();
-            }
-            catch
-            {
-                diagnostics = new List<Microsoft.CodeAnalysis.Diagnostic>();
-            }
 
             if (diagnostics.Count > 0)
             {
@@ -642,7 +785,8 @@ public sealed class CSharpToCalorConverter
                 // rescue on its own as well. No user-visible change today (the
                 // CLI sets RescueUnusableMembers, and --passthrough sets both),
                 // but the contract now holds without relying on that pairing.
-                && (_options.RescueUnusableMembers || _options.PassthroughOnError)
+                && (_options.RescueUnusableMembers || _options.PassthroughOnError
+                    || _options.Fidelity == ConversionFidelity.Lossless)
                 && !context.HasErrors
                 && context.PreservesCSharp
                 && roundTripGate
@@ -747,7 +891,7 @@ public sealed class CSharpToCalorConverter
             {
                 context.AddError(
                     $"Lossless conversion refused {destructiveLosses} lossy substitution(s) or drop(s). " +
-                    "Use explicit lossy mode to acknowledge semantic loss.",
+                    "Faithful C# preservation is required instead.",
                     feature: "lossless-contract");
             }
 
@@ -808,11 +952,28 @@ public sealed class CSharpToCalorConverter
 
         // Use replacement fallback to handle files with unpaired surrogates
         // (e.g., regex patterns containing \uD800-\uDBFF in string literals)
-        var encoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
-        var source = await File.ReadAllTextAsync(csharpFilePath, encoding, cancellationToken);
+        var source = await ReadSourceFileAsync(csharpFilePath, cancellationToken);
         var result = Convert(source, csharpFilePath, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         return result;
+    }
+
+    internal static async Task<string> ReadSourceFileAsync(
+        string path, CancellationToken cancellationToken = default)
+    {
+        var bytes = await File.ReadAllBytesAsync(path, cancellationToken);
+        if (bytes.AsSpan().StartsWith(System.Text.Encoding.UTF32.GetPreamble()))
+            return new System.Text.UTF32Encoding(false, false, true).GetString(bytes);
+        var bigEndianUtf32 = new System.Text.UTF32Encoding(true, true, true);
+        if (bytes.AsSpan().StartsWith(bigEndianUtf32.GetPreamble()))
+            return bigEndianUtf32.GetString(bytes);
+        if (bytes.AsSpan().StartsWith(System.Text.Encoding.Unicode.GetPreamble()))
+            return new System.Text.UnicodeEncoding(false, false, true).GetString(bytes);
+        if (bytes.AsSpan().StartsWith(System.Text.Encoding.BigEndianUnicode.GetPreamble()))
+            return new System.Text.UnicodeEncoding(true, false, true).GetString(bytes);
+        // Decode the entire source, including a UTF-8 BOM, so exact passthrough
+        // does not silently remove it. Invalid byte sequences are read failures.
+        return new System.Text.UTF8Encoding(false, true).GetString(bytes);
     }
 
     /// <summary>
@@ -1405,13 +1566,8 @@ public sealed class CSharpToCalorConverter
     }
 
     /// <summary>
-    /// #1144: which option made a #717 rescue reachable, and so whether it counts as
-    /// automatic rescue or as requested passthrough. The rescue needs two gates: C#
-    /// preservation (lossless fidelity, interop mode, or PassthroughOnError) and, for
-    /// a round-trip failure, RescueUnusableMembers or PassthroughOnError. It is an
-    /// automatic rescue only when both gates are open without PassthroughOnError;
-    /// so with both options on, lossless reports rescue (it would have fired without
-    /// the request) while lossy standard mode reports passthrough.
+    /// Records explicit rescue/passthrough preferences separately from default
+    /// lossless rescue. Historical lossy producers retain their requested path.
     /// </summary>
     private static (string Path, string EnabledBy) RescueProvenance(string trigger, ConversionContext context)
     {
@@ -1423,7 +1579,9 @@ public sealed class CSharpToCalorConverter
         if (trigger == ConversionTrigger.RoundTripFailure)
             return context.RescueUnusableMembers
                 ? (ConversionPath.Rescue, ConversionEnabledBy.RescueUnusableMembers)
-                : (ConversionPath.Passthrough, ConversionEnabledBy.PassthroughOnError);
+                : context.PassthroughOnError
+                    ? (ConversionPath.Passthrough, ConversionEnabledBy.PassthroughOnError)
+                    : (ConversionPath.Rescue, preserveGate);
         return (ConversionPath.Rescue, preserveGate);
     }
 
@@ -1803,10 +1961,14 @@ public sealed class CSharpToCalorConverter
         if (failures > 0 && !refuseOnFailure)
         {
             context.AddWarning(
-                $"Lossy output is unverified: the round-trip compile check found {failures} error(s), " +
-                "so the generated C# does not compile. The output was kept because lossy mode was requested; " +
-                "fix it by hand, or convert losslessly, which keeps a failing type as C# where it can.",
-                feature: LossyRoundTripUnverifiedFeature);
+                context.Fidelity == ConversionFidelity.Lossless
+                    ? $"Exact original C# was preserved, but the standalone round-trip compile check found {failures} error(s). " +
+                      "Writing is not proof of a build; supply the original project references and configuration."
+                    : $"Lossy output is unverified: the round-trip compile check found {failures} error(s), " +
+                      "so the generated C# does not compile. The output was kept because lossy mode was requested; " +
+                      "fix it by hand, or convert losslessly, which keeps a failing type as C# where it can.",
+                feature: context.Fidelity == ConversionFidelity.Lossless
+                    ? "preserved-roundtrip-unverified" : LossyRoundTripUnverifiedFeature);
         }
     }
 

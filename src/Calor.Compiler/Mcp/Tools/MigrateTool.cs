@@ -58,8 +58,8 @@ public sealed class MigrateTool : McpToolBase
                 },
                 "fidelity": {
                     "type": "string",
-                    "enum": ["lossless", "lossy"],
-                    "description": "Fidelity contract. Lossless is the default.",
+                    "enum": ["lossless"],
+                    "description": "Native conversion with exact C# preservation at member, type, or whole-file boundaries.",
                     "default": "lossless"
                 }
             },
@@ -81,10 +81,10 @@ public sealed class MigrateTool : McpToolBase
         var maxFiles = GetInt(arguments, "maxFiles", defaultValue: 0);
         var autoFix = GetBool(arguments, "autoFix", defaultValue: true);
         var explicitCallClosers = GetBool(arguments, "explicitCallClosers", defaultValue: false);
-        var fidelity = (GetString(arguments, "fidelity") ?? "lossless")
-            .Equals("lossy", StringComparison.OrdinalIgnoreCase)
-            ? ConversionFidelity.Lossy
-            : ConversionFidelity.Lossless;
+        if (GetString(arguments, "fidelity") is { } requestedFidelity
+            && !requestedFidelity.Equals("lossless", StringComparison.OrdinalIgnoreCase))
+            return McpToolResult.Error("Only lossless migration is supported; unsupported C# is preserved, not dropped.");
+        var fidelity = ConversionFidelity.Lossless;
 
         // Resolve directory from .csproj or directory path
         var directory = ResolveDirectory(projectPath);

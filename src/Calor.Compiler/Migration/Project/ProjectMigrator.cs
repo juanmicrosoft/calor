@@ -445,7 +445,7 @@ public sealed class ProjectMigrator
             TargetFramework = _options.TargetFramework
         };
         var (projectInput, selectionError) = SelectProjectInput(entry.SourcePath);
-        if (selectionError != null)
+        if (selectionError != null && projectInput == null)
         {
             var excluded = selectionError.StartsWith(
                 "Excluded from evaluated Compile items:",
@@ -536,6 +536,16 @@ public sealed class ProjectMigrator
         var converter = new CSharpToCalorConverter(conversionOptions);
 
         var result = await converter.ConvertFileAsync(entry.SourcePath, cancellationToken);
+        if (selectionError != null && _options.Fidelity == ConversionFidelity.Lossless)
+            result = converter.PreserveOriginal(
+                await CSharpToCalorConverter.ReadSourceFileAsync(entry.SourcePath, cancellationToken),
+                entry.SourcePath, result, cancellationToken,
+                [new ConversionIssue
+                {
+                    Severity = ConversionIssueSeverity.Warning,
+                    Feature = "preprocessor-project-selection",
+                    Message = selectionError + " Original C# is preserved for validation under every target framework."
+                }]);
 
         // Tag partial classes with source file for merging
         if (result.Success && result.Ast != null && _options.MergePartialClasses)
@@ -573,17 +583,36 @@ public sealed class ProjectMigrator
                 });
             if (compileResult.HasErrors)
             {
-                status = FileMigrationStatus.Failed;
-                issues.AddRange(compileResult.Diagnostics.Errors.Select(diagnostic => new ConversionIssue
+                var failures = compileResult.Diagnostics.Errors.Select(diagnostic => new ConversionIssue
                 {
                     Severity = ConversionIssueSeverity.Error,
                     Feature = "roundtrip-calor-validation",
                     Message = $"Generated Calor failed compilation: {diagnostic.Message}",
                     Line = diagnostic.Span.Line,
                     Column = diagnostic.Span.Column
-                }));
+                }).ToList();
+                if (_options.Fidelity == ConversionFidelity.Lossless)
+                {
+                    result = converter.PreserveOriginal(
+                        await CSharpToCalorConverter.ReadSourceFileAsync(entry.SourcePath, cancellationToken),
+                        entry.SourcePath, result, cancellationToken, failures);
+                    status = GetMigrationStatus(result);
+                    issues = result.Issues.ToList();
+                    compileResult = Program.Compile(
+                        result.CalorSource!, entry.OutputPath,
+                        new CompilationOptions
+                        {
+                            DeferGeneratedOutputValidation = true,
+                            CancellationToken = cancellationToken
+                        });
+                }
+                if (!result.Success || compileResult.HasErrors)
+                {
+                    status = FileMigrationStatus.Failed;
+                    issues.AddRange(failures);
+                }
             }
-            else
+            if (!compileResult.HasErrors)
             {
                 generatedCSharp = compileResult.GeneratedCode;
             }
@@ -695,23 +724,6 @@ public sealed class ProjectMigrator
         var converted = report.FileResults
             .Where(result => result.Status is FileMigrationStatus.Success or FileMigrationStatus.Partial)
             .ToList();
-
-        if (report.FileResults.Any(result =>
-                result.Status is FileMigrationStatus.Failed or FileMigrationStatus.TimedOut))
-        {
-            foreach (var result in converted)
-            {
-                result.Status = FileMigrationStatus.Failed;
-                result.OutputPath = null;
-                result.Issues.Add(new ConversionIssue
-                {
-                    Severity = ConversionIssueSeverity.Error,
-                    Feature = "project-validation",
-                    Message = "Project migration was not written because another file failed conversion."
-                });
-            }
-            return;
-        }
 
         IReadOnlyList<ProjectCompilationInputs> projectInputs;
         try
@@ -838,22 +850,114 @@ public sealed class ProjectMigrator
         }).ToList();
         if (errors.Count > 0)
         {
+            if (_options.Fidelity == ConversionFidelity.Lossless)
+            {
+                var failingPaths = errors
+                    .Select(error => error.Location.SourceTree?.FilePath)
+                    .Where(path => path != null)
+                    .ToHashSet(BuildStateCache.GetPathComparer());
+                var candidates = converted.Where(result =>
+                    result.Losses.All(loss => loss.Feature != "whole-file-preservation")
+                    && failingPaths.Contains(
+                        Path.ChangeExtension(result.OutputPath ?? result.SourcePath, ".g.cs")))
+                    .ToList();
+                if (candidates.Count == 0)
+                    candidates = converted.Where(result =>
+                        result.Losses.All(loss => loss.Feature != "whole-file-preservation")).ToList();
+                foreach (var result in candidates)
+                {
+                    var original = await CSharpToCalorConverter.ReadSourceFileAsync(result.SourcePath, cancellationToken);
+                    var attempted = new ConversionResult
+                    {
+                        Success = true,
+                        Context = new ConversionContext { Metadata = result.Metadata ?? new() }
+                    };
+                    var converter = new CSharpToCalorConverter(new ConversionOptions
+                    {
+                        ValidateRoundTripCSharp = false,
+                        ParseOptions = new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
+                            _options.LanguageVersion ?? Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview,
+                            _options.DocumentationMode,
+                            Path.GetExtension(result.SourcePath).Equals(".csx", StringComparison.OrdinalIgnoreCase)
+                                ? Microsoft.CodeAnalysis.SourceCodeKind.Script
+                                : Microsoft.CodeAnalysis.SourceCodeKind.Regular,
+                            result.Metadata?.DefinedSymbols ?? _options.DefinedSymbols),
+                        UserManifestRoot = ""
+                    });
+                    var preserved = converter.PreserveOriginal(
+                        original, result.SourcePath, attempted, cancellationToken,
+                        result.Issues.Concat(errors.Select(error => new ConversionIssue
+                        {
+                            Severity = ConversionIssueSeverity.Error,
+                            Feature = "roundtrip-csharp-validation",
+                            Message = $"Project C# validation failed ({error.Id}): {error.GetMessage()}"
+                        })));
+                    if (!preserved.Success)
+                    {
+                        result.Issues.AddRange(preserved.Issues);
+                        result.Status = FileMigrationStatus.Failed;
+                        result.OutputPath = null;
+                        result.Losses = preserved.Losses;
+                        result.ConversionPaths = (preserved.Paths with
+                        {
+                            RoundTrip = ConversionRoundTrip.Failed
+                        }).WithSuccess(false);
+                        continue;
+                    }
+                    result.ConvertedSource = preserved.CalorSource;
+                    result.GeneratedCSharp = original;
+                    result.Losses = preserved.Losses;
+                    result.Issues = preserved.Issues.ToList();
+                    result.ConversionPaths = preserved.Paths;
+                    result.Status = FileMigrationStatus.Partial;
+                    if (_options.IncludeBenchmark)
+                        result.Metrics = BenchmarkIntegration.CalculateMetrics(original, preserved.CalorSource!);
+                }
+                if (candidates.Count > 0)
+                {
+                    await FinalizeLosslessProjectAsync(report, projectFilePath, dryRun, cancellationToken);
+                    return;
+                }
+            }
             foreach (var result in converted)
             {
-                result.Status = FileMigrationStatus.Failed;
-                result.OutputPath = null;
+                var exact = string.Equals(result.GeneratedCSharp,
+                    await CSharpToCalorConverter.ReadSourceFileAsync(result.SourcePath, cancellationToken),
+                    StringComparison.Ordinal);
+                if (!exact || projectFilePath != null)
+                {
+                    result.Status = FileMigrationStatus.Failed;
+                    result.OutputPath = null;
+                }
+                else
+                {
+                    result.Status = FileMigrationStatus.Partial;
+                }
+                if (result.ConversionPaths != null)
+                    result.ConversionPaths = (result.ConversionPaths with
+                    {
+                        RoundTrip = ConversionRoundTrip.Failed
+                    }).WithSuccess(result.OutputPath != null);
                 foreach (var error in errors.Take(20))
                 {
                     result.Issues.Add(new ConversionIssue
                     {
-                        Severity = ConversionIssueSeverity.Error,
+                        Severity = result.OutputPath == null
+                            ? ConversionIssueSeverity.Error : ConversionIssueSeverity.Warning,
                         Feature = "roundtrip-csharp-validation",
                         Message = $"Lossless project C# validation failed ({error.Id}): {error.GetMessage()}"
                     });
                 }
             }
 
-            return;
+        }
+        else
+        {
+            foreach (var result in converted.Where(result => result.ConversionPaths != null))
+                result.ConversionPaths = (result.ConversionPaths! with
+                {
+                    RoundTrip = ConversionRoundTrip.Verified
+                }).WithSuccess(true);
         }
 
         if (dryRun)
@@ -861,22 +965,51 @@ public sealed class ProjectMigrator
             return;
         }
 
+        foreach (var result in converted.Where(result => result.OutputPath != null))
+            if (Directory.Exists(result.OutputPath))
+            {
+                result.Status = FileMigrationStatus.Failed;
+                result.Issues.Add(new ConversionIssue
+                {
+                    Severity = ConversionIssueSeverity.Error,
+                    Feature = "migration-write-failure",
+                    Message = $"Destination is a directory: {result.OutputPath}"
+                });
+                result.OutputPath = null;
+            }
         var outputs = converted.Where(result => result.OutputPath != null && result.ConvertedSource != null).ToArray();
         if (outputs.Length == 0) return;
-        var identityRoot = Incremental.BuildStateCache.ComputeCommonDirectory(
-            outputs.Select(result => new FileInfo(result.OutputPath!)).ToArray());
-        var identityStore = new Ids.DeclarationIdentityStore(identityRoot);
-        identityStore.Sync(outputs.Select(result => result.OutputPath!).Where(File.Exists));
-        var identityChanges = new List<Ids.DeclarationIdentityStore.SourceChange>();
-        foreach (var result in outputs)
+        try
         {
+            var identityRoot = Incremental.BuildStateCache.ComputeCommonDirectory(
+                outputs.Select(result => new FileInfo(result.OutputPath!)).ToArray());
+            var identityStore = new Ids.DeclarationIdentityStore(identityRoot);
+            identityStore.Sync(outputs.Select(result => result.OutputPath!).Where(File.Exists));
+            var identityChanges = new List<Ids.DeclarationIdentityStore.SourceChange>();
+            foreach (var result in outputs)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var before = File.Exists(result.OutputPath!)
+                    ? await File.ReadAllTextAsync(result.OutputPath!, cancellationToken) : null;
+                identityChanges.Add(new(result.OutputPath!, before, result.ConvertedSource));
+            }
             cancellationToken.ThrowIfCancellationRequested();
-            var before = File.Exists(result.OutputPath!)
-                ? await File.ReadAllTextAsync(result.OutputPath!, cancellationToken) : null;
-            identityChanges.Add(new(result.OutputPath!, before, result.ConvertedSource));
+            identityStore.Apply(identityChanges);
         }
-        cancellationToken.ThrowIfCancellationRequested();
-        identityStore.Apply(identityChanges);
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            foreach (var result in outputs)
+            {
+                result.Status = FileMigrationStatus.Failed;
+                result.OutputPath = null;
+                result.Issues.Add(new ConversionIssue
+                {
+                    Severity = ConversionIssueSeverity.Error,
+                    Feature = "migration-write-failure",
+                    Message = $"Identity-managed output write failed: {ex.Message}"
+                });
+            }
+        }
 
         static ProjectCompilationInputs
             CreateLooseDirectoryInputs(
@@ -1110,7 +1243,7 @@ public sealed class ProjectMigrator
             .ToList();
         if (configurations.Count != 1)
         {
-            return (null,
+            return (_options.Fidelity == ConversionFidelity.Lossless ? candidates[0] : null,
                 $"Conditional-compilation configuration for '{sourcePath}' is ambiguous across "
                 + $"{candidates.Count} target frameworks ({string.Join(", ", candidates.Select(input => input.TargetFramework ?? "<default>"))}). "
                 + "Specify a target framework explicitly; symbols are never unioned across frameworks.");

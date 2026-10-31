@@ -80,7 +80,7 @@ The C# → Calor surfaces report in three shapes:
 | MCP `calor_batch` (`action: "convert"`) | The tool's own result object | `files[].issues[]` | `files[].conversionPaths` |
 
 `conversionPaths.outcome` (`native`, `preserved`, `lossy`, `unverified`, `refused`) is the field
-to test. `unverified` means the file was written under `--lossy` but its C# failed
+to test. `unverified` means exact original C# was preserved and written but failed
 the round-trip compile check; `conversionPaths.roundTrip` says whether that check
 ran (`verified`, `failed`, `deferred`, `not-run`). The native construct counts (`nativeConversionCount`,
 `lossSummary.nativeConversions`) also count constructs of a type a rescue later

@@ -57,7 +57,6 @@ calor migrate ./src --direction calor-to-cs
 | `--skip-verify` | — | `false` | Skip the Z3 contract verification phase |
 | `--verification-timeout` | — | `5000` | Z3 verification timeout per contract, in milliseconds |
 | `--explicit-call-closers` | — | `false` | Emit explicit `§/C` for every `§C` call (v0.6.0-compatible output). |
-| `--lossy` | — | `false` | Allow reported semantic substitutions or drops. The default is lossless migration |
 
 ---
 
@@ -124,21 +123,18 @@ The console summary adds one line when any member was preserved:
   Preservation paths: 1 by automatic rescue (parse-failure: 1; no passthrough request needed)
 ```
 
-`migrate` rescues fewer members than `convert`. It rescues a member whose Calor
-does not parse, but not one whose Calor parses and then fails the C# round
-trip: `migrate` checks the round trip once for the whole project, not file by
-file. Such a file fails. In the default lossless mode one failed file means no
-file is written, so every file then reports `outcome: "refused"`. Its counts
-still show what conversion did. `calor migrate` has no `--passthrough` option.
+Default migration tries native conversion, then preserves C# at a member, type,
+or whole-file boundary. Generated-Calor and combined project C# checks still run;
+failures escalate preservation and trigger another check. Whole-file output
+reproduces the original C# without a generated preamble.
 
-For example, take a two-file project: `Inventory.cs` converts natively, and
-`Counter.cs` has a statement label that fails the C# round trip. `calor convert
-Counter.cs` alone rescues `Counter` as `§CSHARP` and exits `0`. `calor migrate` on
-the project exits `1`, writes no `.calr` file, and reports `outcome: "refused"` for
-both files. The MCP `calor_migrate` and `calor_batch` tools give the same result.
-To migrate the rest, convert the failing file with `calor convert` (or fix the C#
-first), then migrate the others. The [C# interoperability guide](/docs/guides/csharp-interoperability/)
-lists which C# shapes convert natively in 0.25 and which can fail the round trip.
+Every buildable discovered input is written without a lossy or passthrough flag.
+Malformed, missing, unreadable inputs and write failures remain errors; they do
+not discard unrelated valid files. Loose source copies may lack project references.
+Their exact preserved outputs are written with `outcome: "unverified"` and failed
+compilation diagnostics, not a passed build. Native fraction excludes passthrough
+and is reported separately from writing, compilation, and test execution.
+The destructive lossy and branch-selection options have been removed.
 
 ---
 

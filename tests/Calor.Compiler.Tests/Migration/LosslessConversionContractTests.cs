@@ -7,6 +7,152 @@ namespace Calor.Compiler.Tests;
 
 public sealed class LosslessConversionContractTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void DefaultCli_WholeFilePreservation_ReproducesUtf8BytesAndRuntime(bool bom, bool eofComment)
+    {
+        var directory = Directory.CreateTempSubdirectory("calor-default-exact-").FullName;
+        const string code = """"
+            [assembly: System.Reflection.AssemblyMetadata("oracle", "original")]
+            #line 20 "original-location.cs"
+            public static class Oracle
+            {
+                public static string Run() => """
+                    exact §CSHARP text
+                      raw indentation
+                    """ + typeof(Oracle).Assembly.GetCustomAttributes(
+                        typeof(System.Reflection.AssemblyMetadataAttribute), false).Length;
+            }
+            """";
+        var source = (bom ? "\uFEFF" : "") + code.Replace("\n", "\r\n")
+            + (eofComment ? "// original EOF }§/CSHARP" : "\r\n");
+        var input = Path.Combine(directory, "Oracle.cs");
+        File.WriteAllBytes(input, Encoding.UTF8.GetBytes(source));
+        try
+        {
+            var converted = CliTestHarness.RunCli(directory, "convert", input);
+            Assert.True(converted.ExitCode == 0, converted.StdOut + converted.StdErr);
+            var calor = Path.ChangeExtension(input, ".calr");
+            var generated = CliTestHarness.RunCli(directory, "convert", calor);
+            Assert.True(generated.ExitCode == 0, generated.StdOut + generated.StdErr);
+            var csharp = Path.Combine(directory, "Oracle.g.cs");
+            Assert.Equal(File.ReadAllBytes(input), File.ReadAllBytes(csharp));
+            Assert.Equal("exact §CSHARP text\r\n  raw indentation1", Run(source));
+            Assert.Equal(Run(source), Run(Encoding.UTF8.GetString(File.ReadAllBytes(csharp))));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+
+        static string Run(string source)
+        {
+            var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
+                .Split(Path.PathSeparator).Select(path =>
+                    Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(path));
+            var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
+                "Oracle" + Guid.NewGuid().ToString("N"),
+                [Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(source)],
+                references,
+                new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
+                    Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var emitted = compilation.Emit(stream);
+            Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+            var assembly = System.Reflection.Assembly.Load(stream.ToArray());
+            return (string)assembly.GetType("Oracle")!.GetMethod("Run")!.Invoke(null, null)!;
+        }
+    }
+
+    [Fact]
+    public void DefaultCli_MalformedMissingAndWriteFailure_DoNotBlockOtherSources()
+    {
+        var directory = Directory.CreateTempSubdirectory("calor-default-controls-").FullName;
+        File.WriteAllText(Path.Combine(directory, "Valid.cs"),
+            "public class Valid { public int Value() => 7; }");
+        File.WriteAllText(Path.Combine(directory, "Malformed.cs"),
+            "public class Malformed { public int Value( }");
+        File.WriteAllText(Path.Combine(directory, "Unwritable.cs"),
+            "public class Unwritable { }");
+        File.WriteAllText(Path.Combine(directory, "InvalidType.cs"),
+            "public class InvalidType { public int Value() => \"not an int\"; }");
+        File.WriteAllText(Path.Combine(directory, "InvalidWithMissingContext.cs"),
+            "public class InvalidWithMissingContext { MissingContext field; public int Value() => \"not an int\"; }");
+        File.WriteAllBytes(Path.Combine(directory, "Unreadable.cs"), [0xFF, 0xFF, 0xFF]);
+        Directory.CreateDirectory(Path.Combine(directory, "Unwritable.calr"));
+        try
+        {
+            Assert.Equal(1, CliTestHarness.RunCli(directory, "convert", "Missing.cs").ExitCode);
+            Assert.Equal(1, CliTestHarness.RunCli(directory, "migrate", "missing").ExitCode);
+            Assert.Equal(1, CliTestHarness.RunCli(directory, "convert", "Malformed.cs").ExitCode);
+            Assert.Equal(1, CliTestHarness.RunCli(directory, "convert", "InvalidType.cs").ExitCode);
+            Assert.Equal(1, CliTestHarness.RunCli(directory, "convert", "InvalidWithMissingContext.cs").ExitCode);
+            Assert.Equal(1, CliTestHarness.RunCli(directory, "convert", "Unreadable.cs").ExitCode);
+            var reportPath = Path.Combine(directory, "report.json");
+            var migration = CliTestHarness.RunCli(directory, "migrate", directory, "--report", reportPath);
+            Assert.Equal(1, migration.ExitCode);
+            Assert.True(File.Exists(Path.Combine(directory, "Valid.calr")),
+                migration.StdOut + migration.StdErr
+                    + (File.Exists(reportPath) ? File.ReadAllText(reportPath) : ""));
+            Assert.False(File.Exists(Path.Combine(directory, "Malformed.calr")));
+            Assert.True(Directory.Exists(Path.Combine(directory, "Unwritable.calr")));
+            var report = System.Text.Json.JsonDocument.Parse(File.ReadAllText(reportPath))
+                .RootElement.GetProperty("data");
+            Assert.Equal(6, report.GetProperty("summary").GetProperty("totalFiles").GetInt32());
+            Assert.Equal(5, report.GetProperty("summary").GetProperty("failedFiles").GetInt32());
+            Assert.Contains(report.GetProperty("fileResults").EnumerateArray(), file =>
+                file.GetProperty("issues").EnumerateArray().Any(issue =>
+                    issue.GetProperty("feature").GetString() == "migration-write-failure"));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task DefaultCli_Csproj_WritesEveryInputAndRetainsNativeAndPreservedOutcomes()
+    {
+        var directory = Directory.CreateTempSubdirectory("calor-default-project-").FullName;
+        var project = Path.Combine(directory, "Original.csproj");
+        File.WriteAllText(project, """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+            </Project>
+            """);
+        File.WriteAllText(Path.Combine(directory, "Native.cs"),
+            "public class Native { public int Value() => 7; }");
+        const string original = "[assembly: System.Reflection.AssemblyMetadata(\"oracle\", \"exact\")]\r\npublic record Preserved(int Value);\r\n";
+        File.WriteAllText(Path.Combine(directory, "Preserved.cs"), original);
+        try
+        {
+            await RestoreAsync(project);
+            var reportPath = Path.Combine(directory, "report.json");
+            var migrated = CliTestHarness.RunCli(directory, "migrate", project, "--report", reportPath);
+            Assert.True(migrated.ExitCode == 0, migrated.StdOut + migrated.StdErr);
+            Assert.Equal(2, Directory.GetFiles(directory, "*.calr").Length);
+            var files = System.Text.Json.JsonDocument.Parse(File.ReadAllText(reportPath))
+                .RootElement.GetProperty("data").GetProperty("fileResults").EnumerateArray().ToList();
+            Assert.Contains(files, file =>
+                file.GetProperty("conversionPaths").GetProperty("outcome").GetString() == "native");
+            Assert.Contains(files, file =>
+                file.GetProperty("conversionPaths").GetProperty("outcome").GetString() == "preserved");
+            Assert.All(files, file => Assert.Equal("verified",
+                file.GetProperty("conversionPaths").GetProperty("roundTrip").GetString()));
+            var compiled = Program.Compile(File.ReadAllText(Path.Combine(directory, "Preserved.calr")),
+                "Preserved.calr", new CompilationOptions { DeferGeneratedOutputValidation = true });
+            Assert.False(compiled.HasErrors);
+            Assert.Equal(original, compiled.GeneratedCode);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [Fact]
     public void CliPolicy_DefaultsToLossless()
     {
@@ -19,6 +165,31 @@ public sealed class LosslessConversionContractTests
             explicitCallClosers: false);
 
         Assert.Equal(ConversionFidelity.Lossless, options.Fidelity);
+    }
+
+    [Theory]
+    [InlineData("convert")]
+    [InlineData("migrate")]
+    public void DefaultCli_HelpAndParser_DoNotExposeDestructiveFlags(string command)
+    {
+        var directory = Directory.CreateTempSubdirectory("calor-default-help-").FullName;
+        try
+        {
+            var help = CliTestHarness.RunCli(directory, command, "--help");
+            Assert.Equal(0, help.ExitCode);
+            Assert.DoesNotContain("--lossy", help.StdOut + help.StdErr);
+            Assert.DoesNotContain("--select-active-preprocessor-branch-lossy", help.StdOut + help.StdErr);
+            foreach (var flag in new[] { "--lossy", "--select-active-preprocessor-branch-lossy" })
+            {
+                var rejected = CliTestHarness.RunCli(directory, command, directory, flag);
+                Assert.NotEqual(0, rejected.ExitCode);
+                Assert.Contains(flag, rejected.StdOut + rejected.StdErr);
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
     }
 
     [Fact]
@@ -334,7 +505,7 @@ public sealed class LosslessConversionContractTests
     }
 
     [Fact]
-    public async Task ProjectMigration_LosslessAggregateFailureWritesNothingAndRefreshesSummary()
+    public async Task ProjectMigration_MissingLooseReferencesPreservesSourceAndReportsFailedValidation()
     {
         var directory = Path.Combine(Path.GetTempPath(), $"calor-project-invalid-reference-{Guid.NewGuid():N}");
         Directory.CreateDirectory(directory);
@@ -366,20 +537,22 @@ public sealed class LosslessConversionContractTests
         {
             var report = await migrator.ExecuteAsync(plan);
 
-            Assert.All(report.FileResults, result => Assert.Equal(FileMigrationStatus.Failed, result.Status));
+            Assert.All(report.FileResults, result =>
+            {
+                Assert.Equal(FileMigrationStatus.Partial, result.Status);
+                Assert.Equal("unverified", result.ConversionPaths!.Outcome);
+                Assert.Equal("failed", result.ConversionPaths.RoundTrip);
+                Assert.Equal(File.ReadAllText(result.SourcePath), result.GeneratedCSharp);
+            });
             Assert.Equal(0, report.Summary.SuccessfulFiles);
-            Assert.Equal(2, report.Summary.FailedFiles);
-            Assert.True(report.Summary.TotalErrors > 0);
-            Assert.False(File.Exists(Path.ChangeExtension(validPath, ".calr")));
-            Assert.False(File.Exists(Path.ChangeExtension(invalidPath, ".calr")));
+            Assert.Equal(0, report.Summary.FailedFiles);
+            Assert.True(report.Summary.TotalWarnings > 0);
+            Assert.True(File.Exists(Path.ChangeExtension(validPath, ".calr")));
+            Assert.True(File.Exists(Path.ChangeExtension(invalidPath, ".calr")));
         }
         finally
         {
-            foreach (var file in Directory.GetFiles(directory))
-            {
-                File.Delete(file);
-            }
-            Directory.Delete(directory);
+            Directory.Delete(directory, recursive: true);
         }
 
         static MigrationPlanEntry Entry(string sourcePath) => new()
