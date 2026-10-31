@@ -7,40 +7,45 @@ namespace Calor.Compiler.Tests;
 public class StaticModuleActiveInputTests
 {
     [Fact]
-    public void StructuredMirror_ChangesOnlyTheTwoModuleSourceRows()
+    public void StructuredMirror_ChangesOnlyApprovedSourceIdsAndTwoModuleRows()
     {
         const string original = "tests/TestData/InteropScope/D1/refout-cases.json";
         var root = CliTestHarness.FindRepoRoot();
         var expected = JsonNode.Parse(File.ReadAllText(Path.Combine(root, original)))!;
         var actual = JsonNode.Parse(File.ReadAllText(ActiveSyntaxInputs.ForCurrentTypedInput(
             root, original, ActiveSyntaxInputs.InputKind.Structured)))!;
-        MigrateLines(expected["preludes"]!["cls"]!.AsArray());
+        foreach (var (name, prelude) in expected["preludes"]!.AsObject())
+            ProjectLines(prelude!.AsArray(), moduleSpelling: name == "cls");
         var changedCases = 0;
         foreach (var row in expected["cases"]!.AsArray())
         {
             if (row!["kind"]!.GetValue<string>() != "calor")
                 continue;
             var source = row["source"]!.AsArray();
-            if (source.Any(line => line!.GetValue<string>().Contains("§CL{K:pub:stat}", StringComparison.Ordinal)))
+            var moduleRow = source.Any(line =>
+                line!.GetValue<string>().Contains("§CL{c1:K:pub:stat}", StringComparison.Ordinal));
+            if (moduleRow)
             {
                 Assert.Equal("D1-NULL-10", row["id"]!.GetValue<string>());
-                MigrateLines(source);
                 changedCases++;
             }
+            ProjectLines(source, moduleRow);
+            if (row["warmup"] is JsonArray warmup)
+                ProjectLines(warmup);
         }
         Assert.Equal(1, changedCases);
         Assert.True(JsonNode.DeepEquals(expected, actual),
-            "Only the shared cls prelude and D1-NULL-10 source may change; all other rows, observations, proofs and mutants stay exact.");
+            "Only source IDs and the cls/D1-NULL-10 module spellings may change; all non-source fields, observations, proofs and mutants stay exact.");
     }
 
     [Fact]
-    public void TranscriptMirrors_ChangeOnlyModuleFunctionSpellingsInEveryCell()
+    public void TranscriptMirrors_ChangeOnlyApprovedCurrentSourceInEveryCell()
     {
         var root = CliTestHarness.FindRepoRoot();
         var entries = ActiveSyntaxInputs.TypedRegistrations
             .Where(entry => entry.Value == ActiveSyntaxInputs.InputKind.Transcript
                 && !entry.Key.Contains("W1-F6-", StringComparison.Ordinal)).ToArray();
-        Assert.Equal(7, entries.Length);
+        Assert.Equal(8, entries.Length);
         foreach (var (original, kind) in entries)
         {
             var expected = JsonNode.Parse(File.ReadAllText(Path.Combine(root, original)))!;
@@ -52,7 +57,15 @@ public class StaticModuleActiveInputTests
                 {
                     if (cell?[field] is not JsonValue value || !value.TryGetValue<string>(out var text))
                         continue;
-                    var migrated = ModuleSpelling(text);
+                    var migrated = ModuleSpelling(IdFreeFrozenControl(text));
+                    if (original.EndsWith("/W1-F3-local-functions.json", StringComparison.Ordinal))
+                    {
+                        const string local = "        §F{Clamp} (i32:v) -> i32\n          §R (? (< v 0) 0 v)\n";
+                        Assert.Equal(1, migrated.Split(local, StringSplitOptions.None).Length - 1);
+                        migrated = migrated.Replace(local,
+                            "        §B{Clamp:System.Func<i32, i32>} §LAM{static:v:i32} (? (< v 0) 0 v) §/LAM\n",
+                            StringComparison.Ordinal);
+                    }
                     if (migrated != text)
                         changedCells++;
                     cell[field] = migrated;
@@ -60,7 +73,7 @@ public class StaticModuleActiveInputTests
             }
             Assert.Equal(3, changedCells);
             Assert.True(JsonNode.DeepEquals(expected, actual),
-                $"{original}: all surface/cell fields must stay equal except approved Calor module/function spellings.");
+                $"{original}: only source IDs, module/function spellings and the exact W1-F3 Clamp lambda projection may change.");
         }
     }
 
@@ -69,10 +82,12 @@ public class StaticModuleActiveInputTests
     {
         var (expected, actual) = Transcripts("W1-F6-rescue");
         var native = expected["mcp-convert"]!["calorSource"]!.GetValue<string>();
-        Assert.Contains("§PROP{Count:i32:priv:stat}", native);
+        Assert.Contains("§PROP{p002:Count:i32:priv:stat}", native);
         Assert.DoesNotContain("§CSHARP", native);
         Assert.Contains("§CSHARP", expected["cli-convert"]!["calor"]!.GetValue<string>());
-        expected["cli-convert"]!["calor"] = native.Replace("m001:ConvertedModule:", "m001:Counter:", StringComparison.Ordinal);
+        native = IdFreeFrozenControl(native);
+        expected["mcp-convert"]!["calorSource"] = native;
+        expected["cli-convert"]!["calor"] = native.Replace("§M{ConvertedModule:", "§M{Counter:", StringComparison.Ordinal);
         expected["cli-convert"]!["stdout"] = JsonNode.Parse("""["✓ Conversion successful","Output: <dir>/Counter.calr"]""");
         var json = expected["cli-convert-json"]!;
         Change(json, "interopPreservationCount", 1, 0);
@@ -153,10 +168,54 @@ public class StaticModuleActiveInputTests
         Assert.Equal(before, parent[field]!.GetValue<T>());
         parent[field] = System.Text.Json.JsonSerializer.SerializeToNode(after);
     }
-    private static void MigrateLines(JsonArray lines)
+    private static void ProjectLines(JsonArray lines, bool moduleSpelling = false)
     {
         for (var index = 0; index < lines.Count; index++)
-            lines[index] = ModuleSpelling(lines[index]!.GetValue<string>());
+        {
+            var source = IdFreeFrozenControl(lines[index]!.GetValue<string>());
+            lines[index] = moduleSpelling ? ModuleSpelling(source) : source;
+        }
+    }
+
+    // Finite ID vocabulary of these frozen controls only. Never infer replacements
+    // from an active mirror or rewrite bodies, bindings, observations or diagnostics.
+    internal static string IdFreeFrozenControl(string source)
+    {
+        foreach (var (tag, ids) in new (string Tag, string Ids)[]
+        {
+            ("M", "m001 m1"),
+            ("NS", "ns001 ns003 ns1 ns2 ns_global"),
+            ("CL", "c001 c002 c003 c004 c005 c006 c008 c012 c014 c016 c1 c2"),
+            ("F", "f0 f001 f002 f003 f007 f008 f009 f1 f2 f3 f6 f7 f8 f9"),
+            ("MT", "m0 m001 m002 m003 m004 m005 m006 m007 m008 m009 m011 m013 m015 m017 m1 m2 m9 mt001 mt002 mt003 mt004 mt005 mt1"),
+            ("CTOR", "ctor001 ctor009 k1"),
+            ("DEL", "del003 del011"),
+            ("IFACE", "i001"),
+            ("IXER", "ix005"),
+            ("PROP", "p001 p002 p003 p005 p010 p1 pr1"),
+            ("EACH", "each003 each008 each009"),
+            ("L", "for003 l1"),
+            ("LAM", "lam018"),
+            ("LIST", "list002 items"),
+            ("ARR", "arrI32010")
+        })
+        {
+            foreach (var id in ids.Split(' '))
+                source = source.Replace($"§{tag}{{{id}:", $"§{tag}{{", StringComparison.Ordinal);
+        }
+        foreach (var id in new[] { "i1", "if003", "if004", "if005", "if006", "if007", "if008", "if010", "if1", "tern000" })
+            source = source.Replace($"§IF{{{id}}}", "§IF", StringComparison.Ordinal);
+        return source
+            .Replace("§PROOF{pr1}", "§PROOF{}", StringComparison.Ordinal)
+            .Replace("§ARR2D{arr2d003:arr2d003:i32}", "§ARR2D{i32}", StringComparison.Ordinal)
+            .Replace("§ARR2D{arr2d004:two:i32}", "§ARR2D{i32}", StringComparison.Ordinal)
+            .Replace("§ARR2D{arr2d005:arr2d005:i32}", "§ARR2D{i32}", StringComparison.Ordinal)
+            .Replace("§/ARR2D{arr2d003}", "§/ARR2D", StringComparison.Ordinal)
+            .Replace("§/ARR2D{arr2d005}", "§/ARR2D", StringComparison.Ordinal)
+            .Replace("§/ARR{arrI32010}", "§/ARR", StringComparison.Ordinal)
+            .Replace("§/LIST{list002}", "§/LIST", StringComparison.Ordinal)
+            .Replace("§/LIST{items}", "§/LIST", StringComparison.Ordinal)
+            .Replace("§/LAM{lam018}", "§/LAM", StringComparison.Ordinal);
     }
 
     private static string ModuleSpelling(string source)

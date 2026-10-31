@@ -9015,7 +9015,7 @@ public sealed class Parser
         if (!isModule && isStatic)
         {
             _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
-                $"Static class declarations are removed. Replace '§CL{{{id}:{name}:...}}' with a named module '§M{{{id}:{name}:...}}'; use §F for its functions. Static members of non-static classes remain supported.");
+                $"Static class declarations are removed. Replace '§CL{{{name}:...}}' with a named module '§M{{{name}:...}}'; use §F for its functions. Static members of non-static classes remain supported.");
         }
         var isPartial = modifierTokens.Any(t => t.Equals("partial", StringComparison.Ordinal));
         var isStruct = modifierTokens.Any(t => t.Equals("struct", StringComparison.Ordinal));

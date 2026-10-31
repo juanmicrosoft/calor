@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.RegularExpressions;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
@@ -29,7 +30,7 @@ public class StaticModuleDeclarationTests
     {
         var root = CliTestHarness.FindRepoRoot();
         var source = File.ReadAllText(Path.Combine(root, original));
-        var originalModule = ParseRejectedHistoricalStatic(source);
+        var originalModule = ParseCurrentStaticControl(source, original);
         var activeModule = Parse(File.ReadAllText(ActiveSyntaxInputs.ForCurrentCompiler(root, original)));
         Assert.Equal(new CSharpEmitter(EmitContractMode.Release).Emit(originalModule),
             new CSharpEmitter(EmitContractMode.Release).Emit(activeModule));
@@ -44,10 +45,10 @@ public class StaticModuleDeclarationTests
         var source = File.ReadAllText(Path.Combine(root, original))
             .Replace("(len one)", "one.Length", StringComparison.Ordinal)
             .Replace("(len two)", "two.Length", StringComparison.Ordinal);
-        var historical = ParseRejectedHistoricalStatic(source);
+        var control = ParseCurrentStaticControl(source, original);
         var active = Parse(File.ReadAllText(ActiveSyntaxInputs.ForCurrentTypedInput(
             root, original, ActiveSyntaxInputs.InputKind.CalorText)));
-        Assert.Equal(new CSharpEmitter(EmitContractMode.Release).Emit(historical),
+        Assert.Equal(new CSharpEmitter(EmitContractMode.Release).Emit(control),
             new CSharpEmitter(EmitContractMode.Release).Emit(active));
     }
 
@@ -82,9 +83,9 @@ public class StaticModuleDeclarationTests
         Assert.False(declaration.NestedClasses.Single(type => type.Name == "Item").IsModule);
         Assert.Contains("§F{", result.CalorSource);
         Assert.DoesNotContain(":stat}", result.CalorSource!.Split('\n')
-            .First(line => line.Contains(":Utilities", StringComparison.Ordinal)));
+            .First(line => line.Contains("§M{Utilities:", StringComparison.Ordinal)));
         Assert.DoesNotContain("§CL", result.CalorSource.Split('\n')
-            .First(line => line.Contains(":Nested", StringComparison.Ordinal)));
+            .First(line => line.Contains("§M{Nested:", StringComparison.Ordinal)));
         Assert.Contains("public static partial class Utilities", generated);
         Assert.Contains("Obsolete(\"kept\")]", generated);
         Assert.Contains("Obsolete(\"method\")]", generated);
@@ -493,14 +494,14 @@ public class StaticModuleDeclarationTests
     {
         var source = $$"""
             §M{Library}
-              §CL{c1:Helpers:{{modifiers}}}
+              §CL{Helpers:{{modifiers}}}
                 §MT{Get:pub:stat} () -> i32
                   §R 1
             """;
         var result = Program.Compile(source, "legacy-static.calr");
         Assert.Contains(result.Diagnostics.Errors, diagnostic =>
             diagnostic.Code == DiagnosticCode.InvalidModifier
-            && diagnostic.Message.Contains("§M{c1:Helpers:", StringComparison.Ordinal));
+            && diagnostic.Message == "Static class declarations are removed. Replace '§CL{Helpers:...}' with a named module '§M{Helpers:...}'; use §F for its functions. Static members of non-static classes remain supported.");
         Assert.True(result.HasErrors);
     }
 
@@ -654,7 +655,48 @@ public class StaticModuleDeclarationTests
         return module;
     }
 
-    private static ModuleNode ParseRejectedHistoricalStatic(string source)
+    private static ModuleNode ParseCurrentStaticControl(string source, string original)
+    {
+        // These are current-parser controls, not replay of the frozen source's compiler.
+        source = StaticModuleActiveInputTests.IdFreeFrozenControl(source);
+        if (original is "bench/phase0-agent-native/fixtures/d-s1.5/conditional-expression-hoisting/expected.calr"
+            or "bench/phase0-agent-native/fixtures/d-s1.5/conditional-expression-hoisting/test.calr")
+        {
+            Assert.Equal(3, source.Split("(post-inc i)", StringSplitOptions.None).Length - 1);
+            Assert.Equal(4, source.Split("(inc i)", StringSplitOptions.None).Length - 1);
+            source = source.Replace("(post-inc i)", "(cast i32 §CS{(i++)})", StringComparison.Ordinal)
+                .Replace("(inc i)", "(cast i32 §CS{(++i)})", StringComparison.Ordinal);
+        }
+        if (original is "bench/phase0-agent-native/fixtures/d-s1.5/local-function/expected.calr"
+            or "bench/phase0-agent-native/fixtures/d-s1.5/local-function/test.calr")
+        {
+            const string locals = """
+                  §F{Add} (i32:x) -> i32
+                    §R (+ x 1)
+                  §F{Square} (i32:n) -> i32
+                    §R (* n n)
+                  §F{Fact} (i32:n) -> i32
+                    §IF (<= n 1)
+                      §R 1
+                    §R (* n §C{Fact} §A (- n 1) §/C)
+            """;
+            Assert.EndsWith(locals + "\n", source);
+            var control = ParseRejectedStaticControl(source[..^(locals.Length + 1)]);
+            var functions = Parse("§M{LocalControl}\n" + string.Join("\n",
+                locals.Split('\n').Select(line => line[4..]))).Functions;
+            Assert.Equal(new[] { "Add", "Square", "Fact" }, functions.Select(function => function.Name));
+            var body = Assert.IsType<List<StatementNode>>(Assert.Single(control.Classes)
+                .Methods.Single(method => method.Name == "Run").Body);
+            // Build an independent emitter AST control without accepting retired local §F source.
+            body.AddRange(functions.Select(function => new LocalFunctionStatementNode(function.Span, function)));
+            return control;
+        }
+        return Regex.IsMatch(source, @"§CL\{[^}\r\n]+:stat\}")
+            ? ParseRejectedStaticControl(source)
+            : Parse(source);
+    }
+
+    private static ModuleNode ParseRejectedStaticControl(string source)
     {
         // Recovery AST is only a negative old-form/codegen control, never accepted compilation.
         var diagnostics = new DiagnosticBag();
