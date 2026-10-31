@@ -12,6 +12,11 @@ name: Syntax token count (count-only, #1597)
 # `count_tokens.py --validate-only` printed for the reviewed bytes. Nothing from
 # that commit is executed; the tool always comes from the dispatched commit.
 # Offline controls: scripts/test_count_tokens.py checks this file's invariants.
+#
+# The count job's environment (anthropic-count-tokens) is never created here:
+# preflight fails if it does not already exist, because a job that names a missing
+# environment would create an unprotected one. Maintainers should protect it with
+# required reviewers and a main-only deployment branch policy before dispatching.
 
 on:
   workflow_dispatch:
@@ -27,7 +32,7 @@ on:
         description: "inputs_sha256 printed by count_tokens.py --validate-only for the reviewed payloads"
         required: true
       max_requests:
-        description: "Upper bound on provider requests (1 metadata listing + 1 per payload)"
+        description: "Hard cap on provider HTTP attempts, including model pages and retries (minimum 1 + 1 per payload)"
         required: true
         default: "400"
       confirm:
@@ -53,6 +58,9 @@ jobs:
   preflight:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
     steps:
       - name: Check dispatch inputs and ref
         run: |
@@ -66,6 +74,18 @@ jobs:
           [[ "$MANIFEST_PATH" =~ ^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*\.json$ ]] || fail "bad manifest_path"
           [[ "/$MANIFEST_PATH/" != */../* && "/$MANIFEST_PATH/" != */./* ]] || fail "bad manifest_path"
 
+      - name: Require existing count environment (read-only)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          name=$(gh api "repos/$GITHUB_REPOSITORY/environments/anthropic-count-tokens" \
+            --jq .name 2>/dev/null) || name=""
+          if [[ "$name" != anthropic-count-tokens ]]; then
+            echo "::error::environment anthropic-count-tokens is absent or inaccessible; create and protect it first"
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -76,13 +96,21 @@ jobs:
           path: payload
           persist-credentials: false
 
+      - name: Reject symlinks in payload checkout
+        run: |
+          set -euo pipefail
+          if [[ -n "$(find payload -path payload/.git -prune -o -type l -print -quit)" ]]; then
+            echo "::error::payload_commit contains symlinks"
+            exit 1
+          fi
+
       - name: Offline count_tokens controls
         run: python3 scripts/test_count_tokens.py
 
       - name: Validate exact payloads (no credential)
         run: |
           set -euo pipefail
-          python3 scripts/count_tokens.py "payload/$MANIFEST_PATH" --validate-only \
+          python3 scripts/count_tokens.py "payload/$MANIFEST_PATH" --validate-only --payload-root payload \
             --expect-inputs-sha256 "$INPUTS_SHA256" --expect-target-model "$TARGET_MODEL" \
             --max-requests "$MAX_REQUESTS"
 
@@ -102,6 +130,14 @@ jobs:
           path: payload
           persist-credentials: false
 
+      - name: Reject symlinks in payload checkout
+        run: |
+          set -euo pipefail
+          if [[ -n "$(find payload -path payload/.git -prune -o -type l -print -quit)" ]]; then
+            echo "::error::payload_commit contains symlinks"
+            exit 1
+          fi
+
       - name: Count tokens (count_tokens endpoint only)
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -109,7 +145,7 @@ jobs:
           set -euo pipefail
           out="$RUNNER_TEMP/syntax-token-count"
           mkdir -p "$out"
-          python3 scripts/count_tokens.py "payload/$MANIFEST_PATH" \
+          python3 scripts/count_tokens.py "payload/$MANIFEST_PATH" --payload-root payload \
             --output "$out/results.json" --table "$out/results.md" \
             --expect-inputs-sha256 "$INPUTS_SHA256" --expect-target-model "$TARGET_MODEL" \
             --max-requests "$MAX_REQUESTS" \
