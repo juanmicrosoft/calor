@@ -39,7 +39,7 @@ class RegisteredReplayTests(unittest.TestCase):
 
     def test_changed_final_ledger_or_repointed_producer_fails_before_build(self):
         for name, (producer, _, ledger, _) in replay.REPLAYS.items():
-            for repoint in ((False,) if name == "formatter" else (False, True)):
+            for repoint in ((False,) if name in ("formatter", "binder") else (False, True)):
                 with self.subTest(name=name, repoint=repoint), tempfile.TemporaryDirectory() as temporary:
                     root = Path(temporary)
                     field = "MeasuredCommit" if name == "corpus" else "measuredCommit"
@@ -54,6 +54,21 @@ class RegisteredReplayTests(unittest.TestCase):
                                     with self.assertRaisesRegex(ValueError, "producer differs|immutable final ledger"):
                                         replay.replay(name)
                                     run.assert_not_called()
+
+    def test_changed_binder_aggregate_baseline_fails_before_build(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            ledger = root / replay.REPLAYS["binder"][2]
+            ledger.parent.mkdir(parents=True)
+            ledger.write_bytes(b"{}")
+            (ledger.parent / "binder-incomplete-baseline.json").write_bytes(b"changed")
+            with patch.dict(os.environ, {}, clear=True):
+                with patch.object(replay, "ROOT", root), patch.object(replay, "require_commit"):
+                    with patch.object(replay, "git", return_value=b"{}"):
+                        with patch.object(replay, "run_dotnet") as run:
+                            with self.assertRaisesRegex(ValueError, "immutable conversion baseline"):
+                                replay.replay("binder")
+                            run.assert_not_called()
 
     def test_isolated_index_uses_original_paths_not_current_files(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
+using Calor.Compiler.Commands;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
 using Xunit;
@@ -25,9 +26,11 @@ namespace Calor.Compiler.Tests;
 ///   else fails by NAME (review C2: without this, a parser regression removes files from
 ///   the denominator, the count "improves", and the failure message invites laundering
 ///   the regression into the baseline).
-/// Regenerate: CALOR_UPDATE_BINDER_BASELINE=1 dotnet test --filter BinderIncompleteRatchet
-/// BOTH F-2 legs are active as of B2: the conversion leg (three A-1.5.3 subjects at pinned
-/// submodule commits, converted in-process) skips only where submodules are absent.
+/// CALOR_UPDATE_BINDER_BASELINE updates the native leg only. Conversion artifacts
+/// remain immutable: the original exact conversion test replays its original compiler.
+/// The separate current conversion test retains every source/coverage/count comparison,
+/// with explicit current serialized diagnostic sites instead of historical source IDs.
+/// Only the current conversion test skips where corpus submodules are absent.
 /// </summary>
 public class BinderIncompleteRatchetTests
 {
@@ -270,9 +273,22 @@ public class BinderIncompleteRatchetTests
         })).ToArray());
     }
 
-    [SkippableFact]
-    public void ConversionLeg_IncompleteCount_MatchesBaseline()
+    [Fact]
+    [Trait("Category", "HistoricalReplay")]
+    public async Task ConversionLeg_IncompleteCount_MatchesBaseline()
     {
+        var result = await ExecutionWorkspace.CaptureProcessAsync(
+            "python3", [Path.Combine(RepoRoot(), "scripts", "registered_ledger_historical_replay.py"), "binder"],
+            RepoRoot(), TimeSpan.FromMinutes(20), CancellationToken.None);
+        Assert.True(result.ExitCode == 0 && !result.TimedOut,
+            $"Historical binder conversion replay failed (exit {result.ExitCode}).\n{result.Output}");
+    }
+
+    [SkippableFact]
+    public void CurrentCompiler_ConversionLeg_MatchesCoverageAndDiagnosticSitesExactly()
+    {
+        Assert.True(string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CALOR_UPDATE_BINDER_BASELINE")),
+            "Conversion baselines are immutable; CALOR_UPDATE_BINDER_BASELINE is forbidden.");
         var root = RepoRoot();
         var subjects = new[] { "MediatR", "serilog", "FluentValidation" }
             .Select(subject => Path.Combine(root, "bench", "corpus", subject, "src"))
@@ -297,6 +313,7 @@ public class BinderIncompleteRatchetTests
         var opaqueIdentities = new HashSet<string>(StringComparer.Ordinal);
         var unconvertedIdentities = new HashSet<string>(StringComparer.Ordinal);
         var sourceCoverage = new SortedDictionary<string, SourceCoverageRecord>(StringComparer.Ordinal);
+        var diagnosticSites = new SortedDictionary<string, BindingDiagnosticSites>(StringComparer.Ordinal);
 
         foreach (var file in files)
         {
@@ -305,6 +322,8 @@ public class BinderIncompleteRatchetTests
             var relative = Path.GetRelativePath(Path.Combine(root, "bench", "corpus"), file)
                 .Replace('\\', '/');
             sourceCoverage.Add(relative, native.LastSourceCoverage!);
+            Assert.NotNull(native.LastBindingSites);
+            diagnosticSites.Add(relative, native.LastBindingSites);
             MeasurePreserve(
                 file,
                 source,
@@ -327,25 +346,6 @@ public class BinderIncompleteRatchetTests
         Assert.Equal(0, measuredNative.ConvertExceptions);
         Assert.Equal(0, measuredNative.EmptyOutput);
         Assert.Equal(0, measuredNative.OutputParseFailures);
-        if (Environment.GetEnvironmentVariable("CALOR_UPDATE_BINDER_BASELINE") == "1")
-        {
-            var baseline = File.Exists(BaselinePath())
-                ? JsonSerializer.Deserialize<Baseline>(File.ReadAllText(BaselinePath()))!
-                : new Baseline(0, 0, 0, 0, ScopeText);
-            File.WriteAllText(BaselinePath(), JsonSerializer.Serialize(
-                baseline with
-                {
-                    Conversion = measuredNative,
-                    PreserveCoverage = measuredPreserve,
-                    Scope = ScopeText
-                },
-                new JsonSerializerOptions { WriteIndented = true }) + "\n");
-            File.WriteAllText(SourceCoveragePath(),
-                JsonSerializer.Serialize(sourceCoverage,
-                    new JsonSerializerOptions { WriteIndented = true }) + "\n");
-            return;
-        }
-
         var recorded = JsonSerializer.Deserialize<Baseline>(
             File.ReadAllText(BaselinePath()))!;
         Assert.NotNull(recorded.Conversion);
@@ -360,10 +360,12 @@ public class BinderIncompleteRatchetTests
             SortedDictionary<string, SourceCoverageRecord>>(
                 File.ReadAllText(SourceCoveragePath()))!;
         Assert.Equal(recordedSources.Keys.Order(StringComparer.Ordinal), sourceCoverage.Keys);
+        var expectedSites = ReadCurrentDiagnosticSites();
+        Assert.Equal(sourceCoverage.Keys, expectedSites.Keys);
+        Assert.Equal(sourceCoverage.Keys, diagnosticSites.Keys);
         foreach (var (file, measured) in sourceCoverage)
-            Assert.True(recordedSources[file] == measured,
-                $"Source representation changed in {file}: {recordedSources[file]} -> {measured}. "
-                + "Audit source identities and expression interop, not just the binder-visit total.");
+            AssertCurrentSourceCoverage(recordedSources[file], measured,
+                expectedSites[file], diagnosticSites[file]);
         Assert.Equal(0, measuredPreserve.OpaqueUnmapped);
         Assert.Equal(
             measuredPreserve.OpaqueBoundaries,
@@ -378,6 +380,99 @@ public class BinderIncompleteRatchetTests
             $"Preserve-mode opaque coverage regressed: measured {measuredPreserve} "
             + $"vs baseline {recorded.PreserveCoverage}.");
         Assert.Equal(recorded.PreserveCoverage, measuredPreserve);
+    }
+
+    private static SortedDictionary<string, BindingDiagnosticSites> ReadCurrentDiagnosticSites() =>
+        new(JsonSerializer.Deserialize<Dictionary<string, BindingDiagnosticSites>>(File.ReadAllText(
+            Path.Combine(RepoRoot(), "tests", "TestData", "Binding", "binder-current-diagnostic-sites.json")))!,
+            StringComparer.Ordinal);
+
+    private static SourceCoverageRecord WithCurrentDiagnosticIdentities(
+        SourceCoverageRecord historical, BindingDiagnosticSites expected)
+    {
+        static string Identities(IEnumerable<BindingErrorSite> errors) => HashIdentities(errors
+            .Select(error => $"{error.Code}:{error.Start}:{error.End}:{error.Message}")
+            .Order(StringComparer.Ordinal));
+        return historical with
+        {
+            BindingErrorIdentityHash = Identities(expected.RawErrors),
+            PropagatedBindingErrorIdentityHash = Identities(expected.PropagatedErrors)
+        };
+    }
+
+    private static void AssertCurrentSourceCoverage(
+        SourceCoverageRecord historical, SourceCoverageRecord measured,
+        BindingDiagnosticSites expected, BindingDiagnosticSites actual)
+    {
+        Assert.Equal(expected.RawErrors, actual.RawErrors);
+        Assert.Equal(expected.PropagatedErrors, actual.PropagatedErrors);
+        Assert.Equal(historical.BindingErrorCount, expected.RawErrors.Length);
+        Assert.Equal(historical.PropagatedBindingErrorCount, expected.PropagatedErrors.Length);
+        // Only serialized diagnostic identities have a distinct current role.
+        // Every source/coverage/loss/success/count field still equals the original.
+        Assert.Equal(WithCurrentDiagnosticIdentities(historical, expected), measured);
+    }
+
+    [Theory]
+    [InlineData("code")]
+    [InlineData("message")]
+    [InlineData("start")]
+    [InlineData("end")]
+    [InlineData("line")]
+    [InlineData("column")]
+    [InlineData("span-text")]
+    [InlineData("raw-count")]
+    [InlineData("propagated-count")]
+    [InlineData("propagated-message")]
+    [InlineData("source-hash")]
+    [InlineData("coverage-identity")]
+    [InlineData("loss-identity")]
+    [InlineData("conversion-success")]
+    [InlineData("binder-attempts")]
+    [InlineData("historical-raw-count")]
+    [InlineData("historical-propagated-count")]
+    public void CurrentConversionGuard_RejectsDiagnosticAndCoverageTampering(string mutation)
+    {
+        var (file, expected) = ReadCurrentDiagnosticSites().First(pair =>
+            pair.Value.RawErrors.Length > 0 && pair.Value.PropagatedErrors.Length > 0);
+        var historical = JsonSerializer.Deserialize<SortedDictionary<string, SourceCoverageRecord>>(
+            File.ReadAllText(SourceCoveragePath()))![file];
+        var measured = WithCurrentDiagnosticIdentities(historical, expected);
+        AssertCurrentSourceCoverage(historical, measured, expected, expected);
+        var actual = expected with
+        {
+            RawErrors = expected.RawErrors.ToArray(),
+            PropagatedErrors = expected.PropagatedErrors.ToArray()
+        };
+        var first = actual.RawErrors[0];
+        switch (mutation)
+        {
+            case "code": actual.RawErrors[0] = first with { Code = "Calor9999" }; break;
+            case "message": actual.RawErrors[0] = first with { Message = first.Message + " changed" }; break;
+            case "start": actual.RawErrors[0] = first with { Start = first.Start + 1 }; break;
+            case "end": actual.RawErrors[0] = first with { End = first.End + 1 }; break;
+            case "line": actual.RawErrors[0] = first with { Line = first.Line + 1 }; break;
+            case "column": actual.RawErrors[0] = first with { Column = first.Column + 1 }; break;
+            case "span-text": actual.RawErrors[0] = first with { SpanText = first.SpanText + " changed" }; break;
+            case "raw-count": actual = actual with { RawErrors = actual.RawErrors.Skip(1).ToArray() }; break;
+            case "propagated-count":
+                actual = actual with { PropagatedErrors = actual.PropagatedErrors.Skip(1).ToArray() }; break;
+            case "propagated-message":
+                actual.PropagatedErrors[0] = actual.PropagatedErrors[0] with { Message = "changed" }; break;
+            case "source-hash": measured = measured with { SourceHash = "changed" }; break;
+            case "coverage-identity": measured = measured with { ExactExpressionSourceIdentityHash = "changed" }; break;
+            case "loss-identity": measured = measured with { LossIdentityHash = "changed" }; break;
+            case "conversion-success":
+                measured = measured with { ConversionReportedSuccess = !measured.ConversionReportedSuccess }; break;
+            case "binder-attempts": measured = measured with { BinderAttempts = measured.BinderAttempts + 1 }; break;
+            case "historical-raw-count":
+                historical = historical with { BindingErrorCount = historical.BindingErrorCount + 1 }; break;
+            case "historical-propagated-count":
+                historical = historical with { PropagatedBindingErrorCount = historical.PropagatedBindingErrorCount + 1 }; break;
+            default: throw new ArgumentOutOfRangeException(nameof(mutation));
+        }
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
+            AssertCurrentSourceCoverage(historical, measured, expected, actual));
     }
 
     [Fact]
@@ -673,6 +768,7 @@ public class BinderIncompleteRatchetTests
     {
         coverage.FilesSeen++;
         coverage.LastSourceCoverage = null;
+        coverage.LastBindingSites = null;
         var parseOptions = new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
             Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview,
             Microsoft.CodeAnalysis.DocumentationMode.Parse,
@@ -720,6 +816,8 @@ public class BinderIncompleteRatchetTests
         var bindDiagnostics = new DiagnosticBag();
         var binder = new Binder(bindDiagnostics);
         binder.Bind(module);
+        coverage.LastBindingSites = CaptureBindingSites(bindDiagnostics,
+            conversion.CalorSource.Replace("\r\n", "\n"));
         Assert.NotNull(conversion.Ast);
         // Branch selection removes trivia/text and shifts offsets. Conversion AST spans
         // belong to this selected source, not the original file.
@@ -1011,6 +1109,16 @@ public class BinderIncompleteRatchetTests
         };
     }
 
+    private static BindingDiagnosticSites CaptureBindingSites(DiagnosticBag diagnostics, string serialized)
+    {
+        BindingErrorSite[] Sites(DiagnosticBag bag) => bag.Errors.Select(error => new BindingErrorSite(
+            error.Code, error.Span.Start, error.Span.End, error.Span.Line, error.Span.Column,
+            error.Message, serialized[error.Span.Start..error.Span.End])).ToArray();
+        var propagated = new DiagnosticBag();
+        BindingDiagnosticPolicy.PropagateCompilationErrors(diagnostics, propagated);
+        return new BindingDiagnosticSites(Sites(diagnostics), Sites(propagated));
+    }
+
     private static void AssertSourceCarriersPreserved(ModuleNode module, string source, string file)
     {
         var relative = Path.GetRelativePath(Path.Combine(RepoRoot(), "bench", "corpus"), file)
@@ -1141,6 +1249,12 @@ public class BinderIncompleteRatchetTests
         int ExactExpressionsWithOpaqueDescendants = 0,
         string MixedExpressionSourceIdentityHash = "");
 
+    private sealed record BindingErrorSite(
+        string Code, int Start, int End, int Line, int Column, string Message, string SpanText);
+
+    private sealed record BindingDiagnosticSites(
+        BindingErrorSite[] RawErrors, BindingErrorSite[] PropagatedErrors);
+
     private sealed record SourceCarrierEvidence(IReadOnlyList<SourceCarrierCase> Cases, IReadOnlyList<SourceCarrierCase>? PreservedCases = null);
 
     private sealed record SourceCarrierCase(
@@ -1164,6 +1278,7 @@ public class BinderIncompleteRatchetTests
         public int EmptyOutput;
         public int OutputParseFailures;
         public SourceCoverageRecord? LastSourceCoverage;
+        public BindingDiagnosticSites? LastBindingSites;
         public NativeConversionLeg ToRecord() => new(
             Incomplete,
             LegacySourceOrderAttempted,

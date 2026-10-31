@@ -79,7 +79,7 @@ this historical category, so it is **not** a full compiler-suite result.
 Current-compiler semantic replay uses separate active-syntax fixtures and cannot
 replace this historical check. Neither command reruns paid epochs or token collection.
 
-**Historical effect/demand ledgers, formatter baseline and current regressions:**
+**Historical ledgers/baselines and current regressions:**
 
 ```bash
 python3 scripts/test_registered_ledger_historical_replay.py
@@ -87,10 +87,11 @@ python3 scripts/registered_ledger_historical_replay.py key
 python3 scripts/registered_ledger_historical_replay.py corpus
 python3 scripts/registered_ledger_historical_replay.py demand
 python3 scripts/registered_ledger_historical_replay.py formatter
-dotnet test tests/Calor.Compiler.Tests/ --filter "FullyQualifiedName~EffectResolverKeyLedgerTests|FullyQualifiedName~Calor0425CorpusLedgerTests|FullyQualifiedName~HigherOrderDemandLedgerTests|FullyQualifiedName~LosslessFormattingTests"
+python3 scripts/registered_ledger_historical_replay.py binder
+dotnet test tests/Calor.Compiler.Tests/ --filter "FullyQualifiedName~EffectResolverKeyLedgerTests|FullyQualifiedName~Calor0425CorpusLedgerTests|FullyQualifiedName~HigherOrderDemandLedgerTests|FullyQualifiedName~LosslessFormattingTests|FullyQualifiedName~BinderIncompleteRatchetTests"
 ```
 
-The four historical checks have the same prerequisites and process deadline as
+The five historical checks have the same prerequisites and process deadline as
 PP-E1, plus initialized corpus submodule object stores containing their recorded
 commits. They never fetch missing history. Each runner archives its recorded
 compiler and each recorded submodule commit from Git objects, not from current
@@ -121,6 +122,18 @@ comments and idempotence. Its 39 additional successful transformations are 35
 latency L3 modules, three benchmarks using a `base` parameter, and the verbatim
 identifier snapshot. Reserved identifiers now emit with `@` escaping; the
 original 704-success baseline stays unchanged.
+The binder conversion replay uses compiler `7daf2bc99` and preserves both the
+original source-coverage artifact and aggregate baseline. The live conversion
+test retains all 364 exact original source/coverage/loss/success/count records.
+Only serialized diagnostic identities use separate ordinary expectations in
+`tests/TestData/Binding/binder-current-diagnostic-sites.json`: every code, message,
+offset, line, column and actual serialized span text is explicit, for all 2,248
+raw errors and 115 propagated errors. Source-ID removal changes offsets, columns,
+candidate identity URIs and 14 raw span texts; counts and codes do not change.
+Two existing zero-offset recovery spans still slice incidental module-header
+text, not mapped native C# sites. These are pinned as observed, not promoted to
+source-coverage evidence. `CALOR_UPDATE_BINDER_BASELINE` cannot update conversion
+artifacts, and the historical replay rejects it.
 
 **Full-corpus lane** (adds ~500 MB and a few minutes; needed to unskip
 `BinderIncompleteRatchetTests`):

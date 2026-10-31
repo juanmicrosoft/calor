@@ -19,6 +19,12 @@ from ppe1_historical_replay import ROOT, git, run_dotnet
 
 
 REPLAYS = {
+    "binder": (
+        "7daf2bc99ec98937d489cf2b8bb69388fcb930d5",
+        "7daf2bc99ec98937d489cf2b8bb69388fcb930d5",
+        "bench/phase0-agent-native/binder-source-coverage.json",
+        "Calor.Compiler.Tests.BinderIncompleteRatchetTests.ConversionLeg_IncompleteCount_MatchesBaseline",
+    ),
     "formatter": (
         "ab53adc3737bab92ff8637cb32235629c64ece9d",
         "ab53adc3737bab92ff8637cb32235629c64ece9d",
@@ -45,6 +51,7 @@ REPLAYS = {
     ),
 }
 REGENERATION_FLAGS = (
+    "CALOR_UPDATE_BINDER_BASELINE",
     "CALOR_REGENERATE_HIGHER_ORDER_DEMAND_LEDGER",
     "CALOR_REGENERATE_EFFECT_RESOLVER_KEY_LEDGER",
     "CALOR_REGENERATE_CALOR0425_LEDGER",
@@ -129,11 +136,18 @@ def replay(name: str) -> None:
     final_ledger = git("show", f"{landing}:{ledger_path}")
     if (ROOT / ledger_path).read_bytes() != final_ledger:
         raise ValueError(f"{ledger_path}: immutable final ledger differs from original landing {landing}")
-    if name != "formatter":
+    if name not in ("formatter", "binder"):
         recorded = json.loads(final_ledger)
         identity_field = "MeasuredCommit" if name == "corpus" else "measuredCommit"
         if recorded[identity_field] != producer:
             raise ValueError("recorded producer differs from the original compiler selected for replay")
+    artifacts = {ledger_path: final_ledger}
+    if name == "binder":
+        baseline_path = "bench/phase0-agent-native/binder-incomplete-baseline.json"
+        baseline = git("show", f"{landing}:{baseline_path}")
+        if (ROOT / baseline_path).read_bytes() != baseline:
+            raise ValueError(f"{baseline_path}: immutable conversion baseline differs from original landing {landing}")
+        artifacts[baseline_path] = baseline
     verifier = ROOT / "scripts/verify-z3-assets.py"
     subprocess.run([sys.executable, str(verifier)], check=True, timeout=60)
     with tempfile.TemporaryDirectory(prefix=f"calor-{name}-history-") as temporary:
@@ -158,7 +172,10 @@ def replay(name: str) -> None:
         subprocess.run(
             [sys.executable, str(source / "scripts/verify-z3-assets.py")], check=True, timeout=60,
         )
-        (source / ledger_path).write_bytes(final_ledger)
+        for relative, expected in artifacts.items():
+            if name == "binder" and (source / relative).read_bytes() != expected:
+                raise ValueError(f"{relative}: original producer artifact differs from final landing")
+            (source / relative).write_bytes(expected)
         environment = os.environ.copy()
         environment["LC_ALL"] = "C"
         environment["CALOR_HOME"] = str(scratch / "empty-calor-home")
@@ -175,6 +192,9 @@ def replay(name: str) -> None:
             source, environment, timeout=600,
         )
         verify_result(scratch / "results/historical.trx", test)
+        for relative, expected in artifacts.items():
+            if (source / relative).read_bytes() != expected:
+                raise ValueError(f"{relative}: historical replay changed its immutable input")
 
 
 if __name__ == "__main__":
