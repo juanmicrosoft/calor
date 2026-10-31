@@ -228,12 +228,11 @@ namespace Test
     }
 }";
         var calor = ConvertToCalor(csharp);
-        // Should have two §SYNC blocks
-        var syncCount = calor.Split("§SYNC{").Length - 1;
-        Assert.True(syncCount >= 2, $"Expected at least 2 §SYNC blocks, found {syncCount}");
+        Assert.Equal(2, calor.Split("§SYNC").Length - 1);
+        Assert.DoesNotContain("§SYNC{", calor);
 
         var generated = RoundTrip(csharp);
-        Assert.Contains("lock", generated);
+        Assert.Equal(2, generated.Split("lock (").Length - 1);
     }
 
     [Fact]
