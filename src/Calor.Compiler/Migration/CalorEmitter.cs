@@ -2303,13 +2303,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             // #1132: a complex size is quoted in place, not hoisted (a hoisted size ran
             // before the statement's earlier reads).
             var size = EmitSizeAttribute(node.Size);
-            // An expression's array ID is not a binding. Keep it unambiguously
-            // name-first even when the element is a type parameter such as T.
-            var arrayHeader = AttributeHelper.IsLikelyType(elementType)
-                && !AttributeHelper.IsLikelyType(variableName)
-                ? $"{elementType}:{variableName}"
-                : $"{FreshTemp("_arr")}:{elementType}";
-            AppendLine($"§B{{{BindHeaderFields(variableName, arrayType, isMutable)}}} §ARR{{{arrayHeader}:{size}}}");
+            AppendLine($"§B{{{BindHeaderFields(variableName, arrayType, isMutable)}}} §ARR{{{elementType}:{size}}}");
             if (originalTarget != variableName)
                 AppendLine($"§ASSIGN {originalTarget} {variableName}");
         }

@@ -39,6 +39,86 @@ public class ArrayExpressionConversionTests
         ProjectMigratePassthrough
     }
 
+    public static IEnumerable<object[]> SizedArraySurfaces() =>
+        Enum.GetValues<Surface>().Select(surface => new object[] { surface });
+
+    [Theory]
+    [MemberData(nameof(SizedArraySurfaces))]
+    public async Task SizedArrayBindings_UseIdentityFreeHeaders_AndPreserveRuntime(Surface surface)
+    {
+        const string source = """
+            namespace SizedArrayCutover
+            {
+                public static class Probe
+                {
+                    private static string Log = "";
+                    private static int Size() { Log += "s"; return 3; }
+                    private static int Negative() { Log += "n"; return -1; }
+                    public static T[] Make<T>(T value, int count)
+                    {
+                        T[] result = new T[count];
+                        result[0] = value;
+                        return result;
+                    }
+                    public static string Run()
+                    {
+                        int[] numbers = new int[Size()];
+                        numbers[2] = 7;
+                        string[] words = Make("x", 2);
+                        int[] empty = new int[0];
+                        try
+                        {
+                            int[] invalid = new int[Negative()];
+                            return "bad";
+                        }
+                        catch (System.OverflowException)
+                        {
+                            return numbers.Length + ":" + numbers[2] + ":" + words.Length + ":" + words[0] + ":" + empty.Length + ":" + Log;
+                        }
+                    }
+                }
+            }
+            """;
+        const string expected = "3:7:2:x:0:sn";
+        Assert.Equal(expected, Run(source));
+        string calor;
+        if (surface is Surface.CliDefault or Surface.CliPassthrough)
+        {
+            var dir = Directory.CreateTempSubdirectory("calor-sized-array-").FullName;
+            try
+            {
+                File.WriteAllText(Path.Combine(dir, "Fixture.cs"), source);
+                var flags = surface == Surface.CliPassthrough ? new[] { "--passthrough" } : [];
+                var (exit, stdout, stderr) = CliTestHarness.RunCli(dir,
+                    ["convert", "Fixture.cs", "-o", "Fixture.calr", "--format", "json", .. flags]);
+                Assert.True(exit == 0, stdout + "\n" + stderr);
+                using var document = JsonDocument.Parse(stdout);
+                var data = document.RootElement.GetProperty("data");
+                Assert.Equal(0, data.GetProperty("lossCount").GetInt32());
+                Assert.Equal("native", data.GetProperty("conversionPaths").GetProperty("outcome").GetString());
+                calor = File.ReadAllText(Path.Combine(dir, "Fixture.calr"));
+            }
+            finally
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+        }
+        else
+        {
+            var converted = await ConvertAsync(source, surface);
+            Assert.Empty(converted.Losses);
+            calor = converted.Calor;
+        }
+        Assert.DoesNotContain("§CS", calor);
+        Assert.Contains("§ARR{T:count}", calor);
+        Assert.Contains("§ARR{i32:0}", calor);
+        var compilation = Program.Compile(calor, "sized-array.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compilation.HasErrors,
+            string.Join(Environment.NewLine, compilation.Diagnostics.Errors) + "\n" + calor);
+        Assert.Equal(expected, Run(compilation.GeneratedCode));
+    }
+
     // Element order around a call that mutates what the other elements read, in
     // expression and statement position; object initializers as 2-D elements; a ?: that
     // must not evaluate the unselected branch; && / || laziness over array operands;
