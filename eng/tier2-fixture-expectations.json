@@ -133,17 +133,12 @@
     },
     {
       "id": "conversion-snapshots:11-05.approved",
-      "expect": "known-failure",
+      "expect": "compile",
       "mode": "each",
       "options": [
         "--permissive-effects"
       ],
-      "errors": [
-        "11-05.approved.calr|Calor1002:CS0246|[\"11-05.approved.calr\",5,\"Test_11_05.DictExample`0\",\"GetImmutableScores\",\"{\\\"arity\\\":0,\\\"parameters\\\":[],\\\"output\\\":\\\"ImmutableDictionary\\\\u003Cstr,i32\\\\u003E\\\"}\"]|Generated C# failed compilation (CS0246): The type or namespace name 'i32' could not be found (are you missing a using directive or an assembly reference?)",
-        "11-05.approved.calr|Calor1002:CS0246|[\"11-05.approved.calr\",5,\"Test_11_05.DictExample`0\",\"GetImmutableScores\",\"{\\\"arity\\\":0,\\\"parameters\\\":[],\\\"output\\\":\\\"ImmutableDictionary\\\\u003Cstr,i32\\\\u003E\\\"}\"]|Generated C# failed compilation (CS0246): The type or namespace name 'str' could not be found (are you missing a using directive or an assembly reference?)"
-      ],
-      "defect": "Front end accepts the source; generated C# (CS0246): The type or namespace name 'str' could not be found (are you missing a using directive or an assembly reference?); generated C# (CS0246): The type or namespace name 'i32' could not be found (are you missing a using directive or an assembly reference?)",
-      "evidence": "Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
+      "evidence": "Generic receiver type aliases were repaired by 57408cb36: ImmutableDictionary<str, i32>.Empty now emits ImmutableDictionary<string, int>.Empty. Actual checkout-built CLI execution compiles this exact unchanged subject with its existing --permissive-effects option and generated-C# validation. It is now an ordinary positive obligation, not a waived codegen failure. Default strict compilation still rejects its unknown .Empty effect with Calor0410; the formatter therefore retains its existing semantic fallback. Original source, approved conversion text, formatter expectations and historical artifacts are unchanged.",
       "files": [
         "tests/Calor.Conversion.Tests/Snapshots/11-05.approved.calr"
       ]
