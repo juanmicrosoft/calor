@@ -1,6 +1,9 @@
+using System.Runtime.Loader;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Migration;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -657,7 +660,7 @@ public class WedgeW4SliceAStructuralTests
     }
 
     [Fact]
-    public void D4_RecursiveLocalFunction_PreservesTheMember()
+    public void D4_DirectPureRecursiveLocalFunction_ConvertsAtItsDeclarationAndRunsTheSame()
     {
         var csharp = """
             public class F
@@ -674,7 +677,51 @@ public class WedgeW4SliceAStructuralTests
             }
             """;
 
-        AssertLocalFunctionEscalated(Convert(csharp), "Fac");
+        var result = Convert(csharp);
+        Assert.True(result.Success, string.Join("; ", result.Issues));
+        Assert.Empty(result.Context.Losses);
+        Assert.DoesNotContain(result.Issues, issue => issue.Feature == "local-function");
+        var body = Assert.Single(Assert.Single(result.Ast!.Classes).Methods).Body;
+        var self = Assert.IsType<BindStatementNode>(body[0]);
+        Assert.Equal("Fac", self.Name);
+        Assert.True(self.IsMutable);
+        Assert.Null(self.Initializer);
+        Assert.Empty(Assert.IsType<EffectsNode>(self.Row).Effects);
+        var assignment = Assert.IsType<AssignmentStatementNode>(body[1]);
+        Assert.Equal("Fac", Assert.IsType<ReferenceNode>(assignment.Target).Name);
+        Assert.IsType<LambdaExpressionNode>(assignment.Value);
+        Assert.DoesNotContain(RecursiveAstWalker.DescendantsAndSelf(result.Ast),
+            node => node is LocalFunctionStatementNode or CSharpInteropBlockNode);
+        var compiled = Calor.Compiler.Program.Compile(result.CalorSource!, "recursive-current.calr",
+            new Calor.Compiler.CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics));
+        foreach (var (input, expected) in new[]
+                 { (-5, 1), (0, 1), (1, 1), (2, 2), (12, 479001600), (13, 1932053504) })
+        {
+            Assert.Equal(expected, Run(csharp, input));
+            Assert.Equal(expected, Run(compiled.GeneratedCode, input));
+        }
+
+        static int Run(string source, int input)
+        {
+            var compilation = CSharpCompilation.Create("Recursive_" + Guid.NewGuid().ToString("N"),
+                [CSharpSyntaxTree.ParseText(source)], Calor.Compiler.CodeGen.GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var emission = compilation.Emit(stream);
+            Assert.True(emission.Success, string.Join("; ", emission.Diagnostics));
+            stream.Position = 0;
+            var context = new AssemblyLoadContext(compilation.AssemblyName!, isCollectible: true);
+            try
+            {
+                var type = context.LoadFromStream(stream).GetTypes().Single(candidate => candidate.Name == "F");
+                return Assert.IsType<int>(type.GetMethod("M")!.Invoke(Activator.CreateInstance(type), [input]));
+            }
+            finally
+            {
+                context.Unload();
+            }
+        }
     }
 
     [Fact]
