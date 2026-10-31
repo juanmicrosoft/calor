@@ -7,7 +7,7 @@ namespace Calor.Compiler.Tests;
 
 /// <summary>
 /// Tests for compiler gap fixes discovered during native interop sample conversion.
-/// Covers: struct support, static fields, global namespace, increment/decrement operators.
+/// Covers: struct support, static fields, global namespace, explicit update replacements.
 /// </summary>
 public class CompilerGapFixTests
 {
@@ -189,70 +189,90 @@ public class CompilerGapFixTests
 
     #endregion
 
-    #region Fix 4: Increment/Decrement
+    #region Fix 4: Increment/Decrement Replacements
 
     [Fact]
-    public void Increment_Prefix()
+    public void Increment_PrefixReplacement_UsesUpdatedValue()
     {
         var source = @"
 §M{TestMod}
-  §F{Main:pub}
-      §O{void}
-      §B{~x:i32} 0
-      (inc x)
+  §F{Main:pub} () -> i32
+    §B{~x:i32} 0
+    §ASSIGN x (+ x 1)
+    §B{value:i32} x
+    §R value
 ";
 
         var result = ParseAndEmit(source);
 
-        Assert.Contains("checked(++x);", result);
+        Assert.Contains("x = checked(x + 1);", result);
+        Assert.Contains("int value = x;", result);
+        Assert.True(result.IndexOf("x = checked(x + 1);", StringComparison.Ordinal)
+            < result.IndexOf("int value = x;", StringComparison.Ordinal));
+        Assert.Contains("return value;", result);
     }
 
     [Fact]
-    public void Increment_PostFix()
+    public void Increment_PostfixReplacement_CapturesPreviousValue()
     {
         var source = @"
 §M{TestMod}
-  §F{Main:pub}
-      §O{void}
-      §B{~x:i32} 0
-      (post-inc x)
+  §F{Main:pub} () -> i32
+    §B{~x:i32} 0
+    §B{previous:i32} x
+    §ASSIGN x (+ x 1)
+    §R previous
 ";
 
         var result = ParseAndEmit(source);
 
-        Assert.Contains("checked(x++);", result);
+        Assert.Contains("x = checked(x + 1);", result);
+        Assert.Contains("int previous = x;", result);
+        Assert.True(result.IndexOf("int previous = x;", StringComparison.Ordinal)
+            < result.IndexOf("x = checked(x + 1);", StringComparison.Ordinal));
+        Assert.Contains("return previous;", result);
     }
 
     [Fact]
-    public void Decrement_Prefix()
+    public void Decrement_PrefixReplacement_UsesUpdatedValue()
     {
         var source = @"
 §M{TestMod}
-  §F{Main:pub}
-      §O{void}
-      §B{~x:i32} 0
-      (dec x)
+  §F{Main:pub} () -> i32
+    §B{~x:i32} 0
+    §ASSIGN x (- x 1)
+    §B{value:i32} x
+    §R value
 ";
 
         var result = ParseAndEmit(source);
 
-        Assert.Contains("checked(--x);", result);
+        Assert.Contains("x = checked(x - 1);", result);
+        Assert.Contains("int value = x;", result);
+        Assert.True(result.IndexOf("x = checked(x - 1);", StringComparison.Ordinal)
+            < result.IndexOf("int value = x;", StringComparison.Ordinal));
+        Assert.Contains("return value;", result);
     }
 
     [Fact]
-    public void Decrement_PostFix()
+    public void Decrement_PostfixReplacement_CapturesPreviousValue()
     {
         var source = @"
 §M{TestMod}
-  §F{Main:pub}
-      §O{void}
-      §B{~x:i32} 0
-      (post-dec x)
+  §F{Main:pub} () -> i32
+    §B{~x:i32} 0
+    §B{previous:i32} x
+    §ASSIGN x (- x 1)
+    §R previous
 ";
 
         var result = ParseAndEmit(source);
 
-        Assert.Contains("checked(x--);", result);
+        Assert.Contains("x = checked(x - 1);", result);
+        Assert.Contains("int previous = x;", result);
+        Assert.True(result.IndexOf("int previous = x;", StringComparison.Ordinal)
+            < result.IndexOf("x = checked(x - 1);", StringComparison.Ordinal));
+        Assert.Contains("return previous;", result);
     }
 
     #endregion
@@ -270,8 +290,8 @@ public class CompilerGapFixTests
       §FLD{i32:InstanceCount:pub:stat}
       §MT{Advance:pub}
           §O{void}
-          (inc X)
-          (post-inc InstanceCount)
+          §ASSIGN X (+ X 1)
+          §ASSIGN InstanceCount (+ InstanceCount 1)
 ";
 
         var result = ParseAndEmit(source);
@@ -282,9 +302,8 @@ public class CompilerGapFixTests
         Assert.Contains("public struct Vector2", result);
         // Static field
         Assert.Contains("public static int InstanceCount;", result);
-        // Increment operators as standalone statements
-        Assert.Contains("checked(++X);", result);
-        Assert.Contains("checked(InstanceCount++);", result);
+        Assert.Contains("X = checked(X + 1);", result);
+        Assert.Contains("InstanceCount = checked(InstanceCount + 1);", result);
     }
 
     #endregion

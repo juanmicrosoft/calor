@@ -49,7 +49,7 @@ public class ControlFlowTests
         var source = """
             §M{Test}
               §F{Probe:pub} (i32:value) -> i32
-                §W value
+                §W{expr} value
                   §K _
                     §R 1
             """;
@@ -423,7 +423,8 @@ public class ControlFlowTests
         Assert.False(diagnostics.HasErrors);
         var doStmt = module.Functions[0].Body[0] as DoWhileStatementNode;
         Assert.NotNull(doStmt);
-        Assert.Equal("do1", doStmt.Id);
+        Assert.Matches("^do_auto[0-9]+$", doStmt.Id);
+        Assert.Null(doStmt.ToolingId);
         Assert.Single(doStmt.Body);
         Assert.NotNull(doStmt.Condition);
     }

@@ -11,12 +11,10 @@ namespace Calor.Compiler.Tests;
 /// rollback used to copy both module-wide maps at every loop, which made
 /// binding quadratic in module size (Binding_MediumModule_Under500ms). It now
 /// undoes only what discovery added. These tests pin the observable result:
-/// the same symbol ids, in the same order, with no "duplicate:" suffixes.
+/// the same snapshot-local symbol ids, in the same order, without leaked discovery symbols.
 /// </summary>
 public sealed class LoopDiscoveryRollbackTests
 {
-    private const string Prefix = "calor://source/%3Cmemory%3E/module/m1/";
-
     private static BoundModule Bind(string source)
     {
         var diagnostics = new DiagnosticBag();
@@ -27,6 +25,18 @@ public sealed class LoopDiscoveryRollbackTests
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
         return bound;
     }
+
+    private static string Snapshot(BoundModule module)
+    {
+        var id = Assert.Single(module.SymbolsById, entry => entry.Value.Name == "total").Key.Value;
+        var snapshot = id.Split("/snapshot/", StringSplitOptions.None)[1].Split('/')[0];
+        Assert.Matches("^[A-F0-9]{64}$", snapshot);
+        return snapshot;
+    }
+
+    private static string Local(string owner, string snapshot, string kind, string name, int start) =>
+        owner + "/snapshot/" + snapshot + "/" + kind + "/" + Uri.EscapeDataString("name:" +
+            System.Text.Json.JsonSerializer.Serialize(new { name, typeName = "INT", Start = start }));
 
     [Fact]
     public void SymbolsById_KeepsDeclarationOrderAcrossLoopDiscovery()
@@ -49,23 +59,24 @@ public sealed class LoopDiscoveryRollbackTests
                 §R x
             """);
 
-        // Recorded from the binder before the rollback change (full-copy restore).
+        var run = bound.Functions.Single(function => function.Symbol.Name == "Run").Symbol.Id.Value;
+        var other = bound.Functions.Single(function => function.Symbol.Name == "Other").Symbol.Id.Value;
+        var snapshot = Snapshot(bound);
         string[] expected =
         [
-            "function/ast%3Af1/parameter/name%3An",
-            "function/ast%3Af1",
-            "function/ast%3Af2",
-            "function/ast%3Af1/local/name%3Atotal",
-            "function/ast%3Af1/for/name%3Ai",
-            "function/ast%3Af1/local/name%3Astep",
-            "function/ast%3Af1/local/name%3Adup",
-            "function/ast%3Af1/local/name%3Ainner",
-            "function/ast%3Af1/local/name%3Aafter",
-            "function/ast%3Af2/local/name%3Ax",
+            run + "/parameter/name%3An",
+            run,
+            other,
+            Local(run, snapshot, "local", "total", 47),
+            Local(run, snapshot, "for", "i", 67),
+            Local(run, snapshot, "local", "step", 85),
+            Local(run, snapshot, "local", "dup", 112),
+            Local(run, snapshot, "local", "inner", 191),
+            Local(run, snapshot, "local", "after", 247),
+            Local(other, snapshot, "local", "x", 310),
         ];
-        Assert.Equal(
-            expected.Select(suffix => Prefix + suffix),
-            bound.SymbolsById.Keys.Select(id => id.Value));
+        Assert.True(expected.SequenceEqual(bound.SymbolsById.Keys.Select(id => id.Value)),
+            string.Join("\n", bound.SymbolsById.Keys.Select(id => id.Value)));
     }
 
     [Fact]
@@ -86,23 +97,23 @@ public sealed class LoopDiscoveryRollbackTests
                 §R total
             """);
 
-        // Recorded from the binder before the rollback change. The second block
-        // local `a` legitimately takes duplicate ordinal 1; discovery of the
-        // three loop bodies must not consume any further ordinals.
+        // Distinct source offsets distinguish the two locals named `a`.
+        // Discovery must not register extra instances or duplicate suffixes.
+        var run = Assert.Single(bound.Functions).Symbol.Id.Value;
+        var snapshot = Snapshot(bound);
         string[] expected =
         [
-            "function/ast%3Af1/parameter/name%3An",
-            "function/ast%3Af1",
-            "function/ast%3Af1/local/name%3Atotal",
-            "function/ast%3Af1/for/name%3Ai",
-            "function/ast%3Af1/local/name%3Aa",
-            "function/ast%3Af1/for/name%3Aj",
-            "function/ast%3Af1/local/name%3Aa2",
-            "function/ast%3Af1/for/name%3Ak",
-            "function/ast%3Af1/local/name%3Aa/duplicate%3A1",
+            run + "/parameter/name%3An",
+            run,
+            Local(run, snapshot, "local", "total", 48),
+            Local(run, snapshot, "for", "i", 68),
+            Local(run, snapshot, "local", "a", 86),
+            Local(run, snapshot, "for", "j", 104),
+            Local(run, snapshot, "local", "a2", 124),
+            Local(run, snapshot, "for", "k", 182),
+            Local(run, snapshot, "local", "a", 200),
         ];
-        Assert.Equal(
-            expected.Select(suffix => Prefix + suffix),
-            bound.SymbolsById.Keys.Select(id => id.Value));
+        Assert.True(expected.SequenceEqual(bound.SymbolsById.Keys.Select(id => id.Value)),
+            string.Join("\n", bound.SymbolsById.Keys.Select(id => id.Value)));
     }
 }

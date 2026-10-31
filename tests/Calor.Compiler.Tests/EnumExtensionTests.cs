@@ -115,7 +115,8 @@ public class EnumExtensionTests
         Assert.False(diagnostics.HasErrors);
         Assert.Single(module.Enums);
         var enumDef = module.Enums[0];
-        Assert.Equal("e001", enumDef.Id);
+        Assert.Equal(enumDef.LocalId, enumDef.Id);
+        Assert.Null(enumDef.ToolingId);
         Assert.Equal("Color", enumDef.Name);
         Assert.Equal(3, enumDef.Members.Count);
         Assert.Equal("Red", enumDef.Members[0].Name);
@@ -181,7 +182,8 @@ public class EnumExtensionTests
         Assert.False(diagnostics.HasErrors);
         Assert.Single(module.EnumExtensions);
         var ext = module.EnumExtensions[0];
-        Assert.Equal("ext001", ext.Id);
+        Assert.Equal(ext.LocalId, ext.Id);
+        Assert.Null(ext.ToolingId);
         Assert.Equal("Color", ext.EnumName);
         Assert.Single(ext.Methods);
         Assert.Equal("ToHex", ext.Methods[0].Name);
@@ -376,7 +378,7 @@ public class EnumExtensionTests
     }
 
     [Fact]
-    public void Parser_EnumExtension_MissingId_ReportsError()
+    public void Parser_EnumExtension_EmptyLeadingName_ReportsError()
     {
         var source = """
             §M{Test}
@@ -398,7 +400,7 @@ public class EnumExtensionTests
     {
         var source = """
             §M{Test}
-              §EEXT{ext001}
+              §EEXT{}
                 §F{ToHex:pub}
                     §I{Color:self}
                     §O{str}
@@ -436,11 +438,11 @@ public class EnumExtensionTests
     }
 
     [Fact]
-    public void Parser_Enum_MismatchedCloseId_ReportsError()
+    public void Parser_Enum_SourceIdHeader_ReportsError()
     {
         var source = """
             §M{Test}
-              §EN{Color}
+              §EN{e001:Color}
               Red
               Green
               §/EN
@@ -448,7 +450,7 @@ public class EnumExtensionTests
         var module = Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics.Errors, e => e.Code == DiagnosticCode.LegacyCloserForm);
+        Assert.Contains(diagnostics.Errors, e => e.Code == DiagnosticCode.UnexpectedToken);
     }
 
     [Fact]

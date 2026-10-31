@@ -373,13 +373,13 @@ public class ExceptionHandlingTests
     #region Negative/Error Case Tests
 
     [Fact]
-    public void Parse_MismatchedTryId_ReportsError()
+    public void Parse_TrySourceId_ReportsError()
     {
         var source = @"
 §M{Test}
   §F{Bad:pub}
     §O{void}
-    §TR
+    §TR{t1}
     §P ""try""
     §/TR
 ";
@@ -387,27 +387,29 @@ public class ExceptionHandlingTests
         var module = Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
-        var errorMessages = string.Join("\n", diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Message));
-        Assert.Contains("does not match", errorMessages, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnexpectedToken
+            && diagnostic.Message.Contains("Source IDs are removed from '§TR'", StringComparison.Ordinal));
     }
 
     [Fact]
-    public void Parse_MissingTryId_ReportsError()
+    public void Parse_TryWithoutSourceId_ParsesSuccessfully()
     {
         var source = @"
 §M{Test}
   §F{Bad:pub}
     §O{void}
     §TR
-    §P ""try""
-    §/TR
+      §P ""try""
+    §CA{Exception:e}
+      §P ""catch""
 ";
 
         var module = Parse(source, out var diagnostics);
 
-        Assert.True(diagnostics.HasErrors);
-        var errorMessages = string.Join("\n", diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Message));
-        Assert.Contains("id", errorMessages, StringComparison.OrdinalIgnoreCase);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(diagnostic => diagnostic.Message)));
+        var statement = Assert.IsType<Ast.TryStatementNode>(Assert.Single(module.Functions[0].Body));
+        Assert.Single(statement.TryBody);
+        Assert.Single(Assert.Single(statement.CatchClauses).Body);
     }
 
     [Fact]
