@@ -245,6 +245,75 @@ public class ArrayExpressionConversionTests
         return calor;
     }
 
+    public static IEnumerable<object[]> EagerArrayAddressArguments()
+    {
+        foreach (var modifier in new[] { "ref", "in" })
+        foreach (var scenario in new[] { "valid", "null", "bounds", "rebind", "rebind-null", "rebind-bounds" })
+        foreach (var surface in Enum.GetValues<Surface>())
+            yield return [modifier, scenario, surface];
+    }
+
+    [Theory]
+    [MemberData(nameof(EagerArrayAddressArguments))]
+    public async Task EagerArrayAddresses_AreValidatedBeforeLaterArgumentEffects(
+        string modifier, string scenario, Surface surface)
+    {
+        var initializer = scenario.EndsWith("null", StringComparison.Ordinal) ? "null" : "new[] { 3, 4 }";
+        var start = scenario.EndsWith("bounds", StringComparison.Ordinal) ? "2" : "0";
+        var rebinds = scenario.StartsWith("rebind", StringComparison.Ordinal);
+        var later = rebinds ? "Rebind(ref xs)" : "++other";
+        var body = modifier == "ref" ? "value += later; return value;" : "return value + later;";
+        var source = $$"""
+            public static class Probe
+            {
+                private static string Log = "";
+                private static int Use({{modifier}} int value, int later)
+                {
+                    Log += "u";
+                    {{body}}
+                }
+                private static int Rebind(ref int[] xs)
+                {
+                    Log += "r";
+                    xs = new[] { 30, 40 };
+                    return 6;
+                }
+                public static string Run()
+                {
+                    int[] xs = {{initializer}};
+                    int[] original = xs;
+                    int i = {{start}};
+                    int other = 5;
+                    try
+                    {
+                        int seen = Use({{modifier}} xs[i++], {{later}});
+                        return seen + ":" + i + ":" + other + ":" + xs[0] + ":" + original[0] + ":" + Log;
+                    }
+                    catch (System.NullReferenceException) { return "null:" + i + ":" + other + ":" + Log; }
+                    catch (System.IndexOutOfRangeException) { return "bounds:" + i + ":" + other + ":" + Log; }
+                }
+            }
+            """;
+        var expected = scenario switch
+        {
+            "null" or "rebind-null" => "null:1:5:",
+            "bounds" or "rebind-bounds" => "bounds:3:5:",
+            "rebind" when modifier == "ref" => "9:1:5:30:9:ru",
+            "rebind" => "9:1:5:30:3:ru",
+            _ when modifier == "ref" => "9:1:6:9:9:u",
+            _ => "9:1:6:3:3:u"
+        };
+        Assert.Equal(expected, Run(source));
+        var (calor, losses) = await ConvertWithRealCliAsync(source, surface);
+        var feature = rebinds ? modifier + "-parameter" : "compound-assignment-order";
+        Assert.Equal(new[] { feature }, losses);
+        Assert.Contains("§RAW", calor);
+        var compilation = Program.Compile(calor, "eager-array-address.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
+        Assert.Equal(expected, Run(compilation.GeneratedCode));
+    }
+
     private static async Task<(string Calor, List<string> Losses)> ConvertWithRealCliAsync(string source, Surface surface)
     {
         if (surface is Surface.CliDefault or Surface.CliPassthrough)
