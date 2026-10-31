@@ -22,6 +22,11 @@ shape but are reported separately, never pooled with the 41-file population.
   python3 scripts/count_tokens.py manifest.json --output results.json
   python3 scripts/count_tokens.py manifest.json --output results.json --table results.md
 Results are written only after every request succeeds. No offline counts exist.
+
+Payload paths must stay inside the manifest directory. --validate-only prints an
+inputs_sha256 digest over the manifest bytes and every payload's relative path,
+SHA-256 and size; pass it back with --expect-inputs-sha256 so a measurement can
+only run on exactly the reviewed bytes (.github/workflows/syntax-token-count.yml).
 """
 
 from __future__ import annotations
@@ -36,6 +41,7 @@ from pathlib import Path
 import re
 import sys
 import tempfile
+import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import HTTPRedirectHandler, Request, build_opener
@@ -43,6 +49,10 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 API_ROOT = "https://api.anthropic.com"
 API_VERSION = "2023-06-01"
+RETRY_STATUSES = {429, 500, 502, 503, 504, 529}
+MAX_ATTEMPTS = 6
+MAX_RETRY_DELAY = 60.0
+COMMIT = re.compile(r"[0-9a-f]{40}")
 
 
 class MeasurementError(Exception):
@@ -58,8 +68,25 @@ class Anthropic:
     def __init__(self, key: str):
         self.key = key
         self.opener = build_opener(NoRedirects())
+        self.sleep = time.sleep
+        self.requests = 0
 
     def request(self, path: str, payload: dict | None = None) -> dict:
+        # Bounded retries only for rate limits, overload and transport failures; the
+        # same idempotent count/metadata request is resent, never a different endpoint.
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            try:
+                return self.request_once(path, payload)
+            except Retryable as exc:
+                if attempt == MAX_ATTEMPTS:
+                    raise MeasurementError(f"{exc} after {MAX_ATTEMPTS} attempts; "
+                                           "no complete results written") from None
+                self.sleep(exc.delay if exc.delay is not None
+                           else min(2.0 ** attempt, MAX_RETRY_DELAY))
+        raise AssertionError("unreachable")
+
+    def request_once(self, path: str, payload: dict | None) -> dict:
+        self.requests += 1
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8") if payload is not None else None
         request = Request(API_ROOT + path, data=body, headers={
             "x-api-key": self.key,
@@ -71,10 +98,13 @@ class Anthropic:
                 result = json.load(response)
         except HTTPError as exc:
             # Provider bodies can echo request data; never print them or headers.
+            code, delay = exc.code, retry_after(exc.headers)
             exc.close()
-            raise MeasurementError(f"Anthropic HTTP {exc.code}; no complete results written") from None
+            if code in RETRY_STATUSES:
+                raise Retryable(f"Anthropic HTTP {code}", delay) from None
+            raise MeasurementError(f"Anthropic HTTP {code}; no complete results written") from None
         except (URLError, TimeoutError, OSError):
-            raise MeasurementError("Anthropic transport failed; no complete results written") from None
+            raise Retryable("Anthropic transport failed", None) from None
         except (ValueError, UnicodeError):
             raise MeasurementError("Anthropic returned invalid JSON") from None
         if not isinstance(result, dict):
@@ -126,12 +156,39 @@ class Anthropic:
         return count
 
 
+class Retryable(Exception):
+    def __init__(self, message: str, delay: float | None):
+        super().__init__(message)
+        self.delay = delay
+
+
+def retry_after(headers) -> float | None:
+    try:
+        value = float(headers.get("retry-after")) if headers is not None else None
+    except (TypeError, ValueError):
+        return None
+    return None if value is None or value != value or value < 0 else min(value, MAX_RETRY_DELAY)
+
+
 def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def inputs_digest(manifest: dict, samples: list[dict]) -> str:
+    payloads = sorted([sample["id"], variant, payload["path"], payload["sha256"], payload["utf8_bytes"]]
+                      for sample in samples for variant, payload in sample["variants"].items())
+    canonical = json.dumps({"manifest_sha256": manifest["manifest_sha256"], "payloads": payloads},
+                           ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return digest(canonical.encode("utf-8"))
+
+
+def request_count(samples: list[dict]) -> int:
+    return 1 + sum(len(sample["variants"]) for sample in samples)
+
+
 def load_manifest(path: Path) -> tuple[dict, list[dict]]:
     raw = path.read_bytes()
+    root = path.resolve().parent
     manifest = json.loads(raw)
     if (not isinstance(manifest, dict) or type(manifest.get("schema_version")) is not int
             or manifest["schema_version"] != 1):
@@ -182,15 +239,18 @@ def load_manifest(path: Path) -> tuple[dict, list[dict]]:
                     raise MeasurementError(f"{name}: incomplete variant coverage")
             texts = {}
             for variant, relative in paths.items():
-                if not isinstance(relative, str) or not relative:
-                    raise MeasurementError(f"{name}/{variant}: expected payload path")
-                payload_path = (path.parent / relative).resolve()
+                if not isinstance(relative, str) or not relative or Path(relative).is_absolute():
+                    raise MeasurementError(f"{name}/{variant}: expected relative payload path")
+                payload_path = (root / relative).resolve()
+                if not payload_path.is_relative_to(root) or not payload_path.is_file():
+                    raise MeasurementError(f"{name}/{variant}: payload must be a file inside "
+                                           "the manifest directory")
                 data = payload_path.read_bytes()
                 text = data.decode("utf-8")
                 if not text.strip():
                     raise MeasurementError(f"{name}/{variant}: empty payload")
                 texts[variant] = {
-                    "path": str(payload_path), "sha256": digest(data),
+                    "path": payload_path.relative_to(root).as_posix(), "sha256": digest(data),
                     "utf8_bytes": len(data), "text": text,
                 }
             loaded.append({"id": name, "population": group, "source": source,
@@ -199,10 +259,12 @@ def load_manifest(path: Path) -> tuple[dict, list[dict]]:
     if dict(counts) != expected:
         raise MeasurementError(f"Population mismatch: expected {expected}, found {dict(counts)}")
     manifest = dict(manifest, manifest_sha256=digest(raw))
+    manifest["inputs_sha256"] = inputs_digest(manifest, loaded)
     return manifest, loaded
 
 
-def measure(client: Anthropic, manifest: dict, samples: list[dict]) -> dict:
+def measure(client: Anthropic, manifest: dict, samples: list[dict],
+            attestation: dict | None = None) -> dict:
     model = client.resolve_model(manifest["target_model"])
     results = []
     totals: Counter = Counter()
@@ -236,11 +298,14 @@ def measure(client: Anthropic, manifest: dict, samples: list[dict]) -> dict:
         "measured_at": datetime.now(timezone.utc).isoformat(),
         "source_commit": manifest["source_commit"],
         "manifest_sha256": manifest["manifest_sha256"],
+        "inputs_sha256": manifest["inputs_sha256"],
+        "attestation": attestation or {},
+        "request_count": request_count(samples),
         "tool_sha256": digest(Path(__file__).read_bytes()),
         "target_model": manifest["target_model"], "resolved_model": model,
         "baseline": manifest["baseline"],
         "experiment": {key: value for key, value in manifest.items()
-                       if key not in ("samples", "probes")},
+                       if key not in ("samples", "probes", "manifest_sha256", "inputs_sha256")},
         "count_scope": "sum of independent single-user-message input_tokens; includes API framing",
         "samples": results, "table": table,
     }
@@ -250,7 +315,8 @@ def markdown(report: dict) -> str:
     lines = [
         f"Source commit: `{report['source_commit']}`; provider model: "
         f"`{report['resolved_model']['id']}` ({report['target_model']}).",
-        f"Manifest SHA-256: `{report['manifest_sha256']}`.",
+        f"Manifest SHA-256: `{report['manifest_sha256']}`; inputs SHA-256: "
+        f"`{report['inputs_sha256']}`.",
         report["count_scope"] + ". Negative deltas mean fewer tokens; savings overlap.",
     ]
     for key in ("selection", "comparison", "semantic_status"):
@@ -287,11 +353,33 @@ def main(argv: list[str] | None = None) -> int:
                         help="Check population and payloads locally; never output token counts")
     parser.add_argument("--output", type=Path, help="Complete measured JSON report")
     parser.add_argument("--table", type=Path, help="One comparable-results Markdown table")
+    parser.add_argument("--expect-inputs-sha256", help="Fail unless the reviewed inputs digest matches")
+    parser.add_argument("--expect-target-model", help="Fail unless the manifest names this model")
+    parser.add_argument("--max-requests", type=int, help="Fail before any request above this bound")
+    parser.add_argument("--attest-tool-commit", help="40-hex commit of this tool, recorded in results")
+    parser.add_argument("--attest-payload-commit", help="40-hex commit holding the payloads")
     args = parser.parse_args(argv)
     try:
         manifest, samples = load_manifest(args.manifest)
+        expected = args.expect_inputs_sha256
+        if expected is not None and expected != manifest["inputs_sha256"]:
+            raise MeasurementError("Inputs digest mismatch; payloads differ from the reviewed set")
+        if (args.expect_target_model is not None
+                and args.expect_target_model != manifest["target_model"]):
+            raise MeasurementError("Manifest target_model differs from the expected model")
+        if args.max_requests is not None and request_count(samples) > args.max_requests:
+            raise MeasurementError(f"{request_count(samples)} requests exceed --max-requests")
+        attestation = {}
+        for key, value in (("tool_commit", args.attest_tool_commit),
+                           ("payload_commit", args.attest_payload_commit)):
+            if value is not None:
+                if not COMMIT.fullmatch(value):
+                    raise MeasurementError(f"{key} must be a 40-character lowercase commit")
+                attestation[key] = value
+        root = args.manifest.resolve().parent
         inputs = {args.manifest.resolve()} | {
-            Path(payload["path"]) for sample in samples for payload in sample["variants"].values()
+            (root / payload["path"]).resolve()
+            for sample in samples for payload in sample["variants"].values()
         }
         outputs = [path.resolve() for path in (args.output, args.table) if path is not None]
         if len(set(outputs)) != len(outputs) or any(path in inputs for path in outputs):
@@ -299,6 +387,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.validate_only:
             print(f"Validated 41 population files, {len(manifest.get('probes', []))} probes; "
                   f"target {manifest['target_model']}; NOT MEASURED")
+            print(f"inputs_sha256={manifest['inputs_sha256']}")
+            print(f"manifest_sha256={manifest['manifest_sha256']}")
+            print(f"request_count={request_count(samples)}")
             return 0
         if args.output is None:
             raise MeasurementError("--output is required for measurement")
@@ -308,7 +399,7 @@ def main(argv: list[str] | None = None) -> int:
         if not key:
             raise MeasurementError("ANTHROPIC_API_KEY is absent; target model unresolved, "
                                    "NOT MEASURED. Configure Anthropic access and rerun.")
-        report = measure(Anthropic(key), manifest, samples)
+        report = measure(Anthropic(key), manifest, samples, attestation)
         write_atomic(args.output, json.dumps(report, ensure_ascii=False, indent=2) + "\n")
         if args.table:
             write_atomic(args.table, markdown(report))

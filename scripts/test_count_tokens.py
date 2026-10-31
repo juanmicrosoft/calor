@@ -6,6 +6,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
@@ -79,9 +80,25 @@ class AnthropicTests(unittest.TestCase):
             client = tool.Anthropic("test-secret")
             client.opener = Mock()
             client.opener.open.side_effect = error
+            client.sleep = Mock()
             with self.subTest(error=type(error)), self.assertRaises(tool.MeasurementError) as found:
                 client.count(MODEL["id"], "text")
             self.assertNotIn("test-secret", str(found.exception))
+            retried = not (isinstance(error, HTTPError) and error.code == 401)
+            self.assertEqual(tool.MAX_ATTEMPTS if retried else 1, client.opener.open.call_count)
+
+    def test_rate_limit_retry_is_bounded_and_resends_same_count_request(self):
+        limited = HTTPError(tool.API_ROOT, 429, "limited", {"retry-after": "500"}, None)
+        overloaded = HTTPError(tool.API_ROOT, 529, "overloaded", {}, None)
+        client = tool.Anthropic("test-secret")
+        client.opener = Mock()
+        client.opener.open.side_effect = [limited, overloaded, response({"input_tokens": 5})]
+        client.sleep = Mock()
+        self.assertEqual(5, client.count(MODEL["id"], "text"))
+        self.assertEqual([tool.MAX_RETRY_DELAY, 4.0],
+                         [call.args[0] for call in client.sleep.call_args_list])
+        urls = {call.args[0].full_url for call in client.opener.open.call_args_list}
+        self.assertEqual({tool.API_ROOT + "/v1/messages/count_tokens"}, urls)
 
     def test_invalid_json_and_nonobject_response(self):
         client = tool.Anthropic("test-secret")
@@ -256,6 +273,74 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual(2, code)
         self.assertIn("baseline must name", err)
 
+    def test_inputs_digest_pins_exact_payload_bytes(self):
+        code, out, err = self.run_main("--validate-only")
+        self.assertEqual(0, code, err)
+        digest = next(line.split("=", 1)[1] for line in out.splitlines()
+                      if line.startswith("inputs_sha256="))
+        self.assertIn("request_count=83", out)
+        self.assertEqual(0, self.run_main("--validate-only", "--expect-inputs-sha256", digest)[0])
+        (self.root / "after.txt").write_bytes("§ after\r\n".encode("utf-8"))
+        code, _, err = self.run_main("--validate-only", "--expect-inputs-sha256", digest)
+        self.assertEqual(2, code)
+        self.assertIn("Inputs digest mismatch", err)
+
+    def test_payloads_must_stay_inside_manifest_directory(self):
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        secret = Path(outside.name) / "secret.txt"
+        secret.write_text("not a payload")
+        (self.root / "link.txt").symlink_to(secret)
+        for relative in ("../" + Path(outside.name).name + "/secret.txt", str(secret),
+                         "link.txt", "missing.txt", "."):
+            with self.subTest(relative=relative):
+                original = json.loads(json.dumps(self.manifest))
+                self.manifest["samples"][0]["variants"]["infix"] = relative
+                self.save()
+                code, _, err = self.run_main("--validate-only")
+                self.assertEqual(2, code)
+                self.assertIn("payload", err)
+                self.manifest = original
+
+    def test_expected_model_and_request_bound_fail_closed(self):
+        code, _, err = self.run_main("--validate-only", "--expect-target-model", "Claude Opus 5")
+        self.assertEqual(2, code)
+        self.assertIn("target_model differs", err)
+        code, _, err = self.run_main("--validate-only", "--max-requests", "82")
+        self.assertEqual(2, code)
+        self.assertIn("exceed", err)
+        self.assertEqual(0, self.run_main("--validate-only", "--max-requests", "83")[0])
+        for value in ("main", "A" * 40, "a" * 39):
+            with self.subTest(value=value):
+                code, _, err = self.run_main("--validate-only", "--attest-tool-commit", value)
+                self.assertEqual(2, code)
+
+    def test_results_attest_inputs_and_never_contain_credential(self):
+        table = self.root / "result.md"
+        opener = Mock()
+        opener.open.side_effect = [
+            response({"data": [MODEL], "has_more": False}),
+            *[response({"input_tokens": count}) for count in [10, 7] * 41],
+        ]
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test-credential"}), \
+                patch.object(tool, "build_opener", return_value=opener):
+            code, out, err = self.run_main(
+                "--output", str(self.output), "--table", str(table),
+                "--expect-inputs-sha256", tool.load_manifest(self.path)[0]["inputs_sha256"],
+                "--expect-target-model", "Claude Opus 5.5", "--max-requests", "83",
+                "--attest-tool-commit", "b" * 40, "--attest-payload-commit", "c" * 40)
+        self.assertEqual(0, code, err)
+        report = json.loads(self.output.read_text())
+        self.assertEqual({"tool_commit": "b" * 40, "payload_commit": "c" * 40},
+                         report["attestation"])
+        self.assertEqual(83, report["request_count"])
+        self.assertEqual("before.txt", report["samples"][0]["variants"]["current"]["path"])
+        self.assertIn(report["inputs_sha256"], table.read_text())
+        for text in (self.output.read_text(), table.read_text(), out, err):
+            self.assertNotIn("sk-test-credential", text)
+        for text in (self.output.read_text(), table.read_text()):
+            self.assertNotIn(str(self.root), text)
+
     def test_output_cannot_overwrite_input_or_other_output(self):
         for args in (("--output", str(self.path)),
                      ("--output", str(self.root / "before.txt")),
@@ -264,6 +349,67 @@ class ManifestTests(unittest.TestCase):
                 code, _, err = self.run_main(*args)
                 self.assertEqual(2, code)
                 self.assertIn("Output paths must be distinct", err)
+
+
+class WorkflowTests(unittest.TestCase):
+    """Static invariants of the count-only workflow (no YAML dependency)."""
+
+    path = Path(__file__).resolve().parent.parent / ".github/workflows/syntax-token-count.yml"
+
+    def setUp(self):
+        self.text = self.path.read_text(encoding="utf-8")
+        self.code = "\n".join(line for line in self.text.splitlines()
+                              if not line.lstrip().startswith("#"))
+
+    def job(self, name):
+        match = re.search(rf"^  {name}:\n(.*?)(?=^  \S|\Z)", self.code, re.M | re.S)
+        self.assertIsNotNone(match, name)
+        return match.group(1)
+
+    def test_manual_trigger_and_read_only_token(self):
+        self.assertRegex(self.code, r"\non:\n  workflow_dispatch:\n")
+        self.assertNotRegex(self.code, r"\n  (push|pull_request|pull_request_target|schedule|"
+                                       r"workflow_run|repository_dispatch):")
+        self.assertRegex(self.code, r"\npermissions:\n  contents: read\n\n")
+        self.assertEqual(4, self.code.count("persist-credentials: false"))
+        self.assertEqual(4, self.code.count("uses: actions/checkout@"))
+
+    def test_secret_only_in_count_step_after_offline_preflight(self):
+        self.assertEqual(["secrets.ANTHROPIC_API_KEY"], re.findall(r"secrets\.[A-Za-z_]+", self.code))
+        preflight, count = self.job("preflight"), self.job("count")
+        self.assertNotIn("secrets.", preflight)
+        self.assertIn("needs: preflight", count)
+        self.assertIn("environment: anthropic-count-tokens", count)
+        self.assertIn("python3 scripts/test_count_tokens.py", preflight)
+        self.assertIn("refs/heads/main", preflight)
+        self.assertIn("count-tokens-only", preflight)
+
+    def test_only_count_tool_runs_and_inputs_are_pinned(self):
+        for banned in ("benchmark", "/v1/messages\"", "/v1/complete", "curl", "wget",
+                       "pip install", "workflow_call"):
+            self.assertNotIn(banned, self.code)
+        commands = re.findall(r"python3 (\S+)", self.code)
+        self.assertEqual({"scripts/test_count_tokens.py", "scripts/count_tokens.py"}, set(commands))
+        for job in ("preflight", "count"):
+            body = self.job(job)
+            self.assertIn('--expect-inputs-sha256 "$INPUTS_SHA256"', body)
+            self.assertIn('--expect-target-model "$TARGET_MODEL"', body)
+            self.assertIn('--max-requests "$MAX_REQUESTS"', body)
+        self.assertIn('TARGET_MODEL: "Claude Opus 5.5"', self.code)
+        self.assertIn('--attest-payload-commit "$PAYLOAD_COMMIT"', self.job("count"))
+
+    def test_dispatch_inputs_never_interpolated_into_scripts(self):
+        for line in self.code.splitlines():
+            if "${{ inputs." in line:
+                self.assertRegex(line, r"^\s+([A-Z0-9_]+|ref): \$\{\{ inputs\.[a-z0-9_]+ \}\}$")
+
+    def test_results_uploaded_only_after_complete_count(self):
+        count = self.job("count")
+        self.assertIn("if-no-files-found: error", count)
+        self.assertNotIn("if: always()", count)
+        self.assertNotIn("continue-on-error", self.code)
+        self.assertLess(count.index("Count tokens"), count.index("upload-artifact"))
+        self.assertIn('grep -rqF -- "$ANTHROPIC_API_KEY"', count)
 
 
 if __name__ == "__main__":
