@@ -135,7 +135,7 @@ public class EnvelopeConformanceTests
     public void CompileErrors_ProduceConformantDocument_WithFix()
     {
         // §RET is a lexer-level mistake with an attached machine fix
-        var result = Program.Compile("§M{m1:Demo}\n  §F{f1:F:pub} () -> void\n    §RET\n", "demo.calr");
+        var result = Program.Compile("§M{Demo}\n  §F{F:pub} () -> void\n    §RET\n", "demo.calr");
         Assert.True(result.HasErrors);
 
         var json = new JsonDiagnosticFormatter().Format(result.Diagnostics);
@@ -148,29 +148,49 @@ public class EnvelopeConformanceTests
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
-        var source = "§M{m1:Demo}\n  §F{f1:Dec:pub} (i32:x) -> i32\n    §Q (> x 0)\n    §S (> result 10)\n    §R (- x 1)\n";
+        var source = "§M{Demo}\n  §F{Dec:pub} (i32:x) -> i32\n    §Q (> x 0)\n    §S (> result 10)\n    §R (- x 1)\n";
         var options = new CompilationOptions
         {
             VerifyContracts = true,
             StatusWriter = TextWriter.Null,
             VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
         };
-        var result = Program.Compile(source, "demo.calr", options);
-        Assert.NotNull(result.Ast);
+        var root = Path.Combine(Path.GetTempPath(), "calor-contract-envelope-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var file = Path.Combine(root, "demo.calr");
+            File.WriteAllText(file, source);
+            var store = new DeclarationIdentityStore(root);
+            store.Sync([file]);
+            var result = Program.Compile(source, file, options);
+            Assert.NotNull(result.Ast);
 
-        var resolver = new DeclarationIdResolver();
-        resolver.AddFile("demo.calr", source, result.Ast!);
+            string Format(CompilationResult compilation)
+            {
+                var resolver = new DeclarationIdResolver();
+                resolver.AddFile(file, source, compilation.Ast!);
+                return new JsonDiagnosticFormatter { DeclarationIds = resolver }.Format(compilation.Diagnostics);
+            }
 
-        var formatter = new JsonDiagnosticFormatter { DeclarationIds = resolver };
-        using var doc = JsonDocument.Parse(formatter.Format(result.Diagnostics));
-        ValidateEnvelopeDocument(doc.RootElement);
+            var json = Format(result);
+            Assert.Equal(json, Format(Program.Compile(source, file, options)));
+            using var doc = JsonDocument.Parse(json);
+            ValidateEnvelopeDocument(doc.RootElement);
 
-        var refuted = doc.RootElement.GetProperty("diagnostics").EnumerateArray()
-            .Single(d => d.GetProperty("code").GetString() == DiagnosticCode.PostconditionMayBeViolated);
-        Assert.Equal("f1", refuted.GetProperty("declarationId").GetString());
-        Assert.Equal("refuted", refuted.GetProperty("verification").GetProperty("status").GetString());
-        Assert.True(refuted.GetProperty("verification").GetProperty("counterexample")
-            .GetProperty("bindings").GetArrayLength() > 0);
+            var refuted = doc.RootElement.GetProperty("diagnostics").EnumerateArray()
+                .Single(d => d.GetProperty("code").GetString() == DiagnosticCode.PostconditionMayBeViolated);
+            var id = Assert.Single(result.Ast!.Functions).ToolingId;
+            Assert.True(IdValidator.IsCanonicalId(id));
+            Assert.Equal(id, refuted.GetProperty("declarationId").GetString());
+            Assert.Equal("refuted", refuted.GetProperty("verification").GetProperty("status").GetString());
+            Assert.True(refuted.GetProperty("verification").GetProperty("counterexample")
+                .GetProperty("bindings").GetArrayLength() > 0);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     [Fact]

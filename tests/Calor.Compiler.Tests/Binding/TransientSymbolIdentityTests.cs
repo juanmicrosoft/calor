@@ -1,5 +1,6 @@
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Ids;
 using Calor.Compiler.Parsing;
 using Xunit;
 
@@ -7,6 +8,79 @@ namespace Calor.Compiler.Tests;
 
 public sealed class TransientSymbolIdentityTests
 {
+    [Theory]
+    [InlineData("§CTOR{pub} ()", "§B{value:i32} 1", "§B{value:i32} 2", BoundMemberKind.Constructor)]
+    [InlineData("§OP{+:pub} (Box:a, Box:b) -> Box", "§R a", "§R b", BoundMemberKind.OperatorOverload)]
+    public void AmbiguousConstructorAndOperatorSnapshotsNeverRedirectStaleHandles(
+        string header, string firstBody, string secondBody, BoundMemberKind kind)
+    {
+        string Source(params string[] bodies) => "§M{Demo}\n  §CL{Box:pub}\n"
+            + string.Concat(bodies.Select(body => $"    {header}\n      {body}\n"));
+        BoundModule Read(string source)
+        {
+            var diagnostics = new DiagnosticBag();
+            var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+            return new Binder(diagnostics, "memory:transient-tests").Bind(module);
+        }
+
+        var old = Assert.Single(Read(Source(firstBody)).Functions.Where(f => f.MemberKind == kind)).Symbol.Id;
+        var ambiguous = Read(Source(firstBody, secondBody));
+        var reordered = Read(Source(secondBody, firstBody));
+        var symbols = ambiguous.Functions.Where(f => f.MemberKind == kind).Select(f => f.Symbol.Id).ToArray();
+        Assert.Equal(2, symbols.Length);
+        Assert.Equal(2, symbols.Distinct().Count());
+        Assert.False(ambiguous.SymbolsById.ContainsKey(old));
+        Assert.False(reordered.SymbolsById.ContainsKey(old));
+        Assert.All(symbols, id => Assert.False(reordered.SymbolsById.ContainsKey(id)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void IdenticalCompilationsKeepPublicArtifactsAndSidecarIdentitiesDeterministic(bool invalidAssignment)
+    {
+        var source = """
+            §M{Demo}
+              §F{Run:pub} (i32:value) -> i32
+                §B{offset:i32} 1
+                §B{callback:System.Func<i32,i32>} §LAM{x:i32} (+ x value)
+                §R §C{callback} §A offset §/C
+            """ + "\n";
+        if (invalidAssignment)
+            source = source.Replace("    §R ", "    §ASSIGN offset 2\n    §R ");
+        var root = Path.Combine(Path.GetTempPath(), "calor-transient-determinism-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var file = Path.Combine(root, "active.calr");
+            File.WriteAllText(file, source);
+            var store = new DeclarationIdentityStore(root);
+            store.Sync([file]);
+            var first = Program.Compile(source, file);
+            var sidecar = File.ReadAllText(store.SidecarPath);
+            var firstBound = new Binder(new DiagnosticBag(), file).Bind(first.Ast!);
+            var second = Program.Compile(source, file);
+            var secondBound = new Binder(new DiagnosticBag(), file).Bind(second.Ast!);
+            Assert.Equal(invalidAssignment, first.HasErrors);
+            if (!invalidAssignment) Assert.NotEmpty(first.GeneratedCode);
+            else Assert.Contains(first.Diagnostics, d => d.Code == DiagnosticCode.WriteToReadOnlyLocal);
+            Assert.Equal(first.GeneratedCode, second.GeneratedCode);
+            Assert.Equal(new JsonDiagnosticFormatter().Format(first.Diagnostics),
+                new JsonDiagnosticFormatter().Format(second.Diagnostics));
+            Assert.Equal(firstBound.SymbolsById.Keys.OrderBy(id => id.Value),
+                secondBound.SymbolsById.Keys.OrderBy(id => id.Value));
+            Assert.Contains(firstBound.SymbolsById.Keys, id => id.Value.Contains("/snapshot/"));
+            Assert.Equal(sidecar, File.ReadAllText(store.SidecarPath));
+            Assert.DoesNotContain("snapshot", sidecar);
+            Assert.Equal(source, File.ReadAllText(file));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public void AmbiguousTransientDeclarationsReportAnErrorAndDoNotReuseAStaleKey()
     {

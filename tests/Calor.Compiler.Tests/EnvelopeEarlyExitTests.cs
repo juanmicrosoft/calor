@@ -229,7 +229,7 @@ public class EnvelopeEarlyExitTests : IDisposable
         // Z3 finds a counterexample (e.g. x = 1 → result = 0).
         var file = Path.Combine(_tempDir, "refutable.calr");
         File.WriteAllText(file,
-            "§M{m1:Demo}\n  §F{f1:Dec:pub} (i32:x) -> i32\n    §Q (> x 0)\n    §S (> result 10)\n    §R (- x 1)\n");
+            "§M{Demo}\n  §F{Dec:pub} (i32:x) -> i32\n    §Q (> x 0)\n    §S (> result 10)\n    §R (- x 1)\n");
         return file;
     }
 
@@ -238,7 +238,7 @@ public class EnvelopeEarlyExitTests : IDisposable
         // §S (>= x 1) follows directly from §Q (> x 0) for §R x.
         var file = Path.Combine(_tempDir, "provable.calr");
         File.WriteAllText(file,
-            "§M{m1:Demo}\n  §F{f1:Ok:pub} (i32:x) -> i32\n    §Q (> x 0)\n    §S (>= x 1)\n    §R x\n");
+            "§M{Demo}\n  §F{Ok:pub} (i32:x) -> i32\n    §Q (> x 0)\n    §S (>= x 1)\n    §R x\n");
         return file;
     }
 
@@ -299,7 +299,7 @@ public class EnvelopeEarlyExitTests : IDisposable
         // error (Calor0250) — a compile error must exit 1 (not Z3-dependent).
         var file = Path.Combine(_tempDir, "broken.calr");
         File.WriteAllText(file,
-            "§M{m1:Broken}\n  §F{f1:Main:pub} () -> void\n    §B{x}\n");
+            "§M{Broken}\n  §F{Main:pub} () -> void\n    §B{x}\n");
 
         var (exitCode, stdOut, stdErr) = CliTestHarness.RunCli(_tempDir,
             "verify", file, "--format", "json", "--no-cache");
@@ -310,7 +310,7 @@ public class EnvelopeEarlyExitTests : IDisposable
             d => d.GetProperty("severity").GetString() == "error");
     }
 
-    private const string ValidSource = "\u00a7M{m001:T}\n  \u00a7F{f001:Main:pub} () -> void\n    \u00a7E{cw}\n    \u00a7P \"hi\"\n";
+    private const string ValidSource = "\u00a7M{T}\n  \u00a7F{Main:pub} () -> void\n    \u00a7E{cw}\n    \u00a7P \"hi\"\n";
 
     [Fact]
     public void FormatWrite_Json_EnabledWithoutExperimental_EmitsEnvelope()
@@ -368,7 +368,7 @@ public class EnvelopeEarlyExitTests : IDisposable
         // parse error, and the formatter (correctly) declines to write a file it cannot parse,
         // which would make the test fail for a reason unrelated to the gate.
         var file = Path.Combine(_tempDir, "c.calr");
-        var misformatted = ValidSource.Replace("\u00a7M{m001:T}\n", "\u00a7M{m001:T}\n\n\n")
+        var misformatted = ValidSource.Replace("\u00a7M{T}\n", "\u00a7M{T}\n\n\n")
                                       .Replace("-> void", "-> void   ");
         File.WriteAllText(file, misformatted);
 

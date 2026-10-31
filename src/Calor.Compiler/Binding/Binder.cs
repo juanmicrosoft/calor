@@ -1,3 +1,4 @@
+using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp;
@@ -762,7 +763,7 @@ public sealed class Binder
         _delegateTypeNames.Clear();
         _misplacedRowsReported.Clear();
         _currentNamespaceIdentity = null;
-        _transientBindingId = Guid.NewGuid().ToString("N");
+        _transientBindingId = SnapshotIdentityKey(module);
         _toolingIds = Ids.DeclarationIdentityStore.ToolingIds(module).ToHashSet(StringComparer.Ordinal);
         _moduleSymbolId = module.ToolingId != null
             ? SymbolId.Create("declaration", module.ToolingId)
@@ -1114,14 +1115,20 @@ public sealed class Binder
         }
 
         var constructors = EnumerateConstructorRegistrations(cls).ToArray();
+        var ambiguousConstructorKeys = constructors.GroupBy(item =>
+                CallableIdentityKey(item.Constructor.IsStatic ? ".cctor" : ".ctor", item.Constructor.Parameters, []))
+            .Where(group => group.Count() > 1).Select(group => group.Key).ToHashSet(StringComparer.Ordinal);
         for (var constructorIndex = 0; constructorIndex < constructors.Length; constructorIndex++)
         {
             var (constructor, conditionalAlternative) = constructors[constructorIndex];
             var constructorName = constructor.IsStatic ? ".cctor" : ".ctor";
             var qualifiedLookupName = $"{qualifiedClassName}.{constructorName}";
+            var fallbackKey = CallableIdentityKey(constructorName, constructor.Parameters, []);
+            if (ambiguousConstructorKeys.Contains(fallbackKey))
+                fallbackKey += ":ambiguous-snapshot:" + _transientBindingId;
             var symbol = CreateFunctionSymbol(
                 CreateDeclarationId(classIdentity, "constructor", constructor.Id,
-                    CallableIdentityKey(constructorName, constructor.Parameters, [])),
+                    fallbackKey),
                 qualifiedLookupName,
                 "VOID",
                 Array.Empty<string>(),
@@ -1445,6 +1452,33 @@ public sealed class Binder
             isTypeInferred: isTypeInferred,
             methodInputArrayType: methodInputArrayType,
             genericNullabilityType: genericNullabilityType);
+    }
+
+    private static string SnapshotIdentityKey(ModuleNode module)
+    {
+        // Snapshot-local handles must change after edits, not between identical compilations.
+        // Tooling and parser identities are metadata, not part of the syntax fingerprint.
+        var text = new System.Text.StringBuilder();
+        var pending = new Stack<AstNode>();
+        var visited = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+        pending.Push(module);
+        while (pending.TryPop(out var node))
+        {
+            if (!visited.Add(node)) continue;
+            text.Append(node.GetType().FullName).Append(':').Append(node.Span.Start).Append(':').Append(node.Span.Length);
+            foreach (var property in node.GetType().GetProperties().OrderBy(property => property.Name, StringComparer.Ordinal))
+            {
+                if (!property.CanRead || property.GetIndexParameters().Length != 0
+                    || property.Name is "Id" or "LocalId" or "ToolingId") continue;
+                var type = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
+                if (!type.IsPrimitive && !type.IsEnum && type != typeof(string) && type != typeof(decimal)) continue;
+                text.Append('|').Append(property.Name).Append('=').Append(System.Text.Json.JsonSerializer.Serialize(
+                    Convert.ToString(property.GetValue(node), System.Globalization.CultureInfo.InvariantCulture)));
+            }
+            text.AppendLine();
+            foreach (var child in RecursiveAstWalker.GetAllChildren(node).Reverse()) pending.Push(child);
+        }
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text.ToString())));
     }
 
     private static string CallableIdentityKey(
@@ -7917,15 +7951,20 @@ public sealed class Binder
 
             // Operator overloads
             var operators = EnumerateOperators(cls).ToArray();
+            var ambiguousOperatorKeys = operators.GroupBy(op => CallableIdentityKey($"op_{op.Kind}", op.Parameters, []))
+                .Where(group => group.Count() > 1).Select(group => group.Key).ToHashSet(StringComparer.Ordinal);
             for (var operatorIndex = 0; operatorIndex < operators.Length; operatorIndex++)
             {
                 var op = operators[operatorIndex];
                 if (op.Body.Count == 0) continue;
+                var fallbackKey = CallableIdentityKey($"op_{op.Kind}", op.Parameters, []);
+                if (ambiguousOperatorKeys.Contains(fallbackKey))
+                    fallbackKey += ":ambiguous-snapshot:" + _transientBindingId;
                 var bound = TryBindMember(
-                    () => BindOperator(op, className, operatorIndex),
+                    () => BindOperator(op, className, fallbackKey),
                     op.Span,
                     className,
-                    CallableIdentityKey($"op_{op.Kind}", op.Parameters, []));
+                    fallbackKey);
                 if (bound != null) functions.Add(bound);
             }
 
@@ -8178,7 +8217,7 @@ public sealed class Binder
     private BoundFunction BindOperator(
         OperatorOverloadNode op,
         string className,
-        int operatorIndex)
+        string fallbackKey)
     {
         var functionScope = _scope.CreateChild();
         using var _s = PushScope(functionScope);
@@ -8187,7 +8226,7 @@ public sealed class Binder
             _currentClassIdentity,
             "operator",
             op.Id,
-            $"op_{op.Kind}");
+            fallbackKey);
         using var _identity = PushDeclarationContext(functionId);
 
         var parameters = BindParameters(op.Parameters);
