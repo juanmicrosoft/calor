@@ -66,9 +66,9 @@ public class NamedRefinementArithmeticTests
     public void Arithmetic_TwoValuesOfTheSameNamedRefinement_TypeChecks(string baseType, string op)
     {
         AssertNoErrors($"""
-            §M{"{"}m:R{"}"}
-              §RTYPE{"{"}r1:Nat:{baseType}{"}"} {Predicate(baseType)}
-              §F{"{"}f1:Op:pub{"}"} (Nat:a, Nat:b) -> {ResultOf(baseType)}
+            §M{"{"}R{"}"}
+              §RTYPE{"{"}Nat:{baseType}{"}"} {Predicate(baseType)}
+              §F{"{"}Op:pub{"}"} (Nat:a, Nat:b) -> {ResultOf(baseType)}
                 §R ({op} a b)
             """);
     }
@@ -78,9 +78,9 @@ public class NamedRefinementArithmeticTests
     public void Arithmetic_NamedRefinementWithItsBaseType_TypeChecks(string baseType, string op)
     {
         AssertNoErrors($"""
-            §M{"{"}m:R{"}"}
-              §RTYPE{"{"}r1:Nat:{baseType}{"}"} {Predicate(baseType)}
-              §F{"{"}f1:Op:pub{"}"} (Nat:a, {baseType}:b) -> {ResultOf(baseType)}
+            §M{"{"}R{"}"}
+              §RTYPE{"{"}Nat:{baseType}{"}"} {Predicate(baseType)}
+              §F{"{"}Op:pub{"}"} (Nat:a, {baseType}:b) -> {ResultOf(baseType)}
                 §R ({op} b a)
             """);
     }
@@ -94,14 +94,14 @@ public class NamedRefinementArithmeticTests
     public void Arithmetic_NamedRefinementWithLiterals_TypeChecks(string op)
     {
         AssertNoErrors($"""
-            §M{"{"}m:R{"}"}
-              §RTYPE{"{"}r1:Nat:i32{"}"} (>= # INT:0)
-              §RTYPE{"{"}r2:Pos:f64{"}"} (> # FLOAT:0.0)
-              §F{"{"}f1:I:pub{"}"} (Nat:a) -> i32
+            §M{"{"}R{"}"}
+              §RTYPE{"{"}Nat:i32{"}"} (>= # INT:0)
+              §RTYPE{"{"}Pos:f64{"}"} (> # FLOAT:0.0)
+              §F{"{"}I:pub{"}"} (Nat:a) -> i32
                 §R ({op} a INT:7)
-              §F{"{"}f2:J:pub{"}"} (Nat:a) -> i32
+              §F{"{"}J:pub{"}"} (Nat:a) -> i32
                 §R ({op} INT:7 a)
-              §F{"{"}f3:F:pub{"}"} (Pos:x) -> f64
+              §F{"{"}F:pub{"}"} (Pos:x) -> f64
                 §R ({op} x FLOAT:2.5)
             """);
     }
@@ -115,10 +115,10 @@ public class NamedRefinementArithmeticTests
         var lower = baseType == "f64" ? "(> # FLOAT:0.0)" : "(>= # INT:0)";
         var upper = baseType == "f64" ? "(< # FLOAT:100.0)" : "(< # INT:100)";
         AssertNoErrors($"""
-            §M{"{"}m:R{"}"}
-              §RTYPE{"{"}r1:Low:{baseType}{"}"} {lower}
-              §RTYPE{"{"}r2:High:{baseType}{"}"} {upper}
-              §F{"{"}f1:Mix:pub{"}"} (Low:a, High:b) -> {baseType}
+            §M{"{"}R{"}"}
+              §RTYPE{"{"}Low:{baseType}{"}"} {lower}
+              §RTYPE{"{"}High:{baseType}{"}"} {upper}
+              §F{"{"}Mix:pub{"}"} (Low:a, High:b) -> {baseType}
                 §R (- (* (+ a b) (- a b)) (% (/ a b) b))
             """);
     }
@@ -145,9 +145,9 @@ public class NamedRefinementArithmeticTests
     public void UnaryMinus_OnNamedRefinement_TypeChecks(string baseType)
     {
         AssertNoErrors($"""
-            §M{"{"}m:R{"}"}
-              §RTYPE{"{"}r1:Nat:{baseType}{"}"} {Predicate(baseType)}
-              §F{"{"}f1:Neg:pub{"}"} (Nat:a) -> {baseType}
+            §M{"{"}R{"}"}
+              §RTYPE{"{"}Nat:{baseType}{"}"} {Predicate(baseType)}
+              §F{"{"}Neg:pub{"}"} (Nat:a) -> {baseType}
                 §B{"{"}y:{baseType}{"}"} (- a)
                 §R (+ y (- a))
             """);
@@ -192,11 +192,11 @@ public class NamedRefinementArithmeticTests
         // Bare comparisons already returned bool before #1515 without looking at operand types;
         // the last comparison compares arithmetic RESULTS, which is what the fix enables.
         AssertNoErrors($"""
-            §M{"{"}m:R{"}"}
-              §RTYPE{"{"}r1:Nat:i32{"}"} (>= # INT:0)
-              §RTYPE{"{"}r2:Small:i32{"}"} (< # INT:100)
-              §RTYPE{"{"}r3:Pos:f64{"}"} (> # FLOAT:0.0)
-              §F{"{"}f1:Cmp:pub{"}"} (Nat:a, Small:b, Pos:x, i32:c) -> bool
+            §M{"{"}R{"}"}
+              §RTYPE{"{"}Nat:i32{"}"} (>= # INT:0)
+              §RTYPE{"{"}Small:i32{"}"} (< # INT:100)
+              §RTYPE{"{"}Pos:f64{"}"} (> # FLOAT:0.0)
+              §F{"{"}Cmp:pub{"}"} (Nat:a, Small:b, Pos:x, i32:c) -> bool
                 §B{"{"}p:bool{"}"} ({op} a b)
                 §B{"{"}q:bool{"}"} ({op} a c)
                 §B{"{"}r:bool{"}"} ({op} x a)
@@ -245,20 +245,19 @@ public class NamedRefinementArithmeticTests
     // ---- The result type is the BASE type, not the refinement ----
 
     /// <summary>
-    /// Inc/dec of a collection element has no mutation guard (the emitter and the obligation
-    /// generator only guard a plain variable), so its result must NOT keep the refinement.
-    /// Found by the review verification pass: `(dec §IDX a INT:0)` on a `Dictionary&lt;i32,Nat&gt;`
-    /// yielded -1 typed as `Nat`.
+    /// An arithmetic value used for a collection update cannot carry the element's refinement.
+    /// The emitter and obligation generator guard plain variables, not index writes.
     /// </summary>
     [Fact]
-    public void IncrementDecrement_OfUnguardedElement_GetsTheBaseType()
+    public void ExplicitUpdate_OfUnguardedElement_GetsTheBaseType()
     {
         var result = Check("""
             §M{R}
               §U{Nat:System.Int32}
               §RTYPE{Nat:i32} (>= # INT:0)
               §F{Bad:pub} (Dictionary<i32,Nat>:a) -> Nat
-                §B{x} (dec §IDX a INT:0)
+                §B{x} (- §IDX a INT:0 INT:1)
+                §PUT{a} INT:0 x
                 §B{boxed:Nat} x
                 §R boxed
             """);
@@ -268,23 +267,24 @@ public class NamedRefinementArithmeticTests
     }
 
     /// <summary>
-    /// The exception: inc/dec. They mutate the refined variable, and that mutation is itself
-    /// guarded (Subtype obligation + runtime check) before it commits, so the value they yield
-    /// satisfies the refinement. Before #1515 they typed as the error type, which let this
-    /// program compile; it must keep compiling.
+    /// Capturing a refined variable before or after an explicit guarded update preserves the
+    /// refinement on the captured read. The arithmetic result alone is still the base type.
     /// </summary>
     [Theory]
-    [InlineData("inc")]
-    [InlineData("dec")]
-    [InlineData("post-inc")]
-    [InlineData("post-dec")]
-    public void IncrementDecrement_OfNamedRefinement_KeepsTheRefinedType(string op)
+    [InlineData("+", false)]
+    [InlineData("-", false)]
+    [InlineData("+", true)]
+    [InlineData("-", true)]
+    public void ExplicitUpdate_OfNamedRefinement_KeepsTheRefinedReadType(string op, bool captureBefore)
     {
+        var update = $"§ASSIGN a ({op} a INT:1)";
+        var capture = "§B{x:Nat} a";
+        var body = captureBefore ? capture + "\n    " + update : update + "\n    " + capture;
         AssertNoErrors($"""
-            §M{"{"}m:R{"}"}
-              §RTYPE{"{"}r1:Nat:i32{"}"} (>= # INT:0)
-              §F{"{"}f1:Step:pub{"}"} (Nat:a) -> i32
-                §B{"{"}x:Nat{"}"} ({op} a)
+            §M{"{"}R{"}"}
+              §RTYPE{"{"}Nat:i32{"}"} (>= # INT:0)
+              §F{"{"}Step:pub{"}"} (Nat:a) -> i32
+                {body}
                 §R (+ x INT:1)
             """);
     }
@@ -446,7 +446,7 @@ public class NamedRefinementArithmeticTests
             §R x
           §F{Dec:pub} (Nat:a) -> i32
             §B{~x:Nat} a
-            (dec x)
+            §ASSIGN x (- x INT:1)
             §R x
         """;
 
@@ -599,17 +599,20 @@ public class NamedRefinementArithmeticTests
         Assert.DoesNotContain(result.Diagnostics.Errors,
             d => d.Message.Contains("Arithmetic operators require numeric operands"));
         Assert.NotNull(options.ObligationResults);
-        ObligationStatus StatusOf(string functionId) => Assert.Single(
-            options.ObligationResults!.Obligations,
-            o => o.FunctionId == functionId && o.Kind == ObligationKind.Subtype).Status;
+        ObligationStatus StatusOf(string functionName)
+        {
+            var functionId = Assert.Single(result.Ast!.Functions, function => function.Name == functionName).Id;
+            return Assert.Single(options.ObligationResults!.Obligations,
+                o => o.FunctionId == functionId && o.Kind == ObligationKind.Subtype).Status;
+        }
 
-        Assert.Equal(StatusOf("i1"), StatusOf("n1"));
-        Assert.Equal(StatusOf("i2"), StatusOf("n2"));
+        Assert.Equal(StatusOf("InlineDown"), StatusOf("NamedDown"));
+        Assert.Equal(StatusOf("InlineUp"), StatusOf("NamedUp"));
         // a = 0 is a counterexample to a - 5 >= 0, so it must never be discharged. (Today the
         // solver reports assignment obligations on parameters as Unsupported, for named and
         // inline refinements alike; either way the runtime guard is kept.)
-        Assert.NotEqual(ObligationStatus.Discharged, StatusOf("n1"));
-        Assert.NotEqual(ObligationStatus.Discharged, StatusOf("n2"));
+        Assert.NotEqual(ObligationStatus.Discharged, StatusOf("NamedDown"));
+        Assert.NotEqual(ObligationStatus.Discharged, StatusOf("NamedUp"));
         // Both named-refinement assignment guards are emitted.
         Assert.Equal(2, CountOccurrences(result.GeneratedCode, "Value violates refinement type 'Nat'"));
     }

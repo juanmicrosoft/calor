@@ -114,7 +114,7 @@ public sealed class ArrayAllocationAnnotationTests
                 §E{}
               §F{Probe:pub} (i32:count) -> {{(boundary == "return" ? "[str]" : "void")}}
                 §E{alloc}
-                §B{ {{binding}} } §ARR{ {{element}} :values:{{size}} }
+                §B{ {{binding}} } §ARR{ {{element}} :{{size}} }
                 {{sink}}
             """;
         var diagnostics = new DiagnosticBag();

@@ -124,7 +124,7 @@ public class RefinementStaticGapsTests
     }
 
     private const string PrintLambda = """
-          §DEL{Mapper:pub}
+          §DEL{Mapper}
             §I{Nat:p}
             §O{i32}
           §F{Apply:pub} (Mapper:fn, Nat:a) -> i32
@@ -164,7 +164,7 @@ public class RefinementStaticGapsTests
     public void Print_LambdaReturningADifferentRefinement_IsRejected()
     {
         var result = Compile("""
-              §DEL{ToPos:pub}
+              §DEL{ToPos}
                 §I{i32:v}
                 §O{Pos}
               §F{Apply:pub} (ToPos:fn) -> i32
@@ -771,7 +771,7 @@ public class RefinementStaticGapsTests
     public void ExpressionLambdaReturningADifferentRefinement_IsRejectedInPrintAndInAClassMethod()
     {
         const string Factory = """
-              §DEL{Factory:pub}
+              §DEL{Factory}
                 §O{Pos}
               §F{Apply:pub} (Factory:fn) -> i32
                 §R §C{fn} §/C
@@ -794,7 +794,7 @@ public class RefinementStaticGapsTests
     public void Runtime_LambdaInAClassMethod_IsGuarded()
     {
         var assembly = CompileAndLoad("""
-              §DEL{Mapper:pub}
+              §DEL{Mapper}
                 §I{Nat:p}
                 §O{i32}
               §CL{Holder:pub}

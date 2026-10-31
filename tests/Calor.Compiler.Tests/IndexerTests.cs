@@ -14,7 +14,7 @@ public class IndexerTests
     [Fact]
     public void Lexer_Indexer_TokenizesCorrectly()
     {
-        var source = "§IXER{ix1:int:pub}";
+        var source = "§IXER{int:pub}";
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
         var tokens = lexer.TokenizeAllForParser();
@@ -45,7 +45,7 @@ public class IndexerTests
         var source = """
             §M{Test}
               §CL{MyClass:pub}
-                §IXER{ix1:int:pub}
+                §IXER{int:pub}
                 §I{int:index}
                 §GET
                 §R INT:0
@@ -64,7 +64,8 @@ public class IndexerTests
         Assert.Empty(diag);
         var cls = Assert.Single(module.Classes);
         var indexer = Assert.Single(cls.Indexers);
-        Assert.Equal("ix1", indexer.Id);
+        Assert.StartsWith("ix_auto", indexer.LocalId);
+        Assert.Null(indexer.ToolingId);
         Assert.Equal("int", indexer.TypeName);
         Assert.Equal(Visibility.Public, indexer.Visibility);
         Assert.Single(indexer.Parameters);
@@ -80,7 +81,7 @@ public class IndexerTests
         var source = """
             §M{Test}
               §CL{MyClass:pub}
-                §IXER{ix1:int:pub:get,set} (int:index)
+                §IXER{int:pub:get,set} (int:index)
             """;
 
         var diag = new DiagnosticBag();
@@ -92,7 +93,8 @@ public class IndexerTests
         Assert.Empty(diag);
         var cls = Assert.Single(module.Classes);
         var indexer = Assert.Single(cls.Indexers);
-        Assert.Equal("ix1", indexer.Id);
+        Assert.StartsWith("ix_auto", indexer.LocalId);
+        Assert.Null(indexer.ToolingId);
         Assert.Equal("int", indexer.TypeName);
         Assert.Equal(Visibility.Public, indexer.Visibility);
         Assert.True(indexer.IsAutoIndexer);
@@ -108,7 +110,7 @@ public class IndexerTests
         var source = """
             §M{Test}
               §CL{MyClass:pub}
-                §IXER{ix1:int:pub:get,set} (int:row, int:col)
+                §IXER{int:pub:get,set} (int:row, int:col)
             """;
 
         var diag = new DiagnosticBag();
@@ -131,7 +133,7 @@ public class IndexerTests
         var source = """
             §M{Test}
               §IFACE{IMyCollection}
-                §IXER{ix1:int:pub:get,set} (int:index)
+                §IXER{int:pub:get,set} (int:index)
             """;
 
         var diag = new DiagnosticBag();
@@ -143,7 +145,8 @@ public class IndexerTests
         Assert.Empty(diag);
         var iface = Assert.Single(module.Interfaces);
         var indexer = Assert.Single(iface.Indexers);
-        Assert.Equal("ix1", indexer.Id);
+        Assert.StartsWith("ix_auto", indexer.LocalId);
+        Assert.Null(indexer.ToolingId);
         Assert.Equal("int", indexer.TypeName);
     }
 
@@ -153,7 +156,7 @@ public class IndexerTests
         var source = """
             §M{Test}
               §CL{MyClass:pub}
-                §IXER{ix1:int:pub:virt:get,set} (int:index)
+                §IXER{int:pub:virt:get,set} (int:index)
             """;
 
         var diag = new DiagnosticBag();
@@ -504,7 +507,7 @@ public class IndexerTests
         var source = """
             §M{Test}
               §CL{MyClass:pub}
-                §IXER{ix1:int:pub:get,set} (int:index)
+                §IXER{int:pub:get,set} (int:index)
             """;
 
         // Parse

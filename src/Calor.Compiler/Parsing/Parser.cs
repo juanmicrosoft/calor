@@ -9151,8 +9151,11 @@ public sealed class Parser
             else if (Check(TokenKind.OperatorOverload))
             {
                 var node = ParseOperatorOverload();
-                operatorOverloads.Add(node);
-                classItems.Add(node);
+                if (node != null)
+                {
+                    operatorOverloads.Add(node);
+                    classItems.Add(node);
+                }
             }
             else if (Check(TokenKind.Method) || (isModule && Check(TokenKind.Func)))
             {
@@ -11030,7 +11033,7 @@ public sealed class Parser
     ///   body
     /// §/OP{id}
     /// </summary>
-    private OperatorOverloadNode ParseOperatorOverload()
+    private OperatorOverloadNode? ParseOperatorOverload()
     {
         var startToken = Expect(TokenKind.OperatorOverload);
 
@@ -11099,6 +11102,9 @@ public sealed class Parser
 
         }
 
+        if (operatorToken == null)
+            return null;
+
         var kind = OperatorOverloadNode.ResolveOperatorKind(operatorToken, parameters.Count);
 
         var span = startToken.Span.Union(endToken.Span);
@@ -11110,7 +11116,7 @@ public sealed class Parser
     /// Parses an operator token in the context of §OP{id:operator:vis}.
     /// Handles multi-character operators like ++, --, ==, !=, etc.
     /// </summary>
-    private string ParseOperatorToken()
+    private string? ParseOperatorToken()
     {
         var token = Current;
         switch (token.Kind)
@@ -11183,7 +11189,7 @@ public sealed class Parser
                 _diagnostics.ReportError(token.Span, DiagnosticCode.UnexpectedToken,
                     $"Expected operator token in §OP, found '{token.Text}'");
                 Advance();
-                return token.Text;
+                return null;
         }
     }
 
@@ -11920,8 +11926,11 @@ public sealed class Parser
         else if (Check(TokenKind.OperatorOverload))
         {
             var node = ParseOperatorOverload();
-            operatorOverloads.Add(node);
-            items?.Add(node);
+            if (node != null)
+            {
+                operatorOverloads.Add(node);
+                items?.Add(node);
+            }
         }
         else if (Check(TokenKind.Method) || (_parsingModuleMembers && Check(TokenKind.Func)))
         {

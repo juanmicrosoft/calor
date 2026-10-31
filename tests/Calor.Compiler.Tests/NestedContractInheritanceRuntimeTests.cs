@@ -26,7 +26,7 @@ public sealed class NestedContractInheritanceRuntimeTests
                 §R (? (== value INT:13) INT:-1 value)
             """;
         for (var level = depth - 1; level >= 0; level--)
-            implementation = $"§CL{{outer{level}:Outer{level}:pub}}\n" + Indent(implementation);
+            implementation = $"§CL{{Outer{level}:pub}}\n" + Indent(implementation);
         var source = "§M{NestedContracts}\n" + Indent(PositiveInterface)
             + "\n" + Indent(implementation);
         var assembly = Compile(source, verify);
@@ -102,7 +102,7 @@ public sealed class NestedContractInheritanceRuntimeTests
             """ + "\n" + Indent(Indent(PositiveInterface)) + "\n" + Indent(Indent($$"""
             §CL{Inner:pub}
               §IMPL{IPositive}
-              §MT{mt1:{{method}}:pub} (i32:value) -> i32
+              §MT{{{method}}:pub} (i32:value) -> i32
                 §E{}
                 §R value
             """));
@@ -287,7 +287,7 @@ public sealed class NestedContractInheritanceRuntimeTests
             if (generic)
             {
                 source = source.Replace("§CL{Outer:pub}", "§CL{Outer:pub}<T>")
-                    .Replace("§CL{Marker:pub}", "§CL{Marker:pub}<T>")
+                    .Replace("    §CL{Marker:pub}", "    §CL{Marker:pub}<T>")
                     .Replace("Outer.IValue", "Outer<i32>.IValue")
                     .Replace(" Marker)", " Marker<str>)");
             }
@@ -435,12 +435,12 @@ public sealed class NestedContractInheritanceRuntimeTests
             declarations += "\n" + $$"""
                 §CL{Impl:pub}
                   {{(path == "interface" ? $"§IMPL{{IValue<{parameterType}>}}" : $"§EXT{{Base<{parameterType}>}}")}}
-                  §MT{mt2:Check:pub{{(path == "interface" ? "" : ":over")}}} ({{parameterType}}:value) -> {{parameterType}}
+                  §MT{Check:pub{{(path == "interface" ? "" : ":over")}}} ({{parameterType}}:value) -> {{parameterType}}
                     §E{}
                     §R value
                 """;
             for (var level = depth - 1; level >= 0; level--)
-                declarations = $"§CL{{outer{level}:Outer{level}:pub}}\n" + Indent(declarations);
+                declarations = $"§CL{{Outer{level}:pub}}\n" + Indent(declarations);
             var assembly = Compile("§M{NestedContracts}\n" + Indent(declarations), verify);
             var prefix = "NestedContracts." + string.Concat(
                 Enumerable.Range(0, depth).Select(level => $"Outer{level}+"));
@@ -509,13 +509,13 @@ public sealed class NestedContractInheritanceRuntimeTests
             declarations += "\n" + $$"""
                 §CL{Impl:pub}
                   {{(path == "interface" ? "§IMPL{IValue}" : "§EXT{Base}")}}
-                  §MT{mt2:Check:pub{{(path == "interface" ? "" : ":over")}}}<U> ({{implementationShape}}:value) -> {{implementationShape}}
+                  §MT{Check:pub{{(path == "interface" ? "" : ":over")}}}<U> ({{implementationShape}}:value) -> {{implementationShape}}
                     §WHERE U : class
                     §E{}
                     §R value
                 """;
             for (var level = depth - 1; level >= 0; level--)
-                declarations = $"§CL{{outer{level}:Outer{level}:pub}}\n" + Indent(declarations);
+                declarations = $"§CL{{Outer{level}:pub}}\n" + Indent(declarations);
             var assembly = Compile("§M{NestedContracts}\n" + Indent(declarations), verify);
             var name = "NestedContracts." + string.Concat(
                 Enumerable.Range(0, depth).Select(level => $"Outer{level}+")) + "Impl";
@@ -554,7 +554,7 @@ public sealed class NestedContractInheritanceRuntimeTests
         {
             var namespacePrefix = moduleName == "_global" ? "" : moduleName + ".";
             var source = $$"""
-                §M{m1:{{moduleName}}}
+                §M{{{moduleName}}}
                   §CL{Outer:pub}
                     §IFACE{IValue}
                       §MT{Check} (object:x) -> object
@@ -642,7 +642,7 @@ public sealed class NestedContractInheritanceRuntimeTests
             var typeName = "Scope.";
             for (var level = 0; level < depth; level++)
             {
-                implementation = $"§CL{{c{5 + level}:Container{level}:pub}}\n" + Indent(implementation);
+                implementation = $"§CL{{Container{level}:pub}}\n" + Indent(implementation);
                 typeName = "Scope." + $"Container{level}+" + typeName["Scope.".Length..];
             }
             var source = $$"""
@@ -839,10 +839,10 @@ public sealed class NestedContractInheritanceRuntimeTests
                       §MT{Tag:pub} () -> i32
                         §E{}
                         §R INT:1
-                {{(inheritedShadow == "private-type" ? $"      §CL{{c8:{nestedName}:priv}}\n        §FLD{{i32:Min:pub:stat}} INT:-20" : "")}}
+                {{(inheritedShadow == "private-type" ? $"      §CL{{{nestedName}:priv}}\n        §FLD{{i32:Min:pub:stat}} INT:-20" : "")}}
                     §CL{Base:pub}
                       §EXT{Storage<i32>}
-                      §CL{c5:{{nestedName}}:pub}<T>
+                      §CL{{{nestedName}}:pub}<T>
                         §MT{Tag:pub} () -> i32
                           §E{}
                           §R INT:1
@@ -884,7 +884,7 @@ public sealed class NestedContractInheritanceRuntimeTests
                   §CL{Limits:pub}
                     §FLD{i32:Min:pub:stat} INT:0
                   §CL{Storage:pub}
-                    §CL{c3:{{privateName}}:priv}
+                    §CL{{{privateName}}:priv}
                       §FLD{i32:Min:pub:stat} INT:-10
                   §CL{Outer:pub}
                     §CL{Base:pub}

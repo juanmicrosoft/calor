@@ -610,7 +610,7 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var result = Check("""
             §M{SafeConsumption}
-              §DEL{Picker:pub}
+              §DEL{Picker}
                 §I{i32:value}
                 §O{i32}
               §F{Pick:pub} (str:value) -> str
@@ -709,7 +709,7 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var result = Check("""
             §M{SafeConsumption}
-              §DEL{Picker:pub}
+              §DEL{Picker}
                 §I{i32:number}
                 §I{str:text}
                 §O{str}
@@ -1178,7 +1178,7 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var modifierResult = Check("""
             §M{SafeConsumption}
-              §DEL{Mutator:pub}
+              §DEL{Mutator}
                 §I{i32:value:ref}
                 §O{i32}
               §F{Probe:pub} (Mutator:mutate, i32:value) -> i32
@@ -1205,7 +1205,7 @@ public sealed class SafeConsumptionTypeCheckerTests
 
         var identityResult = Check("""
             §M{SafeConsumption}
-              §DEL{Mutator:pub}
+              §DEL{Mutator}
                 §I{f64:value:ref}
                 §O{void}
               §F{Probe:pub} (Mutator:mutate, i32:value:ref) -> void
@@ -2470,10 +2470,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var result = Check("""
             §M{SafeConsumption}
-              §DEL{First:pub}
+              §DEL{First}
                 §I{str:value}
                 §O{void}
-              §DEL{Second:pub}
+              §DEL{Second}
                 §I{str:value}
                 §O{void}
               §F{Use:pub} (First:callback) -> void

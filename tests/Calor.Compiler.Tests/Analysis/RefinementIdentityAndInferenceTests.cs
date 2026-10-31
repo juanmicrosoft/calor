@@ -92,7 +92,7 @@ public class RefinementIdentityAndInferenceTests
             §R x
           §F{Decrement:pub} (Nat:a) -> i32
             §B{~x} a
-            (dec x)
+            §ASSIGN x (- x INT:1)
             §R x
           §F{GetNat:pub} (i32:v) -> Nat
             §R v
@@ -476,7 +476,7 @@ public class RefinementIdentityAndInferenceTests
     public void Runtime_LambdaParameterTypedByARefinedDelegate_IsGuarded()
     {
         var assembly = CompileAndLoad("""
-              §DEL{Mapper:pub}
+              §DEL{Mapper}
                 §I{Nat:p}
                 §O{i32}
               §F{Apply:pub} (Nat:a) -> i32
@@ -561,10 +561,10 @@ public class RefinementIdentityAndInferenceTests
         // Overload trials type the lambda against each candidate. Only the selected candidate's
         // typing (PosMapper, so p: Pos) may decide the guard; NatMapper's must be rolled back.
         var assembly = CompileAndLoad("""
-              §DEL{PosMapper:pub}
+              §DEL{PosMapper}
                 §I{Pos:p}
                 §O{i32}
-              §DEL{NatMapper:pub}
+              §DEL{NatMapper}
                 §I{Nat:p}
                 §O{i32}
               §F{Pick:pub} (PosMapper:fn, Pos:tag) -> i32
@@ -622,7 +622,7 @@ public class RefinementIdentityAndInferenceTests
     public void Runtime_Verified_LambdaParameterShadowingARefinedLocal_KeepsItsOwnGuard()
     {
         var assembly = CompileAndLoadVerified("""
-              §DEL{Mapper:pub}
+              §DEL{Mapper}
                 §I{Pos:p}
                 §O{i32}
               §F{Run:pub} (Nat:a, Pos:b, i32:v) -> i32
@@ -643,7 +643,7 @@ public class RefinementIdentityAndInferenceTests
     public void Runtime_LambdaAssignedToARefinedDelegateVariable_IsGuarded()
     {
         var assembly = CompileAndLoad("""
-              §DEL{Mapper:pub}
+              §DEL{Mapper}
                 §I{Pos:p}
                 §O{i32}
               §F{Run:pub} (Pos:a, i32:v) -> i32
@@ -665,7 +665,7 @@ public class RefinementIdentityAndInferenceTests
     public void Assign_NestedDelegateCallWithADifferentRefinement_IsRejected()
     {
         var rejected = Compile("""
-              §DEL{Mapper:pub}
+              §DEL{Mapper}
                 §I{Pos:p}
                 §O{i32}
               §F{Run:pub} (Nat:a) -> i32
@@ -762,7 +762,7 @@ public class RefinementIdentityAndInferenceTests
     public void Assign_LambdaReturningADifferentRefinement_IsRejected_SameRefinementIsAccepted()
     {
         var rejected = Compile("""
-              §DEL{Factory:pub}
+              §DEL{Factory}
                 §O{Pos}
               §F{Run:pub} (Nat:a, Pos:p) -> i32
                 §B{~fn:Factory} §LAM{}
@@ -776,7 +776,7 @@ public class RefinementIdentityAndInferenceTests
         AssertDistinctRefinementError(rejected, "Nat", "Pos");
 
         var accepted = Compile("""
-              §DEL{Factory:pub}
+              §DEL{Factory}
                 §O{Pos}
               §F{Run:pub} (Nat:a, Pos:p) -> i32
                 §B{~fn:Factory} §LAM{}
@@ -811,10 +811,10 @@ public class RefinementIdentityAndInferenceTests
         // Typing the lambda against the rejected NatMapper would make `§B{q:Pos} p` a mismatch;
         // that speculative diagnostic must not survive the try body's flow cache.
         var result = Compile("""
-              §DEL{PosMapper:pub}
+              §DEL{PosMapper}
                 §I{Pos:p}
                 §O{i32}
-              §DEL{NatMapper:pub}
+              §DEL{NatMapper}
                 §I{Nat:p}
                 §O{i32}
               §F{Pick:pub} (PosMapper:fn, Pos:tag) -> i32
@@ -866,7 +866,7 @@ public class RefinementIdentityAndInferenceTests
     public void LambdaParameter_ShadowingAnInlineRefinedParameter_CanBeRebound()
     {
         var accepted = Compile("""
-              §DEL{Mapper:pub}
+              §DEL{Mapper}
                 §I{i32:a}
                 §O{i32}
               §F{Run:pub}

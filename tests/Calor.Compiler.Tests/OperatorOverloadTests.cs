@@ -128,7 +128,8 @@ public class OperatorOverloadTests
         var cls = Assert.Single(module.Classes);
         var op = Assert.Single(cls.OperatorOverloads);
 
-        Assert.Equal("op001", op.Id);
+        Assert.StartsWith("op_auto", op.LocalId);
+        Assert.Null(op.ToolingId);
         Assert.Equal("+", op.OperatorToken);
         Assert.Equal(OperatorOverloadKind.Add, op.Kind);
         Assert.True(op.IsBinary);
@@ -233,29 +234,38 @@ public class OperatorOverloadTests
         Assert.Single(op.Postconditions);
     }
 
-    [Fact]
-    public void Parse_MismatchedId_ReportsDiagnostic()
+    [Theory]
+    [InlineData("op001:+:pub")]
+    [InlineData("op_3hj8x2bw9pkq:+:pub")]
+    [InlineData("invalid:pub")]
+    public void Parse_InvalidOperatorHeader_ReportsDiagnosticAndKeepsLaterMember(string header)
     {
-        var source = @"
-§M{Test}
-  §CL{MyType}
-      §OP{+:pub}
-        §I{MyType:left}
-        §I{MyType:right}
-        §O{MyType}
-        §R left
-      §/OP
-";
+        var source = $$"""
+            §M{Test}
+              §CL{MyType}
+                §OP{ {{header}} }
+                  §I{MyType:left}
+                  §I{MyType:right}
+                  §O{MyType}
+                  §R left
+                §/OP
+                §MT{Later:pub} () -> i32
+                  §R 1
+            """;
 
         var diagnostics = new DiagnosticBag();
         diagnostics.SetFilePath("test.calr");
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
-        parser.Parse();
+        var module = parser.Parse();
 
-        // Should have a mismatched ID diagnostic
-        Assert.True(diagnostics.HasErrors);
+        Assert.Contains(diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnexpectedToken
+            && diagnostic.Message.Contains("Expected operator token in §OP", StringComparison.Ordinal));
+        var type = Assert.Single(module.Classes);
+        Assert.Empty(type.OperatorOverloads);
+        Assert.Equal("Later", Assert.Single(type.Methods).Name);
     }
 
     [Theory]
@@ -278,7 +288,7 @@ public class OperatorOverloadTests
         var source = $@"
 §M{{Test}}
   §CL{{MyType}}
-    §OP{{op001:{operatorSymbol}:pub}}
+    §OP{{{operatorSymbol}:pub}}
       §I{{MyType:left}}
       §I{{MyType:right}}
       §O{{MyType}}
@@ -302,7 +312,7 @@ public class OperatorOverloadTests
         var source = $@"
 §M{{Test}}
   §CL{{MyType}}
-    §OP{{op001:{operatorSymbol}:pub}}
+    §OP{{{operatorSymbol}:pub}}
       §I{{MyType:value}}
       §O{{MyType}}
       §R value
@@ -326,7 +336,7 @@ public class OperatorOverloadTests
         var source = $@"
 §M{{Test}}
   §CL{{MyType}}
-    §OP{{op001:{operatorSymbol}:pub}}
+    §OP{{{operatorSymbol}:pub}}
       §I{{MyType:value}}
       §O{{bool}}
       §R {operatorSymbol}
@@ -350,7 +360,7 @@ public class OperatorOverloadTests
         var source = $@"
 §M{{Test}}
   §CL{{MyType}}
-    §OP{{op001:{operatorSymbol}:pub}}
+    §OP{{{operatorSymbol}:pub}}
       §I{{MyType:value}}
       §O{{MyType}}
       §R value
@@ -683,7 +693,7 @@ public class Money
         var result = ConvertCSharpToCalor(csharpCode);
 
         Assert.Contains("§OP{", result);
-        Assert.Contains(":+:", result);
+        Assert.Contains("§OP{+:", result);
         Assert.DoesNotContain("§/OP{", result);
     }
 
@@ -704,7 +714,7 @@ public class Money
         var result = ConvertCSharpToCalor(csharpCode);
 
         Assert.Contains("§OP{", result);
-        Assert.Contains(":-:", result);
+        Assert.Contains("§OP{-:", result);
         Assert.DoesNotContain("§/OP{", result);
     }
 
@@ -725,7 +735,7 @@ public class Money
         var result = ConvertCSharpToCalor(csharpCode);
 
         Assert.Contains("§OP{", result);
-        Assert.Contains(":implicit:", result);
+        Assert.Contains("§OP{implicit:", result);
         Assert.DoesNotContain("§/OP{", result);
     }
 
@@ -746,7 +756,7 @@ public class Money
         var result = ConvertCSharpToCalor(csharpCode);
 
         Assert.Contains("§OP{", result);
-        Assert.Contains(":explicit:", result);
+        Assert.Contains("§OP{explicit:", result);
         Assert.DoesNotContain("§/OP{", result);
     }
 
@@ -767,7 +777,7 @@ public class Counter
         var result = ConvertCSharpToCalor(csharpCode);
 
         Assert.Contains("§OP{", result);
-        Assert.Contains(":++:", result);
+        Assert.Contains("§OP{++:", result);
         Assert.DoesNotContain("§/OP{", result);
     }
 
@@ -793,8 +803,8 @@ public class MyBool
         var result = ConvertCSharpToCalor(csharpCode);
 
         Assert.Contains("§OP{", result);
-        Assert.Contains(":true:", result);
-        Assert.Contains(":false:", result);
+        Assert.Contains("§OP{true:", result);
+        Assert.Contains("§OP{false:", result);
     }
 
     [Fact]
@@ -814,7 +824,7 @@ public class MyBool
         var result = ConvertCSharpToCalor(csharpCode);
 
         Assert.Contains("§OP{", result);
-        Assert.Contains(":!:", result);
+        Assert.Contains("§OP{!:", result);
         Assert.DoesNotContain("§/OP{", result);
     }
 
@@ -832,7 +842,7 @@ public class Vector
         var result = ConvertCSharpToCalor(csharpCode);
 
         Assert.Contains("§OP{", result);
-        Assert.Contains(":+:", result);
+        Assert.Contains("§OP{+:", result);
         // Expression body should be converted to a return statement
         Assert.Contains("§R", result);
         Assert.DoesNotContain("§/OP{", result);
@@ -852,7 +862,7 @@ public class Wrapper
         var result = ConvertCSharpToCalor(csharpCode);
 
         Assert.Contains("§OP{", result);
-        Assert.Contains(":implicit:", result);
+        Assert.Contains("§OP{implicit:", result);
         // Expression body should be converted to a return statement
         Assert.Contains("§R", result);
         Assert.DoesNotContain("§/OP{", result);
