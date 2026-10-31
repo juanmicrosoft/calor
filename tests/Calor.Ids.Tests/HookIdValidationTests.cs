@@ -1,158 +1,138 @@
 using Calor.Compiler.Commands;
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Ids;
 using Xunit;
 
 namespace Calor.Ids.Tests;
 
 public class HookIdValidationTests : IDisposable
 {
-    private readonly string _testDirectory;
+    private readonly string _testDirectory = Path.Combine(Path.GetTempPath(), $"calor-id-hook-test-{Guid.NewGuid():N}");
 
-    public HookIdValidationTests()
-    {
-        _testDirectory = Path.Combine(Path.GetTempPath(), $"calor-id-hook-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(_testDirectory);
-    }
+    public HookIdValidationTests() => Directory.CreateDirectory(_testDirectory);
 
-    public void Dispose()
-    {
-        if (Directory.Exists(_testDirectory))
-        {
-            Directory.Delete(_testDirectory, recursive: true);
-        }
-    }
+    public void Dispose() => Directory.Delete(_testDirectory, recursive: true);
 
     [Fact]
-    public void ValidateIds_AllowsValidContent()
+    public void ValidateIds_AllowsValidCurrentContentWithoutChangingSidecar()
     {
-        var content = """
-            §M{m_01J5X7K9M2NPQRSTABWXYZ1234:TestModule}
-              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:TestFunc:pub}
-                  §O{void}
-            """;
-        var json = CreateToolInput("/src/test.calr", content);
+        const string content = "§M{TestModule}\n  §F{TestFunc:pub} () -> void\n";
+        var (file, store) = Register(content);
+        var before = File.ReadAllText(store.SidecarPath);
 
-        var (exitCode, reason) = HookCommand.ValidateIds(json);
+        var (exitCode, reason) = HookCommand.ValidateIds(CreateToolInput(file, content));
 
         Assert.Equal(0, exitCode);
         Assert.Null(reason);
+        Assert.Equal(before, File.ReadAllText(store.SidecarPath));
+        Assert.Equal(content, File.ReadAllText(file));
     }
 
     [Fact]
     public void ValidateIds_AllowsNonCalorFiles()
     {
-        var json = CreateToolInput("/src/test.cs", "public class Test {}");
-
-        var (exitCode, reason) = HookCommand.ValidateIds(json);
-
+        var (exitCode, _) = HookCommand.ValidateIds(CreateToolInput(
+            Path.Combine(_testDirectory, "test.cs"), "public class Test {}"));
         Assert.Equal(0, exitCode);
     }
 
     [Fact]
-    public void ValidateIds_AllowsTestIdsInTestPath()
+    public void ValidateIds_AllowsIdShapedSemanticNames()
     {
-        var content = """
-            §M{m001:TestModule}
-              §F{f001:TestFunc:pub}
-                  §O{void}
-            """;
-        var json = CreateToolInput("/tests/test.calr", content);
-
-        var (exitCode, reason) = HookCommand.ValidateIds(json);
-
+        const string content = "§M{m001}\n  §F{f001:pub} () -> void\n";
+        var (file, _) = Register(content);
+        var (exitCode, reason) = HookCommand.ValidateIds(CreateToolInput(file, content));
         Assert.Equal(0, exitCode);
+        Assert.Null(reason);
     }
 
     [Fact]
-    public void ValidateIds_BlocksDuplicateIds()
+    public void ValidateIds_BlocksDuplicatePersistedIdsWithoutWritingAnything()
     {
-        var content = """
-            §M{m_01J5X7K9M2NPQRSTABWXYZ1234:TestModule}
-              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Func1:pub}
-                  §O{void}
-              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Func2:pub}
-                  §O{void}
-            """;
-        var json = CreateToolInput("/src/test.calr", content);
+        const string content = "§M{TestModule}\n  §F{First:pub} () -> void\n  §F{Second:pub} () -> void\n";
+        var (file, store) = Register(content);
+        var functions = store.Sync().Declarations.Where(d => d.Kind == IdKind.Function).ToArray();
+        var corrupt = File.ReadAllText(store.SidecarPath).Replace(functions[1].Id, functions[0].Id);
+        File.WriteAllText(store.SidecarPath, corrupt);
 
-        var (exitCode, reason) = HookCommand.ValidateIds(json);
+        var (exitCode, reason) = HookCommand.ValidateIds(CreateToolInput(file, content));
 
         Assert.Equal(1, exitCode);
-        Assert.Contains("Duplicate ID", reason);
+        Assert.Contains("duplicate or invalid declarations", reason);
+        var compilation = Calor.Compiler.Program.Compile(content, file);
+        Assert.Contains(compilation.Diagnostics, d => d.Code == DiagnosticCode.DeclarationIdentityUnavailable);
+        Assert.Empty(compilation.GeneratedCode);
+        Assert.Equal(corrupt, File.ReadAllText(store.SidecarPath));
+        Assert.Equal(content, File.ReadAllText(file));
     }
 
     [Fact]
-    public async Task ValidateIds_BlocksIdChurn()
+    public void ValidateIds_BlocksMalformedIdentityStorage()
     {
-        // Create existing file with an ID
-        var filePath = Path.Combine(_testDirectory, "test.calr");
-        var existingContent = """
-            §M{m_01J5X7K9M2NPQRSTABWXYZ1234:TestModule}
-              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:TestFunc:pub}
-                  §O{void}
-            """;
-        await File.WriteAllTextAsync(filePath, existingContent);
+        const string content = "§M{TestModule}\n";
+        var (file, store) = Register(content);
+        File.WriteAllText(store.SidecarPath, "{ malformed");
 
-        // Try to write content with changed ID
-        var newContent = """
-            §M{m_01J5X7K9M2NPQRSTABWXYZ1234:TestModule}
-              §F{f_01J5X7K9M2NPQRSTABWXYZ9912:TestFunc:pub}
-                  §O{void}
-            """;
-        var json = CreateToolInput(filePath, newContent);
-
-        var (exitCode, reason) = HookCommand.ValidateIds(json);
+        var (exitCode, reason) = HookCommand.ValidateIds(CreateToolInput(file, content));
 
         Assert.Equal(1, exitCode);
-        Assert.Contains("ID churn", reason);
+        Assert.Contains("identity", reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("{ malformed", File.ReadAllText(store.SidecarPath));
     }
 
     [Fact]
-    public async Task ValidateIds_AllowsNewFunctions()
+    public void ValidateIds_BlocksAmbiguousContinuityWithoutWritingAnything()
     {
-        // Create existing file with one function
-        var filePath = Path.Combine(_testDirectory, "test.calr");
-        var existingContent = """
-            §M{m_01J5X7K9M2NPQRSTABWXYZ1234:TestModule}
-              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:TestFunc:pub}
-                  §O{void}
-            """;
-        await File.WriteAllTextAsync(filePath, existingContent);
+        const string content = "§M{TestModule}\n  §F{First:pub} () -> void\n  §F{Second:pub} () -> void\n";
+        var (file, store) = Register(content);
+        var before = File.ReadAllText(store.SidecarPath);
+        var proposed = content.Replace("First", "RenamedFirst").Replace("Second", "RenamedSecond");
 
-        // Add a new function (this should be allowed)
-        var newContent = """
-            §M{m_01J5X7K9M2NPQRSTABWXYZ1234:TestModule}
-              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:TestFunc:pub}
-                  §O{void}
-              §F{f_01J5X7K9M2NPQRSTABWXYZ9912:NewFunc:pub}
-                  §O{void}
-            """;
-        var json = CreateToolInput(filePath, newContent);
+        var (exitCode, reason) = HookCommand.ValidateIds(CreateToolInput(file, proposed));
 
-        var (exitCode, reason) = HookCommand.ValidateIds(json);
+        Assert.Equal(1, exitCode);
+        Assert.Contains("ambiguous", reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(before, File.ReadAllText(store.SidecarPath));
+        Assert.Equal(content, File.ReadAllText(file));
+    }
 
+    [Fact]
+    public void ValidateIds_AllowsNewFunctionsWithoutMintingPersistedIds()
+    {
+        const string content = "§M{TestModule}\n  §F{TestFunc:pub} () -> void\n";
+        var (file, store) = Register(content);
+        var before = File.ReadAllText(store.SidecarPath);
+        var (exitCode, _) = HookCommand.ValidateIds(CreateToolInput(file,
+            content + "  §F{NewFunc:pub} () -> void\n"));
         Assert.Equal(0, exitCode);
+        Assert.Equal(before, File.ReadAllText(store.SidecarPath));
+        Assert.Equal(content, File.ReadAllText(file));
     }
 
     [Fact]
     public void ValidateIds_AllowsEmptyContent()
     {
-        var json = CreateToolInput("/src/test.calr", "");
-
-        var (exitCode, reason) = HookCommand.ValidateIds(json);
-
+        var (exitCode, _) = HookCommand.ValidateIds(CreateToolInput(
+            Path.Combine(_testDirectory, "test.calr"), ""));
         Assert.Equal(0, exitCode);
     }
 
     [Fact]
-    public void ValidateIds_AllowsInvalidJson()
+    public void ValidateIds_AllowsInvalidToolInputJson()
     {
-        var (exitCode, reason) = HookCommand.ValidateIds("not valid json");
-
+        var (exitCode, _) = HookCommand.ValidateIds("not valid json");
         Assert.Equal(0, exitCode);
     }
 
-    private static string CreateToolInput(string filePath, string content)
+    private (string File, DeclarationIdentityStore Store) Register(string source)
     {
-        return $"{{\"file_path\": {System.Text.Json.JsonSerializer.Serialize(filePath)}, \"content\": {System.Text.Json.JsonSerializer.Serialize(content)}}}";
+        var file = Path.Combine(_testDirectory, "test.calr");
+        File.WriteAllText(file, source);
+        var store = new DeclarationIdentityStore(_testDirectory);
+        store.Sync([file]);
+        return (file, store);
     }
+
+    private static string CreateToolInput(string filePath, string content) =>
+        System.Text.Json.JsonSerializer.Serialize(new { file_path = filePath, content });
 }

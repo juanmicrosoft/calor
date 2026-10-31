@@ -626,11 +626,11 @@ public static class HookCommand
         }
         else
         {
-            var systemMessage = "ID validation failed. Key rules:\n" +
-                                "- NEVER modify existing IDs\n" +
-                                "- OMIT IDs for new declarations (run `calor ids assign`)\n" +
-                                "- NEVER copy IDs when extracting code\n" +
-                                "- Run `calor ids check .` before commit";
+            var systemMessage = "Project declaration identity could not be preserved.\n" +
+                                "- Declarations have no IDs in source; tooling maintains .calor/ids.json\n" +
+                                "- Use transactional rename/move tools to preserve exact identity\n" +
+                                "- Run `calor ids sync .` to recover pending transactions\n" +
+                                "- Resolve ambiguous edits explicitly; never choose an ID by guesswork";
             response = new GeminiDenyResponse
             {
                 Decision = "deny",
@@ -643,7 +643,7 @@ public static class HookCommand
     }
 
     /// <summary>
-    /// Validates IDs in .calr file content.
+    /// Validates proposed source against registered project identity without writing source or sidecar.
     /// Returns (0, null) to allow, (1, reason) to block.
     /// </summary>
     public static (int ExitCode, string? BlockReason) ValidateIds(string toolInputJson)
@@ -693,61 +693,8 @@ public static class HookCommand
                 return (0, null);
             }
 
-            // Scan IDs in the new content
+            // Read-only reconciliation rejects ambiguous continuity and invalid identity storage.
             DeclarationIdentityStore.AttachIfRegistered(Path.GetFullPath(path), content, module);
-            var scanner = new IdScanner();
-            var newEntries = scanner.Scan(module, path);
-
-            // Check for issues
-            var isTestPath = IdValidator.IsTestPath(path);
-            var result = IdChecker.Check(newEntries, allowTestIds: isTestPath);
-
-            // Check for duplicates within the file
-            if (result.DuplicateGroups.Count > 0)
-            {
-                var first = result.DuplicateGroups[0][0];
-                return (1, $"BLOCKED: Duplicate ID '{first.Id}' detected in {Path.GetFileName(path)}.\n" +
-                          "Each declaration must have a unique ID.\n" +
-                          "Run `calor ids assign --fix-duplicates` to fix.");
-            }
-
-            // Check for ID churn if the file already exists
-            if (File.Exists(path))
-            {
-                var existingContent = File.ReadAllText(path);
-                var existingDiagnostics = new DiagnosticBag();
-                existingDiagnostics.SetFilePath(path);
-
-                var existingLexer = new Lexer(existingContent, existingDiagnostics);
-                var existingTokens = existingLexer.TokenizeAllForParser();
-
-                if (!existingDiagnostics.HasErrors)
-                {
-                    var existingParser = new Parser(existingTokens, existingDiagnostics);
-                    var existingModule = existingParser.Parse();
-
-                    if (!existingDiagnostics.HasErrors)
-                    {
-                        DeclarationIdentityStore.AttachIfRegistered(Path.GetFullPath(path), existingContent, existingModule);
-                        var existingScanner = new IdScanner();
-                        var existingEntries = existingScanner.Scan(existingModule, path);
-
-                        // Detect ID churn
-                        var churn = IdChecker.DetectIdChurn(existingEntries, newEntries);
-                        if (churn.Count > 0)
-                        {
-                            var (old, @new) = churn[0];
-                            return (1, $"BLOCKED: ID churn detected for {old.Kind} '{old.Name}'.\n" +
-                                      $"  Existing ID: {old.Id}\n" +
-                                      $"  New ID: {@new.Id}\n\n" +
-                                      "IDs are immutable. NEVER modify an existing ID.\n" +
-                                      "If you need to rename, preserve the ID.");
-                        }
-                    }
-                }
-            }
-
-            // All checks passed
             return (0, null);
         }
         catch (DeclarationIdentityException ex)

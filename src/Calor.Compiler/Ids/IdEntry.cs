@@ -127,14 +127,13 @@ public sealed class DeclarationIdentityStore
     {
         if (file == null || !file.EndsWith(".calr", StringComparison.Ordinal) || !File.Exists(file)) return;
         file = Path.GetFullPath(file);
-        var store = Find(file);
-        if (store == null) return;
         try
         {
-            if (store.IncludesRegistration(file)) store.Attach(file, source, module);
+            var store = Find(file);
+            if (store != null && store.IncludesRegistration(file)) store.Attach(file, source, module);
         }
         catch (DeclarationIdentityParseException) { throw; }
-        catch (Exception ex) when (ex is IOException or InvalidOperationException or JsonException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or JsonException or UnauthorizedAccessException)
         {
             throw new DeclarationIdentityException($"Declaration identity unavailable: {ex.Message}", ex);
         }

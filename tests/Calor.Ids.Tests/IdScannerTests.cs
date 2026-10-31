@@ -1,6 +1,7 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Ids;
+using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Xunit;
 
@@ -8,187 +9,89 @@ namespace Calor.Ids.Tests;
 
 public class IdScannerTests
 {
-    [Fact]
-    public void Scan_FindsModuleId()
+    [Theory]
+    [InlineData("", IdKind.Module, "TestModule")]
+    [InlineData("  §F{TestFunction:pub} () -> void", IdKind.Function, "TestFunction")]
+    [InlineData("  §CL{TestClass:pub}", IdKind.Class, "TestClass")]
+    [InlineData("  §CL{TestClass:pub}\n    §MT{TestMethod:pub} () -> void", IdKind.Method, "TestMethod")]
+    [InlineData("  §CL{TestClass:pub}\n    §PROP{TestProperty:i32:pub:get,set}", IdKind.Property, "TestProperty")]
+    [InlineData("  §CL{TestClass:pub}\n    §CTOR{pub} ()", IdKind.Constructor, ".ctor")]
+    [InlineData("  §IFACE{ITestInterface}", IdKind.Interface, "ITestInterface")]
+    [InlineData("  §EN{Status:pub}\n    Active", IdKind.Enum, "Status")]
+    public void ScanFindsEffectiveSidecarIdentity(string members, IdKind kind, string name)
     {
-        var source = """
-            §M{m001:TestModule}
-            """;
-        var module = Parse(source);
-        var scanner = new IdScanner();
-
-        var entries = scanner.Scan(module, "test.calr");
-
-        Assert.Single(entries);
-        Assert.Equal("m001", entries[0].Id);
-        Assert.Equal(IdKind.Module, entries[0].Kind);
-        Assert.Equal("TestModule", entries[0].Name);
+        var source = "§M{TestModule}\n" + members + "\n";
+        WithIdentity(source, (module, state) =>
+        {
+            var entries = new IdScanner().Scan(module, "test.calr");
+            var expected = Assert.Single(state.Declarations.Where(d => d.Kind == kind && d.Name == name));
+            Assert.Contains(entries, e => e.Id == expected.Id && e.Kind == kind && e.Name == name);
+            Assert.All(entries, e => Assert.True(IdValidator.IsCanonicalId(e.Id)));
+            foreach (var declaration in state.Declarations)
+                Assert.DoesNotContain(declaration.Id, new CalorEmitter().Emit(module));
+        });
     }
 
     [Fact]
-    public void Scan_FindsFunctionId()
+    public void ScanRecordsRequestedFilePath()
     {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:TestFunction:pub}
-                  §O{void}
-            """;
-        var module = Parse(source);
-        var scanner = new IdScanner();
-
-        var entries = scanner.Scan(module, "test.calr");
-
-        Assert.Equal(2, entries.Count);
-        Assert.Contains(entries, e => e.Id == "f001" && e.Kind == IdKind.Function && e.Name == "TestFunction");
+        WithIdentity("§M{TestModule}", (module, _) =>
+        {
+            var entries = new IdScanner().Scan(module, "/path/to/test.calr");
+            Assert.Single(entries);
+            Assert.All(entries, e => Assert.Equal("/path/to/test.calr", e.FilePath));
+        });
     }
 
     [Fact]
-    public void Scan_FindsClassId()
+    public void ScanFindsEveryDeclarationExactlyOnceInComplexFile()
     {
-        var source = """
-            §M{m001:TestModule}
-              §CL{c001:TestClass}
+        const string source = """
+            §M{TestModule}
+              §F{Func1:pub} () -> void
+              §CL{Class1:pub}
+                §MT{Method1:pub} () -> void
+                §PROP{Prop1:i32:pub:get}
+                §CTOR{pub} ()
+              §IFACE{ITest}
+              §EN{Status:pub}
+                Active
             """;
-        var module = Parse(source);
-        var scanner = new IdScanner();
-
-        var entries = scanner.Scan(module, "test.calr");
-
-        Assert.Contains(entries, e => e.Id == "c001" && e.Kind == IdKind.Class && e.Name == "TestClass");
+        WithIdentity(source, (module, state) =>
+        {
+            var entries = new IdScanner().Scan(module, "test.calr");
+            Assert.Equal(8, entries.Count);
+            Assert.Equal(8, entries.Select(e => e.Id).Distinct().Count());
+            Assert.Equal(state.Declarations.Select(d => d.Id).Order(), entries.Select(e => e.Id).Order());
+            Assert.Equal(
+                new[] { IdKind.Module, IdKind.Function, IdKind.Class, IdKind.Method, IdKind.Property,
+                    IdKind.Constructor, IdKind.Interface, IdKind.Enum }.Order(),
+                entries.Select(e => e.Kind).Order());
+        });
     }
 
-    [Fact]
-    public void Scan_FindsMethodId()
+    private static void WithIdentity(
+        string source,
+        Action<ModuleNode, DeclarationIdentityStore.State> assertions)
     {
-        var source = """
-            §M{m001:TestModule}
-              §CL{c001:TestClass}
-                §MT{mt001:TestMethod:pub}
-                    §O{void}
-            """;
-        var module = Parse(source);
-        var scanner = new IdScanner();
-
-        var entries = scanner.Scan(module, "test.calr");
-
-        Assert.Contains(entries, e => e.Id == "mt001" && e.Kind == IdKind.Method && e.Name == "TestMethod");
-    }
-
-    [Fact]
-    public void Scan_FindsPropertyId()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §CL{c001:TestClass}
-                §PROP{p001:TestProperty:i32:pub}
-                  §GET
-                  §SET
-                §/PROP{p001}
-            """;
-        var module = Parse(source);
-        var scanner = new IdScanner();
-
-        var entries = scanner.Scan(module, "test.calr");
-
-        Assert.Contains(entries, e => e.Id == "p001" && e.Kind == IdKind.Property && e.Name == "TestProperty");
-    }
-
-    [Fact]
-    public void Scan_FindsConstructorId()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §CL{c001:TestClass}
-                §CTOR{ctor001:pub}
-                §/CTOR{ctor001}
-            """;
-        var module = Parse(source);
-        var scanner = new IdScanner();
-
-        var entries = scanner.Scan(module, "test.calr");
-
-        Assert.Contains(entries, e => e.Id == "ctor001" && e.Kind == IdKind.Constructor && e.Name == ".ctor");
-    }
-
-    [Fact]
-    public void Scan_FindsInterfaceId()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §IFACE{i001:ITestInterface}
-            """;
-        var module = Parse(source);
-        var scanner = new IdScanner();
-
-        var entries = scanner.Scan(module, "test.calr");
-
-        Assert.Contains(entries, e => e.Id == "i001" && e.Kind == IdKind.Interface && e.Name == "ITestInterface");
-    }
-
-    // Note: Enum parsing at module level is not currently supported by the Parser.
-    // The IdScanner has the Visit(EnumDefinitionNode) method ready for when it is supported.
-    // For now, we skip the enum test since the parser doesn't recognize §ENUM tokens.
-
-    [Fact]
-    public void Scan_RecordsFilePath()
-    {
-        var source = """
-            §M{m001:TestModule}
-            """;
-        var module = Parse(source);
-        var scanner = new IdScanner();
-
-        var entries = scanner.Scan(module, "/path/to/test.calr");
-
-        Assert.All(entries, e => Assert.Equal("/path/to/test.calr", e.FilePath));
-    }
-
-    [Fact]
-    public void Scan_FindsAllIdsInComplexFile()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Func1:pub}
-                  §O{void}
-              §CL{c001:Class1}
-                §MT{mt001:Method1:pub}
-                    §O{void}
-                §PROP{p001:Prop1:i32:pub}
-                  §GET
-                §/PROP{p001}
-                §CTOR{ctor001:pub}
-                §/CTOR{ctor001}
-              §IFACE{i001:ITest}
-              §EN{e001:Status}
-              Active
-              §/EN{e001}
-            """;
-        var module = Parse(source);
-        var scanner = new IdScanner();
-
-        var entries = scanner.Scan(module, "test.calr");
-
-        // m001, f001, c001, mt001, p001, ctor001, i001, e001 = 8 entries
-        // Note: Enum may parse as a different node type, so we check for 7 or 8
-        Assert.True(entries.Count >= 7, $"Expected at least 7 entries, got {entries.Count}. Found IDs: {string.Join(", ", entries.Select(e => e.Id))}");
-        Assert.Contains(entries, e => e.Id == "m001");
-        Assert.Contains(entries, e => e.Id == "f001");
-        Assert.Contains(entries, e => e.Id == "c001");
-        Assert.Contains(entries, e => e.Id == "mt001");
-        Assert.Contains(entries, e => e.Id == "p001");
-        Assert.Contains(entries, e => e.Id == "ctor001");
-        Assert.Contains(entries, e => e.Id == "i001");
-        // Enum may not be fully parsed depending on the parser implementation
-        if (entries.Count >= 8)
-            Assert.Contains(entries, e => e.Id == "e001");
-    }
-
-    private static ModuleNode Parse(string source)
-    {
-        var diagnostics = new DiagnosticBag();
-        var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAllForParser();
-        var parser = new Parser(tokens, diagnostics);
-        return parser.Parse();
+        var root = Path.Combine(Path.GetTempPath(), "calor-scanner-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var file = Path.Combine(root, "active.calr");
+            File.WriteAllText(file, source);
+            var diagnostics = new DiagnosticBag();
+            var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+            var store = new DeclarationIdentityStore(root);
+            var state = store.Sync([file]);
+            store.Attach(file, source, module);
+            assertions(module, state);
+            Assert.Equal(source, File.ReadAllText(file));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 }

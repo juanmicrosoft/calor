@@ -791,7 +791,7 @@ public class Program
             {
                 diagnostics.AddRange(ex.Diagnostics);
             }
-            catch (Exception ex) when (ex is IOException or InvalidOperationException or System.Text.Json.JsonException or UnauthorizedAccessException)
+            catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or System.Text.Json.JsonException or UnauthorizedAccessException)
             {
                 diagnostics.Report(ast.Span, DiagnosticCode.DeclarationIdentityUnavailable, ex.Message);
             }
