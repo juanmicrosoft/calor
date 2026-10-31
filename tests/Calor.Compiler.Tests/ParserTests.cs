@@ -18,7 +18,7 @@ public class ParserTests
     [InlineData("private-protected", "priv-prot")]
     public void RemovedClassVisibility_IsNotReinterpretedAsABaseType(string alias, string canonical)
     {
-        var source = $"§M{{m1:Modifiers}}\n  §CL{{c1:Widget:{alias}}}";
+        var source = $"§M{{Modifiers}}\n  §CL{{Widget:{alias}}}";
         var diagnostics = new DiagnosticBag();
         new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnknownVisibility
@@ -32,7 +32,7 @@ public class ParserTests
     [InlineData("TRUE", true)]
     public void ConfigureAwait_RequiresExactBooleanSpelling(string value, bool hasError)
     {
-        var source = $"§M{{m1:Modifiers}}\n  §AF{{f1:Run:pub}} () -> i32\n    §R §AWAIT{{{value}}} §C{{GetAsync}} §/C";
+        var source = $"§M{{Modifiers}}\n  §AF{{Run:pub}} () -> i32\n    §R §AWAIT{{{value}}} §C{{GetAsync}} §/C";
         var diagnostics = new DiagnosticBag();
         new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.Equal(hasError, diagnostics.HasErrors);
@@ -45,7 +45,7 @@ public class ParserTests
     [InlineData("CLASS", TypeConstraintKind.TypeName)]
     public void ConstraintKeywords_AreNotCaseFolded(string constraint, TypeConstraintKind expected)
     {
-        var source = $"§M{{m1:Modifiers}}\n  §F{{f1:Run:pub}}<T> () -> void\n    §WHERE T : {constraint}";
+        var source = $"§M{{Modifiers}}\n  §F{{Run:pub}}<T> () -> void\n    §WHERE T : {constraint}";
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
@@ -57,7 +57,7 @@ public class ParserTests
     [InlineData("", "    §I{i32:x:REF}")]
     public void ParameterModifierCaseVariants_ReportAnError(string signature, string taggedParameter)
     {
-        var source = $"§M{{m1:Modifiers}}\n  §F{{f1:Run:pub}} {signature}\n{taggedParameter}\n    §R";
+        var source = $"§M{{Modifiers}}\n  §F{{Run:pub}} {signature}\n{taggedParameter}\n    §R";
         var diagnostics = new DiagnosticBag();
         new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.InvalidModifier
@@ -69,7 +69,7 @@ public class ParserTests
     [InlineData("AMT")]
     public void CompactMethodWithoutModifiers_DoesNotTreatDefaultVisibilityAsAModifier(string marker)
     {
-        var source = $"§M{{m1:Modifiers}}\n  §CL{{c1:Widget:pub}}\n    §{marker}{{Run:pub}} () -> void";
+        var source = $"§M{{Modifiers}}\n  §CL{{Widget:pub}}\n    §{marker}{{Run:pub}} () -> void";
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
@@ -88,9 +88,9 @@ public class ParserTests
     public void MemberModifierCaseVariants_ReportCanonicalSpelling(string modifier, string canonical)
     {
         var source = $$"""
-            §M{m1:Modifiers}
-              §CL{c1:Widget:pub}
-                §MT{mt1:Run:pub:{{modifier}}} () -> void
+            §M{Modifiers}
+              §CL{Widget:pub}
+                §MT{Run:pub:{{modifier}}} () -> void
             """;
         var diagnostics = new DiagnosticBag();
         new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
@@ -105,7 +105,7 @@ public class ParserTests
     [InlineData("Readonly", "readonly")]
     public void ClassModifierCaseVariants_ReportCanonicalSpelling(string modifier, string canonical)
     {
-        var source = $"§M{{m1:Modifiers}}\n  §CL{{c1:Widget:pub:{modifier}}}";
+        var source = $"§M{{Modifiers}}\n  §CL{{Widget:pub:{modifier}}}";
         var diagnostics = new DiagnosticBag();
         new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.InvalidModifier
@@ -137,7 +137,7 @@ public class ParserTests
     [InlineData("bnot", "~")]
     public void Parse_RemovedWordOperator_NamesSymbol(string word, string symbol)
     {
-        Parse($"§M{{m001:Test}}\n  §F{{f001:Test:pub}} () -> i32\n    §R ({word} 1 2)",
+        Parse($"§M{{Test}}\n  §F{{Test:pub}} () -> i32\n    §R ({word} 1 2)",
             out var diagnostics);
 
         Assert.Contains(diagnostics.Errors, diagnostic =>
@@ -155,7 +155,7 @@ public class ParserTests
     [InlineData("INC", "1")]
     public void Parse_OperatorNames_AreExactCase(string name, string arguments)
     {
-        Parse($"§M{{m001:Test}}\n  §F{{f001:Test:pub}} () -> i32\n    §R ({name} {arguments})",
+        Parse($"§M{{Test}}\n  §F{{Test:pub}} () -> i32\n    §R ({name} {arguments})",
             out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
@@ -174,13 +174,14 @@ public class ParserTests
     public void Parse_MinimalModule_ReturnsModuleNode()
     {
         var source = """
-            §M{m001:Test}
+            §M{Test}
             """;
 
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
-        Assert.Equal("m001", module.Id);
+        Assert.Equal(module.LocalId, module.Id);
+        Assert.Null(module.ToolingId);
         Assert.Equal("Test", module.Name);
         Assert.Empty(module.Functions);
     }
@@ -189,8 +190,8 @@ public class ParserTests
     public void Parse_ModuleWithFunction_ReturnsFunctionNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:MyFunc:pub}
+            §M{Test}
+              §F{MyFunc:pub}
                   §O{void}
             """;
 
@@ -200,7 +201,8 @@ public class ParserTests
         Assert.Single(module.Functions);
 
         var func = module.Functions[0];
-        Assert.Equal("f001", func.Id);
+        Assert.Equal(func.LocalId, func.Id);
+        Assert.Null(func.ToolingId);
         Assert.Equal("MyFunc", func.Name);
         Assert.Equal(Visibility.Public, func.Visibility);
     }
@@ -209,8 +211,8 @@ public class ParserTests
     public void Parse_FunctionWithParameters_ReturnsParameterNodes()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Add:pub}
+            §M{Test}
+              §F{Add:pub}
                   §I{i32:a}
                   §I{i32:b}
                   §O{i32}
@@ -232,8 +234,8 @@ public class ParserTests
         foreach (var effects in new[] { "!e", "alloc, !e" })
         {
             var source = $$"""
-                §M{m001:Test}
-                  §F{f001:Main:pub} () -> void
+                §M{Test}
+                  §F{Main:pub} () -> void
                     §E{{{effects}}}
                 """;
             var result = Program.Compile(source);
@@ -250,8 +252,8 @@ public class ParserTests
     public void Parse_FallibleCall_PreservesTerminalBang()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub} () -> void
+            §M{Test}
+              §F{Main:pub} () -> void
                 §C{Risky!} §/C
             """;
 
@@ -267,8 +269,8 @@ public class ParserTests
     public void Parse_FunctionWithCallStatement_ReturnsCallNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §E{cw}
                   §C{Console.WriteLine}
@@ -297,8 +299,8 @@ public class ParserTests
     public void Parse_FunctionWithEffects_ReturnsEffectsNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §E{cw}
             """;
@@ -317,8 +319,8 @@ public class ParserTests
         // §/M is removed closer-form (Phase 4d): rejected with Calor0830.
         // The obsolete id-mismatch diagnostic no longer fires for structural closers.
         var source = """
-            §M{m001:Test}
-            §/M{m002}
+            §M{Test}
+            §/M
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -332,11 +334,11 @@ public class ParserTests
     {
         // §/F is removed closer-form (Phase 4d): rejected with Calor0830, not MismatchedId.
         var source = """
-            §M{m001:Test}
-            §F{f001:Main:pub}
+            §M{Test}
+            §F{Main:pub}
               §O{void}
-            §/F{f999}
-            §/M{m001}
+            §/F
+            §/M
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -349,7 +351,7 @@ public class ParserTests
     public void Parse_MissingRequiredAttribute_ReportsError()
     {
         var source = """
-            §M{m001}
+            §M{}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -362,8 +364,8 @@ public class ParserTests
     public void Parse_ReturnStatement_ReturnsReturnNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:GetValue:pub}
+            §M{Test}
+              §F{GetValue:pub}
                   §O{i32}
                   §R 42
             """;
@@ -387,8 +389,8 @@ public class ParserTests
     public void Parse_HelloWorldProgram_Succeeds()
     {
         var source = """
-            §M{m001:Hello}
-              §F{f001:Main:pub}
+            §M{Hello}
+              §F{Main:pub}
                   §O{void}
                   §E{cw}
                   §C{Console.WriteLine}
@@ -399,7 +401,8 @@ public class ParserTests
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
-        Assert.Equal("m001", module.Id);
+        Assert.Equal(module.LocalId, module.Id);
+        Assert.Null(module.ToolingId);
         Assert.Equal("Hello", module.Name);
         Assert.Single(module.Functions);
 
@@ -426,9 +429,9 @@ public class ParserTests
     public void Parse_SemverDirective_PopulatesDeclaredSemanticsVersion()
     {
         var source = $$"""
-            §M{m001:Test}
+            §M{Test}
               §SEMVER{{{SemanticsVersion.VersionString}}}
-              §F{f001:Main:pub} () -> void
+              §F{Main:pub} () -> void
                 §E{}
                 §R
             """;
@@ -445,9 +448,9 @@ public class ParserTests
     public void CalorEmitter_RoundTrips_SemverDirective()
     {
         var source = $$"""
-            §M{m001:Test}
+            §M{Test}
               §SEMVER{{{SemanticsVersion.VersionString}}}
-              §F{f001:Main:pub} () -> void
+              §F{Main:pub} () -> void
                 §E{}
                 §R
             """;

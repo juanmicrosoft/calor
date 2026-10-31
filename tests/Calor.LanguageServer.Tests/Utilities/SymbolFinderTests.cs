@@ -9,14 +9,14 @@ namespace Calor.LanguageServer.Tests.Utilities;
 public class SymbolFinderTests
 {
     [Theory]
-    [InlineData("§L{same:item:0:1:1}", "§L{same:item:2:3:1}")]
+    [InlineData("§L{item:0:1:1}", "§L{item:2:3:1}")]
     [InlineData("§EACH{same:item:i32} items", "§EACH{same:item:i32} items")]
-    [InlineData("§WH{same} BOOL:false", "§WH{same} BOOL:false")]
+    [InlineData("§WH BOOL:false", "§WH BOOL:false")]
     public void Visitor_LoopScopesDoNotDependOnStatementIds(string firstHeader, string secondHeader)
     {
         var source = $$"""
-            §M{m1:Test}
-              §F{f1:Probe:pub} ([i32]:items) -> void
+            §M{Test}
+              §F{Probe:pub} ([i32]:items) -> void
                 {{firstHeader}}
                   §B{local:i32} 1
                   §P local
@@ -97,10 +97,10 @@ public class SymbolFinderTests
     public void ParsedDeclarationIdentifierSpans_AreSafeRenameEdits()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c1:Container:pub}
+            §M{TestModule}
+              §CL{Container:pub}
                 §FLD{i32:field:priv}
-                §MT{m1:Compute:pub} (i32:parameter) -> i32
+                §MT{Compute:pub} (i32:parameter) -> i32
                   §B{local:i32} parameter
                   §R (+ local field)
             """;
@@ -126,13 +126,13 @@ public class SymbolFinderTests
     public void CallReceiverAndCallee_ResolveAndReferenceExactIdentifierSpans()
     {
         const string source = """
-            §M{m001:TestModule}
-              §CL{c1:Worker:pub}
-                §MT{m1:Pick:pub} (i32:value) -> i32
+            §M{TestModule}
+              §CL{Worker:pub}
+                §MT{Pick:pub} (i32:value) -> i32
                   §R value
-                §MT{m2:Ping:pub} () -> void
+                §MT{Ping:pub} () -> void
                   §P STR:"ping"
-              §F{f1:Use:pub} (Worker:worker) -> i32
+              §F{Use:pub} (Worker:worker) -> i32
                 §C{worker.Ping}
                 §R §C{worker.Pick} §A INT:1 §/C
             """;
@@ -217,16 +217,16 @@ public class SymbolFinderTests
     public void TupleGenericNewTypes_IndexContainersAndSkipAnonymousTupleNodes()
     {
         const string source = """
-            §M{m001:TupleReferences}
-              §CL{c001:List:pub}<T>
-                §CTOR{ctor001:pub} ()
+            §M{TupleReferences}
+              §CL{List:pub}<T>
+                §CTOR{pub} ()
                   §P STR:"list"
-              §CL{c002:Dictionary:pub}<TKey,TValue>
-                §CTOR{ctor002:pub} ()
+              §CL{Dictionary:pub}<TKey,TValue>
+                §CTOR{pub} ()
                   §P STR:"dictionary"
-              §F{f001:MakeList:pub} () -> object
+              §F{MakeList:pub} () -> object
                 §R §NEW{List<(i32,i32)>} §/NEW
-              §F{f002:MakeDictionary:pub} () -> object
+              §F{MakeDictionary:pub} () -> object
                 §R §NEW{Dictionary<str,(i32,i32)>} §/NEW
             """;
         var state = LspTestHarness.CreateDocument(source);
@@ -296,21 +296,21 @@ public class SymbolFinderTests
     public void NestedLocalDeclarationSpans_AreIdentifierTokens()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f1:Scopes:pub} ([str]:items, IDisposable:input) -> bool
-                §L{l1:index:0:1:1}
+            §M{TestModule}
+              §F{Scopes:pub} ([str]:items, IDisposable:input) -> bool
+                §L{index:0:1:1}
                   §P index
-                §EACH{e1:item:str:position} items
+                §EACH{item:str:position} items
                   §P item
-                §USE{u1:resource:IDisposable} input
+                §USE{resource:IDisposable} input
                   §P STR:"using"
-                §TR{t1}
+                §TR
                   §P STR:"try"
                 §CA{Exception:error}
                   §P STR:"catch"
-                §/TR{t1}
-                §B{predicate} §LAM{lam1:lambdaValue:i32} (> lambdaValue 0) §/LAM{lam1}
-                §B{matched:i32} §W{match1} INT:1
+                §/TR
+                §B{predicate} §LAM{lambdaValue:i32} (> lambdaValue 0) §/LAM
+                §B{matched:i32} §W INT:1
                   §K §VAR{captured} → captured
                 §R (forall ((quantified i32)) (>= quantified 0))
             """;
@@ -345,8 +345,8 @@ public class SymbolFinderTests
     public void FindDefinition_Function_ReturnsFunction()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Add}
+            §M{TestModule}
+              §F{Add}
                 §R 0
             """;
 
@@ -363,8 +363,8 @@ public class SymbolFinderTests
     public void FindDefinition_Class_ReturnsClass()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Person}
+            §M{TestModule}
+              §CL{Person}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -380,8 +380,8 @@ public class SymbolFinderTests
     public void FindDefinition_Interface_ReturnsInterface()
     {
         var source = """
-            §M{m001:TestModule}
-              §IFACE{i001:IShape}
+            §M{TestModule}
+              §IFACE{IShape}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -397,10 +397,10 @@ public class SymbolFinderTests
     public void FindDefinition_Enum_ReturnsEnum()
     {
         var source = """
-            §M{m001:TestModule}
-              §EN{e001:Color}
+            §M{TestModule}
+              §EN{Color}
               §EM{Red}
-              §/EN{e001}
+              §/EN
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -416,11 +416,11 @@ public class SymbolFinderTests
     public void FindDefinition_Delegate_ReturnsDelegate()
     {
         var source = """
-            §M{m001:TestModule}
-              §DEL{d001:Callback}
+            §M{TestModule}
+              §DEL{Callback}
               §I{i32:value}
               §O{void}
-              §/DEL{d001}
+              §/DEL
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -436,8 +436,8 @@ public class SymbolFinderTests
     public void FindDefinition_Nonexistent_ReturnsNull()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test}
+            §M{TestModule}
+              §F{Test}
                 §R 0
             """;
 
@@ -453,8 +453,8 @@ public class SymbolFinderTests
     public void FindFunction_ExistingFunction_ReturnsFunction()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Calculate}
+            §M{TestModule}
+              §F{Calculate}
                 §I{i32:x}
                 §O{i32}
                 §R x
@@ -474,8 +474,8 @@ public class SymbolFinderTests
     public void FindFunction_NonExistent_ReturnsNull()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test}
+            §M{TestModule}
+              §F{Test}
                 §R 0
             """;
 
@@ -491,9 +491,9 @@ public class SymbolFinderTests
     public void FindMethod_ExistingMethod_ReturnsMethod()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Calculator}
-                §MT{m001:Add}
+            §M{TestModule}
+              §CL{Calculator}
+                §MT{Add}
                   §I{i32:a}
                   §I{i32:b}
                   §O{i32}
@@ -517,8 +517,8 @@ public class SymbolFinderTests
     public void FindMethod_NonExistent_ReturnsNull()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Calculator}
+            §M{TestModule}
+              §CL{Calculator}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -537,8 +537,8 @@ public class SymbolFinderTests
     public void FindSymbol_AtModuleName_ReturnsModule()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:/*cursor*/TestModule}
-              §F{f001:Test}
+            §M{/*cursor*/TestModule}
+              §F{Test}
                 §R 0
             """);
 
@@ -553,8 +553,8 @@ public class SymbolFinderTests
     public void FindSymbol_AtFunctionName_ReturnsFunction()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §F{f001:/*cursor*/Add}
+            §M{TestModule}
+              §F{/*cursor*/Add}
                 §I{i32:a}
                 §O{i32}
                 §R a
@@ -571,8 +571,8 @@ public class SymbolFinderTests
     public void FindSymbol_AtParameterName_ReturnsParameter()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §F{f001:Add}
+            §M{TestModule}
+              §F{Add}
                 §I{i32:/*cursor*/myParam}
                 §O{i32}
                 §R myParam
@@ -590,8 +590,8 @@ public class SymbolFinderTests
     public void FindSymbol_AtTypeName_ReturnsType()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §F{f001:Test}
+            §M{TestModule}
+              §F{Test}
                 §I{/*cursor*/i32:x}
                 §O{i32}
                 §R x
@@ -608,8 +608,8 @@ public class SymbolFinderTests
     public void FindSymbol_AtLocalVariable_ReturnsVariable()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §F{f001:Test}
+            §M{TestModule}
+              §F{Test}
                 §B{/*cursor*/myVar:i32} 42
                 §R myVar
             """);
@@ -625,8 +625,8 @@ public class SymbolFinderTests
     public void FindSymbol_AtVariableReference_ReturnsReference()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §F{f001:Test}
+            §M{TestModule}
+              §F{Test}
                 §I{i32:n}
                 §O{i32}
                 §R /*cursor*/n
@@ -644,8 +644,8 @@ public class SymbolFinderTests
     public void FindSymbol_AtClassName_ReturnsClass()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §CL{c001:/*cursor*/Person}
+            §M{TestModule}
+              §CL{/*cursor*/Person}
                 §FLD{str:name}
             """);
 
@@ -660,8 +660,8 @@ public class SymbolFinderTests
     public void FindSymbol_AtFieldName_ReturnsField()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §CL{c001:Person}
+            §M{TestModule}
+              §CL{Person}
                 §FLD{str:/*cursor*/name}
             """);
 
@@ -676,10 +676,10 @@ public class SymbolFinderTests
     public void FindSymbol_AtEnumName_ReturnsEnum()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §EN{e001:/*cursor*/Color}
+            §M{TestModule}
+              §EN{/*cursor*/Color}
               §EM{Red}
-              §/EN{e001}
+              §/EN
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -693,10 +693,10 @@ public class SymbolFinderTests
     public void FindSymbol_AtEnumMember_ReturnsEnumMember()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §EN{e001:Color}
+            §M{TestModule}
+              §EN{Color}
               §EM{/*cursor*/Red}
-              §/EN{e001}
+              §/EN
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -710,8 +710,8 @@ public class SymbolFinderTests
     public void FindSymbol_AtIntegerLiteral_ReturnsLiteral()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §F{f001:Test}
+            §M{TestModule}
+              §F{Test}
                 §O{i32}
                 §R /*cursor*/42
             """);
@@ -727,8 +727,8 @@ public class SymbolFinderTests
     public void FindSymbol_OutsideModule_ReturnsNull()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test}
+            §M{TestModule}
+              §F{Test}
                 §R 0
             """;
 
@@ -742,9 +742,9 @@ public class SymbolFinderTests
     public void FindSymbol_AtMethodName_ReturnsMethod()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §CL{c001:Calculator}
-                §MT{m001:/*cursor*/Add}
+            §M{TestModule}
+              §CL{Calculator}
+                §MT{/*cursor*/Add}
                   §I{i32:a}
                   §I{i32:b}
                   §O{i32}
@@ -762,10 +762,10 @@ public class SymbolFinderTests
     public void Ast_ContainsMultipleFunctions()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:First}
+            §M{TestModule}
+              §F{First}
                 §R 1
-              §F{f002:Second}
+              §F{Second}
                 §R 2
             """;
 
@@ -781,10 +781,10 @@ public class SymbolFinderTests
     public void Ast_ContainsMultipleClasses()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Person}
+            §M{TestModule}
+              §CL{Person}
                 §FLD{str:name}
-              §CL{c002:Employee}
+              §CL{Employee}
                 §FLD{i32:id}
             """;
 

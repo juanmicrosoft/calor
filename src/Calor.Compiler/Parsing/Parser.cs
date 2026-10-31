@@ -2383,7 +2383,7 @@ public sealed class Parser
         ValidateIdentityFreeHeader(startToken, attrs, 1);
 
         var id = GenerateParserAutoId("po");
-        var description = attrs["_pos0"];
+        var description = string.IsNullOrEmpty(attrs["_pos0"]) ? null : attrs["_pos0"];
 
 
         var condition = ParseExpression();

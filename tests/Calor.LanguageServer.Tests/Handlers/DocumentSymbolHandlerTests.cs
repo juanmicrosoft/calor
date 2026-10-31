@@ -9,10 +9,10 @@ public class DocumentSymbolHandlerTests
     public void DocumentSymbols_FunctionsListed()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Add}
+            §M{TestModule}
+              §F{Add}
                 §R 0
-              §F{f002:Subtract}
+              §F{Subtract}
                 §R 0
             """;
 
@@ -28,10 +28,10 @@ public class DocumentSymbolHandlerTests
     public void DocumentSymbols_ClassesListed()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Person}
+            §M{TestModule}
+              §CL{Person}
                 §FLD{str:name}
-              §CL{c002:Employee}
+              §CL{Employee}
                 §FLD{i32:id}
             """;
 
@@ -47,14 +47,14 @@ public class DocumentSymbolHandlerTests
     public void DocumentSymbols_ClassWithMembersListed()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Calculator}
+            §M{TestModule}
+              §CL{Calculator}
                 §FLD{i32:value}
-                §MT{m001:Add}
+                §MT{Add}
                   §I{i32:x}
                   §O{i32}
                   §R x
-                §MT{m002:Subtract}
+                §MT{Subtract}
                   §I{i32:x}
                   §O{i32}
                   §R x
@@ -76,12 +76,12 @@ public class DocumentSymbolHandlerTests
     public void DocumentSymbols_InterfacesListed()
     {
         var source = """
-            §M{m001:TestModule}
-              §IFACE{i001:IReadable}
-                §MT{m001:Read}
+            §M{TestModule}
+              §IFACE{IReadable}
+                §MT{Read}
                   §O{str}
-              §IFACE{i002:IWritable}
-                §MT{m001:Write}
+              §IFACE{IWritable}
+                §MT{Write}
                   §I{str:data}
                   §O{void}
             """;
@@ -98,17 +98,17 @@ public class DocumentSymbolHandlerTests
     public void DocumentSymbols_EnumsListed()
     {
         var source = """
-            §M{m001:TestModule}
-              §EN{e001:Color}
+            §M{TestModule}
+              §EN{Color}
               §EM{Red}
               §EM{Green}
               §EM{Blue}
-              §/EN{e001}
-              §EN{e002:Size}
+              §/EN
+              §EN{Size}
               §EM{Small}
               §EM{Medium}
               §EM{Large}
-              §/EN{e002}
+              §/EN
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -123,12 +123,12 @@ public class DocumentSymbolHandlerTests
     public void DocumentSymbols_EnumMembersListed()
     {
         var source = """
-            §M{m001:TestModule}
-              §EN{e001:Status}
+            §M{TestModule}
+              §EN{Status}
               §EM{Pending}
               §EM{Active}
               §EM{Complete}
-              §/EN{e001}
+              §/EN
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -147,14 +147,14 @@ public class DocumentSymbolHandlerTests
     public void DocumentSymbols_DelegatesListed()
     {
         var source = """
-            §M{m001:TestModule}
-              §DEL{d001:Action}
+            §M{TestModule}
+              §DEL{Action}
               §O{void}
-              §/DEL{d001}
-              §DEL{d002:Func}
+              §/DEL
+              §DEL{Func}
               §I{i32:x}
               §O{i32}
-              §/DEL{d002}
+              §/DEL
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -169,17 +169,17 @@ public class DocumentSymbolHandlerTests
     public void DocumentSymbols_MixedTypesListed()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Helper}
+            §M{TestModule}
+              §F{Helper}
                 §R 0
-              §CL{c001:MyClass}
+              §CL{MyClass}
                 §FLD{i32:dummy:priv}
-              §IFACE{i001:IMyInterface}
-                §MT{m001:Foo:pub}
+              §IFACE{IMyInterface}
+                §MT{Foo:pub}
                   §O{void}
-              §EN{e001:MyEnum}
+              §EN{MyEnum}
                 §EM{Value}
-              §DEL{d001:MyDelegate}
+              §DEL{MyDelegate}
                 §O{void}
             """;
 
@@ -197,8 +197,8 @@ public class DocumentSymbolHandlerTests
     public void DocumentSymbols_FunctionParameters_Counted()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Calculate}
+            §M{TestModule}
+              §F{Calculate}
                 §I{i32:a}
                 §I{i32:b}
                 §I{str:label}
@@ -218,20 +218,20 @@ public class DocumentSymbolHandlerTests
     public void DocumentSymbols_ClassProperties_Listed()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Person}
-                §PROP{p001:Name:str:pub}
+            §M{TestModule}
+              §CL{Person}
+                §PROP{Name:str:pub}
                 §GET
                 §R ""
                 §/GET
-                §/PROP{p001}
-                §PROP{p002:Age:i32:pub}
+                §/PROP
+                §PROP{Age:i32:pub}
                 §GET
                 §R 0
                 §/GET
                 §SET
                 §/SET
-                §/PROP{p002}
+                §/PROP
             """;
 
         var ast = LspTestHarness.GetAst(source);

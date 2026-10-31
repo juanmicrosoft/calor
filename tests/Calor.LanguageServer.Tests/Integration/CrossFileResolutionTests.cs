@@ -21,8 +21,8 @@ public class CrossFileResolutionTests
         var firstUri = DocumentUri.FromFileSystemPath("/workspace/first.calr");
         var secondUri = DocumentUri.FromFileSystemPath("/workspace/second.calr");
         var source = """
-            §M{m001:Shared}
-              §F{f001:Same:pub}
+            §M{Shared}
+              §F{Same:pub}
                 §O{void}
             """;
 
@@ -41,19 +41,19 @@ public class CrossFileResolutionTests
     {
         var workspace = new WorkspaceState();
         var definitions = """
-            §M{m001:Utils}
-              §F{f001:Pick:pub}
+            §M{Utils}
+              §F{Pick:pub}
                 §I{i32:value}
                 §O{i32}
                 §R value
-              §F{f002:Pick:pub}
+              §F{Pick:pub}
                 §I{str:value}
                 §O{str}
                 §R value
             """;
         var use = """
-            §M{m002:Main}
-              §F{f003:Run:pub}
+            §M{Main}
+              §F{Run:pub}
                 §O{i32}
                 §R §C{Pick} §A INT:1 §/C
             """;
@@ -95,15 +95,15 @@ public class CrossFileResolutionTests
         workspace.GetOrCreate(
             DocumentUri.From("file:///utils.calr"),
             """
-            §M{m001:Utils}
-              §F{f001:Pick:pub}
+            §M{Utils}
+              §F{Pick:pub}
                 §I{str:value}
                 §O{str}
                 §R value
             """);
         var use = """
-            §M{m002:Main}
-              §F{f002:Run:pub}
+            §M{Main}
+              §F{Run:pub}
                 §O{i32}
                 §R §C{Pick} §A INT:1 §/C
             """;
@@ -127,14 +127,14 @@ public class CrossFileResolutionTests
         var definitionsState = workspace.GetOrCreate(
             DocumentUri.From("file:///utils.calr"),
             """
-            §M{m001:Utils}
-              §F{f001:Take:pub} (str:value) -> str
+            §M{Utils}
+              §F{Take:pub} (str:value) -> str
                 §E{}
                 §R value
             """);
         var use = """
-            §M{m002:Main}
-              §F{f002:Run:pub} (?str:value) -> str
+            §M{Main}
+              §F{Run:pub} (?str:value) -> str
                 §E{}
                 §R §C{Take} §A value §/C
             """;
@@ -160,13 +160,13 @@ public class CrossFileResolutionTests
         workspace.GetOrCreate(
             DocumentUri.From("file:///models.calr"),
             """
-            §M{m001:Models}
-              §CL{c001:Box:pub}
-                §CTOR{ctor001:pub} (str:value)
+            §M{Models}
+              §CL{Box:pub}
+                §CTOR{pub} (str:value)
             """);
         var use = """
-            §M{m002:Main}
-              §F{f002:Run:pub} (?str:value) -> Box
+            §M{Main}
+              §F{Run:pub} (?str:value) -> Box
                 §E{}
                 §R §NEW{Box} §A value §/NEW
             """;
@@ -191,14 +191,14 @@ public class CrossFileResolutionTests
         workspace.GetOrCreate(
             DocumentUri.From("file:///base.calr"),
             """
-            §M{m001:Models}
-              §CL{c001:Base:pub}
-                §CTOR{ctor001:pub} (str:value)
+            §M{Models}
+              §CL{Base:pub}
+                §CTOR{pub} (str:value)
             """);
         var use = """
-            §M{m002:Main}
-              §CL{c002:Derived:Base:pub}
-                §CTOR{ctor002:pub} (?str:value)
+            §M{Main}
+              §CL{Derived:Base:pub}
+                §CTOR{pub} (?str:value)
                   §BASE
                     §A value
             """;
@@ -219,8 +219,8 @@ public class CrossFileResolutionTests
     public void EquivalentWorkspaceRoots_ProducePortableStableSymbolIds()
     {
         const string source = """
-            §M{m001:Shared}
-              §F{f001:Same:pub}
+            §M{Shared}
+              §F{Same:pub}
                 §O{void}
             """;
         var first = new WorkspaceState("/checkout/one");
@@ -242,8 +242,8 @@ public class CrossFileResolutionTests
     public void MultipleWorkspaceRoots_DisambiguateIdenticalRelativePathsPortably()
     {
         const string source = """
-            §M{m001:Shared}
-              §F{f001:Same:pub}
+            §M{Shared}
+              §F{Same:pub}
                 §O{void}
             """;
         var firstWorkspace = new WorkspaceState();
@@ -288,13 +288,13 @@ public class CrossFileResolutionTests
         workspace.GetOrCreate(
             DocumentUri.From("file:///private.calr"),
             """
-            §M{m001:Utils}
-              §F{f001:Hidden:priv} () -> i32
+            §M{Utils}
+              §F{Hidden:priv} () -> i32
                 §R 1
             """);
         var use = """
-            §M{m002:Main}
-              §F{f002:Run:pub} () -> i32
+            §M{Main}
+              §F{Run:pub} () -> i32
                 §R §C{Hidden} §/C
             """;
         var useState = workspace.GetOrCreate(
@@ -316,14 +316,14 @@ public class CrossFileResolutionTests
         workspace.GetOrCreate(
             DocumentUri.From("file:///service.calr"),
             """
-            §M{m001:Service}
-              §CL{c1:Worker:pub}
-                §MT{m1:Run:pub} () -> i32
+            §M{Service}
+              §CL{Worker:pub}
+                §MT{Run:pub} () -> i32
                   §R 1
             """);
         var use = """
-            §M{m002:Main}
-              §F{f002:RunMain:pub} () -> i32
+            §M{Main}
+              §F{RunMain:pub} () -> i32
                 §R §C{Run} §/C
             """;
         var useState = workspace.GetOrCreate(
@@ -343,11 +343,11 @@ public class CrossFileResolutionTests
     {
         var workspace = new WorkspaceState();
         var source = """
-            §M{m001:Main}
-              §CL{c1:Worker:pub}
-                §MT{m1:Hidden:priv} () -> i32
+            §M{Main}
+              §CL{Worker:pub}
+                §MT{Hidden:priv} () -> i32
                   §R 1
-              §F{f2:Run:pub} () -> i32
+              §F{Run:pub} () -> i32
                 §R §C{Worker.Hidden} §/C
             """;
         var state = workspace.GetOrCreate(DocumentUri.From("file:///main.calr"), source);
@@ -365,11 +365,11 @@ public class CrossFileResolutionTests
     {
         var workspace = new WorkspaceState();
         var source = """
-            §M{m001:Main}
-              §CL{c1:Worker:pub}
-                §MT{m1:Hidden:priv} () -> i32
+            §M{Main}
+              §CL{Worker:pub}
+                §MT{Hidden:priv} () -> i32
                   §R 1
-                §MT{m2:Run:pub} () -> i32
+                §MT{Run:pub} () -> i32
                   §R §C{Hidden} §/C
             """;
         var state = workspace.GetOrCreate(DocumentUri.From("file:///main.calr"), source);
@@ -389,15 +389,15 @@ public class CrossFileResolutionTests
         workspace.GetOrCreate(
             DocumentUri.From("file:///base.calr"),
             """
-            §M{m001:BaseModule}
-              §CL{c1:Base:pub}
-                §MT{m1:Pick:pub} (i32:value) -> i32
+            §M{BaseModule}
+              §CL{Base:pub}
+                §MT{Pick:pub} (i32:value) -> i32
                   §R value
             """);
         var source = """
-            §M{m002:DerivedModule}
-              §CL{c2:Derived:Base:pub}
-                §MT{m2:Use:pub} () -> i32
+            §M{DerivedModule}
+              §CL{Derived:Base:pub}
+                §MT{Use:pub} () -> i32
                   §R §C{base.Pick} §A INT:1 §/C
             """;
         var state = workspace.GetOrCreate(DocumentUri.From("file:///derived.calr"), source);
@@ -417,12 +417,12 @@ public class CrossFileResolutionTests
         var classState = workspace.GetOrCreate(
             DocumentUri.From("file:///model.calr"),
             """
-            §M{m001:Models}
-              §CL{c1:Widget:pub}
+            §M{Models}
+              §CL{Widget:pub}
             """);
         var use = """
-            §M{m002:Main}
-              §F{f2:Make:pub} () -> Widget
+            §M{Main}
+              §F{Make:pub} () -> Widget
                 §R §NEW{Widget} §/NEW
             """;
         var useState = workspace.GetOrCreate(
@@ -451,25 +451,25 @@ public class CrossFileResolutionTests
         var definitions = workspace.GetOrCreate(
             definitionsUri,
             """
-            §M{m001:Utils}
-              §F{f001:Pick:pub} () -> i32
+            §M{Utils}
+              §F{Pick:pub} () -> i32
                 §R 1
             """);
         var oldSymbol = Assert.Single(definitions.BoundModule!.Functions).Symbol;
         workspace.Update(
             definitionsUri,
             """
-            §M{m001:Utils}
-              §F{before:Before:pub} () -> i32
+            §M{Utils}
+              §F{Before:pub} () -> i32
                 §R 0
-              §F{f001:Pick:pub} () -> i32
+              §F{Pick:pub} () -> i32
                 §B{value:i32} 1
                 §R value
             """,
             version: 2);
         var use = """
-            §M{m002:Main}
-              §F{f002:Run:pub} () -> i32
+            §M{Main}
+              §F{Run:pub} () -> i32
                 §R §C{Pick} §/C
             """;
         var useState = workspace.GetOrCreate(DocumentUri.From("file:///main.calr"), use);
@@ -493,16 +493,16 @@ public class CrossFileResolutionTests
         var uri = DocumentUri.From("file:///state.calr");
         var state = workspace.GetOrCreate(
             uri,
-            "§M{m1:State}\n  §F{f1:Value:pub} () -> i32\n    §R 1\n",
+            "§M{State}\n  §F{Value:pub} () -> i32\n    §R 1\n",
             version: 1);
         var captured = state.Snapshot;
         workspace.Update(
             uri,
-            "§M{m1:State}\n  §F{f1:Value:pub} () -> i32\n    §R 2\n",
+            "§M{State}\n  §F{Value:pub} () -> i32\n    §R 2\n",
             version: 2);
         workspace.Update(
             uri,
-            "§M{m1:State}\n  §F{f1:Value:pub} () -> i32\n    §R 0\n",
+            "§M{State}\n  §F{Value:pub} () -> i32\n    §R 0\n",
             version: 1);
 
         Assert.Equal(1, captured.Version);
@@ -520,8 +520,8 @@ public class CrossFileResolutionTests
 
         // First document defines a function
         var source1 = """
-            §M{m001:Utils}
-              §F{f001:Add:pub}
+            §M{Utils}
+              §F{Add:pub}
                 §I{i32:a}
                 §I{i32:b}
                 §O{i32}
@@ -531,8 +531,8 @@ public class CrossFileResolutionTests
 
         // Second document uses the function
         var source2 = """
-            §M{m002:Main}
-              §F{f002:Test}
+            §M{Main}
+              §F{Test}
                 §O{i32}
                 §B{result} §C{Add} 1 2 §/C
                 §R result
@@ -554,8 +554,8 @@ public class CrossFileResolutionTests
 
         // First document defines a class
         var source1 = """
-            §M{m001:Models}
-              §CL{c001:Person}
+            §M{Models}
+              §CL{Person}
                 §FLD{str:name}
                 §FLD{i32:age}
             """;
@@ -563,8 +563,8 @@ public class CrossFileResolutionTests
 
         // Second document uses the class
         var source2 = """
-            §M{m002:Main}
-              §F{f001:CreatePerson}
+            §M{Main}
+              §F{CreatePerson}
                 §O{Person}
                 §R §NEW Person
             """;
@@ -584,9 +584,9 @@ public class CrossFileResolutionTests
 
         // First document defines an interface
         var source1 = """
-            §M{m001:Interfaces}
-              §IFACE{i001:IShape}
-                §MT{m001:GetArea}
+            §M{Interfaces}
+              §IFACE{IShape}
+                §MT{GetArea}
                   §O{f64}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///interfaces.calr"), source1);
@@ -605,12 +605,12 @@ public class CrossFileResolutionTests
 
         // First document defines an enum
         var source1 = """
-            §M{m001:Types}
-              §EN{e001:Color}
+            §M{Types}
+              §EN{Color}
               §EM{Red}
               §EM{Green}
               §EM{Blue}
-              §/EN{e001}
+              §/EN
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///types.calr"), source1);
 
@@ -627,8 +627,8 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{m001:Test}
-              §F{f001:Test}
+            §M{Test}
+              §F{Test}
                 §R 42
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///test.calr"), source);
@@ -645,10 +645,10 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{m001:Test}
-              §F{f001:Helper}
+            §M{Test}
+              §F{Helper}
                 §R 42
-              §F{f002:Main}
+              §F{Main}
                 §B{x} §C{Helper} §/C
                 §R x
             """;
@@ -671,10 +671,10 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{m001:Test}
-              §F{f001:PublicFunc:pub}
+            §M{Test}
+              §F{PublicFunc:pub}
                 §R 42
-              §F{f002:PrivateFunc:priv}
+              §F{PrivateFunc:priv}
                 §R 0
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///test.calr"), source);
@@ -691,8 +691,8 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{m001:Test}
-              §CL{c001:MyClass}
+            §M{Test}
+              §CL{MyClass}
                 §FLD{i32:value}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///test.calr"), source);
@@ -708,9 +708,9 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{m001:Test}
-              §IFACE{i001:IMyInterface}
-                §MT{m001:DoSomething}
+            §M{Test}
+              §IFACE{IMyInterface}
+                §MT{DoSomething}
                   §O{void}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///test.calr"), source);
@@ -726,11 +726,11 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{m001:Test}
-              §EN{e001:Status}
+            §M{Test}
+              §EN{Status}
               §EM{Active}
               §EM{Inactive}
-              §/EN{e001}
+              §/EN
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///test.calr"), source);
 
@@ -745,11 +745,11 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{m001:Test}
-              §DEL{d001:Callback}
+            §M{Test}
+              §DEL{Callback}
               §I{i32:value}
               §O{void}
-              §/DEL{d001}
+              §/DEL
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///test.calr"), source);
 
@@ -764,22 +764,22 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source1 = """
-            §M{m001:File1}
-              §F{f001:FuncA:pub}
+            §M{File1}
+              §F{FuncA:pub}
                 §R 1
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///file1.calr"), source1);
 
         var source2 = """
-            §M{m002:File2}
-              §F{f001:FuncB:pub}
+            §M{File2}
+              §F{FuncB:pub}
                 §R 2
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///file2.calr"), source2);
 
         var source3 = """
-            §M{m003:File3}
-              §CL{c001:ClassC}
+            §M{File3}
+              §CL{ClassC}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///file3.calr"), source3);
 
@@ -801,16 +801,16 @@ public class CrossFileResolutionTests
 
         // First document defines a class
         var source1 = """
-            §M{m001:Models}
-              §CL{c001:Customer}
+            §M{Models}
+              §CL{Customer}
                 §FLD{str:name}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///models.calr"), source1);
 
         // Second document should have access to Customer type in completions
         var source2 = """
-            §M{m002:Service}
-              §F{f001:GetCustomer}
+            §M{Service}
+              §F{GetCustomer}
                 §O{i32}
                 §R 0
             """;
@@ -831,8 +831,8 @@ public class CrossFileResolutionTests
 
         // First document defines a utility function
         var source1 = """
-            §M{m001:Utils}
-              §F{f001:Calculate:pub}
+            §M{Utils}
+              §F{Calculate:pub}
                 §I{i32:x}
                 §O{i32}
                 §R x * 2
@@ -841,8 +841,8 @@ public class CrossFileResolutionTests
 
         // Second document should see Calculate in completions
         var source2 = """
-            §M{m002:Main}
-              §F{f001:Test}
+            §M{Main}
+              §F{Test}
                 §O{i32}
                 §R 0
             """;
@@ -866,8 +866,8 @@ public class CrossFileResolutionTests
 
         // First document defines a class
         var source1 = """
-            §M{m001:Models}
-              §CL{c001:Address}
+            §M{Models}
+              §CL{Address}
                 §FLD{str:street}
                 §FLD{str:city}
             """;
@@ -894,10 +894,10 @@ public class CrossFileResolutionTests
 
         // First document defines a base class
         var source1 = """
-            §M{m001:Base}
-              §CL{c001:Animal}
+            §M{Base}
+              §CL{Animal}
                 §FLD{str:name}
-                §MT{m001:Speak}
+                §MT{Speak}
                   §O{str}
                   §R "..."
             """;
@@ -905,8 +905,8 @@ public class CrossFileResolutionTests
 
         // Second document defines a derived class
         var source2 = """
-            §M{m002:Derived}
-              §CL{c001:Dog}
+            §M{Derived}
+              §CL{Dog}
                 §EXT{Animal}
                 §FLD{str:breed}
             """;
@@ -939,8 +939,8 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{m001:Test}
-              §F{f001:ToRemove:pub}
+            §M{Test}
+              §F{ToRemove:pub}
                 §R 42
             """;
         var uri = DocumentUri.From("file:///toremove.calr");
@@ -967,8 +967,8 @@ public class CrossFileResolutionTests
 
         // Initial source
         var source1 = """
-            §M{m001:Test}
-              §F{f001:OldName:pub}
+            §M{Test}
+              §F{OldName:pub}
                 §R 42
             """;
         workspace.GetOrCreate(uri, source1);
@@ -979,8 +979,8 @@ public class CrossFileResolutionTests
 
         // Update the document
         var source2 = """
-            §M{m001:Test}
-              §F{f001:NewName:pub}
+            §M{Test}
+              §F{NewName:pub}
                 §R 42
             """;
         workspace.Update(uri, source2, 2);
@@ -1004,8 +1004,8 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{m001:Models}
-              §CL{c001:Person}
+            §M{Models}
+              §CL{Person}
                 §FLD{str:name}
                 §FLD{i32:age}
             """;
@@ -1024,10 +1024,10 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{m001:Models}
-              §CL{c001:Person}
+            §M{Models}
+              §CL{Person}
                 §FLD{str:name}
-                §MT{m001:GetName}
+                §MT{GetName}
                   §O{str}
                   §R name
             """;
@@ -1045,9 +1045,9 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{m001:Models}
-              §CL{c001:Person}
-                §PROP{str:FullName}
+            §M{Models}
+              §CL{Person}
+                §PROP{FullName:str}
                 §GET
                 §R "test"
                 §/GET
@@ -1067,12 +1067,12 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{m001:Types}
-              §EN{e001:Color}
+            §M{Types}
+              §EN{Color}
               §EM{Red}
               §EM{Green}
               §EM{Blue}
-              §/EN{e001}
+              §/EN
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///types.calr"), source);
 
@@ -1088,9 +1088,9 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{m001:Interfaces}
-              §IFACE{i001:IShape}
-                §MT{m001:GetArea}
+            §M{Interfaces}
+              §IFACE{IShape}
+                §MT{GetArea}
                   §O{f64}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///interfaces.calr"), source);
@@ -1108,16 +1108,16 @@ public class CrossFileResolutionTests
 
         // Base class in one file
         var source1 = """
-            §M{m001:Base}
-              §CL{c001:Animal}
+            §M{Base}
+              §CL{Animal}
                 §FLD{str:name}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///base.calr"), source1);
 
         // Derived class in another file
         var source2 = """
-            §M{m002:Derived}
-              §CL{c001:Dog}
+            §M{Derived}
+              §CL{Dog}
                 §EXT{Animal}
                 §FLD{str:breed}
             """;
@@ -1138,13 +1138,13 @@ public class CrossFileResolutionTests
         var aUri = DocumentUri.From("file:///cycle-a.calr");
         var bUri = DocumentUri.From("file:///cycle-b.calr");
         workspace.GetOrCreate(aUri, """
-            §M{m001:CycleA}
-              §CL{c001:A}
+            §M{CycleA}
+              §CL{A}
                 §EXT{B}
             """);
         workspace.GetOrCreate(bUri, """
-            §M{m002:CycleB}
-              §CL{c002:B}
+            §M{CycleB}
+              §CL{B}
                 §EXT{A}
             """);
 
@@ -1175,18 +1175,18 @@ public class CrossFileResolutionTests
         var bUri = DocumentUri.From("file:///indirect-b.calr");
         var cUri = DocumentUri.From("file:///indirect-c.calr");
         workspace.GetOrCreate(aUri, """
-            §M{m001:CycleA}
-              §CL{c001:A}
+            §M{CycleA}
+              §CL{A}
                 §EXT{B}
             """);
         workspace.GetOrCreate(bUri, """
-            §M{m002:CycleB}
-              §CL{c002:B}
+            §M{CycleB}
+              §CL{B}
                 §EXT{C}
             """);
         workspace.GetOrCreate(cUri, """
-            §M{m003:CycleC}
-              §CL{c003:C}
+            §M{CycleC}
+              §CL{C}
                 §EXT{A}
             """);
 
@@ -1217,13 +1217,13 @@ public class CrossFileResolutionTests
         var aUri = DocumentUri.From("file:///qualified-cycle-a.calr");
         var bUri = DocumentUri.From("file:///qualified-cycle-b.calr");
         workspace.GetOrCreate(aUri, """
-            §M{m001:CycleA}
-              §CL{c001:A}
+            §M{CycleA}
+              §CL{A}
                 §EXT{CycleB.B}
             """);
         workspace.GetOrCreate(bUri, """
-            §M{m002:CycleB}
-              §CL{c002:B}
+            §M{CycleB}
+              §CL{B}
                 §EXT{CycleA.A}
             """);
 
@@ -1246,23 +1246,23 @@ public class CrossFileResolutionTests
         var sources = new Dictionary<DocumentUri, string>
         {
             [DocumentUri.From("file:///left-a.calr")] = """
-                §M{m001:LeftA}
-                  §CL{c001:A}
+                §M{LeftA}
+                  §CL{A}
                     §EXT{LeftB.B}
                 """,
             [DocumentUri.From("file:///left-b.calr")] = """
-                §M{m002:LeftB}
-                  §CL{c002:B}
+                §M{LeftB}
+                  §CL{B}
                     §EXT{LeftA.A}
                 """,
             [DocumentUri.From("file:///right-a.calr")] = """
-                §M{m003:RightA}
-                  §CL{c003:A}
+                §M{RightA}
+                  §CL{A}
                     §EXT{RightB.B}
                 """,
             [DocumentUri.From("file:///right-b.calr")] = """
-                §M{m004:RightB}
-                  §CL{c004:B}
+                §M{RightB}
+                  §CL{B}
                     §EXT{RightA.A}
                 """,
         };
@@ -1289,23 +1289,23 @@ public class CrossFileResolutionTests
         var sources = new Dictionary<DocumentUri, string>
         {
             [DocumentUri.From("file:///partial-a-base.calr")] = """
-                §M{ma1:CycleA}
-                  §CL{a1:A:pub:partial}
+                §M{CycleA}
+                  §CL{A:pub:partial}
                     §EXT{CycleB.B}
                 """,
             [DocumentUri.From("file:///partial-a-members.calr")] = """
-                §M{ma2:CycleA}
-                  §CL{a2:A:pub:partial}
+                §M{CycleA}
+                  §CL{A:pub:partial}
                     §FLD{i32:value}
                 """,
             [DocumentUri.From("file:///partial-b-base.calr")] = """
-                §M{mb1:CycleB}
-                  §CL{b1:B:pub:partial}
+                §M{CycleB}
+                  §CL{B:pub:partial}
                     §EXT{CycleA.A}
                 """,
             [DocumentUri.From("file:///partial-b-members.calr")] = """
-                §M{mb2:CycleB}
-                  §CL{b2:B:pub:partial}
+                §M{CycleB}
+                  §CL{B:pub:partial}
                     §FLD{i32:value}
                 """,
         };
@@ -1332,31 +1332,31 @@ public class CrossFileResolutionTests
         var sources = new Dictionary<DocumentUri, string>
         {
             [DocumentUri.From("file:///partial-indirect-a-base.calr")] = """
-                §M{ma1:CycleA}
-                  §CL{a1:A:pub:partial}
+                §M{CycleA}
+                  §CL{A:pub:partial}
                     §EXT{CycleB.B}
                 """,
             [DocumentUri.From("file:///partial-indirect-a-part.calr")] = """
-                §M{ma2:CycleA}
-                  §CL{a2:A:pub:partial}
+                §M{CycleA}
+                  §CL{A:pub:partial}
                 """,
             [DocumentUri.From("file:///partial-indirect-b-base.calr")] = """
-                §M{mb1:CycleB}
-                  §CL{b1:B:pub:partial}
+                §M{CycleB}
+                  §CL{B:pub:partial}
                     §EXT{CycleC.C}
                 """,
             [DocumentUri.From("file:///partial-indirect-b-part.calr")] = """
-                §M{mb2:CycleB}
-                  §CL{b2:B:pub:partial}
+                §M{CycleB}
+                  §CL{B:pub:partial}
                 """,
             [DocumentUri.From("file:///partial-indirect-c-base.calr")] = """
-                §M{mc1:CycleC}
-                  §CL{c1:C:pub:partial}
+                §M{CycleC}
+                  §CL{C:pub:partial}
                     §EXT{CycleA.A}
                 """,
             [DocumentUri.From("file:///partial-indirect-c-part.calr")] = """
-                §M{mc2:CycleC}
-                  §CL{c2:C:pub:partial}
+                §M{CycleC}
+                  §CL{C:pub:partial}
                 """,
         };
         foreach (var (uri, source) in sources)
@@ -1384,17 +1384,17 @@ public class CrossFileResolutionTests
         var sources = new Dictionary<DocumentUri, string>
         {
             [DocumentUri.From("file:///duplicate-a-one.calr")] = """
-                §M{ma1:Duplicate}
-                  §CL{a1:A:pub}
+                §M{Duplicate}
+                  §CL{A:pub}
                     §EXT{Other.B}
                 """,
             [DocumentUri.From("file:///duplicate-a-two.calr")] = """
-                §M{ma2:Duplicate}
-                  §CL{a2:A:pub}
+                §M{Duplicate}
+                  §CL{A:pub}
                 """,
             [DocumentUri.From("file:///duplicate-b.calr")] = """
-                §M{mb1:Other}
-                  §CL{b1:B:pub}
+                §M{Other}
+                  §CL{B:pub}
                     §EXT{Duplicate.A}
                 """,
         };
@@ -1416,23 +1416,23 @@ public class CrossFileResolutionTests
         var sources = new Dictionary<DocumentUri, string>
         {
             [DocumentUri.From("file:///generic-foo-one.calr")] = """
-                §M{m1:Generic}
-                  §CL{f1:Foo:pub}<T>
+                §M{Generic}
+                  §CL{Foo:pub}<T>
                     §EXT{Generic.Bar<T>}
                 """,
             [DocumentUri.From("file:///generic-bar-one.calr")] = """
-                §M{m2:Generic}
-                  §CL{b1:Bar:pub}<T>
+                §M{Generic}
+                  §CL{Bar:pub}<T>
                     §EXT{Generic.Foo<T>}
                 """,
             [DocumentUri.From("file:///generic-foo-two.calr")] = """
-                §M{m3:Generic}
-                  §CL{f2:Foo:pub}<T,U>
+                §M{Generic}
+                  §CL{Foo:pub}<T,U>
                     §EXT{Generic.Bar<T,U>}
                 """,
             [DocumentUri.From("file:///generic-bar-two.calr")] = """
-                §M{m4:Generic}
-                  §CL{b2:Bar:pub}<T,U>
+                §M{Generic}
+                  §CL{Bar:pub}<T,U>
                     §EXT{Generic.Foo<T,U>}
                 """,
         };
@@ -1471,13 +1471,13 @@ public class CrossFileResolutionTests
         var barUri = DocumentUri.From(
             $"file:///arity-bar-{typeArgument.Length}.calr");
         workspace.GetOrCreate(fooUri, $$"""
-            §M{m1:Generic}
-              §CL{f1:Foo:pub}<T>
+            §M{Generic}
+              §CL{Foo:pub}<T>
                 §EXT{Generic.Bar<{{typeArgument}}>}
             """);
         workspace.GetOrCreate(barUri, $$"""
-            §M{m2:Generic}
-              §CL{b1:Bar:pub}<T>
+            §M{Generic}
+              §CL{Bar:pub}<T>
                 §EXT{Generic.Foo<{{typeArgument}}>}
             """);
 
@@ -1500,16 +1500,16 @@ public class CrossFileResolutionTests
         var localUri = DocumentUri.From("file:///lexical-local.calr");
         var globalUri = DocumentUri.From("file:///lexical-global.calr");
         workspace.GetOrCreate(localUri, """
-            §M{m1:Local}
-              §CL{h1:Host:pub}
+            §M{Local}
+              §CL{Host:pub}
                 §CL{Parent:pub}
                   §EXT{Child}
                 §CL{Child:pub}
                   §EXT{Parent}
             """);
         workspace.GetOrCreate(globalUri, """
-            §M{m2:Other}
-              §CL{p1:Parent:pub}
+            §M{Other}
+              §CL{Parent:pub}
             """);
 
         var snapshot = workspace.CaptureSnapshot();
@@ -1545,22 +1545,22 @@ public class CrossFileResolutionTests
         var sources = new Dictionary<DocumentUri, string>
         {
             [DocumentUri.From("file:///ambiguous-base-one.calr")] = """
-                §M{m1:Local}
-                  §CL{b1:Base:pub}
+                §M{Local}
+                  §CL{Base:pub}
                 """,
             [DocumentUri.From("file:///ambiguous-base-two.calr")] = """
-                §M{m2:Local}
-                  §CL{b2:Base:pub}
+                §M{Local}
+                  §CL{Base:pub}
                 """,
             [DocumentUri.From("file:///ambiguous-derived.calr")] = """
-                §M{m3:Local}
+                §M{Local}
                   §U{Other}
-                  §CL{d1:Derived:pub}
+                  §CL{Derived:pub}
                     §EXT{Base}
                 """,
             [DocumentUri.From("file:///ambiguous-import.calr")] = """
-                §M{m4:Other}
-                  §CL{b3:Base:pub}
+                §M{Other}
+                  §CL{Base:pub}
                     §EXT{Local.Derived}
                 """,
         };
@@ -1578,16 +1578,16 @@ public class CrossFileResolutionTests
     public void PartialGenericParameterNameMismatch_IsNotMergedIntoCycle()
     {
         AssertIncompatiblePartialGenericDoesNotCycle(
-            "§CL{f1:Foo:pub:partial}<T>\n    §EXT{Generic.Bar<T>}",
-            "§CL{f2:Foo:pub:partial}<U>");
+            "§CL{Foo:pub:partial}<T>\n    §EXT{Generic.Bar<T>}",
+            "§CL{Foo:pub:partial}<U>");
     }
 
     [Fact]
     public void PartialGenericConstraintMismatch_IsNotMergedIntoCycle()
     {
         AssertIncompatiblePartialGenericDoesNotCycle(
-            "§CL{f1:Foo:pub:partial}<T>\n    §WHERE T : class\n    §EXT{Generic.Bar<T>}",
-            "§CL{f2:Foo:pub:partial}<T>\n    §WHERE T : struct");
+            "§CL{Foo:pub:partial}<T>\n    §WHERE T : class\n    §EXT{Generic.Bar<T>}",
+            "§CL{Foo:pub:partial}<T>\n    §WHERE T : struct");
     }
 
     [Fact]
@@ -1598,19 +1598,19 @@ public class CrossFileResolutionTests
         var secondUri = DocumentUri.From("file:///compatible-partial-two.calr");
         var barUri = DocumentUri.From("file:///compatible-partial-bar.calr");
         var firstState = workspace.GetOrCreate(firstUri, """
-            §M{m1:Generic}
-              §CL{f1:Foo:pub:partial}<T>
+            §M{Generic}
+              §CL{Foo:pub:partial}<T>
                 §WHERE T : class
                 §EXT{Generic.Bar<T>}
             """);
         var secondState = workspace.GetOrCreate(secondUri, """
-            §M{m2:Generic}
-              §CL{f2:Foo:pub:partial}<T>
+            §M{Generic}
+              §CL{Foo:pub:partial}<T>
                 §WHERE T : class
             """);
         workspace.GetOrCreate(barUri, """
-            §M{m3:Generic}
-              §CL{b1:Bar:pub}<T>
+            §M{Generic}
+              §CL{Bar:pub}<T>
                 §EXT{Generic.Foo<T>}
             """);
 
@@ -1653,14 +1653,14 @@ public class CrossFileResolutionTests
         var nestedUri = DocumentUri.From("file:///structured-nested.calr");
         var moduleUri = DocumentUri.From("file:///structured-module.calr");
         workspace.GetOrCreate(nestedUri, """
-            §M{m1:A}
-              §CL{b1:B:pub}
+            §M{A}
+              §CL{B:pub}
                 §CL{C:pub}
                   §EXT{A.B.C}
             """);
         workspace.GetOrCreate(moduleUri, """
-            §M{m2:A.B}
-              §CL{c2:C:pub}
+            §M{A.B}
+              §CL{C:pub}
                 §EXT{A.B.C}
             """);
 
@@ -1682,11 +1682,11 @@ public class CrossFileResolutionTests
         var firstUri = DocumentUri.From("file:///incompatible-partial-one.calr");
         var secondUri = DocumentUri.From("file:///incompatible-partial-two.calr");
         var barUri = DocumentUri.From("file:///incompatible-partial-bar.calr");
-        workspace.GetOrCreate(firstUri, $"§M{{m1:Generic}}\n  {firstDeclaration}\n");
-        workspace.GetOrCreate(secondUri, $"§M{{m2:Generic}}\n  {secondDeclaration}\n");
+        workspace.GetOrCreate(firstUri, $"§M{{Generic}}\n  {firstDeclaration}\n");
+        workspace.GetOrCreate(secondUri, $"§M{{Generic}}\n  {secondDeclaration}\n");
         workspace.GetOrCreate(barUri, """
-            §M{m3:Generic}
-              §CL{b1:Bar:pub}<T>
+            §M{Generic}
+              §CL{Bar:pub}<T>
                 §EXT{Generic.Foo<T>}
             """);
 
@@ -1701,17 +1701,17 @@ public class CrossFileResolutionTests
     public async Task CapturedWorkspaceIndex_RemainsVersionCoherentAfterUpdateAsync()
     {
         const string original = """
-            §M{m001:TestModule}
-              §F{f001:Compute:pub} () -> i32
+            §M{TestModule}
+              §F{Compute:pub} () -> i32
                 §R 42
-              §F{f002:Use:pub} () -> i32
+              §F{Use:pub} () -> i32
                 §R §C{Compute} §/C
             """;
         const string updated = """
-            §M{m001:TestModule}
-              §F{f001:Calculate:pub} () -> i32
+            §M{TestModule}
+              §F{Calculate:pub} () -> i32
                 §R 42
-              §F{f002:Use:pub} () -> i32
+              §F{Use:pub} () -> i32
                 §R §C{Calculate} §/C
             """;
         var workspace = new WorkspaceState();
@@ -1772,7 +1772,7 @@ public class CrossFileResolutionTests
         Directory.CreateDirectory(directory);
         await File.WriteAllTextAsync(
             Path.Combine(directory, "blocked.calr"),
-            "§M{m001:Blocked}\n");
+            "§M{Blocked}\n");
         var readerStarted = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var workspace = new WorkspaceState(
@@ -1869,9 +1869,9 @@ public class CrossFileResolutionTests
             $"workspace-registry-{Guid.NewGuid():N}");
         Directory.CreateDirectory(directory);
         var path = Path.Combine(directory, "race.calr");
-        const string diskSource = "§M{d001:Disk}\n";
-        const string openSource = "§M{o001:Open}\n";
-        const string reopenedSource = "§M{r001:Reopened}\n";
+        const string diskSource = "§M{Disk}\n";
+        const string openSource = "§M{Open}\n";
+        const string reopenedSource = "§M{Reopened}\n";
         await File.WriteAllTextAsync(path, diskSource);
         var uri = DocumentUri.FromFileSystemPath(path);
         var scanReadyToApply = new TaskCompletionSource(
@@ -1949,8 +1949,8 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{m001:Models}
-              §CL{c001:Person}
+            §M{Models}
+              §CL{Person}
                 §FLD{str:name}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///models.calr"), source);
@@ -1967,8 +1967,8 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{m001:Models}
-              §CL{c001:Person}
+            §M{Models}
+              §CL{Person}
                 §FLD{str:name}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///models.calr"), source);
@@ -2017,8 +2017,8 @@ public class CrossFileResolutionTests
 
         // Valid document
         var source2 = """
-            §M{m002:Valid}
-              §F{f001:ValidFunc:pub}
+            §M{Valid}
+              §F{ValidFunc:pub}
                 §R 0
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///valid.calr"), source2);
@@ -2036,16 +2036,16 @@ public class CrossFileResolutionTests
 
         // First document defines Helper
         var source1 = """
-            §M{m001:File1}
-              §F{f001:Helper:pub}
+            §M{File1}
+              §F{Helper:pub}
                 §R 1
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///file1.calr"), source1);
 
         // Second document also defines Helper
         var source2 = """
-            §M{m002:File2}
-              §F{f001:Helper:pub}
+            §M{File2}
+              §F{Helper:pub}
                 §R 2
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///file2.calr"), source2);

@@ -20,8 +20,8 @@ public class SpanDebugTests
     [Fact]
     public void Debug_SpanPositions()
     {
-        var source = @"§M{m001:TestModule}
-  §F{f001:Add}
+        var source = @"§M{TestModule}
+  §F{Add}
     §I{i32:a}
     §O{i32}
     §R a";
@@ -77,7 +77,7 @@ public class SpanDebugTests
         _output.WriteLine("FindSymbol tests:");
 
         // Test at offset that should be in the function name area
-        var funcLineOffset = source.IndexOf("§F{f001:Add}");
+        var funcLineOffset = source.IndexOf("§F{Add}");
         _output.WriteLine($"Function line starts at offset {funcLineOffset}");
 
         // Try finding at line 2 (where function is)
@@ -120,8 +120,8 @@ public class SpanDebugTests
     [Fact]
     public void Span_Contains_Position()
     {
-        var source = @"§M{m001:TestModule}
-  §F{f001:Add}
+        var source = @"§M{TestModule}
+  §F{Add}
     §I{i32:a}
     §O{i32}
     §R a";

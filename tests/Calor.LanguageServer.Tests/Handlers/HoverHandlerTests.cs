@@ -22,8 +22,8 @@ public class HoverHandlerTests
     public void BuildHover_UsesOneCapturedAnalysisSnapshot()
     {
         const string original = """
-            §M{m001:TestModule}
-              §F{f001:Original:pub} () -> i32
+            §M{TestModule}
+              §F{Original:pub} () -> i32
                 §R 1
             """;
         var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(
@@ -34,7 +34,7 @@ public class HoverHandlerTests
         var (line, column) = LspTestHarness.GetLineColumn(original, offset);
         _workspace.Update(
             uri,
-            "§M{m002:Changed}\n  §F{f002:New:pub} () -> i32\n    §R 2\n",
+            "§M{Changed}\n  §F{New:pub} () -> i32\n    §R 2\n",
             version: 2);
 
         var hover = HoverHandler.BuildHover(
@@ -52,8 +52,8 @@ public class HoverHandlerTests
     public void Hover_Function_ReturnsSymbolInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §F{f001:/*cursor*/Add}
+            §M{TestModule}
+              §F{/*cursor*/Add}
                 §I{i32:a}
                 §I{i32:b}
                 §O{i32}
@@ -71,8 +71,8 @@ public class HoverHandlerTests
     public void Hover_Parameter_ReturnsTypeInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §F{f001:Test}
+            §M{TestModule}
+              §F{Test}
                 §I{i32:/*cursor*/value}
                 §O{i32}
                 §R value
@@ -90,8 +90,8 @@ public class HoverHandlerTests
     public void Hover_Class_ReturnsClassInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §CL{c001:/*cursor*/Person}
+            §M{TestModule}
+              §CL{/*cursor*/Person}
                 §FLD{str:name}
                 §FLD{i32:age}
             """);
@@ -107,8 +107,8 @@ public class HoverHandlerTests
     public void Hover_Field_ReturnsFieldInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §CL{c001:Person}
+            §M{TestModule}
+              §CL{Person}
                 §FLD{str:/*cursor*/name}
             """);
 
@@ -123,9 +123,9 @@ public class HoverHandlerTests
     public void Hover_Method_ReturnsMethodInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §CL{c001:Calculator}
-                §MT{m001:/*cursor*/Add}
+            §M{TestModule}
+              §CL{Calculator}
+                §MT{/*cursor*/Add}
                   §I{i32:a}
                   §I{i32:b}
                   §O{i32}
@@ -143,9 +143,9 @@ public class HoverHandlerTests
     public void Hover_Interface_ReturnsInterfaceInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §IFACE{i001:/*cursor*/IShape}
-                §MT{m001:GetArea}
+            §M{TestModule}
+              §IFACE{/*cursor*/IShape}
+                §MT{GetArea}
                   §O{f64}
             """);
 
@@ -160,12 +160,12 @@ public class HoverHandlerTests
     public void Hover_Enum_ReturnsEnumInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §EN{e001:/*cursor*/Color}
+            §M{TestModule}
+              §EN{/*cursor*/Color}
               §EM{Red}
               §EM{Green}
               §EM{Blue}
-              §/EN{e001}
+              §/EN
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -179,10 +179,10 @@ public class HoverHandlerTests
     public void Hover_EnumMember_ReturnsMemberInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §EN{e001:Color}
+            §M{TestModule}
+              §EN{Color}
               §EM{/*cursor*/Red}
-              §/EN{e001}
+              §/EN
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -196,8 +196,8 @@ public class HoverHandlerTests
     public void Hover_LocalVariable_ReturnsVariableInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §F{f001:Test}
+            §M{TestModule}
+              §F{Test}
                 §B{/*cursor*/x:i32} 42
                 §R x
             """);
@@ -213,8 +213,8 @@ public class HoverHandlerTests
     public void Hover_Module_ReturnsModuleInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:/*cursor*/TestModule}
-              §F{f001:Test}
+            §M{/*cursor*/TestModule}
+              §F{Test}
                 §R 0
             """);
 
@@ -255,7 +255,7 @@ public class HoverHandlerTests
     {
         if (!TagDocumentationProvider.Instance.IsLoaded) return;
 
-        var source = "§F{f001:Test}§/F";
+        var source = "§F{Test}§/F";
         var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
         _workspace.GetOrCreate(uri, source);
 
@@ -299,7 +299,7 @@ public class HoverHandlerTests
     {
         if (!TagDocumentationProvider.Instance.IsLoaded) return;
 
-        var source = "§IF{x > 0} true §/IF";
+        var source = "§IF true §/IF";
         var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
         _workspace.GetOrCreate(uri, source);
 
@@ -365,7 +365,7 @@ public class HoverHandlerTests
     {
         if (!TagDocumentationProvider.Instance.IsLoaded) return;
 
-        var source = "§TR{} body §CA{} handler §/TR";
+        var source = "§TR body §CA{} handler §/TR";
         var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
         _workspace.GetOrCreate(uri, source);
 

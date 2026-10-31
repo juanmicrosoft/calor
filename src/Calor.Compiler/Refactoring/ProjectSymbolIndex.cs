@@ -374,7 +374,7 @@ public sealed class ProjectSymbolIndex
                 "source",
                 SymbolSourceIdentity.Canonicalize(document.FilePath),
                 "module",
-                document.Ast.Id);
+                document.Ast.Name);
             var moduleSplit =
                 (moduleDocumentCounts.TryGetValue(document.Ast.Name, out var declaringModules)
                     && declaringModules > 1)

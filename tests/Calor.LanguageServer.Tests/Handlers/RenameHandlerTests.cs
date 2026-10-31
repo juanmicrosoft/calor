@@ -13,18 +13,13 @@ namespace Calor.LanguageServer.Tests.Handlers;
 
 public class RenameHandlerTests
 {
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task ClassRenameKeepsSelfTypedMemberIdentityAsync(bool canonicalSourceId)
+    [Fact]
+    public async Task ClassRenameKeepsSelfTypedMemberIdentityAsync()
     {
         var root = CreateWorkspaceDirectory();
         try
         {
-            var methodId = canonicalSourceId
-                ? Calor.Compiler.Ids.CompactIdGenerator.Generate(Calor.Compiler.Ids.IdKind.Method) + ":" : "";
-            var source = "§M{Demo}\n  §CL{A:pub}\n    §MT{" + methodId
-                + "Echo:pub} (A:value) -> A\n      §R value\n";
+            var source = "§M{Demo}\n  §CL{A:pub}\n    §MT{Echo:pub} (A:value) -> A\n      §R value\n";
             var file = Path.Combine(root, "active.calr");
             File.WriteAllText(file, source);
             var store = new Calor.Compiler.Ids.DeclarationIdentityStore(root);
@@ -62,19 +57,16 @@ public class RenameHandlerTests
     }
 
     [Theory]
-    [InlineData(true, false, false)]
-    [InlineData(true, true, false)]
-    [InlineData(true, true, true)]
-    [InlineData(false, true, false)]
-    [InlineData(false, true, true)]
-    public async Task RegisteredLegacyRenameRemainsAvailableWhileUnsavedSidecarRenameFailsExplicitlyAsync(
-        bool legacy, bool unsaved, bool transactional)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task SidecarRenameRefusesNontransactionalClientsAndUnsavedBuffersExplicitlyAsync(
+        bool unsaved, bool transactional)
     {
         var root = CreateWorkspaceDirectory();
         try
         {
-            const string idless = "§M{Demo}\n  §F{Compute:pub} () -> i32\n    §R 42\n";
-            var source = legacy ? idless.Replace("§M{", "§M{m001:").Replace("§F{", "§F{f001:") : idless;
+            const string source = "§M{Demo}\n  §F{Compute:pub} () -> i32\n    §R 42\n";
             var file = Path.Combine(root, "active.calr");
             File.WriteAllText(file, source);
             var store = new Calor.Compiler.Ids.DeclarationIdentityStore(root);
@@ -84,21 +76,10 @@ public class RenameHandlerTests
             var uri = DocumentUri.FromFileSystemPath(file);
             var workspace = new WorkspaceState();
             workspace.GetOrCreate(uri, buffer, version: 2);
-            if (legacy)
-            {
-                var edit = await RenameAtAsync(workspace, uri, buffer, "Compute", "Calculate",
-                    supportsTransactionalEdits: transactional);
-                var documentEdit = Assert.Single(edit!.DocumentChanges!).TextDocumentEdit!;
-                Assert.Equal(2, documentEdit.TextDocument.Version);
-                Assert.Equal(uri, documentEdit.TextDocument.Uri);
-            }
-            else
-            {
-                var error = await Assert.ThrowsAsync<OmniSharp.Extensions.JsonRpc.Server.RequestFailedException>(
-                    () => RenameAtAsync(workspace, uri, buffer, "Compute", "Calculate",
-                        supportsTransactionalEdits: transactional));
-                Assert.Contains(transactional ? "Save sidecar-backed" : "transactional", error.Message);
-            }
+            var error = await Assert.ThrowsAsync<OmniSharp.Extensions.JsonRpc.Server.RequestFailedException>(
+                () => RenameAtAsync(workspace, uri, buffer, "Compute", "Calculate",
+                    supportsTransactionalEdits: transactional));
+            Assert.Contains(transactional ? "Save sidecar-backed" : "transactional", error.Message);
             Assert.Equal(source, File.ReadAllText(file));
             Assert.Equal(sidecar, File.ReadAllText(store.SidecarPath));
         }
@@ -164,10 +145,10 @@ public class RenameHandlerTests
     public async Task RenameUsesVersionedDocumentChangesAndExactTokenRangesAsync()
     {
         const string source = """
-            §M{m001:TestModule}
-              §F{f001:Compute:pub} () -> i32
+            §M{TestModule}
+              §F{Compute:pub} () -> i32
                 §R 42
-              §F{f002:Use:pub} () -> i32
+              §F{Use:pub} () -> i32
                 §R §C{Compute} §/C
             """;
         var uri = DocumentUri.From("file:///rename.calr");
@@ -195,11 +176,11 @@ public class RenameHandlerTests
     public async Task RenameInheritedFieldAccessesEditsOnlyFieldIdentifiersAsync()
     {
         const string source = """
-            §M{m001:TestModule}
-              §CL{c001:Base:pub}
+            §M{TestModule}
+              §CL{Base:pub}
                 §FLD{i32:shared:prot}
-              §CL{c002:Derived:Base:pub}
-                §MT{m001:Use:pub} () -> i32
+              §CL{Derived:Base:pub}
+                §MT{Use:pub} () -> i32
                   §R (+ §THIS.shared §BASE.shared)
             """;
         var uri = DocumentUri.From("file:///rename-field.calr");
@@ -225,9 +206,9 @@ public class RenameHandlerTests
     public async Task RenameTypeDoesNotEditQualifiedExternalTypeAsync()
     {
         const string source = """
-            §M{m001:TestModule}
-              §CL{c001:Exception:pub}
-              §CL{c002:Holder:pub}
+            §M{TestModule}
+              §CL{Exception:pub}
+              §CL{Holder:pub}
                 §FLD{Exception:local:priv}
                 §FLD{System.Exception:external:priv}
             """;
@@ -258,8 +239,8 @@ public class RenameHandlerTests
     public async Task RenameModuleUsesStableModuleSymbolIdAndExactNameSpanAsync()
     {
         const string source = """
-            §M{m001:OriginalModule}
-              §F{f001:Run:pub} () -> i32
+            §M{OriginalModule}
+              §F{Run:pub} () -> i32
                 §R INT:1
             """;
         var uri = DocumentUri.From("file:///rename-module.calr");
@@ -288,12 +269,12 @@ public class RenameHandlerTests
         try
         {
             const string definition = """
-                §M{m001:Models}
-                  §CL{c001:Widget:pub}
+                §M{Models}
+                  §CL{Widget:pub}
                 """;
             const string use = """
-                §M{m002:Models}
-                  §F{f001:Make:pub} () -> Widget
+                §M{Models}
+                  §F{Make:pub} () -> Widget
                     §R §NEW{Widget} §/NEW
                 """;
             var definitionPath = Path.Combine(root, "definition.calr");
@@ -348,8 +329,8 @@ public class RenameHandlerTests
     public async Task RenameDoesNotResolveAdjacentOrWhitespaceCursorsAsync(int relativeOffset)
     {
         const string source = """
-            §M{m001:TestModule}
-              §F{f001:Compute:pub} () -> i32
+            §M{TestModule}
+              §F{Compute:pub} () -> i32
                 §R 42
             """;
         var uri = DocumentUri.From("file:///rename-cursor.calr");
@@ -374,10 +355,10 @@ public class RenameHandlerTests
     public async Task GenericModuleFunctionRefactoringUsesBaseIdentifierAndCompilesAsync()
     {
         const string source = """
-            §M{m001:GenericModule}
-              §F{f001:Identity<T>:pub} (T:value) -> T
+            §M{GenericModule}
+              §F{Identity<T>:pub} (T:value) -> T
                 §R value
-              §F{f002:Use:pub} () -> i32
+              §F{Use:pub} () -> i32
                 §R §C{Identity<i32>} §A INT:1 §/C
             """;
         var uri = DocumentUri.From("file:///generic-refactor.calr");
@@ -413,7 +394,7 @@ public class RenameHandlerTests
         var edit = await RenameAtAsync(workspace, uri, source, "Identity<i32>", "Transform");
         Assert.NotNull(edit);
         var updated = ApplySingleDocumentEdit(source, edit!);
-        Assert.Contains("§F{f001:Transform<T>:pub}", updated);
+        Assert.Contains("§F{Transform<T>:pub}", updated);
         Assert.Contains("§C{Transform<i32>}", updated);
         AssertRoslynClean(updated);
     }
@@ -422,29 +403,29 @@ public class RenameHandlerTests
     public async Task TypeRenamesCoverStaticCallsAndTypeBearingPositionsAsync()
     {
         const string source = """
-            §M{m001:TypeRefactor}
-              §IFACE{i001:IWidget}
-                §MT{m000:Marker} () -> void
-              §CL{c001:WidgetException:pub}
+            §M{TypeRefactor}
+              §IFACE{IWidget}
+                §MT{Marker} () -> void
+              §CL{WidgetException:pub}
                 §EXT{System.Exception}
                 §IMPL{IWidget}
-                §MT{m001:Create:pub:static} () -> WidgetException
+                §MT{Create:pub:static} () -> WidgetException
                   §R §NEW{WidgetException} §/NEW
-                §MT{m002:Marker:pub} () -> void
+                §MT{Marker:pub} () -> void
                   §P STR:"marker"
-              §CL{c002:DerivedException:pub}
+              §CL{DerivedException:pub}
                 §EXT{WidgetException}
                 §FLD{i32:Code:pub}
-              §F{f001:Use:pub} (object:value) -> WidgetException
+              §F{Use:pub} (object:value) -> WidgetException
                 §ARR{items:WidgetException:1}
                 §LIST{values:WidgetException}
                   §NEW{WidgetException} §/NEW
-                §/LIST{values}
-                §TR{t001}
+                §/LIST
+                §TR
                   §R (cast WidgetException value)
                 §CA{WidgetException:ex}
                   §R §C{WidgetException.Create} §/C
-                §/TR{t001}
+                §/TR
             """;
         var uri = DocumentUri.From("file:///type-refactor.calr");
         var workspace = new WorkspaceState();
@@ -552,7 +533,7 @@ public class RenameHandlerTests
         var renamedInterface = ApplySingleDocumentEdit(
             renamedClass,
             interfaceEdit!);
-        Assert.Contains("§IFACE{i001:IRenamedWidget}", renamedInterface);
+        Assert.Contains("§IFACE{IRenamedWidget}", renamedInterface);
         Assert.Contains("§IMPL{IRenamedWidget}", renamedInterface);
         AssertRoslynClean(renamedInterface);
     }
@@ -561,13 +542,13 @@ public class RenameHandlerTests
     public async Task ConditionalAlternativeReferencesRefuseDefinitionReferencesAndRenameAsync()
     {
         const string source = """
-            §M{m001:Conditional}
-              §CL{c001:Worker:pub}
+            §M{Conditional}
+              §CL{Worker:pub}
                 §PP{FEATURE}
-                  §MT{m001:Pick:pub} () -> i32
+                  §MT{Pick:pub} () -> i32
                     §R INT:1
                 §PPE
-                  §MT{m002:Pick:pub} () -> i32
+                  §MT{Pick:pub} () -> i32
                     §R INT:2
                 §/PP{FEATURE}
                 §PP{FEATURE}
@@ -575,7 +556,7 @@ public class RenameHandlerTests
                 §PPE
                   §FLD{i32:value:pub}
                 §/PP{FEATURE}
-                §MT{m003:Run:pub} () -> i32
+                §MT{Run:pub} () -> i32
                   §R (+ §C{Pick} §/C §THIS.value)
             """;
         var uri = DocumentUri.From("file:///conditional-refactor.calr");
@@ -616,8 +597,8 @@ public class RenameHandlerTests
     public async Task RenameRejectsCalorAndCSharpReservedWordsAsync(string newName)
     {
         const string source = """
-            §M{m001:Keywords}
-              §F{f001:Compute:pub} () -> i32
+            §M{Keywords}
+              §F{Compute:pub} () -> i32
                 §R INT:1
             """;
         var uri = DocumentUri.From("file:///rename-keyword.calr");
@@ -631,12 +612,12 @@ public class RenameHandlerTests
     public async Task RenameRejectsDeclarationCollisionWithoutPartialEditsAsync()
     {
         const string source = """
-            §M{m001:Collisions}
-              §F{f001:First:pub} () -> i32
+            §M{Collisions}
+              §F{First:pub} () -> i32
                 §R INT:1
-              §F{f002:Second:pub} () -> i32
+              §F{Second:pub} () -> i32
                 §R INT:2
-              §F{f003:Use:pub} () -> i32
+              §F{Use:pub} () -> i32
                 §R §C{First} §/C
             """;
         var uri = DocumentUri.From("file:///rename-collision.calr");
@@ -655,20 +636,20 @@ public class RenameHandlerTests
             var sources = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["models.calr"] = """
-                    §M{m001:Models}
-                      §CL{c001:Widget:pub}
+                    §M{Models}
+                      §CL{Widget:pub}
                         §FLD{i32:Value:pub}
                     """,
                 ["services.calr"] = """
-                    §M{m002:Services}
+                    §M{Services}
                       §U{Models}
-                      §F{f001:Make:pub} () -> Widget
+                      §F{Make:pub} () -> Widget
                         §R §NEW{Widget} §/NEW
                     """,
                 ["app.calr"] = """
-                    §M{m003:App}
+                    §M{App}
                       §U{Models}
-                      §F{f002:Run:pub} () -> Widget
+                      §F{Run:pub} () -> Widget
                         §R §C{Make} §/C
                     """,
             };
@@ -732,19 +713,19 @@ public class RenameHandlerTests
             var sources = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["definition.calr"] = """
-                    §M{m001:Split}
-                      §CL{c001:Worker:pub:partial}
-                        §MT{m001:Pick:pub} (i32:value) -> i32
+                    §M{Split}
+                      §CL{Worker:pub:partial}
+                        §MT{Pick:pub} (i32:value) -> i32
                           §R value
                     """,
                 ["use.calr"] = """
-                    §M{m002:Split}
-                      §CL{c002:Worker:pub:partial}
-                        §MT{m002:Run:pub} () -> i32
+                    §M{Split}
+                      §CL{Worker:pub:partial}
+                        §MT{Run:pub} () -> i32
                           §R §C{Pick} §A INT:1 §/C
                     """,
                 ["broken.calr"] = """
-                    §M{m003:Broken}
+                    §M{Broken}
                       §CSHARP{public static class BrokenProbe
                     {
                         public static int Value => MissingValue;
@@ -799,8 +780,8 @@ public class RenameHandlerTests
     public async Task RenameRejectsNewCompilationErrorWhenAbsoluteCountIsUnchangedAsync()
     {
         const string source = """
-            §M{m001:SwapErrors}
-              §F{f001:Old:pub} () -> i32
+            §M{SwapErrors}
+              §F{Old:pub} () -> i32
                 §R INT:1
               §CSHARP{public static class Probe
             {
@@ -809,8 +790,8 @@ public class RenameHandlerTests
             }}§/CSHARP
             """;
         var candidate = source.Replace(
-            "§F{f001:Old:pub}",
-            "§F{f001:NewName:pub}",
+            "§F{Old:pub}",
+            "§F{NewName:pub}",
             StringComparison.Ordinal);
         var baselineErrors = GetRoslynErrors(source);
         var candidateErrors = GetRoslynErrors(candidate);
@@ -837,10 +818,10 @@ public class RenameHandlerTests
     public async Task RenameRejectsFieldToParameterCaptureThatStillCompilesAsync()
     {
         const string source = """
-            §M{m001:Capture}
-              §CL{c001:Box:pub}
+            §M{Capture}
+              §CL{Box:pub}
                 §FLD{i32:stored:priv}
-                §MT{m001:Read:pub} (i32:value) -> i32
+                §MT{Read:pub} (i32:value) -> i32
                   §R stored
             """;
         var candidate = source
@@ -863,10 +844,10 @@ public class RenameHandlerTests
     public async Task RenameRejectsParameterToFieldCaptureThatStillCompilesAsync()
     {
         const string source = """
-            §M{m001:Capture}
-              §CL{c001:Box:pub}
+            §M{Capture}
+              §CL{Box:pub}
                 §FLD{i32:value:priv}
-                §MT{m001:Read:pub} (i32:input) -> i32
+                §MT{Read:pub} (i32:input) -> i32
                   §R (+ input value)
             """;
         var candidate = source
@@ -889,10 +870,10 @@ public class RenameHandlerTests
     public async Task RenameRejectsFieldLocalCaptureInBothDirectionsAsync()
     {
         const string fieldToLocal = """
-            §M{m001:Capture}
-              §CL{c001:Box:pub}
+            §M{Capture}
+              §CL{Box:pub}
                 §FLD{i32:stored:priv}
-                §MT{m001:Read:pub} () -> i32
+                §MT{Read:pub} () -> i32
                   §B{value:i32} INT:2
                   §R (+ stored value)
             """;
@@ -911,10 +892,10 @@ public class RenameHandlerTests
             "value"));
 
         const string localToField = """
-            §M{m001:Capture}
-              §CL{c001:Box:pub}
+            §M{Capture}
+              §CL{Box:pub}
                 §FLD{i32:value:priv}
-                §MT{m001:Read:pub} () -> i32
+                §MT{Read:pub} () -> i32
                   §B{input:i32} INT:2
                   §R (+ input value)
             """;
@@ -937,10 +918,10 @@ public class RenameHandlerTests
     public async Task RenameAllowsExplicitFieldAccessToShadowParameterSafelyAsync()
     {
         const string source = """
-            §M{m001:Capture}
-              §CL{c001:Box:pub}
+            §M{Capture}
+              §CL{Box:pub}
                 §FLD{i32:stored:priv}
-                §MT{m001:Read:pub} (i32:value) -> i32
+                §MT{Read:pub} (i32:value) -> i32
                   §R (+ §THIS.stored value)
             """;
         var uri = DocumentUri.From("file:///shadow-safe-field-rename.calr");
@@ -1037,16 +1018,16 @@ public class RenameHandlerTests
         try
         {
             const string target = """
-                §M{m001:ConditionalCollision}
-                  §CL{c001:Worker:pub:partial}
-                    §MT{m001:Compute:pub} () -> i32
+                §M{ConditionalCollision}
+                  §CL{Worker:pub:partial}
+                    §MT{Compute:pub} () -> i32
                       §R INT:1
                 """;
             const string conditional = """
-                §M{m002:ConditionalCollision}
-                  §CL{c002:Worker:pub:partial}
+                §M{ConditionalCollision}
+                  §CL{Worker:pub:partial}
                     §PP{COLLIDING_METHOD}
-                      §MT{m002:Calculate:pub} () -> i32
+                      §MT{Calculate:pub} () -> i32
                         §R INT:2
                     §/PP{COLLIDING_METHOD}
                 """;
@@ -1083,13 +1064,13 @@ public class RenameHandlerTests
         try
         {
             const string target = """
-                §M{m001:ConditionalCollision}
-                  §CL{c001:Worker:pub:partial}
+                §M{ConditionalCollision}
+                  §CL{Worker:pub:partial}
                     §FLD{i32:stored:pub}
                 """;
             const string conditional = """
-                §M{m002:ConditionalCollision}
-                  §CL{c002:Worker:pub:partial}
+                §M{ConditionalCollision}
+                  §CL{Worker:pub:partial}
                     §PP{COLLIDING_FIELD}
                       §FLD{i32:value:pub}
                     §/PP{COLLIDING_FIELD}
@@ -1127,12 +1108,12 @@ public class RenameHandlerTests
         try
         {
             const string target = """
-                §M{m001:RawGuard}
-                  §F{f001:Compute:pub} () -> i32
+                §M{RawGuard}
+                  §F{Compute:pub} () -> i32
                     §R INT:1
                 """;
             const string guardedReference = """
-                §M{m002:RawGuard}
+                §M{RawGuard}
                   §CSHARP{public static class RawProbe
                 {
                 #if PRIMARY_RAW
@@ -1182,12 +1163,12 @@ public class RenameHandlerTests
         try
         {
             const string target = """
-                §M{m001:RawSpacing}
-                  §F{f001:Compute:pub} () -> i32
+                §M{RawSpacing}
+                  §F{Compute:pub} () -> i32
                     §R INT:1
                 """;
             var guardedReference = $$$"""
-                §M{m002:RawSpacing}
+                §M{RawSpacing}
                   §CSHARP{public static class RawProbe
                 {
                 {{{directive}}}
@@ -1231,12 +1212,12 @@ public class RenameHandlerTests
         try
         {
             const string target = """
-                §M{m001:RawCompound}
-                  §F{f001:Compute:pub} () -> i32
+                §M{RawCompound}
+                  §F{Compute:pub} () -> i32
                     §R INT:1
                 """;
             const string guardedReference = """
-                §M{m002:RawCompound}
+                §M{RawCompound}
                   §CSHARP{public static class RawProbe
                 {
                 #if OUTER_RAW
@@ -1285,24 +1266,24 @@ public class RenameHandlerTests
         bool includeTrailingContext)
     {
         var source = """
-            §M{m001:ListOps}
-              §F{f001:Sum:pub} (i32:a, i32:b) -> i32
+            §M{ListOps}
+              §F{Sum:pub} (i32:a, i32:b) -> i32
                 §R (+ a b)
-              §F{f002:Count:pub} (i32:n) -> i32
+              §F{Count:pub} (i32:n) -> i32
                 §R n
-              §F{f003:FirstOrDefault:pub} (i32:value, i32:defaultVal, bool:hasElements) -> i32
-                §IF{if1} hasElements
+              §F{FirstOrDefault:pub} (i32:value, i32:defaultVal, bool:hasElements) -> i32
+                §IF hasElements
                   §R value
                 §EL
                   §R defaultVal
-              §F{f004:Use:pub} () -> i32
+              §F{Use:pub} () -> i32
                 §R §C{FirstOrDefault} §A INT:1 §A INT:0 §A BOOL:true §/C
             """;
         if (includeTrailingContext)
         {
             source += """
 
-                  §F{f005:TrailingContext:pub} () -> i32
+                  §F{TrailingContext:pub} () -> i32
                     §R INT:0
                 """;
         }
@@ -1332,17 +1313,17 @@ public class RenameHandlerTests
         try
         {
             const string target = """
-                §M{m001:ConditionalControl}
-                  §CL{c001:Worker:pub:partial}
-                    §MT{m001:Compute:pub} () -> i32
+                §M{ConditionalControl}
+                  §CL{Worker:pub:partial}
+                    §MT{Compute:pub} () -> i32
                       §R INT:1
                     §FLD{i32:stored:pub}
                 """;
             const string conditional = """
-                §M{m002:ConditionalControl}
-                  §CL{c002:Worker:pub:partial}
+                §M{ConditionalControl}
+                  §CL{Worker:pub:partial}
                     §PP{UNRELATED_MEMBERS}
-                      §MT{m002:OtherMethod:pub} () -> i32
+                      §MT{OtherMethod:pub} () -> i32
                         §R INT:2
                       §FLD{i32:otherField:pub}
                     §/PP{UNRELATED_MEMBERS}
@@ -1416,8 +1397,8 @@ public class RenameHandlerTests
                 "CombinedBudget",
                 preprocessorSymbolCount: 3);
             const string conditional = """
-                §M{m002:CombinedBudget}
-                  §CL{c002:OtherFlags:pub}
+                §M{CombinedBudget}
+                  §CL{OtherFlags:pub}
                     §PP{OTHER_FLAG_0}
                       §FLD{i32:Calculate:pub}
                     §/PP{OTHER_FLAG_0}
@@ -1470,8 +1451,8 @@ public class RenameHandlerTests
                 File.WriteAllText(
                     Path.Combine(root, $"unrelated-{index}.calr"),
                     $$"""
-                    §M{m100:Unrelated{{index}}}
-                      §CL{c100:Type{{index}}:pub}
+                    §M{Unrelated{{index}}}
+                      §CL{Type{{index}}:pub}
                         §FLD{i32:Value:pub}
                     """);
             }
@@ -1517,10 +1498,10 @@ public class RenameHandlerTests
     public async Task TypeRenameRefusesWhenSemanticCompletenessSignalFindsSpanlessConstraintAsync()
     {
         const string source = """
-            §M{m001:IncompleteTypeSpan}
-              §CL{c001:Widget:pub}
+            §M{IncompleteTypeSpan}
+              §CL{Widget:pub}
                 §FLD{i32:Value:pub}
-              §F{f001:Use:pub}<T> (T:value) -> T
+              §F{Use:pub}<T> (T:value) -> T
                 §WHERE T : Widget
                 §R value
             """;
@@ -1543,13 +1524,13 @@ public class RenameHandlerTests
         try
         {
             const string definitions = """
-                §M{m001:Definitions}
-                  §F{f001:Pick:pub} (i32:value) -> i32
+                §M{Definitions}
+                  §F{Pick:pub} (i32:value) -> i32
                     §R value
                 """;
             const string use = """
-                §M{m002:Use}
-                  §F{f002:Run:pub} () -> i32
+                §M{Use}
+                  §F{Run:pub} () -> i32
                     §R §C{Pick} §A INT:1 §/C
                 """;
             File.WriteAllText(Path.Combine(root, "definitions.calr"), definitions);
@@ -1742,11 +1723,11 @@ public class RenameHandlerTests
     {
         var lines = new List<string>
         {
-            $"§M{{m001:{moduleName}}}",
+            $"§M{{{moduleName}}}",
         };
         if (preprocessorSymbolCount > 0)
         {
-            lines.Add("  §CL{c001:Flags:pub}");
+            lines.Add("  §CL{Flags:pub}");
             for (var index = 0; index < preprocessorSymbolCount; index++)
             {
                 lines.Add($"    §PP{{FLAG_{index}}}");
@@ -1756,9 +1737,9 @@ public class RenameHandlerTests
         }
         if (includeRenameTarget)
         {
-            lines.Add("  §F{f001:Compute:pub} () -> i32");
+            lines.Add("  §F{Compute:pub} () -> i32");
             lines.Add("    §R INT:1");
-            lines.Add("  §F{f002:Use:pub} () -> i32");
+            lines.Add("  §F{Use:pub} () -> i32");
             lines.Add("    §R §C{Compute} §/C");
         }
         return string.Join(Environment.NewLine, lines);
@@ -1854,45 +1835,45 @@ public sealed class ExactSpanRefactoringGateTests
             var sources = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["definitions.calr"] = """
-                    §M{defs:Collision}
-                      §CL{c001:Worker:pub:partial}
+                    §M{Collision}
+                      §CL{Worker:pub:partial}
                         §FLD{i32:value:pub}
-                        §MT{m001:Pick:pub} (i32:value) -> i32
-                          §IF{nested} (== value INT:0)
+                        §MT{Pick:pub} (i32:value) -> i32
+                          §IF (== value INT:0)
                             §B{result:i32} INT:10
                             §R result
                           §EL
                             §B{result:i32} value
                             §R result
-                        §MT{m002:Pick:pub} (str:value) -> i32
+                        §MT{Pick:pub} (str:value) -> i32
                           §R INT:2
-                        §MT{m003:Run:pub} () -> i32
+                        §MT{Run:pub} () -> i32
                           §B{value:i32} INT:3
                           §R (+ value §THIS.value)
-                        §CL{c005:Nested:pub}
-                          §MT{m005:Run:pub} () -> i32
+                        §CL{Nested:pub}
+                          §MT{Run:pub} () -> i32
                             §B{result:i32} INT:4
                             §R result
                     """,
                 ["open-use.calr"] = """
-                    §M{openUse:Collision}
-                      §CL{c002:Worker:pub:partial}
-                        §MT{m010:UseOne:pub} () -> i32
+                    §M{Collision}
+                      §CL{Worker:pub:partial}
+                        §MT{UseOne:pub} () -> i32
                           §R §C{Pick} §A INT:1 §/C
                     """,
                 ["closed-use.calr"] = """
-                    §M{closedUse:Collision}
-                      §CL{c003:Worker:pub:partial}
-                        §MT{m011:UseTwo:pub} () -> i32
+                    §M{Collision}
+                      §CL{Worker:pub:partial}
+                        §MT{UseTwo:pub} () -> i32
                           §R §C{Pick} §A INT:2 §/C
                     """,
                 ["collisions.calr"] = """
-                    §M{other:Collision}
-                      §CL{c004:OtherType:pub}
+                    §M{Collision}
+                      §CL{OtherType:pub}
                         §FLD{i32:value:pub}
-                        §MT{m020:Pick:pub} (str:value) -> i32
+                        §MT{Pick:pub} (str:value) -> i32
                           §R INT:3
-                        §MT{m021:Run:pub} (i32:value) -> i32
+                        §MT{Run:pub} (i32:value) -> i32
                           §R value
                     """,
             };
@@ -1952,12 +1933,12 @@ public sealed class ExactSpanRefactoringGateTests
             Assert.Equal(3, updated.Values.Sum(source => Count(source, "Choose")));
             Assert.Equal(
                 1,
-                Count(updated[Path.Combine(root, "definitions.calr")], ":Pick:pub"));
+                Count(updated[Path.Combine(root, "definitions.calr")], "§MT{Pick:pub"));
             Assert.Equal(
                 1,
-                Count(updated[Path.Combine(root, "collisions.calr")], ":Pick:pub"));
-            Assert.Contains("§MT{m003:Run:pub}", updated[Path.Combine(root, "definitions.calr")]);
-            Assert.Contains("§MT{m021:Run:pub}", updated[Path.Combine(root, "collisions.calr")]);
+                Count(updated[Path.Combine(root, "collisions.calr")], "§MT{Pick:pub"));
+            Assert.Contains("§MT{Run:pub}", updated[Path.Combine(root, "definitions.calr")]);
+            Assert.Contains("§MT{Run:pub}", updated[Path.Combine(root, "collisions.calr")]);
 
             var syntaxTrees = new List<SyntaxTree>();
             foreach (var (path, source) in updated.OrderBy(pair => pair.Key, StringComparer.Ordinal))
@@ -2017,15 +1998,15 @@ public sealed class ExactSpanRefactoringGateTests
             var sources = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["definitions.calr"] = """
-                    §M{defs:Collision}
-                      §CL{c001:Worker:pub:partial}
-                        §MT{m001:Pick:pub} (i32:value) -> i32
+                    §M{Collision}
+                      §CL{Worker:pub:partial}
+                        §MT{Pick:pub} (i32:value) -> i32
                           §R value
                     """,
                 ["open-use.calr"] = """
-                    §M{openUse:Collision}
-                      §CL{c002:Worker:pub:partial}
-                        §MT{m010:UseOne:pub} () -> i32
+                    §M{Collision}
+                      §CL{Worker:pub:partial}
+                        §MT{UseOne:pub} () -> i32
                           §R §C{Pick} §A INT:1 §/C
                     """,
             };
@@ -2072,13 +2053,13 @@ public sealed class ExactSpanRefactoringGateTests
             var sources = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["models.calr"] = """
-                    §M{m001:Models}
-                      §CL{c001:Widget:pub}
+                    §M{Models}
+                      §CL{Widget:pub}
                     """,
                 ["app.calr"] = """
-                    §M{m002:App}
+                    §M{App}
                       §U{Models}
-                      §F{f001:Make:pub} () -> Widget
+                      §F{Make:pub} () -> Widget
                         §R §NEW{Widget} §/NEW
                     """,
             };

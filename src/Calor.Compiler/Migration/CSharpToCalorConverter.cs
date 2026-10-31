@@ -1436,7 +1436,7 @@ public sealed class CSharpToCalorConverter
         IReadOnlyList<DelegateDefinitionNode>? delegates = null)
     {
         var solo = new ModuleNode(
-            module.Span, module.SourceId, module.Name, module.Usings,
+            module.Span, module.LocalId, module.Name, module.Usings,
             interfaces ?? Array.Empty<InterfaceDefinitionNode>(),
             classes ?? Array.Empty<ClassDefinitionNode>(),
             enums ?? Array.Empty<EnumDefinitionNode>(),

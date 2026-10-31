@@ -14,8 +14,8 @@ public class BindInferenceQuickfixTests
     public void RemovedNoneInitializer_DoesNotSuggestRemovedType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §O{void}
                 §B{x} §NN
             """;
@@ -30,8 +30,8 @@ public class BindInferenceQuickfixTests
     public void Calor0252_VecEmpty_SurfacesVecFix()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §O{void}
                 §B{xs} §C{Vec.empty}
             """;
@@ -46,8 +46,8 @@ public class BindInferenceQuickfixTests
     public void Calor0253_AmbiguousNumeric_SurfacesF64Fix()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §O{void}
                 §B{x} (+ INT:0 FLOAT:0.0)
             """;
@@ -64,8 +64,8 @@ public class BindInferenceQuickfixTests
         // Explicit type annotation bypasses strict-inference checks; the LSP
         // should not surface any Calor0251-0253 quick-fixes.
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §O{void}
                 §B{x:?i32} null
             """;

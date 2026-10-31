@@ -9,8 +9,8 @@ public class CodeActionHandlerTests
     public void ValidSource_NoFixes()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub} () -> i32
+            §M{TestModule}
+              §F{Test:pub} () -> i32
                 §R 0
             """;
 
@@ -23,13 +23,13 @@ public class CodeActionHandlerTests
     public void FixApplied_SourceIsValid()
     {
         var source = """
-            §M{m001:TestModule}
-            §F{f001:Test:pub} () -> i32
+            §M{TestModule}
+            §F{Test:pub} () -> i32
             §R 0
             """;
 
         // The fix should change f002 to f001
-        var fixedSource = source.Replace("§/F{f002}", "§/F{f001}");
+        var fixedSource = source.Replace("§/F", "§/F");
 
         var diagnostics = LspTestHarness.GetDiagnostics(fixedSource);
 
@@ -40,8 +40,8 @@ public class CodeActionHandlerTests
     public void UndefinedReference_WithSimilarName_GeneratesFix()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §O{i32}
                 §B{counter} 0
                 §R couner
@@ -61,8 +61,8 @@ public class CodeActionHandlerTests
     public void UndefinedReference_NoSimilarName_NoFix()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §O{i32}
                 §B{counter} 0
                 §R xyz
@@ -84,8 +84,8 @@ public class CodeActionHandlerTests
     public void UndefinedReference_SimilarParameter_GeneratesFix()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Add:pub}
+            §M{TestModule}
+              §F{Add:pub}
                 §I{i32:value}
                 §O{i32}
                 §R valeu
@@ -104,11 +104,11 @@ public class CodeActionHandlerTests
     public void FunctionUsedAsVariable_GeneratesFix()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Helper:pub}
+            §M{TestModule}
+              §F{Helper:pub}
                 §O{i32}
                 §R 42
-              §F{f002:Main:pub}
+              §F{Main:pub}
                 §O{i32}
                 §B{x} Helper
                 §R x
@@ -127,8 +127,8 @@ public class CodeActionHandlerTests
     public void DuplicateParameter_GeneratesFix()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Add:pub}
+            §M{TestModule}
+              §F{Add:pub}
                 §I{i32:x}
                 §I{i32:x}
                 §O{i32}
@@ -148,8 +148,8 @@ public class CodeActionHandlerTests
     public void MultipleFixes_AllHaveCorrectEdits()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Calc:pub}
+            §M{TestModule}
+              §F{Calc:pub}
                 §O{i32}
                 §B{counter} 0
                 §B{result} couner
@@ -173,8 +173,8 @@ public class CodeActionHandlerTests
     {
         // Test that applying a typo fix results in valid code
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §O{i32}
                 §B{counter} 0
                 §R couner
@@ -197,8 +197,8 @@ public class CodeActionHandlerTests
     public void OperatorTypo_GeneratesFix()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §O{bool}
                 §R (cotains "hello" "h")
             """;
@@ -217,8 +217,8 @@ public class CodeActionHandlerTests
     public void OperatorTypo_AppliedFix_ProducesValidCode()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §O{bool}
                 §R (cotains "hello" "h")
             """;
@@ -238,8 +238,8 @@ public class CodeActionHandlerTests
     public void NameofOperator_CompilesWithNoErrors()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §O{str}
                 §R (nameof x)
             """;
@@ -253,8 +253,8 @@ public class CodeActionHandlerTests
     public void UnknownOperator_NoSimilar_NoFix()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §O{i32}
                 §R (xyzqwerty 1 2)
             """;

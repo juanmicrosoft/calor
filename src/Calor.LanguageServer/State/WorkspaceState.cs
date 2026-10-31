@@ -1743,7 +1743,7 @@ public sealed class WorkspaceState
                 "source",
                 GetCanonicalSourceIdentity(document.Document.Uri),
                 "module",
-                document.Analysis.Ast!.Id);
+                document.Analysis.Ast!.Name);
             AddOccurrence(
                 document,
                 moduleId,

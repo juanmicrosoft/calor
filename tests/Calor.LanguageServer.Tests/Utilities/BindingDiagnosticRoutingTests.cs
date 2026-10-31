@@ -35,14 +35,14 @@ public class BindingDiagnosticRoutingTests
             _ => "§C{Take} §A value §/C"
         };
         var source = $$"""
-            §M{m1:StageBLsp}
-              §CL{c1:Widget:pub}
-                §MT{id:Id:pub} () -> i32
+            §M{StageBLsp}
+              §CL{Widget:pub}
+                §MT{Id:pub} () -> i32
                   §E{}
                   §R 1
-              §F{take:Take:pub} ({{targetType}}:value) -> void
+              §F{Take:pub} ({{targetType}}:value) -> void
                 §E{}
-              §F{probe:Probe:pub} ({{sourceType}}:value) -> {{(code == "Calor0273" ? targetType : "void")}}
+              §F{Probe:pub} ({{sourceType}}:value) -> {{(code == "Calor0273" ? targetType : "void")}}
                 §E{}
                 {{statement}}
             """;
@@ -74,11 +74,11 @@ public class BindingDiagnosticRoutingTests
     public async Task StageB_ArrayInputs_UseActiveArrayContextAndExactSpanAsync(string sourceType, string component)
     {
         var source = $$"""
-            §M{m1:ArrayRouting}
-              §F{take:Take:pub} ([str]:items) -> i32
+            §M{ArrayRouting}
+              §F{Take:pub} ([str]:items) -> i32
                 §E{}
                 §R 1
-              §F{caller:Caller:pub} ({{sourceType}}:values) -> i32
+              §F{Caller:pub} ({{sourceType}}:values) -> i32
                 §E{}
                 §B{first} values
                 §B{second} first
@@ -110,11 +110,11 @@ public class BindingDiagnosticRoutingTests
         bool expression, bool objectOverload)
     {
         var extra = objectOverload
-            ? "  §F{object:Take:pub} (object:value) -> i32\n    §E{}\n    §R 2\n"
+            ? "  §F{Take:pub} (object:value) -> i32\n    §E{}\n    §R 2\n"
             : "";
-        var source = "§M{m1:Routing}\n  §F{take:Take:pub} (str:value) -> i32\n    §E{}\n    §R 1\n"
+        var source = "§M{Routing}\n  §F{Take:pub} (str:value) -> i32\n    §E{}\n    §R 1\n"
             + extra
-            + "  §F{caller:Caller:pub} (?str:value) -> i32\n    §E{}\n    "
+            + "  §F{Caller:pub} (?str:value) -> i32\n    §E{}\n    "
             + (expression ? "§R " : "") + "§C{Take} §A value §/C\n"
             + (expression ? "" : "    §R 0\n");
         var path = Path.Combine(Path.GetTempPath(), "native-routing-" + Guid.NewGuid().ToString("N") + ".calr");
@@ -143,10 +143,10 @@ public class BindingDiagnosticRoutingTests
     public async Task CodeActions_PreserveAnalysisOnlyProvenanceAsync()
     {
         const string source = """
-            §M{m1:Routing}
-              §F{f1:Helper:pub} () -> i32
+            §M{Routing}
+              §F{Helper:pub} () -> i32
                 §R 42
-              §F{f2:Main:pub} () -> i32
+              §F{Main:pub} () -> i32
                 §B{x} Helper
                 §R x
             """;
@@ -188,7 +188,7 @@ public class BindingDiagnosticRoutingTests
     public async Task ActiveScalarFindings_AreLabeledWithoutChangingBinderSeverityOrSpanAsync(
         string body, string returnType, string code)
     {
-        var source = $"§M{{m1:Routing}}\n  §F{{f1:Probe:pub}} () -> {returnType}\n    §E{{env}}\n    {body}\n";
+        var source = $"§M{{Routing}}\n  §F{{Probe:pub}} () -> {returnType}\n    §E{{env}}\n    {body}\n";
         var path = Path.Combine(Path.GetTempPath(), "routing-" + Guid.NewGuid().ToString("N") + ".calr");
         using var document = new DocumentState(new Uri(path), source);
         await document.ReanalyzeAsync();
@@ -207,7 +207,7 @@ public class BindingDiagnosticRoutingTests
         var compiler = Assert.Single(compiled.Diagnostics.Where(d => d.Code == code));
         Assert.Equal(diagnostic.Span, compiler.Span);
         Assert.Equal(diagnostic.Severity, compiler.Severity);
-        var update = await document.UpdateAsync("§M{m1:Routing}\n  §F{f1:Probe:pub} () -> str\n    §R \"safe\"\n", 1);
+        var update = await document.UpdateAsync("§M{Routing}\n  §F{Probe:pub} () -> str\n    §R \"safe\"\n", 1);
         Assert.True(update.Accepted);
         Assert.DoesNotContain(update.Snapshot.Diagnostics, d => d.Code == code);
     }
@@ -216,10 +216,10 @@ public class BindingDiagnosticRoutingTests
     public async Task ActiveBinderError_AgreesWithApiAcrossOptOutModesAsync()
     {
         const string source = """
-            §M{m1:Routing}
-              §F{f1:Probe:pub} () -> i32
+            §M{Routing}
+              §F{Probe:pub} () -> i32
                 §R 1
-              §F{f2:Probe:pub} () -> i32
+              §F{Probe:pub} () -> i32
                 §R 2
             """;
         var path = Path.Combine(Path.GetTempPath(), "routing-" + Guid.NewGuid().ToString("N") + ".calr");

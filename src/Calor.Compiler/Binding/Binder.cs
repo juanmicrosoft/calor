@@ -116,6 +116,7 @@ public sealed class Binder
     private SymbolId _moduleSymbolId;
     private HashSet<string> _toolingIds = new(StringComparer.Ordinal);
     private SymbolId _declarationContext;
+    private string _transientBindingId = "";
     private string? _currentClassName;
     private ClassDefinitionNode? _currentClass;
 
@@ -761,10 +762,11 @@ public sealed class Binder
         _delegateTypeNames.Clear();
         _misplacedRowsReported.Clear();
         _currentNamespaceIdentity = null;
+        _transientBindingId = Guid.NewGuid().ToString("N");
         _toolingIds = Ids.DeclarationIdentityStore.ToolingIds(module).ToHashSet(StringComparer.Ordinal);
         _moduleSymbolId = module.ToolingId != null
             ? SymbolId.Create("declaration", module.ToolingId)
-            : SymbolId.Create("source", _sourceIdentity, "module", module.Id);
+            : SymbolId.Create("source", _sourceIdentity, "module", module.Name);
         _declarationContext = _moduleSymbolId;
 
         var functions = new List<BoundFunction>();
@@ -801,10 +803,16 @@ public sealed class Binder
 
     private void RegisterTopLevelFunctions(ModuleNode module)
     {
+        var ambiguousKeys = module.Functions.GroupBy(function =>
+            CallableIdentityKey(function.Name, function.Parameters, function.TypeParameters, function.NamespaceIdentity))
+            .Where(group => group.Count() > 1).Select(group => group.Key).ToHashSet(StringComparer.Ordinal);
         foreach (var function in module.Functions)
         {
+            var fallbackKey = CallableIdentityKey(function.Name, function.Parameters, function.TypeParameters, function.NamespaceIdentity);
+            if (ambiguousKeys.Contains(fallbackKey))
+                fallbackKey += ":ambiguous-snapshot:" + _transientBindingId;
             var symbol = CreateFunctionSymbol(
-                CreateDeclarationId(_moduleSymbolId, "function", function.Id, function.Name),
+                CreateDeclarationId(_moduleSymbolId, "function", function.Id, fallbackKey),
                 function.Name,
                 function.Output?.TypeName ?? "VOID",
                 GetCallableTypeParameters(
@@ -914,7 +922,7 @@ public sealed class Binder
         Parsing.TextSpan definitionSpan)
     {
         TrackSymbol(new TypeSymbol(
-            CreateDeclarationId(parentIdentity, kind, stableAstId, name),
+            CreateDeclarationId(parentIdentity, kind, stableAstId, qualifiedName),
             name,
             qualifiedName,
             visibility,
@@ -934,7 +942,7 @@ public sealed class Binder
         SymbolId parentIdentity,
         string? containingTypeName)
     {
-        var classIdentity = CreateDeclarationId(parentIdentity, cls.IsModule ? "module" : "class", cls.Id, cls.Name);
+        var classIdentity = CreateDeclarationId(parentIdentity, cls.IsModule ? "module" : "class", cls.Id, GetQualifiedTypeName(cls));
         var qualifiedClassName = containingTypeName == null
             ? GetQualifiedTypeName(cls)
             : $"{containingTypeName}.{GetTypeNameWithArity(cls.Name, cls.TypeParameters.Count)}";
@@ -1053,9 +1061,15 @@ public sealed class Binder
         }
 
         var methods = EnumerateMethodRegistrations(cls).ToArray();
+        var ambiguousMethodKeys = methods.GroupBy(item =>
+            CallableIdentityKey(item.Method.Name, item.Method.Parameters, item.Method.TypeParameters))
+            .Where(group => group.Count() > 1).Select(group => group.Key).ToHashSet(StringComparer.Ordinal);
         for (var methodIndex = 0; methodIndex < methods.Length; methodIndex++)
         {
             var (method, conditionalAlternative) = methods[methodIndex];
+            var fallbackKey = CallableIdentityKey(method.Name, method.Parameters, method.TypeParameters);
+            if (ambiguousMethodKeys.Contains(fallbackKey))
+                fallbackKey += ":ambiguous-snapshot:" + _transientBindingId;
             var extensionParameters = method.Parameters
                 .Select((parameter, index) => (parameter, index))
                 .Where(item => item.parameter.Modifier.HasFlag(ParameterModifier.This))
@@ -1071,7 +1085,7 @@ public sealed class Binder
             var lookupName = GetCallableLookupName(method.Name);
             var qualifiedLookupName = $"{qualifiedClassName}.{lookupName}";
             var symbol = CreateFunctionSymbol(
-                CreateDeclarationId(classIdentity, "method", method.Id, method.Name),
+                CreateDeclarationId(classIdentity, "method", method.Id, fallbackKey),
                 $"{qualifiedClassName}.{method.Name}",
                 method.Output?.TypeName ?? "VOID",
                 GetCallableTypeParameters(
@@ -1106,7 +1120,8 @@ public sealed class Binder
             var constructorName = constructor.IsStatic ? ".cctor" : ".ctor";
             var qualifiedLookupName = $"{qualifiedClassName}.{constructorName}";
             var symbol = CreateFunctionSymbol(
-                CreateDeclarationId(classIdentity, "constructor", constructor.Id, constructorName),
+                CreateDeclarationId(classIdentity, "constructor", constructor.Id,
+                    CallableIdentityKey(constructorName, constructor.Parameters, [])),
                 qualifiedLookupName,
                 "VOID",
                 Array.Empty<string>(),
@@ -1415,7 +1430,8 @@ public sealed class Binder
     {
         var context = _declarationContext.IsNone ? _moduleSymbolId : _declarationContext;
         return CreateVariable(
-            CreateDeclarationId(context, kind, stableAstId: null, name),
+            CreateDeclarationId(context.Append("snapshot", _transientBindingId), kind, stableAstId: null,
+                System.Text.Json.JsonSerializer.Serialize(new { name, typeName, declarationSpan.Start })),
             name,
             typeName,
             isMutable,
@@ -1431,6 +1447,26 @@ public sealed class Binder
             genericNullabilityType: genericNullabilityType);
     }
 
+    private static string CallableIdentityKey(
+        string name,
+        IReadOnlyList<ParameterNode> parameters,
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        string? namespaceIdentity = null)
+    {
+        var names = typeParameters.Select(parameter => parameter.Name).ToArray();
+        return System.Text.Json.JsonSerializer.Serialize(new
+        {
+            namespaceIdentity,
+            name,
+            arity = names.Length,
+            parameters = parameters.Select(parameter => new
+            {
+                type = TypeIdentity.CanonicalizeSignature(parameter.TypeName, names),
+                modifier = parameter.Modifier.ToString()
+            })
+        });
+    }
+
     private SymbolId CreateDeclarationId(
         SymbolId parent,
         string kind,
@@ -1439,8 +1475,6 @@ public sealed class Binder
     {
         var baseId = stableAstId != null && _toolingIds.Contains(stableAstId)
             ? SymbolId.Create("declaration", stableAstId)
-            : !string.IsNullOrWhiteSpace(stableAstId)
-            ? parent.Append(kind, $"ast:{stableAstId}")
             : parent.Append(kind, $"name:{fallbackName}");
         var key = baseId.Value;
         if (!_declarationIdOccurrences.TryGetValue(key, out var occurrence))
@@ -1576,7 +1610,8 @@ public sealed class Binder
                 scope = _scope.CreateChild();
             var function = local.Function;
             var symbol = CreateFunctionSymbol(
-                CreateDeclarationId(enclosing, "localfunction", function.Id, function.Name),
+                CreateDeclarationId(enclosing, "localfunction", function.Id,
+                    CallableIdentityKey(function.Name, function.Parameters, function.TypeParameters)),
                 function.Name,
                 function.Output?.TypeName ?? "VOID",
                 Array.Empty<string>(),
@@ -4207,7 +4242,7 @@ public sealed class Binder
             parentContext,
             "lambda",
             lambda.Id,
-            "lambda");
+            $"snapshot:{_transientBindingId}:lambda:{lambda.Span.Start}");
         using var _scopeGuard = PushScope(_scope.CreateChild());
         using var _staticGuard = PushStaticContext(lambda.IsStatic);
         using var _identityGuard = PushDeclarationContext(lambdaIdentity);
@@ -7890,7 +7925,7 @@ public sealed class Binder
                     () => BindOperator(op, className, operatorIndex),
                     op.Span,
                     className,
-                    $"op_{op.Kind}");
+                    CallableIdentityKey($"op_{op.Kind}", op.Parameters, []));
                 if (bound != null) functions.Add(bound);
             }
 

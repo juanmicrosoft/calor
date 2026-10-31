@@ -41,8 +41,8 @@ public static class LspTestHarness
     public static string WrapInFunction(string bodySource)
     {
         return $$"""
-            §M{m001:TestModule}
-              §F{f001:TestFunc}
+            §M{TestModule}
+              §F{TestFunc}
                 {{bodySource}}
             """;
     }
@@ -53,7 +53,7 @@ public static class LspTestHarness
     public static string WrapInModule(string moduleContent)
     {
         return $$"""
-            §M{m001:TestModule}
+            §M{TestModule}
               {{moduleContent}}
             """;
     }

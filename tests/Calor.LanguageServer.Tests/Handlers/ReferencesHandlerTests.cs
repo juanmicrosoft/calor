@@ -14,10 +14,10 @@ public class ReferencesHandlerTests
     public async Task NestedShadowedLocalsRemainSeparatedBySymbolIdAsync()
     {
         const string source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub} (bool:flag) -> i32
+            §M{TestModule}
+              §F{Test:pub} (bool:flag) -> i32
                 §B{value:i32} INT:1
-                §IF{nested} (== flag BOOL:true)
+                §IF (== flag BOOL:true)
                   §B{value:i32} INT:2
                   §R value
                 §R value
@@ -57,14 +57,14 @@ public class ReferencesHandlerTests
     public async Task SameMethodNameOnUnrelatedTypesDoesNotCollideAsync()
     {
         const string source = """
-            §M{m001:TestModule}
-              §CL{c001:First:pub}
-                §MT{m001:Run:pub} () -> i32
+            §M{TestModule}
+              §CL{First:pub}
+                §MT{Run:pub} () -> i32
                   §R INT:1
-              §CL{c002:Second:pub}
-                §MT{m002:Run:pub} () -> i32
+              §CL{Second:pub}
+                §MT{Run:pub} () -> i32
                   §R INT:2
-              §F{f001:Use:pub} () -> i32
+              §F{Use:pub} () -> i32
                 §B{first:First} §NEW{First} §/NEW
                 §R §C{first.Run} §/C
             """;
@@ -90,12 +90,12 @@ public class ReferencesHandlerTests
     public async Task OverloadsResolveToExactSignatureAsync()
     {
         const string source = """
-            §M{m001:TestModule}
-              §F{f001:Pick:pub} (i32:value) -> i32
+            §M{TestModule}
+              §F{Pick:pub} (i32:value) -> i32
                 §R value
-              §F{f002:Pick:pub} (str:value) -> str
+              §F{Pick:pub} (str:value) -> str
                 §R value
-              §F{f003:Use:pub} () -> i32
+              §F{Use:pub} () -> i32
                 §R §C{Pick} §A INT:1 §/C
             """;
         var uri = DocumentUri.From("file:///references-overloads.calr");
@@ -122,21 +122,21 @@ public class ReferencesHandlerTests
         try
         {
             const string definition = """
-                §M{defs:Collision}
-                  §CL{worker1:Worker:pub:partial}
-                    §MT{pick:Pick:pub} (i32:value) -> i32
+                §M{Collision}
+                  §CL{Worker:pub:partial}
+                    §MT{Pick:pub} (i32:value) -> i32
                       §R value
                 """;
             const string openUse = """
-                §M{openUse:Collision}
-                  §CL{worker2:Worker:pub:partial}
-                    §MT{use:Use:pub} () -> i32
+                §M{Collision}
+                  §CL{Worker:pub:partial}
+                    §MT{Use:pub} () -> i32
                       §R §C{Pick} §A INT:1 §/C
                 """;
             const string closedUse = """
-                §M{closedUse:Collision}
-                  §CL{worker3:Worker:pub:partial}
-                    §MT{use:UseAgain:pub} () -> i32
+                §M{Collision}
+                  §CL{Worker:pub:partial}
+                    §MT{UseAgain:pub} () -> i32
                       §R §C{Pick} §A INT:2 §/C
                 """;
             File.WriteAllText(Path.Combine(root, "definition.calr"), definition);
@@ -173,27 +173,27 @@ public class ReferencesHandlerTests
         try
         {
             const string originalDefinition = """
-                §M{defs:Collision}
-                  §CL{c001:Worker:pub:partial}
-                    §MT{m001:Pick:pub} (i32:value) -> i32
+                §M{Collision}
+                  §CL{Worker:pub:partial}
+                    §MT{Pick:pub} (i32:value) -> i32
                       §R value
                 """;
             const string changedDefinition = """
-                §M{defs:Collision}
-                  §CL{c001:Worker:pub:partial}
-                    §MT{m001:Pock:pub} (i32:value) -> i32
+                §M{Collision}
+                  §CL{Worker:pub:partial}
+                    §MT{Pock:pub} (i32:value) -> i32
                       §R value
                 """;
             const string originalUse = """
-                §M{use:Collision}
-                  §CL{c002:Worker:pub:partial}
-                    §MT{m002:Use:pub} () -> i32
+                §M{Collision}
+                  §CL{Worker:pub:partial}
+                    §MT{Use:pub} () -> i32
                       §R §C{Pick} §A INT:1 §/C
                 """;
             const string changedUse = """
-                §M{use:Collision}
-                  §CL{c002:Worker:pub:partial}
-                    §MT{m002:Use:pub} () -> i32
+                §M{Collision}
+                  §CL{Worker:pub:partial}
+                    §MT{Use:pub} () -> i32
                       §R §C{Pock} §A INT:1 §/C
                 """;
             var definitionPath = Path.Combine(root, "definition.calr");
@@ -252,8 +252,8 @@ public class ReferencesHandlerTests
     public async Task WhitespaceAndEndAdjacentCursorsReturnNoReferencesAsync()
     {
         const string source = """
-            §M{m001:TestModule}
-              §F{f001:Compute:pub} () -> i32
+            §M{TestModule}
+              §F{Compute:pub} () -> i32
                 §R INT:1
             """;
         var uri = DocumentUri.From("file:///references-cursor.calr");

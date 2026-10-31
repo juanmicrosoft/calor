@@ -137,12 +137,6 @@ public sealed class RenameHandler : RenameHandlerBase
                 if (registered.Length == 0) continue;
                 var unsaved = registered.Any(change => !File.Exists(change.File)
                     || File.ReadAllText(change.File) != change.Before);
-                var legacySourceIdentity = registered.All(change =>
-                    DeclarationIdentityStore.Describe(change.File, change.Before!)
-                    .Where(declaration => declaration.Kind is not (IdKind.Field or IdKind.Variant)).All(declaration =>
-                        IdValidator.IsCanonicalId(declaration.Id) || IdValidator.IsTestId(declaration.Id)));
-                if ((!SupportsTransactionalWorkspaceEdits || unsaved) && legacySourceIdentity)
-                    continue;
                 if (!SupportsTransactionalWorkspaceEdits)
                     throw new InvalidOperationException("Sidecar-backed rename requires a client with transactional text WorkspaceEdit support; no edits were applied.");
                 if (unsaved)

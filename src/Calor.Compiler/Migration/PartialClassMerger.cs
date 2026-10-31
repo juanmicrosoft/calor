@@ -208,7 +208,7 @@ public sealed class PartialClassMerger
 
         var merged = primary.CopyMetadataTo(new ClassDefinitionNode(
             primary.Span,
-            primary.SourceId,
+            primary.LocalId,
             primary.Name,
             isAbstract,
             isSealed,

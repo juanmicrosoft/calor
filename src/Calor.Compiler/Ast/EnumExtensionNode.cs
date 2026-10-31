@@ -17,8 +17,8 @@ public sealed class EnumExtensionNode : AstNode
     /// <summary>
     /// The unique identifier for this enum extension.
     /// </summary>
-    public string Id => ToolingId ?? SourceId;
-    public string SourceId { get; }
+    public string Id => ToolingId ?? LocalId;
+    public string LocalId { get; }
 
     /// <summary>
     /// The name of the enum type being extended.
@@ -43,7 +43,7 @@ public sealed class EnumExtensionNode : AstNode
         AttributeCollection attributes)
         : base(span)
     {
-        SourceId = id ?? throw new ArgumentNullException(nameof(id));
+        LocalId = id ?? throw new ArgumentNullException(nameof(id));
         EnumName = enumName ?? throw new ArgumentNullException(nameof(enumName));
         Methods = methods ?? throw new ArgumentNullException(nameof(methods));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));

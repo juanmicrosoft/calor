@@ -107,8 +107,8 @@ public sealed class EffectsNode : AstNode
 /// </summary>
 public sealed class FunctionNode : AstNode
 {
-    public string Id => ToolingId ?? SourceId;
-    public string SourceId { get; }
+    public string Id => ToolingId ?? LocalId;
+    public string LocalId { get; }
     public string Name { get; }
     public TextSpan IdentifierSpan { get; }
     public Visibility Visibility { get; }
@@ -253,7 +253,7 @@ public sealed class FunctionNode : AstNode
         TextSpan? identifierSpan = null)
         : base(span)
     {
-        SourceId = id ?? throw new ArgumentNullException(nameof(id));
+        LocalId = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         IdentifierSpan = identifierSpan ?? span;
         Visibility = visibility;

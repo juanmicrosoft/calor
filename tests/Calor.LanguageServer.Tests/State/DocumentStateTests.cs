@@ -15,8 +15,8 @@ public class DocumentStateTests
     public void N3_NamedCall_EditorRetainsActualArgumentSpanAndActiveRoute(bool expression)
     {
         var source = $$"""
-            §M{m1:EditorMapping}
-              §F{caller:Caller:pub} (?string:maybe) -> string
+            §M{EditorMapping}
+              §F{Caller:pub} (?string:maybe) -> string
                 {{(expression ? "§R " : "")}}§C{System.IO.Path.Combine} §A[path2] STR:"safe" §A[path1] maybe §/C
                 {{(expression ? "" : "§R STR:\"done\"")}}
             """;
@@ -58,8 +58,8 @@ public class DocumentStateTests
     public void Reanalyze_ValidSource_ParsesAst()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub} () -> i32
+            §M{TestModule}
+              §F{Test:pub} () -> i32
                 §R 0
             """;
 
@@ -73,7 +73,7 @@ public class DocumentStateTests
     [Fact]
     public void Reanalyze_InvalidSource_HasErrors()
     {
-        var source = "§M{m001:Test} §UNKNOWN_TOKEN_XYZ"; // Invalid section marker
+        var source = "§M{Test} §UNKNOWN_TOKEN_XYZ"; // Invalid section marker
 
         var state = LspTestHarness.CreateDocument(source);
 
@@ -89,9 +89,9 @@ public class DocumentStateTests
     public void Reanalyze_LegacySemver_ReportsCalor0701()
     {
         var source = """
-            §M{m001:Legacy}
+            §M{Legacy}
               §SEMVER{1.0.0}
-              §F{f001:Test:pub} () -> i32
+              §F{Test:pub} () -> i32
                 §R 0
             """;
 
@@ -111,9 +111,9 @@ public class DocumentStateTests
     public void Reanalyze_CurrentSemver_NoVersionDiagnostics()
     {
         var source = $$"""
-            §M{m001:Modern}
+            §M{Modern}
               §SEMVER{{{Compiler.SemanticsVersion.VersionString}}}
-              §F{f001:Test:pub} () -> i32
+              §F{Test:pub} () -> i32
                 §R 0
             """;
 
@@ -132,8 +132,8 @@ public class DocumentStateTests
         string expression)
     {
         var source = $$"""
-            §M{m001:TestModule}
-              §F{f001:Make:pub} () -> object
+            §M{TestModule}
+              §F{Make:pub} () -> object
                 §R {{expression}}
             """;
 
@@ -156,8 +156,8 @@ public class DocumentStateTests
     public void Reanalyze_InteropConstruct_PublishesInfoSeverityUnsupported_NotError()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Pick:pub} () -> object
+            §M{TestModule}
+              §F{Pick:pub} () -> object
                 §R §CS{DateTime.Now}
             """;
 
@@ -175,13 +175,13 @@ public class DocumentStateTests
     public void Update_ChangesSource()
     {
         var source1 = """
-            §M{m001:TestModule}
-              §F{f001:Test}
+            §M{TestModule}
+              §F{Test}
                 §R 0
             """;
         var source2 = """
-            §M{m001:TestModule}
-              §F{f001:Test2}
+            §M{TestModule}
+              §F{Test2}
                 §R 1
             """;
 
@@ -197,9 +197,9 @@ public class DocumentStateTests
     [Fact]
     public void Update_ClearsPreviousDiagnostics()
     {
-        var badSource = "§M{m001:Test} §UNKNOWN_TOKEN_XYZ"; // Invalid
+        var badSource = "§M{Test} §UNKNOWN_TOKEN_XYZ"; // Invalid
         var goodSource = """
-            §M{m001:TestModule}
+            §M{TestModule}
             """;
 
         var state = LspTestHarness.CreateDocument(badSource);
@@ -214,7 +214,7 @@ public class DocumentStateTests
     public void GetTokenAtPosition_ReturnsToken()
     {
         var source = """
-            §M{m001:TestModule}
+            §M{TestModule}
             """;
 
         var state = LspTestHarness.CreateDocument(source);
@@ -227,7 +227,7 @@ public class DocumentStateTests
     public void GetTokenAtPosition_InvalidPosition_ReturnsNull()
     {
         var source = """
-            §M{m001:TestModule}
+            §M{TestModule}
             """;
 
         var state = LspTestHarness.CreateDocument(source);
@@ -240,7 +240,7 @@ public class DocumentStateTests
     public void GetTokenAtOffset_ReturnsToken()
     {
         var source = """
-            §M{m001:TestModule}
+            §M{TestModule}
             """;
 
         var state = LspTestHarness.CreateDocument(source);
@@ -253,7 +253,7 @@ public class DocumentStateTests
     public void Reanalyze_SetsFilePath()
     {
         var source = """
-            §M{m001:TestModule}
+            §M{TestModule}
             """;
 
         var state = LspTestHarness.CreateDocument(source, "file:///path/to/test.calr");
@@ -267,8 +267,8 @@ public class DocumentStateTests
     public void Reanalyze_WithBindingErrors_StillHasAst()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test}
+            §M{TestModule}
+              §F{Test}
                 §R undefined_variable
             """;
 
@@ -284,8 +284,8 @@ public class DocumentStateTests
     {
         // Uses "valeu" instead of "value" - a typo that should be suggested
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test}
+            §M{TestModule}
+              §F{Test}
                 §I{i32:value}
                 §O{i32}
                 §R valeu
@@ -309,8 +309,8 @@ public class DocumentStateTests
     {
         // Uses "valeu" instead of "value" - should have a quick fix
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test}
+            §M{TestModule}
+              §F{Test}
                 §I{i32:value}
                 §O{i32}
                 §R valeu
@@ -623,12 +623,12 @@ public class DocumentStateTests
         var workspace = new WorkspaceState();
         var aUri = DocumentUri.From("file:///publication-a.calr");
         var bUri = DocumentUri.From("file:///publication-b.calr");
-        workspace.GetOrCreate(aUri, "§M{m001:A}\n", version: 1);
-        workspace.GetOrCreate(bUri, "§M{m002:B}\n", version: 1);
+        workspace.GetOrCreate(aUri, "§M{A}\n", version: 1);
+        workspace.GetOrCreate(bUri, "§M{B}\n", version: 1);
         var older = workspace.CaptureSnapshot();
         var olderB = older.GetDocument(bUri)!;
 
-        workspace.Update(aUri, "§M{m001:A2}\n", version: 2);
+        workspace.Update(aUri, "§M{A2}\n", version: 2);
         var newer = workspace.CaptureSnapshot();
         var newerB = newer.GetDocument(bUri)!;
         Assert.Same(olderB.Analysis, newerB.Analysis);
@@ -718,8 +718,8 @@ public class DocumentStateTests
     }
 
     private static string VersionedSource(int version) => $$"""
-        §M{m001:Versioned}
-          §F{f001:Version{{version}}:pub} () -> i32
+        §M{Versioned}
+          §F{Version{{version}}:pub} () -> i32
             §R MissingVersion{{version}}
         """;
 
@@ -785,8 +785,8 @@ public class DocumentStateTests
     public void Calor0270_InferredLocalReceiver_IsOneInformationDiagnostic()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:DoWork:pub} () -> void
+            §M{Test}
+              §F{DoWork:pub} () -> void
                 §B{x} §C{Unknown.Make} §/C
                 §C{x.Run} §/C
             """;
@@ -810,8 +810,8 @@ public class DocumentStateTests
     public void Calor0270_MemberChainReceiver_IsSilentInTheEditor()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:DoWork:pub} () -> void
+            §M{Test}
+              §F{DoWork:pub} () -> void
                 §B{a} §NEW{Random} §/NEW
                 §C{a.b.Chain} §/C
             """;

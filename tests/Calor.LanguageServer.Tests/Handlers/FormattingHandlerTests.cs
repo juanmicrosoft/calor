@@ -20,8 +20,8 @@ public sealed class FormattingHandlerTests
     {
         var source = string.Join(
             newline,
-            "§M{m001:Formatting}   ",
-            "    §F{f001:Main:pub} () -> void",
+            "§M{Formatting}   ",
+            "    §F{Main:pub} () -> void",
             "        §E{cw}",
             "        §B{user001} STR:\"secret\"",
             "        // user001 must survive.",
@@ -63,8 +63,8 @@ public sealed class FormattingHandlerTests
     public async Task CompilerErrors_ReturnNoEditsAndLogReasonAsync()
     {
         const string source =
-            "§M{m001:Formatting}\n" +
-            "  §F{f001:Main:pub} () -> void\n" +
+            "§M{Formatting}\n" +
+            "  §F{Main:pub} () -> void\n" +
             "    §P \"missing effect\"\n";
         var uri = DocumentUri.From("file:///formatting-errors.calr");
         var workspace = new WorkspaceState();
@@ -94,11 +94,11 @@ public sealed class FormattingHandlerTests
     public void CapturedSnapshot_UsesOriginalSourceAfterWorkspaceUpdate()
     {
         const string original =
-            "§M{m001:Original}   \r\n" +
-            "    §F{f001:Main:pub} () -> void   \r\n";
+            "§M{Original}   \r\n" +
+            "    §F{Main:pub} () -> void   \r\n";
         const string updated =
-            "§M{m002:Updated}\n" +
-            "    §F{f002:Different:pub} () -> void\n" +
+            "§M{Updated}\n" +
+            "    §F{Different:pub} () -> void\n" +
             "        §B{broken\n";
         var uri = DocumentUri.From("file:///formatting-snapshot.calr");
         var workspace = new WorkspaceState();
@@ -114,7 +114,7 @@ public sealed class FormattingHandlerTests
 
         Assert.NotNull(edits);
         var applied = ApplyEdits(original, edits!);
-        Assert.Contains("§M{m001:Original}", applied, StringComparison.Ordinal);
+        Assert.Contains("§M{Original}", applied, StringComparison.Ordinal);
         Assert.DoesNotContain("Updated", applied, StringComparison.Ordinal);
         Assert.Equal(new Position(2, 0), Assert.Single(edits!).Range.End);
         Assert.Equal(updated, state.Source);

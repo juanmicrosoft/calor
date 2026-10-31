@@ -154,8 +154,8 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
 /// </summary>
 public sealed class MethodSignatureNode : AstNode
 {
-    public string Id => ToolingId ?? SourceId;
-    public string SourceId { get; }
+    public string Id => ToolingId ?? LocalId;
+    public string LocalId { get; }
     public string Name { get; }
     public IReadOnlyList<TypeParameterNode> TypeParameters { get; }
 
@@ -237,7 +237,7 @@ public sealed class MethodSignatureNode : AstNode
         IReadOnlyList<CalorAttributeNode> csharpAttributes)
         : base(span)
     {
-        SourceId = id ?? throw new ArgumentNullException(nameof(id));
+        LocalId = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));
         Parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
@@ -665,8 +665,8 @@ public sealed class ClassFieldNode : AstNode
 /// </summary>
 public sealed class MethodNode : AstNode
 {
-    public string Id => ToolingId ?? SourceId;
-    public string SourceId { get; }
+    public string Id => ToolingId ?? LocalId;
+    public string LocalId { get; }
     public string Name { get; }
     public TextSpan IdentifierSpan { get; }
     public Visibility Visibility { get; }
@@ -744,7 +744,7 @@ public sealed class MethodNode : AstNode
         TextSpan? identifierSpan = null)
         : base(span)
     {
-        SourceId = id ?? throw new ArgumentNullException(nameof(id));
+        LocalId = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         IdentifierSpan = identifierSpan ?? span;
         Visibility = visibility;
@@ -823,8 +823,8 @@ public enum OperatorOverloadKind
 /// </summary>
 public sealed class OperatorOverloadNode : AstNode
 {
-    public string Id => ToolingId ?? SourceId;
-    public string SourceId { get; }
+    public string Id => ToolingId ?? LocalId;
+    public string LocalId { get; }
     public string OperatorToken { get; }
     public OperatorOverloadKind Kind { get; }
     public Visibility Visibility { get; }
@@ -874,7 +874,7 @@ public sealed class OperatorOverloadNode : AstNode
         IReadOnlyList<CalorAttributeNode> csharpAttributes)
         : base(span)
     {
-        SourceId = id ?? throw new ArgumentNullException(nameof(id));
+        LocalId = id ?? throw new ArgumentNullException(nameof(id));
         OperatorToken = operatorToken ?? throw new ArgumentNullException(nameof(operatorToken));
         Kind = kind;
         Visibility = visibility;

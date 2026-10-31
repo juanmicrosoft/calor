@@ -13,8 +13,8 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesFunction_WithDeclarationModifier()
     {
-        var source = @"§M{m1:Test}
-  §F{f1:MyFunc:pub}
+        var source = @"§M{Test}
+  §F{MyFunc:pub}
       §O{i32}
       §R 42";
 
@@ -29,8 +29,8 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesParameters()
     {
-        var source = @"§M{m1:Test}
-  §F{f1:Add:pub}
+        var source = @"§M{Test}
+  §F{Add:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -48,9 +48,9 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesClass_WithAbstractModifier()
     {
-        var source = @"§M{m1:Test}
-  §CL{c1:Shape:abs}
-      §MT{mt1:Area:pub:abs}
+        var source = @"§M{Test}
+  §CL{Shape:abs}
+      §MT{Area:pub:abs}
           §O{f64}";
 
         var state = LspTestHarness.CreateDocument(source);
@@ -65,9 +65,9 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesMethod_WithVirtualModifier()
     {
-        var source = @"§M{m1:Test}
-  §CL{c1:Animal:pub}
-      §MT{mt1:Speak:pub:virt}
+        var source = @"§M{Test}
+  §CL{Animal:pub}
+      §MT{Speak:pub:virt}
           §O{str}
           §R ""...""";
 
@@ -82,10 +82,10 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesMethod_WithOverrideModifier()
     {
-        var source = @"§M{m1:Test}
-  §CL{c1:Dog:pub}
+        var source = @"§M{Test}
+  §CL{Dog:pub}
       §EXT{Animal}
-      §MT{mt1:Speak:pub:over}
+      §MT{Speak:pub:over}
           §O{str}
           §R ""Woof!""";
 
@@ -100,9 +100,9 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesInterface()
     {
-        var source = @"§M{m1:Test}
-  §IFACE{i1:IDrawable:pub}
-      §MT{m1:Draw}
+        var source = @"§M{Test}
+  §IFACE{IDrawable:pub}
+      §MT{Draw}
           §O{void}";
 
         var state = LspTestHarness.CreateDocument(source);
@@ -115,12 +115,12 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesEnum()
     {
-        var source = @"§M{m1:Test}
-  §EN{e1:Color:pub}
+        var source = @"§M{Test}
+  §EN{Color:pub}
     §EV{Red}
     §EV{Green}
     §EV{Blue}
-  §/EN{e1}";
+  §/EN";
 
         var state = LspTestHarness.CreateDocument(source);
 
@@ -134,8 +134,8 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesBindStatement_Readonly()
     {
-        var source = @"§M{m1:Test}
-  §F{f1:Test:pub}
+        var source = @"§M{Test}
+  §F{Test:pub}
       §O{i32}
       §B{x:i32} 42
       §R x";
@@ -156,8 +156,8 @@ public class SemanticTokensHandlerTests
     public void TokenizesBindStatement_Mutable()
     {
         // Use ~name prefix for mutable binding
-        var source = @"§M{m1:Test}
-  §F{f1:Test:pub}
+        var source = @"§M{Test}
+  §F{Test:pub}
       §O{i32}
       §B{~x:i32} 42
       §R x";
@@ -176,8 +176,8 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesLiterals()
     {
-        var source = @"§M{m1:Test}
-  §F{f1:Test:pub}
+        var source = @"§M{Test}
+  §F{Test:pub}
       §O{i32}
       §B{a:i32} 42
       §B{b:f64} 3.14
@@ -195,8 +195,8 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesIfStatement()
     {
-        var source = @"§M{m1:Test}
-  §F{f1:Max:pub}
+        var source = @"§M{Test}
+  §F{Max:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -217,11 +217,11 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesForLoop()
     {
-        var source = @"§M{m1:Test}
-  §F{f1:Sum:pub}
+        var source = @"§M{Test}
+  §F{Sum:pub}
     §O{i32}
     §B{~total:i32} INT:0
-    §L{i:INT:1:INT:10}
+    §L{INT:1:INT:10}
       §B{~total:i32} (+ total i)
     §R total";
 
@@ -236,12 +236,12 @@ public class SemanticTokensHandlerTests
     public void TokenizesAsyncMethod()
     {
         // Async methods use §AMT tag
-        var source = @"§M{m1:Test}
-  §CL{c1:Service:pub}
-      §AMT{mt1:FetchData:pub}
+        var source = @"§M{Test}
+  §CL{Service:pub}
+      §AMT{FetchData:pub}
         §O{str}
         §R ""data""
-      §/AMT{mt1}";
+      §/AMT";
 
         var state = LspTestHarness.CreateDocument(source);
 
@@ -253,9 +253,9 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesStaticMethod()
     {
-        var source = @"§M{m1:Test}
-  §CL{c1:Utils:pub}
-      §MT{mt1:Square:pub:stat}
+        var source = @"§M{Test}
+  §CL{Utils:pub}
+      §MT{Square:pub:stat}
           §I{i32:x}
           §O{i32}
           §R (* x x)";
@@ -270,8 +270,8 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesNewExpression()
     {
-        var source = @"§M{m1:Test}
-  §F{f1:Create:pub}
+        var source = @"§M{Test}
+  §F{Create:pub}
       §O{object}
       §R §NEW{List<i32>}";
 
@@ -284,8 +284,8 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesFieldAccess()
     {
-        var source = @"§M{m1:Test}
-  §CL{c1:Point:pub}
+        var source = @"§M{Test}
+  §CL{Point:pub}
       §FLD{i32:X:pub}
       §FLD{i32:Y:pub}";
 
@@ -301,8 +301,8 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesLambdaExpression()
     {
-        var source = @"§M{m1:Test}
-  §F{f1:Test:pub}
+        var source = @"§M{Test}
+  §F{Test:pub}
       §O{i32}
       §B{add:Func<i32,i32,i32>} §LAMBDA
         §I{i32:a}
@@ -320,10 +320,10 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesProperty()
     {
-        var source = @"§M{m1:Test}
-  §CL{c1:Person:pub}
+        var source = @"§M{Test}
+  §CL{Person:pub}
       §FLD{str:_name:priv}
-      §PROP{str:Name:pub}
+      §PROP{Name:str:pub}
         §GET
           §R §THIS._name
         §/GET
@@ -343,8 +343,8 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesTryCatch()
     {
-        var source = @"§M{m1:Test}
-  §F{f1:SafeDiv:pub}
+        var source = @"§M{Test}
+  §F{SafeDiv:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -364,8 +364,8 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesForeach()
     {
-        var source = @"§M{m1:Test}
-  §F{f1:Print:pub}
+        var source = @"§M{Test}
+  §F{Print:pub}
       §I{List<str>:items}
       §O{void}
       §FOREACH{item:items}
@@ -381,7 +381,7 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void HandlesMalformedSourceGracefully()
     {
-        var source = @"§M{m1:Test}
+        var source = @"§M{Test}
   §F{f1:Bad";
 
         // Should not throw, just produce diagnostics

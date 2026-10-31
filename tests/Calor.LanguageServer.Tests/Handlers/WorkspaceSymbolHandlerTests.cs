@@ -13,10 +13,10 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_EmptyQuery_ReturnsAllSymbolsAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Add:pub}
+            §M{TestModule}
+              §F{Add:pub}
                 §R 0
-              §F{f002:Subtract:pub}
+              §F{Subtract:pub}
                 §R 0
             """;
 
@@ -33,10 +33,10 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_SpecificQuery_FiltersResultsAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Calculate:pub}
+            §M{TestModule}
+              §F{Calculate:pub}
                 §R 0
-              §F{f002:Process:pub}
+              §F{Process:pub}
                 §R 0
             """;
 
@@ -54,10 +54,10 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_ClassQuery_ReturnsClassesAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:PersonService}
+            §M{TestModule}
+              §CL{PersonService}
                 §FLD{i32:dummy:priv}
-              §CL{c002:OrderService}
+              §CL{OrderService}
                 §FLD{i32:dummy:priv}
             """;
 
@@ -76,12 +76,12 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_MethodQuery_ReturnsMethodsAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Calculator}
-                §MT{m001:Add:pub}
+            §M{TestModule}
+              §CL{Calculator}
+                §MT{Add:pub}
                   §O{i32}
                   §R 0
-                §MT{m002:Multiply:pub}
+                §MT{Multiply:pub}
                   §O{i32}
                   §R 0
             """;
@@ -100,11 +100,11 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_EnumQuery_ReturnsEnumsAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §EN{e001:StatusCode}
+            §M{TestModule}
+              §EN{StatusCode}
               Ok = 200
               NotFound = 404
-              §/EN{e001}
+              §/EN
             """;
 
         var workspace = CreateWorkspace(source);
@@ -121,12 +121,12 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_EnumMemberQuery_ReturnsEnumMembersAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §EN{e001:Color}
+            §M{TestModule}
+              §EN{Color}
               Red
               Green
               Blue
-              §/EN{e001}
+              §/EN
             """;
 
         var workspace = CreateWorkspace(source);
@@ -143,8 +143,8 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_InterfaceQuery_ReturnsInterfacesAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §IFACE{i001:IRepository}
+            §M{TestModule}
+              §IFACE{IRepository}
             """;
 
         var workspace = CreateWorkspace(source);
@@ -161,8 +161,8 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_FieldQuery_ReturnsFieldsAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Person}
+            §M{TestModule}
+              §CL{Person}
                 §FLD{str:firstName:priv}
                 §FLD{str:lastName:priv}
             """;
@@ -182,8 +182,8 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_NoMatches_ReturnsEmptyAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §R 0
             """;
 
@@ -200,8 +200,8 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_CaseInsensitiveSearchAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:CalculateTotal:pub}
+            §M{TestModule}
+              §F{CalculateTotal:pub}
                 §R 0
             """;
 
@@ -218,9 +218,9 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_SymbolsIncludeContainerNameAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Calculator}
-                §MT{m001:Add:pub}
+            §M{TestModule}
+              §CL{Calculator}
+                §MT{Add:pub}
                   §O{i32}
                   §R 0
             """;

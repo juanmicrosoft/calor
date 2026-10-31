@@ -241,14 +241,14 @@ public class MultiDocumentLspE2ETests
 
     private static string BuildTargetSource(string symbolName) =>
         $$"""
-        §M{m001:TargetModule}
-          §F{f001:{{symbolName}}:pub} () -> i32
+        §M{TargetModule}
+          §F{ {{symbolName}}:pub} () -> i32
             §R INT:42
         """;
 
     // Note (adversarial review): `§U{TargetModule}` was previously included on the
     // caller-module source. The parser treats §U payload as a .NET namespace path
-    // (System.Text style); a Calor `§M{id:Name}` module is not registered as an
+    // (System.Text style); a Calor `§M{Name}` module is not registered as an
     // importable namespace, so `§U{TargetModule}` was a no-op — cross-module
     // symbol resolution goes through WorkspaceState in the language server, which
     // merges symbols across open documents regardless of using directives.
@@ -256,8 +256,8 @@ public class MultiDocumentLspE2ETests
     // (multi-document workspace-state resolution, not `§U` import).
     private static string BuildCallerSource(int index, string symbolName) =>
         $$"""
-        §M{m{{index + 1:D3}}:CallerModule{{index}}}
-          §F{f{{index + 100:D3}}:Run:pub} () -> i32
+        §M{CallerModule{{index}}}
+          §F{Run:pub} () -> i32
             §R §C{{{symbolName}}} §/C
         """;
 

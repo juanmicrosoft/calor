@@ -10,8 +10,8 @@ public class SignatureHelpHandlerTests
     public void FindFunction_WithParameters_ReturnsFunction()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Add}
+            §M{TestModule}
+              §F{Add}
                 §I{i32:a}
                 §I{i32:b}
                 §O{i32}
@@ -36,8 +36,8 @@ public class SignatureHelpHandlerTests
     public void FindFunction_NoParameters_ReturnsFunction()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:GetValue}
+            §M{TestModule}
+              §F{GetValue}
                 §O{i32}
                 §R 42
             """;
@@ -56,8 +56,8 @@ public class SignatureHelpHandlerTests
     public void FindFunction_WithOutput_HasOutputType()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:GetString}
+            §M{TestModule}
+              §F{GetString}
                 §O{str}
                 §R "hello"
             """;
@@ -76,8 +76,8 @@ public class SignatureHelpHandlerTests
     public void FindFunction_VoidOutput_HasNullOutput()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:DoSomething}
+            §M{TestModule}
+              §F{DoSomething}
                 §P "done"
             """;
 
@@ -94,9 +94,9 @@ public class SignatureHelpHandlerTests
     public void FindMethod_InClass_ReturnsMethod()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Calculator}
-                §MT{m001:Add}
+            §M{TestModule}
+              §CL{Calculator}
+                §MT{Add}
                   §I{i32:x}
                   §I{i32:y}
                   §O{i32}
@@ -120,9 +120,9 @@ public class SignatureHelpHandlerTests
     public void FindMethod_VirtualMethod_HasVirtualFlag()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Base:pub}
-                §MT{m001:Process:pub:virt}
+            §M{TestModule}
+              §CL{Base:pub}
+                §MT{Process:pub:virt}
                   §O{void}
             """;
 
@@ -142,13 +142,13 @@ public class SignatureHelpHandlerTests
     public void FindMethod_OverrideMethod_HasOverrideFlag()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Base:pub}
-                §MT{m001:Process:pub:virt}
+            §M{TestModule}
+              §CL{Base:pub}
+                §MT{Process:pub:virt}
                   §O{void}
-              §CL{c002:Derived:pub}
+              §CL{Derived:pub}
                 §EXT{Base}
-                §MT{m002:Process:pub:over}
+                §MT{Process:pub:over}
                   §O{void}
             """;
 
@@ -168,8 +168,8 @@ public class SignatureHelpHandlerTests
     public void Function_WithPreconditions_HasPreconditions()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Divide}
+            §M{TestModule}
+              §F{Divide}
                 §I{i32:a}
                 §I{i32:b}
                 §O{i32}
@@ -190,12 +190,12 @@ public class SignatureHelpHandlerTests
     public void Function_WithPostconditions_HasPostconditions()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Abs}
+            §M{TestModule}
+              §F{Abs}
                 §I{i32:x}
                 §O{i32}
                 §S result >= 0
-                §IF{if001} x >= 0
+                §IF x >= 0
                   §R x
                 §EL
                   §R -x
@@ -214,8 +214,8 @@ public class SignatureHelpHandlerTests
     public void Function_MixedParameterTypes_AllTypesPreserved()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Process}
+            §M{TestModule}
+              §F{Process}
                 §I{i32:count}
                 §I{str:name}
                 §I{bool:enabled}
@@ -240,9 +240,9 @@ public class SignatureHelpHandlerTests
     public void Method_StaticMethod_HasStaticFlag()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Utils:pub}
-                §MT{m001:Helper:pub:static}
+            §M{TestModule}
+              §CL{Utils:pub}
+                §MT{Helper:pub:static}
                   §O{i32}
                   §R 0
             """;
@@ -263,12 +263,12 @@ public class SignatureHelpHandlerTests
     public void Method_AsyncMethod_HasAsyncFlag()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Service}
-                §AMT{m001:FetchData}
+            §M{TestModule}
+              §CL{Service}
+                §AMT{FetchData}
                 §O{str}
                 §R "data"
-                §/AMT{m001}
+                §/AMT
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -287,8 +287,8 @@ public class SignatureHelpHandlerTests
     public void Function_AsyncFunction_HasAsyncFlag()
     {
         var source = """
-            §M{m001:TestModule}
-              §AF{f001:LoadData}
+            §M{TestModule}
+              §AF{LoadData}
                 §O{str}
                 §R "loaded"
             """;

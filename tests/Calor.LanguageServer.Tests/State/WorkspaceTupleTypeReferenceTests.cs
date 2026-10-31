@@ -16,21 +16,21 @@ public class WorkspaceTupleTypeReferenceTests
     public async Task TupleNewDocument_DoesNotBreakWorkspaceIndexOrLspOperationsAsync()
     {
         const string validSource = """
-            §M{valid:TupleContainers}
-              §CL{c001:List:pub}<T>
-                §CTOR{ctor001:pub} ()
+            §M{TupleContainers}
+              §CL{List:pub}<T>
+                §CTOR{pub} ()
                   §P STR:"list"
-              §CL{c002:Dictionary:pub}<TKey,TValue>
-                §CTOR{ctor002:pub} ()
+              §CL{Dictionary:pub}<TKey,TValue>
+                §CTOR{pub} ()
                   §P STR:"dictionary"
-              §F{f001:MakeList:pub} () -> object
+              §F{MakeList:pub} () -> object
                 §R §NEW{List<(i32,i32)>} §/NEW
-              §F{f002:MakeDictionary:pub} () -> object
+              §F{MakeDictionary:pub} () -> object
                 §R §NEW{Dictionary<str,(i32,i32)>} §/NEW
             """;
         const string malformedSource = """
-            §M{malformed:MalformedTupleNew}
-              §F{f001:Make:pub} () -> object
+            §M{MalformedTupleNew}
+              §F{Make:pub} () -> object
                 §R §NEW{(i32,i32)} §/NEW
             """;
         var validUri = DocumentUri.From("file:///valid-tuple-containers.calr");

@@ -13,8 +13,8 @@ public class CompletionHandlerTests
     public void GetAst_ValidModule_ReturnsAst()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Add}
+            §M{TestModule}
+              §F{Add}
                 §I{i32:a}
                 §I{i32:b}
                 §O{i32}
@@ -32,11 +32,11 @@ public class CompletionHandlerTests
     public void GetAst_WithClass_HasClassMembers()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Person}
+            §M{TestModule}
+              §CL{Person}
                 §FLD{str:name}
                 §FLD{i32:age}
-                §MT{m001:GetName}
+                §MT{GetName}
                   §O{str}
                   §R name
             """;
@@ -55,12 +55,12 @@ public class CompletionHandlerTests
     public void GetAst_WithEnum_HasEnumMembers()
     {
         var source = """
-            §M{m001:TestModule}
-              §EN{e001:Color}
+            §M{TestModule}
+              §EN{Color}
               §EM{Red}
               §EM{Green}
               §EM{Blue}
-              §/EN{e001}
+              §/EN
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -76,9 +76,9 @@ public class CompletionHandlerTests
     public void GetAst_WithInterface_HasMethods()
     {
         var source = """
-            §M{m001:TestModule}
-              §IFACE{i001:IShape}
-                §MT{m001:GetArea}
+            §M{TestModule}
+              §IFACE{IShape}
+                §MT{GetArea}
                   §O{f64}
             """;
 
@@ -95,11 +95,11 @@ public class CompletionHandlerTests
     public void GetAst_WithDelegate_HasDelegate()
     {
         var source = """
-            §M{m001:TestModule}
-              §DEL{d001:Callback}
+            §M{TestModule}
+              §DEL{Callback}
               §I{i32:value}
               §O{void}
-              §/DEL{d001}
+              §/DEL
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -113,8 +113,8 @@ public class CompletionHandlerTests
     public void Function_Parameters_AreExtracted()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Calculate}
+            §M{TestModule}
+              §F{Calculate}
                 §I{i32:x}
                 §I{i32:y}
                 §I{str:label}
@@ -138,8 +138,8 @@ public class CompletionHandlerTests
     public void Function_OutputType_IsExtracted()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:GetValue}
+            §M{TestModule}
+              §F{GetValue}
                 §O{str}
                 §R "hello"
             """;
@@ -156,8 +156,8 @@ public class CompletionHandlerTests
     public void Function_VoidReturn_HasNoOutput()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:DoNothing}
+            §M{TestModule}
+              §F{DoNothing}
                 §R
             """;
 
@@ -172,8 +172,8 @@ public class CompletionHandlerTests
     public void LocalBinding_IsRecognized()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test}
+            §M{TestModule}
+              §F{Test}
                 §B{x:i32} 42
                 §R x
             """;
@@ -193,9 +193,9 @@ public class CompletionHandlerTests
     public void ForLoop_IsRecognized()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test}
-                §L{l001:i:0:10}
+            §M{TestModule}
+              §F{Test}
+                §L{i:0:10}
                   §P i
             """;
 
@@ -213,10 +213,10 @@ public class CompletionHandlerTests
     public void WhileLoop_IsRecognized()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test}
+            §M{TestModule}
+              §F{Test}
                 §B{bool:running} true
-                §WH{w001} running
+                §WH running
                   §B{bool:running} false
             """;
 
@@ -233,11 +233,11 @@ public class CompletionHandlerTests
     public void IfStatement_IsRecognized()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test}
+            §M{TestModule}
+              §F{Test}
                 §I{bool:condition}
                 §O{i32}
-                §IF{if001} condition
+                §IF condition
                   §R 1
                 §EL
                   §R 0
@@ -258,11 +258,11 @@ public class CompletionHandlerTests
     public void MemberCompletion_ClassField_ShowsFields()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Person}
+            §M{TestModule}
+              §CL{Person}
                 §FLD{str:name}
                 §FLD{i32:age}
-              §F{f001:Test}
+              §F{Test}
                 §B{p:Person} §NEW Person
                 §R p.
             """;
@@ -278,14 +278,14 @@ public class CompletionHandlerTests
     public void MemberCompletion_ClassMethod_ShowsMethods()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Calculator}
-                §MT{m001:Add}
+            §M{TestModule}
+              §CL{Calculator}
+                §MT{Add}
                   §I{i32:a}
                   §I{i32:b}
                   §O{i32}
                   §R a + b
-              §F{f001:Test}
+              §F{Test}
                 §B{calc:Calculator} §NEW Calculator
                 §R calc.
             """;
@@ -300,13 +300,13 @@ public class CompletionHandlerTests
     public void MemberCompletion_EnumMembers_ShowsMembers()
     {
         var source = """
-            §M{m001:TestModule}
-              §EN{e001:Color}
+            §M{TestModule}
+              §EN{Color}
               §EM{Red}
               §EM{Green}
               §EM{Blue}
-              §/EN{e001}
-              §F{f001:Test}
+              §/EN
+              §F{Test}
                 §O{Color}
                 §R Color.
             """;
@@ -323,8 +323,8 @@ public class CompletionHandlerTests
     public void MemberCompletion_StringType_ShowsStringMethods()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test}
+            §M{TestModule}
+              §F{Test}
                 §I{str:text}
                 §O{str}
                 §R text.
@@ -342,10 +342,10 @@ public class CompletionHandlerTests
     public void MemberCompletion_Parameter_ResolvesType()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Person}
+            §M{TestModule}
+              §CL{Person}
                 §FLD{str:name}
-              §F{f001:Greet}
+              §F{Greet}
                 §I{Person:person}
                 §O{str}
                 §R person.
@@ -363,13 +363,13 @@ public class CompletionHandlerTests
     public void ChainedAccess_TwoLevels_ShowsNestedMembers()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Address}
+            §M{TestModule}
+              §CL{Address}
                 §FLD{str:city}
                 §FLD{str:street}
-              §CL{c002:Person}
+              §CL{Person}
                 §FLD{Address:address}
-              §F{f001:Test}
+              §F{Test}
                 §I{Person:person}
                 §O{str}
                 §R person.address.
@@ -386,15 +386,15 @@ public class CompletionHandlerTests
     public void ChainedAccess_ThreeLevels_ShowsDeeplyNestedMembers()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:PostalCode}
+            §M{TestModule}
+              §CL{PostalCode}
                 §FLD{str:code}
                 §FLD{str:region}
-              §CL{c002:Address}
+              §CL{Address}
                 §FLD{PostalCode:postal}
-              §CL{c003:Person}
+              §CL{Person}
                 §FLD{Address:address}
-              §F{f001:Test}
+              §F{Test}
                 §I{Person:person}
                 §O{str}
                 §R person.address.postal.
@@ -411,14 +411,14 @@ public class CompletionHandlerTests
     public void ChainedAccess_MethodReturnType_ShowsMembersOfReturnType()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Address}
+            §M{TestModule}
+              §CL{Address}
                 §FLD{str:city}
-              §CL{c002:Person}
-                §MT{m001:GetAddress}
+              §CL{Person}
+                §MT{GetAddress}
                   §O{Address}
                   §R §NEW Address
-              §F{f001:Test}
+              §F{Test}
                 §I{Person:person}
                 §O{str}
                 §R person.GetAddress().
@@ -434,16 +434,16 @@ public class CompletionHandlerTests
     public void ChainedAccess_MixedFieldsAndMethods_WorksCorrectly()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Name}
+            §M{TestModule}
+              §CL{Name}
                 §FLD{str:first}
                 §FLD{str:last}
-              §CL{c002:Person}
+              §CL{Person}
                 §FLD{Name:name}
-                §MT{m001:GetName}
+                §MT{GetName}
                   §O{Name}
                   §R name
-              §F{f001:Test}
+              §F{Test}
                 §I{Person:person}
                 §O{str}
                 §R person.name.first.
@@ -462,8 +462,8 @@ public class CompletionHandlerTests
     public void ChainedAccess_StringMethodChaining_WorksCorrectly()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test}
+            §M{TestModule}
+              §F{Test}
                 §I{str:text}
                 §O{str}
                 §R text.ToUpper().
@@ -481,15 +481,15 @@ public class CompletionHandlerTests
     public void ChainedAccess_PropertyThenMethod_WorksCorrectly()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Container}
+            §M{TestModule}
+              §CL{Container}
                 §FLD{str:value}
-                §MT{m001:GetValue}
+                §MT{GetValue}
                   §O{str}
                   §R value
-              §CL{c002:Wrapper}
+              §CL{Wrapper}
                 §FLD{Container:inner}
-              §F{f001:Test}
+              §F{Test}
                 §I{Wrapper:wrapper}
                 §O{str}
                 §R wrapper.inner.GetValue().
@@ -506,12 +506,12 @@ public class CompletionHandlerTests
     public void ChainedAccess_ThisKeyword_WorksWithChaining()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Address}
+            §M{TestModule}
+              §CL{Address}
                 §FLD{str:city}
-              §CL{c002:Person}
+              §CL{Person}
                 §FLD{Address:address}
-                §MT{m001:GetCity}
+                §MT{GetCity}
                   §O{str}
                   §R this.address.
             """;
@@ -530,14 +530,14 @@ public class CompletionHandlerTests
     public void Inheritance_DerivedClass_ShowsInheritedFields()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Animal}
+            §M{TestModule}
+              §CL{Animal}
                 §FLD{str:name}
                 §FLD{i32:age}
-              §CL{c002:Dog}
+              §CL{Dog}
                 §EXT{Animal}
                 §FLD{str:breed}
-              §F{f001:Test}
+              §F{Test}
                 §I{Dog:dog}
                 §O{str}
                 §R dog.
@@ -557,17 +557,17 @@ public class CompletionHandlerTests
     public void Inheritance_DerivedClass_ShowsInheritedMethods()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Animal}
-                §MT{m001:Speak}
+            §M{TestModule}
+              §CL{Animal}
+                §MT{Speak}
                   §O{str}
                   §R "sound"
-              §CL{c002:Dog}
+              §CL{Dog}
                 §EXT{Animal}
-                §MT{m002:Bark}
+                §MT{Bark}
                   §O{str}
                   §R "woof"
-              §F{f001:Test}
+              §F{Test}
                 §I{Dog:dog}
                 §O{str}
                 §R dog.
@@ -586,15 +586,15 @@ public class CompletionHandlerTests
     public void Inheritance_ChainedAccess_WorksWithInheritedMembers()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Address}
+            §M{TestModule}
+              §CL{Address}
                 §FLD{str:city}
-              §CL{c002:Person}
+              §CL{Person}
                 §FLD{Address:address}
-              §CL{c003:Employee}
+              §CL{Employee}
                 §EXT{Person}
                 §FLD{str:department}
-              §F{f001:Test}
+              §F{Test}
                 §I{Employee:emp}
                 §O{str}
                 §R emp.address.
@@ -611,16 +611,16 @@ public class CompletionHandlerTests
     public void Inheritance_MultiLevel_ShowsAllInheritedMembers()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Animal}
+            §M{TestModule}
+              §CL{Animal}
                 §FLD{str:name}
-              §CL{c002:Mammal}
+              §CL{Mammal}
                 §EXT{Animal}
                 §FLD{bool:warmBlooded}
-              §CL{c003:Dog}
+              §CL{Dog}
                 §EXT{Mammal}
                 §FLD{str:breed}
-              §F{f001:Test}
+              §F{Test}
                 §I{Dog:dog}
                 §O{str}
                 §R dog.
@@ -650,11 +650,11 @@ public class CompletionHandlerTests
     {
         // Test basic index access on a generic list parameter
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Person}
+            §M{TestModule}
+              §CL{Person}
                 §FLD{str:name}
                 §FLD{i32:age}
-              §F{f001:Test}
+              §F{Test}
                 §I{List<Person>:people}
                 §O{str}
                 §B{p:Person} people[0]
@@ -674,12 +674,12 @@ public class CompletionHandlerTests
     public void GenericList_ChainedIndexAccess_WorksCorrectly()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Address}
+            §M{TestModule}
+              §CL{Address}
                 §FLD{str:city}
-              §CL{c002:Person}
+              §CL{Person}
                 §FLD{Address:address}
-              §F{f001:Test}
+              §F{Test}
                 §I{List<Person>:people}
                 §O{str}
                 §B{p:Person} people[0]
@@ -696,10 +696,10 @@ public class CompletionHandlerTests
     public void ArraySyntax_IndexAccess_ResolvesElementType()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Item}
+            §M{TestModule}
+              §CL{Item}
                 §FLD{str:name}
-              §F{f001:Test}
+              §F{Test}
                 §I{Item[]:items}
                 §O{str}
                 §B{item:Item} items[0]
@@ -718,8 +718,8 @@ public class CompletionHandlerTests
         // String index access returns char, which is a primitive
         // This test verifies the type resolution works even if no members are shown
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test}
+            §M{TestModule}
+              §F{Test}
                 §I{str:text}
                 §O{str}
                 §R text[0].
@@ -735,10 +735,10 @@ public class CompletionHandlerTests
     public void NestedGenericType_WorksCorrectly()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Person}
+            §M{TestModule}
+              §CL{Person}
                 §FLD{str:name}
-              §F{f001:Test}
+              §F{Test}
                 §I{List<List<Person>>:nestedPeople}
                 §O{str}
                 §B{innerList:List<Person>} nestedPeople[0]
@@ -758,10 +758,10 @@ public class CompletionHandlerTests
     {
         // Test that generic type parameters like List<Person> are correctly parsed
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Person}
+            §M{TestModule}
+              §CL{Person}
                 §FLD{str:name}
-              §F{f001:Test}
+              §F{Test}
                 §I{List<Person>:people}
                 §O{i32}
                 §R people.
@@ -783,8 +783,8 @@ public class CompletionHandlerTests
     public void ScopeCompletion_ParametersAvailable()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §I{i32:myParam}
                 §I{str:anotherParam}
                 §O{i32}
@@ -804,8 +804,8 @@ public class CompletionHandlerTests
     public void ScopeCompletion_LocalBindingsAvailable()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §O{i32}
                 §B{x} 10
                 §B{y} 20
@@ -825,8 +825,8 @@ public class CompletionHandlerTests
     public void ScopeCompletion_BindingsBeforeCursor_AreVisible()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §O{i32}
                 §B{first} 1
                 §B{second} 2
@@ -845,10 +845,10 @@ public class CompletionHandlerTests
     public void ScopeCompletion_MethodHasThisAndFields()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:MyClass}
+            §M{TestModule}
+              §CL{MyClass}
                 §FLD{str:myField}
-                §MT{m001:MyMethod}
+                §MT{MyMethod}
                   §O{str}
                   §R this.myField
             """;
@@ -866,12 +866,12 @@ public class CompletionHandlerTests
     public void ScopeCompletion_NestedIfStatement_BindingsVisible()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §I{bool:condition}
                 §O{i32}
                 §B{outer} 1
-                §IF{if001} condition
+                §IF condition
                   §B{inner} 2
                   §R inner
                 §R outer
@@ -895,8 +895,8 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_IncludesParameters()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §I{i32:myParam}
                 §I{str:otherParam}
                 §O{i32}
@@ -913,8 +913,8 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_IncludesLocalBindings()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §O{i32}
                 §B{localVar:i32} 42
                 §B{anotherVar:str} "hello"
@@ -931,11 +931,11 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_IncludesFunctions()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Helper:pub}
+            §M{TestModule}
+              §F{Helper:pub}
                 §O{i32}
                 §R 42
-              §F{f002:Main:pub}
+              §F{Main:pub}
                 §O{i32}
                 §R _CURSOR_
             """;
@@ -949,8 +949,8 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_IncludesBooleanLiterals()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §O{bool}
                 §R _CURSOR_
             """;
@@ -965,8 +965,8 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_ShowsParameterTypes()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §I{i32:count}
                 §O{i32}
                 §R _CURSOR_
@@ -984,8 +984,8 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_ShowsBindingTypes()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §O{str}
                 §B{name:str} "test"
                 §R _CURSOR_
@@ -1002,11 +1002,11 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_ForLoopVariable()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §O{i32}
                 §B{~sum:i32} 0
-                §L{l001:i:0:10}
+                §L{i:0:10}
                   §ASSIGN sum (+ sum _CURSOR_)
                 §R sum
             """;
@@ -1024,11 +1024,11 @@ public class CompletionHandlerTests
     {
         // Syntax: §EACH{id:variable:type} collection
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §I{List<str>:items}
                 §O{void}
-                §EACH{e001:item:str} items
+                §EACH{item:str} items
                   §P _CURSOR_
             """;
 
@@ -1044,11 +1044,11 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_MethodContext_HasThisAndFields()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Counter}
+            §M{TestModule}
+              §CL{Counter}
                 §FLD{i32:count}
                 §FLD{str:name}
-                §MT{m001:Increment}
+                §MT{Increment}
                   §O{i32}
                   §R _CURSOR_
             """;
@@ -1066,9 +1066,9 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_MethodContext_HasMethodParameters()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Calculator}
-                §MT{m001:Add}
+            §M{TestModule}
+              §CL{Calculator}
+                §MT{Add}
                   §I{i32:a}
                   §I{i32:b}
                   §O{i32}
@@ -1085,8 +1085,8 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_MutableVsImmutableBindings()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §O{i32}
                 §B{immutable:i32} 10
                 §B{~mutable:i32} 20
@@ -1111,13 +1111,13 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_DoWhileLoop()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §O{i32}
                 §B{~counter:i32} 0
-                §DO{d001}
+                §DO
                 §ASSIGN counter (+ counter _CURSOR_)
-                §/DO{d001} (< counter 10)
+                §/DO (< counter 10)
                 §R counter
             """;
 
@@ -1131,11 +1131,11 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_DictionaryForeach_KeyAndValue()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §I{Dict<str,i32>:scores}
                 §O{void}
-                §EACHKV{e001:name:score} scores
+                §EACHKV{name:score} scores
                   §P _CURSOR_
             """;
 
@@ -1152,11 +1152,11 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_MatchStatement_PatternVariable()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §I{i32:value}
                 §O{str}
-                §W{w001} value
+                §W value
                 §K §VAR{x} §WHEN (> x 0) → _CURSOR_
                 §K _ → "other"
             """;
@@ -1170,15 +1170,15 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_ConstructorBody()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Person}
+            §M{TestModule}
+              §CL{Person}
                 §FLD{str:_name}
                 §FLD{i32:_age}
-                §CTOR{ctor001:pub}
+                §CTOR{pub}
                 §I{str:name}
                 §I{i32:age}
                 §ASSIGN §THIS._name _CURSOR_
-                §/CTOR{ctor001}
+                §/CTOR
             """;
 
         var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
@@ -1191,14 +1191,14 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_NestedScopes_AllVisible()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §I{i32:param}
                 §O{i32}
                 §B{outer:i32} 1
-                §IF{if001} (> param 0)
+                §IF (> param 0)
                   §B{inner:i32} 2
-                  §L{l001:i:0:10}
+                  §L{i:0:10}
                     §B{deepest:i32} _CURSOR_
                 §R outer
             """;
@@ -1216,14 +1216,14 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_TryCatch_ExceptionVariable()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
+            §M{TestModule}
+              §F{Test:pub}
                 §O{str}
-                §TR{t001}
+                §TR
                 §R "success"
                 §CA{Exception:ex}
                 §R _CURSOR_
-                §/TR{t001}
+                §/TR
             """;
 
         var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
@@ -1236,11 +1236,11 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_ClassProperties()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Rectangle}
+            §M{TestModule}
+              §CL{Rectangle}
                 §FLD{f64:_width}
                 §FLD{f64:_height}
-                §PROP{f64:Area:pub}
+                §PROP{Area:pub}
                 §GET
                 §R _CURSOR_
                 §/GET

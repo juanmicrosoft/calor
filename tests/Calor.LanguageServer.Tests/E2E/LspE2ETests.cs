@@ -76,10 +76,10 @@ public class LspE2ETests
     {
         const string uri = "file:///calor-lsp-e2e/main.calr";
         const string source = """
-            §M{m001:TestModule}
-              §F{f001:Compute:pub} () -> i32
+            §M{TestModule}
+              §F{Compute:pub} () -> i32
                 §R 42
-              §F{f002:Use:pub} () -> i32
+              §F{Use:pub} () -> i32
                 §R §C{Compute} §/C
             """;
         await using var client = await LspClient.StartAsync(_output);
@@ -136,10 +136,10 @@ public class LspE2ETests
                 .GetArrayLength());
 
         const string changedSource = """
-            §M{m001:TestModule}
-              §F{f001:Calculate:pub} () -> i32
+            §M{TestModule}
+              §F{Calculate:pub} () -> i32
                 §R 42
-              §F{f002:Use:pub} () -> i32
+              §F{Use:pub} () -> i32
                 §R §C{Calculate} §/C
             """;
         await client.ChangeAsync(uri, changedSource, version: 2);
@@ -166,14 +166,14 @@ public class LspE2ETests
         const string diagnosticUri = "file:///calor-lsp-e2e/diagnostics.calr";
         await client.OpenAsync(
             diagnosticUri,
-            "§M{m003:Broken}\n  §UNKNOWN_TOKEN_XYZ",
+            "§M{Broken}\n  §UNKNOWN_TOKEN_XYZ",
             version: 1);
         var errors = await client.WaitForDiagnosticsAsync(diagnosticUri, version: 1);
         Assert.Contains(errors.EnumerateArray(), diagnostic =>
             diagnostic.GetProperty("severity").GetInt32() == 1);
         await client.ChangeAsync(
             diagnosticUri,
-            "§M{m003:Fixed}\n",
+            "§M{Fixed}\n",
             version: 2);
         var cleared = await client.WaitForDiagnosticsAsync(diagnosticUri, version: 2);
         Assert.Equal(0, cleared.GetArrayLength());

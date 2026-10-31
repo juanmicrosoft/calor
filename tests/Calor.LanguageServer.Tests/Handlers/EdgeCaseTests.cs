@@ -15,8 +15,8 @@ public class EdgeCaseTests
     public void Generic_Class_ReturnsClassInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §CL{c001:/*cursor*/Container<T>}
+            §M{TestModule}
+              §CL{/*cursor*/Container<T>}
                 §FLD{T:value}
             """);
 
@@ -32,9 +32,9 @@ public class EdgeCaseTests
     public void Generic_Method_WithTypeParameter()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Utils}
-                §MT{m001:Identity<T>}
+            §M{TestModule}
+              §CL{Utils}
+                §MT{Identity<T>}
                   §I{T:value}
                   §O{T}
                   §R value
@@ -55,8 +55,8 @@ public class EdgeCaseTests
     public void Generic_Function_WithConstraint()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Compare<T>}
+            §M{TestModule}
+              §F{Compare<T>}
                 §TP{T}
                 §TC{IComparable}
                 §I{T:a}
@@ -79,8 +79,8 @@ public class EdgeCaseTests
     public void Inheritance_BaseClass_HasFields()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Animal:pub}
+            §M{TestModule}
+              §CL{Animal:pub}
                 §FLD{str:name:pub}
                 §FLD{i32:age:pub}
             """;
@@ -97,10 +97,10 @@ public class EdgeCaseTests
     public void Inheritance_DerivedClass_ExtendsBase()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Animal:pub}
+            §M{TestModule}
+              §CL{Animal:pub}
                 §FLD{str:name:pub}
-              §CL{c002:Dog:pub}
+              §CL{Dog:pub}
                 §EXT{Animal}
                 §FLD{str:breed:pub}
             """;
@@ -121,13 +121,13 @@ public class EdgeCaseTests
     public void Inheritance_ClassImplementsInterface()
     {
         var source = """
-            §M{m001:TestModule}
-              §IFACE{i001:IDrawable}
-                §MT{m001:Draw}
+            §M{TestModule}
+              §IFACE{IDrawable}
+                §MT{Draw}
                   §O{void}
-              §CL{c001:Circle:pub}
+              §CL{Circle:pub}
                 §IMPL{IDrawable}
-                §MT{m001:Draw}
+                §MT{Draw}
                   §O{void}
                   §P "Drawing circle"
             """;
@@ -144,15 +144,15 @@ public class EdgeCaseTests
     public void Inheritance_MultipleInterfaces()
     {
         var source = """
-            §M{m001:TestModule}
-              §IFACE{i001:IReadable}
-                §MT{m001:Read}
+            §M{TestModule}
+              §IFACE{IReadable}
+                §MT{Read}
                   §O{str}
-              §IFACE{i002:IWritable}
-                §MT{m001:Write}
+              §IFACE{IWritable}
+                §MT{Write}
                   §I{str:data}
                   §O{void}
-              §CL{c001:File:pub}
+              §CL{File:pub}
                 §IMPL{IReadable}
                 §IMPL{IWritable}
             """;
@@ -169,9 +169,9 @@ public class EdgeCaseTests
     public void Inheritance_AbstractClass()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Shape:pub:abs}
-                §MT{m001:GetArea:pub:abs}
+            §M{TestModule}
+              §CL{Shape:pub:abs}
+                §MT{GetArea:pub:abs}
                   §O{f64}
             """;
 
@@ -189,8 +189,8 @@ public class EdgeCaseTests
     public void Inheritance_SealedClass()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:FinalClass:pub:sealed}
+            §M{TestModule}
+              §CL{FinalClass:pub:sealed}
                 §FLD{i32:value}
             """;
 
@@ -211,8 +211,8 @@ public class EdgeCaseTests
     public void Async_Function_HasAsyncFlag()
     {
         var source = """
-            §M{m001:TestModule}
-              §AF{f001:FetchData}
+            §M{TestModule}
+              §AF{FetchData}
                 §O{str}
                 §R "data"
             """;
@@ -229,12 +229,12 @@ public class EdgeCaseTests
     public void Async_Method_HasAsyncFlag()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Service}
-                §AMT{m001:LoadAsync}
+            §M{TestModule}
+              §CL{Service}
+                §AMT{LoadAsync}
                 §O{str}
                 §R "loaded"
-                §/AMT{m001}
+                §/AMT
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -252,8 +252,8 @@ public class EdgeCaseTests
     public void Async_FunctionWithParameters()
     {
         var source = """
-            §M{m001:TestModule}
-              §AF{f001:DownloadFile}
+            §M{TestModule}
+              §AF{DownloadFile}
                 §I{str:url}
                 §I{str:path}
                 §O{bool}
@@ -277,14 +277,14 @@ public class EdgeCaseTests
     public void ComplexExpression_NestedIfElse()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Classify}
+            §M{TestModule}
+              §F{Classify}
                 §I{i32:n}
                 §O{str}
-                §IF{if001} n < 0
+                §IF n < 0
                   §R "negative"
                 §EL
-                  §IF{if002} n == 0
+                  §IF n == 0
                     §R "zero"
                 §EL
                     §R "positive"
@@ -299,11 +299,11 @@ public class EdgeCaseTests
     public void ComplexExpression_MatchStatement()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Describe}
+            §M{TestModule}
+              §F{Describe}
                 §I{i32:n}
                 §O{str}
-                §W{sw001} n
+                §W n
                   §CS{cs001} 0
                   §R "zero"
                   §/CS{cs001}
@@ -324,8 +324,8 @@ public class EdgeCaseTests
     public void ComplexExpression_ForLoop()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Sum}
+            §M{TestModule}
+              §F{Sum}
                 §I{i32:n}
                 §O{i32}
                 §B{~total:i32} 0
@@ -344,12 +344,12 @@ public class EdgeCaseTests
     public void ComplexExpression_WhileLoop()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Countdown}
+            §M{TestModule}
+              §F{Countdown}
                 §I{i32:n}
                 §O{void}
                 §B{~count:i32} n
-                §WH{wh001} count > 0
+                §WH count > 0
                   §P count
                   §B{~count} count - 1
             """;
@@ -363,8 +363,8 @@ public class EdgeCaseTests
     public void ComplexExpression_TryCatch()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:SafeDivide}
+            §M{TestModule}
+              §F{SafeDivide}
                 §I{i32:a}
                 §I{i32:b}
                 §O{i32}
@@ -385,12 +385,12 @@ public class EdgeCaseTests
     public void ComplexExpression_Delegate()
     {
         var source = """
-            §M{m001:TestModule}
-              §DEL{d001:BinaryOp}
+            §M{TestModule}
+              §DEL{BinaryOp}
               §I{i32:a}
               §I{i32:b}
               §O{i32}
-              §/DEL{d001}
+              §/DEL
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -404,8 +404,8 @@ public class EdgeCaseTests
     {
         // Events may not be fully supported yet, test that class parses
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Button}
+            §M{TestModule}
+              §CL{Button}
                 §FLD{i32:clickCount}
             """;
 
@@ -426,13 +426,13 @@ public class EdgeCaseTests
     public void Property_GetterOnly()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Person}
-                §PROP{p001:Name:str:pub}
+            §M{TestModule}
+              §CL{Person}
+                §PROP{Name:str:pub}
                 §GET
                 §R ""
                 §/GET
-                §/PROP{p001}
+                §/PROP
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -448,15 +448,15 @@ public class EdgeCaseTests
     public void Property_GetterAndSetter()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Counter}
-                §PROP{p001:Value:i32:pub}
+            §M{TestModule}
+              §CL{Counter}
+                §PROP{Value:i32:pub}
                 §GET
                 §R 0
                 §/GET
                 §SET
                 §/SET
-                §/PROP{p001}
+                §/PROP
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -475,13 +475,13 @@ public class EdgeCaseTests
     public void Static_Method()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Math}
-                §MT{m001:Max:pub:static}
+            §M{TestModule}
+              §CL{Math}
+                §MT{Max:pub:static}
                   §I{i32:a}
                   §I{i32:b}
                   §O{i32}
-                  §IF{if001} a > b
+                  §IF a > b
                     §R a
                   §EL
                     §R b
@@ -502,8 +502,8 @@ public class EdgeCaseTests
     public void Static_Field()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Config}
+            §M{TestModule}
+              §CL{Config}
                 §FLD{str:Version:pub}
             """;
 
@@ -523,13 +523,13 @@ public class EdgeCaseTests
     public void Constructor_WithParameters()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Person}
+            §M{TestModule}
+              §CL{Person}
                 §FLD{str:_name:priv}
                 §CTOR{ctor001}
                 §I{str:name}
                 §B{_name} name
-                §/CTOR{ctor001}
+                §/CTOR
             """;
 
         var ast = LspTestHarness.GetAst(source);

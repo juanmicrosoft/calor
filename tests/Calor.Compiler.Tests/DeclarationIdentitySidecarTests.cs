@@ -629,7 +629,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
         var emitted = new CalorEmitter().Emit(parsed.Ast!);
         foreach (var declaration in state.Declarations)
             Assert.DoesNotContain(declaration.Id, emitted);
-        Assert.DoesNotContain(parsed.Ast!.Functions.Single().SourceId, emitted);
+        Assert.DoesNotContain(parsed.Ast!.Functions.Single().LocalId, emitted);
     }
 
     [Fact]
@@ -676,7 +676,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
         Assert.False(legacy.IsModule);
         var identity = Assert.Single(new IdScanner().Scan(module, "legacy-ast.calr").Where(d => d.Name == "Legacy"));
         Assert.Equal(IdKind.Class, identity.Kind);
-        Assert.Equal(legacy.SourceId, identity.Id);
+        Assert.Equal(legacy.LocalId, identity.Id);
     }
 
     [Fact]
@@ -700,7 +700,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
         var ast = CalorSourceHelper.Parse(source, file).Ast!;
         var simplified = new Calor.Compiler.Verification.ContractSimplificationPass(new DiagnosticBag()).Simplify(ast);
         Assert.NotSame(ast.Functions.Single(), simplified.Functions.Single());
-        Assert.Equal(ast.Functions.Single().SourceId, simplified.Functions.Single().SourceId);
+        Assert.Equal(ast.Functions.Single().LocalId, simplified.Functions.Single().LocalId);
         Assert.Equal(ast.Functions.Single().Id, simplified.Functions.Single().Id);
         var emitted = new CalorEmitter().Emit(simplified);
         foreach (var declaration in state.Declarations)

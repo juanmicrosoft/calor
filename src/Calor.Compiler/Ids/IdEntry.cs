@@ -747,20 +747,20 @@ public sealed class DeclarationIdentityStore
         {
             var sourceId = node switch
             {
-                ModuleNode n => n.SourceId,
-                FunctionNode n => n.SourceId,
-                TypeDefinitionNode n => n.SourceId,
-                MethodNode n => n.SourceId,
-                MethodSignatureNode n => n.SourceId,
-                PropertyNode n => n.SourceId,
-                IndexerNode n => n.SourceId,
-                ConstructorNode n => n.SourceId,
-                OperatorOverloadNode n => n.SourceId,
-                EnumExtensionNode n => n.SourceId,
-                RefinementTypeNode n => n.SourceId,
-                IndexedTypeNode n => n.SourceId,
-                EventDefinitionNode n => n.SourceId,
-                ProofObligationNode n => n.SourceId,
+                ModuleNode n => n.LocalId,
+                FunctionNode n => n.LocalId,
+                TypeDefinitionNode n => n.LocalId,
+                MethodNode n => n.LocalId,
+                MethodSignatureNode n => n.LocalId,
+                PropertyNode n => n.LocalId,
+                IndexerNode n => n.LocalId,
+                ConstructorNode n => n.LocalId,
+                OperatorOverloadNode n => n.LocalId,
+                EnumExtensionNode n => n.LocalId,
+                RefinementTypeNode n => n.LocalId,
+                IndexedTypeNode n => n.LocalId,
+                EventDefinitionNode n => n.LocalId,
+                ProofObligationNode n => n.LocalId,
                 _ => ""
             };
             result.Add(new ParsedDeclaration(new DeclarationIdentity(sourceId, file, container, kind, name, signature), node));

@@ -9,7 +9,10 @@ public abstract class AstNode
 {
     public TextSpan Span { get; }
 
-    /// <summary>Tooling-owned identity projected from the registered project sidecar.</summary>
+    /// <summary>
+    /// Tooling-owned identity projected from the registered project sidecar.
+    /// Declaration LocalId values are ephemeral parser/converter handles, never source fields or durable identities.
+    /// </summary>
     public string? ToolingId { get; internal set; }
 
     /// <summary>

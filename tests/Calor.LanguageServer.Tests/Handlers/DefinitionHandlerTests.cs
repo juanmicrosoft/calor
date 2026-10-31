@@ -14,8 +14,8 @@ public class DefinitionHandlerTests
     public void FindDefinition_Function_ReturnsFunction()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Add}
+            §M{TestModule}
+              §F{Add}
                 §I{i32:a}
                 §I{i32:b}
                 §O{i32}
@@ -35,8 +35,8 @@ public class DefinitionHandlerTests
     public void FindDefinition_Class_ReturnsClass()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Person}
+            §M{TestModule}
+              §CL{Person}
                 §FLD{str:name}
             """;
 
@@ -53,9 +53,9 @@ public class DefinitionHandlerTests
     public void FindDefinition_Interface_ReturnsInterface()
     {
         var source = """
-            §M{m001:TestModule}
-              §IFACE{i001:IShape}
-                §MT{m001:GetArea}
+            §M{TestModule}
+              §IFACE{IShape}
+                §MT{GetArea}
                   §O{f64}
             """;
 
@@ -72,11 +72,11 @@ public class DefinitionHandlerTests
     public void FindDefinition_Enum_ReturnsEnum()
     {
         var source = """
-            §M{m001:TestModule}
-              §EN{e001:Color}
+            §M{TestModule}
+              §EN{Color}
               §EM{Red}
               §EM{Green}
-              §/EN{e001}
+              §/EN
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -92,11 +92,11 @@ public class DefinitionHandlerTests
     public void FindDefinition_Delegate_ReturnsDelegate()
     {
         var source = """
-            §M{m001:TestModule}
-              §DEL{d001:Callback}
+            §M{TestModule}
+              §DEL{Callback}
               §I{i32:value}
               §O{void}
-              §/DEL{d001}
+              §/DEL
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -112,8 +112,8 @@ public class DefinitionHandlerTests
     public void FindDefinition_NonExistent_ReturnsNull()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test}
+            §M{TestModule}
+              §F{Test}
                 §R 0
             """;
 
@@ -129,8 +129,8 @@ public class DefinitionHandlerTests
     public void FindFunction_ExistingFunction_ReturnsFunction()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Calculate}
+            §M{TestModule}
+              §F{Calculate}
                 §I{i32:x}
                 §I{i32:y}
                 §O{i32}
@@ -151,9 +151,9 @@ public class DefinitionHandlerTests
     public void FindMethod_ExistingMethod_ReturnsMethod()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Calculator}
-                §MT{m001:Add}
+            §M{TestModule}
+              §CL{Calculator}
+                §MT{Add}
                   §I{i32:a}
                   §I{i32:b}
                   §O{i32}
@@ -177,12 +177,12 @@ public class DefinitionHandlerTests
     public void FindDefinition_MultipleFunctions_FindsCorrectOne()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:First}
+            §M{TestModule}
+              §F{First}
                 §R 1
-              §F{f002:Second}
+              §F{Second}
                 §R 2
-              §F{f003:Third}
+              §F{Third}
                 §R 3
             """;
 
@@ -201,10 +201,10 @@ public class DefinitionHandlerTests
     public void FindDefinition_NestedClassInOtherClass_FindsClass()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Outer}
+            §M{TestModule}
+              §CL{Outer}
                 §FLD{i32:x}
-              §CL{c002:Inner}
+              §CL{Inner}
                 §FLD{str:name}
             """;
 
@@ -224,17 +224,17 @@ public class DefinitionHandlerTests
         try
         {
             const string definition = """
-                §M{defs:Collision}
-                  §CL{worker1:Worker:pub:partial}
-                    §MT{pickInt:Pick:pub} (i32:value) -> i32
+                §M{Collision}
+                  §CL{Worker:pub:partial}
+                    §MT{Pick:pub} (i32:value) -> i32
                       §R value
-                    §MT{pickText:Pick:pub} (str:value) -> i32
+                    §MT{Pick:pub} (str:value) -> i32
                       §R INT:2
                 """;
             const string use = """
-                §M{use:Collision}
-                  §CL{worker2:Worker:pub:partial}
-                    §MT{call:Call:pub} () -> i32
+                §M{Collision}
+                  §CL{Worker:pub:partial}
+                    §MT{Call:pub} () -> i32
                       §R §C{Pick} §A INT:1 §/C
                 """;
             var definitionPath = Path.Combine(root, "definition.calr");
@@ -275,16 +275,16 @@ public class DefinitionHandlerTests
     public async Task DefinitionResolvesNamespacedGenericStaticReceiverByArityAsync()
     {
         const string source = """
-            §M{m001:GenericDefinitions}
-              §NS{ns1:Alpha}
-                §CL{c001:Box:pub}<T>
-                  §MT{m001:Create:pub:stat} (i32:value) -> i32
+            §M{GenericDefinitions}
+              §NS{Alpha}
+                §CL{Box:pub}<T>
+                  §MT{Create:pub:stat} (i32:value) -> i32
                     §R value
-                §CL{c002:Box:pub}<TLeft,TRight>
-                  §MT{m002:Create:pub:stat} (str:value) -> str
+                §CL{Box:pub}<TLeft,TRight>
+                  §MT{Create:pub:stat} (str:value) -> str
                     §R value
-              §NS{ns2:Beta}
-                §F{f001:UseStatic:pub} () -> i32
+              §NS{Beta}
+                §F{UseStatic:pub} () -> i32
                   §R §C{Alpha.Box<i32>.Create} §A INT:1 §/C
             """;
         var uri = DocumentUri.From("file:///generic-definition.calr");
@@ -320,8 +320,8 @@ public class DefinitionHandlerTests
     public async Task DefinitionDoesNotResolveWhitespaceOrEndAdjacentCursorAsync()
     {
         const string source = """
-            §M{m001:TestModule}
-              §F{f001:Compute:pub} () -> i32
+            §M{TestModule}
+              §F{Compute:pub} () -> i32
                 §R INT:1
             """;
         var uri = DocumentUri.From("file:///definition-cursor.calr");
@@ -348,12 +348,12 @@ public class DefinitionHandlerTests
     public async Task DefinitionResolvesNamespacedTypeQualifiedStaticCallAsync()
     {
         const string source = """
-            §M{m001:TestModule}
-              §NS{ns1:Alpha}
-                §CL{c1:Widget:pub}
-                  §MT{m1:Create:pub:stat} (i32:value) -> i32
+            §M{TestModule}
+              §NS{Alpha}
+                §CL{Widget:pub}
+                  §MT{Create:pub:stat} (i32:value) -> i32
                     §R value
-                §F{f1:Use:pub} () -> i32
+                §F{Use:pub} () -> i32
                   §R §C{Widget.Create} §A INT:42 §/C
             """;
         var uri = DocumentUri.From("file:///namespaced-static-definition.calr");

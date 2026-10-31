@@ -31,8 +31,8 @@ public sealed record NamespaceScopeInfo(
 /// </summary>
 public sealed class ModuleNode : AstNode
 {
-    public string Id => ToolingId ?? SourceId;
-    public string SourceId { get; }
+    public string Id => ToolingId ?? LocalId;
+    public string LocalId { get; }
     public string Name { get; }
     public TextSpan IdentifierSpan { get; }
     public IReadOnlyList<UsingDirectiveNode> Usings { get; }
@@ -222,7 +222,7 @@ public sealed class ModuleNode : AstNode
         : base(span)
     {
         DeclaredSemanticsVersion = declaredSemanticsVersion;
-        SourceId = id ?? throw new ArgumentNullException(nameof(id));
+        LocalId = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         IdentifierSpan = identifierSpan ?? span;
         Usings = usings ?? throw new ArgumentNullException(nameof(usings));
@@ -264,7 +264,7 @@ public sealed class ModuleNode : AstNode
         internal ModuleUpdate(ModuleNode source)
         {
             Span = source.Span;
-            SourceId = source.SourceId;
+            LocalId = source.LocalId;
             Name = source.Name;
             IdentifierSpan = source.IdentifierSpan;
             Usings = source.Usings;
@@ -290,8 +290,8 @@ public sealed class ModuleNode : AstNode
         }
 
         public TextSpan Span { get; set; }
-        public string SourceId { get; set; }
-        public string Id { get => SourceId; set => SourceId = value; }
+        public string LocalId { get; set; }
+        public string Id { get => LocalId; set => LocalId = value; }
         public string Name { get; set; }
         public TextSpan IdentifierSpan { get; set; }
         public IReadOnlyList<UsingDirectiveNode> Usings { get; set; }

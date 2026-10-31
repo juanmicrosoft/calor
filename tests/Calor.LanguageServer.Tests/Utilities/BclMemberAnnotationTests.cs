@@ -15,7 +15,7 @@ public class BclMemberAnnotationTests
     public async Task ScalarMemberDiagnostic_IsActiveAndClearsOnSafeEditAsync(
         string body, string returnType, string code)
     {
-        var source = $"§M{{m1:Members}}\n  §F{{f1:Probe:pub}} () -> {returnType}\n    {body}\n";
+        var source = $"§M{{Members}}\n  §F{{Probe:pub}} () -> {returnType}\n    {body}\n";
         var path = Path.Combine(Path.GetTempPath(), "members-" + Guid.NewGuid().ToString("N") + ".calr");
         using var document = new DocumentState(new Uri(path), source);
         await document.ReanalyzeAsync();

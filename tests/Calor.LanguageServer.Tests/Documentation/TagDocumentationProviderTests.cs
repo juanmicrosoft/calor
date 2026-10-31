@@ -211,7 +211,7 @@ public class TagDocumentationProviderTests
     [Fact]
     public void ExtractTagAtPosition_FunctionTag_ReturnsTag()
     {
-        var text = "§F{f001:Add:pub}";
+        var text = "§F{Add:pub}";
         var tag = TagDocumentationProvider.ExtractTagAtPosition(text, 1);
 
         Assert.Equal("§F", tag);
@@ -229,7 +229,7 @@ public class TagDocumentationProviderTests
     [Fact]
     public void ExtractTagAtPosition_IfTag_ReturnsTag()
     {
-        var text = "§IF{x > 0} §EI{x < 0} §EL §/IF";
+        var text = "§IF §EI{x < 0} §EL §/IF";
         var tag = TagDocumentationProvider.ExtractTagAtPosition(text, 0);
 
         Assert.Equal("§IF", tag);
@@ -238,8 +238,8 @@ public class TagDocumentationProviderTests
     [Fact]
     public void ExtractTagAtPosition_ElseIfTag_ReturnsTag()
     {
-        var text = "§IF{x > 0} §EI{x < 0} §EL §/IF";
-        var tag = TagDocumentationProvider.ExtractTagAtPosition(text, 12);
+        var text = "§IF §EI{x < 0} §EL §/IF";
+        var tag = TagDocumentationProvider.ExtractTagAtPosition(text, text.IndexOf("§EI", StringComparison.Ordinal) + 1);
 
         Assert.Equal("§EI", tag);
     }
@@ -247,8 +247,8 @@ public class TagDocumentationProviderTests
     [Fact]
     public void ExtractTagAtPosition_ElseTag_ReturnsTag()
     {
-        var text = "§IF{x > 0} §EI{x < 0} §EL §/IF";
-        var tag = TagDocumentationProvider.ExtractTagAtPosition(text, 23);
+        var text = "§IF §EI{x < 0} §EL §/IF";
+        var tag = TagDocumentationProvider.ExtractTagAtPosition(text, text.IndexOf("§EL", StringComparison.Ordinal) + 1);
 
         Assert.Equal("§EL", tag);
     }
@@ -327,8 +327,8 @@ public class TagDocumentationProviderTests
     public void ExtractTagAtPosition_MultiLineSource_FindsTag()
     {
         var text = """
-            §M{m001:Test}
-            §F{f001:Add}
+            §M{Test}
+            §F{Add}
             §I{i32:a}
             """;
         // Position at §F
