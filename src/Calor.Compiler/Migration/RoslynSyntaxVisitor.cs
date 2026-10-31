@@ -11038,7 +11038,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // ordered conversion still refuses to move them before an observable operand.
         var hasUpdate = ContainsUpdateExpression(binary);
         var operands = ConvertOrderedExpressions([binary.Left, binary.Right], inPlace: !hasUpdate,
-            captureBeforeUpdates: hasUpdate && HasStatementTemporaryContext(binary));
+            captureBeforeUpdates: hasUpdate && _conditionalRegionDepth == 0 && HasStatementTemporaryContext(binary));
 
         return new BinaryOperationNode(GetTextSpan(binary), binaryOp, operands[0], operands[1]);
     }

@@ -69,6 +69,36 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
     }
 
     [Fact]
+    public void ConditionalFixture_PreservesOnlyTheSevenLazyUpdateSites()
+    {
+        var inputPath = Path.Combine(RegistryPath(), "conditional-expression-hoisting", "input.cs");
+        Assert.True(File.Exists(inputPath), "Required original conditional fixture missing.");
+        var converted = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            ModuleName = "Fixture",
+            GracefulFallback = true,
+            AutoGenerateIds = true,
+            PreprocessorMode = PreprocessorConversionMode.PreserveAllBranches
+        }).Convert(File.ReadAllText(inputPath), "conditional-expression-hoisting.cs");
+        Assert.True(converted.Success, string.Join("; ", converted.Issues.Select(issue => issue.Message)));
+        var losses = converted.Losses.ToArray();
+        output.WriteLine(JsonSerializer.Serialize(losses.Select(loss => new
+        {
+            loss.Feature, loss.Description, loss.Line
+        })));
+        Assert.All(losses, loss =>
+        {
+            Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+            Assert.Equal("conditional-expression-hoisting", loss.Feature);
+        });
+        Assert.Equal(new int?[] { 7, 11, 14, 18, 22, 22, 26 }, losses.Select(loss => loss.Line));
+        Assert.Equal(new[] { "i++", "i++", "++i", "++i", "i++", "++i", "++i" },
+            losses.Select(loss => loss.Description.Split("as C#: ", StringSplitOptions.None)[1]));
+        Assert.DoesNotContain("_arrayOperand", converted.CalorSource);
+    }
+
+    [Fact]
     public void AllFixtures_AreCompleteConvertExactlyAndCompile()
     {
         // A single fact rather than a MemberData theory: the registry is legitimately
