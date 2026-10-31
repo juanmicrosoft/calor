@@ -8462,7 +8462,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     ];
 
     private static string SanitizeQualifiedName(string name)
-        => RewriteIdentifierTokens(
+    {
+        name = TypeMapper.CalorToCSharpQualifiedName(name);
+        return RewriteIdentifierTokens(
             name,
             (identifier, start, end) =>
             {
@@ -8486,6 +8488,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
                 return SanitizeSingleIdentifier(identifier);
             });
+    }
 
     private static bool IsInsideGenericTypeArgument(string text, int offset)
     {

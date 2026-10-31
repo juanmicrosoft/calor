@@ -41,8 +41,12 @@ no substitute tokenizer or estimated result is reported here.
 
 - **C# conversion preserves indexer parameters and generic array element types.**
   Both cases now survive the full C# → Calor → C# pipeline. The 100-snippet
-  scorecard reaches 100 round-trip compilations, with 98 fully native conversions.
+  scorecard reaches 100 round-trip compilations, with 97 fully native conversions.
   Preserved C# does not count as native conversion.
+- **Generic member references map Calor type aliases correctly.**
+  `ImmutableDictionary<str, i32>.Empty` now emits
+  `ImmutableDictionary<string, int>.Empty`. Namespace, member and generic-method
+  names stay unchanged. Strict effect checks still apply.
 - **Built-in C# unary `+` converts natively.** Numeric promotion uses a cast,
   preserving nullable lifting and one evaluation of the operand. User-defined,
   dynamic and unresolved operators remain preserved as C#.

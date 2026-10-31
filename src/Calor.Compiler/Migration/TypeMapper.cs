@@ -506,6 +506,28 @@ public static class TypeMapper
         return CalorToCSharpMap.TryGetValue(calorType, out var result) ? result : calorType;
     }
 
+    internal static string CalorToCSharpQualifiedName(string name)
+    {
+        var genericIndex = name.IndexOf('<');
+        if (genericIndex <= 0)
+            return name;
+
+        var closingIndex = FindMatchingCloseBracket(name, genericIndex);
+        if (closingIndex <= genericIndex || name[closingIndex] != '>')
+            return name;
+
+        var baseName = name[..genericIndex];
+        var suffix = name[(closingIndex + 1)..];
+        var mappedBase = suffix.StartsWith('.')
+            && CalorToCSharpMap.TryGetValue(baseName, out var csharpBase)
+                ? csharpBase : baseName;
+        var mappedArgs = MapGenericArguments(
+            name[(genericIndex + 1)..closingIndex], CalorToCSharp);
+        var mappedSuffix = suffix.StartsWith('.')
+            ? CalorToCSharpQualifiedName(suffix) : suffix;
+        return $"{mappedBase}<{mappedArgs}>{mappedSuffix}";
+    }
+
     /// <summary>
     /// Converts a C# operator to an Calor operator kind.
     /// </summary>

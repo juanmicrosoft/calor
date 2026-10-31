@@ -1,6 +1,7 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Xunit;
@@ -196,6 +197,52 @@ public class MigrationLearningFixTests
         Assert.Equal("value.@base", new ReferenceNode(Span, "value.base").Accept(emitter));
         Assert.Equal("@base.Value", new ReferenceNode(Span, "@base.Value").Accept(emitter));
         Assert.Equal("global::System.Int32", new ReferenceNode(Span, "global::System.Int32").Accept(emitter));
+    }
+
+    [Theory]
+    [InlineData("ImmutableDictionary<str, i32>.Empty", "ImmutableDictionary<string, int>.Empty")]
+    [InlineData("global::System.Collections.Immutable.ImmutableDictionary<str, List<i32[]>>.Empty",
+        "global::System.Collections.Immutable.ImmutableDictionary<string, List<int[]>>.Empty")]
+    [InlineData("Outer<str>.Inner<i32>.event", "Outer<string>.Inner<int>.@event")]
+    [InlineData("Holder<?i32, ?str>.Empty", "Holder<int?, string?>.Empty")]
+    [InlineData("Holder<Namespace.str>.Empty", "Holder<Namespace.str>.Empty")]
+    [InlineData("holder.Create<str>", "holder.Create<string>")]
+    [InlineData("str<i32>", "str<int>")]
+    [InlineData("holder.str<i32>", "holder.str<int>")]
+    public void QualifiedGenericReferences_MapTypesWithoutRenamingValueIdentifiers(
+        string reference, string expected)
+    {
+        var emitter = new CSharpEmitter();
+        Assert.Equal(expected, new ReferenceNode(Span, reference).Accept(emitter));
+    }
+
+    [Fact]
+    public void QualifiedGenericCallTargets_MapTypeArguments()
+    {
+        var call = new CallExpressionNode(Span, "Comparer<str>.Default.Compare",
+            [new StringLiteralNode(Span, "a"), new StringLiteralNode(Span, "b")]);
+        Assert.Equal("Comparer<string>.Default.Compare(\"a\", \"b\")",
+            call.Accept(new CSharpEmitter()));
+    }
+
+    [Fact]
+    public void ImmutableDictionarySnapshot_TypeFixPreservesEffectPolicy()
+    {
+        var path = Path.Combine(CliTestHarness.FindRepoRoot(),
+            "tests", "Calor.Conversion.Tests", "Snapshots", "11-05.approved.calr");
+        var original = File.ReadAllBytes(path);
+        var source = File.ReadAllText(path);
+        var strict = Program.Compile(source, path);
+        Assert.Equal(DiagnosticCode.ForbiddenEffect,
+            Assert.Single(strict.Diagnostics.Errors).Code);
+        var result = Program.Compile(source, path, new CompilationOptions
+        {
+            UnknownCallPolicy = UnknownCallPolicy.Permissive
+        });
+
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));
+        Assert.Contains("ImmutableDictionary<string, int>.Empty", result.GeneratedCode);
+        Assert.Equal(original, File.ReadAllBytes(path));
     }
 
     #endregion
