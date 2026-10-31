@@ -8,7 +8,7 @@ namespace Calor.Compiler.Ids;
 /// (envelope schema v1 <c>declarationId</c>, loop plan D1.1). Built once per
 /// compilation from parsed modules; resolution is byte-offset containment against
 /// the full-extent spans that <see cref="IdScanner"/> records, picking the
-/// innermost containing declaration that carries a non-empty ID.
+/// innermost containing declaration that carries a persisted tooling ID.
 /// </summary>
 public sealed class DeclarationIdResolver
 {
@@ -16,13 +16,14 @@ public sealed class DeclarationIdResolver
 
     private readonly Dictionary<string, FileIndex> _files = new(StringComparer.Ordinal);
 
-    /// <summary>Registers a parsed file. Entries with empty IDs are dropped (IDs are optional per language policy).</summary>
+    /// <summary>Registers a parsed file, excluding snapshot-local declaration handles.</summary>
     public void AddFile(string filePath, string source, ModuleNode module)
     {
         DeclarationIdentityStore.AttachIfRegistered(filePath, source, module);
+        var persistedIds = DeclarationIdentityStore.ToolingIds(module).ToHashSet(StringComparer.Ordinal);
         var entries = new IdScanner()
             .Scan(module, filePath)
-            .Where(e => !string.IsNullOrEmpty(e.Id))
+            .Where(e => persistedIds.Contains(e.Id))
             .ToList();
         _files[Normalize(filePath)] = new FileIndex(source, entries);
     }

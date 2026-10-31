@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 using Calor.Compiler;
+using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Ids;
 using Calor.Compiler.Verification;
@@ -141,6 +142,29 @@ public class EnvelopeConformanceTests
         var json = new JsonDiagnosticFormatter().Format(result.Diagnostics);
         using var doc = JsonDocument.Parse(json);
         ValidateEnvelopeDocument(doc.RootElement);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DeclarationId_WithoutSidecar_DoesNotExposeLocalHandles(bool canonicalLookingLocalId)
+    {
+        const string source = "§M{Demo}\n";
+        var file = Path.Combine(Path.GetTempPath(), "calor-unregistered-" + Guid.NewGuid().ToString("N") + ".calr");
+        var compilation = Program.Compile(source, file);
+        Assert.False(compilation.HasErrors);
+        var module = Assert.IsType<ModuleNode>(compilation.Ast);
+        if (canonicalLookingLocalId)
+        {
+            module = new ModuleNode(module.Span, "m_000000000001", module.Name,
+                module.Usings, module.Functions, module.Attributes);
+            Assert.True(IdValidator.IsCanonicalId(module.LocalId));
+        }
+
+        Assert.Null(module.ToolingId);
+        var resolver = new DeclarationIdResolver();
+        resolver.AddFile(file, source, module);
+        Assert.Null(resolver.Resolve(file, 0, 1, 1, 1));
     }
 
     [SkippableFact]

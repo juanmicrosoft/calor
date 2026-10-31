@@ -8261,7 +8261,7 @@ public sealed class Parser
                 DiagnosticCode.EffectVariableScope,
                 $"An 'eff' effect variable cannot be declared on {owner}. In 0.15 an effect "
                 + "variable may only be bound by a function or method declaration — write it on "
-                + "the member's own type-parameter list, for example §MT{mt001:Handle:pub}<eff e>.");
+                + "the member's own type-parameter list, for example §MT{Handle:pub}<eff e>.");
             return;
         }
 
