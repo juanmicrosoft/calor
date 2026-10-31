@@ -38,8 +38,6 @@ public class ParsePrettyRoundTripPropertyTests
         var literalGen = Gen.Elements(literals);
         var statementGen = literalGen.Select(lit => $"    §P {lit}");
         var stmtCountGen = Gen.Choose(1, 3);
-        var funcIdGen = Gen.Choose(1, 999).Select(n => $"f{n:D3}");
-        var modIdGen = Gen.Choose(1, 999).Select(n => $"m{n:D3}");
 
         // Module name generator — restrict to a safe alphabet.
         var modNameChar = Gen.Elements("ABCDEFGHIJKLMNOPQRSTUVWXYZ".ToCharArray());
@@ -52,14 +50,12 @@ public class ParsePrettyRoundTripPropertyTests
             select head + new string(tail);
 
         return Arb.From(
-            from modId in modIdGen
             from modName in modNameGen
-            from funcId in funcIdGen
             from stmtCount in stmtCountGen
             from stmts in Gen.ArrayOf(stmtCount, statementGen)
             select
-                $"§M{{{modId}:{modName}}}\n"
-                + $"  §F{{{funcId}:Main:pub}} () -> void\n"
+                $"§M{{{modName}}}\n"
+                + "  §F{Main:pub} () -> void\n"
                 + "    §E{cw}\n"
                 + string.Join("\n", stmts)
                 + "\n");

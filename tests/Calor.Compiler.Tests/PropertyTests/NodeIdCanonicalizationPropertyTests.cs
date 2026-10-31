@@ -9,14 +9,11 @@ using Xunit;
 namespace Calor.Compiler.Tests.PropertyTests;
 
 /// <summary>
-/// IdScanner observes declaration identities; it does not rewrite them.
-/// Parse/emit materializes optional IDs. Explicit IDs are preserved, not
-/// rewritten by a legacy migration command.
+/// Parse/emit never serializes declaration IDs. Sidecar synchronization and
+/// attachment preserve identity across formatting and fresh parser snapshots.
 /// </summary>
 public sealed class NodeIdCanonicalizationPropertyTests
 {
-    private const string Path = "tests/generated-ids.calr";
-
     public sealed record Sample(int Rotation, int FunctionCount, int MethodCount, int Value, string Payload);
 
     public static Arbitrary<Sample> Modules() => Arb.From(
@@ -28,7 +25,7 @@ public sealed class NodeIdCanonicalizationPropertyTests
         select new Sample(rotation, functions, methods, value, new string(payload)));
 
     [Property(MaxTest = 100)]
-    public Property NodeIdCanonicalization_IsIdempotentAndPreservesDeclarations() =>
+    public Property SidecarIdentity_IsIdempotentAndPreservesDeclarations() =>
         Prop.ForAll(Modules(), sample =>
         {
             Check(sample);
@@ -40,43 +37,53 @@ public sealed class NodeIdCanonicalizationPropertyTests
     [InlineData(1)]
     [InlineData(2)]
     [InlineData(3)]
-    public void Controls_ExerciseEveryIdStyleOnModuleFunctionsAndMethods(int rotation) =>
+    public void Controls_ExerciseSourceOrdersOnModuleFunctionsAndMethods(int rotation) =>
         Check(new Sample(rotation, 4, 3, -17, "01J5X7K9M2NPQRSTABWXYZ12345"));
 
     private static void Check(Sample sample)
     {
-        var source = Render(sample);
-        var before = Parse(source);
-        var scanner = new IdScanner();
-        var original = scanner.Scan(before, Path);
-        var expectedCount = 2 + sample.FunctionCount + sample.MethodCount;
-        Assert.Equal(expectedCount, original.Count);
-        Assert.Contains(original, entry => entry.Id.Contains("_auto", StringComparison.Ordinal));
-        Assert.Contains(original, entry => IdValidator.IsTestId(entry.Id));
-        Assert.Contains(original, entry => IdValidator.IsLegacyUlidId(entry.Id));
-        Assert.Contains(original, entry => IdValidator.IsCompactId(entry.Id));
-
-        var emitted = new CalorEmitter().Emit(before);
-        Assert.Equal(original.Select(Identity), scanner.Scan(Parse(emitted), Path).Select(Identity));
-        var canonicalModule = Parse(emitted);
-        var canonicalEntries = scanner.Scan(canonicalModule, Path);
-        Assert.Equal(expectedCount, canonicalEntries.Count);
-        Assert.Equal(expectedCount, canonicalEntries.Select(entry => entry.Id).Distinct(StringComparer.Ordinal).Count());
-        Assert.DoesNotContain(canonicalEntries, entry => string.IsNullOrEmpty(entry.Id));
-        Assert.Equal(Shape(before), Shape(canonicalModule));
-        foreach (var (oldEntry, newEntry) in original.Zip(canonicalEntries))
+        var root = Path.Combine(Path.GetTempPath(), $"calor-generated-ids-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
         {
-            Assert.Equal((oldEntry.Kind, oldEntry.Name), (newEntry.Kind, newEntry.Name));
-            Assert.Equal(oldEntry.Id, newEntry.Id);
-            if (!newEntry.Id.Contains("_auto", StringComparison.Ordinal))
-                Assert.Equal(IdValidationResult.Valid, IdValidator.Validate(newEntry.Id, newEntry.Kind, isTestPath: true));
-        }
+            var file = Path.Combine(root, "generated.calr");
+            var source = Render(sample);
+            File.WriteAllText(file, source);
+            var store = new DeclarationIdentityStore(root);
+            store.Sync([file]);
+            var before = Parse(source);
+            store.Attach(file, source, before);
+            var scanner = new IdScanner();
+            var original = scanner.Scan(before, file);
+            var expectedCount = 2 + sample.FunctionCount + sample.MethodCount;
+            Assert.Equal(expectedCount, original.Count);
+            Assert.All(original, entry => Assert.Equal(
+                IdValidationResult.Valid, IdValidator.Validate(entry.Id, entry.Kind, isTestPath: false)));
 
-        // Fresh parse/emit passes must discover the same fixed point.
-        var emittedAgain = new CalorEmitter().Emit(canonicalModule);
-        Assert.Equal(emitted, emittedAgain);
-        var rescanned = new IdScanner().Scan(Parse(emittedAgain), Path);
-        Assert.Equal(canonicalEntries, rescanned);
+            var emitted = new CalorEmitter().Emit(before);
+            Assert.All(original, entry => Assert.DoesNotContain(entry.Id, emitted, StringComparison.Ordinal));
+            File.WriteAllText(file, emitted);
+            store.Sync();
+            var canonicalModule = Parse(emitted);
+            store.Attach(file, emitted, canonicalModule);
+            var canonicalEntries = scanner.Scan(canonicalModule, file);
+            Assert.Equal(original.Select(Identity), canonicalEntries.Select(Identity));
+            Assert.Equal(expectedCount, canonicalEntries.Select(entry => entry.Id).Distinct(StringComparer.Ordinal).Count());
+            Assert.Equal(Shape(before), Shape(canonicalModule));
+
+            var emittedAgain = new CalorEmitter().Emit(canonicalModule);
+            Assert.Equal(emitted, emittedAgain);
+            var sidecar = File.ReadAllBytes(store.SidecarPath);
+            store.Sync();
+            Assert.Equal(sidecar, File.ReadAllBytes(store.SidecarPath));
+            var fresh = Parse(emittedAgain);
+            store.Attach(file, emittedAgain, fresh);
+            Assert.Equal(canonicalEntries, new IdScanner().Scan(fresh, file));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     private static ModuleNode Parse(string source)
@@ -94,40 +101,19 @@ public sealed class NodeIdCanonicalizationPropertyTests
 
     private static string Render(Sample sample)
     {
-        string Id(IdKind kind, string shortPrefix, int number)
-        {
-            var style = (sample.Rotation + number) % 4;
-            var suffix = number.ToString("D3", System.Globalization.CultureInfo.InvariantCulture);
-            return style switch
-            {
-                0 => shortPrefix + suffix,
-                1 => IdGenerator.GetPrefix(kind) + sample.Payload[..23] + suffix,
-                2 => IdGenerator.GetPrefix(kind) + sample.Payload[..9].ToLowerInvariant() + suffix,
-                3 => "",
-                _ => throw new InvalidOperationException()
-            };
-        }
-
-        string Header(IdKind kind, string prefix, int number, string rest)
-        {
-            var id = Id(kind, prefix, number);
-            return string.IsNullOrEmpty(id) ? rest : $"{id}:{rest}";
-        }
-
         var source = new StringBuilder();
-        source.AppendLine($"§M{{{Header(IdKind.Module, "m", 0, "GeneratedIds")}}}");
-        for (var index = 1; index <= sample.FunctionCount; index++)
+        source.AppendLine($"§M{{GeneratedIds{sample.Payload[..4]}R{sample.Rotation}}}");
+        foreach (var index in Enumerable.Range(1, sample.FunctionCount)
+                     .OrderBy(index => (index + sample.Rotation) % sample.FunctionCount))
         {
-            source.AppendLine($"  §F{{{Header(IdKind.Function, "f", index, $"Compute{index}:pub")}}} (i32:x) -> i32");
+            source.AppendLine($"  §F{{Compute{index}:pub}} (i32:x) -> i32");
             source.AppendLine($"    §B{{offset:i32}} {sample.Value}");
             source.AppendLine($"    §R (+ x (+ offset {index}))");
         }
-        // Class header disambiguation currently only recognizes numeric IDs.
-        // Keep the container stable; mixed IDs are exercised on its methods.
         source.AppendLine("  §CL{Calculator:pub}");
         for (var index = 1; index <= sample.MethodCount; index++)
         {
-            source.AppendLine($"    §MT{{{Header(IdKind.Method, "mt", 20 + index, $"Apply{index}:pub")}}} (bool:flag) -> bool");
+            source.AppendLine($"    §MT{{Apply{index}:pub}} (bool:flag) -> bool");
             source.AppendLine($"      §R (|| flag BOOL:{(index % 2 == 0 ? "true" : "false")})");
         }
         return source.ToString();

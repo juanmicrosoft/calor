@@ -501,7 +501,7 @@ public sealed class GeneratedProductionPipelinePropertyTests(ITestOutputHelper o
         var body = sample.Mode switch
         {
             "expression" => $"    §R {expression}\n",
-            "loop" => $"    §B{{~total:i32}} 0\n    §L{{loop:i:1:{sample.Count}:1}}\n      §B{{~total}} (+ total {expression})\n    §R total\n",
+            "loop" => $"    §B{{~total:i32}} 0\n    §L{{i:1:{sample.Count}:1}}\n      §B{{~total}} (+ total {expression})\n    §R total\n",
             "match" => $"    §W {sample.Count}\n      §K 0\n        §R {expression}\n      §K _\n        §R {RenderTerm(sample.Alternative)}\n",
             _ => throw new NotSupportedException(sample.Mode)
         };
