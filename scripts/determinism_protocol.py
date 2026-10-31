@@ -45,7 +45,15 @@ RECORDER = "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/Determini
 CALL_SITES = {"tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DifferentialGate.cs": ["DeterminismRecord.WriteCells(results);"],
               "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/VerifierRuntimeDifferentialTests.cs":
                   ['DeterminismRecord.WriteGenerated("verifier-runtime-differential.json"', 'DeterminismRecord.WriteGenerated("verifier-runtime-differential.md"'],
-              "tests/Calor.Verification.Tests/ContractTranslatorSemanticsVersionGuardTests.cs": ['DeterminismRecord.WriteGenerated(\n            "translator-fixture"']}
+              "tests/Calor.Verification.Tests/ContractTranslatorSemanticsVersionGuardTests.cs": [
+                  'DeterminismRecord.WriteGenerated(\n            "translator-fixture"',
+                  'DeterminismRecord.WriteGenerated(\n            "translator-fixture-v3"',
+                  "RecordHistoricalTranslator();"],
+              "scripts/determinism_runner.py": [
+                  'str(ROOT / "scripts/registered_ledger_historical_replay.py")',
+                  '"translator", "--record-dir", str(historical)'],
+              "scripts/registered_ledger_historical_replay.py": [
+                  "verify_result(result, TRANSLATOR_TEST, strict=True)"]}
 CELL_FIELDS = {"id": str, "formId": str, "category": str, "position": str, "nestingDepth": int, "polarity": str, "solverStatus": str,
                "runtimeVerdict": str, "guardForced": bool, "elidedWhenEnabled": bool, "solverHandled": bool, "mismatch": bool,
                "detail": (str, type(None))}
@@ -361,8 +369,10 @@ def judge(protocol, env: dict, observed, commit: str) -> list[str]:
 
 
 def harness_digest(root: Path) -> str:
-    """harnessSha256 of a record (amendment 1.1.0): SHA-256 over the validator/decider, runner, and workflow bytes."""
-    return sha256_bytes("\n".join(f"{rel} {sha256_file(root / rel)}" for rel in (HARNESS, RUNNER, WORKFLOW)).encode("utf-8"))
+    """Bind the runner, validator, workflow, and historical execution helpers to each record."""
+    paths = (HARNESS, RUNNER, WORKFLOW, "scripts/registered_ledger_historical_replay.py",
+             "scripts/ppe1_historical_replay.py")
+    return sha256_bytes("\n".join(f"{rel} {sha256_file(root / rel)}" for rel in paths).encode("utf-8"))
 
 
 ATTEMPT_STATUSES = ["completed", "timeout", "crash", "infrastructure-failure", "environment-violation", "invalid"]

@@ -12780,6 +12780,14 @@
    "profiles": [
     "verification-full"
    ]
+  },
+  {
+   "name": "translator-fixture-v3",
+   "source": "tests/Calor.Verification.Tests/ContractTranslatorSemanticsVersionGuardTests.cs",
+   "expected": "f58ee927a0ae8fa8fe5bf2af5dbf0ea78b989ca4264fc055bc027f583b51628a|z3-executable-semantics-v3",
+   "profiles": [
+    "verification-full"
+   ]
   }
  ]
 }

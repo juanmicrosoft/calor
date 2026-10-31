@@ -90,12 +90,67 @@ def prof(record, pid) -> dict:
     return next(p for p in record["profiles"] if p["profile"] == pid)
 
 
+class HistoricalTranslatorRunnerControls(unittest.TestCase):
+    def test_replay_precedes_current_guard_and_shares_its_timeout_without_retry(self):
+        from unittest import mock
+        profile = dict(dp.profile_by_id(PROTOCOL)["verification-full"], oracle=False)
+        for replay_result in ((0, False), (7, False), (-9, True)):
+            with self.subTest(replay_result=replay_result), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                calls = []
+                clock = [100.0]
+                def run(cmd, env, seconds, log):
+                    calls.append((cmd, env, seconds, log))
+                    clock[0] += 12
+                    if len(calls) == 1:
+                        generated = Path(env["CALOR_DETERMINISM_RECORD_DIR"]) / "historical-translator/generated"
+                        generated.mkdir(parents=True)
+                        (generated / "translator-fixture").write_bytes(b"observed historical output")
+                    return replay_result if len(calls) == 1 else (0, False)
+                with mock.patch.object(dr, "run_with_timeout", side_effect=run), \
+                        mock.patch.object(dr.time, "monotonic", side_effect=lambda: clock[0]):
+                    result = dr.run_profile(
+                        PROTOCOL, CASES, profile, {"rid": "osx-arm64"}, root / "invocation", {},
+                        str(root / "packages"), time.time() + 100000,
+                    )
+                self.assertIn("translator", calls[0][0])
+                self.assertIn("--record-dir", calls[0][0])
+                self.assertEqual(root / "invocation/historical-translator.log", calls[0][3])
+                self.assertEqual(dp.sha256_bytes(b"observed historical output"),
+                                 result["artifacts"]["translator-fixture"])
+                if replay_result == (0, False):
+                    self.assertEqual(2, len(calls))
+                    self.assertEqual("dotnet", calls[1][0][0])
+                    self.assertEqual(calls[0][2] - 12, calls[1][2])
+                    self.assertEqual(24, result["seconds"])
+                else:
+                    self.assertEqual(1, len(calls))
+                    self.assertEqual(replay_result[0], result["exitCode"])
+                    self.assertNotEqual("completed", result["status"])
+                    self.assertEqual({"Timeout" if replay_result[1] else "Crash"},
+                                     {value for name, value in result["artifacts"].items()
+                                      if name != "translator-fixture"})
+
+
 class RegistrationTests(unittest.TestCase):
     def test_committed_protocol_is_valid(self) -> None:
         self.assertEqual([], dp.validate(ROOT))
 
     def test_unchanged_packet_is_valid_against_itself_as_baseline(self) -> None:
         self.assertEqual(set(), codes(baseline=(PROTOCOL, CASES)))
+
+    def test_translator_split_only_adds_to_the_old_artifact_and_contributions(self):
+        old_cases = mutate(lambda c: c["artifacts"].pop(), CASES)
+        old_protocol = mutate(lambda p: next(
+            r for r in p["determinismRows"]
+            if r["id"] == "platform-TranslatorOutputMatchesCommittedBaseline"
+        )["cases"].remove("artifact:translator-fixture-v3"))
+        self.assertEqual("translator-fixture", old_cases["artifacts"][-1]["name"])
+        self.assertEqual(set(), codes(baseline=(old_protocol, old_cases)))
+        for name in ("translator-fixture", "translator-fixture-v3"):
+            changed = mutate(lambda c: next(a for a in c["artifacts"] if a["name"] == name)
+                             .update(expected="changed"), CASES)
+            self.assertIn("D016", codes(cases=changed, baseline=(PROTOCOL, CASES)))
 
     def test_case_registry_shape(self) -> None:
         # Amendment 1.4.0: + 62 verification tests (S2 repairs); compiler-verifier + 1 test in a registered
@@ -401,6 +456,24 @@ class DecisionControls(unittest.TestCase):
         for r in records:
             prof(r, "verification-full")["artifacts"]["translator-fixture"] = ("a" if r["environment"].startswith("win-") else "b") * 64
         self.assertEqual("DISAGREE", self.klass(self.decide(records), "artifact:translator-fixture")["class"])
+
+    def test_historical_and_current_translator_artifacts_are_independently_enforced(self) -> None:
+        for name in ("translator-fixture", "translator-fixture-v3"):
+            for value, expected in (("0" * 64, "AGREE-FAIL"), ("Missing", "AGREE-FAIL"),
+                                    (dp.sha256_bytes(b""), "AGREE-FAIL")):
+                with self.subTest(name=name, value=value):
+                    records = passing_records(self.protocol)
+                    for record in records:
+                        prof(record, "verification-full")["artifacts"][name] = value
+                    result = self.decide(records)
+                    self.assertEqual(expected, self.klass(result, f"artifact:{name}")["class"])
+                    other = "translator-fixture-v3" if name == "translator-fixture" else "translator-fixture"
+                    self.assertEqual("AGREE-PASS", self.klass(result, f"artifact:{other}")["class"])
+                    self.assertEqual("OPEN", next(r for r in result["determinismRows"]
+                                                 if r["id"] == "platform-TranslatorOutputMatchesCommittedBaseline")["status"])
+            records = passing_records(self.protocol)
+            prof(records[0], "verification-full")["artifacts"].pop(name)
+            self.assertEqual("INVALID", self.decide(records)["verdict"])
 
     def test_single_cell_flip_and_crlf_report_bytes_disagree(self) -> None:
         records = passing_records(self.protocol)

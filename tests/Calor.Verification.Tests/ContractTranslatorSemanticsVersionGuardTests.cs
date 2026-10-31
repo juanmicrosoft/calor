@@ -42,6 +42,9 @@ public class ContractTranslatorSemanticsVersionGuardTests
     private const string ExpectedSemanticsVersion = "z3-executable-semantics-v3";
     private const string ExpectedFixtureHash =
         "f58ee927a0ae8fa8fe5bf2af5dbf0ea78b989ca4264fc055bc027f583b51628a";
+    private const string HistoricalSemanticsVersion = "z3-executable-semantics-v2";
+    private const string HistoricalFixtureHash =
+        "95e8039c7ea350581bc5c32b530d75576ae296c26850eec2056235d6847f0d86";
 
     [SkippableFact]
     public void TranslatorOutputMatchesCommittedBaseline()
@@ -58,7 +61,8 @@ public class ContractTranslatorSemanticsVersionGuardTests
         // #1421: opt-in determinism record (no-op unless CALOR_DETERMINISM_RECORD_DIR is set), so a
         // platform difference in translator output is compared as bytes, not only as Failed.
         VerifierRuntimeDifferential.DeterminismRecord.WriteGenerated(
-            "translator-fixture", Encoding.UTF8.GetBytes($"{actualHash}|{actualVersion}"));
+            "translator-fixture-v3", Encoding.UTF8.GetBytes($"{actualHash}|{actualVersion}"));
+        RecordHistoricalTranslator();
 
         // The version constant and the translator output must move together.
         // We assert both in one shot so the failure message is unambiguous.
@@ -100,6 +104,22 @@ public class ContractTranslatorSemanticsVersionGuardTests
             "now translate differently (see #961 / #997).";
 
         Assert.Fail(message);
+    }
+
+    private static void RecordHistoricalTranslator()
+    {
+        var directory = Environment.GetEnvironmentVariable(
+            VerifierRuntimeDifferential.DeterminismRecord.DirectoryVariable);
+        if (string.IsNullOrEmpty(directory))
+            return;
+
+        // The runner replays the pinned v2 producer in an unmodified isolated tree.
+        // Never label today's computation as the historical artifact.
+        var measured = File.ReadAllBytes(Path.Combine(
+            directory, "historical-translator", "generated", "translator-fixture"));
+        VerifierRuntimeDifferential.DeterminismRecord.WriteGenerated(
+            "translator-fixture", measured);
+        Assert.Equal(Encoding.UTF8.GetBytes($"{HistoricalFixtureHash}|{HistoricalSemanticsVersion}"), measured);
     }
 
     /// <summary>

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -57,14 +58,28 @@ REGENERATION_FLAGS = (
     "CALOR_REGENERATE_CALOR0425_LEDGER",
     "CALOR_REGENERATE_PPE1_LEDGER",
 )
+TRANSLATOR_PRODUCER = "452afeb29e7bfbd5aff892336de722e79ca3c157"
+TRANSLATOR_TEST = "Calor.Verification.Tests.ContractTranslatorSemanticsVersionGuardTests.TranslatorOutputMatchesCommittedBaseline"
+TRANSLATOR_GUARD = "tests/Calor.Verification.Tests/ContractTranslatorSemanticsVersionGuardTests.cs"
+DETERMINISM_CASES = "tests/TestData/DeterminismProtocol/cases.json"
 
 
-def verify_result(path: Path, test: str) -> None:
-    results = ET.parse(path).findall(
+def verify_result(path: Path, test: str, *, strict: bool = False) -> None:
+    document = ET.parse(path)
+    results = document.findall(
         ".//{http://microsoft.com/schemas/VisualStudio/TeamTest/2010}UnitTestResult"
     )
     if len(results) != 1 or results[0].get("testName") != test or results[0].get("outcome") != "Passed":
         raise ValueError(f"historical replay requires exactly one executed passing {test}; no skips/empty runs")
+    if strict:
+        summary = document.find("./{*}ResultSummary")
+        counters = document.find("./{*}ResultSummary/{*}Counters")
+        if summary is None or summary.get("outcome") != "Completed" or counters is None \
+                or any(counters.get(key) != "1" for key in ("total", "executed", "passed")) \
+                or any(counters.get(key) != "0" for key in ("failed", "error", "timeout", "notExecuted")) \
+                or any(value != "0" for key, value in counters.attrib.items()
+                       if key not in ("total", "executed", "passed")):
+            raise ValueError("historical replay requires exact 1 pass / 0 skips / 0 failures counters")
 
 
 def require_commit(commit: str) -> None:
@@ -124,6 +139,89 @@ def archive_submodules(producer: str, source: Path, scratch: Path) -> None:
             check=True, timeout=60,
         )
         extract_archive(archive, source / relative)
+
+
+def replay_translator(record: Path) -> None:
+    """Run the original v2 guard, retaining observed bytes even when acceptance fails."""
+    from determinism_runner import check_isolation, invocation_env
+
+    if any(key.upper().startswith(("CALOR_UPDATE_", "CALOR_REGENERATE_")) and value
+           for key, value in os.environ.items()):
+        raise ValueError("translator historical replay forbids regeneration flags")
+    require_commit(TRANSLATOR_PRODUCER)
+    original_cases = json.loads(git(
+        "show", f"{TRANSLATOR_PRODUCER}:docs/plans/evidence/g2-1421/cases.json",
+    ))
+    artifact = next(a for a in original_cases["artifacts"] if a["name"] == "translator-fixture")
+    registry = (ROOT / DETERMINISM_CASES).read_bytes()
+    if artifact not in json.loads(registry)["artifacts"]:
+        raise ValueError("original translator registration changed")
+    original_guard = git("show", f"{TRANSLATOR_PRODUCER}:{TRANSLATOR_GUARD}")
+    if any(part.encode() not in original_guard for part in artifact["expected"].split("|")):
+        raise ValueError("original translator guard does not match the registered expectation")
+    record = record.resolve()
+    if record.exists():
+        raise ValueError("translator replay record directory must be fresh")
+    verifier = ROOT / "scripts/verify-z3-assets.py"
+    subprocess.run([sys.executable, str(verifier)], check=True, timeout=60)
+    with tempfile.TemporaryDirectory(prefix="calor-translator-history-") as temporary:
+        scratch = Path(temporary)
+        archive = scratch / "source.tar"
+        git("archive", "--format=tar", f"--output={archive}", TRANSLATOR_PRODUCER)
+        source = scratch / "source"
+        extract_archive(archive, source)
+        inputs = {path: hashlib.sha256(path.read_bytes()).digest()
+                  for path in source.rglob("*") if path.is_file()}
+        for manifest in (
+            ".github/z3-binaries-4.15.7.sha256",
+            "src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256",
+        ):
+            if (ROOT / manifest).read_bytes() != (source / manifest).read_bytes():
+                raise ValueError(f"{manifest}: assets differ from original translator producer")
+        for relative in runpy.run_path(str(verifier))["ASSET_PATHS"].values():
+            destination = source / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / relative, destination)
+        subprocess.run(
+            [sys.executable, str(source / "scripts/verify-z3-assets.py")], check=True, timeout=60,
+        )
+        invocation = scratch / "invocation"
+        invocation.mkdir()
+        environment = invocation_env(
+            os.environ, invocation, os.environ.get("CALOR_Z3_EXPECTED_RID", ""),
+            os.environ.get("NUGET_PACKAGES", str(scratch / "packages")),
+        )
+        environment["CALOR_DETERMINISM_RECORD_DIR"] = str(record)
+        check_isolation(environment, invocation)
+        Path(environment["HOME"]).mkdir()
+        Path(environment["TEMP"]).mkdir(parents=True)
+        environment["LC_ALL"] = "C"
+        environment["CALOR_HOME"] = str(scratch / "empty-calor-home")
+        Path(environment["CALOR_HOME"]).mkdir()
+        project = "tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj"
+        print(f"translator historical exact replay: producer {TRANSLATOR_PRODUCER}", flush=True)
+        run_dotnet(["restore", project, "--locked-mode"], source, environment, timeout=300)
+        run_dotnet(
+            ["test", project, "-c", "Release", "--no-restore",
+             "--filter", f"FullyQualifiedName={TRANSLATOR_TEST}",
+             "--logger", "trx;LogFileName=historical.trx",
+             "--results-directory", str(record)],
+            source, environment, timeout=600,
+        )
+        result = record / "historical.trx"
+        verify_result(result, TRANSLATOR_TEST, strict=True)
+        generated = Path(environment["CALOR_DETERMINISM_RECORD_DIR"]) / "generated/translator-fixture"
+        actual = generated.read_bytes()
+        if actual != artifact["expected"].encode("utf-8"):
+            raise ValueError("original translator computation differs from its registered bytes")
+        for path, digest in inputs.items():
+            if hashlib.sha256(path.read_bytes()).digest() != digest:
+                raise ValueError(f"{path.relative_to(source)}: replay changed an immutable producer input")
+        subprocess.run(
+            [sys.executable, str(source / "scripts/verify-z3-assets.py")], check=True, timeout=60,
+        )
+        if (ROOT / DETERMINISM_CASES).read_bytes() != registry:
+            raise ValueError("translator registration changed during replay")
 
 
 def replay(name: str) -> None:
@@ -199,10 +297,18 @@ def replay(name: str) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("ledger", choices=REPLAYS)
+    parser.add_argument("ledger", choices=[*REPLAYS, "translator"])
+    parser.add_argument("--record-dir", type=Path)
     args = parser.parse_args()
     try:
-        replay(args.ledger)
+        if args.ledger == "translator":
+            if args.record_dir is None:
+                raise ValueError("translator replay requires --record-dir")
+            replay_translator(args.record_dir)
+        else:
+            if args.record_dir is not None:
+                raise ValueError("--record-dir is only valid for translator replay")
+            replay(args.ledger)
     except (OSError, ValueError, subprocess.SubprocessError, ET.ParseError, tarfile.TarError) as error:
         print(f"ERROR: registered ledger historical replay failed: {error}", file=sys.stderr)
         raise SystemExit(1)

@@ -12,6 +12,129 @@ from unittest.mock import patch
 import registered_ledger_historical_replay as replay
 
 
+class TranslatorReplayTests(unittest.TestCase):
+    def test_requires_exact_summary_as_well_as_one_passing_result(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "result.trx"
+            for outcome, total, executed, passed, failed, skipped in (
+                ("Completed", 1, 1, 1, 0, 0), ("Failed", 1, 1, 1, 0, 0),
+                ("Completed", 0, 0, 0, 0, 0), ("Completed", 2, 1, 1, 0, 1),
+                ("Completed", 1, 1, 1, 1, 0),
+            ):
+                path.write_text(
+                    '<TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">'
+                    f'<Results><UnitTestResult testName="{replay.TRANSLATOR_TEST}" outcome="Passed" /></Results>'
+                    f'<ResultSummary outcome="{outcome}"><Counters total="{total}" executed="{executed}" '
+                    f'passed="{passed}" failed="{failed}" notExecuted="{skipped}" error="0" timeout="0" />'
+                    '</ResultSummary></TestRun>', encoding="utf-8",
+                )
+                if (outcome, total, executed, passed, failed, skipped) == ("Completed", 1, 1, 1, 0, 0):
+                    replay.verify_result(path, replay.TRANSLATOR_TEST, strict=True)
+                else:
+                    with self.assertRaisesRegex(ValueError, "exact 1 pass"):
+                        replay.verify_result(path, replay.TRANSLATOR_TEST, strict=True)
+
+    def test_regeneration_and_missing_producer_fail_before_build(self):
+        for flag in ("CALOR_UPDATE_ANYTHING", "CALOR_REGENERATE_ANYTHING"):
+            with patch.dict(os.environ, {flag: "1"}, clear=True):
+                with patch.object(replay, "require_commit") as require:
+                    with self.assertRaisesRegex(ValueError, "forbids regeneration"):
+                        replay.replay_translator(Path("unused"))
+                    require.assert_not_called()
+        with patch.dict(os.environ, {}, clear=True):
+            with patch.object(replay, "git", side_effect=subprocess.CalledProcessError(128, "git")):
+                with self.assertRaisesRegex(ValueError, "fetch full history"):
+                    replay.replay_translator(Path("unused"))
+
+    def test_acceptance_requires_actual_output_pass_assets_and_immutable_inputs(self):
+        cases = json.loads((replay.ROOT / replay.DETERMINISM_CASES).read_bytes())
+        artifact = next(a for a in cases["artifacts"] if a["name"] == "translator-fixture")
+        for fault in (None, "missing-output", "empty-output", "tampered-output", "skipped",
+                      "empty-run", "tampered-source", "missing-assets", "build-failure",
+                      "changed-registration", "reused-output"):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                registry = root / replay.DETERMINISM_CASES
+                registry.parent.mkdir(parents=True)
+                registry.write_text(json.dumps(cases), encoding="utf-8")
+                manifests = (
+                    ".github/z3-binaries-4.15.7.sha256",
+                    "src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256",
+                )
+                for relative in manifests:
+                    path = root / relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(b"pinned assets")
+                def git(*args):
+                    if args[0] == "show":
+                        return json.dumps(cases).encode() if args[1].endswith("cases.json") \
+                            else artifact["expected"].encode()
+                    return b""
+                def extract(_, source):
+                    for relative in (*manifests, "original.cs"):
+                        path = source / relative
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        path.write_bytes(b"pinned assets" if relative in manifests else b"original")
+                def run(arguments, source, environment, timeout):
+                    self.assertGreater(timeout, 0)
+                    self.assertEqual(root / "output", output)
+                    self.assertNotEqual(os.environ.get("HOME"), environment["HOME"])
+                    if fault == "build-failure":
+                        raise subprocess.CalledProcessError(1, "dotnet")
+                    if arguments[0] != "test":
+                        self.assertIn("--locked-mode", arguments)
+                        return
+                    self.assertIn(f"FullyQualifiedName={replay.TRANSLATOR_TEST}", arguments)
+                    self.assertNotIn("--no-build", arguments)
+                    results = Path(arguments[arguments.index("--results-directory") + 1])
+                    results.mkdir()
+                    outcome = "NotExecuted" if fault == "skipped" else "Passed"
+                    rows = "" if fault == "empty-run" else (
+                        f'<UnitTestResult testName="{replay.TRANSLATOR_TEST}" outcome="{outcome}" />')
+                    (results / "historical.trx").write_text(
+                        '<TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">'
+                        f'<Results>{rows}</Results><ResultSummary outcome="Completed">'
+                        '<Counters total="1" executed="1" passed="1" failed="0" error="0" '
+                        'timeout="0" notExecuted="0" /></ResultSummary></TestRun>', encoding="utf-8",
+                    )
+                    generated = Path(environment["CALOR_DETERMINISM_RECORD_DIR"]) / "generated"
+                    generated.mkdir(parents=True)
+                    if fault != "missing-output":
+                        (generated / "translator-fixture").write_bytes(
+                            b"" if fault == "empty-output" else b"changed" if fault == "tampered-output"
+                            else artifact["expected"].encode())
+                    if fault == "tampered-source":
+                        (source / "original.cs").write_bytes(b"changed")
+                    if fault == "changed-registration":
+                        registry.write_bytes(b"changed")
+                output = root / "output"
+                if fault == "reused-output":
+                    output.mkdir()
+                with patch.dict(os.environ, {}, clear=True), patch.object(replay, "ROOT", root), \
+                        patch.object(replay, "git", side_effect=git), \
+                        patch.object(replay, "require_commit"), \
+                        patch.object(replay, "extract_archive", side_effect=extract), \
+                        patch.object(replay.runpy, "run_path", return_value={"ASSET_PATHS": {}}), \
+                        patch.object(replay.subprocess, "run", side_effect=(
+                            subprocess.CalledProcessError(1, "verify assets") if fault == "missing-assets" else None)), \
+                        patch.object(replay, "run_dotnet", side_effect=run):
+                    if fault is None:
+                        replay.replay_translator(output)
+                        self.assertEqual(artifact["expected"].encode(),
+                                         (output / "generated/translator-fixture").read_bytes())
+                        replay.verify_result(output / "historical.trx", replay.TRANSLATOR_TEST, strict=True)
+                    else:
+                        with self.assertRaises((ValueError, FileNotFoundError, subprocess.CalledProcessError)):
+                            replay.replay_translator(output)
+                        observed = output / "generated/translator-fixture"
+                        if fault in ("empty-output", "tampered-output"):
+                            self.assertEqual(b"" if fault == "empty-output" else b"changed", observed.read_bytes())
+                        elif fault in ("skipped", "empty-run", "tampered-source", "changed-registration"):
+                            self.assertEqual(artifact["expected"].encode(), observed.read_bytes())
+                        else:
+                            self.assertFalse(observed.exists())
+
+
 class RegisteredReplayTests(unittest.TestCase):
     def test_every_regeneration_flag_fails_before_git_or_build(self):
         for name in replay.REPLAYS:
