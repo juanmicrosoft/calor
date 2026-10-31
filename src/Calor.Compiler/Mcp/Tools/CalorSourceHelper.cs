@@ -93,8 +93,14 @@ internal static class CalorSourceHelper
                 return ParseResult.Success(ast, source);
             }
 
+            Ids.DeclarationIdentityStore.AttachIfRegistered(filePath, source, ast, diagnostics);
             return ParseResult.Partial(ast, source,
                 diagnostics.Errors.Select(e => e.Message).ToList(), diagnostics, effectivePath);
+        }
+        catch (Ids.DeclarationIdentityException ex)
+        {
+            diagnostics.Report(TextSpan.Empty, DiagnosticCode.DeclarationIdentityUnavailable, ex.Message);
+            return ParseResult.Failed(diagnostics.Errors.Select(error => error.Message).ToList(), diagnostics);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -262,7 +268,7 @@ internal sealed class ParseResult
             if (Ast != null && Source != null)
             {
                 resolver = new Ids.DeclarationIdResolver();
-                resolver.AddFile(FilePath ?? "mcp-input.calr", Source, Ast);
+                resolver.AddFile(FilePath ?? "mcp-input.calr", Source, Ast, identitiesAttached: true);
             }
 
             return DiagnosticEnvelope.Build(Diagnostics, resolver)

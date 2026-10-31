@@ -17,9 +17,10 @@ public sealed class DeclarationIdResolver
     private readonly Dictionary<string, FileIndex> _files = new(StringComparer.Ordinal);
 
     /// <summary>Registers a parsed file, excluding snapshot-local declaration handles.</summary>
-    public void AddFile(string filePath, string source, ModuleNode module)
+    public void AddFile(string filePath, string source, ModuleNode module, bool identitiesAttached = false)
     {
-        DeclarationIdentityStore.AttachIfRegistered(filePath, source, module);
+        if (!identitiesAttached)
+            DeclarationIdentityStore.AttachIfRegistered(filePath, source, module);
         var persistedIds = DeclarationIdentityStore.ToolingIds(module).ToHashSet(StringComparer.Ordinal);
         var entries = new IdScanner()
             .Scan(module, filePath)

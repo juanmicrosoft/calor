@@ -73,6 +73,14 @@ public sealed class TolerantParseTests : IDisposable
 
     private static JsonElement Args(object value) => JsonSerializer.SerializeToElement(value);
 
+    private (string Path, string Id) RegisterPart()
+    {
+        var path = WriteFile("part.calr", PartiallyBrokenSource + " INT:1)");
+        var store = new Calor.Compiler.Ids.DeclarationIdentityStore(_root);
+        var state = store.Sync([path]).Declarations;
+        return (path, Assert.Single(state, declaration => declaration.Name == "broken").Id);
+    }
+
     private static JsonElement Payload(McpToolResult result)
     {
         Assert.False(result.IsError, $"Expected success result, got error: {result.Content[0].Text}");
@@ -107,15 +115,60 @@ public sealed class TolerantParseTests : IDisposable
     [Fact]
     public void ParseTolerant_EnvelopeDiagnostics_CarryEnclosingDeclarationId()
     {
-        var result = CalorSourceHelper.ParseTolerant(PartiallyBrokenSource, "part.calr");
+        var (path, id) = RegisterPart();
+        File.WriteAllText(path, PartiallyBrokenSource);
+        var sidecar = File.ReadAllBytes(Path.Combine(_root, ".calor", "ids.json"));
+        var result = CalorSourceHelper.ParseTolerant(PartiallyBrokenSource, path);
         Assert.True(result.IsPartial);
 
         var diagnostics = result.ToEnvelopeDiagnostics();
 
         Assert.NotEmpty(diagnostics);
-        // The parse error sits inside f041's body; span containment against
-        // the partial AST must attribute it there.
-        Assert.Contains(diagnostics, d => d.DeclarationId == "f041");
+        Assert.Contains(diagnostics, diagnostic => diagnostic.DeclarationId == id);
+        Assert.Equal(sidecar, File.ReadAllBytes(Path.Combine(_root, ".calor", "ids.json")));
+    }
+
+    [Fact]
+    public void ParseTolerant_SourceOnly_DoesNotInventPersistentIdentity()
+    {
+        var result = CalorSourceHelper.ParseTolerant(PartiallyBrokenSource, "part.calr");
+        Assert.True(result.IsPartial);
+        Assert.All(result.ToEnvelopeDiagnostics(), diagnostic => Assert.Null(diagnostic.DeclarationId));
+    }
+
+    [Theory]
+    [InlineData("§F{renamed:pub}", false)]
+    [InlineData("§F{broken:bogus}", false)]
+    [InlineData("§F{broken:pub}", true)]
+    public void ParseTolerant_UncertainHeader_NeverGuessesIdentity(string header, bool duplicate)
+    {
+        var (path, id) = RegisterPart();
+        var source = PartiallyBrokenSource.Replace("§F{broken:pub}", header, StringComparison.Ordinal);
+        if (duplicate)
+            source = source.Replace("  §F{broken:pub}", "  §F{broken:pub}\n    §I{i32:y}\n    §O{i32}\n    §R y\n  §F{broken:pub}", StringComparison.Ordinal);
+        var sidecar = File.ReadAllBytes(Path.Combine(_root, ".calor", "ids.json"));
+        var result = CalorSourceHelper.ParseTolerant(source, path);
+
+        Assert.False(result.IsSuccess);
+        Assert.DoesNotContain(result.ToEnvelopeDiagnostics(), diagnostic => diagnostic.DeclarationId == id);
+        if (duplicate)
+            Assert.Contains(result.ToEnvelopeDiagnostics(), diagnostic =>
+                diagnostic.Code == Calor.Compiler.Diagnostics.DiagnosticCode.DeclarationIdentityUnavailable);
+        Assert.Equal(sidecar, File.ReadAllBytes(Path.Combine(_root, ".calor", "ids.json")));
+    }
+
+    [Fact]
+    public void ParseTolerant_CorruptIdentity_IsAnExplicitErrorAlongsideParseErrors()
+    {
+        var (path, _) = RegisterPart();
+        File.WriteAllText(Path.Combine(_root, ".calor", "ids.json"), "{");
+        var result = CalorSourceHelper.ParseTolerant(PartiallyBrokenSource, path);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.ToEnvelopeDiagnostics(), diagnostic =>
+            diagnostic.Code == Calor.Compiler.Diagnostics.DiagnosticCode.DeclarationIdentityUnavailable);
+        Assert.Contains(result.ToEnvelopeDiagnostics(), diagnostic =>
+            diagnostic.Code != Calor.Compiler.Diagnostics.DiagnosticCode.DeclarationIdentityUnavailable);
     }
 
     [Fact]
@@ -142,7 +195,9 @@ public sealed class TolerantParseTests : IDisposable
     [Fact]
     public async Task FileWrite_RejectDiagnostics_IncludeDeclarationId()
     {
-        var path = WriteFile("part.calr", MathSource);
+        var (path, id) = RegisterPart();
+        var original = File.ReadAllText(path);
+        var sidecar = File.ReadAllBytes(Path.Combine(_root, ".calor", "ids.json"));
 
         var payload = Payload(await WriteTool
             .ExecuteAsync(Args(new { path, content = PartiallyBrokenSource, heal = false })));
@@ -152,7 +207,9 @@ public sealed class TolerantParseTests : IDisposable
         var errors = payload.GetProperty("compilationResult").GetProperty("errors").EnumerateArray().ToList();
         Assert.NotEmpty(errors);
         Assert.Contains(errors, e =>
-            e.TryGetProperty("declarationId", out var id) && id.GetString() == "f041");
+            e.TryGetProperty("declarationId", out var declarationId) && declarationId.GetString() == id);
+        Assert.Equal(original, File.ReadAllText(path));
+        Assert.Equal(sidecar, File.ReadAllBytes(Path.Combine(_root, ".calor", "ids.json")));
     }
 
     [Fact]
@@ -256,7 +313,7 @@ public sealed class TolerantParseTests : IDisposable
         var indent = "    ";
         for (var i = 0; i < 4000; i++)
         {
-            builder.Append(indent).Append("§IF{if").Append(i).Append("} (== INT:1 INT:1)\n");
+            builder.Append(indent).Append("§IF (== INT:1 INT:1)\n");
             indent += "  ";
         }
         builder.Append(indent).Append("§B{x:i32} INT:1\n");
@@ -312,7 +369,8 @@ public sealed class TolerantParseTests : IDisposable
     [Fact]
     public async Task SessionOpen_BrokenFile_DiagnosticsCarryDeclarationId()
     {
-        WriteFile("part.calr", PartiallyBrokenSource);
+        var (path, id) = RegisterPart();
+        File.WriteAllText(path, PartiallyBrokenSource);
 
         var payload = Payload(await OpenTool.ExecuteAsync(Args(new { directory = _root })));
 
@@ -320,6 +378,6 @@ public sealed class TolerantParseTests : IDisposable
         var diagnostics = payload.GetProperty("diagnostics").EnumerateArray().ToList();
         Assert.NotEmpty(diagnostics);
         Assert.Contains(diagnostics, d =>
-            d.TryGetProperty("declarationId", out var id) && id.GetString() == "f041");
+            d.TryGetProperty("declarationId", out var declarationId) && declarationId.GetString() == id);
     }
 }

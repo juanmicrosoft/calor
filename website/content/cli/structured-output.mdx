@@ -38,7 +38,7 @@ with `action: "error"` and the diagnostic code.
       "message": "Postcondition refuted",
       "severity": "warning",
       "location": { "file": "Math.calr", "line": 4, "column": 5 },
-      "declarationId": "f001",
+      "declarationId": "f_a1b2c3d4e5f6",
       "verification": {
         "status": "refuted",
         "counterexample": {
@@ -59,6 +59,13 @@ fix. Command-specific results live under `data`.
 need review. `calor fix --apply` and MCP `calor_check` with `apply: true` apply
 only safe patches and return fresh diagnostics. Structured messages and
 verification payloads are unchanged.
+
+`declarationId` comes from the project's `.calor/ids.json` sidecar, not the
+source text or a parser-local handle. MCP can attribute a broken function's
+body diagnostics when its valid declaration header exactly matches an existing
+sidecar entry. This read-only lookup does not rename declarations or allocate
+IDs. Invalid or ambiguous headers and source-only inputs have no persistent
+declaration ID; corrupt sidecars produce an explicit identity error.
 
 ## Conversion Output
 

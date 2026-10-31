@@ -123,14 +123,15 @@ public sealed class DeclarationIdentityStore
             || canonical == CanonicalPath.Resolve(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
     }
 
-    public static void AttachIfRegistered(string? file, string source, ModuleNode module)
+    public static void AttachIfRegistered(string? file, string source, ModuleNode module,
+        DiagnosticBag? partialDiagnostics = null)
     {
         if (file == null || !file.EndsWith(".calr", StringComparison.OrdinalIgnoreCase) || !File.Exists(file)) return;
         file = Path.GetFullPath(file);
         try
         {
             var store = Find(file);
-            if (store != null && store.IncludesRegistration(file)) store.Attach(file, source, module);
+            if (store != null && store.IncludesRegistration(file)) store.Attach(file, source, module, partialDiagnostics);
         }
         catch (DeclarationIdentityParseException) { throw; }
         catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or JsonException or UnauthorizedAccessException)
@@ -665,7 +666,7 @@ public sealed class DeclarationIdentityStore
     }
 
     /// <summary>Read-only projection for unsaved buffers and all identity consumers.</summary>
-    public void Attach(string file, string source, ModuleNode module)
+    public void Attach(string file, string source, ModuleNode module, DiagnosticBag? partialDiagnostics = null)
     {
         using var gate = Acquire();
         if (File.Exists(JournalPath))
@@ -674,6 +675,28 @@ public sealed class DeclarationIdentityStore
         var relative = Relative(file);
         if (!state.Files.Contains(relative, StringComparer.Ordinal)) return;
         var parsed = Describe(relative, module);
+        if (partialDiagnostics != null)
+        {
+            if (parsed.GroupBy(declaration => declaration.Identity.Key, StringComparer.Ordinal)
+                .Any(group => group.Count() > 1 && !IsPartialDeclaration(group.ToArray())))
+                throw new InvalidDataException("Partial source has ambiguous declaration headers; identity cannot be attached.");
+            var existing = state.Declarations.ToDictionary(declaration => declaration.Key, StringComparer.Ordinal);
+            foreach (var declaration in parsed)
+            {
+                var headerEnd = declaration.Node switch
+                {
+                    FunctionNode function => function.Body.FirstOrDefault()?.Span.Start ?? function.Span.End,
+                    MethodNode method => method.Body.FirstOrDefault()?.Span.Start ?? method.Span.End,
+                    _ => declaration.Node.Span.End
+                };
+                if (partialDiagnostics.Errors.Any(error => error.Span.Start >= declaration.Node.Span.Start
+                    && error.Span.Start <= headerEnd))
+                    continue;
+                if (existing.TryGetValue(declaration.Identity.Key, out var identity))
+                    declaration.Node.ToolingId = identity.Id;
+            }
+            return;
+        }
         var sources = state.Files.Where(f => File.Exists(ValidatePath(f)))
             .ToDictionary(f => f, f => f == relative ? source : File.ReadAllText(ValidatePath(f)), StringComparer.Ordinal);
         sources[relative] = source;
