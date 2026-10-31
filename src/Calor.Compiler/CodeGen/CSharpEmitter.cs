@@ -8429,27 +8429,16 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             result = "_" + result;
         }
 
-        // Handle reserved words — prefix with @ to make valid C# identifiers.
-        // Type syntax is handled separately by SanitizeTypeName, which preserves
-        // predefined type keywords. Exclude this/base/null/true/false here because
-        // expression visitors handle their special meaning before sanitization.
+        // Literal, receiver and predefined-type syntax is handled by its visitors,
+        // not by identifier escaping.
+        if (Microsoft.CodeAnalysis.CSharp.SyntaxFacts.GetKeywordKind(result)
+            != Microsoft.CodeAnalysis.CSharp.SyntaxKind.None)
+        {
+            return "@" + result;
+        }
+
         return result switch
         {
-            "abstract" or "as" or "bool" or "break" or
-            "case" or "catch" or "checked" or
-            "class" or "const" or "continue" or "default" or
-            "delegate" or "do" or "double" or "else" or "enum" or
-            "event" or "explicit" or "extern" or "finally" or "fixed" or
-            "float" or "for" or "foreach" or "goto" or "if" or
-            "implicit" or "in" or "int" or "interface" or "internal" or
-            "is" or "lock" or "namespace" or "new" or
-            "operator" or "out" or "override" or "params" or
-            "private" or "protected" or "public" or "readonly" or "ref" or
-            "return" or "sealed" or "sizeof" or
-            "stackalloc" or "static" or "string" or "struct" or "switch" or
-            "throw" or "try" or "typeof" or
-            "unchecked" or "unsafe" or "using" or "virtual" or
-            "void" or "volatile" or "while" or
             // Contextual keywords that conflict when used as identifiers
             "var" or "dynamic" or "yield" or "async" or "await" or
             "nameof" or "when"
@@ -8470,12 +8459,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             name,
             (identifier, start, end) =>
             {
-                if (identifier is "this" or "base" or "global")
-                    return identifier;
-
                 var next = end;
                 while (next < name.Length && char.IsWhiteSpace(name[next]))
                     next++;
+                if (start == 0
+                    && next < name.Length
+                    && ((identifier is "this" or "base" && name[next] == '.')
+                        || (identifier == "global"
+                            && name.AsSpan(next).StartsWith("::", StringComparison.Ordinal))))
+                {
+                    return identifier;
+                }
                 if (PredefinedTypeKeywords.Contains(identifier)
                     && ((next < name.Length && name[next] == '.')
                         || IsInsideGenericTypeArgument(name, start)))

@@ -135,6 +135,54 @@ public class MigrationLearningFixTests
         Assert.DoesNotContain("@myVariable", result);
     }
 
+    [Theory]
+    [InlineData("base")]
+    [InlineData("this")]
+    [InlineData("byte")]
+    [InlineData("char")]
+    [InlineData("decimal")]
+    [InlineData("long")]
+    [InlineData("object")]
+    [InlineData("sbyte")]
+    [InlineData("short")]
+    [InlineData("uint")]
+    [InlineData("ulong")]
+    [InlineData("ushort")]
+    public void ReservedIdentifier_LocalRebindAndParameter_Compile(string keyword)
+    {
+        var result = Program.Compile(
+            $$"""
+            §M{Keywords}
+              §F{Local:pub} (i32:input) -> i32
+                §B{~{{keyword}}:i32} input
+                §B{~{{keyword}}:i32} (+ {{keyword}} 1)
+                §R {{keyword}}
+              §F{Parameter:pub} (i32:{{keyword}}) -> i32
+                §R {{keyword}}
+            """);
+
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));
+        Assert.Contains($"int @{keyword} = input;", result.GeneratedCode);
+        Assert.Contains($"int Parameter(int @{keyword})", result.GeneratedCode);
+        Assert.Contains($"return @{keyword};", result.GeneratedCode);
+        Assert.DoesNotContain($"int {keyword} =", result.GeneratedCode);
+    }
+
+    [Fact]
+    public void ReceiverKeywords_RemainDistinctFromEscapedIdentifierSegments()
+    {
+        var emitter = new CSharpEmitter();
+        Assert.Equal("base", new BaseExpressionNode(Span).Accept(emitter));
+        Assert.Equal("this", new ThisExpressionNode(Span).Accept(emitter));
+        Assert.Equal("@base", new ReferenceNode(Span, "base").Accept(emitter));
+        Assert.Equal("@this", new ReferenceNode(Span, "this").Accept(emitter));
+        Assert.Equal("base.@event", new ReferenceNode(Span, "base.event").Accept(emitter));
+        Assert.Equal("this.@base", new ReferenceNode(Span, "this.base").Accept(emitter));
+        Assert.Equal("value.@base", new ReferenceNode(Span, "value.base").Accept(emitter));
+        Assert.Equal("@base.Value", new ReferenceNode(Span, "@base.Value").Accept(emitter));
+        Assert.Equal("global::System.Int32", new ReferenceNode(Span, "global::System.Int32").Accept(emitter));
+    }
+
     #endregion
 
     #region PR 2: Call Expression Leading Dot
