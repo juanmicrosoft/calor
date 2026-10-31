@@ -757,7 +757,13 @@ public class StaticModuleDeclarationTests
                 §S (== result 31620)
                 §R §C{LocalFunctionFixture.Run}
             """;
-        var harness = Parse(preservedSource + "\n" + wrapper + "\n");
+        var harnessSource = preservedSource + "\n" + wrapper + "\n";
+        var unsupported = Program.Compile(harnessSource, "local-function-runtime-harness.calr");
+        Assert.True(unsupported.HasErrors);
+        Assert.Equal(DiagnosticCode.ForbiddenEffect, Assert.Single(unsupported.Diagnostics.Errors).Code);
+        Assert.Equal(new[] { DiagnosticCode.ForbiddenEffect, DiagnosticCode.UnknownExternalCall },
+            unsupported.Diagnostics.Select(diagnostic => diagnostic.Code).Order(StringComparer.Ordinal));
+        var harness = Parse(harnessSource);
         Assert.Single(Assert.Single(harness.Functions).Postconditions);
         var assembly = Compile(new CSharpEmitter(EmitContractMode.Release).Emit(harness));
         Assert.Equal(31620, assembly.GetType("Fixture.FixtureModule")!
