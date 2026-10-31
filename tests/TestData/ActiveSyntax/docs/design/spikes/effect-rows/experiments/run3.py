@@ -39,23 +39,23 @@ def case(name, src, args=None):
 
 # --- N1: does the "later line" branch reach a §E arm at every position? ---
 case("Z1-FLD-nextline-E", """
-    §M{m001:Z1}
-      §CL{c001:C:pub}
+    §M{Z1}
+      §CL{C:pub}
         §FLD{i32:x:priv}
         §E{cw}
-        §MT{mt001:M:pub} () -> void
+        §MT{M:pub} () -> void
           §E{}
 """)
 case("Z2-B-nextline-E", """
-    §M{m001:Z2}
-      §F{f001:Main:pub} () -> void
+    §M{Z2}
+      §F{Main:pub} () -> void
         §E{}
         §B{y:i32} INT:1
         §E{cw}
 """)
 case("Z3-wrapped-inline-sig-E-inside-parens", """
-    §M{m001:Z3}
-      §F{f001:Apply:pub} (
+    §M{Z3}
+      §F{Apply:pub} (
           Func<i32,i32>:transform
           §E{cw}
         ) -> i32
@@ -64,24 +64,24 @@ case("Z3-wrapped-inline-sig-E-inside-parens", """
 """)
 # --- N2 / Z4 / Z6: eff-name collisions ---
 case("Z4-typeparam-named-eff", """
-    §M{m001:Z4}
-      §F{f001:M:pub}<eff> (eff:x) -> void
+    §M{Z4}
+      §F{M:pub}<eff> (eff:x) -> void
         §E{}
 """)
 case("Z6-typeparam-named-cw", """
-    §M{m001:Z6}
-      §F{f001:M:pub}<T, cw> (T:a, cw:b) -> void
+    §M{Z6}
+      §F{M:pub}<T, cw> (T:a, cw:b) -> void
         §E{}
 """)
 case("Z6b-typeparam-named-fs", """
-    §M{m001:Z6}
-      §F{f001:M:pub}<T, fs> (T:a, fs:b) -> void
+    §M{Z6}
+      §F{M:pub}<T, fs> (T:a, fs:b) -> void
         §E{}
 """)
 # --- Z5: do inline parameter lists really wrap? ---
 case("Z5-wrapped-inline-parameter-list", """
-    §M{m001:Z5}
-      §F{f001:Apply:pub} (
+    §M{Z5}
+      §F{Apply:pub} (
           i32:a,
           i32:b
         ) -> i32
@@ -90,60 +90,60 @@ case("Z5-wrapped-inline-parameter-list", """
 """)
 # --- N3 / N4: where can an eff variable be declared at all? ---
 case("Z7-class-typeparam-reaches-member", """
-    §M{m001:Z7}
-      §CL{c001:Box:pub}<T>
+    §M{Z7}
+      §CL{Box:pub}<T>
         §FLD{T:value:priv}
-        §MT{mt001:Get:pub} () -> T
+        §MT{Get:pub} () -> T
           §E{}
           §R value
 """)
 case("Z8-DEL-typeparam-list", """
-    §M{m001:Z8}
-      §DEL{d001:Handler}<T>
+    §M{Z8}
+      §DEL{Handler}<T>
         §I{T:x}
         §O{void}
         §E{}
-      §F{f001:Main:pub} () -> void
+      §F{Main:pub} () -> void
         §E{}
 """)
 case("Z8b-LAM-typeparam-list", """
-    §M{m001:Z8}
-      §F{f001:Main:pub} () -> void
+    §M{Z8}
+      §F{Main:pub} () -> void
         §E{}
-        §B{f} §LAM{lam1}<T> §R INT:1 §/LAM{lam1}
+        §B{f} §LAM{}<T> §R INT:1 §/LAM
 """)
 case("Z7b-IFACE-typeparam-reaches-member", """
-    §M{m001:Z7}
-      §IFACE{i001:IBox}<T>
-        §MT{mt001:Get} () -> T
+    §M{Z7}
+      §IFACE{IBox}<T>
+        §MT{Get} () -> T
           §E{}
 """)
 # --- N5: a same-line row on a NON-function-typed position ---
 case("Z9-arrow-void-sameline-E", """
-    §M{m001:Z9}
-      §F{f001:Log:pub} (i32:x) -> void §E{cw}
+    §M{Z9}
+      §F{Log:pub} (i32:x) -> void §E{cw}
         §P x
 """)
 case("Z9b-I-i32-sameline-E", """
-    §M{m001:Z9}
-      §F{f001:Log:pub}
+    §M{Z9}
+      §F{Log:pub}
         §I{i32:x} §E{cw}
         §O{void}
         §P x
 """)
 case("Z9c-O-i32-sameline-E", """
-    §M{m001:Z9}
-      §F{f001:Get:pub}
+    §M{Z9}
+      §F{Get:pub}
         §O{i32} §E{cw}
         §R INT:1
 """)
 # --- minor: §E inside a §C ... §/C argument list ---
 case("Z10-E-inside-call-arguments", """
-    §M{m001:Z10}
-      §F{f001:Helper:pub} (i32:x) -> i32
+    §M{Z10}
+      §F{Helper:pub} (i32:x) -> i32
         §E{}
         §R x
-      §F{f002:Main:pub} () -> i32
+      §F{Main:pub} () -> i32
         §E{}
         §R §C{Helper} §A INT:1 §E{cw} §/C
 """)
@@ -152,19 +152,19 @@ case("Z10-E-inside-call-arguments", """
 # bind `eff e` at position 1 (already permitted by §7.3) instead of needing a
 # class/interface-level binder that §7.3 forbids.
 case("W1a-IFACE-member-typeparams", """
-    §M{m001:W1}
-      §IFACE{i001:IP}
-        §MT{mt001:Handle}<T> (T:r) -> T
+    §M{W1}
+      §IFACE{IP}
+        §MT{Handle}<T> (T:r) -> T
           §E{}
 """)
 case("W1b-IFACE-and-impl-member-typeparams", """
-    §M{m001:W1}
-      §IFACE{i001:IP}
-        §MT{mt001:Handle}<T> (T:r) -> T
+    §M{W1}
+      §IFACE{IP}
+        §MT{Handle}<T> (T:r) -> T
           §E{}
-      §CL{c001:Logging:pub}
+      §CL{Logging:pub}
         §IMPL{IP}
-        §MT{mt001:Handle:pub}<T> (T:r) -> T
+        §MT{Handle:pub}<T> (T:r) -> T
           §E{}
           §R r
 """)
@@ -172,13 +172,13 @@ case("W1b-IFACE-and-impl-member-typeparams", """
 # boundary -- the property `fits` will need for a member-level `eff`.
 # StrictnessBatchTests.cs:172 pins the analogous property for OVERRIDES.
 case("W1c-IFACE-impl-member-typeparams-renamed", """
-    §M{m001:W1}
-      §IFACE{i001:IP}
-        §MT{mt001:Handle}<T> (T:r) -> T
+    §M{W1}
+      §IFACE{IP}
+        §MT{Handle}<T> (T:r) -> T
           §E{}
-      §CL{c001:Logging:pub}
+      §CL{Logging:pub}
         §IMPL{IP}
-        §MT{mt001:Handle:pub}<U> (U:r) -> U
+        §MT{Handle:pub}<U> (U:r) -> U
           §E{cw}
           §P r
           §R r
@@ -186,8 +186,8 @@ case("W1c-IFACE-impl-member-typeparams-renamed", """
 
 # Current Y2a nullable/throw replacement, not a replay of the retired string error channel.
 case("Z11-fallible-brace-form-full-output", """
-    §M{m001:Z11}
-      §F{f001:Parse:pub}
+    §M{Z11}
+      §F{Parse:pub}
         §I{?str:s}
         §O{str}
         §E{alloc,throw}

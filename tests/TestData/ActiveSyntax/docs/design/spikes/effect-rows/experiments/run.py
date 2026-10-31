@@ -44,31 +44,31 @@ def case(name, src, args=None):
 # DECLARATION today; X1b/X2b prove it by making the declaration pure and
 # the body impure.
 case("X1a-twoline-O-then-E", """
-    §M{m001:X1}
-      §F{f001:Log:pub}
+    §M{X1}
+      §F{Log:pub}
         §I{str:m}
         §O{void}
         §E{cw}
         §P m
 """)
 case("X1b-twoline-O-then-E-pure", """
-    §M{m001:X1}
-      §F{f001:Log:pub}
+    §M{X1}
+      §F{Log:pub}
         §I{str:m}
         §O{void}
         §E{}
         §P m
 """)
 case("X2a-sameline-O-and-E", """
-    §M{m001:X2}
-      §F{f001:Log:pub}
+    §M{X2}
+      §F{Log:pub}
         §I{str:m}
         §O{void} §E{cw}
         §P m
 """)
 case("X2b-sameline-O-and-E-pure", """
-    §M{m001:X2}
-      §F{f001:Log:pub}
+    §M{X2}
+      §F{Log:pub}
         §I{str:m}
         §O{void} §E{}
         §P m
@@ -77,14 +77,14 @@ case("X2b-sameline-O-and-E-pure", """
 # ---------------------------------------------------------------- X3
 # Draft v1's `!e` sigil, run through the real parser.
 case("X3-bang-sigil-in-E", """
-    §M{m001:X3}
-      §F{f001:Map:pub}
+    §M{X3}
+      §F{Map:pub}
         §O{void}
         §E{!e}
 """)
 case("X3b-bang-sigil-mixed", """
-    §M{m001:X3}
-      §F{f001:Map:pub}
+    §M{X3}
+      §F{Map:pub}
         §O{void}
         §E{alloc, !e}
 """)
@@ -93,8 +93,8 @@ case("X3b-bang-sigil-mixed", """
 # Current replacement for the retired T!E/§OK probe: nullable input, explicit throw.
 # This is not a replay of the original syntax or a string-valued error channel.
 case("X4-fallible-type-suffix", """
-    §M{m001:X4}
-      §F{f001:Parse:pub} (?str:s) -> str
+    §M{X4}
+      §F{Parse:pub} (?str:s) -> str
         §E{alloc,throw}
         §R (?? s §TH §NEW{ArgumentException} §A "Missing value" §/NEW)
 """)
@@ -102,14 +102,14 @@ case("X4-fallible-type-suffix", """
 # ---------------------------------------------------------------- X5
 # Alternative sigils, to see which the lexer/ParseValue already own.
 case("X5a-caret-sigil", """
-    §M{m001:X5}
-      §F{f001:Map:pub}
+    §M{X5}
+      §F{Map:pub}
         §O{void}
         §E{^e}
 """)
 case("X5b-bare-identifier", """
-    §M{m001:X5}
-      §F{f001:Map:pub}
+    §M{X5}
+      §F{Map:pub}
         §O{void}
         §E{e}
 """)
@@ -118,14 +118,14 @@ case("X5b-bare-identifier", """
 # The chosen spelling: `eff e` in the existing type-parameter list,
 # mirroring the in/out variance branch. Must FAIL today.
 case("X6a-eff-modifier-in-typaram-list", """
-    §M{m001:X6}
-      §F{f001:Map:pub}<T, U, eff e> ([T]:xs) -> [U]
+    §M{X6}
+      §F{Map:pub}<T, U, eff e> ([T]:xs) -> [U]
         §E{}
         §R §ARR{U} INT:0
 """)
 case("X6b-variance-modifier-on-function", """
-    §M{m001:X6}
-      §F{f001:Map:pub}<T, out U> ([T]:xs) -> [U]
+    §M{X6}
+      §F{Map:pub}<T, out U> ([T]:xs) -> [U]
         §E{}
         §R §ARR{U} INT:0
 """)
@@ -134,23 +134,23 @@ case("X6b-variance-modifier-on-function", """
 # Positions that already parse §E today (2, 3) and positions that do not
 # (4, 7).
 case("X7-LAM-with-E", """
-    §M{m001:X7}
-      §F{f001:Main:pub} () -> void
+    §M{X7}
+      §F{Main:pub} () -> void
         §E{}
-        §B{f} §LAM{lam1:x:i32} §E{} (+ x 1) §/LAM{lam1}
+        §B{f} §LAM{x:i32} §E{} (+ x 1) §/LAM
 """)
 case("X8-DEL-with-E", """
-    §M{m001:X8}
-      §DEL{d1:Transform}
+    §M{X8}
+      §DEL{Transform}
         §I{i32:x}
         §O{i32}
         §E{cw}
-      §F{f001:Main:pub} () -> void
+      §F{Main:pub} () -> void
         §E{}
 """)
 case("X9a-I-with-sameline-E", """
-    §M{m001:X9}
-      §F{f001:Apply:pub}
+    §M{X9}
+      §F{Apply:pub}
         §I{Func<i32,i32>:transform} §E{cw}
         §I{i32:value}
         §O{i32}
@@ -158,16 +158,16 @@ case("X9a-I-with-sameline-E", """
         §R §C{transform} §A value §/C
 """)
 case("X9b-FLD-with-sameline-E", """
-    §M{m001:X9}
-      §CL{c001:Counter:pub}
+    §M{X9}
+      §CL{Counter:pub}
         §FLD{Action<i32>:onChange:priv} §E{cw}
-        §MT{mt001:Bump:pub} (i32:n) -> void
+        §MT{Bump:pub} (i32:n) -> void
           §E{cw}
           §C{onChange} §A n §/C
 """)
 case("X9c-inline-param-with-E", """
-    §M{m001:X9}
-      §F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
+    §M{X9}
+      §F{Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
         §E{cw}
         §R §C{transform} §A value §/C
 """)
@@ -175,35 +175,35 @@ case("X9c-inline-param-with-E", """
 # ---------------------------------------------------------------- X10-X12
 # The BEFORE behaviour the doc's worked examples quote.
 case("X10-E1-before-calor0418", """
-    §M{m001:Ex1}
-      §F{f001:Apply:pub} (Func<i32,i32>:transform, i32:value) -> i32
+    §M{Ex1}
+      §F{Apply:pub} (Func<i32,i32>:transform, i32:value) -> i32
         §E{cw}
         §R §C{transform} §A value §/C
 """)
 case("X11-E3-before-silent-laundering", """
-    §M{m001:Ex3}
-      §F{f001:Apply:pub} (Func<i32,i32>:transform, i32:value) -> i32
+    §M{Ex3}
+      §F{Apply:pub} (Func<i32,i32>:transform, i32:value) -> i32
         §E{}
         §R INT:0
 
-      §F{f002:Shout:pub} (i32:x) -> i32
+      §F{Shout:pub} (i32:x) -> i32
         §E{cw}
         §P x
         §R x
 
-      §F{f003:Main:pub} () -> i32
+      §F{Main:pub} () -> i32
         §E{cw}
         §R §C{Apply} §A Shout §A INT:1 §/C
 """)
 case("X12-calor0410-real-message", """
-    §M{m001:X12}
-      §F{f001:Log:pub} (str:m) -> void
+    §M{X12}
+      §F{Log:pub} (str:m) -> void
         §E{}
         §P m
 """)
 case("X12b-calor0410-two-effects", """
-    §M{m001:X12}
-      §F{f001:Log:pub} (str:m) -> void
+    §M{X12}
+      §F{Log:pub} (str:m) -> void
         §E{}
         §P m
         §C{System.IO.File.WriteAllText} §A m §A m §/C
@@ -212,10 +212,10 @@ case("X12b-calor0410-two-effects", """
 # ---------------------------------------------------------------- X13
 # Field-level: does a row-less function-typed field invocation reach 0418?
 case("X13-field-delegate-invocation", """
-    §M{m001:X13}
-      §CL{c001:Counter:pub}
+    §M{X13}
+      §CL{Counter:pub}
         §FLD{Action<i32>:onChange:priv}
-        §MT{mt001:Bump:pub} (i32:n) -> void
+        §MT{Bump:pub} (i32:n) -> void
           §E{}
           §C{onChange} §A n §/C
 """)
@@ -223,10 +223,10 @@ case("X13-field-delegate-invocation", """
 # ---------------------------------------------------------------- X14
 # The §LAM-bound-local rejection the doc's §5 changes.
 case("X14-lambda-bound-local", """
-    §M{m001:X14}
-      §F{f001:UseLambda:pub} () -> i32
+    §M{X14}
+      §F{UseLambda:pub} () -> i32
         §E{}
-        §B{f} §LAM{lam1:x:i32} (+ x 1) §/LAM{lam1}
+        §B{f} §LAM{x:i32} (+ x 1) §/LAM
         §R §C{f} §A INT:1 §/C
 """)
 

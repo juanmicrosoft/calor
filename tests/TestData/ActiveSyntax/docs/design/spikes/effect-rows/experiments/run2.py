@@ -38,8 +38,8 @@ def case(name, src, args=None):
 # flat loop treats both as the declaration's row, the LAST one wins and the
 # function is pure -> Calor0410 fires on the §P.
 case("Y1a-I-sameline-cw-then-decl-pure", """
-    §M{m001:Y1}
-      §F{f001:Log:pub}
+    §M{Y1}
+      §F{Log:pub}
         §I{str:m} §E{cw}
         §O{void}
         §E{}
@@ -47,8 +47,8 @@ case("Y1a-I-sameline-cw-then-decl-pure", """
 """)
 # Y1b — same, but with NO later §E: the same-line §E{cw} is the only one.
 case("Y1b-I-sameline-cw-only", """
-    §M{m001:Y1}
-      §F{f001:Log:pub}
+    §M{Y1}
+      §F{Log:pub}
         §I{str:m} §E{cw}
         §O{void}
         §P m
@@ -56,8 +56,8 @@ case("Y1b-I-sameline-cw-only", """
 # Y1c — same-line §E{} on §I, declaration §E{cw} later: if the LAST wins the
 # function is impure and compiles.
 case("Y1c-I-sameline-pure-then-decl-cw", """
-    §M{m001:Y1}
-      §F{f001:Log:pub}
+    §M{Y1}
+      §F{Log:pub}
         §I{str:m} §E{}
         §O{void}
         §E{cw}
@@ -67,55 +67,55 @@ case("Y1c-I-sameline-pure-then-decl-cw", """
 # Y2 — current nullable/throw replacements for the retired T!E/§OK probes.
 # No arbitrary string error payload is represented by these current inputs.
 case("Y2a-fallible-brace-form", """
-    §M{m001:Y2}
-      §F{f001:Parse:pub}
+    §M{Y2}
+      §F{Parse:pub}
         §I{?str:s}
         §O{str}
         §E{alloc,throw}
         §R (?? s §TH §NEW{ArgumentException} §A "Missing value" §/NEW)
 """)
 case("Y2b-fallible-in-B", """
-    §M{m001:Y2}
-      §F{f001:Main:pub} () -> void
+    §M{Y2}
+      §F{Main:pub} () -> void
         §E{}
         §B{r:?i32} INT:1
 """)
 
 # Y3 — the §B suffix position (position 6c).
 case("Y3a-B-with-sameline-E", """
-    §M{m001:Y3}
-      §F{f001:Main:pub} () -> void
+    §M{Y3}
+      §F{Main:pub} () -> void
         §E{}
-        §B{f:Func<i32,i32>} §E{cw} §LAM{lam1:x:i32} (+ x 1) §/LAM{lam1}
+        §B{f:Func<i32,i32>} §E{cw} §LAM{x:i32} (+ x 1) §/LAM
 """)
 case("Y3b-B-plain", """
-    §M{m001:Y3}
-      §F{f001:Main:pub} () -> void
+    §M{Y3}
+      §F{Main:pub} () -> void
         §E{}
-        §B{f:Func<i32,i32>} §LAM{lam1:x:i32} (+ x 1) §/LAM{lam1}
+        §B{f:Func<i32,i32>} §LAM{x:i32} (+ x 1) §/LAM
 """)
 
 # Y4 — the §O suffix position with a function type, discriminating.
 case("Y4a-O-sameline-E-decl-later", """
-    §M{m001:Y4}
-      §F{f001:Make:pub}
+    §M{Y4}
+      §F{Make:pub}
         §O{Func<i32>} §E{cw}
         §E{}
-        §R §LAM{lam1} §R INT:1 §/LAM{lam1}
+        §R §LAM{} §R INT:1 §/LAM
 """)
 
 # Y5 — arrow-return same-line §E (position 6b).
 case("Y5a-arrow-sameline-E", """
-    §M{m001:Y5}
-      §F{f001:Log:pub} (str:m) -> void §E{cw}
+    §M{Y5}
+      §F{Log:pub} (str:m) -> void §E{cw}
         §P m
 """)
 
 # Y6 — §MT (method) two-line §O/§E, to confirm position 1 covers §MT.
 case("Y6a-MT-twoline", """
-    §M{m001:Y6}
-      §CL{c001:C:pub}
-        §MT{mt001:Log:pub}
+    §M{Y6}
+      §CL{C:pub}
+        §MT{Log:pub}
           §I{str:m}
           §O{void}
           §E{}
@@ -124,14 +124,14 @@ case("Y6a-MT-twoline", """
 
 # Y7 — an interface method's §E (site 5's destination row today).
 case("Y7a-IFACE-E", """
-    §M{m001:Y7}
-      §IFACE{i001:IRenderer}
-        §MT{m001:Render}
+    §M{Y7}
+      §IFACE{IRenderer}
+        §MT{Render}
           §O{void}
           §E{}
-      §CL{c001:ConsoleRenderer:pub}
+      §CL{ConsoleRenderer:pub}
         §IMPL{IRenderer}
-        §MT{mt001:Render:pub}
+        §MT{Render:pub}
           §O{void}
           §E{cw}
           §P "rendering"
@@ -139,27 +139,27 @@ case("Y7a-IFACE-E", """
 
 # Y8 — permissive demotion of Calor0420 (consistency lens M2 / :517-519).
 case("Y8a-override-broader-permissive", """
-    §M{m001:Y8}
-      §CL{c001:Base:pub}
-        §MT{mt001:Render:pub:virt}
+    §M{Y8}
+      §CL{Base:pub}
+        §MT{Render:pub:virt}
           §O{void}
           §E{}
-      §CL{c002:Derived:pub}
+      §CL{Derived:pub}
         §EXT{Base}
-        §MT{mt002:Render:pub:over}
+        §MT{Render:pub:over}
           §O{void}
           §E{cw}
           §P "laundered"
 """, ["--permissive-effects"])
 case("Y8b-override-broader-strict", """
-    §M{m001:Y8}
-      §CL{c001:Base:pub}
-        §MT{mt001:Render:pub:virt}
+    §M{Y8}
+      §CL{Base:pub}
+        §MT{Render:pub:virt}
           §O{void}
           §E{}
-      §CL{c002:Derived:pub}
+      §CL{Derived:pub}
         §EXT{Base}
-        §MT{mt002:Render:pub:over}
+        §MT{Render:pub:over}
           §O{void}
           §E{cw}
           §P "laundered"
@@ -167,10 +167,10 @@ case("Y8b-override-broader-strict", """
 
 # Y9 — §B{f} §LAM with no type and no row: today's inferred path (§5.4 / M7).
 case("Y9a-B-untyped-lambda-then-invoke-permissive", """
-    §M{m001:Y9}
-      §F{f001:UseLambda:pub} () -> i32
+    §M{Y9}
+      §F{UseLambda:pub} () -> i32
         §E{}
-        §B{f} §LAM{lam1:x:i32} (+ x 1) §/LAM{lam1}
+        §B{f} §LAM{x:i32} (+ x 1) §/LAM
         §R §C{f} §A INT:1 §/C
 """, ["--permissive-effects"])
 

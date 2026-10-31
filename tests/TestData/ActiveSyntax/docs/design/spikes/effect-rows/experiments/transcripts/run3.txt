@@ -1,11 +1,11 @@
 ==============================================================================
 CASE Z1-FLD-nextline-E  args: (none)  exit: 1
 ------------------------------------------------------------------------------
-§M{m001:Z1}
-  §CL{c001:C:pub}
+§M{Z1}
+  §CL{C:pub}
     §FLD{i32:x:priv}
     §E{cw}
-    §MT{mt001:M:pub} () -> void
+    §MT{M:pub} () -> void
       §E{}
 ------------------------------------------------------------------------------
 Z1-FLD-nextline-E.calr(4,5): error Calor0405: A §E{…} effect row must be on the same line as the type it annotates. Move it onto the end of the 'x' field line, or — if this is meant to be the function's own effect declaration — onto its own line in the §F body.
@@ -13,8 +13,8 @@ Z1-FLD-nextline-E.calr(4,5): error Calor0405: A §E{…} effect row must be on t
 ==============================================================================
 CASE Z2-B-nextline-E  args: (none)  exit: 1
 ------------------------------------------------------------------------------
-§M{m001:Z2}
-  §F{f001:Main:pub} () -> void
+§M{Z2}
+  §F{Main:pub} () -> void
     §E{}
     §B{y:i32} INT:1
     §E{cw}
@@ -24,8 +24,8 @@ Z2-B-nextline-E.calr(5,5): error Calor0405: A §E{…} effect row must be on the
 ==============================================================================
 CASE Z3-wrapped-inline-sig-E-inside-parens  args: (none)  exit: 1
 ------------------------------------------------------------------------------
-§M{m001:Z3}
-  §F{f001:Apply:pub} (
+§M{Z3}
+  §F{Apply:pub} (
       Func<i32,i32>:transform
       §E{cw}
     ) -> i32
@@ -37,8 +37,8 @@ Z3-wrapped-inline-sig-E-inside-parens.calr(4,7): error Calor0405: A §E{…} eff
 ==============================================================================
 CASE Z4-typeparam-named-eff  args: (none)  exit: 0
 ------------------------------------------------------------------------------
-§M{m001:Z4}
-  §F{f001:M:pub}<eff> (eff:x) -> void
+§M{Z4}
+  §F{M:pub}<eff> (eff:x) -> void
     §E{}
 ------------------------------------------------------------------------------
 Compilation successful: Z4-typeparam-named-eff.g.cs
@@ -46,8 +46,8 @@ Compilation successful: Z4-typeparam-named-eff.g.cs
 ==============================================================================
 CASE Z6-typeparam-named-cw  args: (none)  exit: 0
 ------------------------------------------------------------------------------
-§M{m001:Z6}
-  §F{f001:M:pub}<T, cw> (T:a, cw:b) -> void
+§M{Z6}
+  §F{M:pub}<T, cw> (T:a, cw:b) -> void
     §E{}
 ------------------------------------------------------------------------------
 Compilation successful: Z6-typeparam-named-cw.g.cs
@@ -55,8 +55,8 @@ Compilation successful: Z6-typeparam-named-cw.g.cs
 ==============================================================================
 CASE Z6b-typeparam-named-fs  args: (none)  exit: 0
 ------------------------------------------------------------------------------
-§M{m001:Z6}
-  §F{f001:M:pub}<T, fs> (T:a, fs:b) -> void
+§M{Z6}
+  §F{M:pub}<T, fs> (T:a, fs:b) -> void
     §E{}
 ------------------------------------------------------------------------------
 Compilation successful: Z6b-typeparam-named-fs.g.cs
@@ -64,8 +64,8 @@ Compilation successful: Z6b-typeparam-named-fs.g.cs
 ==============================================================================
 CASE Z5-wrapped-inline-parameter-list  args: (none)  exit: 0
 ------------------------------------------------------------------------------
-§M{m001:Z5}
-  §F{f001:Apply:pub} (
+§M{Z5}
+  §F{Apply:pub} (
       i32:a,
       i32:b
     ) -> i32
@@ -77,10 +77,10 @@ Compilation successful: Z5-wrapped-inline-parameter-list.g.cs
 ==============================================================================
 CASE Z7-class-typeparam-reaches-member  args: (none)  exit: 0
 ------------------------------------------------------------------------------
-§M{m001:Z7}
-  §CL{c001:Box:pub}<T>
+§M{Z7}
+  §CL{Box:pub}<T>
     §FLD{T:value:priv}
-    §MT{mt001:Get:pub} () -> T
+    §MT{Get:pub} () -> T
       §E{}
       §R value
 ------------------------------------------------------------------------------
@@ -89,36 +89,36 @@ Compilation successful: Z7-class-typeparam-reaches-member.g.cs
 ==============================================================================
 CASE Z8-DEL-typeparam-list  args: (none)  exit: 1
 ------------------------------------------------------------------------------
-§M{m001:Z8}
-  §DEL{d001:Handler}<T>
+§M{Z8}
+  §DEL{Handler}<T>
     §I{T:x}
     §O{void}
     §E{}
-  §F{f001:Main:pub} () -> void
+  §F{Main:pub} () -> void
     §E{}
 ------------------------------------------------------------------------------
-Z8-DEL-typeparam-list.calr(2,21): error Calor0100: Expected I, O, E, or END_DEL but found Less
-Z8-DEL-typeparam-list.calr(2,22): error Calor0100: Expected I, O, E, or END_DEL but found Identifier
-Z8-DEL-typeparam-list.calr(2,23): error Calor0100: Expected I, O, E, or END_DEL but found Greater
+Z8-DEL-typeparam-list.calr(2,16): error Calor0100: Expected I, O, E, or END_DEL but found Less
+Z8-DEL-typeparam-list.calr(2,17): error Calor0100: Expected I, O, E, or END_DEL but found Identifier
+Z8-DEL-typeparam-list.calr(2,18): error Calor0100: Expected I, O, E, or END_DEL but found Greater
 
 ==============================================================================
 CASE Z8b-LAM-typeparam-list  args: (none)  exit: 1
 ------------------------------------------------------------------------------
-§M{m001:Z8}
-  §F{f001:Main:pub} () -> void
+§M{Z8}
+  §F{Main:pub} () -> void
     §E{}
-    §B{f} §LAM{lam1}<T> §R INT:1 §/LAM{lam1}
+    §B{f} §LAM{}<T> §R INT:1 §/LAM
 ------------------------------------------------------------------------------
-Z8b-LAM-typeparam-list.calr(4,21): error Calor0100: Expected statement but found Less
-Z8b-LAM-typeparam-list.calr(4,22): error Calor0100: Expected statement but found Identifier
-Z8b-LAM-typeparam-list.calr(4,23): error Calor0100: Expected statement but found Greater
+Z8b-LAM-typeparam-list.calr(4,17): error Calor0100: Expected statement but found Less
+Z8b-LAM-typeparam-list.calr(4,18): error Calor0100: Expected statement but found Identifier
+Z8b-LAM-typeparam-list.calr(4,19): error Calor0100: Expected statement but found Greater
 
 ==============================================================================
 CASE Z7b-IFACE-typeparam-reaches-member  args: (none)  exit: 0
 ------------------------------------------------------------------------------
-§M{m001:Z7}
-  §IFACE{i001:IBox}<T>
-    §MT{mt001:Get} () -> T
+§M{Z7}
+  §IFACE{IBox}<T>
+    §MT{Get} () -> T
       §E{}
 ------------------------------------------------------------------------------
 Compilation successful: Z7b-IFACE-typeparam-reaches-member.g.cs
@@ -126,17 +126,17 @@ Compilation successful: Z7b-IFACE-typeparam-reaches-member.g.cs
 ==============================================================================
 CASE Z9-arrow-void-sameline-E  args: (none)  exit: 1
 ------------------------------------------------------------------------------
-§M{m001:Z9}
-  §F{f001:Log:pub} (i32:x) -> void §E{cw}
+§M{Z9}
+  §F{Log:pub} (i32:x) -> void §E{cw}
     §P x
 ------------------------------------------------------------------------------
-Z9-arrow-void-sameline-E.calr(2,36): error Calor0405: The return type 'VOID' is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
+Z9-arrow-void-sameline-E.calr(2,31): error Calor0405: The return type 'VOID' is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
 
 ==============================================================================
 CASE Z9b-I-i32-sameline-E  args: (none)  exit: 1
 ------------------------------------------------------------------------------
-§M{m001:Z9}
-  §F{f001:Log:pub}
+§M{Z9}
+  §F{Log:pub}
     §I{i32:x} §E{cw}
     §O{void}
     §P x
@@ -146,8 +146,8 @@ Z9b-I-i32-sameline-E.calr(3,15): error Calor0405: 'x' has type 'INT', which is n
 ==============================================================================
 CASE Z9c-O-i32-sameline-E  args: (none)  exit: 1
 ------------------------------------------------------------------------------
-§M{m001:Z9}
-  §F{f001:Get:pub}
+§M{Z9}
+  §F{Get:pub}
     §O{i32} §E{cw}
     §R INT:1
 ------------------------------------------------------------------------------
@@ -156,11 +156,11 @@ Z9c-O-i32-sameline-E.calr(3,13): error Calor0405: The return type 'INT' is not a
 ==============================================================================
 CASE Z10-E-inside-call-arguments  args: (none)  exit: 1
 ------------------------------------------------------------------------------
-§M{m001:Z10}
-  §F{f001:Helper:pub} (i32:x) -> i32
+§M{Z10}
+  §F{Helper:pub} (i32:x) -> i32
     §E{}
     §R x
-  §F{f002:Main:pub} () -> i32
+  §F{Main:pub} () -> i32
     §E{}
     §R §C{Helper} §A INT:1 §E{cw} §/C
 ------------------------------------------------------------------------------
@@ -174,9 +174,9 @@ Z10-E-inside-call-arguments.calr(7,35): error Calor0100: Expected statement but 
 ==============================================================================
 CASE W1a-IFACE-member-typeparams  args: (none)  exit: 0
 ------------------------------------------------------------------------------
-§M{m001:W1}
-  §IFACE{i001:IP}
-    §MT{mt001:Handle}<T> (T:r) -> T
+§M{W1}
+  §IFACE{IP}
+    §MT{Handle}<T> (T:r) -> T
       §E{}
 ------------------------------------------------------------------------------
 Compilation successful: W1a-IFACE-member-typeparams.g.cs
@@ -184,13 +184,13 @@ Compilation successful: W1a-IFACE-member-typeparams.g.cs
 ==============================================================================
 CASE W1b-IFACE-and-impl-member-typeparams  args: (none)  exit: 0
 ------------------------------------------------------------------------------
-§M{m001:W1}
-  §IFACE{i001:IP}
-    §MT{mt001:Handle}<T> (T:r) -> T
+§M{W1}
+  §IFACE{IP}
+    §MT{Handle}<T> (T:r) -> T
       §E{}
-  §CL{c001:Logging:pub}
+  §CL{Logging:pub}
     §IMPL{IP}
-    §MT{mt001:Handle:pub}<T> (T:r) -> T
+    §MT{Handle:pub}<T> (T:r) -> T
       §E{}
       §R r
 ------------------------------------------------------------------------------
@@ -199,13 +199,13 @@ Compilation successful: W1b-IFACE-and-impl-member-typeparams.g.cs
 ==============================================================================
 CASE W1c-IFACE-impl-member-typeparams-renamed  args: (none)  exit: 1
 ------------------------------------------------------------------------------
-§M{m001:W1}
-  §IFACE{i001:IP}
-    §MT{mt001:Handle}<T> (T:r) -> T
+§M{W1}
+  §IFACE{IP}
+    §MT{Handle}<T> (T:r) -> T
       §E{}
-  §CL{c001:Logging:pub}
+  §CL{Logging:pub}
     §IMPL{IP}
-    §MT{mt001:Handle:pub}<U> (U:r) -> U
+    §MT{Handle:pub}<U> (U:r) -> U
       §E{cw}
       §P r
       §R r
@@ -215,8 +215,8 @@ W1c-IFACE-impl-member-typeparams-renamed.calr(8,7): error Calor0421: Implementat
 ==============================================================================
 CASE Z11-fallible-brace-form-full-output  args: (none)  exit: 0
 ------------------------------------------------------------------------------
-§M{m001:Z11}
-  §F{f001:Parse:pub}
+§M{Z11}
+  §F{Parse:pub}
     §I{?str:s}
     §O{str}
     §E{alloc,throw}

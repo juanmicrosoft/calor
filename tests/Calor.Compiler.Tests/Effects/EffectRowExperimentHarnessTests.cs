@@ -22,11 +22,11 @@ namespace Calor.Compiler.Tests;
 /// output byte-for-byte against explicitly registered active transcript mirrors. The scripts
 /// render structured diagnostics in the archived layout, preserving full messages
 /// without making the old layout a contract for today's default text output.
-/// Original scripts and transcripts remain historical inputs; only the active copies
-/// replace retired Option/Result probes with nullable/throw probes.</para>
+/// Original scripts and transcripts remain historical inputs. Active copies use ID-free
+/// source and replace retired Option/Result probes with nullable/throw probes.</para>
 ///
 /// <para><b>Regenerating.</b> After an intentional compiler change, review the diff,
-/// update the design doc's quoted output, and commit both in the same PR.
+/// update only the registered current copies, not the historical design doc's quoted output.
 /// Setting <c>CALOR_REGENERATE_EXPERIMENT_TRANSCRIPTS=1</c> makes this test
 /// rewrite only the active transcripts instead of asserting — the same discipline as
 /// <c>CALOR_REGENERATE_S5_LEDGER</c> for the metadata ledger.</para>
@@ -84,7 +84,7 @@ public sealed class EffectRowExperimentHarnessTests
     }
 
     [Fact]
-    public void ActiveTranscripts_ChangeOnlyRetiredProbesAndPrefixBangDiagnosticSpelling()
+    public void ActiveTranscripts_ChangeOnlyRetiredProbesSourceIdentityAndPrefixBangSpelling()
     {
         var replacements = new Dictionary<string, string[]>
         {
@@ -112,13 +112,40 @@ public sealed class EffectRowExperimentHarnessTests
                     const string historicalMessage = "Unknown effect code '! e'.";
                     const string currentMessage = "Unknown effect code '!e'.";
                     Assert.Contains(historicalMessage, expected);
-                    Assert.Equal(expected.Replace(historicalMessage, currentMessage, StringComparison.Ordinal),
-                        active[name]);
+                    Assert.Equal(ProjectSourceIdentity(
+                        expected.Replace(historicalMessage, currentMessage, StringComparison.Ordinal)), active[name]);
                 }
                 else
-                    Assert.Equal(expected, active[name]);
+                    Assert.Equal(ProjectSourceIdentity(expected), active[name]);
             }
         }
+    }
+
+    private static string ProjectSourceIdentity(string transcript)
+    {
+        // Expected-output metadata only: preserve every exit, diagnostic code/message and C# byte.
+        var separator = "\n" + new string('-', 78) + "\n";
+        var parts = transcript.Split(separator);
+        Assert.Equal(3, parts.Length);
+        var originalLines = parts[1].Split('\n');
+        static string Project(string text)
+        {
+            text = Regex.Replace(text, @"§(M|F|CL|MT|IFACE|DEL)\{(?:m|f|c|mt|i|d)\d+:", "§$1{");
+            text = Regex.Replace(text, @"§LAM\{lam\d+:", "§LAM{");
+            text = Regex.Replace(text, @"§LAM\{lam\d+\}", "§LAM{}");
+            return Regex.Replace(text, @"§/LAM\{lam\d+\}", "§/LAM");
+        }
+        parts[1] = string.Join("\n", originalLines.Select(Project));
+        parts[2] = Regex.Replace(parts[2], @"(?<file>\S+\.calr)\((?<line>\d+),(?<column>\d+)\)", match =>
+        {
+            var line = int.Parse(match.Groups["line"].Value, System.Globalization.CultureInfo.InvariantCulture);
+            var column = int.Parse(match.Groups["column"].Value, System.Globalization.CultureInfo.InvariantCulture);
+            Assert.InRange(line, 1, originalLines.Length);
+            Assert.InRange(column, 1, originalLines[line - 1].Length + 1);
+            var projectedColumn = Project(originalLines[line - 1][..(column - 1)]).Length + 1;
+            return $"{match.Groups["file"].Value}({line},{projectedColumn})";
+        });
+        return string.Join(separator, parts);
     }
 
     private static Dictionary<string, string> TranscriptCases(string text)
