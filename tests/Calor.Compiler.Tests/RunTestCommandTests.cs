@@ -365,8 +365,10 @@ public class RunTestCommandTests : IDisposable
 
         var pairCopy = Path.Combine(_tempDir, "N1-003-csv-row");
         CopyDirectory(pairDir, pairCopy);
+        var original = Path.Combine(pairDir, "reference", "calor", "CsvRow.calr");
+        var originalBytes = File.ReadAllBytes(original);
         File.Copy(
-            Path.Combine(pairCopy, "reference", "calor", "CsvRow.calr"),
+            ActiveSyntaxInputs.ForCurrentCompiler(CliTestHarness.FindRepoRoot(), original),
             Path.Combine(pairCopy, "calor", "CsvRow.calr"),
             overwrite: true);
 
@@ -375,6 +377,8 @@ public class RunTestCommandTests : IDisposable
         Assert.True(exitCode == 0, $"expected exit 0, got {exitCode}. stderr: {stdErr}\nstdout: {stdOut}");
         Assert.Contains("skipping", stdErr);
         Assert.Contains("reference", stdErr);
+        Assert.Equal(originalBytes, File.ReadAllBytes(original));
+        Assert.Equal(originalBytes, File.ReadAllBytes(Path.Combine(pairCopy, "reference", "calor", "CsvRow.calr")));
     }
 
     private static void CopyDirectory(string source, string target)
