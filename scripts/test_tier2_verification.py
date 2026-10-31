@@ -185,6 +185,117 @@ class ScratchDeclarationControls(unittest.TestCase):
         self.assertNotEqual(first, other["f_000000000001"])
 
 
+class CurrentInputControls(unittest.TestCase):
+    def setUp(self):
+        self.registry = "current/inputs.json"
+        self.original = "fx/original.calr"
+        self.mirror = "current/" + self.original
+        self.repo = FakeRepo(self, {
+            self.original: "FAIL:Calor0100:historical source",
+            self.mirror: "current source",
+            "fx/direct.calr": "fine",
+            self.registry: json.dumps({"originalPaths": [self.original]}),
+        })
+
+    def check(self, groups):
+        return fcc.check(self.repo.root, {
+            "schemaVersion": 1, "currentInputs": self.registry, "groups": groups,
+        }, ["fx", "current"], checkout_compiler.tracked_calr(
+            self.repo.root, ["fx", "current"]), self.repo.cmd, 2, 20)
+
+    def test_explicit_resolution_keeps_subjects_paths_and_frozen_bytes(self):
+        before = (self.repo.root / self.original).read_bytes()
+        report = self.check([group("original", [self.original]),
+                             group("mirror", [self.mirror]),
+                             group("direct", ["fx/direct.calr"])])
+        self.assertEqual(report["verdict"], "PASS")
+        self.assertEqual(report["trackedFixtures"], 3)
+        self.assertEqual(report["counts"]["passed"], 3)
+        rows = {r["group"]: r for r in report["rows"]}
+        self.assertEqual(rows["original"]["files"], [self.original])
+        self.assertEqual(rows["original"]["currentFiles"], [self.mirror])
+        self.assertEqual(rows["mirror"]["currentFiles"], [self.mirror])
+        self.assertEqual(rows["direct"]["currentFiles"], ["fx/direct.calr"])
+        self.assertEqual((self.repo.root / self.original).read_bytes(), before)
+
+    def test_mirror_registration_and_original_expectation_are_not_waived(self):
+        groups = [group("original", [self.original], "known-failure",
+                        errors=["original.calr|Calor0100|-|historical source"]),
+                  group("direct", ["fx/direct.calr"])]
+        report = self.check(groups)
+        self.assertEqual(report["verdict"], "FAIL")
+        self.assertEqual(statuses(report)[self.original], "unexpected-pass")
+        self.assertEqual(statuses(report)[self.mirror], "unclassified")
+
+    def test_resolution_preserves_multifile_group_and_options(self):
+        report = self.check([group("pair", [self.original, "fx/direct.calr"],
+                                   mode="together", options=["--no-enforce-effects"]),
+                             group("mirror", [self.mirror])])
+        self.assertEqual(report["verdict"], "PASS")
+        row = next(r for r in report["rows"] if r["group"] == "pair")
+        self.assertEqual(row["files"], [self.original, "fx/direct.calr"])
+        self.assertEqual(row["currentFiles"], [self.mirror, "fx/direct.calr"])
+        self.assertEqual(row["options"], ["--no-enforce-effects"])
+
+    def test_missing_registry_or_mirror_fails_without_historical_fallback(self):
+        for missing in (self.registry, self.mirror):
+            with self.subTest(missing=missing):
+                path = self.repo.root / missing
+                saved = path.read_bytes()
+                path.unlink()
+                try:
+                    with mock.patch.object(fcc, "run_unit") as compile_input:
+                        report = self.check([group("original", [self.original])])
+                    compile_input.assert_not_called()
+                    self.assertEqual(report["counts"]["invalid"], 1)
+                    self.assertEqual(report["counts"]["passed"], 0)
+                    self.assertIn("invalid current input registry", report["rows"][0]["detail"])
+                finally:
+                    path.write_bytes(saved)
+
+    def test_duplicate_malformed_chained_and_escaping_mappings_fail_closed(self):
+        documents = [
+            {"originalPaths": [self.original, self.original]},
+            {"originalPaths": []},
+            {"originalPaths": "not a list"},
+            {"originalPaths": ["../outside.calr"]},
+            {"originalPaths": ["/outside.calr"]},
+            {"originalPaths": ["./" + self.original]},
+            {"originalPaths": [True]},
+            {"originalPaths": [self.original, self.mirror]},
+        ]
+        nested = self.repo.root / "current" / self.mirror
+        nested.parent.mkdir(parents=True)
+        nested.write_text("must not follow a chain", encoding="utf-8")
+        for document in documents:
+            with self.subTest(document=document):
+                (self.repo.root / self.registry).write_text(json.dumps(document))
+                report = self.check([group("original", [self.original])])
+                self.assertEqual(report["verdict"], "FAIL")
+                self.assertEqual(report["counts"]["invalid"], 1)
+        (self.repo.root / self.registry).write_text("{ malformed")
+        self.assertEqual(self.check([group("original", [self.original])])[
+            "counts"]["invalid"], 1)
+
+    def test_explicit_invalid_registry_path_does_not_disable_resolution(self):
+        manifest = {"schemaVersion": 1, "groups": [group("original", [self.original])]}
+        for value in (None, False, "", "../outside.json", "/outside.json"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                fcc.current_input_paths(self.repo.root, dict(manifest, currentInputs=value))
+
+    def test_distinct_registrations_cannot_alias_one_physical_mirror(self):
+        alias = "fx/alias.calr"
+        (self.repo.root / alias).write_text("historical alias", encoding="utf-8")
+        (self.repo.root / ("current/" + alias)).symlink_to(
+            Path(self.mirror).name)
+        (self.repo.root / self.registry).write_text(json.dumps({
+            "originalPaths": [self.original, alias],
+        }))
+        report = self.check([group("original", [self.original])])
+        self.assertEqual(report["counts"]["invalid"], 1)
+        self.assertIn("duplicate", report["rows"][0]["detail"])
+
+
 class FixtureCheckControls(unittest.TestCase):
     def setUp(self):
         self.repo = FakeRepo(self, {
@@ -447,6 +558,28 @@ class RepositoryGuards(unittest.TestCase):
         known = {f for g in self.manifest["groups"]
                  if g["expect"] == "known-failure" for f in g["files"]}
         self.assertEqual(known & listed, bulk)
+
+    def test_all_current_copies_have_explicit_consumer_expectations(self):
+        mapping = fcc.current_input_paths(REPO_ROOT, self.manifest)
+        self.assertTrue(mapping)
+        groups = {f: g for g in self.manifest["groups"] for f in g["files"]}
+        self.assertTrue(set(mapping.values()) <= groups.keys())
+        nullable = "tests/TestData/Benchmarks/ErrorDetection/NullDeref_buggy.calr"
+        self.assertEqual(groups[nullable]["expect"], "known-failure")
+        self.assertEqual(groups[mapping[nullable]]["expect"], "compile")
+        for original, current in mapping.items():
+            if original not in groups or original == nullable:
+                continue
+            with self.subTest(original=original):
+                self.assertEqual(groups[original]["expect"], groups[current]["expect"])
+                self.assertEqual(groups[original].get("options", []),
+                                 groups[current].get("options", []))
+        ds15 = [g for g in self.manifest["groups"]
+                if g["id"] == "active:ds15-conversion"]
+        self.assertEqual(len(ds15), 1)
+        self.assertEqual(set(ds15[0]["options"]),
+                         {"--no-enforce-effects", "--permissive-effects"})
+        self.assertEqual(ds15[0]["expect"], "compile")
 
     def test_codegen_only_failures_are_not_incidental_negatives(self):
         for g in self.manifest["groups"]:

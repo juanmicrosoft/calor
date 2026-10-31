@@ -5,6 +5,10 @@ each registered multi-file group) with the checkout-built compiler and
 compare the outcome with its expectation in
 eng/tier2-fixture-expectations.json (#1241). It does not perform an AST round
 trip. Its predecessor, `ast_roundtrip_check.py`, claimed one but did not.
+The current lane resolves original inputs through the manifest's explicit
+ActiveSyntax registry, never by rewriting historical source. Reports retain
+both the registered subject and the actual current input. Tracked mirrors
+also need their own registration; resolution does not remove any subjects.
 
 Every tracked fixture under the selected roots needs exactly one entry:
 `compile` (must compile), `reject` (must fail with exactly the registered
@@ -136,6 +140,50 @@ def scratch_declaration_keys(work: Path, files: list[Path]) -> dict[str, str]:
 
 # ---------------------------------------------------------------- manifest
 
+def current_input_paths(repo_root: Path, manifest: dict) -> dict[str, str]:
+    """Resolve only explicitly registered current copies; missing data fails."""
+    if "currentInputs" not in manifest:
+        return {}
+    registry = manifest["currentInputs"]
+
+    def relative(value):
+        if not isinstance(value, str) or not value \
+                or Path(value).is_absolute() \
+                or Path(value).as_posix() != value \
+                or any(part in ("", ".", "..") for part in value.split("/")):
+            raise ValueError(f"invalid current input path: {value!r}")
+        return value
+
+    registry = relative(registry)
+    path = repo_root / registry
+    if not path.resolve(strict=True).is_relative_to(repo_root.resolve()):
+        raise ValueError(f"current input registry escapes repository: {registry}")
+    document = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(document, dict) \
+            or not isinstance(document.get("originalPaths"), list) \
+            or not document["originalPaths"]:
+        raise ValueError("current input registry needs non-empty originalPaths")
+    resolved: dict[str, str] = {}
+    targets: set[Path] = set()
+    root = repo_root.resolve()
+    for original in document["originalPaths"]:
+        original = relative(original)
+        mirror = (path.parent / original).relative_to(repo_root).as_posix()
+        if original in resolved:
+            raise ValueError(f"duplicate current input: {original}")
+        for candidate in (original, mirror):
+            source = (repo_root / candidate).resolve(strict=True)
+            if not source.is_relative_to(root) or not source.is_file() \
+                    or not candidate.endswith(".calr"):
+                raise ValueError(f"invalid current input: {candidate}")
+        target = (repo_root / mirror).resolve()
+        if target in targets or mirror in document["originalPaths"]:
+            raise ValueError(f"duplicate or chained current mirror: {mirror}")
+        targets.add(target)
+        resolved[original] = mirror
+    return resolved
+
+
 def validate_manifest(manifest: dict) -> list[str]:
     """Structural problems in the expectations file (empty when valid)."""
     errors: list[str] = []
@@ -263,6 +311,12 @@ def check(repo_root: Path, manifest: dict, roots: list[str], discovered: list[st
     """Run the registered expectations for `discovered` and build a report."""
     rows: list[dict] = []
     problems = validate_manifest(manifest)
+    current: dict[str, str] = {}
+    if not problems:
+        try:
+            current = current_input_paths(repo_root, manifest)
+        except (OSError, ValueError, TypeError) as error:
+            problems.append(f"invalid current input registry: {error}")
     if problems:
         rows += [{"group": None, "files": [], "status": "invalid", "detail": p}
                  for p in problems]
@@ -308,11 +362,13 @@ def check(repo_root: Path, manifest: dict, roots: list[str], discovered: list[st
 
     def work(unit):
         g, batch = unit
-        outcome, sig, detail, errs = run_unit(compiler_cmd, repo_root, batch,
+        inputs = [current.get(f, f) for f in batch]
+        outcome, sig, detail, errs = run_unit(compiler_cmd, repo_root, inputs,
                                               g.get("options", []), timeout)
         expected_sig = g.get("errors") or []
         status = classify(g["expect"], expected_sig, outcome, sig)
-        row = {"group": g["id"], "files": batch, "expect": g["expect"],
+        row = {"group": g["id"], "files": batch, "currentFiles": inputs,
+               "expect": g["expect"],
                "options": g.get("options", []), "status": status,
                "signature": sig}
         if g["expect"] != "compile":
@@ -355,6 +411,8 @@ def _report(manifest: dict, roots: list[str], discovered: list[str],
         "schemaVersion": 1,
         "check": "fixture-compile-check",
         "astRoundTrip": False,
+        "inputContract": "current-compiler",
+        "currentInputs": manifest.get("currentInputs"),
         "roots": roots,
         "manifestSha256": hashlib.sha256(
             json.dumps(manifest, sort_keys=True).encode()).hexdigest(),
@@ -374,8 +432,11 @@ def print_summary(report: dict) -> None:
     for s, n in report["counts"].items():
         print(f"  {s:<22} {n}") if n else None
     for r in (r for r in report["rows"] if r["status"] not in SUCCESS):
+        current = (f" current input: {', '.join(r['currentFiles'])}"
+                   if r.get("currentFiles") != r["files"]
+                   and r.get("currentFiles") else "")
         print(f"  [{r['status']}] {', '.join(r['files']) or '-'} "
-              f"{r.get('detail', '')} got {r.get('signature')} expected "
+              f"{r.get('detail', '')}{current} got {r.get('signature')} expected "
               f"{r.get('expectedSignature', [])}")
     print(f"fixture_compile_check: {report['verdict']} "
           f"{'; '.join(report['failReasons'])}")
