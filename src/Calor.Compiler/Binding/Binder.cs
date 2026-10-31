@@ -1,6 +1,7 @@
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -1471,15 +1472,47 @@ public sealed class Binder
                 if (!property.CanRead || property.GetIndexParameters().Length != 0
                     || property.Name is "Id" or "LocalId" or "ToolingId") continue;
                 var type = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
-                if (!type.IsPrimitive && !type.IsEnum && type != typeof(string) && type != typeof(decimal)) continue;
-                text.Append('|').Append(property.Name).Append('=').Append(System.Text.Json.JsonSerializer.Serialize(
-                    Convert.ToString(property.GetValue(node), System.Globalization.CultureInfo.InvariantCulture)));
+                var value = property.GetValue(node);
+                var encoded = value == null ? "null"
+                    : type.IsPrimitive || type.IsEnum || type == typeof(string) || type == typeof(decimal)
+                        ? System.Text.Json.JsonSerializer.Serialize(Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture))
+                        : SnapshotMetadataValue(value);
+                if (encoded == null)
+                {
+                    if (value is AstNode or IEnumerable<AstNode>
+                        || RecursiveAstWalker.GetAllChildProperties(node.GetType()).Contains(property)) continue;
+                    throw new InvalidOperationException($"Unsupported identity snapshot metadata: {node.GetType().Name}.{property.Name} ({type.Name}).");
+                }
+                text.Append('|').Append(property.Name).Append('=').Append(encoded);
             }
             text.AppendLine();
             foreach (var child in RecursiveAstWalker.GetAllChildren(node).Reverse()) pending.Push(child);
         }
         return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text.ToString())));
     }
+
+    private static string? SnapshotMetadataValue(object value) => value switch
+    {
+        AttributeCollection attributes => System.Text.Json.JsonSerializer.Serialize(
+            attributes.All().OrderBy(pair => pair.Key, StringComparer.Ordinal)),
+        IReadOnlyDictionary<string, string> map => System.Text.Json.JsonSerializer.Serialize(
+            map.OrderBy(pair => pair.Key, StringComparer.Ordinal)),
+        IReadOnlyList<string> strings => System.Text.Json.JsonSerializer.Serialize(strings),
+        IReadOnlyList<int> ordinals => System.Text.Json.JsonSerializer.Serialize(ordinals),
+        IReadOnlyList<EffectParameterInfo> parameters => System.Text.Json.JsonSerializer.Serialize(parameters),
+        IReadOnlyList<NamespaceScopeInfo> scopes => System.Text.Json.JsonSerializer.Serialize(
+            scopes.Select(scope => new { scope.Name, scope.FullName, scope.IsFileScoped, scope.Span, scope.Kind })),
+        IReadOnlyList<TextSpan> spans => System.Text.Json.JsonSerializer.Serialize(spans),
+        IReadOnlyList<ObjectInitializerAssignment> initializers => System.Text.Json.JsonSerializer.Serialize(
+            initializers.Select(initializer => initializer.PropertyName)),
+        IReadOnlyList<CalorAttributeArgument> arguments => System.Text.Json.JsonSerializer.Serialize(
+            arguments.Select(argument => new { argument.Name, Value = argument.GetCalorFormattedValue() })),
+        InlineRefinementInfo refinement => System.Text.Json.JsonSerializer.Serialize(refinement.BaseTypeName),
+        TextSpan span => System.Text.Json.JsonSerializer.Serialize(span),
+        DateOnly date => System.Text.Json.JsonSerializer.Serialize(date),
+        DateTime date => System.Text.Json.JsonSerializer.Serialize(date),
+        _ => null
+    };
 
     private static string CallableIdentityKey(
         string name,

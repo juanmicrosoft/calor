@@ -9,6 +9,54 @@ namespace Calor.Compiler.Tests;
 public sealed class TransientSymbolIdentityTests
 {
     [Theory]
+    [InlineData("effects")]
+    [InlineData("effect-variable")]
+    [InlineData("effect-order")]
+    [InlineData("attributes")]
+    public void SameWidthNonScalarSemanticEditsInvalidateSnapshotHandles(string edit)
+    {
+        var source = """
+            §M{Demo}
+              §F{Run:pub}<eff e, eff f> (i32:value) -> i32
+                §E{cw,e,f}
+                §B{offset:i32} 1
+                §B{callback:System.Func<i32,i32>} §LAM{x:i32} (+ x value)
+                §R value
+            """;
+        var changed = edit switch
+        {
+            "effects" => source.Replace("cw", "cr"),
+            "effect-variable" => source.Replace("eff e", "eff g").Replace("cw,e,f", "cw,g,f"),
+            "effect-order" => source.Replace("cw,e,f", "cw,f,e"),
+            _ => source
+        };
+        BoundModule Read(string text, string attribute)
+        {
+            var diagnostics = new DiagnosticBag();
+            var module = new Parser(new Lexer(text, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+            if (edit == "attributes") module.Functions.Single().Attributes.Add("custom", attribute);
+            return new Binder(diagnostics, "memory:transient-tests").Bind(module);
+        }
+
+        var first = Read(source, "first");
+        var second = Read(changed, "other");
+        var old = first.SymbolsById.Keys.Where(id => id.Value.Contains("snapshot")).ToArray();
+        Assert.NotEmpty(old);
+        Assert.Contains(old, id => id.Value.Contains("lambda"));
+        Assert.All(old, id => Assert.False(second.SymbolsById.ContainsKey(id)));
+    }
+
+    [Fact]
+    public void UnorderedEffectMapInsertionOrderDoesNotChangeSnapshotHandles()
+    {
+        const string source = "§M{Demo}\n  §F{Run:pub} () -> i32\n    §E{cw,mut:col}\n    §B{value:i32} 1\n    §R value\n";
+        var first = Bind(source);
+        var second = Bind(source.Replace("cw,mut:col", "mut:col,cw"));
+        Assert.Equal(first.SymbolsById.Keys.OrderBy(id => id.Value), second.SymbolsById.Keys.OrderBy(id => id.Value));
+    }
+
+    [Theory]
     [InlineData("§CTOR{pub} ()", "§B{value:i32} 1", "§B{value:i32} 2", BoundMemberKind.Constructor)]
     [InlineData("§OP{+:pub} (Box:a, Box:b) -> Box", "§R a", "§R b", BoundMemberKind.OperatorOverload)]
     public void AmbiguousConstructorAndOperatorSnapshotsNeverRedirectStaleHandles(
