@@ -1110,8 +1110,8 @@ public class Calor0425CorpusLedgerTests
         // the effect the caller declares, so a pass that reads the manifest is
         // silent and a pass that does not is not.
         const string source = """
-            §M{m001:ScratchCwd}
-              §F{f001:Main:pub} () -> void
+            §M{ScratchCwd}
+              §F{Main:pub} () -> void
                 §E{cw}
                 §C{K1ScratchWidget.Ping} §/C
             """;

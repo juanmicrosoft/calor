@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using Calor.Compiler.CodeGen;
+using Calor.Compiler.Commands;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Formatting;
 using Calor.Compiler.Parsing;
@@ -84,8 +85,8 @@ public sealed class LosslessFormattingTests : IDisposable
         Assert.False(result.UsedConservativeFallback, result.ConservativeFallbackReason);
         foreach (var text in new[]
                  {
-                     "m001", "Test001", "c001", "Type001", "field001",
-                     "ctor001", "mt001", "method001", "arg001", "f001",
+                     "Test001", "Type001", "field001",
+                     "ctor001", "method001", "arg001",
                      "call001", "user001", "user001.method001",
                      "var raw001 = \"user001 Type001.field001.method001\";"
                  })
@@ -780,7 +781,19 @@ public sealed class LosslessFormattingTests : IDisposable
     }
 
     [Fact]
-    public void CheckedInCalorCorpus_MatchesBaselineAndExercisesSafeTransformations()
+    [Trait("Category", "HistoricalReplay")]
+    public async Task CheckedInCalorCorpus_MatchesBaselineAndExercisesSafeTransformations()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var result = await ExecutionWorkspace.CaptureProcessAsync(
+            "python3", [Path.Combine(root, "scripts", "registered_ledger_historical_replay.py"), "formatter"],
+            root, TimeSpan.FromMinutes(20), CancellationToken.None);
+        Assert.True(result.ExitCode == 0 && !result.TimedOut,
+            $"Historical formatter replay failed (exit {result.ExitCode}).\n{result.Output}");
+    }
+
+    [Fact]
+    public void CurrentCompiler_CheckedInCalorCorpus_MatchesExpectationsAndExercisesSafeTransformations()
     {
         var repoRoot = CliTestHarness.FindRepoRoot();
         var files = GetTrackedCalorFiles(repoRoot);
@@ -789,19 +802,11 @@ public sealed class LosslessFormattingTests : IDisposable
             "tests",
             "TestData",
             "Formatting",
-            "formatter-corpus-baseline.json")));
+            "formatter-current-expectations.json")));
         var baseline = baselineDocument.RootElement;
         Assert.Equal(
             baseline.GetProperty("trackedFileCount").GetInt32(),
             files.Length);
-
-        var expectedParseFailures = ReadPathSet(
-            baseline.GetProperty("parseFailurePaths"));
-        var fallbacks = baseline.GetProperty("conservativeFallbacks");
-        var expectedSemanticFallbacks = ReadPathSet(
-            fallbacks.GetProperty("semanticErrors"));
-        var expectedGeneratedFallbacks = ReadPathSet(
-            fallbacks.GetProperty("generatedCSharpErrors"));
 
         var formatter = new CalorFormatter();
         var actualParseFailures = new HashSet<string>(StringComparer.Ordinal);
@@ -888,19 +893,67 @@ public sealed class LosslessFormattingTests : IDisposable
             successfulTransformations++;
         }
 
-        AssertMatchingPathSets("parse failures", expectedParseFailures, actualParseFailures);
+        AssertCurrentCorpusExpectations(baseline, files.Length, successfulTransformations,
+            actualParseFailures, actualSemanticFallbacks, actualGeneratedFallbacks);
+        Assert.Equal(successfulTransformations, commentProbes);
+    }
+
+    private static void AssertCurrentCorpusExpectations(
+        JsonElement baseline, int fileCount, int successfulTransformations,
+        HashSet<string> actualParseFailures, HashSet<string> actualSemanticFallbacks,
+        HashSet<string> actualGeneratedFallbacks)
+    {
+        Assert.Equal(1, baseline.GetProperty("schemaVersion").GetInt32());
+        Assert.False(baseline.TryGetProperty("measuredCommit", out _));
+        Assert.Equal(baseline.GetProperty("trackedFileCount").GetInt32(), fileCount);
+        AssertMatchingPathSets("parse failures",
+            ReadPathSet(baseline.GetProperty("parseFailurePaths")), actualParseFailures);
+        var fallbacks = baseline.GetProperty("conservativeFallbacks");
         AssertMatchingPathSets(
             "semantic fallbacks",
-            expectedSemanticFallbacks,
+            ReadPathSet(fallbacks.GetProperty("semanticErrors")),
             actualSemanticFallbacks);
         AssertMatchingPathSets(
             "generated C# fallbacks",
-            expectedGeneratedFallbacks,
+            ReadPathSet(fallbacks.GetProperty("generatedCSharpErrors")),
             actualGeneratedFallbacks);
         Assert.Equal(
             baseline.GetProperty("successfulTransformationCount").GetInt32(),
             successfulTransformations);
-        Assert.Equal(successfulTransformations, commentProbes);
+    }
+
+    [Theory]
+    [InlineData("trackedFileCount")]
+    [InlineData("successfulTransformationCount")]
+    [InlineData("parseFailurePaths")]
+    [InlineData("semanticErrors")]
+    [InlineData("generatedCSharpErrors")]
+    public void CurrentCorpusExpectations_RejectCountOrClassificationTampering(string field)
+    {
+        var path = Path.Combine(CliTestHarness.FindRepoRoot(), "tests", "TestData",
+            "Formatting", "formatter-current-expectations.json");
+        var original = JsonSerializer.Deserialize<JsonElement>(File.ReadAllText(path));
+        var parseFailures = ReadPathSet(original.GetProperty("parseFailurePaths"));
+        var fallbacks = original.GetProperty("conservativeFallbacks");
+        var semanticErrors = ReadPathSet(fallbacks.GetProperty("semanticErrors"));
+        var generatedErrors = ReadPathSet(fallbacks.GetProperty("generatedCSharpErrors"));
+        var fileCount = original.GetProperty("trackedFileCount").GetInt32();
+        var successes = original.GetProperty("successfulTransformationCount").GetInt32();
+        AssertCurrentCorpusExpectations(original, fileCount, successes,
+            parseFailures, semanticErrors, generatedErrors);
+        var changed = System.Text.Json.Nodes.JsonNode.Parse(original.GetRawText())!;
+        if (field is "trackedFileCount" or "successfulTransformationCount")
+            changed[field] = changed[field]!.GetValue<int>() + 1;
+        else
+        {
+            var array = field == "parseFailurePaths"
+                ? changed[field]!.AsArray()
+                : changed["conservativeFallbacks"]![field]!.AsArray();
+            array.Add("unexpected-current-subject.calr");
+        }
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => AssertCurrentCorpusExpectations(
+            JsonSerializer.Deserialize<JsonElement>(changed.ToJsonString()), fileCount, successes,
+            parseFailures, semanticErrors, generatedErrors));
     }
 
     private static void AssertMatchingPathSets(

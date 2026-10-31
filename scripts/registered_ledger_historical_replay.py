@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replay the two registered effect ledgers with their original producer trees."""
+"""Replay registered regression artifacts with their original producer trees."""
 
 from __future__ import annotations
 
@@ -19,6 +19,18 @@ from ppe1_historical_replay import ROOT, git, run_dotnet
 
 
 REPLAYS = {
+    "formatter": (
+        "ab53adc3737bab92ff8637cb32235629c64ece9d",
+        "ab53adc3737bab92ff8637cb32235629c64ece9d",
+        "tests/TestData/Formatting/formatter-corpus-baseline.json",
+        "Calor.Compiler.Tests.LosslessFormattingTests.CheckedInCalorCorpus_MatchesBaselineAndExercisesSafeTransformations",
+    ),
+    "demand": (
+        "76270627daf26d4de30c1a98e078b2e2bd53fc8e",
+        "01158abf6686378fd75f03e4778406be87ebe437",
+        "bench/phase0-agent-native/higher-order-demand-ledger.json",
+        "Calor.Compiler.Tests.HigherOrderDemandLedgerTests.DA_CalorNative_MatchesLedgerExactly",
+    ),
     "key": (
         "76270627daf26d4de30c1a98e078b2e2bd53fc8e",
         "01158abf6686378fd75f03e4778406be87ebe437",
@@ -33,6 +45,7 @@ REPLAYS = {
     ),
 }
 REGENERATION_FLAGS = (
+    "CALOR_REGENERATE_HIGHER_ORDER_DEMAND_LEDGER",
     "CALOR_REGENERATE_EFFECT_RESOLVER_KEY_LEDGER",
     "CALOR_REGENERATE_CALOR0425_LEDGER",
     "CALOR_REGENERATE_PPE1_LEDGER",
@@ -60,6 +73,19 @@ def extract_archive(archive: Path, destination: Path) -> None:
     destination.mkdir(parents=True, exist_ok=True)
     with tarfile.open(archive) as tree:
         tree.extractall(destination, filter="data")
+
+def index_original_tree(producer: str, source: Path) -> None:
+    # The original formatter test uses git ls-files. Its isolated index contains
+    # exactly the producer's paths, never build outputs or today's active copies.
+    subprocess.run(["git", "init", "--quiet", str(source)], check=True, timeout=60)
+    subprocess.run(
+        ["git", "-C", str(source), "update-index", "-z", "--index-info"],
+        input=git("ls-tree", "-r", "-z", producer), check=True, timeout=60,
+    )
+    expected = git("ls-tree", "-r", "--name-only", "-z", producer)
+    actual = subprocess.check_output(["git", "-C", str(source), "ls-files", "-z"], timeout=60)
+    if actual != expected:
+        raise ValueError("isolated tracked-file index differs from original producer tree")
 
 
 def archive_submodules(producer: str, source: Path, scratch: Path) -> None:
@@ -103,10 +129,11 @@ def replay(name: str) -> None:
     final_ledger = git("show", f"{landing}:{ledger_path}")
     if (ROOT / ledger_path).read_bytes() != final_ledger:
         raise ValueError(f"{ledger_path}: immutable final ledger differs from original landing {landing}")
-    recorded = json.loads(final_ledger)
-    identity_field = "measuredCommit" if name == "key" else "MeasuredCommit"
-    if recorded[identity_field] != producer:
-        raise ValueError("recorded producer differs from the original compiler selected for replay")
+    if name != "formatter":
+        recorded = json.loads(final_ledger)
+        identity_field = "MeasuredCommit" if name == "corpus" else "measuredCommit"
+        if recorded[identity_field] != producer:
+            raise ValueError("recorded producer differs from the original compiler selected for replay")
     verifier = ROOT / "scripts/verify-z3-assets.py"
     subprocess.run([sys.executable, str(verifier)], check=True, timeout=60)
     with tempfile.TemporaryDirectory(prefix=f"calor-{name}-history-") as temporary:
@@ -115,6 +142,8 @@ def replay(name: str) -> None:
         git("archive", "--format=tar", f"--output={archive}", producer)
         source = scratch / "source"
         extract_archive(archive, source)
+        if name == "formatter":
+            index_original_tree(producer, source)
         archive_submodules(producer, source, scratch)
         for manifest in (
             ".github/z3-binaries-4.15.7.sha256",

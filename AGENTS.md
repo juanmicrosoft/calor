@@ -79,16 +79,18 @@ this historical category, so it is **not** a full compiler-suite result.
 Current-compiler semantic replay uses separate active-syntax fixtures and cannot
 replace this historical check. Neither command reruns paid epochs or token collection.
 
-**Historical registered key/corpus ledgers and current regressions:**
+**Historical effect/demand ledgers, formatter baseline and current regressions:**
 
 ```bash
 python3 scripts/test_registered_ledger_historical_replay.py
 python3 scripts/registered_ledger_historical_replay.py key
 python3 scripts/registered_ledger_historical_replay.py corpus
-dotnet test tests/Calor.Compiler.Tests/ --filter "FullyQualifiedName~EffectResolverKeyLedgerTests|FullyQualifiedName~Calor0425CorpusLedgerTests"
+python3 scripts/registered_ledger_historical_replay.py demand
+python3 scripts/registered_ledger_historical_replay.py formatter
+dotnet test tests/Calor.Compiler.Tests/ --filter "FullyQualifiedName~EffectResolverKeyLedgerTests|FullyQualifiedName~Calor0425CorpusLedgerTests|FullyQualifiedName~HigherOrderDemandLedgerTests|FullyQualifiedName~LosslessFormattingTests"
 ```
 
-The two historical checks have the same prerequisites and process deadline as
+The four historical checks have the same prerequisites and process deadline as
 PP-E1, plus initialized corpus submodule object stores containing their recorded
 commits. They never fetch missing history. Each runner archives its recorded
 compiler and each recorded submodule commit from Git objects, not from current
@@ -99,12 +101,26 @@ attempted regeneration and skipped/empty results fail.
 
 The original test names remain `Category=HistoricalReplay` obligations.
 `CurrentCompiler_*` tests compare today's compiler against ordinary fixtures in
-`tests/TestData/Effects/*-current-expectations.json`; these have no historical
+`tests/TestData/Effects/*-current-expectations.json` and
+`tests/TestData/Formatting/formatter-current-expectations.json`; these have no historical
 `measuredCommit` or provenance seals. Per-subject counts, denominators, named
 exclusions and binding causes are exact, and the original floors still apply.
 The current corpus test executes all 364 CLI module cross-checks on every run
 and compares every CLI field; it does not reuse recorded CLI results.
 Historical shape and gate tests continue to read the original ledgers.
+The demand D-A replay retains the original compiler's exact first-error codes.
+Its separate current fixture pins all 952 logical subjects, the same 52 excluded
+files and their current first errors. Source-ID rejection now precedes the older
+closer/effect errors in 31 intentionally obsolete MCP inputs. Active mirrors do
+not add subjects; no historical ledger is regenerated.
+The formatter replay uses the compiler and active inputs from the baseline's
+original producing commit. Its isolated Git index lists that commit's exact
+tracked paths, not build outputs or today's mirrors. The separate current test
+still checks every transformation's token stream, generated C#, public API,
+comments and idempotence. Its 39 additional successful transformations are 35
+latency L3 modules, three benchmarks using a `base` parameter, and the verbatim
+identifier snapshot. Reserved identifiers now emit with `@` escaping; the
+original 704-success baseline stays unchanged.
 
 **Full-corpus lane** (adds ~500 MB and a few minutes; needed to unskip
 `BinderIncompleteRatchetTests`):

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed controls for registered key and corpus replay."""
+"""Fail-closed controls for registered effect/demand ledger replay."""
 
 import json
 import os
@@ -39,10 +39,10 @@ class RegisteredReplayTests(unittest.TestCase):
 
     def test_changed_final_ledger_or_repointed_producer_fails_before_build(self):
         for name, (producer, _, ledger, _) in replay.REPLAYS.items():
-            for repoint in (False, True):
+            for repoint in ((False,) if name == "formatter" else (False, True)):
                 with self.subTest(name=name, repoint=repoint), tempfile.TemporaryDirectory() as temporary:
                     root = Path(temporary)
-                    field = "measuredCommit" if name == "key" else "MeasuredCommit"
+                    field = "MeasuredCommit" if name == "corpus" else "measuredCommit"
                     original = json.dumps({field: "0" * 40 if repoint else producer}).encode()
                     path = root / ledger
                     path.parent.mkdir(parents=True)
@@ -54,6 +54,31 @@ class RegisteredReplayTests(unittest.TestCase):
                                     with self.assertRaisesRegex(ValueError, "producer differs|immutable final ledger"):
                                         replay.replay(name)
                                     run.assert_not_called()
+
+    def test_isolated_index_uses_original_paths_not_current_files(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            original = root / "original"
+            original.mkdir()
+            subprocess.run(["git", "init", "--quiet", str(original)], check=True)
+            (original / "frozen.calr").write_text("original\n")
+            subprocess.run(["git", "-C", str(original), "add", "frozen.calr"], check=True)
+            subprocess.run(
+                ["git", "-C", str(original), "-c", "user.name=Replay fixture",
+                 "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false",
+                 "commit", "--quiet", "-m", "Original test fixture"], check=True,
+            )
+            commit = subprocess.check_output(["git", "-C", str(original), "rev-parse", "HEAD"]).decode().strip()
+            source = root / "source"
+            source.mkdir()
+            (source / "untracked-current.calr").write_text("not an original subject\n")
+            def git(*args):
+                return subprocess.check_output(["git", "-C", str(original), *args])
+            with patch.object(replay, "git", side_effect=git):
+                replay.index_original_tree(commit, source)
+            tracked = subprocess.check_output(["git", "-C", str(source), "ls-files"]).decode()
+            self.assertEqual("frozen.calr\n", tracked)
+            self.assertFalse((source / "frozen.calr").exists())
 
     def test_only_one_executed_pass_is_accepted(self):
         with tempfile.TemporaryDirectory() as temporary:
