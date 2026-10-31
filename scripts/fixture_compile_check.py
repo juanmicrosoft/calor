@@ -68,10 +68,13 @@ def errors_of(diagnostics: list[dict]) -> list[dict]:
             if str(d.get("severity", "")).lower() == "error"]
 
 
-def signature(diagnostics: list[dict]) -> list[str]:
+def signature(diagnostics: list[dict],
+              declaration_keys: dict[str, str] | None = None) -> list[str]:
     """One `file|code|declaration|message` entry per error, sorted, with
     duplicates kept, so an error with another location, declaration, or
-    cause, or one more error, changes the signature. `file` is the base
+    cause, or one more error, changes the signature. Fresh scratch-sidecar
+    IDs resolve to exact file/kind/container/name/signature descriptors.
+    `file` is the base
     name; Calor1002 carries its Roslyn code; whitespace is collapsed.
     """
     sig = []
@@ -82,8 +85,53 @@ def signature(diagnostics: list[dict]) -> list[str]:
             code = f"Calor1002:{m.group(1)}" if m else "Calor1002"
         where = Path(str((d.get("location") or {}).get("file") or "-")).name
         msg = " ".join(str(d.get("message", "")).split())
-        sig.append(f"{where}|{code}|{d.get('declarationId') or '-'}|{msg}")
+        declaration = d.get("declarationId") or "-"
+        if declaration != "-" and declaration_keys is not None:
+            if declaration not in declaration_keys:
+                raise ValueError(f"unresolved diagnostic declaration {declaration}")
+            declaration = declaration_keys[declaration]
+        sig.append(f"{where}|{code}|{declaration}|{msg}")
     return sorted(sig)
+
+
+def scratch_declaration_keys(work: Path, files: list[Path]) -> dict[str, str]:
+    """Keep semantic identity exact without comparing freshly minted IDs."""
+    keys: dict[str, str] = {}
+    inputs = (work / "in").resolve()
+    stores: set[Path] = set()
+    for source in files:
+        parent = source.resolve(strict=True).parent
+        if not parent.is_relative_to(inputs):
+            raise ValueError(f"scratch input escapes its root: {source}")
+        while parent.is_relative_to(inputs):
+            sidecar = parent / ".calor" / "ids.json"
+            if sidecar.is_file():
+                stores.add(sidecar)
+                break
+            parent = parent.parent
+    for path in sorted(stores):
+        state = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(state, dict) or type(state.get("Version")) is not int \
+                or state["Version"] != 1 \
+                or not isinstance(state.get("Declarations"), list):
+            raise ValueError(f"invalid scratch identity storage: {path}")
+        for declaration in state["Declarations"]:
+            if not isinstance(declaration, dict) \
+                    or not all(isinstance(declaration.get(field), str)
+                               for field in ("Id", "File", "Container", "Name", "Signature")) \
+                    or not declaration["Id"] or not declaration["Name"] \
+                    or type(declaration.get("Kind")) is not int:
+                raise ValueError(f"invalid scratch declaration: {path}")
+            identity = declaration["Id"]
+            if identity in keys:
+                raise ValueError(f"duplicate scratch declaration {identity}")
+            source = (path.parent.parent / declaration["File"]).resolve(strict=True)
+            relative = source.relative_to(inputs).as_posix()
+            keys[identity] = json.dumps([
+                relative, declaration["Kind"], declaration["Container"],
+                declaration["Name"], declaration["Signature"],
+            ], separators=(",", ":"))
+    return keys
 
 
 # ---------------------------------------------------------------- manifest
@@ -178,6 +226,11 @@ def run_unit(compiler_cmd: list[str], repo_root: Path, files: list[str],
         except subprocess.TimeoutExpired:
             return "timeout", [], f"exceeded {timeout:.0f}s", []
         outcome, sig, detail, errs = _parse_result(cp.returncode, cp.stdout)
+        if outcome is not None:
+            try:
+                sig = signature(errs, scratch_declaration_keys(work, inputs))
+            except (OSError, ValueError, TypeError) as error:
+                return None, [], f"invalid scratch declaration identity: {error}", errs
         if outcome == "ok":
             outputs = ([work / "out.g.cs"] if len(inputs) == 1
                        else [p.with_suffix(".g.cs") for p in inputs])
@@ -337,16 +390,17 @@ def self_test() -> int:
     except checkout_compiler.CompilerResolutionError as e:
         print(f"fixture_compile_check self-test: {e}", file=sys.stderr)
         return 2
-    good = "§M{m001:Pos}\n  §F{f001:Echo:pub} (i32:x) -> i32\n    §R x\n"
-    broken = "§M{m001:Neg}\n  §Q (unterminated\n"
-    effect = "§M{m001:Eff}\n  §F{f001:Hi:pub} () -> void\n    §P \"hi\"\n"
+    good = "§M{Pos}\n  §F{Echo:pub} (i32:x) -> i32\n    §R x\n"
+    broken = "§M{Neg}\n  §Q (unterminated\n"
+    effect = "§M{Eff}\n  §F{Hi:pub} () -> void\n    §P \"hi\"\n"
     cases = [  # (source, expect, errors, wanted status)
         (good, "compile", [], "passed"),
         (broken, "compile", [], "failed"),
-        (good, "reject", ["Calor0410|f001|Function 'Hi' uses effect 'cw' but does not declare it"], "unexpected-pass"),
-        (effect, "reject", ["Calor0410|f001|Function 'Hi' uses effect 'cw' but does not declare it"], "expected-negative"),
-        (effect, "reject", ["Calor0410|f001|Function 'Hi' uses effect 'db' but does not declare it"], "failed"),
-        (effect, "known-failure", ["Calor0410|f001|Function 'Hi' uses effect 'cw' but does not declare it"], "known-failure"),
+        (good, "reject", ["Calor0410|<Hi>|Function 'Hi' uses effect 'cw' but does not declare it"], "unexpected-pass"),
+        (effect, "reject", ["Calor0410|<Hi>|Function 'Hi' uses effect 'cw' but does not declare it"], "expected-negative"),
+        (effect, "reject", ["Calor0410|<Hi>|Function 'Hi' uses effect 'db' but does not declare it"], "failed"),
+        (effect, "known-failure", ["Calor0410|<Hi>|Function 'Hi' uses effect 'cw' but does not declare it"], "known-failure"),
+        (effect, "reject", ["Calor0410|<Other>|Function 'Hi' uses effect 'cw' but does not declare it"], "failed"),
     ]
     failures = 0
     with tempfile.TemporaryDirectory() as td:
@@ -356,7 +410,15 @@ def self_test() -> int:
             (root / f"fx/c{i}.calr").write_text(src, encoding="utf-8")
             g = {"id": f"c{i}", "files": [f"fx/c{i}.calr"], "mode": "each",
                  "expect": expect, "evidence": "self-test"}
-            g.update({"errors": [f"c{i}.calr|{e}" for e in errs]} if errs
+            def control_identity(name: str) -> str:
+                return json.dumps([
+                    f"c{i}.calr", 1, "Eff", name,
+                    '{"arity":0,"parameters":[],"output":"void"}',
+                ], separators=(",", ":"))
+
+            g.update({"errors": [
+                f"c{i}.calr|{e.replace('<Hi>', control_identity('Hi')).replace('<Other>', control_identity('Other'))}"
+                for e in errs]} if errs
                      else {})
             g.update({"defect": "self-test"} if expect == "known-failure"
                      else {"negativeKind": "designed"} if expect == "reject"

@@ -122,6 +122,69 @@ def statuses(report: dict) -> dict:
     return {f: r["status"] for r in report["rows"] for f in r["files"]}
 
 
+class ScratchDeclarationControls(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.source = self.root / "in" / "fixture.calr"
+        self.source.parent.mkdir()
+        self.source.write_text("controlled fixture", encoding="utf-8")
+        self.sidecar = self.source.parent / ".calor" / "ids.json"
+        self.sidecar.parent.mkdir()
+        self.declaration = {
+            "Id": "f_000000000001", "File": "fixture.calr", "Kind": 1,
+            "Container": "Demo", "Name": "Run",
+            "Signature": '{"arity":0,"parameters":[],"output":"void"}',
+        }
+
+    def keys(self, *declarations):
+        self.sidecar.write_text(json.dumps({
+            "Version": 1, "Files": ["fixture.calr"],
+            "Declarations": list(declarations),
+        }), encoding="utf-8")
+        return fcc.scratch_declaration_keys(self.root, [self.source])
+
+    def test_fresh_ids_keep_exact_semantic_identity(self):
+        first = self.keys(self.declaration)["f_000000000001"]
+        second = self.keys(dict(self.declaration, Id="f_000000000002"))
+        self.assertEqual(first, second["f_000000000002"])
+        for field, value in (("Kind", 2), ("Container", "Other"),
+                             ("Name", "Other"), ("Signature", "different")):
+            changed = self.keys(dict(self.declaration, **{field: value}))
+            self.assertNotEqual(first, changed["f_000000000001"])
+
+    def test_duplicate_or_invalid_storage_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            self.keys(self.declaration, self.declaration)
+        self.sidecar.write_text("{ malformed", encoding="utf-8")
+        with self.assertRaises(ValueError):
+            fcc.scratch_declaration_keys(self.root, [self.source])
+        with self.assertRaisesRegex(ValueError, "invalid"):
+            self.keys(dict(self.declaration, Kind=True))
+
+    def test_missing_diagnostic_identity_is_not_normalized_away(self):
+        diagnostic = {"code": "Calor0410", "severity": "error",
+                      "message": "controlled", "declarationId": "f_missing"}
+        with self.assertRaisesRegex(ValueError, "unresolved"):
+            fcc.signature([diagnostic], self.keys(self.declaration))
+        result = subprocess.CompletedProcess(
+            [], 1, json.dumps({"diagnostics": [diagnostic]}), "")
+        with mock.patch.object(fcc.subprocess, "run", return_value=result):
+            outcome, _, detail, _ = fcc.run_unit(
+                ["unused"], self.root, ["in/fixture.calr"], [], 1)
+        self.assertIsNone(outcome)
+        self.assertIn("invalid scratch declaration identity", detail)
+
+    def test_distinct_input_paths_keep_distinct_identity(self):
+        first = self.keys(self.declaration)["f_000000000001"]
+        nested = self.source.parent / "nested" / self.source.name
+        nested.parent.mkdir()
+        nested.write_text("controlled fixture", encoding="utf-8")
+        other = self.keys(dict(self.declaration, File="nested/fixture.calr"))
+        self.assertNotEqual(first, other["f_000000000001"])
+
+
 class FixtureCheckControls(unittest.TestCase):
     def setUp(self):
         self.repo = FakeRepo(self, {
