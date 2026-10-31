@@ -814,7 +814,7 @@ public static class FeatureSupport
         {
             Name = "local-function",
             Support = SupportLevel.Partial,
-            Description = "A non-capturing, non-generic local function with direct calls after its declaration converts at the same point to a typed §B lambda binding. Forward/recursive calls, method-group uses, captures, named local-call arguments, unused locals, attributes, async/unsafe/extern, yield, nested locals, ref-like signatures and ref/out/in/params/default parameters preserve the containing member as §CSHARP interop",
+            Description = "A non-capturing, non-generic local function with direct calls after its declaration converts at the same point to a typed §B lambda binding. Direct self-recursion additionally requires a pure body proved over resolved built-in scalar operations; its lambda captures only an initialized internal self binding. Forward/mutual calls, method-group uses, captures, explicit checked/unchecked regions in recursive bodies, named local-call arguments, unused locals, attributes, async/unsafe/extern, yield, nested locals, ref-like signatures and ref/out/in/params/default parameters preserve the containing member as §CSHARP interop",
             Workaround = "Use an existing lambda binding with calls after its declaration, or keep the original member as §CSHARP interop"
         },
 

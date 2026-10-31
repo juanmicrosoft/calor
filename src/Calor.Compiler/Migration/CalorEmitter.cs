@@ -1824,18 +1824,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     /// <summary>
-    /// Emits a hoisted block-bodied lambda as a binding in explicit block form:
-    /// <c>§B{...} §LAM{header}</c> on the opener line, body statements indented one
-    /// level under it, and <c>§/LAM</c> at the binding's own column. This mirrors
+    /// Emits a block-bodied lambda after a binding or assignment header:
+    /// <c>§LAM{header}</c> on the opener line, body statements indented one
+    /// level under it, and <c>§/LAM</c> at the opener's own column. This mirrors
     /// the match-expression binding path and, crucially, routes body statements
     /// through the normal statement visitor so their indentation tracks the current
     /// scope instead of a fixed column (the #705 defect).
     /// </summary>
-    private void EmitBlockLambdaAsBindingInitializer(string bindHeader, LambdaExpressionNode lambda)
+    private void EmitBlockLambdaWithHeader(string statementHeader, LambdaExpressionNode lambda)
     {
         var header = BuildLambdaHeader(lambda);
 
-        AppendLine($"{bindHeader} §LAM{{{header}}}{(lambda.Effects != null ? " " + FormatEffectsTag(lambda.Effects) : "")}");
+        AppendLine($"{statementHeader} §LAM{{{header}}}{(lambda.Effects != null ? " " + FormatEffectsTag(lambda.Effects) : "")}");
         Indent();
         // Review m12: this is a lambda BODY like any other, so it bumps the depth
         // that stops a nested block lambda being hoisted out of scope. Benign
@@ -2097,7 +2097,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Initializer is LambdaExpressionNode { IsExpressionLambda: false, StatementBody.Count: > 0 } blockLambda
             && !(blockLambda.StatementBody.Count <= 2 && !blockLambda.StatementBody.Any(s => s is FallbackCommentNode or RawCSharpNode)))
         {
-            EmitBlockLambdaAsBindingInitializer(bindHeader, blockLambda);
+            EmitBlockLambdaWithHeader(bindHeader, blockLambda);
             return "";
         }
 
@@ -2478,6 +2478,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // a naked zero-arg §C{...} would absorb value as its inline arg. Defensive
         // wrap; cheap and aligned with the inline-sibling discipline used elsewhere.
         var target = AcceptInInlineSibling(node.Target);
+
+        if (node.Value is LambdaExpressionNode { IsExpressionLambda: false, StatementBody.Count: > 0 } lambda)
+        {
+            EmitBlockLambdaWithHeader($"§ASSIGN {target}", lambda);
+            return "";
+        }
 
         // Collection/array creation on the RHS of an ASSIGNMENT is a reassignment, not a
         // declaration — but the *-WithName helpers emit a creation *block* (§ARR{arr:…},

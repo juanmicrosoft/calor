@@ -4596,9 +4596,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     }
 
     /// <summary>The local-function slice representable as a same-point lambda binding.
-    /// Forward, recursive and method-group uses retain their original C# declaration.</summary>
+    /// Forward, mutual-recursive and method-group uses retain their original C# declaration.</summary>
     private bool IsNativeLocalFunction(LocalFunctionStatementSyntax local)
+        => IsNativeLocalFunction(local, out _);
+
+    private bool IsNativeLocalFunction(LocalFunctionStatementSyntax local, out bool selfRecursive)
     {
+        selfRecursive = false;
         if (local.Parent is not BlockSyntax { Parent: MethodDeclarationSyntax }
             || local.AttributeLists.Count > 0
             || local.TypeParameterList != null
@@ -4617,14 +4621,85 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             || !CanUseDelegateType(symbol.ReturnType)
             || symbol.Parameters.Any(parameter => !CanUseDelegateType(parameter.Type)))
             return false;
-        return !CapturesEnclosingState(local) && HasOnlySamePointCalls(local, symbol);
+        if (!HasOnlySamePointCalls(local, symbol, out selfRecursive)
+            || CapturesEnclosingState(local, checkStatic: selfRecursive))
+            return false;
+        if (selfRecursive)
+        {
+            var method = (MethodDeclarationSyntax)local.Parent.Parent!;
+            if (method.TypeParameterList != null || method.Modifiers.Any(SyntaxKind.AsyncKeyword)
+                || method.DescendantNodes().Any(node => node is YieldStatementSyntax)
+                || local.DescendantNodes().Any(node => node is AnonymousFunctionExpressionSyntax
+                    or CheckedExpressionSyntax or CheckedStatementSyntax)
+                || symbol.ReturnType.TypeKind == TypeKind.Dynamic
+                || symbol.Parameters.Any(parameter => parameter.Type.TypeKind == TypeKind.Dynamic
+                    || parameter.Name == local.Identifier.ValueText))
+                return false;
+            var region = (SyntaxNode?)local.Body ?? local.ExpressionBody?.Expression;
+            if (region == null || _semanticModel.AnalyzeDataFlow(region) is not { Succeeded: true } flow
+                || flow.VariablesDeclared.Any(variable => variable.Name == local.Identifier.ValueText)
+                || !IsPureRecursiveScalar(symbol.ReturnType)
+                || symbol.Parameters.Any(parameter => !IsPureRecursiveScalar(parameter.Type))
+                || _semanticModel.GetOperation(region) is not { } operation
+                || !IsPureRecursiveOperation(operation, symbol))
+                return false;
+        }
+        return true;
     }
 
     private static bool CanUseDelegateType(ITypeSymbol type) =>
         !type.IsRefLikeType && type.TypeKind is not (TypeKind.Error or TypeKind.Pointer or TypeKind.FunctionPointer);
 
-    private bool HasOnlySamePointCalls(LocalFunctionStatementSyntax local, IMethodSymbol symbol)
+    private static bool IsPureRecursiveScalar(ITypeSymbol? type) => type?.SpecialType is
+        SpecialType.System_Boolean or SpecialType.System_Char
+        or SpecialType.System_SByte or SpecialType.System_Byte
+        or SpecialType.System_Int16 or SpecialType.System_UInt16
+        or SpecialType.System_Int32 or SpecialType.System_UInt32
+        or SpecialType.System_Int64 or SpecialType.System_UInt64
+        or SpecialType.System_Single or SpecialType.System_Double;
+
+    // The self binding's empty invocation row is derived from the entire resolved
+    // body, not from the signature or a syntactically recursive return expression.
+    private static bool IsPureRecursiveOperation(IOperation operation, IMethodSymbol self)
     {
+        var allowed = operation switch
+        {
+            Microsoft.CodeAnalysis.Operations.IBlockOperation
+                or Microsoft.CodeAnalysis.Operations.IReturnOperation
+                or Microsoft.CodeAnalysis.Operations.IConditionalOperation
+                or Microsoft.CodeAnalysis.Operations.IVariableDeclarationGroupOperation
+                or Microsoft.CodeAnalysis.Operations.IVariableDeclarationOperation
+                or Microsoft.CodeAnalysis.Operations.IVariableInitializerOperation => true,
+            Microsoft.CodeAnalysis.Operations.IVariableDeclaratorOperation variable =>
+                variable.Symbol.RefKind == RefKind.None && IsPureRecursiveScalar(variable.Symbol.Type)
+                && SymbolEqualityComparer.Default.Equals(variable.Symbol.ContainingSymbol, self),
+            Microsoft.CodeAnalysis.Operations.ILocalReferenceOperation local =>
+                local.Local.RefKind == RefKind.None && IsPureRecursiveScalar(local.Type)
+                && SymbolEqualityComparer.Default.Equals(local.Local.ContainingSymbol, self),
+            Microsoft.CodeAnalysis.Operations.IParameterReferenceOperation parameter =>
+                parameter.Parameter.RefKind == RefKind.None && IsPureRecursiveScalar(parameter.Type)
+                && SymbolEqualityComparer.Default.Equals(parameter.Parameter.ContainingSymbol, self),
+            Microsoft.CodeAnalysis.Operations.ILiteralOperation => IsPureRecursiveScalar(operation.Type),
+            Microsoft.CodeAnalysis.Operations.IBinaryOperation binary =>
+                binary.OperatorMethod == null && IsPureRecursiveScalar(binary.Type),
+            Microsoft.CodeAnalysis.Operations.IUnaryOperation unary =>
+                unary.OperatorMethod == null && IsPureRecursiveScalar(unary.Type),
+            Microsoft.CodeAnalysis.Operations.IConversionOperation conversion =>
+                conversion.OperatorMethod == null && conversion.Conversion.Exists
+                && !conversion.Conversion.IsUserDefined && IsPureRecursiveScalar(conversion.Type),
+            Microsoft.CodeAnalysis.Operations.IInvocationOperation invocation =>
+                SymbolEqualityComparer.Default.Equals(invocation.TargetMethod, self),
+            Microsoft.CodeAnalysis.Operations.IArgumentOperation argument =>
+                argument.Parameter is { RefKind: RefKind.None }
+                && !argument.InConversion.IsUserDefined && !argument.OutConversion.IsUserDefined,
+            _ => false
+        };
+        return allowed && operation.ChildOperations.All(child => IsPureRecursiveOperation(child, self));
+    }
+
+    private bool HasOnlySamePointCalls(LocalFunctionStatementSyntax local, IMethodSymbol symbol, out bool selfRecursive)
+    {
+        selfRecursive = false;
         var body = (BlockSyntax)local.Parent!;
         var hasCall = false;
         foreach (var use in body.DescendantNodes().OfType<IdentifierNameSyntax>()
@@ -4636,22 +4711,29 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 return false;
             if (!SymbolEqualityComparer.Default.Equals(resolved, symbol))
                 continue;
-            if (use.SpanStart < local.Span.End
-                || use.Parent is not InvocationExpressionSyntax invocation || invocation.Expression != use
+            if (use.Parent is not InvocationExpressionSyntax invocation || invocation.Expression != use
                 || invocation.ArgumentList.Arguments.Any(argument => argument.NameColon != null)
                 || use.Ancestors().TakeWhile(node => node != body)
-                    .Any(node => node is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax))
+                    .Any(node => node is AnonymousFunctionExpressionSyntax
+                        || node is LocalFunctionStatementSyntax nested && nested != local))
                 return false;
-            hasCall = true;
+            if (local.Span.Contains(use.Span))
+                selfRecursive = true;
+            else
+            {
+                if (use.SpanStart < local.Span.End)
+                    return false;
+                hasCall = true;
+            }
         }
         return hasCall;
     }
 
     /// <summary>Whether a local function uses an enclosing local or parameter, or
     /// <c>this</c>/<c>base</c> (also implicitly). Unknown counts as capturing.</summary>
-    private bool CapturesEnclosingState(LocalFunctionStatementSyntax local)
+    private bool CapturesEnclosingState(LocalFunctionStatementSyntax local, bool checkStatic = false)
     {
-        if (local.Modifiers.Any(SyntaxKind.StaticKeyword))
+        if (!checkStatic && local.Modifiers.Any(SyntaxKind.StaticKeyword))
             return false; // C# already rejects any capture by a static local function
         if (_semanticModel == null || !ReferenceEquals(local.SyntaxTree, _semanticModel.SyntaxTree)
             || _semanticModel.GetDeclaredSymbol(local) is not { } self)
@@ -4700,8 +4782,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _ => false,
         };
 
-    private BindStatementNode ConvertLocalFunction(LocalFunctionStatementSyntax local)
+    private IReadOnlyList<StatementNode> ConvertLocalFunction(LocalFunctionStatementSyntax local)
     {
+        if (!IsNativeLocalFunction(local, out var selfRecursive))
+            throw EscalateExpression(local, "local-function");
         var savedReassigned = _reassignedVariables;
         var savedPending = _pendingStatements.ToList();
         _pendingStatements.Clear();
@@ -4748,9 +4832,21 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
             var lambda = new LambdaExpressionNode(GetTextSpan(local), _context.GenerateId("lam"),
                 parameters, effects: null, isAsync: false, expression, statements,
-                new AttributeCollection(), isStatic: true);
-            return new BindStatementNode(GetTextSpan(local), local.Identifier.ValueText, delegateType,
-                isMutable: false, lambda, new AttributeCollection());
+                new AttributeCollection(), isStatic: !selfRecursive);
+            var span = GetTextSpan(local);
+            var name = local.Identifier.ValueText;
+            if (selfRecursive)
+            {
+                return
+                [
+                    new BindStatementNode(span, name, delegateType, isMutable: true,
+                        initializer: null, new AttributeCollection(),
+                        row: new EffectsNode(span, new Dictionary<string, string>())),
+                    new AssignmentStatementNode(span, new ReferenceNode(span, name), lambda)
+                ];
+            }
+            return [new BindStatementNode(span, name, delegateType,
+                isMutable: false, lambda, new AttributeCollection())];
         }
         finally
         {
@@ -7007,7 +7103,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             if (!IsNativeLocalFunction(localFunc))
                 throw EscalateExpression(localFunc, "local-function");
-            statements.Add(ConvertLocalFunction(localFunc));
+            statements.AddRange(ConvertLocalFunction(localFunc));
             return lowered;
         }
 

@@ -12,13 +12,14 @@ using Calor.Compiler.Migration;
 using Calor.Compiler.Migration.Project;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
 
 /// <summary>
 /// #1600: safe non-capturing local functions become same-point lambda bindings.
-/// Forward calls, recursion and method-group conversions preserve the member.
+/// Forward/mutual calls and method-group conversions preserve the member.
 /// Native rows compile with default effect enforcement and run against the original C#.
 /// Preserved members retain counted losses and the existing permissive unknown-call
 /// policy for callers without native declarations.
@@ -233,12 +234,265 @@ public class LocalFunctionConversionTests
             data.Add("F3-LOCAL-02", "3|1002", surface);
             data.Add("same-point", "6:4:2:first", surface);
             data.Add("invocation-timing", "0:1:4:2:2", surface);
+            data.Add("F3-LOCAL-01", "3|120", surface);
+            data.Add("official-074", "1:1:1:2:479001600:1932053504:11", surface);
         }
         return data;
     }
 
     public static IEnumerable<object[]> Surfaces() =>
         Enum.GetValues<Surface>().Select(surface => new object[] { surface });
+
+    [Fact]
+    public void DirectSelfRecursion_UsesOnlyAnInitializedSelfBindingAndLambdaAssignment()
+    {
+        const string source = """
+            public static class Probe
+            {
+                public static string Run()
+                {
+                    static int Factorial(int n)
+                    {
+                        if (n <= 1) return 1;
+                        return n * Factorial(n - 1);
+                    }
+                    return Factorial(0) + ":" + Factorial(1) + ":" + Factorial(5);
+                }
+            }
+            """;
+        Assert.Equal("1:1:120", Run(source));
+        var converted = new CSharpToCalorConverter().Convert(source);
+        Assert.True(converted.Success, string.Join("\n", converted.Issues) + "\n" + converted.CalorSource);
+        Assert.Empty(converted.Losses);
+        Assert.DoesNotContain("§CS", converted.CalorSource);
+        Assert.DoesNotContain("§RAW", converted.CalorSource);
+        var originalBody = Assert.Single(converted.Ast!.Classes).Methods.Single(method => method.Name == "Run").Body;
+        var binding = Assert.IsType<BindStatementNode>(originalBody[0]);
+        Assert.True(binding.IsMutable);
+        Assert.Null(binding.Initializer);
+        var assignment = Assert.IsType<AssignmentStatementNode>(originalBody[1]);
+        Assert.Equal(binding.Name, Assert.IsType<ReferenceNode>(assignment.Target).Name);
+        Assert.False(Assert.IsType<LambdaExpressionNode>(assignment.Value).IsStatic);
+        var compilation = Program.Compile(converted.CalorSource!, "direct-recursion.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compilation.HasErrors,
+            string.Join("\n", compilation.Diagnostics) + "\n" + converted.CalorSource);
+        Assert.Contains("= default!;", compilation.GeneratedCode);
+        Assert.Equal("1:1:120", Run(compilation.GeneratedCode));
+    }
+
+    public static TheoryData<bool, bool, int, int> RecursiveArithmeticCases()
+    {
+        var data = new TheoryData<bool, bool, int, int>();
+        foreach (var isStatic in new[] { false, true })
+        foreach (var expressionBody in new[] { false, true })
+        foreach (var (input, expected) in new[]
+                 { (-5, 1), (0, 1), (1, 1), (2, 2), (12, 479001600), (13, 1932053504) })
+            data.Add(isStatic, expressionBody, input, expected);
+        return data;
+    }
+
+    private static string RecursiveSource(bool isStatic, bool expressionBody) => $$"""
+        public static class Probe
+        {
+            public static string Run(int n)
+            {
+                int before = 7;
+                {{(isStatic ? "static " : "")}}int Factorial(int value)
+                {{(expressionBody
+                    ? "=> value <= 1 ? 1 : value * Factorial(value - 1);"
+                    : "{ if (value <= 1) return 1; return value * Factorial(value - 1); }")}}
+                return before + ":" + Factorial(n) + ":" + Factorial(2);
+            }
+        }
+        """;
+
+    [Theory]
+    [MemberData(nameof(RecursiveArithmeticCases))]
+    public void SelfRecursion_PreservesArithmeticDeclarationPointAndOnlyItsInternalCapture(
+        bool isStatic, bool expressionBody, int input, int expected)
+    {
+        var source = RecursiveSource(isStatic, expressionBody);
+        var expectedResult = $"7:{expected}:2";
+        Assert.Equal(expectedResult, Run(source, false, input));
+        var converted = new CSharpToCalorConverter().Convert(source);
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        Assert.Empty(converted.Losses);
+        Assert.DoesNotContain(converted.Issues, issue => issue.Feature == "local-function");
+        var body = Assert.Single(converted.Ast!.Classes).Methods.Single(method => method.Name == "Run").Body;
+        Assert.Equal("before", Assert.IsType<BindStatementNode>(body[0]).Name);
+        var self = Assert.IsType<BindStatementNode>(body[1]);
+        Assert.Equal("Factorial", self.Name);
+        Assert.True(self.IsMutable);
+        Assert.Null(self.Initializer);
+        Assert.Empty(Assert.IsType<EffectsNode>(self.Row).Effects);
+        var assignment = Assert.IsType<AssignmentStatementNode>(body[2]);
+        Assert.Equal(self.Name, Assert.IsType<ReferenceNode>(assignment.Target).Name);
+        Assert.False(Assert.IsType<LambdaExpressionNode>(assignment.Value).IsStatic);
+        Assert.DoesNotContain(RecursiveAstWalker.DescendantsAndSelf(converted.Ast),
+            node => node is LocalFunctionStatementNode or CSharpInteropBlockNode or RawCSharpExpressionNode);
+
+        var compiled = Program.Compile(converted.CalorSource!, "recursive-arithmetic.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics) + "\n" + converted.CalorSource);
+        Assert.Equal(expectedResult, Run(compiled.GeneratedCode, false, input));
+        var parsedSelf = RecursiveAstWalker.DescendantsAndSelf(compiled.Ast!)
+            .OfType<BindStatementNode>().Single(bind => bind.Name == "Factorial");
+        Assert.Empty(Assert.IsType<EffectsNode>(parsedSelf.Row).Effects);
+
+        var tree = CSharpSyntaxTree.ParseText(compiled.GeneratedCode);
+        var model = CSharpCompilation.Create("CaptureProof", [tree], GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)).GetSemanticModel(tree);
+        var lambda = Assert.Single(tree.GetRoot().DescendantNodes().OfType<LambdaExpressionSyntax>());
+        var flow = model.AnalyzeDataFlow(lambda.Body)!;
+        Assert.True(flow.Succeeded);
+        Assert.Equal(["Factorial"], flow.CapturedInside.Select(symbol => symbol.Name));
+    }
+
+    [Theory]
+    [InlineData(-5, 1)]
+    [InlineData(0, 1)]
+    [InlineData(1, 1)]
+    [InlineData(2, 2)]
+    [InlineData(12, 479001600)]
+    [InlineData(13, 0)]
+    public void SelfRecursion_GloballyCheckedSource_RemainsCheckedInsideTheLambda(int input, int expected)
+    {
+        var source = RecursiveSource(isStatic: true, expressionBody: false);
+        var tree = CSharpSyntaxTree.ParseText(source);
+        var original = CSharpCompilation.Create("CheckedRecursion", [tree], GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, checkOverflow: true));
+        var context = new ConversionContext { SourceFile = "checked-recursion.cs" };
+        var ast = new RoslynSyntaxVisitor(context, original.GetSemanticModel(tree))
+            .Convert(tree.GetCompilationUnitRoot(), "CheckedRecursion");
+        Assert.False(context.HasErrors, string.Join("\n", context.Issues));
+        Assert.Empty(context.Losses);
+        var calor = new CalorEmitter().Emit(ast);
+        Assert.Contains("overflow=checked", calor);
+        var compiled = Program.Compile(calor, "checked-recursion.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics) + "\n" + calor);
+        if (input == 13)
+        {
+            Assert.Throws<OverflowException>(() => Run(source, true, input));
+            Assert.Throws<OverflowException>(() => Run(compiled.GeneratedCode, false, input));
+        }
+        else
+        {
+            Assert.Equal($"7:{expected}:2", Run(source, true, input));
+            Assert.Equal(Run(source, true, input), Run(compiled.GeneratedCode, false, input));
+        }
+    }
+
+    [Theory]
+    [InlineData("return checked(value * Factorial(value - 1));")]
+    [InlineData("checked { return value * Factorial(value - 1); }")]
+    public void SelfRecursion_ExplicitOverflowRegionsRemainPreservedWithTheirExceptions(string recursiveReturn)
+    {
+        var source = $$"""
+            public static class Probe
+            {
+                public static string Run(int n)
+                {
+                    static int Factorial(int value)
+                    {
+                        if (value <= 1) return 1;
+                        {{recursiveReturn}}
+                    }
+                    return "" + Factorial(n);
+                }
+            }
+            """;
+        var converted = new CSharpToCalorConverter().Convert(source);
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        Assert.Contains(converted.Issues, issue => issue.Feature == "local-function");
+        Assert.Contains(converted.Losses, loss => loss.Feature == "method"
+            && loss.Kind == ConversionLossKind.InteropPreserved);
+        Assert.Contains("§CSHARP", converted.CalorSource);
+        var compiled = Program.Compile(converted.CalorSource!, "preserved-checked-recursion.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Equal("479001600", Run(source, false, 12));
+        Assert.Equal(Run(source, false, 12), Run(compiled.GeneratedCode, false, 12));
+        Assert.Throws<OverflowException>(() => Run(source, false, 13));
+        Assert.Throws<OverflowException>(() => Run(compiled.GeneratedCode, false, 13));
+    }
+
+    [Theory]
+    [InlineData("int L(int n) { Hits++; if (n <= 1) return 1; return n * L(n - 1); } return L(3);")]
+    [InlineData("int L(int n) { Touch(); if (n <= 1) return 1; return n * L(n - 1); } return L(3);")]
+    [InlineData("int L(int n) => n == 0 ? Hits : L(n - 1); return L(3);")]
+    [InlineData("int L(int n) { int value = n; value++; return n == 0 ? value : n * L(n - 1); } return L(3);")]
+    [InlineData("int L(int n) { ref int alias = ref n; return n <= 1 ? 1 : n * L(n - 1); } return L(3);")]
+    [InlineData("int L(int n) => n == 0 ? 1 : L(n - 1) + new Tag(); return L(3);")]
+    [InlineData("dynamic L(dynamic n) => n <= 1 ? 1 : n * L(n - 1); return (int)L(3);")]
+    [InlineData("int L(int n) { new object(); return n <= 1 ? 1 : n * L(n - 1); } return L(3);")]
+    [InlineData("int L(int n) { if (n < 0) throw new System.ArgumentException(); return n <= 1 ? 1 : n * L(n - 1); } return L(3);")]
+    [InlineData("return L(3); int L(int n) => n <= 1 ? 1 : n * L(n - 1);")]
+    [InlineData("int L(int n) => n <= 1 ? 1 : n * L(n - 1); System.Func<int,int> f = L; return f(3);")]
+    [InlineData("int L(int n) => n <= 1 ? 1 : n * L(n - 1); string name = nameof(L); return L(3) + name.Length;")]
+    [InlineData("int L(int n) { System.Func<int> again = () => L(n - 1); return n <= 1 ? 1 : n * again(); } return L(3);")]
+    [InlineData("int k = 2; int L(int n) => n == 0 ? k : n * L(n - 1); return L(3);")]
+    [InlineData("int A(int n) => n <= 1 ? 1 : n * B(n - 1); int B(int n) => n <= 1 ? 1 : n * A(n - 1); return A(3);")]
+    [InlineData("int L(int n = 1) => n <= 1 ? 1 : n * L(n - 1); return L(3);")]
+    [InlineData("int L(int n) => n <= 1 ? 1 : n * L(n: n - 1); return L(3);")]
+    [InlineData("int L(int n) { if (n <= 1) { int L = 1; return L; } return n * L(n - 1); } return L(3);")]
+    [InlineData("int L(int n) => n <= 1 ? 1 : n * L(n - 1); return 42;")]
+    public void SelfRecursion_WholeBodyProofAndExcludedUsesRemainCountedPreservation(string body)
+    {
+        var source = $$"""
+            public class C
+            {
+                public static int Hits;
+                public static int Touch() => ++Hits;
+                public struct Tag
+                {
+                    public static int operator +(int value, Tag tag) { Hits++; return value + 1; }
+                }
+                public int M() { {{body}} }
+            }
+            public static class Probe
+            {
+                public static string Run() => new C().M() + ":" + C.Hits;
+            }
+            """;
+        var expected = Run(source);
+        var converted = new CSharpToCalorConverter().Convert(source);
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        Assert.Contains(converted.Issues, issue => issue.Feature == "local-function");
+        Assert.Contains(converted.Losses, loss => loss.Feature == "method"
+            && loss.Kind == ConversionLossKind.InteropPreserved);
+        var compiled = Program.Compile(converted.CalorSource!, "preserved-recursion.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null, UnknownCallPolicy = UnknownCallPolicy.Permissive });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics) + "\n" + converted.CalorSource);
+        Assert.Equal(expected, Run(compiled.GeneratedCode));
+    }
+
+    [Fact]
+    public void SelfRecursion_StaticCaptureErrorsCannotBecomeLegalCapturingLambdas()
+    {
+        const string source = """
+            public static class Probe
+            {
+                public static int Run(int outer)
+                {
+                    static int Factorial(int value) => value <= 1 ? outer : value * Factorial(value - 1);
+                    return Factorial(3);
+                }
+            }
+            """;
+        var tree = CSharpSyntaxTree.ParseText(source);
+        var compilation = CSharpCompilation.Create("StaticCapture", [tree], GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.Contains(compilation.GetDiagnostics(), diagnostic => diagnostic.Id == "CS8421");
+        var context = new ConversionContext { SourceFile = "static-capture.cs" };
+        var ast = new RoslynSyntaxVisitor(context, compilation.GetSemanticModel(tree))
+            .Convert(tree.GetCompilationUnitRoot(), "StaticCapture");
+        Assert.Contains(context.Issues, issue => issue.Feature == "local-function");
+        Assert.Contains(context.Losses, loss => loss.Feature == "method"
+            && loss.Kind == ConversionLossKind.InteropPreserved);
+        Assert.DoesNotContain(RecursiveAstWalker.DescendantsAndSelf(ast), node => node is LambdaExpressionNode);
+    }
 
     [Theory]
     [MemberData(nameof(Surfaces))]
@@ -286,9 +540,11 @@ public class LocalFunctionConversionTests
             "edge-shapes" => EdgeShapes,
             "same-point" => SamePointLambdas,
             "invocation-timing" => LambdaInvocationTiming,
+            "official-074" => File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(),
+                "tests/TestData/CSharpImport/Level4_Methods/074_LocalFunctions.cs")),
             _ => R0Fixture(row)
         };
-        Assert.Equal(expected, Run(source));
+        Assert.Equal(expected, row == "official-074" ? RunOfficialScorecard(source) : Run(source));
 
         var (calor, losses) = await ConvertAsync(source, surface);
 
@@ -305,7 +561,8 @@ public class LocalFunctionConversionTests
         Assert.Contains("static (", compilation.GeneratedCode);
         Assert.DoesNotContain(RecursiveAstWalker.DescendantsAndSelf(compilation.Ast!),
             node => node is LocalFunctionStatementNode);
-        Assert.Equal(expected, Run(compilation.GeneratedCode));
+        Assert.Equal(expected, row == "official-074"
+            ? RunOfficialScorecard(compilation.GeneratedCode) : Run(compilation.GeneratedCode));
     }
 
     public static TheoryData<string, string, int, Surface> PreservedRows()
@@ -316,7 +573,6 @@ public class LocalFunctionConversionTests
             data.Add("F3-LOCAL-04", "5|g3|2", 3, surface);
             data.Add("F3-LOCAL-05", "42", 1, surface);
             data.Add("mixed", "8", 1, surface);
-            data.Add("F3-LOCAL-01", "3|120", 1, surface);
             data.Add("F3-LOCAL-03", "6|5|60|3000|502", 1, surface);
             data.Add("more-shapes", "11|False|xy6|16", 2, surface);
             data.Add("edge-shapes", "ab|42|14|p", 1, surface);
@@ -363,7 +619,6 @@ public class LocalFunctionConversionTests
     [Theory]
     [InlineData("F3-LOCAL-04")]
     [InlineData("F3-LOCAL-05")]
-    [InlineData("F3-LOCAL-01")]
     [InlineData("F3-LOCAL-03")]
     public void NoFallback_RefusesOutsideTheSlice_ByName(string row)
     {
@@ -375,6 +630,7 @@ public class LocalFunctionConversionTests
     }
 
     [Theory]
+    [InlineData("F3-LOCAL-01")]
     [InlineData("F3-LOCAL-02")]
     public void NoFallback_AcceptsTheSlice(string row)
     {
@@ -398,7 +654,6 @@ public class LocalFunctionConversionTests
     [InlineData("public int M() { static T L<T>(T x) => x; return L(1); }")]
     [InlineData("public C() { int L() => 1; L(); }")]
     [InlineData("public int M() { return L(1); int L(int x) => x; }")]
-    [InlineData("public int M() { int L(int x) => x == 0 ? 1 : L(x - 1); return L(3); }")]
     [InlineData("public int M() { int A(int x) => B(x); int B(int x) => x; return A(1); }")]
     [InlineData("public int M() { int L(int x) => x; return L(x: 1); }")]
     [InlineData("public int M() { int L(int x) => x; System.Func<int,int> f = L; return f(1); }")]
@@ -591,12 +846,30 @@ public class LocalFunctionConversionTests
     }
 
     /// <summary>Compiles C# in memory and returns <c>Probe.Run()</c>.</summary>
-    private static string Run(string csharp)
+    private static string Run(string csharp, bool checkOverflow = false, params object[] arguments)
+        => RunAssembly(csharp, checkOverflow, assembly =>
+        {
+            var probe = assembly.GetTypes().Single(type => type.Name == "Probe");
+            var run = probe.GetMethod("Run", BindingFlags.Public | BindingFlags.Static)!;
+            return Assert.IsType<string>(run.Invoke(null, arguments));
+        });
+
+    private static string RunOfficialScorecard(string csharp) => RunAssembly(csharp, false, assembly =>
+    {
+        var calculator = assembly.GetTypes().Single(type => type.Name == "Calculator");
+        var factorial = calculator.GetMethod("Factorial", BindingFlags.Public | BindingFlags.Static)!;
+        var values = new[] { -5, 0, 1, 2, 12, 13 }
+            .Select(input => Assert.IsType<int>(factorial.Invoke(null, [input])));
+        var calculate = calculator.GetMethod("Calculate", BindingFlags.Public | BindingFlags.Static)!;
+        return string.Join(":", values) + ":" + Assert.IsType<int>(calculate.Invoke(null, [2, 3]));
+    });
+
+    private static string RunAssembly(string csharp, bool checkOverflow, Func<Assembly, string> invoke)
     {
         var compilation = CSharpCompilation.Create("F3_" + Guid.NewGuid().ToString("N"),
             [CSharpSyntaxTree.ParseText(csharp)],
             GeneratedCSharpCompiler.References,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, checkOverflow: checkOverflow));
         using var stream = new MemoryStream();
         var emission = compilation.Emit(stream);
         Assert.True(emission.Success, string.Join(Environment.NewLine, emission.Diagnostics) + "\n" + csharp);
@@ -604,11 +877,10 @@ public class LocalFunctionConversionTests
         var context = new AssemblyLoadContext(compilation.AssemblyName!, isCollectible: true);
         try
         {
-            var probe = context.LoadFromStream(stream).GetTypes().Single(type => type.Name == "Probe");
-            var run = probe.GetMethod("Run", BindingFlags.Public | BindingFlags.Static)!;
+            var assembly = context.LoadFromStream(stream);
             try
             {
-                return Assert.IsType<string>(run.Invoke(null, null));
+                return invoke(assembly);
             }
             catch (TargetInvocationException invocation) when (invocation.InnerException != null)
             {
