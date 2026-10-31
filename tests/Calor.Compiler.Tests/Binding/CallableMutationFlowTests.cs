@@ -33,12 +33,12 @@ public sealed class CallableMutationFlowTests
     {
         var nullableType = array ? "?[str]" : "?str";
         var nonNullableType = array ? "[str]" : "str";
-        var mutator = $"§LAM{{mut}} §C{{Mutate}} §A{{{modifier}}} value §/C §/LAM";
+        var mutator = $"§LAM{{}} §C{{Mutate}} §A{{{modifier}}} value §/C §/LAM";
         var body = scenario switch
         {
             "call-before-reset" => $$"""
                 §B{~later:Action} {{mutator}}
-                §B{wrapper:Action} §LAM{wrap}
+                §B{wrapper:Action} §LAM{}
                   §C{later} §/C
                   §ASSIGN later Noop
                 §/LAM
@@ -46,7 +46,7 @@ public sealed class CallableMutationFlowTests
                 """,
             "block-local-alias" => $$"""
                 §B{later:Action} {{mutator}}
-                §B{wrapper:Action} §LAM{wrap}
+                §B{wrapper:Action} §LAM{}
                   §IF flag
                     §B{alias:Action} later
                     §C{alias} §/C
@@ -54,8 +54,8 @@ public sealed class CallableMutationFlowTests
                 §C{wrapper} §/C
                 """,
             "expression-call-before-reset" => $$"""
-                §B{~later:Func<bool>} §LAM{mut} §C{MutateBool} §A{ {{modifier}} } value §/C §/LAM
-                §B{wrapper:Func<bool>} §LAM{wrap}
+                §B{~later:Func<bool>} §LAM{} §C{MutateBool} §A{ {{modifier}} } value §/C §/LAM
+                §B{wrapper:Func<bool>} §LAM{}
                   §B{result:bool} §C{later} §/C
                   §ASSIGN later NoopBool
                   §R result
@@ -64,7 +64,7 @@ public sealed class CallableMutationFlowTests
                 """,
             "late-target" => $$"""
                 §B{~later:Action} Noop
-                §B{wrapper:Action} §LAM{wrap} §C{later} §/C §/LAM
+                §B{wrapper:Action} §LAM{} §C{later} §/C §/LAM
                 §ASSIGN later {{mutator}}
                 §C{wrapper} §/C
                 """,
@@ -79,7 +79,7 @@ public sealed class CallableMutationFlowTests
                 §IF flag
                   §ASSIGN later Noop
                 §EL
-                  §B{wrapper:Action} §LAM{wrap} §C{later} §/C §/LAM
+                  §B{wrapper:Action} §LAM{} §C{later} §/C §/LAM
                   §C{wrapper} §/C
                 """,
             "mutable-rebind" => $$"""
@@ -90,7 +90,7 @@ public sealed class CallableMutationFlowTests
             "deferred-setter" => $$"""
                 §B{~later:Action} Noop
                 §B{mutator:Action} {{mutator}}
-                §B{setter:Action} §LAM{set}
+                §B{setter:Action} §LAM{}
                   §ASSIGN later mutator
                 §/LAM
                 §C{setter} §/C
@@ -99,17 +99,17 @@ public sealed class CallableMutationFlowTests
             "nested-deferred-setter" => $$"""
                 §B{~later:Action} Noop
                 §B{mutator:Action} {{mutator}}
-                §B{setter:Action} §LAM{set}
+                §B{setter:Action} §LAM{}
                   §ASSIGN later mutator
                 §/LAM
-                §B{wrapper:Action} §LAM{wrap} §C{setter} §/C §/LAM
+                §B{wrapper:Action} §LAM{} §C{setter} §/C §/LAM
                 §C{wrapper} §/C
                 §C{later} §/C
                 """,
             "deferred-rebind" => $$"""
                 §B{~later:Action} Noop
                 §B{mutator:Action} {{mutator}}
-                §B{setter:Action} §LAM{set}
+                §B{setter:Action} §LAM{}
                   §B{~later} mutator
                 §/LAM
                 §C{setter} §/C
@@ -118,7 +118,7 @@ public sealed class CallableMutationFlowTests
             "late-write-source" => $$"""
                 §B{~later:Action} Noop
                 §B{~mutator:Action} Noop
-                §B{setter:Action} §LAM{set}
+                §B{setter:Action} §LAM{}
                   §ASSIGN later mutator
                 §/LAM
                 §ASSIGN mutator {{mutator}}
@@ -129,10 +129,10 @@ public sealed class CallableMutationFlowTests
                 §B{~later:Action} Noop
                 §B{~source:Action} Noop
                 §B{mutator:Action} {{mutator}}
-                §B{setter:Action} §LAM{set}
+                §B{setter:Action} §LAM{}
                   §ASSIGN source mutator
                 §/LAM
-                §B{wrapper:Action} §LAM{wrap}
+                §B{wrapper:Action} §LAM{}
                   §C{setter} §/C
                   §ASSIGN later source
                 §/LAM
@@ -142,7 +142,7 @@ public sealed class CallableMutationFlowTests
             "setter-does-not-invoke-value" => $$"""
                 §B{~later:Action} Noop
                 §B{mutator:Action} {{mutator}}
-                §B{setter:Action} §LAM{set}
+                §B{setter:Action} §LAM{}
                   §ASSIGN later mutator
                 §/LAM
                 §C{setter} §/C
@@ -160,17 +160,17 @@ public sealed class CallableMutationFlowTests
                 """,
             "invoke-member" => $$"""
                 §B{later:Action} {{mutator}}
-                §B{wrapper:Action} §LAM{wrap} §C{later.Invoke} §/C §/LAM
+                §B{wrapper:Action} §LAM{} §C{later.Invoke} §/C §/LAM
                 §C{wrapper.Invoke} §/C
                 """,
             "direct-write" => """
-                §B{later:Action} §LAM{mut}
+                §B{later:Action} §LAM{}
                   §ASSIGN value null
                 §/LAM
                 §C{later} §/C
                 """,
             "nested-guard" => $$"""
-                §B{later:Action} §LAM{mut}
+                §B{later:Action} §LAM{}
                   §IF (!= value null)
                     §C{Mutate} §A{ {{modifier}} } value §/C
                 §/LAM
@@ -187,8 +187,8 @@ public sealed class CallableMutationFlowTests
                 §B{~first:Action} Noop
                 §B{~second:Action} Noop
                 §B{mutator:Action} {{mutator}}
-                §ASSIGN first §LAM{one} §C{second} §/C §/LAM
-                §ASSIGN second §LAM{two}
+                §ASSIGN first §LAM{} §C{second} §/C §/LAM
+                §ASSIGN second §LAM{}
                   §C{first} §/C
                   §C{mutator} §/C
                 §/LAM
@@ -197,14 +197,14 @@ public sealed class CallableMutationFlowTests
             "pure-cycle" => """
                 §B{~first:Action} Noop
                 §B{~second:Action} Noop
-                §ASSIGN first §LAM{one} §C{second} §/C §/LAM
-                §ASSIGN second §LAM{two} §C{first} §/C §/LAM
+                §ASSIGN first §LAM{} §C{second} §/C §/LAM
+                §ASSIGN second §LAM{} §C{first} §/C §/LAM
                 §C{first} §/C
                 """,
             "uninvoked-setter" => $$"""
                 §B{~later:Action} Noop
                 §B{mutator:Action} {{mutator}}
-                §B{setter:Action} §LAM{set}
+                §B{setter:Action} §LAM{}
                   §ASSIGN later mutator
                 §/LAM
                 §C{later} §/C
@@ -214,7 +214,7 @@ public sealed class CallableMutationFlowTests
                 """,
             "uninvoked-reset" => $$"""
                 §B{~later:Action} {{mutator}}
-                §B{setter:Action} §LAM{set}
+                §B{setter:Action} §LAM{}
                   §ASSIGN later Noop
                 §/LAM
                 §C{later} §/C
@@ -289,7 +289,7 @@ public sealed class CallableMutationFlowTests
                 §FLD{ {{nullableType}} :value:pub}
                 §MT{Probe:pub} () -> void
                   §IF (!= value null)
-                    §B{later:Action<{{nullableType}}>} §LAM{mut:value:{{nullableType}}}
+                    §B{later:Action<{{nullableType}}>} §LAM{value:{{nullableType}}}
                       §C{Mutate} §A{ {{modifier}} } value §/C
                     §/LAM
                     §C{later} §A value §/C
@@ -328,7 +328,7 @@ public sealed class CallableMutationFlowTests
         {
             "while" => scenario == "zero" ? "§WH false" : "§WH flag",
             "for" => scenario == "zero" ? "§L{i:1:0:1}" : "§L{i:1:2:1}",
-            "foreach" => scenario == "zero" ? "§EACH{loop:i} \"\"" : "§EACH{loop:i} \"xx\"",
+            "foreach" => scenario == "zero" ? "§EACH{i} \"\"" : "§EACH{i} \"xx\"",
             "do" => "§DO",
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
@@ -354,7 +354,7 @@ public sealed class CallableMutationFlowTests
                 §ASSIGN later mutator
                 """,
             "unused" => """
-                §B{unused:Action} §LAM{set}
+                §B{unused:Action} §LAM{}
                   §ASSIGN later mutator
                 §/LAM
                 §C{later} §/C
@@ -375,8 +375,8 @@ public sealed class CallableMutationFlowTests
                 §E{}
               §F{Probe:pub} ({{nullableType}}:value, bool:flag) -> void
                 §IF (!= value null)
-                  §B{noopAction:Action} §LAM{noopLambda} §C{Noop} §/C §/LAM
-                  §B{mutator:Action} §LAM{mut} §C{Mutate} §A{ {{modifier}} } value §/C §/LAM
+                  §B{noopAction:Action} §LAM{} §C{Noop} §/C §/LAM
+                  §B{mutator:Action} §LAM{} §C{Mutate} §A{ {{modifier}} } value §/C §/LAM
                   {{setup}}
                   {{header}}
             {{Indent(body, 8)}}
@@ -512,14 +512,14 @@ public sealed class CallableMutationFlowTests
                 §E{}
               §F{Probe:pub} ({{nullableType}}:value, bool:flag) -> void
                 §IF (!= value null)
-                  §B{noopAction:Action} §LAM{noopLambda} §C{Noop} §/C §/LAM
-                  §B{mutator:Action} §LAM{mutLambda} §C{Mutate} §A{ {{modifier}} } value §/C §/LAM
+                  §B{noopAction:Action} §LAM{} §C{Noop} §/C §/LAM
+                  §B{mutator:Action} §LAM{} §C{Mutate} §A{ {{modifier}} } value §/C §/LAM
                   §B{~later:Action} noopAction
-                  §B{setter:Func<bool>} §LAM{setLambda}
+                  §B{setter:Func<bool>} §LAM{}
                     §ASSIGN later mutator
                     §R false
                   §/LAM
-                  §B{testLater:Func<bool>} §LAM{testLambda}
+                  §B{testLater:Func<bool>} §LAM{}
                     §C{later} §/C
                     §R false
                   §/LAM
@@ -633,7 +633,7 @@ public sealed class CallableMutationFlowTests
         "outside" => body,
         "for" => "§L{i:1:2:1}\n" + Indent(body, 2),
         "while" => "§WH false\n" + Indent(body, 2),
-        "foreach" => "§EACH{loop:item} \"ab\"\n" + Indent(body, 2),
+        "foreach" => "§EACH{item} \"ab\"\n" + Indent(body, 2),
         "do" => "§DO\n" + Indent(body, 2) + "\nfalse",
         "nested" => "§L{i:1:2:1}\n  §WH false\n" + Indent(body, 4),
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
@@ -751,7 +751,7 @@ public sealed class CallableMutationFlowTests
                     {{Indent(receive, 4)}}
                     """,
                 "filter-write-wrapper" or "filter-write-unused" => $$"""
-                    §B{wrapper:Action} §LAM{wrapperLambda}
+                    §B{wrapper:Action} §LAM{}
                       §TR
                         §C{MayThrow} §A flag §/C
                       §CA{Exception:ex} §WHEN (&& (!= ex null) §C{writeFilter} §/C)
@@ -764,7 +764,7 @@ public sealed class CallableMutationFlowTests
                     {{Indent(receive, 2)}}
                     """,
                 "filter-wrapper" or "filter-unused" => $$"""
-                    §B{wrapper:Action} §LAM{wrapperLambda}
+                    §B{wrapper:Action} §LAM{}
                       §TR
                         §C{MayThrow} §A flag §/C
                       §CA{Exception:ex} §WHEN §C{setter} §/C
@@ -775,7 +775,7 @@ public sealed class CallableMutationFlowTests
                     {{(scenario == "filter-wrapper" ? "§C{wrapper} §/C" : "")}}
                     """,
                 "unused-try" => """
-                    §B{unused:Action} §LAM{unusedLambda}
+                    §B{unused:Action} §LAM{}
                       §TR
                         §C{MayThrow} §A flag §/C
                       §CA{Exception:ex}
@@ -807,22 +807,22 @@ public sealed class CallableMutationFlowTests
                     §E{}
                   §F{Probe:pub} (?{{requiredType}}:value, bool:flag, ?str:text) -> void
                     §E{throw}
-                    §B{noopAction:Action} §LAM{noopLambda} §C{Noop} §/C §/LAM
-                    §B{mutator:Action} §LAM{mutLambda} §C{Mutate} §A{ {{modifier}} } value §/C §/LAM
+                    §B{noopAction:Action} §LAM{} §C{Noop} §/C §/LAM
+                    §B{mutator:Action} §LAM{} §C{Mutate} §A{ {{modifier}} } value §/C §/LAM
                     §B{~later:Action} {{(initialNoop ? "noopAction" : "mutator")}}
-                    §B{resetter:Func<bool>} §LAM{resetLambda}
+                    §B{resetter:Func<bool>} §LAM{}
                       §ASSIGN later noopAction
                       §R false
                     §/LAM
-                    §B{resetString:Func<str>} §LAM{resetStringLambda}
+                    §B{resetString:Func<str>} §LAM{}
                       §ASSIGN later noopAction
                       §R "done"
                     §/LAM
-                    §B{setter:Func<bool>} §LAM{setLambda}
+                    §B{setter:Func<bool>} §LAM{}
                       §ASSIGN later mutator
                       §R false
                     §/LAM
-                    §B{writeFilter:Func<bool>} §LAM{writeFilterLambda}
+                    §B{writeFilter:Func<bool>} §LAM{}
                       §C{Mutate} §A{ {{modifier}} } value §/C
                       §R false
                     §/LAM
@@ -918,7 +918,7 @@ public sealed class CallableMutationFlowTests
                 §MT{Probe:pub} (bool:flag) -> void
                   §E{mut}
                   §IF (!= value null)
-                    §B{mutator:Action} §LAM{mutLambda} §C{Mutate} §A{ {{modifier}} } {{(control == "other-storage" ? "otherValue" : "value")}} §/C §/LAM
+                    §B{mutator:Action} §LAM{} §C{Mutate} §A{ {{modifier}} } {{(control == "other-storage" ? "otherValue" : "value")}} §/C §/LAM
                     §W flag
                       §K §VAR{ {{(control == "renamed" ? "other" : "value")}} }
             {{Indent(body, 12)}}

@@ -34,7 +34,7 @@ public sealed class StageBDelegateReturnTests
         var source = $$"""
             §M{DelegateReturns}
               §U{System.Collections.Generic}
-              §DEL{Reader:pub}
+              §DEL{Reader}
                 §O{ {{sourceType}} }
               §F{Take:pub} ({{targetType}}:value) -> void
                 §E{}

@@ -76,12 +76,12 @@ public class ForLoopConditionSemanticsTests
     public void NativeDoWhile_PreservesUnassignedLocalDefiniteAssignment()
         => AssertEquivalent(
             "int result; int i = 0; do { result = i; i++; } while (i < 2); return result;",
-            "1", native: false, loopMarker: "§DO{");
+            "1", native: false, loopMarker: "§DO");
 
     [Fact]
     public void NativeDoWhile_PreservesOutParameterDefiniteAssignment()
         => AssertEquivalent("int result; Assign(out result); return result;",
-            "1", native: false, loopMarker: "§DO{", members: """
+            "1", native: false, loopMarker: "§DO", members: """
             private static void Assign(out int result)
             {
                 int i = 0;
@@ -228,7 +228,7 @@ public class ForLoopConditionSemanticsTests
         else if (memberPreserved)
             Assert.Contains("§CSHARP{", conversion.CalorSource); // #943 (D1 RO-UNS-1): a ref local keeps its member as C#
         else
-            Assert.True(conversion.CalorSource!.Contains("§WH{"),
+            Assert.True(conversion.CalorSource!.Contains("§WH "),
                 conversion.CalorSource + "\n" + string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
         var compiled = Program.Compile(conversion.CalorSource!, "for.calr", new CompilationOptions
         {

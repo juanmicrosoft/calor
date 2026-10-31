@@ -1,4 +1,5 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Analysis;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification.Obligations;
@@ -15,7 +16,7 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public sealed class ProofLocalObligationTests
 {
-    private static Obligation SolveProof(string body, string parameters = "§I{i32:x}", string? proofId = "p1", string prelude = "")
+    private static Obligation SolveProof(string body, string parameters = "§I{i32:x}", string prelude = "")
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
         var source = $$"""
@@ -26,15 +27,16 @@ public sealed class ProofLocalObligationTests
                 §O{void}
             {{Indent(body)}}
             """;
-        return SolveModule(source, proofId);
+        return SolveModule(source);
     }
 
-    private static Obligation SolveModule(string source, string? proofId = "p1")
+    private static Obligation SolveModule(string source)
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.ToString())));
+        var proofId = Assert.Single(RecursiveAstWalker.DescendantsAndSelf(module).OfType<ProofObligationNode>()).Id;
 
         var tracker = new ObligationTracker();
         new ObligationGenerator(tracker).Generate(module);
@@ -193,19 +195,26 @@ public sealed class ProofLocalObligationTests
     [InlineData("INT:1")]
     [InlineData("INT:2")]
     public void LocalSharingItsCSharpName_IsRefused(string claimed)
-        => AssertNotDischarged(SolveProof($"""
-            §B{"{"}a-b:i32{"}"} INT:1
-            §B{"{"}~ab:i32{"}"} INT:2
-            §PROOF{"{"}p1{"}"} (== `a-b` {claimed})
+        => AssertNotDischarged(SolveProof($$"""
+            §B{a-b:i32} INT:1
+            §B{~ab:i32} INT:2
+            §PROOF{} (== `a-b` {{claimed}})
             """), "shares its C# name with another variable");
 
-    // Review round 2: the refinement guard `(inc #)` runs after the binding and changes k to 2.
+    // Review round 2: the refinement guard changes its value to 2 after the binding.
     [SkippableFact]
     public void LocalWithStateChangingRefinementGuard_IsRefused()
         => AssertNotDischarged(SolveProof("""
             §B{k:Bump} INT:1
             §PROOF{} (== k INT:1)
-            """, prelude: "§RTYPE{Bump:i32} (== (inc #) INT:2)"), "refinement guards may change state");
+            """, prelude: """
+            §RTYPE{Bump:i32} (== §C{Increment} §A{ref} # §/C INT:2)
+              §F{Increment:priv}
+                §I{i32:value:ref}
+                §O{i32}
+                §ASSIGN value (+ value INT:1)
+                §R value
+            """), "refinement guards may change state");
 
     [SkippableFact]
     public void LocalWithPureRefinementType_Discharges()
