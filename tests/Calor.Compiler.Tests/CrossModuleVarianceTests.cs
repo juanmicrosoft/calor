@@ -103,8 +103,10 @@ public sealed class CrossModuleVarianceTests : IDisposable
     {
         Write("base", Base("").Replace("Shared", "Contracts"));
         Write("decoy", Base("cw").Replace("Shared", "Unrelated"));
-        Write("derived", Derived.Replace("§M{Shared}\n", "§M{Consumer}\n" + imports)
-            .Replace(":Derived:Base:pub", ":Derived:" + reference + ":pub"));
+        var derived = Derived.Replace("§M{Shared}\n", "§M{Consumer}\n" + imports)
+            .Replace("§CL{Derived:Base:pub}", "§CL{Derived:" + reference + ":pub}");
+        Assert.Contains("§CL{Derived:" + reference + ":pub}", derived);
+        Write("derived", derived);
 
         var (_, diagnostics) = Compile();
 
@@ -154,7 +156,9 @@ public sealed class CrossModuleVarianceTests : IDisposable
     [Fact]
     public void PartialBaseDeclarationsShareTheirMethods()
     {
-        Write("base", Base("").Replace(":Base:pub}", ":Base:pub:partial}"));
+        var firstPart = Base("").Replace("§CL{Base:pub}", "§CL{Base:pub:partial}");
+        Assert.Contains("§CL{Base:pub:partial}", firstPart);
+        Write("base", firstPart);
         Write("other", """
             §M{Shared}
               §CL{Base:pub:partial}

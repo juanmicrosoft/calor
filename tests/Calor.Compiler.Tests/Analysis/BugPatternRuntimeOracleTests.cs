@@ -136,7 +136,7 @@ public class BugPatternRuntimeOracleTests
             """
             §M{BoundsUnsafe}
               §F{Run:pub} () -> i32
-                §B{[i32]:items} §ARR{items:2}
+                §B{[i32]:items} §ARR{i32:2}
                 §R §IDX items INT:2
             """,
             DiagnosticCode.IndexOutOfBounds,
@@ -146,7 +146,7 @@ public class BugPatternRuntimeOracleTests
             """
             §M{BoundsSafe}
               §F{Run:pub} () -> i32
-                §B{[i32]:items} §ARR{items} §A INT:4 §A INT:7 §/ARR
+                §B{[i32]:items} §ARR{i32} §A INT:4 §A INT:7 §/ARR
                 §R §IDX items INT:1
             """,
             DiagnosticCode.IndexOutOfBounds,
@@ -265,7 +265,7 @@ public class BugPatternRuntimeOracleTests
             """
             §M{NullableArraySafe}
               §F{Run:pub} () -> i32
-                §B{items:i32[]} §ARR{items} §A INT:1 §/ARR
+                §B{items:i32[]} §ARR{i32} §A INT:1 §/ARR
                 §R §LEN items
             """,
             DiagnosticCode.NullDereference,
@@ -275,7 +275,7 @@ public class BugPatternRuntimeOracleTests
             """
             §M{NullFirstArrayGuardSafe}
               §F{Run:pub} () -> i32
-                §B{items:i32[]} §ARR{items} §A INT:1 §/ARR
+                §B{items:i32[]} §ARR{i32} §A INT:1 §/ARR
                 §IF (== null items)
                   §R INT:0
                 §R §LEN items
@@ -289,7 +289,7 @@ public class BugPatternRuntimeOracleTests
               §F{Make:priv} () -> i32[]
                 §R null
               §F{Run:pub} (bool:condition) -> i32
-                §B{known:i32[]} §ARR{known} §A INT:1 §/ARR
+                §B{known:i32[]} §ARR{i32} §A INT:1 §/ARR
                 §B{items:i32[]} (? condition known §C{Make} §/C)
                 §R §LEN items
             """,
@@ -313,7 +313,7 @@ public class BugPatternRuntimeOracleTests
             """
             §M{OffByOneUnsafe}
               §F{Run:pub} () -> i32
-                §B{[i32]:items} §ARR{items} §A INT:1 §A INT:2 §/ARR
+                §B{[i32]:items} §ARR{i32} §A INT:1 §A INT:2 §/ARR
                 §B{length:i32} §LEN items
                 §B{~sum:i32} INT:0
                 §L{i:0:length:1}
@@ -327,7 +327,7 @@ public class BugPatternRuntimeOracleTests
             """
             §M{OffByOneSafe}
               §F{Run:pub} () -> i32
-                §B{[i32]:items} §ARR{items} §A INT:1 §A INT:2 §/ARR
+                §B{[i32]:items} §ARR{i32} §A INT:1 §A INT:2 §/ARR
                 §B{length:i32} §LEN items
                 §B{upper:i32} (- length INT:1)
                 §B{~sum:i32} INT:0
@@ -342,7 +342,7 @@ public class BugPatternRuntimeOracleTests
             """
             §M{ComputedNegativeStepUnsafe}
               §F{Run:pub} () -> i32
-                §B{[i32]:items} §ARR{items} §A INT:1 §A INT:2 §A INT:3 §/ARR
+                §B{[i32]:items} §ARR{i32} §A INT:1 §A INT:2 §A INT:3 §/ARR
                 §B{length:i32} §LEN items
                 §B{~sum:i32} INT:0
                 §L{i:length:0:(- 0 1)}
@@ -356,7 +356,7 @@ public class BugPatternRuntimeOracleTests
             """
             §M{ComputedNegativeStepSafe}
               §F{Run:pub} () -> i32
-                §B{[i32]:items} §ARR{items} §A INT:1 §A INT:2 §A INT:3 §/ARR
+                §B{[i32]:items} §ARR{i32} §A INT:1 §A INT:2 §A INT:3 §/ARR
                 §B{length:i32} §LEN items
                 §B{upper:i32} (- length INT:1)
                 §B{~sum:i32} INT:0
@@ -371,7 +371,7 @@ public class BugPatternRuntimeOracleTests
             """
             §M{StepTwoSkipsEndpoint}
               §F{Run:pub} () -> i32
-                §B{[i32]:items} §ARR{items} §A INT:1 §A INT:2 §A INT:3 §/ARR
+                §B{[i32]:items} §ARR{i32} §A INT:1 §A INT:2 §A INT:3 §/ARR
                 §B{length:i32} §LEN items
                 §B{~sum:i32} INT:0
                 §L{i:0:length:2}
@@ -385,7 +385,7 @@ public class BugPatternRuntimeOracleTests
             """
             §M{StepTwoReachesEndpoint}
               §F{Run:pub} () -> i32
-                §B{[i32]:items} §ARR{items} §A INT:1 §A INT:2 §A INT:3 §A INT:4 §/ARR
+                §B{[i32]:items} §ARR{i32} §A INT:1 §A INT:2 §A INT:3 §A INT:4 §/ARR
                 §B{length:i32} §LEN items
                 §B{~sum:i32} INT:0
                 §L{i:0:length:2}

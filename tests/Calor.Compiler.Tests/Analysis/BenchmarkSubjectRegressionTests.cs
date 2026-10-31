@@ -76,20 +76,20 @@ public sealed class BenchmarkSubjectRegressionTests(ITestOutputHelper output)
             _ => [DiagnosticCode.SqlInjection, DiagnosticCode.CommandInjection, DiagnosticCode.PathTraversal],
         };
 
-        var functions = Regex.Matches(source, @"§F\{[^:]+:([^:}]+):[^}]+\}");
-        Assert.Equal(functionCount, functions.Count);
+        var functions = module.Functions.OrderBy(function => function.Span.Start).ToArray();
+        Assert.Equal(functionCount, functions.Length);
         var observedGaps = new HashSet<string>();
-        for (var i = 0; i < functions.Count; i++)
+        for (var i = 0; i < functions.Length; i++)
         {
-            var start = functions[i].Index;
-            var end = i + 1 < functions.Count ? functions[i + 1].Index : source.Length;
+            var start = functions[i].Span.Start;
+            var end = i + 1 < functions.Length ? functions[i + 1].Span.Start : source.Length;
             var expectation = Regex.Match(source[start..end], @"// EXPECTED: (Calor\d+|No warnings)");
-            Assert.True(expectation.Success, $"Missing EXPECTED in {functions[i].Groups[1].Value}");
+            Assert.True(expectation.Success, $"Missing EXPECTED in {functions[i].Name}");
             var actual = findings.Where(d => targetCodes.Contains(d.Code) && d.Span.Start >= start && d.Span.Start < end)
                 .Select(d => d.Code).Distinct().Order().ToArray();
             var expected = expectation.Groups[1].Value;
-            output.WriteLine($"{functions[i].Groups[1].Value}: expected {expected}; actual {string.Join(", ", actual)}");
-            var key = $"{relativePath}:{functions[i].Groups[1].Value}";
+            output.WriteLine($"{functions[i].Name}: expected {expected}; actual {string.Join(", ", actual)}");
+            var key = $"{relativePath}:{functions[i].Name}";
             if (SafeCaseGaps.TryGetValue(key, out var gapCode))
             {
                 Assert.Equal("No warnings", expected);

@@ -74,7 +74,7 @@ public class ProductionOverflowRuntimeTests
     public void UnknownOverflowPolicy_IsRejectedRatherThanSilentlyChanged(string policy)
     {
         var result = Program.Compile($$"""
-            §M{m1:Overflow:overflow={{policy}}}
+            §M{Overflow:overflow={{policy}}}
               §F{Probe:pub} (i32:value) -> i32
                 §R (+ value 1)
             """, "overflow.calr", Options());
@@ -417,16 +417,17 @@ public class ProductionOverflowRuntimeTests
     }
 
     [Theory]
-    [InlineData("inc", int.MaxValue)]
-    [InlineData("dec", int.MinValue)]
-    public void IncrementAndDecrement_Trap(string operation, int input)
+    [InlineData("+", int.MaxValue)]
+    [InlineData("-", int.MinValue)]
+    public void ExplicitIncrementAndDecrement_Trap(string operation, int input)
     {
         AssertOverflow($$"""
             §M{Overflow}
               §F{Probe:pub} (i32:input) -> i32
                 §E{mut}
                 §B{~value:i32} input
-                §R ({{operation}} value)
+                §ASSIGN value ({{operation}} value 1)
+                §R value
             """, [input]);
     }
 

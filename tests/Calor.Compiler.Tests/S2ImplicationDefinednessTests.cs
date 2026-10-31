@@ -134,7 +134,7 @@ public sealed class S2ImplicationDefinednessTests
     {
         var source = IntegerTemplate.Replace("IFACEPRE", ifacePre).Replace("IMPLPRE", implPre);
         if (overflow != null)
-            source = source.Replace("§M{M}", $"§M{{m1:M:overflow={overflow}}}");
+            source = source.Replace("§M{M}", $"§M{{M:overflow={overflow}}}");
         return Compile(source);
     }
 
@@ -419,11 +419,21 @@ public sealed class S2ImplicationDefinednessTests
         Directory.CreateDirectory(dir);
         try
         {
-            var frozenPath = Path.Combine(dir, "frozen.calr");
-            var finalPath = Path.Combine(dir, "final.calr");
+            var frozenRoot = Path.Combine(dir, "frozen");
+            var finalRoot = Path.Combine(dir, "final");
+            Directory.CreateDirectory(frozenRoot);
+            Directory.CreateDirectory(finalRoot);
+            var frozenPath = Path.Combine(frozenRoot, "input.calr");
+            var finalPath = Path.Combine(finalRoot, "input.calr");
             File.WriteAllText(frozenPath, frozen);
             File.WriteAllText(finalPath, frozen.Replace("§M{M}", "§M{M:overflow=unchecked}"));
-            var (exit, stdOut, _) = CliTestHarness.RunCli(dir, "verify", frozenPath, finalPath, "--weakening-check", "f1");
+            var identities = new Calor.Compiler.Ids.DeclarationIdentityStore(frozenRoot);
+            var state = identities.Sync([frozenPath]);
+            var id = Assert.Single(state.Declarations, declaration =>
+                declaration.Kind == Calor.Compiler.Ids.IdKind.Function && declaration.Name == "Run").Id;
+            Calor.Compiler.Ids.DeclarationIdentityStore.CopyToSnapshot(
+                new Dictionary<string, string> { [frozenPath] = finalPath });
+            var (exit, stdOut, _) = CliTestHarness.RunCli(dir, "verify", frozenPath, finalPath, "--weakening-check", id);
             Assert.Equal(0, exit);
             var line = stdOut.Split('\n').First(l => l.TrimStart().StartsWith('{'));
             var json = System.Text.Json.JsonDocument.Parse(line).RootElement;
