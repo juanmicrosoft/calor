@@ -150,25 +150,12 @@
     },
     {
       "id": "conversion-snapshots:13-02.approved",
-      "expect": "known-failure",
+      "expect": "compile",
       "mode": "each",
       "options": [
         "--permissive-effects"
       ],
-      "errors": [
-        "13-02.approved.calr|Calor1002:CS1001|[\"13-02.approved.calr\",6,\"Test_13_02.VerbatimDemo`0\",\".ctor\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"i32\\\",\\\"modifier\\\":\\\"None\\\"},{\\\"type\\\":\\\"str\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"void\\\"}\"]|Generated C# failed compilation (CS1001): Identifier expected",
-        "13-02.approved.calr|Calor1002:CS1001|[\"13-02.approved.calr\",6,\"Test_13_02.VerbatimDemo`0\",\".ctor\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"i32\\\",\\\"modifier\\\":\\\"None\\\"},{\\\"type\\\":\\\"str\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"void\\\"}\"]|Generated C# failed compilation (CS1001): Identifier expected",
-        "13-02.approved.calr|Calor1002:CS1002|[\"13-02.approved.calr\",6,\"Test_13_02.VerbatimDemo`0\",\".ctor\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"i32\\\",\\\"modifier\\\":\\\"None\\\"},{\\\"type\\\":\\\"str\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"void\\\"}\"]|Generated C# failed compilation (CS1002): ; expected",
-        "13-02.approved.calr|Calor1002:CS1525|[\"13-02.approved.calr\",6,\"Test_13_02.VerbatimDemo`0\",\".ctor\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"i32\\\",\\\"modifier\\\":\\\"None\\\"},{\\\"type\\\":\\\"str\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"void\\\"}\"]|Generated C# failed compilation (CS1525): Invalid expression term 'object'",
-        "13-02.approved.g.cs|Calor1002:CS1001|-|Generated C# failed compilation (CS1001): Identifier expected",
-        "13-02.approved.g.cs|Calor1002:CS1001|-|Generated C# failed compilation (CS1001): Identifier expected",
-        "13-02.approved.g.cs|Calor1002:CS1003|-|Generated C# failed compilation (CS1003): Syntax error, ',' expected",
-        "13-02.approved.g.cs|Calor1002:CS1519|-|Generated C# failed compilation (CS1519): Invalid token ';' in a member declaration",
-        "13-02.approved.g.cs|Calor1002:CS1519|-|Generated C# failed compilation (CS1519): Invalid token ';' in a member declaration",
-        "13-02.approved.g.cs|Calor1002:CS1519|-|Generated C# failed compilation (CS1519): Invalid token 'object' in a member declaration"
-      ],
-      "defect": "Front end accepts the source; generated C# (CS1519): Invalid token 'object' in a member declaration; generated C# (CS1519): Invalid token ';' in a member declaration; generated C# (CS1001): Identifier expected; and 3 more",
-      "evidence": "Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
+      "evidence": "Reserved value-identifier emission was repaired by 86ad513a5: Roslyn keyword escaping now preserves base/type-word locals, parameters and members without rewriting real receiver syntax. Original and registered current-source bytes are unchanged. This exact subject now compiles with default CLI options and generated-C# validation; Tier 2 preserves its existing consumer options and promotes it to an ordinary positive obligation. The former keyword-only codegen failure is resolved, not waived. SnapshotConversionTests retains the approved conversion text.",
       "files": [
         "tests/Calor.Conversion.Tests/Snapshots/13-02.approved.calr"
       ]
@@ -1065,18 +1052,12 @@
     },
     {
       "id": "benchmarks:NetworkEffect",
-      "expect": "known-failure",
+      "expect": "compile",
       "mode": "each",
       "options": [
         "--no-enforce-effects"
       ],
-      "errors": [
-        "NetworkEffect.calr|Calor1002:CS1511|-|Generated C# failed compilation (CS1511): Keyword 'base' is not available in a static method",
-        "NetworkEffect.g.cs|Calor1002:CS1001|-|Generated C# failed compilation (CS1001): Identifier expected",
-        "NetworkEffect.g.cs|Calor1002:CS1003|-|Generated C# failed compilation (CS1003): Syntax error, ',' expected"
-      ],
-      "defect": "Front end accepts the source; generated C# (CS1001): Identifier expected; generated C# (CS1003): Syntax error, ',' expected; generated C# (CS1511): Keyword 'base' is not available in a static method",
-      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "evidence": "Reserved value-identifier emission was repaired by 86ad513a5: Roslyn keyword escaping now preserves base/type-word locals, parameters and members without rewriting real receiver syntax. Original and registered current-source bytes are unchanged. This exact subject now compiles with default CLI options and generated-C# validation; Tier 2 preserves its existing consumer options and promotes it to an ordinary positive obligation. The former keyword-only codegen failure is resolved, not waived. BulkBenchmarkCompilationTests now requires validated success for this manifest benchmark (EnforceEffects=false, ContractMode.Debug); original/current registrations remain separate.",
       "files": [
         "tests/TestData/Benchmarks/EffectSoundness/NetworkEffect.calr"
       ]
@@ -1095,18 +1076,12 @@
     },
     {
       "id": "benchmarks:PureFunctions",
-      "expect": "known-failure",
+      "expect": "compile",
       "mode": "each",
       "options": [
         "--no-enforce-effects"
       ],
-      "errors": [
-        "PureFunctions.calr|Calor1002:CS1511|[\"PureFunctions.calr\",1,\"PureMath\",\"Power\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"i32\\\",\\\"modifier\\\":\\\"None\\\"},{\\\"type\\\":\\\"i32\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"i32\\\"}\"]|Generated C# failed compilation (CS1511): Keyword 'base' is not available in a static method",
-        "PureFunctions.g.cs|Calor1002:CS1001|-|Generated C# failed compilation (CS1001): Identifier expected",
-        "PureFunctions.g.cs|Calor1002:CS1003|-|Generated C# failed compilation (CS1003): Syntax error, ',' expected"
-      ],
-      "defect": "Front end accepts the source; generated C# (CS1001): Identifier expected; generated C# (CS1003): Syntax error, ',' expected; generated C# (CS1511): Keyword 'base' is not available in a static method",
-      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "evidence": "Reserved value-identifier emission was repaired by 86ad513a5: Roslyn keyword escaping now preserves base/type-word locals, parameters and members without rewriting real receiver syntax. Original and registered current-source bytes are unchanged. This exact subject now compiles with default CLI options and generated-C# validation; Tier 2 preserves its existing consumer options and promotes it to an ordinary positive obligation. The former keyword-only codegen failure is resolved, not waived. BulkBenchmarkCompilationTests now requires validated success for this manifest benchmark (EnforceEffects=false, ContractMode.Debug); original/current registrations remain separate.",
       "files": [
         "tests/TestData/Benchmarks/InteropEffectCoverage/PureFunctions.calr"
       ]
@@ -1135,14 +1110,10 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "InterfaceImpl.calr|Calor1002:CS0266|[\"InterfaceImpl.calr\",1,\"InterfaceImpl\",\"AreaCircle\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"f32\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"f32\\\"}\"]|Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
-        "InterfaceImpl.calr|Calor1002:CS1511|[\"InterfaceImpl.calr\",1,\"InterfaceImpl\",\"AreaTriangle\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"f32\\\",\\\"modifier\\\":\\\"None\\\"},{\\\"type\\\":\\\"f32\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"f32\\\"}\"]|Generated C# failed compilation (CS1511): Keyword 'base' is not available in a static method",
-        "InterfaceImpl.g.cs|Calor1002:CS1001|-|Generated C# failed compilation (CS1001): Identifier expected",
-        "InterfaceImpl.g.cs|Calor1002:CS1003|-|Generated C# failed compilation (CS1003): Syntax error, ',' expected",
-        "InterfaceImpl.g.cs|Calor1002:CS1511|-|Generated C# failed compilation (CS1511): Keyword 'base' is not available in a static method"
+        "InterfaceImpl.calr|Calor1002:CS0266|[\"InterfaceImpl.calr\",1,\"InterfaceImpl\",\"AreaCircle\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"f32\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"f32\\\"}\"]|Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
       ],
-      "defect": "Front end accepts the source; generated C# (CS1001): Identifier expected; generated C# (CS1003): Syntax error, ',' expected; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?); and 1 more",
-      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "defect": "AreaCircle still generates a double expression for an f32 return type (CS0266); no numeric conversion repair is claimed.",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only. Product keyword repair 86ad513a5 removes only the four base-related CS1001/CS1003/CS1511 errors on unchanged source. Independent default CLI compilation retains exactly the original AreaCircle CS0266 file, authoritative declaration descriptor, message and multiplicity. This subject remains a failing known-failure obligation.",
       "files": [
         "tests/TestData/Benchmarks/OOPGenerics/InterfaceImpl.calr"
       ]
@@ -1229,18 +1200,12 @@
     },
     {
       "id": "benchmarks:Power",
-      "expect": "known-failure",
+      "expect": "compile",
       "mode": "each",
       "options": [
         "--no-enforce-effects"
       ],
-      "errors": [
-        "Power.calr|Calor1002:CS1511|[\"Power.calr\",1,\"MathPower\",\"Power\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"i32\\\",\\\"modifier\\\":\\\"None\\\"},{\\\"type\\\":\\\"i32\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"i32\\\"}\"]|Generated C# failed compilation (CS1511): Keyword 'base' is not available in a static method",
-        "Power.g.cs|Calor1002:CS1001|-|Generated C# failed compilation (CS1001): Identifier expected",
-        "Power.g.cs|Calor1002:CS1003|-|Generated C# failed compilation (CS1003): Syntax error, ',' expected"
-      ],
-      "defect": "Front end accepts the source; generated C# (CS1001): Identifier expected; generated C# (CS1003): Syntax error, ',' expected; generated C# (CS1511): Keyword 'base' is not available in a static method",
-      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "evidence": "Reserved value-identifier emission was repaired by 86ad513a5: Roslyn keyword escaping now preserves base/type-word locals, parameters and members without rewriting real receiver syntax. Original and registered current-source bytes are unchanged. This exact subject now compiles with default CLI options and generated-C# validation; Tier 2 preserves its existing consumer options and promotes it to an ordinary positive obligation. The former keyword-only codegen failure is resolved, not waived. BulkBenchmarkCompilationTests now requires validated success for this manifest benchmark (EnforceEffects=false, ContractMode.Debug); original/current registrations remain separate.",
       "files": [
         "tests/TestData/Benchmarks/TokenEconomics/Power.calr"
       ]
@@ -2370,18 +2335,12 @@
     },
     {
       "id": "active:benchmarks:NetworkEffect",
-      "expect": "known-failure",
+      "expect": "compile",
       "mode": "each",
       "options": [
         "--no-enforce-effects"
       ],
-      "errors": [
-        "NetworkEffect.calr|Calor1002:CS1511|-|Generated C# failed compilation (CS1511): Keyword 'base' is not available in a static method",
-        "NetworkEffect.g.cs|Calor1002:CS1001|-|Generated C# failed compilation (CS1001): Identifier expected",
-        "NetworkEffect.g.cs|Calor1002:CS1003|-|Generated C# failed compilation (CS1003): Syntax error, ',' expected"
-      ],
-      "defect": "Front end accepts the source; generated C# (CS1001): Identifier expected; generated C# (CS1003): Syntax error, ',' expected; generated C# (CS1511): Keyword 'base' is not available in a static method",
-      "evidence": "Current semantic copies explicitly registered in ActiveSyntax/inputs.json; BulkBenchmarkCompilationTests resolves registered benchmark inputs to these copies without changing each subject's success/rejection intent. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "evidence": "Reserved value-identifier emission was repaired by 86ad513a5: Roslyn keyword escaping now preserves base/type-word locals, parameters and members without rewriting real receiver syntax. Original and registered current-source bytes are unchanged. This exact subject now compiles with default CLI options and generated-C# validation; Tier 2 preserves its existing consumer options and promotes it to an ordinary positive obligation. The former keyword-only codegen failure is resolved, not waived. BulkBenchmarkCompilationTests now requires validated success for this manifest benchmark (EnforceEffects=false, ContractMode.Debug); original/current registrations remain separate.",
       "files": [
         "tests/TestData/ActiveSyntax/tests/TestData/Benchmarks/EffectSoundness/NetworkEffect.calr"
       ]
@@ -2400,18 +2359,12 @@
     },
     {
       "id": "active:benchmarks:PureFunctions",
-      "expect": "known-failure",
+      "expect": "compile",
       "mode": "each",
       "options": [
         "--no-enforce-effects"
       ],
-      "errors": [
-        "PureFunctions.calr|Calor1002:CS1511|[\"PureFunctions.calr\",1,\"PureMath\",\"Power\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"i32\\\",\\\"modifier\\\":\\\"None\\\"},{\\\"type\\\":\\\"i32\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"i32\\\"}\"]|Generated C# failed compilation (CS1511): Keyword 'base' is not available in a static method",
-        "PureFunctions.g.cs|Calor1002:CS1001|-|Generated C# failed compilation (CS1001): Identifier expected",
-        "PureFunctions.g.cs|Calor1002:CS1003|-|Generated C# failed compilation (CS1003): Syntax error, ',' expected"
-      ],
-      "defect": "Front end accepts the source; generated C# (CS1001): Identifier expected; generated C# (CS1003): Syntax error, ',' expected; generated C# (CS1511): Keyword 'base' is not available in a static method",
-      "evidence": "Current semantic copies explicitly registered in ActiveSyntax/inputs.json; BulkBenchmarkCompilationTests resolves registered benchmark inputs to these copies without changing each subject's success/rejection intent. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "evidence": "Reserved value-identifier emission was repaired by 86ad513a5: Roslyn keyword escaping now preserves base/type-word locals, parameters and members without rewriting real receiver syntax. Original and registered current-source bytes are unchanged. This exact subject now compiles with default CLI options and generated-C# validation; Tier 2 preserves its existing consumer options and promotes it to an ordinary positive obligation. The former keyword-only codegen failure is resolved, not waived. BulkBenchmarkCompilationTests now requires validated success for this manifest benchmark (EnforceEffects=false, ContractMode.Debug); original/current registrations remain separate.",
       "files": [
         "tests/TestData/ActiveSyntax/tests/TestData/Benchmarks/InteropEffectCoverage/PureFunctions.calr"
       ]
@@ -2440,14 +2393,10 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "InterfaceImpl.calr|Calor1002:CS0266|[\"InterfaceImpl.calr\",1,\"InterfaceImpl\",\"AreaCircle\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"f32\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"f32\\\"}\"]|Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
-        "InterfaceImpl.calr|Calor1002:CS1511|[\"InterfaceImpl.calr\",1,\"InterfaceImpl\",\"AreaTriangle\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"f32\\\",\\\"modifier\\\":\\\"None\\\"},{\\\"type\\\":\\\"f32\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"f32\\\"}\"]|Generated C# failed compilation (CS1511): Keyword 'base' is not available in a static method",
-        "InterfaceImpl.g.cs|Calor1002:CS1001|-|Generated C# failed compilation (CS1001): Identifier expected",
-        "InterfaceImpl.g.cs|Calor1002:CS1003|-|Generated C# failed compilation (CS1003): Syntax error, ',' expected",
-        "InterfaceImpl.g.cs|Calor1002:CS1511|-|Generated C# failed compilation (CS1511): Keyword 'base' is not available in a static method"
+        "InterfaceImpl.calr|Calor1002:CS0266|[\"InterfaceImpl.calr\",1,\"InterfaceImpl\",\"AreaCircle\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"f32\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"f32\\\"}\"]|Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
       ],
-      "defect": "Front end accepts the source; generated C# (CS1001): Identifier expected; generated C# (CS1003): Syntax error, ',' expected; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?); and 1 more",
-      "evidence": "Current semantic copies explicitly registered in ActiveSyntax/inputs.json; BulkBenchmarkCompilationTests resolves registered benchmark inputs to these copies without changing each subject's success/rejection intent. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "defect": "AreaCircle still generates a double expression for an f32 return type (CS0266); no numeric conversion repair is claimed.",
+      "evidence": "Current semantic copies explicitly registered in ActiveSyntax/inputs.json; BulkBenchmarkCompilationTests resolves registered benchmark inputs to these copies without changing each subject's success/rejection intent. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only. Product keyword repair 86ad513a5 removes only the four base-related CS1001/CS1003/CS1511 errors on unchanged source. Independent default CLI compilation retains exactly the original AreaCircle CS0266 file, authoritative declaration descriptor, message and multiplicity. This subject remains a failing known-failure obligation.",
       "files": [
         "tests/TestData/ActiveSyntax/tests/TestData/Benchmarks/OOPGenerics/InterfaceImpl.calr"
       ]
@@ -2534,18 +2483,12 @@
     },
     {
       "id": "active:benchmarks:Power",
-      "expect": "known-failure",
+      "expect": "compile",
       "mode": "each",
       "options": [
         "--no-enforce-effects"
       ],
-      "errors": [
-        "Power.calr|Calor1002:CS1511|[\"Power.calr\",1,\"MathPower\",\"Power\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"i32\\\",\\\"modifier\\\":\\\"None\\\"},{\\\"type\\\":\\\"i32\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"i32\\\"}\"]|Generated C# failed compilation (CS1511): Keyword 'base' is not available in a static method",
-        "Power.g.cs|Calor1002:CS1001|-|Generated C# failed compilation (CS1001): Identifier expected",
-        "Power.g.cs|Calor1002:CS1003|-|Generated C# failed compilation (CS1003): Syntax error, ',' expected"
-      ],
-      "defect": "Front end accepts the source; generated C# (CS1001): Identifier expected; generated C# (CS1003): Syntax error, ',' expected; generated C# (CS1511): Keyword 'base' is not available in a static method",
-      "evidence": "Current semantic copies explicitly registered in ActiveSyntax/inputs.json; BulkBenchmarkCompilationTests resolves registered benchmark inputs to these copies without changing each subject's success/rejection intent. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "evidence": "Reserved value-identifier emission was repaired by 86ad513a5: Roslyn keyword escaping now preserves base/type-word locals, parameters and members without rewriting real receiver syntax. Original and registered current-source bytes are unchanged. This exact subject now compiles with default CLI options and generated-C# validation; Tier 2 preserves its existing consumer options and promotes it to an ordinary positive obligation. The former keyword-only codegen failure is resolved, not waived. BulkBenchmarkCompilationTests now requires validated success for this manifest benchmark (EnforceEffects=false, ContractMode.Debug); original/current registrations remain separate.",
       "files": [
         "tests/TestData/ActiveSyntax/tests/TestData/Benchmarks/TokenEconomics/Power.calr"
       ]

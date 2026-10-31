@@ -658,6 +658,65 @@ class RepositoryGuards(unittest.TestCase):
                 self.assertEqual(group.get("options", []), [])
                 self.assertNotIn("errors", group)
 
+    def test_keyword_repaired_subjects_require_compilation(self):
+        groups = {g["id"]: g for g in self.manifest["groups"]}
+        expected = [(
+            "conversion-snapshots:13-02.approved",
+            "tests/Calor.Conversion.Tests/Snapshots/13-02.approved.calr",
+            ["--permissive-effects"],
+        )]
+        for prefix, root in (
+            ("benchmarks:", "tests/TestData/Benchmarks/"),
+            ("active:benchmarks:", "tests/TestData/ActiveSyntax/tests/TestData/Benchmarks/"),
+        ):
+            expected.extend((prefix + name, root + relative, ["--no-enforce-effects"])
+                            for name, relative in (
+                                ("NetworkEffect", "EffectSoundness/NetworkEffect.calr"),
+                                ("PureFunctions", "InteropEffectCoverage/PureFunctions.calr"),
+                                ("Power", "TokenEconomics/Power.calr"),
+                            ))
+        self.assertEqual(len(expected), 7)
+        for identifier, file, options in expected:
+            with self.subTest(group=identifier):
+                group = groups[identifier]
+                self.assertEqual(group["files"], [file])
+                self.assertEqual(group["mode"], "each")
+                self.assertEqual(group["options"], options)
+                self.assertEqual(group["expect"], "compile")
+                self.assertNotIn("errors", group)
+                self.assertNotIn("defect", group)
+                self.assertNotIn("negativeKind", group)
+
+    def test_interface_impl_retains_only_exact_unrepaired_float_cause(self):
+        groups = {g["id"]: g for g in self.manifest["groups"]}
+        signature = json.dumps({
+            "arity": 0, "parameters": [{"type": "f32", "modifier": "None"}],
+            "output": "f32",
+        }, separators=(",", ":"))
+        declaration = json.dumps([
+            "InterfaceImpl.calr", 1, "InterfaceImpl", "AreaCircle", signature,
+        ], separators=(",", ":"))
+        error = (
+            f"InterfaceImpl.calr|Calor1002:CS0266|{declaration}|"
+            "Generated C# failed compilation (CS0266): Cannot implicitly convert "
+            "type 'double' to 'float'. An explicit conversion exists "
+            "(are you missing a cast?)"
+        )
+        for prefix, root in (
+            ("benchmarks:", "tests/TestData/Benchmarks/"),
+            ("active:benchmarks:", "tests/TestData/ActiveSyntax/tests/TestData/Benchmarks/"),
+        ):
+            identifier = prefix + "InterfaceImpl"
+            with self.subTest(group=identifier):
+                group = groups[identifier]
+                self.assertEqual(group["files"], [root + "OOPGenerics/InterfaceImpl.calr"])
+                self.assertEqual(group["mode"], "each")
+                self.assertEqual(group["options"], ["--no-enforce-effects"])
+                self.assertEqual(group["expect"], "known-failure")
+                self.assertEqual(group["errors"], [error])
+                self.assertTrue(group["defect"])
+                self.assertNotIn("negativeKind", group)
+
     def test_current_latency_project_keeps_all_modules_and_compile_obligation(self):
         prefix = "bench/phase0-agent-native/latency/fixture-10k/src/"
         mapping = fcc.current_input_paths(REPO_ROOT, self.manifest)

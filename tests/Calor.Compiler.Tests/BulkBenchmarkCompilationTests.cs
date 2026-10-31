@@ -14,7 +14,6 @@ public class BulkBenchmarkCompilationTests
     private static readonly HashSet<string> KnownGeneratedCSharpFailures =
     [
         "TokenEconomics/TemperatureConverter.calr",
-        "TokenEconomics/Power.calr",
         "DesignPatterns/Factory.calr",
         "TokenEconomics/Average.calr",
         "TokenEconomics/CelsiusToKelvin.calr",
@@ -29,8 +28,6 @@ public class BulkBenchmarkCompilationTests
         "DomainProblems/CurrencyConverter.calr",
         "DesignPatterns/Visitor.calr",
         "DesignPatterns/TemplateMethod.calr",
-        "EffectSoundness/NetworkEffect.calr",
-        "InteropEffectCoverage/PureFunctions.calr",
         "OOPGenerics/InterfaceImpl.calr",
         "OOPGenerics/Composition.calr",
         "OOPGenerics/Polymorphism.calr",
