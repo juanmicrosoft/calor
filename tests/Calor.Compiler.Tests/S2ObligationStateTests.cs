@@ -1,3 +1,5 @@
+using Calor.Compiler.Analysis;
+using Calor.Compiler.Ast;
 using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Obligations;
 using Calor.Compiler.Verification.Z3;
@@ -34,6 +36,12 @@ public sealed class S2ObligationStateTests
             VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
         };
         var result = Program.Compile(source, "case.calr", options);
+        if (options.ObligationResults != null)
+        {
+            var proofs = RecursiveAstWalker.DescendantsAndSelf(result.Ast!).OfType<ProofObligationNode>().ToArray();
+            foreach (var obligation in options.ObligationResults.Obligations.Where(o => o.Kind == ObligationKind.ProofObligation))
+                Assert.Equal(Assert.Single(proofs, proof => proof.Span == obligation.Span).Id, obligation.SourceProofId);
+        }
         // A type error stops compilation before obligations are generated.
         return (options.ObligationResults?.Obligations.ToList() ?? [], result.GeneratedCode, result.HasErrors);
     }
@@ -68,7 +76,7 @@ public sealed class S2ObligationStateTests
         Assert.Equal(ProofStatus.Unsupported, proof.Outcome!.Status);
         Assert.Contains("may change", proof.Outcome.Reason);
         // The runtime guard stays in the default (elision-enabled) emission.
-        Assert.Contains("Proof obligation [p1", csharp);
+        Assert.Contains($"Proof obligation [{proof.SourceProofId}", csharp);
     }
 
     [Fact]
@@ -309,7 +317,7 @@ public sealed class S2ObligationStateTests
                   §R x
             """;
         var proof = Assert.Single(Solve(source).Obligations,
-            obligation => obligation.Kind == ObligationKind.ProofObligation && obligation.SourceProofId == "p1");
+            obligation => obligation.Kind == ObligationKind.ProofObligation && obligation.Description == "claim");
         Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
     }
 
@@ -468,7 +476,7 @@ public sealed class S2ObligationStateTests
         Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
         Assert.Equal(ProofStatus.Unsupported, proof.Outcome!.Status);
         Assert.False(hasErrors);
-        Assert.Contains("Proof obligation [p1", csharp);
+        Assert.Contains($"Proof obligation [{proof.SourceProofId}", csharp);
     }
 
     [Fact]

@@ -3,6 +3,8 @@ using System.Runtime.Loader;
 using System.Text;
 using System.Text.Json.Nodes;
 using Calor.Compiler.CodeGen;
+using Calor.Compiler.Analysis;
+using Calor.Compiler.Ast;
 using Calor.Compiler.Verification.Obligations;
 using Calor.Compiler.Verification.Z3;
 using Calor.Compiler.Verification.Z3.Cache;
@@ -74,10 +76,13 @@ public class RefOutContractCaseTests
         if (c["expected"]?["proof"] is not null)
         {
             var proof = Assert.IsAssignableFrom<JsonNode>(observed["proof"]);
-            var status = Assert.Single(options.ObligationResults!.Obligations, o => o.Kind == ObligationKind.ProofObligation).Status;
+            var obligation = Assert.Single(options.ObligationResults!.Obligations, o => o.Kind == ObligationKind.ProofObligation);
+            var owner = Assert.Single(RecursiveAstWalker.DescendantsAndSelf(result.Ast!).OfType<ProofObligationNode>());
+            Assert.Equal(owner.Id, obligation.SourceProofId);
+            var status = obligation.Status;
             Assert.Equal(proof.GetValue<string>(), status.ToString());
             // RO-ANA-3: an Unsupported obligation is visible (Calor1124) and keeps its runtime guard.
-            const string guard = "Proof obligation [pr1] violated";
+            var guard = $"Proof obligation [{owner.Id}] violated";
             if (status == ObligationStatus.Unsupported)
             {
                 Assert.Contains(result.Diagnostics, d => d.Code == "Calor1124");

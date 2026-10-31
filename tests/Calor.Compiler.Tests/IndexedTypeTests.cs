@@ -102,7 +102,8 @@ public sealed class IndexedTypeTests
         Assert.Single(module.IndexedTypes);
 
         var itype = module.IndexedTypes[0];
-        Assert.Equal("it1", itype.Id);
+        Assert.StartsWith("it_auto", itype.LocalId);
+        Assert.Null(itype.ToolingId);
         Assert.Equal("SizedList", itype.Name);
         Assert.Equal("List", itype.BaseTypeName);
         Assert.Equal("n", itype.SizeParam);
@@ -124,7 +125,8 @@ public sealed class IndexedTypeTests
         Assert.Single(module.IndexedTypes);
 
         var itype = module.IndexedTypes[0];
-        Assert.Equal("it2", itype.Id);
+        Assert.StartsWith("it_auto", itype.LocalId);
+        Assert.Null(itype.ToolingId);
         Assert.Equal("NonEmptyArr", itype.Name);
         Assert.Equal("IntArr", itype.BaseTypeName);
         Assert.Equal("n", itype.SizeParam);
@@ -252,7 +254,9 @@ public sealed class IndexedTypeTests
         var scanner = new Ids.IdScanner();
         var entries = scanner.Scan(module, "test.calr");
 
-        Assert.Contains(entries, e => e.Id == "it1" && e.Kind == Ids.IdKind.IndexedType);
+        var type = Assert.Single(module.IndexedTypes);
+        Assert.Contains(entries, e => e.Id == type.Id && e.Kind == Ids.IdKind.IndexedType
+            && e.Name == type.Name && e.Span == type.Span);
     }
 
     // ───── Feature Support ─────
@@ -294,7 +298,7 @@ public sealed class IndexedTypeTests
 
         Assert.Contains(tracker.Obligations, o => o.Kind == ObligationKind.IndexBounds);
         var indexObl = tracker.Obligations.First(o => o.Kind == ObligationKind.IndexBounds);
-        Assert.Equal("f001", indexObl.FunctionId);
+        Assert.Equal(Assert.Single(module.Functions).Id, indexObl.FunctionId);
         Assert.Contains("items", indexObl.Description);
     }
 

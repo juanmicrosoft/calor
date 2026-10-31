@@ -1,3 +1,5 @@
+using Calor.Compiler.Analysis;
+using Calor.Compiler.Ast;
 using Calor.Compiler.Verification.Obligations;
 using Calor.Compiler.Verification.Z3;
 using Calor.Compiler.Verification.Z3.Cache;
@@ -27,12 +29,15 @@ public sealed class S2ObligationResidualTests
         };
         var result = Program.Compile(source, "case.calr", options);
         Assert.True(options.ObligationResults != null, string.Join("\n", result.Diagnostics.Select(d => d.Message)));
+        var proofs = RecursiveAstWalker.DescendantsAndSelf(result.Ast!).OfType<ProofObligationNode>().ToArray();
+        foreach (var obligation in options.ObligationResults!.Obligations.Where(o => o.Kind == ObligationKind.ProofObligation))
+            Assert.Equal(Assert.Single(proofs, proof => proof.Span == obligation.Span).Id, obligation.SourceProofId);
         return (options.ObligationResults!.Obligations.ToList(), result.GeneratedCode,
             result.Diagnostics.Select(d => d.Code).ToList());
     }
 
-    private static Obligation Proof(List<Obligation> obligations, string id)
-        => Assert.Single(obligations, o => o.Kind == ObligationKind.ProofObligation && o.SourceProofId == id);
+    private static Obligation Proof(List<Obligation> obligations, string description)
+        => Assert.Single(obligations, o => o.Kind == ObligationKind.ProofObligation && o.Description == description);
 
     private static void AssertWithheld(Obligation obligation)
     {
@@ -59,7 +64,7 @@ public sealed class S2ObligationResidualTests
                 §PROOF{claim} (== box.Trigger INT:0)
             """;
         var (obligations, csharp, codes) = Solve(source);
-        AssertWithheld(Proof(obligations, "p1"));
+        AssertWithheld(Proof(obligations, "claim"));
         Assert.Contains("box.Trigger == 0", csharp);   // the runtime check stays
         Assert.Contains("Calor1124", codes);           // reported as unsupported
         Assert.DoesNotContain("Calor1140", codes);     // no failed-proof error
@@ -102,7 +107,7 @@ public sealed class S2ObligationResidualTests
                 §PROOF{claim} (!= x INT:0)
                 §R q
             """;
-        AssertWithheld(Proof(Solve(source).Obligations, "p1"));
+        AssertWithheld(Proof(Solve(source).Obligations, "claim"));
     }
 
     [Fact]
@@ -117,7 +122,7 @@ public sealed class S2ObligationResidualTests
                 §PROOF{second} (> x INT:0)
                 §R x
             """;
-        AssertWithheld(Proof(Solve(source).Obligations, "p2"));
+        AssertWithheld(Proof(Solve(source).Obligations, "second"));
     }
 
     [Fact]
@@ -134,7 +139,7 @@ public sealed class S2ObligationResidualTests
                 §R x
             """;
         // The type checker rejects i32 -> NZ without a cast; the emitter's guard is what runs.
-        AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "p1"));
+        AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "claim"));
     }
 
     [Fact]
@@ -156,7 +161,7 @@ public sealed class S2ObligationResidualTests
                 §PROOF{claim} (!= x INT:0)
                 §R x
             """;
-        AssertWithheld(Proof(Solve(source).Obligations, "p1"));
+        AssertWithheld(Proof(Solve(source).Obligations, "claim"));
     }
 
     [Fact]
@@ -174,7 +179,7 @@ public sealed class S2ObligationResidualTests
                   §R INT:2
                 §R x
             """;
-        Assert.Equal(ObligationStatus.Failed, Proof(Solve(source).Obligations, "p1").Status);
+        Assert.Equal(ObligationStatus.Failed, Proof(Solve(source).Obligations, "claim").Status);
     }
 
     [Fact]
@@ -216,7 +221,7 @@ public sealed class S2ObligationResidualTests
                 §E{}
                 §PROOF{claim} (== box.Trigger INT:0)
             """;
-        AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "p1"));
+        AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "claim"));
     }
 
     [Fact]
@@ -234,7 +239,7 @@ public sealed class S2ObligationResidualTests
                 §PROOF{claim} (!= x INT:0)
                 §R q
             """;
-        AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "p1"));
+        AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "claim"));
     }
 
     [Fact]
@@ -256,7 +261,7 @@ public sealed class S2ObligationResidualTests
                 §R q
             """;
         var (obligations, csharp, codes) = Solve(source, typeCheck: false);
-        AssertWithheld(Proof(obligations, "p1"));
+        AssertWithheld(Proof(obligations, "claim"));
         Assert.Contains("box.Value != 0", csharp);           // the runtime check stays
         Assert.Contains("Calor1124", codes);          // reported as unsupported
         Assert.DoesNotContain("Calor1140", codes);    // no failed-proof error
@@ -287,7 +292,7 @@ public sealed class S2ObligationResidualTests
                 §R x
             """;
         var (obligations, csharp, codes) = Solve(source, typeCheck: false);
-        AssertWithheld(Proof(obligations, "p1"));
+        AssertWithheld(Proof(obligations, "claim"));
         Assert.Contains("x != 0", csharp);           // the runtime check stays
         Assert.Contains("Calor1124", codes);          // reported as unsupported
         Assert.DoesNotContain("Calor1140", codes);    // no failed-proof error
@@ -327,7 +332,7 @@ public sealed class S2ObligationResidualTests
                 §PROOF{claim} (< x INT:2147483647)
                 §R x
             """;
-        AssertWithheld(Proof(Solve(source).Obligations, "p1"));
+        AssertWithheld(Proof(Solve(source).Obligations, "claim"));
     }
 
     [Fact]
@@ -359,7 +364,7 @@ public sealed class S2ObligationResidualTests
                 §B{length:i32} §LEN items
                 §PROOF{claim} (> x INT:0)
             """;
-        AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "p1"));
+        AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "claim"));
     }
 
     [Fact]
@@ -376,7 +381,7 @@ public sealed class S2ObligationResidualTests
                 §E{}
                 §PROOF{claim} (== §LEN box INT:0)
             """;
-        var proof = Proof(Solve(source, typeCheck: false).Obligations, "p1");
+        var proof = Proof(Solve(source, typeCheck: false).Obligations, "claim");
         Assert.NotEqual(ObligationStatus.Failed, proof.Status);
         Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
     }
@@ -396,7 +401,7 @@ public sealed class S2ObligationResidualTests
                 §E{}
                 §PROOF{claim} (== box.Trigger INT:0)
             """;
-        var proof = Proof(Solve(source, typeCheck: false).Obligations, "p1");
+        var proof = Proof(Solve(source, typeCheck: false).Obligations, "claim");
         Assert.NotEqual(ObligationStatus.Failed, proof.Status);
         Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
     }
@@ -419,7 +424,7 @@ public sealed class S2ObligationResidualTests
                   §/BASE
                   §PROOF{claim} (!= x INT:0)
             """;
-        AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "p1"));
+        AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "claim"));
     }
 
     [Fact]
@@ -433,7 +438,7 @@ public sealed class S2ObligationResidualTests
                 §PROOF{claim} (> x INT:0)
                 §R q
             """;
-        Assert.Equal(ObligationStatus.Failed, Proof(Solve(source).Obligations, "p1").Status);
+        Assert.Equal(ObligationStatus.Failed, Proof(Solve(source).Obligations, "claim").Status);
     }
 
     [Fact]
@@ -447,6 +452,6 @@ public sealed class S2ObligationResidualTests
                 §E{}
                 §PROOF{claim} (> box.Value INT:0)
             """;
-        Assert.Equal(ObligationStatus.Failed, Proof(Solve(source).Obligations, "p1").Status);
+        Assert.Equal(ObligationStatus.Failed, Proof(Solve(source).Obligations, "claim").Status);
     }
 }

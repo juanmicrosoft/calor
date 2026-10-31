@@ -82,10 +82,10 @@ public class BclLoweringPrerequisiteTests
         var known = Assert.IsType<BindStatementNode>(module.Functions[0].Body[0]).Initializer!;
         var unknown = Assert.IsType<BindStatementNode>(module.Functions[1].Body[0]).Initializer!;
         var array = Assert.IsType<Calor.Compiler.Binding.BoundTypes.ArrayBoundType>(
-            graph.MetadataArrayReceiverType("f1", known.Span));
+            graph.MetadataArrayReceiverType(module.Functions[0].Id, known.Span));
         Assert.Equal("System.Type", array.ElementType.DisplayString);
-        Assert.Null(graph.MetadataArrayReceiverType("f2", known.Span));
-        Assert.Null(graph.MetadataArrayReceiverType("f2", unknown.Span));
+        Assert.Null(graph.MetadataArrayReceiverType(module.Functions[1].Id, known.Span));
+        Assert.Null(graph.MetadataArrayReceiverType(module.Functions[1].Id, unknown.Span));
         var compiled = Program.Compile(source, "scoped-arrays.calr",
             new CompilationOptions { UnknownCallPolicy = UnknownCallPolicy.Strict, StatusWriter = TextWriter.Null });
         Assert.Single(compiled.Diagnostics.Where(diagnostic =>
@@ -141,7 +141,7 @@ public class BclLoweringPrerequisiteTests
         Assert.False(diagnostics.HasErrors);
         var initializer = Assert.IsType<BindStatementNode>(module.Functions[0].Body[0]).Initializer!;
         var graph = CallGraphAnalysis.Build(module);
-        Assert.Null(graph.MetadataArrayReceiverType("f1", initializer.Span));
+        Assert.Null(graph.MetadataArrayReceiverType(module.Functions[0].Id, initializer.Span));
         var compiled = Program.Compile(source, "type-array-call.calr",
             new CompilationOptions { UnknownCallPolicy = UnknownCallPolicy.Strict, StatusWriter = TextWriter.Null });
         Assert.Contains(compiled.Diagnostics, diagnostic =>
