@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.Loader;
+using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Migration;
 using Microsoft.CodeAnalysis;
@@ -9,15 +10,12 @@ using Xunit;
 namespace Calor.Compiler.Tests;
 
 /// <summary>
-/// 0.25 F3 (#847): the native local-function construct, a nested <c>§F</c> in a
-/// <c>§F</c>/<c>§MT</c> body emitted in place as a C# <c>static</c> local function:
-/// name resolution, effects, Calor0211, capture rejection, verification and the
-/// Calor-emitter round trip. Conversion from C# is in LocalFunctionConversionTests.
+/// #1600: binding/lambda replacements retain local resolution, effect, capture,
+/// verification and round-trip controls. Retired nested §F forms fail explicitly.
+/// Conversion from C# is covered separately in LocalFunctionConversionTests.
 /// </summary>
 public class LocalFunctionLanguageTests
 {
-    // ---- Native Calor: the construct itself ----
-
     private const string ShadowingModule = """
         §M{Shadow}
           §M{Probe:pub}
@@ -28,9 +26,10 @@ public class LocalFunctionLanguageTests
 
             §MT{Quiet:pub:stat} () -> i32
               §E{}
-              §R §C{Add} §A 2 §/C
-              §F{Add} (i32:x) -> i32
+              §B{Add:Func<i32,i32>} §LAM{static:x:i32}
                 §R (+ x 1)
+              §/LAM
+              §R §C{Add} §A 2 §/C
 
             §MT{Run:pub:stat} () -> str
               §E{}
@@ -41,8 +40,7 @@ public class LocalFunctionLanguageTests
     public void NativeLocal_ShadowsSameNamedMember_ForResolutionAndEffects()
     {
         // The class Add prints; the local Add is pure. Quiet and Run declare §E{}:
-        // charging the class method (a silent rebind in the effect pass) would be
-        // Calor0410. The call is emitted in place and runs the local function.
+        // Charging the class method instead of the lambda would be Calor0410.
         var compilation = Program.Compile(ShadowingModule, "shadow.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
@@ -50,11 +48,10 @@ public class LocalFunctionLanguageTests
     }
 
     [Theory]
-    // A local body's effect is charged to the enclosing callable, called or not.
-    [InlineData("§F{Help} (i32:x) -> i32\n        §P \"hidden\"\n        §R x\n      §R 1", "Calor0410")]
-    // Escaping as a value: its row is the union of the local bodies, never a member's.
-    [InlineData("§F{Help} (i32:x) -> i32\n        §R x\n      §R §C{Help} §A 1 §/C", null)]
-    public void NativeLocal_EffectsAreChargedToTheEnclosingCallable(string body, string? expectedCode)
+    [InlineData("§B{Help:Func<i32,i32>} §LAM{static:x:i32}\n        §P \"hidden\"\n        §R x\n      §/LAM\n      §R §C{Help} §A 1 §/C", "Calor0410")]
+    [InlineData("§B{Help:Func<i32,i32>} §LAM{static:x:i32}\n        §R x\n      §/LAM\n      §R §C{Help} §A 1 §/C", null)]
+    [InlineData("§B{Help:Func<i32,i32>} §LAM{static:x:i32}\n        §P \"deferred\"\n        §R x\n      §/LAM\n      §R 1", "Calor0410")]
+    public void NativeLocal_LambdaBodyEffectsAreChargedToTheEnclosingCallable(string body, string? expectedCode)
     {
         var source = "§M{E}\n  §M{Probe:pub}\n    §MT{Get:pub:stat} () -> i32\n      §E{}\n      "
             + body + "\n";
@@ -77,15 +74,18 @@ public class LocalFunctionLanguageTests
                 §R (+ x "!")
 
               §F{Use:pub} () -> i32
+                §B{Add:Func<i32,i32>} §LAM{static:x:i32}
+                  §R (+ x 1)
+                §/LAM
                 §B{y} §C{Add} §A 2 §/C
                 §R (+ y 1)
-                §F{Add} (i32:x) -> i32
-                  §R (+ x 1)
             """;
         var compilation = Program.Compile(source, "typeshadow.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
-        Assert.Contains("static int Add(int x)", compilation.GeneratedCode);
+        var binding = Assert.IsType<BindStatementNode>(compilation.Ast!.Functions.Single(f => f.Name == "Use").Body[0]);
+        Assert.Equal("Add", binding.Name);
+        Assert.True(Assert.IsType<LambdaExpressionNode>(binding.Initializer).IsStatic);
     }
 
     [Fact]
@@ -100,9 +100,10 @@ public class LocalFunctionLanguageTests
 
                 §MT{Get:pub:stat} () -> Func<i32, i32> §E{}
                   §E{cw}
-                  §F{Help} (i32:x) -> i32
+                  §B{Help:Func<i32,i32>} §LAM{static:x:i32}
                     §P "hidden"
                     §R x
+                  §/LAM
                   §R Help
             """;
         var compilation = Program.Compile(source, "escape.calr",
@@ -119,11 +120,12 @@ public class LocalFunctionLanguageTests
               §M{Probe:pub}
                 §MT{Run:pub:stat} () -> str
                   §E{cw}
-                  §B{Func<i32, i32>:f} Later
-                  §R (+ "" §C{f} §A 4 §/C)
-                  §F{Later} (i32:y) -> i32
+                  §B{Later:Func<i32,i32>} §LAM{static:y:i32}
                     §P "called"
                     §R (* y 10)
+                  §/LAM
+                  §B{Func<i32, i32>:f} Later
+                  §R (+ "" §C{f} §A 4 §/C)
             """;
         var compilation = Program.Compile(source, "del.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
@@ -132,25 +134,25 @@ public class LocalFunctionLanguageTests
     }
 
     [Theory]
-    [InlineData("§IF (> n 0)\n      §F{L} (i32:x) -> i32\n        §R x\n      §R §C{L} §A n §/C\n    §R 0", "must be declared directly")]
-    [InlineData("§F{L} (i32:x) -> i32\n      §F{N} (i32:y) -> i32\n        §R y\n      §R §C{N} §A x §/C\n    §R §C{L} §A n §/C", "must be declared directly")]
-    [InlineData("§F{L} (i32:x) -> i32\n      §E{}\n      §R x\n    §R §C{L} §A n §/C", "effect row")]
-    [InlineData("§F{L} (i32:x) -> i32\n      §Q (> x 0)\n      §R x\n    §R §C{L} §A n §/C", "contracts")]
-    [InlineData("§F{L}<T> (T:x) -> T\n      §R x\n    §R §C{L} §A n §/C", "generic")]
-    [InlineData("§F{L} (i32:x) -> IEnumerable<i32>\n      §YIELD x\n    §R 0", "iterator")]
-    public void NativeLocal_OutsideTheShape_IsCalor0211(string body, string message)
+    [InlineData("§IF (> n 0)\n      §F{L} (i32:x) -> i32\n        §R x\n      §R §C{L} §A n §/C\n    §R 0", "conditional placement", 1)]
+    [InlineData("§F{L} (i32:x) -> i32\n      §F{N} (i32:y) -> i32\n        §R y\n      §R §C{N} §A x §/C\n    §R §C{L} §A n §/C", "nested placement", 2)]
+    [InlineData("§F{L} (i32:x) -> i32\n      §E{}\n      §R x\n    §R §C{L} §A n §/C", "effect row", 1)]
+    [InlineData("§F{L} (i32:x) -> i32\n      §Q (> x 0)\n      §R x\n    §R §C{L} §A n §/C", "contracts", 1)]
+    [InlineData("§F{L}<T> (T:x) -> T\n      §R x\n    §R §C{L} §A n §/C", "generic", 1)]
+    [InlineData("§F{L} (i32:x) -> IEnumerable<i32>\n      §YIELD x\n    §R 0", "iterator", 1)]
+    public void RetiredLocal_OutsideTheShape_IsRejectedWithLambdaGuidance(string body, string message, int expectedCount)
     {
         var source = "§M{Bad}\n  §F{Outer:pub} (i32:n) -> i32\n    " + body + "\n";
         var compilation = Program.Compile(source, "bad.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
-        var error = Assert.Single(compilation.Diagnostics.Errors, d => d.Code == "Calor0211");
-        Assert.Contains(message, error.Message);
+        Assert.True(compilation.HasErrors, message);
+        AssertRetiredLocal(compilation, expectedCount);
     }
 
     [Fact]
     public void NativeLocal_Capture_IsRejectedEvenWhenAFieldHasTheSameName()
     {
-        // `n` is the outer parameter in C#, not the field: the static local function
+        // `n` is the outer parameter in C#, not the field: the static lambda
         // makes that a compile error rather than a silent rebind to the field.
         var source = """
             §M{Cap}
@@ -158,14 +160,15 @@ public class LocalFunctionLanguageTests
                 §FLD{i32:n:priv:stat} 5
 
                 §MT{Get:pub:stat} (i32:n) -> i32
-                  §F{AddN} (i32:x) -> i32
+                  §B{AddN:Func<i32,i32>} §LAM{static:x:i32}
                     §R (+ x n)
+                  §/LAM
                   §R §C{AddN} §A 1 §/C
             """;
         var compilation = Program.Compile(source, "cap.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.Contains(compilation.Diagnostics.Errors,
-            d => d.Code == "Calor1002" && d.Message.Contains("CS8421"));
+            d => d.Code == "Calor1002" && d.Message.Contains("CS8820"));
     }
 
     [Theory]
@@ -178,8 +181,9 @@ public class LocalFunctionLanguageTests
               §M{Probe:pub}
                 §MT{Five:pub:stat} () -> i32
                   §S (== result 5)
-                  §F{Value} () -> i32
+                  §B{Value:Func<i32>} §LAM{static}
                     §R {{returned}}
+                  §/LAM
                   §R §C{Value} §/C
 
                 §MT{Run:pub:stat} () -> str
@@ -216,10 +220,11 @@ public class LocalFunctionLanguageTests
               §M{Probe:pub}
                 §MT{Run:pub:stat} () -> str
                   §E{}
+                  §B{Add:Func<i32,i32>} §LAM{static:x:i32}
+                    §R (+ x 1)
+                  §/LAM
                   §B{Func<i32, i32>:g} Add
                   §R (+ (+ "" §C{Add} §A 2 §/C) §C{g} §A 0 §/C)
-                  §F{Add} (i32:x) -> i32
-                    §R (+ x 1)
             """;
         var compilation = Program.Compile(source, "r1a.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
@@ -236,16 +241,17 @@ public class LocalFunctionLanguageTests
               §F{Add:pub} (i32:x) -> i32
                 §R (+ x 1000)
               §M{Probe:pub}
-                §MT{Get:pub:stat} (Func<i32, i32>:Add) -> i32
+                §MT{Get:pub:stat} (Func<i32, i32>:Add §E{}) -> i32
                   §E{cw}
-                  §F{L} () -> i32
+                  §B{L:Func<i32>} §LAM{static}
                     §R §C{Add} §A 1 §/C
+                  §/LAM
                   §R §C{L} §/C
             """;
         var compilation = Program.Compile(source, "r1b.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.Contains(compilation.Diagnostics.Errors,
-            d => d.Code == "Calor1002" && d.Message.Contains("CS8421"));
+            d => d.Code == "Calor1002" && d.Message.Contains("CS8820"));
     }
 
     [Theory]
@@ -255,7 +261,7 @@ public class LocalFunctionLanguageTests
     {
         var source = "§M{Escape}\n  §M{Probe:pub}\n"
             + "    §MT{Get:pub:stat} () -> Func<i32, i32> §E{}\n      §E{cw}\n"
-            + "      §F{Help} (i32:x) -> i32\n        §P \"hidden\"\n        §R x\n"
+            + "      §B{Help:Func<i32,i32>} §LAM{static:x:i32}\n        §P \"hidden\"\n        §R x\n      §/LAM\n"
             + "      " + returned + "\n";
         var compilation = Program.Compile(source, "r2.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
@@ -272,9 +278,10 @@ public class LocalFunctionLanguageTests
                 §FLD{Func<i32, i32>:Help:priv:stat} §E{}
                 §MT{Get:pub:stat} () -> Func<i32, i32> §E{}
                   §E{cw}
-                  §F{Help} (i32:x) -> i32
+                  §B{Help:Func<i32,i32>} §LAM{static:x:i32}
                     §P "hidden"
                     §R x
+                  §/LAM
                   §R Help
             """;
         var compilation = Program.Compile(source, "r3.calr",
@@ -293,10 +300,12 @@ public class LocalFunctionLanguageTests
                 §MT{Add:pub:stat} (str:x) -> str
                   §R x
                 §MT{M:pub:stat} () -> i32
-                  §F{Add} (i32:x) -> i32
+                  §B{Add:Func<i32,i32>} §LAM{static:x:i32}
                     §R (+ x 1)
-                  §F{Other} (Func<i32, i32>:Add) -> i32
+                  §/LAM
+                  §B{Other:Func<Func<i32,i32>,i32>} §LAM{static:Add:Func<i32,i32>}
                     §R §C{Add} §A 10 §/C
+                  §/LAM
                   §R §C{Other} §A Add §/C
             """;
         var compilation = Program.Compile(source, "r4.calr",
@@ -307,7 +316,7 @@ public class LocalFunctionLanguageTests
     }
 
     [Fact]
-    public void Review1_LocalFunctionInsideALambda_IsCalor0211()
+    public void Review1_RetiredLocalFunctionInsideALambda_HasReplacementGuidance()
     {
         var source = """
             §M{BadPlacement}
@@ -321,18 +330,16 @@ public class LocalFunctionLanguageTests
             """;
         var compilation = Program.Compile(source, "r5.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
-        Assert.Contains(compilation.Diagnostics.Errors,
-            d => d.Code == "Calor0211" && d.Message.Contains("must be declared directly"));
+        AssertRetiredLocal(compilation);
     }
 
     [Fact]
-    public void Review1_EmbeddedGenericLocalName_IsCalor0211()
+    public void Review1_RetiredEmbeddedGenericLocalName_HasReplacementGuidance()
     {
         var source = "§M{Bad}\n  §F{Outer:pub} () -> i32\n    §F{L<T>} (i32:x) -> i32\n      §R x\n    §R 0\n";
         var compilation = Program.Compile(source, "r7.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
-        Assert.Contains(compilation.Diagnostics.Errors,
-            d => d.Code == "Calor0211" && d.Message.Contains("generic"));
+        AssertRetiredLocal(compilation);
     }
 
     // ---- Codex review round 2 regressions ----
@@ -348,11 +355,12 @@ public class LocalFunctionLanguageTests
                 §FLD{Func<i32, i32>:Help:priv:stat} §E{}
                 §MT{Get:pub:stat} () -> Func<i32, i32> §E{}
                   §E{cw}
-                  §B{Func<i32, i32>:f} Help
-                  §R §LAM{x:i32} §C{f} §A x §/C §/LAM
-                  §F{Help} (i32:x) -> i32
+                  §B{Help:Func<i32,i32>} §LAM{static:x:i32}
                     §P "hidden"
                     §R x
+                  §/LAM
+                  §B{Func<i32, i32>:f} Help
+                  §R §LAM{x:i32} §C{f} §A x §/C §/LAM
             """;
         var compilation = Program.Compile(source, "r2a.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
@@ -371,14 +379,15 @@ public class LocalFunctionLanguageTests
                 §MT{Get:pub:stat} (object:o) -> i32
                   §IF (is o Func<i32, i32> Add)
                     §R 1
-                  §F{L} () -> i32
+                  §B{L:Func<i32>} §LAM{static}
                     §R §C{Add} §A 1 §/C
+                  §/LAM
                   §R §C{L} §/C
             """;
         var compilation = Program.Compile(source, "r2b.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.Contains(compilation.Diagnostics.Errors,
-            d => d.Code == "Calor1002" && d.Message.Contains("CS8421"));
+            d => d.Code == "Calor1002" && d.Message.Contains("CS8820"));
     }
 
     [Fact]
@@ -390,10 +399,11 @@ public class LocalFunctionLanguageTests
                 §FLD{Func<i32, i32>:Help:priv:stat} §E{}
                 §MT{Get:pub:stat} () -> Func<i32, i32> §E{}
                   §E{cw}
-                  §R §LAM{x:i32} §C Help §A x §/C §/LAM
-                  §F{Help} (i32:x) -> i32
+                  §B{Help:Func<i32,i32>} §LAM{static:x:i32}
                     §P "hidden"
                     §R x
+                  §/LAM
+                  §R §LAM{x:i32} §C Help §A x §/C §/LAM
             """;
         var compilation = Program.Compile(source, "r2c.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
@@ -408,10 +418,11 @@ public class LocalFunctionLanguageTests
               §M{Probe:pub}
                 §MT{Get:pub:stat} (bool:c) -> Func<i32, i32> §E{}
                   §E{cw}
-                  §R (? c Help Help)
-                  §F{Help} (i32:x) -> i32
+                  §B{Help:Func<i32,i32>} §LAM{static:x:i32}
                     §P "hidden"
                     §R x
+                  §/LAM
+                  §R (? c Help Help)
             """;
         var compilation = Program.Compile(source, "r2d.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
@@ -422,11 +433,11 @@ public class LocalFunctionLanguageTests
 
     [Theory]
     // An expression-call argument, a null-coalescing operand, a qualified store:
-    // positions with no checked effect row (Codex round 3, findings 1-3).
+    // These formerly unchecked local-function positions must not re-enable §F.
     [InlineData("§R §LAM{x:i32} §C Take §A Help §/C §/LAM")]
     [InlineData("§R (?? f Help)")]
     [InlineData("§ASSIGN Probe.Saved Help\n      §R f")]
-    public void Review3_LocalFunctionValueInAnUncheckedPosition_IsCalor0211(string body)
+    public void Review3_RetiredLocalValueInUncheckedPositions_HasReplacementGuidance(string body)
     {
         var source = "§M{Escape}\n  §M{Probe:pub}\n"
             + "    §FLD{Func<i32, i32>:Saved:pub:stat} §E{}\n"
@@ -435,36 +446,60 @@ public class LocalFunctionLanguageTests
             + body + "\n      §F{Help} (i32:x) -> i32\n        §P \"hidden\"\n        §R x\n";
         var compilation = Program.Compile(source, "r3.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
-        Assert.Contains(compilation.Diagnostics.Errors,
-            d => d.Code == "Calor0211" && d.Message.Contains("used as a value"));
+        AssertRetiredLocal(compilation);
     }
 
-    [Fact]
-    public void Review3_BindValidation_DoesNotUseAShadowedModuleSignature()
+    [Theory]
+    [InlineData("Add", false)]
+    [InlineData("Add.Invoke", true)]
+    public void Review3_BindValidation_DoesNotUseAShadowedModuleSignature(string target, bool unknownInvocation)
     {
-        var source = """
+        var source = $$"""
             §M{Shadow}
               §U{System.Collections.Generic}
               §F{Add:pub} (List<i32>:xs) -> [i32]
                 §E{alloc}
-                §R §ARR{a:0}
+                §R §ARR{i32} §/ARR
               §F{Use:pub} (List<i32>:xs) -> List<i32>
-                §B{List<i32>:y} §C{Add} §A xs §/C
-                §R y
-                §F{Add} (List<i32>:xs) -> List<i32>
+                §B{Add:Func<List<i32>,List<i32>>} §LAM{static:xs:List<i32>}
                   §R xs
+                §/LAM
+                §B{List<i32>:y} §C{{{target}}} §A xs §/C
+                §R y
             """;
         var compilation = Program.Compile(source, "r3e.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.DoesNotContain(compilation.Diagnostics.Errors, d => d.Code == "Calor0254");
+        AssertBindingOutcome(compilation, unknownInvocation);
+    }
+
+    [Theory]
+    [InlineData("Pick", false)]
+    [InlineData("Pick.Invoke", true)]
+    public void LocalValue_ArrayArgumentsDoNotUseTheShadowedModuleSignature(string target, bool unknownInvocation)
+    {
+        var source = $$"""
+            §M{ArgumentShadow}
+              §U{System.Collections.Generic}
+              §F{Pick:pub} (List<i32>:xs) -> i32
+                §R 0
+              §F{Use:pub} () -> i32
+                §E{alloc}
+                §B{Pick:Func<[i32],i32>} §LAM{static:xs:[i32]}
+                  §R 1
+                §/LAM
+                §R §C{{{target}}} §A §ARR{i32} §/ARR §/C
+            """;
+        var compilation = Program.Compile(source, "argument-shadow.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        AssertBindingOutcome(compilation, unknownInvocation);
     }
 
     [Fact]
     public void Review3_AnOutOfScopeEnclosingName_FailsLoudlyNotSilently()
     {
-        // Known limitation (Codex round 3, finding 4): any name the enclosing callable
-        // declares stays bare inside a local function, even when out of scope there.
-        // The result is a C# compile error, never a call to the wrong function.
+        // The retired form must fail before it can silently rebind an out-of-scope
+        // enclosing name to the module function.
         var source = """
             §M{Shadow}
               §F{Add:pub} (i32:x) -> i32
@@ -479,7 +514,7 @@ public class LocalFunctionLanguageTests
             """;
         var compilation = Program.Compile(source, "r3d.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
-        Assert.Contains(compilation.Diagnostics.Errors, d => d.Code == "Calor1002");
+        AssertRetiredLocal(compilation);
     }
 
     [Fact]
@@ -489,11 +524,37 @@ public class LocalFunctionLanguageTests
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(parsed.HasErrors);
         var emitted = new CalorEmitter().Emit(parsed.Ast!);
-        Assert.Contains("§F{Add} (i32:x) -> i32", emitted);
+        Assert.Contains("§LAM{static:x:i32}", emitted);
+        Assert.DoesNotContain("§F{Add}", emitted);
         var again = Program.Compile(emitted, "rt2.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(again.HasErrors, string.Join("\n", again.Diagnostics.Errors) + "\n" + emitted);
         Assert.Equal("3", Run(again.GeneratedCode));
+    }
+
+    private static void AssertBindingOutcome(CompilationResult compilation, bool unknownInvocation)
+    {
+        if (unknownInvocation)
+        {
+            var error = Assert.Single(compilation.Diagnostics.Errors);
+            Assert.Equal("Calor0410", error.Code);
+            Assert.Equal("Function 'Use' uses effect 'unknown' but does not declare it", error.Message);
+        }
+        else
+        {
+            Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
+        }
+    }
+
+    private static void AssertRetiredLocal(CompilationResult compilation, int expectedCount = 1)
+    {
+        var errors = compilation.Diagnostics.Errors.ToArray();
+        Assert.Equal(expectedCount, errors.Length);
+        Assert.All(errors, error =>
+        {
+            Assert.Equal("Calor0100", error.Code);
+            Assert.Equal("Local §F declarations are removed. Use a §B binding with §LAM instead.", error.Message);
+        });
     }
 
     /// <summary>Compiles C# in memory and returns <c>Probe.Run()</c>.</summary>

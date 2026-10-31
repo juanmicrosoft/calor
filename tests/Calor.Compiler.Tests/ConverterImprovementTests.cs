@@ -1789,15 +1789,22 @@ public class ConverterImprovementTests
 
     // #777 (WS-W4 D4): local functions are never hoisted to a module-level §F (the
     // orphaned call site build-breaks, or silently rebinds to a same-named member).
-    // 0.25 F3 (#847): a non-capturing one converts in place to a nested §F, and
-    // target-typed `new()` in it takes the LOCAL function's return type.
+    // #1600: safe non-capturing locals become same-point static lambda bindings.
+    // Target-typed `new()` must still use the local callable's return type.
 
     private static NewExpressionNode LocalReturnedNew(ConversionResult result)
     {
         var method = Assert.Single(Assert.Single(result.Ast!.Classes).Methods);
-        var local = Assert.IsType<LocalFunctionStatementNode>(method.Body[0]);
-        var ret = Assert.IsType<ReturnStatementNode>(Assert.Single(local.Function.Body));
-        return Assert.IsType<NewExpressionNode>(ret.Expression);
+        var binding = Assert.IsType<BindStatementNode>(method.Body[0]);
+        Assert.Equal("Local", binding.Name);
+        var lambda = Assert.IsType<LambdaExpressionNode>(binding.Initializer);
+        Assert.True(lambda.IsStatic);
+        Assert.Empty(lambda.Parameters);
+        Assert.DoesNotContain(method.Body, statement => statement is LocalFunctionStatementNode);
+        return lambda.ExpressionBody is { } expression
+            ? Assert.IsType<NewExpressionNode>(expression)
+            : Assert.IsType<NewExpressionNode>(
+                Assert.IsType<ReturnStatementNode>(Assert.Single(lambda.StatementBody!)).Expression);
     }
 
     [Fact]

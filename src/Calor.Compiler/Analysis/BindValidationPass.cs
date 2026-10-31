@@ -975,7 +975,7 @@ public sealed class BindValidationPass
     private bool TryResolveReturnType(CallExpressionNode call, out string returnType)
     {
         returnType = string.Empty;
-        if (_localFunctionNames.Contains(call.Target))
+        if (_localFunctionNames.Contains(call.Target) || IsValueCallTarget(call.Target))
             return false;
         if (TryResolveExactSignature(
                 call.Target,
@@ -1015,7 +1015,7 @@ public sealed class BindValidationPass
     private bool TryResolveParamTypes(string target, int arity, out List<string> paramTypes)
     {
         paramTypes = [];
-        if (_localFunctionNames.Contains(target))
+        if (_localFunctionNames.Contains(target) || IsValueCallTarget(target))
             return false;
         if (_currentClassName != null)
         {
@@ -1148,6 +1148,13 @@ public sealed class BindValidationPass
     private static HashSet<string> LocalFunctionNames(IReadOnlyList<StatementNode> body) =>
         body.OfType<LocalFunctionStatementNode>().Select(local => local.Function.Name).ToHashSet(StringComparer.Ordinal);
 
+    // A lexical value shadows a method even when this syntax-only pass cannot
+    // resolve the value's Invoke signature.
+    private bool IsValueCallTarget(string target) =>
+        TryLookupLocal(target, out _)
+        || target.EndsWith(".Invoke", StringComparison.Ordinal)
+            && TryLookupLocal(target[..^".Invoke".Length], out _);
+
     private bool TryResolveExactSignature(
         string target,
         IReadOnlyList<ExpressionNode> arguments,
@@ -1155,7 +1162,7 @@ public sealed class BindValidationPass
         IReadOnlyList<string?>? argumentModifiers,
         out UserCallableSignature signature)
     {
-        if (_localFunctionNames.Contains(target))
+        if (_localFunctionNames.Contains(target) || IsValueCallTarget(target))
         {
             signature = null!;
             return false;
