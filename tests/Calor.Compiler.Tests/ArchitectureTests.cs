@@ -452,7 +452,7 @@ public class ArchitectureTests
     /// is what PR #1095 review round 1 finding 10 flagged.
     ///
     /// <para><see cref="CompilerComponents_MatchDeclaredDependencyContract"/>
-    /// already declares Binding's allowed dependencies (Ast, CodeGen, Parsing —
+    /// already declares Binding's allowed dependencies (Analysis, Ast, CodeGen, Parsing —
     /// Effects is absent), but it matches the fully-qualified spelling
     /// <c>Calor.Compiler.Effects</c> only, so a namespace-relative
     /// <c>Effects.EffectEnforcementPass</c> slipped past it. This pin closes

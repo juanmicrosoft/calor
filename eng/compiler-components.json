@@ -18,7 +18,7 @@
     {
       "name": "Binding",
       "path": "Binding",
-      "allowedDependencies": ["Ast", "CodeGen", "Parsing"]
+      "allowedDependencies": ["Analysis", "Ast", "CodeGen", "Parsing"]
     },
     {
       "name": "Analysis",
