@@ -680,9 +680,9 @@ public sealed class WebsiteExampleCheckerTests
 
         // Pinned so a convention change that silently skips examples fails here. Update
         // deliberately when pages add or remove examples.
-        Assert.Equal(Pinned,
-            $"pages={coverage.Pages} complete={coverage.CompletePrograms} negative={coverage.NegativePrograms} " +
-            $"grouped={coverage.GroupedPrograms} checkedOutputs={coverage.CheckedOutputs} illustrative={coverage.IllustrativeOutputs}");
+        var actual = $"pages={coverage.Pages} complete={coverage.CompletePrograms} negative={coverage.NegativePrograms} " +
+            $"grouped={coverage.GroupedPrograms} checkedOutputs={coverage.CheckedOutputs} illustrative={coverage.IllustrativeOutputs}";
+        Assert.True(Pinned == actual, $"Expected: {Pinned}\nExecuted: {actual}");
     }
 
     // #1139 (0.25 F4): complete 49 -> 51, the two converted-output examples in cli/convert.mdx.
@@ -700,7 +700,8 @@ public sealed class WebsiteExampleCheckerTests
     // and its Calor0202 refusal in syntax-reference/refinement-types.mdx.
     // #1617: NullableFallback and Division add two compile-checked complete programs.
     // #1619: named static-container example and the corrected native W1-F6 Counter output.
-    private const string Pinned = "pages=97 complete=68 negative=7 grouped=3 checkedOutputs=2 illustrative=34";
+    // #1600: current-language.mdx adds one page and 82 actually compiled complete examples.
+    private const string Pinned = "pages=98 complete=150 negative=7 grouped=3 checkedOutputs=2 illustrative=34";
 
     [Theory]
     [InlineData("guides/nullability-and-dotnet-interop.mdx", "```calor expect=Calor0272\n", "```calor\n")]
@@ -708,7 +709,7 @@ public sealed class WebsiteExampleCheckerTests
     [InlineData("guides/dependent-types-tutorial.mdx", "    §I{i32:amount} | (> # INT:0)\n    §O{i32}\n    §Q", "    §I{i32:amount} | (> # INT:0)\n    §O{str}\n    §Q")]
     [InlineData("benchmarking/metrics/token-economics.mdx", "```calor\n§M{Name}    // Module requires tag + ID + name\n```",
         "```calor\n§M{Name}    // Module requires tag + ID + name\nnamespace Name\n```")]
-    [InlineData("syntax-reference/structure-tags.mdx", "      §IF (> i 5)", "      §IF (> i 5)")]
+    [InlineData("syntax-reference/structure-tags.mdx", "      §IF (> i 5)", "      §IF (> missing 5)")]
     [InlineData("cli/compile.mdx", "error Calor0200: Undefined variable 'x'", "error Calor0200: Undefined variable 'y'")]
     [InlineData("guides/cross-module-effect-propagation.mdx", "warning Calor0417: Public function 'HandleRequest'", "warning Calor0417: Public function 'HandleRequests'")]
     public void PublishedWebsite_MutatedExampleIsCaught(string page, string original, string mutated)
@@ -717,7 +718,9 @@ public sealed class WebsiteExampleCheckerTests
         var path = Path.Combine(root, "website", "content", page);
         var content = File.ReadAllText(path).Replace("\r\n", "\n");
         Assert.Contains(original, content);
-        var findings = WebsiteExampleChecker.Check([new DocFile(page, content.Replace(original, mutated))]);
+        var changed = content.Replace(original, mutated);
+        Assert.NotEqual(content, changed);
+        var findings = WebsiteExampleChecker.Check([new DocFile(page, changed)]);
         Assert.NotEmpty(findings);
     }
 }

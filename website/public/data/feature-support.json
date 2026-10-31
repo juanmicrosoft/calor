@@ -425,7 +425,7 @@
         },
         {
           "name": "conditional-expression-hoisting",
-          "description": "Conditional increments, calls and throw expressions remain in their native evaluation region. Assignment operands and conversions requiring unsafe eager preludes preserve the original expression as counted C# interop",
+          "description": "Conditional calls and throw expressions remain in their native evaluation region. Update/assignment operands and conversions requiring unsafe eager preludes preserve the original expression as counted C# interop; updates use only \u00A7ASSIGN when lowered to statements",
           "workaround": "Keep the counted interop, or express conditional side effects as explicit statements before converting"
         },
         {
@@ -506,8 +506,8 @@
         },
         {
           "name": "local-function",
-          "description": "A non-capturing local function declared directly in a method body, without attributes, type parameters, async/unsafe/extern, yield, nested local functions, or ref/out/in/params/default parameters, converts in place to a nested \u00A7F (a C# static local function). A member with any other local function is preserved verbatim as a \u00A7CSHARP interop block",
-          "workaround": "Make the local function static (pass captured values as parameters) and non-generic, or keep the member as a \u00A7CSHARP interop block"
+          "description": "A non-capturing, non-generic local function with direct calls after its declaration converts at the same point to a typed \u00A7B lambda binding. Forward/recursive calls, method-group uses, captures, named local-call arguments, unused locals, attributes, async/unsafe/extern, yield, nested locals, ref-like signatures and ref/out/in/params/default parameters preserve the containing member as \u00A7CSHARP interop",
+          "workaround": "Use an existing lambda binding with calls after its declaration, or keep the original member as \u00A7CSHARP interop"
         },
         {
           "name": "complex-is-pattern",
