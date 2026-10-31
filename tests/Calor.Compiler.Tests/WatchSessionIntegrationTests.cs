@@ -77,14 +77,14 @@ public sealed class WatchSessionIntegrationTests : IDisposable
 
     // Three tiny modules that compile independently: no cross-module refs, so
     // an edit to one must not force recompilation of the other two. Distinct
-    // module IDs (m001/m002/m003) keep the compiler happy under the
+    // module names keep the compiler happy under the
     // cross-module map that CompilationDriver builds even for warm caches.
-    private static string ModuleSource(string moduleId, string moduleName, string funcId, int answer)
+    private static string ModuleSource(string moduleName, int answer)
     {
         // Written with string concatenation because C#'s raw-string interpolation
         // and Calor's own '§X{...}' brace syntax fight each other unpleasantly.
-        return "§M{" + moduleId + ":" + moduleName + "}\n"
-            + "  §F{" + funcId + ":answer:pub}\n"
+        return "§M{" + moduleName + "}\n"
+            + "  §F{answer:pub}\n"
             + "    §O{i32}\n"
             + "    §R INT:" + answer.ToString(System.Globalization.CultureInfo.InvariantCulture) + "\n";
     }
@@ -99,9 +99,9 @@ public sealed class WatchSessionIntegrationTests : IDisposable
 
     private void WriteAllModules()
     {
-        File.WriteAllText(Path.Combine(_root, "a.calr"), ModuleSource("m001", "ModA", "f001", 1));
-        File.WriteAllText(Path.Combine(_root, "b.calr"), ModuleSource("m002", "ModB", "f002", 2));
-        File.WriteAllText(Path.Combine(_root, "c.calr"), ModuleSource("m003", "ModC", "f003", 3));
+        File.WriteAllText(Path.Combine(_root, "a.calr"), ModuleSource("ModA", 1));
+        File.WriteAllText(Path.Combine(_root, "b.calr"), ModuleSource("ModB", 2));
+        File.WriteAllText(Path.Combine(_root, "c.calr"), ModuleSource("ModC", 3));
     }
 
     /// <summary>
@@ -109,9 +109,9 @@ public sealed class WatchSessionIntegrationTests : IDisposable
     /// A distinct <paramref name="newAnswer"/> per rebuild guarantees the content
     /// hash actually changes even if the filesystem timestamps do not.
     /// </summary>
-    private void EditModule(string fileName, string moduleId, string moduleName, string funcId, int newAnswer)
+    private void EditModule(string fileName, string moduleName, int newAnswer)
     {
-        File.WriteAllText(Path.Combine(_root, fileName), ModuleSource(moduleId, moduleName, funcId, newAnswer));
+        File.WriteAllText(Path.Combine(_root, fileName), ModuleSource(moduleName, newAnswer));
     }
 
     /// <summary>
@@ -214,7 +214,7 @@ public sealed class WatchSessionIntegrationTests : IDisposable
             Assert.Equal(3, initial.Compiled);
             Assert.False(initial.AnyErrors);
 
-            EditModule("a.calr", "m001", "ModA", "f001", 101);
+            EditModule("a.calr", "ModA", 101);
             var changed = await ReadUntilAsync(completed.Reader, result => result.Compiled > 0);
             Assert.Equal(1, changed.Compiled);
             Assert.Equal(2, changed.Skipped);
@@ -242,7 +242,7 @@ public sealed class WatchSessionIntegrationTests : IDisposable
         {
             await completed.Reader.ReadAsync().AsTask().WaitAsync(RebuildTimeout);
             var source = Path.Combine(nested, "d.calr");
-            File.WriteAllText(source, ModuleSource("m004", "ModD", "f004", 4));
+            File.WriteAllText(source, ModuleSource("ModD", 4));
             // Source-set changes can invalidate the cross-module map and recompile
             // unchanged modules; only ordinary content edits promise cache hits.
             var created = await ReadUntilAsync(completed.Reader, result =>
@@ -303,7 +303,7 @@ public sealed class WatchSessionIntegrationTests : IDisposable
         {
             // Step 1: edit file a.calr, inject its change. Files b/c must be
             // reported as cache-skipped — that is the load-bearing assertion.
-            EditModule("a.calr", "m001", "ModA", "f001", 11);
+            EditModule("a.calr", "ModA", 11);
             session.InjectChange(Path.Combine(_root, "a.calr"));
         });
 
@@ -327,8 +327,8 @@ public sealed class WatchSessionIntegrationTests : IDisposable
             // Edit files a and b, inject BOTH changes before the debounce window
             // closes. Because InjectChange is synchronous and the debounce window
             // is 50ms, the two events land in the same batch → one rebuild.
-            EditModule("a.calr", "m001", "ModA", "f001", 12);
-            EditModule("b.calr", "m002", "ModB", "f002", 22);
+            EditModule("a.calr", "ModA", 12);
+            EditModule("b.calr", "ModB", 22);
             session.InjectChange(Path.Combine(_root, "a.calr"));
             session.InjectChange(Path.Combine(_root, "b.calr"));
         });
@@ -353,13 +353,13 @@ public sealed class WatchSessionIntegrationTests : IDisposable
         {
             if (step == 1)
             {
-                EditModule("a.calr", "m001", "ModA", "f001", 13);
+                EditModule("a.calr", "ModA", 13);
                 session.InjectChange(Path.Combine(_root, "a.calr"));
             }
             else if (step == 2)
             {
-                EditModule("a.calr", "m001", "ModA", "f001", 14);
-                EditModule("b.calr", "m002", "ModB", "f002", 24);
+                EditModule("a.calr", "ModA", 14);
+                EditModule("b.calr", "ModB", 24);
                 session.InjectChange(Path.Combine(_root, "a.calr"));
                 session.InjectChange(Path.Combine(_root, "b.calr"));
             }
@@ -382,7 +382,7 @@ public sealed class WatchSessionIntegrationTests : IDisposable
     public async Task ActiveBindingError_InChangedWarmSourceIsNotSkipped()
     {
         var source = Path.Combine(_root, "routing.calr");
-        var safe = ModuleSource("m1", "Routing", "f1", 1);
+        var safe = ModuleSource("Routing", 1);
         File.WriteAllText(source, safe);
         var results = await RunScriptAsync(rebuildCount: 3, drive: (session, step) =>
         {

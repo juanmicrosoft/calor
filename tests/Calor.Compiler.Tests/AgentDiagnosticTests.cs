@@ -11,7 +11,7 @@ namespace Calor.Compiler.Tests;
 public sealed class AgentDiagnosticTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), $"calor-agent-diag-{Guid.NewGuid():N}");
-    private const string Broken = "§M{m1:Calc}\n  §F{f1:Add:i32:pub}\n    §R (+ 1 2)\n  §/F{f1}\n§/M{m1}";
+    private const string Broken = "§M{Calc}\n  §F{Add:i32:pub}\n    §R (+ 1 2)\n  §/F\n§/M";
 
     public AgentDiagnosticTests() => Directory.CreateDirectory(_directory);
     public void Dispose() => Directory.Delete(_directory, recursive: true);
@@ -171,7 +171,7 @@ public sealed class AgentDiagnosticTests : IDisposable
     [Fact]
     public async Task McpCheck_DoesNotApplyFuzzySuggestions()
     {
-        const string source = "§M{m:Test}\n  §F{f:Contains:pub} () -> bool\n    §R (cotains \"hello\" \"h\")";
+        const string source = "§M{Test}\n  §F{Contains:pub} () -> bool\n    §R (cotains \"hello\" \"h\")";
         var result = await new CheckTool().ExecuteAsync(JsonSerializer.SerializeToElement(
             new { action = "diagnose", source, apply = true }));
         var json = JsonDocument.Parse(result.Content[0].Text!).RootElement;
@@ -183,9 +183,9 @@ public sealed class AgentDiagnosticTests : IDisposable
     }
 
     [Theory]
-    [InlineData("§M{m:T}\n    §F{f:Value:pub} () -> i32\n        §E{}\n        §R 1")]
-    [InlineData("§M{m:T}\n\t§F{f:Value:pub} () -> i32\n\t\t§E{}\n\t\t§R 1")]
-    [InlineData("§M{m:T}\n  §F{f:Value:pub} () -> i32\n    §E{}\n    §R 1 §/F{f}\n§/M{m}")]
+    [InlineData("§M{T}\n    §F{Value:pub} () -> i32\n        §E{}\n        §R 1")]
+    [InlineData("§M{T}\n\t§F{Value:pub} () -> i32\n\t\t§E{}\n\t\t§R 1")]
+    [InlineData("§M{T}\n  §F{Value:pub} () -> i32\n    §E{}\n    §R 1 §/F\n§/M")]
     public async Task SafeFixes_PreserveGeneratedCodeAndInlineCodeBeforeClosers(string source)
     {
         var tool = new CheckTool();
@@ -267,7 +267,7 @@ public sealed class AgentDiagnosticTests : IDisposable
     public void CliApply_UnfixableErrorsRemainErrors()
     {
         var path = Path.Combine(_directory, "broken.calr");
-        const string source = "§M{m:Test}\n  §F{f:Broken:pub} () -> i32\n    §R missing";
+        const string source = "§M{Test}\n  §F{Broken:pub} () -> i32\n    §R missing";
         File.WriteAllText(path, source);
         var (exit, stdout, _) = CliTestHarness.RunCli(_directory, "fix", "--apply", "--format", "json");
         Assert.NotEqual(0, exit);
@@ -306,7 +306,7 @@ public sealed class AgentDiagnosticTests : IDisposable
         var paths = new[] { "Alpha", "Beta" }.Select(name =>
         {
             var path = Path.Combine(_directory, $"{name}.calr");
-            File.WriteAllText(path, $"§M{{m:{name}}}\n  §F{{f:Value:pub}} () -> i32\n    §E{{}}\n    §R 1");
+            File.WriteAllText(path, $"§M{{{name}}}\n  §F{{Value:pub}} () -> i32\n    §E{{}}\n    §R 1");
             return path;
         }).ToArray();
         for (var pass = 0; pass < 2; pass++)

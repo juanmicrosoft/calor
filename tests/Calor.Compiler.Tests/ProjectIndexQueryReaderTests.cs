@@ -327,8 +327,8 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
             new[]
             {
                 "Error: 'Shared' is declared in 2 places; narrow it with --in-file:",
-                "  ambiguous.calr:2:11 function Shared",
-                "  ambiguous2.calr:2:11 function Shared",
+                "  ambiguous.calr:2:6 function Shared",
+                "  ambiguous2.calr:2:6 function Shared",
             },
             ProjectIndexQueryReader.AmbiguityLines("Shared", lookup.Candidates));
     }
@@ -342,7 +342,7 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
         var answer = ProjectIndexQueryReader.Callers(index, Subject(index, "Scale"));
 
         Assert.Equal("callers", answer.Facet);
-        Assert.Equal("math.calr:2:11 function Scale", answer.Subject);
+        Assert.Equal("math.calr:2:6 function Scale", answer.Subject);
         Assert.Equal(
             new[] { "app.calr:2:Run", "math.calr:5:ScaleTwice" },
             answer.Declarations.Select(d => $"{d.File}:{d.Line}:{d.Name}"));
@@ -390,7 +390,7 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
         var index = BuildAndSave(Fixture());
         var answer = ProjectIndexQueryReader.Impact(index, Subject(index, "Scale"));
 
-        Assert.Equal("math.calr:2:11 function Scale", answer.Subject);
+        Assert.Equal("math.calr:2:6 function Scale", answer.Subject);
         Assert.NotNull(answer.SymbolId);
         Assert.Null(answer.File);
         Assert.Equal(
@@ -518,7 +518,7 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
         var answer = ProjectIndexQueryReader.EffectImpact(index, Subject(index, "Uses"), null, out var error);
         Assert.Null(answer);
         Assert.Equal(
-            "Error: no effect row is recorded for broken.calr:2:11 function Uses; pass --row to ask about a hypothetical one.",
+            "Error: no effect row is recorded for broken.calr:2:6 function Uses; pass --row to ask about a hypothetical one.",
             error);
     }
 
@@ -528,7 +528,7 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
         var index = BuildAndSave(Fixture());
         var answer = ProjectIndexQueryReader.Effects(index, Subject(index, "Leaky"));
 
-        Assert.Equal("app.calr:11:11 function Leaky", answer.Subject);
+        Assert.Equal("app.calr:11:6 function Leaky", answer.Subject);
         var own = Assert.Single(answer.Rows);
         Assert.True(ProjectIndexQueryReader.IsOwnRow(own));
         Assert.Equal("does-not-fit", own.Verdict);
@@ -668,9 +668,9 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
         var writer = new StringWriter();
         QueryCommand.WriteDeclarations(writer, ProjectIndexQueryReader.Callers(index, Subject(index, "Scale")));
         Assert.Equal(
-            "  app.calr:2:11 function Run" + Environment.NewLine
-                + "  math.calr:5:11 function ScaleTwice" + Environment.NewLine
-                + "query: 2 caller(s) of math.calr:2:11 function Scale" + Environment.NewLine,
+            "  app.calr:2:6 function Run" + Environment.NewLine
+                + "  math.calr:5:6 function ScaleTwice" + Environment.NewLine
+                + "query: 2 caller(s) of math.calr:2:6 function Scale" + Environment.NewLine,
             writer.ToString());
     }
 
@@ -680,7 +680,7 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
         var index = BuildAndSave(Fixture());
         var writer = new StringWriter();
         QueryCommand.WriteDeclarations(writer, ProjectIndexQueryReader.Callers(index, Subject(index, "Unused")));
-        Assert.Equal("query: no callers found for app.calr:5:11 function Unused" + Environment.NewLine, writer.ToString());
+        Assert.Equal("query: no callers found for app.calr:5:6 function Unused" + Environment.NewLine, writer.ToString());
     }
 
     [Fact]
@@ -690,7 +690,7 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
         var writer = new StringWriter();
         QueryCommand.WriteImpact(writer, ProjectIndexQueryReader.ImpactOfFile(index, "math.calr", out _)!);
         var lines = writer.ToString().Split(Environment.NewLine);
-        Assert.Equal("  app.calr:2:11 function Run", lines[0]);
+        Assert.Equal("  app.calr:2:6 function Run", lines[0]);
         Assert.Equal("impact: 1 declaration(s) in 1 file(s) affected by a change to the whole file math.calr", lines[1]);
         Assert.StartsWith("impact: file-grained — a change to ANY declaration in this file", lines[2]);
         Assert.StartsWith("query: PARTIAL", lines[3]);
@@ -703,7 +703,7 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
         var writer = new StringWriter();
         QueryCommand.WriteEffectImpact(writer, ProjectIndexQueryReader.EffectImpact(index, Subject(index, "Log"), null, out _)!);
         Assert.Contains(
-            "impact: 1 of 3 affected declaration(s) would stop fitting a row of cw (its current declared row) on app.calr:8:11 function Log",
+            "impact: 1 of 3 affected declaration(s) would stop fitting a row of cw (its current declared row) on app.calr:8:6 function Log",
             writer.ToString());
     }
 
