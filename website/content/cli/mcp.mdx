@@ -152,7 +152,7 @@ Partial results look like this:
   returned (and written to `outputPath`), but its C# does not compile. `issues[]`
   lists the compiler errors. The destructive lossy fidelity and branch-selection
   parameters are no longer supported.
-- **`calor_batch` and `calor_migrate`:** default conversion preserves unsupported
+- **`calor_batch` and `calor_migrate`:** default conversion preserves unconverted
   C# at member, type, or whole-file boundaries and writes every buildable discovered
   input. One malformed or unwritable input does not discard unrelated outputs.
   Failed inputs report `outcome: "refused"` and the result has `isError: true`.

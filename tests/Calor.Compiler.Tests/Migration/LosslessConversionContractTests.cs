@@ -9,6 +9,53 @@ namespace Calor.Compiler.Tests;
 public sealed class LosslessConversionContractTests
 {
     [Theory]
+    [InlineData("#nullable enable\npublic static class Scalar { public static int Take(string value) => 1; public static int Call(string? value) => Take(value); }")]
+    [InlineData("#nullable enable\npublic static class Arrays { public static int Take(string[,] values) => 1; public static int Call(string[,]? values) => Take(values); }")]
+    [InlineData("#nullable enable\npublic class Box { public Box(string? value) { } public static Box Create(string value) => new Box(value); }")]
+    public void DefaultPreservation_DoesNotRelaxNativeReceivingChecks(string original)
+    {
+        Assert.Empty(Calor.Compiler.CodeGen.GeneratedCSharpCompiler.Validate(original).CompilationErrors);
+        var native = new CSharpToCalorConverter(new() { ValidateRoundTripCSharp = false }).Convert(original);
+        Assert.True(native.Success);
+        Assert.Equal(0, native.InteropPreservationCount);
+        Assert.True(Program.Compile(native.CalorSource!, "native-receiving.calr",
+            new CompilationOptions { DeferGeneratedOutputValidation = true }).HasErrors);
+
+        var converted = new CSharpToCalorConverter().Convert(original);
+        Assert.True(converted.Success, string.Join("\n", converted.Issues.Select(issue => issue.Message)));
+        Assert.Equal(1, converted.InteropPreservationCount);
+        Assert.DoesNotContain(converted.Losses, loss => loss.IsSemanticLoss);
+        var compiled = Program.Compile(converted.CalorSource!, "preserved-receiving.calr",
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
+        Assert.False(compiled.HasErrors);
+        Assert.Contains(original.Split('\n', 2)[1], compiled.GeneratedCode);
+        Assert.Empty(Calor.Compiler.CodeGen.GeneratedCSharpCompiler.Validate(compiled.GeneratedCode!).CompilationErrors);
+    }
+
+    [Fact]
+    public void DefaultPreservation_DoesNotAcceptInvalidIteratorParameters()
+    {
+        const string original = """
+            using System.Collections.Generic;
+            public class IteratorParameters
+            {
+                public void Outer()
+                {
+                    IEnumerable<int> Local(ref int value)
+                    {
+                        yield return value;
+                    }
+                }
+            }
+            """;
+        var converted = new CSharpToCalorConverter().Convert(original);
+        Assert.False(converted.Success);
+        Assert.Contains(converted.Issues, issue => issue.Severity == ConversionIssueSeverity.Error
+            && issue.Message.Contains("local function 'Local'", StringComparison.Ordinal)
+            && issue.Message.Contains("modifier 'ref'", StringComparison.Ordinal));
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(false, true)]

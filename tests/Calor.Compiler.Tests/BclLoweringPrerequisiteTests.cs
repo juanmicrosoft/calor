@@ -220,25 +220,31 @@ public class BclLoweringPrerequisiteTests
     [Fact]
     public void MissingCrossFileLambdaType_RetainsLegacyBehaviorWithoutMetadataProof()
     {
-        var missingInput = new CSharpToCalorConverter().Convert("""
+        const string missingSource = """
             using System.Linq;
             public static class Sample
             {
                 public static int Run() =>
                     External.Types.Count(type => type.GetGenericArguments().Length == 2);
             }
-            """);
+            """;
+        AssertDefaultPreservation(missingSource);
+        var missingInput = new CSharpToCalorConverter(
+            new() { ValidateRoundTripCSharp = false }).Convert(missingSource);
         Assert.NotNull(missingInput.Ast);
         Assert.Equal(0, missingInput.InteropPreservationCount);
         Assert.Contains("(len ", missingInput.CalorSource);
-        var converted = new CSharpToCalorConverter().Convert("""
+        const string typedSource = """
             using System.Linq;
             public static class Sample
             {
                 public static int Run() =>
                     External.Types.Count((System.Type type) => External.Arguments(type).Length == 2);
             }
-            """);
+            """;
+        AssertDefaultPreservation(typedSource);
+        var converted = new CSharpToCalorConverter(
+            new() { ValidateRoundTripCSharp = false }).Convert(typedSource);
         Assert.NotNull(converted.Ast);
         Assert.Equal(0, converted.InteropPreservationCount);
         Assert.Contains("(len ", converted.CalorSource);
@@ -264,6 +270,16 @@ public class BclLoweringPrerequisiteTests
         Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
         var assembly = System.Reflection.Assembly.Load(assemblyStream.ToArray());
         Assert.Equal(1, assembly.GetType("Sample")!.GetMethod("Run")!.Invoke(null, null));
+
+        static void AssertDefaultPreservation(string original)
+        {
+            var migration = new CSharpToCalorConverter().Convert(original);
+            Assert.True(migration.Success, string.Join("\n", migration.Issues.Select(issue => issue.Message)));
+            Assert.Equal(1, migration.InteropPreservationCount);
+            Assert.Contains(migration.Losses, loss => loss.Feature == "whole-file-preservation");
+            Assert.DoesNotContain(migration.Losses, loss => loss.IsSemanticLoss);
+            Assert.Equal(original, new CSharpEmitter().Emit(migration.Ast!));
+        }
     }
 
     [Fact]

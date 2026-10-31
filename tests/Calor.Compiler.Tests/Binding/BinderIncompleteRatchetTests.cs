@@ -363,6 +363,22 @@ public class BinderIncompleteRatchetTests
         var expectedSites = ReadCurrentDiagnosticSites();
         Assert.Equal(sourceCoverage.Keys, expectedSites.Keys);
         Assert.Equal(sourceCoverage.Keys, diagnosticSites.Keys);
+        if (Environment.GetEnvironmentVariable("CALOR_REGENERATE_CURRENT_BINDING_SITES") == "1")
+        {
+            foreach (var (file, actual) in diagnosticSites)
+            {
+                var expected = expectedSites[file];
+                Assert.Equal(expected.RawErrors.Select(error => (error.Code, error.Message, error.SpanText)),
+                    actual.RawErrors.Select(error => (error.Code, error.Message, error.SpanText)));
+                Assert.Equal(expected.PropagatedErrors.Select(error => (error.Code, error.Message, error.SpanText)),
+                    actual.PropagatedErrors.Select(error => (error.Code, error.Message, error.SpanText)));
+                Assert.Equal(WithCurrentDiagnosticIdentities(recordedSources[file], actual), sourceCoverage[file]);
+            }
+            // Only current diagnostic locations may change; historical coverage stays exact.
+            File.WriteAllText(Path.Combine(root, "tests", "TestData", "Binding", "binder-current-diagnostic-sites.json"),
+                JsonSerializer.Serialize(diagnosticSites, new JsonSerializerOptions { WriteIndented = true }) + "\n");
+            expectedSites = ReadCurrentDiagnosticSites();
+        }
         foreach (var (file, measured) in sourceCoverage)
             AssertCurrentSourceCoverage(recordedSources[file], measured,
                 expectedSites[file], diagnosticSites[file]);

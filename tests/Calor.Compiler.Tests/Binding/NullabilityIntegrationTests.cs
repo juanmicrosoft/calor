@@ -715,8 +715,10 @@ public class NullabilityIntegrationTests
                 }
             }
             """;
-        var converted = new Calor.Compiler.Migration.CSharpToCalorConverter().Convert(original);
-        Assert.Equal(form == "out", converted.Success);
+        // Bind the native output directly; default migration may preserve a rejected body.
+        var converted = new Calor.Compiler.Migration.CSharpToCalorConverter(
+            new() { ValidateRoundTripCSharp = false }).Convert(original);
+        Assert.True(converted.Success);
         Assert.NotNull(converted.CalorSource);
         var source = converted.CalorSource!;
         var (bound, diagnostics) = BindSource(source);
@@ -822,7 +824,8 @@ public class NullabilityIntegrationTests
     [InlineData(true, true)]
     public void N3_NativeStringParams_PreservesScalarMapAndTransitionalRejection(bool expression, bool nullable)
     {
-        var converted = new Calor.Compiler.Migration.CSharpToCalorConverter().Convert($$"""
+        var converted = new Calor.Compiler.Migration.CSharpToCalorConverter(
+            new() { ValidateRoundTripCSharp = false }).Convert($$"""
             public static class Strings
             {
                 public static int Take(params string[] values) { return 1; }
@@ -833,9 +836,7 @@ public class NullabilityIntegrationTests
                 }
             }
             """);
-        Assert.Equal(!nullable, converted.Success);
-        if (nullable)
-            Assert.Contains(converted.Issues, issue => issue.Message.Contains("may be null", StringComparison.Ordinal));
+        Assert.True(converted.Success);
         var (bound, diagnostics) = BindSource(converted.CalorSource!);
         var caller = bound.Functions.Single(f => f.Symbol.Name.EndsWith(".Caller", StringComparison.Ordinal));
         var matches = expression
@@ -854,6 +855,7 @@ public class NullabilityIntegrationTests
         {
             Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
                 && BindingDiagnosticPolicy.IsCompilationError(d));
+            Assert.Contains(diagnostics, d => d.Message.Contains("may be null", StringComparison.Ordinal));
         }
         else
         {
@@ -3451,7 +3453,8 @@ public class NullabilityIntegrationTests
     [InlineData(true)]
     public void StageB_ExpandedGenericParamsUsesEffectiveElementTarget(bool nullablePayload)
     {
-        var converted = new Calor.Compiler.Migration.CSharpToCalorConverter().Convert($$"""
+        var converted = new Calor.Compiler.Migration.CSharpToCalorConverter(
+            new() { ValidateRoundTripCSharp = false }).Convert($$"""
             using System.Collections.Generic;
             public static class Strings
             {
@@ -3461,7 +3464,7 @@ public class NullabilityIntegrationTests
             }
             """);
         Assert.NotNull(converted.CalorSource);
-        Assert.Equal(!nullablePayload, converted.Success);
+        Assert.True(converted.Success);
 
         var (_, diagnostics) = BindSource(converted.CalorSource!);
         var findings = diagnostics.Where(diagnostic =>

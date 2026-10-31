@@ -394,7 +394,9 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     {
         var brackets = $"[{new string(',', rank - 1)}]";
         var type = $"string{((shape & 2) != 0 ? "?" : "")}{brackets}{((shape & 1) != 0 ? "?" : "")}";
-        var converted = new CSharpToCalorConverter().Convert($$"""
+        // These cases run their own binding and strict compilation of native output.
+        var converted = new CSharpToCalorConverter(
+            new() { ValidateRoundTripCSharp = false }).Convert($$"""
             #nullable enable
             public static class RectangularArrays {
                 public static int Take(string{{brackets}} items) { return 1; }
@@ -405,7 +407,7 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
                 }
             }
             """, "a4-rectangular.cs");
-        Assert.Equal(shape == 0, converted.Success);
+        Assert.True(converted.Success);
         Assert.NotNull(converted.CalorSource);
         var (module, diagnostics) = Bind(converted.CalorSource!);
         var caller = module.Functions.Single(f => f.Symbol.Name.EndsWith(".Caller", StringComparison.Ordinal));
@@ -437,7 +439,8 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     public void A4_ConvertedArrayCreation_SeesNullableLaterElement(
         bool nullable, bool named, bool expression)
     {
-        var converted = new CSharpToCalorConverter().Convert($$"""
+        var converted = new CSharpToCalorConverter(
+            new() { ValidateRoundTripCSharp = false }).Convert($$"""
             #nullable enable
             public static class CreatedArrays {
                 public static int Take(params string[] items) { return 1; }
@@ -450,7 +453,7 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
             }
             """, "a4-created.cs");
         output.WriteLine(converted.CalorSource);
-        Assert.Equal(!nullable, converted.Success);
+        Assert.True(converted.Success);
         Assert.NotNull(converted.CalorSource);
         var (module, diagnostics) = Bind(converted.CalorSource!);
         var caller = module.Functions.Single(f => f.Symbol.Name.EndsWith(".Caller", StringComparison.Ordinal));
@@ -580,7 +583,8 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     public void A4_KnownNativeNominalArray_UsesActualElementIdentityWithoutWideningPayloadPolicy(
         bool nullableContainer, bool nullableElements)
     {
-        var converted = new CSharpToCalorConverter().Convert($$"""
+        var converted = new CSharpToCalorConverter(
+            new() { ValidateRoundTripCSharp = false }).Convert($$"""
             #nullable enable
             public class Foo { }
             public static class NominalArrays {
@@ -592,7 +596,7 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
                 }
             }
             """, "a4-nominal-array.cs");
-        Assert.Equal(!nullableContainer, converted.Success);
+        Assert.True(converted.Success);
         Assert.NotNull(converted.CalorSource);
         var (module, diagnostics) = Bind(converted.CalorSource!);
         var caller = module.Functions.Single(f => f.Symbol.Name.EndsWith(".Caller", StringComparison.Ordinal));

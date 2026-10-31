@@ -72,7 +72,7 @@
       "triggers": {},
       "rescueUnusableMembers": false,
       "passthroughOnError": false,
-      "roundTrip": "deferred"
+      "roundTrip": "verified"
     }
   },
   "mcp-convert": {

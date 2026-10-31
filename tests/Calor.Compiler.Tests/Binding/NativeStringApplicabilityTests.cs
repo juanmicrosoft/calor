@@ -185,7 +185,8 @@ public sealed class NativeStringApplicabilityTests
     [Fact]
     public void PreviousAmbiguity_IsNotMistakenForPreviousAcceptance()
     {
-        var converted = new Migration.CSharpToCalorConverter().Convert("""
+        var converted = new Migration.CSharpToCalorConverter(
+            new() { ValidateRoundTripCSharp = false }).Convert("""
             public static class NativeString
             {
                 public static int Take(string value) => 1;
@@ -204,7 +205,8 @@ public sealed class NativeStringApplicabilityTests
     [Fact]
     public void Constructors_RemainOutsideTheCompatibilityChange()
     {
-        var converted = new Migration.CSharpToCalorConverter().Convert("""
+        var converted = new Migration.CSharpToCalorConverter(
+            new() { ValidateRoundTripCSharp = false }).Convert("""
             public class Box
             {
                 public Box(string? value) { }
