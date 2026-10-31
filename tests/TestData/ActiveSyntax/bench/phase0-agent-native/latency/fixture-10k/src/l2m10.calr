@@ -1,0 +1,107 @@
+§M{L2M10}
+
+  §F{l2m10_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 22268)
+    §IF (>= x 22268)
+      §R x
+    §EL
+      §R 22268
+
+  §F{l2m10_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m03_fn06} §A x §A INT:12 §/C
+    §B{v2:i32} §C{l3m08_fn05} §A x §A INT:14 §/C
+    §R (+ (+ v1 v2) y)
+
+  §F{l2m10_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m07_fn07} §A x §A INT:25 §/C
+    §B{v2:i32} §C{l3m02_fn04} §A x §A INT:86 §/C
+    §R (+ (+ v1 v2) y)
+
+  §F{l2m10_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 0)
+    §S (>= x 1)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF (> acc 22275)
+      §R (+ acc 22275)
+    §EL
+      §R (+ (* acc 2) 22275)
+
+  §F{l2m10_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 4)
+    §S (>= x 5)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF (> acc 22282)
+      §R (+ acc 22282)
+    §EL
+      §R (+ (* acc 2) 22282)
+
+  §F{l2m10_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m18_fn12} §A x §A INT:49 §/C
+    §B{v2:i32} §C{l3m01_fn02} §A x §A INT:34 §/C
+    §R (+ (+ v1 v2) y)
+
+  §F{l2m10_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m31_fn04} §A x §A INT:29 §/C
+    §B{v2:i32} §C{l3m01_fn10} §A x §A INT:59 §/C
+    §R (+ (+ v1 v2) y)
+
+  §F{l2m10_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 22289)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (> total 22289)
+      §R 22289
+    §R total
+
+  §F{l2m10_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 22296)
+    §IF (>= x 22296)
+      §R x
+    §EL
+      §R 22296
+
+  §F{l2m10_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 22303)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (> total 22303)
+      §R 22303
+    §R total
+
+  §F{l2m10_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 22310)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (> total 22310)
+      §R 22310
+    §R total
+
+  §F{l2m10_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m27_fn01} §A x §A INT:72 §/C
+    §R (+ v1 y)
+
+  §F{l2m10_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 3)
+    §S (>= x 4)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF (> acc 22317)
+      §R (+ acc 22317)
+    §EL
+      §R (+ (* acc 2) 22317)

@@ -1,0 +1,103 @@
+§M{L2M23}
+
+  §F{l2m23_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m05_fn04} §A x §A INT:9 §/C
+    §B{v2:i32} §C{l3m15_fn10} §A x §A INT:24 §/C
+    §R (+ (+ v1 v2) y)
+
+  §F{l2m23_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 22891)
+    §IF (>= x 22891)
+      §R x
+    §EL
+      §R 22891
+
+  §F{l2m23_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m15_fn04} §A x §A INT:2 §/C
+    §R (+ v1 y)
+
+  §F{l2m23_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 22898)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (> total 22898)
+      §R 22898
+    §R total
+
+  §F{l2m23_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 22905)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (> total 22905)
+      §R 22905
+    §R total
+
+  §F{l2m23_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 22912)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (> total 22912)
+      §R 22912
+    §R total
+
+  §F{l2m23_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 22919)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (> total 22919)
+      §R 22919
+    §R total
+
+  §F{l2m23_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m27_fn01} §A x §A INT:28 §/C
+    §R (+ v1 y)
+
+  §F{l2m23_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 22926)
+    §IF (>= x 22926)
+      §R x
+    §EL
+      §R 22926
+
+  §F{l2m23_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 6)
+    §Q (>= y 0)
+    §S (>= result 22933)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (< total 22933)
+      §R 22933
+    §EL
+      §R total
+
+  §F{l2m23_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m16_fn08} §A x §A INT:8 §/C
+    §R (+ v1 y)
+
+  §F{l2m23_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m34_fn12} §A x §A INT:6 §/C
+    §R (+ v1 y)
+
+  §F{l2m23_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 22940)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (> total 22940)
+      §R 22940
+    §R total

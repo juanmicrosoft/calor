@@ -1,0 +1,107 @@
+§M{L3M23}
+
+  §F{l3m23_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 43)
+
+  §F{l3m23_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 24886)
+    §IF (>= x 24886)
+      §R x
+    §EL
+      §R 24886
+
+  §F{l3m23_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 47)
+
+  §F{l3m23_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 24893)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (> total 24893)
+      §R 24893
+    §R total
+
+  §F{l3m23_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 1)
+    §S (>= x 2)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF (> acc 24900)
+      §R (+ acc 24900)
+    §EL
+      §R (+ (* acc 2) 24900)
+
+  §F{l3m23_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 87)
+
+  §F{l3m23_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 2)
+    §Q (>= y 0)
+    §S (>= result 24907)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (< total 24907)
+      §R 24907
+    §EL
+      §R total
+
+  §F{l3m23_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 24914)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (> total 24914)
+      §R 24914
+    §R total
+
+  §F{l3m23_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 24921)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (> total 24921)
+      §R 24921
+    §R total
+
+  §F{l3m23_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 10)
+
+  §F{l3m23_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 24928)
+    §IF (>= x 24928)
+      §R x
+    §EL
+      §R 24928
+
+  §F{l3m23_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 24935)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (> total 24935)
+      §R 24935
+    §R total
+
+  §F{l3m23_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 24942)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (> total 24942)
+      §R 24942
+    §R total

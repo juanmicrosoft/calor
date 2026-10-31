@@ -1,0 +1,7 @@
+§M{TypeSystem}
+  §F{Main:pub} () -> void
+    §E{cw}
+    §B{present:?i32} 42
+    §B{absent:?i32} null
+    §C{Console.WriteLine} (?? present 0)
+    §C{Console.WriteLine} (?? absent 0)

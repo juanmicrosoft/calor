@@ -1,0 +1,108 @@
+§M{L1M05}
+
+  §F{l1m05_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 5)
+    §S (>= x 6)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF (> acc 20203)
+      §R (+ acc 20203)
+    §EL
+      §R (+ (* acc 2) 20203)
+
+  §F{l1m05_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l2m12_fn05} §A x §A INT:87 §/C
+    §R (+ v1 y)
+
+  §F{l1m05_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 20210)
+    §IF (>= x 20210)
+      §R x
+    §EL
+      §R 20210
+
+  §F{l1m05_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 4)
+    §S (>= x 5)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF (> acc 20217)
+      §R (+ acc 20217)
+    §EL
+      §R (+ (* acc 2) 20217)
+
+  §F{l1m05_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 6)
+    §Q (>= y 0)
+    §S (>= result 20224)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (< total 20224)
+      §R 20224
+    §EL
+      §R total
+
+  §F{l1m05_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 20231)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (> total 20231)
+      §R 20231
+    §R total
+
+  §F{l1m05_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l2m03_fn02} §A x §A INT:7 §/C
+    §R (+ v1 y)
+
+  §F{l1m05_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l2m12_fn05} §A x §A INT:23 §/C
+    §R (+ v1 y)
+
+  §F{l1m05_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l2m02_fn12} §A x §A INT:23 §/C
+    §B{v2:i32} §C{l2m11_fn13} §A x §A INT:48 §/C
+    §R (+ (+ v1 v2) y)
+
+  §F{l1m05_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 4)
+    §Q (>= y 0)
+    §S (>= result 20238)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (< total 20238)
+      §R 20238
+    §EL
+      §R total
+
+  §F{l1m05_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 20245)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (> total 20245)
+      §R 20245
+    §R total
+
+  §F{l1m05_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l2m05_fn05} §A x §A INT:22 §/C
+    §B{v2:i32} §C{l2m05_fn07} §A x §A INT:23 §/C
+    §R (+ (+ v1 v2) y)
+
+  §F{l1m05_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 4)
+    §S (>= x 5)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF (> acc 20252)
+      §R (+ acc 20252)
+    §EL
+      §R (+ (* acc 2) 20252)

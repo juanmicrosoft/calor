@@ -1,0 +1,40 @@
+{
+  "Version": 1,
+  "Files": [
+    "test.calr"
+  ],
+  "Declarations": [
+    {
+      "Id": "m_2d40znbca7ty",
+      "File": "test.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "Fixture",
+      "Signature": ""
+    },
+    {
+      "Id": "f_avhawpxmp228",
+      "File": "test.calr",
+      "Container": "Fixture",
+      "Kind": 1,
+      "Name": "CheckCurrentRun",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "m_a8ssj9b78x65",
+      "File": "test.calr",
+      "Container": "Fixture",
+      "Kind": 0,
+      "Name": "LocalFunctionFixture",
+      "Signature": "0"
+    },
+    {
+      "Id": "mt_6a3prxx4js0t",
+      "File": "test.calr",
+      "Container": "Fixture.LocalFunctionFixture\u00600",
+      "Kind": 5,
+      "Name": "Add",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    }
+  ]
+}

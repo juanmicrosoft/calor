@@ -1,0 +1,62 @@
+§M{CsvRow}
+  §F{NeedsQuoting:pub} (str:field) -> bool
+    §E{}
+    §R (|| (contains field ",") (|| (contains field "\"") (|| (contains field "\r") (contains field "\n"))))
+  §F{EscapeField:pub} (str:field) -> str
+    §E{}
+    §B{needs} §C{NeedsQuoting} §A field §/C
+    §IF needs
+      §B{doubled} (replace field "\"" "\"\"")
+      §R (concat "\"" doubled "\"")
+    §EL
+      §R field
+  §F{JoinRow:pub} (List<str>:fields) -> str
+    §E{}
+    §B{result} ""
+    §B{first} true
+    §EACH{field:str} fields
+      §B{esc} §C{EscapeField} §A field §/C
+      §IF first
+        §ASSIGN result esc
+        §ASSIGN first false
+      §EL
+        §ASSIGN result (concat result "," esc)
+
+    §R result
+  §F{SplitRow:pub} (str:line) -> List<str>
+    §E{mut,alloc}
+    §LIST{result:str}
+    §/LIST
+    §B{i} 0
+    §B{n} (len line)
+    §B{done} false
+    §WH (! done)
+      §B{field} ""
+      §IF (&& (< i n) (== (char-code (char-at line i)) 34))
+        §ASSIGN i (+ i 1)
+        §B{qdone} false
+        §WH (&& (! qdone) (< i n))
+          §B{c} (char-at line i)
+          §IF (== (char-code c) 34)
+            §IF (&& (< (+ i 1) n) (== (char-code (char-at line (+ i 1))) 34))
+              §ASSIGN field (concat field "\"")
+              §ASSIGN i (+ i 2)
+            §EL
+              §ASSIGN i (+ i 1)
+              §ASSIGN qdone true
+          §EL
+            §ASSIGN field (concat field (str c))
+            §ASSIGN i (+ i 1)
+      §EL
+        §WH (&& (< i n) (! (== (char-code (char-at line i)) 44)))
+          §B{c2} (char-at line i)
+          §ASSIGN field (concat field (str c2))
+          §ASSIGN i (+ i 1)
+
+      §PUSH{result} field
+      §IF (&& (< i n) (== (char-code (char-at line i)) 44))
+        §ASSIGN i (+ i 1)
+      §EL
+        §ASSIGN done true
+
+    §R result

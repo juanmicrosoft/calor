@@ -1,0 +1,101 @@
+§M{L3M19}
+
+  §F{l3m19_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 4)
+    §S (>= x 5)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF (> acc 24634)
+      §R (+ acc 24634)
+    §EL
+      §R (+ (* acc 2) 24634)
+
+  §F{l3m19_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 87)
+
+  §F{l3m19_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 24641)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (> total 24641)
+      §R 24641
+    §R total
+
+  §F{l3m19_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 83)
+
+  §F{l3m19_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 1)
+
+  §F{l3m19_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 3)
+    §Q (>= y 0)
+    §S (>= result 24648)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (< total 24648)
+      §R 24648
+    §EL
+      §R total
+
+  §F{l3m19_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 24655)
+    §IF (>= x 24655)
+      §R x
+    §EL
+      §R 24655
+
+  §F{l3m19_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 56)
+
+  §F{l3m19_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 26)
+
+  §F{l3m19_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 8)
+    §Q (>= y 0)
+    §S (>= result 24662)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (< total 24662)
+      §R 24662
+    §EL
+      §R total
+
+  §F{l3m19_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 24669)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (> total 24669)
+      §R 24669
+    §R total
+
+  §F{l3m19_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 0)
+    §S (>= x 1)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF (> acc 24676)
+      §R (+ acc 24676)
+    §EL
+      §R (+ (* acc 2) 24676)
+
+  §F{l3m19_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 20)

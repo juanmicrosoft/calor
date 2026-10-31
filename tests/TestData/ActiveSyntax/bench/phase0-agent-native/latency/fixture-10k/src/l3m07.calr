@@ -1,0 +1,106 @@
+§M{L3M07}
+
+  §F{l3m07_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 40)
+
+  §F{l3m07_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 23955)
+    §IF (>= x 23955)
+      §R x
+    §EL
+      §R 23955
+
+  §F{l3m07_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 23962)
+    §IF (>= x 23962)
+      §R x
+    §EL
+      §R 23962
+
+  §F{l3m07_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 23969)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (> total 23969)
+      §R 23969
+    §R total
+
+  §F{l3m07_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 3)
+
+  §F{l3m07_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 5)
+    §Q (>= y 0)
+    §S (>= result 23976)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (< total 23976)
+      §R 23976
+    §EL
+      §R total
+
+  §F{l3m07_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 11)
+
+  §F{l3m07_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 0)
+    §S (>= x 1)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF (> acc 23983)
+      §R (+ acc 23983)
+    §EL
+      §R (+ (* acc 2) 23983)
+
+  §F{l3m07_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 23)
+
+  §F{l3m07_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 23990)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (> total 23990)
+      §R 23990
+    §R total
+
+  §F{l3m07_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 23997)
+    §IF (>= x 23997)
+      §R x
+    §EL
+      §R 23997
+
+  §F{l3m07_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 36)
+
+  §F{l3m07_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 3)
+    §Q (>= y 0)
+    §S (>= result 24004)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (< total 24004)
+      §R 24004
+    §EL
+      §R total

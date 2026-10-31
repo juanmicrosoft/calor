@@ -1,0 +1,101 @@
+§M{L3M32}
+
+  §F{l3m32_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 25362)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (> total 25362)
+      §R 25362
+    §R total
+
+  §F{l3m32_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 0)
+    §S (>= x 1)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF (> acc 25369)
+      §R (+ acc 25369)
+    §EL
+      §R (+ (* acc 2) 25369)
+
+  §F{l3m32_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 8)
+    §Q (>= y 0)
+    §S (>= result 25376)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (< total 25376)
+      §R 25376
+    §EL
+      §R total
+
+  §F{l3m32_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 25383)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (> total 25383)
+      §R 25383
+    §R total
+
+  §F{l3m32_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 38)
+
+  §F{l3m32_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 4)
+    §Q (>= y 0)
+    §S (>= result 25390)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (< total 25390)
+      §R 25390
+    §EL
+      §R total
+
+  §F{l3m32_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 73)
+
+  §F{l3m32_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 73)
+
+  §F{l3m32_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 1)
+    §Q (>= y 0)
+    §S (>= result 25397)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (< total 25397)
+      §R 25397
+    §EL
+      §R total
+
+  §F{l3m32_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 27)
+
+  §F{l3m32_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 85)
+
+  §F{l3m32_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 22)
+
+  §F{l3m32_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 25404)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (> total 25404)
+      §R 25404
+    §R total

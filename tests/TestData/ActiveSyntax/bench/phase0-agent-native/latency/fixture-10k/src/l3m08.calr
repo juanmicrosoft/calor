@@ -1,0 +1,111 @@
+§M{L3M08}
+
+  §F{l3m08_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 24011)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (> total 24011)
+      §R 24011
+    §R total
+
+  §F{l3m08_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 24018)
+    §IF (>= x 24018)
+      §R x
+    §EL
+      §R 24018
+
+  §F{l3m08_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 44)
+
+  §F{l3m08_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 24025)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (> total 24025)
+      §R 24025
+    §R total
+
+  §F{l3m08_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 39)
+
+  §F{l3m08_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 43)
+
+  §F{l3m08_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 4)
+    §S (>= x 5)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF (> acc 24032)
+      §R (+ acc 24032)
+    §EL
+      §R (+ (* acc 2) 24032)
+
+  §F{l3m08_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 3)
+    §Q (>= y 0)
+    §S (>= result 24039)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (< total 24039)
+      §R 24039
+    §EL
+      §R total
+
+  §F{l3m08_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 24046)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (> total 24046)
+      §R 24046
+    §R total
+
+  §F{l3m08_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 85)
+
+  §F{l3m08_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 8)
+    §Q (>= y 0)
+    §S (>= result 24053)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (< total 24053)
+      §R 24053
+    §EL
+      §R total
+
+  §F{l3m08_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 7)
+    §Q (>= y 0)
+    §S (>= result 24060)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (< total 24060)
+      §R 24060
+    §EL
+      §R total
+
+  §F{l3m08_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 2)
+    §S (>= x 3)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF (> acc 24067)
+      §R (+ acc 24067)
+    §EL
+      §R (+ (* acc 2) 24067)

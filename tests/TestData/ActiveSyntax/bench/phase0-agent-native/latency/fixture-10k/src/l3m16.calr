@@ -1,0 +1,105 @@
+§M{L3M16}
+
+  §F{l3m16_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 6)
+    §Q (>= y 0)
+    §S (>= result 24445)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (< total 24445)
+      §R 24445
+    §EL
+      §R total
+
+  §F{l3m16_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 24452)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (> total 24452)
+      §R 24452
+    §R total
+
+  §F{l3m16_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 6)
+    §S (>= x 7)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF (> acc 24459)
+      §R (+ acc 24459)
+    §EL
+      §R (+ (* acc 2) 24459)
+
+  §F{l3m16_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 74)
+
+  §F{l3m16_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 24466)
+    §IF (>= x 24466)
+      §R x
+    §EL
+      §R 24466
+
+  §F{l3m16_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 56)
+
+  §F{l3m16_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 24473)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (> total 24473)
+      §R 24473
+    §R total
+
+  §F{l3m16_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 21)
+
+  §F{l3m16_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 2)
+    §Q (>= y 0)
+    §S (>= result 24480)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (< total 24480)
+      §R 24480
+    §EL
+      §R total
+
+  §F{l3m16_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 24487)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (> total 24487)
+      §R 24487
+    §R total
+
+  §F{l3m16_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 20)
+
+  §F{l3m16_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 24494)
+    §IF (>= x 24494)
+      §R x
+    §EL
+      §R 24494
+
+  §F{l3m16_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 74)

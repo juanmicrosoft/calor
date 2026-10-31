@@ -1,0 +1,59 @@
+§M{CsvRow}
+  §F{NeedsQuoting:pub} (str:field) -> bool
+    §E{}
+    §R (|| (contains field ",") (|| (contains field "\"") (|| (contains field "\r") (contains field "\n"))))
+
+  §F{EscapeField:pub} (str:field) -> str
+    §E{}
+    §B{q:bool} §C{NeedsQuoting} §A field §/C
+    §IF q
+      §B{doubled:str} (replace field "\"" "\"\"")
+      §R (+ "\"" (+ doubled "\""))
+    §R field
+
+  §F{JoinRow:pub} (List<str>:fields) -> str
+    §E{}
+    §B{~result:str} ""
+    §B{~first:bool} true
+    §EACH{field} fields
+      §B{esc:str} §C{EscapeField} §A field §/C
+      §IF first
+        §ASSIGN result esc
+        §ASSIGN first false
+      §EL
+        §ASSIGN result (+ result (+ "," esc))
+    §R result
+
+  §F{SplitRow:pub} (str:line) -> List<str>
+    §E{mut,alloc}
+    §LIST{fields:str}
+    §/LIST
+    §B{n:i32} (len line)
+    §B{~i:i32} 0
+    §WH true
+      §B{~field:str} ""
+      §B{quoted:bool} (&& (< i n) (== (substr line i 1) "\""))
+      §IF quoted
+        §ASSIGN i (+ i 1)
+        §WH (< i n)
+          §B{c:str} (substr line i 1)
+          §IF (== c "\"")
+            §IF (&& (< (+ i 1) n) (== (substr line (+ i 1) 1) "\""))
+              §ASSIGN field (+ field "\"")
+              §ASSIGN i (+ i 2)
+            §EL
+              §ASSIGN i (+ i 1)
+              §BK
+          §EL
+            §ASSIGN field (+ field c)
+            §ASSIGN i (+ i 1)
+      §EL
+        §WH (&& (< i n) (!= (substr line i 1) ","))
+          §ASSIGN field (+ field (substr line i 1))
+          §ASSIGN i (+ i 1)
+      §PUSH{fields} field
+      §IF (&& (< i n) (== (substr line i 1) ","))
+        §ASSIGN i (+ i 1)
+      §EL
+        §BK
+    §R fields

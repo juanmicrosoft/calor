@@ -1,0 +1,14 @@
+§M{Contracts}
+  §F{Main:pub} () -> void
+    §E{cw}
+    §C{Console.WriteLine} §A "Testing contracts..." §/C
+
+  §F{Square:pub} (i32:x) -> i32
+    §Q (>= x 0)
+    §S (>= result 0)
+    §R (* x x)
+
+  §F{Divide:pub} (i32:a, i32:b) -> i32
+    §Q{"divisor must not be zero"} (!= b 0)
+    §R (/ a b)
+

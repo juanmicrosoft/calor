@@ -1,0 +1,120 @@
+§M{L2M32}
+
+  §F{l2m32_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 4)
+    §Q (>= y 0)
+    §S (>= result 23395)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (< total 23395)
+      §R 23395
+    §EL
+      §R total
+
+  §F{l2m32_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 2)
+    §S (>= x 3)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF (> acc 23402)
+      §R (+ acc 23402)
+    §EL
+      §R (+ (* acc 2) 23402)
+
+  §F{l2m32_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m15_fn04} §A x §A INT:26 §/C
+    §R (+ v1 y)
+
+  §F{l2m32_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 4)
+    §S (>= x 5)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF (> acc 23409)
+      §R (+ acc 23409)
+    §EL
+      §R (+ (* acc 2) 23409)
+
+  §F{l2m32_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 23416)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (> total 23416)
+      §R 23416
+    §R total
+
+  §F{l2m32_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m26_fn04} §A x §A INT:42 §/C
+    §R (+ v1 y)
+
+  §F{l2m32_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 4)
+    §S (>= x 5)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF (> acc 23423)
+      §R (+ acc 23423)
+    §EL
+      §R (+ (* acc 2) 23423)
+
+  §F{l2m32_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 5)
+    §S (>= x 6)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF (> acc 23430)
+      §R (+ acc 23430)
+    §EL
+      §R (+ (* acc 2) 23430)
+
+  §F{l2m32_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 23437)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (> total 23437)
+      §R 23437
+    §R total
+
+  §F{l2m32_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 5)
+    §Q (>= y 0)
+    §S (>= result 23444)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (< total 23444)
+      §R 23444
+    §EL
+      §R total
+
+  §F{l2m32_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 7)
+    §S (>= x 8)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF (> acc 23451)
+      §R (+ acc 23451)
+    §EL
+      §R (+ (* acc 2) 23451)
+
+  §F{l2m32_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 23458)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (> total 23458)
+      §R 23458
+    §R total
+
+  §F{l2m32_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 23465)
+    §IF (>= x 23465)
+      §R x
+    §EL
+      §R 23465

@@ -1,0 +1,108 @@
+§M{L2M20}
+
+  §F{l2m20_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 2)
+    §Q (>= y 0)
+    §S (>= result 22737)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (< total 22737)
+      §R 22737
+    §EL
+      §R total
+
+  §F{l2m20_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 5)
+    §S (>= x 6)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF (> acc 22744)
+      §R (+ acc 22744)
+    §EL
+      §R (+ (* acc 2) 22744)
+
+  §F{l2m20_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 22751)
+    §IF (>= x 22751)
+      §R x
+    §EL
+      §R 22751
+
+  §F{l2m20_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m28_fn09} §A x §A INT:45 §/C
+    §B{v2:i32} §C{l3m07_fn07} §A x §A INT:71 §/C
+    §R (+ (+ v1 v2) y)
+
+  §F{l2m20_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 22758)
+    §IF (>= x 22758)
+      §R x
+    §EL
+      §R 22758
+
+  §F{l2m20_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m27_fn02} §A x §A INT:36 §/C
+    §R (+ v1 y)
+
+  §F{l2m20_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 2)
+    §S (>= x 3)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF (> acc 22765)
+      §R (+ acc 22765)
+    §EL
+      §R (+ (* acc 2) 22765)
+
+  §F{l2m20_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 22772)
+    §IF (>= x 22772)
+      §R x
+    §EL
+      §R 22772
+
+  §F{l2m20_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m16_fn04} §A x §A INT:54 §/C
+    §R (+ v1 y)
+
+  §F{l2m20_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m07_fn12} §A x §A INT:83 §/C
+    §B{v2:i32} §C{l3m34_fn03} §A x §A INT:1 §/C
+    §R (+ (+ v1 v2) y)
+
+  §F{l2m20_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m33_fn05} §A x §A INT:55 §/C
+    §R (+ v1 y)
+
+  §F{l2m20_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 22779)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (> total 22779)
+      §R 22779
+    §R total
+
+  §F{l2m20_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 4)
+    §S (>= x 5)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF (> acc 22786)
+      §R (+ acc 22786)
+    §EL
+      §R (+ (* acc 2) 22786)

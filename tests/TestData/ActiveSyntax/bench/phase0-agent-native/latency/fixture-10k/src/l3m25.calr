@@ -1,0 +1,101 @@
+§M{L3M25}
+
+  §F{l3m25_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 48)
+
+  §F{l3m25_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 24991)
+    §IF (>= x 24991)
+      §R x
+    §EL
+      §R 24991
+
+  §F{l3m25_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 24998)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (> total 24998)
+      §R 24998
+    §R total
+
+  §F{l3m25_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 1)
+    §Q (>= y 0)
+    §S (>= result 25005)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (< total 25005)
+      §R 25005
+    §EL
+      §R total
+
+  §F{l3m25_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 25012)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (> total 25012)
+      §R 25012
+    §R total
+
+  §F{l3m25_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 78)
+
+  §F{l3m25_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 3)
+    §Q (>= y 0)
+    §S (>= result 25019)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (< total 25019)
+      §R 25019
+    §EL
+      §R total
+
+  §F{l3m25_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 8)
+    §Q (>= y 0)
+    §S (>= result 25026)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (< total 25026)
+      §R 25026
+    §EL
+      §R total
+
+  §F{l3m25_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 62)
+
+  §F{l3m25_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 25033)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (> total 25033)
+      §R 25033
+    §R total
+
+  §F{l3m25_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 41)
+
+  §F{l3m25_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 32)
+
+  §F{l3m25_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 40)

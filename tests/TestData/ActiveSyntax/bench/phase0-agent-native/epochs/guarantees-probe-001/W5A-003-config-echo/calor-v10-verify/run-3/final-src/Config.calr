@@ -1,0 +1,28 @@
+§M{Config}
+  §F{FormatEntry:pub} (str:key, str:val) -> str
+    §E{}
+    §R (+ key (+ "=" val))
+
+  §F{QuoteValue:pub} (str:val) -> str
+    §E{}
+    §R (+ "'" (+ val "'"))
+
+  §F{FormatConfig:pub} (str:key, str:val) -> str
+    §E{}
+    §B{quoted:str} §C{QuoteValue} §A val §/C
+    §B{line:str} §C{FormatEntry} §A key §A quoted §/C
+    §R line
+
+  §F{SaveConfig:pub} (str:path, str:key, str:val) -> void
+    §E{fs:w}
+    §B{line:str} §C{FormatConfig} §A key §A val §/C
+    §C{File.WriteAllText} §A path §A line §/C
+
+  §F{FormatSection:pub} (str:name) -> str
+    §E{}
+    §R (+ "[" (+ name "]"))
+
+  §F{LoadConfig:pub} (str:path) -> str
+    §E{fs:r}
+    §B{text:str} §C{File.ReadAllText} §A path §/C
+    §R text

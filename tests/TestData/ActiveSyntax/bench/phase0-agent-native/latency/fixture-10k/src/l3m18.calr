@@ -1,0 +1,120 @@
+§M{L3M18}
+
+  §F{l3m18_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 4)
+    §Q (>= y 0)
+    §S (>= result 24557)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (< total 24557)
+      §R 24557
+    §EL
+      §R total
+
+  §F{l3m18_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 1)
+    §S (>= x 2)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF (> acc 24564)
+      §R (+ acc 24564)
+    §EL
+      §R (+ (* acc 2) 24564)
+
+  §F{l3m18_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 2)
+    §Q (>= y 0)
+    §S (>= result 24571)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (< total 24571)
+      §R 24571
+    §EL
+      §R total
+
+  §F{l3m18_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 24578)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (> total 24578)
+      §R 24578
+    §R total
+
+  §F{l3m18_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 24585)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (> total 24585)
+      §R 24585
+    §R total
+
+  §F{l3m18_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 89)
+
+  §F{l3m18_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 24592)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (> total 24592)
+      §R 24592
+    §R total
+
+  §F{l3m18_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 1)
+    §S (>= x 2)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF (> acc 24599)
+      §R (+ acc 24599)
+    §EL
+      §R (+ (* acc 2) 24599)
+
+  §F{l3m18_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 7)
+    §Q (>= y 0)
+    §S (>= result 24606)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (< total 24606)
+      §R 24606
+    §EL
+      §R total
+
+  §F{l3m18_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 3)
+    §S (>= x 4)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF (> acc 24613)
+      §R (+ acc 24613)
+    §EL
+      §R (+ (* acc 2) 24613)
+
+  §F{l3m18_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 24620)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (> total 24620)
+      §R 24620
+    §R total
+
+  §F{l3m18_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 32)
+
+  §F{l3m18_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 24627)
+    §IF (>= x 24627)
+      §R x
+    §EL
+      §R 24627

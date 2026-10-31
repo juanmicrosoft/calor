@@ -1,0 +1,105 @@
+§M{L3M26}
+
+  §F{l3m26_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 25040)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (> total 25040)
+      §R 25040
+    §R total
+
+  §F{l3m26_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 40)
+
+  §F{l3m26_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 25047)
+    §IF (>= x 25047)
+      §R x
+    §EL
+      §R 25047
+
+  §F{l3m26_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 7)
+
+  §F{l3m26_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 7)
+
+  §F{l3m26_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 7)
+    §Q (>= y 0)
+    §S (>= result 25054)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (< total 25054)
+      §R 25054
+    §EL
+      §R total
+
+  §F{l3m26_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 25061)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (> total 25061)
+      §R 25061
+    §R total
+
+  §F{l3m26_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 45)
+
+  §F{l3m26_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 4)
+    §Q (>= y 0)
+    §S (>= result 25068)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (< total 25068)
+      §R 25068
+    §EL
+      §R total
+
+  §F{l3m26_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 25075)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (> total 25075)
+      §R 25075
+    §R total
+
+  §F{l3m26_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 25082)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (> total 25082)
+      §R 25082
+    §R total
+
+  §F{l3m26_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 68)
+
+  §F{l3m26_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 4)
+    §Q (>= y 0)
+    §S (>= result 25089)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (< total 25089)
+      §R 25089
+    §EL
+      §R total

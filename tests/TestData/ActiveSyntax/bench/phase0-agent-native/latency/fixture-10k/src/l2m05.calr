@@ -1,0 +1,88 @@
+§M{L2M05}
+
+  §F{l2m05_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 22093)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (> total 22093)
+      §R 22093
+    §R total
+
+  §F{l2m05_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m21_fn11} §A x §A INT:15 §/C
+    §R (+ v1 y)
+
+  §F{l2m05_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m12_fn11} §A x §A INT:8 §/C
+    §B{v2:i32} §C{l3m14_fn12} §A x §A INT:34 §/C
+    §R (+ (+ v1 v2) y)
+
+  §F{l2m05_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 22100)
+    §IF (>= x 22100)
+      §R x
+    §EL
+      §R 22100
+
+  §F{l2m05_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m16_fn06} §A x §A INT:30 §/C
+    §R (+ v1 y)
+
+  §F{l2m05_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m06_fn12} §A x §A INT:59 §/C
+    §R (+ v1 y)
+
+  §F{l2m05_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m32_fn05} §A x §A INT:53 §/C
+    §B{v2:i32} §C{l3m32_fn07} §A x §A INT:31 §/C
+    §R (+ (+ v1 v2) y)
+
+  §F{l2m05_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m32_fn07} §A x §A INT:66 §/C
+    §R (+ v1 y)
+
+  §F{l2m05_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m11_fn05} §A x §A INT:86 §/C
+    §R (+ v1 y)
+
+  §F{l2m05_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m19_fn02} §A x §A INT:23 §/C
+    §R (+ v1 y)
+
+  §F{l2m05_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m11_fn05} §A x §A INT:71 §/C
+    §B{v2:i32} §C{l3m30_fn04} §A x §A INT:47 §/C
+    §R (+ (+ v1 v2) y)
+
+  §F{l2m05_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 2)
+    §Q (>= y 0)
+    §S (>= result 22107)
+    §B{total:i32} (+ (* x 5) y)
+    §IF (< total 22107)
+      §R 22107
+    §EL
+      §R total
+
+  §F{l2m05_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 22114)
+    §B{total:i32} (+ (* x 3) y)
+    §IF (> total 22114)
+      §R 22114
+    §R total

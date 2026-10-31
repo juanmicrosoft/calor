@@ -1,0 +1,112 @@
+§M{L2M34}
+
+  §F{l2m34_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 23514)
+    §IF (>= x 23514)
+      §R x
+    §EL
+      §R 23514
+
+  §F{l2m34_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m28_fn02} §A x §A INT:88 §/C
+    §R (+ v1 y)
+
+  §F{l2m34_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 4)
+    §S (>= x 5)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF (> acc 23521)
+      §R (+ acc 23521)
+    §EL
+      §R (+ (* acc 2) 23521)
+
+  §F{l2m34_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 3)
+    §Q (>= y 0)
+    §S (>= result 23528)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (< total 23528)
+      §R 23528
+    §EL
+      §R total
+
+  §F{l2m34_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m13_fn09} §A x §A INT:9 §/C
+    §B{v2:i32} §C{l3m12_fn06} §A x §A INT:37 §/C
+    §R (+ (+ v1 v2) y)
+
+  §F{l2m34_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 0)
+    §S (<= result 23535)
+    §B{total:i32} (+ (* x 2) y)
+    §IF (> total 23535)
+      §R 23535
+    §R total
+
+  §F{l2m34_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 23542)
+    §IF (>= x 23542)
+      §R x
+    §EL
+      §R 23542
+
+  §F{l2m34_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 1)
+    §S (>= x 2)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF (> acc 23549)
+      §R (+ acc 23549)
+    §EL
+      §R (+ (* acc 2) 23549)
+
+  §F{l2m34_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 23556)
+    §IF (>= x 23556)
+      §R x
+    §EL
+      §R 23556
+
+  §F{l2m34_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m17_fn05} §A x §A INT:62 §/C
+    §R (+ v1 y)
+
+  §F{l2m34_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l3m11_fn08} §A x §A INT:64 §/C
+    §R (+ v1 y)
+
+  §F{l2m34_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 23563)
+    §IF (>= x 23563)
+      §R x
+    §EL
+      §R 23563
+
+  §F{l2m34_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 23570)
+    §IF (>= x 23570)
+      §R x
+    §EL
+      §R 23570
