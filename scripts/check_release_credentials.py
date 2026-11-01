@@ -244,7 +244,8 @@ def check_workflows(workflow_dir: Path) -> list[str]:
 
     nuget.org issues a key only to a job of publish-nuget.yml that runs in nuget-release (module
     docstring), so every job-level environment must be the publish job's exact `nuget-release`
-    or one of OTHER_ENVIRONMENTS, and every job-level `uses` must be a local
+    or one of OTHER_ENVIRONMENTS, or exactly `anthropic-count-tokens` in the `count`
+    job of syntax-token-count.yml. Every job-level `uses` must be a local
     ./.github/workflows/ file with no @ref (its own jobs are checked here too). Codes:
       W001 publish-nuget.yml is missing.
       W002 a workflow names NUGET_API_KEY or NUGET_RELEASE_API_KEY anywhere other than the exact
@@ -315,7 +316,10 @@ def check_workflows(workflow_dir: Path) -> list[str]:
                 problems.append(f"W003: {path.name} job '{job}' uses NuGet/login or names its output; only "
                                 "the gated publish job may")
             for environment in environments:
-                if environment not in OTHER_ENVIRONMENTS or mentions(environment, ENVIRONMENT):
+                count_environment = (path.name == "syntax-token-count.yml" and job == "count"
+                                     and environment == "anthropic-count-tokens")
+                if (environment not in OTHER_ENVIRONMENTS and not count_environment) \
+                        or mentions(environment, ENVIRONMENT):
                     problems.append(f"W004: {path.name} job '{job}' declares an environment the check does not "
                                     f"recognize (it may be {ENVIRONMENT}): {environment!r}")
     if not publish_seen and not any(p.startswith("W012: " + PUBLISH_WORKFLOW) for p in problems):

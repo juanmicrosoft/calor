@@ -702,10 +702,45 @@ class WorkflowTests(unittest.TestCase):
         label = (components / "benchmarks/HistoricalMethodLabel.tsx").read_text()
         self.assertIn("Historical, not comparable under the 0.24 method", label)
         for relative in ("benchmarks/BenchmarkDashboard.tsx", "benchmarks/BenchmarkSummaryTable.tsx",
-                         "benchmarks/AgentRefactoringCard.tsx", "benchmarks/AgentBenchmarkDashboard.tsx",
-                         "landing/BenchmarkChart.tsx"):
+                         "benchmarks/AgentRefactoringCard.tsx", "benchmarks/AgentBenchmarkDashboard.tsx"):
             with self.subTest(component=relative):
                 self.assertIn("<HistoricalMethodLabel", (components / relative).read_text())
+
+    def assert_landing_has_no_measurements(self, source: str) -> None:
+        # #1722 replaced the numeric snapshot with static limitations and links. Keep this
+        # branch data-free; restoring measurements requires restoring their label checks too.
+        component = re.fullmatch(
+            r"\s*import Link from 'next/link';\s*"
+            r"export function BenchmarkChart\(\) \{\s*return \((?P<jsx>.*?)\);\s*\}\s*",
+            source, re.S,
+        )
+        self.assertIsNotNone(component, "landing limits must not import data or execute data-loading code")
+        jsx = component.group("jsx")
+        self.assertNotIn("{", jsx, "landing limits must not interpolate measurements")
+        tags = set(re.findall(r"</?([A-Za-z][A-Za-z0-9]*)\b", jsx))
+        self.assertEqual({"section", "div", "h2", "p", "Link"}, tags,
+                         "landing limits must not render a benchmark component")
+        visible_text = " ".join(re.findall(r">([^<>]*)<", jsx)).replace("pre-1.0", "")
+        self.assertNotRegex(visible_text, r"\d|%", "numeric claims require historical-label protection")
+
+    def test_landing_research_limits_do_not_import_or_render_measurements(self) -> None:
+        source = (REPO_ROOT / "website/src/components/landing/BenchmarkChart.tsx").read_text()
+        self.assert_landing_has_no_measurements(source)
+
+    def test_unlabeled_measurements_cannot_return_to_the_landing_limits(self) -> None:
+        source = (REPO_ROOT / "website/src/components/landing/BenchmarkChart.tsx").read_text()
+        for mutant in (
+            source.replace("import Link", "import benchmarkData from '../../../public/data/benchmark-results.json';\n"
+                                         "import Link", 1),
+            source.replace("Published comparisons", "{benchmarkData.programs.length} source pairs. Published comparisons"),
+            source.replace("Published comparisons", "217 source pairs. Published comparisons"),
+            source.replace("</section>", "<BenchmarkDashboard /></section>"),
+            source.replace("  return (", "  const data = require('../../../public/data/benchmark-results.json');\n"
+                                         "  return ("),
+            source.replace("  return (", "  fetch('/data/benchmark-results.json');\n  return ("),
+        ):
+            with self.subTest(mutant=mutant), self.assertRaises(AssertionError):
+                self.assert_landing_has_no_measurements(mutant)
 
 
 class RealPacketTests(unittest.TestCase):

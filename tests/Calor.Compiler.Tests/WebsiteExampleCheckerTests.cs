@@ -516,7 +516,11 @@ public sealed class WebsiteExampleCheckerTests
     // transcript by W1GuideTranscriptTests) and one unchecked report excerpt.
     // #1529/#1530 (0.27): complete 62 -> 64 and negative 6 -> 7, the nominal-refinement example
     // and its Calor0202 refusal in syntax-reference/refinement-types.mdx.
-    private const string Pinned = "pages=97 complete=64 negative=7 grouped=3 checkedOutputs=2 illustrative=34";
+    // #1722: complete 64 -> 60. Agent-first guidance removed HelloApp from
+    // getting-started/how-it-works.mdx, MyApp from getting-started/index.mdx, and Calculator
+    // from guides/adding-calor-to-existing-projects.mdx and philosophy/index.mdx.
+    // Pages, negative/grouped programs, and checked/illustrative outputs are unchanged.
+    private const string Pinned = "pages=97 complete=60 negative=7 grouped=3 checkedOutputs=2 illustrative=34";
 
     [Theory]
     [InlineData("guides/nullability-and-dotnet-interop.mdx", "```calor expect=Calor0272\n", "```calor\n")]
