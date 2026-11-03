@@ -507,8 +507,12 @@ public static class TypeMapper
             return $"{mappedBase}<{mappedArgs}>{mappedSuffix}";
         }
 
-        // Direct mapping
-        return CalorToCSharpMap.TryGetValue(calorType, out var result) ? result : calorType;
+        if (CalorToCSharpMap.TryGetValue(calorType, out var result))
+            return result;
+
+        return CSharpToCalorMap.TryGetValue(calorType, out var alias)
+            && CalorToCSharpMap.TryGetValue(alias, out var csharpAlias)
+                ? csharpAlias : calorType;
     }
 
     internal static string CalorToCSharpQualifiedName(string name)

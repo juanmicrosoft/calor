@@ -132,12 +132,41 @@ public class ToSurfaceSpellingTests
     [InlineData("iNt")]
     [InlineData("sTr")]
     [InlineData("dOuBlE")]
+    [InlineData("iNt32")]
+    [InlineData("INT32")]
+    [InlineData("sYsTeM.Int32")]
     [InlineData("MyGeneric<MyTYPE>")]
     public void UnknownTypeCasing_IsNeverFolded(string type)
     {
         Assert.Equal(type, AttributeHelper.ExpandType(type));
         Assert.Equal(type, Migration.TypeMapper.ToSurfaceType(type));
         Assert.Equal(type, Migration.TypeMapper.CalorToCSharp(type));
+    }
+
+    [Theory]
+    [InlineData("Int32", "int")]
+    [InlineData("Int64", "long")]
+    [InlineData("Int16", "short")]
+    [InlineData("Byte", "byte")]
+    [InlineData("SByte", "sbyte")]
+    [InlineData("UInt32", "uint")]
+    [InlineData("UInt64", "ulong")]
+    [InlineData("UInt16", "ushort")]
+    [InlineData("Single", "float")]
+    [InlineData("Double", "double")]
+    [InlineData("Decimal", "decimal")]
+    [InlineData("Boolean", "bool")]
+    [InlineData("String", "string")]
+    [InlineData("Char", "char")]
+    [InlineData("Void", "void")]
+    [InlineData("Object", "object")]
+    public void ClrPrimitiveAliases_UseExplicitCaseSensitiveMappings(string name, string expected)
+    {
+        foreach (var type in new[] { name, $"System.{name}" })
+        {
+            Assert.Equal(expected, Migration.TypeMapper.CalorToCSharp(type));
+            Assert.Equal(expected, Migration.TypeMapper.ToSurfaceType(type));
+        }
     }
 
     [Theory]
