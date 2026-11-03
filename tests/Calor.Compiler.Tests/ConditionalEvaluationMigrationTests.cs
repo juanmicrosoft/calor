@@ -16,6 +16,252 @@ namespace Calor.Compiler.Tests;
 public class ConditionalEvaluationMigrationTests
 {
     [Theory]
+    [InlineData("Math")]
+    [InlineData("System.Math")]
+    public void NamedStaticPrimitiveProducer_RetainsExactMetadataForItsReceivingCall(string receiver)
+    {
+        var source = $$"""
+            §M{Probe}
+              §F{Read:pub} () -> int
+                §E{}
+                §R §C{ {{receiver}}.Max} §A §C{ {{receiver}}.Min} §A 8 §A 3 §/C §A 7 §/C
+            """;
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parsing.Parser(new Parsing.Lexer(source, diagnostics)
+            .TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(ast);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var calls = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>().ToArray();
+        Assert.Equal(2, calls.Length);
+        Assert.All(calls, call =>
+        {
+            Assert.Null(call.ResolvedSymbol);
+            var method = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+            Assert.True(method.IsStatic);
+            Assert.Equal("System.Math", method.ContainingType.ToDisplayString());
+            Assert.Equal(SpecialType.System_Int32, method.ReturnType.SpecialType);
+            Assert.Equal(2, method.Parameters.Length);
+            Assert.All(method.Parameters, parameter => Assert.Equal(SpecialType.System_Int32, parameter.Type.SpecialType));
+            var result = Assert.IsType<Calor.Compiler.Binding.BoundTypes.NominalBoundType>(call.Type);
+            Assert.Equal(SpecialType.System_Int32,
+                Assert.IsAssignableFrom<INamedTypeSymbol>(result.RoslynSymbol).SpecialType);
+        });
+        var compiled = Program.Compile(source, "named-math-producer.calr",
+            new CompilationOptions { EnforceEffects = true, StatusWriter = TextWriter.Null });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ToStringReturnAuthority_DistinguishesObjectMetadataFromTheSourceOverride(bool throughObject)
+    {
+        var source = $$"""
+            #nullable enable
+            public static class Probe
+            {
+                private static int Calls;
+                public sealed class Text
+                {
+                    public override {{(throughObject ? "string?" : "string")}} ToString()
+                    {
+                        Calls++;
+                        return {{(throughObject ? "null" : "\"text\"")}};
+                    }
+                }
+                public static {{(throughObject ? "string?" : "string")}} Read({{(throughObject ? "object" : "Text")}} value)
+                {
+                    return value.ToString();
+                }
+                public static int Run()
+                {
+                    var rendered = Read(new Text());
+                    return Calls * 10 + (rendered == null ? 1 : 0);
+                }
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        var diagnostics = new DiagnosticBag();
+        var reparsed = new Parsing.Parser(new Parsing.Lexer(conversion.CalorSource!, diagnostics)
+            .TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(reparsed);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
+            .Single(call => call.Target == "value.ToString");
+        var returnType = Assert.IsType<Calor.Compiler.Binding.BoundTypes.NominalBoundType>(call.Type);
+        Assert.Equal(throughObject ? "string?" : "string", returnType.QualifiedName);
+        if (throughObject)
+        {
+            Assert.Null(call.ResolvedSymbol);
+            var method = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+            Assert.Equal(SpecialType.System_Object, method.ContainingType.SpecialType);
+            Assert.Equal(SpecialType.System_String, method.ReturnType.SpecialType);
+            Assert.Equal(Microsoft.CodeAnalysis.NullableAnnotation.Annotated, method.ReturnNullableAnnotation);
+            Assert.False(method.IsStatic);
+            Assert.True(method.IsVirtual);
+            Assert.Empty(method.Parameters);
+            Assert.NotNull(call.ResolvedParameterTypes);
+            Assert.Empty(call.ResolvedParameterTypes);
+            Assert.Equal(Calor.Compiler.Binding.BoundTypes.NullableAnnotation.Annotated,
+                returnType.NullableAnnotation);
+        }
+        else
+        {
+            Assert.Null(call.ResolvedMetadataMethod);
+            Assert.Same(bound.Functions.Single(function => function.Symbol.Name == "Probe.Text.ToString").Symbol,
+                call.ResolvedSymbol);
+            Assert.Equal(Calor.Compiler.Binding.BoundTypes.NullableAnnotation.NotAnnotated,
+                returnType.NullableAnnotation);
+        }
+        var compiled = Program.Compile(conversion.CalorSource!, "to-string-return.calr",
+            new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Equal(throughObject ? 11 : 10, Execute(source));
+        Assert.Equal(throughObject ? 11 : 10, Execute(compiled.GeneratedCode));
+        if (throughObject)
+        {
+            var enforced = Program.Compile(conversion.CalorSource!, "object-virtual-effects.calr",
+                new CompilationOptions { EnforceEffects = true, StatusWriter = TextWriter.Null });
+            Assert.Contains(enforced.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("value.ToString", StringComparison.Ordinal));
+        }
+    }
+
+    [Theory]
+    [InlineData(true, "Calor0272")]
+    [InlineData(false, "Calor0273")]
+    public void NamedObjectToString_DoesNotProveANonnullableResult(bool assign, string diagnosticCode)
+    {
+        var compiled = Program.Compile($$"""
+            §M{Probe}
+              §F{Read:pub} (object:value) -> string
+                {{(assign ? "§B{rendered:string} §C{value.ToString} §/C\n    §R rendered" : "§R §C{value.ToString} §/C")}}
+            """, "to-string-nullable.calr", new CompilationOptions
+            { EnforceEffects = false, StatusWriter = TextWriter.Null });
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == diagnosticCode);
+    }
+
+    [Theory]
+    [InlineData("§C{Missing} §/C", false)]
+    [InlineData("missing", false)]
+    [InlineData("other", true)]
+    public void NamedMetadataReceiver_RequiresAuthoritativeArgumentTypes(string argument, bool resolves)
+    {
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parsing.Parser(new Parsing.Lexer($$"""
+            §M{Probe}
+              §F{Read:pub} (object:value, object:other) -> bool
+                §B{missing} §C{Missing} §/C
+                §R §C{value.Equals} §A {{argument}} §/C
+            """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(ast);
+        var call = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
+            .Single(call => call.Target == "value.Equals");
+        Assert.Null(call.ResolvedSymbol);
+        if (resolves)
+        {
+            var method = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+            Assert.False(method.IsStatic);
+            Assert.Equal(SpecialType.System_Object, method.ContainingType.SpecialType);
+            Assert.Equal(SpecialType.System_Object, Assert.Single(method.Parameters).Type.SpecialType);
+        }
+        else
+        {
+            Assert.Null(call.ResolvedMetadataMethod);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false, 123)]
+    [InlineData(true, false, 1)]
+    [InlineData(false, true, 123)]
+    public void SelectedPropertyReceiver_EvaluatesOnceBeforeArgumentsAndPreservesExceptions(
+        bool failGetter, bool failCall, int expected)
+    {
+        var members = $$"""
+            private static int Calls;
+            public static string Argument() { Calls = Calls * 10 + 2; return "x"; }
+            public sealed class Holder
+            {
+                public Box Child
+                {
+                    get
+                    {
+                        Calls = Calls * 10 + 1;
+                        if ({{(failGetter ? "true" : "false")}}) throw new System.Exception();
+                        return new Box();
+                    }
+                }
+            }
+            public sealed class Box
+            {
+                public bool Contains(string value)
+                {
+                    Calls = Calls * 10 + 3;
+                    if ({{(failCall ? "true" : "false")}}) throw new System.Exception();
+                    return true;
+                }
+            }
+            """;
+        const string body = """
+            var holder = new Holder();
+            try { bool ignored = holder.Child.Contains(Argument()); }
+            catch (System.Exception) { }
+            return Calls;
+            """;
+        var conversion = new CSharpToCalorConverter().Convert($$"""
+            public static class Probe { {{members}} public static int Run() { {{body}} } }
+            """);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Contains(Descendants(conversion.Ast!).OfType<ExpressionCallNode>(), call =>
+            call.TargetExpression is FieldAccessNode
+                { FieldName: "Contains", Target: FieldAccessNode { FieldName: "Child" } });
+        AssertRoundTrip(body, expected, false, members: members);
+    }
+
+    [Fact]
+    public void MetadataValueMemberReceiver_RetainsTheUnsupportedReadAndUnknownCallEffects()
+    {
+        const string body = """
+            var s = new System.Diagnostics.Stopwatch();
+            string rendered = s.Elapsed.ToString();
+            return rendered == "00:00:00" ? 1 : 0;
+            """;
+        var conversion = new CSharpToCalorConverter().Convert($$"""
+            public static class Probe { public static int Run() { {{body}} } }
+            """);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Contains(Descendants(conversion.Ast!).OfType<ExpressionCallNode>(),
+            call => call.TargetExpression is FieldAccessNode
+                { FieldName: "ToString", Target: FieldAccessNode { FieldName: "Elapsed" } });
+        var diagnostics = new DiagnosticBag();
+        var reparsed = new Parsing.Parser(new Parsing.Lexer(conversion.CalorSource!, diagnostics)
+            .TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(reparsed);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
+            .Single(call => call.ResolvedMethodName == "ToString");
+        var member = Assert.IsType<BoundFieldAccessExpression>(call.EvaluatedReceiver);
+        Assert.IsType<Calor.Compiler.Binding.BoundTypes.UnresolvedBoundType>(member.Type);
+        var property = Assert.IsAssignableFrom<IPropertySymbol>(member.UnsupportedMetadataMember);
+        Assert.Equal("System.Diagnostics.Stopwatch", property.ContainingType.ToDisplayString());
+        Assert.Equal("Elapsed", property.Name);
+        Assert.Equal("System.TimeSpan", property.Type.ToDisplayString());
+        Assert.Null(call.ResolvedSymbol);
+        Assert.Null(call.ResolvedMetadataMethod);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "Calor0270"
+            && diagnostic.Span.Start == member.Span.Start && diagnostic.Span.Length == member.Span.Length
+            && diagnostic.Message.Contains("outside supported scalar reference reads", StringComparison.Ordinal));
+        var enforced = Program.Compile(conversion.CalorSource!, "metadata-value-receiver.calr",
+            new CompilationOptions { EnforceEffects = true, StatusWriter = TextWriter.Null });
+        Assert.Contains(enforced.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+            && diagnostic.Message.Contains("ToString", StringComparison.Ordinal));
+        AssertRoundTrip(body, 1, false);
+    }
+
+    [Theory]
     [InlineData("string ignored = Receiver().ToString(); return Calls;", 13)]
     [InlineData("bool ignored = Receiver().Contains(Argument()); return Calls;", 123)]
     [InlineData("bool ignored = Receiver().ToString().Contains(Argument()); return Calls;", 132)]
@@ -169,7 +415,7 @@ public class ConditionalEvaluationMigrationTests
         var conversion = new CSharpToCalorConverter().Convert($$"""
             public static class Probe
             {
-                public static string Render({{type}} value) { return value.ToString(); }
+                public static string? Render({{type}} value) { return value.ToString(); }
             }
             """);
         Assert.True(conversion.Success, string.Join("\n", conversion.Issues));

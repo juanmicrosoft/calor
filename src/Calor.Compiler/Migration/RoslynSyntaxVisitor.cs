@@ -13778,7 +13778,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 && member.Expression.DescendantNodesAndSelf(node => node is not AnonymousFunctionExpressionSyntax)
                     .Any(node => node is InvocationExpressionSyntax or ElementAccessExpressionSyntax
                         or ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax
-                        or CastExpressionSyntax or ConditionalExpressionSyntax);
+                        or CastExpressionSyntax or ConditionalExpressionSyntax
+                        || node is MemberAccessExpressionSyntax valueMember
+                            && _semanticModel?.GetSymbolInfo(valueMember).Symbol is IPropertySymbol or IFieldSymbol);
         return invocation.Expression is not (IdentifierNameSyntax or GenericNameSyntax);
     }
 

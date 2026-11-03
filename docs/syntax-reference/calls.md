@@ -100,6 +100,11 @@ selected metadata method and receiver prove the built-in operation. Zero-argumen
 foreign, and unresolved same-spelled methods remain calls, preserving their
 declaration identity and conservative effect analysis.
 
+Property and field receivers remain explicit reads, so a call cannot erase an
+unsupported member-result diagnostic. Named instance calls also retain selected
+metadata return annotations: `ToString()` on an `object` receiver returns nullable
+`string`, while a resolved source override uses its own declared return type.
+
 ---
 
 ## Rules

@@ -241,6 +241,13 @@ public sealed class Binder
             || computedReceiver is BoundCallExpression { ResolvedSymbol: null, ResolvedMetadataMethod: null,
                 Type.DisplayString: "OBJECT" })
             return null;
+        if (computedReceiver is not null && args.Any(argument =>
+            argument.Type is BoundTypes.UnresolvedBoundType
+            || argument is BoundCallExpression { ResolvedSymbol: null, ResolvedMetadataMethod: null,
+                Type.DisplayString: "OBJECT" }
+            || argument is BoundVariableExpression
+                { Variable: { IsTypeInferred: true, TypeName: "OBJECT", InferredReferenceType: null } }))
+            return null;
 
         // Member reads and their receiving calls must use the same actual reference set.
         var ctx = binder.Context;
@@ -5810,12 +5817,31 @@ public sealed class Binder
         // additionally consumes the parameter-side annotations from the same
         // resolution to fire Calor0274 for possibly-null strings passed into
         // non-nullable :string parameters.
+        var metadataReceiver = computedReceiver
+            ?? (receiverSymbol is { FunctionType: null } && receiver is BoundVariableExpression ? receiver : null);
+        if (metadataReceiver is null && receiver is BoundTypeReferenceExpression { ResolvedType: null } typeReceiver
+            && !callExpr.Target.StartsWith("System.", StringComparison.Ordinal)
+            && !callExpr.Target.StartsWith("Microsoft.", StringComparison.Ordinal))
+            metadataReceiver = TryBindMetadataTypeReceiver(new ReferenceNode(typeReceiver.Span, typeReceiver.Name));
         var bclResolution = resolution.Kind == OverloadResolutionKind.NotFound && !resolution.HasOpaqueOverloads
-            ? computedReceiver is not null
-                ? TryResolveBclCall($"{computedReceiver.Type.FullyQualifiedName}.{computedMethodName}", args,
-                    callExpr.ArgumentNames, callExpr.ArgumentModifiers, computedReceiver, callExpr.TypeArguments)
+            ? metadataReceiver is not null
+                ? TryResolveBclCall($"{metadataReceiver.Type.FullyQualifiedName}.{resolvedMethodName}", args,
+                    callExpr.ArgumentNames, callExpr.ArgumentModifiers, metadataReceiver, callExpr.TypeArguments)
                 : TryResolveBclCall(callExpr.Target, args, callExpr.ArgumentNames, callExpr.ArgumentModifiers)
             : null;
+        var metadataScalarReturn = bclResolution?.Symbol?.ReturnType.SpecialType
+            is Microsoft.CodeAnalysis.SpecialType.System_String
+                or Microsoft.CodeAnalysis.SpecialType.System_Boolean or Microsoft.CodeAnalysis.SpecialType.System_Char
+                or Microsoft.CodeAnalysis.SpecialType.System_SByte or Microsoft.CodeAnalysis.SpecialType.System_Byte
+                or Microsoft.CodeAnalysis.SpecialType.System_Int16 or Microsoft.CodeAnalysis.SpecialType.System_UInt16
+                or Microsoft.CodeAnalysis.SpecialType.System_Int32 or Microsoft.CodeAnalysis.SpecialType.System_UInt32
+                or Microsoft.CodeAnalysis.SpecialType.System_Int64 or Microsoft.CodeAnalysis.SpecialType.System_UInt64
+                or Microsoft.CodeAnalysis.SpecialType.System_Single or Microsoft.CodeAnalysis.SpecialType.System_Double
+                or Microsoft.CodeAnalysis.SpecialType.System_Decimal or Microsoft.CodeAnalysis.SpecialType.System_IntPtr
+                or Microsoft.CodeAnalysis.SpecialType.System_UIntPtr;
+        // Named-call enrichment does not widen the staged nominal/array producer surface.
+        if (computedReceiver is null && metadataReceiver is not null && !metadataScalarReturn)
+            bclResolution = null;
         var instanceArrayResolution = computedReceiver is null && resolution.Kind == OverloadResolutionKind.NotFound
             && !resolution.HasOpaqueOverloads
             ? TryResolveInstanceArrayCall(callExpr, receiver)
@@ -5905,9 +5931,10 @@ public sealed class Binder
             receiver: receiver)
         {
             EvaluatedReceiver = computedReceiver,
-            ResolvedMetadataMethod = instanceArrayResolution?.Symbol ?? (computedReceiver is not null ? bclResolution?.Symbol : null),
+            ResolvedMetadataMethod = instanceArrayResolution?.Symbol
+                ?? (metadataReceiver is not null || metadataScalarReturn ? bclResolution?.Symbol : null),
             MetadataArrayResultType = (instanceArrayResolution?.Symbol
-                ?? (computedReceiver is not null ? bclResolution?.Symbol : null))?.ReturnType as Microsoft.CodeAnalysis.IArrayTypeSymbol,
+                ?? (metadataReceiver is not null ? bclResolution?.Symbol : null))?.ReturnType as Microsoft.CodeAnalysis.IArrayTypeSymbol,
             CallableStorageIdentity = callable,
             ObservedCallableEffects = callableEffects,
             ArgumentParameterIndices = GetBclArgumentParameterIndices(bclResolution, args.Count),
