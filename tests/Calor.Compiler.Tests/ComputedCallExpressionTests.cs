@@ -8,6 +8,7 @@ using Calor.Compiler.Effects;
 using Calor.Compiler.Effects.Manifests;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
+using BoundTypes = Calor.Compiler.Binding.BoundTypes;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
@@ -16,6 +17,149 @@ namespace Calor.Compiler.Tests;
 
 public sealed class ComputedCallExpressionTests
 {
+    [Theory]
+    [InlineData(BoundTypes.NullableAnnotation.NotAnnotated)]
+    [InlineData(BoundTypes.NullableAnnotation.Annotated)]
+    [InlineData(BoundTypes.NullableAnnotation.Oblivious)]
+    public void IndexedPayloadType_DoesNotPromoteExistingAnnotations(BoundTypes.NullableAnnotation annotation)
+    {
+        var payload = new BoundTypes.NominalBoundType("STRING", annotation);
+        var array = new BoundStructuralExpression(default, "Probe", "List<string>");
+        var access = new BoundArrayAccess(default, array, new BoundIntLiteral(default, 0), resolvedType: payload);
+        Assert.Same(payload, access.Type);
+        Assert.False(access.HasUnknownInferredType);
+        Assert.Equal(annotation != BoundTypes.NullableAnnotation.NotAnnotated,
+            NullabilityChecker.IsPossiblyNullAssignedTo(access,
+                new BoundTypes.NominalBoundType("STRING", BoundTypes.NullableAnnotation.NotAnnotated)));
+    }
+
+    [Fact]
+    public void IndexedDeclaredField_PreservesExecutableCSharp()
+    {
+        var (ast, _, diagnostics) = Bind("""
+            §M{Probe}
+              §CL{Chain:pub}
+                §FLD{List<string>:_memberNames:priv:readonly} = §NEW{List<string>} §A 2 §/NEW
+                §MT{Run:pub} () -> str
+                  §C{_memberNames.Add} §A "root" §/C
+                  §B{last:str} §IDX{_memberNames} 0
+                  §R §IDX{_memberNames} 0
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        const string original = """
+            namespace Probe;
+            public class Chain
+            {
+                private readonly System.Collections.Generic.List<string> _memberNames = new(2);
+                public string Run()
+                {
+                    _memberNames.Add("root");
+                    string last = _memberNames[0];
+                    return _memberNames[0];
+                }
+            }
+            """;
+        foreach (var code in new[] { original, new CSharpEmitter().Emit(ast) })
+        {
+            var compilation = CSharpCompilation.Create("Indexed_" + Guid.NewGuid().ToString("N"),
+                [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble + code)],
+                GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var emission = compilation.Emit(stream);
+            Assert.True(emission.Success, string.Join("\n", emission.Diagnostics) + "\n" + code);
+            var assembly = System.Reflection.Assembly.Load(stream.ToArray());
+            var chain = assembly.GetType("Probe.Chain", throwOnError: true)!;
+            Assert.Equal("root", chain.GetMethod("Run")!.Invoke(Activator.CreateInstance(chain), null));
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void IndexedDeclaredField_PreservesStringPayloadNullability(bool nullable, bool throughThis)
+    {
+        var element = nullable ? "string?" : "string";
+        var receiver = throughThis ? "§THIS._memberNames" : "_memberNames";
+        var (_, bound, diagnostics) = Bind($$"""
+            §M{Test}
+              §CL{Chain:pub}
+                §FLD{List<{{element}}>:_memberNames:priv:readonly} = §NEW{List<{{element}}>} §A 2 §/NEW
+                §MT{Last:pub} () -> str
+                  §B{last:str} §IDX {{receiver}} 0
+                  §R §IDX {{receiver}} 0
+            """);
+        Assert.Equal(nullable, diagnostics.Errors.Any(diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableToNonNullableBinding));
+        Assert.Equal(nullable, diagnostics.Errors.Any(diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableReturnFromNonNullable));
+        Assert.Equal(nullable ? 2 : 0, diagnostics.Errors.Count());
+        var accesses = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundArrayAccess>().ToArray();
+        Assert.Equal(2, accesses.Length);
+        foreach (var access in accesses)
+        {
+            Assert.False(access.HasUnknownInferredType);
+            Assert.Equal(nullable ? BoundTypes.NullableAnnotation.Annotated : BoundTypes.NullableAnnotation.NotAnnotated,
+                Assert.IsType<BoundTypes.NominalBoundType>(access.Type).NullableAnnotation);
+        }
+    }
+
+    [Theory]
+    [InlineData("items", false)]
+    [InlineData("items", true)]
+    [InlineData("§C{Make} §/C", false)]
+    [InlineData("§C{Make} §/C", true)]
+    public void IndexedInferredCollection_PreservesKnownStringPayload(string initializer, bool nullable)
+    {
+        var element = nullable ? "string?" : "string";
+        var (_, bound, diagnostics) = Bind($$"""
+            §M{Test}
+              §F{Use:pub} (List<{{element}}>:items) -> str
+                §B{source} {{initializer}}
+                §B{value} §IDX{source} 0
+                §B{copy:str} value
+                §R value
+              §F{Make:pub} () -> List<{{element}}>
+                §R §NEW{List<{{element}}>} §/NEW
+            """);
+        Assert.Equal(nullable, diagnostics.Errors.Any(diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableToNonNullableBinding));
+        Assert.Equal(nullable, diagnostics.Errors.Any(diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableReturnFromNonNullable));
+        Assert.Equal(nullable ? 2 : 0, diagnostics.Errors.Count());
+        var access = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundArrayAccess>());
+        Assert.False(access.HasUnknownInferredType);
+        Assert.Equal(nullable ? BoundTypes.NullableAnnotation.Annotated : BoundTypes.NullableAnnotation.NotAnnotated,
+            Assert.IsType<BoundTypes.NominalBoundType>(access.Type).NullableAnnotation);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void IndexedDeclaredReference_PreservesPayloadIdentityAndNullability(bool nullable)
+    {
+        var (_, bound, diagnostics) = Bind($$"""
+            §M{Test}
+              §F{Use:pub} (List<{{(nullable ? "?Widget" : "Widget")}}>:items) -> Widget
+                §B{value} §IDX{items} 0
+                §B{copy:Widget} value
+                §R value
+              §CL{Widget:pub}
+            """);
+        Assert.Equal(nullable, diagnostics.Errors.Any(diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableToNonNullableBinding));
+        Assert.Equal(nullable, diagnostics.Errors.Any(diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableReturnFromNonNullable));
+        var access = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundArrayAccess>());
+        var type = Assert.IsType<BoundTypes.NominalBoundType>(access.Type);
+        Assert.NotNull(type.Declaration);
+        Assert.Equal("Widget", type.Declaration.Name);
+        Assert.Equal(nullable ? BoundTypes.NullableAnnotation.Annotated : BoundTypes.NullableAnnotation.NotAnnotated,
+            type.NullableAnnotation);
+    }
+
     [Theory]
     [InlineData("(§C{External.Make} §/C).Value", false)]
     [InlineData("(§IDX §C{External.GetFields} §/C 0).Value", false)]

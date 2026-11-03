@@ -1067,7 +1067,7 @@ public sealed class BoundArrayAccess : BoundExpression
     public override IReadOnlyList<BoundExpression> Children => [Array, Index];
 
     public BoundArrayAccess(TextSpan span, BoundExpression array, BoundExpression index,
-        string? elementTypeName = null) : base(span)
+        string? elementTypeName = null, BoundType? resolvedType = null) : base(span)
     {
         Array = array; Index = index;
         HasUnknownInferredType = array.HasUnknownInferredType;
@@ -1086,8 +1086,10 @@ public sealed class BoundArrayAccess : BoundExpression
         elementTypeName ??= arrayTypeName.EndsWith("[]", StringComparison.Ordinal)
             ? arrayTypeName[..^2]
             : null;
-        Type = new NominalBoundType(elementTypeName ?? "OBJECT");
-        HasUnknownInferredType = array.HasUnknownInferredType || elementTypeName is null;
+        Type = resolvedType ?? new NominalBoundType(elementTypeName ?? "OBJECT");
+        MethodInputArrayType = Type as ArrayBoundType;
+        GenericNullabilityType = Type as GenericInstantiationBoundType;
+        HasUnknownInferredType = array.HasUnknownInferredType || resolvedType is null && elementTypeName is null;
     }
 }
 

@@ -4264,18 +4264,20 @@ public sealed class Binder
             && ResolveBclArgumentType(metadata.Context, array.Type.DisplayString)
                 is Microsoft.CodeAnalysis.IArrayTypeSymbol { ElementType: Microsoft.CodeAnalysis.IArrayTypeSymbol element }
                 ? element : null;
+        var elementType = GetArrayAccessElementType(array);
         return new BoundArrayAccess(arrayAccess.Span, array, index,
-            GetArrayAccessElementType(array))
+            elementType?.DisplayString, elementType)
         {
             MetadataArrayResultType = metadataArray
         };
     }
 
-    private string? GetArrayAccessElementType(BoundExpression array)
+    private BoundTypes.BoundType? GetArrayAccessElementType(BoundExpression array)
     {
         var typeName = array.Type.DisplayString;
         if (!TypeIdentity.TrySplitGeneric(typeName, out var name, out var arguments))
-            return GetIndexedElementType(typeName);
+            return GetIndexedElementType(typeName) is { } elementName
+                ? new BoundTypes.NominalBoundType(elementName) : null;
         if (array.Type is BoundTypes.NominalBoundType { Declaration: not null }
             || ResolveTypeSymbol(name, arguments.Count) is not null)
             return null;
@@ -4299,8 +4301,21 @@ public sealed class Binder
 
         var indexer = definition.GetMembers().OfType<Microsoft.CodeAnalysis.IPropertySymbol>()
             .FirstOrDefault(property => property.IsIndexer && property.GetMethod is not null);
-        return indexer?.Type is Microsoft.CodeAnalysis.ITypeParameterSymbol parameter
-            && parameter.Ordinal < arguments.Count ? arguments[parameter.Ordinal] : null;
+        if (indexer?.Type is not Microsoft.CodeAnalysis.ITypeParameterSymbol parameter
+            || parameter.Ordinal >= arguments.Count)
+            return null;
+
+        var generic = array.GenericNullabilityType ?? array.Type as BoundTypes.GenericInstantiationBoundType
+            ?? (array as BoundFieldAccessExpression)?.ResolvedField?.GenericNullabilityType;
+        if (generic?.TypeArguments.Length == arguments.Count)
+            return generic.TypeArguments[parameter.Ordinal];
+        if (array.Type is BoundTypes.NominalBoundType { RoslynSymbol: { } constructed })
+            return Metadata.MetadataBinderResult.ToBoundType(constructed.TypeArguments[parameter.Ordinal]);
+
+        var argument = arguments[parameter.Ordinal];
+        return TryBuildReferenceType(argument, _currentClassName, _currentNamespaceIdentity,
+                _currentMemberTypeParameters?.Select(typeParameter => typeParameter.Name))
+            ?? BuildDeclaredBoundType(argument);
     }
 
     private BoundExpression BindMultiDimArrayAccess(MultiDimArrayAccessNode arrayAccess)
