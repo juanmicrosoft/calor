@@ -5280,14 +5280,17 @@ public sealed class Parser
         // undefined name, a type error) points at the hole instead of line 1, column 1.
         var holeSpan = new TextSpan(part.Start, source.Length, part.Line, part.Column);
         // Native call parsing must retain the existing intrinsic and literal-value safeguards.
-        if (source.Contains("nameof", StringComparison.Ordinal) || source.Contains('"'))
+        if (source.Contains("nameof", StringComparison.Ordinal) || source.Contains('"')
+            || source.Contains("=>", StringComparison.Ordinal) || source.Contains('{'))
         {
             const int prefix = 3;
             if (SyntaxFactory.ParseExpression($"$\"{{{source}}}\"") is InterpolatedStringExpressionSyntax
                 { Contents: [InterpolationSyntax interpolation] })
             {
                 var calls = interpolation.Expression.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>();
-                if (calls.Any(invocation =>
+                if (interpolation.Expression.DescendantNodesAndSelf()
+                        .Any(node => node is AnonymousFunctionExpressionSyntax or InitializerExpressionSyntax)
+                    || calls.Any(invocation =>
                         invocation.Expression is IdentifierNameSyntax { Identifier.Text: "nameof" })
                     || calls.SelectMany(invocation => invocation.ArgumentList.Arguments)
                         .SelectMany(argument => argument.Expression.DescendantNodesAndSelf()
@@ -6199,7 +6202,7 @@ public sealed class Parser
             var tempLexer = new Lexer(attrStr, _diagnostics);
             var tokens = tempLexer.Tokenize().ToList();
             var tempParser = new Parser(tokens, _diagnostics);
-            return tempParser.ParseExpression();
+            return tempParser.ParseExpression(allowSpacedCall: false);
         }
         if (int.TryParse(attrStr, out var intVal))
             return new IntLiteralNode(span, intVal);
@@ -7347,6 +7350,9 @@ public sealed class Parser
             }
             else if (Check(TokenKind.OpenParen))
             {
+                // Re-lexed header operands must not become an attached postfix call.
+                if (sb.Length > 0 && sb[^1] == ')' && Peek(-1).Span.End < Current.Span.Start)
+                    sb.Append(' ');
                 sb.Append('(');
                 Advance();
             }

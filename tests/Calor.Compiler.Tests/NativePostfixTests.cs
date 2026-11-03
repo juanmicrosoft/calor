@@ -15,6 +15,54 @@ namespace Calor.Compiler.Tests;
 
 public sealed class NativePostfixTests
 {
+    [Theory]
+    [InlineData(4, 5)]
+    [InlineData(1, 2)]
+    public void LegacyLoopHeader_NestedSiblingOperandsRetainCheckedRuntimeSemantics(int a, int b)
+    {
+        const string source = """
+            §M{Native}
+              §F{Probe:pub} (int:a, int:b) -> int
+                §E{}
+                §B{~count:int} 0
+                §L{i:0:(+ (- a 1) (- b 2)):1}
+                  §ASSIGN count (+ count 1)
+                §R count
+            """;
+        var result = Program.Compile(source);
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        Assert.Contains("checked(checked(a - 1) + (checked(b - 2)))", result.GeneratedCode);
+        Assert.Equal(a + b - 2, Invoke(Compile(source), "Probe", a, b));
+        var overflow = Assert.Throws<TargetInvocationException>(() =>
+            Invoke(Compile(source), "Probe", int.MinValue, 2));
+        Assert.IsType<OverflowException>(overflow.InnerException);
+    }
+
+    [Theory]
+    [InlineData("dict.GetOrAdd(key, () => new V { P = 1 })")]
+    [InlineData("dict.GetOrAdd(key, () => new V { P = 1 }),8")]
+    public void CSharpLambdaInitializerHole_PreservesTheOriginalRawSource(string hole)
+    {
+        var ast = Parse(Source($"\"${{{hole}}}\"", type: "string"));
+        var interpolation = Assert.IsType<InterpolatedStringNode>(Assert.IsType<ReturnStatementNode>(
+            Assert.Single(Assert.Single(ast.Functions).Body)).Expression);
+        var part = Assert.IsType<InterpolatedStringExpressionNode>(Assert.Single(interpolation.Parts));
+        Assert.IsType<RawCSharpExpressionNode>(part.Expression);
+        Assert.Contains("$\"{" + hole + "}\"", ast.Accept(new CSharpEmitter()));
+    }
+
+    [Theory]
+    [InlineData("new Lazy<System.Text.StringBuilder>(() => new System.Text.StringBuilder { Capacity = 8 }).Value.Capacity", "8")]
+    [InlineData("((Func<int>)(() => 9))()", "9")]
+    [InlineData("Array.IndexOf(new int[] { 1, 2 }, 2)", "1")]
+    public void UnsupportedCSharpHoleChildren_KeepTheirRawRuntimeSemantics(string hole, string expected)
+    {
+        var source = Source($"\"${{{hole}}}\"", type: "string");
+        var result = Program.Compile(source);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0419");
+        Assert.Equal(expected, Invoke(Compile(source, enforceEffects: false), "Probe"));
+    }
+
     [Fact]
     public void LegacyTypeArrayWitness_PreservesBothElementsThroughRuntimeAndSourceRoundTrip()
     {
