@@ -5148,7 +5148,10 @@ public sealed class Binder
             {
                 ["FeatureName"] = fallback.FeatureName,
                 ["Suggestion"] = fallback.Suggestion,
-            });
+            })
+        {
+            HasUnknownInferredType = true
+        };
     }
 
     private BoundExpression BindRawCSharpInterop(RawCSharpExpressionNode raw)
@@ -5162,7 +5165,10 @@ public sealed class Binder
             metadata: new Dictionary<string, object?>
             {
                 ["CSharpCode"] = raw.CSharpCode,
-            });
+            })
+        {
+            HasUnknownInferredType = true
+        };
     }
 
     private BoundExpression BindReferenceExpression(ReferenceNode refNode)

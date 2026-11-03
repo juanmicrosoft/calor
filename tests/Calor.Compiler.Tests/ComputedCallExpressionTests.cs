@@ -17,6 +17,134 @@ namespace Calor.Compiler.Tests;
 public sealed class ComputedCallExpressionTests
 {
     [Theory]
+    [InlineData("raw", false)]
+    [InlineData("raw", true)]
+    [InlineData("fallback", false)]
+    [InlineData("fallback", true)]
+    [InlineData("native", false)]
+    [InlineData("native", true)]
+    public void OpaqueExpressionInference_DoesNotAcquireObjectAuthority(string kind, bool explicitType)
+    {
+        const string rawCode = "(new object())";
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parser(new Lexer($$"""
+            §M{Test}
+              §F{Use:pub} () -> void
+                §E{}
+                §B{value{{(explicitType ? ":object" : "")}}} {{(kind == "native" ? "§NEW{object} §/NEW" : $"§CS{{{rawCode}}}")}}
+                §B{alias} value
+                §C{alias.ToString} §/C
+                §C{Pick} §A alias §/C
+                §B{text} §C{System.Convert.ToString} §A alias §/C
+              §F{Pick:pub} (object:item) -> void
+                §E{}
+            """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        if (kind == "fallback")
+        {
+            var use = ast.Functions[0];
+            var body = use.Body.Select(statement =>
+                statement is BindStatementNode { Initializer: RawCSharpExpressionNode raw } binding
+                    ? new BindStatementNode(binding.Span, binding.Name, binding.TypeName, binding.IsMutable,
+                        new FallbackExpressionNode(raw.Span, raw.CSharpCode, "opaque-test"),
+                        binding.Attributes, binding.IdentifierSpan, binding.TypeNameSpan)
+                    : statement).ToArray();
+            ast = new ModuleNode(ast.Span, ast.Id, ast.Name, [],
+                [new FunctionNode(use.Span, use.Id, use.Name, use.Visibility, use.Parameters,
+                    use.Output, use.Effects, body, use.Attributes), ast.Functions[1]], ast.Attributes);
+        }
+        var bound = new Binder(diagnostics).Bind(ast);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        if (kind != "native")
+        {
+            var interop = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundInteropExpression>());
+            Assert.Equal(rawCode, interop.SourceText);
+            Assert.True(interop.HasUnknownInferredType);
+        }
+        var useBound = bound.Functions.Single(function => function.Symbol.Name == "Use");
+        var calls = BoundNodeHelpers.DescendantsAndSelf(useBound).OfType<BoundCallStatement>().ToArray();
+        var receiverCall = calls.Single(call => call.Target == "alias.ToString");
+        var pick = calls.Single(call => call.Target == "Pick");
+        var metadataCall = BoundNodeHelpers.DescendantsAndSelf(useBound).OfType<BoundCallExpression>()
+            .Single(call => call.Target == "System.Convert.ToString");
+        if (explicitType || kind == "native")
+        {
+            Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.SignatureUnresolved);
+            Assert.NotNull(pick.ResolvedSymbol);
+            Assert.Single(pick.SelectedOverloadMatches);
+            Assert.False(metadataCall.HasUnresolvedArguments);
+            Assert.False(Assert.Single(pick.Arguments).HasUnknownInferredType);
+        }
+        else
+        {
+            var warning = Assert.Single(diagnostics.Where(diagnostic =>
+                diagnostic.Code == DiagnosticCode.SignatureUnresolved));
+            Assert.Equal(receiverCall.ReceiverSpan, warning.Span);
+            Assert.IsType<Calor.Compiler.Binding.BoundTypes.UnresolvedBoundType>(receiverCall.Receiver!.Type);
+            Assert.Null(pick.ResolvedSymbol);
+            Assert.Empty(pick.ResolvedSymbols);
+            Assert.Empty(pick.SelectedOverloadMatches);
+            Assert.Null(metadataCall.ResolvedMetadataMethod);
+            Assert.True(metadataCall.HasUnresolvedArguments);
+            Assert.Empty(CallGraphAnalysis.BuildResolved(bound).ForwardGraph[useBound.SymbolId]);
+            Assert.Empty(CallGraphAnalysis.Build(ast).ResolveCallSites(ast.Functions[0].Id, "Pick", pick.Span));
+            new EffectEnforcementPass(diagnostics, policy: UnknownCallPolicy.Strict, strictEffects: true).Enforce(ast);
+            foreach (var span in new[] { pick.Span, metadataCall.Span })
+                Assert.Contains(diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Span == span);
+        }
+    }
+
+    [Fact]
+    public void OpaqueExpressionInference_PreservesExecutableCSharp()
+    {
+        const string rawCode = "(new Witness { Value = 7 })";
+        var (ast, bound, diagnostics) = Bind($$"""
+            §M{Probe}
+              §CL{Runner:pub}
+                §MT{Run:pub:static} () -> i32
+                  §B{validator} §CS{{{rawCode}}}
+                  §R §C{Pick} §A validator §/C
+                §MT{Pick:priv:static} (Witness:validator) -> i32
+                  §R validator.Value
+            """);
+        Assert.DoesNotContain(diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Null(call.ResolvedSymbol);
+        Assert.True(call.HasUnresolvedArguments);
+        Assert.Equal(rawCode, Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound)
+            .OfType<BoundInteropExpression>()).SourceText);
+        const string original = """
+            namespace Probe;
+            public class Runner
+            {
+                public static int Run()
+                {
+                    var validator = (new Witness { Value = 7 });
+                    return Pick(validator);
+                }
+                private static int Pick(Witness validator) => validator.Value;
+            }
+            """;
+        var emitted = new CSharpEmitter().Emit(ast);
+        Assert.Contains(rawCode, emitted, StringComparison.Ordinal);
+        foreach (var code in new[] { original, emitted })
+        {
+            var compilation = CSharpCompilation.Create("Opaque_" + Guid.NewGuid().ToString("N"),
+                [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble + code),
+                    CSharpSyntaxTree.ParseText("namespace Probe; public class Witness { public int Value { get; set; } }")],
+                GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var emission = compilation.Emit(stream);
+            Assert.True(emission.Success, string.Join("\n", emission.Diagnostics) + "\n" + code);
+            var assembly = System.Reflection.Assembly.Load(stream.ToArray());
+            Assert.Equal(7, assembly.GetType("Probe.Runner", throwOnError: true)!
+                .GetMethod("Run")!.Invoke(null, null));
+        }
+    }
+
+    [Theory]
     [InlineData(false, false, "[object]")]
     [InlineData(false, true, "[object]")]
     [InlineData(true, false, "[object]")]
