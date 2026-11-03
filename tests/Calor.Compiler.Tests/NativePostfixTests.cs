@@ -257,6 +257,100 @@ public sealed class NativePostfixTests
     }
 
     [Theory]
+    [InlineData("  §F{Use:pub}<T> () -> int\n    §R T.Pick()")]
+    [InlineData("  §CL{Container:pub}<T>\n    §MT{Use:pub:stat} () -> int\n      §R T.Pick()")]
+    [InlineData("  §CL{Container:pub}\n    §MT{Use:pub:stat}<T> () -> int\n      §R T.Pick()")]
+    public void TypeParameterReceivers_DoNotBindAnUnrelatedSourceClass(string declaration)
+    {
+        var source = $$"""
+            §M{Native}
+            {{declaration}}
+              §CL{T:pub}
+                §MT{Pick:pub:stat} () -> int
+                  §R 1
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.True(diagnostics.HasErrors);
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Null(call.ResolvedSymbol);
+        Assert.IsType<BoundVariableExpression>(call.EvaluatedReceiver);
+        var result = Program.Compile(source, "native-postfix.calr", new CompilationOptions
+            { EnableTypeChecking = true, EnforceEffects = true, StatusWriter = TextWriter.Null });
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LexicalValueReceiver_ShadowingAClassRetainsItsRealMethodIdentity(bool inherited)
+    {
+        var ownerMember = inherited ? "§EXT{Parent}" : "§FLD{Holder:T:pub:stat}";
+        var (_, bound, diagnostics) = Bind($$"""
+            §M{Native}
+              §CL{Owner:pub}
+                {{ownerMember}}
+                §MT{Use:pub:stat} () -> int
+                  §R T.Pick()
+              §CL{Parent:pub}
+                §FLD{Holder:T:pub:stat}
+              §CL{T:pub}
+                §MT{Pick:pub:stat} () -> int
+                  §R 1
+              §CL{Holder:pub}
+                §MT{Pick:pub} () -> int
+                  §R 2
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Same(bound.Functions.Single(function => function.Symbol.Name == "Holder.Pick").Symbol,
+            call.ResolvedSymbol);
+        Assert.IsType<BoundVariableExpression>(call.EvaluatedReceiver);
+    }
+
+    [Fact]
+    public void TypeParameterReceiver_DoesNotBindUnrelatedBclMetadata()
+    {
+        var source = """
+            §M{Native}
+              §F{Use:pub}<Math> () -> int
+                §R Math.Abs(-3)
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.True(diagnostics.HasErrors);
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Null(call.ResolvedSymbol);
+        Assert.Null(call.ResolvedMetadataMethod);
+        Assert.IsType<BoundVariableExpression>(call.EvaluatedReceiver);
+        var result = Program.Compile(source, "native-postfix.calr", new CompilationOptions
+            { EnableTypeChecking = true, EnforceEffects = true, StatusWriter = TextWriter.Null });
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
+    [Fact]
+    public void NestedTypeReceiver_RetainsItsLexicalDeclarationIdentity()
+    {
+        var (_, bound, diagnostics) = Bind("""
+            §M{Native}
+              §CL{Owner:pub}
+                §MT{Use:pub:stat} () -> int
+                  §R T.Pick()
+                §CL{T:pub}
+                  §MT{Pick:pub:stat} () -> int
+                    §R 2
+              §CL{T:pub}
+                §MT{Pick:pub:stat} () -> int
+                  §R 1
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Same(bound.Functions.Single(function => function.Symbol.Name == "Owner.T.Pick").Symbol,
+            call.ResolvedSymbol);
+        Assert.Equal(call.ResolvedSymbol!.ContainingTypeName,
+            Assert.IsType<BoundTypeReferenceExpression>(call.EvaluatedReceiver).ResolvedType!.QualifiedName);
+    }
+
+    [Theory]
     [InlineData("missing.Pick(1)", "missing")]
     [InlineData("System.Math.Abs(missing)", "missing")]
     [InlineData("System.Math.Abs(GetMissing())", "GetMissing")]
@@ -486,6 +580,27 @@ public sealed class NativePostfixTests
         Assert.Equal(expected, Invoke(Compile(source), "Probe", 12));
     }
 
+    [Theory]
+    [InlineData("String.Concat(\"\\x41\")", "A")]
+    [InlineData("String.Concat(\"${x}\")", "${x}")]
+    [InlineData("String.Concat(\"\\x41\"),4", "   A")]
+    [InlineData("String.Concat(\"${x}\"),8", "    ${x}")]
+    [InlineData("String.Concat(String.Concat(\"\\x41\"))", "A")]
+    [InlineData("String.Concat(\"${x}\").Length", "4")]
+    public void NativeCallInterpolation_UnsafeStringOperandsKeepTheirCSharpRuntimeValue(string hole, string expected)
+    {
+        var source = $$"""
+            §M{Native}
+              §F{Probe:pub} (int:x) -> string
+                §R "${{{hole}}}"
+            """;
+        var interpolation = Assert.IsType<InterpolatedStringNode>(Assert.IsType<ReturnStatementNode>(
+            Assert.Single(Assert.Single(Parse(source).Functions).Body)).Expression);
+        Assert.IsType<RawCSharpExpressionNode>(Assert.IsType<InterpolatedStringExpressionNode>(
+            Assert.Single(interpolation.Parts)).Expression);
+        Assert.Equal(expected, Invoke(Compile(source, enforceEffects: false), "Probe", 7));
+    }
+
     [Fact]
     public void NativeNamedCallInterpolation_HasExactMetadataAndRealOutput()
     {
@@ -557,10 +672,10 @@ public sealed class NativePostfixTests
     private static object? Invoke(Type type, string name, params object?[] arguments) =>
         type.GetMethod(name)!.Invoke(null, arguments);
 
-    private static Type Compile(string source)
+    private static Type Compile(string source, bool enforceEffects = true)
     {
         var result = Program.Compile(source, "native-postfix.calr", new CompilationOptions
-            { EnableTypeChecking = true, EnforceEffects = true, StatusWriter = TextWriter.Null });
+            { EnableTypeChecking = true, EnforceEffects = enforceEffects, StatusWriter = TextWriter.Null });
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
         var compilation = CSharpCompilation.Create("Postfix_" + Guid.NewGuid().ToString("N"),
             [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble + result.GeneratedCode)],

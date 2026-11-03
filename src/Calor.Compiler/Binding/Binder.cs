@@ -3884,7 +3884,7 @@ public sealed class Binder
         if (name is null)
             return null;
         var head = name.Split('.')[0];
-        if (_scope.LookupAll(head).Count != 0 || ResolveLexicalMembers(head).Count != 0)
+        if (IsTypeReceiverHeadShadowed(head, allowDeclaredTypes: false))
             return null;
         var type = TryBuildReferenceType(
             name, _currentClassName, _currentNamespaceIdentity,
@@ -3893,6 +3893,11 @@ public sealed class Binder
             ? new BoundTypeReferenceExpression(expression.Span, name, type)
             : null;
     }
+
+    private bool IsTypeReceiverHeadShadowed(string head, bool allowDeclaredTypes) =>
+        _scope.LookupAll(head).Concat(ResolveLexicalMembers(head))
+            .Any(symbol => !allowDeclaredTypes || symbol is not TypeSymbol)
+        || GetTypeParameterConstraints(head) is not null;
 
     private static string? DottedReferenceName(ExpressionNode expression) => expression switch
     {
@@ -5075,11 +5080,12 @@ public sealed class Binder
         if (call.TargetExpression is FieldAccessNode member)
         {
             BoundExpression? receiver = null;
-            if (DottedReferenceName(member) is { } targetName
-                && !_scope.LookupAll(targetName.Split('.')[0]).OfType<VariableSymbol>().Any()
-                && ResolveCallReceiverType(targetName) is { } typeSymbol)
+            if (DottedReferenceName(member.Target) is { } receiverName
+                && !IsTypeReceiverHeadShadowed(receiverName.Split('.')[0], allowDeclaredTypes: true)
+                && ReferenceLookupNames(receiverName, _currentClassName ?? _currentNamespaceIdentity)
+                    .Select(name => ResolveTypeSymbol(name)).FirstOrDefault(type => type is not null) is { } typeSymbol)
                 receiver = new BoundTypeReferenceExpression(member.Target.Span,
-                    DottedReferenceName(member.Target)!,
+                    receiverName,
                     new BoundTypes.NominalBoundType(typeSymbol.QualifiedName, declaration: typeSymbol), typeSymbol);
             receiver ??= TryBindMetadataTypeReceiver(member.Target) ?? BindExpression(member.Target);
             return BindCallExpression(new CallExpressionNode(call.Span,
@@ -5137,8 +5143,12 @@ public sealed class Binder
             return new BoundNullLiteral(refNode.Span);
 
         var symbols = _scope.LookupAll(refNode.Name);
-        if (symbols.Count == 0)
-            symbols = ResolveLexicalMembers(refNode.Name);
+        if (symbols.Count == 0 || symbols.All(symbol => symbol is TypeSymbol))
+        {
+            var lexicalMembers = ResolveLexicalMembers(refNode.Name);
+            if (lexicalMembers.Count != 0)
+                symbols = lexicalMembers;
+        }
 
         if (symbols.Count == 0)
         {

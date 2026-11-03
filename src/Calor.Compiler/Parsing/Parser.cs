@@ -5278,12 +5278,24 @@ public sealed class Parser
         // 0.25 F2 (#906): lex the hole at its real position, so a diagnostic inside it (an
         // undefined name, a type error) points at the hole instead of line 1, column 1.
         var holeSpan = new TextSpan(part.Start, source.Length, part.Line, part.Column);
-        // Keep the existing C# intrinsic route before native invocation lifting can classify nameof as a call.
-        if (source.Contains("nameof", StringComparison.Ordinal)
-            && SyntaxFactory.ParseExpression(source).DescendantNodesAndSelf()
-                .OfType<InvocationExpressionSyntax>().Any(invocation =>
-                    invocation.Expression is IdentifierNameSyntax { Identifier.Text: "nameof" }))
-            return ParseRawCSharpInterpolationPart(part, holeSpan);
+        // Native call parsing must retain the existing intrinsic and literal-value safeguards.
+        if (source.Contains("nameof", StringComparison.Ordinal) || source.Contains('"'))
+        {
+            const int prefix = 3;
+            if (SyntaxFactory.ParseExpression($"$\"{{{source}}}\"") is InterpolatedStringExpressionSyntax
+                { Contents: [InterpolationSyntax interpolation] })
+            {
+                var calls = interpolation.Expression.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>();
+                if (calls.Any(invocation =>
+                        invocation.Expression is IdentifierNameSyntax { Identifier.Text: "nameof" })
+                    || calls.SelectMany(invocation => invocation.ArgumentList.Arguments)
+                        .SelectMany(argument => argument.Expression.DescendantNodesAndSelf()
+                            .OfType<LiteralExpressionSyntax>())
+                        .Any(literal => literal.Token.Value is string
+                            && TryParseCompleteHoleExpression(literal, part, prefix) is null))
+                    return ParseRawCSharpInterpolationPart(part, holeSpan);
+            }
+        }
         var lexer = new Lexer(source, _diagnostics, part.Start, part.Line, part.Column);
         var parser = new Parser(lexer.TokenizeAllForParser(), _diagnostics);
         var expression = parser.ParseExpression();
@@ -5864,7 +5876,7 @@ public sealed class Parser
                 _ => ">="
             };
 
-            var operand = ParseExpression();
+            var operand = ParseExpression(allowSpacedCall: false);
             return new RelationalPatternNode(relToken.Span.Union(operand.Span), op, operand);
         }
 
@@ -5884,7 +5896,7 @@ public sealed class Parser
             if (op != null)
             {
                 Advance(); // consume the operator keyword
-                var operand = ParseExpression();
+                var operand = ParseExpression(allowSpacedCall: false);
                 return new RelationalPatternNode(token.Span.Union(operand.Span), op, operand);
             }
 
@@ -13242,7 +13254,7 @@ public sealed class Parser
         var attrs = ParseAttributes();
         var op = attrs["_pos0"] ?? "eq";
 
-        var value = ParseExpression();
+        var value = ParseExpression(allowSpacedCall: false);
 
         var span = startToken.Span.Union(value.Span);
         return new RelationalPatternNode(span, op, value);
@@ -13337,7 +13349,7 @@ public sealed class Parser
     /// </summary>
     private ConstantPatternNode ParseConstantPattern()
     {
-        var expr = ParseExpression();
+        var expr = ParseExpression(allowSpacedCall: false);
         return new ConstantPatternNode(expr.Span, expr);
     }
 
