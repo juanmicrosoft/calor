@@ -211,14 +211,14 @@ public class DiagnosticCodeClassificationTests
     #region Calor0114 — InvalidLispExpression
 
     [Fact]
-    public void InvalidOperatorInLispExpression_ProducesCalor0114()
+    public void GroupingWithoutAnOperator_ProducesCalor0100()
     {
-        // Use a literal where an operator is expected
+        // Ordinary grouping requires an operator between these two operands.
         var source = WrapInFunction("§R (42 x)", inputType: "int", outputType: "int");
         Parse(source, out var diagnostics);
 
-        var error = Assert.Single(diagnostics.Errors, d => d.Code == DiagnosticCode.InvalidLispExpression);
-        Assert.Contains("Expected operator in Lisp expression", error.Message);
+        Assert.Contains(diagnostics.Errors, d => d.Code == DiagnosticCode.UnexpectedToken
+            && d.Message.Contains("Expected CloseParen"));
     }
 
     [Fact]

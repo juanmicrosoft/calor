@@ -410,13 +410,14 @@ public class StringOperationTests
     #region Phase 3: Error Cases
 
     [Fact]
-    public void Parse_Upper_NoArgs_ReportsError()
+    public void Parse_UpperWithoutArguments_IsOrdinaryIdentifierGrouping()
     {
         var source = WrapInFunction("§R (upper)");
-        Parse(source, out var diagnostics);
+        var module = Parse(source, out var diagnostics);
 
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("requires at least 1 argument"));
+        Assert.False(diagnostics.HasErrors);
+        var statement = Assert.IsType<ReturnStatementNode>(Assert.Single(Assert.Single(module.Functions).Body));
+        Assert.Equal("upper", Assert.IsType<ReferenceNode>(statement.Expression).Name);
     }
 
     [Fact]

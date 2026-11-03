@@ -137,7 +137,13 @@ public sealed class FloatLiteralConversionTests
         var diagnostics = new DiagnosticBag();
         var tokens = new Lexer(emitted, diagnostics).TokenizeAll();
         Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
-        Assert.Equal(TokenKind.FloatLiteral, tokens[0].Kind);
+        if (value < 0)
+        {
+            Assert.Equal(TokenKind.Minus, tokens[0].Kind);
+            Assert.Equal(TokenKind.FloatLiteral, tokens[1].Kind);
+        }
+        else
+            Assert.Equal(TokenKind.FloatLiteral, tokens[0].Kind);
     }
 
     [Theory]

@@ -4702,6 +4702,10 @@ public sealed class TypeChecker
             return PrimitiveType.Bool;
         }
 
+        if (binOp.Operator is BinaryOperator.BitwiseAnd or BinaryOperator.BitwiseOr or BinaryOperator.BitwiseXor
+            && leftType.Equals(PrimitiveType.Bool) && rightType.Equals(PrimitiveType.Bool))
+            return PrimitiveType.Bool;
+
         // `+` on strings is CONCATENATION, exactly as in the emitted C#. Rejecting it as
         // "requires numeric operands" made the checker refuse a working, documented program —
         // the MCP primer's own §M{m3:Files} module among them.

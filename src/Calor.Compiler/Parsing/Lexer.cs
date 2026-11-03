@@ -835,12 +835,7 @@ public sealed class Lexer
             Advance(); // consume '>'
             return MakeToken(TokenKind.Arrow);
         }
-        // Check for negative number
-        if (char.IsDigit(Lookahead))
-        {
-            return ScanNumber();
-        }
-        // Otherwise it's just minus operator
+        // A sign is an operator, including without whitespace in a-1.
         Advance();
         return MakeToken(TokenKind.Minus);
     }
@@ -3275,7 +3270,7 @@ public sealed class Lexer
             : null;
     }
 
-    private static IntLiteralInfo? InferSuffixedInteger(
+    private IntLiteralInfo? InferSuffixedInteger(
         ulong magnitude,
         IntegerLiteralSign sign,
         IntegerLiteralBase literalBase,
@@ -3310,8 +3305,11 @@ public sealed class Lexer
                 IntegerLiteralSignedness.Signed);
         }
 
-        return sign == IntegerLiteralSign.Negative
-            && magnitude == 0x8000_0000_0000_0000UL
+        // Minus is now its own token. Leave this one contextual magnitude for
+        // the parser to validate as an immediate unary-minus operand.
+        var afterMinus = _source.AsSpan(0, _tokenStart).TrimEnd().EndsWith("-".AsSpan());
+        return magnitude == 0x8000_0000_0000_0000UL
+            && (sign == IntegerLiteralSign.Negative || afterMinus)
             ? new IntLiteralInfo(
                 magnitude,
                 sign,

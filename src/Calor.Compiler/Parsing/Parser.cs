@@ -64,6 +64,9 @@ public sealed class Parser
             [TokenKind.RawCSharpExpression] = static parser => parser.ParseRawCSharpExpression(),
             [TokenKind.Hash] = static parser => parser.ParseSelfRef(),
             [TokenKind.At] = static parser => parser.ParseVerbatimIdentifier(),
+            [TokenKind.Minus] = static parser => parser.ParsePrefixUnary(),
+            [TokenKind.Exclamation] = static parser => parser.ParsePrefixUnary(),
+            [TokenKind.Tilde] = static parser => parser.ParsePrefixUnary(),
         };
 
     internal static IReadOnlyCollection<TokenKind> RegisteredExpressionStartTokens
@@ -2953,8 +2956,9 @@ public sealed class Parser
     // stacks.
     private const int MaxExpressionDepth = 128;
     private int _expressionDepth;
+    private bool _allowSignedMinimumLiteral;
 
-    private ExpressionNode ParseExpression()
+    private ExpressionNode ParseExpression(int minimumPrecedence = 0)
     {
         if (_expressionDepth >= MaxExpressionDepth)
             return SkipTooDeepExpression();
@@ -2967,7 +2971,7 @@ public sealed class Parser
         _expressionDepth++;
         try
         {
-            return ParseExpressionCore();
+            return ParseExpressionCore(minimumPrecedence);
         }
         finally
         {
@@ -3008,7 +3012,7 @@ public sealed class Parser
         return new IntLiteralNode(span, 0);
     }
 
-    private ExpressionNode ParseExpressionCore()
+    private ExpressionNode ParseExpressionCore(int minimumPrecedence)
     {
         var expr = ExpressionParsers.TryGetValue(Current.Kind, out var parser)
             ? parser(this)
@@ -3017,7 +3021,127 @@ public sealed class Parser
         // Handle trailing member access (e.g., (typeof X).Name, result.Property)
         expr = ParseTrailingMemberAccess(expr);
 
+        while (Current.Span.Line == TokenEndLine(PreviousToken))
+        {
+            if (Check(TokenKind.Question) && minimumPrecedence <= 1)
+            {
+                var question = Advance();
+                var whenTrue = ParseInfixOperand(question, 0);
+                var colon = Expect(TokenKind.Colon);
+                var whenFalse = ParseInfixOperand(colon, 1);
+                expr = new ConditionalExpressionNode(expr.Span.Union(whenFalse.Span),
+                    expr, whenTrue, whenFalse);
+                continue;
+            }
+
+            var precedence = InfixPrecedence(Current.Kind);
+            if (precedence == 0 || precedence < minimumPrecedence)
+                break;
+
+            var op = Advance();
+            if (op.Kind == TokenKind.Minus && Check(TokenKind.Minus)
+                && op.Span.End == Current.Span.Start)
+                _diagnostics.ReportError(op.Span.Union(Current.Span), DiagnosticCode.UnexpectedToken,
+                    "Update operator '--' is removed. Use §ASSIGN with an explicit value instead.");
+            var right = ParseInfixOperand(op,
+                op.Kind == TokenKind.NullCoalesce ? precedence : precedence + 1);
+            expr = op.Kind == TokenKind.NullCoalesce
+                ? new NullCoalesceNode(expr.Span.Union(right.Span), expr, right)
+                : new BinaryOperationNode(expr.Span.Union(right.Span),
+                    BinaryOperatorExtensions.FromString(op.Text)!.Value, expr, right);
+        }
+
         return expr;
+    }
+
+    private static int TokenEndLine(Token token)
+    {
+        var line = token.Span.Line;
+        for (var i = 0; i < token.Text.Length; i++)
+        {
+            if (token.Text[i] == '\n'
+                || token.Text[i] == '\r' && (i + 1 == token.Text.Length || token.Text[i + 1] != '\n'))
+                line++;
+        }
+        return line;
+    }
+
+    private static int InfixPrecedence(TokenKind kind) => kind switch
+    {
+        TokenKind.NullCoalesce => 2,
+        TokenKind.PipePipe => 3,
+        TokenKind.AmpAmp => 4,
+        TokenKind.Pipe => 5,
+        TokenKind.Caret => 6,
+        TokenKind.Amp => 7,
+        TokenKind.EqualEqual or TokenKind.BangEqual => 8,
+        TokenKind.Less or TokenKind.LessEqual or TokenKind.Greater or TokenKind.GreaterEqual => 9,
+        TokenKind.LessLess or TokenKind.GreaterGreater => 10,
+        TokenKind.Plus or TokenKind.Minus => 11,
+        TokenKind.Star or TokenKind.Slash or TokenKind.Percent => 12,
+        _ => 0
+    };
+
+    private ExpressionNode ParseInfixOperand(Token op, int minimumPrecedence)
+    {
+        if (Current.Span.Line != op.Span.Line || !IsExpressionStart())
+        {
+            _diagnostics.ReportUnexpectedToken(Current.Span, $"operand after '{op.Text}'", Current.Kind);
+            return new IntLiteralNode(op.Span, 0);
+        }
+        return ParseExpression(minimumPrecedence);
+    }
+
+    private ExpressionNode ParsePrefixUnary()
+    {
+        var op = Advance();
+        if (op.Kind == TokenKind.Minus && Check(TokenKind.Minus)
+            && op.Span.End == Current.Span.Start)
+            _diagnostics.ReportError(op.Span.Union(Current.Span), DiagnosticCode.UnexpectedToken,
+                "Update operator '--' is removed. Use §ASSIGN with an explicit value instead.");
+        var immediateInteger = Check(TokenKind.IntLiteral);
+        var literalText = Current.Text;
+        var savedMinimum = _allowSignedMinimumLiteral;
+        _allowSignedMinimumLiteral = op.Kind == TokenKind.Minus && immediateInteger;
+        ExpressionNode operand;
+        try
+        {
+            operand = ParseInfixOperand(op, 13);
+        }
+        finally
+        {
+            _allowSignedMinimumLiteral = savedMinimum;
+        }
+        if (op.Kind == TokenKind.Minus && immediateInteger && operand is IntLiteralNode unsigned
+            && unsigned.Signedness == IntegerLiteralSignedness.Unsigned
+            && (literalText.Contains('U') || literalText.Contains('u')))
+            _diagnostics.ReportUnsignedNegativeLiteral(op.Span.Union(operand.Span));
+        if (op.Kind == TokenKind.Minus && immediateInteger && operand is IntLiteralNode overflowing
+            && overflowing.Magnitude > 0x8000_0000_0000_0000UL)
+            _diagnostics.ReportSignedIntegerLiteralOverflow(op.Span.Union(operand.Span));
+        // Fold immediate signed literals as before, preserving signed minima and
+        // floating/decimal negative zero without applying this rule to grouping.
+        if (op.Kind == TokenKind.Minus && immediateInteger && operand is IntLiteralNode literal
+            && literal.Sign == IntegerLiteralSign.Positive
+            && !literalText.Contains(':') && !literalText.Contains('u') && !literalText.Contains('U')
+            && literal.Magnitude <= 0x8000_0000_0000_0000UL)
+        {
+            var width = literalText.EndsWith('l') || literalText.EndsWith('L')
+                || literal.Magnitude > 0x8000_0000UL || literal.Base == IntegerLiteralBase.Hexadecimal
+                    && literal.Signedness == IntegerLiteralSignedness.Unsigned
+                ? IntegerLiteralWidth.Bits64 : IntegerLiteralWidth.Bits32;
+            return new IntLiteralNode(op.Span.Union(operand.Span), literal.Magnitude,
+                IntegerLiteralSign.Negative, literal.Base, width, IntegerLiteralSignedness.Signed);
+        }
+        if (op.Kind == TokenKind.Minus && operand is FloatLiteralNode number && !literalText.Contains(':'))
+            return new FloatLiteralNode(op.Span.Union(operand.Span), -number.Value, number.IsDecimal)
+                { IsSingle = number.IsSingle };
+        return new UnaryOperationNode(op.Span.Union(operand.Span), op.Kind switch
+        {
+            TokenKind.Minus => UnaryOperator.Negate,
+            TokenKind.Exclamation => UnaryOperator.Not,
+            _ => UnaryOperator.BitwiseNot
+        }, operand);
     }
 
     /// <summary>
@@ -3169,7 +3293,75 @@ public sealed class Parser
             return ParseTupleLiteral();
         }
 
-        return ParseLispExpression();
+        if (IsStagedPrefixExpression())
+            return ParseLispExpression();
+
+        var open = Expect(TokenKind.OpenParen);
+        var grouped = ParseExpression();
+        var close = Expect(TokenKind.CloseParen);
+        grouped.IncludeSpan(open.Span.Union(close.Span));
+        return grouped;
+    }
+
+    // Prefix forms remain during the header/emitter cutover. Infix operators
+    // inside the outer parentheses distinguish (-x + y) from legacy (- x y).
+    private bool IsStagedPrefixExpression()
+    {
+        var head = Peek(1);
+        if (head.Kind == TokenKind.OpenParen)
+            return false;
+        if (head.Kind is TokenKind.NullCoalesce or TokenKind.NullConditional
+            && !head.Text.StartsWith('§'))
+            return true;
+        if (head.Kind == TokenKind.Identifier
+            && Peek(2).Kind is TokenKind.Dot or TokenKind.NullConditional or TokenKind.OpenBrace)
+            return false;
+        if (head.Kind == TokenKind.Identifier)
+        {
+            var name = head.Text;
+            var i = _position + 2;
+            while (i + 1 < _tokens.Count && _tokens[i].Kind == TokenKind.Minus
+                && _tokens[i + 1].Kind == TokenKind.Identifier)
+            {
+                name += "-" + _tokens[i + 1].Text;
+                i += 2;
+            }
+            if (name != head.Text && OperatorSuggestions.AllOperators.Contains(name))
+                return true;
+            return Peek(2).Kind != TokenKind.CloseParen
+                && InfixPrecedence(Peek(2).Kind) == 0 && Peek(2).Kind != TokenKind.Question;
+        }
+        if (head.Kind is TokenKind.Minus or TokenKind.Exclamation or TokenKind.Tilde)
+        {
+            var depth = 0;
+            for (var i = _position + 2; i < _tokens.Count; i++)
+            {
+                var kind = _tokens[i].Kind;
+                if (kind is TokenKind.OpenParen or TokenKind.OpenBrace or TokenKind.OpenBracket)
+                    depth++;
+                else if (kind is TokenKind.CloseParen or TokenKind.CloseBrace or TokenKind.CloseBracket)
+                {
+                    if (depth == 0)
+                        return head.Kind != TokenKind.Identifier || i > _position + 2;
+                    depth--;
+                }
+                else if (depth == 0 && (InfixPrecedence(kind) != 0 || kind == TokenKind.Question))
+                {
+                    // Staged emitters still write (- x -1). Preserve the signed
+                    // second prefix operand only when the head is spaced and
+                    // the later sign is attached to its literal. (-x - 1) groups.
+                    if (kind == TokenKind.Minus && head.Span.End < Peek(2).Span.Start
+                        && i + 1 < _tokens.Count && _tokens[i].Span.End == _tokens[i + 1].Span.Start
+                        && _tokens[i + 1].Kind is TokenKind.IntLiteral or TokenKind.FloatLiteral or TokenKind.DecimalLiteral)
+                        continue;
+                    return false;
+                }
+            }
+        }
+        return head.Kind != TokenKind.IntLiteral && head.Kind != TokenKind.FloatLiteral
+            && head.Kind != TokenKind.DecimalLiteral && head.Kind != TokenKind.StrLiteral
+            && head.Kind != TokenKind.BoolLiteral && head.Kind != TokenKind.CharLiteral
+            && head.Kind != TokenKind.At && !head.IsKeyword;
     }
 
     /// <summary>
@@ -3201,7 +3393,9 @@ public sealed class Parser
             {
                 if (depth > 0) depth--;
             }
-            else if (kind == TokenKind.Less && prevKind is TokenKind.Identifier or TokenKind.Star or TokenKind.StarStar or TokenKind.CloseBracket)
+            else if (kind == TokenKind.Less
+                && prevKind is TokenKind.Identifier or TokenKind.Star or TokenKind.StarStar or TokenKind.CloseBracket
+                && IsGenericTypeBracket())
             {
                 // < after identifier, * (function pointers), or ] (calling convention) is a generic bracket
                 depth++;
@@ -4716,7 +4910,12 @@ public sealed class Parser
             else return false; // not a valid generic type pattern
             i++;
         }
-        return depth <= 0;
+        return depth == 0 && i < _tokens.Count && _tokens[i].Kind is
+            TokenKind.OpenParen or TokenKind.CloseParen or TokenKind.CloseBracket
+            or TokenKind.CloseBrace or TokenKind.Colon or TokenKind.Comma or TokenKind.Dot
+            or TokenKind.Question or TokenKind.EqualEqual or TokenKind.BangEqual
+            or TokenKind.Pipe or TokenKind.Caret or TokenKind.Amp or TokenKind.AmpAmp
+            or TokenKind.PipePipe or TokenKind.Eof or TokenKind.Dedent;
     }
 
     private IntLiteralNode ParseIntLiteral()
@@ -4724,6 +4923,10 @@ public sealed class Parser
         var token = Expect(TokenKind.IntLiteral);
         if (token.Value is IntLiteralInfo info)
         {
+            if (info.Sign == IntegerLiteralSign.Positive
+                && info.Signedness == IntegerLiteralSignedness.Signed
+                && info.Magnitude == 0x8000_0000_0000_0000UL && !_allowSignedMinimumLiteral)
+                _diagnostics.ReportSignedIntegerLiteralOverflow(token.Span);
             return new IntLiteralNode(
                 token.Span,
                 info.Magnitude,
@@ -5633,7 +5836,7 @@ public sealed class Parser
         if (!string.IsNullOrEmpty(fromStr))
             from = ParseExpressionFromAttributeString(fromStr, startToken.Span);
         else
-            from = ParseExpression();
+            from = ParseExpression(13);
 
         // TO bound - can be int literal, variable reference, or S-expression like (- n 1)
         if (!string.IsNullOrEmpty(toStr))
@@ -5673,7 +5876,7 @@ public sealed class Parser
     /// </summary>
     private ExpressionNode ParseExpressionFromAttributeString(string attrStr, TextSpan span)
     {
-        if (attrStr.StartsWith("(") || attrStr.StartsWith("'"))
+        if (attrStr.StartsWith("(") || attrStr.StartsWith("'") || attrStr.TrimStart().StartsWith("-"))
         {
             // S-expression: create a temporary lexer/parser to parse it
             var tempLexer = new Lexer(attrStr, _diagnostics);
@@ -7628,7 +7831,7 @@ public sealed class Parser
         else
         {
             // §IDX target index -- two separate expressions
-            array = ParseExpression();
+            array = ParseExpression(13);
         }
 
         // If next token is a closing tag (§/LAM, §/C, §B, §EL, etc.), the "target" was actually
@@ -7868,7 +8071,7 @@ public sealed class Parser
     private KeyValuePairNode ParseKeyValuePair()
     {
         var startToken = Expect(TokenKind.KeyValue);
-        var key = ParseExpression();
+        var key = ParseExpression(13);
         var value = ParseExpression();
         var span = startToken.Span.Union(value.Span);
         return new KeyValuePairNode(span, key, value);
@@ -7981,7 +8184,7 @@ public sealed class Parser
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "PUT", "dictionary name");
         }
 
-        var key = ParseExpression();
+        var key = ParseExpression(13);
         var value = ParseExpression();
         var span = startToken.Span.Union(value.Span);
         return new DictionaryPutNode(span, dictionaryName, key, value);
@@ -8022,7 +8225,7 @@ public sealed class Parser
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "SETIDX", "collection name");
         }
 
-        var index = ParseExpression();
+        var index = ParseExpression(13);
         var value = ParseExpression();
         var span = startToken.Span.Union(value.Span);
         return new CollectionSetIndexNode(span, collectionName, index, value);
@@ -8061,7 +8264,7 @@ public sealed class Parser
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "INS", "collection name");
         }
 
-        var index = ParseExpression();
+        var index = ParseExpression(13);
         var value = ParseExpression();
         var span = startToken.Span.Union(value.Span);
         return new CollectionInsertNode(span, collectionName, index, value);
@@ -11241,7 +11444,8 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Assign);
 
-        var target = ParseExpression();
+        // The whitespace-separated value may start with unary minus.
+        var target = ParseExpression(13);
         var value = ParseExpression();
 
         var span = startToken.Span.Union(value.Span);
@@ -12228,7 +12432,7 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Subscribe);
 
-        var @event = ParseExpression();
+        var @event = ParseExpression(13);
         // Tolerate legacy converter output: §SUB event += handler
         if (Check(TokenKind.Plus) || Check(TokenKind.Minus))
         {
@@ -12249,7 +12453,7 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Unsubscribe);
 
-        var @event = ParseExpression();
+        var @event = ParseExpression(13);
         // Tolerate legacy converter output: §UNSUB event -= handler
         if (Check(TokenKind.Plus) || Check(TokenKind.Minus))
         {
@@ -12525,7 +12729,7 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.NullCoalesce);
 
-        var left = ParseExpression();
+        var left = ParseExpression(13);
         var right = ParseExpression();
 
         var span = startToken.Span.Union(right.Span);
@@ -14205,11 +14409,11 @@ public sealed class Parser
         if (dimCountStr != null && int.TryParse(dimCountStr, out var parsed))
             dimCount = parsed;
 
-        var array = ParseExpression();
+        var array = ParseExpression(13);
         var indices = new List<ExpressionNode>();
         for (int i = 0; i < dimCount && !IsAtEnd && IsExpressionStart(); i++)
         {
-            indices.Add(ParseExpression());
+            indices.Add(ParseExpression(i + 1 == dimCount ? 0 : 13));
         }
         return new MultiDimArrayAccessNode(startToken.Span, array, indices);
     }

@@ -61,6 +61,9 @@ public class ExpressionRegistrationTests
             [TokenKind.RawCSharpExpression] = ("§CS{DateTime.Now}", nameof(RawCSharpExpressionNode)),
             [TokenKind.Hash] = ("#", nameof(SelfRefNode)),
             [TokenKind.At] = ("@value", nameof(ReferenceNode)),
+            [TokenKind.Minus] = ("-value", nameof(UnaryOperationNode)),
+            [TokenKind.Exclamation] = ("!value", nameof(UnaryOperationNode)),
+            [TokenKind.Tilde] = ("~value", nameof(UnaryOperationNode)),
         };
 
     public static IEnumerable<object[]> RegisteredCases()

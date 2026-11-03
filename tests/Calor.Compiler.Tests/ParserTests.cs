@@ -151,7 +151,7 @@ public class ParserTests
     [InlineData("LEN", "\"x\"")]
     [InlineData("Cast", "i32 1")]
     [InlineData("IS-LETTER", "'A'")]
-    [InlineData("SB-NEW", "")]
+    [InlineData("SB-NEW", "\"x\"")]
     [InlineData("INC", "1")]
     public void Parse_OperatorNames_AreExactCase(string name, string arguments)
     {

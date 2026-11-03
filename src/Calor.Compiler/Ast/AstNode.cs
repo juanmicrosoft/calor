@@ -7,7 +7,10 @@ namespace Calor.Compiler.Ast;
 /// </summary>
 public abstract class AstNode
 {
-    public TextSpan Span { get; }
+    private TextSpan _span;
+    public TextSpan Span => _span;
+
+    internal void IncludeSpan(TextSpan span) => _span = _span.Union(span);
 
     /// <summary>
     /// Tooling-owned identity projected from the registered project sidecar.
@@ -43,7 +46,7 @@ public abstract class AstNode
 
     protected AstNode(TextSpan span)
     {
-        Span = span;
+        _span = span;
     }
 
     internal T CopyMetadataTo<T>(T target) where T : AstNode

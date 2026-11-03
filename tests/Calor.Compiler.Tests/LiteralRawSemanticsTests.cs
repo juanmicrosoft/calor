@@ -43,7 +43,8 @@ public sealed class LiteralRawSemanticsTests
     public void UnsignedNegative_IsDiagnosed(string source)
     {
         var diagnostics = new DiagnosticBag();
-        _ = new Lexer(source, diagnostics).TokenizeAll();
+        var program = $"§M{{Unsigned}}\n  §F{{Value:pub}} () -> object\n    §R {source}";
+        _ = new Parser(new Lexer(program, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
 
         Assert.Contains(
             diagnostics,
@@ -61,7 +62,7 @@ public sealed class LiteralRawSemanticsTests
         var diagnostics = new DiagnosticBag();
         var tokens = new Lexer(source, diagnostics).TokenizeAll();
 
-        Assert.Equal(TokenKind.Error, tokens[0].Kind);
+        Assert.Contains(tokens, token => token.Kind == TokenKind.Error);
         Assert.Contains(
             diagnostics,
             diagnostic => diagnostic.Code == DiagnosticCode.SignedIntegerLiteralOverflow);
