@@ -3286,6 +3286,11 @@ public sealed class Parser
             _position = savedPosition;
         }
 
+        // A legacy cast starts with a type, whose generic commas are not tuple separators.
+        if (Peek(1).Kind == TokenKind.Identifier && Peek(1).Text == "cast"
+            && Peek(2).Kind != TokenKind.Comma && IsStagedPrefixExpression())
+            return ParseLispExpression();
+
         // Check for tuple literal: (expr, expr, ...)
         // Tuples contain commas at depth 0; Lisp expressions do not.
         if (LookaheadIsTupleLiteral())
@@ -3377,6 +3382,7 @@ public sealed class Parser
         Advance(); // skip (
 
         var depth = 0;
+        var genericDepth = 0;
         var prevKind = TokenKind.OpenParen;
         while (!IsAtEnd)
         {
@@ -3393,22 +3399,23 @@ public sealed class Parser
             {
                 if (depth > 0) depth--;
             }
-            else if (kind == TokenKind.Less
-                && prevKind is TokenKind.Identifier or TokenKind.Star or TokenKind.StarStar or TokenKind.CloseBracket
-                && IsGenericTypeBracket())
+            else if (kind == TokenKind.Less && depth == 0
+                && (genericDepth > 0
+                    || prevKind is TokenKind.Identifier or TokenKind.Star or TokenKind.StarStar or TokenKind.CloseBracket
+                        && IsGenericTypeBracket()))
             {
                 // < after identifier, * (function pointers), or ] (calling convention) is a generic bracket
-                depth++;
+                genericDepth++;
             }
-            else if (kind == TokenKind.Greater && depth > 0)
+            else if (kind == TokenKind.Greater && depth == 0 && genericDepth > 0)
             {
-                depth--;
+                genericDepth--;
             }
-            else if (kind == TokenKind.GreaterGreater && depth > 0)
+            else if (kind == TokenKind.GreaterGreater && depth == 0 && genericDepth > 0)
             {
-                depth = System.Math.Max(0, depth - 2);
+                genericDepth = System.Math.Max(0, genericDepth - 2);
             }
-            else if (kind == TokenKind.Comma && depth == 0)
+            else if (kind == TokenKind.Comma && depth == 0 && genericDepth == 0)
             {
                 _position = saved;
                 return true;
@@ -4856,8 +4863,7 @@ public sealed class Parser
         }
 
         // Handle generic type references: Type<T> or Type<T1, T2>
-        // In Calor's Lisp syntax, comparisons use (< a b), so Identifier< at
-        // statement/expression level is always a generic type, not a comparison.
+        // A following operand distinguishes infix comparisons from generic references.
         if (Check(TokenKind.Less) && IsGenericTypeBracket())
         {
             var sb = new System.Text.StringBuilder(name);
@@ -4910,12 +4916,13 @@ public sealed class Parser
             else return false; // not a valid generic type pattern
             i++;
         }
-        return depth == 0 && i < _tokens.Count && _tokens[i].Kind is
+        return depth == 0 && i < _tokens.Count
+            && (_tokens[i].Span.Line > TokenEndLine(_tokens[i - 1]) || _tokens[i].Kind is
             TokenKind.OpenParen or TokenKind.CloseParen or TokenKind.CloseBracket
             or TokenKind.CloseBrace or TokenKind.Colon or TokenKind.Comma or TokenKind.Dot
             or TokenKind.Question or TokenKind.EqualEqual or TokenKind.BangEqual
             or TokenKind.Pipe or TokenKind.Caret or TokenKind.Amp or TokenKind.AmpAmp
-            or TokenKind.PipePipe or TokenKind.Eof or TokenKind.Dedent;
+            or TokenKind.PipePipe or TokenKind.Eof or TokenKind.Dedent);
     }
 
     private IntLiteralNode ParseIntLiteral()

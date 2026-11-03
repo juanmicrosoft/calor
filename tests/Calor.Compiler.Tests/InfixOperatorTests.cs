@@ -2,6 +2,7 @@ using System.Reflection;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -97,6 +98,85 @@ public class InfixOperatorTests
         Assert.Equal(BinaryOperator.LessThan, Assert.IsType<BinaryOperationNode>(comparison.Left).Operator);
         var tuple = Assert.IsType<TupleLiteralNode>(ParseExpression("(a < b, c > d)"));
         Assert.All(tuple.Elements, element => Assert.IsType<BinaryOperationNode>(element));
+    }
+
+    [Theory]
+    [InlineData("(cast Func<string, bool> null)", "Func<string, bool>")]
+    [InlineData("(cast RuleComponent<Person, string> _rule.Current)", "RuleComponent<Person, string>")]
+    [InlineData("(cast RuleBuilder<T, TProperty?> ruleBuilder)", "RuleBuilder<T, TProperty?>")]
+    [InlineData("(cast System.Func<string, List<bool>> null)", "System.Func<string, List<bool>>")]
+    [InlineData("(cast global::System.Func<string, bool> null)", "global::System.Func<string, bool>")]
+    public void LegacyGenericCasts_DoNotBecomeTuples(string expression, string type)
+    {
+        var cast = Assert.IsType<TypeOperationNode>(ParseExpression(expression));
+        Assert.Equal(TypeOp.Cast, cast.Operation);
+        Assert.Equal(type, cast.TargetType);
+        Assert.Equal(type, Source(expression).Substring(cast.TargetTypeSpan.Start, cast.TargetTypeSpan.Length));
+    }
+
+    [Theory]
+    [InlineData("((cast Func<string, bool> null), 1)")]
+    [InlineData("((a > b), c)")]
+    [InlineData("((a < b), c > d)")]
+    [InlineData("(cast, other)")]
+    [InlineData("(cast < b, c > d)")]
+    [InlineData("(Func<string, bool>, other)")]
+    [InlineData("(Dictionary<string, List<int>>, other)")]
+    [InlineData("(Container<Dictionary<string, List<int>>, bool>, other)")]
+    public void TupleLookahead_DistinguishesNestedGenericsComparisonsAndCastReferences(string expression)
+    {
+        Assert.Equal(2, Assert.IsType<TupleLiteralNode>(ParseExpression(expression)).Elements.Count);
+    }
+
+    [Theory]
+    [InlineData("§C{_expr004.Clear}")]
+    [InlineData("§B{next} 1")]
+    [InlineData("§R")]
+    public void GenericReference_EndsBeforeTheNextStatement(string nextStatement)
+    {
+        var module = Parse($$"""
+            §M{Infix}
+              §F{Probe:pub} () -> void
+                §B{_expr004} AccessorCache<Person>
+                {{nextStatement}}
+            """);
+        var body = Assert.Single(module.Functions).Body;
+        Assert.Equal(2, body.Count);
+        var binding = Assert.IsType<BindStatementNode>(body[0]);
+        Assert.Equal("AccessorCache<Person>", Assert.IsType<ReferenceNode>(binding.Initializer).Name);
+    }
+
+    [Theory]
+    [InlineData("return (Func<string, bool>)null;")]
+    [InlineData("return (RuleComponent<Person, string>)_rule.Current;")]
+    [InlineData("return (RuleBuilder<T, TProperty?>)ruleBuilder;")]
+    [InlineData("AccessorCache<Person>.Clear(); return null;")]
+    public void ConvertedGenericCastsAndStaticCalls_ReparseWithoutLosingTheirShape(string body)
+    {
+        var conversion = new CSharpToCalorConverter().Convert($$"""
+            using System;
+            public class GenericProbe<T, TProperty>
+            {
+                private RuleComponent<Person, string> _rule;
+                public object Probe(object ruleBuilder)
+                {
+                    {{body}}
+                }
+            }
+            public class Person { }
+            public class RuleComponent<T, TProperty> { public object Current; }
+            public class RuleBuilder<T, TProperty> { }
+            public class AccessorCache<T> { public static void Clear() { } }
+            """);
+        Assert.True(conversion.Success,
+            string.Join(Environment.NewLine, conversion.Issues.Select(issue => issue.Message)));
+        var source = Assert.IsType<string>(conversion.CalorSource);
+        var module = Parse(source);
+        if (body.StartsWith("return"))
+            Assert.Contains("(cast ", source);
+        else
+            Assert.Contains("AccessorCache<Person>", source);
+        Parse(new CalorEmitter().Emit(module));
     }
 
     [Fact]
@@ -207,6 +287,8 @@ public class InfixOperatorTests
     [InlineData("--a")]
     [InlineData("a--b")]
     [InlineData("(a + b")]
+    [InlineData("(cast Func<string, bool>)")]
+    [InlineData("(cast Func<string, bool> null extra)")]
     [InlineData("a +\n    §R b")]
     public void MalformedOrUnsupportedForms_ProduceErrors(string expression)
     {
