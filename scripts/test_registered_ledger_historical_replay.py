@@ -136,6 +136,15 @@ class TranslatorReplayTests(unittest.TestCase):
 
 
 class RegisteredReplayTests(unittest.TestCase):
+    def test_signature_registration_pins_original_compiler_landing_and_test(self):
+        self.assertEqual((
+            "7daf2bc99ec98937d489cf2b8bb69388fcb930d5",
+            "7daf2bc99ec98937d489cf2b8bb69388fcb930d5",
+            "bench/phase0-agent-native/calor0270-corpus-ledger.json",
+            "Calor.Compiler.Tests.Calor0270CorpusVolumeTests.Calor0270Volume_OverConvertedCorpus_MatchesLedger",
+        ), replay.REPLAYS["signature"])
+        self.assertIn("CALOR_REGENERATE_CALOR0270_LEDGER", replay.REGENERATION_FLAGS)
+
     def test_every_regeneration_flag_fails_before_git_or_build(self):
         for name in replay.REPLAYS:
             for flag in replay.REGENERATION_FLAGS:
@@ -162,7 +171,7 @@ class RegisteredReplayTests(unittest.TestCase):
 
     def test_changed_final_ledger_or_repointed_producer_fails_before_build(self):
         for name, (producer, _, ledger, _) in replay.REPLAYS.items():
-            for repoint in ((False,) if name in ("formatter", "binder") else (False, True)):
+            for repoint in ((False,) if name in ("formatter", "binder", "signature") else (False, True)):
                 with self.subTest(name=name, repoint=repoint), tempfile.TemporaryDirectory() as temporary:
                     root = Path(temporary)
                     field = "MeasuredCommit" if name == "corpus" else "measuredCommit"
@@ -177,6 +186,100 @@ class RegisteredReplayTests(unittest.TestCase):
                                     with self.assertRaisesRegex(ValueError, "producer differs|immutable final ledger"):
                                         replay.replay(name)
                                     run.assert_not_called()
+
+    def test_signature_replay_requires_original_bytes_actual_execution_and_exact_result(self):
+        producer, _, ledger, test = replay.REPLAYS["signature"]
+        original = b'{"BindRule":"parsed"}'
+        manifests = (
+            ".github/z3-binaries-4.15.7.sha256",
+            "src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256",
+        )
+        early = ("missing-current", "changed-current", "missing-archive", "changed-archive")
+        for fault in (None, *early, "replayed-ledger", "current-ledger", "deleted-replayed-ledger",
+                      "deleted-current-ledger", "missing-result", "empty-result", "empty-run",
+                      "skipped", "failed", "wrong-test", "duplicate-result", "missing-summary", "bad-counters"):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                current = root / ledger
+                current.parent.mkdir(parents=True)
+                if fault != "missing-current":
+                    current.write_bytes(original + b"\n" if fault == "changed-current" else original)
+                for relative in manifests:
+                    path = root / relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(b"pinned assets")
+                def git(*args):
+                    if args[0] == "show":
+                        self.assertEqual(f"{producer}:{ledger}", args[1])
+                        return original
+                    self.assertEqual(("archive", "--format=tar"), args[:2])
+                    self.assertEqual(producer, args[-1])
+                    return b""
+                def extract(_, source):
+                    for relative in (*manifests, ledger):
+                        if relative == ledger and fault == "missing-archive":
+                            continue
+                        path = source / relative
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        content = original if relative == ledger else b"pinned assets"
+                        path.write_bytes(content + b"\n" if relative == ledger and fault == "changed-archive" else content)
+                def run(arguments, source, environment, timeout):
+                    self.assertGreater(timeout, 0)
+                    self.assertEqual(original, (source / ledger).read_bytes())
+                    if arguments[0] == "restore":
+                        self.assertIn("--locked-mode", arguments)
+                        return
+                    self.assertEqual("test", arguments[0])
+                    self.assertIn("--no-restore", arguments)
+                    self.assertNotIn("--no-build", arguments)
+                    self.assertIn(f"FullyQualifiedName={test}", arguments)
+                    results = Path(arguments[arguments.index("--results-directory") + 1])
+                    results.mkdir()
+                    if fault == "missing-result":
+                        return
+                    path = results / "historical.trx"
+                    if fault == "empty-result":
+                        path.write_bytes(b"")
+                        return
+                    name = "Unrelated.Test" if fault == "wrong-test" else test
+                    outcome = "NotExecuted" if fault == "skipped" else "Failed" if fault == "failed" else "Passed"
+                    row = f'<UnitTestResult testName="{name}" outcome="{outcome}" />'
+                    rows = "" if fault == "empty-run" else row + row if fault == "duplicate-result" else row
+                    summary = "" if fault == "missing-summary" else (
+                        '<ResultSummary outcome="Completed">'
+                        f'<Counters total="{2 if fault == "bad-counters" else 1}" executed="1" passed="1" '
+                        'failed="0" error="0" timeout="0" notExecuted="0" /></ResultSummary>')
+                    path.write_text(
+                        '<TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">'
+                        f'<Results>{rows}</Results>{summary}</TestRun>', encoding="utf-8",
+                    )
+                    if fault == "replayed-ledger":
+                        (source / ledger).write_bytes(original + b"\n")
+                    elif fault == "current-ledger":
+                        current.write_bytes(original + b"\n")
+                    elif fault == "deleted-replayed-ledger":
+                        (source / ledger).unlink()
+                    elif fault == "deleted-current-ledger":
+                        current.unlink()
+                with patch.dict(os.environ, {}, clear=True), patch.object(replay, "ROOT", root), \
+                        patch.object(replay, "git", side_effect=git), patch.object(replay, "require_commit"), \
+                        patch.object(replay, "extract_archive", side_effect=extract), \
+                        patch.object(replay, "archive_submodules") as archive, \
+                        patch.object(replay.runpy, "run_path", return_value={"ASSET_PATHS": {}}), \
+                        patch.object(replay.subprocess, "run"), \
+                        patch.object(replay, "run_dotnet", side_effect=run) as launch:
+                    if fault is None:
+                        replay.replay("signature")
+                        self.assertEqual(2, launch.call_count)
+                        self.assertEqual(original, current.read_bytes())
+                    else:
+                        with self.assertRaises((ValueError, FileNotFoundError, replay.ET.ParseError)):
+                            replay.replay("signature")
+                        self.assertEqual(0 if fault in early else 2, launch.call_count)
+                    if fault in ("missing-current", "changed-current"):
+                        archive.assert_not_called()
+                    else:
+                        self.assertEqual(producer, archive.call_args.args[0])
 
     def test_changed_binder_aggregate_baseline_fails_before_build(self):
         with tempfile.TemporaryDirectory() as temporary:

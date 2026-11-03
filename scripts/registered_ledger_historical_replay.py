@@ -26,6 +26,12 @@ REPLAYS = {
         "bench/phase0-agent-native/binder-source-coverage.json",
         "Calor.Compiler.Tests.BinderIncompleteRatchetTests.ConversionLeg_IncompleteCount_MatchesBaseline",
     ),
+    "signature": (
+        "7daf2bc99ec98937d489cf2b8bb69388fcb930d5",
+        "7daf2bc99ec98937d489cf2b8bb69388fcb930d5",
+        "bench/phase0-agent-native/calor0270-corpus-ledger.json",
+        "Calor.Compiler.Tests.Calor0270CorpusVolumeTests.Calor0270Volume_OverConvertedCorpus_MatchesLedger",
+    ),
     "formatter": (
         "ab53adc3737bab92ff8637cb32235629c64ece9d",
         "ab53adc3737bab92ff8637cb32235629c64ece9d",
@@ -56,6 +62,7 @@ REGENERATION_FLAGS = (
     "CALOR_REGENERATE_HIGHER_ORDER_DEMAND_LEDGER",
     "CALOR_REGENERATE_EFFECT_RESOLVER_KEY_LEDGER",
     "CALOR_REGENERATE_CALOR0425_LEDGER",
+    "CALOR_REGENERATE_CALOR0270_LEDGER",
     "CALOR_REGENERATE_PPE1_LEDGER",
 )
 TRANSLATOR_PRODUCER = "452afeb29e7bfbd5aff892336de722e79ca3c157"
@@ -234,7 +241,7 @@ def replay(name: str) -> None:
     final_ledger = git("show", f"{landing}:{ledger_path}")
     if (ROOT / ledger_path).read_bytes() != final_ledger:
         raise ValueError(f"{ledger_path}: immutable final ledger differs from original landing {landing}")
-    if name not in ("formatter", "binder"):
+    if name not in ("formatter", "binder", "signature"):
         recorded = json.loads(final_ledger)
         identity_field = "MeasuredCommit" if name == "corpus" else "measuredCommit"
         if recorded[identity_field] != producer:
@@ -274,9 +281,10 @@ def replay(name: str) -> None:
             [sys.executable, str(source / "scripts/verify-z3-assets.py")], check=True, timeout=60,
         )
         for relative, expected in artifacts.items():
-            if name == "binder" and (source / relative).read_bytes() != expected:
+            if name in ("binder", "signature") and (source / relative).read_bytes() != expected:
                 raise ValueError(f"{relative}: original producer artifact differs from final landing")
-            (source / relative).write_bytes(expected)
+            if name != "signature":
+                (source / relative).write_bytes(expected)
         environment = os.environ.copy()
         environment["LC_ALL"] = "C"
         environment["CALOR_HOME"] = str(scratch / "empty-calor-home")
@@ -292,7 +300,7 @@ def replay(name: str) -> None:
             ],
             source, environment, timeout=600,
         )
-        verify_result(scratch / "results/historical.trx", test)
+        verify_result(scratch / "results/historical.trx", test, strict=name == "signature")
         for relative, expected in artifacts.items():
             if (source / relative).read_bytes() != expected or (ROOT / relative).read_bytes() != expected:
                 raise ValueError(f"{relative}: historical replay changed its immutable input")

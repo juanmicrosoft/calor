@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Calor.Compiler.Binding;
+using Calor.Compiler.Commands;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
 using Xunit;
@@ -22,11 +23,13 @@ namespace Calor.Compiler.Tests;
 /// (<see cref="MetadataBinderCorpusMeasurementTests"/>). A <i>rise</i> means a new
 /// unactionable shape started reporting and the editor got noisier; a <i>fall</i>
 /// means a shape that authors could act on went silent. Both are decisions, and
-/// both must be made deliberately in a PR that regenerates the ledger and says
-/// what moved — never absorbed silently.</para>
+/// both require explicit current source-site adjudication, never a rewrite of
+/// the immutable historical ledger.</para>
 ///
-/// <para>Regenerate: <c>CALOR_REGENERATE_CALOR0270_LEDGER=1 dotnet test
-/// --filter Calor0270CorpusVolume</c>.</para>
+/// <para>Historical acceptance replays the original compiler and test:
+/// <c>python3 scripts/registered_ledger_historical_replay.py signature</c>.
+/// The separate current-volume test retains every exact comparison; passing
+/// historical replay does not settle a current-volume difference.</para>
 ///
 /// <para>Both sides of the narrowing were measured with this same instrument, by
 /// forcing <c>Binder.ShouldReportUnresolvedReceiver</c> to true and re-running:</para>
@@ -89,9 +92,43 @@ public class Calor0270CorpusVolumeTests
     private static string LedgerPath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "calor0270-corpus-ledger.json");
 
+    private static void AssertRegenerationForbidden(string? value) =>
+        Assert.True(string.IsNullOrEmpty(value),
+            "The original Calor0270 ledger is immutable; CALOR_REGENERATE_CALOR0270_LEDGER is forbidden. "
+            + "Replay its original compiler with registered_ledger_historical_replay.py signature; "
+            + "adjudicate current source-site differences separately.");
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("1")]
+    [InlineData("0")]
+    [InlineData("true")]
+    [InlineData("false")]
+    [InlineData(" ")]
+    public void ImmutableLedger_RejectsEveryNonemptyRegenerationRequest(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+            AssertRegenerationForbidden(value);
+        else
+            Assert.Throws<Xunit.Sdk.TrueException>(() => AssertRegenerationForbidden(value));
+    }
+
+    [Fact]
+    [Trait("Category", "HistoricalReplay")]
+    public async Task Calor0270Volume_OriginalCompiler_MatchesImmutableLedger()
+    {
+        var result = await ExecutionWorkspace.CaptureProcessAsync(
+            "python3", [Path.Combine(RepoRoot(), "scripts", "registered_ledger_historical_replay.py"), "signature"],
+            RepoRoot(), TimeSpan.FromMinutes(20), CancellationToken.None);
+        Assert.True(result.ExitCode == 0 && !result.TimedOut,
+            $"Historical Calor0270 signature replay failed (exit {result.ExitCode}).\n{result.Output}");
+    }
+
     [SkippableFact]
     public void Calor0270Volume_OverConvertedCorpus_MatchesLedger()
     {
+        AssertRegenerationForbidden(Environment.GetEnvironmentVariable("CALOR_REGENERATE_CALOR0270_LEDGER"));
         var root = RepoRoot();
         var subjectDirs = new[] { "MediatR", "serilog", "FluentValidation" }
             .Select(subject => (Name: subject,
@@ -123,20 +160,9 @@ public class Calor0270CorpusVolumeTests
             + $"{measured.AggregateModulesWithDiagnostics} of {measured.AggregateModulesBound} bound modules");
 
         var ledgerPath = LedgerPath();
-        var regenerate = string.Equals(
-            Environment.GetEnvironmentVariable("CALOR_REGENERATE_CALOR0270_LEDGER"),
-            "1", StringComparison.Ordinal);
-        if (regenerate)
-        {
-            File.WriteAllText(ledgerPath, JsonSerializer.Serialize(
-                measured, new JsonSerializerOptions { WriteIndented = true }) + "\n");
-            Console.WriteLine($"Calor0270 corpus ledger regenerated: {ledgerPath}");
-            return;
-        }
-
         // A missing ledger is a failure, never a silent regeneration (R2-A).
         Assert.True(File.Exists(ledgerPath),
-            $"Calor0270 corpus ledger missing at {ledgerPath} — run once with CALOR_REGENERATE_CALOR0270_LEDGER=1");
+            $"Immutable Calor0270 corpus ledger missing at {ledgerPath}; restore the original checked-in bytes.");
         var committed = JsonSerializer.Deserialize<Ledger>(File.ReadAllText(ledgerPath))!;
 
         // Anti-vacuity: a ledger that measured nothing would pass every equality
@@ -155,9 +181,9 @@ public class Calor0270CorpusVolumeTests
                 + $"(of {expected.ModulesBound}), measured {actual.Diagnostics} / "
                 + $"{actual.ModulesWithDiagnostics} (of {actual.ModulesBound}). A RISE means an "
                 + "unactionable receiver shape started reporting and the editor got noisier; a "
-                + "FALL means a shape authors could act on went silent. Either way, regenerate "
-                + "the ledger IN THIS PR with CALOR_REGENERATE_CALOR0270_LEDGER=1 and say what "
-                + "moved — never absorb it silently.");
+                + "FALL means a shape authors could act on went silent. Adjudicate current source-site "
+                + "differences explicitly; do not rewrite the immutable historical ledger or treat "
+                + "a passing original-compiler replay as current-volume acceptance.");
         }
 
         Assert.Equal(committed.AggregateDiagnostics, measured.AggregateDiagnostics);
@@ -240,10 +266,9 @@ public class Calor0270CorpusVolumeTests
     /// schema field. This ledger's numbers are NOT regenerated by K1, so the pin
     /// is: the bind rule is recorded, it is this ledger's own rule
     /// (<c>"parsed"</c>), it is not the Calor0425 ledger's rule, and the
-    /// aggregate the rule produced is unchanged from the pre-K1 file. Runs
-    /// without the corpus submodules — it reads the committed JSON. See
-    /// <see cref="PreK1AggregateModulesBound"/> for when these constants are
-    /// expected to move and which PR must move them.
+    /// aggregate remains the immutable historical pin. Runs without the corpus
+    /// submodules — it reads the committed JSON. Current-volume adjudication
+    /// must not rewrite this historical schema or its aggregate.
     /// </summary>
     [Fact]
     public void Calor0270Ledger_NamesItsBindRule_AndIsNotRegeneratedByK1()
