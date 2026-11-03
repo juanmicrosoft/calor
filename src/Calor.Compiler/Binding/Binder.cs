@@ -6184,6 +6184,12 @@ public sealed class Binder
             .ToArray();
         var lookupNames = computedReceiver is null ? GetCallLookupNames(target)
             : EnumerateHierarchyLookupNames(ResolveClass(computedReceiver.Type.DisplayString), computedMethodName!);
+        var opaqueTarget = computedReceiver switch
+        {
+            null => target,
+            BoundThisExpression => computedMethodName,
+            _ => null
+        };
         foreach (var lookupName in lookupNames.Distinct(StringComparer.Ordinal))
         {
             var requireStatic = computedReceiver is BoundTypeReferenceExpression
@@ -6203,7 +6209,8 @@ public sealed class Binder
             if ((resolution.Kind is OverloadResolutionKind.NoMatch or OverloadResolutionKind.Ambiguous
                     || resolution.Kind == OverloadResolutionKind.Resolved
                         && !resolution.Functions.Any(_localFunctionSymbols.Contains))
-                && CurrentClassHasOpaqueMethodDeclaration(target, typeArguments?.Count))
+                && opaqueTarget != null
+                && CurrentClassHasOpaqueMethodDeclaration(opaqueTarget, typeArguments?.Count))
             {
                 // A native winner is not authoritative when a preserved overload
                 // can compete; leave the call unresolved for downstream analysis.

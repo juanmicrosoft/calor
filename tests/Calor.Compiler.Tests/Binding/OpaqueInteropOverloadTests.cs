@@ -1,5 +1,6 @@
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Analysis.Dataflow;
+using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
@@ -24,6 +25,10 @@ public class OpaqueInteropOverloadTests
     [InlineData("this.Write", false, true)]
     [InlineData("Write", true, true)]
     [InlineData("this.Write", true, true)]
+    [InlineData("<structural-this>", false, false)]
+    [InlineData("<structural-this>", true, false)]
+    [InlineData("<structural-this>", false, true)]
+    [InlineData("<structural-this>", true, true)]
     public void ApplicableNativeGeneric_WithPreservedParamsCompetitor_IsNotAuthoritative(
         string target, bool statement, bool preprocessor)
     {
@@ -41,11 +46,16 @@ public class OpaqueInteropOverloadTests
                   §R 2
                 §MT{Probe:pub} (?[?object]:values) -> i32
                   §E{}
-                  {{(statement ? "" : "§R ")}}§C{ {{target}} } §A (cast System.Exception? null) §A values §/C
+                  {{(statement ? "" : "§R ")}}§C{ {{(target == "<structural-this>" ? "this.Write" : target)}} } §A (cast System.Exception? null) §A values §/C
                   {{(statement ? "§R 0" : "")}}
             """;
         var diagnostics = new DiagnosticBag();
         var ast = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        if (target == "<structural-this>")
+        {
+            ast = WithStructuralReceiver(ast, statement, new ThisExpressionNode(ast.Span));
+            target = "<expression-call>";
+        }
         var bound = new Binder(diagnostics).Bind(ast);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var probe = bound.Functions.Single(function => function.Symbol.Name == "Logger.Probe");
@@ -92,6 +102,67 @@ public class OpaqueInteropOverloadTests
         var instance = Activator.CreateInstance(logger);
         Assert.Equal(statement ? 0 : 1, logger.GetMethod("Probe")!.Invoke(instance, [new object?[] { "item" }]));
         Assert.Equal(statement ? 0 : 1, logger.GetMethod("Probe")!.Invoke(instance, [null]));
+    }
+
+    private static ModuleNode WithStructuralReceiver(ModuleNode module, bool statement, ExpressionNode receiver)
+    {
+        var cls = Assert.Single(module.Classes);
+        var probe = cls.Methods.Single(method => method.Name == "Probe");
+        var arguments = statement
+            ? Assert.IsType<CallStatementNode>(probe.Body[0]).Arguments
+            : Assert.IsType<CallExpressionNode>(Assert.IsType<ReturnStatementNode>(probe.Body[0]).Expression).Arguments;
+        var call = new ExpressionCallNode(probe.Body[0].Span,
+            new FieldAccessNode(probe.Body[0].Span, receiver, "Write"), arguments);
+        StatementNode[] body = statement
+            ? [new ExpressionStatementNode(call.Span, call), probe.Body[1]]
+            : [new ReturnStatementNode(call.Span, call)];
+        var rewrittenProbe = new MethodNode(probe.Span, probe.Id, probe.Name, probe.Visibility, probe.Modifiers,
+            probe.TypeParameters, probe.Parameters, probe.Output, probe.Effects, probe.Preconditions,
+            probe.Postconditions, body, probe.Attributes);
+        var rewrittenClass = new ClassDefinitionNode(cls.Span, cls.Id, cls.Name,
+            isAbstract: false, isSealed: false, isPartial: false, isStatic: false,
+            baseClass: null, [], [], [], [], [],
+            cls.Methods.Select(method => ReferenceEquals(method, probe) ? rewrittenProbe : method).ToArray(),
+            [], [], cls.Attributes, [], visibility: cls.Visibility,
+            interopBlocks: cls.InteropBlocks, preprocessorBlocks: cls.PreprocessorBlocks);
+        return new ModuleNode(module.Span, module.Id, module.Name, [], [], [rewrittenClass], [], module.Attributes);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StructuralUnknownReceiver_IsNotTreatedAsCurrentInstance(bool statement)
+    {
+        var source = $$"""
+            §M{TestModule}
+              §CL{Logger:pub}
+                §CSHARP{public int Write(System.Exception? exception, params object?[]? values) => 1;}§/CSHARP
+                §MT{Write<T>:pub} (?System.Exception:exception, T:values) -> i32
+                  §R 2
+                §MT{Probe:pub} (?[?object]:values) -> i32
+                  {{(statement ? "" : "§R ")}}§C{this.Write} §A (cast System.Exception? null) §A values §/C
+                  {{(statement ? "§R 0" : "")}}
+            """;
+        var diagnostics = new DiagnosticBag();
+        var parsed = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var ast = WithStructuralReceiver(parsed, statement, new ReferenceNode(parsed.Span, "unknownReceiver"));
+        var bound = new Binder(diagnostics).Bind(ast);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference);
+        var probe = bound.Functions.Single(function => function.Symbol.Name == "Logger.Probe");
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(probe).OfType<BoundCallExpression>());
+        Assert.False(call.HasOpaqueOverloads);
+        Assert.Null(call.ResolvedSymbol);
+        Assert.Empty(call.SelectedOverloadMatches);
+        Assert.Null(call.ResolvedMetadataMethod);
+        var graph = CallGraphAnalysis.BuildResolved(bound);
+        Assert.Empty(graph.ForwardGraph[probe.SymbolId]);
+        var unresolved = Assert.Single(graph.UnresolvedCalls.Where(site => site.Caller == probe.SymbolId));
+        Assert.Equal("<expression-call>", unresolved.Target);
+        new EffectEnforcementPass(diagnostics, policy: UnknownCallPolicy.Strict, strictEffects: true).Enforce(ast);
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnknownExternalCall
+            && diagnostic.Span == unresolved.Span
+            && diagnostic.Severity == DiagnosticSeverity.Error);
     }
 
     [Theory]

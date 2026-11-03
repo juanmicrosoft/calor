@@ -29,8 +29,11 @@ The current-class opaque-overload guard covers successful native matches as
 well as ambiguous or inapplicable ones. For a bare or `this.` call, a preserved
 same-name method can compete with the visible native overloads. Its body and
 signature stay in `§CSHARP`; the binder does not claim that a native winner is
-the final C# selection. Explicit-interface declarations do not compete through
-these call forms. An explicit generic call filters preserved candidates by
+the final C# selection. The structural member-call representation uses the same
+guard when its receiver binds to `BoundThisExpression`; the sentinel
+`<expression-call>` is not used as the member name. Unknown receivers are not
+classified as the current instance. Explicit-interface declarations do not
+compete through these call forms. An explicit generic call filters preserved candidates by
 generic arity, and a resolved local function retains its lexical precedence.
 
 An opaque-overload marker travels through both bound call forms. It prevents
@@ -43,8 +46,9 @@ every call resolved; it may be true while `UnresolvedCalls` is nonempty.
 
 This conservative guard does not implement preserved-signature applicability,
 nor extend the existing lookup scope to arbitrary explicit receivers, computed
-receivers or raw declarations in other types. Correct generated C# can select
-the preserved params overload while native analysis honestly remains unresolved.
+receivers other than the known current instance, or raw declarations in other
+types. Correct generated C# can select the preserved params overload while
+native analysis honestly remains unresolved.
 
 This is a bounded N3 implementation under #1082, not Stage A/B activation.
 Copilot/GPT-6 Astra context `e9c6935e-da28-4a3b-94d4-0a5bbb596332` accepted the
