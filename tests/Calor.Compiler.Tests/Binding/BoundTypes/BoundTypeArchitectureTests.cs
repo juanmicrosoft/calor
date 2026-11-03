@@ -277,6 +277,52 @@ public class BoundTypeArchitectureTests
             + "naming what moved:\n  " + string.Join("\n  ", drifted.Take(25)));
     }
 
+    [Fact]
+    public void CorpusPatternBindings_PreserveTheIntegerScrutineeType()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var source = File.ReadAllText(ActiveSyntaxInputs.ForCurrentCompiler(root,
+            Path.Combine(root, "samples", "PatternMatching", "matching.calr")));
+        var references = BindAndCollect<BoundVariableExpression>(source)
+            .Where(reference => reference.Variable.Name == "n").ToArray();
+
+        Assert.Equal(3, references.Length);
+        Assert.Equal(3, references.Select(reference => reference.SymbolId).Distinct().Count());
+        Assert.All(references, reference =>
+        {
+            Assert.Equal("INT", reference.Type.DisplayString);
+            Assert.False(reference.HasUnknownInferredType);
+        });
+    }
+
+    [Theory]
+    [InlineData("benchmarks/security/command-injection.calr", "Replace", 9, "string")]
+    [InlineData("benchmarks/security/sql-injection.calr", "Replace", 1, "string")]
+    [InlineData("benchmarks/null-safety/null-deref.calr", "GetHashCode", 2, "int")]
+    public void CorpusScalarInstanceCalls_UseSelectedStringMetadata(
+        string relativePath, string methodName, int expectedCount, string expectedDisplay)
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var source = File.ReadAllText(ActiveSyntaxInputs.ForCurrentCompiler(root,
+            Path.Combine(root, relativePath)));
+        var calls = BindAndCollect<BoundCallExpression>(source)
+            .Where(call => call.Target.EndsWith("." + methodName, StringComparison.Ordinal)).ToArray();
+
+        Assert.Equal(expectedCount, calls.Length);
+        Assert.All(calls, call =>
+        {
+            var selected = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.IMethodSymbol>(
+               call.ResolvedMetadataMethod);
+            Assert.Equal(Microsoft.CodeAnalysis.SpecialType.System_String,
+               selected.ContainingType.SpecialType);
+            Assert.Equal(methodName, selected.Name);
+            Assert.False(selected.IsStatic);
+            Assert.Empty(selected.DeclaringSyntaxReferences);
+            Assert.Equal(expectedDisplay, call.Type.DisplayString);
+            Assert.False(call.HasUnresolvedArguments);
+        });
+    }
+
     /// <summary>
     /// v0.15 E1 slice 2b — a lambda's bound type is a
     /// <see cref="FunctionBoundType"/> (kind 5), not a
