@@ -382,6 +382,8 @@ public class BinderIncompleteRatchetTests
     {
         Assert.True(string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CALOR_UPDATE_BINDER_BASELINE")),
             "Conversion baselines are immutable; CALOR_UPDATE_BINDER_BASELINE is forbidden.");
+        Assert.True(string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CALOR_REGENERATE_CURRENT_BINDING_SITES")),
+            "Current binding sites are explicit regression expectations, not a live regeneration target.");
         var root = RepoRoot();
         var subjects = new[] { "MediatR", "serilog", "FluentValidation" }
             .Select(subject => Path.Combine(root, "bench", "corpus", subject, "src"))
@@ -446,34 +448,18 @@ public class BinderIncompleteRatchetTests
         Assert.Equal(
             LegacySourceOrderAttempted,
             measuredNative.LegacySourceOrderAttempted);
-        // Binder visits include lowering artifacts and opaque expressions. Exact equality
-        // still catches drift; a monotonic lower bound would reward unnecessary temporaries.
-        Assert.Equal(recorded.Conversion, measuredNative);
+        var current = ReadCurrentConversionExpectations();
+        AssertCurrentConversionTotals(current, measuredNative, measuredPreserve);
         var recordedSources = JsonSerializer.Deserialize<
             SortedDictionary<string, SourceCoverageRecord>>(
                 File.ReadAllText(SourceCoveragePath()))!;
         Assert.Equal(recordedSources.Keys.Order(StringComparer.Ordinal), sourceCoverage.Keys);
+        Assert.Equal(sourceCoverage.Keys, current.SourceCoverage.Keys);
         var expectedSites = ReadCurrentDiagnosticSites();
         Assert.Equal(sourceCoverage.Keys, expectedSites.Keys);
         Assert.Equal(sourceCoverage.Keys, diagnosticSites.Keys);
-        if (Environment.GetEnvironmentVariable("CALOR_REGENERATE_CURRENT_BINDING_SITES") == "1")
-        {
-            foreach (var (file, actual) in diagnosticSites)
-            {
-                var expected = expectedSites[file];
-                Assert.Equal(expected.RawErrors.Select(error => (error.Code, error.Message, error.SpanText)),
-                    actual.RawErrors.Select(error => (error.Code, error.Message, error.SpanText)));
-                Assert.Equal(expected.PropagatedErrors.Select(error => (error.Code, error.Message, error.SpanText)),
-                    actual.PropagatedErrors.Select(error => (error.Code, error.Message, error.SpanText)));
-                Assert.Equal(WithCurrentDiagnosticIdentities(recordedSources[file], actual), sourceCoverage[file]);
-            }
-            // Only current diagnostic locations may change; historical coverage stays exact.
-            File.WriteAllText(Path.Combine(root, "tests", "TestData", "Binding", "binder-current-diagnostic-sites.json"),
-                JsonSerializer.Serialize(diagnosticSites, new JsonSerializerOptions { WriteIndented = true }) + "\n");
-            expectedSites = ReadCurrentDiagnosticSites();
-        }
         foreach (var (file, measured) in sourceCoverage)
-            AssertCurrentSourceCoverage(recordedSources[file], measured,
+            AssertCurrentSourceCoverage(file, recordedSources[file], current.SourceCoverage[file], measured,
                 expectedSites[file], diagnosticSites[file]);
         Assert.Equal(0, measuredPreserve.OpaqueUnmapped);
         Assert.Equal(
@@ -488,7 +474,71 @@ public class BinderIncompleteRatchetTests
             && measuredPreserve.UnconvertedFiles <= recorded.PreserveCoverage.UnconvertedFiles,
             $"Preserve-mode opaque coverage regressed: measured {measuredPreserve} "
             + $"vs baseline {recorded.PreserveCoverage}.");
-        Assert.Equal(recorded.PreserveCoverage, measuredPreserve);
+    }
+
+    private static CurrentConversionExpectations ReadCurrentConversionExpectations()
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(RepoRoot(),
+            "tests", "TestData", "Binding", "binder-current-conversion-expectations.json")));
+        Assert.False(document.RootElement.TryGetProperty("measuredCommit", out _));
+        var current = document.RootElement.Deserialize<CurrentConversionExpectations>()!;
+        return current with
+        {
+            SourceCoverage = new SortedDictionary<string, SourceCoverageRecord>(
+                current.SourceCoverage, StringComparer.Ordinal)
+        };
+    }
+
+    private static void AssertCurrentConversionTotals(
+        CurrentConversionExpectations expected, NativeConversionLeg native, PreserveCoverageLeg preserve)
+    {
+        Assert.Equal(1, expected.SchemaVersion);
+        Assert.Equal(expected.Conversion, native);
+        Assert.Equal(expected.PreserveCoverage, preserve);
+    }
+
+    [Theory]
+    [InlineData("schema")]
+    [InlineData("native-visits")]
+    [InlineData("incomplete")]
+    [InlineData("empty-output")]
+    [InlineData("preserve-boundaries")]
+    [InlineData("preserve-expressions")]
+    public void CurrentConversionGuard_RejectsAggregateTampering(string field)
+    {
+        var expected = ReadCurrentConversionExpectations();
+        var changed = field switch
+        {
+            "schema" => expected with { SchemaVersion = expected.SchemaVersion + 1 },
+            "native-visits" => expected with
+            {
+                Conversion = expected.Conversion with
+                {
+                    RoslynSelectedAttempted = expected.Conversion.RoslynSelectedAttempted + 1
+                }
+            },
+            "incomplete" => expected with
+                { Conversion = expected.Conversion with { Incomplete = expected.Conversion.Incomplete + 1 } },
+            "empty-output" => expected with
+                { Conversion = expected.Conversion with { EmptyOutput = expected.Conversion.EmptyOutput + 1 } },
+            "preserve-boundaries" => expected with
+            {
+                PreserveCoverage = expected.PreserveCoverage with
+                {
+                    OpaqueBoundaries = expected.PreserveCoverage.OpaqueBoundaries + 1
+                }
+            },
+            "preserve-expressions" => expected with
+            {
+                PreserveCoverage = expected.PreserveCoverage with
+                {
+                    OpaqueExpressions = expected.PreserveCoverage.OpaqueExpressions + 1
+                }
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(field))
+        };
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
+            AssertCurrentConversionTotals(changed, expected.Conversion, expected.PreserveCoverage));
     }
 
     private static SortedDictionary<string, BindingDiagnosticSites> ReadCurrentDiagnosticSites() =>
@@ -497,12 +547,12 @@ public class BinderIncompleteRatchetTests
             StringComparer.Ordinal);
 
     private static SourceCoverageRecord WithCurrentDiagnosticIdentities(
-        SourceCoverageRecord historical, BindingDiagnosticSites expected)
+        SourceCoverageRecord coverage, BindingDiagnosticSites expected)
     {
         static string Identities(IEnumerable<BindingErrorSite> errors) => HashIdentities(errors
             .Select(error => $"{error.Code}:{error.Start}:{error.End}:{error.Message}")
             .Order(StringComparer.Ordinal));
-        return historical with
+        return coverage with
         {
             BindingErrorIdentityHash = Identities(expected.RawErrors),
             PropagatedBindingErrorIdentityHash = Identities(expected.PropagatedErrors)
@@ -510,16 +560,22 @@ public class BinderIncompleteRatchetTests
     }
 
     private static void AssertCurrentSourceCoverage(
-        SourceCoverageRecord historical, SourceCoverageRecord measured,
+        string file, SourceCoverageRecord historical, SourceCoverageRecord expectedCoverage,
+        SourceCoverageRecord measured,
         BindingDiagnosticSites expected, BindingDiagnosticSites actual)
     {
+        var original = JsonSerializer.Deserialize<SortedDictionary<string, SourceCoverageRecord>>(
+            File.ReadAllText(SourceCoveragePath()))![file];
+        Assert.Equal(original, historical);
+        Assert.Equal(historical.SourceHash, expectedCoverage.SourceHash);
+        Assert.Equal(historical.SelectedSourceHash, expectedCoverage.SelectedSourceHash);
+        Assert.Equal(historical.SourceExpressions, expectedCoverage.SourceExpressions);
         Assert.Equal(expected.RawErrors, actual.RawErrors);
         Assert.Equal(expected.PropagatedErrors, actual.PropagatedErrors);
-        Assert.Equal(historical.BindingErrorCount, expected.RawErrors.Length);
-        Assert.Equal(historical.PropagatedBindingErrorCount, expected.PropagatedErrors.Length);
-        // Only serialized diagnostic identities have a distinct current role.
-        // Every source/coverage/loss/success/count field still equals the original.
-        Assert.Equal(WithCurrentDiagnosticIdentities(historical, expected), measured);
+        Assert.Equal(expectedCoverage.BindingErrorCount, expected.RawErrors.Length);
+        Assert.Equal(expectedCoverage.PropagatedBindingErrorCount, expected.PropagatedErrors.Length);
+        Assert.Equal(WithCurrentDiagnosticIdentities(expectedCoverage, expected), expectedCoverage);
+        Assert.Equal(expectedCoverage, measured);
     }
 
     [Theory]
@@ -546,8 +602,9 @@ public class BinderIncompleteRatchetTests
             pair.Value.RawErrors.Length > 0 && pair.Value.PropagatedErrors.Length > 0);
         var historical = JsonSerializer.Deserialize<SortedDictionary<string, SourceCoverageRecord>>(
             File.ReadAllText(SourceCoveragePath()))![file];
-        var measured = WithCurrentDiagnosticIdentities(historical, expected);
-        AssertCurrentSourceCoverage(historical, measured, expected, expected);
+        var expectedCoverage = ReadCurrentConversionExpectations().SourceCoverage[file];
+        var measured = expectedCoverage;
+        AssertCurrentSourceCoverage(file, historical, expectedCoverage, measured, expected, expected);
         var actual = expected with
         {
             RawErrors = expected.RawErrors.ToArray(),
@@ -581,7 +638,7 @@ public class BinderIncompleteRatchetTests
             default: throw new ArgumentOutOfRangeException(nameof(mutation));
         }
         Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
-            AssertCurrentSourceCoverage(historical, measured, expected, actual));
+            AssertCurrentSourceCoverage(file, historical, expectedCoverage, measured, expected, actual));
     }
 
     [Fact]
@@ -1554,6 +1611,12 @@ public class BinderIncompleteRatchetTests
         int ConvertExceptions,
         int EmptyOutput,
         int OutputParseFailures);
+
+    private sealed record CurrentConversionExpectations(
+        int SchemaVersion,
+        NativeConversionLeg Conversion,
+        PreserveCoverageLeg PreserveCoverage,
+        SortedDictionary<string, SourceCoverageRecord> SourceCoverage);
 
     private sealed record Baseline(
         int IncompleteCount,
