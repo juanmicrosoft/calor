@@ -1780,9 +1780,7 @@ public sealed class Scope
                 ?? OverloadResolutionResult.NotFound();
         }
 
-        var applicable = new List<(FunctionSymbol Function, string ReturnType, int Score,
-            bool UsesNullableStringCompatibility,
-            IReadOnlyList<ResolvedArgumentMapping> Arguments)>();
+        var applicable = new List<ApplicableOverload>();
         foreach (var function in overloads)
         {
             if (TryMatch(
@@ -1796,14 +1794,18 @@ public sealed class Scope
                     out var resolvedReturnType,
                     out var score,
                     out var usesNullableStringCompatibility,
-                    out var mappedArguments))
+                    out var mappedArguments,
+                    out var substitutedParameterTypes,
+                    out var usesExpandedParams))
             {
-                applicable.Add((
+                applicable.Add(new ApplicableOverload(
                     function,
                     resolvedReturnType,
                     score,
                     usesNullableStringCompatibility,
-                    mappedArguments));
+                    mappedArguments,
+                    substitutedParameterTypes,
+                    usesExpandedParams));
             }
         }
 
@@ -1840,6 +1842,12 @@ public sealed class Scope
                 }
             }
         }
+
+        best = best.Where(candidate => candidate.Function.GenericArity == 0
+            || !best.Any(other => other.Function.GenericArity == 0
+                && HaveEquivalentParameterShapes(other, candidate))).ToArray();
+        if (best.Length == 1)
+            return OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType, best[0].Arguments);
 
         var concreteNullableStringGroups = best
             .Where(item => item.UsesNullableStringCompatibility && item.Function.GenericArity == 0)
@@ -1913,13 +1921,39 @@ public sealed class Scope
         return OverloadResolutionResult.Ambiguous(bestFunctions);
     }
 
+    private sealed record ApplicableOverload(
+        FunctionSymbol Function,
+        string ReturnType,
+        int Score,
+        bool UsesNullableStringCompatibility,
+        IReadOnlyList<ResolvedArgumentMapping> Arguments,
+        IReadOnlyList<string> ParameterTypes,
+        bool UsesExpandedParams);
+
+    private static bool HaveEquivalentParameterShapes(
+        ApplicableOverload left,
+        ApplicableOverload right)
+    {
+        if (left.UsesExpandedParams != right.UsesExpandedParams
+            || !left.ParameterTypes.SequenceEqual(right.ParameterTypes, StringComparer.Ordinal))
+            return false;
+
+        const ParameterModifier byReference = ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In;
+        if (!left.Function.Parameters.Select(parameter => parameter.Modifier & byReference)
+            .SequenceEqual(right.Function.Parameters.Select(parameter => parameter.Modifier & byReference)))
+            return false;
+
+        return left.Arguments.Zip(right.Arguments).All(pair =>
+            pair.First.IsExpandedParams == pair.Second.IsExpandedParams
+            && string.Equals(
+                TypeIdentity.Canonicalize(pair.First.ParameterType),
+                TypeIdentity.Canonicalize(pair.Second.ParameterType),
+                StringComparison.Ordinal));
+    }
+
     private static bool IsBetterNullConversionCandidate(
-        (FunctionSymbol Function, string ReturnType, int Score,
-            bool UsesNullableStringCompatibility,
-            IReadOnlyList<ResolvedArgumentMapping> Arguments) candidate,
-        (FunctionSymbol Function, string ReturnType, int Score,
-            bool UsesNullableStringCompatibility,
-            IReadOnlyList<ResolvedArgumentMapping> Arguments) other,
+        ApplicableOverload candidate,
+        ApplicableOverload other,
         IReadOnlyList<string> argumentTypes,
         Func<string, string, bool> isBetterNullConversionTarget)
     {
@@ -2056,12 +2090,16 @@ public sealed class Scope
         out string resolvedReturnType,
         out int score,
         out bool usesNullableStringCompatibility,
-        out IReadOnlyList<ResolvedArgumentMapping> mappedArguments)
+        out IReadOnlyList<ResolvedArgumentMapping> mappedArguments,
+        out IReadOnlyList<string> substitutedParameterTypes,
+        out bool usesExpandedParams)
     {
         resolvedReturnType = function.ReturnType;
         score = int.MaxValue;
         usesNullableStringCompatibility = false;
         mappedArguments = Array.Empty<ResolvedArgumentMapping>();
+        substitutedParameterTypes = Array.Empty<string>();
+        usesExpandedParams = false;
 
         if (typeArguments != null && function.GenericArity != typeArguments.Count)
             return false;
@@ -2142,15 +2180,15 @@ public sealed class Scope
                 continue;
             }
 
-            var candidateScore =
-                (mapping.UsesParams ? mapping.UsesExpandedParams ? 200 : 100 : 0)
+            score =
+                (mapping.UsesExpandedParams ? 200 : 0)
                 + mapping.OmittedOptionalCount * 10
                 + conversionScore;
-            if (candidateScore >= score)
-                continue;
-
-            score = candidateScore;
             usesNullableStringCompatibility = mappingUsesNullableStringCompatibility;
+            usesExpandedParams = mapping.UsesExpandedParams;
+            substitutedParameterTypes = function.Parameters
+                .Select(parameter => TypeIdentity.Substitute(parameter.TypeName, substitutions))
+                .ToArray();
             resolvedReturnType = substitutions.Count == 0
                 ? function.ReturnType
                 : TypeIdentity.Substitute(function.ReturnType, substitutions);
@@ -2162,9 +2200,12 @@ public sealed class Scope
                         ? parameterTypes[argumentIndex]
                         : TypeIdentity.Substitute(parameterTypes[argumentIndex], substitutions),
                     mapping.ExpandedParams[argumentIndex])).ToArray();
+            // MapArguments yields normal form first; expansion is only applicable
+            // when the declaration cannot accept this call in normal form.
+            return true;
         }
 
-        return score != int.MaxValue;
+        return false;
     }
 
     internal static bool HasNullableStringAnnotationDifference(string parameterType, string argumentType)
@@ -2201,7 +2242,6 @@ public sealed class Scope
         int[] ParameterMap,
         bool[] ExpandedParams,
         int OmittedOptionalCount,
-        bool UsesParams,
         bool UsesExpandedParams);
 
     private static IEnumerable<ArgumentMapping> MapArguments(
@@ -2322,7 +2362,6 @@ public sealed class Scope
                 parameterMap,
                 expandedParams,
                 omittedOptionalCount,
-                UsesParams: false,
                 UsesExpandedParams: false);
             yield break;
         }
@@ -2335,7 +2374,6 @@ public sealed class Scope
                 (int[])parameterMap.Clone(),
                 normalExpanded,
                 omittedOptionalCount,
-                UsesParams: true,
                 UsesExpandedParams: false);
         }
 
@@ -2343,7 +2381,6 @@ public sealed class Scope
             parameterMap,
             expandedParams,
             omittedOptionalCount,
-            UsesParams: true,
             UsesExpandedParams: !namedParamsAssigned
                 && (positionalParamsArguments.Count != 1
                     || expandedParams.Any(value => value)));
@@ -2352,6 +2389,8 @@ public sealed class Scope
     private static string? GetParamsElementType(string typeName)
     {
         var type = typeName.Trim();
+        if (AttributeHelper.TryUnwrapNullableAnnotation(type, out var referent))
+            type = referent.Trim();
         if (type.StartsWith('[') && type.EndsWith(']') && type.Length > 2)
             return type[1..^1].Trim();
         if (type.EndsWith("[]", StringComparison.Ordinal) && type.Length > 2)

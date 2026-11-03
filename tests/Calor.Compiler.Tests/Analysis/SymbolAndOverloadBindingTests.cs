@@ -7,7 +7,11 @@ using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
+using Diagnostic = Calor.Compiler.Diagnostics.Diagnostic;
 
 namespace Calor.Compiler.Tests.Analysis;
 
@@ -606,6 +610,467 @@ public sealed class SymbolAndOverloadBindingTests
             diagnostic.Code == DiagnosticCode.BindReassignsImmutable);
         Assert.Contains(diagnostics, diagnostic =>
             diagnostic.Code == DiagnosticCode.BindRebindTypeMismatch);
+    }
+
+    [Fact]
+    public void NormalParamsArray_BeatsGenericScalar_ToExactSymbolAndArgumentMap()
+    {
+        var array = Function("array", "Pick", "i32",
+            [Parameter("values", "?[?object]", ParameterModifier.Params)], []);
+        var generic = Function("generic", "Pick", "i32",
+            [Parameter("value", "T")], [], ["T"]);
+        var use = Function("use", "Use", "i32", [Parameter("values", "?[?object]")],
+            [new ReturnStatementNode(Span, Call("Pick", [new ReferenceNode(Span, "values")]))]);
+
+        var bound = Bind(Module([array, generic, use]), out var diagnostics);
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound.Functions[^1])
+            .OfType<BoundCallExpression>());
+
+        Assert.DoesNotContain(diagnostics, IsOverloadDiagnostic);
+        Assert.Same(bound.Functions[0].Symbol, call.ResolvedSymbol);
+        Assert.Equal(bound.Functions[0].SymbolId, call.ResolvedSymbolId);
+        var mapping = Assert.Single(Assert.Single(call.SelectedOverloadMatches).Arguments);
+        Assert.Equal(0, mapping.ArgumentIndex);
+        Assert.Equal(0, mapping.ParameterIndex);
+        Assert.Equal(TypeIdentity.Canonicalize("?[?object]"), TypeIdentity.Canonicalize(mapping.ParameterType));
+        Assert.False(mapping.IsExpandedParams);
+    }
+
+    public static IEnumerable<object[]> NormalParamsCases()
+    {
+        foreach (var (native, csharp) in new[]
+        {
+            ("[object]", "object[]"),
+            ("[?object]", "object?[]"),
+            ("?[object]", "object[]?"),
+            ("?[?object]", "object?[]?"),
+        })
+        foreach (var reversed in new[] { false, true })
+        foreach (var named in new[] { false, true })
+        foreach (var statement in new[] { false, true })
+            yield return [native, csharp, reversed, named, statement];
+    }
+
+    [Theory]
+    [MemberData(nameof(NormalParamsCases))]
+    public void NormalParamsForwarding_MatchesRoslynSelectionMappingRuntimeAndEffects(
+        string nativeArray, string csharpArray, bool reversed, bool named, bool statement)
+    {
+        var array = $$"""
+              §F{Pick:pub} (?System.Exception:exception, str:message, {{nativeArray}}:values:params) -> i32
+                §E{}
+                §R 1
+            """;
+        const string generic = """
+              §F{Pick<T>:pub} (?System.Exception:exception, str:message, T:values) -> i32
+                §E{alloc}
+                §B{allocated:[i32]} §ARR{i32:1}
+                §R 2
+            """;
+        var nativeArguments = named
+            ? """§A[values] values §A[message] "x" §A[exception] (cast System.Exception? null)"""
+            : """§A (cast System.Exception? null) §A "x" §A values""";
+        var source = "§M{ParamsOracle}\n" + (reversed ? generic + "\n" + array : array + "\n" + generic)
+            + $$"""
+
+              §F{Use:pub} ({{nativeArray}}:values) -> i32
+                §E{}
+                {{(statement ? "" : "§R ")}}§C{Pick} {{nativeArguments}} §/C
+                {{(statement ? "§R 0" : "")}}
+            """;
+        var diagnostics = new DiagnosticBag();
+        var ast = Parse(source, diagnostics);
+        var bound = new Binder(diagnostics).Bind(ast);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
+        var call = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>().SingleOrDefault();
+        var callStatement = use.Body.OfType<BoundCallStatement>().SingleOrDefault();
+        var match = Assert.Single(call?.SelectedOverloadMatches ?? callStatement!.SelectedOverloadMatches);
+        var selected = bound.Functions.Single(function =>
+            function.Symbol.Name == "Pick" && function.Symbol.GenericArity == 0);
+        Assert.Same(selected.Symbol, match.Function);
+        Assert.Equal(selected.SymbolId, call?.ResolvedSymbolId ?? callStatement!.ResolvedSymbolId);
+        Assert.Equal(named ? new[] { 2, 1, 0 } : new[] { 0, 1, 2 },
+            match.Arguments.Select(argument => argument.ParameterIndex).ToArray());
+        Assert.Equal(new[] { 0, 1, 2 }, match.Arguments.Select(argument => argument.ArgumentIndex).ToArray());
+        Assert.All(match.Arguments, argument => Assert.False(argument.IsExpandedParams));
+        Assert.Equal(TypeIdentity.Canonicalize(nativeArray),
+            TypeIdentity.Canonicalize(match.Arguments[named ? 0 : 2].ParameterType));
+        var graph = CallGraphAnalysis.BuildResolved(bound);
+        Assert.True(CallGraphAnalysis.Build(ast).IsBoundResolutionComplete);
+        Assert.Equal(selected.SymbolId, Assert.Single(graph.ForwardGraph[use.SymbolId]).Callee);
+        var effects = new EffectEnforcementPass(diagnostics);
+        effects.Enforce(ast);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        Assert.Equal("[pure]", effects.DeclarationFacts.Values.Single(fact => fact.Name == "Use").InferredRow.ToDisplayString());
+        Assert.Equal("memory:allocation", effects.DeclarationFacts.Values.Single(fact => fact.Name == "Pick<T>")
+            .InferredRow.ToDisplayString());
+
+        var csharpArguments = named
+            ? """values: values, message: "x", exception: (System.Exception?)null"""
+            : """(System.Exception?)null, "x", values""";
+        var csharpArrayOverload = $"public static int Pick(System.Exception? exception, string message, params {csharpArray} values) => 1;";
+        const string csharpGenericOverload = "public static int Pick<T>(System.Exception? exception, string message, T values) { var allocated = new int[1]; return 2; }";
+        var oracle = $$"""
+            public static class ParamsOracle
+            {
+                {{(reversed ? csharpGenericOverload : csharpArrayOverload)}}
+                {{(reversed ? csharpArrayOverload : csharpGenericOverload)}}
+                public static int Use({{csharpArray}} values)
+                {
+                    {{(statement ? "" : "return ")}}Pick({{csharpArguments}});
+                    {{(statement ? "return 0;" : "")}}
+                }
+            }
+            """;
+        var oracleCompilation = CompileParamsCSharp(oracle);
+        Assert.Equal(0, SelectedParamsMethod(oracleCompilation).Arity);
+        var result = Calor.Compiler.Program.Compile(source);
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        var emittedCompilation = CompileParamsCSharp(GeneratedCSharpCompiler.GlobalUsingsPreamble + result.GeneratedCode);
+        Assert.Equal(0, SelectedParamsMethod(emittedCompilation).Arity);
+        var expected = statement ? 0 : 1;
+        Assert.Equal(expected, InvokeParamsUse(oracleCompilation, "ParamsOracle", new object?[] { "item" }));
+        Assert.Equal(expected, InvokeParamsUse(emittedCompilation, "ParamsOracle.ParamsOracleModule", new object?[] { "item" }));
+        if (nativeArray.StartsWith('?'))
+        {
+            Assert.Equal(expected, InvokeParamsUse(oracleCompilation, "ParamsOracle", null));
+            Assert.Equal(expected, InvokeParamsUse(emittedCompilation, "ParamsOracle.ParamsOracleModule", null));
+        }
+    }
+
+    private static CSharpCompilation CompileParamsCSharp(string source) =>
+        CSharpCompilation.Create("Params_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(source)],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
+
+    private static IMethodSymbol SelectedParamsMethod(CSharpCompilation compilation)
+    {
+        Assert.DoesNotContain(compilation.GetDiagnostics(), diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        var tree = compilation.SyntaxTrees.Single();
+        var invocation = Assert.Single(tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>());
+        return Assert.IsAssignableFrom<IMethodSymbol>(compilation.GetSemanticModel(tree).GetSymbolInfo(invocation).Symbol);
+    }
+
+    private static object? InvokeParamsUse(CSharpCompilation compilation, string typeName, object? values)
+    {
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        return System.Reflection.Assembly.Load(stream.ToArray()).GetType(typeName, throwOnError: true)!
+            .GetMethod("Use")!.Invoke(null, [values]);
+    }
+
+    [Theory]
+    [InlineData("expanded-scalar")]
+    [InlineData("expanded-many")]
+    [InlineData("expanded-empty")]
+    [InlineData("expanded-nullable-array")]
+    [InlineData("expanded-nullable-elements")]
+    [InlineData("generic-only")]
+    [InlineData("explicit-generic")]
+    [InlineData("named-scalar")]
+    [InlineData("unknown-name")]
+    [InlineData("duplicate-name")]
+    [InlineData("ref")]
+    [InlineData("out")]
+    [InlineData("in")]
+    [InlineData("wrong-modifier")]
+    [InlineData("optional-equivalent")]
+    [InlineData("optional-params-omitted")]
+    [InlineData("better-generic-conversion")]
+    [InlineData("ambiguous-shapes")]
+    [InlineData("ambiguous-generics")]
+    [InlineData("ambiguous-optionals")]
+    public void ParamsBoundaries_MatchRoslynWithoutBlanketNonGenericPreference(string scenario)
+    {
+        var array = Function("array", "Pick", "i32",
+            [Parameter("values", "[i32]", ParameterModifier.Params)], []);
+        var generic = Function("generic", "Pick", "i32",
+            [Parameter("values", "T")], [], ["T"]);
+        FunctionNode[] functions = [array, generic];
+        var declarations = "public static int Pick(params int[] values) => 1; public static int Pick<T>(T values) => 2;";
+        string[] types = ["i32"];
+        string?[]? names = null;
+        string?[]? modifiers = null;
+        string[]? typeArguments = null;
+        var invocation = "Pick(value)";
+        var expectedIndex = 1;
+        var expectedKind = OverloadResolutionKind.Resolved;
+        var expanded = false;
+        switch (scenario)
+        {
+            case "expanded-scalar":
+                functions[0] = Function("array", "Pick", "i32",
+                    [Parameter("values", "[object]", ParameterModifier.Params)], []);
+                declarations = "public static int Pick(params object[] values) => 1; public static int Pick<T>(T values) => 2;";
+                break;
+            case "expanded-many":
+            case "expanded-nullable-array":
+            case "expanded-nullable-elements":
+                types = ["i32", "i32"];
+                invocation = "Pick(value, value)";
+                expectedIndex = 0;
+                expanded = true;
+                if (scenario == "expanded-nullable-array")
+                {
+                    functions[0] = Function("array", "Pick", "i32",
+                        [Parameter("values", "?[i32]", ParameterModifier.Params)], []);
+                    declarations = "public static int Pick(params int[]? values) => 1; public static int Pick<T>(T values) => 2;";
+                }
+                else if (scenario == "expanded-nullable-elements")
+                {
+                    functions[0] = Function("array", "Pick", "i32",
+                        [Parameter("values", "?[?i32]", ParameterModifier.Params)], []);
+                    declarations = "public static int Pick(params int?[]? values) => 1; public static int Pick<T>(T values) => 2;";
+                    types = ["?i32", "?i32"];
+                    invocation = "Pick((int?)value, (int?)value)";
+                }
+                break;
+            case "expanded-empty":
+                types = [];
+                invocation = "Pick()";
+                expectedIndex = 0;
+                expanded = true;
+                break;
+            case "generic-only":
+                functions = [generic];
+                declarations = "public static int Pick<T>(T values) => 2;";
+                types = ["[i32]"];
+                invocation = "Pick(values)";
+                expectedIndex = 0;
+                break;
+            case "explicit-generic":
+                types = ["[i32]"];
+                typeArguments = ["[i32]"];
+                invocation = "Pick<int[]>(values)";
+                break;
+            case "named-scalar":
+                functions[0] = Function("array", "Pick", "i32",
+                    [Parameter("values", "[object]", ParameterModifier.Params)], []);
+                declarations = "public static int Pick(params object[] values) => 1; public static int Pick<T>(T values) => 2;";
+                names = ["values"];
+                invocation = "Pick(values: value)";
+                break;
+            case "unknown-name":
+                names = ["missing"];
+                invocation = "Pick(missing: value)";
+                expectedKind = OverloadResolutionKind.NoMatch;
+                break;
+            case "duplicate-name":
+                types = ["i32", "i32"];
+                names = ["values", "values"];
+                invocation = "Pick(values: value, values: value)";
+                expectedKind = OverloadResolutionKind.NoMatch;
+                break;
+            case "ref":
+            case "out":
+            case "in":
+                var modifier = scenario switch
+                {
+                    "ref" => ParameterModifier.Ref,
+                    "out" => ParameterModifier.Out,
+                    _ => ParameterModifier.In,
+                };
+                functions =
+                [
+                    Function("array", "Pick", "i32", [Parameter("values", "[i32]", modifier)], []),
+                    Function("generic", "Pick", "i32", [Parameter("values", "T", modifier)], [], ["T"]),
+                ];
+                var assignment = scenario == "out" ? "values = default!;" : "";
+                declarations = $"public static int Pick({scenario} int[] values) {{ {assignment} return 1; }} "
+                    + $"public static int Pick<T>({scenario} T values) {{ {assignment} return 2; }}";
+                types = ["[i32]"];
+                modifiers = [scenario];
+                invocation = $"Pick({scenario} values)";
+                expectedIndex = 0;
+                break;
+            case "wrong-modifier":
+                types = ["[i32]"];
+                modifiers = ["ref"];
+                invocation = "Pick(ref values)";
+                expectedKind = OverloadResolutionKind.NoMatch;
+                break;
+            case "optional-equivalent":
+                functions =
+                [
+                    Function("array", "Pick", "i32",
+                        [Parameter("values", "[i32]"), Parameter("count", "i32", defaultValue: new IntLiteralNode(Span, 0))], []),
+                    Function("generic", "Pick", "i32",
+                        [Parameter("values", "T"), Parameter("count", "i32", defaultValue: new IntLiteralNode(Span, 0))], [], ["T"]),
+                ];
+                declarations = "public static int Pick(int[] values, int count = 0) => 1; public static int Pick<T>(T values, int count = 0) => 2;";
+                types = ["[i32]"];
+                invocation = "Pick(values)";
+                expectedIndex = 0;
+                break;
+            case "optional-params-omitted":
+                functions =
+                [
+                    Function("array", "Pick", "i32",
+                        [Parameter("count", "i32", defaultValue: new IntLiteralNode(Span, 0)),
+                            Parameter("values", "[i32]", ParameterModifier.Params)], []),
+                    Function("generic", "Pick", "i32",
+                        [Parameter("count", "i32"), Parameter("values", "T")], [], ["T"]),
+                ];
+                declarations = "public static int Pick(int count = 0, params int[] values) => 1; public static int Pick<T>(int count, T values) => 2;";
+                types = ["[i32]"];
+                names = ["values"];
+                invocation = "Pick(values: values)";
+                expectedIndex = 0;
+                break;
+            case "better-generic-conversion":
+                functions[0] = Function("object", "Pick", "i32", [Parameter("values", "object")], []);
+                declarations = "public static int Pick(object values) => 1; public static int Pick<T>(T values) => 2;";
+                types = ["[i32]"];
+                invocation = "Pick(values)";
+                break;
+            case "ambiguous-shapes":
+                functions =
+                [
+                    Function("concrete", "Pick", "i32", [Parameter("left", "i32"), Parameter("right", "object")], []),
+                    Function("generic", "Pick", "i32", [Parameter("left", "object"), Parameter("right", "T")], [], ["T"]),
+                ];
+                declarations = "public static int Pick(int left, object right) => 1; public static int Pick<T>(object left, T right) => 2;";
+                types = ["i32", "i32"];
+                invocation = "Pick(value, value)";
+                expectedKind = OverloadResolutionKind.Ambiguous;
+                break;
+            case "ambiguous-generics":
+                functions =
+                [
+                    Function("left", "Pick", "i32", [Parameter("left", "T"), Parameter("right", "i32")], [], ["T"]),
+                    Function("right", "Pick", "i32", [Parameter("left", "i32"), Parameter("right", "T")], [], ["T"]),
+                ];
+                declarations = "public static int Pick<T>(T left, int right) => 1; public static int Pick<T>(int left, T right) => 2;";
+                types = ["i32", "i32"];
+                invocation = "Pick(value, value)";
+                expectedKind = OverloadResolutionKind.Ambiguous;
+                break;
+            case "ambiguous-optionals":
+                functions =
+                [
+                    Function("number", "Pick", "i32", [Parameter("values", "[i32]"),
+                        Parameter("other", "i32", defaultValue: new IntLiteralNode(Span, 0))], []),
+                    Function("text", "Pick", "i32", [Parameter("values", "[i32]"),
+                        Parameter("other", "str", defaultValue: new StringLiteralNode(Span, ""))], []),
+                ];
+                declarations = "public static int Pick(int[] values, int other = 0) => 1; public static int Pick(int[] values, string other = \"\") => 2;";
+                types = ["[i32]"];
+                invocation = "Pick(values)";
+                expectedKind = OverloadResolutionKind.Ambiguous;
+                break;
+        }
+
+        var bound = Bind(Module(functions), out var diagnostics);
+        Assert.DoesNotContain(diagnostics, IsOverloadDiagnostic);
+        var scope = new Scope();
+        foreach (var function in bound.Functions)
+            Assert.True(scope.DeclareOverload(function.Symbol));
+        var result = scope.ResolveOverload("Pick", types, names, modifiers, typeArguments,
+            (parameter, _) => TypeIdentity.Canonicalize(parameter) == "OBJECT" ? 1 : null);
+        Assert.Equal(expectedKind, result.Kind);
+        var oracle = CompileParamsCSharp($$"""
+            public static class BoundaryOracle
+            {
+                {{declarations}}
+                public static int Use(int[] values, int value) => {{invocation}};
+            }
+            """);
+        var tree = oracle.SyntaxTrees.Single();
+        var call = Assert.Single(tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>());
+        var symbol = oracle.GetSemanticModel(tree).GetSymbolInfo(call);
+        if (expectedKind != OverloadResolutionKind.Resolved)
+        {
+            Assert.Null(result.Function);
+            Assert.Empty(result.Matches);
+            Assert.Null(symbol.Symbol);
+            Assert.Contains(oracle.GetDiagnostics(), diagnostic =>
+                diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+            if (expectedKind == OverloadResolutionKind.Ambiguous)
+            {
+                Assert.Equal(2, result.Candidates.Count);
+                Assert.Contains(oracle.GetDiagnostics(), diagnostic => diagnostic.Id == "CS0121");
+            }
+            return;
+        }
+
+        Assert.Same(bound.Functions[expectedIndex].Symbol, result.Function);
+        var match = Assert.Single(result.Matches);
+        Assert.Equal(types.Length, match.Arguments.Count);
+        Assert.All(match.Arguments, argument => Assert.Equal(expanded, argument.IsExpandedParams));
+        Assert.NotNull(result.Function);
+        Assert.Equal(result.Function.GenericArity, SelectedParamsMethod(oracle).Arity);
+        var expectedMarker = scenario == "generic-only" ? 2 : expectedIndex + 1;
+        using var stream = new MemoryStream();
+        var emission = oracle.Emit(stream);
+        Assert.True(emission.Success, string.Join("\n", emission.Diagnostics));
+        Assert.Equal(expectedMarker, System.Reflection.Assembly.Load(stream.ToArray())
+            .GetType("BoundaryOracle", throwOnError: true)!.GetMethod("Use")!.Invoke(null, [new[] { 4 }, 3]));
+    }
+
+    [Fact]
+    public void ApplicableNormalParamsForm_IsNotReplacedByCheaperExpandedMapping()
+    {
+        var scope = new Scope();
+        var function = new FunctionSymbol("Pick", "i32",
+            [new VariableSymbol("values", "object[]", false, modifier: ParameterModifier.Params)]);
+        Assert.True(scope.DeclareOverload(function));
+        var result = scope.ResolveOverload("Pick", ["str[]"], implicitConversionCost: (parameter, _) =>
+            TypeIdentity.Canonicalize(parameter) switch
+            {
+                "OBJECT[]" => 300,
+                "OBJECT" => 0,
+                _ => null,
+            });
+
+        Assert.Same(function, result.Function);
+        Assert.False(Assert.Single(Assert.Single(result.Matches).Arguments).IsExpandedParams);
+        var oracle = CompileParamsCSharp("""
+            public static class NormalOracle
+            {
+                public static int Pick(params object[] values) => values.Length;
+                public static int Use(string[] values) => Pick(values);
+            }
+            """);
+        var tree = oracle.SyntaxTrees.Single();
+        var call = Assert.Single(tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>());
+        var operation = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.Operations.IInvocationOperation>(
+            oracle.GetSemanticModel(tree).GetOperation(call));
+        Assert.Equal(Microsoft.CodeAnalysis.Operations.ArgumentKind.Explicit,
+            Assert.Single(operation.Arguments).ArgumentKind);
+        Assert.Equal(2, InvokeParamsUse(oracle, "NormalOracle", new[] { "first", "second" }));
+    }
+
+    [Fact]
+    public void NormalParamsTie_PreservesConditionalAlternativesAndTheirMappings()
+    {
+        var scope = new Scope();
+        var first = new FunctionSymbol(SymbolId.Create("first"), "Pick", "i32",
+            [new VariableSymbol("values", "[i32]", false, modifier: ParameterModifier.Params)],
+            conditionalAlternative: new ConditionalAlternative("feature", 0));
+        var second = new FunctionSymbol(SymbolId.Create("second"), "Pick", "i32",
+            [new VariableSymbol("values", "[i32]", false, modifier: ParameterModifier.Params)],
+            conditionalAlternative: new ConditionalAlternative("feature", 1));
+        var generic = new FunctionSymbol("Pick", "i32", [new VariableSymbol("values", "T", false)], ["T"]);
+        Assert.True(scope.DeclareOverload(generic));
+        Assert.True(scope.DeclareOverload(first));
+        Assert.True(scope.DeclareOverload(second));
+
+        var result = scope.ResolveOverload("Pick", ["[i32]"]);
+
+        Assert.Equal(OverloadResolutionKind.Resolved, result.Kind);
+        Assert.Equal(new[] { first, second }, result.Functions);
+        Assert.Equal(2, result.Matches.Count);
+        Assert.All(result.Matches, match =>
+        {
+            var mapping = Assert.Single(match.Arguments);
+            Assert.Equal(0, mapping.ParameterIndex);
+            Assert.False(mapping.IsExpandedParams);
+            Assert.Equal(TypeIdentity.Canonicalize("[i32]"), TypeIdentity.Canonicalize(mapping.ParameterType));
+        });
     }
 
     [Fact]

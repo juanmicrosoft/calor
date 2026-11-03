@@ -1,5 +1,28 @@
 # Selected method-argument mapping (#1382)
 
+## Normal-form params overload selection
+
+A `params` declaration accepting an array in normal form has no params penalty.
+The resolver tries normal form first and only considers expansion if that form
+is inapplicable. Nullable array containers retain their normal array target;
+expansion removes only the container annotation when finding the element type.
+The existing expanded-form and omitted-optional scoring remains unchanged.
+
+Among equally scored candidates, a non-generic declaration wins over a generic
+declaration only when their fully substituted parameter types, by-reference
+modifiers, expansion forms and source-ordered effective argument targets agree.
+This handles array forwarding to `params object?[]?` versus a scalar `T` without
+preferring non-generic declarations with different conversions or parameter
+shapes. Conditional declaration alternatives retain all winning symbols and
+their individual argument maps.
+
+This is not a complete implementation of C# better-member ordering. In
+particular, the retained expanded-form penalty can still prefer `Pick<T>(T)` to
+`Pick(params int[])` for one `int`, whereas C# prefers the non-generic expanded
+overload. That broader scoring limitation is separate from normal-array
+forwarding; selected-symbol and effect attribution must not be inferred from
+successful C# emission alone.
+
 This is a bounded N3 implementation under #1082, not Stage A/B activation.
 Copilot/GPT-6 Astra context `e9c6935e-da28-4a3b-94d4-0a5bbb596332` accepted the
 slot after E1 adjudication, from `be488238d3aac374995174aa47526c7f3d09fd51`.
