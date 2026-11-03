@@ -84,7 +84,7 @@ public sealed class EffectRowExperimentHarnessTests
     }
 
     [Fact]
-    public void ActiveTranscripts_ChangeOnlyRetiredProbesSourceIdentityAndPrefixBangSpelling()
+    public void ActiveTranscripts_RetainHistoricalCasesAndRegisteredCurrentDifferences()
     {
         var replacements = new Dictionary<string, string[]>
         {
@@ -114,6 +114,22 @@ public sealed class EffectRowExperimentHarnessTests
                     Assert.Contains(historicalMessage, expected);
                     Assert.Equal(ProjectSourceIdentity(
                         expected.Replace(historicalMessage, currentMessage, StringComparison.Ordinal)), active[name]);
+                }
+                else if (script == "run3.py" && name is "Z8b-LAM-typeparam-list" or "Z10-E-inside-call-arguments")
+                {
+                    var projected = ProjectSourceIdentity(expected);
+                    var (before, after) = name == "Z8b-LAM-typeparam-list"
+                        ? (
+                            "Z8b-LAM-typeparam-list.calr(4,18): error Calor0100: Expected statement but found Identifier\n"
+                                + "Z8b-LAM-typeparam-list.calr(4,19): error Calor0100: Expected statement but found Greater",
+                            "Z8b-LAM-typeparam-list.calr(4,21): error Calor0100: Expected operand after '>' but found Return\n"
+                                + "Z8b-LAM-typeparam-list.calr(4,18): error Calor0100: A native expression statement must be an invocation.")
+                        : (
+                            "Z10-E-inside-call-arguments.calr(7,31): error Calor0100: Expected statement but found Identifier",
+                            "Z10-E-inside-call-arguments.calr(7,31): error Calor0100: A native expression statement must be an invocation.");
+                    Assert.Contains("exit: 1", projected, StringComparison.Ordinal);
+                    Assert.Contains(before, projected, StringComparison.Ordinal);
+                    Assert.Equal(projected.Replace(before, after, StringComparison.Ordinal), active[name]);
                 }
                 else
                     Assert.Equal(ProjectSourceIdentity(expected), active[name]);

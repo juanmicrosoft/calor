@@ -110,8 +110,8 @@ CASE Z8b-LAM-typeparam-list  args: (none)  exit: 1
     §B{f} §LAM{}<T> §R INT:1 §/LAM
 ------------------------------------------------------------------------------
 Z8b-LAM-typeparam-list.calr(4,17): error Calor0100: Expected statement but found Less
-Z8b-LAM-typeparam-list.calr(4,18): error Calor0100: Expected statement but found Identifier
-Z8b-LAM-typeparam-list.calr(4,19): error Calor0100: Expected statement but found Greater
+Z8b-LAM-typeparam-list.calr(4,21): error Calor0100: Expected operand after '>' but found Return
+Z8b-LAM-typeparam-list.calr(4,18): error Calor0100: A native expression statement must be an invocation.
 
 ==============================================================================
 CASE Z7b-IFACE-typeparam-reaches-member  args: (none)  exit: 0
@@ -167,7 +167,7 @@ CASE Z10-E-inside-call-arguments  args: (none)  exit: 1
 Z10-E-inside-call-arguments.calr(7,28): error Calor0100: Expected EndCall but found Effects
 Z10-E-inside-call-arguments.calr(7,28): error Calor0100: Expected statement but found Effects
 Z10-E-inside-call-arguments.calr(7,30): error Calor0100: Expected statement but found OpenBrace
-Z10-E-inside-call-arguments.calr(7,31): error Calor0100: Expected statement but found Identifier
+Z10-E-inside-call-arguments.calr(7,31): error Calor0100: A native expression statement must be an invocation.
 Z10-E-inside-call-arguments.calr(7,33): error Calor0100: Expected statement but found CloseBrace
 Z10-E-inside-call-arguments.calr(7,35): error Calor0100: Expected statement but found EndCall
 
