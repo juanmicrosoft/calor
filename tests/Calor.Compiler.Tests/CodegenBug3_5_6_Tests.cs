@@ -470,18 +470,24 @@ public class CodegenBug3_5_6_Tests
         Assert.Contains("$\"{obj.GetValue(x)}\"", result);
     }
 
-    [Fact]
-    public void Bug5_ArithmeticExpression()
+    [Theory]
+    [InlineData(19, 23, "42")]
+    [InlineData(int.MaxValue, 1, "overflow")]
+    public void Bug5_ArithmeticExpression(int left, int right, string expected)
     {
-        var source = """
+        var source = $$"""
             §M{Test}
-              §F{Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${a + b}"
+              §F{Get:pub} () -> string
+                §E{}
+                §B{a} {{left}}
+                §B{b} {{right}}
+                §R "${a + b}"
             """;
 
         var result = ParseAndEmit(source);
-        Assert.Contains("$\"{a + b}\"", result);
+        Assert.Contains("$\"{checked(a + b)}\"", result);
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(result
+            + "\npublic static class Probe { public static string Run() { try { return Test.TestModule.Get(); } catch (OverflowException) { return \"overflow\"; } } }"));
     }
 
     [Fact]

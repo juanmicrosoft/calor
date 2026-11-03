@@ -590,13 +590,19 @@ public class SyntaxTests
     }
 
     [Fact]
-    public void Lexer_RecognizesBareNegativeInteger()
+    public void Lexer_SeparatesBareNegativeIntegerSign()
     {
         var tokens = Tokenize("-42");
 
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.IntLiteral, tokens[0].Kind);
-        Assert.Equal(-42, Assert.IsType<IntLiteralInfo>(tokens[0].Value).SignedValue);
+        Assert.Equal(3, tokens.Count);
+        Assert.Equal(TokenKind.Minus, tokens[0].Kind);
+        Assert.Equal(0, tokens[0].Span.Start);
+        Assert.Equal(1, tokens[0].Span.End);
+        Assert.Equal(TokenKind.IntLiteral, tokens[1].Kind);
+        Assert.Equal(42, Assert.IsType<IntLiteralInfo>(tokens[1].Value).SignedValue);
+        Assert.Equal(1, tokens[1].Span.Start);
+        Assert.Equal(3, tokens[1].Span.End);
+        Assert.Equal(TokenKind.Eof, tokens[2].Kind);
     }
 
     [Fact]

@@ -155,13 +155,14 @@ public class TypeOperationTests
     #region Error Tests
 
     [Fact]
-    public void Parse_Cast_NoArgs_ReportsError()
+    public void Parse_GroupedCastName_ReturnsReference()
     {
         var source = WrapInFunction("§R (cast)");
-        Parse(source, out var diagnostics);
+        var module = Parse(source, out var diagnostics);
 
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("Expected type name"));
+        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
+        var statement = Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions).Body[0]);
+        Assert.Equal("cast", Assert.IsType<ReferenceNode>(statement.Expression).Name);
     }
 
     [Fact]
@@ -186,12 +187,14 @@ public class TypeOperationTests
     }
 
     [Fact]
-    public void Parse_Is_NoArgs_ReportsError()
+    public void Parse_GroupedIsName_ReturnsReference()
     {
         var source = WrapInFunction("§R (is)");
-        Parse(source, out var diagnostics);
+        var module = Parse(source, out var diagnostics);
 
-        Assert.True(diagnostics.HasErrors);
+        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
+        var statement = Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions).Body[0]);
+        Assert.Equal("is", Assert.IsType<ReferenceNode>(statement.Expression).Name);
     }
 
     [Fact]
