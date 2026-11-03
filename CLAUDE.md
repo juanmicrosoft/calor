@@ -28,10 +28,10 @@ Any build that touches the compiler project hard-errors with
 src/Calor.Compiler/scripts/download-z3.sh    # or .ps1 on Windows
 ```
 
-**Fast unit-test lane** (seconds; no submodules required):
+**Corpus-independent lane** (no submodules required):
 
 ```bash
-dotnet test tests/Calor.Compiler.Tests/ --filter "Category!=HistoricalReplay"
+dotnet test tests/Calor.Compiler.Tests/ --filter "Category!=HistoricalReplay&Category!=CorpusRequired"
 dotnet test tests/Calor.Conversion.Tests/   # C# → Calor snapshots
 dotnet test tests/Calor.Semantics.Tests/    # binding/semantic analysis
 dotnet test tests/Calor.Verification.Tests/ # Z3 contract verification
@@ -43,10 +43,12 @@ Other corpus-independent projects are also fast-lane candidates —
 `Calor.ILAnalysis.Tests`, `Calor.Experimental.Tests`, `Calor.Performance.Tests`
 — the five above are the routinely-touched core.
 
-`tests/Calor.Compiler.Tests/Binding/BinderIncompleteRatchetTests.cs` will
-silently skip on a bare clone (it uses `Skip.IfNot` when `bench/corpus/`
-is empty); everything else runs green without submodules. To iterate on a
-single class, use the CLAUDE-standard filter:
+Corpus-dependent ratchet cases in `BinderIncompleteRatchetTests` and
+`Calor0425CorpusLedgerTests` report skips on a bare clone.
+`Calor0270CorpusVolumeTests` marks actual-source acceptance with
+`Category=CorpusRequired` and fails explicitly when its inputs are missing.
+The command above excludes that category and historical replay; it is not a
+full compiler-suite result. To iterate on a single class, use:
 `dotnet test --filter "FullyQualifiedName~ClassName"`.
 
 **Historical PP-E1 exact replay** (separate from current-compiler semantics):
@@ -185,14 +187,15 @@ so `--recursive` is unnecessary here. CI passes it as a safe default.
 The three corpora add ~500 MB to a fresh clone; skip them if you are only
 running the unit-test lane.
 
-**Which tests need submodules?** Only the round-trip harness and
-`BinderIncompleteRatchetTests`
-(`tests/Calor.Compiler.Tests/Binding/BinderIncompleteRatchetTests.cs`) read
+**Which tests need submodules?** The round-trip harness, current source
+acceptance in `Calor0270CorpusVolumeTests`, and corpus cases in
+`Calor0425CorpusLedgerTests` and `BinderIncompleteRatchetTests` read
 from `bench/corpus/`. `BinderIncompleteRatchetTests` uses
 `Skip.IfNot(subjects.All(Directory.Exists), "corpus submodules not
-initialized")` to skip cleanly on a bare clone, so running
-`dotnet test tests/Calor.Compiler.Tests/` is safe without submodules —
-you will silently skip that one class. `Calor.Conversion.Tests`,
+initialized")` to skip cleanly on a bare clone.
+The corpus-independent command above excludes required source acceptance.
+The unfiltered compiler suite requires initialized submodules.
+`Calor.Conversion.Tests`,
 `Calor.Semantics.Tests`, `Calor.Verification.Tests`,
 `Calor.Enforcement.Tests`, and `Calor.Evaluation` do not touch
 `bench/corpus/` at all.

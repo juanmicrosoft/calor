@@ -132,6 +132,7 @@ public class Calor0270CorpusVolumeTests
     }
 
     [Fact]
+    [Trait("Category", "CorpusRequired")]
     public void Calor0270Volume_OverConvertedCorpus_MatchesLedger()
     {
         AssertRegenerationForbidden(Environment.GetEnvironmentVariable("CALOR_REGENERATE_CALOR0270_LEDGER"));
@@ -353,6 +354,7 @@ public class Calor0270CorpusVolumeTests
     }
 
     [Fact]
+    [Trait("Category", "CorpusRequired")]
     public void CurrentSource_ChangedInputWithIdenticalSitesStillFails()
     {
         const string file = "FluentValidation/src/CommonAssemblyInfo.cs";
@@ -371,6 +373,7 @@ public class Calor0270CorpusVolumeTests
     }
 
     [Theory]
+    [Trait("Category", "CorpusRequired")]
     [InlineData("FluentValidation/src/FluentValidation.Tests/DependencyInjectionExtensions/ServiceCollectionExtensionsTests.cs",
         "services", 2)]
     [InlineData("FluentValidation/src/FluentValidation/Internal/CollectionPropertyRule.cs", "validators", 2)]
@@ -411,6 +414,7 @@ public class Calor0270CorpusVolumeTests
     }
 
     [Theory]
+    [Trait("Category", "CorpusRequired")]
     [InlineData("FluentValidation/src/FluentValidation.Tests/AccessorCacheTests.cs", "s", "Elapsed", 1)]
     [InlineData("MediatR/src/MediatR/Mediator.cs", "i", "IsGenericType", 2)]
     public void CurrentSource_UnsupportedMetadataReadsRetainActualReceiverAndMember(
