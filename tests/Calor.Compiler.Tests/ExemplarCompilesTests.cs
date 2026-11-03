@@ -2,6 +2,8 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using Calor.Compiler.Analysis.Dataflow;
+using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.SelfCheck;
 using Xunit;
@@ -118,6 +120,15 @@ public class ExemplarCompilesTests
                 var result = Program.Compile(text);
                 Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
                 Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code is "Calor0410" or "Calor0411");
+                var diagnostics = new DiagnosticBag();
+                var bound = new Binding.Binder(diagnostics).Bind(Assert.IsType<Ast.ModuleNode>(result.Ast));
+                Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+                var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound)
+                    .OfType<BoundCallExpression>(), call => call.ResolvedMethodName == "ToArray");
+                var method = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.IMethodSymbol>(call.ResolvedMetadataMethod);
+                Assert.Equal("System.Linq.Enumerable", method.ContainingType.ToDisplayString());
+                Assert.Equal(Microsoft.CodeAnalysis.SpecialType.System_Int32, Assert.Single(method.TypeArguments).SpecialType);
+                Assert.False(call.HasUnknownInferredType);
             }
         }
     }
