@@ -999,7 +999,7 @@ public class ConverterQualityTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.DoesNotContain("§NEW{object}", result.CalorSource);
-        Assert.Contains("§NEW{KeyValuePair<str, i32>}", result.CalorSource);
+        Assert.Contains("§NEW{KeyValuePair<string, int>}", result.CalorSource);
     }
 
     [Fact]
@@ -1134,8 +1134,8 @@ public class Foo
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         // Should contain cast without ? annotation
-        Assert.Contains("cast u8[]", result.CalorSource);
-        Assert.DoesNotContain("cast u8[]?", result.CalorSource);
+        Assert.Contains("cast byte[]", result.CalorSource);
+        Assert.DoesNotContain("cast byte[]?", result.CalorSource);
     }
 
     [Fact]
@@ -1154,8 +1154,8 @@ public class Foo
         var result = converter.Convert(csharp, "Test.cs");
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("cast str[][]", result.CalorSource);
-        Assert.DoesNotContain("cast str[]?[]", result.CalorSource);
+        Assert.Contains("cast string[][]", result.CalorSource);
+        Assert.DoesNotContain("cast string[]?[]", result.CalorSource);
     }
 
     #endregion

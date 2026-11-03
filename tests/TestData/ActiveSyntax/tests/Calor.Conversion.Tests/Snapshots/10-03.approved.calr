@@ -1,0 +1,6 @@
+§M{Test_10_03:overflow=unchecked}
+  §CL{TupleMapper:pub}
+    §MT{GetTriple:pub} () -> (int, string, bool)
+      §R (1, "hello", true)
+
+

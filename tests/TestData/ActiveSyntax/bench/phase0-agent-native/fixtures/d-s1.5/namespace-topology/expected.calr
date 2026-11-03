@@ -5,5 +5,5 @@
 
   §NS{Beta}
     §M{Value:pub}
-      §F{Get:pub} () -> i32
+      §F{Get:pub} () -> int
         §R 42

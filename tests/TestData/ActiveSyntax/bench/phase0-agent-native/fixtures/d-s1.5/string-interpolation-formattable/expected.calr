@@ -2,13 +2,13 @@
   §U{System}
 
   §M{InterpolationFormattable:pub}
-    §F{Kind:pub} (FormattableString:f) -> i32
+    §F{Kind:pub} (FormattableString:f) -> int
       §R 1
 
-    §F{Kind:pub} (any:o) -> i32
+    §F{Kind:pub} (object:o) -> int
       §R (- 1)
 
-    §F{Verify:pub} () -> i32
-      §B{i32:x} 42
-      §B{str:s} "k=${x},${(+ x 1)}"
+    §F{Verify:pub} () -> int
+      §B{int:x} 42
+      §B{string:s} "k=${x},${(+ x 1)}"
       §R (+ (* §C{Kind} §A (cast global::System.FormattableString "k=${x},${(+ x 1)}") §/C 100) (len s))

@@ -1,0 +1,9 @@
+§M{Test_12_01:overflow=unchecked}
+  §CL{Formatter:pub}
+    §MT{Format:priv} (int:value) -> string
+      §R (str value)
+
+    §MT{Describe:pub} (int:x, string[]:labels) -> string
+      §R "The value is ${Format(x)} with label ${§CS{labels[0]}}"
+
+

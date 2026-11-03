@@ -633,7 +633,8 @@ public class RegistryConformanceTests
         _output.WriteLine(result.CalorSource!);
         _output.WriteLine(result.EmittedCSharp!);
 
-        Assert.Contains("SINGLE:3.14", result.CalorSource);
+        Assert.Contains("3.14f", result.CalorSource);
+        Assert.DoesNotContain("SINGLE:", result.CalorSource);
         Assert.Contains("3.14f", result.EmittedCSharp);
         Assert.DoesNotContain("3.140000", result.EmittedCSharp);  // no widened double expansion
         Assert.True(result.RoslynSuccess,
@@ -666,7 +667,7 @@ public class RegistryConformanceTests
     {
         // 4000000000u fits in a long, so the old bare-digit Calor emission
         // re-parsed it as `4000000000L` (long) — a silent signedness+width
-        // change. The UINT: typed literal keeps it uint.
+        // change. The explicit U suffix keeps it uint.
         var result = RoundTrip("""
             public class U
             {
@@ -676,7 +677,8 @@ public class RegistryConformanceTests
 
         _output.WriteLine(result.CalorSource!);
         _output.WriteLine(result.EmittedCSharp!);
-        Assert.Contains("UINT:4000000000", result.CalorSource);
+        Assert.Contains("4000000000U", result.CalorSource);
+        Assert.DoesNotContain("UINT:", result.CalorSource);
         Assert.Contains("4000000000U", result.EmittedCSharp);
         Assert.DoesNotContain("4000000000L", result.EmittedCSharp);
         Assert.True(result.RoslynSuccess,

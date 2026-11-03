@@ -1,0 +1,23 @@
+§M{Test_13_08:overflow=unchecked}
+  §U{System.Collections.Generic}
+
+  §CL{CollectionHoistDemo:pub}
+    §MT{GetValues:pub} () -> Dict<string, int>
+      §R §CS{new Dictionary<string, int>
+        {
+            { "a", Compute(1) },
+            { "b", Compute(2) }
+        }}
+
+    §MT{GetNames:pub} () -> Set<string>
+      §E{alloc}
+      §HSET{set004:string}
+        §C{Format} §A "x" §/C
+        §C{Format} §A "y" §/C
+      §R set004
+
+    §MT{Compute:priv} (int:x) -> int
+      §R (* x 2)
+
+    §MT{Format:priv} (string:s) -> string
+      §R (upper s)

@@ -9,21 +9,30 @@ nav_order: 2
 
 Calor has primitives, .NET nullable types, ordinary generics, and arrays.
 
+Canonical output uses C# primitive names, suffix arrays (`T[]`, `T[,]`,
+`T[][]`), and suffix nullability (`T?`). User-defined names retain their case.
+This is a staged printing and parsing update: compact names such as `i32`,
+prefix arrays and nullable types, and typed literal prefixes remain accepted
+until the coordinated source-grammar cutover. Their continued acceptance is
+not the final retirement of the old syntax.
+
 ---
 
 ## Primitive Types
 
 | Calor | Description | C# | Range |
 |:-----|:------------|:---|:------|
-| `i32` | 32-bit signed integer | `int` | -2³¹ to 2³¹-1 |
-| `i64` | 64-bit signed integer | `long` | -2⁶³ to 2⁶³-1 |
-| `u8` | 8-bit unsigned integer | `byte` | 0 to 255 |
-| `u16` | 16-bit unsigned integer | `ushort` | 0 to 65535 |
-| `u32` | 32-bit unsigned integer | `uint` | 0 to 2³²-1 |
-| `u64` | 64-bit unsigned integer | `ulong` | 0 to 2⁶⁴-1 |
-| `f32` | 32-bit floating point | `float` | ±3.4 × 10³⁸ |
-| `f64` | 64-bit floating point | `double` | ±1.8 × 10³⁰⁸ |
-| `str` | String | `string` | UTF-16 text |
+| `int` | 32-bit signed integer | `int` | -2³¹ to 2³¹-1 |
+| `long` | 64-bit signed integer | `long` | -2⁶³ to 2⁶³-1 |
+| `sbyte` | 8-bit signed integer | `sbyte` | -128 to 127 |
+| `short` | 16-bit signed integer | `short` | -32768 to 32767 |
+| `byte` | 8-bit unsigned integer | `byte` | 0 to 255 |
+| `ushort` | 16-bit unsigned integer | `ushort` | 0 to 65535 |
+| `uint` | 32-bit unsigned integer | `uint` | 0 to 2³²-1 |
+| `ulong` | 64-bit unsigned integer | `ulong` | 0 to 2⁶⁴-1 |
+| `float` | 32-bit floating point | `float` | ±3.4 × 10³⁸ |
+| `double` | 64-bit floating point | `double` | ±1.8 × 10³⁰⁸ |
+| `string` | String | `string` | UTF-16 text |
 | `bool` | Boolean | `bool` | `true` or `false` |
 | `char` | UTF-16 code unit | `char` | U+0000 to U+FFFF |
 | `decimal` | 128-bit precise decimal | `decimal` | ±7.9 × 10²⁸ |
@@ -36,21 +45,21 @@ Calor has primitives, .NET nullable types, ordinary generics, and arrays.
 ### Input Parameters
 
 ```
-§I{i32:count}       // int count
-§I{str:name}        // string name
-§I{f64:price}       // double price
+§I{int:count}       // int count
+§I{string:name}     // string name
+§I{double:price}    // double price
 §I{bool:active}     // bool active
-§I{[u8}:data}       // byte[] data
-§I{[str}:args}      // string[] args
+§I{byte[]:data}     // byte[] data
+§I{string[]:args}   // string[] args
 ```
 
 ### Output Types
 
 ```
-§O{i32}             // returns int
-§O{str}             // returns string
+§O{int}             // returns int
+§O{string}          // returns string
 §O{void}            // returns nothing
-§O{[u8}}            // returns byte[]
+§O{byte[]}          // returns byte[]
 ```
 
 ### Constructor arguments
@@ -73,17 +82,18 @@ literal. Values outside the finite 32-bit range produce a diagnostic.
 
 ### Decimal Literals
 
-Calor supports two forms for decimal literals:
+Canonical decimal literals use the `m` suffix. Integer widths use `U`, `L`,
+or `UL` when needed; fractions without `f` or `m` have type `double`.
 
 ```
-§B{~price:decimal} DECIMAL:18.0000    // prefix form
-§B{~total:decimal} 100m               // suffix form (m or M)
-§B{~rate:decimal} DEC:0.05            // short prefix form
+§B{~price:decimal} 18.0000m
+§B{~total:decimal} 100m
+§B{~rate:decimal} 0.05m
 ```
 
 ### Character Literals
 
-Single quotes produce `char`; double quotes produce `str`. Character literals
+Single quotes produce `char`; double quotes produce `string`. Character literals
 contain exactly one UTF-16 code unit. Empty literals, multiple characters, raw
 line breaks, and invalid escapes report `Calor0112`.
 
@@ -100,56 +110,59 @@ Escapes follow C#: `\0`, `\a`, `\b`, `\f`, `\n`, `\r`, `\t`, `\v`, `\'`, `\"`,
 digits). The decoded value must fit one UTF-16 code unit; supplementary Unicode
 characters require a string. Escaped surrogate code units round-trip unchanged.
 
-Characters participate in numeric arithmetic: `(- c '0')` returns an `i32`.
+Characters participate in numeric arithmetic: `(- c '0')` returns an `int`.
 The existing `(char-lit "x")` spelling remains accepted and formats as `'x'`.
 
 ---
 
 ## Array Types
 
-Calor uses bracket notation `[T]` for array types, which aligns with common programming language conventions.
+Arrays use C# suffix notation. Rank and nesting are preserved.
 
 ### Syntax
 
 ```
-[T]                 // Array of T
-[[T]]               // Jagged array (array of arrays)
+T[]                 // Array of T
+T[,]                // Two-dimensional array
+T[][]               // Jagged array (array of arrays)
 ```
 
 ### Examples
 
 | Calor Type | C# Equivalent |
 |:----------|:--------------|
-| `[u8]` | `byte[]` |
-| `[i32]` | `int[]` |
-| `[str]` | `string[]` |
-| `[bool]` | `bool[]` |
-| `[[i32]]` | `int[][]` |
+| `byte[]` | `byte[]` |
+| `int[]` | `int[]` |
+| `string[]` | `string[]` |
+| `bool[]` | `bool[]` |
+| `int[][]` | `int[][]` |
+| `int[,]` | `int[,]` |
 
 ### Usage
 
 ```
-§FLD{[u8}:_buffer:priv}       // private byte[] field
-§I{[str}:args}                // string[] parameter
-§O{[i32}}                     // returns int[]
+§FLD{byte[]:_buffer:priv}      // private byte[] field
+§I{string[]:args}             // string[] parameter
+§O{int[]}                    // returns int[]
 ```
 
 ---
 
-## Nullable References (`?T`)
+## Nullable References (`T?`)
 
-For supported reference types, `?str` and `?string` mean C# `string?`, and `?Foo`
+For supported reference types, `string?` means C# `string?`, and `Foo?`
 means a nullable `Foo` reference. These annotations do not wrap the value.
-Postfix spellings such as `str?` are also nullable annotations.
+Suffix order matters: `string?[]` has nullable elements; `string[]?` is a
+nullable array.
 
 ```calor
 §M{NullableReferenceExample}
-  §F{Identity:pub} (?str:value) -> ?str
+  §F{Identity:pub} (string?:value) -> string?
     §E{}
     §R value
-  §F{Greeting:pub} () -> ?str
+  §F{Greeting:pub} () -> string?
     §E{}
-    §B{greeting:?str} "hello"
+    §B{greeting:string?} "hello"
     §R greeting
 ```
 
@@ -158,7 +171,7 @@ The staged `Calor0272`/`Calor0273`/`Calor0274` binder findings remain analysis-o
 some older unsafe assignments still fail the TypeChecker first. General mutation
 is outside those receiving-boundary checks.
 
-Existing nullable-value spellings such as `?i32` emit C# `int?`, not a reference.
+Nullable-value spellings such as `int?` emit C# `int?`, not a reference.
 This reference-typing repair does not expand their TypeChecker support.
 Unknown external types and arbitrary generic payloads also need separate analysis;
 absence of an error is not proof that they were resolved.
@@ -168,7 +181,7 @@ null-coalescing expression:
 
 ```calor
 §M{NullableFallback}
-  §F{Greeting:pub} (?str:name) -> str
+  §F{Greeting:pub} (string?:name) -> string
     §E{}
     §R (?? name "anonymous")
 ```
@@ -182,7 +195,7 @@ the exception effect `throw` (and `alloc` when constructing the exception).
 
 ```calor
 §M{Division}
-  §F{Divide:pub} (i32:a, i32:b) -> i32
+  §F{Divide:pub} (int:a, int:b) -> int
     §E{throw,alloc}
     §IF (== b 0)
       §TH §NEW{ArgumentException} §A "Division by zero" §/NEW
@@ -213,9 +226,9 @@ Func<T, U>              // Function from T to U
 ### Examples
 
 ```
-§I{List<i32>:numbers}           // List<int> parameter
-§I{Dictionary<str, i32>:scores} // Dictionary<string, int>
-§O{IEnumerable<str>}            // Returns IEnumerable<string>
+§I{List<int>:numbers}              // List<int> parameter
+§I{Dictionary<string, int>:scores} // Dictionary<string, int>
+§O{IEnumerable<string>}           // Returns IEnumerable<string>
 §FLD{HashSet<T>:_items:priv}     // Generic field with type parameter T
 ```
 
@@ -224,8 +237,8 @@ Func<T, U>              // Function from T to U
 Generic types can be nested.
 
 ```
-§I{Dictionary<str, List<i32>>:data}     // Dictionary<string, List<int>>
-§O{List<Tuple<str, i32>>}               // List<(string, int)>
+§I{Dictionary<string, List<int>>:data} // Dictionary<string, List<int>>
+§O{List<Tuple<string, int>>}           // List<Tuple<string, int>>
 ```
 
 ### Type Parameters
@@ -258,11 +271,11 @@ Calor provides built-in syntax for creating and manipulating collections with ty
 | Part | Description |
 |:-----|:------------|
 | `name` | Variable name for the list |
-| `elementType` | Type of elements (`i32`, `str`, etc.) |
+| `elementType` | Type of elements (`int`, `string`, etc.) |
 
 **Example:**
 ```
-§LIST{numbers:i32}
+§LIST{numbers:int}
   1
   2
   3
@@ -285,7 +298,7 @@ Calor provides built-in syntax for creating and manipulating collections with ty
 
 **Example:**
 ```
-§DICT{ages:str:i32}
+§DICT{ages:string:int}
   §KV "alice" 30
   §KV "bob" 25
 ```
@@ -300,7 +313,7 @@ Calor provides built-in syntax for creating and manipulating collections with ty
 
 **Example:**
 ```
-§HSET{tags:str}
+§HSET{tags:string}
   "urgent"
   "review"
 ```
@@ -313,9 +326,9 @@ instead, such as a field or property default or an element of another collection
 collection on one line and close it with its id:
 
 ```
-§FLD{List<i32>:xs:pub} = §LIST{i32} 1 2 3 §/LIST
-§FLD{List<List<i32>>:grid:pub} = §LIST{List<i32>} §LIST{i32} 1 §/LIST §/LIST
-§PROP{Tags:HashSet<str>:pub:get} = §HSET{str} "a" "b" §/HSET
+§FLD{List<int>:xs:pub} = §LIST{int} 1 2 3 §/LIST
+§FLD{List<List<int>>:grid:pub} = §LIST{List<int>} §LIST{int} 1 §/LIST §/LIST
+§PROP{Tags:HashSet<string>:pub:get} = §HSET{string} "a" "b" §/HSET
 ```
 
 This compiles to `new List<int>() { 1, 2, 3 }`: the elements are added in order, as a C#
@@ -346,7 +359,7 @@ collection initializer does.
 | Contains element | `§HAS{coll} value` | `bool` |
 | Contains key | `§HAS{dict} §KEY key` | `bool` |
 | Contains value | `§HAS{dict} §VAL value` | `bool` |
-| Collection count | `§CNT{coll}` | `i32` |
+| Collection count | `§CNT{coll}` | `int` |
 
 **Example:**
 ```
@@ -364,10 +377,10 @@ Types matter in contracts for proper comparisons:
 
 ```
 §F{Clamp:pub}
-  §I{i32:value}
-  §I{i32:min}
-  §I{i32:max}
-  §O{i32}
+  §I{int:value}
+  §I{int:min}
+  §I{int:max}
+  §O{int}
   §Q (<= min max)           // Requires: min <= max
   §S (>= result min)        // Ensures: result >= min
   §S (<= result max)        // Ensures: result <= max
@@ -380,9 +393,9 @@ Types matter in contracts for proper comparisons:
 
 | Operation | Valid Types |
 |:----------|:------------|
-| Arithmetic (`+`, `-`, `*`, `/`) | Numeric (`i32`, `i64`, `f32`, `f64`) |
-| Modulo (`%`) | Integer (`i32`, `i64`) |
-| Comparison (`<`, `>`, etc.) | Numeric, `str` |
+| Arithmetic (`+`, `-`, `*`, `/`) | Numeric (`int`, `long`, `float`, `double`) |
+| Modulo (`%`) | Integer (`int`, `long`) |
+| Comparison (`<`, `>`, etc.) | Numeric, `string` |
 | Equality (`==`, `!=`) | Any matching types |
 | Logical (`&&`, `\|\|`) | `bool` |
 
@@ -392,11 +405,11 @@ Types matter in contracts for proper comparisons:
 
 | Type | Literal Examples |
 |:-----|:-----------------|
-| `i32` | `42`, `-17`, `0` |
-| `i64` | `42L`, `-17L` |
-| `f32` | `3.14f` |
-| `f64` | `3.14`, `2.718` |
-| `str` | `"hello"`, `"world"` |
+| `int` | `42`, `-17`, `0` |
+| `long` | `42L`, `-17L` |
+| `float` | `3.14f` |
+| `double` | `3.14`, `2.718` |
+| `string` | `"hello"`, `"world"` |
 | `bool` | `true`, `false` |
 | `char` | `'A'`, `'x'` |
 | `decimal` | `DECIMAL:18.0`, `DEC:0.05`, `100m` |

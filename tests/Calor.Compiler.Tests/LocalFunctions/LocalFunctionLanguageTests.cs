@@ -524,7 +524,7 @@ public class LocalFunctionLanguageTests
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(parsed.HasErrors);
         var emitted = new CalorEmitter().Emit(parsed.Ast!);
-        Assert.Contains("§LAM{static:x:i32}", emitted);
+        Assert.Contains("§LAM{static:x:int}", emitted);
         Assert.DoesNotContain("§F{Add}", emitted);
         var again = Program.Compile(emitted, "rt2.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });

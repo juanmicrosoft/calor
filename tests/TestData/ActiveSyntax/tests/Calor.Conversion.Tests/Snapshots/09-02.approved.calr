@@ -1,0 +1,6 @@
+§M{Test_09_02:overflow=unchecked}
+  §CL{IndexDemo:pub}
+    §MT{GetLast:pub} (int[]:items) -> int
+      §R §IDX{items} §^ 1
+
+

@@ -1,0 +1,9 @@
+§M{Test_13_05:overflow=unchecked}
+  §CL{PatternDemo:pub}
+    §MT{Classify:pub} (object:obj) -> string
+      §R §W obj
+        §K string { Length: 0 } → "empty string"
+        §K string { Length: §PREL{gt} 100 } → "long string"
+        §K §PTYPE{int:n} §WHEN (> n 0) → "positive"
+        §K _ → "other"
+

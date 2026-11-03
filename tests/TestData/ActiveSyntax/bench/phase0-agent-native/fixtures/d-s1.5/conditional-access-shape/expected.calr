@@ -1,32 +1,32 @@
 §M{Fixture:overflow=unchecked}
   §M{ConditionalAccessFixture:pub}
-    §FLD{i32:ArgumentCalls:priv:stat}
+    §FLD{int:ArgumentCalls:priv:stat}
 
-    §F{Argument:priv} () -> i32
+    §F{Argument:priv} () -> int
       §E{mut}
       §ASSIGN ArgumentCalls (+ ArgumentCalls 1)
       §R 7
 
-    §F{Run:pub} () -> i32
+    §F{Run:pub} () -> int
       §E{alloc,mut}
       §ASSIGN ArgumentCalls 0
       §B{~target:Holder} null
-      §B{?i32:skipped} §C (?. target "M") §A §C{Argument} §/C §/C
+      §B{int?:skipped} §C (?. target "M") §A §C{Argument} §/C §/C
       §IF (|| (!= skipped null) (!= ArgumentCalls 0))
         §R (- 1)
       §ASSIGN target §NEW{Holder} §/NEW
-      §B{?i32:selected} §C (?. target "M") §A §C{Argument} §/C §/C
+      §B{int?:selected} §C (?. target "M") §A §C{Argument} §/C §/C
       §IF (|| (|| (!= selected 7) (!= ArgumentCalls 1)) (!= target.Calls 1))
         §R (- 2)
       §R (+ (+ (* ArgumentCalls 100) (* target.Calls 10)) (?? selected 0))
 
     §CL{Holder:pub:seal}
-      §FLD{i32:Calls:pub}
+      §FLD{int:Calls:pub}
 
-      §PROP{M7:i32:pub}
+      §PROP{M7:int:pub}
         §GET{pub}
           §R 0
 
-      §MT{M:pub} (i32:value) -> i32
+      §MT{M:pub} (int:value) -> int
         §ASSIGN Calls (+ Calls 1)
         §R value

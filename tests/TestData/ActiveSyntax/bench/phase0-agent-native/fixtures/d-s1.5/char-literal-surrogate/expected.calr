@@ -1,6 +1,6 @@
 §M{Fixture:overflow=unchecked}
   §M{SurrogateValues:pub}
-    §F{Verify:pub} () -> i32
+    §F{Verify:pub} () -> int
       §B{char:high} '\ud800'
       §B{char:low} '\udfff'
-      §R (+ (* (cast i32 high) 2) (cast i32 low))
+      §R (+ (* (cast int high) 2) (cast int low))

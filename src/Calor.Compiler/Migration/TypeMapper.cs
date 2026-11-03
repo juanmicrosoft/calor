@@ -5,10 +5,15 @@ namespace Calor.Compiler.Migration;
 /// </summary>
 public static class TypeMapper
 {
+    /// <summary>Renders parser and converter types using the measured C# surface spellings.</summary>
+    public static string ToSurfaceType(string type) =>
+        Parsing.AttributeHelper.ToSurfaceSpelling(
+            CSharpToCalor(Parsing.AttributeHelper.ToSurfaceSpelling(type)));
+
     /// <summary>
     /// Maps C# type names to Calor type names.
     /// </summary>
-    private static readonly Dictionary<string, string> CSharpToCalorMap = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly Dictionary<string, string> CSharpToCalorMap = new(StringComparer.Ordinal)
     {
         // Numeric types
         ["int"] = "i32",
@@ -117,9 +122,8 @@ public static class TypeMapper
 
     /// <summary>
     /// Maps Calor type names to C# type names.
-    /// Also handles uppercase C# type names for backward compatibility.
     /// </summary>
-    private static readonly Dictionary<string, string> CalorToCSharpMap = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly Dictionary<string, string> CalorToCSharpMap = new(StringComparer.Ordinal)
     {
         // Calor numeric types
         ["i32"] = "int",
@@ -163,14 +167,18 @@ public static class TypeMapper
         // Boolean
         ["bool"] = "bool",
         ["boolean"] = "bool",
+        ["BOOL"] = "bool",
 
         // String and char
         ["str"] = "string",
         ["string"] = "string",
+        ["STRING"] = "string",
         ["char"] = "char",
+        ["CHAR"] = "char",
 
         // Void
         ["void"] = "void",
+        ["VOID"] = "void",
 
         // Object
         ["any"] = "object",
@@ -416,12 +424,6 @@ public static class TypeMapper
         if (string.IsNullOrWhiteSpace(calorType))
             return calorType;
 
-        // Nullable annotations use a dedicated expanded parser spelling.
-        if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(calorType, out var nullableReferent))
-        {
-            return $"{CalorToCSharp(nullableReferent)}?";
-        }
-
         // Peel ranks before expanded scalar attributes, which also contain brackets.
         var rankStart = calorType.LastIndexOf('[');
         if (rankStart > 0 && calorType.EndsWith(']')
@@ -429,6 +431,9 @@ public static class TypeMapper
         {
             return CalorToCSharp(calorType[..rankStart]) + calorType[rankStart..];
         }
+
+        if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(calorType, out var nullableReferent))
+            return $"{CalorToCSharp(nullableReferent)}?";
 
         // Handle expanded INT format: INT[bits=N][signed=B] -> sbyte/short/int/long/byte/ushort/uint/ulong
         // Must check for "bits=" to avoid matching multi-dim array types like INT[,]
@@ -608,8 +613,7 @@ public static class TypeMapper
     /// </summary>
     public static bool IsPrimitiveType(string typeName)
     {
-        var normalizedLower = typeName.ToLowerInvariant();
-        return normalizedLower switch
+        return Parsing.AttributeHelper.ToSurfaceSpelling(typeName) switch
         {
             "int" or "i32" or "long" or "i64" or "short" or "i16" or "byte" or "u8" or
             "sbyte" or "i8" or "uint" or "u32" or "ulong" or "u64" or "ushort" or "u16" or
@@ -624,8 +628,7 @@ public static class TypeMapper
     /// </summary>
     public static bool IsNumericType(string typeName)
     {
-        var normalizedLower = typeName.ToLowerInvariant();
-        return normalizedLower switch
+        return Parsing.AttributeHelper.ToSurfaceSpelling(typeName) switch
         {
             "int" or "i32" or "long" or "i64" or "short" or "i16" or "byte" or "u8" or
             "sbyte" or "i8" or "uint" or "u32" or "ulong" or "u64" or "ushort" or "u16" or
@@ -639,13 +642,17 @@ public static class TypeMapper
     /// </summary>
     public static string GetDefaultValueLiteral(string calorType)
     {
-        return calorType.ToLowerInvariant() switch
+        return Parsing.AttributeHelper.ToSurfaceSpelling(calorType) switch
         {
-            "i32" or "i64" or "i16" or "i8" or "u32" or "u64" or "u16" or "u8" => "0",
-            "f32" or "f64" => "0.0",
+            "int" or "short" or "sbyte" or "ushort" or "byte" => "0",
+            "long" => "0L",
+            "uint" => "0U",
+            "ulong" => "0UL",
+            "float" => "0f",
+            "double" => "0.0",
             "decimal" => "0m",
             "bool" => "false",
-            "str" => "\"\"",
+            "string" => "\"\"",
             "char" => "'\\0'",
             _ when calorType.StartsWith("?") => "null",
             _ => "default"

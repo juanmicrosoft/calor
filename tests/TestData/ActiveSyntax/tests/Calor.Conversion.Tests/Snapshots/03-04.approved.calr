@@ -1,0 +1,14 @@
+§M{Test_03_04:overflow=unchecked}
+  §CL{Router:pub}
+    §MT{Route:pub} (int:code) -> string
+      §W code
+        §K 200
+          §R "OK"
+        §K 404
+          §R "Not Found"
+        §K 500
+          §R "Server Error"
+        §K _
+          §R "Unknown"
+
+

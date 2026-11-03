@@ -1,0 +1,9 @@
+§M{Test_06_01:overflow=unchecked}
+  §CL{Grader:pub}
+    §MT{GetGrade:pub} (int:score) -> string
+      §R §W score
+        §K §PREL{gte} 90 → "A"
+        §K §PREL{gte} 80 → "B"
+        §K §PREL{gte} 70 → "C"
+        §K _ → "F"
+

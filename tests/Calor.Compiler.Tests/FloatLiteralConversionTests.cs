@@ -82,6 +82,10 @@ public sealed class FloatLiteralConversionTests
         { "int n = 1; return n / 3f;", "Single:0.33333334" },
         { "int n = 5; return n / 2.0m;", "Decimal:2.5" },
         { "int n = 5; return $\"{n / 2.0}\";", "String:2.5" },
+        { "return $\"{1,4:D2}\";", "String:  01" },
+        { "return $\"{1,-4:D2} literal=${{0}}\";", "String:01   literal=${0}" },
+        { "return \"${0} ${name}\";", "String:${0} ${name}" },
+        { "return $\"{1 + 2}:{\"${0}\"}\";", "String:3:${0}" },
         // Negative control: an integer literal keeps integer division.
         { "int n = 5; return n / 2;", "Int32:2" },
     };
@@ -123,7 +127,7 @@ public sealed class FloatLiteralConversionTests
     [InlineData(100.0, false, "100.0")]
     [InlineData(1e20, false, "1E+20")]
     [InlineData(0.5, false, "0.5")]
-    [InlineData(2.0, true, "SINGLE:2")]
+    [InlineData(2.0, true, "2f")]
     public void FloatLiteral_EmitsLexerFloatForm(double value, bool single, string expected)
     {
         var node = new FloatLiteralNode(new TextSpan(0, 0, 1, 1), value) { IsSingle = single };

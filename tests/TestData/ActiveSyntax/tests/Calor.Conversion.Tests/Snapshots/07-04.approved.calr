@@ -1,0 +1,17 @@
+§M{Test_07_04:overflow=unchecked}
+  §U{System}
+  §U{System.Linq}
+
+  §M{BlockLambdaDemo:pub}
+    §F{Run:pub}
+      §B{_lam005} §LAM{}
+        §B{_chainRange004} §C{Enumerable.Range} §A 1 §A 5 §/C
+        §B{nums} §C{_chainRange004.ToArray}
+        §B{int:total} §C{nums.Sum}
+        §R total
+      §/LAM
+      §C{Handle} §A "/x" §A _lam005 §/C
+
+    §F{Handle:pub} (string:route, Func<int>:handler)
+      §R
+

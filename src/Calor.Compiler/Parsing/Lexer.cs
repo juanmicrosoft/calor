@@ -2486,7 +2486,8 @@ public sealed class Lexer
 
         var valueText = _source[valueStart.._position].Replace("_", "", StringComparison.Ordinal);
         if (double.TryParse(valueText, System.Globalization.NumberStyles.Float,
-            System.Globalization.CultureInfo.InvariantCulture, out var value))
+            System.Globalization.CultureInfo.InvariantCulture, out var value)
+            && double.IsFinite(value) && (!isSingle || float.IsFinite((float)value)))
         {
             // #774: a SINGLE: literal carries its single-precision width so the C#
             // emitter re-emits the `f` suffix instead of silently widening to double.
@@ -2789,7 +2790,6 @@ public sealed class Lexer
 
             if (Current == '$' && Lookahead == '{')
             {
-                var interpolationStart = _position;
                 FlushText();
                 Advance();
                 Advance();
@@ -2797,16 +2797,12 @@ public sealed class Lexer
                 var expression = ScanInterpolationExpressionText();
                 if (expression == null)
                 {
-                    _position = interpolationStart + 2;
-                    (_line, _column) = (holeLine, holeColumn);
-                    text.Append("${");
-                    continue;
+                    _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.UnterminatedString,
+                        "Unterminated interpolation hole: close ${expression} with }, or use \\${ for literal text.");
+                    return MakeToken(TokenKind.Error);
                 }
-                var intent = IsLiteralInterpolationPlaceholder(expression)
-                    ? InterpolationPartIntent.LiteralPlaceholder
-                    : InterpolationPartIntent.Expression;
                 parts.Add(new InterpolatedStringExpressionTokenPart(
-                    expression, intent, holeStart, holeLine, holeColumn));
+                    expression, InterpolationPartIntent.Expression, holeStart, holeLine, holeColumn));
                 continue;
             }
 
@@ -2825,43 +2821,6 @@ public sealed class Lexer
 
         _diagnostics.ReportUnterminatedString(CurrentSpan());
         return MakeToken(TokenKind.Error);
-    }
-
-    private static bool IsLiteralInterpolationPlaceholder(string source)
-    {
-        var text = source.AsSpan().Trim();
-        var position = 0;
-        while (position < text.Length && char.IsDigit(text[position]))
-            position++;
-        if (position == 0)
-            return false;
-
-        while (position < text.Length && char.IsWhiteSpace(text[position]))
-            position++;
-        if (position < text.Length && text[position] == ',')
-        {
-            position++;
-            while (position < text.Length && char.IsWhiteSpace(text[position]))
-                position++;
-            if (position < text.Length && text[position] is '+' or '-')
-                position++;
-            var alignmentStart = position;
-            while (position < text.Length && char.IsDigit(text[position]))
-                position++;
-            if (position == alignmentStart)
-                return false;
-            while (position < text.Length && char.IsWhiteSpace(text[position]))
-                position++;
-        }
-
-        if (position < text.Length && text[position] == ':')
-        {
-            position++;
-            return position < text.Length
-                && text[position..].IndexOfAny('{', '}') < 0;
-        }
-
-        return position == text.Length;
     }
 
     private bool HasQuoteRun(int length)
@@ -3054,9 +3013,11 @@ public sealed class Lexer
             }
             if (Current == 'f')
                 return ScanSingleSuffix();
+            if (Current is 'M' or 'm')
+                return ScanDecimalSuffix();
             var sciText = CurrentText().Replace("_", "");
             if (double.TryParse(sciText, System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var sciValue))
+                System.Globalization.CultureInfo.InvariantCulture, out var sciValue) && double.IsFinite(sciValue))
             {
                 return MakeToken(TokenKind.FloatLiteral, sciValue);
             }
@@ -3088,21 +3049,12 @@ public sealed class Lexer
             if (Current == 'f')
                 return ScanSingleSuffix();
 
-            // Check for decimal suffix (M/m) on float
             if (Current is 'M' or 'm')
-            {
-                Advance(); // consume M/m
-                var decText = CurrentText().TrimEnd('M', 'm').Replace("_", "");
-                if (decimal.TryParse(decText, System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out var decValue))
-                {
-                    return MakeToken(TokenKind.DecimalLiteral, decValue);
-                }
-            }
+                return ScanDecimalSuffix();
 
             var floatText = CurrentText().Replace("_", "");
             if (double.TryParse(floatText, System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var floatValue))
+                System.Globalization.CultureInfo.InvariantCulture, out var floatValue) && double.IsFinite(floatValue))
             {
                 return MakeToken(TokenKind.FloatLiteral, floatValue);
             }
@@ -3113,15 +3065,7 @@ public sealed class Lexer
 
         // Check for decimal suffix on integers (42M, 100m)
         if (Current is 'M' or 'm')
-        {
-            Advance(); // consume M/m
-            var decText = CurrentText().TrimEnd('M', 'm').Replace("_", "");
-            if (decimal.TryParse(decText, System.Globalization.NumberStyles.Integer,
-                System.Globalization.CultureInfo.InvariantCulture, out var decValue))
-            {
-                return MakeToken(TokenKind.DecimalLiteral, decValue);
-            }
-        }
+            return ScanDecimalSuffix();
 
         // Check for unsigned/long suffix on integers (42U, 100UL, 50L, 50LU)
         bool isUnsignedSuffix = false;
@@ -3173,6 +3117,18 @@ public sealed class Lexer
         }
 
         _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "number");
+        return MakeToken(TokenKind.Error);
+    }
+
+    private Token ScanDecimalSuffix()
+    {
+        Advance();
+        var text = CurrentText()[..^1].Replace("_", "", StringComparison.Ordinal);
+        if (decimal.TryParse(text, System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out var value))
+            return MakeToken(TokenKind.DecimalLiteral, value);
+
+        _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "decimal number");
         return MakeToken(TokenKind.Error);
     }
 

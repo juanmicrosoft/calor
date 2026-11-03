@@ -140,6 +140,10 @@ public static class TestHelpers
     /// </summary>
     public static string? ReadSnapshot(string snapshotName)
     {
+        var root = Calor.Compiler.Tests.ActiveSyntaxInputs.RepositoryRoot;
+        var original = $"tests/Calor.Conversion.Tests/Snapshots/{snapshotName}";
+        if (Calor.Compiler.Tests.ActiveSyntaxInputs.OriginalPaths.Contains(original))
+            return File.ReadAllText(Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentCompiler(root, original));
         var path = Path.Combine(AppContext.BaseDirectory, "Snapshots", snapshotName);
         return File.Exists(path) ? File.ReadAllText(path) : null;
     }

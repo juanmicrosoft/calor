@@ -99,11 +99,11 @@ public class StringInterpolationTests
     }
 
     [Fact]
-    public void Emit_FormatPlaceholder_PreservedAsLiteral()
+    public void Emit_DigitHoles_AreRuntimeExpressions()
     {
         var (converted, hasInterpolation) = CSharpEmitter.ConvertInlineInterpolation("${0} and ${1}");
-        Assert.False(hasInterpolation);
-        Assert.Equal("${0} and ${1}", converted);
+        Assert.True(hasInterpolation);
+        Assert.Equal("{0} and {1}", converted);
     }
 
     // --- Round-trip test ---

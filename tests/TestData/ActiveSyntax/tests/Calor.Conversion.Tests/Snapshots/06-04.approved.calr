@@ -1,0 +1,8 @@
+§M{Test_06_04:overflow=unchecked}
+  §CL{Combinators:pub}
+    §MT{Check:pub} (object:obj) -> string
+      §IF (!= obj null)
+        §R "has value"
+      §R "null"
+
+

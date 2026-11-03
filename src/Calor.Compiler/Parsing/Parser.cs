@@ -6690,10 +6690,14 @@ public sealed class Parser
                 }
             }
 
-            // Handle array suffix or attribute brackets: i32[], int[,], NULLABLE[inner=Type]
-            if (Check(TokenKind.OpenBracket))
+            // Nullable annotations and array ranks may alternate: string?[]?[], int[,][].
+            while (Check(TokenKind.OpenBracket) || Check(TokenKind.Question))
             {
-                if (Peek(1).Kind == TokenKind.CloseBracket)
+                if (Match(TokenKind.Question))
+                {
+                    sb.Append('?');
+                }
+                else if (Peek(1).Kind == TokenKind.CloseBracket)
                 {
                     // Simple array suffix: i32[]
                     sb.Append("[]");
@@ -13832,31 +13836,7 @@ public sealed class Parser
                 Advance();
             }
 
-            // Handle array suffix after tuple: (T1, T2)[]
-            while (Check(TokenKind.OpenBracket))
-            {
-                if (Peek(1).Kind == TokenKind.CloseBracket)
-                {
-                    sb.Append("[]");
-                    Advance(); // [
-                    Advance(); // ]
-                }
-                else if (Peek(1).Kind == TokenKind.Comma)
-                {
-                    sb.Append('[');
-                    Advance();
-                    while (Check(TokenKind.Comma)) { sb.Append(','); Advance(); }
-                    if (Check(TokenKind.CloseBracket)) { sb.Append(']'); Advance(); }
-                }
-                else break;
-            }
-
-            // Handle nullable suffix after tuple: (T1, T2)?
-            if (Check(TokenKind.Question))
-            {
-                sb.Append('?');
-                Advance();
-            }
+            ReadInlineTypeSuffixes(sb);
 
             return sb.ToString();
         }
@@ -14009,10 +13989,19 @@ public sealed class Parser
             }
         }
 
-        // Handle array suffix: Type[], Type[,], Type[][,], etc.
-        while (Check(TokenKind.OpenBracket))
+        ReadInlineTypeSuffixes(sb);
+        return sb.ToString();
+    }
+
+    private void ReadInlineTypeSuffixes(System.Text.StringBuilder sb)
+    {
+        while (Check(TokenKind.OpenBracket) || Check(TokenKind.Question))
         {
-            if (Peek(1).Kind == TokenKind.CloseBracket)
+            if (Match(TokenKind.Question))
+            {
+                sb.Append('?');
+            }
+            else if (Peek(1).Kind == TokenKind.CloseBracket)
             {
                 sb.Append("[]");
                 Advance(); // consume [
@@ -14035,15 +14024,6 @@ public sealed class Parser
             }
             else break;
         }
-
-        // Handle nullable suffix after array brackets: string[]?, int[,]?
-        if (Check(TokenKind.Question))
-        {
-            sb.Append('?');
-            Advance();
-        }
-
-        return sb.ToString();
     }
 
     #endregion

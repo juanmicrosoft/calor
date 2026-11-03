@@ -817,7 +817,7 @@ public class CodeGenBugFixTests
         var output = emitter.Emit(module);
 
         // Immutable typed: {type:name} format
-        Assert.Contains("§B{i32:count} 42", output);
+        Assert.Contains("§B{int:count} 42", output);
         Assert.DoesNotContain(":const", output);
     }
 
@@ -832,7 +832,7 @@ public class CodeGenBugFixTests
         var output = emitter.Emit(module);
 
         // Mutable typed: {~name:type} format
-        Assert.Contains("§B{~total:i32} 0", output);
+        Assert.Contains("§B{~total:int} 0", output);
     }
 
     [Fact]

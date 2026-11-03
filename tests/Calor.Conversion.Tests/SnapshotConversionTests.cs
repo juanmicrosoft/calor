@@ -33,6 +33,31 @@ public class SnapshotConversionTests
     public static IEnumerable<object[]> StaticModuleSnippetData() =>
         SupportedSnippetData().Where(row => row[0] is "01-04" or "07-04" or "10-01" or "10-02" or "12-05" or "13-04");
 
+    public static IEnumerable<object[]> CurrentSnapshotData() =>
+        Calor.Compiler.Tests.ActiveSyntaxInputs.OriginalPaths
+            .Where(path => path.StartsWith("tests/Calor.Conversion.Tests/Snapshots/", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal).Select(path => new object[] { path });
+
+    [Theory]
+    [MemberData(nameof(CurrentSnapshotData))]
+    public void CurrentSnapshot_PreservesOriginalCurrentCompilerProjection(string original)
+    {
+        var root = Calor.Compiler.Tests.ActiveSyntaxInputs.RepositoryRoot;
+        var originalPath = Path.Combine(root, original);
+        var currentPath = Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentCompiler(root, original);
+        Assert.NotEqual(originalPath, currentPath);
+        var before = File.ReadAllText(originalPath);
+        var after = File.ReadAllText(currentPath);
+        Assert.NotEqual(before, after);
+        var originalProjection = TestHelpers.CompileCalorToCSharpWithDiagnostics(before);
+        var currentProjection = TestHelpers.CompileCalorToCSharpWithDiagnostics(after);
+        Assert.NotNull(originalProjection.GeneratedCode);
+        Assert.NotNull(currentProjection.GeneratedCode);
+        Assert.Empty(originalProjection.Diagnostics);
+        Assert.Empty(currentProjection.Diagnostics);
+        Assert.Equal(originalProjection.GeneratedCode, currentProjection.GeneratedCode);
+    }
+
     [Theory]
     [MemberData(nameof(StaticModuleSnippetData))]
     public void StaticModuleSnapshot_PreservesCSharpDeclarationSignatures(string id, string description, string csharpSource)

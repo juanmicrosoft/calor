@@ -1,0 +1,20 @@
+§M{Test_03_02:overflow=unchecked}
+  §CL{Loops:pub}
+    §MT{Sum:pub} (int:n) -> int
+      §B{~total:int} 0
+      §IF true
+        §B{~i:int} 0
+        §B{~_forFirst003:bool} true
+        §WH true
+          §IF _forFirst003
+            §ASSIGN _forFirst003 false
+          §EL
+            §ASSIGN i (+ i 1)
+          §IF (< i n)
+          §EL
+            §BK
+          §IF true
+            §ASSIGN total (+ total i)
+      §R total
+
+

@@ -551,7 +551,7 @@ Complete example: [linq](#example-complete_linq).
 
 ## string interpolation
 
-String interpolation uses $&#123;&#125; inside ordinary string literals. Note: $&#123;0&#125;, $&#123;1&#125; etc. are treated as format placeholders, not interpolation.
+Ordinary strings use $&#123;expression&#125; for runtime interpolation, including numeric expressions such as $&#123;1&#125;. Escape the opening marker as \$&#123;0&#125; to keep literal placeholder text. Alignment and format clauses use $&#123;value,4:D2&#125;.
 
 Syntax: `Inline: "text $&#123;expression&#125; text"`
 

@@ -1,0 +1,8 @@
+§M{Test_07_03:overflow=unchecked}
+  §U{System}
+
+  §CL{StaticLambdaDemo:pub}
+    §MT{Test:pub}
+      §B{Func<int, int>:doubler} §LAM{static:x:int} (* x 2) §/LAM
+
+

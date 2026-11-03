@@ -1,0 +1,5 @@
+§M{Test_10_01:overflow=unchecked}
+  §M{SizeTest:pub}
+    §F{GetSizeOfInt:pub} () -> int
+      §R §SIZEOF{int}
+

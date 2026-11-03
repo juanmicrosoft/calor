@@ -1,0 +1,11 @@
+§M{Test_13_03:overflow=unchecked}
+  §U{System}
+  §U{System.Collections.Generic}
+
+  §CL{NullableGenericDemo:pub}
+    §MT{GetPairs:pub} () -> KeyValuePair<string, object?>[]
+      §E{alloc}
+      §R §ARR{KeyValuePair<string, object?>} §NEW{KeyValuePair<string, object?>} §A "key" §A null §/NEW §NEW{KeyValuePair<string, object?>} §A "key2" §A "value" §/NEW §/ARR
+
+    §MT{GetComparer:pub} () -> Func<object?, object?, bool>
+      §R §LAM{a:object?:b:object?} §C{Equals} §A a §A b §/C §/LAM

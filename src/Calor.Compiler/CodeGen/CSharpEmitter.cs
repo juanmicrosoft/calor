@@ -3499,7 +3499,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     /// <summary>
     /// Converts inline Calor interpolation syntax ${expr} to C# interpolation {expr}.
     /// Uses brace-depth tracking to support complex expressions (indexers, method calls, etc.).
-    /// Content starting with a digit (e.g., ${0}) is treated as a format placeholder, not interpolation.
     /// Limitation: quoted strings containing braces inside interpolation (e.g., ${map["key"]})
     /// will miscount brace depth because the Lexer terminates the string at the inner quote.
     /// Supporting that would require Lexer-level interpolation parsing.
@@ -3538,22 +3537,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     // Found matching } at position j
                     string expr = value.Substring(exprStart, j - exprStart);
 
-                    // Check if this is a format placeholder (starts with digit)
-                    if (expr.Length > 0 && char.IsDigit(expr[0]))
-                    {
-                        // Keep as literal text
-                        sb.Append("${");
-                        sb.Append(expr);
-                        sb.Append('}');
-                    }
-                    else
-                    {
-                        // Convert to C# interpolation, converting prefix notation to infix
-                        sb.Append('{');
-                        sb.Append(ConvertPrefixToInfix(expr));
-                        sb.Append('}');
-                        foundInterpolation = true;
-                    }
+                    sb.Append('{');
+                    sb.Append(ConvertPrefixToInfix(expr));
+                    sb.Append('}');
+                    foundInterpolation = true;
 
                     i = j + 1; // Skip past the closing }
                 }
@@ -3781,7 +3768,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(DecimalLiteralNode node)
     {
-        return node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) + "m";
+        var text = node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var negativeZero = node.Value == 0 && (decimal.GetBits(node.Value)[3] & int.MinValue) != 0;
+        return (negativeZero ? "-" : "") + text + "m";
     }
 
     public string Visit(ReferenceNode node)

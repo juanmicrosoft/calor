@@ -1,0 +1,15 @@
+§M{Test_13_09:overflow=unchecked}
+  §CL{AnonDemo:pub}
+    §MT{GetHtmlAttributes:pub} () -> object
+      §R §ANON
+        class = "container"
+        id = "main"
+      §/ANON
+
+    §MT{GetConfig:pub} (string:name) -> object
+      §R §ANON
+        name = name
+        value = 42
+      §/ANON
+
+

@@ -1,0 +1,5 @@
+§M{Test_02_01:overflow=unchecked}
+  §IFACE{IAnimal}
+    §PROP{Name:string:pub:get}
+    §MT{Speak} () -> string
+

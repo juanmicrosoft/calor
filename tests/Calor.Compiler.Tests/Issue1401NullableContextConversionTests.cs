@@ -13,10 +13,10 @@ namespace Calor.Compiler.Tests;
 public sealed class Issue1401NullableContextConversionTests
 {
     [Theory]
-    [InlineData(NullableContextOptions.Enable, "(str:value) -> str")]
-    [InlineData(NullableContextOptions.Annotations, "(str:value) -> str")]
-    [InlineData(NullableContextOptions.Disable, "(?str:value) -> ?str")]
-    [InlineData(NullableContextOptions.Warnings, "(?str:value) -> ?str")]
+    [InlineData(NullableContextOptions.Enable, "(string:value) -> string")]
+    [InlineData(NullableContextOptions.Annotations, "(string:value) -> string")]
+    [InlineData(NullableContextOptions.Disable, "(string?:value) -> string?")]
+    [InlineData(NullableContextOptions.Warnings, "(string?:value) -> string?")]
     public void EvaluatedProjectContextControlsObliviousDeclarations(
         NullableContextOptions nullableContext,
         string expectedSignature)
@@ -40,11 +40,11 @@ public sealed class Issue1401NullableContextConversionTests
     [InlineData(
         NullableContextOptions.Enable,
         "#nullable disable",
-        "(?str:value) -> ?str")]
+        "(string?:value) -> string?")]
     [InlineData(
         NullableContextOptions.Disable,
         "#nullable enable",
-        "(str:value) -> str")]
+        "(string:value) -> string")]
     public void FileDirectiveOverridesEvaluatedProjectContext(
         NullableContextOptions projectContext,
         string directive,
@@ -86,9 +86,9 @@ public sealed class Issue1401NullableContextConversionTests
             """,
             NullableContextOptions.Disable);
 
-        Assert.Contains("§B{str:literal} \"safe\"", result.CalorSource);
+        Assert.Contains("§B{string:literal} \"safe\"", result.CalorSource);
         Assert.Contains("§B{Item:created} §NEW{Item}", result.CalorSource);
-        Assert.Contains("§B{?str:unknown}", result.CalorSource);
+        Assert.Contains("§B{string?:unknown}", result.CalorSource);
         Assert.DoesNotContain("Option<", result.CalorSource);
         Assert.DoesNotContain("§NN", result.CalorSource);
         Assert.DoesNotContain("§UNWRAP", result.CalorSource);
@@ -115,12 +115,12 @@ public sealed class Issue1401NullableContextConversionTests
 
         Assert.True(
             result.CalorSource!.Contains(
-                "§B{str:present}",
+                "§B{string:present}",
                 StringComparison.Ordinal),
             result.CalorSource);
         Assert.True(
             result.CalorSource.Contains(
-                "§B{?str:absent}",
+                "§B{string?:absent}",
                 StringComparison.Ordinal),
             result.CalorSource);
     }
@@ -144,7 +144,7 @@ public sealed class Issue1401NullableContextConversionTests
             """,
             NullableContextOptions.Enable);
 
-        Assert.Contains("§B{?str:value}", result.CalorSource);
+        Assert.Contains("§B{string?:value}", result.CalorSource);
     }
 
     [Fact]
@@ -166,8 +166,8 @@ public sealed class Issue1401NullableContextConversionTests
             """,
             NullableContextOptions.Enable);
 
-        Assert.Contains("§B{str:value}", result.CalorSource);
-        Assert.DoesNotContain("§B{?str:value}", result.CalorSource);
+        Assert.Contains("§B{string:value}", result.CalorSource);
+        Assert.DoesNotContain("§B{string?:value}", result.CalorSource);
     }
 
     [Fact]
@@ -190,7 +190,7 @@ public sealed class Issue1401NullableContextConversionTests
             """,
             NullableContextOptions.Enable);
 
-        Assert.Contains("§B{?str:value}", result.CalorSource);
+        Assert.Contains("§B{string?:value}", result.CalorSource);
     }
 
     [Fact]
@@ -213,8 +213,8 @@ public sealed class Issue1401NullableContextConversionTests
             """,
             NullableContextOptions.Enable);
 
-        Assert.Contains("§B{str:value}", result.CalorSource);
-        Assert.DoesNotContain("§B{?str:value}", result.CalorSource);
+        Assert.Contains("§B{string:value}", result.CalorSource);
+        Assert.DoesNotContain("§B{string?:value}", result.CalorSource);
     }
 
     [Fact]
@@ -272,7 +272,7 @@ public sealed class Issue1401NullableContextConversionTests
             """,
             NullableContextOptions.Disable);
 
-        Assert.Contains("() -> ?str", result.CalorSource);
+        Assert.Contains("() -> string?", result.CalorSource);
     }
 
     [Fact]
@@ -298,10 +298,10 @@ public sealed class Issue1401NullableContextConversionTests
                 "Fixture.cs");
 
         Assert.Contains(
-            "() -> IAsyncEnumerable<str>",
+            "() -> IAsyncEnumerable<string>",
             result.CalorSource);
         Assert.DoesNotContain(
-            "() -> ?IAsyncEnumerable<str>",
+            "() -> IAsyncEnumerable<string>?",
             result.CalorSource);
     }
 
@@ -317,8 +317,8 @@ public sealed class Issue1401NullableContextConversionTests
             """,
             NullableContextOptions.Disable);
 
-        Assert.Contains("() -> str[]", result.CalorSource);
-        Assert.DoesNotContain("() -> str[]?", result.CalorSource);
+        Assert.Contains("() -> string[]", result.CalorSource);
+        Assert.DoesNotContain("() -> string[]?", result.CalorSource);
         Assert.Contains(
             result.Issues,
             issue => issue.Feature == "nullable-oblivious-nested-shape"
@@ -343,7 +343,7 @@ public sealed class Issue1401NullableContextConversionTests
             """,
             NullableContextOptions.Disable);
 
-        Assert.Contains("§B{~value:?str} \"safe\"", result.CalorSource);
+        Assert.Contains("§B{~value:string?} \"safe\"", result.CalorSource);
     }
 
     [Theory]
@@ -368,7 +368,7 @@ public sealed class Issue1401NullableContextConversionTests
             """,
             NullableContextOptions.Disable);
 
-        Assert.Contains("§B{~value:?str} \"safe\"", result.CalorSource);
+        Assert.Contains("§B{~value:string?} \"safe\"", result.CalorSource);
     }
 
     [Fact]
@@ -393,7 +393,7 @@ public sealed class Issue1401NullableContextConversionTests
             NullableContextOptions.Disable);
 
         Assert.Contains("§B{Item:value} §NEW{Item}", result.CalorSource);
-        Assert.DoesNotContain("§B{?Item:value}", result.CalorSource);
+        Assert.DoesNotContain("§B{Item?:value}", result.CalorSource);
     }
 
     [Fact]
@@ -440,8 +440,8 @@ public sealed class Issue1401NullableContextConversionTests
             """,
             NullableContextOptions.Enable);
 
-        Assert.Contains("§B{?i32:value}", result.CalorSource);
-        Assert.DoesNotContain("§B{??i32:value}", result.CalorSource);
+        Assert.Contains("§B{int?:value}", result.CalorSource);
+        Assert.DoesNotContain("§B{int??:value}", result.CalorSource);
     }
 
     [Fact]
@@ -509,7 +509,7 @@ public sealed class Issue1401NullableContextConversionTests
             Assert.True(result.Success, FormatIssues(result));
             Assert.True(
                 result.CalorSource!.Contains(
-                    "§B{?str:value}",
+                    "§B{string?:value}",
                     StringComparison.Ordinal),
                 result.CalorSource);
             Assert.DoesNotContain("Option<", result.CalorSource);
@@ -658,7 +658,7 @@ public sealed class Issue1401NullableContextConversionTests
                         Path.Combine(directory, "Fixture.cs")),
                     Path.Combine(directory, "Fixture.cs"));
             Assert.True(direct.Success, FormatIssues(direct));
-            Assert.Contains("(?str:value) -> ?str", direct.CalorSource);
+            Assert.Contains("(string?:value) -> string?", direct.CalorSource);
 
             var migrator = new ProjectMigrator(
                 new MigrationPlanOptions
@@ -694,7 +694,7 @@ public sealed class Issue1401NullableContextConversionTests
             Assert.NotEmpty(file.Metadata.References);
             Assert.True(
                 file.ConvertedSource!.Contains(
-                    "(?str:value) -> ?str",
+                    "(string?:value) -> string?",
                     StringComparison.Ordinal),
                 file.ConvertedSource);
         }
@@ -761,7 +761,7 @@ public sealed class Issue1401NullableContextConversionTests
             Assert.DoesNotContain(
                 file.Issues,
                 issue => issue.Severity == ConversionIssueSeverity.Error);
-            Assert.Contains("(?str:value) -> ?str", file.ConvertedSource);
+            Assert.Contains("(string?:value) -> string?", file.ConvertedSource);
             var compiled = Program.Compile(
                 file.ConvertedSource!,
                 "Fixture.calr",
@@ -843,7 +843,7 @@ public sealed class Issue1401NullableContextConversionTests
             Assert.DoesNotContain(
                 consumer.Issues,
                 issue => issue.Feature == "nullable-semantic-unresolved");
-            Assert.Contains("§B{Task<?str>:value}", consumer.ConvertedSource);
+            Assert.Contains("§B{Task<string?>:value}", consumer.ConvertedSource);
         }
         finally
         {

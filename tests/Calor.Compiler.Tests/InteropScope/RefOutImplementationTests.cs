@@ -442,7 +442,7 @@ public class RefOutImplementationTests
     public void OutVar_IsLoweredBeforeItsStatement()
     {
         var calor = new CSharpToCalorConverter().Convert(R0Fixture("F1-REFOUT-02")).CalorSource!;
-        Assert.Contains("§B{~n:i32} `default`\n        §R (? §C{int.TryParse} §A text §A{out} n §/C n (- 1))", calor.Replace("\r\n", "\n"));
+        Assert.Contains("§B{~n:int} `default`\n        §R (? §C{int.TryParse} §A text §A{out} n §/C n (- 1))", calor.Replace("\r\n", "\n"));
         Assert.Contains("§A{out} _ §/C", calor);
     }
 
@@ -563,7 +563,7 @@ public class RefOutImplementationTests
     public void OutDeclaration_IsLoweredWithAnExplicitDefault()
     {
         var calor = new CSharpToCalorConverter().Convert("public static class Probe { static bool Set(out string value) { value = \"ok\"; return true; } public static string Run() { Set(out string value); return value; } }").CalorSource!;
-        Assert.Contains("§B{~value:str} `default`\n        §C{Set} §A{out} value §/C", calor.Replace("\r\n", "\n"));
+        Assert.Contains("§B{~value:string} `default`\n        §C{Set} §A{out} value §/C", calor.Replace("\r\n", "\n"));
     }
 
     [Theory]

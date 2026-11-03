@@ -204,7 +204,7 @@ public class LinqSupportTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.DoesNotContain("§ERR", result.CalorSource);
-        Assert.Contains("§ARR{arr:f64}", result.CalorSource);
+        Assert.Contains("§ARR{arr:double}", result.CalorSource);
     }
 
     [Fact]
@@ -221,7 +221,7 @@ public class LinqSupportTests
         Assert.DoesNotContain("§ERR", result.CalorSource);
         // #1132: an empty initializer is a fresh zero-length array, not the shared
         // Array.Empty<T>() (`new int[0] == new int[0]` is false in C#).
-        Assert.Contains("§ARR{i32:0}", result.CalorSource);
+        Assert.Contains("§ARR{int:0}", result.CalorSource);
         Assert.DoesNotContain("Array.Empty", result.CalorSource);
     }
 
@@ -238,7 +238,7 @@ public class LinqSupportTests
         Assert.NotNull(result.CalorSource);
         // Element type should be inferred from the int[,] declaration. #1132: a bare
         // initializer of a declared int[,] is a rectangular §ARR2D, not a 1-D §ARR of rows.
-        Assert.Contains("§ARR2D{i32}", result.CalorSource);
+        Assert.Contains("§ARR2D{int}", result.CalorSource);
         Assert.Contains("§ROW 1 2", result.CalorSource);
         Assert.DoesNotContain("§ARR{matrix", result.CalorSource);
     }

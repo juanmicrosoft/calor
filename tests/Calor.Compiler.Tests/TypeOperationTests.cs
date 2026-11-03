@@ -129,13 +129,13 @@ public class TypeOperationTests
     #region Round-Trip Tests
 
     [Theory]
-    [InlineData("(cast i32 x)")]
-    [InlineData("(cast f64 x)")]
-    [InlineData("(cast str x)")]
-    [InlineData("(is x str)")]
-    [InlineData("(is x i32)")]
+    [InlineData("(cast int x)")]
+    [InlineData("(cast double x)")]
+    [InlineData("(cast string x)")]
+    [InlineData("(is x string)")]
+    [InlineData("(is x int)")]
     [InlineData("(is x MyClass)")]
-    [InlineData("(as x str)")]
+    [InlineData("(as x string)")]
     [InlineData("(as x MyClass)")]
     public void RoundTrip_TypeOp_ProducesValidCalor(string op)
     {
@@ -370,7 +370,7 @@ public class TypeOperationTests
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
 
-        Assert.Contains("(cast i32 x)", calor);
+        Assert.Contains("(cast int x)", calor);
     }
 
     [Fact]
@@ -385,7 +385,7 @@ public class TypeOperationTests
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
 
-        Assert.Contains("(as x str)", calor);
+        Assert.Contains("(as x string)", calor);
     }
 
     [Fact]
@@ -400,7 +400,7 @@ public class TypeOperationTests
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
 
-        Assert.Contains("(is x str)", calor);
+        Assert.Contains("(is x string)", calor);
     }
 
     [Fact]
@@ -416,7 +416,7 @@ public class TypeOperationTests
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
 
-        Assert.Contains("(is x str s)", calor);
+        Assert.Contains("(is x string s)", calor);
     }
 
     #endregion
@@ -504,7 +504,7 @@ public class TypeOperationTests
         var calorEmitter = new CalorEmitter();
         var roundTripped = calorEmitter.Emit(module);
 
-        Assert.Contains("(cast i32 (cast f64 x))", roundTripped);
+        Assert.Contains("(cast int (cast double x))", roundTripped);
     }
 
     #endregion

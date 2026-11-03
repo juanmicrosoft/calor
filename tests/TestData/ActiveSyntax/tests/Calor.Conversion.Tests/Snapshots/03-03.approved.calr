@@ -1,0 +1,10 @@
+§M{Test_03_03:overflow=unchecked}
+  §CL{Loops:pub}
+    §MT{CountDown:pub} (int:start) -> int
+      §B{~count:int} 0
+      §WH (> start 0)
+        §ASSIGN start (- start 1)
+        §ASSIGN count (+ count 1)
+      §R count
+
+

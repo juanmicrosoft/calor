@@ -962,7 +962,7 @@ public class CallExpressionImplicitCloseTests
             new CallExpressionNode(default, "Foo", new List<ExpressionNode>()),
             "str");
         var emitted = EmitWithImplicitCloser(typeOp);
-        Assert.Equal("(is §C{Foo} §/C str)", emitted);
+        Assert.Equal("(is §C{Foo} §/C string)", emitted);
 
         var typeOpAs = new TypeOperationNode(
             default,
@@ -970,7 +970,7 @@ public class CallExpressionImplicitCloseTests
             new CallExpressionNode(default, "Foo", new List<ExpressionNode>()),
             "str");
         var emittedAs = EmitWithImplicitCloser(typeOpAs);
-        Assert.Equal("(as §C{Foo} §/C str)", emittedAs);
+        Assert.Equal("(as §C{Foo} §/C string)", emittedAs);
     }
 
     [Fact]
@@ -1141,9 +1141,9 @@ public class CallExpressionImplicitCloseTests
             new Migration.ConversionContext { UseImplicitCallCloser = true });
         var emitted = module.Accept<string>(fullEmitter);
         // Emitted form must still close the operand call.
-        Assert.Contains("(is §C{Foo} §/C str)", emitted);
+        Assert.Contains("(is §C{Foo} §/C string)", emitted);
 
-        // And it must re-parse identically.
+        // The call and canonical type must survive re-parsing.
         var module2 = Parse(emitted, out var diags2);
         Assert.False(diags2.HasErrors,
             $"Re-parse errors: {string.Join("; ", diags2.Errors.Select(e => e.Message))}");
@@ -1152,7 +1152,7 @@ public class CallExpressionImplicitCloseTests
         var operandCall = Assert.IsType<CallExpressionNode>(isPattern.Operand);
         Assert.Equal("Foo", operandCall.Target);
         Assert.Empty(operandCall.Arguments);
-        Assert.Equal("str", isPattern.TargetType);
+        Assert.Equal("string", isPattern.TargetType);
     }
 
     [Fact]

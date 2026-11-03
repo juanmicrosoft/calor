@@ -1,0 +1,12 @@
+§M{Test_11_01:overflow=unchecked}
+  §CL{Validator:pub}
+    §MT{IsInRange:pub} (int:x) -> bool
+      §R (&& (> x 0) (< x 100))
+
+    §MT{IsOutOfRange:pub} (int:x) -> bool
+      §R (|| (< x 0) (> x 100))
+
+    §MT{IsNotNegative:pub} (int:x) -> bool
+      §R (! (< x 0))
+
+

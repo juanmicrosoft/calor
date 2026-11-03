@@ -2,10 +2,10 @@
   §U{System.Collections.Generic}
 
   §CL{Bag:pub}
-    §PROP{Items:List<i32>:pub:get} = §LIST{i32} 1 §/LIST
+    §PROP{Items:List<int>:pub:get} = §LIST{int} 1 §/LIST
 
 
   §M{InitializerInterop:pub}
-    §F{Verify:pub} () -> i32
+    §F{Verify:pub} () -> int
       §B{bag} (cast Bag §CS{(new Bag { Items = { 2, 3 } })})
       §R (+ (* bag.Items.Count 10) §IDX bag.Items 2)

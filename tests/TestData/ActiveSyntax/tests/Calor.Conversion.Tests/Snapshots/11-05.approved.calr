@@ -1,0 +1,15 @@
+§M{Test_11_05:overflow=unchecked}
+  §U{System.Collections.Generic}
+  §U{System.Collections.Immutable}
+
+  §CL{DictExample:pub}
+    §MT{GetScores:pub} () -> Dict<string, int>
+      §E{alloc}
+      §DICT{dict003:string:int}
+        §KV "Alice" 95
+        §KV "Bob" 87
+        §KV "Charlie" 92
+      §R dict003
+
+    §MT{GetImmutableScores:pub} () -> ImmutableDictionary<string, int>
+      §R ImmutableDictionary<string, int>.Empty

@@ -1,0 +1,8 @@
+§M{Test_06_03:overflow=unchecked}
+  §CL{PatternDemo:pub}
+    §MT{GetLength:pub} (object:value) -> int
+      §IF (is value string text)
+        §R (len text)
+      §R 0
+
+

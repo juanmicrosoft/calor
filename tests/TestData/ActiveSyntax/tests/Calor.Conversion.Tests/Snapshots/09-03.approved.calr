@@ -1,0 +1,14 @@
+§M{Test_09_03:overflow=unchecked}
+  §CL{ListPatternDemo:pub}
+    §MT{Classify:pub} (int[]:list) -> string
+      §R §W list
+        §K §PLIST  → "empty"
+        §K §PLIST §VAR{single} → "one: ${single}"
+        §K §PLIST §VAR{first} §REST{rest} → "starts with ${first}"
+        §K §PLIST 1 2 §REST{_} → "starts with 1,2"
+
+    §MT{IsFirstAndLast:pub} (int[]:list) -> bool
+      §R §W list
+        §K §PLIST §VAR{first} §REST{_} §VAR{last} → true
+        §K _ → false
+

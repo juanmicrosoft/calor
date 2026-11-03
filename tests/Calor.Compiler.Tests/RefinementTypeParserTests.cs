@@ -402,7 +402,7 @@ public sealed class RefinementTypeParserTests
 
         var calor = ParseAndEmitCalor(source);
 
-        Assert.Contains("§RTYPE{NatInt:i32}", calor);
+        Assert.Contains("§RTYPE{NatInt:int}", calor);
         Assert.Contains("#", calor);
     }
 

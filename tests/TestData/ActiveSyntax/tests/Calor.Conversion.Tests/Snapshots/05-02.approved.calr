@@ -1,0 +1,11 @@
+§M{Test_05_02:overflow=unchecked}
+  §U{System.Linq}
+  §U{System.Collections.Generic}
+
+  §CL{Filter:pub}
+    §MT{GetPositive:pub} (List<int>:items) -> List<int>
+      §B{_lamWhere004} §LAM{x:int} (> x 0) §/LAM
+      §B{_chainWhere005} §C{items.Where} _lamWhere004
+      §R §C{_chainWhere005.ToList}
+
+

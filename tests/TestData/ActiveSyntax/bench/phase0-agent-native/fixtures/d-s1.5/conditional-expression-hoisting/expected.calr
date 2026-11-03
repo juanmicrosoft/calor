@@ -1,28 +1,28 @@
 §M{Fixture:overflow=unchecked}
   §M{ConditionalExpressionFixture:pub}
-    §F{Run:pub} () -> i32
-      §B{~i:i32} 0
+    §F{Run:pub} () -> int
+      §B{~i:int} 0
       §B{~gate:bool} false
-      §B{bool:ignored} (&& gate (> (cast i32 §CS{(i++)}) 0))
+      §B{bool:ignored} (&& gate (> (cast int §CS{(i++)}) 0))
       §IF (|| ignored (!= i 0))
         §R (- 1)
       §ASSIGN gate true
-      §B{~selectedAnd:bool} (&& gate (== (cast i32 §CS{(i++)}) 0))
+      §B{~selectedAnd:bool} (&& gate (== (cast int §CS{(i++)}) 0))
       §IF (|| (! selectedAnd) (!= i 1))
         §R (- 2)
-      §B{~skippedOr:bool} (|| gate (> (cast i32 §CS{(++i)}) 0))
+      §B{~skippedOr:bool} (|| gate (> (cast int §CS{(++i)}) 0))
       §IF (|| (! skippedOr) (!= i 1))
         §R (- 3)
       §ASSIGN gate false
-      §B{~selectedOr:bool} (|| gate (== (cast i32 §CS{(++i)}) 2))
+      §B{~selectedOr:bool} (|| gate (== (cast int §CS{(++i)}) 2))
       §IF (|| (! selectedOr) (!= i 2))
         §R (- 4)
       §ASSIGN gate true
-      §B{i32:selected} §IF gate → (cast i32 §CS{(i++)}) §EL → (cast i32 §CS{(++i)})
+      §B{int:selected} §IF gate → (cast int §CS{(i++)}) §EL → (cast int §CS{(++i)})
       §IF (|| (!= selected 2) (!= i 3))
         §R (- 5)
       §ASSIGN gate false
-      §B{i32:alternate} §IF gate → (cast i32 §CS{(++i)}) §EL → 9
+      §B{int:alternate} §IF gate → (cast int §CS{(++i)}) §EL → 9
       §IF (|| (!= alternate 9) (!= i 3))
         §R (- 6)
       §R (+ (+ (* i 100) (* selected 10)) alternate)

@@ -182,7 +182,7 @@ public sealed class LiteralRawSemanticsTests
     }
 
     [Fact]
-    public void PlaceholderIntent_DistinguishesNegativeExpressionFromLiteralPlaceholder()
+    public void NumericInterpolation_IsRuntimeUnlessEscaped()
     {
         var negative = Assert.IsType<InterpolatedStringNode>(
             ParseExpression("\"${-1}\"", out var negativeDiagnostics));
@@ -201,10 +201,10 @@ public sealed class LiteralRawSemanticsTests
             Assert.Single(placeholder.Parts));
         Assert.False(placeholderDiagnostics.HasErrors);
         Assert.IsType<IntLiteralNode>(placeholderPart.Expression);
-        Assert.Equal(InterpolationPartIntent.LiteralPlaceholder, placeholderPart.Intent);
+        Assert.Equal(InterpolationPartIntent.Expression, placeholderPart.Intent);
         var placeholderCSharp = placeholder.Accept(new CSharpEmitter());
-        Assert.Equal("\"${0}\"", placeholderCSharp);
-        Assert.Equal("${0}", EvaluateStringExpression(placeholderCSharp));
+        Assert.Equal("$\"{0}\"", placeholderCSharp);
+        Assert.Equal("0", EvaluateStringExpression(placeholderCSharp));
 
         var escaped = Assert.IsType<StringLiteralNode>(
             ParseExpression("\"\\${-1}\"", out var escapedDiagnostics));
@@ -213,7 +213,7 @@ public sealed class LiteralRawSemanticsTests
     }
 
     [Fact]
-    public void MixedExpressionAndLiteralPlaceholder_EmitsIntentNotNodeShape()
+    public void MixedVariableAndDigitHoles_AreRuntimeExpressions()
     {
         var interpolated = Assert.IsType<InterpolatedStringNode>(
             ParseExpression("\"${name} ${0}\"", out var diagnostics));
@@ -222,8 +222,115 @@ public sealed class LiteralRawSemanticsTests
         var expression = Assert.IsType<InterpolatedStringExpressionNode>(interpolated.Parts[0]);
         var placeholder = Assert.IsType<InterpolatedStringExpressionNode>(interpolated.Parts[2]);
         Assert.Equal(InterpolationPartIntent.Expression, expression.Intent);
-        Assert.Equal(InterpolationPartIntent.LiteralPlaceholder, placeholder.Intent);
-        Assert.Equal("$\"{name} ${{0}}\"", interpolated.Accept(new CSharpEmitter()));
+        Assert.Equal(InterpolationPartIntent.Expression, placeholder.Intent);
+        Assert.Equal("$\"{name} {0}\"", interpolated.Accept(new CSharpEmitter()));
+    }
+
+    [Theory]
+    [InlineData("\"${1}\"", "1")]
+    [InlineData("\"${1,4:D2}\"", "  01")]
+    [InlineData("\"${1,-4:D2}\"", "01  ")]
+    [InlineData("\"\\${0}\"", "${0}")]
+    [InlineData("\"\\${1,4:D2}\"", "${1,4:D2}")]
+    [InlineData("\"${(+ 1 2)} lit=\\${0}\"", "3 lit=${0}")]
+    [InlineData("\"${1} ${-1} ${1.5f:F1}\"", "1 -1 1.5")]
+    [InlineData("\"\"\"${1,4:D2} \\${0}\"\"\"", "  01 ${0}")]
+    public void MeasuredInterpolation_RoundTripsRuntimeAndLiteralHoles(string source, string expected)
+    {
+        var expression = ParseExpression(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+        Assert.Equal(expected, EvaluateStringExpression(expression.Accept(new CSharpEmitter())));
+        var emitted = expression.Accept(new CalorEmitter());
+        Assert.DoesNotContain("INT:", emitted);
+        Assert.DoesNotContain("SINGLE:", emitted);
+        var reparsed = ParseExpression(emitted, out var replayDiagnostics);
+        Assert.False(replayDiagnostics.HasErrors, string.Join("\n", replayDiagnostics.Errors));
+        Assert.Equal(expected, EvaluateStringExpression(reparsed.Accept(new CSharpEmitter())));
+        Assert.Equal(emitted, reparsed.Accept(new CalorEmitter()));
+    }
+
+    [Theory]
+    [InlineData("-0x8000000000000000L")]
+    [InlineData("18446744073709551615UL")]
+    [InlineData("4294967295U")]
+    [InlineData("-9223372036854775808L")]
+    [InlineData("9223372036854775807L")]
+    [InlineData("-0f")]
+    [InlineData("1.4e-45f")]
+    [InlineData("1.2345678901234567890123456789m")]
+    [InlineData("79228162514264337593543950335m")]
+    [InlineData("1e-28m")]
+    [InlineData("-0.0000m")]
+    [InlineData("0.0000m")]
+    [InlineData("-0.0")]
+    public void BareLiteralEmission_PreservesWidthValueAndSign(string source)
+    {
+        var expression = ParseExpression(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+        var emitted = expression.Accept(new CalorEmitter());
+        Assert.DoesNotContain(":", emitted);
+        var replay = ParseExpression(emitted, out var replayDiagnostics);
+        Assert.False(replayDiagnostics.HasErrors, string.Join("\n", replayDiagnostics.Errors));
+        Assert.Equal(expression.Accept(new CSharpEmitter()), replay.Accept(new CSharpEmitter()));
+        Assert.Equal(emitted, replay.Accept(new CalorEmitter()));
+        if (expression is DecimalLiteralNode originalDecimal)
+        {
+            var replayDecimal = Assert.IsType<DecimalLiteralNode>(replay);
+            Assert.Equal(decimal.GetBits(originalDecimal.Value), decimal.GetBits(replayDecimal.Value));
+            var runtimeDecimal = Assert.IsType<decimal>(
+                InvokeObject(CompileCSharp(
+                    $"public static class DecimalProbe {{ public static object Value() => {emitted}; }}"),
+                    "DecimalProbe", "Value"));
+            Assert.Equal(decimal.GetBits(originalDecimal.Value), decimal.GetBits(runtimeDecimal));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LiteralStringEmission_PreservesEscapesAndLiteralDigitHoles(bool multiline)
+    {
+        const string value = "${0}\r\n\"\\\0\a\b\f\t\v\u0001\uD800";
+        var literal = new StringLiteralNode(default, value) { IsMultiline = multiline };
+        var emitted = literal.Accept(new CalorEmitter());
+        var replay = Assert.IsType<StringLiteralNode>(ParseExpression(emitted, out var diagnostics));
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+        Assert.Equal(value, replay.Value);
+        Assert.Equal(value, EvaluateStringExpression(replay.Accept(new CSharpEmitter())));
+        Assert.Equal(emitted, replay.Accept(new CalorEmitter()));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("0,4:D2")]
+    public void ProgrammaticLiteralPlaceholder_EmitsEscapedText(string? sourceText)
+    {
+        var part = new InterpolatedStringExpressionNode(
+            default, new IntLiteralNode(default, 0), formatSpecifier: "D2",
+            alignmentClause: "4", intent: InterpolationPartIntent.LiteralPlaceholder,
+            sourceText: sourceText);
+        var expression = new InterpolatedStringNode(default, [part]);
+        var emitted = expression.Accept(new CalorEmitter());
+        Assert.Equal("\"\\${0,4:D2}\"", emitted);
+        var replay = Assert.IsType<StringLiteralNode>(ParseExpression(emitted, out var diagnostics));
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+        Assert.Equal("${0,4:D2}", replay.Value);
+    }
+
+    [Theory]
+    [InlineData("1e309")]
+    [InlineData("-1e309")]
+    [InlineData("3.5e38f")]
+    [InlineData("79228162514264337593543950336m")]
+    [InlineData("18446744073709551616UL")]
+    [InlineData("9223372036854775808L")]
+    [InlineData("\"${0\"")]
+    [InlineData("\"\"\"${0\"\"\"")]
+    public void InvalidMeasuredLiteral_IsRejected(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        _ = new Lexer(source, diagnostics).TokenizeAll();
+        Assert.True(diagnostics.HasErrors);
     }
 
     [Fact]

@@ -1,0 +1,9 @@
+§M{Test_02_02:overflow=unchecked}
+  §U{System.Collections.Generic}
+
+  §IFACE{IRepository<T>}
+    §WHERE T : class
+    §MT{GetById} (int:id) -> T
+    §MT{Save} (T:entity)
+    §MT{GetAll} () -> Seq<T>
+

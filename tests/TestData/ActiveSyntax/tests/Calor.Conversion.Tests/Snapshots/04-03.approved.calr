@@ -1,0 +1,20 @@
+§M{Test_04_03:overflow=unchecked}
+  §U{System}
+
+  §CL{Shape:pub}
+    §MT{Area:pub:virt} () -> double
+      §R 0
+
+
+  §CL{Circle:pub}
+    §EXT{Shape}
+
+    §PROP{Radius:double:pub:get}
+
+    §CTOR{pub} (double:radius)
+      §ASSIGN Radius radius
+
+    §MT{Area:pub:over} () -> double
+      §R (* (* Math.PI Radius) Radius)
+
+

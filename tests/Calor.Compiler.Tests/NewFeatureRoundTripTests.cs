@@ -457,9 +457,9 @@ public class NewFeatureRoundTripTests
         var (original, formatted, reparsed) = FormatAndReparse(source);
 
         // Immutable typed bind should format as {type:name}
-        Assert.Contains("§B{i32:count}", formatted);
+        Assert.Contains("§B{int:count}", formatted);
         // Mutable typed bind should format as {~name:type}
-        Assert.Contains("§B{~total:i32}", formatted);
+        Assert.Contains("§B{~total:int}", formatted);
 
         // Round-trip preserves semantics
         var func = Assert.Single(reparsed.Functions);
@@ -603,7 +603,7 @@ public class NewFeatureRoundTripTests
           §F{Main:pub} () -> void
             §E{}
             §B{f} §LAM{x:i32} §E{cw} (+ x INT:1) §/LAM
-        """, "§LAM{x:i32} §E{cw}")]
+        """, "§LAM{x:int} §E{cw}")]
     // position 3 — delegate declaration. Emitted as `§E{[console, write]}` before
     // this slice: a stringified KeyValuePair that did not re-parse.
     [InlineData("""
@@ -624,14 +624,14 @@ public class NewFeatureRoundTripTests
             §O{i32}
             §E{cw}
             §R INT:0
-        """, "§I{Func<i32, i32>:transform} §E{cw}")]
+        """, "§I{Func<int, int>:transform} §E{cw}")]
     // position 5 — parameter, inline form
     [InlineData("""
         §M{R}
           §F{Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
             §E{cw}
             §R INT:0
-        """, "Func<i32, i32>:transform §E{cw}")]
+        """, "Func<int, int>:transform §E{cw}")]
     // position 6 — return, §O spelling
     [InlineData("""
         §M{R}
@@ -639,21 +639,21 @@ public class NewFeatureRoundTripTests
             §O{Func<i32>} §E{cw}
             §E{cw}
             §R §LAM{} INT:0 §/LAM
-        """, "-> Func<i32> §E{cw}")]
+        """, "-> Func<int> §E{cw}")]
     // position 6 — return, arrow spelling
     [InlineData("""
         §M{R}
           §F{Make:pub} () -> Func<i32> §E{cw}
             §E{cw}
             §R §LAM{} INT:0 §/LAM
-        """, "-> Func<i32> §E{cw}")]
+        """, "-> Func<int> §E{cw}")]
     // position 7 — binding
     [InlineData("""
         §M{R}
           §F{Main:pub} () -> void
             §E{}
             §B{f:Func<i32,i32>} §E{cw} §LAM{x:i32} (+ x INT:1) §/LAM
-        """, "§B{Func<i32, i32>:f} §E{cw}")]
+        """, "§B{Func<int, int>:f} §E{cw}")]
     // position 8 — field
     [InlineData("""
         §M{R}
@@ -661,14 +661,14 @@ public class NewFeatureRoundTripTests
             §FLD{Action<i32>:onChange:priv} §E{cw}
             §MT{M:pub} () -> void
               §E{}
-        """, "§FLD{Action<i32>:onChange:priv} §E{cw}")]
+        """, "§FLD{Action<int>:onChange:priv} §E{cw}")]
     // an empty row is not the same as no row (§3.5) and must survive
     [InlineData("""
         §M{R}
           §F{Apply:pub} (Func<i32,i32>:a §E{}, Func<i32,i32>:b) -> i32
             §E{}
             §R INT:0
-        """, "Func<i32, i32>:a §E{}")]
+        """, "Func<int, int>:a §E{}")]
     // the `eff` binder, written last in the type-parameter list
     [InlineData("""
         §M{R}

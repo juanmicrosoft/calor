@@ -1,0 +1,21 @@
+§M{Test_13_10:overflow=unchecked}
+  §U{System.Collections.Generic}
+
+  §CL{MatchListDemo:pub}
+    §MT{GetItems:pub} (int:category) -> List<string>
+      §E{alloc}
+      §R §W category
+        §K 1
+          §LIST{_listStr005:string}
+            "a"
+            "b"
+          §R _listStr005
+        §/K
+        §K 2
+          §LIST{_listStr007:string}
+            "c"
+            "d"
+            "e"
+          §R _listStr007
+        §/K
+        §K _ → §NEW{List<string>} §/NEW

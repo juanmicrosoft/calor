@@ -1,6 +1,6 @@
 §M{Fixture:overflow=unchecked}
   §M{LocalFunctionFixture:pub}
-    §F{Add:pub} (i32:x) -> i32
+    §F{Add:pub} (int:x) -> int
       §R (+ x 1000)
 
     §CSHARP{

@@ -1,0 +1,13 @@
+§M{Test_12_03:overflow=unchecked}
+  §CL{Vector2:pub:struct}
+    §FLD{float:X:pub}
+    §FLD{float:Y:pub}
+
+    §CTOR{pub} (float:x, float:y)
+      §ASSIGN X x
+      §ASSIGN Y y
+
+    §OP{+:pub} (Vector2:a, Vector2:b) -> Vector2
+      §R §NEW{Vector2} §A (+ a.X b.X) §A (+ a.Y b.Y) §/NEW
+
+

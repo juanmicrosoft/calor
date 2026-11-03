@@ -1,0 +1,14 @@
+§M{Test_11_03:overflow=unchecked}
+  §CL{Container:pub}
+    §MT{GetStatus:pub} () -> Status
+      §R Status.Active
+
+    §CL{Inner:priv}
+      §PROP{Value:int:pub:get,set}
+
+
+    §EN{Status:priv}
+      Active
+      Inactive
+
+

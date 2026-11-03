@@ -1,0 +1,9 @@
+§M{Test_01_01:overflow=unchecked}
+  §CL{Calculator:pub}
+    §MT{Add:pub} (int:a, int:b) -> int
+      §R (+ a b)
+
+    §MT{Subtract:pub} (int:a, int:b) -> int
+      §R (- a b)
+
+

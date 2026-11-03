@@ -1,52 +1,52 @@
 §M{Fixture:overflow=unchecked}
   §PP{FEATURE}
     §CL{ConditionalClass:pub}
-      §MT{Value:pub:stat} () -> i32
+      §MT{Value:pub:stat} () -> int
         §R 1
 
 
     §CSHARP{public record ConditionalRecord(int Value);
 }§/CSHARP
     §DEL{ConditionalDelegate}
-      §I{i32:value}
-      §O{i32}
+      §I{int:value}
+      §O{int}
 
     §CL{ConditionalPartial:pub:partial}
-      §MT{PartialValue:pub:stat} () -> i32
+      §MT{PartialValue:pub:stat} () -> int
         §R 10
 
 
   §PPE
     §CL{ConditionalClass:pub}
-      §MT{Value:pub:stat} () -> i32
+      §MT{Value:pub:stat} () -> int
         §R 2
 
 
     §CL{ConditionalRecord:pub:seal}
-      §PROP{Value:i32:pub:get}
+      §PROP{Value:int:pub:get}
 
-      §CTOR{pub} (i32:value)
+      §CTOR{pub} (int:value)
         §ASSIGN Value value
 
 
     §DEL{ConditionalDelegate}
-      §I{i32:value}
-      §O{i32}
+      §I{int:value}
+      §O{int}
 
     §CL{ConditionalPartial:pub:partial}
-      §MT{PartialValue:pub:stat} () -> i32
+      §MT{PartialValue:pub:stat} () -> int
         §R 20
 
 
   §/PP{FEATURE}
 
   §CL{ConditionalPartial:pub:partial}
-    §MT{Shared:pub:stat} () -> i32
+    §MT{Shared:pub:stat} () -> int
       §R 100
 
 
   §M{ConditionalHarness:pub}
-    §F{Get:pub} () -> i32
+    §F{Get:pub} () -> int
       §E{alloc}
-      §B{ConditionalDelegate:d} §LAM{value:i32} (+ value 1) §/LAM
+      §B{ConditionalDelegate:d} §LAM{value:int} (+ value 1) §/LAM
       §R (+ (+ (+ (+ §C{ConditionalClass.Value} §/C §NEW{ConditionalRecord} §A 3 §/NEW.Value) §C{d} §A 4 §/C) §C{ConditionalPartial.PartialValue} §/C) §C{ConditionalPartial.Shared} §/C)

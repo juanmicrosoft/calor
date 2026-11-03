@@ -72,9 +72,9 @@ Named and numeric interpolation expressions, alignment, and format clauses are
 preserved. Unknown escapes retain their backslash and character rather than
 silently dropping the backslash.
 
-Numeric placeholder syntax such as `${0}` is preserved as literal placeholder
-text. Its intent is recorded explicitly in the AST; `${-1}` is an expression
-and evaluates to `-1`, while `\${-1}` remains literal text.
+Every unescaped hole is a runtime expression: `${0}` evaluates to `0`, and
+`${-1}` evaluates to `-1`. Use `\${0}` for literal placeholder text. Alignment
+and format clauses work for numeric holes too: `${1,4:D2}` produces `  01`.
 
 Interpolated UTF-8 literals are rejected with `Calor0011`. Use interpolation
 to produce a string and encode it explicitly; Calor never emits invalid

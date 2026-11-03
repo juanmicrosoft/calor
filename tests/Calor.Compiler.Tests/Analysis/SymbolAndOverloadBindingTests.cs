@@ -459,7 +459,7 @@ public sealed class SymbolAndOverloadBindingTests
         Assert.Equal(1, boundCalls[0].ResolvedSymbol!.GenericArity);
         Assert.Equal(2, boundCalls[1].ResolvedSymbol!.GenericArity);
         Assert.Equal("Select<int>(1);", new CSharpEmitter().Visit(astCalls[0]));
-        Assert.Contains("§C{Select<i32>}", new CalorEmitter().Emit(module));
+        Assert.Contains("§C{Select<int>}", new CalorEmitter().Emit(module));
     }
 
     [Fact]

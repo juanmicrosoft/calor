@@ -135,14 +135,15 @@ public static class AttributeHelper
                 return IsLikelyType(value[..bracketStart]);
         }
 
-        var lower = value.ToLowerInvariant();
-        return lower switch
+        return value switch
         {
             "i8" or "i16" or "i32" or "i64" => true,
             "u8" or "u16" or "u32" or "u64" => true,
             "f32" or "f64" or "decimal" or "dec" => true,
-            "int" or "float" or "str" or "string" or "bool" or "void" or "char" or "var" or "any" or "object" or "dynamic" => true,
-            _ => value.StartsWith('?') || value.Contains('!') || value.Contains('<')
+            "int" or "long" or "short" or "sbyte" or "byte" or "ushort" or "uint" or "ulong"
+                or "float" or "double" or "nint" or "nuint" or "str" or "string" or "bool"
+                or "void" or "char" or "var" or "any" or "object" or "dynamic" => true,
+            _ => value.StartsWith('?') || value.EndsWith('?') || value.Contains('!') || value.Contains('<')
                  || IsLikelyPascalCaseType(value)
         };
     }
@@ -479,6 +480,9 @@ public static class AttributeHelper
             return $"NULLABLE[inner={inner}]";
         }
 
+        if (compactType.EndsWith('?'))
+            return $"NULLABLE[inner={ExpandType(compactType[..^1])}]";
+
         // Handle generic types: List<T>, Dictionary<str, T>
         var genericIndex = compactType.IndexOf('<');
         if (genericIndex > 0 && compactType.EndsWith('>'))
@@ -507,18 +511,18 @@ public static class AttributeHelper
         }
 
         // Primitive type mappings
-        return compactType.ToLowerInvariant() switch
+        return compactType switch
         {
-            "i8" => "INT[bits=8][signed=true]",
-            "i16" => "INT[bits=16][signed=true]",
+            "i8" or "sbyte" => "INT[bits=8][signed=true]",
+            "i16" or "short" => "INT[bits=16][signed=true]",
             "i32" or "int" => "INT",
-            "i64" => "INT[bits=64][signed=true]",
-            "u8" => "INT[bits=8][signed=false]",
-            "u16" => "INT[bits=16][signed=false]",
-            "u32" => "INT[bits=32][signed=false]",
-            "u64" => "INT[bits=64][signed=false]",
-            "f32" => "FLOAT[bits=32]",
-            "f64" or "float" => "FLOAT",
+            "i64" or "long" => "INT[bits=64][signed=true]",
+            "u8" or "byte" => "INT[bits=8][signed=false]",
+            "u16" or "ushort" => "INT[bits=16][signed=false]",
+            "u32" or "uint" => "INT[bits=32][signed=false]",
+            "u64" or "ulong" => "INT[bits=64][signed=false]",
+            "f32" or "float" => "FLOAT[bits=32]",
+            "f64" or "double" => "FLOAT",
             "str" or "string" => "STRING",
             "bool" => "BOOL",
             "void" => "VOID",
@@ -530,8 +534,8 @@ public static class AttributeHelper
 
     /// <summary>
     /// Inverse of <see cref="ExpandType"/>: maps an expanded/internal type name back to
-    /// the compact surface spelling agents actually write (<c>INT</c> → <c>i32</c>,
-    /// <c>STRING</c> → <c>str</c>, <c>ARRAY[element=STRING]</c> → <c>[str]</c>, …). Use in
+    /// the measured C# surface spelling (<c>INT</c> → <c>int</c>,
+    /// <c>STRING</c> → <c>string</c>, <c>ARRAY[element=STRING]</c> → <c>string[]</c>). Use in
     /// any diagnostic that echoes a type so the message never teaches an internal
     /// spelling the user can't write. Idempotent on already-compact input.
     /// </summary>
@@ -544,24 +548,50 @@ public static class AttributeHelper
 
         var t = expandedType.Trim();
 
+        if (t.EndsWith(']'))
+        {
+            var start = t.LastIndexOf('[');
+            if (start > 0 && t[(start + 1)..^1].All(c => c == ','))
+                return ToSurfaceSpelling(t[..start]) + t[start..];
+        }
+
         // Composite forms, mirroring ExpandType (recurse into the payload).
         if (t.StartsWith("ARRAY[element=", StringComparison.Ordinal) && t.EndsWith("]", StringComparison.Ordinal))
         {
-            return $"[{ToSurfaceSpelling(t["ARRAY[element=".Length..^1])}]";
+            return $"{ToSurfaceSpelling(t["ARRAY[element=".Length..^1])}[]";
         }
 
         if (t.StartsWith("NULLABLE[inner=", StringComparison.Ordinal) && t.EndsWith("]", StringComparison.Ordinal))
         {
-            return $"?{ToSurfaceSpelling(t["NULLABLE[inner=".Length..^1])}";
+            return $"{ToSurfaceSpelling(t["NULLABLE[inner=".Length..^1])}?";
         }
+
+        if (t.StartsWith('[') && t.EndsWith(']'))
+            return ToSurfaceSpelling(t[1..^1]) + "[]";
+        if (t.StartsWith('?'))
+            return ToSurfaceSpelling(t[1..]) + "?";
+        if (t.EndsWith('?') || t.EndsWith('*'))
+            return ToSurfaceSpelling(t[..^1]) + t[^1];
+        if (t.StartsWith('(') && t.EndsWith(')'))
+            return Migration.TypeMapper.MapTupleType(t, ToSurfaceSpelling);
 
         // Generic: Base<A, B> — surface-spell each argument.
         var genericIndex = t.IndexOf('<');
-        if (genericIndex > 0 && t.EndsWith(">", StringComparison.Ordinal))
+        if (genericIndex > 0)
         {
-            var baseName = t[..genericIndex];
-            var args = SplitGenericArgs(t[(genericIndex + 1)..^1]);
-            return $"{baseName}<{string.Join(", ", args.Select(a => ToSurfaceSpelling(a.Trim())))}>";
+            var depth = 1;
+            var end = genericIndex + 1;
+            for (; end < t.Length; end++)
+            {
+                if (t[end] == '<') depth++;
+                if (t[end] == '>' && --depth == 0) break;
+            }
+            if (end < t.Length)
+            {
+                var args = SplitGenericArgs(t[(genericIndex + 1)..end]);
+                return $"{t[..genericIndex]}<{string.Join(", ", args.Select(a => ToSurfaceSpelling(a.Trim())))}>"
+                    + ToSurfaceSpelling(t[(end + 1)..]);
+            }
         }
 
         // C#-style array suffix: X[] / X[,] — surface-spell the element.
@@ -580,17 +610,19 @@ public static class AttributeHelper
 
         return t switch
         {
-            "INT" => "i32",
-            "INT[bits=8][signed=true]" => "i8",
-            "INT[bits=16][signed=true]" => "i16",
-            "INT[bits=64][signed=true]" => "i64",
-            "INT[bits=8][signed=false]" => "u8",
-            "INT[bits=16][signed=false]" => "u16",
-            "INT[bits=32][signed=false]" => "u32",
-            "INT[bits=64][signed=false]" => "u64",
-            "FLOAT" => "f64",
-            "FLOAT[bits=32]" => "f32",
-            "STRING" => "str",
+            "INT" or "i32" => "int",
+            "INT[bits=8][signed=true]" or "i8" => "sbyte",
+            "INT[bits=16][signed=true]" or "i16" => "short",
+            "INT[bits=64][signed=true]" or "i64" => "long",
+            "INT[bits=8][signed=false]" or "u8" => "byte",
+            "INT[bits=16][signed=false]" or "u16" => "ushort",
+            "INT[bits=32][signed=false]" or "u32" => "uint",
+            "INT[bits=64][signed=false]" or "u64" => "ulong",
+            "FLOAT" or "f64" => "double",
+            "FLOAT[bits=32]" or "f32" => "float",
+            "STRING" or "str" => "string",
+            "dec" => "decimal",
+            "any" => "object",
             "BOOL" => "bool",
             "VOID" => "void",
             "NEVER" => "never",

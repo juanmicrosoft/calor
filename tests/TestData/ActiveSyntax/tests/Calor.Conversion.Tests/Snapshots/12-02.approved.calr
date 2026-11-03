@@ -1,0 +1,13 @@
+§M{Test_12_02:overflow=unchecked}
+  §CL{Parser:pub}
+    §MT{TryParse:pub} (string:input, int:result:out) -> bool
+      §ASSIGN result 0
+      §IF (isempty input)
+        §R false
+      §ASSIGN result §C{int.Parse} input
+      §R true
+
+    §MT{Increment:pub} (int:value:ref)
+      §ASSIGN value (+ value 1)
+
+

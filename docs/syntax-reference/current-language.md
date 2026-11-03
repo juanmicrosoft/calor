@@ -554,7 +554,7 @@ Complete example: [linq](#example-complete_linq).
 
 ## string interpolation
 
-String interpolation uses ${} inside ordinary string literals. Note: ${0}, ${1} etc. are treated as format placeholders, not interpolation.
+Ordinary strings use ${expression} for runtime interpolation, including numeric expressions such as ${1}. Escape the opening marker as \${0} to keep literal placeholder text. Alignment and format clauses use ${value,4:D2}.
 
 Syntax: `Inline: "text ${expression} text"`
 

@@ -94,7 +94,7 @@ public class ArrayExpressionConversionTests
         var calor = await ConvertNativeWithRealCliAsync(source, surface);
         Assert.DoesNotContain("§CS", calor);
         Assert.Contains("§ARR{T:count}", calor);
-        Assert.Contains("§ARR{i32:0}", calor);
+        Assert.Contains("§ARR{int:0}", calor);
         var compilation = Program.Compile(calor, "sized-array.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compilation.HasErrors,
@@ -1314,7 +1314,7 @@ public class ArrayExpressionConversionTests
         var result = new CSharpToCalorConverter().Convert(source);
         Assert.True(result.Success, string.Join("\n", result.Issues));
         Assert.Empty(result.Losses);
-        Assert.Contains("§B{any[]:xs}", result.CalorSource);
+        Assert.Contains("§B{object[]:xs}", result.CalorSource);
         var compilation = Program.Compile(result.CalorSource!, "declared.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
         Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
@@ -1335,7 +1335,7 @@ public class ArrayExpressionConversionTests
             """;
         var converted = new CSharpToCalorConverter().Convert(effect);
         Assert.True(converted.Success, string.Join("\n", converted.Issues));
-        Assert.Contains("§B{any[]:xs}", converted.CalorSource);
+        Assert.Contains("§B{object[]:xs}", converted.CalorSource);
 
         // PR 2 Codex round 3: a nullable declared type (`object[]?`) is not the created
         // string[] either; the block form (`§ARR{zs:str}`) would declare string[].
@@ -1390,7 +1390,7 @@ public class ArrayExpressionConversionTests
         Assert.Empty(result.Losses);
         Assert.Matches(@"§ARR\{guid:2\} §/ARR", result.CalorSource!);
         Assert.Matches(@"§ARR\{datetime:3\}", result.CalorSource!);
-        Assert.Matches(@"§ARR\{i32:4\}", result.CalorSource!);
+        Assert.Matches(@"§ARR\{int:4\}", result.CalorSource!);
         var compilation = Program.Compile(result.CalorSource!, "lowercase.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
         Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));

@@ -279,7 +279,7 @@ public class V017Round4FindingsTests
             }
             """);
 
-        Assert.Contains("§B{Seq<i32>:evens}", calor);
+        Assert.Contains("§B{Seq<int>:evens}", calor);
     }
 
     // ---------------------------------------------------------------------

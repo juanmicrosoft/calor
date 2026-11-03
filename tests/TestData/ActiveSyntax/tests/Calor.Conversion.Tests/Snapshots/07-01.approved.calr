@@ -1,0 +1,6 @@
+§M{Test_07_01:overflow=unchecked}
+  §DEL{MyHandler}
+    §I{int:x}
+
+  §CSHARP{public delegate bool Predicate<T>(T item);}§/CSHARP
+

@@ -1,11 +1,11 @@
 §M{Fixture:overflow=unchecked}
   §M{InterpolationHole:pub}
-    §F{Verify:pub} () -> i32
+    §F{Verify:pub} () -> int
       §E{alloc}
-      §ARR{items:i32}
+      §ARR{items:int}
         3
         5
         8
-      §B{i32:i} 1
-      §B{str:s} "[${§CS{items[i]}}|${§CS{items[i + 1]}}]"
+      §B{int:i} 1
+      §B{string:s} "[${§CS{items[i]}}|${§CS{items[i + 1]}}]"
       §R (? (== s "[5|8]") 58 (- 1))

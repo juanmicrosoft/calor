@@ -1,0 +1,8 @@
+§M{Test_01_04:overflow=unchecked}
+  §M{MathUtils:pub}
+    §F{Square:pub} (double:x) -> double
+      §R (* x x)
+
+    §F{Cube:pub} (double:x) -> double
+      §R (* (* x x) x)
+

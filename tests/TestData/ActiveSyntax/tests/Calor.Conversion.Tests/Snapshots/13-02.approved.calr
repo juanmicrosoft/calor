@@ -1,0 +1,13 @@
+§M{Test_13_02:overflow=unchecked}
+  §CL{VerbatimDemo:pub}
+    §FLD{int:object:priv}
+    §FLD{string:`class`:priv}
+
+    §CTOR{pub} (int:object, string:`class`)
+      §ASSIGN this.object object
+      §ASSIGN this.class `class`
+
+    §MT{Process:pub} (string:`namespace`, int:`event`)
+      §B{result} (+ `namespace` (str `event`))
+
+

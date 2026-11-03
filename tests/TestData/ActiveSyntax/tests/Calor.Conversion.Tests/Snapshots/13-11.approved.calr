@@ -1,0 +1,13 @@
+§M{Test_13_11:overflow=unchecked}
+  §CL{ArrayDemo:pub}
+    §MT{CreateSized:pub} (int:n) -> int[]
+      §E{alloc}
+      §R §ARR{int:n} §/ARR
+
+    §MT{CreateEmpty:pub} () -> string[]
+      §E{alloc}
+      §R §ARR{string:0} §/ARR
+
+    §MT{Wrap:pub} (string:value) -> object[]
+      §E{alloc}
+      §R §ARR{object} value §ARR{int} 1 2 §/ARR §/ARR

@@ -1612,7 +1612,7 @@ public class CSharpToCalorConversionTests
         Assert.NotNull(result.CalorSource);
 
         // Explicit type declaration: type-first format {type:name}
-        Assert.Contains("§B{i32:count}", result.CalorSource);
+        Assert.Contains("§B{int:count}", result.CalorSource);
         Assert.DoesNotContain(":const", result.CalorSource);
     }
 
@@ -1630,7 +1630,7 @@ public class CSharpToCalorConversionTests
         Assert.NotNull(result.CalorSource);
 
         // Explicit typed mutable: {~name:type} format
-        Assert.Contains("§B{~total:i32}", result.CalorSource);
+        Assert.Contains("§B{~total:int}", result.CalorSource);
         Assert.DoesNotContain(":const", result.CalorSource);
     }
 
@@ -2358,7 +2358,7 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         // Lambda parameter should be inferred as i32, not object
-        Assert.Contains(":i32}", result.CalorSource);
+        Assert.Contains(":int}", result.CalorSource);
         Assert.DoesNotContain(":object}", result.CalorSource);
     }
 
@@ -2383,8 +2383,8 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         // Both n and index should be inferred as i32
-        Assert.Contains("n:i32", result.CalorSource);
-        Assert.Contains("index:i32", result.CalorSource);
+        Assert.Contains("n:int", result.CalorSource);
+        Assert.Contains("index:int", result.CalorSource);
         Assert.DoesNotContain(":object", result.CalorSource);
     }
 

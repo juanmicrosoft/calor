@@ -1,0 +1,13 @@
+§M{Test_01_03:overflow=unchecked}
+  §CL{Account:pub}
+    §FLD{string:_id:priv:readonly}
+    §FLD{decimal:_balance:priv}
+
+    §CTOR{pub} (string:id, decimal:initialBalance)
+      §ASSIGN _id id
+      §ASSIGN _balance initialBalance
+
+    §MT{GetBalance:pub} () -> decimal
+      §R _balance
+
+

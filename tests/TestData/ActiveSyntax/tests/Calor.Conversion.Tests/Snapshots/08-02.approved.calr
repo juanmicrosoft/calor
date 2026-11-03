@@ -1,0 +1,6 @@
+§M{Test_08_02:overflow=unchecked}
+  §CL{TupleDemo:pub}
+    §MT{GetPair:pub} () -> (int, string)
+      §R (42, "hello")
+
+

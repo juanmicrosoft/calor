@@ -1,0 +1,10 @@
+§M{Test_12_05:overflow=unchecked}
+  §M{LiteralShapes:pub}
+    §F{NegativeHex:pub} () -> long
+      §R (- 0x2AL)
+
+    §F{Separated:pub} () -> uint
+      §R 4294967295U
+
+    §F{Format:pub} (int:value) -> string
+      §R "{literal} ${value,8:X4}"
