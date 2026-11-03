@@ -3286,8 +3286,8 @@ public sealed class Parser
             _position = savedPosition;
         }
 
-        // A legacy cast starts with a type, whose generic commas are not tuple separators.
-        if (Peek(1).Kind == TokenKind.Identifier && Peek(1).Text == "cast"
+        // Legacy type operations parse their own types; generic commas are not tuple separators.
+        if (Peek(1).Kind == TokenKind.Identifier && Peek(1).Text is "cast" or "is" or "as"
             && Peek(2).Kind != TokenKind.Comma && IsStagedPrefixExpression())
             return ParseLispExpression();
 

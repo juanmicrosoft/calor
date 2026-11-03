@@ -115,6 +115,40 @@ public class InfixOperatorTests
     }
 
     [Theory]
+    [InlineData("(is o Func<i32, i32> Add)", "Func<i32, i32>", "Add")]
+    [InlineData("(is o Func<string, bool>)", "Func<string, bool>", null)]
+    [InlineData("(is o Dictionary<string, List<bool>> match)", "Dictionary<string, List<bool>>", "match")]
+    [InlineData("(is (as o Func<string, bool>) Func<string, bool> Add)", "Func<string, bool>", "Add")]
+    public void LegacyGenericTypeTests_PreserveTypesPatternVariablesAndSpans(
+        string expression, string type, string? variable)
+    {
+        var pattern = Assert.IsType<IsPatternNode>(ParseExpression(expression));
+        Assert.Equal(type, pattern.TargetType);
+        Assert.Equal(variable, pattern.VariableName);
+        Assert.Equal(type, Source(expression).Substring(pattern.TargetTypeSpan.Start, pattern.TargetTypeSpan.Length));
+    }
+
+    [Theory]
+    [InlineData("(as o Func<string, bool>)", "Func<string, bool>")]
+    [InlineData("(as (cast object o) Dictionary<string, List<bool>>)", "Dictionary<string, List<bool>>")]
+    public void LegacyGenericAsExpressions_PreserveTypesAndSpans(string expression, string type)
+    {
+        var operation = Assert.IsType<TypeOperationNode>(ParseExpression(expression));
+        Assert.Equal(TypeOp.As, operation.Operation);
+        Assert.Equal(type, operation.TargetType);
+        Assert.Equal(type, Source(expression).Substring(operation.TargetTypeSpan.Start, operation.TargetTypeSpan.Length));
+    }
+
+    [Theory]
+    [InlineData("is")]
+    [InlineData("as")]
+    [InlineData("cast")]
+    public void TypeOperationNames_WithoutOperandsRemainGroupedReferences(string name)
+    {
+        Assert.Equal(name, Assert.IsType<ReferenceNode>(ParseExpression($"({name})")).Name);
+    }
+
+    [Theory]
     [InlineData("((cast Func<string, bool> null), 1)")]
     [InlineData("((a > b), c)")]
     [InlineData("((a < b), c > d)")]
@@ -123,7 +157,13 @@ public class InfixOperatorTests
     [InlineData("(Func<string, bool>, other)")]
     [InlineData("(Dictionary<string, List<int>>, other)")]
     [InlineData("(Container<Dictionary<string, List<int>>, bool>, other)")]
-    public void TupleLookahead_DistinguishesNestedGenericsComparisonsAndCastReferences(string expression)
+    [InlineData("((is o Func<string, bool> match), a < b)")]
+    [InlineData("((as o Func<string, bool>), a > b)")]
+    [InlineData("(is, other)")]
+    [InlineData("(as, other)")]
+    [InlineData("(is < b, c > d)")]
+    [InlineData("(as < b, c > d)")]
+    public void TupleLookahead_DistinguishesNestedGenericsComparisonsAndTypeOperationNames(string expression)
     {
         Assert.Equal(2, Assert.IsType<TupleLiteralNode>(ParseExpression(expression)).Elements.Count);
     }
@@ -147,11 +187,15 @@ public class InfixOperatorTests
     }
 
     [Theory]
-    [InlineData("return (Func<string, bool>)null;")]
-    [InlineData("return (RuleComponent<Person, string>)_rule.Current;")]
-    [InlineData("return (RuleBuilder<T, TProperty?>)ruleBuilder;")]
-    [InlineData("AccessorCache<Person>.Clear(); return null;")]
-    public void ConvertedGenericCastsAndStaticCalls_ReparseWithoutLosingTheirShape(string body)
+    [InlineData("return (Func<string, bool>)null;", "(cast ")]
+    [InlineData("return (RuleComponent<Person, string>)_rule.Current;", "(cast ")]
+    [InlineData("return (RuleBuilder<T, TProperty?>)ruleBuilder;", "(cast ")]
+    [InlineData("AccessorCache<Person>.Clear(); return null;", "AccessorCache<Person>")]
+    [InlineData("return ruleBuilder is Func<string, bool> Add;", "(is ")]
+    [InlineData("return ruleBuilder as Func<string, bool>;", "(as ")]
+    [InlineData("return (ruleBuilder is Func<string, bool> Add, ruleBuilder as Func<string, bool>);", "(is ")]
+    public void ConvertedGenericTypeOperationsAndStaticCalls_ReparseWithoutLosingTheirShape(
+        string body, string expectedForm)
     {
         var conversion = new CSharpToCalorConverter().Convert($$"""
             using System;
@@ -172,10 +216,9 @@ public class InfixOperatorTests
             string.Join(Environment.NewLine, conversion.Issues.Select(issue => issue.Message)));
         var source = Assert.IsType<string>(conversion.CalorSource);
         var module = Parse(source);
-        if (body.StartsWith("return"))
-            Assert.Contains("(cast ", source);
-        else
-            Assert.Contains("AccessorCache<Person>", source);
+        Assert.True(source.Contains(expectedForm, StringComparison.Ordinal),
+            source + Environment.NewLine
+                + string.Join(Environment.NewLine, conversion.Issues.Select(issue => issue.Message)));
         Parse(new CalorEmitter().Emit(module));
     }
 
@@ -289,6 +332,10 @@ public class InfixOperatorTests
     [InlineData("(a + b")]
     [InlineData("(cast Func<string, bool>)")]
     [InlineData("(cast Func<string, bool> null extra)")]
+    [InlineData("(is o)")]
+    [InlineData("(as o)")]
+    [InlineData("(is o Func<string, bool> match extra)")]
+    [InlineData("(as o Func<string, bool> extra)")]
     [InlineData("a +\n    §R b")]
     public void MalformedOrUnsupportedForms_ProduceErrors(string expression)
     {
