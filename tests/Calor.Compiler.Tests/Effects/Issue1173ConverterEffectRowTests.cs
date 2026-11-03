@@ -49,7 +49,7 @@ public class Issue1173ConverterEffectRowTests
             var left = Assert.Single(module.Classes.Where(cls => cls.Name == "Left"));
             var right = Assert.Single(module.Classes.Where(cls => cls.Name == "Right"));
             var pureOverload = Assert.Single(left.Methods.Where(method =>
-                method.Name == "Work" && method.Parameters[0].TypeName == "i32"));
+                method.Name == "Work" && TypeMapper.CalorToCSharp(method.Parameters[0].TypeName) == "int"));
             var mutatingOverload = Assert.Single(left.Methods.Where(method =>
                 method.Name == "Work" && method != pureOverload));
             Assert.Empty(EffectEnforcementPass.GetDeclaredEffects(pureOverload.Effects).Effects);

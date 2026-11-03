@@ -374,8 +374,8 @@ public interface ICalculator
 }");
         Assert.True(result.Success, string.Join("\n", result.Issues));
         Assert.Contains("§MT{", result.CalorSource);
-        Assert.Contains("i32:a", result.CalorSource);
-        Assert.Contains("-> i32", result.CalorSource);
+        Assert.Contains("int:a", result.CalorSource);
+        Assert.Contains("-> int", result.CalorSource);
         Assert.DoesNotContain("§SIG", result.CalorSource);
     }
 
@@ -487,8 +487,8 @@ public class Example
         Assert.True(result.Success, string.Join("\n", result.Issues));
         var source = result.CalorSource ?? "";
         // Verbatim identifiers are wrapped in backticks in Calor
-        Assert.Contains("str:`class`", source);
-        Assert.Contains("i32:`event`", source);
+        Assert.Contains("string:`class`", source);
+        Assert.Contains("int:`event`", source);
         Assert.DoesNotContain("@class", source);
         Assert.DoesNotContain("@event", source);
     }
@@ -1038,7 +1038,7 @@ class Test
         var result = _converter.Convert(csharp);
         var calor = result.CalorSource;
 
-        Assert.Contains("(is value str s)", calor);
+        Assert.Contains("(is value string s)", calor);
         Assert.DoesNotContain("(cast", calor);
     }
 
@@ -1060,7 +1060,7 @@ class Test
         var result = _converter.Convert(csharp);
         var calor = result.CalorSource;
 
-        Assert.Contains("(is value str text)", calor);
+        Assert.Contains("(is value string text)", calor);
         Assert.DoesNotContain("(cast", calor);
     }
 
