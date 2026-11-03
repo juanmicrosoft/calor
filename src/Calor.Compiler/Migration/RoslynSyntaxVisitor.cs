@@ -9320,7 +9320,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         // String methods
-        if (methodName is "Contains" or "StartsWith" or "EndsWith" or "IndexOf" or "Replace"
+        if (CanUseNativeStringOperation(invocation)
+            && methodName is "Contains" or "StartsWith" or "EndsWith" or "IndexOf" or "Replace"
             or "Trim" or "TrimStart" or "TrimEnd" or "ToUpper" or "ToLower" or "Substring"
             or "Split" or "Join" or "PadLeft" or "PadRight" or "ToString" or "ToCharArray"
             or "Insert" or "Remove" or "Length" or "IsNullOrEmpty" or "IsNullOrWhiteSpace")
@@ -9330,7 +9331,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         // Static string methods
         if (targetStr.StartsWith("string.") || targetStr.StartsWith("String."))
-            return true;
+            return IsMetadataMember(invocation, "System.String");
 
         // Regex methods
         if (targetStr.StartsWith("Regex.") || targetStr.Contains("RegularExpressions.Regex."))
@@ -9348,6 +9349,31 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             && type.DeclaringSyntaxReferences.Length == 0
             && SymbolEqualityComparer.Default.Equals(type,
                 _semanticModel.Compilation.GetTypeByMetadataName("System.Text.StringBuilder"));
+
+    private bool CanUseNativeStringOperation(InvocationExpressionSyntax invocation)
+    {
+        if (_semanticModel is not { } model
+            || invocation.SyntaxTree != model.SyntaxTree
+            || invocation.Expression is not MemberAccessExpressionSyntax member
+            || model.GetSymbolInfo(invocation).Symbol is not IMethodSymbol { IsStatic: false } method
+            || model.GetTypeInfo(member.Expression).Type is not { } receiverType)
+            return false;
+        if (IsMetadataMember(invocation, "System.String")
+            && receiverType.SpecialType == SpecialType.System_String)
+            return true;
+
+        // CLR scalars cannot override ToString with user code; retain their existing str lowering.
+        return method is { Name: "ToString", Parameters.Length: 0, DeclaringSyntaxReferences.Length: 0 }
+            && receiverType.SpecialType is SpecialType.System_Boolean or SpecialType.System_Char
+                or SpecialType.System_SByte or SpecialType.System_Byte
+                or SpecialType.System_Int16 or SpecialType.System_UInt16
+                or SpecialType.System_Int32 or SpecialType.System_UInt32
+                or SpecialType.System_Int64 or SpecialType.System_UInt64
+                or SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_Decimal
+                or SpecialType.System_IntPtr or SpecialType.System_UIntPtr
+            && SymbolEqualityComparer.Default.Equals(method.ContainingType,
+                model.Compilation.GetSpecialType(receiverType.SpecialType));
+    }
 
     /// <summary>
     /// Collects all steps in a method chain from innermost to outermost.
@@ -13655,7 +13681,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         // Check for static string methods like string.IsNullOrEmpty
-        if (!hasNamedArgs && target.StartsWith("string."))
+        if (!hasNamedArgs && target.StartsWith("string.") && IsMetadataMember(invocation, "System.String"))
         {
             var methodName = target.Substring(7); // Remove "string." prefix
             var span = GetTextSpan(invocation);
@@ -13828,6 +13854,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         List<ExpressionNode> args,
         TextSpan span)
     {
+        if (!CanUseNativeStringOperation(invocation))
+            return null;
+
         // Build argument list with target as first argument (excluding StringComparison arg)
         var allArgs = new List<ExpressionNode> { target };
 

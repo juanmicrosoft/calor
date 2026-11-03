@@ -94,6 +94,12 @@ expressions also accept `f (x)`.
 Existing assignment-target, counted-loop, and lambda staging remains unchanged.
 The experimental CNF lowering rejects expression-target calls explicitly.
 
+C# migration lowers string methods to native string operations only when the
+selected metadata method and receiver prove the built-in operation. Zero-argument
+`ToString()` on CLR scalar types also retains its native lowering. Custom,
+foreign, and unresolved same-spelled methods remain calls, preserving their
+declaration identity and conservative effect analysis.
+
 ---
 
 ## Rules
