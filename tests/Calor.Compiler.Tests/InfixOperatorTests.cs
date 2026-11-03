@@ -115,6 +115,82 @@ public class InfixOperatorTests
     }
 
     [Theory]
+    [InlineData("(cast ?i32 value)", "i32?", "?i32")]
+    [InlineData("(cast ?List<int> value)", "List<int>?", "?List<int>")]
+    [InlineData("(cast i32? value)", "i32?", "i32?")]
+    [InlineData("(cast List<int>? value)", "List<int>?", "List<int>?")]
+    [InlineData("(cast ?global::System.Int32 value)", "global::System.Int32?", "?global::System.Int32")]
+    [InlineData("(cast ?i32 global::Namespace.Value)", "i32?", "?i32")]
+    [InlineData("(cast ?Dictionary<string, List<int?>> value)",
+        "Dictionary<string, List<int?>>?", "?Dictionary<string, List<int?>>")]
+    [InlineData("(cast ?(i32, string) value)", "(i32, string)?", "?(i32, string)")]
+    public void NullableCastTypes_PreservePrefixPostfixAndExactTypeSpans(
+        string expression, string type, string typeText)
+    {
+        var cast = Assert.IsType<TypeOperationNode>(ParseExpression(expression));
+        Assert.Equal(TypeOp.Cast, cast.Operation);
+        Assert.Equal(type, cast.TargetType);
+        Assert.Equal(typeText, Source(expression).Substring(cast.TargetTypeSpan.Start, cast.TargetTypeSpan.Length));
+    }
+
+    [Theory]
+    [InlineData("(cast ?left : right)")]
+    [InlineData("(cast ?left:right)")]
+    [InlineData("(cast?left:right)")]
+    [InlineData("(cast ? left : right)")]
+    [InlineData("(cast ?left + 1:right)")]
+    [InlineData("(cast ?flag ? a : b : c)")]
+    [InlineData("(cast ?List<int?> : fallback)")]
+    [InlineData("(cast ?(nameof global::System.String) : fallback)")]
+    [InlineData("(cast ?(a, b) : other)")]
+    [InlineData("(cast ?(x ? a : b) : c)")]
+    public void GroupedConditionals_KeepCastAsTheirCondition(string expression)
+    {
+        var conditional = Assert.IsType<ConditionalExpressionNode>(ParseExpression(expression));
+        Assert.Equal("cast", Assert.IsType<ReferenceNode>(conditional.Condition).Name);
+        Assert.Equal(expression.Length, conditional.Span.Length);
+    }
+
+    [Fact]
+    public void NullableCastOperand_CanContainItsOwnConditional()
+    {
+        var cast = Assert.IsType<TypeOperationNode>(ParseExpression("(cast ?i32 (flag ? left : right))"));
+        Assert.Equal("i32?", cast.TargetType);
+        Assert.IsType<ConditionalExpressionNode>(cast.Operand);
+        var lambdaCast = Assert.IsType<TypeOperationNode>(
+            ParseExpression("(cast ?Func<i32, i32> §LAM{x:i32} x > 0 ? x : 0 §/LAM)"));
+        Assert.IsType<ConditionalExpressionNode>(
+            Assert.IsType<LambdaExpressionNode>(lambdaCast.Operand).ExpressionBody);
+    }
+
+    [Theory]
+    [InlineData("(cast ?)", DiagnosticCode.ExpectedTypeName)]
+    [InlineData("(cast ?i32)", DiagnosticCode.InvalidLispExpression)]
+    [InlineData("(cast ?List<int>)", DiagnosticCode.InvalidLispExpression)]
+    public void NullableCasts_KeepMissingTypeAndOperandDiagnostics(string expression, string expectedCode)
+    {
+        var diagnostics = new DiagnosticBag();
+        Parse(Source(expression), diagnostics);
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == expectedCode);
+    }
+
+    [Fact]
+    public void NullableCastAndCastNamedCondition_RunWithDistinctSemantics()
+    {
+        var type = Compile("""
+            §M{Infix}
+              §F{Probe:pub} (bool:cast) -> i32
+                §R (cast?4:9)
+              §F{Nullable:pub} (object:value) -> ?i32
+                §R (cast ?i32 value)
+            """);
+        Assert.Equal(4, Invoke(type, "Probe", true));
+        Assert.Equal(9, Invoke(type, "Probe", false));
+        Assert.Equal(23, Invoke(type, "Nullable", 23));
+        Assert.Null(Invoke(type, "Nullable", (object?)null));
+    }
+
+    [Theory]
     [InlineData("(is o Func<i32, i32> Add)", "Func<i32, i32>", "Add")]
     [InlineData("(is o Func<string, bool>)", "Func<string, bool>", null)]
     [InlineData("(is o Dictionary<string, List<bool>> match)", "Dictionary<string, List<bool>>", "match")]
@@ -163,6 +239,8 @@ public class InfixOperatorTests
     [InlineData("(as, other)")]
     [InlineData("(is < b, c > d)")]
     [InlineData("(as < b, c > d)")]
+    [InlineData("(cast?left:right, other)")]
+    [InlineData("((cast?left:right), other)")]
     public void TupleLookahead_DistinguishesNestedGenericsComparisonsAndTypeOperationNames(string expression)
     {
         Assert.Equal(2, Assert.IsType<TupleLiteralNode>(ParseExpression(expression)).Elements.Count);
@@ -336,6 +414,10 @@ public class InfixOperatorTests
     [InlineData("(as o)")]
     [InlineData("(is o Func<string, bool> match extra)")]
     [InlineData("(as o Func<string, bool> extra)")]
+    [InlineData("(cast ?i32 value extra)")]
+    [InlineData("(cast ? : value)")]
+    [InlineData("(cast?left:)")]
+    [InlineData("(cast ?left + 1)")]
     [InlineData("a +\n    §R b")]
     public void MalformedOrUnsupportedForms_ProduceErrors(string expression)
     {

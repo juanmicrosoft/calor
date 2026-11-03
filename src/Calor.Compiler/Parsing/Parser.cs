@@ -3288,7 +3288,8 @@ public sealed class Parser
 
         // Legacy type operations parse their own types; generic commas are not tuple separators.
         if (Peek(1).Kind == TokenKind.Identifier && Peek(1).Text is "cast" or "is" or "as"
-            && Peek(2).Kind != TokenKind.Comma && IsStagedPrefixExpression())
+            && Peek(2).Kind != TokenKind.Comma
+            && (IsStagedPrefixExpression() || IsStagedNullableCast()))
             return ParseLispExpression();
 
         // Check for tuple literal: (expr, expr, ...)
@@ -3306,6 +3307,62 @@ public sealed class Parser
         var close = Expect(TokenKind.CloseParen);
         grouped.IncludeSpan(open.Span.Union(close.Span));
         return grouped;
+    }
+
+    private bool IsStagedNullableCast()
+    {
+        if (Peek(1).Text != "cast" || Peek(2).Kind != TokenKind.Question)
+            return false;
+
+        var savedPosition = _position;
+        var depth = 0;
+        var genericDepth = 0;
+        var conditionalDepth = 0;
+        try
+        {
+            for (_position += 3; !IsAtEnd; Advance())
+            {
+                var kind = Current.Kind;
+                if (kind is TokenKind.OpenParen or TokenKind.OpenBracket or TokenKind.OpenBrace)
+                    depth++;
+                else if (kind is TokenKind.CloseParen or TokenKind.CloseBracket or TokenKind.CloseBrace)
+                {
+                    if (depth == 0)
+                        break;
+                    depth--;
+                }
+                else if (depth == 0)
+                {
+                    if (kind == TokenKind.Less && (genericDepth > 0 || IsGenericTypeBracket()))
+                        genericDepth++;
+                    else if (kind == TokenKind.Greater && genericDepth > 0)
+                        genericDepth--;
+                    else if (kind == TokenKind.GreaterGreater && genericDepth > 0)
+                        genericDepth = System.Math.Max(0, genericDepth - 2);
+                    else if (genericDepth == 0)
+                    {
+                        if (kind == TokenKind.Question)
+                            conditionalDepth++;
+                        else if (kind == TokenKind.Colon)
+                        {
+                            // Alias qualifiers and the operand's own conditionals do not
+                            // supply the colon belonging to the leading '?'.
+                            if (Peek(1).Kind == TokenKind.Colon)
+                                Advance();
+                            else if (conditionalDepth == 0)
+                                return false;
+                            else
+                                conditionalDepth--;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+        finally
+        {
+            _position = savedPosition;
+        }
     }
 
     // Prefix forms remain during the header/emitter cutover. Infix operators
