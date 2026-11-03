@@ -66,10 +66,31 @@ The target evaluates once, before the arguments. Arguments retain source order,
 including named arguments and `ref`, `out`, or `in` modifiers. Calls inside a
 conditional or short-circuit operand stay inside that operand.
 
-This is a compiler prerequisite for the coordinated infix syntax change, not
-that grammar change itself. Explicit generic computed calls are supported in
-the AST and C# emitter. The converter retains its existing temporary lowering
-for those calls until the source parser can round-trip their type arguments.
+### Native postfix calls
+
+Native calls, member access, and indexing can now chain:
+
+```
+GetHandler()(value)
+GetReceiver().Update(value: ref value)
+GetReceiver().Echo<int>(value)
+receivers[NextIndex()].Update(value: out value)
+(chooseFirst ? first : second)(value)
+```
+
+`f()` invokes `f`; `(f)` only groups it; `(f, x)` creates a tuple. Calls accept
+C# type argument lists, named arguments, and `ref`, `out`, or `in`. Their
+receivers and arguments evaluate once, in source order. Native `?.` calls and
+`?[...]` indexing report errors rather than assuming ordinary call semantics.
+The existing conditional-call compatibility lowering remains staged.
+
+Computed-call serialization uses these native postfix forms, including explicit
+generic arguments. Ordinary named-call serialization still uses `§C`; existing
+sources do not need rewriting. Creation and lambda syntax are unchanged.
+In legacy prefix and positional operand slots, keep call parentheses adjacent
+(`f(x)`): a spaced `(x)` there remains the next legacy operand. Ordinary native
+expressions also accept `f (x)`.
+
 Existing assignment-target, counted-loop, and lambda staging remains unchanged.
 The experimental CNF lowering rejects expression-target calls explicitly.
 

@@ -5074,7 +5074,14 @@ public sealed class Binder
     {
         if (call.TargetExpression is FieldAccessNode member)
         {
-            var receiver = TryBindMetadataTypeReceiver(member.Target) ?? BindExpression(member.Target);
+            BoundExpression? receiver = null;
+            if (DottedReferenceName(member) is { } targetName
+                && !_scope.LookupAll(targetName.Split('.')[0]).OfType<VariableSymbol>().Any()
+                && ResolveCallReceiverType(targetName) is { } typeSymbol)
+                receiver = new BoundTypeReferenceExpression(member.Target.Span,
+                    DottedReferenceName(member.Target)!,
+                    new BoundTypes.NominalBoundType(typeSymbol.QualifiedName, declaration: typeSymbol), typeSymbol);
+            receiver ??= TryBindMetadataTypeReceiver(member.Target) ?? BindExpression(member.Target);
             return BindCallExpression(new CallExpressionNode(call.Span,
                 "<expression-call>", call.Arguments, call.ArgumentNames, call.ArgumentModifiers,
                 call.TypeArguments, member.FieldNameSpan, member.Target.Span), receiver, member.FieldName);

@@ -2104,7 +2104,13 @@ public sealed class TypeChecker
     {
         if (call.TargetExpression is FieldAccessNode member)
         {
-            InferExpressionType(member.Target);
+            var root = member.Target;
+            while (root is FieldAccessNode field)
+                root = field.Target;
+            // Binding, not capitalization, distinguishes qualified type receivers from missing values.
+            if (root is not ReferenceNode reference
+                || _env.LookupVariable(reference.Name.Split('.')[0]) != null)
+                InferExpressionType(member.Target);
             foreach (var argument in call.Arguments)
                 InferExpressionType(argument);
             // Member overloads remain binder-owned, just as for dotted named calls.

@@ -81,6 +81,20 @@ public class ConditionalEvaluationMigrationTests
     }
 
     [Fact]
+    public void ComputedGenericCalls_RoundTripWithoutReceiverHoists()
+    {
+        AssertRoundTrip("int ignored = Receiver().Echo<int>(Trace(2)); return Calls;", 123, false, members: """
+            private static int Calls;
+            public static int Trace(int value) { Calls = Calls * 10 + value; return value; }
+            public static Box Receiver() { Trace(1); return new Box(); }
+            public sealed class Box
+            {
+                public T Echo<T>(T item) { Trace(3); return item; }
+            }
+            """);
+    }
+
+    [Fact]
     public void ComputedCallOnStructElement_DoesNotMutateACopy()
     {
         AssertRoundTrip("Counter[] items = new Counter[1]; items[0].Bump(); return items[0].Value;",

@@ -6043,9 +6043,12 @@ public sealed class EffectEnforcementPass
         {
             if (call.TargetExpression is FieldAccessNode member)
             {
-                var evaluated = InferFromExpression(member.Target)
-                    .Union(InferFromCallArguments($"<expression>.{member.FieldName}", call.Arguments, call.ArgumentModifiers));
                 var bound = _context.CallGraph.ComputedMemberCall(_context.CurrentFunctionId, call.Span);
+                var receiverEffects = bound?.Receiver is Binding.BoundTypeReferenceExpression
+                    ? EffectSet.Empty
+                    : InferFromExpression(member.Target);
+                var evaluated = receiverEffects
+                    .Union(InferFromCallArguments($"<expression>.{member.FieldName}", call.Arguments, call.ArgumentModifiers));
                 var ids = _context.CallGraph.ResolveCallSites(
                     _context.CurrentFunctionId, "<expression-call>", call.Span);
                 if (ids.Count > 0)

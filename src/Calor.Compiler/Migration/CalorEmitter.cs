@@ -866,6 +866,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
             AppendLine(Visit(param));
     }
 
+    // Otherwise an initial parenthesized callee can be mistaken for the declaration's signature.
+    private static bool NeedsEmptyPostfixSignature(IReadOnlyList<StatementNode> body) =>
+        body.FirstOrDefault() is ExpressionStatementNode { Expression: ExpressionCallNode };
+
     private void EmitOutputLine(OutputNode? output)
     {
         if (output != null)
@@ -1382,7 +1386,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         // Inline params: §CTOR{vis} (type:name, type:name)
         var inlineFmt = TryFormatInlineParams(node.Parameters);
-        if (inlineFmt != null && node.Parameters.Count > 0)
+        if (inlineFmt != null && (node.Parameters.Count > 0 || NeedsEmptyPostfixSignature(node.Body)))
             AppendLine($"§CTOR{{{visibility}}}{attrs} ({inlineFmt})");
         else
             AppendLine($"§CTOR{{{visibility}}}{attrs}");
@@ -1524,7 +1528,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var inlineFmt = TryFormatInlineParams(node.Parameters);
         if (inlineFmt != null)
         {
-            var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
+            var inlineParams = node.Parameters.Count > 0 || node.Output != null || NeedsEmptyPostfixSignature(node.Body)
+                ? $" ({inlineFmt})" : "";
             var inlineReturn = node.Output != null ? $" -> {output}{FormatEffectRow(node.Output.Row)}" : "";
             AppendEffectRowDeclaration(node, $"§{methodTag}{{{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}{modStr}}}{attrs}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
         }
@@ -1614,7 +1619,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var inlineFmt = TryFormatInlineParams(node.Parameters);
         if (inlineFmt != null)
         {
-            var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
+            var inlineParams = node.Parameters.Count > 0 || node.Output != null || NeedsEmptyPostfixSignature(node.Body)
+                ? $" ({inlineFmt})" : "";
             var inlineReturn = node.Output != null ? $" -> {output}{FormatEffectRow(node.Output.Row)}" : "";
             AppendEffectRowDeclaration(node, $"§{funcTag}{{{EscapeCalorIdentifier(functionName)}{typeParams}{visibilitySegment}}}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
         }
@@ -5075,11 +5081,25 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ExpressionCallNode node)
     {
+        if (!IsConditionalCallTarget(node.TargetExpression))
+        {
+            var callee = EmitPostfixOperand(node.TargetExpression);
+            var types = node.TypeArguments is { Count: > 0 }
+                ? $"<{string.Join(", ", node.TypeArguments.Select(TypeMapper.ToSurfaceType))}>"
+                : "";
+            var arguments = node.Arguments.Select((argument, index) =>
+            {
+                var name = node.ArgumentNames?.ElementAtOrDefault(index);
+                var modifier = node.ArgumentModifiers?.ElementAtOrDefault(index);
+                return (name is null ? "" : $"{EscapeCalorIdentifier(name.TrimStart('@'))}: ")
+                    + (modifier is null ? "" : $"{modifier} ") + AcceptInConditionalRegion(argument);
+            });
+            return $"{callee}{types}({string.Join(", ", arguments)})";
+        }
+
+        // Null-conditional call binding remains on the existing compatibility route.
         if (node.TypeArguments is { Count: > 0 })
-            throw new NotSupportedException("Computed call type arguments require the coordinated infix source-parser cutover.");
-        // Args go through inline-sibling context so that nested zero-arg
-        // calls keep their explicit §/C closer — see Visit(CallExpressionNode)
-        // for the rationale.
+            throw new NotSupportedException("Null-conditional computed generic calls remain staged.");
         var target = AcceptInConditionalRegion(node.TargetExpression);
         var args = node.Arguments.Select((argument, index) =>
         {
@@ -5093,10 +5113,24 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return $"§C {target}{string.Join("", args)} §/C";
     }
 
+    private string EmitPostfixOperand(ExpressionNode node) => node switch
+    {
+        FieldAccessNode field =>
+            $"{EmitPostfixOperand(field.Target)}.{EscapeCalorIdentifier(field.FieldName.TrimStart('@'))}",
+        ArrayAccessNode array =>
+            $"{EmitPostfixOperand(array.Array)}[{AcceptInConditionalRegion(array.Index)}]",
+        MultiDimArrayAccessNode array =>
+            $"{EmitPostfixOperand(array.Array)}[{string.Join(", ", array.Indices.Select(AcceptInConditionalRegion))}]",
+        ReferenceNode or ExpressionCallNode => AcceptInConditionalRegion(node),
+        _ => $"({AcceptInConditionalRegion(node)})"
+    };
+
     private static bool IsConditionalCallTarget(ExpressionNode expression) => expression switch
     {
         NullConditionalNode => true,
         FieldAccessNode field => IsConditionalCallTarget(field.Target),
+        ArrayAccessNode array => IsConditionalCallTarget(array.Array),
+        MultiDimArrayAccessNode array => IsConditionalCallTarget(array.Array),
         ExpressionCallNode call => IsConditionalCallTarget(call.TargetExpression),
         _ => false
     };

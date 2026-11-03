@@ -13438,7 +13438,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 invocation.ArgumentList.Arguments.Any(argument => argument.NameColon != null)
                     ? invocation.ArgumentList.Arguments.Select(argument => argument.NameColon?.Name.Identifier.ValueText).ToArray()
                     : null,
-                ExtractArgumentModifiers(invocation));
+                ExtractArgumentModifiers(invocation),
+                invocation.Expression is MemberAccessExpressionSyntax { Name: GenericNameSyntax generic }
+                    ? generic.TypeArgumentList.Arguments.Select(argument => TypeMapper.CSharpToCalor(argument.ToString())).ToArray()
+                    : null);
         }
         var target = ConvertInvocationTarget(invocation);
         // #1677 (Codex round 1): C# evaluates the receiver before the arguments, so it is
@@ -13719,10 +13722,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 || node is AssignmentExpressionSyntax
                 || node is ForStatementSyntax loop && !loop.Statement.Span.Contains(invocation.Span)))
             return false;
-        // Generic member calls retain their existing conversion until the coordinated
-        // infix parser can round-trip explicit type arguments on expression targets.
         if (invocation.Expression is MemberAccessExpressionSyntax member)
-            return member.Name is not GenericNameSyntax && !WouldChainUseNativeOps(invocation)
+            return !WouldChainUseNativeOps(invocation)
                 && member.Expression.DescendantNodesAndSelf(node => node is not AnonymousFunctionExpressionSyntax)
                     .Any(node => node is InvocationExpressionSyntax or ElementAccessExpressionSyntax
                         or ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax

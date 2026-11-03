@@ -97,7 +97,7 @@ public sealed class ComputedCallExpressionTests
         Assert.Equal("value.Echo<int>(item: 5)", generic.Accept(new CSharpEmitter()));
         var simplified = generic.Accept(new Calor.Compiler.Verification.ExpressionSimplifier());
         Assert.Equal(generic.TypeArguments, Assert.IsType<ExpressionCallNode>(simplified).TypeArguments);
-        Assert.Throws<NotSupportedException>(() => generic.Accept(new CalorEmitter()));
+        Assert.Equal("value.Echo<int>(item: 5)", generic.Accept(new CalorEmitter()));
     }
 
     [Fact]
