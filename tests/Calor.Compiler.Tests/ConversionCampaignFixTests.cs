@@ -1,9 +1,13 @@
+using System.Reflection;
+using System.Runtime.Loader;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -1408,7 +1412,7 @@ public class Example
     }
 
     [Fact]
-    public void Convert_CastThenCall_HoistsToTemp()
+    public void Convert_CastThenCall_PreservesComputedReceiverAndRuntimeBehavior()
     {
         var csharp = @"
 using System;
@@ -1423,10 +1427,47 @@ public class Example
         Assert.NotNull(result.CalorSource);
         var calor = result.CalorSource!;
 
-        // Should not contain ERR
         Assert.DoesNotContain("ERR", calor);
-        // Should have a temp bind for the cast
-        Assert.Contains("_cast", calor);
+        Assert.DoesNotContain("_cast", calor);
+        var module = ParseCalor(calor);
+        var method = Assert.Single(Assert.Single(module.Classes).Methods);
+        var returned = Assert.IsType<ReturnStatementNode>(Assert.Single(method.Body));
+        var call = Assert.IsType<ExpressionCallNode>(returned.Expression);
+        var member = Assert.IsType<FieldAccessNode>(call.TargetExpression);
+        Assert.Equal("ToString", member.FieldName);
+        var cast = Assert.IsType<TypeOperationNode>(member.Target);
+        Assert.Equal(TypeOp.Cast, cast.Operation);
+        Assert.Equal("IFormattable", cast.TargetType);
+        Assert.Equal("obj", Assert.IsType<ReferenceNode>(cast.Operand).Name);
+        Assert.Equal(2, call.Arguments.Count);
+        Assert.Equal("N", Assert.IsType<StringLiteralNode>(call.Arguments[0]).Value);
+        Assert.Equal("null", call.Arguments[1].Accept(new CSharpEmitter()));
+
+        foreach (var source in new[] { csharp, new CSharpEmitter().Emit(module) })
+        {
+            var compilation = CSharpCompilation.Create(
+                $"CastReceiver_{Guid.NewGuid():N}", [CSharpSyntaxTree.ParseText(source)],
+                GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var emitted = compilation.Emit(stream);
+            Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+            stream.Position = 0;
+            var context = new AssemblyLoadContext(compilation.AssemblyName!, isCollectible: true);
+            try
+            {
+                var type = context.LoadFromStream(stream).GetTypes().Single(type => type.Name == "Example");
+                var instance = Activator.CreateInstance(type);
+                var test = type.GetMethod("Test")!;
+                Assert.Equal(((IFormattable)123).ToString("N", null), test.Invoke(instance, [123]));
+                var failure = Assert.Throws<TargetInvocationException>(() => test.Invoke(instance, ["text"]));
+                Assert.IsType<InvalidCastException>(failure.InnerException);
+            }
+            finally
+            {
+                context.Unload();
+            }
+        }
     }
 
     #endregion
