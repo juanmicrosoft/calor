@@ -343,6 +343,8 @@ public sealed class BoundCallStatement : BoundStatement
     public TextSpan CalleeSpan { get; }
     public TextSpan? ReceiverSpan { get; }
     public bool IsInaccessibleCall { get; }
+    // Preserved overloads veto native-name and metadata fallback, not emission.
+    internal bool HasOpaqueOverloads { get; init; }
     public IReadOnlyList<string?>? ArgumentNames { get; }
     public IReadOnlyList<string?>? ArgumentModifiers { get; }
     public IReadOnlyList<string>? TypeArguments { get; }
@@ -777,6 +779,7 @@ public class BoundCallExpression : BoundExpression
     public TextSpan CalleeSpan { get; }
     public TextSpan? ReceiverSpan { get; }
     public bool IsInaccessibleCall { get; }
+    internal bool HasOpaqueOverloads { get; init; }
     public override BoundType Type { get; }
     public BoundExpression? EvaluatedReceiver { get; init; }
     public override IReadOnlyList<BoundExpression> Children =>

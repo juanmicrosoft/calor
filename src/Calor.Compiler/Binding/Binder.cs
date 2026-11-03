@@ -103,7 +103,7 @@ public sealed class Binder
     private List<CallableMutationWrite>? _deferredCallableWrites;
     private bool _isDiscoveringLoopCallables;
     private readonly Dictionary<string, HashSet<string>> _topLevelFunctionLookupNames = new(StringComparer.Ordinal);
-    private readonly Dictionary<CSharpInteropBlockNode, IReadOnlySet<string>> _interopMethodNames = new();
+    private readonly Dictionary<CSharpInteropBlockNode, IReadOnlySet<(string Name, int Arity)>> _interopMethodArities = new();
     private readonly Dictionary<SymbolId, Symbol> _symbolsById = new();
     // Insertion order of _symbolsById. Loop discovery removes the symbols it
     // added; rebuilding the module's map from this list keeps the published
@@ -2230,7 +2230,7 @@ public sealed class Binder
             call.ArgumentModifiers,
             call.TypeArguments,
             allowNullableStringCompatibility: true);
-        var bclResolution = resolution.Kind == OverloadResolutionKind.NotFound
+        var bclResolution = resolution.Kind == OverloadResolutionKind.NotFound && !resolution.HasOpaqueOverloads
             ? TryResolveBclCall(call.Target, args, call.ArgumentNames, call.ArgumentModifiers)
             : null;
         ValidateCallArguments(args, resolution, bclResolution);
@@ -2275,7 +2275,8 @@ public sealed class Binder
             CallableStorageIdentity = callable,
             ObservedCallableEffects = callableEffects,
             ArgumentParameterIndices = GetBclArgumentParameterIndices(bclResolution, args.Count),
-            SelectedOverloadMatches = resolution.Matches
+            SelectedOverloadMatches = resolution.Matches,
+            HasOpaqueOverloads = resolution.HasOpaqueOverloads
         };
         return boundCall;
     }
@@ -5717,13 +5718,14 @@ public sealed class Binder
         // additionally consumes the parameter-side annotations from the same
         // resolution to fire Calor0274 for possibly-null strings passed into
         // non-nullable :string parameters.
-        var bclResolution = resolution.Kind == OverloadResolutionKind.NotFound
+        var bclResolution = resolution.Kind == OverloadResolutionKind.NotFound && !resolution.HasOpaqueOverloads
             ? computedReceiver is not null
                 ? TryResolveBclCall($"{computedReceiver.Type.FullyQualifiedName}.{computedMethodName}", args,
                     callExpr.ArgumentNames, callExpr.ArgumentModifiers, computedReceiver, callExpr.TypeArguments)
                 : TryResolveBclCall(callExpr.Target, args, callExpr.ArgumentNames, callExpr.ArgumentModifiers)
             : null;
         var instanceArrayResolution = computedReceiver is null && resolution.Kind == OverloadResolutionKind.NotFound
+            && !resolution.HasOpaqueOverloads
             ? TryResolveInstanceArrayCall(callExpr, receiver)
             : null;
         var annotatedReturn = bclResolution?.GetReturnBoundTypeEx();
@@ -5817,6 +5819,7 @@ public sealed class Binder
             ObservedCallableEffects = callableEffects,
             ArgumentParameterIndices = GetBclArgumentParameterIndices(bclResolution, args.Count),
             SelectedOverloadMatches = resolution.Matches,
+            HasOpaqueOverloads = resolution.HasOpaqueOverloads,
             MethodInputArrayType = methodInputArrayReturn ?? (resolution.Matches.Count == 1
                 && TryBuildMethodInputArrayType(resolution.Matches[0].ReturnType, out var nativeArray,
                     resolution.Matches[0].Function) ? nativeArray : null),
@@ -6197,10 +6200,14 @@ public sealed class Binder
             if (resolution.Kind == OverloadResolutionKind.NotFound)
                 continue;
 
-            if (resolution.Kind is OverloadResolutionKind.NoMatch or OverloadResolutionKind.Ambiguous
-                && CurrentClassHasOpaqueMethodDeclaration(target))
+            if ((resolution.Kind is OverloadResolutionKind.NoMatch or OverloadResolutionKind.Ambiguous
+                    || resolution.Kind == OverloadResolutionKind.Resolved
+                        && !resolution.Functions.Any(_localFunctionSymbols.Contains))
+                && CurrentClassHasOpaqueMethodDeclaration(target, typeArguments?.Count))
             {
-                return OverloadResolutionResult.NotFound();
+                // A native winner is not authoritative when a preserved overload
+                // can compete; leave the call unresolved for downstream analysis.
+                return OverloadResolutionResult.Opaque();
             }
 
             // v0.17 R2 — an argument whose type this module CANNOT SEE is in the
@@ -6258,7 +6265,7 @@ public sealed class Binder
         return OverloadResolutionResult.NotFound();
     }
 
-    private bool CurrentClassHasOpaqueMethodDeclaration(string target)
+    private bool CurrentClassHasOpaqueMethodDeclaration(string target, int? typeArgumentCount)
     {
         if (_currentClass == null)
             return false;
@@ -6270,7 +6277,9 @@ public sealed class Binder
             return false;
 
         return EnumerateCurrentClassInteropBlocks(_currentClass)
-            .Any(block => GetInteropMethodNames(block).Contains(methodName));
+            .Any(block => GetInteropMethodArities(block).Any(method =>
+                string.Equals(method.Name, methodName, StringComparison.Ordinal)
+                && (typeArgumentCount == null || method.Arity == typeArgumentCount)));
     }
 
     private static IEnumerable<CSharpInteropBlockNode> EnumerateCurrentClassInteropBlocks(
@@ -6285,22 +6294,24 @@ public sealed class Binder
         }
     }
 
-    private IReadOnlySet<string> GetInteropMethodNames(CSharpInteropBlockNode block)
+    private IReadOnlySet<(string Name, int Arity)> GetInteropMethodArities(CSharpInteropBlockNode block)
     {
-        if (_interopMethodNames.TryGetValue(block, out var names))
-            return names;
+        if (_interopMethodArities.TryGetValue(block, out var methods))
+            return methods;
 
         var wrapper = $"class __CalorInteropHost\n{{\n{block.CSharpCode}\n}}";
         var root = CSharpSyntaxTree.ParseText(wrapper).GetCompilationUnitRoot();
-        names = root.Members
+        methods = root.Members
             .OfType<ClassDeclarationSyntax>()
             .SelectMany(declaration => declaration.Members.OfType<MethodDeclarationSyntax>())
             .Where(method => method.ExplicitInterfaceSpecifier == null)
-            .Select(method => method.Identifier.ValueText)
-            .Where(name => !string.IsNullOrEmpty(name))
-            .ToHashSet(StringComparer.Ordinal);
-        _interopMethodNames.Add(block, names);
-        return names;
+            .Select(method => (
+                Name: method.Identifier.ValueText,
+                Arity: method.TypeParameterList?.Parameters.Count ?? 0))
+            .Where(method => !string.IsNullOrEmpty(method.Name))
+            .ToHashSet();
+        _interopMethodArities.Add(block, methods);
+        return methods;
     }
 
     private string GetOverloadArgumentType(BoundExpression argument, string? argumentModifier)

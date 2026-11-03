@@ -818,6 +818,7 @@ public sealed class CallGraphAnalysis
                     IReadOnlyList<FunctionSymbol>? callees = null;
                     VariableSymbol? receiver = null;
                     var inaccessibleCall = false;
+                    var opaqueOverloads = false;
                     var expressionTargetCall = false;
                     switch (node)
                     {
@@ -844,6 +845,7 @@ public sealed class CallGraphAnalysis
                             callees = statement.ResolvedSymbols;
                             receiver = statement.ReceiverSymbol;
                             inaccessibleCall = statement.IsInaccessibleCall;
+                            opaqueOverloads = statement.HasOpaqueOverloads;
                             RecordReceiver(callerId, statement.Target, statement.Receiver);
                             if (receiver != null && !target.Contains('.'))
                                 boundValues.Declarations[(callerId, node.Span.Start, node.Span.End)] =
@@ -854,6 +856,7 @@ public sealed class CallGraphAnalysis
                             callees = expression.ResolvedSymbols;
                             receiver = expression.ReceiverSymbol;
                             inaccessibleCall = expression.IsInaccessibleCall;
+                            opaqueOverloads = expression.HasOpaqueOverloads;
                             if (expression.EvaluatedReceiver is not null)
                             {
                                 expressionTargetCall = true;
@@ -906,6 +909,7 @@ public sealed class CallGraphAnalysis
                     else if (expressionTargetCall
                              || receiver != null
                              || inaccessibleCall
+                             || opaqueOverloads
                              || incompatibleCallSpans.Contains((node.Span.Start, node.Span.End)))
                     {
                         boundCallSites.Add(key);

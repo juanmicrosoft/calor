@@ -1489,6 +1489,7 @@ public sealed class OverloadResolutionResult
     public IReadOnlyList<FunctionSymbol> Functions { get; }
     public IReadOnlyList<ResolvedOverloadMatch> Matches { get; }
     internal bool ReplacesNativeOverloadError { get; }
+    internal bool HasOpaqueOverloads { get; private init; }
 
     private OverloadResolutionResult(
         OverloadResolutionKind kind,
@@ -1514,6 +1515,12 @@ public sealed class OverloadResolutionResult
 
     public static OverloadResolutionResult NotFound() =>
         new(OverloadResolutionKind.NotFound, null, null, Array.Empty<FunctionSymbol>());
+
+    internal static OverloadResolutionResult Opaque() =>
+        new(OverloadResolutionKind.NotFound, null, null, Array.Empty<FunctionSymbol>())
+        {
+            HasOpaqueOverloads = true
+        };
 
     public static OverloadResolutionResult Inaccessible(
         IReadOnlyList<FunctionSymbol> candidates) =>

@@ -1,11 +1,154 @@
+using Calor.Compiler.Analysis;
+using Calor.Compiler.Analysis.Dataflow;
+using Calor.Compiler.Binding;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
+using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
+using DiagnosticSeverity = Calor.Compiler.Diagnostics.DiagnosticSeverity;
 
 namespace Calor.Compiler.Tests;
 
 public class OpaqueInteropOverloadTests
 {
+    [Theory]
+    [InlineData("Write", false, false)]
+    [InlineData("this.Write", false, false)]
+    [InlineData("Write", true, false)]
+    [InlineData("this.Write", true, false)]
+    [InlineData("Write", false, true)]
+    [InlineData("this.Write", false, true)]
+    [InlineData("Write", true, true)]
+    [InlineData("this.Write", true, true)]
+    public void ApplicableNativeGeneric_WithPreservedParamsCompetitor_IsNotAuthoritative(
+        string target, bool statement, bool preprocessor)
+    {
+        const string preserved = "public int Write(System.Exception? exception, params object?[]? values) => 1;";
+        var opaque = $"§CSHARP{{{preserved}}}§/CSHARP";
+        if (preprocessor)
+            opaque = "§PP{true}\n      " + opaque;
+        var source = $$"""
+            §M{TestModule}
+              §CL{Logger:pub}
+                {{opaque}}
+                §MT{Write<T>:pub} (?System.Exception:exception, T:values) -> i32
+                  §E{alloc}
+                  §B{allocated:[i32]} §ARR{i32:1}
+                  §R 2
+                §MT{Probe:pub} (?[?object]:values) -> i32
+                  §E{}
+                  {{(statement ? "" : "§R ")}}§C{ {{target}} } §A (cast System.Exception? null) §A values §/C
+                  {{(statement ? "§R 0" : "")}}
+            """;
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Binder(diagnostics).Bind(ast);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var probe = bound.Functions.Single(function => function.Symbol.Name == "Logger.Probe");
+        var expression = BoundNodeHelpers.DescendantsAndSelf(probe).OfType<BoundCallExpression>().SingleOrDefault();
+        var callStatement = probe.Body.OfType<BoundCallStatement>().SingleOrDefault();
+        Assert.Null(expression?.ResolvedSymbol ?? callStatement?.ResolvedSymbol);
+        Assert.Empty(expression?.ResolvedSymbols ?? callStatement!.ResolvedSymbols);
+        Assert.Empty(expression?.SelectedOverloadMatches ?? callStatement!.SelectedOverloadMatches);
+        Assert.True(expression?.HasOpaqueOverloads ?? callStatement!.HasOpaqueOverloads);
+        Assert.Null(expression?.ResolvedMetadataMethod);
+        var graph = CallGraphAnalysis.BuildResolved(bound);
+        Assert.Empty(graph.ForwardGraph[probe.SymbolId]);
+        var unresolved = Assert.Single(graph.UnresolvedCalls.Where(call => call.Caller == probe.SymbolId));
+        Assert.Equal(target, unresolved.Target);
+        var astGraph = CallGraphAnalysis.Build(ast);
+        var astProbe = ast.Classes.Single().Methods.Single(method => method.Name == "Probe");
+        Assert.True(astGraph.IsBoundResolutionComplete);
+        Assert.Empty(astGraph.ResolveCallSites($"Logger.{astProbe.Id}", target, unresolved.Span));
+        Assert.Contains(astGraph.UnresolvedCalls, call =>
+            call.CallerId == $"Logger.{astProbe.Id}" && call.Target == target && call.Span == unresolved.Span);
+        var effects = new EffectEnforcementPass(diagnostics, policy: UnknownCallPolicy.Strict, strictEffects: true);
+        effects.Enforce(ast);
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnknownExternalCall
+            && diagnostic.Span == unresolved.Span
+            && diagnostic.Severity == DiagnosticSeverity.Error);
+
+        var generated = new CSharpEmitter().Emit(ast);
+        Assert.Contains(preserved, generated);
+        var compilation = CSharpCompilation.Create("Opaque_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble + generated)],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
+        var tree = compilation.SyntaxTrees.Single();
+        var invocation = Assert.Single(tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>());
+        var method = Assert.IsAssignableFrom<IMethodSymbol>(compilation.GetSemanticModel(tree).GetSymbolInfo(invocation).Symbol);
+        Assert.False(method.IsGenericMethod);
+        Assert.True(method.Parameters[^1].IsParams);
+        using var stream = new MemoryStream();
+        var emission = compilation.Emit(stream);
+        Assert.True(emission.Success, string.Join("\n", emission.Diagnostics));
+        var logger = System.Reflection.Assembly.Load(stream.ToArray()).GetType("TestModule.Logger", throwOnError: true)!;
+        var instance = Activator.CreateInstance(logger);
+        Assert.Equal(statement ? 0 : 1, logger.GetMethod("Probe")!.Invoke(instance, [new object?[] { "item" }]));
+        Assert.Equal(statement ? 0 : 1, logger.GetMethod("Probe")!.Invoke(instance, [null]));
+    }
+
+    [Theory]
+    [InlineData("public int Pick(params object[] values) => 1;", true, false)]
+    [InlineData("public int Pick<T,U>(T value, U other) => 1;", true, false)]
+    [InlineData("public int Pick<T>(params T[] values) => 1;", true, true)]
+    [InlineData("int IFoo.Pick(int value) => 1;", false, false)]
+    public void PreservedCandidates_RespectExplicitArityAndInterfaceExclusions(
+        string preserved, bool explicitGeneric, bool opaque)
+    {
+        var source = $$"""
+            §M{TestModule}
+              §CL{Value:pub}
+                §CSHARP{ {{preserved}} }§/CSHARP
+                §MT{Pick<T>:pub} (T:value) -> i32
+                  §R 2
+                §MT{Probe:pub} (i32:value) -> i32
+                  §R §C{ {{(explicitGeneric ? "Pick<i32>" : "Pick")}} } §A value §/C
+            """;
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Binder(diagnostics).Bind(ast);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound.Functions.Single(function =>
+            function.Symbol.Name == "Value.Probe")).OfType<BoundCallExpression>());
+        Assert.Equal(opaque, call.HasOpaqueOverloads);
+        if (opaque)
+        {
+            Assert.Null(call.ResolvedSymbol);
+            Assert.Empty(call.SelectedOverloadMatches);
+        }
+        else
+        {
+            Assert.Same(bound.Functions.Single(function => function.Symbol.Name == "Value.Pick").Symbol,
+                call.ResolvedSymbol);
+            Assert.Single(call.SelectedOverloadMatches);
+        }
+    }
+
+    [Fact]
+    public void InapplicableExplicitGeneric_DoesNotFallBackToPreservedNonGeneric()
+    {
+        const string source = """
+            §M{TestModule}
+              §CL{Value:pub}
+                §CSHARP{public int Pick(string value) => 1;}§/CSHARP
+                §MT{Pick<T>:pub} (T:value) -> i32
+                  §R 2
+                §MT{Probe:pub} () -> i32
+                  §R §C{Pick<i32>} §A "wrong" §/C
+            """;
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        _ = new Binder(diagnostics).Bind(ast);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+    }
+
     [Fact]
     public void PreprocessorInteropMethod_KeepsSameNameCallOpaque()
     {
