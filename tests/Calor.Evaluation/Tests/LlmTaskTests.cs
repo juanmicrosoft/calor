@@ -49,13 +49,42 @@ public class LlmTaskTests
         Assert.False(result.FromCache);
     }
 
+    [Theory]
+    [InlineData("unpriced-model")]
+    [InlineData("CLAUDE-SONNET-4-20250514")]
+    public async Task ClaudeProvider_RejectsUnpricedModelBeforeSendingRequest(string model)
+    {
+        var handler = new ClaudeUsageHandler(1000, 100, 0, 0);
+        using var client = new HttpClient(handler);
+        using var provider = new ClaudeProvider("offline-test-key", client);
+
+        var result = await provider.GenerateCodeAsync("test", "csharp",
+            new LlmGenerationOptions { Model = model });
+
+        Assert.False(result.Success);
+        Assert.Contains("pricing", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public void ClaudeProvider_EstimateCost_RejectsUnpricedModel()
+    {
+        using var provider = new ClaudeProvider("offline-test-key");
+        var error = Assert.Throws<ArgumentException>(() =>
+            provider.EstimateCost(1000, 100, "unpriced-model"));
+        Assert.Contains("pricing", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class ClaudeUsageHandler(
         int inputTokens, int outputTokens, int cacheReadTokens, int cacheCreationTokens)
         : HttpMessageHandler
     {
+        public int RequestCount { get; private set; }
+
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            RequestCount++;
             Assert.Equal(HttpMethod.Post, request.Method);
             Assert.Equal("https://api.anthropic.com/v1/messages", request.RequestUri?.AbsoluteUri);
             return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
