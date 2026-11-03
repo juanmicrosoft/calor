@@ -58,7 +58,6 @@ silently dropping the modifier.
 The existing expression-target form accepts a computed receiver or delegate:
 
 ```
-§C §NEW{object} §/NEW.Equals §A value §/C
 §C §C{GetHandler} §/C §A value §/C
 §C §C{GetReceiver} §/C.Update §A{ref}[value] value §/C
 ```
