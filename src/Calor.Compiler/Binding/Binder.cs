@@ -216,6 +216,9 @@ public sealed class Binder
         BoundExpression? computedReceiver = null,
         IReadOnlyList<string>? typeArguments = null)
     {
+        if (args.Any(argument => argument.HasUnknownInferredType)
+            || computedReceiver?.HasUnknownInferredType == true)
+            return null;
         // BCL-shape heuristic: receiver contains at least one dot AND starts
         // with System./Microsoft. or a capitalized identifier followed by a dot.
         var lastDot = callTarget.LastIndexOf('.');
@@ -1449,7 +1452,8 @@ public sealed class Binder
         BoundTypes.NominalBoundType? inferredReferenceType = null,
         bool isTypeInferred = false,
         BoundTypes.ArrayBoundType? methodInputArrayType = null,
-        BoundTypes.GenericInstantiationBoundType? genericNullabilityType = null)
+        BoundTypes.GenericInstantiationBoundType? genericNullabilityType = null,
+        bool hasUnknownInferredType = false)
     {
         var symbol = new VariableSymbol(
             id,
@@ -1471,6 +1475,7 @@ public sealed class Binder
         {
             InferredReferenceType = inferredReferenceType,
             IsTypeInferred = isTypeInferred,
+            HasUnknownInferredType = hasUnknownInferredType,
             MethodInputArrayType = methodInputArrayType
                 ?? (TryBuildMethodInputArrayType(typeName, out var arrayType) ? arrayType : null),
             GenericNullabilityType = genericNullabilityType
@@ -1496,7 +1501,8 @@ public sealed class Binder
         BoundTypes.NominalBoundType? inferredReferenceType = null,
         bool isTypeInferred = false,
         BoundTypes.ArrayBoundType? methodInputArrayType = null,
-        BoundTypes.GenericInstantiationBoundType? genericNullabilityType = null)
+        BoundTypes.GenericInstantiationBoundType? genericNullabilityType = null,
+        bool hasUnknownInferredType = false)
     {
         var context = _declarationContext.IsNone ? _moduleSymbolId : _declarationContext;
         if (!_snapshotLocalContexts.TryGetValue((context, kind), out var snapshotContext))
@@ -1519,7 +1525,8 @@ public sealed class Binder
             inferredReferenceType: inferredReferenceType,
             isTypeInferred: isTypeInferred,
             methodInputArrayType: methodInputArrayType,
-            genericNullabilityType: genericNullabilityType);
+            genericNullabilityType: genericNullabilityType,
+            hasUnknownInferredType: hasUnknownInferredType);
     }
 
     private string LocalIdentitySuffix(string name, string typeName, int start)
@@ -2257,7 +2264,8 @@ public sealed class Binder
             call.ArgumentNames,
             call.ArgumentModifiers,
             receiverSymbol,
-            WithLocalFunctionCandidates(call.Target, resolution.Functions),
+            resolution.Kind == OverloadResolutionKind.UnresolvedArguments ? []
+                : WithLocalFunctionCandidates(call.Target, resolution.Functions),
             call.CalleeSpan,
             call.ReceiverSpan,
             resolution.Kind == OverloadResolutionKind.Inaccessible,
@@ -2276,7 +2284,8 @@ public sealed class Binder
             ObservedCallableEffects = callableEffects,
             ArgumentParameterIndices = GetBclArgumentParameterIndices(bclResolution, args.Count),
             SelectedOverloadMatches = resolution.Matches,
-            HasOpaqueOverloads = resolution.HasOpaqueOverloads
+            HasOpaqueOverloads = resolution.HasOpaqueOverloads,
+            HasUnresolvedArguments = resolution.Kind == OverloadResolutionKind.UnresolvedArguments
         };
         return boundCall;
     }
@@ -2701,7 +2710,8 @@ public sealed class Binder
             inferredReferenceType: inferredReferenceType,
             isTypeInferred: bind.TypeName is null,
             methodInputArrayType: GetLocalMethodInputArrayType(bind.TypeName, initializer),
-            genericNullabilityType: bind.TypeName is null ? initializer?.GenericNullabilityType : null);
+            genericNullabilityType: bind.TypeName is null ? initializer?.GenericNullabilityType : null,
+            hasUnknownInferredType: bind.TypeName is null && initializer?.HasUnknownInferredType == true);
         variable.IsImmutableBinding = !bind.IsMutable && !bind.IsCollectionStatementForm; // #1550
         variable.MetadataArrayResultType = initializer?.MetadataArrayResultType;
 
@@ -5105,7 +5115,8 @@ public sealed class Binder
         return new BoundExpressionCall(call.Span, target, arguments, resultType,
             call.ArgumentNames, call.ArgumentModifiers, call.TypeArguments)
         {
-            ObservedCallableEffects = observed
+            ObservedCallableEffects = observed,
+            HasUnknownInferredType = resultType is null
         };
     }
 
@@ -5803,7 +5814,8 @@ public sealed class Binder
             typeArguments: callExpr.TypeArguments,
             resolvedSymbol: resolution.Function,
             receiverSymbol: receiverSymbol,
-            resolvedSymbols: WithLocalFunctionCandidates(callExpr.Target, resolution.Functions),
+            resolvedSymbols: resolution.Kind == OverloadResolutionKind.UnresolvedArguments ? []
+                : WithLocalFunctionCandidates(callExpr.Target, resolution.Functions),
             calleeSpan: callExpr.CalleeSpan,
             receiverSpan: callExpr.ReceiverSpan,
             isInaccessibleCall: resolution.Kind == OverloadResolutionKind.Inaccessible,
@@ -5820,6 +5832,9 @@ public sealed class Binder
             ArgumentParameterIndices = GetBclArgumentParameterIndices(bclResolution, args.Count),
             SelectedOverloadMatches = resolution.Matches,
             HasOpaqueOverloads = resolution.HasOpaqueOverloads,
+            HasUnresolvedArguments = resolution.Kind == OverloadResolutionKind.UnresolvedArguments,
+            HasUnknownInferredType = resolution.ResolvedReturnType is null
+                && annotatedReturn is null && instanceArrayResolution is null,
             MethodInputArrayType = methodInputArrayReturn ?? (resolution.Matches.Count == 1
                 && TryBuildMethodInputArrayType(resolution.Matches[0].ReturnType, out var nativeArray,
                     resolution.Matches[0].Function) ? nativeArray : null),
@@ -5944,15 +5959,7 @@ public sealed class Binder
                         report: ShouldReportUnresolvedReceiver(receiverPath)));
             }
 
-            // The binder's OBJECT fallback on an inferred local it could not type
-            // (unknown callee return, disagreeing conditional resolutions). A
-            // parameter, field or property always carries a declared type, so its
-            // OBJECT is a real `object` and is honoured. A local explicitly
-            // declared `§B{o:OBJECT}` (uppercase; the surface `object` keyword
-            // stays lowercase and is unaffected) is conflated with the fallback —
-            // documented, not distinguished, exactly as slice 1 had it.
-            if (typedHead.Type is BoundTypes.NominalBoundType { QualifiedName: "OBJECT" }
-                && !(receiverSymbol.IsParameter || receiverSymbol.IsField || receiverSymbol.IsProperty))
+            if (typedHead.HasUnknownInferredType)
             {
                 return new BoundVariableExpression(
                     receiverSpan,
@@ -6160,6 +6167,9 @@ public sealed class Binder
         BoundExpression? computedReceiver = null,
         string? computedMethodName = null)
     {
+        if (arguments.Any(argument => argument.HasUnknownInferredType)
+            || computedReceiver?.HasUnknownInferredType == true)
+            return OverloadResolutionResult.UnresolvedArguments();
         // Synthetic constructor targets can also occur in ordinary call nodes.
         allowNullableStringCompatibility &= !target.EndsWith("..ctor", StringComparison.Ordinal);
         var argumentTypes = arguments
@@ -7916,7 +7926,8 @@ public sealed class Binder
                 "using",
                 nullableAnnotation: annotation,
                 inferredReferenceType: inferredReferenceType,
-                isTypeInferred: usingStmt.VariableType is null);
+                isTypeInferred: usingStmt.VariableType is null,
+                hasUnknownInferredType: usingStmt.VariableType is null && resourceExpr.HasUnknownInferredType);
             _scope.TryDeclare(resource);
         }
 
@@ -8037,6 +8048,7 @@ public sealed class Binder
             {
                 StoreCallableState(visible, UnionCallableEffects(GetCallableState(visible), GetCallableState(other)));
                 _callableState.Remove(other);
+                visible.HasUnknownInferredType |= other.HasUnknownInferredType;
                 other.StorageIdentity = visible;
             }
             // A flow fact (such as "not null") a branch established for its binding survives the

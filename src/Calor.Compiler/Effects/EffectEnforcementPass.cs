@@ -3529,6 +3529,11 @@ public sealed class EffectEnforcementPass
             IReadOnlyList<ExpressionNode>? arguments,
             TextSpan? referenceSpan)
         {
+            // Unknown argument inference cannot authorize a same-named manifest
+            // overload. A declared delegate still supplies its invocation row.
+            if (_context.CallGraph.HasUnresolvedCallArguments(_context.CurrentFunctionId, span)
+                && (target.Contains('.') || ResolveLocalValueType(target) is null or UnknownLocalTypeSentinel))
+                return UnknownResolvedOperation(target, span);
             var exactInternalIds = _context.CallGraph.ResolveCallSites(
                 _context.CurrentFunctionId,
                 target,

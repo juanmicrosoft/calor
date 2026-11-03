@@ -15,6 +15,273 @@ namespace Calor.Compiler.Tests;
 
 public sealed class ComputedCallExpressionTests
 {
+    [Theory]
+    [InlineData("object")]
+    [InlineData("IList<ObjectDetails>")]
+    public void UnknownInferredArgument_DoesNotRejectOrSelectNativeOverload(string parameterType)
+    {
+        var (ast, bound, diagnostics) = Bind($$"""
+            §M{Test}
+              §F{Use:pub} () -> i32
+                §E{}
+                §B{details} §C{External.Make} §/C
+                §B{alias} details
+                §R §C{Pick} §A alias §/C
+              §F{Pick:pub} ({{parameterType}}:value) -> i32
+                §E{}
+                §R 2
+            """);
+        Assert.DoesNotContain(diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+        var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
+        var call = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>()
+            .Single(call => call.Target == "Pick");
+        Assert.Null(call.ResolvedSymbol);
+        Assert.Empty(call.ResolvedSymbols);
+        Assert.Empty(call.SelectedOverloadMatches);
+        Assert.Null(call.ResolvedMetadataMethod);
+        Assert.Null(call.ArgumentParameterIndices);
+        var graph = CallGraphAnalysis.BuildResolved(bound);
+        Assert.Empty(graph.ForwardGraph[use.SymbolId]);
+        var astUse = ast.Functions.Single(function => function.Name == "Use");
+        var astGraph = CallGraphAnalysis.Build(ast);
+        Assert.Empty(astGraph.ResolveCallSites(astUse.Id, "Pick", call.Span));
+        new EffectEnforcementPass(diagnostics, policy: UnknownCallPolicy.Strict, strictEffects: true).Enforce(ast);
+        Assert.Contains(diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Span == call.Span);
+    }
+
+    [Theory]
+    [InlineData("§B{value:OBJECT} §C{External.Make} §/C")]
+    [InlineData("§B{value:object} §C{External.Make} §/C")]
+    [InlineData("§B{value} §NEW{object} §/NEW")]
+    [InlineData("§B{value} §C{Make} §/C")]
+    [InlineData("§B{value} §C{make} §/C")]
+    [InlineData("§B{value} §C make §/C")]
+    [InlineData("§B{value} §C{System.Runtime.CompilerServices.RuntimeHelpers.GetObjectValue} §A §NEW{object} §/NEW §/C")]
+    public void ActualObjectArgument_RetainsNativeSelectionAndMismatch(string binding)
+    {
+        foreach (var parameter in new[] { "object", "i32" })
+        {
+            var (_, bound, diagnostics) = Bind($$"""
+                §M{Test}
+                  §F{Use:pub} (Func<object>:make) -> i32
+                    {{binding}}
+                    §B{alias} value
+                    §R §C{Pick} §A alias §/C
+                  §F{Make:pub} () -> object
+                    §R §NEW{object} §/NEW
+                  §F{Pick:pub} ({{parameter}}:value) -> i32
+                    §R 2
+                """);
+            var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
+            var pick = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>()
+                .Single(call => call.Target == "Pick");
+            if (parameter == "object")
+            {
+                Assert.DoesNotContain(diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+                Assert.NotNull(pick.ResolvedSymbol);
+                Assert.Single(pick.SelectedOverloadMatches);
+                Assert.Contains(CallGraphAnalysis.BuildResolved(bound).ForwardGraph[use.SymbolId],
+                    site => site.Callee == pick.ResolvedSymbolId);
+            }
+            else
+            {
+                Assert.Contains(diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+                Assert.Null(pick.ResolvedSymbol);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void MutableInferredTypeAuthority_IsStaticAcrossReassignmentsAndJoins(bool unknown, bool branch)
+    {
+        var initializer = unknown ? "§C{External.Make} §/C" : "§NEW{object} §/NEW";
+        var replacement = unknown ? "§NEW{object} §/NEW" : "§C{External.Make} §/C";
+        var (_, bound, diagnostics) = Bind($$"""
+            §M{Test}
+              §F{Use:pub} (bool:gate) -> i32
+                §B{~value} {{initializer}}
+                {{(branch ? "§IF gate\n      §ASSIGN value " : "§B{~value} ")}}{{replacement}}
+                §B{alias} value
+                §R §C{Pick} §A alias §/C
+              §F{Pick:pub} (object:value) -> i32
+                §R 2
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var pick = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
+            .Single(call => call.Target == "Pick");
+        Assert.Equal(unknown, pick.HasUnresolvedArguments);
+        Assert.Equal(!unknown, pick.ResolvedSymbol is not null);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void InferredTypeJoin_DoesNotRecoverUnknownAuthority(bool preprocessor)
+    {
+        var binding = preprocessor
+            ? """
+                §PP{FEATURE}
+                  §B{value} §NEW{object} §/NEW
+                §PPE
+                  §B{value} §C{External.Make} §/C
+                """
+            : "§B{value} (? gate §NEW{object} §/NEW §C{External.Make} §/C)";
+        var (_, bound, diagnostics) = Bind($$"""
+            §M{Test}
+              §F{Use:pub} (bool:gate) -> i32
+                {{binding.Replace("\n", "\n    ", StringComparison.Ordinal)}}
+                §R §C{Pick} §A value §/C
+              §F{Pick:pub} (object:item) -> i32
+                §R 2
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var pick = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
+            .Single(call => call.Target == "Pick");
+        Assert.True(pick.HasUnresolvedArguments);
+        Assert.Null(pick.ResolvedSymbol);
+        Assert.Empty(pick.SelectedOverloadMatches);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UnknownArgument_BlocksNativeAndMetadataFallback(bool statement)
+    {
+        var (ast, bound, diagnostics) = Bind($$"""
+            §M{Test}
+              §F{Use:pub} () -> i32
+                §E{}
+                §B{value} §C{External.Make} §/C
+                §B{text} §C{System.Convert.ToString} §A value §/C
+                {{(statement ? "" : "§B{result} ")}}§C{Pick} §A value §/C
+                §R 0
+              §F{Pick:pub} (object:item) -> i32
+                §E{}
+                §R 2
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
+        var metadata = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>()
+            .Single(call => call.Target == "System.Convert.ToString");
+        Assert.True(metadata.HasUnknownInferredType);
+        Assert.Null(metadata.ResolvedMetadataMethod);
+        Assert.Null(metadata.ArgumentParameterIndices);
+        var expression = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>()
+            .SingleOrDefault(call => call.Target == "Pick");
+        var callStatement = use.Body.OfType<BoundCallStatement>().SingleOrDefault(call => call.Target == "Pick");
+        Assert.Empty(expression?.ResolvedSymbols ?? callStatement!.ResolvedSymbols);
+        Assert.Empty(expression?.SelectedOverloadMatches ?? callStatement!.SelectedOverloadMatches);
+        var graph = CallGraphAnalysis.BuildResolved(bound);
+        Assert.Empty(graph.ForwardGraph[use.SymbolId]);
+        var span = expression?.Span ?? callStatement!.Span;
+        var astGraph = CallGraphAnalysis.Build(ast);
+        Assert.Empty(astGraph.ResolveCallSites(ast.Functions[0].Id, "Pick", span));
+        new EffectEnforcementPass(diagnostics, policy: UnknownCallPolicy.Strict, strictEffects: true).Enforce(ast);
+        Assert.Contains(diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Span == span);
+        Assert.Contains(diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Span == metadata.Span);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UnknownArgument_DoesNotEraseADeclaredDelegateInvocationRow(bool unknown)
+    {
+        var (ast, bound, diagnostics) = Bind($$"""
+            §M{Test}
+              §F{Use:pub} (Func<object,i32>:make §E{cw}, object:seed) -> i32
+                §E{}
+                §B{value} {{(unknown ? "§C{External.Make} §/C" : "seed")}}
+                §R §C{make} §A value §/C
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
+            .Single(call => call.Target == "make");
+        new EffectEnforcementPass(diagnostics, policy: UnknownCallPolicy.Strict, strictEffects: true).Enforce(ast);
+        Assert.DoesNotContain(diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Span == call.Span);
+        if (!unknown)
+            Assert.Contains(diagnostics.Errors, diagnostic =>
+                diagnostic.Code == "Calor0410" && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void UnknownInferredLinqArgument_PreservesExecutableCSharpInference()
+    {
+        const string source = """
+            using System.Linq;
+            using System.Collections.Generic;
+            namespace Probe;
+            public class Orderer
+            {
+                public static int Run(Handler[] handlers)
+                {
+                    var handlerObjectsDetails = handlers.Select(static s => new ObjectDetails(s)).ToList();
+                    var uniqueHandlers = RemoveOverridden(handlerObjectsDetails).ToArray();
+                    return uniqueHandlers.Length;
+                }
+                private static IEnumerable<ObjectDetails> RemoveOverridden(IList<ObjectDetails> details)
+                {
+                    return details;
+                }
+            }
+            """;
+        const string externalTypes = """
+            namespace Probe;
+            public sealed class Handler { }
+            public sealed class ObjectDetails
+            {
+                public ObjectDetails(Handler handler) { }
+            }
+            """;
+        var (ast, bound, diagnostics) = Bind("""
+            §M{Probe}
+              §U{System.Linq}
+              §U{System.Collections.Generic}
+              §CL{Orderer:pub}
+                §MT{Run:pub:static} ([Handler]:handlers) -> i32
+                  §B{handlerObjectsDetails} §C §C{handlers.Select} §A §LAM{s:Handler} §NEW{ObjectDetails} §A s §/NEW §/LAM §/C.ToList §/C
+                  §B{uniqueHandlers} §C §C{RemoveOverridden} §A handlerObjectsDetails §/C.ToArray §/C
+                  §R uniqueHandlers.Length
+                §MT{RemoveOverridden:pri:static} (IList<ObjectDetails>:details) -> IEnumerable<ObjectDetails>
+                  §R details
+            """);
+        Assert.DoesNotContain(diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+        var calls = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>().ToArray();
+        var call = calls.Single(call => call.Target.EndsWith("RemoveOverridden", StringComparison.Ordinal)
+            || call.ResolvedMethodName == "RemoveOverridden");
+        Assert.Null(call.ResolvedSymbol);
+        Assert.Empty(call.SelectedOverloadMatches);
+        var emitted = new CSharpEmitter().Emit(ast);
+        foreach (var code in new[] { source, emitted })
+        {
+            var compilation = CSharpCompilation.Create("Inferred_" + Guid.NewGuid().ToString("N"),
+                [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble + code),
+                    CSharpSyntaxTree.ParseText(externalTypes)],
+                GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var emission = compilation.Emit(stream);
+            Assert.True(emission.Success, string.Join("\n", emission.Diagnostics) + "\n" + code);
+            var assembly = System.Reflection.Assembly.Load(stream.ToArray());
+            var handlers = Array.CreateInstance(assembly.GetType("Probe.Handler", throwOnError: true)!, 3);
+            for (var index = 0; index < handlers.Length; index++)
+                handlers.SetValue(Activator.CreateInstance(handlers.GetType().GetElementType()!), index);
+            Assert.Equal(3, assembly.GetType("Probe.Orderer", throwOnError: true)!
+                .GetMethod("Run")!.Invoke(null, [handlers]));
+        }
+    }
+
     [Fact]
     public void ComputedMembers_RetainOverloadIdentityAndOrderedReceiverChildren()
     {

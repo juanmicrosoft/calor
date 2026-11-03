@@ -1245,6 +1245,9 @@ public sealed class VariableSymbol : Symbol
     // from its display spelling in the local's lexical namespace.
     internal BoundTypes.NominalBoundType? InferredReferenceType { get; init; }
     internal bool IsTypeInferred { get; init; }
+    // Static type authority belongs to the declaration, not its current value.
+    // Assignments cannot recover an unknown var type or erase a known object type.
+    internal bool HasUnknownInferredType { get; set; }
     internal Microsoft.CodeAnalysis.IArrayTypeSymbol? MetadataArrayResultType { get; set; }
     internal BoundTypes.ArrayBoundType? MethodInputArrayType { get; init; }
     internal BoundTypes.GenericInstantiationBoundType? GenericNullabilityType { get; init; }
@@ -1466,6 +1469,7 @@ public enum OverloadResolutionKind
     NoMatch,
     Ambiguous,
     Resolved,
+    UnresolvedArguments,
 }
 
 /// <summary>An entry from the winning argument map, indexed in source evaluation order.</summary>
@@ -1515,6 +1519,9 @@ public sealed class OverloadResolutionResult
 
     public static OverloadResolutionResult NotFound() =>
         new(OverloadResolutionKind.NotFound, null, null, Array.Empty<FunctionSymbol>());
+
+    internal static OverloadResolutionResult UnresolvedArguments() =>
+        new(OverloadResolutionKind.UnresolvedArguments, null, null, Array.Empty<FunctionSymbol>());
 
     internal static OverloadResolutionResult Opaque() =>
         new(OverloadResolutionKind.NotFound, null, null, Array.Empty<FunctionSymbol>())

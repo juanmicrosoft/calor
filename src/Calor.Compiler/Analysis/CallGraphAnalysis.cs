@@ -82,6 +82,7 @@ public sealed class CallGraphAnalysis
     {
         internal Dictionary<(string CallerId, int Start, int End), BoundCallExpression>
             ComputedMemberCalls { get; } = new();
+        internal HashSet<(string CallerId, int Start, int End)> UnresolvedArgumentCalls { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), Microsoft.CodeAnalysis.IArrayTypeSymbol>
             MetadataArrayTypes { get; } = new();
         /// <summary>(callerId, reference start, reference end) → the resolved
@@ -106,6 +107,9 @@ public sealed class CallGraphAnalysis
 
     internal BoundCallExpression? ComputedMemberCall(string callerId, TextSpan span) =>
         _boundValues.ComputedMemberCalls.GetValueOrDefault((callerId, span.Start, span.End));
+
+    internal bool HasUnresolvedCallArguments(string callerId, TextSpan span) =>
+        _boundValues.UnresolvedArgumentCalls.Contains((callerId, span.Start, span.End));
 
     /// <summary>The declaration span of the variable the binder resolved a bare
     /// value reference (a call target or a <c>ReferenceNode</c>) to, or
@@ -818,7 +822,8 @@ public sealed class CallGraphAnalysis
                     IReadOnlyList<FunctionSymbol>? callees = null;
                     VariableSymbol? receiver = null;
                     var inaccessibleCall = false;
-                    var opaqueOverloads = false;
+                    var blocksNameFallback = false;
+                    var unresolvedArguments = false;
                     var expressionTargetCall = false;
                     switch (node)
                     {
@@ -845,7 +850,8 @@ public sealed class CallGraphAnalysis
                             callees = statement.ResolvedSymbols;
                             receiver = statement.ReceiverSymbol;
                             inaccessibleCall = statement.IsInaccessibleCall;
-                            opaqueOverloads = statement.HasOpaqueOverloads;
+                            blocksNameFallback = statement.HasOpaqueOverloads || statement.HasUnresolvedArguments;
+                            unresolvedArguments = statement.HasUnresolvedArguments;
                             RecordReceiver(callerId, statement.Target, statement.Receiver);
                             if (receiver != null && !target.Contains('.'))
                                 boundValues.Declarations[(callerId, node.Span.Start, node.Span.End)] =
@@ -856,7 +862,8 @@ public sealed class CallGraphAnalysis
                             callees = expression.ResolvedSymbols;
                             receiver = expression.ReceiverSymbol;
                             inaccessibleCall = expression.IsInaccessibleCall;
-                            opaqueOverloads = expression.HasOpaqueOverloads;
+                            blocksNameFallback = expression.HasOpaqueOverloads || expression.HasUnresolvedArguments;
+                            unresolvedArguments = expression.HasUnresolvedArguments;
                             if (expression.EvaluatedReceiver is not null)
                             {
                                 expressionTargetCall = true;
@@ -886,6 +893,8 @@ public sealed class CallGraphAnalysis
                     if (target == null)
                         continue;
 
+                    if (unresolvedArguments)
+                        boundValues.UnresolvedArgumentCalls.Add((callerId, node.Span.Start, node.Span.End));
                     var key = new AstCallKey(callerId, target, node.Span.Start, node.Span.End);
                     if (callees?.Any(callee => localFunctionIds.Contains(callee.Id)) == true)
                     {
@@ -909,7 +918,7 @@ public sealed class CallGraphAnalysis
                     else if (expressionTargetCall
                              || receiver != null
                              || inaccessibleCall
-                             || opaqueOverloads
+                             || blocksNameFallback
                              || incompatibleCallSpans.Contains((node.Span.Start, node.Span.End)))
                     {
                         boundCallSites.Add(key);

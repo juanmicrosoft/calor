@@ -39,6 +39,8 @@ public abstract class BoundExpression : BoundNode
     /// </summary>
     public abstract BoundType Type { get; }
 
+    // The display type can be OBJECT for recovery without establishing System.Object.
+    internal bool HasUnknownInferredType { get; init; }
     internal ArrayBoundType? MethodInputArrayType { get; init; }
     internal GenericInstantiationBoundType? GenericNullabilityType { get; init; }
     // Effects-only producer identity, independent of nullability and verifier eligibility.
@@ -211,6 +213,7 @@ public sealed class BoundVariableExpression : BoundExpression
         Variable = variable;
         ResolvedSymbols = resolvedSymbols
             ?? [variable];
+        HasUnknownInferredType = ResolvedSymbols.Any(symbol => symbol.StorageIdentity.HasUnknownInferredType);
         if (ResolvedSymbols.Count == 1 && typeOverride is not UnresolvedBoundType)
         {
             MethodInputArrayType = variable.MethodInputArrayType;
@@ -345,6 +348,7 @@ public sealed class BoundCallStatement : BoundStatement
     public bool IsInaccessibleCall { get; }
     // Preserved overloads veto native-name and metadata fallback, not emission.
     internal bool HasOpaqueOverloads { get; init; }
+    internal bool HasUnresolvedArguments { get; init; }
     public IReadOnlyList<string?>? ArgumentNames { get; }
     public IReadOnlyList<string?>? ArgumentModifiers { get; }
     public IReadOnlyList<string>? TypeArguments { get; }
@@ -780,6 +784,7 @@ public class BoundCallExpression : BoundExpression
     public TextSpan? ReceiverSpan { get; }
     public bool IsInaccessibleCall { get; }
     internal bool HasOpaqueOverloads { get; init; }
+    internal bool HasUnresolvedArguments { get; init; }
     public override BoundType Type { get; }
     public BoundExpression? EvaluatedReceiver { get; init; }
     public override IReadOnlyList<BoundExpression> Children =>
@@ -1989,6 +1994,7 @@ public sealed class BoundConditionalExpression : BoundExpression
         if (resultType is null) throw new ArgumentNullException(nameof(resultType));
         var shape = NullabilityResultTypes.Join([whenTrue, whenFalse]);
         Type = shape ?? ExpressionResultTypes.Join(resultType, [whenTrue.Type, whenFalse.Type]);
+        HasUnknownInferredType = whenTrue.HasUnknownInferredType || whenFalse.HasUnknownInferredType;
         MethodInputArrayType = shape as ArrayBoundType;
         GenericNullabilityType = shape as GenericInstantiationBoundType;
         Children = [condition, whenTrue, whenFalse];
