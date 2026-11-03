@@ -5,6 +5,7 @@ using Calor.Compiler.Binding;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
+using Calor.Compiler.Effects.Manifests;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
@@ -206,12 +207,35 @@ public sealed class ComputedCallExpressionTests
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var call = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
             .Single(call => call.Target == "make");
-        new EffectEnforcementPass(diagnostics, policy: UnknownCallPolicy.Strict, strictEffects: true).Enforce(ast);
+        var enforcement = new EffectEnforcementPass(diagnostics, policy: UnknownCallPolicy.Strict, strictEffects: true);
+        enforcement.Enforce(ast);
         Assert.DoesNotContain(diagnostics.Errors, diagnostic =>
             diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Span == call.Span);
+        var fact = enforcement.DeclarationFacts[ast.Functions.Single().Id];
+        Assert.Equal(unknown, fact.InferredRow.IsUnknown);
+        Assert.Equal(unknown ? ["unknown"] : new[] { "cw" }, fact.Forbidden);
         if (!unknown)
             Assert.Contains(diagnostics.Errors, diagnostic =>
                 diagnostic.Code == "Calor0410" && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+
+        // Isolate this invocation's charge without teaching the binder the
+        // producer's return type. Unknown remains top in the default pass above.
+        var loader = new ManifestLoader(loadUserLevelManifests: false);
+        Assert.NotNull(loader.LoadFromJson("""
+            {"mappings":[{"type":"External","methods":{"Make":[]}}]}
+            """));
+        var isolatedDiagnostics = new DiagnosticBag();
+        var isolated = new EffectEnforcementPass(isolatedDiagnostics,
+            policy: UnknownCallPolicy.Strict, strictEffects: true, resolver: new EffectResolver(loader));
+        isolated.Enforce(ast);
+        var isolatedFact = isolated.DeclarationFacts[ast.Functions.Single().Id];
+        Assert.False(isolatedFact.InferredRow.IsUnknown);
+        Assert.Equal(["cw"], isolatedFact.Forbidden);
+        var forbidden = Assert.Single(isolatedDiagnostics.Errors,
+            diagnostic => diagnostic.Code == "Calor0410");
+        Assert.Contains("uses effect 'cw'", forbidden.Message, StringComparison.Ordinal);
+        Assert.Contains("charged by invoking 'make' (row: cw)", forbidden.Message, StringComparison.Ordinal);
+        Assert.Equal(unknown, Assert.IsType<BoundVariableExpression>(Assert.Single(call.Arguments)).HasUnknownInferredType);
     }
 
     [Fact]
