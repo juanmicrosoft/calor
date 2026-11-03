@@ -5,8 +5,8 @@
   "scope": "D-A: every .calr under the repository root (bin/, obj/, .git/, .claude/, node_modules/, bench/corpus/ submodules, docs/design/spikes/ artifacts and the PP-W-rows measurement fixtures (bench/phase0-agent-native/{pairs,epochs/*}/W-<ddd>-*, roadmap §4.1) excluded; nothing else filtered), compiled one file at a time via Program.Compile with EnforceEffects=true, UnknownCallPolicy.Strict, StrictEffects=false, EnableTypeChecking=true (the CLI default), UnsafeTranspileOnly=false, DeferGeneratedOutputValidation=true (per-file Roslyn validation of the emitted C# is skipped; it runs after the effect pass and cannot affect the counts), ProjectDirectory=null (the CLI sets it to the file's directory; here no project-local manifest is consulted), and a shared hermetic EffectResolver loading built-in manifests only; no project/solution/user-level manifests. Files that fail before the effect pass (lexer/parser/type-check/binder errors; witnessed by the absence of Program.Compile's verbose 'Effect enforcement completed' status line) are listed by name with their first error code in notReachingEffectPass, never dropped. Calor0419 is counted per DIAGNOSTIC (one per function, first three reasons shown), so a function with more than three assumptions whose function-typed reason is truncated out of the message is under-counted — a known floor, not a ceiling. D-B: Roslyn syntax-only (CSharpSyntaxTree.ParseText, LanguageVersion.Preview, no preprocessor symbols defined, so inactive #if branches are not scanned) over bench/corpus/{MediatR,serilog,FluentValidation}/src/**/*.cs (bin/, obj/ excluded). delegate declarations are collected per SUBJECT (all files) before classifying, so a delegate declared in one file counts where it is used in another.",
   "purpose": "Current-compiler D-A regression expectations, not historical raw-source replay or a ledger identity.",
   "fileCount": 952,
-  "filesNotReachingEffectPass": 52,
-  "notReachingEffectPassNote": "Current compiler over the original 952 logical subjects, resolving explicitly registered active copies. The same 52 files fail before the effect pass. Intentionally obsolete MCP inputs retain their original bytes; removed source-ID errors now precede legacy closer/effect errors. Every named first error remains exact.",
+  "filesNotReachingEffectPass": 51,
+  "notReachingEffectPassNote": "Current compiler over the original 952 logical subjects, resolving explicitly registered active copies. 51 files fail before the effect pass; the w5-parity-002 treatment run-3 CSV subject now reaches it with authoritative List<str> indexed element typing. Intentionally obsolete MCP inputs retain their original bytes; removed source-ID errors now precede legacy closer/effect errors. Every named first error remains exact.",
   "notReachingEffectPass": [
     {
       "file": "bench/mcp/tasks/01-fix-closing-tag/expected.calr",
@@ -175,10 +175,6 @@
     {
       "file": "bench/phase0-agent-native/epochs/w5-parity-002/N1-003-csv-row/calor+control/run-5/final-src/CsvRow.calr",
       "firstError": "Calor0213"
-    },
-    {
-      "file": "bench/phase0-agent-native/epochs/w5-parity-002/N1-003-csv-row/calor+treatment/run-3/final-src/CsvRow.calr",
-      "firstError": "Calor0208"
     },
     {
       "file": "tests/Calor.Conversion.Tests/Snapshots/13-10.approved.calr",

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "purpose": "Current formatter regression expectations; original formatter-corpus-baseline.json is replayed with its producing compiler.",
   "trackedFileCount": 952,
-  "successfulTransformationCount": 743,
+  "successfulTransformationCount": 744,
   "parseFailurePaths": [
     "bench/mcp/tasks/01-fix-closing-tag/expected.calr",
     "bench/mcp/tasks/01-fix-closing-tag/input.calr",
@@ -54,7 +54,6 @@
       "bench/phase0-agent-native/epochs/w5-parity-002/N1-002-inventory/calor+treatment/run-3/final-src/Inventory.calr",
       "bench/phase0-agent-native/epochs/w5-parity-002/N1-002-inventory/calor+treatment/run-5/final-src/Inventory.calr",
       "bench/phase0-agent-native/epochs/w5-parity-002/N1-003-csv-row/calor+control/run-5/final-src/CsvRow.calr",
-      "bench/phase0-agent-native/epochs/w5-parity-002/N1-003-csv-row/calor+treatment/run-3/final-src/CsvRow.calr",
       "bench/phase0-agent-native/fixtures/d-s1.5/conditional-access-shape/expected.calr",
       "bench/phase0-agent-native/fixtures/d-s1.5/conditional-access-shape/test.calr",
       "bench/phase0-agent-native/fixtures/d-s1.5/conditional-declaration/expected.calr",

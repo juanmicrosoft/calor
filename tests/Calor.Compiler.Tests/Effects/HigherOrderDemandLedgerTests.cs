@@ -2,6 +2,9 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Calor.Compiler.Analysis.Dataflow;
+using Calor.Compiler.Binding;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Commands;
 using Calor.Compiler.Effects;
@@ -107,7 +110,8 @@ public class HigherOrderDemandLedgerTests
 
     private const string CurrentNotReachingEffectPassNote =
         "Current compiler over the original 952 logical subjects, resolving explicitly registered "
-        + "active copies. The same 52 files fail before the effect pass. Intentionally obsolete "
+        + "active copies. 51 files fail before the effect pass; the w5-parity-002 treatment run-3 "
+        + "CSV subject now reaches it with authoritative List<str> indexed element typing. Intentionally obsolete "
         + "MCP inputs retain their original bytes; removed source-ID errors now precede legacy "
         + "closer/effect errors. Every named first error remains exact.";
 
@@ -193,6 +197,39 @@ public class HigherOrderDemandLedgerTests
         Assert.True(measured.FileCount > 0, "D-A found no .calr files — corpus discovery broke.");
         using var stream = File.OpenRead(CurrentExpectationsPath());
         AssertCurrentExpectations(JsonSerializer.Deserialize<JsonElement>(stream), measured);
+    }
+
+    [Fact]
+    public void CurrentCsvSubject_UsesKnownIndexedStringAndReachesEffectEnforcement()
+    {
+        const string relative =
+            "bench/phase0-agent-native/epochs/w5-parity-002/N1-003-csv-row/calor+treatment/run-3/final-src/CsvRow.calr";
+        var root = RepoRoot();
+        var active = ActiveSyntaxInputs.ForCurrentCompiler(root, Path.Combine(root, relative));
+        var source = File.ReadAllText(active);
+        var diagnostics = new DiagnosticBag();
+        var module = new Parsing.Parser(new Parsing.Lexer(source, diagnostics)
+            .TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Binding.Binder(diagnostics).Bind(module);
+        var compilationDiagnostics = new DiagnosticBag();
+        BindingDiagnosticPolicy.PropagateCompilationErrors(diagnostics, compilationDiagnostics);
+        Assert.False(compilationDiagnostics.HasErrors, string.Join("\n", compilationDiagnostics));
+        var index = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundArrayAccess>());
+        Assert.False(index.HasUnknownInferredType);
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
+            .Where(call => call.Target == "EscapeField"));
+        Assert.False(call.HasUnresolvedArguments);
+        Assert.Same(bound.Functions.Single(function => function.Symbol.Name == "EscapeField").Symbol,
+            call.ResolvedSymbol);
+
+        var status = new StringWriter();
+        var compiled = Program.Compile(source, active,
+            new CompilationOptions { Verbose = true, StatusWriter = status });
+        Assert.False(compiled.Diagnostics.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Contains(Program.EffectEnforcementCompletedStatus, status.ToString());
+        var generated = GeneratedCSharpCompiler.Validate(new CSharpEmitter().Emit(module));
+        Assert.Empty(generated.SyntaxErrors);
+        Assert.Empty(generated.CompilationErrors);
     }
 
     private static void AssertCurrentExpectations(JsonElement committed, DALedger measured)
