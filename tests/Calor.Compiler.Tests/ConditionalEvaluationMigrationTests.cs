@@ -12,6 +12,112 @@ namespace Calor.Compiler.Tests;
 public class ConditionalEvaluationMigrationTests
 {
     [Theory]
+    [InlineData("Receiver().Next().Take(Trace(3), Trace(4))", 1234)]
+    [InlineData("new Box().Next().Take(Trace(3), Trace(4))", 234)]
+    [InlineData("Items[Trace(0)].Next().Take(Trace(3), Trace(4))", 234)]
+    public void ComputedCalls_PreserveReceiverAndArgumentEvaluationOrder(string expression, int expected)
+    {
+        AssertRoundTrip($"return {expression};", expected, false, members: """
+            private static int Calls;
+            private static Box[] Items = new Box[] { new Box() };
+            public static int Trace(int value) { Calls = Calls * 10 + value; return value; }
+            public static Box Receiver() { Trace(1); return new Box(); }
+            public sealed class Box
+            {
+                public Box Next() { Trace(2); return this; }
+                public int Take(int first, int second) { return Calls; }
+            }
+            """);
+    }
+
+    [Theory]
+    [InlineData("false", 0)]
+    [InlineData("true", 123)]
+    public void ComputedCalls_ShortCircuitKeepsReceiverAndArgumentsLazy(string gate, int expected)
+    {
+        AssertRoundTrip($"bool gate = {gate}; bool ignored = gate && Receiver().Check(Trace(2), Trace(3)); return Calls;",
+            expected, false, members: """
+                private static int Calls;
+                public static int Trace(int value) { Calls = Calls * 10 + value; return value; }
+                public static Box Receiver() { Trace(1); return new Box(); }
+                public sealed class Box { public bool Check(int first, int second) { return true; } }
+                """);
+    }
+
+    [Theory]
+    [InlineData("FailReceiver().Take(Trace(2), Trace(3))", 1)]
+    [InlineData("Receiver().Take(FailArgument(), Trace(3))", 12)]
+    public void ComputedCalls_ExceptionsStopLaterEvaluation(string expression, int expected)
+    {
+        AssertRoundTrip($"try {{ int ignored = {expression}; }} catch (System.Exception) {{ }} return Calls;",
+            expected, false, members: """
+                private static int Calls;
+                public static int Trace(int value) { Calls = Calls * 10 + value; return value; }
+                public static Box Receiver() { Trace(1); return new Box(); }
+                public static Box FailReceiver() { Trace(1); throw new System.Exception(); }
+                public static int FailArgument() { Trace(2); throw new System.Exception(); }
+                public sealed class Box { public int Take(int first, int second) { return 0; } }
+                """);
+    }
+
+    [Fact]
+    public void ComputedCalls_PreserveNamedRefOutAndInArguments()
+    {
+        foreach (var modifier in new[] { "ref", "out", "in" })
+        {
+            var assignment = modifier == "in" ? "" : "item = 7;";
+            AssertRoundTrip(
+                $"int value = 2; Receiver().Update(item: {modifier} value); return Calls * 10 + value;",
+                modifier == "in" ? 132 : 137, false, members: $$"""
+                    private static int Calls;
+                    public static void Trace(int value) { Calls = Calls * 10 + value; }
+                    public static Box Receiver() { Trace(1); return new Box(); }
+                    public sealed class Box
+                    {
+                        public void Update({{modifier}} int item) { Trace(3); {{assignment}} }
+                    }
+                    """);
+        }
+    }
+
+    [Fact]
+    public void ComputedCallOnStructElement_DoesNotMutateACopy()
+    {
+        AssertRoundTrip("Counter[] items = new Counter[1]; items[0].Bump(); return items[0].Value;",
+            1, false, members: """
+                public struct Counter
+                {
+                    public int Value;
+                    public void Bump() { Value += 1; }
+                }
+                """);
+    }
+
+    [Fact]
+    public void ReturnedDelegate_ReceiverAndArgumentsRunOnce()
+    {
+        AssertRoundTrip("int ignored = Factory()(Trace(2)); return Calls;", 123, false, members: """
+            private static int Calls;
+            public static int Trace(int value) { Calls = Calls * 10 + value; return value; }
+            public static System.Func<int,int> Factory() { Trace(1); return value => Trace(3); }
+            """);
+    }
+
+    [Theory]
+    [InlineData("true", 13)]
+    [InlineData("false", 23)]
+    public void ConditionalDelegateCallee_InvokesOnlyTheSelectedFactory(string gate, int expected)
+    {
+        AssertRoundTrip($"bool gate = {gate}; int ignored = (gate ? First() : Second())(Trace(3)); return Calls;",
+            expected, false, members: """
+                private static int Calls;
+                public static int Trace(int value) { Calls = Calls * 10 + value; return value; }
+                public static System.Func<int,int> First() { Trace(1); return value => value; }
+                public static System.Func<int,int> Second() { Trace(2); return value => value; }
+                """);
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
     [InlineData(true, false)]
@@ -116,9 +222,9 @@ public class ConditionalEvaluationMigrationTests
     [Theory]
     [InlineData("Receiver()", false)]
     [InlineData("((Holder)Receiver())", false)]
-    [InlineData("new Holder()", true)]
-    [InlineData("Items[0]", true)]
-    [InlineData("Items[0].Self", true)]
+    [InlineData("new Holder()", false)]
+    [InlineData("Items[0]", false)]
+    [InlineData("Items[0].Self", false)]
     public void CapturedReceivers_PreserveNamedArguments(string receiver, bool expectInterop)
     {
         AssertRoundTrip($"bool gate = true; bool ignored = gate && {receiver}.Check(second: 1, first: 2); return Calls;",
@@ -241,7 +347,6 @@ public class ConditionalEvaluationMigrationTests
     [InlineData("§C{Use} §A{readonly} value §/C")]
     [InlineData("§C{Use} §A{ref:out} value §/C")]
     [InlineData("§C{Use} §A{} value §/C")]
-    [InlineData("§B{result} §C §C{Get} §/C §A{ref} value §/C")]
     [InlineData("§B{result} §NEW{Box} §A{ref} value")]
     public void UnsupportedArgumentModifiers_AreDiagnosed(string statement)
     {

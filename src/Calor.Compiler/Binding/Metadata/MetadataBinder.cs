@@ -47,6 +47,20 @@ internal sealed class MetadataBinder
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
+    internal MetadataBinderResult ResolveExpressionCall(
+        ITypeSymbol receiverType, string methodName, IReadOnlyList<MetadataArgument> arguments,
+        IReadOnlyList<ITypeSymbol> typeArguments, bool isStatic, bool preserveArrayAnnotations = false)
+    {
+        var receiver = receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        if (!isStatic)
+            receiver = $"(({receiver})default!)";
+        var method = "@" + methodName.TrimStart('@');
+        if (typeArguments.Count > 0)
+            method += $"<{string.Join(", ", typeArguments.Select(type => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)))}>";
+        return QueryInvocation(BuildSyntheticSource(receiver, method, arguments, preserveArrayAnnotations), out var reason)
+            ?? MetadataBinderResult.CreateUnresolved(reason ?? "Expression call resolution failed.");
+    }
+
     /// <summary>
     /// Resolves a Calor call site. Returns a resolved
     /// <see cref="MetadataBinderResult"/> on success or an unresolved one

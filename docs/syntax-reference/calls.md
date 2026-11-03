@@ -37,7 +37,7 @@ identifier, dotted reference, member access, indexer access, or a
 parenthesized expression. It is **not** a `§A`-list; for two or more
 arguments use form (3) or (4).
 
-Named-target calls retain C# argument modifiers with `§A{ref}`,
+Calls retain C# argument modifiers with `§A{ref}`,
 `§A{out}`, or `§A{in}`. A named argument can combine both forms:
 
 ```
@@ -49,9 +49,30 @@ Modifier braces must touch the marker: `§A{ref}`. A space before the brace
 instead starts a collection argument, as in `§A {1, 2}`.
 The modifier belongs to that argument, not the call. It must keep its
 explicit `§A` marker even for a single argument. These modifiers are not
-supported on expression-target calls or constructor/collection argument
-lists; those contexts report an invalid-modifier diagnostic rather than
+supported on constructor/collection argument lists; those contexts
+report an invalid-modifier diagnostic rather than
 silently dropping the modifier.
+
+### Expression targets
+
+The existing expression-target form accepts a computed receiver or delegate:
+
+```
+§C §NEW{object} §/NEW.Equals §A value §/C
+§C §C{GetHandler} §/C §A value §/C
+§C §C{GetReceiver} §/C.Update §A{ref}[value] value §/C
+```
+
+The target evaluates once, before the arguments. Arguments retain source order,
+including named arguments and `ref`, `out`, or `in` modifiers. Calls inside a
+conditional or short-circuit operand stay inside that operand.
+
+This is a compiler prerequisite for the coordinated infix syntax change, not
+that grammar change itself. Explicit generic computed calls are supported in
+the AST and C# emitter. The converter retains its existing temporary lowering
+for those calls until the source parser can round-trip their type arguments.
+Existing assignment-target, counted-loop, and lambda staging remains unchanged.
+The experimental CNF lowering rejects expression-target calls explicitly.
 
 ---
 

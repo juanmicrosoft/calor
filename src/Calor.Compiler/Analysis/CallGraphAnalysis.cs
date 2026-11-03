@@ -80,6 +80,8 @@ public sealed class CallGraphAnalysis
     /// </summary>
     public sealed class BoundValueIndex
     {
+        internal Dictionary<(string CallerId, int Start, int End), BoundCallExpression>
+            ComputedMemberCalls { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), Microsoft.CodeAnalysis.IArrayTypeSymbol>
             MetadataArrayTypes { get; } = new();
         /// <summary>(callerId, reference start, reference end) → the resolved
@@ -101,6 +103,9 @@ public sealed class CallGraphAnalysis
     }
 
     private BoundValueIndex _boundValues = new();
+
+    internal BoundCallExpression? ComputedMemberCall(string callerId, TextSpan span) =>
+        _boundValues.ComputedMemberCalls.GetValueOrDefault((callerId, span.Start, span.End));
 
     /// <summary>The declaration span of the variable the binder resolved a bare
     /// value reference (a call target or a <c>ReferenceNode</c>) to, or
@@ -849,6 +854,11 @@ public sealed class CallGraphAnalysis
                             callees = expression.ResolvedSymbols;
                             receiver = expression.ReceiverSymbol;
                             inaccessibleCall = expression.IsInaccessibleCall;
+                            if (expression.EvaluatedReceiver is not null)
+                            {
+                                expressionTargetCall = true;
+                                boundValues.ComputedMemberCalls[(callerId, node.Span.Start, node.Span.End)] = expression;
+                            }
                             RecordReceiver(callerId, expression.Target, expression.Receiver);
                             if (receiver != null && !target.Contains('.'))
                                 boundValues.Declarations[(callerId, node.Span.Start, node.Span.End)] =

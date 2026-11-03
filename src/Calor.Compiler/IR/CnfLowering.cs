@@ -421,6 +421,9 @@ public sealed class CnfLowering
             case CallExpressionNode call:
                 return LowerCallExpression(call);
 
+            case ExpressionCallNode:
+                throw new NotSupportedException("CNF does not support expression-valued callees.");
+
             case ConditionalExpressionNode cond:
                 return LowerConditional(cond);
 

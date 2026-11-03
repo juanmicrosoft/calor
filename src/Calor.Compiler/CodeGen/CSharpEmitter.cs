@@ -3379,24 +3379,28 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             var typeArgs = string.Join(", ", node.TypeArguments.Select(MapTypeName));
             target += $"<{typeArgs}>";
         }
+        return $"{target}({EmitCallArguments(node.Arguments, node.ArgumentNames, node.ArgumentModifiers)});";
+    }
+
+    private string EmitCallArguments(IReadOnlyList<ExpressionNode> arguments,
+        IReadOnlyList<string?>? argumentNames, IReadOnlyList<string?>? argumentModifiers)
+    {
         var argStrings = new List<string>();
-        for (int i = 0; i < node.Arguments.Count; i++)
+        for (int i = 0; i < arguments.Count; i++)
         {
-            var argStr = node.Arguments[i].Accept(this);
-            if (node.ArgumentModifiers != null && i < node.ArgumentModifiers.Count && node.ArgumentModifiers[i] != null)
+            var argStr = arguments[i].Accept(this);
+            if (argumentModifiers != null && i < argumentModifiers.Count && argumentModifiers[i] != null)
             {
-                ReportRefinedVariableByReference(node.Arguments[i], node.ArgumentModifiers[i]!);
-                argStr = $"{node.ArgumentModifiers[i]} {argStr}";
+                ReportRefinedVariableByReference(arguments[i], argumentModifiers[i]!);
+                argStr = $"{argumentModifiers[i]} {argStr}";
             }
-            if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
+            if (argumentNames != null && i < argumentNames.Count && argumentNames[i] != null)
             {
-                argStr = $"{SanitizeSingleIdentifier(node.ArgumentNames[i]!)}: {argStr}";
+                argStr = $"{SanitizeSingleIdentifier(argumentNames[i]!)}: {argStr}";
             }
             argStrings.Add(argStr);
         }
-        var args = string.Join(", ", argStrings);
-
-        return $"{target}({args});";
+        return string.Join(", ", argStrings);
     }
 
     public string Visit(ReturnStatementNode node)
@@ -6538,23 +6542,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             target += $"<{typeArgs}>";
         }
 
-        var argStrings = new List<string>();
-        for (int i = 0; i < node.Arguments.Count; i++)
-        {
-            var argStr = node.Arguments[i].Accept(this);
-            if (node.ArgumentModifiers != null && i < node.ArgumentModifiers.Count && node.ArgumentModifiers[i] != null)
-            {
-                ReportRefinedVariableByReference(node.Arguments[i], node.ArgumentModifiers[i]!);
-                argStr = $"{node.ArgumentModifiers[i]} {argStr}";
-            }
-            if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
-            {
-                argStr = $"{SanitizeSingleIdentifier(node.ArgumentNames[i]!)}: {argStr}";
-            }
-            argStrings.Add(argStr);
-        }
-        var args = string.Join(", ", argStrings);
-        return $"{target}({args})";
+        return $"{target}({EmitCallArguments(node.Arguments, node.ArgumentNames, node.ArgumentModifiers)})";
     }
 
     /// <summary>
@@ -9046,8 +9034,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ExpressionCallNode node)
     {
-        var target = node.TargetExpression.Accept(this);
-        var args = string.Join(", ", node.Arguments.Select(a => a.Accept(this)));
+        var target = EmitGroupedOperand(node.TargetExpression);
+        if (node.TypeArguments is { Count: > 0 })
+            target += $"<{string.Join(", ", node.TypeArguments.Select(MapTypeName))}>";
+        var args = EmitCallArguments(node.Arguments, node.ArgumentNames, node.ArgumentModifiers);
         return $"{target}({args})";
     }
 

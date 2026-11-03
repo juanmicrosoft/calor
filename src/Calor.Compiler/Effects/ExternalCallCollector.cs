@@ -233,8 +233,16 @@ public sealed class ExternalCallCollector
             case NewExpressionNode newExpr:
                 TryAddCall(newExpr.TypeName, CallKind.Constructor, newExpr.Span);
                 break;
-            case ExpressionCallNode:
-                TryAddCall("<expression-call>", CallKind.Method, node.Span);
+            case ExpressionCallNode expressionCall:
+                if (_computedMemberCalls.TryGetValue((node.Span.Start, node.Span.End), out var bound)
+                    && expressionCall.TargetExpression is FieldAccessNode member)
+                {
+                    var target = $"<expression>.{member.FieldName}";
+                    _boundReceiverTypes[(node.Span.Start, node.Span.End, target)] = ResolveBoundReceiver(bound.Receiver);
+                    TryAddCall(target, CallKind.Method, node.Span);
+                }
+                else
+                    TryAddCall("<expression-call>", CallKind.Method, node.Span);
                 break;
         }
 
@@ -316,6 +324,8 @@ public sealed class ExternalCallCollector
         }
     }
 
+    private readonly Dictionary<(int Start, int End), BoundCallExpression> _computedMemberCalls = new();
+
     private void IndexBoundCallReceivers(ModuleNode module)
     {
         try
@@ -325,6 +335,9 @@ public sealed class ExternalCallCollector
             {
                 switch (node)
                 {
+                    case BoundCallExpression { EvaluatedReceiver: not null } expression:
+                        _computedMemberCalls[(expression.Span.Start, expression.Span.End)] = expression;
+                        break;
                     case BoundCallStatement statement when HasReceiver(statement.Target):
                         _boundReceiverTypes[
                             (statement.Span.Start, statement.Span.End, statement.Target)] =

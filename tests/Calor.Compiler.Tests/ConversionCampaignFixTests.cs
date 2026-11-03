@@ -2154,7 +2154,7 @@ public class Demo
     }
 
     [Fact]
-    public void Convert_FluentChainOnNew_HoistsNewToBinding()
+    public void Convert_FluentChainOnNew_PreservesComputedTarget()
     {
         var csharp = @"
 public class Builder
@@ -2174,10 +2174,9 @@ public class Demo
         Assert.NotNull(result.CalorSource);
         var calor = result.CalorSource!;
 
-        // The §NEW should be hoisted to a temp binding, not inlined in call target
         Assert.DoesNotContain("new Builder()", calor);
-        // Should have a proper chain decomposition
-        Assert.Contains("_new", calor);
+        Assert.DoesNotContain("_new", calor);
+        Assert.DoesNotContain("_chain", calor);
         Assert.Contains("§NEW{Builder}", calor);
     }
 

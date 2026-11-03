@@ -8496,6 +8496,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Handle invocation expressions (method calls)
         if (expr is InvocationExpressionSyntax invocation)
         {
+            if (HasComputedCallTarget(invocation))
+                return new ExpressionStatementNode(GetTextSpan(node), ConvertInvocationExpression(invocation));
             // #1677: where the statement's own conversion starts; the fallback below converts the
             // invocation again and must not keep the first conversion's hoists.
             var invocationMark = _pendingStatements.Count;
@@ -9256,9 +9258,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// <summary>
     /// Checks if an expression is a chained method invocation (e.g., a.Where(...).First()).
     /// </summary>
-    private static bool IsChainedInvocation(ExpressionSyntax expression)
+    private bool IsChainedInvocation(ExpressionSyntax expression)
     {
         return expression is InvocationExpressionSyntax invocation
+            && !HasComputedCallTarget(invocation)
             && invocation.Expression is MemberAccessExpressionSyntax memberAccess
             && (memberAccess.Expression is InvocationExpressionSyntax
                 || memberAccess.Expression is ElementAccessExpressionSyntax);
@@ -13422,6 +13425,21 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertInvocationExpression(InvocationExpressionSyntax invocation)
     {
+        if (HasComputedCallTarget(invocation))
+        {
+            var targetExpression = invocation.Expression is MemberAccessExpressionSyntax member
+                ? new FieldAccessNode(GetTextSpan(member),
+                    ConvertInPlace(member.Expression, always: true), member.Name.Identifier.ValueText,
+                    GetTextSpan(member.Name))
+                : ConvertInPlace(invocation.Expression, always: true);
+            var arguments = ConvertOrderedExpressions(
+                invocation.ArgumentList.Arguments.Select(argument => argument.Expression), inPlace: true);
+            return new ExpressionCallNode(GetTextSpan(invocation), targetExpression, arguments,
+                invocation.ArgumentList.Arguments.Any(argument => argument.NameColon != null)
+                    ? invocation.ArgumentList.Arguments.Select(argument => argument.NameColon?.Name.Identifier.ValueText).ToArray()
+                    : null,
+                ExtractArgumentModifiers(invocation));
+        }
         var target = ConvertInvocationTarget(invocation);
         // #1677 (Codex round 1): C# evaluates the receiver before the arguments, so it is
         // converted first and its hoists (`_chainNext = c.Next()`) come before the arguments'.
@@ -13690,6 +13708,26 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         return new CallExpressionNode(GetTextSpan(invocation), target, args, argNames, argModifiers, typeArguments);
+    }
+
+    private bool HasComputedCallTarget(InvocationExpressionSyntax invocation)
+    {
+        // Keep contextual lambda staging and the existing assignment-target/counted-loop
+        // lowering boundaries until their coordinated source cutover.
+        if (invocation.DescendantNodes().Any(node => node is AnonymousFunctionExpressionSyntax)
+            || invocation.Ancestors().Any(node => node is AnonymousFunctionExpressionSyntax
+                || node is AssignmentExpressionSyntax
+                || node is ForStatementSyntax loop && !loop.Statement.Span.Contains(invocation.Span)))
+            return false;
+        // Generic member calls retain their existing conversion until the coordinated
+        // infix parser can round-trip explicit type arguments on expression targets.
+        if (invocation.Expression is MemberAccessExpressionSyntax member)
+            return member.Name is not GenericNameSyntax && !WouldChainUseNativeOps(invocation)
+                && member.Expression.DescendantNodesAndSelf(node => node is not AnonymousFunctionExpressionSyntax)
+                    .Any(node => node is InvocationExpressionSyntax or ElementAccessExpressionSyntax
+                        or ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax
+                        or CastExpressionSyntax or ConditionalExpressionSyntax);
+        return invocation.Expression is not (IdentifierNameSyntax or GenericNameSyntax);
     }
 
     private bool IsMetadataMember(ExpressionSyntax expression, string metadataName)

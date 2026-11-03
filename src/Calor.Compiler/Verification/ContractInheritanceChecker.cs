@@ -1178,7 +1178,10 @@ public sealed class ContractInheritanceChecker : IDisposable
                         argument,
                         replacements,
                         typeReplacements))
-                    .ToArray());
+                    .ToArray(),
+                expressionCall.ArgumentNames,
+                expressionCall.ArgumentModifiers,
+                expressionCall.TypeArguments?.Select(type => RewriteTypeName(type, typeReplacements)).ToArray());
         }
         if (expression is ForallExpressionNode forall)
         {

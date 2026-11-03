@@ -1182,7 +1182,9 @@ public sealed class SymbolAndOverloadBindingTests
         var bound = ParseAndBind(source, out var diagnostics);
         var use = Assert.Single(bound.Functions);
         var expressionCall = Assert.Single(
-            BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundExpressionCall>());
+            BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>());
+        Assert.NotNull(expressionCall.EvaluatedReceiver);
+        Assert.Equal("GetType", expressionCall.ResolvedMetadataMethod?.Name);
         var graph = CallGraphAnalysis.BuildResolved(bound);
         var unresolved = Assert.Single(graph.UnresolvedCalls.Where(call =>
             call.Target == "<expression-call>"));

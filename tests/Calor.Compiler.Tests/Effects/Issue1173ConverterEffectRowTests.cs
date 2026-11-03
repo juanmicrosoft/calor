@@ -242,7 +242,8 @@ public class Issue1173ConverterEffectRowTests
             }
             """);
 
-        Assert.Contains("§B{_chain", conversion.CalorSource!);
+        Assert.DoesNotContain("§B{_chain", conversion.CalorSource!);
+        Assert.Contains(".Set", conversion.CalorSource!);
         Assert.Empty(EffectErrors(conversion.CalorSource!).Select(d => d.Message));
     }
 

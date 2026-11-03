@@ -2431,6 +2431,11 @@ public sealed class Parser
 
         if (Check(TokenKind.Call))
         {
+            if (Peek(1).Kind is not (TokenKind.OpenBrace or TokenKind.OpenBracket))
+            {
+                var call = ParseCallExpression();
+                return new ExpressionStatementNode(call.Span, call);
+            }
             return ParseCallStatement();
         }
         else if (Check(TokenKind.Func))
@@ -4218,18 +4223,16 @@ public sealed class Parser
                 var isNullConditional = Check(TokenKind.NullConditional);
                 Advance(); // consume '.' or '?.'
                 var memberToken = Expect(TokenKind.Identifier);
-                var span = expr.Span.Union(memberToken.Span);
-                if (isNullConditional)
+                var memberOffset = 0;
+                foreach (var memberName in memberToken.Text.Split('.'))
                 {
-                    expr = new NullConditionalNode(span, expr, memberToken.Text);
-                }
-                else
-                {
-                    expr = new FieldAccessNode(
-                        span,
-                        expr,
-                        memberToken.Text,
-                        memberToken.Span);
+                    var memberSpan = new TextSpan(memberToken.Span.Start + memberOffset, memberName.Length,
+                        memberToken.Span.Line, memberToken.Span.Column + memberOffset);
+                    var span = expr.Span.Union(memberSpan);
+                    expr = isNullConditional && memberOffset == 0
+                        ? new NullConditionalNode(span, expr, memberName)
+                        : new FieldAccessNode(span, expr, memberName, memberSpan);
+                    memberOffset += memberName.Length + 1;
                 }
             }
         }
@@ -10218,6 +10221,8 @@ public sealed class Parser
             var targetExpr = ParseExpression();
 
             var exprArgs = new List<ExpressionNode>();
+            var exprNames = new List<string?>();
+            var exprModifiers = new List<string?>();
             while (!IsAtEnd && !IsBlockEnd(TokenKind.EndCall))
             {
                 if (Check(TokenKind.Arg))
@@ -10225,7 +10230,9 @@ public sealed class Parser
                     _inOuterCallArgDepth++;
                     try
                     {
-                        exprArgs.Add(ParseArgument());
+                        exprArgs.Add(ParseArgument(out var name, out var modifier));
+                        exprNames.Add(name);
+                        exprModifiers.Add(modifier);
                     }
                     finally
                     {
@@ -10235,6 +10242,8 @@ public sealed class Parser
                 else if (IsExpressionStart())
                 {
                     exprArgs.Add(ParseExpression());
+                    exprNames.Add(null);
+                    exprModifiers.Add(null);
                 }
                 else
                 {
@@ -10244,7 +10253,9 @@ public sealed class Parser
 
             var exprEndSpan = FinishExpressionCall(startToken, "expression", exprArgs.FirstOrDefault()?.Span);
             var exprSpan = startToken.Span.Union(exprEndSpan);
-            ExpressionNode exprCall = new ExpressionCallNode(exprSpan, targetExpr, exprArgs);
+            ExpressionNode exprCall = new ExpressionCallNode(exprSpan, targetExpr, exprArgs,
+                exprNames.Any(name => name != null) ? exprNames : null,
+                exprModifiers.Any(modifier => modifier != null) ? exprModifiers : null);
             return ParseTrailingMemberAccess(exprCall);
         }
 

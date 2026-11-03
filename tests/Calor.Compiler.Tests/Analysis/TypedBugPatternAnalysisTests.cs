@@ -393,11 +393,16 @@ public class TypedBugPatternAnalysisTests
             diagnostic.Code == DiagnosticCode.DivisionByZeroHint);
     }
 
-    [Fact]
-    public void Division_LeftOperandRefMutationInvalidatesRightDivisorState()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Division_LeftOperandRefMutationInvalidatesRightDivisorState(bool expressionTarget)
     {
         var divisor = Variable("divisor", "i32");
-        var setZero = new BoundCallExpression(
+        BoundExpression setZero = expressionTarget
+            ? new BoundExpressionCall(S, Ref(Variable("setZero", "object")), [Ref(divisor)],
+                argumentModifiers: ["ref"])
+            : new BoundCallExpression(
             S,
             "SetZero",
             [Ref(divisor)],

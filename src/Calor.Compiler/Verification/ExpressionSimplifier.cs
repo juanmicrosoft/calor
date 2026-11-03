@@ -1011,7 +1011,8 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
                 argsChanged = true;
         }
         return !ReferenceEquals(newTarget, node.TargetExpression) || argsChanged
-            ? new ExpressionCallNode(node.Span, newTarget, newArgs)
+            ? new ExpressionCallNode(node.Span, newTarget, newArgs,
+                node.ArgumentNames, node.ArgumentModifiers, node.TypeArguments)
             : node;
     }
     public ExpressionNode Visit(ExpressionStatementNode node) => throw new InvalidOperationException();

@@ -5075,15 +5075,21 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ExpressionCallNode node)
     {
+        if (node.TypeArguments is { Count: > 0 })
+            throw new NotSupportedException("Computed call type arguments require the coordinated infix source-parser cutover.");
         // Args go through inline-sibling context so that nested zero-arg
         // calls keep their explicit §/C closer — see Visit(CallExpressionNode)
         // for the rationale.
-        var conditional = IsConditionalCallTarget(node.TargetExpression);
-        var target = conditional
-            ? AcceptInConditionalRegion(node.TargetExpression)
-            : node.TargetExpression.Accept(this);
-        var args = node.Arguments.Select(a =>
-            $" §A {(conditional ? AcceptInConditionalRegion(a) : AcceptInInlineSibling(a))}").ToList();
+        var target = AcceptInConditionalRegion(node.TargetExpression);
+        var args = node.Arguments.Select((argument, index) =>
+        {
+            var modifier = node.ArgumentModifiers?.ElementAtOrDefault(index);
+            var name = node.ArgumentNames?.ElementAtOrDefault(index);
+            var marker = modifier is null ? "§A" : $"§A{{{modifier}}}";
+            if (name is not null)
+                marker += $"[{name.TrimStart('@')}]";
+            return $" {marker} {AcceptInConditionalRegion(argument)}";
+        }).ToList();
         return $"§C {target}{string.Join("", args)} §/C";
     }
 

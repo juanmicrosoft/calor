@@ -778,7 +778,9 @@ public class BoundCallExpression : BoundExpression
     public TextSpan? ReceiverSpan { get; }
     public bool IsInaccessibleCall { get; }
     public override BoundType Type { get; }
-    public override IReadOnlyList<BoundExpression> Children => Arguments;
+    public BoundExpression? EvaluatedReceiver { get; init; }
+    public override IReadOnlyList<BoundExpression> Children =>
+        EvaluatedReceiver is { } receiver ? [receiver, .. Arguments] : Arguments;
 
     /// <summary>
     /// Named argument labels, argument modifiers, and explicit generic arguments
@@ -942,14 +944,23 @@ public sealed class BoundExpressionCall : BoundExpression
 {
     public BoundExpression Target { get; }
     public IReadOnlyList<BoundExpression> Arguments { get; }
+    public IReadOnlyList<string?>? ArgumentNames { get; }
+    public IReadOnlyList<string?>? ArgumentModifiers { get; }
+    public IReadOnlyList<string>? TypeArguments { get; }
+    internal CallableMutationSummary ObservedCallableEffects { get; init; } = CallableMutationSummary.Empty;
     public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children => [Target, .. Arguments];
 
     public BoundExpressionCall(TextSpan span, BoundExpression target,
-        IReadOnlyList<BoundExpression> arguments, BoundType? resultType = null) : base(span)
+        IReadOnlyList<BoundExpression> arguments, BoundType? resultType = null,
+        IReadOnlyList<string?>? argumentNames = null, IReadOnlyList<string?>? argumentModifiers = null,
+        IReadOnlyList<string>? typeArguments = null) : base(span)
     {
         Target = target;
         Arguments = arguments;
+        ArgumentNames = argumentNames;
+        ArgumentModifiers = argumentModifiers;
+        TypeArguments = typeArguments;
         Type = resultType ?? new NominalBoundType("OBJECT");
     }
 }
@@ -1848,7 +1859,8 @@ public sealed class BoundNewExpression : BoundExpression
         TextSpan? typeNameSpan = null,
         IReadOnlyList<FunctionSymbol>? resolvedConstructors = null,
         BoundTypeReference? typeReference = null,
-        IReadOnlyList<string?>? argumentNames = null)
+        IReadOnlyList<string?>? argumentNames = null,
+        Microsoft.CodeAnalysis.INamedTypeSymbol? resolvedMetadataType = null)
         : base(span)
     {
         // v0.14 nullability §NEW annotation flow — a `§NEW{Foo}` expression
@@ -1859,7 +1871,8 @@ public sealed class BoundNewExpression : BoundExpression
         // preserved (F-3B discipline): the raw `typeName` string flows
         // through unchanged. This does NOT affect constructor dispatch or
         // overload resolution — it is a type-annotation-channel-only change.
-        Type = new NominalBoundType(typeName ?? "OBJECT", NullableAnnotation.NotAnnotated);
+        Type = new NominalBoundType(typeName ?? "OBJECT", NullableAnnotation.NotAnnotated,
+            roslynSymbol: resolvedMetadataType);
         TypeNameSpan = typeNameSpan ?? span;
         TypeArguments = typeArguments ?? Array.Empty<string>();
         Arguments = arguments ?? Array.Empty<BoundExpression>();

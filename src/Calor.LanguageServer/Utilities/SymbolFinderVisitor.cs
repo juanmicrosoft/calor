@@ -630,6 +630,10 @@ public sealed class SymbolFinderVisitor
                 VisitExpression(printStmt.Expression);
                 break;
 
+            case ExpressionStatementNode expressionStatement:
+                VisitExpression(expressionStatement.Expression);
+                break;
+
             case CallStatementNode callStmt:
                 VisitCallTarget(
                     callStmt.Target,
@@ -1085,6 +1089,16 @@ public sealed class SymbolFinderVisitor
                     {
                         VisitExpression(arg);
                     }
+                }
+                break;
+
+            case ExpressionCallNode computedCall:
+                if (SpanContainsOffset(computedCall.TargetExpression.Span))
+                    VisitExpression(computedCall.TargetExpression);
+                foreach (var argument in computedCall.Arguments)
+                {
+                    if (SpanContainsOffset(argument.Span))
+                        VisitExpression(argument);
                 }
                 break;
 

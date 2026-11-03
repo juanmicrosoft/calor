@@ -2102,14 +2102,25 @@ public sealed class TypeChecker
 
     private CalorType InferExpressionCallType(ExpressionCallNode call)
     {
+        if (call.TargetExpression is FieldAccessNode member)
+        {
+            InferExpressionType(member.Target);
+            foreach (var argument in call.Arguments)
+                InferExpressionType(argument);
+            // Member overloads remain binder-owned, just as for dotted named calls.
+            return ErrorType.Instance;
+        }
         var targetType = InferExpressionType(call.TargetExpression);
         if (!TryGetDelegateFunctionType(targetType, out var function))
         {
+            foreach (var argument in call.Arguments)
+                InferExpressionType(argument);
             return ErrorType.Instance;
         }
 
-        var argumentTypes = InferDelegateArgumentTypes(function, call.Arguments, null);
-        return ValidateDelegateCall(function, argumentTypes, call.Arguments, null, null, call.Span)
+        var argumentTypes = InferDelegateArgumentTypes(function, call.Arguments, call.ArgumentNames);
+        return ValidateDelegateCall(function, argumentTypes, call.Arguments,
+            call.ArgumentNames, call.ArgumentModifiers, call.Span)
             ? function.ReturnType
             : ErrorType.Instance;
     }

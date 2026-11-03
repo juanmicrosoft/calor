@@ -2333,6 +2333,13 @@ internal sealed class TypedBugPatternAnalysis
                 call.ArgumentModifiers,
                 result);
         }
+        else if (expression is BoundExpressionCall expressionCall)
+        {
+            result = InvalidateCallArguments(
+                expressionCall.Arguments,
+                expressionCall.ArgumentModifiers,
+                result);
+        }
         return result;
     }
 

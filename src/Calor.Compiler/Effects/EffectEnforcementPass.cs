@@ -3968,6 +3968,9 @@ public sealed class EffectEnforcementPass
                 case CallExpressionNode call:
                     return ReturnedValueRow(call.Target, call.Span, bind.Name, ownerName);
 
+                case ExpressionCallNode { TargetExpression: FieldAccessNode } call:
+                    return ReturnedValueRow("<expression-call>", call.Span, bind.Name, ownerName);
+
                 case ReferenceNode reference when !reference.Name.Contains('.')
                                                    && !reference.Name.Equals(bind.Name, StringComparison.Ordinal):
                 {
@@ -4942,6 +4945,9 @@ public sealed class EffectEnforcementPass
                         {
                             return callResultType;
                         }
+                        if (bind.Initializer is ExpressionCallNode computedCall
+                            && InferKnownComputedCallResultType(computedCall) is { } computedResultType)
+                            return computedResultType;
                         // Known value, unknown type. v0.15 E1 slice 2c: this
                         // stays a sentinel rather than becoming null, because
                         // null here means "no such value" and the two are
@@ -5463,10 +5469,20 @@ public sealed class EffectEnforcementPass
                     InferExpressionType(conditional.WhenTrue),
                     InferExpressionType(conditional.WhenFalse)),
                 CallExpressionNode call => InferCallReturnType(call),
+                ExpressionCallNode call => InferKnownComputedCallResultType(call) ?? "?",
                 FieldAccessNode field => InferFieldAccessType(field),
                 NullConditionalNode conditional => InferMemberType(conditional.Target, conditional.MemberName),
                 _ => "?"
             };
+        }
+
+        private string? InferKnownComputedCallResultType(ExpressionCallNode call)
+        {
+            var bound = _context.CallGraph.ComputedMemberCall(_context.CurrentFunctionId, call.Span);
+            return bound?.Type is { } type
+                && type is not Binding.BoundTypes.UnresolvedBoundType && type.DisplayString != "OBJECT"
+                ? EffectResolver.NormalizeParameterType(type.DisplayString)
+                : null;
         }
 
         private string InferCallReturnType(CallExpressionNode call)
@@ -6025,11 +6041,26 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromExpressionCall(ExpressionCallNode call)
         {
-            var argEffects = EffectSet.Empty;
-            foreach (var arg in call.Arguments)
+            if (call.TargetExpression is FieldAccessNode member)
             {
-                argEffects = argEffects.Union(InferFromExpression(arg));
+                var evaluated = InferFromExpression(member.Target)
+                    .Union(InferFromCallArguments($"<expression>.{member.FieldName}", call.Arguments, call.ArgumentModifiers));
+                var bound = _context.CallGraph.ComputedMemberCall(_context.CurrentFunctionId, call.Span);
+                var ids = _context.CallGraph.ResolveCallSites(
+                    _context.CurrentFunctionId, "<expression-call>", call.Span);
+                if (ids.Count > 0)
+                    return evaluated.Union(InferFromInternalFunctions(ids));
+                if (bound?.ResolvedMetadataMethod is { } method && bound.Receiver is { } receiver)
+                {
+                    var resolution = _context.Resolver.Resolve(EffectResolverKey.FromBoundReceiver(
+                        receiver.Type, method.Name, bound.ResolvedParameterTypes));
+                    if (resolution.Status != EffectResolutionStatus.Unknown)
+                        return evaluated.Union(resolution.Effects);
+                }
+                return evaluated.Union(UnknownResolvedOperation(
+                    $"{bound?.Receiver?.Type.DisplayString ?? "<expression>"}.{member.FieldName}", call.Span));
             }
+            var argEffects = InferFromCallArguments("<expression-call>", call.Arguments, call.ArgumentModifiers);
 
             // W2 review M1: the expression-call spelling must not demote the
             // delegate rule. Classify the callee expression:
@@ -6063,6 +6094,16 @@ public sealed class EffectEnforcementPass
                     return InferFromExpression(call.TargetExpression)
                         .Union(ChargeInvokedRow(
                             $"the value returned by '{inner.Target}'", returned, call.Span))
+                        .Union(argEffects);
+                }
+
+                case ExpressionCallNode { TargetExpression: FieldAccessNode } inner:
+                {
+                    _context.Functions.TryGetValue(_context.CurrentFunctionId, out var owner);
+                    var returned = ReturnedValueRow("<expression-call>", inner.Span, boundName: null,
+                        owner?.Name ?? _context.CurrentFunctionId);
+                    return InferFromExpression(inner)
+                        .Union(ChargeInvokedRow("the value returned by an expression call", returned, call.Span))
                         .Union(argEffects);
                 }
 

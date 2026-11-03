@@ -228,12 +228,20 @@ public sealed class ExpressionCallNode : ExpressionNode
 {
     public ExpressionNode TargetExpression { get; }
     public IReadOnlyList<ExpressionNode> Arguments { get; }
+    public IReadOnlyList<string?>? ArgumentNames { get; }
+    public IReadOnlyList<string?>? ArgumentModifiers { get; }
+    public IReadOnlyList<string>? TypeArguments { get; }
 
-    public ExpressionCallNode(TextSpan span, ExpressionNode targetExpression, IReadOnlyList<ExpressionNode> arguments)
+    public ExpressionCallNode(TextSpan span, ExpressionNode targetExpression, IReadOnlyList<ExpressionNode> arguments,
+        IReadOnlyList<string?>? argumentNames = null, IReadOnlyList<string?>? argumentModifiers = null,
+        IReadOnlyList<string>? typeArguments = null)
         : base(span)
     {
         TargetExpression = targetExpression ?? throw new ArgumentNullException(nameof(targetExpression));
         Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
+        ArgumentNames = argumentNames;
+        ArgumentModifiers = argumentModifiers;
+        TypeArguments = typeArguments;
     }
 
 

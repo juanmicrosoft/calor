@@ -347,6 +347,9 @@ public sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                 case ReturnStatementNode ret:
                     if (ret.Expression != null) VisitExpression(ret.Expression);
                     break;
+                case ExpressionStatementNode expressionStatement:
+                    VisitExpression(expressionStatement.Expression);
+                    break;
                 case IfStatementNode ifStmt:
                     VisitExpression(ifStmt.Condition);
                     foreach (var s in ifStmt.ThenBody) VisitStatement(s);
@@ -456,6 +459,11 @@ public sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                     // Target is a string (function/method name), not an expression
                     foreach (var arg in call.Arguments)
                         VisitExpression(arg);
+                    break;
+                case ExpressionCallNode computedCall:
+                    VisitExpression(computedCall.TargetExpression);
+                    foreach (var argument in computedCall.Arguments)
+                        VisitExpression(argument);
                     break;
                 case FieldAccessNode fieldAccess:
                     VisitExpression(fieldAccess.Target);

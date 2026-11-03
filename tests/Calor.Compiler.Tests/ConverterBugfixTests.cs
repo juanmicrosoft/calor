@@ -96,7 +96,7 @@ public class Test
     #region Bug 2: Chained call with built-in hoists to temp bind
 
     [Fact]
-    public void Converter_ChainedCallWithBuiltin_HoistsToTempBind()
+    public void Converter_ChainedCallWithBuiltin_UsesComputedTarget()
     {
         var csharp = @"
 public class Test
@@ -108,18 +108,16 @@ public class Test
 }";
         var calor = ConvertToCalor(csharp);
 
-        // The built-in ToLower() is hoisted to a temp bind, GetHashCode called on temp
-        Assert.Contains("_chain", calor);
+        Assert.DoesNotContain("_chain", calor);
+        Assert.Contains("(lower obj)", calor);
         Assert.Contains("GetHashCode", calor);
         // Should NOT contain the broken CalorEmitter serialization pattern
         Assert.DoesNotContain("§C{(§C{", calor);
     }
 
     [Fact]
-    public void Converter_DeeperChainWithMultipleBuiltins_HoistsToTempBinds()
+    public void Converter_DeeperChainWithMultipleBuiltins_UsesComputedTarget()
     {
-        // When multiple built-in operations are chained (e.g., ToLower().Trim()),
-        // each built-in is hoisted to a temp bind
         var csharp = @"
 public class Test
 {
@@ -130,8 +128,7 @@ public class Test
 }";
         var calor = ConvertToCalor(csharp);
 
-        // Chain is decomposed via temp binds
-        Assert.Contains("_chain", calor);
+        Assert.DoesNotContain("_chain", calor);
         Assert.Contains("GetHashCode", calor);
         // Should NOT contain the broken CalorEmitter serialization pattern
         Assert.DoesNotContain("§C{(§C{", calor);

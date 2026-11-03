@@ -9,6 +9,26 @@ namespace Calor.LanguageServer.Tests.Utilities;
 public class SymbolFinderTests
 {
     [Theory]
+    [InlineData("§R ")]
+    [InlineData("")]
+    public void ComputedCalls_ExposeNestedReceiverAndArgumentReferences(string prefix)
+    {
+        var source = $$"""
+            §M{Test}
+              §F{Probe:pub} (object:receiver, object:value) -> object
+                {{prefix}}§C (§C{Identity} §A receiver §/C).Equals §A value §/C
+              §F{Identity:pub} (object:item) -> object
+                §R item
+            """;
+        var ast = LspTestHarness.GetAst(source);
+        Assert.NotNull(ast);
+        var receiverOffset = source.IndexOf("§A receiver", StringComparison.Ordinal) + "§A ".Length;
+        var argumentOffset = source.IndexOf("§A value", StringComparison.Ordinal) + "§A ".Length;
+        Assert.Equal("receiver", new SymbolFinderVisitor(receiverOffset, source).FindSymbol(ast)?.Name);
+        Assert.Equal("value", new SymbolFinderVisitor(argumentOffset, source).FindSymbol(ast)?.Name);
+    }
+
+    [Theory]
     [InlineData("§L{item:0:1:1}", "§L{item:2:3:1}")]
     [InlineData("§EACH{same:item:i32} items", "§EACH{same:item:i32} items")]
     [InlineData("§WH BOOL:false", "§WH BOOL:false")]
