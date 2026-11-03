@@ -508,8 +508,8 @@ public class SuggestionTests
     [Fact]
     public void Parser_MultipleTyposOnSameLine_GeneratesMultipleFixes()
     {
-        // Source with multiple typos on the same line
-        var source = "§M{Test} §F{Fn} §O{i32} §B{x} (abss (ngative 5)) §R x";
+        // Multiple whitespace-separated operands cannot be mistaken for native call syntax.
+        var source = "§M{Test} §F{Fn} §O{i32} §B{x} (abss 1 (ngative 5 6)) §R x";
         var result = Program.Compile(source, "test.calr");
 
         Assert.True(result.HasErrors);
@@ -517,6 +517,21 @@ public class SuggestionTests
         // Should have at least 2 errors for the two typos
         var unknownOpErrors = result.Diagnostics.Where(d => d.Code == DiagnosticCode.InvalidOperator).ToList();
         Assert.True(unknownOpErrors.Count >= 2, $"Expected at least 2 unknown operator errors, got {unknownOpErrors.Count}");
+    }
+
+    [Theory]
+    [InlineData("(abss(ngative(5)))")]
+    [InlineData("abss(ngative(5))")]
+    public void Parser_NestedNativeCalls_AreNotUnknownPrefixOperators(string expression)
+    {
+        var diagnostics = new DiagnosticBag();
+        var source = $"§M{{Test}} §F{{Fn}} §O{{i32}} §B{{x}} {expression} §R x";
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var binding = Assert.IsType<Ast.BindStatementNode>(Assert.Single(module.Functions).Body[0]);
+        var outer = Assert.IsType<Ast.CallExpressionNode>(binding.Initializer);
+        Assert.IsType<Ast.CallExpressionNode>(Assert.Single(outer.Arguments));
     }
 
     [Fact]
