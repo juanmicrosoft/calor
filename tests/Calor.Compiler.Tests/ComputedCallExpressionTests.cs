@@ -17,6 +17,68 @@ namespace Calor.Compiler.Tests;
 public sealed class ComputedCallExpressionTests
 {
     [Theory]
+    [InlineData(false, "[object]", "object", false)]
+    [InlineData(false, "List<object>", "object", false)]
+    [InlineData(true, "[object]", "object", false)]
+    [InlineData(true, "List<object>", "object", false)]
+    [InlineData(true, "[i32]", "i32", false)]
+    [InlineData(true, "List<i32>", "i32", false)]
+    [InlineData(true, "object", "object", false)]
+    [InlineData(true, "UnresolvedCollection<object>", "object", false)]
+    [InlineData(true, "IEnumerable<object>", "object", false)]
+    [InlineData(false, "object[,]", "object", true)]
+    [InlineData(true, "object[,]", "object", true)]
+    [InlineData(true, "object", "object", true)]
+    public void IndexedElementInference_DistinguishesUnknownFromKnownElements(
+        bool known, string collectionType, string elementType, bool multiDimensional)
+    {
+        var (ast, bound, diagnostics) = Bind($$"""
+            §M{Test}
+              §F{Use:pub} ({{collectionType}}:items) -> void
+                §E{}
+                §B{source} {{(known ? "items" : "§C{External.GetFields} §/C")}}
+                §B{element} {{(multiDimensional ? "§IDX2D source 0 0" : "§IDX{source} 0")}}
+                §B{alias} element
+                §C{alias.ToString} §/C
+                §C{Pick} §A alias §/C
+              §F{Pick:pub} ({{elementType}}:item) -> void
+                §E{}
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
+        var calls = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallStatement>().ToArray();
+        var receiverCall = calls.Single(call => call.Target == "alias.ToString");
+        var pick = calls.Single(call => call.Target == "Pick");
+        if (known && collectionType is not ("object" or "UnresolvedCollection<object>" or "IEnumerable<object>"))
+        {
+            Assert.DoesNotContain(diagnostics, diagnostic =>
+                diagnostic.Code == DiagnosticCode.SignatureUnresolved);
+            Assert.NotNull(pick.ResolvedSymbol);
+            Assert.Single(pick.SelectedOverloadMatches);
+            Assert.False(Assert.Single(pick.Arguments).HasUnknownInferredType);
+            Assert.Contains(CallGraphAnalysis.BuildResolved(bound).ForwardGraph[use.SymbolId],
+                call => call.Callee == pick.ResolvedSymbolId);
+        }
+        else
+        {
+            var warning = Assert.Single(diagnostics.Where(diagnostic =>
+                diagnostic.Code == DiagnosticCode.SignatureUnresolved));
+            Assert.Equal(receiverCall.ReceiverSpan, warning.Span);
+            Assert.IsType<Calor.Compiler.Binding.BoundTypes.UnresolvedBoundType>(receiverCall.Receiver!.Type);
+            Assert.True(Assert.Single(pick.Arguments).HasUnknownInferredType);
+            Assert.True(pick.HasUnresolvedArguments);
+            Assert.Null(pick.ResolvedSymbol);
+            Assert.Empty(pick.ResolvedSymbols);
+            Assert.Empty(pick.SelectedOverloadMatches);
+            Assert.Empty(CallGraphAnalysis.BuildResolved(bound).ForwardGraph[use.SymbolId]);
+            Assert.Empty(CallGraphAnalysis.Build(ast).ResolveCallSites(ast.Functions[0].Id, "Pick", pick.Span));
+            new EffectEnforcementPass(diagnostics, policy: UnknownCallPolicy.Strict, strictEffects: true).Enforce(ast);
+            Assert.Contains(diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Span == pick.Span);
+        }
+    }
+
+    [Theory]
     [InlineData("raw", false)]
     [InlineData("raw", true)]
     [InlineData("fallback", false)]

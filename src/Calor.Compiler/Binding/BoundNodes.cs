@@ -1057,9 +1057,8 @@ public sealed class BoundArrayCreation : BoundExpression
     }
 }
 
-/// <summary>#762 B3: array element access. Element type derives from the array's
-/// composed type string when it has the "T[]" shape; "OBJECT" otherwise (0.13 string
-/// types — 0.14's typed representation replaces the derivation).</summary>
+/// <summary>#762 B3: indexed element access. Unavailable element inference
+/// retains OBJECT only as a non-authoritative recovery type.</summary>
 public sealed class BoundArrayAccess : BoundExpression
 {
     public BoundExpression Array { get; }
@@ -1067,9 +1066,11 @@ public sealed class BoundArrayAccess : BoundExpression
     public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children => [Array, Index];
 
-    public BoundArrayAccess(TextSpan span, BoundExpression array, BoundExpression index) : base(span)
+    public BoundArrayAccess(TextSpan span, BoundExpression array, BoundExpression index,
+        string? elementTypeName = null) : base(span)
     {
         Array = array; Index = index;
+        HasUnknownInferredType = array.HasUnknownInferredType;
         if (array.MethodInputArrayType is
             {
                 ElementType: NominalBoundType
@@ -1082,9 +1083,11 @@ public sealed class BoundArrayAccess : BoundExpression
             return;
         }
         var arrayTypeName = array.Type.DisplayString;
-        Type = new NominalBoundType(arrayTypeName.EndsWith("[]", StringComparison.Ordinal)
+        elementTypeName ??= arrayTypeName.EndsWith("[]", StringComparison.Ordinal)
             ? arrayTypeName[..^2]
-            : "OBJECT");
+            : null;
+        Type = new NominalBoundType(elementTypeName ?? "OBJECT");
+        HasUnknownInferredType = array.HasUnknownInferredType || elementTypeName is null;
     }
 }
 
@@ -1143,6 +1146,7 @@ public sealed class BoundMultiDimArrayAccess : BoundExpression
         var t = array.Type.DisplayString;
         var open = t.LastIndexOf('[');
         Type = new NominalBoundType(open > 0 ? t[..open] : "OBJECT");
+        HasUnknownInferredType = array.HasUnknownInferredType || open <= 0;
     }
 }
 

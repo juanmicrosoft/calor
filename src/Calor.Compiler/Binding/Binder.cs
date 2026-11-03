@@ -4259,7 +4259,8 @@ public sealed class Binder
             && ResolveBclArgumentType(metadata.Context, array.Type.DisplayString)
                 is Microsoft.CodeAnalysis.IArrayTypeSymbol { ElementType: Microsoft.CodeAnalysis.IArrayTypeSymbol element }
                 ? element : null;
-        return new BoundArrayAccess(arrayAccess.Span, array, index)
+        return new BoundArrayAccess(arrayAccess.Span, array, index,
+            GetIndexedElementType(array.Type.DisplayString, requireIndexer: true))
         {
             MetadataArrayResultType = metadataArray
         };
@@ -7490,7 +7491,7 @@ public sealed class Binder
             : "OBJECT";
     }
 
-    private static string? GetIndexedElementType(string typeName)
+    private static string? GetIndexedElementType(string typeName, bool requireIndexer = false)
     {
         const string arrayPrefix = "ARRAY[element=";
         if (typeName.StartsWith(arrayPrefix, StringComparison.OrdinalIgnoreCase)
@@ -7508,6 +7509,10 @@ public sealed class Binder
         if (genericStart > 0 && typeName.EndsWith('>'))
         {
             var genericName = typeName[..genericStart];
+            var simpleName = genericName[(genericName.LastIndexOf('.') + 1)..];
+            if (requireIndexer && simpleName is not ("List" or "IList" or "IReadOnlyList"
+                or "Dictionary" or "IDictionary" or "IReadOnlyDictionary" or "Dict"))
+                return null;
             var arguments = SplitTopLevelTypeArguments(typeName[(genericStart + 1)..^1]);
             if (genericName.Contains("Dictionary", StringComparison.OrdinalIgnoreCase)
                 || genericName.Equals("Dict", StringComparison.OrdinalIgnoreCase))
