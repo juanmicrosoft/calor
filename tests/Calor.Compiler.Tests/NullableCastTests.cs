@@ -1,7 +1,11 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using System.Reflection;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -92,10 +96,23 @@ public class Foo
         Assert.True(result.Success, "Conversion should succeed");
         Assert.NotNull(result.CalorSource);
         Assert.True(result.CalorSource!.Length > 0);
-        // Converter should strip nullable annotation from cast types to avoid parser errors
-        // from ? tokens inside Lisp expressions. (cast i32 value) instead of (cast i32? value).
-        Assert.Contains("cast i32", result.CalorSource);
-        Assert.DoesNotContain("cast ?i32", result.CalorSource);
-        Assert.DoesNotContain("cast i32?", result.CalorSource);
+        Assert.Contains("(cast int? value)", result.CalorSource);
+        var compiled = Program.Compile(result.CalorSource, "nullable-cast.calr");
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        Assert.Contains("(int?)value", compiled.GeneratedCode);
+        var compilation = CSharpCompilation.Create(
+            $"NullableCast_{Guid.NewGuid():N}",
+            [CSharpSyntaxTree.ParseText(compiled.GeneratedCode!)],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var image = new MemoryStream();
+        var emission = compilation.Emit(image);
+        Assert.True(emission.Success, string.Join("\n", emission.Diagnostics));
+        var type = Assembly.Load(image.ToArray()).GetTypes().Single(t => t.Name == "Foo");
+        var method = type.GetMethod("Bar")!;
+        Assert.Equal(typeof(int?), method.ReturnType);
+        var instance = Activator.CreateInstance(type);
+        Assert.Null(method.Invoke(instance, [null]));
+        Assert.Equal(42, method.Invoke(instance, [42]));
     }
 }

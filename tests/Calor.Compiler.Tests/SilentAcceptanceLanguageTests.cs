@@ -214,10 +214,7 @@ public class SilentAcceptanceLanguageTests
     [InlineData("W", "t")]
     [InlineData("T", "item")]
     [InlineData("URL", "u")]
-    [InlineData("long", "t")]
-    [InlineData("nint", "p")]
     [InlineData("T[]", "items")]
-    [InlineData("i32?", "x")]
     public void Parser_TypeFirstHeaderReadNameFirst_IsCalor0123(string pos0, string pos1)
     {
         Parse(Fn($"§B{{{pos0}:{pos1}}} default\n§R 1"), out var diagnostics);
@@ -246,7 +243,11 @@ public class SilentAcceptanceLanguageTests
     [InlineData("i32:x", "x", "INT")]       // built-in type-first
     [InlineData("x:T", "x", "T")]           // generic parameter, name-first
     [InlineData("N:i32", "N", "INT")]       // upper-case name, built-in type
-    [InlineData("N:long", "N", "long")]     // upper-case name, keyword type
+    [InlineData("N:long", "N", "INT[bits=64][signed=true]")]
+    [InlineData("long:t", "t", "INT[bits=64][signed=true]")]
+    [InlineData("nint:p", "p", "nint")]
+    [InlineData("i32?:x", "x", "NULLABLE[inner=INT]")]
+    [InlineData("int?:x", "x", "NULLABLE[inner=INT]")]
     [InlineData("W:t:const", "t", "W")]     // explicit type-first form
     public void Parser_UnambiguousHeaders_ParseWithoutCalor0123(string header, string name, string type)
     {

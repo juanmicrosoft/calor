@@ -78,6 +78,17 @@ public class TypeCheckerDefectTests
         Assert.Contains(type, error.Message);
     }
 
+    [Theory]
+    [InlineData("float", "f32")]
+    [InlineData("FLOAT", "f64")]
+    [InlineData("double", "f64")]
+    public void FloatingTypeSpellings_PreserveDiagnosticWidth(string spelling, string surface)
+    {
+        Assert.Equal(surface, TypeChecking.PrimitiveType.FromName(spelling)!.SurfaceName);
+        var result = Check($"§M{{S}}\n  §F{{Do:pub}} () -> void\n    §E{{}}\n    §B{{x:{spelling}}} true\n");
+        Assert.Contains(surface, Assert.Single(result.Diagnostics.Errors).Message);
+    }
+
     /// <summary>
     /// `object` is excluded from the theory above — a top type cannot reject a `str`, so the
     /// negative test has to run the other way. It was 13 of the original 92 and would otherwise

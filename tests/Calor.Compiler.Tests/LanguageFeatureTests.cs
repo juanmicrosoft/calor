@@ -236,8 +236,11 @@ public class LanguageFeatureTests
                   §O{Type}
                   §R (typeof System.String)
             """;
-        var code = CompileToCode(source);
-        Assert.Contains("return typeof(System.String);", code);
+        var result = Program.Compile(source, "qualified-typeof.calr");
+        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
+        Assert.Contains("return typeof(string);", result.GeneratedCode);
+        Assert.Equal("same", InteropScope.RefOutImplementationTests.Run(result.GeneratedCode
+            + "\npublic static class Probe { public static string Run() => Test.TestModule.Run() == typeof(string) ? \"same\" : \"different\"; }"));
     }
 
     [Fact]

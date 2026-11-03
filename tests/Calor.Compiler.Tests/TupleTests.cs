@@ -184,8 +184,8 @@ public class TupleTests
         var calrText = calrEmitter.Emit(convertResult.Ast!);
 
         // Verify the Calor text contains tuple syntax
-        Assert.Contains("(i32, i32)", calrText);
-        Assert.Contains("(str Name, i32 Age)", calrText);
+        Assert.Contains("(int, int)", calrText);
+        Assert.Contains("(string Name, int Age)", calrText);
 
         // Calor text → Parse → Compile → C#
         var compileResult = Program.Compile(calrText, "round-trip.calr", new CompilationOptions

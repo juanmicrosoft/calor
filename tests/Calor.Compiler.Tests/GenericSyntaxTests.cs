@@ -666,7 +666,7 @@ public class GenericSyntaxTests
         Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
         Assert.NotNull(result.CalorSource);
         // Verify nested generic types are converted (Dict is Calor shorthand for Dictionary)
-        Assert.Contains("Dict<str, List<i32>>", result.CalorSource);
+        Assert.Contains("Dict<string, List<int>>", result.CalorSource);
     }
 
     #endregion

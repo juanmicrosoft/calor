@@ -188,7 +188,7 @@ public class GenericCallTests
         var emitter = new CalorEmitter();
         var result = node.Accept(emitter);
 
-        Assert.Contains("items.Cast<i32>", result);
+        Assert.Contains("items.Cast<int>", result);
         Assert.Contains("§C{", result);
     }
 

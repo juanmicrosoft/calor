@@ -56,7 +56,8 @@ public class FormatExpressionCoverageTests
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* DecimalLiteralNode */", result);
-        Assert.Contains("DEC:", result);
+        Assert.Contains("3.14m", result);
+        Assert.DoesNotContain("DEC:", result);
     }
 
     #endregion

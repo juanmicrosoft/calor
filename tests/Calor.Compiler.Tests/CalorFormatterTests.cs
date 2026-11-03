@@ -411,7 +411,7 @@ public class CalorFormatterTests
         var result = formatter.Format(module);
 
         Assert.Contains("§EACH{", result);
-        Assert.Contains("item:i32:idx", result);
+        Assert.Contains("item:int:idx", result);
     }
 
     [Fact]
@@ -432,7 +432,7 @@ public class CalorFormatterTests
         var result = formatter.Format(module);
 
         Assert.Contains("§EACH{", result);
-        Assert.Contains("item:i32", result);
+        Assert.Contains("item:int", result);
         // Variable should be just "item:i32" with no trailing :idx slot in indent form
         Assert.DoesNotContain("item:i32:", result);
     }

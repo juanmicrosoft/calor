@@ -485,7 +485,7 @@ public class CodegenBug3_5_6_Tests
     }
 
     [Fact]
-    public void Bug5_FormatPlaceholder_BackwardCompat()
+    public void Bug5_DigitHole_IsRuntimeInterpolation()
     {
         var source = """
             §M{Test}
@@ -495,9 +495,7 @@ public class CodegenBug3_5_6_Tests
             """;
 
         var result = ParseAndEmit(source);
-        // Format placeholders should NOT be converted to interpolation
-        Assert.DoesNotContain("$\"", result);
-        Assert.Contains("\"${0}\"", result);
+        Assert.Contains("$\"{0}\"", result);
     }
 
     [Fact]
@@ -538,10 +536,30 @@ public class CodegenBug3_5_6_Tests
                   §B{~result:str} STR:"${incomplete"
             """;
 
-        var result = ParseAndEmit(source);
-        // Unmatched ${ should be treated as literal text, not interpolation
-        Assert.DoesNotContain("$\"", result);
-        Assert.Contains("\"${incomplete\"", result);
+        var result = Program.Compile(source, "unterminated-hole.calr");
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.UnterminatedString
+            && d.Message.Contains("interpolation hole", StringComparison.Ordinal));
+        Assert.True(string.IsNullOrEmpty(result.GeneratedCode));
+    }
+
+    [Theory]
+    [InlineData("\"${0}\"", "$\"{0}\"", "0")]
+    [InlineData("\"\\${0}\"", "\"${0}\"", "${0}")]
+    [InlineData("\"\\${incomplete\"", "\"${incomplete\"", "${incomplete")]
+    public void Bug5_RuntimeAndEscapedLiteralHoles_CompileAndRun(string literal, string expected, string value)
+    {
+        var source = $$"""
+            §M{Test}
+              §F{Get:pub} () -> string
+                §E{}
+                §R {{literal}}
+            """;
+        var result = Program.Compile(source, "holes.calr");
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));
+        Assert.Contains(expected, result.GeneratedCode);
+        Assert.Equal(value, InteropScope.RefOutImplementationTests.Run(result.GeneratedCode
+            + "\npublic static class Probe { public static string Run() => Test.TestModule.Get(); }"));
     }
 
     [Fact]

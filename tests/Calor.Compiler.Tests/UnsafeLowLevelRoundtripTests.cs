@@ -704,7 +704,7 @@ public class UnsafeLowLevelRoundtripTests
             """;
 
         var (calor, csharpOutput) = ConvertAndEmit(csharpInput);
-        Assert.Contains("(cast i32*", calor);
+        Assert.Contains("(cast int*", calor);
         Assert.Contains("(int*)", csharpOutput);
     }
 

@@ -123,6 +123,9 @@ public sealed class PrimitiveType : CalorType
 
     public static PrimitiveType? FromName(string name)
     {
+        // The C# surface spelling is single precision; internal FLOAT stays double.
+        if (name == "float")
+            return Sized(Float, "f32");
         return name.ToUpperInvariant() switch
         {
             "VOID" => Void,

@@ -794,7 +794,7 @@ public class QuantifierTests
         var result = forall.Accept(emitter);
 
         // Should emit valid Calor syntax
-        Assert.Contains("(forall ((i i32))", result);
+        Assert.Contains("(forall ((i int))", result);
         Assert.Contains("(>= i", result);
     }
 
@@ -812,7 +812,7 @@ public class QuantifierTests
         var result = exists.Accept(emitter);
 
         // Should emit valid Calor syntax
-        Assert.Contains("(exists ((k i32))", result);
+        Assert.Contains("(exists ((k int))", result);
         Assert.Contains("(== k", result);
     }
 
@@ -849,7 +849,7 @@ public class QuantifierTests
         var result = forall.Accept(emitter);
 
         // Should emit both bound variables
-        Assert.Contains("(forall ((i i32) (j i32))", result);
+        Assert.Contains("(forall ((i int) (j int))", result);
     }
 
     [Fact]
@@ -876,7 +876,7 @@ public class QuantifierTests
         // Verify the emitted string contains expected elements
         Assert.Contains("forall", emittedContract);
         Assert.Contains("->", emittedContract);
-        Assert.Contains("(i i32)", emittedContract);
+        Assert.Contains("(i int)", emittedContract);
     }
 
     #endregion

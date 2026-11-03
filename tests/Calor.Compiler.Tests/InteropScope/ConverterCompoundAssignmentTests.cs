@@ -212,18 +212,18 @@ public class ConverterCompoundAssignmentTests
 
     // #1634: every compound operator and ++/-- on a small integral type casts back to the target type.
     [Theory]
-    [InlineData("byte", "u8")]
-    [InlineData("sbyte", "i8")]
-    [InlineData("short", "i16")]
-    [InlineData("ushort", "u16")]
-    [InlineData("char", "char")]
-    public void SmallIntegralTarget_CastsBack(string type, string calorType)
+    [InlineData("byte")]
+    [InlineData("sbyte")]
+    [InlineData("short")]
+    [InlineData("ushort")]
+    [InlineData("char")]
+    public void SmallIntegralTarget_CastsBack(string type)
     {
         foreach (var (name, _) in Operators)
-            Assert.Contains($"(cast {calorType} (", Convert(Rows().Single(r => r.Id == $"N-{type}-{name}").Source));
+            Assert.Contains($"(cast {type} (", Convert(Rows().Single(r => r.Id == $"N-{type}-{name}").Source));
         // Eight statement updates plus k++, ++k and k-- as values all narrow explicitly.
         var increments = Convert(Rows().Single(r => r.Id == $"N-{type}-increment").Source);
-        Assert.Equal(11, System.Text.RegularExpressions.Regex.Matches(increments, $@"\(cast {calorType} \(").Count);
+        Assert.Equal(11, System.Text.RegularExpressions.Regex.Matches(increments, $@"\(cast {type} \(").Count);
     }
 
     // Controls: an int target, and a right-hand side that hoists nothing, convert exactly as before.

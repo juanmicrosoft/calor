@@ -2468,7 +2468,7 @@ public class CollectionOperationsTests
         var calorOutput = emitter.Emit(module);
 
         // Verify the emitted Calor contains the index variable
-        Assert.Contains("item:i32:idx", calorOutput);
+        Assert.Contains("item:int:idx", calorOutput);
 
         // Re-parse the emitted Calor
         var reparsed = Parse(calorOutput, out var rediagnostics);

@@ -10,7 +10,7 @@ namespace Calor.Compiler.Tests;
 /// Tests for batch codegen/converter bug fixes:
 /// Fix 1: §B{var:name} generates correct C#
 /// Fix 2: Auto-using System.Collections.Generic and System.Linq
-/// Fix 3: Decimal literal support (DEC: prefix)
+/// Fix 3: Decimal literal support (canonical m suffix)
 /// Fix 4: Object initializer roundtrip with §INIT tags
 /// Fix 5: Array initializer CalorEmitter uses §ARR tags
 /// </summary>
@@ -156,7 +156,7 @@ public class CodegenBatchFixTests
     [Fact]
     public void Fix3_DecimalLiteral_RoundtripThroughCalorEmitter()
     {
-        // DEC:21.35 should parse, then CalorEmitter should produce DEC:21.35
+        // The accepted prefix input formats as a bare decimal with its m suffix.
         var source = @"
 §M{Test}
   §F{Main:pub}
@@ -168,7 +168,9 @@ public class CodegenBatchFixTests
         var calorEmitter = new Migration.CalorEmitter();
         var calorOutput = calorEmitter.Emit(module);
 
-        Assert.Contains("DEC:21.35", calorOutput);
+        Assert.Contains("21.35m", calorOutput);
+        var reparsed = ParseModule(calorOutput);
+        Assert.Contains("21.35m", new CSharpEmitter().Emit(reparsed));
     }
 
     // ========== Fix 4: Object initializer §INIT ==========
@@ -289,15 +291,15 @@ public class CodegenBatchFixTests
     // ========== Gap-closing: Converter-level tests ==========
 
     [Fact]
-    public void Gap_Converter_DecimalLiteral_ProducesDECPrefix()
+    public void Gap_Converter_DecimalLiteral_ProducesMSuffix()
     {
-        // C# decimal literal → converter → Calor should contain DEC:
+        // C# decimal literal → converter → Calor keeps its decimal suffix.
         var converter = new Migration.CSharpToCalorConverter(new Migration.ConversionOptions { Fidelity = Migration.ConversionFidelity.Lossy });
         var result = converter.Convert("decimal price = 21.35m;");
 
         Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("DEC:21.35", result.CalorSource);
+        Assert.Contains("21.35m", result.CalorSource);
         Assert.DoesNotContain("§ERR", result.CalorSource);
     }
 
@@ -320,15 +322,15 @@ public class CodegenBatchFixTests
     }
 
     [Fact]
-    public void Gap_Converter_DecimalZero_ProducesDECPrefix()
+    public void Gap_Converter_DecimalZero_PreservesScaleWithMSuffix()
     {
-        // C# 0.00m → converter → Calor should contain DEC:0
+        // Decimal zero retains both its scale and decimal suffix.
         var converter = new Migration.CSharpToCalorConverter(new Migration.ConversionOptions { Fidelity = Migration.ConversionFidelity.Lossy });
         var result = converter.Convert("decimal zero = 0.00m;");
 
         Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("DEC:0", result.CalorSource);
+        Assert.Contains("0.00m", result.CalorSource);
     }
 
     [Fact]

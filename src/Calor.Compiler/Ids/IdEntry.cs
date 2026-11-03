@@ -282,10 +282,10 @@ public sealed class DeclarationIdentityStore
         if (resolveMerge && text.Split('\n').Any(line => line.StartsWith("<<<<<<<", StringComparison.Ordinal)))
         {
             var (left, right) = ConflictVersions(text);
-            var ours = JsonSerializer.Deserialize<State>(left, JsonOptions) ?? throw new InvalidDataException("Empty identity merge side.");
-            var theirs = JsonSerializer.Deserialize<State>(right, JsonOptions) ?? throw new InvalidDataException("Empty identity merge side.");
-            ValidateState(ours);
-            ValidateState(theirs);
+            var ours = CanonicalizeState(JsonSerializer.Deserialize<State>(left, JsonOptions)
+                ?? throw new InvalidDataException("Empty identity merge side."));
+            var theirs = CanonicalizeState(JsonSerializer.Deserialize<State>(right, JsonOptions)
+                ?? throw new InvalidDataException("Empty identity merge side."));
             var declarations = ours.Declarations.Concat(theirs.Declarations).Distinct().ToArray();
             if (declarations.Select(d => d.Id).Distinct(StringComparer.Ordinal).Count() != declarations.Length)
                 throw new InvalidDataException("Concurrent edits to the same declaration identity require an explicit relocation; sidecar left untouched.");
@@ -294,8 +294,70 @@ public sealed class DeclarationIdentityStore
         }
         else
             state = JsonSerializer.Deserialize<State>(text, JsonOptions) ?? throw new InvalidDataException("Empty identity sidecar.");
+        return CanonicalizeState(state);
+    }
+
+    private State CanonicalizeState(State state)
+    {
+        ValidateState(state);
+        state = state with { Declarations = state.Declarations.Select(CanonicalizeIdentity).ToArray() };
         ValidateState(state);
         return state;
+    }
+
+    private static DeclarationIdentity CanonicalizeIdentity(DeclarationIdentity identity) =>
+        identity with
+        {
+            Container = CanonicalizeContainer(identity.Container),
+            Signature = identity.Kind switch
+            {
+                IdKind.Function or IdKind.Method or IdKind.Constructor or IdKind.OperatorOverload
+                    or IdKind.Indexer or IdKind.Delegate => CanonicalizeCallableSignature(identity.Signature),
+                IdKind.Field or IdKind.Property or IdKind.Event or IdKind.RefinementType or IdKind.IndexedType =>
+                    CanonicalIdentityType(identity.Signature),
+                _ => identity.Signature
+            }
+        };
+
+    // Keep sidecar types in one internal spelling, independent of source formatting.
+    private static string CanonicalIdentityType(string type) =>
+        Migration.TypeMapper.CSharpToCalor(Migration.TypeMapper.CalorToCSharp(type));
+
+    private static string CanonicalizeCallableSignature(string signature)
+    {
+        if (System.Text.Json.Nodes.JsonNode.Parse(signature) is not System.Text.Json.Nodes.JsonObject json
+            || json["parameters"] is not System.Text.Json.Nodes.JsonArray parameters
+            || json["output"] is not System.Text.Json.Nodes.JsonValue output
+            || !output.TryGetValue<string>(out var outputType) || outputType == null)
+            throw new InvalidDataException("Invalid callable identity signature.");
+        foreach (var parameter in parameters)
+        {
+            if (parameter is not System.Text.Json.Nodes.JsonObject item
+                || item["type"] is not System.Text.Json.Nodes.JsonValue type
+                || !type.TryGetValue<string>(out var typeName) || typeName == null)
+                throw new InvalidDataException("Invalid callable identity parameter type.");
+            item["type"] = CanonicalIdentityType(typeName);
+        }
+        json["output"] = CanonicalIdentityType(outputType);
+        return json.ToJsonString();
+    }
+
+    private static string CanonicalizeContainer(string container)
+    {
+        var result = new System.Text.StringBuilder();
+        var offset = 0;
+        // Local declarations embed their enclosing callable's serialized signature.
+        while (container.IndexOf("#{\"arity\":", offset, StringComparison.Ordinal) is var index && index >= 0)
+        {
+            var reader = new Utf8JsonReader(System.Text.Encoding.UTF8.GetBytes(container[(index + 1)..]));
+            using var document = JsonDocument.ParseValue(ref reader);
+            var signature = document.RootElement.GetRawText();
+            result.Append(container.AsSpan(offset, index + 1 - offset));
+            result.Append(CanonicalizeCallableSignature(signature));
+            offset = index + 1 + signature.Length;
+        }
+        result.Append(container.AsSpan(offset));
+        return result.ToString();
     }
 
     private static (string Left, string Right) ConflictVersions(string text)
@@ -788,7 +850,8 @@ public sealed class DeclarationIdentityStore
                 ProofObligationNode n => n.LocalId,
                 _ => ""
             };
-            result.Add(new ParsedDeclaration(new DeclarationIdentity(sourceId, file, container, kind, name, signature), node));
+            result.Add(new ParsedDeclaration(CanonicalizeIdentity(
+                new DeclarationIdentity(sourceId, file, container, kind, name, signature)), node));
         }
         static string Signature(IReadOnlyList<ParameterNode> parameters, OutputNode? output, int arity = 0) =>
             JsonSerializer.Serialize(new

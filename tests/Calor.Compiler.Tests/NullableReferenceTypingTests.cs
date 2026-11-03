@@ -590,11 +590,11 @@ public class NullableReferenceTypingTests
         Assert.DoesNotContain("Kind", references);
         var result = Compile(source, checking: true);
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.UndefinedReference
-            && d.Message.Contains("?Foo", StringComparison.Ordinal));
+            && d.Message.Contains("Foo?", StringComparison.Ordinal));
         Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.UndefinedReference
-            && d.Message.Contains("?Value", StringComparison.Ordinal));
+            && d.Message.Contains("Value?", StringComparison.Ordinal));
         Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.UndefinedReference
-            && d.Message.Contains("?Kind", StringComparison.Ordinal));
+            && d.Message.Contains("Kind?", StringComparison.Ordinal));
     }
 
     [Fact]

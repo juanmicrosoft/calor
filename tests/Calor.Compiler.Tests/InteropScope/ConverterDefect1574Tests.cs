@@ -72,7 +72,7 @@ public class ConverterDefect1574Tests
         ("R2-type-named-like-builtin", "namespace N { public sealed class String { } public static class Probe { public static string Run() { N.String a; N.String b; a = b = new N.String(); return object.ReferenceEquals(a, b) ? \"same\" : \"different\"; } } }", "preserved"),
         ("R2-oblivious-target", "#nullable enable\npublic static class Probe {\n#nullable disable annotations\n    static string value;\n#nullable enable annotations\n    public static string Run() { object? r = value = null; return r == null ? \"null\" : \"set\"; } }", "native"),
         // Codex review round 3 reproducers.
-        ("R3-type-named-like-calor-alias", "namespace N { public sealed class Str { } public static class Probe { public static string Run() { N.Str a; N.Str b; a = b = new N.Str(); return object.ReferenceEquals(a, b) ? \"same\" : \"different\"; } } }", "preserved"),
+        ("R3-type-named-like-calor-alias", "namespace N { public sealed class Str { } public static class Probe { public static string Run() { N.Str a; N.Str b; a = b = new N.Str(); return object.ReferenceEquals(a, b) ? \"same\" : \"different\"; } } }", "native"),
         ("R3-allow-null-target", "#nullable enable\nusing System.Diagnostics.CodeAnalysis;\npublic static class Probe { [AllowNull] public static string Value = \"\"; static string? F() { return Value = null; } public static string Run() => F() == null ? \"null\" : \"set\"; }", "preserved"),
         // Codex verification pass reproducers (approved exception): `using` aliases in the temp's
         // displayed type, and nullability attributes on a property setter's parameter.
@@ -131,7 +131,7 @@ public class ConverterDefect1574Tests
     {
         var calor = Convert(Rows().Single(r => r.Id == "CH-locals").Source);
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(calor, @"§C\{G\}"));
-        Assert.Matches(@"§B\{~(_asg\d+):i32\} §C\{G\}\s+§ASSIGN y \1\s+§ASSIGN x \1", calor);
+        Assert.Matches(@"§B\{~(_asg\d+):int\} §C\{G\}\s+§ASSIGN y \1\s+§ASSIGN x \1", calor);
     }
 
     [Fact]
@@ -177,7 +177,7 @@ public class ConverterDefect1574Tests
     public void ObliviousTarget_TempIsNullable_AndCompilesWithoutCS8600()
     {
         var calor = Convert(Rows().Single(r => r.Id == "R2-oblivious-target").Source);
-        Assert.Matches(@"§B\{~_asg\d+:\?str\} null", calor);
+        Assert.Matches(@"§B\{~_asg\d+:string\?\} null", calor);
         var compiled = Program.Compile(calor, "oblivious.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
         Assert.DoesNotContain(CSharpDiagnostics(compiled.GeneratedCode), id => id == "CS8600");

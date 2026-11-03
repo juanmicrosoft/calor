@@ -70,14 +70,14 @@ public class RebindTypeMismatchTests
     [Fact]
     public void Message_UsesSurfaceSpellings_NotInternalForms()
     {
-        // The message must teach the syntax the user writes (i32/str), never the
+        // The message must teach current surface syntax (int/string), never the
         // expanded internal spelling (INT/STRING) — which isn't valid annotation syntax.
         var diag = Validate(
             "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x:str} \"hi\"\n    §R 0\n")
             .Single(d => d.Code == DiagnosticCode.BindRebindTypeMismatch);
 
-        Assert.Contains("'i32'", diag.Message);
-        Assert.Contains("'str'", diag.Message);
+        Assert.Contains("'int'", diag.Message);
+        Assert.Contains("'string'", diag.Message);
         Assert.DoesNotContain("INT", diag.Message);
         Assert.DoesNotContain("STRING", diag.Message);
     }

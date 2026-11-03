@@ -38,11 +38,11 @@ public class DictionaryInitializerSemanticsTests
     }
 
     [Theory]
-    [InlineData("new Dictionary<int, int> { [1] = 2 }", "§B{System.Collections.Generic.Dictionary<i32, i32>:d}")]
-    [InlineData("new SortedDictionary<int, int> { [1] = 2 }", "§B{System.Collections.Generic.SortedDictionary<i32, i32>:d}")]
-    [InlineData("new D { [1] = 2 }", "§B{System.Collections.Generic.Dictionary<i32, i32>:d}")]
-    [InlineData("new SD { [1] = 2 }", "§B{System.Collections.Generic.SortedDictionary<i32, i32>:d}")]
-    [InlineData("new CD { [1] = 2 }", "§B{System.Collections.Concurrent.ConcurrentDictionary<i32, i32>:d}")]
+    [InlineData("new Dictionary<int, int> { [1] = 2 }", "§B{System.Collections.Generic.Dictionary<int, int>:d}")]
+    [InlineData("new SortedDictionary<int, int> { [1] = 2 }", "§B{System.Collections.Generic.SortedDictionary<int, int>:d}")]
+    [InlineData("new D { [1] = 2 }", "§B{System.Collections.Generic.Dictionary<int, int>:d}")]
+    [InlineData("new SD { [1] = 2 }", "§B{System.Collections.Generic.SortedDictionary<int, int>:d}")]
+    [InlineData("new CD { [1] = 2 }", "§B{System.Collections.Concurrent.ConcurrentDictionary<int, int>:d}")]
     [InlineData("new Dictionary<int, int?> { [1] = 2 }", "§B{d}")]
     [InlineData("new Dictionary<dynamic, int> { [1] = 2 }", "§B{d}")]
     [InlineData("new Dictionary<(int, int), int> { [(1, 2)] = 3 }", "§B{d}")]

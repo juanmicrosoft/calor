@@ -103,6 +103,84 @@ public class LintRegressionTests
         Assert.Contains("§L{j:1:5:1}", formatted);
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Formatter_PreservesOverloadIdentitiesAcrossCanonicalTypeSpellings(
+        bool existingSurfaceSpellingSidecar, bool mergeConflict)
+    {
+        const string source = """
+            §M{Types}
+              §CL{Token:pub}
+              §CL{token:pub}
+              §F{Echo:pub} (i32:value) -> i32
+                §PROOF{"positive"} (> 1 0)
+                §R value
+              §F{Echo:pub} (str:value) -> str
+                §PROOF{"positive"} (> 1 0)
+                §R value
+              §F{Echo:pub} (Token:value) -> Token
+                §R value
+              §F{Echo:pub} (token:value) -> token
+                §R value
+              §F{Echo:pub} (f32:value) -> f32
+                §R value
+              §F{Echo:pub} (f64:value) -> f64
+                §R value
+              §F{Echo:pub} (?i32:value) -> ?i32
+                §R value
+              §F{Echo:pub} ([i32]:value) -> [i32]
+                §R value
+            """;
+        static string SurfaceSpelling(string signature) => signature
+            .Replace("\"i32\"", "\"int\"", StringComparison.Ordinal)
+            .Replace("\"str\"", "\"string\"", StringComparison.Ordinal)
+            .Replace("\"f32\"", "\"float\"", StringComparison.Ordinal)
+            .Replace("\"f64\"", "\"double\"", StringComparison.Ordinal)
+            .Replace("\"?i32\"", "\"int?\"", StringComparison.Ordinal)
+            .Replace("\"i32[]\"", "\"int[]\"", StringComparison.Ordinal);
+        var root = Path.Combine(Path.GetTempPath(), $"calor-type-identity-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            var path = Path.Combine(root, "input.calr");
+            File.WriteAllText(path, source);
+            var store = new DeclarationIdentityStore(root);
+            var before = store.Sync([path]);
+            if (existingSurfaceSpellingSidecar)
+            {
+                var previous = before with
+                {
+                    Declarations = before.Declarations.Select(declaration => declaration with
+                    {
+                        Signature = SurfaceSpelling(declaration.Signature),
+                        Container = SurfaceSpelling(declaration.Container)
+                    }).ToArray()
+                };
+                var previousJson = System.Text.Json.JsonSerializer.Serialize(previous);
+                File.WriteAllText(store.SidecarPath, mergeConflict
+                    ? $"<<<<<<< ours\n{System.Text.Json.JsonSerializer.Serialize(before)}\n=======\n{previousJson}\n>>>>>>> theirs\n"
+                    : previousJson);
+            }
+            var (success, formatted) = FormatSource(source);
+            Assert.True(success);
+            File.WriteAllText(path, formatted);
+            var after = store.Sync();
+            Assert.Equal(before.Declarations, after.Declarations);
+            var overloads = after.Declarations.Where(d => d.Kind == IdKind.Function).ToArray();
+            Assert.Equal(8, overloads.Select(d => d.Id).Distinct().Count());
+            Assert.Equal(8, overloads.Select(d => d.Signature).Distinct().Count());
+            var proofs = after.Declarations.Where(d => d.Kind == IdKind.ProofObligation).ToArray();
+            Assert.Equal(2, proofs.Length);
+            Assert.NotEqual(proofs[0].Container, proofs[1].Container);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
     #endregion
 
     #region Whitespace Tests
@@ -307,8 +385,8 @@ public class LintRegressionTests
 
         // Type names should be lowercase
         Assert.Contains("void", formatted);
-        Assert.Contains("i32", formatted);
-        Assert.Contains("str", formatted);
+        Assert.Contains("int", formatted);
+        Assert.Contains("string", formatted);
         Assert.Contains("bool", formatted);
     }
 
