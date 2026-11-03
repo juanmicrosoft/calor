@@ -4260,10 +4260,42 @@ public sealed class Binder
                 is Microsoft.CodeAnalysis.IArrayTypeSymbol { ElementType: Microsoft.CodeAnalysis.IArrayTypeSymbol element }
                 ? element : null;
         return new BoundArrayAccess(arrayAccess.Span, array, index,
-            GetIndexedElementType(array.Type.DisplayString, requireIndexer: true))
+            GetArrayAccessElementType(array))
         {
             MetadataArrayResultType = metadataArray
         };
+    }
+
+    private string? GetArrayAccessElementType(BoundExpression array)
+    {
+        var typeName = array.Type.DisplayString;
+        if (!TypeIdentity.TrySplitGeneric(typeName, out var name, out var arguments))
+            return GetIndexedElementType(typeName);
+        if (array.Type is BoundTypes.NominalBoundType { Declaration: not null }
+            || ResolveTypeSymbol(name, arguments.Count) is not null)
+            return null;
+
+        var metadataName = name switch
+        {
+            "List" or "System.Collections.Generic.List" => "System.Collections.Generic.List`1",
+            "IList" or "System.Collections.Generic.IList" => "System.Collections.Generic.IList`1",
+            "IReadOnlyList" or "System.Collections.Generic.IReadOnlyList" => "System.Collections.Generic.IReadOnlyList`1",
+            "Dictionary" or "Dict" or "System.Collections.Generic.Dictionary" => "System.Collections.Generic.Dictionary`2",
+            "IDictionary" or "System.Collections.Generic.IDictionary" => "System.Collections.Generic.IDictionary`2",
+            "IReadOnlyDictionary" or "System.Collections.Generic.IReadOnlyDictionary" => "System.Collections.Generic.IReadOnlyDictionary`2",
+            _ => null
+        };
+        if (metadataName is null
+            || GetOrCreateMetadataBinder()?.Context.TryResolveType(metadataName) is not { } definition
+            || definition.Arity != arguments.Count
+            || array.Type is BoundTypes.NominalBoundType { RoslynSymbol: { } actual }
+                && !Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(actual.OriginalDefinition, definition))
+            return null;
+
+        var indexer = definition.GetMembers().OfType<Microsoft.CodeAnalysis.IPropertySymbol>()
+            .FirstOrDefault(property => property.IsIndexer && property.GetMethod is not null);
+        return indexer?.Type is Microsoft.CodeAnalysis.ITypeParameterSymbol parameter
+            && parameter.Ordinal < arguments.Count ? arguments[parameter.Ordinal] : null;
     }
 
     private BoundExpression BindMultiDimArrayAccess(MultiDimArrayAccessNode arrayAccess)
@@ -7491,7 +7523,7 @@ public sealed class Binder
             : "OBJECT";
     }
 
-    private static string? GetIndexedElementType(string typeName, bool requireIndexer = false)
+    private static string? GetIndexedElementType(string typeName)
     {
         const string arrayPrefix = "ARRAY[element=";
         if (typeName.StartsWith(arrayPrefix, StringComparison.OrdinalIgnoreCase)
@@ -7509,10 +7541,6 @@ public sealed class Binder
         if (genericStart > 0 && typeName.EndsWith('>'))
         {
             var genericName = typeName[..genericStart];
-            var simpleName = genericName[(genericName.LastIndexOf('.') + 1)..];
-            if (requireIndexer && simpleName is not ("List" or "IList" or "IReadOnlyList"
-                or "Dictionary" or "IDictionary" or "IReadOnlyDictionary" or "Dict"))
-                return null;
             var arguments = SplitTopLevelTypeArguments(typeName[(genericStart + 1)..^1]);
             if (genericName.Contains("Dictionary", StringComparison.OrdinalIgnoreCase)
                 || genericName.Equals("Dict", StringComparison.OrdinalIgnoreCase))

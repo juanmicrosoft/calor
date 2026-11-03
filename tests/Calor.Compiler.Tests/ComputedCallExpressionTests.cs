@@ -17,10 +17,83 @@ namespace Calor.Compiler.Tests;
 public sealed class ComputedCallExpressionTests
 {
     [Theory]
+    [InlineData("List", false, false, false)]
+    [InlineData("Dictionary", false, false, false)]
+    [InlineData("List", true, false, false)]
+    [InlineData("Dictionary", true, false, false)]
+    [InlineData("List", true, true, false)]
+    [InlineData("Dictionary", true, true, false)]
+    [InlineData("List", true, true, true)]
+    [InlineData("Dictionary", true, true, true)]
+    public void IndexedElementInference_RequiresActualBclCollectionIdentity(
+        string family, bool sourceDeclared, bool hasIndexer, bool bclQualified)
+    {
+        var typeName = (bclQualified ? "System.Collections.Generic." : sourceDeclared ? "" : "Foreign.")
+            + family + (family == "List" ? "<object>" : "<str,object>");
+        var index = family == "List" ? "0" : "\"key\"";
+        var declaration = sourceDeclared
+            ? $"  §CL{{{family}:pub}}<{(family == "List" ? "T" : "K,V")}>\n"
+                + (hasIndexer ? $$"""
+                        §IXER{i32:pub}
+                          §I{{{(family == "List" ? "i32" : "str")}}:index}
+                          §GET
+                            §R 1
+                    """ : "")
+            : "";
+        var (ast, bound, diagnostics) = Bind($$"""
+            §M{Test}
+              §F{Use:pub} ({{typeName}}:items) -> void
+                §E{}
+                §B{element} §IDX{items} {{index}}
+                §C{element.ToString} §/C
+                §C{Pick} §A element §/C
+              §F{Pick:pub} (object:item) -> void
+                §E{}
+            {{declaration}}
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
+        var calls = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallStatement>().ToArray();
+        var receiverCall = calls.Single(call => call.Target == "element.ToString");
+        var pick = calls.Single(call => call.Target == "Pick");
+        if (bclQualified)
+        {
+            Assert.NotNull(pick.ResolvedSymbol);
+            Assert.DoesNotContain(diagnostics, diagnostic =>
+                diagnostic.Code == DiagnosticCode.SignatureUnresolved);
+        }
+        else
+        {
+            var warning = Assert.Single(diagnostics.Where(diagnostic =>
+                diagnostic.Code == DiagnosticCode.SignatureUnresolved));
+            Assert.Equal(receiverCall.ReceiverSpan, warning.Span);
+            Assert.Null(pick.ResolvedSymbol);
+            Assert.Empty(pick.SelectedOverloadMatches);
+            Assert.True(pick.HasUnresolvedArguments);
+            Assert.Empty(CallGraphAnalysis.BuildResolved(bound).ForwardGraph[use.SymbolId]);
+            Assert.Empty(CallGraphAnalysis.Build(ast).ResolveCallSites(ast.Functions[0].Id, "Pick", pick.Span));
+            new EffectEnforcementPass(diagnostics, policy: UnknownCallPolicy.Strict, strictEffects: true).Enforce(ast);
+            Assert.Contains(diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Span == pick.Span);
+        }
+    }
+
+    [Theory]
     [InlineData(false, "[object]", "object", false)]
     [InlineData(false, "List<object>", "object", false)]
     [InlineData(true, "[object]", "object", false)]
     [InlineData(true, "List<object>", "object", false)]
+    [InlineData(true, "System.Collections.Generic.List<object>", "object", false)]
+    [InlineData(true, "IList<object>", "object", false)]
+    [InlineData(true, "System.Collections.Generic.IList<object>", "object", false)]
+    [InlineData(true, "IReadOnlyList<object>", "object", false)]
+    [InlineData(true, "System.Collections.Generic.IReadOnlyList<object>", "object", false)]
+    [InlineData(true, "Dictionary<str,object>", "object", false)]
+    [InlineData(true, "System.Collections.Generic.Dictionary<str,object>", "object", false)]
+    [InlineData(true, "IDictionary<str,object>", "object", false)]
+    [InlineData(true, "System.Collections.Generic.IDictionary<str,object>", "object", false)]
+    [InlineData(true, "IReadOnlyDictionary<str,object>", "object", false)]
+    [InlineData(true, "System.Collections.Generic.IReadOnlyDictionary<str,object>", "object", false)]
     [InlineData(true, "[i32]", "i32", false)]
     [InlineData(true, "List<i32>", "i32", false)]
     [InlineData(true, "object", "object", false)]
@@ -32,12 +105,13 @@ public sealed class ComputedCallExpressionTests
     public void IndexedElementInference_DistinguishesUnknownFromKnownElements(
         bool known, string collectionType, string elementType, bool multiDimensional)
     {
+        var index = collectionType.Contains("Dictionary", StringComparison.Ordinal) ? "\"key\"" : "0";
         var (ast, bound, diagnostics) = Bind($$"""
             §M{Test}
               §F{Use:pub} ({{collectionType}}:items) -> void
                 §E{}
                 §B{source} {{(known ? "items" : "§C{External.GetFields} §/C")}}
-                §B{element} {{(multiDimensional ? "§IDX2D source 0 0" : "§IDX{source} 0")}}
+                §B{element} {{(multiDimensional ? "§IDX2D source 0 0" : $"§IDX{{source}} {index}")}}
                 §B{alias} element
                 §C{alias.ToString} §/C
                 §C{Pick} §A alias §/C
