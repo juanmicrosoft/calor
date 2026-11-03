@@ -8834,10 +8834,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 && _semanticModel.GetTypeInfo(
                     initializer,
                     _cancellationToken).Type is { TypeKind: not TypeKind.Error }
-                    expressionType)
+                    expressionType
+                && HasAuthoritativeInferredType(expressionType, typeSyntax.SpanStart))
             {
                 type = expressionType;
                 nullableAnnotation = expressionType.NullableAnnotation;
+            }
+            if (!HasAuthoritativeInferredType(type, typeSyntax.SpanStart))
+            {
+                RecordUnresolvedNullableSemantics(typeSyntax);
+                return mapped;
             }
             if (initializer is InvocationExpressionSyntax invocation
                 && _semanticModel.GetSymbolInfo(
@@ -8891,6 +8897,22 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         return mapped;
     }
+
+    // Error recovery can leave a callee's unsubstituted type parameter inside a non-error array or generic type.
+    private bool HasAuthoritativeInferredType(ITypeSymbol type, int position) => type switch
+    {
+        { TypeKind: TypeKind.Error } => false,
+        ITypeParameterSymbol parameter => _semanticModel!
+            .LookupNamespacesAndTypes(position, name: parameter.Name)
+            .Any(symbol => SymbolEqualityComparer.Default.Equals(symbol, parameter)),
+        IArrayTypeSymbol array => HasAuthoritativeInferredType(array.ElementType, position),
+        INamedTypeSymbol named => named.TypeArguments.All(argument => HasAuthoritativeInferredType(argument, position))
+            && (named.ContainingType is null || HasAuthoritativeInferredType(named.ContainingType, position)),
+        IPointerTypeSymbol pointer => HasAuthoritativeInferredType(pointer.PointedAtType, position),
+        IFunctionPointerTypeSymbol pointer => HasAuthoritativeInferredType(pointer.Signature.ReturnType, position)
+            && pointer.Signature.Parameters.All(parameter => HasAuthoritativeInferredType(parameter.Type, position)),
+        _ => true
+    };
 
     private Microsoft.CodeAnalysis.NullableAnnotation? GetReturnFlowAnnotation(SyntaxNode? declaration)
     {
@@ -9159,6 +9181,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     variable.Initializer.Value,
                     variable);
                 if (!string.IsNullOrWhiteSpace(mapped)
+                    && mapped != "var"
                     && IsSpellableInBindingHeader(mapped))
                 {
                     typeName = mapped;
@@ -9183,7 +9206,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (_semanticModel != null)
         {
             var typeInfo = _semanticModel.GetTypeInfo(node.Declaration.Type);
-            if (typeInfo.Type != null)
+            if (typeInfo.Type != null
+                && (!node.Declaration.Type.IsVar
+                    || HasAuthoritativeInferredType(typeInfo.Type, node.Declaration.Type.SpanStart)))
             {
                 var fullTypeName = typeInfo.Type.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat)
                     .Replace("global::", "");

@@ -4,11 +4,13 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Commands;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Migration.Project;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -41,6 +43,155 @@ public class ArrayExpressionConversionTests
 
     public static IEnumerable<object[]> SizedArraySurfaces() =>
         Enum.GetValues<Surface>().Select(surface => new object[] { surface });
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, true)]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]
+    public void InferredLinqCollections_RejectForeignMetadataTypeParameters(
+        bool sameSpelledSourceParameter, bool resolveCompanion, bool list)
+    {
+        var source = $$"""
+            using System.Linq;
+            public static class Probe
+            {
+                public static string Read{{(sameSpelledSourceParameter ? "<TSource>" : "")}}(Configuration configuration)
+                {
+                    var assembliesToScan = configuration.AssembliesToRegister.Distinct().{{(list ? "ToList" : "ToArray")}}();
+                    return string.Join(",", assembliesToScan);
+                }
+                public static string Run()
+                {
+                    return Read{{(sameSpelledSourceParameter ? "<string>" : "")}}(new Configuration());
+                }
+            }
+            """;
+        const string companion = """
+            public sealed class Configuration
+            {
+                public int[] AssembliesToRegister => new int[] { 3, 3, 7 };
+            }
+            """;
+        var parseOptions = new CSharpParseOptions(LanguageVersion.Preview,
+            DocumentationMode.Parse, SourceCodeKind.Regular, preprocessorSymbols: []);
+        var input = resolveCompanion ? source + Environment.NewLine + companion : source;
+        var tree = CSharpSyntaxTree.ParseText(input, parseOptions);
+        var semanticCompilation = CSharpCompilation.Create("InferredArrayAuthority",
+            [tree],
+            new CSharpToCalorConverter().GetSemanticMetadataReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var model = semanticCompilation.GetSemanticModel(tree);
+        var declaration = tree.GetRoot().DescendantNodes()
+            .OfType<VariableDeclaratorSyntax>()
+            .Single(variable => variable.Identifier.ValueText == "assembliesToScan");
+        var local = Assert.IsAssignableFrom<ILocalSymbol>(model.GetDeclaredSymbol(declaration));
+        var element = list
+            ? Assert.Single(Assert.IsAssignableFrom<INamedTypeSymbol>(local.Type).TypeArguments)
+            : Assert.IsAssignableFrom<IArrayTypeSymbol>(local.Type).ElementType;
+        if (resolveCompanion)
+        {
+            Assert.Equal(SpecialType.System_Int32, element.SpecialType);
+        }
+        else
+        {
+            var foreign = Assert.IsAssignableFrom<ITypeParameterSymbol>(element);
+            Assert.Equal("TSource", foreign.Name);
+            Assert.Equal(list ? "ToList" : "ToArray", foreign.ContainingSymbol.Name);
+            Assert.Empty(foreign.DeclaringSyntaxReferences);
+            Assert.DoesNotContain(model.LookupNamespacesAndTypes(declaration.SpanStart, name: foreign.Name),
+                symbol => SymbolEqualityComparer.Default.Equals(symbol, foreign));
+            if (sameSpelledSourceParameter)
+                Assert.Contains(model.LookupNamespacesAndTypes(declaration.SpanStart, name: foreign.Name),
+                    symbol => symbol is ITypeParameterSymbol { Name: "TSource" });
+        }
+
+        var result = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            PreprocessorMode = PreprocessorConversionMode.SelectActiveBranchLossy,
+            ParseOptions = parseOptions,
+            DefinedSymbols = [],
+            ModuleName = "Calor0270Leg",
+            GracefulFallback = true,
+            AutoGenerateIds = true
+        }).Convert(input, "Probe.cs");
+        // The incomplete per-file input still needs its companion to build; do not hide that failure.
+        Assert.Equal(resolveCompanion, result.Success);
+        var errors = result.Issues.Where(issue => issue.Severity == ConversionIssueSeverity.Error).ToArray();
+        Assert.Equal(resolveCompanion ? 0 : 2, errors.Length);
+        Assert.All(errors, issue =>
+        {
+            Assert.Equal("roundtrip-csharp-validation", issue.Feature);
+            Assert.Contains("'Configuration'", issue.Message);
+        });
+        Assert.Empty(result.Losses);
+        Assert.DoesNotContain("§CS", result.CalorSource);
+        var binding = Assert.Single(result.CalorSource!.Split('\n')
+            .Where(line => line.TrimStart().StartsWith("§B{", StringComparison.Ordinal)
+                && (line.Contains(":assembliesToScan}", StringComparison.Ordinal)
+                    || line.TrimStart().StartsWith("§B{assembliesToScan}", StringComparison.Ordinal))));
+        Assert.StartsWith(resolveCompanion
+                ? $"§B{{{(list ? "List<int>" : "int[]")}:assembliesToScan}}"
+                : "§B{assembliesToScan}",
+            binding.TrimStart());
+        Assert.DoesNotContain(list ? "List<TSource>" : "TSource[]", result.CalorSource);
+        var generated = ParseInferredCollectionSource(result.CalorSource!);
+        Assert.Equal("3,7", Run(source, companion));
+        Assert.Equal("3,7", Run(generated, resolveCompanion ? null : companion));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void InferredLinqCollections_KeepSourceVisibleGenericParameters(bool typeParameterOnType, bool list)
+    {
+        var source = $$"""
+            using System.Linq;
+            using System.Collections.Generic;
+            public static class Copy{{(typeParameterOnType ? "<TSource>" : "")}}
+            {
+                public static {{(list ? "List<TSource>" : "TSource[]")}} Read{{(typeParameterOnType ? "" : "<TSource>")}}(TSource[] source)
+                {
+                    var values = source.Distinct().{{(list ? "ToList" : "ToArray")}}();
+                    return values;
+                }
+            }
+            """;
+        var caller = $$"""
+            public static class Probe
+            {
+                public static string Run()
+                {
+                    return string.Join(",", Copy{{(typeParameterOnType ? "<int>" : "")}}.Read{{(typeParameterOnType ? "" : "<int>")}}(new int[] { 3, 3, 7 }));
+                }
+            }
+            """;
+        var result = new CSharpToCalorConverter().Convert(source, "Probe.cs");
+        Assert.True(result.Success, string.Join(Environment.NewLine, result.Issues));
+        Assert.Empty(result.Losses);
+        Assert.DoesNotContain("§CS", result.CalorSource);
+        Assert.Contains($"§B{{{(list ? "List<TSource>" : "TSource[]")}:values}}", result.CalorSource);
+        var generated = ParseInferredCollectionSource(result.CalorSource!);
+        Assert.Equal("3,7", Run(source, caller));
+        Assert.Equal("3,7", Run(generated, caller));
+    }
+
+    private static string ParseInferredCollectionSource(string calor)
+    {
+        var diagnostics = new DiagnosticBag();
+        var parser = new Parsing.Parser(
+            new Parsing.Lexer(calor, diagnostics).TokenizeAllForParser(), diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+        return new CSharpEmitter().Emit(module);
+    }
 
     [Theory]
     [InlineData("u8[]", "byte[]")]
@@ -1600,10 +1751,12 @@ public class ArrayExpressionConversionTests
         }
     }
 
-    private static string Run(string csharp)
+    private static string Run(string csharp, string? additionalSource = null)
     {
         var compilation = CSharpCompilation.Create("F5_" + Guid.NewGuid().ToString("N"),
-            [CSharpSyntaxTree.ParseText(csharp)],
+            additionalSource is null
+                ? [CSharpSyntaxTree.ParseText(csharp)]
+                : [CSharpSyntaxTree.ParseText(csharp), CSharpSyntaxTree.ParseText(additionalSource)],
             GeneratedCSharpCompiler.References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         using var stream = new MemoryStream();
