@@ -5183,7 +5183,8 @@ public sealed class Parser
             i++;
         }
         if (requireCall)
-            return depth == 0 && i < _tokens.Count && _tokens[i].Kind == TokenKind.OpenParen;
+            return depth == 0 && i < _tokens.Count && _tokens[i].Kind == TokenKind.OpenParen
+                && _tokens[i].Span.Line == TokenEndLine(_tokens[i - 1]);
         return depth == 0 && i < _tokens.Count
             && (_tokens[i].Span.Line > TokenEndLine(_tokens[i - 1]) || _tokens[i].Kind is
             TokenKind.OpenParen or TokenKind.CloseParen or TokenKind.CloseBracket

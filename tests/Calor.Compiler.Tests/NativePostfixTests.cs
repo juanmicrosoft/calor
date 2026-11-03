@@ -60,6 +60,20 @@ public sealed class NativePostfixTests
             ? product.Left : throw new InvalidOperationException());
     }
 
+    [Fact]
+    public void GenericCallLookahead_DoesNotJoinTheFollowingPhysicalLine()
+    {
+        var body = Assert.Single(Parse("""
+            §M{Native}
+              §F{Probe:pub} () -> void
+                §B{selected} M<int>
+                (f)
+            """).Functions).Body;
+        Assert.Equal("M<int>", Assert.IsType<ReferenceNode>(
+            Assert.IsType<BindStatementNode>(body[0]).Initializer).Name);
+        Assert.IsType<ReferenceNode>(Assert.IsType<ExpressionStatementNode>(body[1]).Expression);
+    }
+
     [Theory]
     [InlineData("(obj.Child.Pick)(value)", "Pick")]
     [InlineData("obj.@class(value)", "@class")]
