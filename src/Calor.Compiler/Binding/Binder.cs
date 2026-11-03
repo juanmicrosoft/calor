@@ -4719,7 +4719,7 @@ public sealed class Binder
     private BoundExpression BindMatchExpression(MatchExpressionNode match)
     {
         var target = BindExpression(match.Target);
-        var cases = BindMatchCases(match.Cases);
+        var cases = BindMatchCases(match.Cases, target);
         var resultType = GetCommonType(
                 cases.Where(matchCase => matchCase.Result != null)
                     .Select(matchCase => matchCase.Result!.Type.DisplayString))
@@ -4733,7 +4733,8 @@ public sealed class Binder
             resultType);
     }
 
-    private IReadOnlyList<BoundMatchCase> BindMatchCases(IReadOnlyList<MatchCaseNode> cases)
+    private IReadOnlyList<BoundMatchCase> BindMatchCases(
+        IReadOnlyList<MatchCaseNode> cases, BoundExpression target)
     {
         var baseline = CaptureFlowNarrowingState();
         var fallthrough = baseline;
@@ -4746,7 +4747,7 @@ public sealed class Binder
             FlowNarrowingState afterGuard;
             using (PushScope(_scope.CreateChild()))
             {
-                var pattern = BindPattern(matchCase.Pattern);
+                var pattern = BindPattern(matchCase.Pattern, matchedValue: target);
                 var guard = matchCase.Guard != null ? BindExpression(matchCase.Guard) : null;
                 afterGuard = CaptureFlowNarrowingState();
                 if (matchCase.Guard != null && guard != null)
@@ -4786,7 +4787,8 @@ public sealed class Binder
         return boundCases;
     }
 
-    private BoundPattern BindPattern(PatternNode pattern, bool allowBindings = true)
+    private BoundPattern BindPattern(
+        PatternNode pattern, bool allowBindings = true, BoundExpression? matchedValue = null)
     {
         switch (pattern)
         {
@@ -4794,7 +4796,10 @@ public sealed class Binder
                 return Pattern(pattern);
             case VariablePatternNode variable:
                 if (allowBindings && !variable.Name.Contains('.', StringComparison.Ordinal))
-                    DeclarePatternVariable(variable.IdentifierSpan, variable.Name, "OBJECT");
+                    DeclarePatternVariable(variable.IdentifierSpan, variable.Name,
+                        matchedValue?.Type is BoundTypes.UnresolvedBoundType
+                            ? "OBJECT" : matchedValue?.Type.DisplayString ?? "OBJECT",
+                        isTypeInferred: true, inferredValue: matchedValue);
                 return Pattern(
                     variable,
                     metadata: new Dictionary<string, object?>
@@ -4804,7 +4809,10 @@ public sealed class Binder
                     });
             case VarPatternNode variable:
                 if (allowBindings)
-                    DeclarePatternVariable(variable.IdentifierSpan, variable.Name, "OBJECT");
+                    DeclarePatternVariable(variable.IdentifierSpan, variable.Name,
+                        matchedValue?.Type is BoundTypes.UnresolvedBoundType
+                            ? "OBJECT" : matchedValue?.Type.DisplayString ?? "OBJECT",
+                        isTypeInferred: true, inferredValue: matchedValue);
                 return Pattern(
                     variable,
                     metadata: new Dictionary<string, object?> { ["Name"] = variable.Name });
@@ -4875,7 +4883,9 @@ public sealed class Binder
 
     private void DeclarePatternVariable(Parsing.TextSpan span, string name, string typeName,
         BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious,
-        VariableSymbol? binding = null)
+        VariableSymbol? binding = null,
+        bool isTypeInferred = false,
+        BoundExpression? inferredValue = null)
     {
         if (_scope.LookupLocal(name) is VariableSymbol existing
             && string.Equals(existing.TypeName, typeName, StringComparison.OrdinalIgnoreCase))
@@ -4889,7 +4899,13 @@ public sealed class Binder
             ParameterModifier.None,
             span,
             "pattern",
-            nullableAnnotation: nullableAnnotation);
+            nullableAnnotation: nullableAnnotation,
+            isTypeInferred: isTypeInferred,
+            inferredReferenceType: isTypeInferred ? GetInferredReferenceType(inferredValue) : null,
+            hasUnknownInferredType: isTypeInferred && (inferredValue is null
+                || inferredValue.HasUnknownInferredType
+                || inferredValue.Type is BoundTypes.UnresolvedBoundType
+                || inferredValue is BoundVariableExpression { Variable.Id.IsNone: true }));
         if (!_scope.TryDeclare(symbol))
         {
             _diagnostics.ReportError(
@@ -7775,7 +7791,7 @@ public sealed class Binder
     private BoundMatchStatement BindMatchStatement(MatchStatementNode matchStmt)
     {
         var target = BindExpression(matchStmt.Target);
-        return new BoundMatchStatement(matchStmt.Span, target, BindMatchCases(matchStmt.Cases));
+        return new BoundMatchStatement(matchStmt.Span, target, BindMatchCases(matchStmt.Cases, target));
     }
 
     // ===== New statement binders for class member bodies =====

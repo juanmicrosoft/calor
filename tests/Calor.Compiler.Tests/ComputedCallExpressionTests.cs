@@ -109,6 +109,141 @@ public sealed class ComputedCallExpressionTests
     }
 
     [Theory]
+    [InlineData("§VAR{captured}", false)]
+    [InlineData("captured", false)]
+    [InlineData("§PPROP{} §PMATCH{Item} §VAR{captured}", false)]
+    [InlineData("§PTYPE{object:captured}", true)]
+    public void MatchCapture_UnknownRecoveryDoesNotAcquireObjectAuthority(string pattern, bool explicitType)
+    {
+        var (ast, bound, diagnostics) = Bind($$"""
+            §M{Test}
+              §F{Use:pub} () -> i32
+                §E{}
+                §B{source} §C{External.Make} §/C
+                §W source
+                  §K {{pattern}}
+                    §C{captured.ToString} §/C
+                    §R §C{Pick} §A captured §/C
+              §F{Pick:pub} (object:item) -> i32
+                §E{}
+                §R 2
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
+        var receiverCall = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallStatement>()
+            .Single(call => call.Target == "captured.ToString");
+        var pick = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>()
+            .Single(call => call.Target == "Pick");
+        if (explicitType)
+        {
+            Assert.DoesNotContain(diagnostics, diagnostic =>
+                diagnostic.Code == DiagnosticCode.SignatureUnresolved);
+            Assert.NotNull(pick.ResolvedSymbol);
+            Assert.Single(pick.SelectedOverloadMatches);
+        }
+        else
+        {
+            var warning = Assert.Single(diagnostics.Where(diagnostic =>
+                diagnostic.Code == DiagnosticCode.SignatureUnresolved));
+            Assert.Equal(receiverCall.ReceiverSpan, warning.Span);
+            Assert.IsType<Calor.Compiler.Binding.BoundTypes.UnresolvedBoundType>(receiverCall.Receiver!.Type);
+            Assert.Null(pick.ResolvedSymbol);
+            Assert.Empty(pick.ResolvedSymbols);
+            Assert.Empty(pick.SelectedOverloadMatches);
+            Assert.Empty(CallGraphAnalysis.BuildResolved(bound).ForwardGraph[use.SymbolId]);
+            Assert.Empty(CallGraphAnalysis.Build(ast).ResolveCallSites(ast.Functions[0].Id, "Pick", pick.Span));
+            new EffectEnforcementPass(diagnostics, policy: UnknownCallPolicy.Strict, strictEffects: true).Enforce(ast);
+            Assert.Contains(diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Span == pick.Span);
+        }
+    }
+
+    [Theory]
+    [InlineData("§VAR{captured}", "object")]
+    [InlineData("captured", "object")]
+    [InlineData("§VAR{captured}", "i32")]
+    [InlineData("captured", "i32")]
+    public void MatchCapture_KnownMatchedTypeRetainsItsAuthority(string pattern, string type)
+    {
+        var (_, bound, diagnostics) = Bind($$"""
+            §M{Test}
+              §F{Use:pub} ({{type}}:source) -> i32
+                §W source
+                  §K {{pattern}}
+                    §C{captured.ToString} §/C
+                    §R §C{Pick} §A captured §/C
+              §F{Pick:pub} ({{type}}:item) -> i32
+                §R 2
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.SignatureUnresolved);
+        var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
+        var pick = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>()
+            .Single(call => call.Target == "Pick");
+        Assert.NotNull(pick.ResolvedSymbol);
+        Assert.Single(pick.SelectedOverloadMatches);
+        Assert.False(Assert.Single(pick.Arguments).HasUnknownInferredType);
+        Assert.Contains(CallGraphAnalysis.BuildResolved(bound).ForwardGraph[use.SymbolId],
+            call => call.Callee == pick.ResolvedSymbolId);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MatchExpressionCapture_RetainsMatchedValueAuthority(bool known)
+    {
+        var (ast, bound, diagnostics) = Bind($$"""
+            §M{Test}
+              §F{Use:pub} (object:input) -> i32
+                §B{source} {{(known ? "input" : "§C{External.Make} §/C")}}
+                §R §W source
+                  §K §VAR{captured} → §C{Pick} §A captured §/C
+              §F{Pick:pub} (object:item) -> i32
+                §R 2
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
+        var pick = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>()
+            .Single(call => call.Target == "Pick");
+        Assert.Equal(known, pick.ResolvedSymbol is not null);
+        Assert.Equal(!known, pick.HasUnresolvedArguments);
+        if (!known)
+        {
+            Assert.Empty(pick.ResolvedSymbols);
+            Assert.Empty(pick.SelectedOverloadMatches);
+            Assert.Empty(CallGraphAnalysis.BuildResolved(bound).ForwardGraph[use.SymbolId]);
+            Assert.Empty(CallGraphAnalysis.Build(ast).ResolveCallSites(ast.Functions[0].Id, "Pick", pick.Span));
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void MatchCaptureResult_DoesNotRecoverUnknownAuthority(bool known, bool returnCapture)
+    {
+        var (_, bound, diagnostics) = Bind($$"""
+            §M{Test}
+              §F{Use:pub} (object:input) -> i32
+                §B{source} {{(known ? "input" : "§C{External.Make} §/C")}}
+                §B{projected} §W source
+                  §K §VAR{captured} → {{(returnCapture ? "captured" : "input")}}
+                §B{alias} projected
+                §R §C{Pick} §A alias §/C
+              §F{Pick:pub} (object:item) -> i32
+                §R 2
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
+        var pick = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>()
+            .Single(call => call.Target == "Pick");
+        Assert.Equal(known || !returnCapture, pick.ResolvedSymbol is not null);
+        Assert.Equal(!known && returnCapture, pick.HasUnresolvedArguments);
+    }
+
+    [Theory]
     [InlineData("object")]
     [InlineData("IList<ObjectDetails>")]
     public void UnknownInferredArgument_DoesNotRejectOrSelectNativeOverload(string parameterType)

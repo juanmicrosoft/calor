@@ -2385,6 +2385,7 @@ public sealed class BoundMatchExpression : BoundExpression
             cases.Where(matchCase => matchCase.Result != null).Select(matchCase => matchCase.Result!));
         Type = shape ?? ExpressionResultTypes.Join(resultType,
             cases.Where(matchCase => matchCase.Result != null).Select(matchCase => matchCase.Result!.Type));
+        HasUnknownInferredType = cases.Any(matchCase => matchCase.Result?.HasUnknownInferredType == true);
         MethodInputArrayType = shape as ArrayBoundType;
         GenericNullabilityType = shape as GenericInstantiationBoundType;
         Children =
