@@ -17,6 +17,98 @@ namespace Calor.Compiler.Tests;
 public sealed class ComputedCallExpressionTests
 {
     [Theory]
+    [InlineData(false, false, "[object]")]
+    [InlineData(false, true, "[object]")]
+    [InlineData(true, false, "[object]")]
+    [InlineData(true, true, "[object]")]
+    [InlineData(true, false, "IEnumerable<object>")]
+    [InlineData(true, false, "List<object>")]
+    public void ForeachElementInference_DistinguishesUnknownFromActualObject(
+        bool known, bool explicitType, string collectionType)
+    {
+        var (ast, bound, diagnostics) = Bind($$"""
+            §M{Test}
+              §F{Use:pub} ({{collectionType}}:items) -> void
+                §E{}
+                §B{source} {{(known ? "items" : "§C{External.GetTypes} §/C")}}
+                §EACH{value{{(explicitType ? ":object" : "")}}} source
+                  §C{value.ToString} §/C
+                  §C{Pick} §A value §/C
+              §F{Pick:pub} (object:item) -> void
+                §E{}
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
+        var receiverCall = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallStatement>()
+            .Single(call => call.Target == "value.ToString");
+        var pick = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallStatement>()
+            .Single(call => call.Target == "Pick");
+        if (known || explicitType)
+        {
+            Assert.DoesNotContain(diagnostics, diagnostic =>
+                diagnostic.Code == DiagnosticCode.SignatureUnresolved);
+            Assert.IsNotType<Calor.Compiler.Binding.BoundTypes.UnresolvedBoundType>(receiverCall.Receiver!.Type);
+            Assert.NotNull(pick.ResolvedSymbol);
+            Assert.Single(pick.SelectedOverloadMatches);
+        }
+        else
+        {
+            var warning = Assert.Single(diagnostics.Where(diagnostic =>
+                diagnostic.Code == DiagnosticCode.SignatureUnresolved));
+            Assert.Equal(receiverCall.ReceiverSpan, warning.Span);
+            Assert.IsType<Calor.Compiler.Binding.BoundTypes.UnresolvedBoundType>(receiverCall.Receiver!.Type);
+            Assert.Null(pick.ResolvedSymbol);
+            Assert.Empty(pick.ResolvedSymbols);
+            Assert.Empty(pick.SelectedOverloadMatches);
+            Assert.Empty(CallGraphAnalysis.BuildResolved(bound).ForwardGraph[use.SymbolId]);
+            new EffectEnforcementPass(diagnostics, policy: UnknownCallPolicy.Strict, strictEffects: true).Enforce(ast);
+            Assert.Contains(diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Span == pick.Span);
+        }
+    }
+
+    [Fact]
+    public void NestedUnknownForeachElements_RetainEveryReceiverWarningAndRejectAuthority()
+    {
+        var (ast, bound, diagnostics) = Bind("""
+            §M{Test}
+              §F{Use:pub} (System.Reflection.Assembly:assembly) -> void
+                §E{}
+                §EACH{type} §C{assembly.GetTypes} §/C
+                  §C{type.GetInterfaces} §/C
+                  §C{type.GetGenericArguments} §/C
+                  §EACH{interface} §C{type.GetInterfaces} §/C
+                    §C{interface.GetGenericArguments} §/C
+                    §C{Pick} §A interface §/C
+              §F{Pick:pub} (object:item) -> void
+                §E{}
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
+        var calls = BoundNodeHelpers.DescendantsAndSelf(use)
+            .Where(node => node is BoundCallExpression or BoundCallStatement).ToArray();
+        var receivers = calls.Select(node => node switch
+            {
+                BoundCallExpression call => call.Receiver,
+                BoundCallStatement call => call.Receiver,
+                _ => null
+            })
+            .Where(receiver => receiver?.Type is Calor.Compiler.Binding.BoundTypes.UnresolvedBoundType)
+            .ToArray();
+        Assert.Equal(4, receivers.Length);
+        Assert.Equal(receivers.Select(receiver => receiver!.Span.Start).Order(),
+            diagnostics.Where(diagnostic => diagnostic.Code == DiagnosticCode.SignatureUnresolved)
+                .Select(diagnostic => diagnostic.Span.Start).Order());
+        var pick = calls.OfType<BoundCallStatement>().Single(call => call.Target == "Pick");
+        Assert.Null(pick.ResolvedSymbol);
+        Assert.Empty(pick.SelectedOverloadMatches);
+        Assert.Empty(CallGraphAnalysis.BuildResolved(bound).ForwardGraph[use.SymbolId]);
+        var graph = CallGraphAnalysis.Build(ast);
+        Assert.Empty(graph.ResolveCallSites(ast.Functions.Single(function => function.Name == "Use").Id,
+            "Pick", pick.Span));
+    }
+
+    [Theory]
     [InlineData("object")]
     [InlineData("IList<ObjectDetails>")]
     public void UnknownInferredArgument_DoesNotRejectOrSelectNativeOverload(string parameterType)

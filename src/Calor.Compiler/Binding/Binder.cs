@@ -7468,7 +7468,7 @@ public sealed class Binder
             : "OBJECT";
     }
 
-    private static string GetIndexedElementType(string typeName)
+    private static string? GetIndexedElementType(string typeName)
     {
         const string arrayPrefix = "ARRAY[element=";
         if (typeName.StartsWith(arrayPrefix, StringComparison.OrdinalIgnoreCase)
@@ -7489,11 +7489,11 @@ public sealed class Binder
             var arguments = SplitTopLevelTypeArguments(typeName[(genericStart + 1)..^1]);
             if (genericName.Contains("Dictionary", StringComparison.OrdinalIgnoreCase)
                 || genericName.Equals("Dict", StringComparison.OrdinalIgnoreCase))
-                return arguments.Count > 1 ? arguments[1] : "OBJECT";
-            return arguments.Count > 0 ? arguments[0] : "OBJECT";
+                return arguments.Count > 1 ? arguments[1] : null;
+            return arguments.Count > 0 ? arguments[0] : null;
         }
 
-        return "OBJECT";
+        return null;
     }
 
     private static IReadOnlyList<string> SplitTopLevelTypeArguments(string text)
@@ -7845,10 +7845,14 @@ public sealed class Binder
         using var _ = PushScope(_scope.CreateChild());
 
         var collection = BindExpression(forEach.Collection);
-        var variableType = string.IsNullOrWhiteSpace(forEach.VariableType)
-                           || forEach.VariableType.Equals("var", StringComparison.OrdinalIgnoreCase)
-            ? GetIndexedElementType(collection.Type.DisplayString)
-            : forEach.VariableType;
+        var isTypeInferred = string.IsNullOrWhiteSpace(forEach.VariableType)
+            || forEach.VariableType.Equals("var", StringComparison.OrdinalIgnoreCase);
+        var inferredElementType = isTypeInferred
+            ? GetIndexedElementType(collection.Type.DisplayString) : null;
+        var variableType = isTypeInferred
+            ? inferredElementType ?? "OBJECT" : forEach.VariableType;
+        var hasUnknownInferredType = isTypeInferred
+            && (inferredElementType is null || collection.HasUnknownInferredType);
         var loopVar = CreateLocalVariable(
             forEach.VariableName,
             variableType,
@@ -7860,7 +7864,13 @@ public sealed class Binder
             // v0.14 nullability workstream (task #3) — inherit declared
             // STRING nullability on foreach loop variables. Scoped to
             // STRING per §D6; INT/other keep Oblivious.
-            nullableAnnotation: TryReadDeclaredStringAnnotation(variableType));
+            nullableAnnotation: TryReadDeclaredStringAnnotation(variableType),
+            isTypeInferred: isTypeInferred,
+            inferredReferenceType: isTypeInferred && !hasUnknownInferredType
+                ? TryBuildReferenceType(variableType, _currentClassName, _currentNamespaceIdentity,
+                    _currentMemberTypeParameters?.Select(parameter => parameter.Name))
+                : null,
+            hasUnknownInferredType: hasUnknownInferredType);
         _scope.TryDeclare(loopVar);
 
         if (forEach.IndexVariableName != null)
