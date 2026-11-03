@@ -17,7 +17,7 @@ public class AgentTaskReferenceTests
         var path = Path.Combine(directory.FullName, AgentTaskReferencePath);
         var content = File.ReadAllText(path);
         var programs = ExtractAgentTaskPrograms(content);
-        Assert.Equal(80, programs.Count);
+        Assert.Equal(81, programs.Count);
         foreach (var name in new[] { "TryDouble", "SafeDivide", "HasNegative", "DigitValue", "Offset", "ClampScore" })
             Assert.Contains(programs, program => program.Source.Contains($"{{{name}:", StringComparison.Ordinal));
         var diagnostics = CheckAgentTaskReference(new(path, content));

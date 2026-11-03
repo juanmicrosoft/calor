@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.SelfCheck;
 using Xunit;
@@ -96,6 +97,22 @@ public class ExemplarCompilesTests
         var inputs = DocDriftChecker.LoadTeachingFromRepository(TeachingRoot(), diagnostics);
         diagnostics.AddRange(DocDriftChecker.Check(inputs));
         Assert.True(diagnostics.Count == 0, string.Join("\n", diagnostics));
+    }
+
+    [Fact]
+    public void TeachingExamples_UseMeasuredExpressionsAndTypesWithoutInventingHeaders()
+    {
+        var source = JsonNode.Parse(File.ReadAllText(Path.Combine(TeachingRoot(), ExemplarCompileChecker.TeachingSourcePath)))!;
+        foreach (var program in source["programs"]!.AsArray())
+        {
+            var text = program!["calor"]!.GetValue<string>();
+            Assert.StartsWith("§M{", text);
+            Assert.DoesNotMatch(@"\((?:\+|-|\*|/|%|==|!=|<=|>=|<|>|&&|\|\||&|\||\^|<<|>>|\?\?|\?|->|!|~)\s", text);
+            Assert.DoesNotMatch(@"\b(?:i32|i64|i16|i8|u8|u16|u32|u64|f32|f64|dec|str|Seq)\b", text);
+            Assert.DoesNotMatch(@"\b(?:INT|LONG|UINT|ULONG|FLOAT|DOUBLE|DECIMAL|DEC|STR|BOOL):", text);
+            var sectionCalls = Regex.Matches(text, "§C\\{").Count;
+            Assert.Equal(program["id"]!.GetValue<string>() == "complete_linq" ? 1 : 0, sectionCalls);
+        }
     }
 
     [Fact]
@@ -221,6 +238,19 @@ public class ExemplarCompilesTests
         ExemplarCompileChecker.CheckArrayBindingTraps(doc, findings);
 
         Assert.Empty(findings);
+    }
+
+    [Theory]
+    [InlineData("List<string>", true)]
+    [InlineData("IEnumerable<string>", true)]
+    [InlineData("string[]", false)]
+    public void PostfixArrayReturningBinding_PreservesFragmentTrapGuard(string type, bool rejected)
+    {
+        var doc = new DocFile(ExemplarCompileChecker.RelativePath,
+            $"```\n§B{{lines:{type}}} File.ReadAllLines(path)\n```\n");
+        var findings = new List<Diagnostic>();
+        ExemplarCompileChecker.CheckArrayBindingTraps(doc, findings);
+        Assert.Equal(rejected, findings.Any(f => f.Code == DiagnosticCode.DocDriftArrayBindingTrap));
     }
 
     [Fact]

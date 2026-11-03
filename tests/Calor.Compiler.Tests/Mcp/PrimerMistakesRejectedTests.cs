@@ -23,9 +23,8 @@ namespace Calor.Compiler.Tests.Mcp;
 /// each is rewritten into the smallest complete module where it would naturally appear, then
 /// checked for non-compilation at EITHER layer:
 ///   1. Calor itself reports an error (HasErrors), or
-///   2. the generated C# fails to compile under Roslyn — e.g. the 4-field §F header drops the
-///      return type, emitting <c>void Add() { return 0; }</c> =&gt; CS0127, which Calor does not
-///      flag today but csc does.
+///   2. the generated C# fails to compile under Roslyn.
+/// The obsolete ID-bearing function header is rejected by the current parser.
 /// Two drift guards keep this curated set and the primer text in lock-step.
 /// </summary>
 public class PrimerMistakesRejectedTests
@@ -42,11 +41,11 @@ public class PrimerMistakesRejectedTests
     private static readonly Mistake[] Mistakes =
     {
         new("legacy-closers", "§/F §/M §/I §/L", TopLevel: false),
-        new("uppercase-result", "§S (>= §RESULT 0)", TopLevel: false),
+        new("uppercase-result", "§S (§RESULT >= 0)", TopLevel: false),
         new("if-missing-condition", "§IF", TopLevel: false),
         new("if-condition-in-braces", "§IF{i1}{x > 0}", TopLevel: false),
         new("nonexistent-keywords", "§K   §ELSE", TopLevel: false),
-        new("four-field-header", "§F{f1:Add:i32:pub}", TopLevel: true),
+        new("four-field-header", "§F{f1:Add:int:pub}", TopLevel: true),
     };
 
     public static IEnumerable<object[]> MistakeCases() =>
@@ -84,7 +83,7 @@ public class PrimerMistakesRejectedTests
         // Sanity for the two-layer check itself: a correct module must pass BOTH layers, so a
         // green above cannot be an artifact of RoslynErrors spuriously rejecting everything.
         const string correct =
-            "§M{Probe}\n§F{Add:pub} (i32:a, i32:b) -> i32\n  §R (+ a b)\n";
+            "§M{Probe}\n§F{Add:pub} (int:a, int:b) -> int\n  §R a + b\n";
 
         var result = Compile(correct, "primer-correct.calr");
 

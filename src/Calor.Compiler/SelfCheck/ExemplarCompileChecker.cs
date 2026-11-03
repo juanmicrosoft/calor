@@ -184,7 +184,7 @@ public static class ExemplarCompileChecker
     }
 
     // A binding whose initializer is a call to an array-returning BCL API, e.g.
-    // "§B{lines:[str]} §C{File.ReadAllLines} §A path §/C". Captures the declared
+    // "§B{lines:string[]} File.ReadAllLines(path)". Captures the declared
     // binding type and the API so the type can be required to be the array form.
     // The recognized APIs come from the shared Analysis.ArrayReturningBcl table
     // (same source the language-level Calor0254 check uses), so the docs-level lint
@@ -193,9 +193,9 @@ public static class ExemplarCompileChecker
     // Roslyn compile, which catches array/collection mismatches for any API.
     private static readonly Regex ArrayReturningBinding = new(
         @"§B\{\s*~?\s*[A-Za-z_][A-Za-z0-9_]*\s*:\s*(?<type>[^}]+?)\s*\}\s*" +
-        @"§C\{\s*(?<api>" +
+        @"(?:§C\{\s*)?(?<api>" +
         string.Join("|", Analysis.ArrayReturningBcl.Methods.Keys.Select(Regex.Escape)) +
-        @")\s*\}",
+        @")\s*[}(]",
         RegexOptions.Compiled);
 
     /// <summary>The exemplar's repository-relative path.</summary>
@@ -301,7 +301,7 @@ public static class ExemplarCompileChecker
             }
 
             var type = match.Groups["type"].Value.Trim();
-            if (type.StartsWith("[", StringComparison.Ordinal))
+            if (type.StartsWith("[", StringComparison.Ordinal) || type.EndsWith("[]", StringComparison.Ordinal))
             {
                 continue;
             }
@@ -310,7 +310,7 @@ public static class ExemplarCompileChecker
             diagnostics.Add(new Diagnostic(
                 DiagnosticCode.DocDriftArrayBindingTrap, DiagnosticSeverity.Error,
                 $"Exemplar binds {api} (returns an array) to type '{type}'; use the array form " +
-                $"'[...]', not a generic collection — copying this into C# is a CS0029 type error " +
+                $"'T[]', not a generic collection — copying this into C# is a CS0029 type error " +
                 $"(the E1a trap).",
                 exemplar.Path, i + 1, match.Index + 1));
         }
@@ -321,7 +321,7 @@ public static class ExemplarCompileChecker
     /// fenced block whose first non-blank content line starts with §M. The tag is
     /// what distinguishes a compilable program from the prose-annotated reference
     /// blocks (which use bare <c>```</c> fences and may open with a shape line like
-    /// <c>§M{id:Name}   Module</c>) and the "common mistakes" block (deliberately
+    /// <c>§M{Name}   Module</c>) and the "common mistakes" block (deliberately
     /// non-compiling).
     /// </summary>
     public static IReadOnlyList<ExemplarProgram> ExtractCompletePrograms(string markdown)

@@ -1,21 +1,12 @@
-# C# → Calor Type Mappings
+# C# types in Calor
 
-| C# Type | Calor Type | Notes |
-|---------|------------|-------|
-| `int` | `i32` | 32-bit signed integer |
-| `long` | `i64` | 64-bit signed integer |
-| `short` | `i16` | 16-bit signed integer |
-| `byte` | `u8` | 8-bit unsigned integer |
-| `float` | `f32` | 32-bit floating point |
-| `double` | `f64` | 64-bit floating point |
-| `decimal` | `dec` | 128-bit decimal |
-| `string` | `str` | UTF-16 string |
-| `bool` | `bool` | Boolean |
-| `char` | `char` | Unicode character |
-| `void` | `void` | No return value |
-| `object` | `object` | Base type |
-| `int?` / `Nullable<int>` | `?i32` | Nullable value |
-| `Task<T>` | use `§AF`/`§AMT` | Async function/method |
-| `List<T>` | `§LIST{name:type}` | List collection |
-| `Dictionary<K,V>` | `§DICT{name:key:val}` | Dictionary collection |
-| `HashSet<T>` | `§HSET{name:type}` | HashSet collection |
+Use the same C# names: `int`, `long`, `short`, `sbyte`, `byte`, `ushort`, `uint`,
+`ulong`, `float`, `double`, `decimal`, `string`, `bool`, `char`, `object`, `void`.
+Arrays use `T[]` (jagged arrays: `T[][]`); nullable values/references use `T?`.
+Use ordinary .NET generic types such as `List<T>`, `Dictionary<K,V>`, `HashSet<T>`,
+`IEnumerable<T>`, `Task<T>` and `Func<T,R>`, not dedicated absence/failure types.
+Async functions and methods use the currently implemented `§AF` / `§AMT` headers.
+
+Types and value construction are distinct: `§LIST{name:type}`, `§DICT{name:key:val}`
+and `§HSET{name:type}` bind collection values; their headers are not type names.
+`File.ReadAllLines(path)` returns `string[]`, not `List<string>`.

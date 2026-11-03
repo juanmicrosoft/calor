@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "version": "1.0.0",
-  "introduction": "# Current Calor language reference\n\nThis reference describes the current compiler, not a final 0.30 grammar or a measured token budget.\nWrite `.calr` files. Bodies are indented two spaces and structural blocks end at dedent.\nSource declarations carry no IDs; tooling keeps declaration identity in `.calor/ids.json`. Use tooling for renames.\nUse inline signatures, name-first bindings, and indented conditional branches.\nUse `§C{target} §A arg §/C` for calls, including nested calls inside prefix expressions.\nUse nullable .NET types (`?str`, `?i32`, `null`) and exceptions for absence and failure.\nDo not handwrite raw C# passthrough. Conversion fallback capabilities belong in `calor_help action=features`.\nArrays and collections are different: `File.ReadAllLines` returns `[str]`, not `List<str>`.\nContracts evaluate in order: check for null before reading length or members.\nUse only supported arguments for built-ins; `(indexof text value :ordinal)` selects ordinal comparison.\nSingle quotes produce characters; double quotes produce strings.\n\nQuery a specific feature with `calor_help` for detailed syntax and examples.\n",
-  "overview": "## Calor Language Overview\n\nModule and function bodies use indentation. Control Flow uses indented branches and loops.\nContracts and Effects describe obligations and side effects. Async functions use `§AF` and `§AWAIT`.\nCollections use ordinary .NET types; Typed Literals include `INT:42`, `STR:\"hello\"`, and `BOOL:true`.\nProperty and Indexer declarations use `§PROP` and `§IXER`.\nQuery a specific feature for complete examples; use `action=features` for conversion support.\n",
-  "agentInstructions": "Calor is an indentation-only DSL that compiles to C# on .NET 10.\n\n### MANDATORY Rules for AI Agents\n\nRule 0: Read `calor://primer` once before writing Calor. Use `calor_help` with `query` or `feature` for details; `action=features` reports conversion capabilities.\nRule 1: Never create new `.cs` files. All new code MUST be written in Calor; new files must be `.calr` files.\nRule 2: Convert C# to Calor before modifying: use `calor_convert`, then edit the `.calr` source. Use `calor analyze` for migration assessment.\nRule 3: Never edit generated files (`.g.cs`).\nRule 4: Compile after writing with `calor_compile` (autoFix is on by default); apply diagnostics and verify contracts with `calor_verify`.\n\nIndent bodies two spaces. Structural blocks end at dedent. Bindings put the name before the type; prefix mutable names with `~`. Use indented conditional branches and inline function signatures. Expressions use prefix notation; section expressions can nest inside them. Use nullable .NET types and exceptions for absence and failure. Do not handwrite raw C# passthrough; the converter owns fallback output.\n\nRead `calor://effects` for effect codes, `calor://tags` for syntax, `calor://id-prefixes` for tooling-owned identity, and `calor://workflows` for editing workflows. Use `calor_file_write` for atomic checked edits; for multi-file edits use `calor_session_open` and `calor_session_close`.\n\nThese are best-effort agent instructions; compiler diagnostics remain authoritative.\n\nConvert before modifying existing C#. Agent hooks are best-effort; repository CI is the backstop for changes against a protected base.\n",
+  "introduction": "# Current Calor language reference\n\nThis reference describes the current compiler, not a final 0.30 grammar or a measured token budget.\nWrite `.calr` files. Bodies are indented two spaces and structural blocks end at dedent.\nSource declarations carry no IDs; tooling keeps declaration identity in `.calor/ids.json`. Use tooling for renames.\nThe current staged headers are `§M`, `§F`, `§B`, and the other documented tags; use their existing field order and inline signatures.\nExpressions use infix operators with C# precedence, postfix calls `target(arg)`, and indexing `items[index]`. Calls can chain and their callee can be an expression.\nUse C# type names, `T[]` arrays, `T?` nullable types, `null`, and exceptions for absence and failure.\nDo not handwrite raw C# passthrough. Conversion fallback capabilities belong in `calor_help action=features`.\nArrays and collections are different: `File.ReadAllLines` returns `string[]`, not `List<string>`.\nContracts evaluate in order: check for null before reading length or members. Express implication as `!condition || consequence`.\nStaged string and character built-ins retain their documented prefix forms; `(indexof text value :ordinal)` selects ordinal comparison. Do not invent extra arguments.\nSingle quotes produce characters; double quotes produce strings. Plain strings interpolate `${expression}`; escape `\\${0}` for literal placeholder text.\nUse `§ASSIGN` for updates, not increment/decrement or assignment expressions. Bind local helpers as lambdas, not nested `§F` declarations.\nNewlines end infix expressions. Parenthesize infix values in whitespace-separated legacy hosts such as collection entries.\n\nQuery a specific feature with `calor_help` for detailed syntax and examples.\n",
+  "overview": "## Calor Language Overview\n\nModule and function bodies use indentation. Control flow uses indented branches and loops.\nContracts and effects describe obligations and side effects. Async functions use `§AF` and `§AWAIT`.\nExpressions use infix operators with C# precedence, postfix calls, and indexing. Collections use ordinary .NET types.\nTypes use C# names, `T[]` arrays and `T?` nullability. Literals include `42`, `\"hello\"`, `true`, and `18.00m`.\nProperty and indexer declarations use `§PROP` and `§IXER`; staged headers keep their existing field order.\nQuery a specific feature for complete examples; use `action=features` for conversion support.\n",
+  "agentInstructions": "Calor is an indentation-only DSL that compiles to C# on .NET 10.\n\n### MANDATORY Rules for AI Agents\n\nRule 0: Read `calor://primer` once before writing Calor. Use `calor_help` with `query` or `feature` for details; `action=features` reports conversion capabilities.\nRule 1: Never create new `.cs` files. All new code MUST be written in Calor; new files must be `.calr` files.\nRule 2: Convert C# to Calor before modifying: use `calor_convert`, then edit the `.calr` source. Use `calor analyze` for migration assessment.\nRule 3: Never edit generated files (`.g.cs`).\nRule 4: Compile after writing with `calor_compile` (autoFix is on by default); apply diagnostics and verify contracts with `calor_verify`.\n\nIndent bodies two spaces. Structural blocks end at dedent. Keep the current documented section headers and field order; source declarations have no IDs. Bindings put the name before the type; prefix mutable names with `~` and update them with `§ASSIGN`. Use indented conditional branches and inline function signatures. Expressions use infix operators with C# precedence, postfix calls `f(x)`, and indexing `items[i]`. Use C# type names, `T[]` arrays, `T?` nullable types, and exceptions for absence and failure. Plain strings interpolate `${expression}`; `\\${0}` preserves literal placeholder text. Staged constructors and block lambdas keep their documented delimiters. Do not handwrite raw C# passthrough; the converter owns fallback output.\n\nRead `calor://effects` for effect codes, `calor://tags` for syntax, `calor://id-prefixes` for tooling-owned identity, and `calor://workflows` for editing workflows. Use `calor_file_write` for atomic checked edits; for multi-file edits use `calor_session_open` and `calor_session_close`.\n\nThese are best-effort agent instructions; compiler diagnostics remain authoritative.\n\nConvert before modifying existing C#. Agent hooks are best-effort; repository CI is the backstop for changes against a protected base.\n",
   "constructs": [
     {
       "id": "object_instantiation",
@@ -39,7 +39,7 @@
         "variable declaration"
       ],
       "calorSyntax": "§B{name} value or §B{~name} value (mutable)",
-      "description": "Declares a variable binding. Use ~ prefix for mutable variables. Immutable by default. Give null an explicit existing nullable type, such as ?str.",
+      "description": "Declares a variable binding. Use ~ prefix for mutable variables. Immutable by default. Give null an explicit existing nullable type, such as string?.",
       "programs": [
         "primer_bindings",
         "nested_arrays"
@@ -103,7 +103,8 @@
       "calorSyntax": "§LAM{[static:][async:]name:type[:name:type...]} body §/LAM; zero parameters: §LAM{}",
       "description": "Creates an anonymous function using name:type parameter pairs. It can capture variables from its enclosing scope. The closing delimiter carries no source ID. Bind local helpers as lambdas, not nested §F declarations. Automatic local-function conversion lowers noncapturing, non-generic direct same-point calls with ordinary parameters. Direct self-recursion also requires a complete proof of pure built-in scalar operations and captures only the initialized internal self binding; unsupported cases remain explicit converter preservation.",
       "programs": [
-        "task_25"
+        "task_25",
+        "complete_postfix"
       ],
       "csharpEquivalent": "x => x * 2\n(a, b) => a + b\nitems.Where(x => x > 5)"
     },
@@ -160,8 +161,8 @@
         "getter",
         "property access vs method call"
       ],
-      "calorSyntax": "Property: use bare member expression (e.g., obj.Property). Method: use §C{obj.Method} args.",
-      "description": "§C{...} emits parentheses, making it a method call. For property or field access (no parentheses), use a bare dotted expression in a binding (§B{var} obj.Property) or directly as an expression. Do NOT use §C for property access — it will emit obj.Property() with unwanted parens.",
+      "calorSyntax": "Property: obj.Property. Method: obj.Method(arg).",
+      "description": "Use bare member access for properties and fields, without parentheses. Parentheses invoke a method. Calls and indexing can chain on expression-valued receivers.",
       "programs": [
         "task_31",
         "complete_objects"
@@ -259,8 +260,8 @@
         "inline if",
         "ternary expression"
       ],
-      "calorSyntax": "(? condition trueValue falseValue)",
-      "description": "Conditional expression (ternary operator). Uses prefix notation with (? ...) syntax. Both branches are expressions, not statements.",
+      "calorSyntax": "condition ? trueValue : falseValue",
+      "description": "Conditional expression with two expression branches. Only the selected branch evaluates. Conditional and null-coalescing operators associate right; ordinary binary operators associate left.",
       "programs": [
         "task_4"
       ],
@@ -472,10 +473,11 @@
         "execute",
         "method call"
       ],
-      "calorSyntax": "§C{method} §A arg1 §A arg2 §/C",
-      "description": "Calls a method or function. Each argument uses §A; §/C delimits nested argument lists.",
+      "calorSyntax": "target(arg1, arg2); target<T>(arg); Factory()(arg)",
+      "description": "Calls a method or function with comma-separated arguments. Named arguments use name: value; ref, out and in modifiers precede values. The callee can be an expression; chains preserve left-to-right evaluation and short-circuit regions.",
       "programs": [
-        "primer_files"
+        "primer_files",
+        "complete_postfix"
       ],
       "csharpEquivalent": "Console.WriteLine(\"Hello\");\nuser.Save();\nCalculate(x, y) // internal pure call"
     },
@@ -581,8 +583,8 @@
         "null conditional",
         "null check"
       ],
-      "calorSyntax": "(?? left right) for null-coalescing, (?. target Member) for null-conditional",
-      "description": "Handles nullable values. (?? left right) returns left if non-null, else right. (?. target Member) accesses Member on target only if non-null. Both use Lisp-style prefix notation inside parentheses.",
+      "calorSyntax": "left ?? fallback; target?.Member",
+      "description": "Null-coalescing returns the left value when non-null, otherwise the fallback. Null-conditional access reads the member only when the target is non-null.",
       "programs": [
         "task_6"
       ],
@@ -637,8 +639,8 @@
         "from",
         "linq query"
       ],
-      "calorSyntax": "§C{System.Linq.Enumerable.Where} §A collection §A predicate §/C",
-      "description": "LINQ queries use method-chain syntax with §C (call) and §LAM (lambda) in Calor. Complex chains are commonly hoisted into bindings before the final call.",
+      "calorSyntax": "System.Linq.Enumerable.Where(collection, predicate)",
+      "description": "LINQ uses ordinary postfix calls, including generic calls and chained receivers. Bind predicates as typed lambda values and retain authoritative effect rows.",
       "programs": [
         "complete_linq"
       ],
@@ -710,7 +712,7 @@
         "array creation"
       ],
       "calorSyntax": "§B{items} §ARR{type} elements §/ARR",
-      "description": "Creates and initializes a fixed-size array. The element type is specified in the header. Elements are space-separated between the opening and closing tags. Supports both explicit (new int[] { ... }) and bare ({ ... }) initializer syntax.",
+      "description": "Creates a fixed-size array with a typed §ARR value literal. Elements are whitespace-separated; group infix elements explicitly. The documented bare closer remains part of this staged literal form.",
       "programs": [
         "complete_arrays"
       ],
@@ -955,7 +957,7 @@
         "operator overload"
       ],
       "calorSyntax": "§OP{operator:vis} (type:param, ...) -> returnType",
-      "description": "Defines an operator overload for a class or struct. Supports binary operators (+, -, *, /, ==, etc.), unary operators (-, !, ~, ++, --), and conversion operators (implicit, explicit).",
+      "description": "Defines an operator overload using the supported arithmetic, comparison, equality or unary operators. Updates still use §ASSIGN; do not author increment/decrement or compound assignment expressions.",
       "programs": [
         "complex_class"
       ],
@@ -973,8 +975,8 @@
         "m suffix",
         "decimal literal"
       ],
-      "calorSyntax": "DECIMAL:value or DEC:value or value with m/M suffix",
-      "description": "Decimal literals for precise numeric values. Use DECIMAL: or DEC: prefix, or append m/M suffix.",
+      "calorSyntax": "18.00m (or M suffix)",
+      "description": "Decimal literals use the m/M suffix for precise decimal values; unsuffixed fractional literals are double.",
       "programs": [
         "complete_decimal"
       ],
@@ -1159,8 +1161,8 @@
         "null assign",
         "null coalescing assignment"
       ],
-      "calorSyntax": "§IF (== x null) with indented §ASSIGN x default",
-      "description": "C#'s ??= operator has no direct Calor equivalent. Use an §IF null check with §ASSIGN as a workaround.",
+      "calorSyntax": "§IF (x == null) with indented §ASSIGN x fallback",
+      "description": "Use a null check and §ASSIGN for a conditional update. Assignment expressions, including ??=, are not authored expression forms.",
       "programs": [
         "complete_nullable"
       ],
@@ -1180,7 +1182,7 @@
         "attribute annotation"
       ],
       "calorSyntax": "Attach [@AttributeName] or [@Attr(arg1, arg2)] after a declaration header",
-      "description": "Attaches metadata to declarations. Placed before the declaration they annotate.",
+      "description": "Attaches metadata after the declaration header it annotates.",
       "programs": [
         "complete_struct"
       ],
@@ -1200,8 +1202,8 @@
         "pattern combinator",
         "is pattern combinators"
       ],
-      "calorSyntax": "(&& (> x 0) (< x 100)) or (|| (< x 0) (> x 100))",
-      "description": "C# 'is' patterns with and/or/not combinators are decomposed into standard boolean expressions using prefix notation. No special tag needed — fully supported natively.",
+      "calorSyntax": "(x > 0) && (x < 100); (x < 0) || (x > 100)",
+      "description": "Express Boolean combinations with infix &&, || and unary !. These are expressions, not new pattern or block headers.",
       "programs": [
         "complete_patterns"
       ],
@@ -1281,7 +1283,7 @@
         "tuple type"
       ],
       "calorSyntax": "(Type1, Type2) for types; (expr1, expr2) for literals",
-      "description": "Tuple types use parenthesized comma-separated types: (i32, str). Tuple literals use parenthesized comma-separated expressions: (1, \"hello\"). Named tuple elements are supported: (i32 X, i32 Y). Tuples are distinguished from Lisp expressions by the presence of commas.",
+      "description": "Tuple types use comma-separated types, such as (int, string). Tuple literals use comma-separated expressions, such as (1, \"hello\"). Named type elements are supported: (int X, int Y). A parenthesized single expression is grouping, not a tuple.",
       "programs": [
         "complete_tuples"
       ],
@@ -1299,8 +1301,8 @@
         "coalesce",
         "null coalescing operator"
       ],
-      "calorSyntax": "(?? left right)",
-      "description": "Null-coalescing operator in Lisp-style prefix notation. Returns left if non-null, otherwise returns right. Use inside parentheses: (?? expr default).",
+      "calorSyntax": "left ?? fallback",
+      "description": "Returns left when non-null; otherwise evaluates and returns fallback. Coalescing associates right.",
       "programs": [
         "complete_nullable"
       ],
@@ -1318,8 +1320,8 @@
         "null propagation",
         "null conditional operator"
       ],
-      "calorSyntax": "(?. target MemberName)",
-      "description": "Null-conditional member access in Lisp-style prefix notation. Accesses MemberName on target only if target is non-null, otherwise returns null. The member name is an unquoted identifier.",
+      "calorSyntax": "target?.Member",
+      "description": "Accesses Member only when target is non-null; otherwise returns null.",
       "programs": [
         "complete_objects"
       ],
@@ -1356,7 +1358,7 @@
         "indexof"
       ],
       "calorSyntax": "(concat a b), (substr text start count), (indexof text value :ordinal)",
-      "description": "Prefix operations include (str value), (concat a b), (fmt \"{0}\" value), (len text), (contains text value), (starts text prefix), (ends text suffix), (equals left right), (isempty text), (upper text), (lower text), (trim text), (replace text old new) and (substr text start count). indexof accepts an optional start and count; use :ordinal for ordinal comparison. Do not invent extra arguments.",
+      "description": "Staged prefix built-ins include (str value), (concat a b), (fmt \"{0}\" value), (len text), (contains text value), (starts text prefix), (ends text suffix), (equals left right), (isempty text), (upper text), (lower text), (trim text), (replace text old new) and (substr text start count). indexof accepts an optional start and count; use :ordinal for ordinal comparison. Do not invent extra arguments.",
       "programs": [
         "primer_strings",
         "task_37",
@@ -1375,7 +1377,7 @@
         "character literal"
       ],
       "calorSyntax": "(char-at text index), (char-code value), '0'",
-      "description": "Single quotes produce char literals with C# escapes. Built-ins include char-at, char-code, char-from-code, char-upper, char-lower, is-letter, is-digit, is-whitespace, is-upper and is-lower. Character subtraction promotes to i32.",
+      "description": "Single quotes produce char literals with C# escapes. Built-ins include char-at, char-code, char-from-code, char-upper, char-lower, is-letter, is-digit, is-whitespace, is-upper and is-lower. Character subtraction promotes to int.",
       "programs": [
         "task_36",
         "task_41",
@@ -1394,8 +1396,8 @@
         "nested",
         "length"
       ],
-      "calorSyntax": "§IDX array index",
-      "description": "Use [T] for array types and [[T]] for jagged arrays. Section expressions can nest inside prefix expressions. File.ReadAllLines returns [str], not List<str>.",
+      "calorSyntax": "items[index]",
+      "description": "Use T[] for arrays and T[][] for jagged arrays. Indexing and calls can chain on expression-valued receivers. File.ReadAllLines returns string[], not List<string>.",
       "programs": [
         "nested_arrays",
         "primer_files"
@@ -1426,14 +1428,14 @@
       "keywords": [
         "types",
         "type",
-        "i32",
-        "str",
+        "int",
+        "string",
         "bool",
         "nullable",
         "literal"
       ],
-      "calorSyntax": "i32, i64, i16, u8, u16, u32, u64, f32, f64, dec, str, bool, char, object, void, ?T, [T]",
-      "description": "Use the C# type mappings for aliases, ordinary .NET generic types for collections, ?T and null for nullable values. Typed numeric bounds such as INT:-2147483648 avoid an out-of-range positive intermediate. Use double quotes for strings.",
+      "calorSyntax": "int, long, short, sbyte, byte, ushort, uint, ulong, float, double, decimal, string, bool, char, object, void, T?, T[]",
+      "description": "Use C# type names and ordinary .NET generic types. Nullable types use a suffix (int?, string?); arrays use T[]. Integer widths and signedness use L, U or UL suffixes, decimal uses m/M and float uses f/F. Negative bounds such as -2147483648 retain their literal meaning. Absence and failure use nullability and exceptions, not dedicated Option/Result forms.",
       "programs": [
         "primer_bindings",
         "task_6"
@@ -1442,22 +1444,39 @@
     },
     {
       "id": "prefix_expressions",
-      "csharpConstruct": "prefix expressions",
+      "csharpConstruct": "Infix expressions and precedence",
       "keywords": [
         "expressions",
         "operator",
         "arithmetic",
         "boolean",
-        "math"
+        "math",
+        "infix",
+        "postfix",
+        "precedence",
+        "computed call",
+        "infix",
+        "postfix",
+        "precedence",
+        "computed call",
+        "infix",
+        "postfix",
+        "precedence",
+        "computed call",
+        "infix",
+        "postfix",
+        "precedence",
+        "computed call"
       ],
-      "calorSyntax": "(+ a b), (== a b), (&& a b), (? condition thenValue elseValue)",
-      "description": "Arithmetic and comparisons use prefix notation. Boolean operators && and || short circuit; ! negates. Use (- 0 value) for negation and (? condition thenValue elseValue) for a conditional value. Call Math methods for operations not provided as built-ins; method names are not prefix operators.",
+      "calorSyntax": "a + b, a == b, p && q, !p, condition ? thenValue : elseValue",
+      "description": "Use infix arithmetic, shifts, comparisons, equality, eager bitwise and short-circuit Boolean operators with C# precedence. Unary -, ! and ~ are supported. Calls and indexing bind tighter. Write implication as !p || q; use Math.Pow(a, b) for powers. Increment/decrement, assignment expressions, unary +, >>> and infix ** are not supported. Newlines end expressions; group infix operands in whitespace-separated staged hosts.",
       "programs": [
         "task_4",
         "task_10",
-        "nested_arrays"
+        "nested_arrays",
+        "complete_postfix"
       ],
-      "csharpEquivalent": "a + b; a == b; a && b; condition ? thenValue : elseValue;"
+      "csharpEquivalent": "a + b; a == b; p && q; !p; condition ? thenValue : elseValue"
     },
     {
       "id": "quantified_contracts",
@@ -1469,8 +1488,8 @@
         "contracts",
         "implication"
       ],
-      "calorSyntax": "(forall ((i i32)) body), (exists ((i i32)) body), (-> condition consequence)",
-      "description": "Quantifiers declare typed bound variables. Bound runtime quantifiers with finite array ranges; check array lengths against external bounds. Use -> for implication. Contracts are obligations, not a guarantee that every proof succeeds.",
+      "calorSyntax": "(forall ((i int)) body), (exists ((i int)) body); !condition || consequence",
+      "description": "Staged quantifiers declare typed bound variables. Check array lengths against external bounds. The examples use bounded exists and its negation for finite runtime checking. Runtime forall certification still requires a legacy implication AST; an equivalent infix Boolean body is not yet certified. Express ordinary implication as !condition || consequence. Contracts are obligations, not a guarantee that every proof succeeds.",
       "programs": [
         "task_39",
         "task_40"
@@ -1498,6 +1517,21 @@
         "copilot_smoke"
       ],
       "csharpEquivalent": "list.Add(value); dictionary[key] = value;"
+    },
+    {
+      "id": "legacy_section_call",
+      "csharpConstruct": "Staged section call",
+      "keywords": [
+        "section call",
+        "legacy call",
+        "§C"
+      ],
+      "calorSyntax": "§C{target<T>} §A arg §/C",
+      "description": "Compatibility call form retained during parser/metadata integration. Prefer postfix calls. The LINQ example keeps this bridge for ToArray because its native postfix form currently lacks authoritative effect resolution; do not relax effect policy to work around that boundary.",
+      "csharpEquivalent": "System.Linq.Enumerable.ToArray<int>(filtered)",
+      "programs": [
+        "complete_linq"
+      ]
     }
   ],
   "tags": {
@@ -1540,7 +1574,7 @@
       "examples": [
         {
           "name": "Extension Method Parameter",
-          "calor": "str:value:this",
+          "calor": "string:value:this",
           "description": "Marks this as an extension method parameter (C# 'this' modifier)"
         },
         {
@@ -1550,17 +1584,17 @@
         },
         {
           "name": "Default Value",
-          "calor": "i32:count = 0",
+          "calor": "int:count = 0",
           "description": "Parameter with default value"
         },
         {
           "name": "Ref Parameter",
-          "calor": "i32:value:ref",
+          "calor": "int:value:ref",
           "description": "Ref parameter (C# 'ref' keyword)"
         },
         {
           "name": "Out Parameter",
-          "calor": "i32:result:out",
+          "calor": "int:result:out",
           "description": "Out parameter (C# 'out' keyword)"
         }
       ]
@@ -1757,25 +1791,25 @@
     },
     "§??": {
       "name": "Null-Coalescing (Legacy)",
-      "syntax": "(?? left right)",
-      "description": "Legacy null-coalescing syntax. Prefer Lisp-style (?? left right) for null-coalescing.",
+      "syntax": "left ?? fallback",
+      "description": "Legacy tag lookup retained; author infix null-coalescing: left ?? fallback.",
       "csharpEquivalent": "expression ?? default"
     },
     "§?.": {
       "name": "Null-Conditional Access",
-      "syntax": "(?. target Member)",
-      "description": "Null-conditional member access in Lisp prefix notation. Returns null if target is null, otherwise accesses Member.",
+      "syntax": "target?.Member",
+      "description": "Legacy tag lookup retained; author postfix null-conditional member access.",
       "csharpEquivalent": "target?.Member"
     },
     "§INTERP": {
       "name": "String Interpolation",
       "syntax": "Prefer inline string interpolation: \"literal ${expr} literal\"",
-      "description": "Builds an interpolated string from literal parts and §EXP expression parts. Strings are opaque — expressions cannot be embedded inside quotes. Use separate \"literal\" and §EXP expr parts.",
+      "description": "Plain strings interpolate ${expression}, including numeric expressions. Escape \\${0} for literal placeholder text. The legacy section form uses separate literal and §EXP parts.",
       "csharpEquivalent": "$\"literal{expr}literal\""
     },
     "§C": {
       "name": "Call",
-      "construct": "method_call",
+      "construct": "legacy_section_call",
       "close": "§/C"
     },
     "§U": {
@@ -1855,7 +1889,7 @@
     "§A": {
       "name": "Argument",
       "syntax": "§A expression",
-      "description": "Marks an argument in inline calls or constructors.",
+      "description": "Marks a constructor or staged section-call argument. Ordinary calls use comma-separated arguments inside parentheses.",
       "csharpEquivalent": "Type name"
     },
     "§EX": {
@@ -1925,127 +1959,127 @@
     {
       "id": "copilot_smoke",
       "title": "Collection allocation, loop mutation and count",
-      "calor": "§M{CopilotSmoke}\n  §F{Collect:pub} (i32:n) -> i32\n    §E{mut,alloc}\n    §LIST{items:i32}\n    §/LIST\n    §L{i:1:n:1}\n      §PUSH{items} i\n    §B{count:i32} §CNT{items}\n    §R count"
+      "calor": "§M{CopilotSmoke}\n  §F{Collect:pub} (int:n) -> int\n    §E{mut,alloc}\n    §LIST{items:int}\n    §/LIST\n    §L{i:1:n:1}\n      §PUSH{items} i\n    §B{count:int} §CNT{items}\n    §R count"
     },
     {
       "id": "complete_arrays",
       "title": "Array values and indexed access",
-      "calor": "§M{ArrayValues}\n  §F{First:pub} () -> i32\n    §E{alloc}\n    §B{items} §ARR{i32} 10 20 30 §/ARR\n    §R §IDX items 0"
+      "calor": "§M{ArrayValues}\n  §F{First:pub} () -> int\n    §E{alloc}\n    §B{items} §ARR{int} 10 20 30 §/ARR\n    §R items[0]"
     },
     {
       "id": "task_0",
       "title": "ReadInput",
-      "calor": "§M{AgentReference0}\n  §F{ReadInput:pub} () -> str\n    §E{cr}\n    §B{line} §C{Console.ReadLine} §/C\n    §R line"
+      "calor": "§M{AgentReference0}\n  §F{ReadInput:pub} () -> string?\n    §E{cr}\n    §B{line} Console.ReadLine()\n    §R line"
     },
     {
       "id": "task_1",
       "title": "PrintValue",
-      "calor": "§M{AgentReference1}\n  §F{PrintValue:pub} (i32:x) -> void\n    §E{cw}\n    §C{Console.WriteLine}\n    §A x\n    §/C"
+      "calor": "§M{AgentReference1}\n  §F{PrintValue:pub} (int:x) -> void\n    §E{cw}\n    Console.WriteLine(x)"
     },
     {
       "id": "task_2",
       "title": "ClampScore",
-      "calor": "§M{AgentReference2}\n  §F{ClampScore:pub} (i32:score) -> i32\n    §E{}\n    §B{value:i32} §C{Math.Clamp}\n      §A[value] score\n      §A[min] 0\n      §A[max] 100\n    §/C\n    §R value"
+      "calor": "§M{AgentReference2}\n  §F{ClampScore:pub} (int:score) -> int\n    §E{}\n    §B{value:int} Math.Clamp(value: score, min: 0, max: 100)\n    §R value"
     },
     {
       "id": "task_3",
       "title": "SquareRoot",
-      "calor": "§M{AgentReference3}\n  §F{SquareRoot:pub} (i32:x) -> i32\n    §Q (>= x 0)\n    §R x"
+      "calor": "§M{AgentReference3}\n  §F{SquareRoot:pub} (int:x) -> int\n    §Q (x >= 0)\n    §R x"
     },
     {
       "id": "task_4",
       "title": "Abs",
-      "calor": "§M{AgentReference4}\n  §F{Abs:pub} (i32:x) -> i32\n    §S (>= result 0)\n    §R (? (< x 0) (- 0 x) x)"
+      "calor": "§M{AgentReference4}\n  §F{Abs:pub} (int:x) -> int\n    §S (result >= 0)\n    §R ((x < 0) ? (0 - x) : x)"
     },
     {
       "id": "task_5",
       "title": "PrintNumber",
-      "calor": "§M{AgentReference5}\n  §F{PrintNumber:pub} (i32:x) -> void\n    §E{cw}\n    §C{Console.WriteLine}\n    §A x\n    §/C"
+      "calor": "§M{AgentReference5}\n  §F{PrintNumber:pub} (int:x) -> void\n    §E{cw}\n    Console.WriteLine(x)"
     },
     {
       "id": "task_6",
       "title": "TryDouble",
-      "calor": "§M{AgentReference6}\n  §F{TryDouble:pub} (i32:x) -> ?i32\n    §E{}\n    §IF (> x 0)\n      §R (* x 2)\n    §EL\n      §R null"
+      "calor": "§M{AgentReference6}\n  §F{TryDouble:pub} (int:x) -> int?\n    §E{}\n    §IF (x > 0)\n      §R (x * 2)\n    §EL\n      §R null"
     },
     {
       "id": "task_7",
       "title": "TryParseDigit",
-      "calor": "§M{AgentReference7}\n  §F{TryParseDigit:pub} (char:c) -> ?i32\n    §E{}\n    §IF (&& (>= c '0') (<= c '9'))\n      §R (- c '0')\n    §EL\n      §R null"
+      "calor": "§M{AgentReference7}\n  §F{TryParseDigit:pub} (char:c) -> int?\n    §E{}\n    §IF ((c >= '0') && (c <= '9'))\n      §R (c - '0')\n    §EL\n      §R null"
     },
     {
       "id": "task_8",
       "title": "SafeDivide",
-      "calor": "§M{AgentReference8}\n  §F{SafeDivide:pub} (i32:a, i32:b) -> i32\n    §E{alloc,throw}\n    §IF (!= b 0)\n      §R (/ a b)\n    §EL\n      §TH §NEW{ArgumentException} §A \"Division by zero\" §/NEW"
+      "calor": "§M{AgentReference8}\n  §F{SafeDivide:pub} (int:a, int:b) -> int\n    §E{alloc,throw}\n    §IF (b != 0)\n      §R (a / b)\n    §EL\n      §TH §NEW{ArgumentException} §A \"Division by zero\" §/NEW"
     },
     {
       "id": "task_9",
       "title": "Classify",
-      "calor": "§M{AgentReference9}\n  §F{Classify:pub} (i32:n) -> str\n    §IF (< n 0)\n      §R \"negative\"\n    §EI (== n 0)\n      §R \"zero\"\n    §EL\n      §R \"positive\""
+      "calor": "§M{AgentReference9}\n  §F{Classify:pub} (int:n) -> string\n    §IF (n < 0)\n      §R \"negative\"\n    §EI (n == 0)\n      §R \"zero\"\n    §EL\n      §R \"positive\""
     },
     {
       "id": "task_10",
       "title": "Max",
-      "calor": "§M{AgentReference10}\n  §F{Max:pub} (i32:a, i32:b) -> i32\n    §IF (>= a b)\n      §R a\n    §EL\n      §R b"
+      "calor": "§M{AgentReference10}\n  §F{Max:pub} (int:a, int:b) -> int\n    §IF (a >= b)\n      §R a\n    §EL\n      §R b"
     },
     {
       "id": "task_11",
       "title": "GetGrade",
-      "calor": "§M{AgentReference11}\n  §F{GetGrade:pub} (i32:score) -> str\n    §B{~grade:str} \"F\"\n    §IF (>= score 90)\n      §ASSIGN grade \"A\"\n    §EI (>= score 80)\n      §ASSIGN grade \"B\"\n    §EI (>= score 70)\n      §ASSIGN grade \"C\"\n    §EL\n      §ASSIGN grade \"F\"\n    §R grade"
+      "calor": "§M{AgentReference11}\n  §F{GetGrade:pub} (int:score) -> string\n    §B{~grade:string} \"F\"\n    §IF (score >= 90)\n      §ASSIGN grade \"A\"\n    §EI (score >= 80)\n      §ASSIGN grade \"B\"\n    §EI (score >= 70)\n      §ASSIGN grade \"C\"\n    §EL\n      §ASSIGN grade \"F\"\n    §R grade"
     },
     {
       "id": "task_12",
       "title": "Countdown",
-      "calor": "§M{AgentReference12}\n  §F{Countdown:pub} () -> void\n    §E{cw}\n    §B{~count:i32} 5\n    §WH (> count 0)\n      §C{Console.WriteLine}\n      §A count\n      §/C\n      §ASSIGN count (- count 1)"
+      "calor": "§M{AgentReference12}\n  §F{Countdown:pub} () -> void\n    §E{cw}\n    §B{~count:int} 5\n    §WH (count > 0)\n      Console.WriteLine(count)\n      §ASSIGN count (count - 1)"
     },
     {
       "id": "task_13",
       "title": "DoWhileDemo",
-      "calor": "§M{AgentReference13}\n  §F{DoWhileDemo:pub} () -> void\n    §E{cw}\n    §B{~x:i32} 0\n    §DO\n      §C{Console.WriteLine}\n        §A x\n      §/C\n      §ASSIGN x (+ x 1)\n    §/DO (< x INT:3)"
+      "calor": "§M{AgentReference13}\n  §F{DoWhileDemo:pub} () -> void\n    §E{cw}\n    §B{~x:int} 0\n    §DO\n      Console.WriteLine(x)\n      §ASSIGN x (x + 1)\n    §/DO (x < 3)"
     },
     {
       "id": "task_14",
       "title": "SumList",
-      "calor": "§M{AgentReference14}\n  §F{SumList:pub} () -> i32\n    §E{alloc,mut}\n    §B{nums:List<i32>} §NEW{List<i32>}\n    §PUSH{nums} 10\n    §PUSH{nums} 20\n    §PUSH{nums} 30\n    §B{~sum:i32} 0\n    §EACH{n} nums\n      §ASSIGN sum (+ sum n)\n    §R sum"
+      "calor": "§M{AgentReference14}\n  §F{SumList:pub} () -> int\n    §E{alloc,mut}\n    §B{nums:List<int>} §NEW{List<int>}\n    §PUSH{nums} 10\n    §PUSH{nums} 20\n    §PUSH{nums} 30\n    §B{~sum:int} 0\n    §EACH{n} nums\n      §ASSIGN sum (sum + n)\n    §R sum"
     },
     {
       "id": "task_15",
       "title": "GetListLength",
-      "calor": "§M{AgentReference15}\n  §F{GetListLength:pub} (i32:n) -> i32\n    §E{alloc,mut}\n    §Q (>= n 0)\n    §B{nums:List<i32>} §NEW{List<i32>}\n    §L{i:1:n:1}\n      §PUSH{nums} i\n    §R §CNT{nums}"
+      "calor": "§M{AgentReference15}\n  §F{GetListLength:pub} (int:n) -> int\n    §E{alloc,mut}\n    §Q (n >= 0)\n    §B{nums:List<int>} §NEW{List<int>}\n    §L{i:1:n:1}\n      §PUSH{nums} i\n    §R §CNT{nums}"
     },
     {
       "id": "task_16",
       "title": "PrintDictionary",
-      "calor": "§M{AgentReference16}\n  §F{PrintDictionary:pub} (Dictionary<str,i32>:scores) -> void\n    §E{cw}\n    §EACHKV{k:v} scores\n      §P k\n      §P v"
+      "calor": "§M{AgentReference16}\n  §F{PrintDictionary:pub} (Dictionary<string,int>:scores) -> void\n    §E{cw}\n    §EACHKV{k:v} scores\n      §P k\n      §P v"
     },
     {
       "id": "task_17",
       "title": "GetDataAsync",
-      "calor": "§M{AgentReference17}\n  §AF{GetDataAsync:pub} () -> Task<i32>\n    §R 42"
+      "calor": "§M{AgentReference17}\n  §AF{GetDataAsync:pub} () -> Task<int>\n    §R 42"
     },
     {
       "id": "task_18",
       "title": "GetStatus",
-      "calor": "§M{AgentReference18}\n  §F{GetStatus:pub} (i32:code) -> str\n    §R §W code\n      §K 200 → \"OK\"\n      §K 404 → \"Not Found\"\n      §K 500 → \"Server Error\"\n      §K _ → \"Unknown\""
+      "calor": "§M{AgentReference18}\n  §F{GetStatus:pub} (int:code) -> string\n    §R §W code\n      §K 200 → \"OK\"\n      §K 404 → \"Not Found\"\n      §K 500 → \"Server Error\"\n      §K _ → \"Unknown\""
     },
     {
       "id": "task_19",
       "title": "DayName",
-      "calor": "§M{AgentReference19}\n  §F{DayName:pub} (i32:day) -> i32\n    §R §W day\n      §K 1 → 100\n      §K 2 → 100\n      §K 3 → 100\n      §K 4 → 100\n      §K 5 → 100\n      §K 6 → 200\n      §K 7 → 200\n      §K _ → 0"
+      "calor": "§M{AgentReference19}\n  §F{DayName:pub} (int:day) -> int\n    §R §W day\n      §K 1 → 100\n      §K 2 → 100\n      §K 3 → 100\n      §K 4 → 100\n      §K 5 → 100\n      §K 6 → 200\n      §K 7 → 200\n      §K _ → 0"
     },
     {
       "id": "task_20",
       "title": "GetGrade",
-      "calor": "§M{AgentReference20}\n  §F{GetGrade:pub} (i32:score) -> str\n    §R §W score\n      §K §PREL{gte} 90 → \"A\"\n      §K §PREL{gte} 80 → \"B\"\n      §K §PREL{gte} 70 → \"C\"\n      §K _ → \"F\""
+      "calor": "§M{AgentReference20}\n  §F{GetGrade:pub} (int:score) -> string\n    §R §W score\n      §K §PREL{gte} 90 → \"A\"\n      §K §PREL{gte} 80 → \"B\"\n      §K §PREL{gte} 70 → \"C\"\n      §K _ → \"F\""
     },
     {
       "id": "task_21",
       "title": "Describe",
-      "calor": "§M{AgentReference21}\n  §F{Describe:pub} (i32:x) -> str\n    §R §W x\n      §K §VAR{n} §WHEN (> n 100) → \"large\"\n      §K §VAR{n} §WHEN (< n 0) → \"negative\"\n      §K 0 → \"zero\"\n      §K _ → \"normal\""
+      "calor": "§M{AgentReference21}\n  §F{Describe:pub} (int:x) -> string\n    §R §W x\n      §K §VAR{n} §WHEN (n > 100) → \"large\"\n      §K §VAR{n} §WHEN (n < 0) → \"negative\"\n      §K 0 → \"zero\"\n      §K _ → \"normal\""
     },
     {
       "id": "task_22",
       "title": "IsSingleDigit",
-      "calor": "§M{AgentReference22}\n  §F{IsSingleDigit:pub} (i32:n) -> bool\n    §R §W n\n      §K 0 → true\n      §K 1 → true\n      §K 2 → true\n      §K 3 → true\n      §K 4 → true\n      §K 5 → true\n      §K 6 → true\n      §K 7 → true\n      §K 8 → true\n      §K 9 → true\n      §K _ → false"
+      "calor": "§M{AgentReference22}\n  §F{IsSingleDigit:pub} (int:n) -> bool\n    §R §W n\n      §K 0 → true\n      §K 1 → true\n      §K 2 → true\n      §K 3 → true\n      §K 4 → true\n      §K 5 → true\n      §K 6 → true\n      §K 7 → true\n      §K 8 → true\n      §K 9 → true\n      §K _ → false"
     },
     {
       "id": "task_23",
@@ -2055,276 +2089,281 @@
     {
       "id": "task_24",
       "title": "ApplyDouble",
-      "calor": "§M{AgentReference24}\n  §F{ApplyDouble:pub} (i32:x) -> i32\n    §B{doubler:Func<i32,i32>} (n) → (* n 2)\n    §R §C{doubler} §A x §/C"
+      "calor": "§M{AgentReference24}\n  §F{ApplyDouble:pub} (int:x) -> int\n    §B{doubler:Func<int,int>} (n) → (n * 2)\n    §R doubler(x)"
     },
     {
       "id": "task_25",
       "title": "ApplyComplex",
-      "calor": "§M{AgentReference25}\n  §F{ApplyComplex:pub} (i32:x) -> i32\n    §B{process:Func<i32,i32>} §LAM{n:i32}\n    (? (> n 0) (* n 2) 0)\n    §/LAM\n    §R §C{process} §A x §/C"
+      "calor": "§M{AgentReference25}\n  §F{ApplyComplex:pub} (int:x) -> int\n    §B{process:Func<int,int>} §LAM{n:int}\n    ((n > 0) ? (n * 2) : 0)\n    §/LAM\n    §R process(x)"
     },
     {
       "id": "task_26",
       "title": "MathOperation",
-      "calor": "§M{AgentReference26}\n  §DEL{MathOperation}\n    §I{i32:x}\n    §I{i32:y}\n    §O{i32}"
+      "calor": "§M{AgentReference26}\n  §DEL{MathOperation}\n    §I{int:x}\n    §I{int:y}\n    §O{int}"
     },
     {
       "id": "task_27",
       "title": "Accumulate",
-      "calor": "§M{AgentReference27}\n  §F{Accumulate:pub} (i32:n) -> i32\n    §B{~acc:i32} 0          // Bind mutable variable acc = 0\n    §ASSIGN acc (+ acc n)   // Assign acc = acc + n\n    §ASSIGN acc (+ acc n)   // Assign again\n    §ASSIGN acc (+ acc n)   // And again\n    §R acc"
+      "calor": "§M{AgentReference27}\n  §F{Accumulate:pub} (int:n) -> int\n    §B{~acc:int} 0          // Bind mutable variable acc = 0\n    §ASSIGN acc (acc + n)   // Assign acc = acc + n\n    §ASSIGN acc (acc + n)   // Assign again\n    §ASSIGN acc (acc + n)   // And again\n    §R acc"
     },
     {
       "id": "task_28",
       "title": "Calculator",
-      "calor": "§M{AgentReference28}\n  §CL{Calculator:pub}\n    §MT{Add:pub} (i32:a, i32:b) -> i32\n      §R (+ a b)"
+      "calor": "§M{AgentReference28}\n  §CL{Calculator:pub}\n    §MT{Add:pub} (int:a, int:b) -> int\n      §R (a + b)"
     },
     {
       "id": "task_29",
       "title": "Container",
-      "calor": "§M{AgentReference29}\n  §CL{Container:pub}<T>\n    §FLD{T:_value:priv}\n    §MT{Get:pub} () -> T\n      §R _value\n    §MT{Set:pub} (T:value) -> void\n      §E{mut}\n      §ASSIGN _value value"
+      "calor": "§M{AgentReference29}\n  §CL{Container:pub}<T>\n    §FLD{T:_value:priv}\n    §MT{Get:pub} () -> T\n      §R _value\n    §MT{HashSet:pub} (T:value) -> void\n      §E{mut}\n      §ASSIGN _value value"
     },
     {
       "id": "task_30",
       "title": "Repository",
-      "calor": "§M{AgentReference30}\n  §CL{Repository:pub}<T>\n    §WHERE T : class\n    §FLD{List<T>:_items:priv}\n    §MT{Add:pub} (T:item) -> void\n      §E{mut}\n      §C{_items.Add} §A item §/C"
+      "calor": "§M{AgentReference30}\n  §CL{Repository:pub}<T>\n    §WHERE T : class\n    §FLD{List<T>:_items:priv}\n    §MT{Add:pub} (T:item) -> void\n      §E{mut}\n      §PUSH{_items} item"
     },
     {
       "id": "task_31",
       "title": "Product",
-      "calor": "§M{AgentReference31}\n  §CL{Product:pub}\n    §FLD{f64:_price:priv}\n    §PROP{Price:f64:pub}\n      §GET\n        §R _price\n      §SET\n        §ASSIGN _price value"
+      "calor": "§M{AgentReference31}\n  §CL{Product:pub}\n    §FLD{double:_price:priv}\n    §PROP{Price:double:pub}\n      §GET\n        §R _price\n      §SET\n        §ASSIGN _price value"
     },
     {
       "id": "task_32",
       "title": "Person",
-      "calor": "§M{AgentReference32}\n  §CL{Person:pub}\n    §PROP{Name:str:pub}\n      §GET\n        §SET"
+      "calor": "§M{AgentReference32}\n  §CL{Person:pub}\n    §PROP{Name:string:pub}\n      §GET\n        §SET"
     },
     {
       "id": "task_33",
       "title": "Person",
-      "calor": "§M{AgentReference33}\n  §CL{Person:pub}\n    §FLD{str:_name:priv}\n    §FLD{i32:_age:priv}\n    §CTOR{pub} (str:name, i32:age)\n      §ASSIGN _name name\n      §ASSIGN _age age\n    §MT{GetName:pub} () -> str\n      §R _name"
+      "calor": "§M{AgentReference33}\n  §CL{Person:pub}\n    §FLD{string:_name:priv}\n    §FLD{int:_age:priv}\n    §CTOR{pub} (string:name, int:age)\n      §ASSIGN _name name\n      §ASSIGN _age age\n    §MT{GetName:pub} () -> string\n      §R _name"
     },
     {
       "id": "task_34",
       "title": "AbsoluteValue",
-      "calor": "§M{AgentReference34}\n  §F{AbsoluteValue:pub} (i32:x) -> i32\n    §S (>= result 0)\n    §S (-> (>= x 0) (== result x))\n    §S (-> (< x 0) (== result (- 0 x)))\n    §R (? (< x 0) (- 0 x) x)"
+      "calor": "§M{AgentReference34}\n  §F{AbsoluteValue:pub} (int:x) -> int\n    §S (result >= 0)\n    §S (!((x >= 0)) || (result == x))\n    §S (!((x < 0)) || (result == (0 - x)))\n    §R ((x < 0) ? (0 - x) : x)"
     },
     {
       "id": "task_35",
       "title": "LogToFileAndConsole",
-      "calor": "§M{AgentReference35}\n  §F{LogToFileAndConsole:pub} (str:path, str:message) -> void\n    §E{cw,fs:w}\n    §C{Console.WriteLine}\n    §A message\n    §/C\n    §C{File.AppendAllText}\n    §A path\n    §A message\n    §/C"
+      "calor": "§M{AgentReference35}\n  §F{LogToFileAndConsole:pub} (string:path, string:message) -> void\n    §E{cw,fs:w}\n    Console.WriteLine(message)\n    File.AppendAllText(path, message)"
     },
     {
       "id": "task_36",
       "title": "GetFirstChar",
-      "calor": "§M{AgentReference36}\n  §F{GetFirstChar:pub} (str:s) -> char\n    §E{}\n    §Q (> (len s) 0)\n    §R (char-at s 0)"
+      "calor": "§M{AgentReference36}\n  §F{GetFirstChar:pub} (string:s) -> char\n    §E{}\n    §Q ((len s) > 0)\n    §R (char-at s 0)"
     },
     {
       "id": "task_37",
       "title": "StringContains",
-      "calor": "§M{AgentReference37}\n  §F{StringContains:pub} (str:s, str:sub) -> bool\n    §E{}\n    §R (contains s sub)"
+      "calor": "§M{AgentReference37}\n  §F{StringContains:pub} (string:s, string:sub) -> bool\n    §E{}\n    §R (contains s sub)"
     },
     {
       "id": "task_38",
       "title": "BuildGreeting",
-      "calor": "§M{AgentReference38}\n  §F{BuildGreeting:pub} (str:name) -> str\n    §E{alloc,mut}\n    §B{sb:StringBuilder} (sb-new)\n    (sb-append sb \"Hello, \")\n    (sb-append sb name)\n    (sb-append sb \"!\")\n    §R (sb-tostring sb)"
+      "calor": "§M{AgentReference38}\n  §F{BuildGreeting:pub} (string:name) -> string\n    §E{alloc,mut}\n    §B{sb:StringBuilder} (sb-new)\n    (sb-append sb \"Hello, \")\n    (sb-append sb name)\n    (sb-append sb \"!\")\n    §R (sb-tostring sb)"
     },
     {
       "id": "task_39",
       "title": "AllPositive",
-      "calor": "§M{AgentReference39}\n  §F{AllPositive:pub} ([i32]:arr, i32:n) -> bool\n    §Q (== n (len arr))\n    §S (-> result (forall ((i i32)) (-> (&& (>= i 0) (< i n)) (> arr{i} 0))))\n    §B{~allPos:bool} true\n    §L{i:0:(- (len arr) 1):1}\n      §IF (<= arr{i} 0)\n        §ASSIGN allPos false\n    §R allPos"
+      "calor": "§M{AgentReference39}\n  §F{AllPositive:pub} (int[]:arr, int:n) -> bool\n    §Q (n == (len arr))\n    §S (!(result) || !(exists ((i int)) (((i >= 0) && (i < n)) && (arr[i] <= 0))))\n    §B{~allPos:bool} true\n    §L{i:0:((len arr) - 1):1}\n      §IF (arr[i] <= 0)\n        §ASSIGN allPos false\n    §R allPos"
     },
     {
       "id": "task_40",
       "title": "HasNegative",
-      "calor": "§M{AgentReference40}\n  §F{HasNegative:pub} ([i32]:arr, i32:n) -> bool\n    §Q (== n (len arr))\n    §S (== result (exists ((i i32)) (&& (&& (>= i 0) (< i n)) (< arr{i} 0))))\n    §L{i:0:(- (len arr) 1):1}\n      §IF (< arr{i} 0)\n        §R true\n    §R false"
+      "calor": "§M{AgentReference40}\n  §F{HasNegative:pub} (int[]:arr, int:n) -> bool\n    §Q (n == (len arr))\n    §S (result == (exists ((i int)) (((i >= 0) && (i < n)) && (arr[i] < 0))))\n    §L{i:0:((len arr) - 1):1}\n      §IF (arr[i] < 0)\n        §R true\n    §R false"
     },
     {
       "id": "task_41",
       "title": "DigitValue",
-      "calor": "§M{AgentReference41}\n  §F{DigitValue:pub} (char:c) -> i32\n    §E{}\n    §Q (is-digit c)\n    §R (- c '0')"
+      "calor": "§M{AgentReference41}\n  §F{DigitValue:pub} (char:c) -> int\n    §E{}\n    §Q (is-digit c)\n    §R (c - '0')"
     },
     {
       "id": "task_42",
       "title": "Offset",
-      "calor": "§M{AgentReference42}\n  §F{Offset:pub} (char:c) -> i32\n    §E{}\n    §R (- c '0')"
+      "calor": "§M{AgentReference42}\n  §F{Offset:pub} (char:c) -> int\n    §E{}\n    §R (c - '0')"
     },
     {
       "id": "primer_contracts",
       "title": "Contracts",
-      "calor": "§M{Contracts}\n  §F{Square:pub} (i32:x) -> i32\n    §Q (>= x 0)\n    §S (>= result 0)\n    §R (* x x)\n\n  §F{Divide:pub} (i32:a, i32:b) -> i32\n    §Q{\"divisor must not be zero\"} (!= b 0)\n    §R (/ a b)"
+      "calor": "§M{Contracts}\n  §F{Square:pub} (int:x) -> int\n    §Q (x >= 0)\n    §S (result >= 0)\n    §R (x * x)\n\n  §F{Divide:pub} (int:a, int:b) -> int\n    §Q{\"divisor must not be zero\"} (b != 0)\n    §R (a / b)"
     },
     {
       "id": "primer_branching",
       "title": "Branching",
-      "calor": "§M{Branching}\n  §F{Sign:pub} (i32:x) -> i32\n    §IF (> x 0)\n      §R 1\n    §EI (< x 0)\n      §R (- 0 1)\n    §EL\n      §R 0"
+      "calor": "§M{Branching}\n  §F{Sign:pub} (int:x) -> int\n    §IF (x > 0)\n      §R 1\n    §EI (x < 0)\n      §R (-1)\n    §EL\n      §R 0"
     },
     {
       "id": "primer_files",
       "title": "Files",
-      "calor": "§M{Files}\n  §F{Append:pub} (str:path, str:key, str:value) -> void\n    §E{fs:w}\n    §C{File.AppendAllText} §A path §A (+ key (+ \"=\" (+ value \"\\n\"))) §/C\n\n  §F{CountLines:pub} (str:path) -> i32\n    §E{fs:r}\n    §B{ok:bool} §C{File.Exists} §A path §/C\n    §IF (! ok)\n      §R 0\n    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C\n    §R (len lines)"
+      "calor": "§M{Files}\n  §F{Append:pub} (string:path, string:key, string:value) -> void\n    §E{fs:w}\n    File.AppendAllText(path, (key + (\"=\" + (value + \"\\n\"))))\n\n  §F{CountLines:pub} (string:path) -> int\n    §E{fs:r}\n    §B{ok:bool} File.Exists(path)\n    §IF (!ok)\n      §R 0\n    §B{lines:string[]} File.ReadAllLines(path)\n    §R (len lines)"
     },
     {
       "id": "primer_strings",
       "title": "Strings",
-      "calor": "§M{Strings}\n  §F{FirstField:pub} (str:line) -> str\n    §E{}\n    §B{i:i32} (indexof line \",\" :ordinal)\n    §IF (< i 0)\n      §R line\n    §R (substr line 0 i)"
+      "calor": "§M{Strings}\n  §F{FirstField:pub} (string:line) -> string\n    §E{}\n    §B{i:int} (indexof line \",\" :ordinal)\n    §IF (i < 0)\n      §R line\n    §R (substr line 0 i)"
     },
     {
       "id": "primer_collections",
       "title": "Collections",
-      "calor": "§M{Collections}\n  §F{Tally:pub} (str:key) -> i32\n    §E{mut,alloc}\n    §DICT{counts:str:i32}\n    §/DICT\n    §PUT{counts} key 1\n    §R §IDX counts key"
+      "calor": "§M{Collections}\n  §F{Tally:pub} (string:key) -> int\n    §E{mut,alloc}\n    §DICT{counts:string:int}\n    §/DICT\n    §PUT{counts} key 1\n    §R counts[key]"
     },
     {
       "id": "primer_effects",
       "title": "Effects",
-      "calor": "§M{Effects}\n  §F{Greet:pub} (str:name) -> void\n    §E{cw}\n    §C{Console.WriteLine} §A \"Hello\" §/C\n    §C{Console.WriteLine} §A name §/C"
+      "calor": "§M{Effects}\n  §F{Greet:pub} (string:name) -> void\n    §E{cw}\n    Console.WriteLine(\"Hello\")\n    Console.WriteLine(name)"
     },
     {
       "id": "primer_loops",
       "title": "Loops",
-      "calor": "§M{Loops}\n  §F{PrintOneToFive:pub} () -> void\n    §E{cw}\n    §L{i:1:5:1}\n      §C{Console.WriteLine} §A i §/C"
+      "calor": "§M{Loops}\n  §F{PrintOneToFive:pub} () -> void\n    §E{cw}\n    §L{i:1:5:1}\n      Console.WriteLine(i)"
     },
     {
       "id": "primer_bindings",
       "title": "Bindings",
-      "calor": "§M{Bindings}\n  §F{Demo:pub} () -> void\n    §E{cw}\n    §B{greeting:str} \"Ada\"\n    §B{~count:i32} 0\n    §C{Console.WriteLine} §A greeting §/C\n    §C{Console.WriteLine} §A count §/C"
+      "calor": "§M{Bindings}\n  §F{Demo:pub} () -> void\n    §E{cw}\n    §B{greeting:string} \"Ada\"\n    §B{~count:int} 0\n    Console.WriteLine(greeting)\n    Console.WriteLine(count)"
     },
     {
       "id": "primer_classes",
       "title": "Classes",
-      "calor": "§M{Classes}\n  §CL{Greeter:pub}\n    §MT{Greet:pub} () -> str\n      §R \"hello\""
+      "calor": "§M{Classes}\n  §CL{Greeter:pub}\n    §MT{Greet:pub} () -> string\n      §R \"hello\""
     },
     {
       "id": "nested_arrays",
       "title": "Nested array expressions",
-      "calor": "§M{NestedArrayExpressions}\n  §F{SumPair:pub} ([i32]:data) -> i32\n    §E{}\n    §S (== result (+ §IDX data 0 §IDX data 1))\n    §B{~sum} 0\n    §ASSIGN sum (+ sum §IDX data 0)\n    §R (+ sum §IDX data 1)\n\n  §F{MixFirst:pub} ([i32]:data, i32:hash) -> i32\n    §E{}\n    §R (^ hash §IDX data 0)"
+      "calor": "§M{NestedArrayExpressions}\n  §F{SumPair:pub} (int[]:data) -> int\n    §E{}\n    §S (result == (data[0] + data[1]))\n    §B{~sum} 0\n    §ASSIGN sum (sum + data[0])\n    §R (sum + data[1])\n\n  §F{MixFirst:pub} (int[]:data, int:hash) -> int\n    §E{}\n    §R (hash ^ data[0])"
     },
     {
       "id": "complex_class",
       "title": "Class with Fields, Constructor + Operators",
-      "calor": "§M{PointModule}\n  §CL{Point:pub}\n    §FLD{i32:_x:priv}\n    §FLD{i32:_y:priv}\n\n    §CTOR{pub} (i32:x, i32:y)\n      §ASSIGN §THIS._x x\n      §ASSIGN §THIS._y y\n\n    §MT{Equals:pub} (Point:other) -> bool\n      §IF (== other null)\n        §R false\n      §EL\n        §R true\n\n    §OP{==:pub} (Point:left, Point:right) -> bool\n      §IF (== left null)\n        §R (== right null)\n      §EL\n        §R §C{left.Equals} §A right §/C\n\n    §OP{!=:pub} (Point:left, Point:right) -> bool\n      §R (! (== left right))"
+      "calor": "§M{PointModule}\n  §CL{Point:pub}\n    §FLD{int:_x:priv}\n    §FLD{int:_y:priv}\n\n    §CTOR{pub} (int:x, int:y)\n      §ASSIGN §THIS._x x\n      §ASSIGN §THIS._y y\n\n    §MT{Equals:pub} (Point:other) -> bool\n      §IF (other == null)\n        §R false\n      §EL\n        §R true\n\n    §OP{==:pub} (Point:left, Point:right) -> bool\n      §IF (left == null)\n        §R (right == null)\n      §EL\n        §R left.Equals(right)\n\n    §OP{!=:pub} (Point:left, Point:right) -> bool\n      §R (!(left == right))"
     },
     {
       "id": "complex_async",
       "title": "Async Method with Try/Catch",
-      "calor": "§M{ConvertedModule}\n  §U{System}\n  §U{System.Threading.Tasks}\n\n  §CL{DataService:pub}\n    §AMT{FetchAsync:pub} (str:url) -> str\n      §TR\n        §B{_} §AWAIT §C{Task.Delay} §A 100 §/C\n        §R (+ \"data from \" url)\n      §CA{Exception:ex}\n        §R (+ \"error: \" ex.Message)"
+      "calor": "§M{ConvertedModule}\n  §U{System}\n  §U{System.Threading.Tasks}\n\n  §CL{DataService:pub}\n    §AMT{FetchAsync:pub} (string:url) -> string\n      §TR\n        §B{_} §AWAIT Task.Delay(100)\n        §R (\"data from \" + url)\n      §CA{Exception:ex}\n        §R (\"error: \" + ex.Message)"
     },
     {
       "id": "complex_enum",
       "title": "Enum with Switch/Match",
-      "calor": "§M{ConvertedModule}\n  §EN{Status}\n    Pending\n    Active\n    Suspended\n    Closed\n\n  §CL{StatusHelper:pub}\n    §MT{GetLabel:pub:stat} (Status:s) -> str\n      §R §W s\n        §K Status.Pending → \"Pending Review\"\n        §K Status.Active → \"Active\"\n        §K Status.Suspended → \"Temporarily Suspended\"\n        §K Status.Closed → \"Closed\"\n        §K _ → \"Unknown\""
+      "calor": "§M{ConvertedModule}\n  §EN{Status}\n    Pending\n    Active\n    Suspended\n    Closed\n\n  §CL{StatusHelper:pub}\n    §MT{GetLabel:pub:stat} (Status:s) -> string\n      §R §W s\n        §K Status.Pending → \"Pending Review\"\n        §K Status.Active → \"Active\"\n        §K Status.Suspended → \"Temporarily Suspended\"\n        §K Status.Closed → \"Closed\"\n        §K _ → \"Unknown\""
     },
     {
       "id": "complex_yield",
       "title": "Yield Iterator",
-      "calor": "§M{ConvertedModule}\n  §U{System.Collections.Generic}\n\n  §CL{NumberGen:pub}\n    §MT{GetEvens:pub} (i32:max) -> Seq<i32>\n      §L{i:0:max:2}\n        §YIELD i"
+      "calor": "§M{ConvertedModule}\n  §U{System.Collections.Generic}\n\n  §CL{NumberGen:pub}\n    §MT{GetEvens:pub} (int:max) -> IEnumerable<int>\n      §L{i:0:max:2}\n        §YIELD i"
     },
     {
       "id": "complete_objects",
       "title": "objects",
-      "calor": "§M{Objects}\n  §CL{Person:pub}\n    §PROP{Name:str:pub:get,set}\n  §F{Create:pub} () -> Person\n    §E{alloc}\n    §R §NEW{Person} §/NEW\n  §F{ReadName:pub} (Person:person) -> ?str\n    §R (?. person Name)"
+      "calor": "§M{Objects}\n  §CL{Person:pub}\n    §PROP{Name:string:pub:get,set}\n  §F{Create:pub} () -> Person\n    §E{alloc}\n    §R §NEW{Person} §/NEW\n  §F{ReadName:pub} (Person:person) -> string?\n    §R person?.Name"
     },
     {
       "id": "complete_indexer",
       "title": "indexer",
-      "calor": "§M{Indexers}\n  §CL{Numbers:pub}\n    §IXER{i32:pub}\n      §I{i32:index}\n      §GET\n        §R (+ index 1)"
+      "calor": "§M{Indexers}\n  §CL{Numbers:pub}\n    §IXER{int:pub}\n      §I{int:index}\n      §GET\n        §R (index + 1)"
     },
     {
       "id": "complete_invariant",
       "title": "invariant",
-      "calor": "§M{Invariants}\n  §IV (> 1 0)\n  §F{Read:pub} () -> i32\n    §R 1"
+      "calor": "§M{Invariants}\n  §IV (1 > 0)\n  §F{Read:pub} () -> int\n    §R 1"
     },
     {
       "id": "complete_interface",
       "title": "interface",
-      "calor": "§M{Interfaces}\n  §IFACE{ICounter}\n    §MT{Count:pub} () -> i32\n  §CL{Counter:pub}\n    §IMPL{ICounter}\n    §MT{Count:pub} () -> i32\n      §R 1"
+      "calor": "§M{Interfaces}\n  §IFACE{ICounter}\n    §MT{Count:pub} () -> int\n  §CL{Counter:pub}\n    §IMPL{ICounter}\n    §MT{Count:pub} () -> int\n      §R 1"
     },
     {
       "id": "complete_using",
       "title": "using",
-      "calor": "§M{Resources}\n  §F{Read:pub} (str:value) -> str\n    §E{alloc}\n    §USE{reader:System.IO.StringReader} §NEW{System.IO.StringReader} §A value §/NEW\n      §R §C{reader.ReadToEnd} §/C"
+      "calor": "§M{Resources}\n  §F{Read:pub} (string:value) -> string\n    §E{alloc}\n    §USE{reader:System.IO.StringReader} §NEW{System.IO.StringReader} §A value §/NEW\n      §R reader.ReadToEnd()"
     },
     {
       "id": "complete_linq",
       "title": "linq",
-      "calor": "§M{Queries}\n  §U{System.Linq}\n  §F{Positive:pub} ([i32]:values) -> [i32]\n    §E{alloc}\n    §B{predicate:Func<i32,bool>} §LAM{x:i32} (> x 0) §/LAM\n    §B{filtered:IEnumerable<i32>} §C{System.Linq.Enumerable.Where} §A values §A predicate §/C\n    §R §C{System.Linq.Enumerable.ToArray} §A filtered §/C"
+      "calor": "§M{Queries}\n  §U{System.Linq}\n  §F{Positive:pub} (int[]:values) -> int[]\n    §E{alloc}\n    §B{predicate:Func<int,bool>} §E{} §LAM{x:int} §E{} (x > 0) §/LAM\n    §B{filtered:IEnumerable<int>} System.Linq.Enumerable.Where<int>(values, predicate)\n    §R §C{System.Linq.Enumerable.ToArray<int>} §A filtered §/C"
     },
     {
       "id": "complete_interpolation",
       "title": "interpolation",
-      "calor": "§M{Interpolation}\n  §F{Greet:pub} (str:name) -> str\n    §R \"Hello ${name}\""
+      "calor": "§M{Interpolation}\n  §F{Greet:pub} (string:name) -> string\n    §R \"Hello ${name}\""
     },
     {
       "id": "complete_break_continue",
       "title": "break continue",
-      "calor": "§M{LoopControl}\n  §F{FirstPositive:pub} ([i32]:values) -> i32\n    §E{}\n    §B{~answer:i32} 0\n    §EACH{value:i32} values\n      §IF (<= value 0)\n        §CN\n      §ASSIGN answer value\n      §BK\n    §R answer"
+      "calor": "§M{LoopControl}\n  §F{FirstPositive:pub} (int[]:values) -> int\n    §E{}\n    §B{~answer:int} 0\n    §EACH{value:int} values\n      §IF (value <= 0)\n        §CN\n      §ASSIGN answer value\n      §BK\n    §R answer"
     },
     {
       "id": "complete_inheritance",
       "title": "inheritance",
-      "calor": "§M{Inheritance}\n  §CL{Base:pub:abs}\n    §MT{Read:pub:abs} () -> i32\n    §MT{Label:pub:virt} () -> str\n      §R \"base\"\n  §CL{Derived:pub:seal}\n    §EXT{Base}\n    §MT{Read:pub:over} () -> i32\n      §R 7\n    §MT{Label:pub:over} () -> str\n      §R \"derived\""
+      "calor": "§M{Inheritance}\n  §CL{Base:pub:abs}\n    §MT{Read:pub:abs} () -> int\n    §MT{Label:pub:virt} () -> string\n      §R \"base\"\n  §CL{Derived:pub:seal}\n    §EXT{Base}\n    §MT{Read:pub:over} () -> int\n      §R 7\n    §MT{Label:pub:over} () -> string\n      §R \"derived\""
     },
     {
       "id": "complete_sync",
       "title": "sync",
-      "calor": "§M{Synchronization}\n  §F{Read:pub} (object:gate) -> i32\n    §SYNC (gate)\n      §R 7"
+      "calor": "§M{Synchronization}\n  §F{Read:pub} (object:gate) -> int\n    §SYNC (gate)\n      §R 7"
     },
     {
       "id": "complete_documentation",
       "title": "documentation",
-      "calor": "§M{Documentation}\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  §F{Read:pub} () -> i32\n    §DP{Use ReadCurrent instead}\n    §R 7\n  §F{ReadCurrent:priv} () -> i32\n    §R 8"
+      "calor": "§M{Documentation}\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  §F{Read:pub} () -> int\n    §DP{Use ReadCurrent instead}\n    §R 7\n  §F{ReadCurrent:priv} () -> int\n    §R 8"
     },
     {
       "id": "complete_decimal",
       "title": "decimal",
-      "calor": "§M{Decimals}\n  §F{Price:pub} () -> dec\n    §R DECIMAL:18.00"
+      "calor": "§M{Decimals}\n  §F{Price:pub} () -> decimal\n    §R 18.00m"
     },
     {
       "id": "complete_preprocessor",
       "title": "preprocessor",
-      "calor": "§M{Preprocessor}\n  §F{Mode:pub} () -> str\n    §PP{DEBUG}\n      §R \"debug\"\n    §PPE\n      §R \"release\""
+      "calor": "§M{Preprocessor}\n  §F{Mode:pub} () -> string\n    §PP{DEBUG}\n      §R \"debug\"\n    §PPE\n      §R \"release\""
     },
     {
       "id": "complete_struct",
       "title": "struct",
-      "calor": "§M{Values}\n  §CL{Point:pub:struct}[@Serializable]\n    §PROP{X:i32:pub:get,set}"
+      "calor": "§M{Values}\n  §CL{Point:pub:struct}[@Serializable]\n    §PROP{X:int:pub:get,set}"
     },
     {
       "id": "complete_partial",
       "title": "partial",
-      "calor": "§M{PartialTypes}\n  §CL{Counter:pub:partial}\n    §MT{Read:pub} () -> i32\n      §R 1"
+      "calor": "§M{PartialTypes}\n  §CL{Counter:pub:partial}\n    §MT{Read:pub} () -> int\n      §R 1"
     },
     {
       "id": "complete_unsafe",
       "title": "unsafe",
-      "calor": "§M{UnsafeCode}\n  §F{Size:pub} () -> i32\n    §E{unsafe}\n    §UNSAFE\n      §R 4"
+      "calor": "§M{UnsafeCode}\n  §F{Size:pub} () -> int\n    §E{unsafe}\n    §UNSAFE\n      §R 4"
     },
     {
       "id": "complete_nullable",
       "title": "nullable",
-      "calor": "§M{NullableValues}\n  §F{DefaultName:pub} (?str:name) -> str\n    §B{~value:?str} name\n    §IF (== value null)\n      §ASSIGN value \"unknown\"\n    §R (?? value \"unknown\")"
+      "calor": "§M{NullableValues}\n  §F{DefaultName:pub} (string?:name) -> string\n    §B{~value:string?} name\n    §IF (value == null)\n      §ASSIGN value \"unknown\"\n    §R (value ?? \"unknown\")"
     },
     {
       "id": "complete_patterns",
       "title": "patterns",
-      "calor": "§M{Patterns}\n  §F{InRange:pub} (i32:value) -> bool\n    §R (&& (> value 0) (< value 100))"
+      "calor": "§M{Patterns}\n  §F{InRange:pub} (int:value) -> bool\n    §R ((value > 0) && (value < 100))"
     },
     {
       "id": "complete_tuples",
       "title": "tuples",
-      "calor": "§M{Tuples}\n  §F{Pair:pub} (i32:value) -> (i32, str)\n    §R (value, \"value\")"
+      "calor": "§M{Tuples}\n  §F{Pair:pub} (int:value) -> (int, string)\n    §R (value, \"value\")"
     },
     {
       "id": "complete_goto",
       "title": "goto",
-      "calor": "§M{Jumps}\n  §F{Normalize:pub} (i32:value) -> i32\n    §W value\n      §K 0\n        §GOTO{CASE:1}\n      §K 1\n        §R 1\n      §K _\n        §R 0"
+      "calor": "§M{Jumps}\n  §F{Normalize:pub} (int:value) -> int\n    §W value\n      §K 0\n        §GOTO{CASE:1}\n      §K 1\n        §R 1\n      §K _\n        §R 0"
     },
     {
       "id": "complete_ranges",
       "title": "array ranges",
-      "calor": "§M{ArrayRanges}\n  §F{FirstTwo:pub} ([i32]:values) -> [i32]\n    §R §IDX{values} §RANGE 0 2\n"
+      "calor": "§M{ArrayRanges}\n  §F{FirstTwo:pub} (int[]:values) -> int[]\n    §R values[§RANGE 0 2]"
+    },
+    {
+      "id": "complete_postfix",
+      "title": "Expression-valued call target with an explicit pure delegate row",
+      "calor": "§M{PostfixCalls}\n  §F{Apply:pub} (Holder:h) -> int\n    §E{}\n    §R h.Make()(41)\n  §CL{Holder:pub}\n    §MT{Make:pub} () -> Func<int,int> §E{}\n      §E{}\n      §R §LAM{x:int} §E{} (x + 1) §/LAM"
     }
   ],
   "primer": {
-    "introduction": "# Calor syntax exemplar (reference sheet)\n\nCalor is an indentation-only DSL (2 spaces per level, Python-style) that compiles\n<!-- drift:ignore -->\nto C#. **Never write structural closer tags** (`§/M`, `§/F`, `§/IF`, `§/WH`,\n`§/EACH`, ... are hard errors); blocks end by dedent. Value delimiters remain where documented: calls (`§/C`), block lambdas\n(`§/LAM`), constructors (`§/NEW`), empty collection literals, and the do-while\ncondition carried by `§/DO`. Structural blocks end at dedent.\n\nEvery complete `§M{...}` program in the \"Complete programs\" section below compiles\n(the compiler's own tests prove it); the reference blocks show the shape of each\nconstruct, and every idiom in them is exercised by one of those programs.\n\n## Core tags\n\n```\n§M{Name}                     Module\n§F{Name:pub} (str:x) -> str  Function, inline signature (priv = private)\n§E{}                            Effects: §E{} pure; fs:r, fs:w, fs:rw file I/O;\n                                mut collection/heap mutation; cw console; comma-join\n§B{name:str} expr               Immutable binding (type annotation optional: §B{name})\n§B{~name:i32} 0                 Mutable binding (~ prefix required to reassign)\n§ASSIGN name expr               Reassign a mutable binding\n§Q (pre)  §S (post)             Precondition / postcondition (post can use `result`)\n§R expr                         Return (bare §R for void)\n§P expr                         Print line\n§IF (cond) / §EI (cond) / §EL   If / else-if / else (§EI/§EL at §IF's column)\n§WH (cond)                  While loop\n§L{i:0:9:1}                  For loop, i from 0 to 9 step 1 (inclusive)\n§EACH{x} coll                Foreach over list/array\n§EACHKV{k:v} dict            Foreach over dictionary\n```\n\nExpressions are prefix s-expressions: `(+ a b)`, `(== a b)`, `(&& p q)`, `(! p)`,\n`(< i n)`, `(% n 3)`. String `+` concatenates. Typed literals when needed:\n`INT:42`, `STR:\"hi\"`, `BOOL:true`. Escapes in strings: `\\\"`, `\\n`, `\\r`.\n\n## Calls\n\n```\n§C{Obj.Method} §A arg1 §A arg2 §/C     each arg prefixed §A, closed with §/C\n§B{lines:[str]} §C{File.ReadAllLines} §A path §/C\n§C{File.AppendAllText} §A path §A (+ key (+ \"=\" (+ value \"\\n\"))) §/C\n§B{ok:bool} §C{File.Exists} §A path §/C\n§B{n:i32} §C{LocalFunc} §A x §/C       user functions are called the same way\n```\n\n## Strings (prefix ops, not method calls)\n\n```\n(len s)                 s.Length            (substr s start count)   s.Substring\n(contains s sub)        s.Contains          (indexof s sub :ordinal) s.IndexOf\n(starts s pre)          s.StartsWith        (replace s old new)      s.Replace\n(trim s)  (upper s)  (lower s)  (equals a b)  (ends s suf)\n§B{c:str} (substr line i 1)      // single char at i, as a str\n```\n\n## Lists and dictionaries\n\n```\n§LIST{items:str}          empty list literal — close the empty form with §/LIST\n§/LIST\n§PUSH{items} x            items.Add(x)         [needs mut effect]\n§B{n:i32} §CNT{items}     items.Count\n§B{e:str} §IDX items i    items[i]\n§IF (! §HAS{items} k)   Contains check (dict key: §HAS{d} §KEY k)\n§DICT{ages:str:i32}       empty dict literal\n§/DICT\n§PUT{ages} k v            ages[k] = v          [needs mut effect]\n```\n\nA function whose body mutates a collection (`§PUSH`, `§PUT`, `§SETIDX`) must\ndeclare `mut` in `§E{...}`; file reads/writes need `fs:r` / `fs:w` / `fs:rw`.\nCallers must declare (at least) the union of their callees' effects.\n\n**Arrays vs lists (common trap):** `File.ReadAllLines` returns an ARRAY — bind it\nas `[str]`. Do NOT copy `[str]` into signatures that require `List<str>`; match\nthe type the surrounding surface declares.\n\n",
+    "introduction": "# Calor syntax exemplar (reference sheet)\n\nCalor compiles to C# on .NET 10. Indent bodies two spaces; structural blocks end at dedent.\n<!-- drift:ignore -->\nNever write structural closers such as `§/M`, `§/F`, `§/IF`, `§/WH` or `§/EACH`.\nThe current staged headers below keep their existing field order, without source IDs.\nConstructors, block lambdas and collection literals retain their documented value delimiters;\n`§/DO` carries the do-while condition. Ordinary calls need only parentheses, not call tags.\n\nEvery complete `§M{...}` program in the \"Complete programs\" section below compiles\n(the compiler's own tests prove it). The fragments summarize these supported forms.\n\n## Core tags\n\n```\n§M{Name}                             Module\n§F{Name:pub} (string:x) -> string     Inline function signature (priv = private)\n§E{}                                 Pure; cw console write; fs:r/fs:w file I/O;\n                                     mut collection/heap mutation; alloc allocation\n§B{name:string} expr                 Immutable (type optional: §B{name})\n§B{~name:int} 0                      Mutable (~ prefix required to reassign)\n§ASSIGN name expr                    All updates, including increments\n§Q condition / §S condition          Precondition / postcondition (result = return value)\n§R expr                              Return (bare §R for void)\n§P expr                              Print line\n§IF (cond) / §EI (cond) / §EL         Indented if / else-if / else branches\n§WH (cond)                           While\n§L{i:0:9:1}                          Inclusive snapshot range, 0 to 9 step 1\n§EACH{x} collection                  Foreach (optional item type)\n§EACHKV{k:v} dictionary              Key/value foreach\n```\n\nExpressions use infix operators with C# precedence: `a + b`, `a == b`, `p && q`,\n`!p`, `i < n`, `n % 3`, `value ?? fallback`, `condition ? yes : no`.\nBinary operators associate left; `??` and `?:` associate right. Boolean operators\nshort circuit. Use `!condition || consequence` for implication, not a special operator.\nNewlines end expressions. Group infix values in whitespace-separated staged hosts.\nUse C# type names, `T[]` arrays, `T?` nullability and literals such as `42`, `true`,\n`\"hi\"`, `18.00m` and `1.5f`. Escapes include `\\\"`, `\\n`, `\\r`.\nPlain strings interpolate `\"Hello ${name}\"`; `\"\\${0}\"` keeps literal placeholder text.\nUse nullability and exceptions for absence/failure, not dedicated Option/Result forms.\n\n## Calls\n\n```\nObj.Method(arg1, arg2)                     Postfix call; comma-separated arguments\n§B{lines:string[]} File.ReadAllLines(path)\nFile.AppendAllText(path, key + \"=\" + value + \"\\n\")\n§B{ok:bool} File.Exists(path)\n§B{n:int} LocalFunc(x)                     User functions use the same call syntax\n```\n\nCallees may be expressions; calls, member access and indexing can chain.\nOnly methods use parentheses; property/field reads use `obj.Property`.\nBind local helpers to typed `§LAM{...} body §/LAM` values, not nested `§F` declarations.\n\n## Strings (staged built-ins)\n\n```\n(len s)                 s.Length            (substr s start count)   s.Substring\n(contains s sub)        s.Contains          (indexof s sub :ordinal) s.IndexOf\n(starts s pre)          s.StartsWith        (replace s old new)      s.Replace\n(trim s)  (upper s)  (lower s)  (equals a b)  (ends s suffix)\n§B{c:string} (substr line i 1)               One-character string, not a char\n```\n\nThese named built-ins retain prefix operands during integration; they are not\narithmetic operators or ordinary method names. Do not invent extra arguments.\n\n## Lists and dictionaries\n\n```\n§LIST{items:string}                   Empty list; close with §/LIST\n§/LIST\n§PUSH{items} x                        Append [needs mut]\n§B{n:int} §CNT{items}                Count\n§B{element:string} items[i]          Index\n§DICT{ages:string:int}               Empty dictionary\n§/DICT\n§PUT{ages} k v                        Upsert ages[k] = v [needs mut]\n```\n\nFunctions that mutate collections (`§PUSH`, `§PUT`, `§SETIDX`) declare `mut`;\nallocation needs `alloc`; file I/O needs `fs:r` / `fs:w` / `fs:rw`.\nCallers declare at least the union of their callees' effects. Unknown effects are not purity proofs.\nArrays and lists differ: `File.ReadAllLines` returns `string[]`, not `List<string>`.\n\n",
     "programs": [
       "primer_contracts",
       "primer_branching",
@@ -2336,10 +2375,10 @@
       "primer_bindings",
       "primer_classes"
     ],
-    "mistakes": "## Common mistakes (these do NOT compile — shown so you avoid them)\n\n```\n<!-- drift:ignore -->\n§/F §/M §/I §/L       removed; use indentation only (a block ends on dedent)\n<!-- drift:ignore -->\n§S (>= §RESULT 0)     wrong; the return value is lowercase: §S (>= result 0)\n§IF                  wrong; §IF needs a condition, such as §IF (> x 0)\n§IF{i1}{x > 0}        wrong; the condition goes in (parens), not braces\n<!-- drift:ignore -->\n§K   §ELSE            no such keywords; else is §EL, else-if is §EI (no id)\n§F{f1:Add:i32:pub}    wrong; a 4-field header drops the return type. Use:\n                     §F{Add:pub} (i32:a, i32:b) -> i32\n```\n\nEffects: `§E{cw}` declares console write; declare effects on any function that\nperforms I/O. See the `calor://effects` resource for the full effect catalog.\n"
+    "mistakes": "## Common mistakes (these do NOT compile — shown so you avoid them)\n\n```\n<!-- drift:ignore -->\n§/F §/M §/I §/L       removed; use indentation only (a block ends on dedent)\n<!-- drift:ignore -->\n§S (§RESULT >= 0)     wrong; the return value is lowercase: §S (result >= 0)\n§IF                  wrong; §IF needs a condition, such as §IF (x > 0)\n§IF{i1}{x > 0}        wrong; the condition goes in (parens), not braces\n<!-- drift:ignore -->\n§K   §ELSE            no such keywords; else is §EL, else-if is §EI (no id)\n§F{f1:Add:int:pub}    wrong; the obsolete ID-bearing header is rejected. Use:\n                     §F{Add:pub} (int:a, int:b) -> int\n```\n\nEffects: `§E{cw}` declares console write; declare effects on any function that\nperforms I/O. See the `calor://effects` resource for the full effect catalog.\n"
   },
   "catalogs": {
-    "type-mappings.md": "# C# → Calor Type Mappings\n\n| C# Type | Calor Type | Notes |\n|---------|------------|-------|\n| `int` | `i32` | 32-bit signed integer |\n| `long` | `i64` | 64-bit signed integer |\n| `short` | `i16` | 16-bit signed integer |\n| `byte` | `u8` | 8-bit unsigned integer |\n| `float` | `f32` | 32-bit floating point |\n| `double` | `f64` | 64-bit floating point |\n| `decimal` | `dec` | 128-bit decimal |\n| `string` | `str` | UTF-16 string |\n| `bool` | `bool` | Boolean |\n| `char` | `char` | Unicode character |\n| `void` | `void` | No return value |\n| `object` | `object` | Base type |\n| `int?` / `Nullable<int>` | `?i32` | Nullable value |\n| `Task<T>` | use `§AF`/`§AMT` | Async function/method |\n| `List<T>` | `§LIST{name:type}` | List collection |\n| `Dictionary<K,V>` | `§DICT{name:key:val}` | Dictionary collection |\n| `HashSet<T>` | `§HSET{name:type}` | HashSet collection |\n",
+    "type-mappings.md": "# C# types in Calor\n\nUse the same C# names: `int`, `long`, `short`, `sbyte`, `byte`, `ushort`, `uint`,\n`ulong`, `float`, `double`, `decimal`, `string`, `bool`, `char`, `object`, `void`.\nArrays use `T[]` (jagged arrays: `T[][]`); nullable values/references use `T?`.\nUse ordinary .NET generic types such as `List<T>`, `Dictionary<K,V>`, `HashSet<T>`,\n`IEnumerable<T>`, `Task<T>` and `Func<T,R>`, not dedicated absence/failure types.\nAsync functions and methods use the currently implemented `§AF` / `§AMT` headers.\n\nTypes and value construction are distinct: `§LIST{name:type}`, `§DICT{name:key:val}`\nand `§HSET{name:type}` bind collection values; their headers are not type names.\n`File.ReadAllLines(path)` returns `string[]`, not `List<string>`.\n",
     "effects.json": {
       "effects": [
         {

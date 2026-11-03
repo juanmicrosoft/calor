@@ -14,7 +14,7 @@ Rule 2: Convert C# to Calor before modifying: use `calor_convert`, then edit the
 Rule 3: Never edit generated files (`.g.cs`).
 Rule 4: Compile after writing with `calor_compile` (autoFix is on by default); apply diagnostics and verify contracts with `calor_verify`.
 
-Indent bodies two spaces. Structural blocks end at dedent. Bindings put the name before the type; prefix mutable names with `~`. Use indented conditional branches and inline function signatures. Expressions use prefix notation; section expressions can nest inside them. Use nullable .NET types and exceptions for absence and failure. Do not handwrite raw C# passthrough; the converter owns fallback output.
+Indent bodies two spaces. Structural blocks end at dedent. Keep the current documented section headers and field order; source declarations have no IDs. Bindings put the name before the type; prefix mutable names with `~` and update them with `§ASSIGN`. Use indented conditional branches and inline function signatures. Expressions use infix operators with C# precedence, postfix calls `f(x)`, and indexing `items[i]`. Use C# type names, `T[]` arrays, `T?` nullable types, and exceptions for absence and failure. Plain strings interpolate `${expression}`; `\${0}` preserves literal placeholder text. Staged constructors and block lambdas keep their documented delimiters. Do not handwrite raw C# passthrough; the converter owns fallback output.
 
 Read `calor://effects` for effect codes, `calor://tags` for syntax, `calor://id-prefixes` for tooling-owned identity, and `calor://workflows` for editing workflows. Use `calor_file_write` for atomic checked edits; for multi-file edits use `calor_session_open` and `calor_session_close`.
 

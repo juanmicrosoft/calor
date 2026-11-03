@@ -98,6 +98,19 @@ public class SyntaxLookupToolTests
         Assert.Contains("examples", json);
     }
 
+    [Theory]
+    [InlineData("method call", "target(arg1, arg2)")]
+    [InlineData("null coalescing", "left ?? fallback")]
+    [InlineData("postfix", "h.Make()(41)")]
+    [InlineData("primitive types", "int, long, short")]
+    public async Task ExecuteAsync_CurrentMeasuredSyntax_RemainsQueryable(string query, string expected)
+    {
+        var args = JsonSerializer.SerializeToElement(new { query });
+        var result = await _tool.ExecuteAsync(args);
+        Assert.False(result.IsError);
+        Assert.Contains(expected, result.Content[0].Text);
+    }
+
     [Fact]
     public async Task ExecuteAsync_ForLoop_ReturnsMatch()
     {

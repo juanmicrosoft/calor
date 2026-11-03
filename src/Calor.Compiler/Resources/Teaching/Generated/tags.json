@@ -11,7 +11,7 @@
       "open": "§B{name} value or §B{~name} value (mutable)",
       "close": "(none)",
       "tag": "§B",
-      "description": "Declares a variable binding. Use ~ prefix for mutable variables. Immutable by default. Give null an explicit existing nullable type, such as ?str.",
+      "description": "Declares a variable binding. Use ~ prefix for mutable variables. Immutable by default. Give null an explicit existing nullable type, such as string?.",
       "csharpEquivalent": "var count = 0;\nint mutableCount = 0; // needs to be modified later\nstring name = \"John\";\nstring? name = null;"
     },
     {
@@ -330,32 +330,32 @@
       "csharpEquivalent": "where T : constraint"
     },
     {
-      "open": "(?? left right)",
+      "open": "left ?? fallback",
       "close": "(none)",
       "tag": "§??",
-      "description": "Legacy null-coalescing syntax. Prefer Lisp-style (?? left right) for null-coalescing.",
+      "description": "Legacy tag lookup retained; author infix null-coalescing: left ?? fallback.",
       "csharpEquivalent": "expression ?? default"
     },
     {
-      "open": "(?. target Member)",
+      "open": "target?.Member",
       "close": "(none)",
       "tag": "§?.",
-      "description": "Null-conditional member access in Lisp prefix notation. Returns null if target is null, otherwise accesses Member.",
+      "description": "Legacy tag lookup retained; author postfix null-conditional member access.",
       "csharpEquivalent": "target?.Member"
     },
     {
       "open": "Prefer inline string interpolation: \"literal ${expr} literal\"",
       "close": "(none)",
       "tag": "§INTERP",
-      "description": "Builds an interpolated string from literal parts and §EXP expression parts. Strings are opaque — expressions cannot be embedded inside quotes. Use separate \"literal\" and §EXP expr parts.",
+      "description": "Plain strings interpolate ${expression}, including numeric expressions. Escape \\${0} for literal placeholder text. The legacy section form uses separate literal and §EXP parts.",
       "csharpEquivalent": "$\"literal{expr}literal\""
     },
     {
-      "open": "§C{method} §A arg1 §A arg2 §/C",
+      "open": "§C{target<T>} §A arg §/C",
       "close": "§/C",
       "tag": "§C",
-      "description": "Calls a method or function. Each argument uses §A; §/C delimits nested argument lists.",
-      "csharpEquivalent": "Console.WriteLine(\"Hello\");\nuser.Save();\nCalculate(x, y) // internal pure call"
+      "description": "Compatibility call form retained during parser/metadata integration. Prefer postfix calls. The LINQ example keeps this bridge for ToArray because its native postfix form currently lacks authoritative effect resolution; do not relax effect policy to work around that boundary.",
+      "csharpEquivalent": "System.Linq.Enumerable.ToArray<int>(filtered)"
     },
     {
       "open": "§U{namespace} or §U{alias:namespace}",
@@ -368,7 +368,7 @@
       "open": "§B{items} §ARR{type} elements §/ARR",
       "close": "§/ARR",
       "tag": "§ARR",
-      "description": "Creates and initializes a fixed-size array. The element type is specified in the header. Elements are space-separated between the opening and closing tags. Supports both explicit (new int[] { ... }) and bare ({ ... }) initializer syntax.",
+      "description": "Creates a fixed-size array with a typed §ARR value literal. Elements are whitespace-separated; group infix elements explicitly. The documented bare closer remains part of this staged literal form.",
       "csharpEquivalent": "int[] numbers = { 5, 4, 1, 3 };\nvar items = new int[] { 1, 2, 3 };\nstring[] names = new[] { \"Alice\", \"Bob\" };"
     },
     {
@@ -438,7 +438,7 @@
       "open": "§OP{operator:vis} (type:param, ...) -> returnType",
       "close": "(none)",
       "tag": "§OP",
-      "description": "Defines an operator overload for a class or struct. Supports binary operators (+, -, *, /, ==, etc.), unary operators (-, !, ~, ++, --), and conversion operators (implicit, explicit).",
+      "description": "Defines an operator overload using the supported arithmetic, comparison, equality or unary operators. Updates still use §ASSIGN; do not author increment/decrement or compound assignment expressions.",
       "csharpEquivalent": "public static MyType operator+(MyType left, MyType right) { return new MyType(left.Value + right.Value); }\npublic static MyType operator-(MyType value) { return new MyType(-value.Value); }\npublic static implicit operator int(MyType value) { return value.Value; }\npublic static explicit operator MyType(int value) { return new MyType(value); }"
     },
     {
@@ -466,7 +466,7 @@
       "open": "§A expression",
       "close": "(none)",
       "tag": "§A",
-      "description": "Marks an argument in inline calls or constructors.",
+      "description": "Marks a constructor or staged section-call argument. Ordinary calls use comma-separated arguments inside parentheses.",
       "csharpEquivalent": "Type name"
     },
     {

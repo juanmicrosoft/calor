@@ -2,149 +2,157 @@
 
 # Calor syntax exemplar (reference sheet)
 
-Calor is an indentation-only DSL (2 spaces per level, Python-style) that compiles
+Calor compiles to C# on .NET 10. Indent bodies two spaces; structural blocks end at dedent.
 <!-- drift:ignore -->
-to C#. **Never write structural closer tags** (`§/M`, `§/F`, `§/IF`, `§/WH`,
-`§/EACH`, ... are hard errors); blocks end by dedent. Value delimiters remain where documented: calls (`§/C`), block lambdas
-(`§/LAM`), constructors (`§/NEW`), empty collection literals, and the do-while
-condition carried by `§/DO`. Structural blocks end at dedent.
+Never write structural closers such as `§/M`, `§/F`, `§/IF`, `§/WH` or `§/EACH`.
+The current staged headers below keep their existing field order, without source IDs.
+Constructors, block lambdas and collection literals retain their documented value delimiters;
+`§/DO` carries the do-while condition. Ordinary calls need only parentheses, not call tags.
 
 Every complete `§M{...}` program in the "Complete programs" section below compiles
-(the compiler's own tests prove it); the reference blocks show the shape of each
-construct, and every idiom in them is exercised by one of those programs.
+(the compiler's own tests prove it). The fragments summarize these supported forms.
 
 ## Core tags
 
 ```
-§M{Name}                     Module
-§F{Name:pub} (str:x) -> str  Function, inline signature (priv = private)
-§E{}                            Effects: §E{} pure; fs:r, fs:w, fs:rw file I/O;
-                                mut collection/heap mutation; cw console; comma-join
-§B{name:str} expr               Immutable binding (type annotation optional: §B{name})
-§B{~name:i32} 0                 Mutable binding (~ prefix required to reassign)
-§ASSIGN name expr               Reassign a mutable binding
-§Q (pre)  §S (post)             Precondition / postcondition (post can use `result`)
-§R expr                         Return (bare §R for void)
-§P expr                         Print line
-§IF (cond) / §EI (cond) / §EL   If / else-if / else (§EI/§EL at §IF's column)
-§WH (cond)                  While loop
-§L{i:0:9:1}                  For loop, i from 0 to 9 step 1 (inclusive)
-§EACH{x} coll                Foreach over list/array
-§EACHKV{k:v} dict            Foreach over dictionary
+§M{Name}                             Module
+§F{Name:pub} (string:x) -> string     Inline function signature (priv = private)
+§E{}                                 Pure; cw console write; fs:r/fs:w file I/O;
+                                     mut collection/heap mutation; alloc allocation
+§B{name:string} expr                 Immutable (type optional: §B{name})
+§B{~name:int} 0                      Mutable (~ prefix required to reassign)
+§ASSIGN name expr                    All updates, including increments
+§Q condition / §S condition          Precondition / postcondition (result = return value)
+§R expr                              Return (bare §R for void)
+§P expr                              Print line
+§IF (cond) / §EI (cond) / §EL         Indented if / else-if / else branches
+§WH (cond)                           While
+§L{i:0:9:1}                          Inclusive snapshot range, 0 to 9 step 1
+§EACH{x} collection                  Foreach (optional item type)
+§EACHKV{k:v} dictionary              Key/value foreach
 ```
 
-Expressions are prefix s-expressions: `(+ a b)`, `(== a b)`, `(&& p q)`, `(! p)`,
-`(< i n)`, `(% n 3)`. String `+` concatenates. Typed literals when needed:
-`INT:42`, `STR:"hi"`, `BOOL:true`. Escapes in strings: `\"`, `\n`, `\r`.
+Expressions use infix operators with C# precedence: `a + b`, `a == b`, `p && q`,
+`!p`, `i < n`, `n % 3`, `value ?? fallback`, `condition ? yes : no`.
+Binary operators associate left; `??` and `?:` associate right. Boolean operators
+short circuit. Use `!condition || consequence` for implication, not a special operator.
+Newlines end expressions. Group infix values in whitespace-separated staged hosts.
+Use C# type names, `T[]` arrays, `T?` nullability and literals such as `42`, `true`,
+`"hi"`, `18.00m` and `1.5f`. Escapes include `\"`, `\n`, `\r`.
+Plain strings interpolate `"Hello ${name}"`; `"\${0}"` keeps literal placeholder text.
+Use nullability and exceptions for absence/failure, not dedicated Option/Result forms.
 
 ## Calls
 
 ```
-§C{Obj.Method} §A arg1 §A arg2 §/C     each arg prefixed §A, closed with §/C
-§B{lines:[str]} §C{File.ReadAllLines} §A path §/C
-§C{File.AppendAllText} §A path §A (+ key (+ "=" (+ value "\n"))) §/C
-§B{ok:bool} §C{File.Exists} §A path §/C
-§B{n:i32} §C{LocalFunc} §A x §/C       user functions are called the same way
+Obj.Method(arg1, arg2)                     Postfix call; comma-separated arguments
+§B{lines:string[]} File.ReadAllLines(path)
+File.AppendAllText(path, key + "=" + value + "\n")
+§B{ok:bool} File.Exists(path)
+§B{n:int} LocalFunc(x)                     User functions use the same call syntax
 ```
 
-## Strings (prefix ops, not method calls)
+Callees may be expressions; calls, member access and indexing can chain.
+Only methods use parentheses; property/field reads use `obj.Property`.
+Bind local helpers to typed `§LAM{...} body §/LAM` values, not nested `§F` declarations.
+
+## Strings (staged built-ins)
 
 ```
 (len s)                 s.Length            (substr s start count)   s.Substring
 (contains s sub)        s.Contains          (indexof s sub :ordinal) s.IndexOf
 (starts s pre)          s.StartsWith        (replace s old new)      s.Replace
-(trim s)  (upper s)  (lower s)  (equals a b)  (ends s suf)
-§B{c:str} (substr line i 1)      // single char at i, as a str
+(trim s)  (upper s)  (lower s)  (equals a b)  (ends s suffix)
+§B{c:string} (substr line i 1)               One-character string, not a char
 ```
+
+These named built-ins retain prefix operands during integration; they are not
+arithmetic operators or ordinary method names. Do not invent extra arguments.
 
 ## Lists and dictionaries
 
 ```
-§LIST{items:str}          empty list literal — close the empty form with §/LIST
+§LIST{items:string}                   Empty list; close with §/LIST
 §/LIST
-§PUSH{items} x            items.Add(x)         [needs mut effect]
-§B{n:i32} §CNT{items}     items.Count
-§B{e:str} §IDX items i    items[i]
-§IF (! §HAS{items} k)   Contains check (dict key: §HAS{d} §KEY k)
-§DICT{ages:str:i32}       empty dict literal
+§PUSH{items} x                        Append [needs mut]
+§B{n:int} §CNT{items}                Count
+§B{element:string} items[i]          Index
+§DICT{ages:string:int}               Empty dictionary
 §/DICT
-§PUT{ages} k v            ages[k] = v          [needs mut effect]
+§PUT{ages} k v                        Upsert ages[k] = v [needs mut]
 ```
 
-A function whose body mutates a collection (`§PUSH`, `§PUT`, `§SETIDX`) must
-declare `mut` in `§E{...}`; file reads/writes need `fs:r` / `fs:w` / `fs:rw`.
-Callers must declare (at least) the union of their callees' effects.
-
-**Arrays vs lists (common trap):** `File.ReadAllLines` returns an ARRAY — bind it
-as `[str]`. Do NOT copy `[str]` into signatures that require `List<str>`; match
-the type the surrounding surface declares.
+Functions that mutate collections (`§PUSH`, `§PUT`, `§SETIDX`) declare `mut`;
+allocation needs `alloc`; file I/O needs `fs:r` / `fs:w` / `fs:rw`.
+Callers declare at least the union of their callees' effects. Unknown effects are not purity proofs.
+Arrays and lists differ: `File.ReadAllLines` returns `string[]`, not `List<string>`.
 
 ## Complete programs (the compiler's tests prove every one compiles)
 
 ```calor
 §M{Contracts}
-  §F{Square:pub} (i32:x) -> i32
-    §Q (>= x 0)
-    §S (>= result 0)
-    §R (* x x)
+  §F{Square:pub} (int:x) -> int
+    §Q (x >= 0)
+    §S (result >= 0)
+    §R (x * x)
 
-  §F{Divide:pub} (i32:a, i32:b) -> i32
-    §Q{"divisor must not be zero"} (!= b 0)
-    §R (/ a b)
+  §F{Divide:pub} (int:a, int:b) -> int
+    §Q{"divisor must not be zero"} (b != 0)
+    §R (a / b)
 ```
 
 ```calor
 §M{Branching}
-  §F{Sign:pub} (i32:x) -> i32
-    §IF (> x 0)
+  §F{Sign:pub} (int:x) -> int
+    §IF (x > 0)
       §R 1
-    §EI (< x 0)
-      §R (- 0 1)
+    §EI (x < 0)
+      §R (-1)
     §EL
       §R 0
 ```
 
 ```calor
 §M{Files}
-  §F{Append:pub} (str:path, str:key, str:value) -> void
+  §F{Append:pub} (string:path, string:key, string:value) -> void
     §E{fs:w}
-    §C{File.AppendAllText} §A path §A (+ key (+ "=" (+ value "\n"))) §/C
+    File.AppendAllText(path, (key + ("=" + (value + "\n"))))
 
-  §F{CountLines:pub} (str:path) -> i32
+  §F{CountLines:pub} (string:path) -> int
     §E{fs:r}
-    §B{ok:bool} §C{File.Exists} §A path §/C
-    §IF (! ok)
+    §B{ok:bool} File.Exists(path)
+    §IF (!ok)
       §R 0
-    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
+    §B{lines:string[]} File.ReadAllLines(path)
     §R (len lines)
 ```
 
 ```calor
 §M{Strings}
-  §F{FirstField:pub} (str:line) -> str
+  §F{FirstField:pub} (string:line) -> string
     §E{}
-    §B{i:i32} (indexof line "," :ordinal)
-    §IF (< i 0)
+    §B{i:int} (indexof line "," :ordinal)
+    §IF (i < 0)
       §R line
     §R (substr line 0 i)
 ```
 
 ```calor
 §M{Collections}
-  §F{Tally:pub} (str:key) -> i32
+  §F{Tally:pub} (string:key) -> int
     §E{mut,alloc}
-    §DICT{counts:str:i32}
+    §DICT{counts:string:int}
     §/DICT
     §PUT{counts} key 1
-    §R §IDX counts key
+    §R counts[key]
 ```
 
 ```calor
 §M{Effects}
-  §F{Greet:pub} (str:name) -> void
+  §F{Greet:pub} (string:name) -> void
     §E{cw}
-    §C{Console.WriteLine} §A "Hello" §/C
-    §C{Console.WriteLine} §A name §/C
+    Console.WriteLine("Hello")
+    Console.WriteLine(name)
 ```
 
 ```calor
@@ -152,23 +160,23 @@ the type the surrounding surface declares.
   §F{PrintOneToFive:pub} () -> void
     §E{cw}
     §L{i:1:5:1}
-      §C{Console.WriteLine} §A i §/C
+      Console.WriteLine(i)
 ```
 
 ```calor
 §M{Bindings}
   §F{Demo:pub} () -> void
     §E{cw}
-    §B{greeting:str} "Ada"
-    §B{~count:i32} 0
-    §C{Console.WriteLine} §A greeting §/C
-    §C{Console.WriteLine} §A count §/C
+    §B{greeting:string} "Ada"
+    §B{~count:int} 0
+    Console.WriteLine(greeting)
+    Console.WriteLine(count)
 ```
 
 ```calor
 §M{Classes}
   §CL{Greeter:pub}
-    §MT{Greet:pub} () -> str
+    §MT{Greet:pub} () -> string
       §R "hello"
 ```
 
@@ -178,13 +186,13 @@ the type the surrounding surface declares.
 <!-- drift:ignore -->
 §/F §/M §/I §/L       removed; use indentation only (a block ends on dedent)
 <!-- drift:ignore -->
-§S (>= §RESULT 0)     wrong; the return value is lowercase: §S (>= result 0)
-§IF                  wrong; §IF needs a condition, such as §IF (> x 0)
+§S (§RESULT >= 0)     wrong; the return value is lowercase: §S (result >= 0)
+§IF                  wrong; §IF needs a condition, such as §IF (x > 0)
 §IF{i1}{x > 0}        wrong; the condition goes in (parens), not braces
 <!-- drift:ignore -->
 §K   §ELSE            no such keywords; else is §EL, else-if is §EI (no id)
-§F{f1:Add:i32:pub}    wrong; a 4-field header drops the return type. Use:
-                     §F{Add:pub} (i32:a, i32:b) -> i32
+§F{f1:Add:int:pub}    wrong; the obsolete ID-bearing header is rejected. Use:
+                     §F{Add:pub} (int:a, int:b) -> int
 ```
 
 Effects: `§E{cw}` declares console write; declare effects on any function that

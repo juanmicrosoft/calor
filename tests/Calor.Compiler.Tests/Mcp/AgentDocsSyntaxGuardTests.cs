@@ -45,6 +45,19 @@ public class AgentDocsSyntaxGuardTests
     }
 
     [Fact]
+    public void Reference_ExpressionValuedCall_CompilesAndRunsWithDeclaredRow()
+    {
+        var root = FindRepoRoot() ?? throw new InvalidOperationException("Repository root not found.");
+        var reference = File.ReadAllText(Path.Combine(root, Calor.Compiler.SelfCheck.ExemplarCompileChecker.TeachingReferencePath));
+        var example = Assert.Single(Regex.Matches(reference,
+            @"```calor\s*\n(?<source>§M\{PostfixCalls\}.*?)\n```",
+            RegexOptions.Singleline).Cast<Match>());
+        var module = CompileTeachingModule(example.Groups["source"].Value, "PostfixCalls");
+        var holder = Activator.CreateInstance(Assert.Single(module.Assembly.GetTypes().Where(type => type.Name == "Holder")));
+        Assert.Equal(42, module.GetMethod("Apply")!.Invoke(null, [holder]));
+    }
+
+    [Fact]
     public void ErrorSuggestions_ArrayTypeExamples_CompileAndRun()
     {
         var root = FindRepoRoot() ?? throw new InvalidOperationException("Repository root not found.");
@@ -214,7 +227,7 @@ public class AgentDocsSyntaxGuardTests
             matches.Count == 0,
             $"Agent-doc surface '{name}' teaches {matches.Count} obsolete 4-field §F/§AF header(s) " +
             $"(§F{{id:name:returnType:vis}}). Use the 3-field header + signature: " +
-            $"§F{{id:name:vis}} (type:name) -> retType. Offenders:\n" +
+            $"§F{{name:vis}} (type:name) -> retType. Offenders:\n" +
             string.Join("\n", matches.Select(m => "  " + m.Value)));
     }
 

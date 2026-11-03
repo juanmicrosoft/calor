@@ -369,10 +369,10 @@ public class SyntaxHelpToolTests
         var text = result.Content[0].Text!;
         // Should contain the curated overview — check for section titles and key terms
         Assert.Contains("Calor Language Overview", text);
-        Assert.Contains("Control Flow", text);
+        Assert.Contains("Control flow", text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Module", text);
-        Assert.Contains("Indexer", text);
-        Assert.Contains("Property", text);
+        Assert.Contains("Indexer", text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Property", text, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -385,11 +385,12 @@ public class SyntaxHelpToolTests
         Assert.False(result.IsError);
         var text = result.Content[0].Text!;
         // Verify major language areas are covered
-        Assert.Contains("Control Flow", text);
+        Assert.Contains("Control flow", text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Contracts", text);
         Assert.Contains("Async", text);
         Assert.Contains("Collections", text);
-        Assert.Contains("Typed Literals", text);
+        Assert.Contains("Literals", text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("18.00m", text);
         Assert.Contains("availableFeatures", text);
     }
 

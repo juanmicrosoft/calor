@@ -13,23 +13,26 @@ permalink: /syntax-reference/current-language/
 This reference describes the current compiler, not a final 0.30 grammar or a measured token budget.
 Write `.calr` files. Bodies are indented two spaces and structural blocks end at dedent.
 Source declarations carry no IDs; tooling keeps declaration identity in `.calor/ids.json`. Use tooling for renames.
-Use inline signatures, name-first bindings, and indented conditional branches.
-Use `§C{target} §A arg §/C` for calls, including nested calls inside prefix expressions.
-Use nullable .NET types (`?str`, `?i32`, `null`) and exceptions for absence and failure.
+The current staged headers are `§M`, `§F`, `§B`, and the other documented tags; use their existing field order and inline signatures.
+Expressions use infix operators with C# precedence, postfix calls `target(arg)`, and indexing `items[index]`. Calls can chain and their callee can be an expression.
+Use C# type names, `T[]` arrays, `T?` nullable types, `null`, and exceptions for absence and failure.
 Do not handwrite raw C# passthrough. Conversion fallback capabilities belong in `calor_help action=features`.
-Arrays and collections are different: `File.ReadAllLines` returns `[str]`, not `List<str>`.
-Contracts evaluate in order: check for null before reading length or members.
-Use only supported arguments for built-ins; `(indexof text value :ordinal)` selects ordinal comparison.
-Single quotes produce characters; double quotes produce strings.
+Arrays and collections are different: `File.ReadAllLines` returns `string[]`, not `List<string>`.
+Contracts evaluate in order: check for null before reading length or members. Express implication as `!condition || consequence`.
+Staged string and character built-ins retain their documented prefix forms; `(indexof text value :ordinal)` selects ordinal comparison. Do not invent extra arguments.
+Single quotes produce characters; double quotes produce strings. Plain strings interpolate `${expression}`; escape `\${0}` for literal placeholder text.
+Use `§ASSIGN` for updates, not increment/decrement or assignment expressions. Bind local helpers as lambdas, not nested `§F` declarations.
+Newlines end infix expressions. Parenthesize infix values in whitespace-separated legacy hosts such as collection entries.
 
 Query a specific feature with `calor_help` for detailed syntax and examples.
 
 ## Calor Language Overview
 
-Module and function bodies use indentation. Control Flow uses indented branches and loops.
-Contracts and Effects describe obligations and side effects. Async functions use `§AF` and `§AWAIT`.
-Collections use ordinary .NET types; Typed Literals include `INT:42`, `STR:"hello"`, and `BOOL:true`.
-Property and Indexer declarations use `§PROP` and `§IXER`.
+Module and function bodies use indentation. Control flow uses indented branches and loops.
+Contracts and effects describe obligations and side effects. Async functions use `§AF` and `§AWAIT`.
+Expressions use infix operators with C# precedence, postfix calls, and indexing. Collections use ordinary .NET types.
+Types use C# names, `T[]` arrays and `T?` nullability. Literals include `42`, `"hello"`, `true`, and `18.00m`.
+Property and indexer declarations use `§PROP` and `§IXER`; staged headers keep their existing field order.
 Query a specific feature for complete examples; use `action=features` for conversion support.
 
 ## object instantiation
@@ -50,7 +53,7 @@ Complete example: [objects](#example-complete_objects).
 
 ## variable declaration
 
-Declares a variable binding. Use ~ prefix for mutable variables. Immutable by default. Give null an explicit existing nullable type, such as ?str.
+Declares a variable binding. Use ~ prefix for mutable variables. Immutable by default. Give null an explicit existing nullable type, such as string?.
 
 Syntax: `§B{name} value or §B{~name} value (mutable)`
 
@@ -114,6 +117,8 @@ items.Where(x => x > 5)
 
 Complete example: [ApplyComplex](#example-task_25).
 
+Complete example: [Expression-valued call target with an explicit pure delegate row](#example-complete_postfix).
+
 ## property definition
 
 Defines a property with optional getter and setter. Auto-properties use accessor shorthand such as get,set, get,priset, or get,init. Full properties use indented §GET and §SET bodies.
@@ -151,9 +156,9 @@ Complete example: [indexer](#example-complete_indexer).
 
 ## property access vs method call
 
-§C{...} emits parentheses, making it a method call. For property or field access (no parentheses), use a bare dotted expression in a binding (§B{var} obj.Property) or directly as an expression. Do NOT use §C for property access — it will emit obj.Property() with unwanted parens.
+Use bare member access for properties and fields, without parentheses. Parentheses invoke a method. Calls and indexing can chain on expression-valued receivers.
 
-Syntax: `Property: use bare member expression (e.g., obj.Property). Method: use §C{obj.Method} args.`
+Syntax: `Property: obj.Property. Method: obj.Method(arg).`
 
 C# equivalents (fragments):
 
@@ -232,9 +237,9 @@ Complete example: [Branching](#example-primer_branching).
 
 ## ternary / conditional expression
 
-Conditional expression (ternary operator). Uses prefix notation with (? ...) syntax. Both branches are expressions, not statements.
+Conditional expression with two expression branches. Only the selected branch evaluates. Conditional and null-coalescing operators associate right; ordinary binary operators associate left.
 
-Syntax: `(? condition trueValue falseValue)`
+Syntax: `condition ? trueValue : falseValue`
 
 C# equivalents (fragments):
 
@@ -403,9 +408,9 @@ Complete example: [invariant](#example-complete_invariant).
 
 ## method call
 
-Calls a method or function. Each argument uses §A; §/C delimits nested argument lists.
+Calls a method or function with comma-separated arguments. Named arguments use name: value; ref, out and in modifiers precede values. The callee can be an expression; chains preserve left-to-right evaluation and short-circuit regions.
 
-Syntax: `§C{method} §A arg1 §A arg2 §/C`
+Syntax: `target(arg1, arg2); target<T>(arg); Factory()(arg)`
 
 C# equivalents (fragments):
 
@@ -416,6 +421,8 @@ Calculate(x, y) // internal pure call
 ```
 
 Complete example: [Files](#example-primer_files).
+
+Complete example: [Expression-valued call target with an explicit pure delegate row](#example-complete_postfix).
 
 ## field definition
 
@@ -493,9 +500,9 @@ Complete example: [Enum with Switch/Match](#example-complex_enum).
 
 ## null check
 
-Handles nullable values. (?? left right) returns left if non-null, else right. (?. target Member) accesses Member on target only if non-null. Both use Lisp-style prefix notation inside parentheses.
+Null-coalescing returns the left value when non-null, otherwise the fallback. Null-conditional access reads the member only when the target is non-null.
 
-Syntax: `(?? left right) for null-coalescing, (?. target Member) for null-conditional`
+Syntax: `left ?? fallback; target?.Member`
 
 C# equivalents (fragments):
 
@@ -539,9 +546,9 @@ Complete example: [Container](#example-task_29).
 
 ## LINQ query
 
-LINQ queries use method-chain syntax with §C (call) and §LAM (lambda) in Calor. Complex chains are commonly hoisted into bindings before the final call.
+LINQ uses ordinary postfix calls, including generic calls and chained receivers. Bind predicates as typed lambda values and retain authoritative effect rows.
 
-Syntax: `§C{System.Linq.Enumerable.Where} §A collection §A predicate §/C`
+Syntax: `System.Linq.Enumerable.Where(collection, predicate)`
 
 C# equivalents (fragments):
 
@@ -592,7 +599,7 @@ Syntax: `No authored native record declaration`
 
 ## Array Creation/Initialization
 
-Creates and initializes a fixed-size array. The element type is specified in the header. Elements are space-separated between the opening and closing tags. Supports both explicit (new int[] { ... }) and bare ({ ... }) initializer syntax.
+Creates a fixed-size array with a typed §ARR value literal. Elements are whitespace-separated; group infix elements explicitly. The documented bare closer remains part of this staged literal form.
 
 Syntax: `§B{items} §ARR{type} elements §/ARR`
 
@@ -785,7 +792,7 @@ Complete example: [EventPublisher](#example-task_23).
 
 ## operator overload
 
-Defines an operator overload for a class or struct. Supports binary operators (+, -, *, /, ==, etc.), unary operators (-, !, ~, ++, --), and conversion operators (implicit, explicit).
+Defines an operator overload using the supported arithmetic, comparison, equality or unary operators. Updates still use §ASSIGN; do not author increment/decrement or compound assignment expressions.
 
 Syntax: `§OP{operator:vis} (type:param, ...) -> returnType`
 
@@ -802,9 +809,9 @@ Complete example: [Class with Fields, Constructor + Operators](#example-complex_
 
 ## decimal literal
 
-Decimal literals for precise numeric values. Use DECIMAL: or DEC: prefix, or append m/M suffix.
+Decimal literals use the m/M suffix for precise decimal values; unsuffixed fractional literals are double.
 
-Syntax: `DECIMAL:value or DEC:value or value with m/M suffix`
+Syntax: `18.00m (or M suffix)`
 
 C# equivalents (fragments):
 
@@ -957,9 +964,9 @@ Complete example: [unsafe](#example-complete_unsafe).
 
 ## null-coalescing assignment
 
-C#'s ??= operator has no direct Calor equivalent. Use an §IF null check with §ASSIGN as a workaround.
+Use a null check and §ASSIGN for a conditional update. Assignment expressions, including ??=, are not authored expression forms.
 
-Syntax: `§IF (== x null) with indented §ASSIGN x default`
+Syntax: `§IF (x == null) with indented §ASSIGN x fallback`
 
 C# equivalents (fragments):
 
@@ -972,7 +979,7 @@ Complete example: [nullable](#example-complete_nullable).
 
 ## attribute
 
-Attaches metadata to declarations. Placed before the declaration they annotate.
+Attaches metadata after the declaration header it annotates.
 
 Syntax: `Attach [@AttributeName] or [@Attr(arg1, arg2)] after a declaration header`
 
@@ -989,9 +996,9 @@ Complete example: [struct](#example-complete_struct).
 
 ## is pattern with combinators
 
-C# 'is' patterns with and/or/not combinators are decomposed into standard boolean expressions using prefix notation. No special tag needed — fully supported natively.
+Express Boolean combinations with infix &&, || and unary !. These are expressions, not new pattern or block headers.
 
-Syntax: `(&& (> x 0) (< x 100)) or (|| (< x 0) (> x 100))`
+Syntax: `(x > 0) && (x < 100); (x < 0) || (x > 100)`
 
 C# equivalents (fragments):
 
@@ -1042,7 +1049,7 @@ Syntax: `No authored Calor form`
 
 ## tuple type and tuple literal
 
-Tuple types use parenthesized comma-separated types: (i32, str). Tuple literals use parenthesized comma-separated expressions: (1, "hello"). Named tuple elements are supported: (i32 X, i32 Y). Tuples are distinguished from Lisp expressions by the presence of commas.
+Tuple types use comma-separated types, such as (int, string). Tuple literals use comma-separated expressions, such as (1, "hello"). Named type elements are supported: (int X, int Y). A parenthesized single expression is grouping, not a tuple.
 
 Syntax: `(Type1, Type2) for types; (expr1, expr2) for literals`
 
@@ -1058,9 +1065,9 @@ Complete example: [tuples](#example-complete_tuples).
 
 ## null coalescing operator
 
-Null-coalescing operator in Lisp-style prefix notation. Returns left if non-null, otherwise returns right. Use inside parentheses: (?? expr default).
+Returns left when non-null; otherwise evaluates and returns fallback. Coalescing associates right.
 
-Syntax: `(?? left right)`
+Syntax: `left ?? fallback`
 
 C# equivalents (fragments):
 
@@ -1073,9 +1080,9 @@ Complete example: [nullable](#example-complete_nullable).
 
 ## null conditional operator
 
-Null-conditional member access in Lisp-style prefix notation. Accesses MemberName on target only if target is non-null, otherwise returns null. The member name is an unquoted identifier.
+Accesses Member only when target is non-null; otherwise returns null.
 
-Syntax: `(?. target MemberName)`
+Syntax: `target?.Member`
 
 C# equivalents (fragments):
 
@@ -1105,7 +1112,7 @@ Complete example: [goto](#example-complete_goto).
 
 ## string operations
 
-Prefix operations include (str value), (concat a b), (fmt "{0}" value), (len text), (contains text value), (starts text prefix), (ends text suffix), (equals left right), (isempty text), (upper text), (lower text), (trim text), (replace text old new) and (substr text start count). indexof accepts an optional start and count; use :ordinal for ordinal comparison. Do not invent extra arguments.
+Staged prefix built-ins include (str value), (concat a b), (fmt "{0}" value), (len text), (contains text value), (starts text prefix), (ends text suffix), (equals left right), (isempty text), (upper text), (lower text), (trim text), (replace text old new) and (substr text start count). indexof accepts an optional start and count; use :ordinal for ordinal comparison. Do not invent extra arguments.
 
 Syntax: `(concat a b), (substr text start count), (indexof text value :ordinal)`
 
@@ -1123,7 +1130,7 @@ Complete example: [BuildGreeting](#example-task_38).
 
 ## character operations
 
-Single quotes produce char literals with C# escapes. Built-ins include char-at, char-code, char-from-code, char-upper, char-lower, is-letter, is-digit, is-whitespace, is-upper and is-lower. Character subtraction promotes to i32.
+Single quotes produce char literals with C# escapes. Built-ins include char-at, char-code, char-from-code, char-upper, char-lower, is-letter, is-digit, is-whitespace, is-upper and is-lower. Character subtraction promotes to int.
 
 Syntax: `(char-at text index), (char-code value), '0'`
 
@@ -1141,9 +1148,9 @@ Complete example: [Offset](#example-task_42).
 
 ## array element access
 
-Use [T] for array types and [[T]] for jagged arrays. Section expressions can nest inside prefix expressions. File.ReadAllLines returns [str], not List<str>.
+Use T[] for arrays and T[][] for jagged arrays. Indexing and calls can chain on expression-valued receivers. File.ReadAllLines returns string[], not List<string>.
 
-Syntax: `§IDX array index`
+Syntax: `items[index]`
 
 C# equivalents (fragments):
 
@@ -1171,9 +1178,9 @@ Complete example: [Accumulate](#example-task_27).
 
 ## primitive types
 
-Use the C# type mappings for aliases, ordinary .NET generic types for collections, ?T and null for nullable values. Typed numeric bounds such as INT:-2147483648 avoid an out-of-range positive intermediate. Use double quotes for strings.
+Use C# type names and ordinary .NET generic types. Nullable types use a suffix (int?, string?); arrays use T[]. Integer widths and signedness use L, U or UL suffixes, decimal uses m/M and float uses f/F. Negative bounds such as -2147483648 retain their literal meaning. Absence and failure use nullability and exceptions, not dedicated Option/Result forms.
 
-Syntax: `i32, i64, i16, u8, u16, u32, u64, f32, f64, dec, str, bool, char, object, void, ?T, [T]`
+Syntax: `int, long, short, sbyte, byte, ushort, uint, ulong, float, double, decimal, string, bool, char, object, void, T?, T[]`
 
 C# equivalents (fragments):
 
@@ -1185,16 +1192,16 @@ Complete example: [Bindings](#example-primer_bindings).
 
 Complete example: [TryDouble](#example-task_6).
 
-## prefix expressions
+## Infix expressions and precedence
 
-Arithmetic and comparisons use prefix notation. Boolean operators && and || short circuit; ! negates. Use (- 0 value) for negation and (? condition thenValue elseValue) for a conditional value. Call Math methods for operations not provided as built-ins; method names are not prefix operators.
+Use infix arithmetic, shifts, comparisons, equality, eager bitwise and short-circuit Boolean operators with C# precedence. Unary -, ! and ~ are supported. Calls and indexing bind tighter. Write implication as !p || q; use Math.Pow(a, b) for powers. Increment/decrement, assignment expressions, unary +, >>> and infix ** are not supported. Newlines end expressions; group infix operands in whitespace-separated staged hosts.
 
-Syntax: `(+ a b), (== a b), (&& a b), (? condition thenValue elseValue)`
+Syntax: `a + b, a == b, p && q, !p, condition ? thenValue : elseValue`
 
 C# equivalents (fragments):
 
 ```csharp
-a + b; a == b; a && b; condition ? thenValue : elseValue;
+a + b; a == b; p && q; !p; condition ? thenValue : elseValue
 ```
 
 Complete example: [Abs](#example-task_4).
@@ -1203,11 +1210,13 @@ Complete example: [Max](#example-task_10).
 
 Complete example: [Nested array expressions](#example-nested_arrays).
 
+Complete example: [Expression-valued call target with an explicit pure delegate row](#example-complete_postfix).
+
 ## quantified contracts
 
-Quantifiers declare typed bound variables. Bound runtime quantifiers with finite array ranges; check array lengths against external bounds. Use -> for implication. Contracts are obligations, not a guarantee that every proof succeeds.
+Staged quantifiers declare typed bound variables. Check array lengths against external bounds. The examples use bounded exists and its negation for finite runtime checking. Runtime forall certification still requires a legacy implication AST; an equivalent infix Boolean body is not yet certified. Express ordinary implication as !condition || consequence. Contracts are obligations, not a guarantee that every proof succeeds.
 
-Syntax: `(forall ((i i32)) body), (exists ((i i32)) body), (-> condition consequence)`
+Syntax: `(forall ((i int)) body), (exists ((i int)) body); !condition || consequence`
 
 C# equivalents (fragments):
 
@@ -1241,19 +1250,33 @@ Complete example: [Collections](#example-primer_collections).
 
 Complete example: [Collection allocation, loop mutation and count](#example-copilot_smoke).
 
+## Staged section call
+
+Compatibility call form retained during parser/metadata integration. Prefer postfix calls. The LINQ example keeps this bridge for ToArray because its native postfix form currently lacks authoritative effect resolution; do not relax effect policy to work around that boundary.
+
+Syntax: `§C{target<T>} §A arg §/C`
+
+C# equivalents (fragments):
+
+```csharp
+System.Linq.Enumerable.ToArray<int>(filtered)
+```
+
+Complete example: [linq](#example-complete_linq).
+
 ## Example copilot_smoke
 
 Collection allocation, loop mutation and count
 
 ```calor
 §M{CopilotSmoke}
-  §F{Collect:pub} (i32:n) -> i32
+  §F{Collect:pub} (int:n) -> int
     §E{mut,alloc}
-    §LIST{items:i32}
+    §LIST{items:int}
     §/LIST
     §L{i:1:n:1}
       §PUSH{items} i
-    §B{count:i32} §CNT{items}
+    §B{count:int} §CNT{items}
     §R count
 ```
 
@@ -1263,10 +1286,10 @@ Array values and indexed access
 
 ```calor
 §M{ArrayValues}
-  §F{First:pub} () -> i32
+  §F{First:pub} () -> int
     §E{alloc}
-    §B{items} §ARR{i32} 10 20 30 §/ARR
-    §R §IDX items 0
+    §B{items} §ARR{int} 10 20 30 §/ARR
+    §R items[0]
 ```
 
 ## Example task_0
@@ -1275,9 +1298,9 @@ ReadInput
 
 ```calor
 §M{AgentReference0}
-  §F{ReadInput:pub} () -> str
+  §F{ReadInput:pub} () -> string?
     §E{cr}
-    §B{line} §C{Console.ReadLine} §/C
+    §B{line} Console.ReadLine()
     §R line
 ```
 
@@ -1287,11 +1310,9 @@ PrintValue
 
 ```calor
 §M{AgentReference1}
-  §F{PrintValue:pub} (i32:x) -> void
+  §F{PrintValue:pub} (int:x) -> void
     §E{cw}
-    §C{Console.WriteLine}
-    §A x
-    §/C
+    Console.WriteLine(x)
 ```
 
 ## Example task_2
@@ -1300,13 +1321,9 @@ ClampScore
 
 ```calor
 §M{AgentReference2}
-  §F{ClampScore:pub} (i32:score) -> i32
+  §F{ClampScore:pub} (int:score) -> int
     §E{}
-    §B{value:i32} §C{Math.Clamp}
-      §A[value] score
-      §A[min] 0
-      §A[max] 100
-    §/C
+    §B{value:int} Math.Clamp(value: score, min: 0, max: 100)
     §R value
 ```
 
@@ -1316,8 +1333,8 @@ SquareRoot
 
 ```calor
 §M{AgentReference3}
-  §F{SquareRoot:pub} (i32:x) -> i32
-    §Q (>= x 0)
+  §F{SquareRoot:pub} (int:x) -> int
+    §Q (x >= 0)
     §R x
 ```
 
@@ -1327,9 +1344,9 @@ Abs
 
 ```calor
 §M{AgentReference4}
-  §F{Abs:pub} (i32:x) -> i32
-    §S (>= result 0)
-    §R (? (< x 0) (- 0 x) x)
+  §F{Abs:pub} (int:x) -> int
+    §S (result >= 0)
+    §R ((x < 0) ? (0 - x) : x)
 ```
 
 ## Example task_5
@@ -1338,11 +1355,9 @@ PrintNumber
 
 ```calor
 §M{AgentReference5}
-  §F{PrintNumber:pub} (i32:x) -> void
+  §F{PrintNumber:pub} (int:x) -> void
     §E{cw}
-    §C{Console.WriteLine}
-    §A x
-    §/C
+    Console.WriteLine(x)
 ```
 
 ## Example task_6
@@ -1351,10 +1366,10 @@ TryDouble
 
 ```calor
 §M{AgentReference6}
-  §F{TryDouble:pub} (i32:x) -> ?i32
+  §F{TryDouble:pub} (int:x) -> int?
     §E{}
-    §IF (> x 0)
-      §R (* x 2)
+    §IF (x > 0)
+      §R (x * 2)
     §EL
       §R null
 ```
@@ -1365,10 +1380,10 @@ TryParseDigit
 
 ```calor
 §M{AgentReference7}
-  §F{TryParseDigit:pub} (char:c) -> ?i32
+  §F{TryParseDigit:pub} (char:c) -> int?
     §E{}
-    §IF (&& (>= c '0') (<= c '9'))
-      §R (- c '0')
+    §IF ((c >= '0') && (c <= '9'))
+      §R (c - '0')
     §EL
       §R null
 ```
@@ -1379,10 +1394,10 @@ SafeDivide
 
 ```calor
 §M{AgentReference8}
-  §F{SafeDivide:pub} (i32:a, i32:b) -> i32
+  §F{SafeDivide:pub} (int:a, int:b) -> int
     §E{alloc,throw}
-    §IF (!= b 0)
-      §R (/ a b)
+    §IF (b != 0)
+      §R (a / b)
     §EL
       §TH §NEW{ArgumentException} §A "Division by zero" §/NEW
 ```
@@ -1393,10 +1408,10 @@ Classify
 
 ```calor
 §M{AgentReference9}
-  §F{Classify:pub} (i32:n) -> str
-    §IF (< n 0)
+  §F{Classify:pub} (int:n) -> string
+    §IF (n < 0)
       §R "negative"
-    §EI (== n 0)
+    §EI (n == 0)
       §R "zero"
     §EL
       §R "positive"
@@ -1408,8 +1423,8 @@ Max
 
 ```calor
 §M{AgentReference10}
-  §F{Max:pub} (i32:a, i32:b) -> i32
-    §IF (>= a b)
+  §F{Max:pub} (int:a, int:b) -> int
+    §IF (a >= b)
       §R a
     §EL
       §R b
@@ -1421,13 +1436,13 @@ GetGrade
 
 ```calor
 §M{AgentReference11}
-  §F{GetGrade:pub} (i32:score) -> str
-    §B{~grade:str} "F"
-    §IF (>= score 90)
+  §F{GetGrade:pub} (int:score) -> string
+    §B{~grade:string} "F"
+    §IF (score >= 90)
       §ASSIGN grade "A"
-    §EI (>= score 80)
+    §EI (score >= 80)
       §ASSIGN grade "B"
-    §EI (>= score 70)
+    §EI (score >= 70)
       §ASSIGN grade "C"
     §EL
       §ASSIGN grade "F"
@@ -1442,12 +1457,10 @@ Countdown
 §M{AgentReference12}
   §F{Countdown:pub} () -> void
     §E{cw}
-    §B{~count:i32} 5
-    §WH (> count 0)
-      §C{Console.WriteLine}
-      §A count
-      §/C
-      §ASSIGN count (- count 1)
+    §B{~count:int} 5
+    §WH (count > 0)
+      Console.WriteLine(count)
+      §ASSIGN count (count - 1)
 ```
 
 ## Example task_13
@@ -1458,13 +1471,11 @@ DoWhileDemo
 §M{AgentReference13}
   §F{DoWhileDemo:pub} () -> void
     §E{cw}
-    §B{~x:i32} 0
+    §B{~x:int} 0
     §DO
-      §C{Console.WriteLine}
-        §A x
-      §/C
-      §ASSIGN x (+ x 1)
-    §/DO (< x INT:3)
+      Console.WriteLine(x)
+      §ASSIGN x (x + 1)
+    §/DO (x < 3)
 ```
 
 ## Example task_14
@@ -1473,15 +1484,15 @@ SumList
 
 ```calor
 §M{AgentReference14}
-  §F{SumList:pub} () -> i32
+  §F{SumList:pub} () -> int
     §E{alloc,mut}
-    §B{nums:List<i32>} §NEW{List<i32>}
+    §B{nums:List<int>} §NEW{List<int>}
     §PUSH{nums} 10
     §PUSH{nums} 20
     §PUSH{nums} 30
-    §B{~sum:i32} 0
+    §B{~sum:int} 0
     §EACH{n} nums
-      §ASSIGN sum (+ sum n)
+      §ASSIGN sum (sum + n)
     §R sum
 ```
 
@@ -1491,10 +1502,10 @@ GetListLength
 
 ```calor
 §M{AgentReference15}
-  §F{GetListLength:pub} (i32:n) -> i32
+  §F{GetListLength:pub} (int:n) -> int
     §E{alloc,mut}
-    §Q (>= n 0)
-    §B{nums:List<i32>} §NEW{List<i32>}
+    §Q (n >= 0)
+    §B{nums:List<int>} §NEW{List<int>}
     §L{i:1:n:1}
       §PUSH{nums} i
     §R §CNT{nums}
@@ -1506,7 +1517,7 @@ PrintDictionary
 
 ```calor
 §M{AgentReference16}
-  §F{PrintDictionary:pub} (Dictionary<str,i32>:scores) -> void
+  §F{PrintDictionary:pub} (Dictionary<string,int>:scores) -> void
     §E{cw}
     §EACHKV{k:v} scores
       §P k
@@ -1519,7 +1530,7 @@ GetDataAsync
 
 ```calor
 §M{AgentReference17}
-  §AF{GetDataAsync:pub} () -> Task<i32>
+  §AF{GetDataAsync:pub} () -> Task<int>
     §R 42
 ```
 
@@ -1529,7 +1540,7 @@ GetStatus
 
 ```calor
 §M{AgentReference18}
-  §F{GetStatus:pub} (i32:code) -> str
+  §F{GetStatus:pub} (int:code) -> string
     §R §W code
       §K 200 → "OK"
       §K 404 → "Not Found"
@@ -1543,7 +1554,7 @@ DayName
 
 ```calor
 §M{AgentReference19}
-  §F{DayName:pub} (i32:day) -> i32
+  §F{DayName:pub} (int:day) -> int
     §R §W day
       §K 1 → 100
       §K 2 → 100
@@ -1561,7 +1572,7 @@ GetGrade
 
 ```calor
 §M{AgentReference20}
-  §F{GetGrade:pub} (i32:score) -> str
+  §F{GetGrade:pub} (int:score) -> string
     §R §W score
       §K §PREL{gte} 90 → "A"
       §K §PREL{gte} 80 → "B"
@@ -1575,10 +1586,10 @@ Describe
 
 ```calor
 §M{AgentReference21}
-  §F{Describe:pub} (i32:x) -> str
+  §F{Describe:pub} (int:x) -> string
     §R §W x
-      §K §VAR{n} §WHEN (> n 100) → "large"
-      §K §VAR{n} §WHEN (< n 0) → "negative"
+      §K §VAR{n} §WHEN (n > 100) → "large"
+      §K §VAR{n} §WHEN (n < 0) → "negative"
       §K 0 → "zero"
       §K _ → "normal"
 ```
@@ -1589,7 +1600,7 @@ IsSingleDigit
 
 ```calor
 §M{AgentReference22}
-  §F{IsSingleDigit:pub} (i32:n) -> bool
+  §F{IsSingleDigit:pub} (int:n) -> bool
     §R §W n
       §K 0 → true
       §K 1 → true
@@ -1623,9 +1634,9 @@ ApplyDouble
 
 ```calor
 §M{AgentReference24}
-  §F{ApplyDouble:pub} (i32:x) -> i32
-    §B{doubler:Func<i32,i32>} (n) → (* n 2)
-    §R §C{doubler} §A x §/C
+  §F{ApplyDouble:pub} (int:x) -> int
+    §B{doubler:Func<int,int>} (n) → (n * 2)
+    §R doubler(x)
 ```
 
 ## Example task_25
@@ -1634,11 +1645,11 @@ ApplyComplex
 
 ```calor
 §M{AgentReference25}
-  §F{ApplyComplex:pub} (i32:x) -> i32
-    §B{process:Func<i32,i32>} §LAM{n:i32}
-    (? (> n 0) (* n 2) 0)
+  §F{ApplyComplex:pub} (int:x) -> int
+    §B{process:Func<int,int>} §LAM{n:int}
+    ((n > 0) ? (n * 2) : 0)
     §/LAM
-    §R §C{process} §A x §/C
+    §R process(x)
 ```
 
 ## Example task_26
@@ -1648,9 +1659,9 @@ MathOperation
 ```calor
 §M{AgentReference26}
   §DEL{MathOperation}
-    §I{i32:x}
-    §I{i32:y}
-    §O{i32}
+    §I{int:x}
+    §I{int:y}
+    §O{int}
 ```
 
 ## Example task_27
@@ -1659,11 +1670,11 @@ Accumulate
 
 ```calor
 §M{AgentReference27}
-  §F{Accumulate:pub} (i32:n) -> i32
-    §B{~acc:i32} 0          // Bind mutable variable acc = 0
-    §ASSIGN acc (+ acc n)   // Assign acc = acc + n
-    §ASSIGN acc (+ acc n)   // Assign again
-    §ASSIGN acc (+ acc n)   // And again
+  §F{Accumulate:pub} (int:n) -> int
+    §B{~acc:int} 0          // Bind mutable variable acc = 0
+    §ASSIGN acc (acc + n)   // Assign acc = acc + n
+    §ASSIGN acc (acc + n)   // Assign again
+    §ASSIGN acc (acc + n)   // And again
     §R acc
 ```
 
@@ -1674,8 +1685,8 @@ Calculator
 ```calor
 §M{AgentReference28}
   §CL{Calculator:pub}
-    §MT{Add:pub} (i32:a, i32:b) -> i32
-      §R (+ a b)
+    §MT{Add:pub} (int:a, int:b) -> int
+      §R (a + b)
 ```
 
 ## Example task_29
@@ -1688,7 +1699,7 @@ Container
     §FLD{T:_value:priv}
     §MT{Get:pub} () -> T
       §R _value
-    §MT{Set:pub} (T:value) -> void
+    §MT{HashSet:pub} (T:value) -> void
       §E{mut}
       §ASSIGN _value value
 ```
@@ -1704,7 +1715,7 @@ Repository
     §FLD{List<T>:_items:priv}
     §MT{Add:pub} (T:item) -> void
       §E{mut}
-      §C{_items.Add} §A item §/C
+      §PUSH{_items} item
 ```
 
 ## Example task_31
@@ -1714,8 +1725,8 @@ Product
 ```calor
 §M{AgentReference31}
   §CL{Product:pub}
-    §FLD{f64:_price:priv}
-    §PROP{Price:f64:pub}
+    §FLD{double:_price:priv}
+    §PROP{Price:double:pub}
       §GET
         §R _price
       §SET
@@ -1729,7 +1740,7 @@ Person
 ```calor
 §M{AgentReference32}
   §CL{Person:pub}
-    §PROP{Name:str:pub}
+    §PROP{Name:string:pub}
       §GET
         §SET
 ```
@@ -1741,12 +1752,12 @@ Person
 ```calor
 §M{AgentReference33}
   §CL{Person:pub}
-    §FLD{str:_name:priv}
-    §FLD{i32:_age:priv}
-    §CTOR{pub} (str:name, i32:age)
+    §FLD{string:_name:priv}
+    §FLD{int:_age:priv}
+    §CTOR{pub} (string:name, int:age)
       §ASSIGN _name name
       §ASSIGN _age age
-    §MT{GetName:pub} () -> str
+    §MT{GetName:pub} () -> string
       §R _name
 ```
 
@@ -1756,11 +1767,11 @@ AbsoluteValue
 
 ```calor
 §M{AgentReference34}
-  §F{AbsoluteValue:pub} (i32:x) -> i32
-    §S (>= result 0)
-    §S (-> (>= x 0) (== result x))
-    §S (-> (< x 0) (== result (- 0 x)))
-    §R (? (< x 0) (- 0 x) x)
+  §F{AbsoluteValue:pub} (int:x) -> int
+    §S (result >= 0)
+    §S (!((x >= 0)) || (result == x))
+    §S (!((x < 0)) || (result == (0 - x)))
+    §R ((x < 0) ? (0 - x) : x)
 ```
 
 ## Example task_35
@@ -1769,15 +1780,10 @@ LogToFileAndConsole
 
 ```calor
 §M{AgentReference35}
-  §F{LogToFileAndConsole:pub} (str:path, str:message) -> void
+  §F{LogToFileAndConsole:pub} (string:path, string:message) -> void
     §E{cw,fs:w}
-    §C{Console.WriteLine}
-    §A message
-    §/C
-    §C{File.AppendAllText}
-    §A path
-    §A message
-    §/C
+    Console.WriteLine(message)
+    File.AppendAllText(path, message)
 ```
 
 ## Example task_36
@@ -1786,9 +1792,9 @@ GetFirstChar
 
 ```calor
 §M{AgentReference36}
-  §F{GetFirstChar:pub} (str:s) -> char
+  §F{GetFirstChar:pub} (string:s) -> char
     §E{}
-    §Q (> (len s) 0)
+    §Q ((len s) > 0)
     §R (char-at s 0)
 ```
 
@@ -1798,7 +1804,7 @@ StringContains
 
 ```calor
 §M{AgentReference37}
-  §F{StringContains:pub} (str:s, str:sub) -> bool
+  §F{StringContains:pub} (string:s, string:sub) -> bool
     §E{}
     §R (contains s sub)
 ```
@@ -1809,7 +1815,7 @@ BuildGreeting
 
 ```calor
 §M{AgentReference38}
-  §F{BuildGreeting:pub} (str:name) -> str
+  §F{BuildGreeting:pub} (string:name) -> string
     §E{alloc,mut}
     §B{sb:StringBuilder} (sb-new)
     (sb-append sb "Hello, ")
@@ -1824,12 +1830,12 @@ AllPositive
 
 ```calor
 §M{AgentReference39}
-  §F{AllPositive:pub} ([i32]:arr, i32:n) -> bool
-    §Q (== n (len arr))
-    §S (-> result (forall ((i i32)) (-> (&& (>= i 0) (< i n)) (> arr{i} 0))))
+  §F{AllPositive:pub} (int[]:arr, int:n) -> bool
+    §Q (n == (len arr))
+    §S (!(result) || !(exists ((i int)) (((i >= 0) && (i < n)) && (arr[i] <= 0))))
     §B{~allPos:bool} true
-    §L{i:0:(- (len arr) 1):1}
-      §IF (<= arr{i} 0)
+    §L{i:0:((len arr) - 1):1}
+      §IF (arr[i] <= 0)
         §ASSIGN allPos false
     §R allPos
 ```
@@ -1840,11 +1846,11 @@ HasNegative
 
 ```calor
 §M{AgentReference40}
-  §F{HasNegative:pub} ([i32]:arr, i32:n) -> bool
-    §Q (== n (len arr))
-    §S (== result (exists ((i i32)) (&& (&& (>= i 0) (< i n)) (< arr{i} 0))))
-    §L{i:0:(- (len arr) 1):1}
-      §IF (< arr{i} 0)
+  §F{HasNegative:pub} (int[]:arr, int:n) -> bool
+    §Q (n == (len arr))
+    §S (result == (exists ((i int)) (((i >= 0) && (i < n)) && (arr[i] < 0))))
+    §L{i:0:((len arr) - 1):1}
+      §IF (arr[i] < 0)
         §R true
     §R false
 ```
@@ -1855,10 +1861,10 @@ DigitValue
 
 ```calor
 §M{AgentReference41}
-  §F{DigitValue:pub} (char:c) -> i32
+  §F{DigitValue:pub} (char:c) -> int
     §E{}
     §Q (is-digit c)
-    §R (- c '0')
+    §R (c - '0')
 ```
 
 ## Example task_42
@@ -1867,9 +1873,9 @@ Offset
 
 ```calor
 §M{AgentReference42}
-  §F{Offset:pub} (char:c) -> i32
+  §F{Offset:pub} (char:c) -> int
     §E{}
-    §R (- c '0')
+    §R (c - '0')
 ```
 
 ## Example primer_contracts
@@ -1878,14 +1884,14 @@ Contracts
 
 ```calor
 §M{Contracts}
-  §F{Square:pub} (i32:x) -> i32
-    §Q (>= x 0)
-    §S (>= result 0)
-    §R (* x x)
+  §F{Square:pub} (int:x) -> int
+    §Q (x >= 0)
+    §S (result >= 0)
+    §R (x * x)
 
-  §F{Divide:pub} (i32:a, i32:b) -> i32
-    §Q{"divisor must not be zero"} (!= b 0)
-    §R (/ a b)
+  §F{Divide:pub} (int:a, int:b) -> int
+    §Q{"divisor must not be zero"} (b != 0)
+    §R (a / b)
 ```
 
 ## Example primer_branching
@@ -1894,11 +1900,11 @@ Branching
 
 ```calor
 §M{Branching}
-  §F{Sign:pub} (i32:x) -> i32
-    §IF (> x 0)
+  §F{Sign:pub} (int:x) -> int
+    §IF (x > 0)
       §R 1
-    §EI (< x 0)
-      §R (- 0 1)
+    §EI (x < 0)
+      §R (-1)
     §EL
       §R 0
 ```
@@ -1909,16 +1915,16 @@ Files
 
 ```calor
 §M{Files}
-  §F{Append:pub} (str:path, str:key, str:value) -> void
+  §F{Append:pub} (string:path, string:key, string:value) -> void
     §E{fs:w}
-    §C{File.AppendAllText} §A path §A (+ key (+ "=" (+ value "\n"))) §/C
+    File.AppendAllText(path, (key + ("=" + (value + "\n"))))
 
-  §F{CountLines:pub} (str:path) -> i32
+  §F{CountLines:pub} (string:path) -> int
     §E{fs:r}
-    §B{ok:bool} §C{File.Exists} §A path §/C
-    §IF (! ok)
+    §B{ok:bool} File.Exists(path)
+    §IF (!ok)
       §R 0
-    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
+    §B{lines:string[]} File.ReadAllLines(path)
     §R (len lines)
 ```
 
@@ -1928,10 +1934,10 @@ Strings
 
 ```calor
 §M{Strings}
-  §F{FirstField:pub} (str:line) -> str
+  §F{FirstField:pub} (string:line) -> string
     §E{}
-    §B{i:i32} (indexof line "," :ordinal)
-    §IF (< i 0)
+    §B{i:int} (indexof line "," :ordinal)
+    §IF (i < 0)
       §R line
     §R (substr line 0 i)
 ```
@@ -1942,12 +1948,12 @@ Collections
 
 ```calor
 §M{Collections}
-  §F{Tally:pub} (str:key) -> i32
+  §F{Tally:pub} (string:key) -> int
     §E{mut,alloc}
-    §DICT{counts:str:i32}
+    §DICT{counts:string:int}
     §/DICT
     §PUT{counts} key 1
-    §R §IDX counts key
+    §R counts[key]
 ```
 
 ## Example primer_effects
@@ -1956,10 +1962,10 @@ Effects
 
 ```calor
 §M{Effects}
-  §F{Greet:pub} (str:name) -> void
+  §F{Greet:pub} (string:name) -> void
     §E{cw}
-    §C{Console.WriteLine} §A "Hello" §/C
-    §C{Console.WriteLine} §A name §/C
+    Console.WriteLine("Hello")
+    Console.WriteLine(name)
 ```
 
 ## Example primer_loops
@@ -1971,7 +1977,7 @@ Loops
   §F{PrintOneToFive:pub} () -> void
     §E{cw}
     §L{i:1:5:1}
-      §C{Console.WriteLine} §A i §/C
+      Console.WriteLine(i)
 ```
 
 ## Example primer_bindings
@@ -1982,10 +1988,10 @@ Bindings
 §M{Bindings}
   §F{Demo:pub} () -> void
     §E{cw}
-    §B{greeting:str} "Ada"
-    §B{~count:i32} 0
-    §C{Console.WriteLine} §A greeting §/C
-    §C{Console.WriteLine} §A count §/C
+    §B{greeting:string} "Ada"
+    §B{~count:int} 0
+    Console.WriteLine(greeting)
+    Console.WriteLine(count)
 ```
 
 ## Example primer_classes
@@ -1995,7 +2001,7 @@ Classes
 ```calor
 §M{Classes}
   §CL{Greeter:pub}
-    §MT{Greet:pub} () -> str
+    §MT{Greet:pub} () -> string
       §R "hello"
 ```
 
@@ -2005,16 +2011,16 @@ Nested array expressions
 
 ```calor
 §M{NestedArrayExpressions}
-  §F{SumPair:pub} ([i32]:data) -> i32
+  §F{SumPair:pub} (int[]:data) -> int
     §E{}
-    §S (== result (+ §IDX data 0 §IDX data 1))
+    §S (result == (data[0] + data[1]))
     §B{~sum} 0
-    §ASSIGN sum (+ sum §IDX data 0)
-    §R (+ sum §IDX data 1)
+    §ASSIGN sum (sum + data[0])
+    §R (sum + data[1])
 
-  §F{MixFirst:pub} ([i32]:data, i32:hash) -> i32
+  §F{MixFirst:pub} (int[]:data, int:hash) -> int
     §E{}
-    §R (^ hash §IDX data 0)
+    §R (hash ^ data[0])
 ```
 
 ## Example complex_class
@@ -2024,27 +2030,27 @@ Class with Fields, Constructor + Operators
 ```calor
 §M{PointModule}
   §CL{Point:pub}
-    §FLD{i32:_x:priv}
-    §FLD{i32:_y:priv}
+    §FLD{int:_x:priv}
+    §FLD{int:_y:priv}
 
-    §CTOR{pub} (i32:x, i32:y)
+    §CTOR{pub} (int:x, int:y)
       §ASSIGN §THIS._x x
       §ASSIGN §THIS._y y
 
     §MT{Equals:pub} (Point:other) -> bool
-      §IF (== other null)
+      §IF (other == null)
         §R false
       §EL
         §R true
 
     §OP{==:pub} (Point:left, Point:right) -> bool
-      §IF (== left null)
-        §R (== right null)
+      §IF (left == null)
+        §R (right == null)
       §EL
-        §R §C{left.Equals} §A right §/C
+        §R left.Equals(right)
 
     §OP{!=:pub} (Point:left, Point:right) -> bool
-      §R (! (== left right))
+      §R (!(left == right))
 ```
 
 ## Example complex_async
@@ -2057,12 +2063,12 @@ Async Method with Try/Catch
   §U{System.Threading.Tasks}
 
   §CL{DataService:pub}
-    §AMT{FetchAsync:pub} (str:url) -> str
+    §AMT{FetchAsync:pub} (string:url) -> string
       §TR
-        §B{_} §AWAIT §C{Task.Delay} §A 100 §/C
-        §R (+ "data from " url)
+        §B{_} §AWAIT Task.Delay(100)
+        §R ("data from " + url)
       §CA{Exception:ex}
-        §R (+ "error: " ex.Message)
+        §R ("error: " + ex.Message)
 ```
 
 ## Example complex_enum
@@ -2078,7 +2084,7 @@ Enum with Switch/Match
     Closed
 
   §CL{StatusHelper:pub}
-    §MT{GetLabel:pub:stat} (Status:s) -> str
+    §MT{GetLabel:pub:stat} (Status:s) -> string
       §R §W s
         §K Status.Pending → "Pending Review"
         §K Status.Active → "Active"
@@ -2096,7 +2102,7 @@ Yield Iterator
   §U{System.Collections.Generic}
 
   §CL{NumberGen:pub}
-    §MT{GetEvens:pub} (i32:max) -> Seq<i32>
+    §MT{GetEvens:pub} (int:max) -> IEnumerable<int>
       §L{i:0:max:2}
         §YIELD i
 ```
@@ -2108,12 +2114,12 @@ objects
 ```calor
 §M{Objects}
   §CL{Person:pub}
-    §PROP{Name:str:pub:get,set}
+    §PROP{Name:string:pub:get,set}
   §F{Create:pub} () -> Person
     §E{alloc}
     §R §NEW{Person} §/NEW
-  §F{ReadName:pub} (Person:person) -> ?str
-    §R (?. person Name)
+  §F{ReadName:pub} (Person:person) -> string?
+    §R person?.Name
 ```
 
 ## Example complete_indexer
@@ -2123,10 +2129,10 @@ indexer
 ```calor
 §M{Indexers}
   §CL{Numbers:pub}
-    §IXER{i32:pub}
-      §I{i32:index}
+    §IXER{int:pub}
+      §I{int:index}
       §GET
-        §R (+ index 1)
+        §R (index + 1)
 ```
 
 ## Example complete_invariant
@@ -2135,8 +2141,8 @@ invariant
 
 ```calor
 §M{Invariants}
-  §IV (> 1 0)
-  §F{Read:pub} () -> i32
+  §IV (1 > 0)
+  §F{Read:pub} () -> int
     §R 1
 ```
 
@@ -2147,10 +2153,10 @@ interface
 ```calor
 §M{Interfaces}
   §IFACE{ICounter}
-    §MT{Count:pub} () -> i32
+    §MT{Count:pub} () -> int
   §CL{Counter:pub}
     §IMPL{ICounter}
-    §MT{Count:pub} () -> i32
+    §MT{Count:pub} () -> int
       §R 1
 ```
 
@@ -2160,10 +2166,10 @@ using
 
 ```calor
 §M{Resources}
-  §F{Read:pub} (str:value) -> str
+  §F{Read:pub} (string:value) -> string
     §E{alloc}
     §USE{reader:System.IO.StringReader} §NEW{System.IO.StringReader} §A value §/NEW
-      §R §C{reader.ReadToEnd} §/C
+      §R reader.ReadToEnd()
 ```
 
 ## Example complete_linq
@@ -2173,11 +2179,11 @@ linq
 ```calor
 §M{Queries}
   §U{System.Linq}
-  §F{Positive:pub} ([i32]:values) -> [i32]
+  §F{Positive:pub} (int[]:values) -> int[]
     §E{alloc}
-    §B{predicate:Func<i32,bool>} §LAM{x:i32} (> x 0) §/LAM
-    §B{filtered:IEnumerable<i32>} §C{System.Linq.Enumerable.Where} §A values §A predicate §/C
-    §R §C{System.Linq.Enumerable.ToArray} §A filtered §/C
+    §B{predicate:Func<int,bool>} §E{} §LAM{x:int} §E{} (x > 0) §/LAM
+    §B{filtered:IEnumerable<int>} System.Linq.Enumerable.Where<int>(values, predicate)
+    §R §C{System.Linq.Enumerable.ToArray<int>} §A filtered §/C
 ```
 
 ## Example complete_interpolation
@@ -2186,7 +2192,7 @@ interpolation
 
 ```calor
 §M{Interpolation}
-  §F{Greet:pub} (str:name) -> str
+  §F{Greet:pub} (string:name) -> string
     §R "Hello ${name}"
 ```
 
@@ -2196,11 +2202,11 @@ break continue
 
 ```calor
 §M{LoopControl}
-  §F{FirstPositive:pub} ([i32]:values) -> i32
+  §F{FirstPositive:pub} (int[]:values) -> int
     §E{}
-    §B{~answer:i32} 0
-    §EACH{value:i32} values
-      §IF (<= value 0)
+    §B{~answer:int} 0
+    §EACH{value:int} values
+      §IF (value <= 0)
         §CN
       §ASSIGN answer value
       §BK
@@ -2214,14 +2220,14 @@ inheritance
 ```calor
 §M{Inheritance}
   §CL{Base:pub:abs}
-    §MT{Read:pub:abs} () -> i32
-    §MT{Label:pub:virt} () -> str
+    §MT{Read:pub:abs} () -> int
+    §MT{Label:pub:virt} () -> string
       §R "base"
   §CL{Derived:pub:seal}
     §EXT{Base}
-    §MT{Read:pub:over} () -> i32
+    §MT{Read:pub:over} () -> int
       §R 7
-    §MT{Label:pub:over} () -> str
+    §MT{Label:pub:over} () -> string
       §R "derived"
 ```
 
@@ -2231,7 +2237,7 @@ sync
 
 ```calor
 §M{Synchronization}
-  §F{Read:pub} (object:gate) -> i32
+  §F{Read:pub} (object:gate) -> int
     §SYNC (gate)
       §R 7
 ```
@@ -2244,10 +2250,10 @@ documentation
 §M{Documentation}
   // TODO: add another algorithm.
   // Complexity: O(1).
-  §F{Read:pub} () -> i32
+  §F{Read:pub} () -> int
     §DP{Use ReadCurrent instead}
     §R 7
-  §F{ReadCurrent:priv} () -> i32
+  §F{ReadCurrent:priv} () -> int
     §R 8
 ```
 
@@ -2257,8 +2263,8 @@ decimal
 
 ```calor
 §M{Decimals}
-  §F{Price:pub} () -> dec
-    §R DECIMAL:18.00
+  §F{Price:pub} () -> decimal
+    §R 18.00m
 ```
 
 ## Example complete_preprocessor
@@ -2267,7 +2273,7 @@ preprocessor
 
 ```calor
 §M{Preprocessor}
-  §F{Mode:pub} () -> str
+  §F{Mode:pub} () -> string
     §PP{DEBUG}
       §R "debug"
     §PPE
@@ -2281,7 +2287,7 @@ struct
 ```calor
 §M{Values}
   §CL{Point:pub:struct}[@Serializable]
-    §PROP{X:i32:pub:get,set}
+    §PROP{X:int:pub:get,set}
 ```
 
 ## Example complete_partial
@@ -2291,7 +2297,7 @@ partial
 ```calor
 §M{PartialTypes}
   §CL{Counter:pub:partial}
-    §MT{Read:pub} () -> i32
+    §MT{Read:pub} () -> int
       §R 1
 ```
 
@@ -2301,7 +2307,7 @@ unsafe
 
 ```calor
 §M{UnsafeCode}
-  §F{Size:pub} () -> i32
+  §F{Size:pub} () -> int
     §E{unsafe}
     §UNSAFE
       §R 4
@@ -2313,11 +2319,11 @@ nullable
 
 ```calor
 §M{NullableValues}
-  §F{DefaultName:pub} (?str:name) -> str
-    §B{~value:?str} name
-    §IF (== value null)
+  §F{DefaultName:pub} (string?:name) -> string
+    §B{~value:string?} name
+    §IF (value == null)
       §ASSIGN value "unknown"
-    §R (?? value "unknown")
+    §R (value ?? "unknown")
 ```
 
 ## Example complete_patterns
@@ -2326,8 +2332,8 @@ patterns
 
 ```calor
 §M{Patterns}
-  §F{InRange:pub} (i32:value) -> bool
-    §R (&& (> value 0) (< value 100))
+  §F{InRange:pub} (int:value) -> bool
+    §R ((value > 0) && (value < 100))
 ```
 
 ## Example complete_tuples
@@ -2336,7 +2342,7 @@ tuples
 
 ```calor
 §M{Tuples}
-  §F{Pair:pub} (i32:value) -> (i32, str)
+  §F{Pair:pub} (int:value) -> (int, string)
     §R (value, "value")
 ```
 
@@ -2346,7 +2352,7 @@ goto
 
 ```calor
 §M{Jumps}
-  §F{Normalize:pub} (i32:value) -> i32
+  §F{Normalize:pub} (int:value) -> int
     §W value
       §K 0
         §GOTO{CASE:1}
@@ -2362,6 +2368,21 @@ array ranges
 
 ```calor
 §M{ArrayRanges}
-  §F{FirstTwo:pub} ([i32]:values) -> [i32]
-    §R §IDX{values} §RANGE 0 2
+  §F{FirstTwo:pub} (int[]:values) -> int[]
+    §R values[§RANGE 0 2]
+```
+
+## Example complete_postfix
+
+Expression-valued call target with an explicit pure delegate row
+
+```calor
+§M{PostfixCalls}
+  §F{Apply:pub} (Holder:h) -> int
+    §E{}
+    §R h.Make()(41)
+  §CL{Holder:pub}
+    §MT{Make:pub} () -> Func<int,int> §E{}
+      §E{}
+      §R §LAM{x:int} §E{} (x + 1) §/LAM
 ```

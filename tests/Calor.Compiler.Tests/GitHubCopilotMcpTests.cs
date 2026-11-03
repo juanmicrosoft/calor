@@ -287,9 +287,9 @@ public class GitHubCopilotMcpTests : IDisposable
 
         Assert.Contains("calor://primer", content);
         var primer = Calor.Compiler.Mcp.McpMessageHandler.GetPrimerContentPublic();
-        Assert.Contains("§A", primer);
-        Assert.Contains("§/C", primer);
-        Assert.Contains("returns an ARRAY", primer);
+        Assert.Contains("File.ReadAllLines(path)", primer);
+        Assert.Contains("§ASSIGN", primer);
+        Assert.Contains("returns `string[]`, not `List<string>`", primer);
     }
 
     [Fact]
