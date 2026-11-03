@@ -718,8 +718,8 @@ public static class AttributeHelper
             current.Append(c);
         }
 
-        if (current.Length > 0)
-            args.Add(current.ToString().Trim());
+        // Empty arguments carry the arity of an open generic type.
+        args.Add(current.ToString().Trim());
 
         return args;
     }

@@ -1,4 +1,9 @@
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System.Reflection;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -9,6 +14,98 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class ToSurfaceSpellingTests
 {
+    [Theory]
+    [InlineData("G<>", "G<>")]
+    [InlineData("G<,>", "G<, >")]
+    [InlineData("G<,,>", "G<, , >")]
+    [InlineData("G<,,,>", "G<, , , >")]
+    [InlineData("G< ,  , >", "G<, , >")]
+    [InlineData("N.Outer<, >.Inner<, , >", "N.Outer<, >.Inner<, , >")]
+    public void OpenGenericSlots_SurviveRepeatedTypePrinting(string type, string expected)
+    {
+        Func<string, string>[] printers =
+        [
+            AttributeHelper.ExpandType,
+            AttributeHelper.ToSurfaceSpelling,
+            Migration.TypeMapper.CSharpToCalor,
+            Migration.TypeMapper.CalorToCSharp,
+            Migration.TypeMapper.ToSurfaceType
+        ];
+        foreach (var printer in printers)
+        {
+            var actual = printer(type);
+            Assert.Equal(expected, actual);
+            Assert.Equal(expected, printer(actual));
+        }
+    }
+
+    [Theory]
+    [InlineData("System.Collections.Generic.List<>", 1)]
+    [InlineData("System.Collections.Generic.Dictionary<,>", 2)]
+    [InlineData("System.Func<,,>", 3)]
+    [InlineData("System.Action<,,,>", 4)]
+    [InlineData("ProbeTypes.IRequestExceptionHandler<,>", 2)]
+    [InlineData("ProbeTypes.IRequestExceptionHandler<,,>", 3)]
+    [InlineData("ProbeTypes.Container.Inner<,,>", 3)]
+    [InlineData("ProbeTypes.Outer<>.Inner<,>", 3)]
+    [InlineData("ProbeTypes.Outer<,>.Inner<,,>", 5)]
+    public void OpenGenericTypeOf_ConversionSerializationAndExecutionPreserveExactArity(string type, int arity)
+    {
+        var source = $$"""
+            namespace ProbeTypes
+            {
+                public interface IRequestExceptionHandler<T1, T2> {}
+                public interface IRequestExceptionHandler<T1, T2, T3> {}
+                public class Container { public class Inner<T1, T2, T3> {} }
+                public class Outer<T> { public class Inner<T1, T2> {} }
+                public class Outer<T1, T2> { public class Inner<U1, U2, U3> {} }
+                public static class Probe
+                {
+                    public static System.Type Run() => typeof({{type}});
+                }
+            }
+            """;
+        static int[] Slots(string code) =>
+            Assert.Single(CSharpSyntaxTree.ParseText(code).GetRoot().DescendantNodes().OfType<TypeOfExpressionSyntax>())
+                .Type.DescendantNodesAndSelf().OfType<GenericNameSyntax>()
+                .Select(generic =>
+                {
+                    Assert.All(generic.TypeArgumentList.Arguments, argument => Assert.IsType<OmittedTypeArgumentSyntax>(argument));
+                    return generic.Arity;
+                }).ToArray();
+        static Type Execute(string code)
+        {
+            var compilation = CSharpCompilation.Create($"OpenGeneric_{Guid.NewGuid():N}",
+                [CSharpSyntaxTree.ParseText(code)], GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var image = new MemoryStream();
+            var emitted = compilation.Emit(image);
+            Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+            var probe = Assembly.Load(image.ToArray()).GetTypes().Single(t => t.Name == "Probe");
+            return Assert.IsAssignableFrom<Type>(probe.GetMethod("Run")!.Invoke(null, null));
+        }
+        var original = Execute(source);
+        Assert.True(original.IsGenericTypeDefinition);
+        Assert.Equal(arity, original.GetGenericArguments().Length);
+        var converted = new Migration.CSharpToCalorConverter().Convert(source);
+        Assert.True(converted.Success, string.Join("\n", converted.Issues.Select(issue => issue.Message)));
+        Assert.Empty(converted.Losses);
+        Assert.NotNull(converted.Ast);
+        Assert.Equal(Slots(source), Slots(new CSharpEmitter().Emit(converted.Ast)));
+        var serialized = new Migration.CalorEmitter().Emit(converted.Ast);
+        Assert.Contains("(typeof ", serialized);
+        Assert.DoesNotContain("§CS", serialized);
+        var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
+        var parsed = new Parser(new Lexer(serialized, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+        var generated = new CSharpEmitter().Emit(parsed);
+        Assert.Equal(Slots(source), Slots(generated));
+        var actual = Execute(generated);
+        Assert.True(actual.IsGenericTypeDefinition);
+        Assert.Equal(original.FullName, actual.FullName);
+        Assert.Equal(arity, actual.GetGenericArguments().Length);
+    }
+
     [Theory]
     [InlineData("int", true, true, "0")]
     [InlineData("FLOAT[bits=32]", true, true, "0f")]

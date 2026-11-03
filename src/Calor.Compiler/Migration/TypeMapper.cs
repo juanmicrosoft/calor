@@ -604,10 +604,8 @@ public static class TypeMapper
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(current))
-        {
-            result.Add(mapper(current.Trim()));
-        }
+        // An omitted final argument is a slot: G<,,> has arity three, not two.
+        result.Add(mapper(current.Trim()));
 
         return string.Join(", ", result);
     }
