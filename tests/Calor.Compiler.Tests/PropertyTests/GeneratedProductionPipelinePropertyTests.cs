@@ -488,7 +488,7 @@ public sealed class GeneratedProductionPipelinePropertyTests(ITestOutputHelper o
 
     private static string RenderTerm(Term term) => term.Kind switch
     {
-        "literal" => $"§C{{Tap}} §A trace §A {term.Tag} §A INT:{term.Value.ToString(CultureInfo.InvariantCulture)} §/C",
+        "literal" => $"§C{{Tap}} §A trace §A {term.Tag} §A {term.Value.ToString(CultureInfo.InvariantCulture)} §/C",
         "+" or "-" or "*" or "/" => $"({term.Kind} {RenderTerm(term.Left!)} {RenderTerm(term.Right!)})",
         "conditional" => $"(? (!= {RenderTerm(term.Left!)} 0) {RenderTerm(term.Right!)} {RenderTerm(term.Third!)})",
         "and" or "or" => $"(? ({(term.Kind == "and" ? "&&" : "||")} (!= {RenderTerm(term.Left!)} 0) (!= {RenderTerm(term.Right!)} 0)) 1 0)",
@@ -501,17 +501,17 @@ public sealed class GeneratedProductionPipelinePropertyTests(ITestOutputHelper o
         var body = sample.Mode switch
         {
             "expression" => $"    §R {expression}\n",
-            "loop" => $"    §B{{~total:i32}} 0\n    §L{{i:1:{sample.Count}:1}}\n      §B{{~total}} (+ total {expression})\n    §R total\n",
+            "loop" => $"    §B{{~total:int}} 0\n    §L{{i:1:{sample.Count}:1}}\n      §B{{~total}} (+ total {expression})\n    §R total\n",
             "match" => $"    §W {sample.Count}\n      §K 0\n        §R {expression}\n      §K _\n        §R {RenderTerm(sample.Alternative)}\n",
             _ => throw new NotSupportedException(sample.Mode)
         };
         return """
             §M{GeneratedPipeline}
-              §F{Tap:pub} (List<i32>:trace, i32:tag, i32:value) -> i32
+              §F{Tap:pub} (List<int>:trace, int:tag, int:value) -> int
                 §E{mut}
                 §C{trace.Add} §A tag §/C
                 §R value
-              §F{Probe:pub} (List<i32>:trace) -> i32
+              §F{Probe:pub} (List<int>:trace) -> int
                 §E{mut,cw}
             """ + $"\n    §P {sample.Printed.ToString(CultureInfo.InvariantCulture)}\n" + body;
     }

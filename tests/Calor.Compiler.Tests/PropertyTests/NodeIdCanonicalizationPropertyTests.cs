@@ -106,8 +106,8 @@ public sealed class NodeIdCanonicalizationPropertyTests
         foreach (var index in Enumerable.Range(1, sample.FunctionCount)
                      .OrderBy(index => (index + sample.Rotation) % sample.FunctionCount))
         {
-            source.AppendLine($"  §F{{Compute{index}:pub}} (i32:x) -> i32");
-            source.AppendLine($"    §B{{offset:i32}} {sample.Value}");
+            source.AppendLine($"  §F{{Compute{index}:pub}} (int:x) -> int");
+            source.AppendLine($"    §B{{offset:int}} {sample.Value}");
             source.AppendLine($"    §R (+ x (+ offset {index}))");
         }
         source.AppendLine("  §CL{Calculator:pub}");
