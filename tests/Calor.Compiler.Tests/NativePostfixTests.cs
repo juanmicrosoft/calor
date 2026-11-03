@@ -16,6 +16,79 @@ namespace Calor.Compiler.Tests;
 public sealed class NativePostfixTests
 {
     [Fact]
+    public void LegacyTypeArrayWitness_PreservesBothElementsThroughRuntimeAndSourceRoundTrip()
+    {
+        const string source = """
+            §M{Native}
+              §F{Probe:pub} () -> System.Type[]
+                §E{alloc}
+                §B{~_hoist000} §ARR{System.Type} (typeof Model1Validator) (typeof Model2Validator) §/ARR
+                §R _hoist000
+              §CL{Model1Validator:pub}
+              §CL{Model2Validator:pub}
+            """;
+        var array = Assert.IsType<ArrayCreationNode>(Assert.IsType<BindStatementNode>(
+            Assert.Single(Parse(source).Functions).Body[0]).Initializer);
+        Assert.Equal(2, array.Initializer.Count);
+        foreach (var candidate in new[] { source, Parse(source).Accept(new CalorEmitter()) })
+        {
+            var types = Assert.IsType<Type[]>(Invoke(Compile(candidate), "Probe"));
+            Assert.Equal(["Native.Model1Validator", "Native.Model2Validator"],
+                types.Select(type => type.FullName));
+        }
+    }
+
+    [Theory]
+    [InlineData("§ARR{int} (cast int 1) (cast int 2) §/ARR")]
+    [InlineData("§ARR{int} §A (cast int 1) (cast int 2) §/ARR")]
+    [InlineData("§ARR{int} §A (cast int 1) §A (cast int 2) §/ARR")]
+    [InlineData("§LIST{int} (cast int 1) (cast int 2) §/LIST")]
+    [InlineData("§HSET{int} (cast int 1) (cast int 2) §/HSET")]
+    [InlineData("§DICT{int:int} §KV (cast int 1) (cast int 10) §KV (cast int 2) (cast int 20) §/DICT")]
+    [InlineData("§ARR2D{int} §ROW (cast int 1) (cast int 2) §/ARR2D")]
+    [InlineData("§ARR{int} (Echo (1)) (Echo (2)) §/ARR")]
+    [InlineData("§ARR{int} §A (Echo (1)) (Echo (2)) §/ARR")]
+    [InlineData("§ARR{int} Echo(Echo (1)) (Echo (2)) §/ARR")]
+    [InlineData("§LIST{int} Echo(1) Echo(2) §/LIST")]
+    [InlineData("§HSET{int} (Echo (1)) (Echo (2)) §/HSET")]
+    [InlineData("§DICT{int:int} §KV (Echo (1)) (Echo (10)) §KV (Echo (2)) (Echo (20)) §/DICT")]
+    [InlineData("§ARR2D{int} §ROW (Echo (1)) (Echo (2)) §/ARR2D")]
+    public void LegacyCollectionElements_KeepTheirBoundariesAndExplicitNativeCallDelimiters(string expression)
+    {
+        var source = $$"""
+            §M{Native}
+              §F{Echo:priv} (int:value) -> int
+                §E{}
+                §R value
+              §F{Probe:pub} () -> object
+                §E{alloc}
+                §B{values} {{expression}}
+                §R values
+            """;
+        foreach (var candidate in new[] { source, Parse(source).Accept(new CalorEmitter()) })
+        {
+            var value = Invoke(Compile(candidate), "Probe");
+            if (value is IDictionary<int, int> dictionary)
+            {
+                Assert.Equal(2, dictionary.Count);
+                Assert.Equal(10, dictionary[1]);
+                Assert.Equal(20, dictionary[2]);
+            }
+            else if (value is int[,] matrix)
+            {
+                Assert.Equal(1, matrix.GetLength(0));
+                Assert.Equal(2, matrix.GetLength(1));
+                Assert.Equal(1, matrix[0, 0]);
+                Assert.Equal(2, matrix[0, 1]);
+            }
+            else if (value is HashSet<int> set)
+                Assert.True(set.SetEquals([1, 2]));
+            else
+                Assert.Equal([1, 2], Assert.IsAssignableFrom<IEnumerable<int>>(value));
+        }
+    }
+
+    [Fact]
     public void Chaining_UsesExistingStructuralNodesAndCompleteSpans()
     {
         const string expression = "Factory().Items[Next(), 1].Pick<int>(second: in value, first: ref other)";

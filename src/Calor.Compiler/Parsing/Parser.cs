@@ -2873,19 +2873,20 @@ public sealed class Parser
             typeArguments: typeArguments);
     }
 
-    private ExpressionNode ParseArgument()
-        => ParseArgument(out _);
+    private ExpressionNode ParseArgument(bool? allowSpacedCall = null)
+        => ParseArgument(out _, allowSpacedCall);
 
-    private ExpressionNode ParseArgument(out string? argumentName)
+    private ExpressionNode ParseArgument(out string? argumentName, bool? allowSpacedCall = null)
     {
-        var argument = ParseArgument(out argumentName, out var modifier);
+        var argument = ParseArgument(out argumentName, out var modifier, allowSpacedCall);
         if (modifier != null)
             _diagnostics.ReportError(argument.Span, DiagnosticCode.InvalidModifier,
                 "Argument modifiers are only supported on named-target calls.");
         return argument;
     }
 
-    private ExpressionNode ParseArgument(out string? argumentName, out string? argumentModifier)
+    private ExpressionNode ParseArgument(out string? argumentName, out string? argumentModifier,
+        bool? allowSpacedCall = null)
     {
         var startToken = Expect(TokenKind.Arg);
         argumentName = null;
@@ -2924,7 +2925,7 @@ public sealed class Parser
             {
                 return new ReferenceNode(Current.Span, "null");
             }
-            return ParseExpression();
+            return ParseExpression(allowSpacedCall: allowSpacedCall);
         }
         finally
         {
@@ -8049,12 +8050,12 @@ public sealed class Parser
                 if (Check(TokenKind.Arg))
                 {
                     // §A-prefixed element (backward compat with emitter output)
-                    initializer.Add(ParseArgument());
+                    initializer.Add(ParseArgument(allowSpacedCall: false));
                 }
                 else if (IsExpressionStart())
                 {
                     // Bare expression (documented syntax: §ARR{id:type} 1 2 3 §/ARR{id})
-                    initializer.Add(ParseExpression());
+                    initializer.Add(ParseExpression(allowSpacedCall: false));
                 }
                 else
                 {
@@ -8261,7 +8262,7 @@ public sealed class Parser
         // Parse elements until §/LIST
         while (!IsAtEnd && !IsBlockEnd(TokenKind.EndList) && IsExpressionStart())
         {
-            elements.Add(ParseExpression());
+            elements.Add(ParseExpression(allowSpacedCall: false));
         }
 
         var endToken = ExpectBlockEnd(TokenKind.EndList);
@@ -8388,7 +8389,7 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.KeyValue);
         var key = ParsePositionalExpression();
-        var value = ParseExpression();
+        var value = ParseExpression(allowSpacedCall: false);
         var span = startToken.Span.Union(value.Span);
         return new KeyValuePairNode(span, key, value);
     }
@@ -8430,7 +8431,7 @@ public sealed class Parser
                     elements.Add(bindStmt.Initializer);
                 continue;
             }
-            elements.Add(ParseExpression());
+            elements.Add(ParseExpression(allowSpacedCall: false));
         }
 
         var endToken = ExpectBlockEnd(TokenKind.EndHashSet);
@@ -14684,7 +14685,7 @@ public sealed class Parser
                     var row = new List<ExpressionNode>();
                     while (!IsAtEnd && !Check(TokenKind.Row) && !IsBlockEnd(TokenKind.EndArray2D))
                     {
-                        row.Add(ParseExpression());
+                        row.Add(ParseExpression(allowSpacedCall: false));
                     }
                     initializer.Add(row);
                 }
