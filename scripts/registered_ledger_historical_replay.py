@@ -241,11 +241,14 @@ def replay(name: str) -> None:
             raise ValueError("recorded producer differs from the original compiler selected for replay")
     artifacts = {ledger_path: final_ledger}
     if name == "binder":
-        baseline_path = "bench/phase0-agent-native/binder-incomplete-baseline.json"
-        baseline = git("show", f"{landing}:{baseline_path}")
-        if (ROOT / baseline_path).read_bytes() != baseline:
-            raise ValueError(f"{baseline_path}: immutable conversion baseline differs from original landing {landing}")
-        artifacts[baseline_path] = baseline
+        for relative, role in (
+            ("bench/phase0-agent-native/binder-incomplete-baseline.json", "conversion baseline"),
+            ("bench/phase0-agent-native/binder-source-carrier-evidence.json", "source-carrier evidence"),
+        ):
+            original = git("show", f"{landing}:{relative}")
+            if (ROOT / relative).read_bytes() != original:
+                raise ValueError(f"{relative}: immutable {role} differs from original landing {landing}")
+            artifacts[relative] = original
     verifier = ROOT / "scripts/verify-z3-assets.py"
     subprocess.run([sys.executable, str(verifier)], check=True, timeout=60)
     with tempfile.TemporaryDirectory(prefix=f"calor-{name}-history-") as temporary:
@@ -291,7 +294,7 @@ def replay(name: str) -> None:
         )
         verify_result(scratch / "results/historical.trx", test)
         for relative, expected in artifacts.items():
-            if (source / relative).read_bytes() != expected:
+            if (source / relative).read_bytes() != expected or (ROOT / relative).read_bytes() != expected:
                 raise ValueError(f"{relative}: historical replay changed its immutable input")
 
 

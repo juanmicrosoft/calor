@@ -193,6 +193,84 @@ class RegisteredReplayTests(unittest.TestCase):
                                 replay.replay("binder")
                             run.assert_not_called()
 
+    def test_changed_binder_carrier_evidence_fails_before_build(self):
+        for changed in (b"changed", b"{}\n", b'{"Cases": []}'):
+            with self.subTest(changed=changed), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                ledger = root / replay.REPLAYS["binder"][2]
+                ledger.parent.mkdir(parents=True)
+                ledger.write_bytes(b"{}")
+                (ledger.parent / "binder-incomplete-baseline.json").write_bytes(b"{}")
+                (ledger.parent / "binder-source-carrier-evidence.json").write_bytes(changed)
+                with patch.dict(os.environ, {}, clear=True), \
+                        patch.object(replay, "ROOT", root), patch.object(replay, "require_commit"), \
+                        patch.object(replay, "git", return_value=b"{}"), \
+                        patch.object(replay, "run_dotnet") as run, \
+                        patch.object(replay, "archive_submodules") as archive:
+                    with self.assertRaisesRegex(ValueError, "immutable source-carrier evidence"):
+                        replay.replay("binder")
+                    run.assert_not_called()
+                    archive.assert_not_called()
+
+    def test_binder_carrier_evidence_is_checked_in_archive_and_after_execution(self):
+        carrier = "bench/phase0-agent-native/binder-source-carrier-evidence.json"
+        baseline = "bench/phase0-agent-native/binder-incomplete-baseline.json"
+        manifests = (
+            ".github/z3-binaries-4.15.7.sha256",
+            "src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256",
+        )
+        for fault in (None, "archive", "missing-archive", "replayed-input", "current-input"):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                artifacts = {replay.REPLAYS["binder"][2]: b"{}",
+                             baseline: b"original baseline", carrier: b"original carriers"}
+                inputs = artifacts | {relative: b"pinned assets" for relative in manifests}
+                for relative, content in inputs.items():
+                    path = root / relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(content)
+                def git(*args):
+                    return artifacts[args[1].split(":", 1)[1]] if args[0] == "show" else b""
+                def extract(_, source):
+                    for relative, content in inputs.items():
+                        if relative == carrier and fault == "missing-archive":
+                            continue
+                        path = source / relative
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        path.write_bytes(content + b"\n" if relative == carrier and fault == "archive" else content)
+                def run(arguments, source, environment, timeout):
+                    self.assertEqual(artifacts[carrier], (source / carrier).read_bytes())
+                    self.assertGreater(timeout, 0)
+                    if arguments[0] != "test":
+                        self.assertIn("--locked-mode", arguments)
+                        return
+                    self.assertNotIn("--no-build", arguments)
+                    results = Path(arguments[arguments.index("--results-directory") + 1])
+                    results.mkdir()
+                    (results / "historical.trx").write_text(
+                        '<TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">'
+                        f'<Results><UnitTestResult testName="{replay.REPLAYS["binder"][3]}" outcome="Passed" />'
+                        '</Results></TestRun>', encoding="utf-8",
+                    )
+                    if fault == "replayed-input":
+                        (source / carrier).write_bytes(artifacts[carrier] + b"\n")
+                    elif fault == "current-input":
+                        (root / carrier).write_bytes(artifacts[carrier] + b"\n")
+                with patch.dict(os.environ, {}, clear=True), patch.object(replay, "ROOT", root), \
+                        patch.object(replay, "git", side_effect=git), patch.object(replay, "require_commit"), \
+                        patch.object(replay, "extract_archive", side_effect=extract), \
+                        patch.object(replay, "archive_submodules"), \
+                        patch.object(replay.runpy, "run_path", return_value={"ASSET_PATHS": {}}), \
+                        patch.object(replay.subprocess, "run"), \
+                        patch.object(replay, "run_dotnet", side_effect=run) as launch:
+                    if fault is None:
+                        replay.replay("binder")
+                        self.assertEqual(2, launch.call_count)
+                    else:
+                        with self.assertRaises((ValueError, FileNotFoundError)):
+                            replay.replay("binder")
+                        self.assertEqual(0 if fault in ("archive", "missing-archive") else 2, launch.call_count)
+
     def test_isolated_index_uses_original_paths_not_current_files(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -6,6 +6,9 @@ using Calor.Compiler.Binding;
 using Calor.Compiler.Commands;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
 
 // Flat test namespace: see BinderDispatchCompletenessTests.
@@ -171,6 +174,96 @@ public class BinderIncompleteRatchetTests
     private static readonly Lazy<IReadOnlyList<SourceCarrierCase>> PreservedCarrierCases = new(() =>
         JsonSerializer.Deserialize<SourceCarrierEvidence>(File.ReadAllText(Path.Combine(RepoRoot(),
             "bench", "phase0-agent-native", "binder-source-carrier-evidence.json")))!.PreservedCases ?? []);
+
+    private static readonly Lazy<IReadOnlyList<CurrentSourceCarrier>> CurrentSourceCarriers = new(() =>
+        JsonSerializer.Deserialize<CurrentSourceCarrier[]>(File.ReadAllText(Path.Combine(RepoRoot(),
+            "tests", "TestData", "Binding", "current-source-carrier-compatibility.json")))!);
+
+    [Fact]
+    public void CurrentSourceCarrierCompatibility_RegistersOnlySevenExactHistoricalIdentities()
+    {
+        Assert.Equal(7, CurrentSourceCarriers.Value.Count);
+        Assert.Equal(7, CurrentSourceCarriers.Value.Select(current => current.Original).Distinct().Count());
+        foreach (var current in CurrentSourceCarriers.Value)
+        {
+            Assert.Contains(current.Original, SourceCarrierCases.Value);
+            AssertCurrentCarrierTokenTransition(current);
+        }
+    }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("name-only-swap")]
+    [InlineData("source-span")]
+    [InlineData("carrier-kind")]
+    [InlineData("carrier-span")]
+    [InlineData("unrelated-token")]
+    [InlineData("arbitrary-name")]
+    [InlineData("declaration-span")]
+    [InlineData("operation-span")]
+    [InlineData("operation-change")]
+    [InlineData("opaque-initializer")]
+    [InlineData("declaration-scope")]
+    [InlineData("historical-evidence")]
+    public void CurrentSourceCarrierCompatibility_RequiresSourceOperationAndActualLexicalDeclaration(string mutation)
+    {
+        const string source = "class C { object Run() => F(typeof(int)); }";
+        var callStart = source.IndexOf("F(", StringComparison.Ordinal);
+        var operationStart = source.IndexOf("typeof", StringComparison.Ordinal);
+        var operationSpan = new TextSpan(operationStart, "typeof(int)".Length, 1, operationStart + 1);
+        var callSpan = TextSpan.FromBounds(callStart, operationSpan.End + 1, 1, callStart + 1);
+        var original = new SourceCarrierCase("control.cs", callSpan.Start, callSpan.End,
+            "InvocationExpression", source[callSpan.Start..callSpan.End],
+            nameof(CallExpressionNode), callSpan.Start, callSpan.End, "F(_old)");
+        var current = new CurrentSourceCarrier(original, "_old", "_current", "F(_current)",
+            nameof(BindStatementNode), operationSpan.Start, operationSpan.End,
+            "var _current = typeof(int);", nameof(TypeOfExpressionNode),
+            "TypeOfExpression", operationSpan.Start, operationSpan.End, "typeof(int)");
+        ExpressionNode initializer = new TypeOfExpressionNode(operationSpan, "int");
+        var declarationSpan = operationSpan;
+        var declarationName = "_current";
+        ExpressionNode carrier = new CallExpressionNode(callSpan, "F", [new ReferenceNode(operationSpan, "_current")]);
+        switch (mutation)
+        {
+            case "none": break;
+            case "name-only-swap": declarationName = "_other"; break;
+            case "source-span":
+                current = current with { Original = original with { SourceStart = original.SourceStart + 1 } }; break;
+            case "carrier-kind": carrier = new RawCSharpExpressionNode(callSpan, "F(_current)"); break;
+            case "carrier-span":
+                carrier = new CallExpressionNode(TextSpan.FromBounds(callSpan.Start, callSpan.End + 1, 1, 1),
+                    "F", [new ReferenceNode(operationSpan, "_current")]); break;
+            case "unrelated-token": current = current with { CurrentCarrierCode = "G(_current)" }; break;
+            case "arbitrary-name":
+                carrier = new CallExpressionNode(callSpan, "F", [new ReferenceNode(operationSpan, "_arbitrary")]); break;
+            case "declaration-span":
+                declarationSpan = TextSpan.FromBounds(operationSpan.Start, operationSpan.End + 1, 1, 1); break;
+            case "operation-span":
+                initializer = new TypeOfExpressionNode(new TextSpan(operationSpan.Start + 1, operationSpan.Length, 1, 1), "int"); break;
+            case "operation-change": initializer = new TypeOfExpressionNode(operationSpan, "string"); break;
+            case "opaque-initializer": initializer = new RawCSharpExpressionNode(operationSpan, "typeof(int)"); break;
+            case "declaration-scope": break;
+            case "historical-evidence": original = original with { CarrierCode = "F(_changed)" }; break;
+            default: throw new ArgumentOutOfRangeException(nameof(mutation));
+        }
+        var declaration = new BindStatementNode(declarationSpan, declarationName, null, false,
+            initializer, new AttributeCollection());
+        FunctionNode Function(string name, params StatementNode[] body) =>
+            new(default, name, name, Visibility.Public, [], new OutputNode(default, "object"),
+                null, body, new AttributeCollection());
+        var module = new ModuleNode(default, "m", "Control", [],
+            mutation == "declaration-scope"
+                ? [Function("Run", new ReturnStatementNode(callSpan, carrier)),
+                    Function("Other", declaration, new ReturnStatementNode(operationSpan, new ReferenceNode(operationSpan, declarationName)))]
+                : [Function("Run", declaration, new ReturnStatementNode(callSpan, carrier))],
+            new AttributeCollection());
+        void Check() => AssertCurrentSourceCarrier(module, source, original, current,
+            CreateCarrierBindingModel(module));
+        if (mutation == "none")
+            Check();
+        else
+            Assert.ThrowsAny<Xunit.Sdk.XunitException>(Check);
+    }
 
     [Fact]
     public void InRepoCorpus_IncompleteCount_DoesNotExceedBaseline()
@@ -1140,11 +1233,105 @@ public class BinderIncompleteRatchetTests
         var relative = Path.GetRelativePath(Path.Combine(RepoRoot(), "bench", "corpus"), file)
             .Replace('\\', '/');
         var nodes = Walk(module).OfType<ExpressionNode>().ToArray();
+        var current = CurrentSourceCarriers.Value.Where(c => c.Original.File == relative).ToArray();
+        var bindingModel = current.Length == 0 ? null : CreateCarrierBindingModel(module);
         Assert.Multiple(SourceCarrierCases.Value.Where(c => c.File == relative)
-            .Select(evidence => (Action)(() => AssertSourceCarrierPreserved(nodes, source, evidence)))
+            .Select(evidence => (Action)(() =>
+            {
+                var compatibility = current.SingleOrDefault(c => c.Original == evidence);
+                if (compatibility is null)
+                    AssertSourceCarrierPreserved(nodes, source, evidence);
+                else
+                    AssertCurrentSourceCarrier(module, source, evidence, compatibility, bindingModel!);
+            }))
             .ToArray());
         foreach (var evidence in PreservedCarrierCases.Value.Where(c => c.File == relative))
             AssertSourceCarrierPreservedOrInMember(module, source, evidence);
+    }
+
+    private static SemanticModel CreateCarrierBindingModel(ModuleNode module)
+    {
+        var tree = CSharpSyntaxTree.ParseText(new Compiler.CodeGen.CSharpEmitter().Emit(module));
+        return CSharpCompilation.Create("CurrentCarrierBindings", [tree],
+                Compiler.CodeGen.GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .GetSemanticModel(tree);
+    }
+
+    private static void AssertCurrentCarrierTokenTransition(CurrentSourceCarrier current)
+    {
+        var before = OpaqueTokens(current.Original.CarrierCode).ToArray();
+        var after = OpaqueTokens(current.CurrentCarrierCode).ToArray();
+        Assert.Equal(before.Length, after.Length);
+        Assert.NotEqual(current.OriginalGeneratedName, current.CurrentGeneratedName);
+        var originalIdentifier = $"{(int)SyntaxKind.IdentifierToken}:{current.OriginalGeneratedName}";
+        var currentIdentifier = $"{(int)SyntaxKind.IdentifierToken}:{current.CurrentGeneratedName}";
+        Assert.Equal(current.DeclarationKind == "VarPattern" ? 2 : 1,
+            before.Count(token => token == originalIdentifier));
+        for (var index = 0; index < before.Length; index++)
+            Assert.Equal(before[index] == originalIdentifier ? currentIdentifier : before[index], after[index]);
+    }
+
+    private static void AssertCurrentSourceCarrier(
+        ModuleNode module, string source, SourceCarrierCase original, CurrentSourceCarrier current,
+        SemanticModel bindingModel)
+    {
+        Assert.Equal(original, current.Original);
+        AssertCurrentCarrierTokenTransition(current);
+        AssertSourceCarrierPreserved(Walk(module).OfType<ExpressionNode>().ToArray(), source,
+            original with { CarrierCode = current.CurrentCarrierCode });
+        var sourceRoot = CSharpSyntaxTree.ParseText(source).GetRoot();
+        Assert.Single(sourceRoot.DescendantNodes().OfType<ExpressionSyntax>().Where(node =>
+            node.Span.Start == original.SourceStart && node.Span.End == original.SourceEnd
+            && node.Kind().ToString() == original.SourceKind));
+        Assert.Equal(current.SourceOperation, source[current.SourceOperationStart..current.SourceOperationEnd]);
+        Assert.Single(sourceRoot.DescendantNodes().OfType<ExpressionSyntax>().Where(node =>
+            node.Span.Start == current.SourceOperationStart && node.Span.End == current.SourceOperationEnd
+            && node.Kind().ToString() == current.SourceOperationKind));
+
+        var emittedRoot = bindingModel.SyntaxTree.GetRoot();
+        var emittedCarrier = Assert.Single(emittedRoot.DescendantNodes().OfType<ExpressionSyntax>()
+            .Where(node => OpaqueTokens(node.ToString()).SequenceEqual(OpaqueTokens(current.CurrentCarrierCode))));
+        ISymbol? declarationSymbol;
+        if (current.DeclarationKind == nameof(BindStatementNode))
+        {
+            var binding = Assert.Single(Walk(module).OfType<BindStatementNode>()
+                .Where(node => node.Name == current.CurrentGeneratedName));
+            Assert.Equal(current.DeclarationStart, binding.Span.Start);
+            Assert.Equal(current.DeclarationEnd, binding.Span.End);
+            Assert.Equal(OpaqueTokens(current.DeclarationCode),
+                OpaqueTokens(binding.Accept(new Compiler.CodeGen.CSharpEmitter())));
+            Assert.NotNull(binding.Initializer);
+            Assert.Equal(current.OperationCarrierKind, binding.Initializer.GetType().Name);
+            Assert.Equal(current.SourceOperationStart, binding.Initializer.Span.Start);
+            Assert.Equal(current.SourceOperationEnd, binding.Initializer.Span.End);
+            Assert.Equal(OpaqueTokens(current.SourceOperation),
+                OpaqueTokens(binding.Initializer.Accept(new Compiler.CodeGen.CSharpEmitter())));
+            var emittedDeclaration = Assert.Single(emittedRoot.DescendantNodes().OfType<VariableDeclaratorSyntax>()
+                .Where(node => node.Identifier.ValueText == current.CurrentGeneratedName));
+            Assert.Equal(OpaqueTokens(current.DeclarationCode),
+                OpaqueTokens(Assert.IsType<LocalDeclarationStatementSyntax>(emittedDeclaration.Parent?.Parent).ToString()));
+            declarationSymbol = bindingModel.GetDeclaredSymbol(emittedDeclaration);
+        }
+        else
+        {
+            Assert.Equal("VarPattern", current.DeclarationKind);
+            Assert.Null(current.DeclarationStart);
+            Assert.Null(current.DeclarationEnd);
+            Assert.Null(current.OperationCarrierKind);
+            var capture = Assert.Single(emittedCarrier.DescendantNodesAndSelf().OfType<IsPatternExpressionSyntax>());
+            Assert.Equal(OpaqueTokens(current.DeclarationCode), OpaqueTokens(capture.ToString()));
+            Assert.Equal(OpaqueTokens(current.SourceOperation), OpaqueTokens(capture.Expression.ToString()));
+            var designation = Assert.IsType<SingleVariableDesignationSyntax>(
+                Assert.IsType<VarPatternSyntax>(capture.Pattern).Designation);
+            Assert.Equal(current.CurrentGeneratedName, designation.Identifier.ValueText);
+            declarationSymbol = bindingModel.GetDeclaredSymbol(designation);
+        }
+        var local = Assert.IsAssignableFrom<ILocalSymbol>(declarationSymbol);
+        var reference = Assert.Single(emittedCarrier.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>()
+            .Where(node => node.Identifier.ValueText == current.CurrentGeneratedName));
+        Assert.True(SymbolEqualityComparer.Default.Equals(local, bindingModel.GetSymbolInfo(reference).Symbol),
+            "The renamed carrier reference must resolve to its actual source-corresponding local declaration.");
     }
 
     private static void AssertSourceCarrierPreservedOrInMember(
@@ -1283,6 +1470,21 @@ public class BinderIncompleteRatchetTests
         int CarrierStart,
         int CarrierEnd,
         string CarrierCode);
+
+    private sealed record CurrentSourceCarrier(
+        SourceCarrierCase Original,
+        string OriginalGeneratedName,
+        string CurrentGeneratedName,
+        string CurrentCarrierCode,
+        string DeclarationKind,
+        int? DeclarationStart,
+        int? DeclarationEnd,
+        string DeclarationCode,
+        string? OperationCarrierKind,
+        string SourceOperationKind,
+        int SourceOperationStart,
+        int SourceOperationEnd,
+        string SourceOperation);
 
     private sealed class NativeConversionCoverage
     {
