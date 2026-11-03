@@ -2084,6 +2084,10 @@ public sealed class CSharpToCalorConverter
         if (!string.IsNullOrEmpty(regexLocation))
             refs.Add(MetadataReference.CreateFromFile(regexLocation));
 
+        var concurrentLocation = typeof(System.Collections.Concurrent.ConcurrentDictionary<,>).Assembly.Location;
+        if (!string.IsNullOrEmpty(concurrentLocation))
+            refs.Add(MetadataReference.CreateFromFile(concurrentLocation));
+
         // Add System.Runtime for core types
         var runtimeDir = System.IO.Path.GetDirectoryName(objectLocation);
         if (runtimeDir != null)

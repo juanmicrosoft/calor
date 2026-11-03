@@ -9,6 +9,36 @@ namespace Calor.Compiler.Tests;
 
 public class DictionaryInitializerSemanticsTests
 {
+    [Fact]
+    public void DefaultSemanticReferences_ResolveActualConcurrentDictionaryCountType()
+    {
+        var tree = CSharpSyntaxTree.ParseText("""
+            using CD = System.Collections.Concurrent.ConcurrentDictionary<int, int>;
+            public class Probe
+            {
+                public static string Render()
+                {
+                    var values = new CD { [1] = 2 };
+                    return values.Count.ToString();
+                }
+            }
+            """);
+        var converter = new CSharpToCalorConverter();
+        var compilation = CSharpCompilation.Create(
+            "ConcurrentDictionaryIdentity", [tree], converter.GetSemanticMetadataReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.DoesNotContain(compilation.GetDiagnostics(),
+            diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        var count = tree.GetRoot().DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MemberAccessExpressionSyntax>()
+            .Single(member => member.Name.Identifier.ValueText == "Count");
+        var property = Assert.IsAssignableFrom<IPropertySymbol>(
+            compilation.GetSemanticModel(tree).GetSymbolInfo(count).Symbol);
+        Assert.Equal("ConcurrentDictionary`2", property.ContainingType.MetadataName);
+        Assert.Equal("System.Collections.Concurrent", property.ContainingNamespace.ToDisplayString());
+        Assert.Equal(SpecialType.System_Int32, property.Type.SpecialType);
+    }
+
     [Theory]
     [InlineData("var d = new Dictionary<int, int> { [1] = 2, [1] = 3 }; return d[1].ToString();", "3", true)]
     [InlineData("var d = new Dictionary<int, int> { {1, 2}, {1, 3} }; return d[1].ToString();", "throws:ArgumentException", false)]
