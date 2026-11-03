@@ -3858,7 +3858,8 @@ public sealed class Binder
                 resolvedType: new BoundTypes.UnresolvedBoundType(reason))
             {
                 // #943: the by-reference operand check still needs to know it is a property.
-                UnsupportedMetadataMember = member
+                UnsupportedMetadataMember = member,
+                HasUnknownInferredType = true
             };
         }
 
@@ -3870,7 +3871,11 @@ public sealed class Binder
             fields.FirstOrDefault(),
             fieldAccess.FieldNameSpan,
             fields,
-            resolvedType);
+            resolvedType)
+        {
+            HasUnknownInferredType = fieldTypes.Length != 1
+                || fields.Any(field => field.HasUnknownInferredType)
+        };
     }
 
     /// <summary>#943: the instance field a (possibly dotted) path names through in-module struct values.</summary>
@@ -4473,7 +4478,7 @@ public sealed class Binder
         return new BoundStructuralExpression(
             awaitExpression.Span,
             nameof(AwaitExpressionNode),
-            resultType.DisplayString,
+            resultType?.DisplayString ?? "OBJECT",
             [awaited],
             new Dictionary<string, object?>
             {
@@ -4481,10 +4486,13 @@ public sealed class Binder
             },
             deferredChildren: null,
             typeAnnotation: BoundTypes.NullableAnnotation.Oblivious,
-            resultType: resultType);
+            resultType: resultType)
+        {
+            HasUnknownInferredType = resultType is null || awaited.HasUnknownInferredType
+        };
     }
 
-    private static BoundTypes.BoundType GetAwaitedResultType(BoundTypes.BoundType awaitedType)
+    private static BoundTypes.BoundType? GetAwaitedResultType(BoundTypes.BoundType awaitedType)
     {
         if (awaitedType is BoundTypes.GenericInstantiationBoundType
             {
@@ -4496,7 +4504,8 @@ public sealed class Binder
             return generic.TypeArguments[0];
         }
 
-        return BuildDeclaredBoundType(UnwrapAwaitedType(awaitedType.DisplayString));
+        var typeName = UnwrapAwaitedType(awaitedType.DisplayString);
+        return typeName is null ? null : BuildDeclaredBoundType(typeName);
     }
 
     private BoundExpression BindNullCoalesce(NullCoalesceNode coalesce)
@@ -4523,7 +4532,9 @@ public sealed class Binder
             resultType: shape ?? ExpressionResultTypes.Coalesce(resultName, left.Type, right.Type))
         {
             MethodInputArrayType = shape as BoundTypes.ArrayBoundType,
-            GenericNullabilityType = shape as BoundTypes.GenericInstantiationBoundType
+            GenericNullabilityType = shape as BoundTypes.GenericInstantiationBoundType,
+            HasUnknownInferredType = !ExpressionResultTypes.IsNever(left.Type)
+                && (left.HasUnknownInferredType || right.HasUnknownInferredType)
         };
     }
 
@@ -7508,7 +7519,7 @@ public sealed class Binder
     private static string MakeArrayType(string elementType, int rank) =>
         $"{elementType}[{new string(',', Math.Max(0, rank - 1))}]";
 
-    private static string UnwrapAwaitedType(string typeName)
+    private static string? UnwrapAwaitedType(string typeName)
     {
         foreach (var prefix in new[] { "Task<", "ValueTask<", "TASK<", "VALUETASK<" })
         {
@@ -7520,7 +7531,7 @@ public sealed class Binder
         return typeName.Equals("Task", StringComparison.OrdinalIgnoreCase)
             || typeName.Equals("ValueTask", StringComparison.OrdinalIgnoreCase)
             ? "VOID"
-            : "OBJECT";
+            : null;
     }
 
     private static string? GetIndexedElementType(string typeName)

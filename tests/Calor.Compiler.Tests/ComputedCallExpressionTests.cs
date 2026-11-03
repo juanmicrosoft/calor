@@ -17,6 +17,68 @@ namespace Calor.Compiler.Tests;
 public sealed class ComputedCallExpressionTests
 {
     [Theory]
+    [InlineData("(§C{External.Make} §/C).Value", false)]
+    [InlineData("(§IDX §C{External.GetFields} §/C 0).Value", false)]
+    [InlineData("§AWAIT §C{External.MakeAsync} §/C", false)]
+    [InlineData("§AWAIT input", false)]
+    [InlineData("(?? §C{External.Make} §/C input)", false)]
+    [InlineData("(?? §C{External.Make} §/C null)", false)]
+    [InlineData("(?? null §C{External.Make} §/C)", false)]
+    [InlineData("(§NEW{Holder} §/NEW).Value", true)]
+    [InlineData("(cast Holder §C{External.Make} §/C).Value", true)]
+    [InlineData("§AWAIT task", true)]
+    [InlineData("§AWAIT valueTask", true)]
+    [InlineData("§AWAIT (cast Task<object> §C{External.Make} §/C)", true)]
+    [InlineData("(?? null input)", true)]
+    [InlineData("(?? input null)", true)]
+    [InlineData("(?? null (cast object §C{External.Make} §/C))", true)]
+    public void WrapperResultInference_RetainsOnlyEstablishedAuthority(string initializer, bool knownResult)
+    {
+        var (ast, bound, diagnostics) = Bind($$"""
+            §M{Test}
+              §F{Use:pub} (object:input, Task<object>:task, ValueTask<object>:valueTask) -> void
+                §E{}
+                §B{value} {{initializer}}
+                §B{alias} value
+                §C{alias.ToString} §/C
+                §C{Pick} §A alias §/C
+              §F{Pick:pub} (object:item) -> void
+                §E{}
+              §CL{Holder:pub:struct}
+                §FLD{object:Value:pub}
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
+        var calls = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallStatement>().ToArray();
+        var receiverCall = calls.Single(call => call.Target == "alias.ToString");
+        var pick = calls.Single(call => call.Target == "Pick");
+        Assert.Equal(!knownResult, Assert.Single(pick.Arguments).HasUnknownInferredType);
+        if (knownResult)
+        {
+            Assert.NotNull(pick.ResolvedSymbol);
+            Assert.Single(pick.SelectedOverloadMatches);
+            Assert.DoesNotContain(diagnostics, diagnostic =>
+                diagnostic.Code == DiagnosticCode.SignatureUnresolved);
+        }
+        else
+        {
+            var warning = Assert.Single(diagnostics.Where(diagnostic =>
+                diagnostic.Code == DiagnosticCode.SignatureUnresolved));
+            Assert.Equal(receiverCall.ReceiverSpan, warning.Span);
+            Assert.IsType<Calor.Compiler.Binding.BoundTypes.UnresolvedBoundType>(receiverCall.Receiver!.Type);
+            Assert.Null(pick.ResolvedSymbol);
+            Assert.Empty(pick.ResolvedSymbols);
+            Assert.Empty(pick.SelectedOverloadMatches);
+            Assert.True(pick.HasUnresolvedArguments);
+            Assert.Empty(CallGraphAnalysis.BuildResolved(bound).ForwardGraph[use.SymbolId]);
+            Assert.Empty(CallGraphAnalysis.Build(ast).ResolveCallSites(ast.Functions[0].Id, "Pick", pick.Span));
+        }
+        new EffectEnforcementPass(diagnostics, policy: UnknownCallPolicy.Strict, strictEffects: true).Enforce(ast);
+        Assert.Equal(!knownResult, diagnostics.Errors.Any(diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Span == pick.Span));
+    }
+
+    [Theory]
     [InlineData("List", false, false, false)]
     [InlineData("Dictionary", false, false, false)]
     [InlineData("List", true, false, false)]
