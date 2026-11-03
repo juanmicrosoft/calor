@@ -80,7 +80,6 @@ public static class EffectCodes
         new("io", "network_read", "net:r"),
         new("io", "network_write", "net:w"),
         new("io", "network_readwrite", "net:rw"),
-        new("io", "http", "http"),
         // Database
         new("io", "database", "db"),
         new("io", "database_read", "db:r"),

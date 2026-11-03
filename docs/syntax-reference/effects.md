@@ -217,7 +217,6 @@ Leave off `--row` to use the declaration's current row; `--row ""` asks about a 
 | `net:r` | Network read | HTTP GET, etc. | `HttpClient.GetStringAsync()` |
 | `net:w` | Network write | HTTP POST, etc. | `HttpClient.PostAsync()` |
 | `net:rw` | Network read/write | HTTP operations | `HttpClient.SendAsync()` |
-| `http` | HTTP | HTTP client operations | `HttpClient` usage |
 | `db` | Database | Unspecified database access | Connection setup |
 | `db:r` | Database read | Database queries | `SELECT` queries |
 | `db:w` | Database write | Database mutations | `INSERT/UPDATE/DELETE` |

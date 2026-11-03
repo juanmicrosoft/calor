@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Breaking changes
 
+- **The `http` effect code is removed.** HTTP operations continue to use the
+  existing `net`, `net:r`, `net:w` and `net:rw` codes. Source declarations and
+  effect manifests reject `http`; network effect coverage is unchanged.
 - **Default C# migration preserves instead of refusing.** Failed native conversion
   falls back to member, type or whole-file C# preservation. This reverses the
   previous all-or-nothing contract: one failed input no longer blocks valid

@@ -1,4 +1,6 @@
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
+using Calor.Compiler.Effects.Manifests;
 using Calor.Compiler.Parsing;
 using Xunit;
 
@@ -9,6 +11,43 @@ namespace Calor.Enforcement.Tests;
 /// </summary>
 public class EffectTaxonomyTests
 {
+    [Theory]
+    [InlineData("http")]
+    [InlineData("HTTP")]
+    [InlineData(" http ")]
+    public void RetiredHttpCode_IsRejectedBySourceAndManifests(string code)
+    {
+        Assert.False(EffectCodes.IsKnownCompactCode(code));
+        Assert.False(EffectCodes.TryParseCompact(code, out _, out _, out _));
+        Assert.Throws<ArgumentException>(() => EffectSet.From(code));
+
+        var result = TestHarness.Compile(
+            $$"""
+            §M{Test}
+              §F{Run:pub} () -> void
+                §E{{{code}}}
+            """);
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.UnknownEffectCode);
+
+        var loader = new ManifestLoader();
+        loader.LoadFromJson(
+            $$"""
+            {
+              "version": "1.0",
+              "mappings": [{
+                "type": "Example.Type",
+                "methods": { "Run": ["{{code}}"] }
+              }]
+            }
+            """,
+            "retired-http");
+        Assert.Contains(loader.ValidateManifests(),
+            error => error.Contains("Unknown effect code", StringComparison.Ordinal)
+                && error.Contains(code.Trim(), StringComparison.OrdinalIgnoreCase));
+    }
+
     [Theory]
     [InlineData("fs:r", EffectKind.IO, "filesystem_read")]
     [InlineData("fs:w", EffectKind.IO, "filesystem_write")]
