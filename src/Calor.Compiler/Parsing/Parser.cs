@@ -2967,8 +2967,9 @@ public sealed class Parser
     private const int MaxExpressionDepth = 128;
     private int _expressionDepth;
     private bool _allowSignedMinimumLiteral;
+    private bool _allowSpacedCall = true;
 
-    private ExpressionNode ParseExpression(int minimumPrecedence = 0, bool allowSpacedCall = true)
+    private ExpressionNode ParseExpression(int minimumPrecedence = 0, bool? allowSpacedCall = null)
     {
         if (_expressionDepth >= MaxExpressionDepth)
             return SkipTooDeepExpression();
@@ -2978,14 +2979,17 @@ public sealed class Parser
         // into a catchable InsufficientExecutionStackException.
         System.Runtime.CompilerServices.RuntimeHelpers.EnsureSufficientExecutionStack();
 
+        var previousSpacedCall = _allowSpacedCall;
+        _allowSpacedCall = allowSpacedCall ?? previousSpacedCall;
         _expressionDepth++;
         try
         {
-            return ParseExpressionCore(minimumPrecedence, allowSpacedCall);
+            return ParseExpressionCore(minimumPrecedence, _allowSpacedCall);
         }
         finally
         {
             _expressionDepth--;
+            _allowSpacedCall = previousSpacedCall;
         }
     }
 
@@ -3103,7 +3107,7 @@ public sealed class Parser
                         _diagnostics.ReportUnexpectedToken(Current.Span, "call argument", Current.Kind);
                         break;
                     }
-                    arguments.Add(ParseExpression());
+                    arguments.Add(ParseExpression(allowSpacedCall: true));
                     names.Add(name);
                     modifiers.Add(modifier);
                     if (!Match(TokenKind.Comma))
@@ -3136,7 +3140,7 @@ public sealed class Parser
                         _diagnostics.ReportUnexpectedToken(Current.Span, "index expression", Current.Kind);
                         break;
                     }
-                    indices.Add(ParseExpression());
+                    indices.Add(ParseExpression(allowSpacedCall: true));
                 } while (Match(TokenKind.Comma));
                 var close = Expect(TokenKind.CloseBracket);
                 ReportUnsupportedConditionalPostfix(expr, open.Span);
@@ -3492,7 +3496,7 @@ public sealed class Parser
             return ParseLispExpression();
 
         var open = Expect(TokenKind.OpenParen);
-        var grouped = ParseExpression();
+        var grouped = ParseExpression(allowSpacedCall: true);
         var close = Expect(TokenKind.CloseParen);
         if (grouped is ReferenceNode reference)
             _groupedReferenceSpans.TryAdd(reference, reference.Span);
@@ -3749,6 +3753,8 @@ public sealed class Parser
 
         System.Runtime.CompilerServices.RuntimeHelpers.EnsureSufficientExecutionStack();
 
+        var previousSpacedCall = _allowSpacedCall;
+        _allowSpacedCall = false;
         _expressionDepth++;
         try
         {
@@ -3757,6 +3763,7 @@ public sealed class Parser
         finally
         {
             _expressionDepth--;
+            _allowSpacedCall = previousSpacedCall;
         }
     }
 
@@ -5270,6 +5277,12 @@ public sealed class Parser
         // 0.25 F2 (#906): lex the hole at its real position, so a diagnostic inside it (an
         // undefined name, a type error) points at the hole instead of line 1, column 1.
         var holeSpan = new TextSpan(part.Start, source.Length, part.Line, part.Column);
+        // Keep the existing C# intrinsic route before native invocation lifting can classify nameof as a call.
+        if (source.Contains("nameof", StringComparison.Ordinal)
+            && SyntaxFactory.ParseExpression(source).DescendantNodesAndSelf()
+                .OfType<InvocationExpressionSyntax>().Any(invocation =>
+                    invocation.Expression is IdentifierNameSyntax { Identifier.Text: "nameof" }))
+            return ParseRawCSharpInterpolationPart(part, holeSpan);
         var lexer = new Lexer(source, _diagnostics, part.Start, part.Line, part.Column);
         var parser = new Parser(lexer.TokenizeAllForParser(), _diagnostics);
         var expression = parser.ParseExpression();

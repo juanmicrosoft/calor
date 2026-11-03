@@ -105,6 +105,21 @@ public sealed class NativePostfixTests
             Expression("(+ f() g())")).Left);
     }
 
+    [Fact]
+    public void LegacyNestedOperands_KeepTheirOuterOperandBoundary()
+    {
+        var assignment = Assert.IsType<AssignmentStatementNode>(Assert.Single(
+            Assert.Single(Parse(Source("§ASSIGN §IDX items 0 (+ §IDX items 0 4)", statement: true)).Functions).Body));
+        Assert.IsType<IntLiteralNode>(Assert.IsType<ArrayAccessNode>(assignment.Target).Index);
+        Assert.IsType<BinaryOperationNode>(assignment.Value);
+        Assert.IsType<ArrayAccessNode>(Assert.IsType<BinaryOperationNode>(
+            Expression("(+ §IDX items 0 (+ 1 2))")).Left);
+        Assert.IsType<ArrayLengthNode>(Assert.IsType<BinaryOperationNode>(
+            Expression("(+ §LEN items (+ 1 2))")).Left);
+        Assert.IsType<CallExpressionNode>(Assert.IsType<BinaryOperationNode>(
+            Expression("(+ f(g (1), items[h (2)]) 3)")).Left);
+    }
+
     [Theory]
     [InlineData("f(1,)")]
     [InlineData("f(ref)")]
@@ -436,6 +451,45 @@ public sealed class NativePostfixTests
             Assert.IsType<ReturnStatementNode>(Assert.Single(method.Body)).Expression);
         Assert.IsType<TypeOperationNode>(call.TargetExpression);
         Assert.IsType<ExpressionCallNode>(Expression(call.Accept(new CalorEmitter())));
+    }
+
+    [Theory]
+    [InlineData("nameof(n)", "n")]
+    [InlineData("(nameof(n))", "n")]
+    [InlineData("nameof(n).Length", "1")]
+    [InlineData("nameof(n),3", "  n")]
+    public void NameofInterpolation_KeepsItsExistingIntrinsicRoute(string hole, string expected)
+    {
+        var source = $$"""
+            §M{Native}
+              §F{Probe:pub} (int:n) -> string
+                §R "${{{hole}}}"
+            """;
+        var interpolation = Assert.IsType<InterpolatedStringNode>(Assert.IsType<ReturnStatementNode>(
+            Assert.Single(Assert.Single(Parse(source).Functions).Body)).Expression);
+        Assert.IsType<RawCSharpExpressionNode>(Assert.IsType<InterpolatedStringExpressionNode>(
+            Assert.Single(interpolation.Parts)).Expression);
+        Assert.Equal(expected, Invoke(Compile(source), "Probe", 12));
+    }
+
+    [Fact]
+    public void NativeNamedCallInterpolation_HasExactMetadataAndRealOutput()
+    {
+        const string source = """
+            §M{Native}
+              §F{Probe:pub} (int:n) -> string
+                §R "v=${Math.Max(val1: n, val2: 3)}"
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Equal("System.Math", call.ResolvedMetadataMethod?.ContainingType.ToDisplayString());
+        Assert.Equal("Max", call.ResolvedMetadataMethod?.Name);
+        Assert.All(call.ResolvedMetadataMethod!.Parameters, parameter =>
+            Assert.Equal(SpecialType.System_Int32, parameter.Type.SpecialType));
+        var type = Compile(source);
+        Assert.Equal("v=3", Invoke(type, "Probe", 1));
+        Assert.Equal("v=5", Invoke(type, "Probe", 5));
     }
 
     private static string RuntimeSource(string body, string type = "int", bool zero = false) => $$"""
