@@ -433,8 +433,8 @@ public class CalorFormatterTests
 
         Assert.Contains("§EACH{", result);
         Assert.Contains("item:int", result);
-        // Variable should be just "item:i32" with no trailing :idx slot in indent form
-        Assert.DoesNotContain("item:i32:", result);
+        // Variable should have no trailing index slot.
+        Assert.DoesNotContain("item:int:", result);
     }
 
     #endregion
