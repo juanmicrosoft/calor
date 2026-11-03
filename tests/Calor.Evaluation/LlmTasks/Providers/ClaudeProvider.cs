@@ -145,14 +145,14 @@ public sealed class ClaudeProvider : ILlmProvider, IDisposable
             var cacheReadTokens = usage?.CacheReadInputTokens ?? 0;
             var cacheCreationTokens = usage?.CacheCreationInputTokens ?? 0;
 
-            // Calculate cost accounting for prompt caching (90% discount on cached tokens)
-            var cost = EstimateCostWithCache(inputTokens, outputTokens, cacheReadTokens, model);
+            var cost = EstimateCostWithCache(
+                inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, model);
 
             return LlmGenerationResult.Successful(
                 generatedCode,
                 Name,
                 model,
-                inputTokens,
+                inputTokens + cacheReadTokens + cacheCreationTokens,
                 outputTokens,
                 cost,
                 stopwatch.Elapsed.TotalMilliseconds,
@@ -175,21 +175,23 @@ public sealed class ClaudeProvider : ILlmProvider, IDisposable
 
     public decimal EstimateCost(int inputTokens, int outputTokens, string? model = null)
     {
-        return EstimateCostWithCache(inputTokens, outputTokens, 0, model);
+        return EstimateCostWithCache(inputTokens, outputTokens, 0, 0, model);
     }
 
     /// <summary>
     /// Estimates cost accounting for prompt caching savings.
-    /// Cached tokens get a 90% discount (charged at 10% of normal rate).
+    /// Five-minute cache writes cost 125% of base input; reads cost 10%.
     /// </summary>
-    private decimal EstimateCostWithCache(int inputTokens, int outputTokens, int cacheReadTokens, string? model = null)
+    private decimal EstimateCostWithCache(
+        int inputTokens, int outputTokens, int cacheReadTokens,
+        int cacheCreationTokens, string? model = null)
     {
         model ??= DefaultModel;
         var (inputPrice, outputPrice) = Pricing.GetValueOrDefault(model, Pricing["default"]);
 
-        // Non-cached input tokens at full price
-        var nonCachedInputTokens = inputTokens - cacheReadTokens;
-        var inputCost = (nonCachedInputTokens / 1_000_000m) * inputPrice;
+        // Anthropic reports uncached input, cache reads and cache writes separately.
+        var inputCost = (inputTokens / 1_000_000m) * inputPrice;
+        var cacheWriteCost = (cacheCreationTokens / 1_000_000m) * inputPrice * 1.25m;
 
         // Cached tokens at 10% price (90% discount)
         var cachedInputCost = (cacheReadTokens / 1_000_000m) * inputPrice * 0.1m;
@@ -197,7 +199,7 @@ public sealed class ClaudeProvider : ILlmProvider, IDisposable
         // Output tokens at full price
         var outputCost = (outputTokens / 1_000_000m) * outputPrice;
 
-        return Math.Round(inputCost + cachedInputCost + outputCost, 6);
+        return Math.Round(inputCost + cacheWriteCost + cachedInputCost + outputCost, 6);
     }
 
     public int EstimateTokenCount(string text)

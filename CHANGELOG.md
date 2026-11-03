@@ -45,6 +45,11 @@ no substitute tokenizer or estimated result is reported here.
 
 ### Fixed
 
+- **Paid evaluation cost estimates account for prompt caching.** Claude cache
+  reads no longer reduce the separate uncached-input charge, and five-minute
+  cache writes include their surcharge. Reported input totals include cached
+  tokens. Reusing a local saved response incurs no new API cost. These estimates
+  are not provider invoices.
 - **Declaration identity uses less memory.** Symbol IDs share their prefixes,
   and source fingerprints stream into the hash instead of building large
   intermediate strings. Serialized IDs and fingerprint values stay unchanged.

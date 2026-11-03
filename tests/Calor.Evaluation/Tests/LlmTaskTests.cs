@@ -24,6 +24,57 @@ public class LlmTaskTests
         Assert.Contains("Include a complete module with indented bodies", prompt);
     }
 
+    [Theory]
+    [InlineData(ClaudeProvider.ModelSonnet, 1000, 100, 0, 0, 4500)]
+    [InlineData(ClaudeProvider.ModelSonnet, 1000, 100, 20000, 0, 10500)]
+    [InlineData(ClaudeProvider.ModelSonnet, 1000, 100, 0, 20000, 79500)]
+    [InlineData(ClaudeProvider.ModelSonnet, 1000, 100, 2000, 3000, 16350)]
+    [InlineData(ClaudeProvider.ModelOpus, 1000, 100, 2000, 3000, 27250)]
+    [InlineData(ClaudeProvider.ModelHaiku, 1000, 100, 2000, 3000, 4360)]
+    public async Task ClaudeProvider_AccountsForSeparateCacheUsage(
+        string model, int inputTokens, int outputTokens,
+        int cacheReadTokens, int cacheCreationTokens, int expectedMicrodollars)
+    {
+        using var client = new HttpClient(new ClaudeUsageHandler(
+            inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens));
+        using var provider = new ClaudeProvider("offline-test-key", client);
+
+        var result = await provider.GenerateCodeAsync("test", "csharp",
+            new LlmGenerationOptions { Model = model });
+
+        Assert.True(result.Success, result.Error);
+        Assert.Equal(expectedMicrodollars / 1_000_000m, result.Cost);
+        Assert.Equal(inputTokens + cacheReadTokens + cacheCreationTokens, result.InputTokens);
+        Assert.Equal(outputTokens, result.OutputTokens);
+        Assert.False(result.FromCache);
+    }
+
+    private sealed class ClaudeUsageHandler(
+        int inputTokens, int outputTokens, int cacheReadTokens, int cacheCreationTokens)
+        : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal("https://api.anthropic.com/v1/messages", request.RequestUri?.AbsoluteUri);
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(new
+                {
+                    content = new[] { new { type = "text", text = "return 1;" } },
+                    usage = new
+                    {
+                        input_tokens = inputTokens,
+                        output_tokens = outputTokens,
+                        cache_read_input_tokens = cacheReadTokens,
+                        cache_creation_input_tokens = cacheCreationTokens
+                    }
+                }))
+            });
+        }
+    }
+
     #region MockProvider Tests
 
     [Fact]
@@ -585,6 +636,10 @@ public static class Math
             Assert.NotNull(retrieved);
             Assert.Equal("test code", retrieved.GeneratedCode);
             Assert.True(retrieved.FromCache);
+            Assert.Equal(0m, retrieved.Cost);
+            Assert.Equal(100, retrieved.InputTokens);
+            Assert.Equal(50, retrieved.OutputTokens);
+            Assert.Equal(0.01m, result.Cost);
         }
         finally
         {
