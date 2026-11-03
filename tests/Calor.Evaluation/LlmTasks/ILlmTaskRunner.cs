@@ -6,7 +6,8 @@ namespace Calor.Evaluation.LlmTasks;
 public record LlmTaskRunnerOptions
 {
     /// <summary>
-    /// Maximum budget in USD for the entire run.
+    /// Reported-spend stopping threshold in USD for RunAllAsync.
+    /// Checked between paired tasks, so an in-flight task can exceed it.
     /// </summary>
     public decimal BudgetLimit { get; init; } = 5.00m;
 

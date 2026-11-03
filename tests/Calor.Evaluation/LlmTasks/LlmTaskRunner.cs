@@ -131,17 +131,19 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
             // Estimate tokens for both prompts
             var calorPrompt = task.GetPrompt("calor");
             var csharpPrompt = task.GetPrompt("csharp");
-            var calorInputTokens = _provider.EstimateTokenCount(calorPrompt);
-            var csharpInputTokens = _provider.EstimateTokenCount(csharpPrompt);
+            var calorOptions = CreateGenerationOptions("calor", options);
+            var csharpOptions = CreateGenerationOptions("csharp", options);
+            var calorInputTokens = EstimateInputTokens(calorPrompt, calorOptions);
+            var csharpInputTokens = EstimateInputTokens(csharpPrompt, csharpOptions);
 
             // Estimate output (assume ~500 tokens per generation)
             var estimatedOutputTokens = 500;
 
             // Check cache
             var calorCached = options.UseCache && !options.RefreshCache &&
-                _cache.Contains(_provider.Name, calorPrompt, LlmGenerationOptions.Default);
+                _cache.Contains(_provider.Name, calorPrompt, calorOptions);
             var csharpCached = options.UseCache && !options.RefreshCache &&
-                _cache.Contains(_provider.Name, csharpPrompt, LlmGenerationOptions.Default);
+                _cache.Contains(_provider.Name, csharpPrompt, csharpOptions);
 
             if (!calorCached)
             {
@@ -165,15 +167,16 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
 
             // Calculate per-category cost
             var taskCost = _provider.EstimateCost(
-                calorInputTokens + csharpInputTokens,
-                estimatedOutputTokens * 2);
+                (calorCached ? 0 : calorInputTokens) + (csharpCached ? 0 : csharpInputTokens),
+                estimatedOutputTokens * ((calorCached ? 0 : 1) + (csharpCached ? 0 : 1)),
+                options.Model);
 
             if (!byCategory.ContainsKey(task.Category))
                 byCategory[task.Category] = 0;
             byCategory[task.Category] += taskCost;
         }
 
-        var totalCost = _provider.EstimateCost(totalInputTokens, totalOutputTokens);
+        var totalCost = _provider.EstimateCost(totalInputTokens, totalOutputTokens, options.Model);
         var costWithCache = totalCost; // Already accounts for cache
 
         return new LlmTaskCostEstimate
@@ -197,11 +200,7 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
         LlmTaskRunnerOptions options,
         CancellationToken cancellationToken)
     {
-        var genOptions = LlmGenerationOptions.Default with
-        {
-            SystemPrompt = GetSystemPrompt(language),
-            Model = options.Model
-        };
+        var genOptions = CreateGenerationOptions(language, options);
 
         // Check cache or generate
         LlmGenerationResult genResult;
@@ -610,6 +609,21 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
 
     private static string? GetCalorSkillsContent() => GetSkillsContent("calor");
     private static string? GetCSharpSkillsContent() => GetSkillsContent("csharp");
+
+    private int EstimateInputTokens(string prompt, LlmGenerationOptions options)
+    {
+        var tokens = _provider.EstimateTokenCount(prompt);
+        if (options.SystemPrompt is { } systemPrompt)
+            tokens += _provider.EstimateTokenCount(systemPrompt);
+        return tokens;
+    }
+
+    private static LlmGenerationOptions CreateGenerationOptions(
+        string language, LlmTaskRunnerOptions options) => LlmGenerationOptions.Default with
+    {
+        SystemPrompt = GetSystemPrompt(language),
+        Model = options.Model
+    };
 
     private static string GetSystemPrompt(string language)
     {

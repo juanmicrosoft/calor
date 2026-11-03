@@ -54,6 +54,10 @@ no substitute tokenizer or estimated result is reported here.
   tokens. Reusing a local saved response incurs no new API cost. These estimates
   are not provider invoices. Models without configured prices are rejected
   before a paid request instead of using a guessed fallback price.
+- **Task-run preflight estimates use the selected model and full prompts.**
+  They include system instructions and match generation's local-cache keys.
+  Category estimates exclude saved responses, just like the total. Estimates
+  remain approximate, not a hard spending cap.
 - **Declaration identity uses less memory.** Symbol IDs share their prefixes,
   and source fingerprints stream into the hash instead of building large
   intermediate strings. Serialized IDs and fingerprint values stay unchanged.

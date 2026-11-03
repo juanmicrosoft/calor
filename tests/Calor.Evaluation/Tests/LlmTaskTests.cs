@@ -636,6 +636,121 @@ public static class Math
         Assert.Equal(0m, estimate.EstimatedCost);
     }
 
+    [Theory]
+    [InlineData(ClaudeProvider.ModelSonnet)]
+    [InlineData(ClaudeProvider.ModelOpus)]
+    [InlineData(ClaudeProvider.ModelHaiku)]
+    public void LlmTaskRunner_EstimateCost_UsesSelectedModel(string model)
+    {
+        var handler = new ClaudeUsageHandler(0, 0, 0, 0);
+        using var client = new HttpClient(handler);
+        using var provider = new ClaudeProvider("offline-test-key", client);
+        using var runner = new LlmTaskRunner(provider);
+        var manifest = CreateCostEstimateManifest();
+        var expectedInput = new[] { "calor", "csharp" }.Sum(language =>
+            provider.EstimateTokenCount(manifest.Tasks[0].GetPrompt(language))
+            + provider.EstimateTokenCount(LlmTaskRunner.GetSystemPromptForLanguage(language)));
+        var expectedCost = provider.EstimateCost(expectedInput, 1000, model);
+
+        var estimate = runner.EstimateCost(manifest, new LlmTaskRunnerOptions
+        {
+            Model = model,
+            UseCache = false,
+            BudgetLimit = expectedCost / 2
+        });
+
+        Assert.Equal(expectedInput, estimate.EstimatedInputTokens);
+        Assert.Equal(1000, estimate.EstimatedOutputTokens);
+        Assert.Equal(expectedCost, estimate.EstimatedCost);
+        Assert.Equal(expectedCost, estimate.ByCategory["test"]);
+        Assert.True(estimate.ExceedsBudget);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public void LlmTaskRunner_EstimateCost_RejectsUnpricedSelectedModel()
+    {
+        var handler = new ClaudeUsageHandler(0, 0, 0, 0);
+        using var client = new HttpClient(handler);
+        using var provider = new ClaudeProvider("offline-test-key", client);
+        using var runner = new LlmTaskRunner(provider);
+
+        Assert.Throws<ArgumentException>(() => runner.EstimateCost(
+            CreateCostEstimateManifest(),
+            new LlmTaskRunnerOptions { Model = "unpriced-model", UseCache = false }));
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Theory]
+    [InlineData("calor")]
+    [InlineData("csharp")]
+    [InlineData("both")]
+    public async Task LlmTaskRunner_EstimateCost_MatchesGenerationCacheKeys(string cachedLanguage)
+    {
+        var cacheDir = Path.Combine(Path.GetTempPath(), $"test-cost-cache-{Guid.NewGuid():N}");
+        try
+        {
+            var handler = new ClaudeUsageHandler(0, 0, 0, 0);
+            using var client = new HttpClient(handler);
+            using var provider = new ClaudeProvider("offline-test-key", client);
+            var cache = new LlmResponseCache(cacheDir);
+            using var runner = new LlmTaskRunner(provider, cache);
+            var manifest = CreateCostEstimateManifest();
+            var expectedInput = 0;
+            var expectedOutput = 0;
+            foreach (var language in new[] { "calor", "csharp" })
+            {
+                var prompt = manifest.Tasks[0].GetPrompt(language);
+                var systemPrompt = LlmTaskRunner.GetSystemPromptForLanguage(language);
+                if (cachedLanguage == "both" || cachedLanguage == language)
+                {
+                    await cache.SetAsync(provider.Name, prompt, LlmGenerationOptions.Default with
+                    {
+                        Model = ClaudeProvider.ModelOpus,
+                        SystemPrompt = systemPrompt
+                    }, new LlmGenerationResult { Success = true, Provider = provider.Name, Cost = 1m });
+                }
+                else
+                {
+                    expectedInput += provider.EstimateTokenCount(prompt)
+                        + provider.EstimateTokenCount(systemPrompt);
+                    expectedOutput += 500;
+                }
+            }
+
+            var estimate = runner.EstimateCost(manifest,
+                new LlmTaskRunnerOptions { Model = ClaudeProvider.ModelOpus });
+            var expectedCost = provider.EstimateCost(
+                expectedInput, expectedOutput, ClaudeProvider.ModelOpus);
+
+            Assert.Equal(cachedLanguage == "both" ? 2 : 1, estimate.CachedResponses);
+            Assert.Equal(expectedInput, estimate.EstimatedInputTokens);
+            Assert.Equal(expectedOutput, estimate.EstimatedOutputTokens);
+            Assert.Equal(expectedCost, estimate.EstimatedCost);
+            Assert.Equal(expectedCost, estimate.ByCategory["test"]);
+            Assert.Equal(0, handler.RequestCount);
+        }
+        finally
+        {
+            if (Directory.Exists(cacheDir))
+                Directory.Delete(cacheDir, recursive: true);
+        }
+    }
+
+    private static LlmTaskManifest CreateCostEstimateManifest() => new()
+    {
+        Tasks =
+        [
+            new()
+            {
+                Id = "cost-estimate",
+                Name = "Cost estimate",
+                Category = "test",
+                Prompts = new TaskPrompts { Calor = "Return 1", CSharp = "Return 1" }
+            }
+        ]
+    };
+
     #endregion
 
     #region LlmResponseCache Tests
