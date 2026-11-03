@@ -474,16 +474,35 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void NamedCallHole_IsAnalyzedNativelyAndExecutes()
+    {
+        const string calor = """
+            §M{InterpEffects}
+              §CL{Probe:pub}
+                §MT{Run:pub:stat} () -> str
+                  §E{}
+                  §B{n:i32} 1
+                  §B{higher:i32} 5
+                  §R "v=${Math.Max(val1: n, val2: 3)}|v=${Math.Max(val1: higher, val2: 3)}"
+            """;
+        var result = Program.Compile(calor, "f2-interp-named.calr");
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == "Calor0419");
+        Assert.Equal("v=3|v=5", Execute(result.GeneratedCode));
+    }
+
+    [Fact]
     public void CallHole_ThatCannotBeLifted_StillReportsAssumedEffects()
     {
-        // Negative control: a named argument keeps the hole raw C#; it must not become pure.
+        // Delegate creation remains raw C#; invoking it must not become implicitly pure.
         const string calor = """
             §M{InterpEffects}
               §F{Show:pub} (i32:n) -> str
                 §E{}
-                §R "v=${Math.Max(val1: n, val2: 3)}"
+                §R "v=${new Func<int>(() => n)()}"
             """;
         var result = Program.Compile(calor, "f2-interp-06c.calr");
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
         Assert.Contains(result.Diagnostics, d => d.Code == "Calor0419");
     }
 
