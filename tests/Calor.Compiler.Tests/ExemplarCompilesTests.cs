@@ -110,8 +110,15 @@ public class ExemplarCompilesTests
             Assert.DoesNotMatch(@"\((?:\+|-|\*|/|%|==|!=|<=|>=|<|>|&&|\|\||&|\||\^|<<|>>|\?\?|\?|->|!|~)\s", text);
             Assert.DoesNotMatch(@"\b(?:i32|i64|i16|i8|u8|u16|u32|u64|f32|f64|dec|str|Seq)\b", text);
             Assert.DoesNotMatch(@"\b(?:INT|LONG|UINT|ULONG|FLOAT|DOUBLE|DECIMAL|DEC|STR|BOOL):", text);
-            var sectionCalls = Regex.Matches(text, "§C\\{").Count;
-            Assert.Equal(program["id"]!.GetValue<string>() == "complete_linq" ? 1 : 0, sectionCalls);
+            Assert.DoesNotContain("§C{", text);
+            if (program["id"]!.GetValue<string>() == "complete_linq")
+            {
+                Assert.Contains("filtered:System.Collections.Generic.IEnumerable<int>", text);
+                Assert.Contains("System.Linq.Enumerable.ToArray<int>(filtered)", text);
+                var result = Program.Compile(text);
+                Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+                Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code is "Calor0410" or "Calor0411");
+            }
         }
     }
 

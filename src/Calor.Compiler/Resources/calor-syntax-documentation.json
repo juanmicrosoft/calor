@@ -856,7 +856,7 @@
         "linq query"
       ],
       "calorSyntax": "System.Linq.Enumerable.Where(collection, predicate)",
-      "description": "LINQ uses ordinary postfix calls, including generic calls and chained receivers. Bind predicates as typed lambda values and retain authoritative effect rows.",
+      "description": "LINQ uses ordinary postfix calls, including generic calls and chained receivers. Bind predicates as typed lambda values and retain authoritative effect rows. Declare an IEnumerable<T> result with its accurate qualified System.Collections.Generic.IEnumerable<T> type when passing it to metadata-resolved calls: unqualified interface aliases currently leave native ToArray effect resolution unknown. Do not relax effect policy or use casts to conceal that resolution boundary.",
       "programs": [
         "complete_linq"
       ],
@@ -864,7 +864,7 @@
       "examples": [
         {
           "csharp": "items.Where(x => x > 5).Select(x => x * 2)\nfrom item in items where item.Active select item.Name",
-          "calor": "§M{Queries}\n  §U{System.Linq}\n  §F{Positive:pub} (int[]:values) -> int[]\n    §E{alloc}\n    §B{predicate:Func<int,bool>} §E{} §LAM{x:int} §E{} (x > 0) §/LAM\n    §B{filtered:IEnumerable<int>} System.Linq.Enumerable.Where<int>(values, predicate)\n    §R §C{System.Linq.Enumerable.ToArray<int>} §A filtered §/C"
+          "calor": "§M{Queries}\n  §U{System.Linq}\n  §F{Positive:pub} (int[]:values) -> int[]\n    §E{alloc}\n    §B{predicate:Func<int,bool>} §E{} §LAM{x:int} §E{} (x > 0) §/LAM\n    §B{filtered:System.Collections.Generic.IEnumerable<int>} System.Linq.Enumerable.Where<int>(values, predicate)\n    §R System.Linq.Enumerable.ToArray<int>(filtered)"
         }
       ]
     },
@@ -2065,17 +2065,11 @@
         "§C"
       ],
       "calorSyntax": "§C{target<T>} §A arg §/C",
-      "description": "Compatibility call form retained during parser/metadata integration. Prefer postfix calls. The LINQ example keeps this bridge for ToArray because its native postfix form currently lacks authoritative effect resolution; do not relax effect policy to work around that boundary.",
+      "description": "Compatibility call lookup retained during integration. Author ordinary calls with postfix parentheses. A section call's manifest effect charge alone does not establish authoritative metadata resolution.",
       "csharpEquivalent": "System.Linq.Enumerable.ToArray<int>(filtered)",
-      "programs": [
-        "complete_linq"
-      ],
-      "examples": [
-        {
-          "csharp": "System.Linq.Enumerable.ToArray<int>(filtered)",
-          "calor": "§M{Queries}\n  §U{System.Linq}\n  §F{Positive:pub} (int[]:values) -> int[]\n    §E{alloc}\n    §B{predicate:Func<int,bool>} §E{} §LAM{x:int} §E{} (x > 0) §/LAM\n    §B{filtered:IEnumerable<int>} System.Linq.Enumerable.Where<int>(values, predicate)\n    §R §C{System.Linq.Enumerable.ToArray<int>} §A filtered §/C"
-        }
-      ]
+      "programs": [],
+      "lookupOnly": true,
+      "examples": []
     }
   ],
   "tags": {
@@ -2413,7 +2407,7 @@
       "name": "Call",
       "close": "§/C",
       "syntax": "§C{target<T>} §A arg §/C",
-      "description": "Compatibility call form retained during parser/metadata integration. Prefer postfix calls. The LINQ example keeps this bridge for ToArray because its native postfix form currently lacks authoritative effect resolution; do not relax effect policy to work around that boundary.",
+      "description": "Compatibility call lookup retained during integration. Author ordinary calls with postfix parentheses. A section call's manifest effect charge alone does not establish authoritative metadata resolution.",
       "csharpEquivalent": "System.Linq.Enumerable.ToArray<int>(filtered)"
     },
     "§U": {

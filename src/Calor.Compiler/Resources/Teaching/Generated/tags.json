@@ -354,7 +354,7 @@
       "open": "§C{target<T>} §A arg §/C",
       "close": "§/C",
       "tag": "§C",
-      "description": "Compatibility call form retained during parser/metadata integration. Prefer postfix calls. The LINQ example keeps this bridge for ToArray because its native postfix form currently lacks authoritative effect resolution; do not relax effect policy to work around that boundary.",
+      "description": "Compatibility call lookup retained during integration. Author ordinary calls with postfix parentheses. A section call's manifest effect charge alone does not establish authoritative metadata resolution.",
       "csharpEquivalent": "System.Linq.Enumerable.ToArray<int>(filtered)"
     },
     {

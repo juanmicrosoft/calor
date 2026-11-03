@@ -546,7 +546,7 @@ Complete example: [Container](#example-task_29).
 
 ## LINQ query
 
-LINQ uses ordinary postfix calls, including generic calls and chained receivers. Bind predicates as typed lambda values and retain authoritative effect rows.
+LINQ uses ordinary postfix calls, including generic calls and chained receivers. Bind predicates as typed lambda values and retain authoritative effect rows. Declare an IEnumerable<T> result with its accurate qualified System.Collections.Generic.IEnumerable<T> type when passing it to metadata-resolved calls: unqualified interface aliases currently leave native ToArray effect resolution unknown. Do not relax effect policy or use casts to conceal that resolution boundary.
 
 Syntax: `System.Linq.Enumerable.Where(collection, predicate)`
 
@@ -1252,7 +1252,7 @@ Complete example: [Collection allocation, loop mutation and count](#example-copi
 
 ## Staged section call
 
-Compatibility call form retained during parser/metadata integration. Prefer postfix calls. The LINQ example keeps this bridge for ToArray because its native postfix form currently lacks authoritative effect resolution; do not relax effect policy to work around that boundary.
+Compatibility call lookup retained during integration. Author ordinary calls with postfix parentheses. A section call's manifest effect charge alone does not establish authoritative metadata resolution.
 
 Syntax: `§C{target<T>} §A arg §/C`
 
@@ -1261,8 +1261,6 @@ C# equivalents (fragments):
 ```csharp
 System.Linq.Enumerable.ToArray<int>(filtered)
 ```
-
-Complete example: [linq](#example-complete_linq).
 
 ## Example copilot_smoke
 
@@ -2182,8 +2180,8 @@ linq
   §F{Positive:pub} (int[]:values) -> int[]
     §E{alloc}
     §B{predicate:Func<int,bool>} §E{} §LAM{x:int} §E{} (x > 0) §/LAM
-    §B{filtered:IEnumerable<int>} System.Linq.Enumerable.Where<int>(values, predicate)
-    §R §C{System.Linq.Enumerable.ToArray<int>} §A filtered §/C
+    §B{filtered:System.Collections.Generic.IEnumerable<int>} System.Linq.Enumerable.Where<int>(values, predicate)
+    §R System.Linq.Enumerable.ToArray<int>(filtered)
 ```
 
 ## Example complete_interpolation
