@@ -13,7 +13,7 @@
       "path": "tests/Calor.Conversion.Tests/Calor.Conversion.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 484,
+      "expectedTotal": 532,
       "expectedSkipped": 0,
       "note": "#1386: 466 -> 470, +4 production-path regressions for opaque current-class overloads, preserved null-forgiving expressions, side-effect fidelity, and genuine no-match diagnostics. #1420: 470 -> 474, +4 Z3ConsumerGuardTests cases (tests/Shared, linked into every registered test host): the host RID is a supported Z3 RID, Z3 loads at the pinned version, and the output-root and runtimes/<rid>/native libz3 plus Microsoft.Z3.dll match their committed SHA-256 pins. They fail rather than skip. No new skipped cases. #1485: 474 -> 476, +2 EmptyClauseRoundTripTests cases: X-TRYCATCH-01 and an empty-bodies program converted from C#, round-tripped, and executed with the same result as the original. No new skipped cases. 0.25 F3 PR B (#847): 476 -> 475; two rows (plain, mutually recursive) left the D4 escalation theory because they convert natively now; the mutual-recursion shape became one native fact (the plain shape already had one)."
     },
