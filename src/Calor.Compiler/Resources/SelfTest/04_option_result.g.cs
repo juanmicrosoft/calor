@@ -13,10 +13,42 @@ namespace TypeSystem
     {
         public static void Main()
         {
-            int? present = 42;
-            int? absent = null;
-            Console.WriteLine(present ?? 0);
-            Console.WriteLine(absent ?? 0);
+            Console.WriteLine("Testing nullable values and exceptions...");
+            TestPresent();
+            TestMissing();
+            TestSuccess();
+            TestFailure();
+        }
+
+        private static void TestPresent()
+        {
+            int? value = 42;
+            Console.WriteLine(value ?? 0);
+        }
+
+        private static void TestMissing()
+        {
+            int? value = null;
+            Console.WriteLine(value ?? -1);
+        }
+
+        private static void TestSuccess()
+        {
+            int value = 100;
+            Console.WriteLine(value);
+        }
+
+        private static void TestFailure()
+        {
+            try
+            {
+                throw new InvalidOperationException("Something went wrong");
+            }
+            catch (InvalidOperationException error)
+            {
+                Console.WriteLine(error.Message);
+            }
+
         }
 
     }

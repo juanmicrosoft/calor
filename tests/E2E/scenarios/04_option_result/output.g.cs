@@ -13,70 +13,42 @@ namespace TypeSystem
     {
         public static void Main()
         {
-            #line 4 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
             Console.WriteLine("Testing nullable values and exceptions...");
-            #line default
-            #line 5 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
             TestPresent();
-            #line default
-            #line 6 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
             TestMissing();
-            #line default
-            #line 7 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
             TestSuccess();
-            #line default
-            #line 8 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
             TestFailure();
-            #line default
         }
 
         private static void TestPresent()
         {
-            #line 12 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
             int? value = 42;
-            #line default
-            #line 13 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
             Console.WriteLine(value ?? 0);
-            #line default
         }
 
         private static void TestMissing()
         {
-            #line 17 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
             int? value = null;
-            #line default
-            #line 18 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
             Console.WriteLine(value ?? -1);
-            #line default
         }
 
         private static void TestSuccess()
         {
-            #line 22 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
             int value = 100;
-            #line default
-            #line 23 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
             Console.WriteLine(value);
-            #line default
         }
 
         private static void TestFailure()
         {
-            #line 27 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
             try
             {
-                #line 28 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
                 throw new InvalidOperationException("Something went wrong");
-                #line default
             }
             catch (InvalidOperationException error)
             {
-                #line 30 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
                 Console.WriteLine(error.Message);
-                #line default
             }
 
-            #line default
         }
 
     }
