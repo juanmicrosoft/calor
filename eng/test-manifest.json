@@ -63,7 +63,7 @@
       "path": "tests/Calor.LanguageServer.Tests/Calor.LanguageServer.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 546,
+      "expectedTotal": 548,
       "expectedSkipped": 0,
       "note": "#1420: 528 -> 532, +4 Z3ConsumerGuardTests cases (tests/Shared, linked into every registered test host): the host RID is a supported Z3 RID, Z3 loads at the pinned version, and the output-root and runtimes/<rid>/native libz3 plus Microsoft.Z3.dll match their committed SHA-256 pins. They fail rather than skip. No new skipped cases."
     },
@@ -163,7 +163,7 @@
     },
     {
       "reason": "corpus submodules not initialized",
-      "count": 7
+      "count": 6
     },
     {
       "_comment": "#1600: two DeclarationIdentitySidecarTests require Unix symlinks: physical project boundary discovery and source/transaction symlink rejection. They run on Linux/macOS and skip only on Windows; the compiler CI census still has three skips.",
