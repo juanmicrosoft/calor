@@ -109,7 +109,7 @@ public class InitializerConversionTests
     [InlineData("public Outer O = new Outer { Value = (int?)V0 };", "nullable-cast")]
     [InlineData("public Outer O = new Outer { Value = (System.Nullable<int>)V0 };", "nullable-cast")]
     [InlineData("public int M() { var a = new List<int>[2]; var i = 0; a[i] = new List<int> { Next() }; return 0; }", "initializer-position")]
-    [InlineData("public int M() { var o = new Outer(); System.Func<int> f = () => { o = null; return 1; }; o.Items.Add(Take(1, new Outer { V = f() })); return 0; }", "initializer-position")]
+    [InlineData("public int M() { var o = new Outer(); System.Func<int> f = () => { o = null; return 1; }; o.Items.Add(Take(1, new Outer { V = f() })); return 0; }", "conditional-expression-hoisting")]
     [InlineData("public int M() { var o = new Outer { Value = (System.Func<object>)(() => { return default(int); }) }; return 0; }", "object-initializer-value")]
     public void ShapeWithoutAFaithfulNativeForm_IsPreservedWithALoss(string member, string reason)
     {
@@ -334,6 +334,80 @@ public class InitializerConversionTests
         var generated = Compile(result.CalorSource!, enforceEffects: false);
         Assert.False(generated.HasErrors, name + ": " + string.Join("\n", generated.Diagnostics.Errors.Select(e => e.Message)));
         Assert.Equal(Run(source), Run(generated.GeneratedCode));
+    }
+
+    [Theory]
+    [InlineData(false, false, "receiver;constructor;argument;take;1:True")]
+    [InlineData(true, false, "receiver;constructor;argument;argument-error;0:True")]
+    [InlineData(false, true, "receiver;receiver-error;0:False")]
+    public void CapturedReceiver_PrecedesPreservedInitializerAndItsExceptions(
+        bool argumentThrows, bool receiverThrows, string expected)
+    {
+        var source = $$"""
+            using System;
+            using System.Collections.Generic;
+            public class Outer
+            {
+                public int V;
+                public readonly List<int> Values = new List<int>();
+                public List<int> Items
+                {
+                    get
+                    {
+                        Probe.Log += "receiver;";
+                        if ({{receiverThrows.ToString().ToLowerInvariant()}})
+                            throw new InvalidOperationException("receiver-error");
+                        return Values;
+                    }
+                }
+                public Outer() { Probe.Log += "constructor;"; }
+            }
+            public static class Probe
+            {
+                public static string Log = "";
+                public static int Take(int a, Outer value)
+                {
+                    Log += "take;";
+                    return value.V;
+                }
+                public static string Run()
+                {
+                    var o = new Outer();
+                    var saved = o;
+                    Log = "";
+                    Func<int> f = () =>
+                    {
+                        Log += "argument;";
+                        o = null;
+                        if ({{argumentThrows.ToString().ToLowerInvariant()}})
+                            throw new InvalidOperationException("argument-error");
+                        return 1;
+                    };
+                    try
+                    {
+                        o.Items.Add(Take(1, new Outer { V = f() }));
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        Log += ex.Message + ";";
+                    }
+                    return Log + saved.Values.Count + ":" + (o == null);
+                }
+            }
+            """;
+        var result = Convert(source);
+        Assert.True(result.Success, result.CalorSource);
+        var loss = Assert.Single(result.Context.Losses,
+            loss => loss.Feature == "conditional-expression-hoisting");
+        Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+        Assert.Contains("new Outer { V = f() }", loss.Description, StringComparison.Ordinal);
+        Assert.Contains("§CS{(new Outer { V = f() })}", result.CalorSource!, StringComparison.Ordinal);
+        Assert.DoesNotContain("§CS{(o.Items.Add", result.CalorSource!, StringComparison.Ordinal);
+        var generated = Compile(result.CalorSource!, enforceEffects: false);
+        Assert.False(generated.HasErrors,
+            string.Join("\n", generated.Diagnostics.Errors.Select(error => error.Message)));
+        Assert.Equal(expected, Run(source));
+        Assert.Equal(expected, Run(generated.GeneratedCode));
     }
 
     public static TheoryData<string, string, string> InertEventMutations() => new()
