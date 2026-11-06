@@ -231,18 +231,23 @@ public sealed class BoundVariableExpression : BoundExpression
             return;
         }
 
-        var resolvedTypes = ResolvedSymbols
-            .Select(symbol => TypeIdentity.Canonicalize(symbol.TypeName))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-        var resolvedTypeName = resolvedTypes.Length == 1 ? variable.TypeName : "OBJECT";
+        string? firstResolvedType = null;
+        var singleResolvedType = ResolvedSymbols.Count != 0;
+        for (var index = 0; index < ResolvedSymbols.Count; index++)
+        {
+            var resolvedType = TypeIdentity.Canonicalize(ResolvedSymbols[index].TypeName);
+            if (index == 0) firstResolvedType = resolvedType;
+            else if (!string.Equals(firstResolvedType, resolvedType, StringComparison.Ordinal))
+                singleResolvedType = false;
+        }
+        var resolvedTypeName = singleResolvedType ? variable.TypeName : "OBJECT";
         // Keep the legacy display projection. Resolved reference identity and
         // annotation are carried separately; ambiguous names do not supply one.
-        Type = resolvedTypes.Length == 1
+        Type = singleResolvedType
             ? BuildStringAnnotatedTypeOrDefault(variable, resolvedTypeName)
             : new NominalBoundType(resolvedTypeName, NullableAnnotation.Oblivious);
         referenceIdentity ??= ResolvedSymbols.Count == 1 ? variable.InferredReferenceType : null;
-        if (resolvedTypes.Length == 1 && referenceIdentity is not null && Type is NominalBoundType nominal)
+        if (singleResolvedType && referenceIdentity is not null && Type is NominalBoundType nominal)
             Type = new NominalBoundType(
                 nominal.QualifiedName,
                 referenceIdentity.IsKnownReferenceType ? variable.NullableAnnotation : nominal.NullableAnnotation,
