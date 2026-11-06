@@ -15,7 +15,7 @@
       "Output: <dir>/Grid.calr"
     ],
     "stderr": [],
-    "calor": "§M{Grid:overflow=unchecked}\n  §U{System.Collections.Generic}\n\n  §NS{_global:global}\n    §M{Grid:pub}\n      §F{Pick:pub} (bool:wide, i32:v) -> i32[,]\n        §E{alloc}\n        §R §IF wide → §ARR2D{i32} §ROW v (+ v 1) §/ARR2D §EL → §ARR2D{i32} §ROW v §/ARR2D\n\n      §F{Sum:pub} (i32[]:xs, i32:start) -> i32\n        §B{~s:i32} start\n        §EACH{x:var} xs\n          §ASSIGN s (+ s x)\n        §R s\n\n      §F{Total:pub} (i32:v) -> i32\n        §E{alloc}\n        §R §C{Sum} §A §ARR{i32} v (* v 2) §/ARR §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C\n\n      §F{Mixed:pub} () -> i32\n        §RAW\n        object[] items = { new List<int> { 1 }, 2 };\n        §/RAW\n        §R items.Length\n\n\n\n"
+    "calor": "§M{Grid:overflow=unchecked}\n  §U{System.Collections.Generic}\n\n  §NS{_global:global}\n    §M{Grid:pub}\n      §F{Pick:pub} (bool:wide, int:v) -> int[,]\n        §E{alloc}\n        §R §IF wide → §ARR2D{int} §ROW v (+ v 1) §/ARR2D §EL → §ARR2D{int} §ROW v §/ARR2D\n\n      §F{Sum:pub} (int[]:xs, int:start) -> int\n        §B{~s:int} start\n        §EACH{x:var} xs\n          §ASSIGN s (+ s x)\n        §R s\n\n      §F{Total:pub} (int:v) -> int\n        §E{alloc}\n        §R §C{Sum} §A §ARR{int} v (* v 2) §/ARR §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C\n\n      §F{Mixed:pub} () -> int\n        §RAW\n        object[] items = { new List<int> { 1 }, 2 };\n        §/RAW\n        §R items.Length\n\n\n\n"
   },
   "cli-convert-json": {
     "command": "calor convert Grid.cs -o Grid.calr --format json",
@@ -105,7 +105,7 @@
       "warning:Calor1343:array-element-block",
       "warning:Calor1343:nullable-oblivious-nested-shape"
     ],
-    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §U{System.Collections.Generic}\n\n  §NS{_global:global}\n    §M{Grid:pub}\n      §F{Pick:pub} (bool:wide, i32:v) -> i32[,]\n        §E{alloc}\n        §R §IF wide → §ARR2D{i32} §ROW v (+ v 1) §/ARR2D §EL → §ARR2D{i32} §ROW v §/ARR2D\n\n      §F{Sum:pub} (i32[]:xs, i32:start) -> i32\n        §B{~s:i32} start\n        §EACH{x:var} xs\n          §ASSIGN s (+ s x)\n        §R s\n\n      §F{Total:pub} (i32:v) -> i32\n        §E{alloc}\n        §R §C{Sum} §A §ARR{i32} v (* v 2) §/ARR §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C\n\n      §F{Mixed:pub} () -> i32\n        §RAW\n        object[] items = { new List<int> { 1 }, 2 };\n        §/RAW\n        §R items.Length\n\n\n\n"
+    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §U{System.Collections.Generic}\n\n  §NS{_global:global}\n    §M{Grid:pub}\n      §F{Pick:pub} (bool:wide, int:v) -> int[,]\n        §E{alloc}\n        §R §IF wide → §ARR2D{int} §ROW v (+ v 1) §/ARR2D §EL → §ARR2D{int} §ROW v §/ARR2D\n\n      §F{Sum:pub} (int[]:xs, int:start) -> int\n        §B{~s:int} start\n        §EACH{x:var} xs\n          §ASSIGN s (+ s x)\n        §R s\n\n      §F{Total:pub} (int:v) -> int\n        §E{alloc}\n        §R §C{Sum} §A §ARR{int} v (* v 2) §/ARR §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C\n\n      §F{Mixed:pub} () -> int\n        §RAW\n        object[] items = { new List<int> { 1 }, 2 };\n        §/RAW\n        §R items.Length\n\n\n\n"
   },
   "mcp-convert-passthroughOnError": {
     "arguments": "{ source, passthroughOnError: true }",
@@ -138,6 +138,6 @@
       "warning:Calor1343:array-element-block",
       "warning:Calor1343:nullable-oblivious-nested-shape"
     ],
-    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §U{System.Collections.Generic}\n\n  §NS{_global:global}\n    §M{Grid:pub}\n      §F{Pick:pub} (bool:wide, i32:v) -> i32[,]\n        §E{alloc}\n        §R §IF wide → §ARR2D{i32} §ROW v (+ v 1) §/ARR2D §EL → §ARR2D{i32} §ROW v §/ARR2D\n\n      §F{Sum:pub} (i32[]:xs, i32:start) -> i32\n        §B{~s:i32} start\n        §EACH{x:var} xs\n          §ASSIGN s (+ s x)\n        §R s\n\n      §F{Total:pub} (i32:v) -> i32\n        §E{alloc}\n        §R §C{Sum} §A §ARR{i32} v (* v 2) §/ARR §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C\n\n      §F{Mixed:pub} () -> i32\n        §RAW\n        object[] items = { new List<int> { 1 }, 2 };\n        §/RAW\n        §R items.Length\n\n\n\n"
+    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §U{System.Collections.Generic}\n\n  §NS{_global:global}\n    §M{Grid:pub}\n      §F{Pick:pub} (bool:wide, int:v) -> int[,]\n        §E{alloc}\n        §R §IF wide → §ARR2D{int} §ROW v (+ v 1) §/ARR2D §EL → §ARR2D{int} §ROW v §/ARR2D\n\n      §F{Sum:pub} (int[]:xs, int:start) -> int\n        §B{~s:int} start\n        §EACH{x:var} xs\n          §ASSIGN s (+ s x)\n        §R s\n\n      §F{Total:pub} (int:v) -> int\n        §E{alloc}\n        §R §C{Sum} §A §ARR{int} v (* v 2) §/ARR §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C\n\n      §F{Mixed:pub} () -> int\n        §RAW\n        object[] items = { new List<int> { 1 }, 2 };\n        §/RAW\n        §R items.Length\n\n\n\n"
   }
 }

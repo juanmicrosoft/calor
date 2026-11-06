@@ -21,7 +21,7 @@
       "Output: <dir>/Countdown.calr"
     ],
     "stderr": [],
-    "calor": "§M{Countdown:overflow=unchecked}\n  §U{System.Collections.Generic}\n\n  §NS{_global:global}\n    §CL{Countdown:pub}\n      §FLD{i32:Start:pub} = 3\n\n      §MT{First:pub} () -> i32\n        §EACH{s:var} Steps\n          §R s\n        §R 0\n\n      §CSHARP{\n    public IEnumerable<int> Steps\n    {\n        get\n        {\n            for (int i = Start; i > 0; i--)\n            {\n                yield return i;\n            }\n        }\n    }\n}§/CSHARP\n\n\n\n"
+    "calor": "§M{Countdown:overflow=unchecked}\n  §U{System.Collections.Generic}\n\n  §NS{_global:global}\n    §CL{Countdown:pub}\n      §FLD{int:Start:pub} = 3\n\n      §MT{First:pub} () -> int\n        §EACH{s:var} Steps\n          §R s\n        §R 0\n\n      §CSHARP{\n    public IEnumerable<int> Steps\n    {\n        get\n        {\n            for (int i = Start; i > 0; i--)\n            {\n                yield return i;\n            }\n        }\n    }\n}§/CSHARP\n\n\n\n"
   },
   "cli-convert-json": {
     "command": "calor convert Countdown.cs -o Countdown.calr --format json",
@@ -109,7 +109,7 @@
       "info:Calor1343:iterator-accessor",
       "warning:Calor1343:iterator-accessor"
     ],
-    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §U{System.Collections.Generic}\n\n  §NS{_global:global}\n    §CL{Countdown:pub}\n      §FLD{i32:Start:pub} = 3\n\n      §MT{First:pub} () -> i32\n        §EACH{s:var} Steps\n          §R s\n        §R 0\n\n      §CSHARP{\n    public IEnumerable<int> Steps\n    {\n        get\n        {\n            for (int i = Start; i > 0; i--)\n            {\n                yield return i;\n            }\n        }\n    }\n}§/CSHARP\n\n\n\n"
+    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §U{System.Collections.Generic}\n\n  §NS{_global:global}\n    §CL{Countdown:pub}\n      §FLD{int:Start:pub} = 3\n\n      §MT{First:pub} () -> int\n        §EACH{s:var} Steps\n          §R s\n        §R 0\n\n      §CSHARP{\n    public IEnumerable<int> Steps\n    {\n        get\n        {\n            for (int i = Start; i > 0; i--)\n            {\n                yield return i;\n            }\n        }\n    }\n}§/CSHARP\n\n\n\n"
   },
   "mcp-convert-passthroughOnError": {
     "arguments": "{ source, passthroughOnError: true }",
@@ -142,6 +142,6 @@
       "info:Calor1343:iterator-accessor",
       "warning:Calor1343:iterator-accessor"
     ],
-    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §U{System.Collections.Generic}\n\n  §NS{_global:global}\n    §CL{Countdown:pub}\n      §FLD{i32:Start:pub} = 3\n\n      §MT{First:pub} () -> i32\n        §EACH{s:var} Steps\n          §R s\n        §R 0\n\n      §CSHARP{\n    public IEnumerable<int> Steps\n    {\n        get\n        {\n            for (int i = Start; i > 0; i--)\n            {\n                yield return i;\n            }\n        }\n    }\n}§/CSHARP\n\n\n\n"
+    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §U{System.Collections.Generic}\n\n  §NS{_global:global}\n    §CL{Countdown:pub}\n      §FLD{int:Start:pub} = 3\n\n      §MT{First:pub} () -> int\n        §EACH{s:var} Steps\n          §R s\n        §R 0\n\n      §CSHARP{\n    public IEnumerable<int> Steps\n    {\n        get\n        {\n            for (int i = Start; i > 0; i--)\n            {\n                yield return i;\n            }\n        }\n    }\n}§/CSHARP\n\n\n\n"
   }
 }

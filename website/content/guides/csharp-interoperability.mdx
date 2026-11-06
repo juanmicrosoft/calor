@@ -116,28 +116,28 @@ with default options:
 
   §NS{_global:global}
     §M{Inventory:pub}
-      §F{ParseOr:pub} (str:text, i32:fallback) -> i32
-        §B{~n:i32} `default`
+      §F{ParseOr:pub} (string:text, int:fallback) -> int
+        §B{~n:int} `default`
         §IF §C{int.TryParse} §A text §A{out} n §/C
           §R n
         §R fallback
 
-      §F{CountOf:pub} (Dict<str, i32>:stock, str:item) -> i32
-        §B{~count:i32} `default`
+      §F{CountOf:pub} (Dict<string, int>:stock, string:item) -> int
+        §B{~count:int} `default`
         §C{stock.TryGetValue} §A item §A{out} count §/C
         §R count
 
-      §F{IsNumber:pub} (str:text) -> bool
+      §F{IsNumber:pub} (string:text) -> bool
         §R §C{int.TryParse} §A text §A{out} _ §/C
 
-      §F{Bump:pub} (i32:x:ref)
+      §F{Bump:pub} (int:x:ref)
         §ASSIGN x (+ x 1)
 
-      §F{Twice:pub} (i32:x:in) -> i32
+      §F{Twice:pub} (int:x:in) -> int
         §R (* x 2)
 
-      §F{Run:pub} () -> i32
-        §B{~total:i32} 1
+      §F{Run:pub} () -> int
+        §B{~total:int} 1
         §C{Bump} §A{ref} total §/C
         §R (+ §C{Twice} §A{in} total §/C §C{ParseOr} §A "40" §A 0 §/C)
 ```
@@ -319,8 +319,8 @@ public static class Shapes
 §M{Shapes:overflow=unchecked}
   §NS{_global:global}
     §M{Shapes:pub}
-      §F{Area:pub} (i32:w, i32:h) -> i32
-        §B{Clamp:System.Func<i32, i32>} §LAM{static:v:i32} (? (< v 0) 0 v) §/LAM
+      §F{Area:pub} (int:w, int:h) -> int
+        §B{Clamp:System.Func<int, int>} §LAM{static:v:int} (? (< v 0) 0 v) §/LAM
         §R (* §C{Clamp} §A w §/C §C{Clamp} §A h §/C)
 
       §CSHARP{
@@ -389,21 +389,21 @@ public static class Grid
 
   §NS{_global:global}
     §M{Grid:pub}
-      §F{Pick:pub} (bool:wide, i32:v) -> i32[,]
+      §F{Pick:pub} (bool:wide, int:v) -> int[,]
         §E{alloc}
-        §R §IF wide → §ARR2D{i32} §ROW v (+ v 1) §/ARR2D §EL → §ARR2D{i32} §ROW v §/ARR2D
+        §R §IF wide → §ARR2D{int} §ROW v (+ v 1) §/ARR2D §EL → §ARR2D{int} §ROW v §/ARR2D
 
-      §F{Sum:pub} (i32[]:xs, i32:start) -> i32
-        §B{~s:i32} start
+      §F{Sum:pub} (int[]:xs, int:start) -> int
+        §B{~s:int} start
         §EACH{x:var} xs
           §ASSIGN s (+ s x)
         §R s
 
-      §F{Total:pub} (i32:v) -> i32
+      §F{Total:pub} (int:v) -> int
         §E{alloc}
-        §R §C{Sum} §A §ARR{i32} v (* v 2) §/ARR §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C
+        §R §C{Sum} §A §ARR{int} v (* v 2) §/ARR §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C
 
-      §F{Mixed:pub} () -> i32
+      §F{Mixed:pub} () -> int
         §RAW
         object[] items = { new List<int> { 1 }, 2 };
         §/RAW
@@ -440,9 +440,9 @@ none (`§YIELD` inside a getter is error `Calor0209`), so the converter keeps th
 
   §NS{_global:global}
     §CL{Countdown:pub}
-      §FLD{i32:Start:pub} = 3
+      §FLD{int:Start:pub} = 3
 
-      §MT{First:pub} () -> i32
+      §MT{First:pub} () -> int
         §EACH{s:var} Steps
           §R s
         §R 0

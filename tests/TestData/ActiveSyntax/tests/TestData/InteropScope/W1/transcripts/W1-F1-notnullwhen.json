@@ -7,7 +7,7 @@
       "Output: <dir>/Names.calr"
     ],
     "stderr": [],
-    "calor": "§M{Names:overflow=unchecked}\n  §CDIR{nullable-directive:I251bGxhYmxlIGVuYWJsZQ}\n  §U{System.Diagnostics.CodeAnalysis}\n  §NS{_global:global}\n    §M{Names:pub}\n      §F{TryName:pub}\n        §I{i32:id}\n        §I{?str:name:out}[@NotNullWhen(true)]\n        §O{bool}\n        §ASSIGN name (? (== id 1) \"one\" null)\n        §R (!= name null)\n\n\n\n"
+    "calor": "§M{Names:overflow=unchecked}\n  §CDIR{nullable-directive:I251bGxhYmxlIGVuYWJsZQ}\n  §U{System.Diagnostics.CodeAnalysis}\n  §NS{_global:global}\n    §M{Names:pub}\n      §F{TryName:pub}\n        §I{int:id}\n        §I{string?:name:out}[@NotNullWhen(true)]\n        §O{bool}\n        §ASSIGN name (? (== id 1) \"one\" null)\n        §R (!= name null)\n\n\n\n"
   },
   "cli-convert-json": {
     "command": "calor convert Names.cs -o Names.calr --format json",
@@ -76,7 +76,7 @@
       "roundTrip": "verified"
     },
     "issueCodes": [],
-    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §CDIR{nullable-directive:I251bGxhYmxlIGVuYWJsZQ}\n  §U{System.Diagnostics.CodeAnalysis}\n  §NS{_global:global}\n    §M{Names:pub}\n      §F{TryName:pub}\n        §I{i32:id}\n        §I{?str:name:out}[@NotNullWhen(true)]\n        §O{bool}\n        §ASSIGN name (? (== id 1) \"one\" null)\n        §R (!= name null)\n\n\n\n"
+    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §CDIR{nullable-directive:I251bGxhYmxlIGVuYWJsZQ}\n  §U{System.Diagnostics.CodeAnalysis}\n  §NS{_global:global}\n    §M{Names:pub}\n      §F{TryName:pub}\n        §I{int:id}\n        §I{string?:name:out}[@NotNullWhen(true)]\n        §O{bool}\n        §ASSIGN name (? (== id 1) \"one\" null)\n        §R (!= name null)\n\n\n\n"
   },
   "mcp-convert-passthroughOnError": {
     "arguments": "{ source, passthroughOnError: true }",
@@ -99,6 +99,6 @@
       "roundTrip": "verified"
     },
     "issueCodes": [],
-    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §CDIR{nullable-directive:I251bGxhYmxlIGVuYWJsZQ}\n  §U{System.Diagnostics.CodeAnalysis}\n  §NS{_global:global}\n    §M{Names:pub}\n      §F{TryName:pub}\n        §I{i32:id}\n        §I{?str:name:out}[@NotNullWhen(true)]\n        §O{bool}\n        §ASSIGN name (? (== id 1) \"one\" null)\n        §R (!= name null)\n\n\n\n"
+    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §CDIR{nullable-directive:I251bGxhYmxlIGVuYWJsZQ}\n  §U{System.Diagnostics.CodeAnalysis}\n  §NS{_global:global}\n    §M{Names:pub}\n      §F{TryName:pub}\n        §I{int:id}\n        §I{string?:name:out}[@NotNullWhen(true)]\n        §O{bool}\n        §ASSIGN name (? (== id 1) \"one\" null)\n        §R (!= name null)\n\n\n\n"
   }
 }

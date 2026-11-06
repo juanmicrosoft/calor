@@ -9,7 +9,7 @@
       "Output: <dir>/Parser.calr"
     ],
     "stderr": [],
-    "calor": "§M{Parser:overflow=unchecked}\n  §NS{_global:global}\n    §M{Parser:pub}\n      §F{ParseOrZero:pub} (str:text) -> i32\n        §B{~n:i32} `default`\n        §C{int.TryParse} §A text §A{out} n §/C\n        §R n\n\n\n\n"
+    "calor": "§M{Parser:overflow=unchecked}\n  §NS{_global:global}\n    §M{Parser:pub}\n      §F{ParseOrZero:pub} (string:text) -> int\n        §B{~n:int} `default`\n        §C{int.TryParse} §A text §A{out} n §/C\n        §R n\n\n\n\n"
   },
   "cli-convert-json": {
     "command": "calor convert Parser.cs -o Parser.calr --format json",
@@ -82,7 +82,7 @@
     "issueCodes": [
       "warning:Calor1343:out-var"
     ],
-    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §NS{_global:global}\n    §M{Parser:pub}\n      §F{ParseOrZero:pub} (str:text) -> i32\n        §B{~n:i32} `default`\n        §C{int.TryParse} §A text §A{out} n §/C\n        §R n\n\n\n\n"
+    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §NS{_global:global}\n    §M{Parser:pub}\n      §F{ParseOrZero:pub} (string:text) -> int\n        §B{~n:int} `default`\n        §C{int.TryParse} §A text §A{out} n §/C\n        §R n\n\n\n\n"
   },
   "mcp-convert-passthroughOnError": {
     "arguments": "{ source, passthroughOnError: true }",
@@ -107,6 +107,6 @@
     "issueCodes": [
       "warning:Calor1343:out-var"
     ],
-    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §NS{_global:global}\n    §M{Parser:pub}\n      §F{ParseOrZero:pub} (str:text) -> i32\n        §B{~n:i32} `default`\n        §C{int.TryParse} §A text §A{out} n §/C\n        §R n\n\n\n\n"
+    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §NS{_global:global}\n    §M{Parser:pub}\n      §F{ParseOrZero:pub} (string:text) -> int\n        §B{~n:int} `default`\n        §C{int.TryParse} §A text §A{out} n §/C\n        §R n\n\n\n\n"
   }
 }

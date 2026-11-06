@@ -156,15 +156,15 @@ The current output keeps the ordinary class and its static members:
 §M{Counter:overflow=unchecked}
   §NS{_global:global}
     §CL{Counter:pub}
-      §FLD{i32:count:priv:stat}
+      §FLD{int:count:priv:stat}
 
-      §PROP{Count:i32:priv:stat}
+      §PROP{Count:int:priv:stat}
         §GET{priv}
           §R count
         §SET{priv}
           §ASSIGN count value
 
-      §MT{Next:pub} () -> i32
+      §MT{Next:pub} () -> int
         §ASSIGN Count (+ Count 1)
         §R Count
 ```

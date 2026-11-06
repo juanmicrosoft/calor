@@ -7,7 +7,7 @@
       "Output: <dir>/Counter.calr"
     ],
     "stderr": [],
-    "calor": "§M{Counter:overflow=unchecked}\n  §NS{_global:global}\n    §CL{Counter:pub}\n      §FLD{i32:count:priv:stat}\n\n      §PROP{Count:i32:priv:stat}\n        §GET{priv}\n          §R count\n        §SET{priv}\n          §ASSIGN count value\n\n      §MT{Next:pub} () -> i32\n        §ASSIGN Count (+ Count 1)\n        §R Count\n\n\n\n"
+    "calor": "§M{Counter:overflow=unchecked}\n  §NS{_global:global}\n    §CL{Counter:pub}\n      §FLD{int:count:priv:stat}\n\n      §PROP{Count:int:priv:stat}\n        §GET{priv}\n          §R count\n        §SET{priv}\n          §ASSIGN count value\n\n      §MT{Next:pub} () -> int\n        §ASSIGN Count (+ Count 1)\n        §R Count\n\n\n\n"
   },
   "cli-convert-json": {
     "command": "calor convert Counter.cs -o Counter.calr --format json",
@@ -81,7 +81,7 @@
       "roundTrip": "verified"
     },
     "issueCodes": [],
-    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §NS{_global:global}\n    §CL{Counter:pub}\n      §FLD{i32:count:priv:stat}\n\n      §PROP{Count:i32:priv:stat}\n        §GET{priv}\n          §R count\n        §SET{priv}\n          §ASSIGN count value\n\n      §MT{Next:pub} () -> i32\n        §ASSIGN Count (+ Count 1)\n        §R Count\n\n\n\n"
+    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §NS{_global:global}\n    §CL{Counter:pub}\n      §FLD{int:count:priv:stat}\n\n      §PROP{Count:int:priv:stat}\n        §GET{priv}\n          §R count\n        §SET{priv}\n          §ASSIGN count value\n\n      §MT{Next:pub} () -> int\n        §ASSIGN Count (+ Count 1)\n        §R Count\n\n\n\n"
   },
   "mcp-convert-passthroughOnError": {
     "arguments": "{ source, passthroughOnError: true }",
@@ -104,6 +104,6 @@
       "roundTrip": "verified"
     },
     "issueCodes": [],
-    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §NS{_global:global}\n    §CL{Counter:pub}\n      §FLD{i32:count:priv:stat}\n\n      §PROP{Count:i32:priv:stat}\n        §GET{priv}\n          §R count\n        §SET{priv}\n          §ASSIGN count value\n\n      §MT{Next:pub} () -> i32\n        §ASSIGN Count (+ Count 1)\n        §R Count\n\n\n\n"
+    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §NS{_global:global}\n    §CL{Counter:pub}\n      §FLD{int:count:priv:stat}\n\n      §PROP{Count:int:priv:stat}\n        §GET{priv}\n          §R count\n        §SET{priv}\n          §ASSIGN count value\n\n      §MT{Next:pub} () -> int\n        §ASSIGN Count (+ Count 1)\n        §R Count\n\n\n\n"
   }
 }
