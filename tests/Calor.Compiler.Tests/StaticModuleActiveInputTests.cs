@@ -66,6 +66,7 @@ public class StaticModuleActiveInputTests
                             "        §B{Clamp:System.Func<i32, i32>} §LAM{static:v:i32} (? (< v 0) 0 v) §/LAM\n",
                             StringComparison.Ordinal);
                     }
+                    migrated = ProjectApprovedTypeSites(original, migrated);
                     if (migrated != text)
                         changedCells++;
                     cell[field] = migrated;
@@ -74,7 +75,7 @@ public class StaticModuleActiveInputTests
             Assert.Equal(3, changedCells);
             Change(expected["cli-migrate"]!["conversionPaths"]!, "roundTrip", "deferred", "verified");
             Assert.True(JsonNode.DeepEquals(expected, actual),
-                $"{original}: only source IDs, module/function spellings, the exact W1-F3 Clamp lambda projection and completed project validation may change.");
+                $"{original}: only source IDs, module/function spellings, the exact W1-F3 Clamp lambda projection, attributed type sites and completed project validation may change.");
         }
     }
 
@@ -87,6 +88,7 @@ public class StaticModuleActiveInputTests
         Assert.DoesNotContain("§CSHARP", native);
         Assert.Contains("§CSHARP", expected["cli-convert"]!["calor"]!.GetValue<string>());
         native = IdFreeFrozenControl(native);
+        native = ProjectApprovedTypeSites("W1-F6-rescue.json", native);
         expected["mcp-convert"]!["calorSource"] = native;
         expected["cli-convert"]!["calor"] = native.Replace("§M{ConvertedModule:", "§M{Counter:", StringComparison.Ordinal);
         expected["cli-convert"]!["stdout"] = JsonNode.Parse("""["✓ Conversion successful","Output: <dir>/Counter.calr"]""");
@@ -117,7 +119,7 @@ public class StaticModuleActiveInputTests
         Assert.Contains("§CSHARP", passthrough["calorSource"]!.GetValue<string>());
         passthrough["calorSource"] = native;
         Assert.True(JsonNode.DeepEquals(expected, actual),
-            "Private-property repair and completed project validation may change only the explicitly attributed fields.");
+            "Private-property repair, attributed type sites and completed project validation may change only the explicitly attributed fields.");
     }
 
     [Fact]
@@ -156,6 +158,122 @@ public class StaticModuleActiveInputTests
             JsonNode.Parse(File.ReadAllText(ActiveSyntaxInputs.ForCurrentTypedInput(
                 root, path, ActiveSyntaxInputs.InputKind.Transcript)))!);
     }
+
+    [Fact]
+    public void ApprovedTypeProjection_LeavesUnattributedTextExact()
+    {
+        Assert.Equal(8, ApprovedTypeSites.Count);
+        Assert.Equal(32, ApprovedTypeSites.Values.Sum(sites => sites.Length));
+        const string unrelated = "  §R \"i32 str f64 any ?str\"\n  §RAW\n  string str = \"i32\";\n  §/RAW\n";
+        foreach (var (file, sites) in ApprovedTypeSites)
+        {
+            var source = "\n" + string.Join("\n", sites.Select(site => site.Before)) + "\n" + unrelated;
+            var expected = "\n" + string.Join("\n", sites.Select(site => site.After)) + "\n" + unrelated;
+            Assert.Equal(expected, ProjectApprovedTypeSites(file, source));
+        }
+        Assert.Equal(unrelated, ProjectApprovedTypeSites("W1-F1-ref-return-expression.json", unrelated));
+    }
+
+    [Theory]
+    [InlineData("type")]
+    [InlineData("scope")]
+    [InlineData("missing")]
+    [InlineData("duplicate")]
+    public void ApprovedTypeProjection_RejectsChangedOrUnaccountedSites(string mutation)
+    {
+        var sites = ApprovedTypeSites["W1-F1-notnullwhen.json"];
+        var first = sites[0].Before;
+        var source = "\n" + string.Join("\n", sites.Select(site => site.Before)) + "\n";
+        var changed = mutation switch
+        {
+            "type" => source.Replace(first, first.Replace("i32", "i64", StringComparison.Ordinal), StringComparison.Ordinal),
+            "scope" => source.Replace(first, " " + first, StringComparison.Ordinal),
+            "missing" => source.Replace(first + "\n", "", StringComparison.Ordinal),
+            "duplicate" => source + first + "\n",
+            _ => throw new ArgumentOutOfRangeException(nameof(mutation))
+        };
+        Assert.NotEqual(source, changed);
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
+            ProjectApprovedTypeSites("W1-F1-notnullwhen.json", changed));
+    }
+
+    private static string ProjectApprovedTypeSites(string original, string source)
+    {
+        if (!ApprovedTypeSites.TryGetValue(Path.GetFileName(original), out var sites))
+            return source;
+        foreach (var (before, after) in sites)
+        {
+            var exactLine = "\n" + before + "\n";
+            Assert.Equal(1, source.Split(exactLine, StringSplitOptions.None).Length - 1);
+            source = source.Replace(exactLine, "\n" + after + "\n", StringComparison.Ordinal);
+        }
+        return source;
+    }
+
+    // Finite source-line attribution, never a general alias normalizer or a
+    // projection inferred from the active transcripts being checked.
+    private static readonly Dictionary<string, (string Before, string After)[]> ApprovedTypeSites = new(StringComparer.Ordinal)
+    {
+        ["W1-F1-notnullwhen.json"] =
+        [
+            ("        §I{i32:id}", "        §I{int:id}"),
+            ("        §I{?str:name:out}[@NotNullWhen(true)]", "        §I{string?:name:out}[@NotNullWhen(true)]")
+        ],
+        ["W1-F1-outvar-statement.json"] =
+        [
+            ("      §F{ParseOrZero:pub} (str:text) -> i32", "      §F{ParseOrZero:pub} (string:text) -> int"),
+            ("        §B{~n:i32} `default`", "        §B{~n:int} `default`")
+        ],
+        ["W1-F1-refout.json"] =
+        [
+            ("      §F{ParseOr:pub} (str:text, i32:fallback) -> i32", "      §F{ParseOr:pub} (string:text, int:fallback) -> int"),
+            ("        §B{~n:i32} `default`", "        §B{~n:int} `default`"),
+            ("      §F{CountOf:pub} (Dict<str, i32>:stock, str:item) -> i32", "      §F{CountOf:pub} (Dict<string, int>:stock, string:item) -> int"),
+            ("        §B{~count:i32} `default`", "        §B{~count:int} `default`"),
+            ("      §F{IsNumber:pub} (str:text) -> bool", "      §F{IsNumber:pub} (string:text) -> bool"),
+            ("      §F{Bump:pub} (i32:x:ref)", "      §F{Bump:pub} (int:x:ref)"),
+            ("      §F{Twice:pub} (i32:x:in) -> i32", "      §F{Twice:pub} (int:x:in) -> int"),
+            ("      §F{Run:pub} () -> i32", "      §F{Run:pub} () -> int"),
+            ("        §B{~total:i32} 1", "        §B{~total:int} 1")
+        ],
+        ["W1-F2-interpolation.json"] =
+        [
+            ("      §F{Line:pub} (str:item, f64:amount) -> str", "      §F{Line:pub} (string:item, double:amount) -> string"),
+            ("      §F{Kind:pub} (FormattableString:f) -> str", "      §F{Kind:pub} (FormattableString:f) -> string"),
+            ("      §F{Kind:pub} (any:o) -> str", "      §F{Kind:pub} (object:o) -> string"),
+            ("      §F{Pick:pub} (i32:x) -> str", "      §F{Pick:pub} (int:x) -> string"),
+            ("      §F{Build:pub} (i32:x) -> str", "      §F{Build:pub} (int:x) -> string")
+        ],
+        ["W1-F3-local-functions.json"] =
+        [
+            ("      §F{Area:pub} (i32:w, i32:h) -> i32", "      §F{Area:pub} (int:w, int:h) -> int"),
+            ("        §B{Clamp:System.Func<i32, i32>} §LAM{static:v:i32} (? (< v 0) 0 v) §/LAM",
+             "        §B{Clamp:System.Func<int, int>} §LAM{static:v:int} (? (< v 0) 0 v) §/LAM")
+        ],
+        ["W1-F4-iterator-accessor.json"] =
+        [
+            ("      §FLD{i32:Start:pub} = 3", "      §FLD{int:Start:pub} = 3"),
+            ("      §MT{First:pub} () -> i32", "      §MT{First:pub} () -> int")
+        ],
+        ["W1-F5-arrays.json"] =
+        [
+            ("      §F{Pick:pub} (bool:wide, i32:v) -> i32[,]", "      §F{Pick:pub} (bool:wide, int:v) -> int[,]"),
+            ("        §R §IF wide → §ARR2D{i32} §ROW v (+ v 1) §/ARR2D §EL → §ARR2D{i32} §ROW v §/ARR2D",
+             "        §R §IF wide → §ARR2D{int} §ROW v (+ v 1) §/ARR2D §EL → §ARR2D{int} §ROW v §/ARR2D"),
+            ("      §F{Sum:pub} (i32[]:xs, i32:start) -> i32", "      §F{Sum:pub} (int[]:xs, int:start) -> int"),
+            ("        §B{~s:i32} start", "        §B{~s:int} start"),
+            ("      §F{Total:pub} (i32:v) -> i32", "      §F{Total:pub} (int:v) -> int"),
+            ("        §R §C{Sum} §A §ARR{i32} v (* v 2) §/ARR §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C",
+             "        §R §C{Sum} §A §ARR{int} v (* v 2) §/ARR §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C"),
+            ("      §F{Mixed:pub} () -> i32", "      §F{Mixed:pub} () -> int")
+        ],
+        ["W1-F6-rescue.json"] =
+        [
+            ("      §FLD{i32:count:priv:stat}", "      §FLD{int:count:priv:stat}"),
+            ("      §PROP{Count:i32:priv:stat}", "      §PROP{Count:int:priv:stat}"),
+            ("      §MT{Next:pub} () -> i32", "      §MT{Next:pub} () -> int")
+        ]
+    };
 
     private static void NativePaths(JsonNode paths, string oldOutcome, string oldPath)
     {
