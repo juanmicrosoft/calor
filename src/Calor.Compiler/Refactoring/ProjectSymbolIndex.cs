@@ -154,7 +154,8 @@ public sealed class ProjectSymbolIndex
             Ids.DeclarationIdentityStore.SyncActiveInputs(parsed.Select(document => document.Path), initializeIdentityRoot);
         foreach (var (path, source, ast) in parsed)
         {
-            if (synchronizeIdentities)
+            // Explicit project enrollment above already reconciled every selected input.
+            if (synchronizeIdentities && initializeIdentityRoot == null)
                 Ids.DeclarationIdentityStore.SyncIfRegistered(Path.GetFullPath(path));
             Ids.DeclarationIdentityStore.AttachIfRegistered(Path.GetFullPath(path), source, ast);
             var bindDiagnostics = new DiagnosticBag();

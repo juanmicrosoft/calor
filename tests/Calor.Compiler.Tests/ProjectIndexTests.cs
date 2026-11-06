@@ -51,6 +51,37 @@ public sealed class ProjectIndexTests : IDisposable
             §R §C{Double} §A INT:5 §/C
         """;
 
+    [Fact]
+    public void ExplicitProjectEnrollmentKeepsPersistedIdentitiesAcrossBuildsAndNewInputs()
+    {
+        var root = NewProject(("lib.calr", Library), ("app.calr", App));
+        var first = ProjectIndexBuilder.Build(OptionsFor(root));
+        var sidecar = Path.Combine(root, ".calor", "ids.json");
+        var originalState = File.ReadAllText(sidecar);
+        var repeated = ProjectIndexBuilder.Build(OptionsFor(root));
+        Assert.Equal(originalState, File.ReadAllText(sidecar));
+        Assert.Equal(first.Declarations.Select(declaration => (declaration.SymbolId, declaration.Name)),
+            repeated.Declarations.Select(declaration => (declaration.SymbolId, declaration.Name)));
+        Assert.Equal(first.CallEdges.Select(edge => (edge.CallerSymbolId, edge.CalleeSymbolId)),
+            repeated.CallEdges.Select(edge => (edge.CallerSymbolId, edge.CalleeSymbolId)));
+
+        File.WriteAllText(Path.Combine(root, "new.calr"),
+            "§M{Added}\n  §F{Fresh:pub} () -> i32\n    §E{}\n    §R INT:1\n");
+        var extended = ProjectIndexBuilder.Build(OptionsFor(root));
+        Assert.Contains(extended.Declarations, declaration => declaration.Name == "Fresh");
+        Assert.All(first.Declarations, declaration =>
+            Assert.Contains(extended.Declarations, current => current.SymbolId == declaration.SymbolId));
+        var state = new Calor.Compiler.Ids.DeclarationIdentityStore(root).Sync();
+        Assert.Contains("new.calr", state.Files);
+        Assert.Contains(state.Declarations, declaration => declaration.Name == "Fresh");
+
+        File.WriteAllText(sidecar, "{invalid");
+        Assert.Throws<System.Text.Json.JsonException>(() => ProjectIndexBuilder.Build(OptionsFor(root)));
+        Assert.Equal("{invalid", File.ReadAllText(sidecar));
+        Assert.Equal(Library, File.ReadAllText(Path.Combine(root, "lib.calr")));
+        Assert.Equal(App, File.ReadAllText(Path.Combine(root, "app.calr")));
+    }
+
     // --- staleness: every recorded input must be compared -------------------
 
     public static TheoryData<string> HeaderInputs()
