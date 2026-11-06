@@ -787,7 +787,11 @@ public class Calor0425CorpusLedgerTests
         var changed = System.Text.Json.Nodes.JsonNode.Parse(text)!;
         var subject = changed["PerSubject"]![0]!;
         if (field == "BindFailureCauses")
-            subject[field]!["Calor0208"] = subject[field]!["Calor0208"]!.GetValue<int>() + 1;
+        {
+            var causes = subject[field]!.AsObject();
+            var cause = causes.First().Key;
+            causes[cause] = causes[cause]!.GetValue<int>() + 1;
+        }
         else if (field == "BindFailureModules")
             subject[field]![0] = "Calor0261 deliberately-wrong-input.cs";
         else if (field == "CliCrossCheck")
