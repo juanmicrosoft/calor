@@ -937,9 +937,34 @@ Run without `--fix` to reject stale or missing output.
 | `calor://id-prefixes` | Tooling-owned identity guidance; the legacy URI remains, but source ID prefixes are retired |
 | `calor://workflows` | Agent editing workflows |
 
-`calor_help query=` serves generated construct metadata and complete examples.
-`feature=` searches the generated prose reference; `action=features` reports
-conversion capability rather than teaching agents to author converter fallback.
+`calor_help` defaults to `action=syntax`. `query` and `feature` are aliases for
+the same examples-first lookup:
+
+```json
+{"name":"calor_help","arguments":{"query":"dictionary"}}
+```
+
+The result contains at most two complete programs from the canonical reference,
+with `programId`, byte-identical `calor` source, and the existing C# context.
+`construct`, `calorSyntax` and `description` retain syntax guidance and caveats.
+Programs are ranked within the matching topic; precise matches are not padded
+with an unrelated second example. Equal construct scores use ordinal construct
+IDs; equal example scores retain canonical order. The generated examples are
+compiler-checked by the teaching-resource and help tests; lookup does not compile
+or execute code.
+
+Unknown topics return `found: false`, an empty `examples` array and guidance.
+A known topic without a canonical executable program also returns
+`found: false`, retaining its description rather than substituting a program.
+Use `action=features` for conversion capability rather than treating converter
+preservation as native authoring syntax. The `error`, `features` and `example`
+actions retain their existing behavior.
+
+`query: "overview"` (or `feature: "overview"`) still returns the concise overview
+in `sections`. `query: "reference"` returns the full Markdown reference;
+`calor://reference` remains available as a resource. Ordinary `feature` requests
+now return `examples`, not prose `sections`. The two-example bound is not a
+measured token budget.
 Initialization templates and MCP server instructions share the same authored source.
 
 ---
@@ -948,7 +973,7 @@ Initialization templates and MCP server instructions share the same authored sou
 
 | Variable | Description |
 |:---------|:------------|
-| `CALOR_REFERENCE_FILE` | Explicit Markdown override for `calor_help feature=` topic help; unreadable overrides return an error |
+| `CALOR_REFERENCE_FILE` | Explicit Markdown override for `calor_help query=reference` (or `feature=reference`); unreadable overrides return an error. It does not replace compiler-checked examples in normal topic lookup. |
 
 ---
 

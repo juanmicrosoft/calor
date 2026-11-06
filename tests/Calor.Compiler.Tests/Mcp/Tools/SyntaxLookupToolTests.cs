@@ -9,6 +9,140 @@ public class SyntaxLookupToolTests
 {
     private readonly HelpTool _tool = new();
 
+    private async Task<JsonElement> LookupAsync(string topic, bool feature = false)
+    {
+        var result = await _tool.ExecuteAsync(feature
+            ? JsonSerializer.SerializeToElement(new { feature = topic })
+            : JsonSerializer.SerializeToElement(new { query = topic }));
+        Assert.False(result.IsError, result.Content[0].Text);
+        return JsonDocument.Parse(result.Content[0].Text!).RootElement.Clone();
+    }
+
+    [Fact]
+    public async Task EveryTopic_ReturnsAtMostTwoByteIdenticalCanonicalPrograms_ThatActuallyCompile()
+    {
+        using var canonical = JsonDocument.Parse(File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(),
+            "src", "Calor.Compiler", "Resources", "Teaching", "reference.json")));
+        var programs = canonical.RootElement.GetProperty("programs").EnumerateArray()
+            .ToDictionary(p => p.GetProperty("id").GetString()!, p => p.GetProperty("calor").GetString()!);
+        var compiledPrograms = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var construct in canonical.RootElement.GetProperty("constructs").EnumerateArray())
+        {
+            var topic = construct.GetProperty("csharpConstruct").GetString()!;
+            var result = await LookupAsync(topic);
+            var feature = await LookupAsync(topic, feature: true);
+            Assert.Equal(result.GetRawText(), feature.GetRawText());
+            Assert.False(result.TryGetProperty("sections", out _));
+            Assert.Equal(topic, result.GetProperty("construct").GetString());
+            var expected = construct.GetProperty("programs").EnumerateArray().Select(p => p.GetString()).ToList();
+            var examples = result.GetProperty("examples").EnumerateArray().ToList();
+            Assert.Equal(expected.Count > 0, result.GetProperty("found").GetBoolean());
+            Assert.InRange(examples.Count, expected.Count == 0 ? 0 : 1, Math.Min(2, expected.Count));
+            Assert.Equal(examples.Count, examples.Select(e => e.GetProperty("programId").GetString()).Distinct().Count());
+            foreach (var example in examples)
+            {
+                var id = example.GetProperty("programId").GetString()!;
+                Assert.Contains(id, expected);
+                var source = example.GetProperty("calor").GetString()!;
+                Assert.Equal(programs[id], source);
+                Assert.StartsWith("§M{", source);
+                Assert.NotEqual(result.GetProperty("calorSyntax").GetString(), source);
+                if (compiledPrograms.Add(id))
+                {
+                    var compilation = Program.Compile(source, $"{id}.calr");
+                    Assert.False(compilation.HasErrors, $"{topic}/{id}: {string.Join(Environment.NewLine, compilation.Diagnostics)}");
+                    Assert.NotEmpty(compilation.GeneratedCode);
+                }
+            }
+        }
+        Assert.True(compiledPrograms.Count > 40, "The all-topic check must exercise diverse complete programs, not a common fallback.");
+    }
+
+    [Theory]
+    [InlineData("foreach", "foreach loop", "task_14")]
+    [InlineData("while", "while loop", "task_12")]
+    [InlineData("postcondition", "postcondition", "primer_contracts")]
+    [InlineData("indexof", "string operations", "primer_strings")]
+    [InlineData("dictionary", "collection operations", "task_16")]
+    [InlineData("postfix", "Infix expressions and precedence", "complete_postfix")]
+    [InlineData("how do I index an array", "array element access", "nested_arrays")]
+    [InlineData("how do I use a dictionary", "collection operations", "task_16")]
+    [InlineData("ranges", "range expression", "complete_ranges")]
+    [InlineData("strings", "string operations", "primer_strings")]
+    public async Task PreciseTopics_RankRelevantCompleteProgramFirst_AndAliasesAgree(string query, string construct, string program)
+    {
+        var result = await LookupAsync(query);
+        Assert.True(result.GetProperty("found").GetBoolean());
+        Assert.Equal(construct, result.GetProperty("construct").GetString());
+        Assert.Equal(program, result.GetProperty("examples")[0].GetProperty("programId").GetString());
+        Assert.Equal(result.GetRawText(), (await LookupAsync(query, feature: true)).GetRawText());
+    }
+
+    [Theory]
+    [InlineData("unknown_feature_xyz")]
+    [InlineData("quantum entanglement")]
+    [InlineData("information")]
+    [InlineData("specific")]
+    [InlineData("how do I brew coffee")]
+    [InlineData("x")]
+    public async Task UnrelatedQueries_NeverFallBackToAnIncidentalExample(string query)
+    {
+        var result = await LookupAsync(query);
+        Assert.False(result.GetProperty("found").GetBoolean());
+        Assert.Empty(result.GetProperty("examples").EnumerateArray());
+        Assert.False(result.TryGetProperty("construct", out _));
+        Assert.Contains("action=features", result.GetProperty("message").GetString());
+    }
+
+    [Theory]
+    [InlineData("dictionary", "task_16")]
+    [InlineData("indexof", "primer_strings")]
+    [InlineData("postfix", "complete_postfix")]
+    public async Task PreciseExampleMatches_DoNotPadResponseWithUnrelatedSecondProgram(string query, string program)
+    {
+        var result = await LookupAsync(query);
+        var example = Assert.Single(result.GetProperty("examples").EnumerateArray());
+        Assert.Equal(program, example.GetProperty("programId").GetString());
+    }
+
+    [Theory]
+    [InlineData("record")]
+    [InlineData("pragma warning")]
+    [InlineData("Staged section call")]
+    public async Task TopicsWithoutCanonicalPrograms_PreserveCaveatsWithoutSubstitutingExamples(string query)
+    {
+        var result = await LookupAsync(query);
+        Assert.False(result.GetProperty("found").GetBoolean());
+        Assert.Empty(result.GetProperty("examples").EnumerateArray());
+        Assert.Contains("no canonical executable example", result.GetProperty("message").GetString());
+        Assert.Contains("action=features", result.GetProperty("message").GetString());
+        Assert.NotEmpty(result.GetProperty("description").GetString()!);
+    }
+
+    [Fact]
+    public async Task TiedConstructs_UseOrdinalIds_AndExampleTiesRetainCanonicalOrder()
+    {
+        var first = await LookupAsync("inheritance");
+        Assert.Equal("abstract class", first.GetProperty("construct").GetString());
+        for (var i = 0; i < 10; i++)
+            Assert.Equal(first.GetRawText(), (await LookupAsync("inheritance")).GetRawText());
+        var collections = await LookupAsync("collection operations");
+        Assert.Equal(new[] { "task_14", "task_15" }, collections.GetProperty("examples").EnumerateArray()
+            .Select(e => e.GetProperty("programId").GetString()).ToArray());
+    }
+
+    [Theory]
+    [InlineData("overview")]
+    [InlineData("reference")]
+    public async Task ExplicitDocumentationAccess_IsStillAvailableThroughEitherParameter(string topic)
+    {
+        var query = await LookupAsync(topic);
+        var feature = await LookupAsync(topic, feature: true);
+        Assert.Equal(query.GetRawText(), feature.GetRawText());
+        Assert.NotEmpty(query.GetProperty("sections").EnumerateArray());
+        Assert.False(query.TryGetProperty("examples", out _));
+    }
+
     [Fact]
     public void EmbeddedResource_ExistsInAssembly()
     {
@@ -494,7 +628,8 @@ public class SyntaxLookupToolTests
 
         Assert.False(result.IsError);
         var json = result.Content[0].Text ?? "";
-        Assert.Contains("\"found\":true", json);
+        Assert.Contains("\"found\":false", json);
+        Assert.Contains("no canonical executable example", json);
         Assert.Contains("action=features", json);
         Assert.DoesNotContain("§CSHARP", json);
     }
@@ -510,9 +645,9 @@ public class SyntaxLookupToolTests
 
         Assert.False(result.IsError);
         var json = result.Content[0].Text ?? "";
-        // Single character queries may not find specific matches
-        // This tests that we handle them gracefully
-        Assert.DoesNotContain("exception", json.ToLower());
+        var output = JsonDocument.Parse(json).RootElement;
+        Assert.False(output.GetProperty("found").GetBoolean());
+        Assert.Empty(output.GetProperty("examples").EnumerateArray());
     }
 
     [Fact]

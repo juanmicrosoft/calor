@@ -255,7 +255,8 @@ public class SyntaxHelpToolTests
 
         Assert.False(result.IsError);
         var text = result.Content[0].Text!;
-        Assert.Contains("RANGE", text);
+        Assert.Contains("range expression", text);
+        Assert.Contains("examples", text);
     }
 
     [Fact]
@@ -409,37 +410,32 @@ public class SyntaxHelpToolTests
 
     #endregion
 
-    #region Truncation Tests
+    #region Bounded Example Tests
 
     [Fact]
-    public async Task ExecuteAsync_Functions_ResponseIsTruncatedUnder15KChars()
+    public async Task ExecuteAsync_Functions_ReturnsAtMostTwoCompleteExamplesInsteadOfSections()
     {
-        // MCP Gap 2: "functions" query previously returned 70K+ chars.
-        // With truncation, the serialized response should stay under the budget.
         var args = JsonDocument.Parse("""{"feature": "functions"}""").RootElement;
 
         var result = await _tool.ExecuteAsync(args);
 
         Assert.False(result.IsError);
         var text = result.Content[0].Text!;
-        // The JSON-serialized output should stay well under 25K chars
-        // (15K content budget + JSON overhead + availableFeatures list + tip section)
-        Assert.True(text.Length < 25_000,
-            $"Expected truncated response under 25K chars, got {text.Length}");
+        var json = JsonDocument.Parse(text).RootElement;
+        Assert.InRange(json.GetProperty("examples").GetArrayLength(), 1, 2);
+        Assert.False(json.TryGetProperty("sections", out _));
     }
 
     [Fact]
-    public async Task ExecuteAsync_LargeResult_IncludesOmittedSectionTip()
+    public async Task ExecuteAsync_DefaultLookup_DoesNotTreatUncompiledOverrideAsExamples()
     {
-        // Create a custom skill file with many large sections that will trigger truncation
         var tempFile = Path.GetTempFileName();
         var originalValue = Environment.GetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar);
 
         try
         {
-            // Generate content with 20 sections each ~2K chars, all matching "bigtopic"
             var content = string.Join("\n", Enumerable.Range(1, 20).Select(i =>
-                $"## BigSection {i}\nThis bigtopic section has bigtopic content.\n{new string('x', 2000)}\n"));
+                $"## Functions {i}\nThis bigtopic section has functions content.\n{new string('x', 2000)}\n"));
             File.WriteAllText(tempFile, content);
 
             Environment.SetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar, tempFile);
@@ -452,9 +448,19 @@ public class SyntaxHelpToolTests
 
             Assert.False(result.IsError);
             var text = result.Content[0].Text!;
-            // Should include truncation notice
-            Assert.Contains("Truncated", text);
-            Assert.Contains("additional sections available", text);
+            var json = JsonDocument.Parse(text).RootElement;
+            Assert.False(json.GetProperty("found").GetBoolean());
+            Assert.Empty(json.GetProperty("examples").EnumerateArray());
+            Assert.DoesNotContain(new string('x', 100), text);
+
+            var known = await tool.ExecuteAsync(JsonDocument.Parse("""{"feature":"functions"}""").RootElement);
+            Assert.False(known.IsError);
+            var knownJson = JsonDocument.Parse(known.Content[0].Text!).RootElement;
+            Assert.True(knownJson.GetProperty("found").GetBoolean());
+            Assert.InRange(knownJson.GetProperty("examples").GetArrayLength(), 1, 2);
+            Assert.DoesNotContain(new string('x', 100), known.Content[0].Text);
+            Assert.All(knownJson.GetProperty("examples").EnumerateArray(),
+                e => Assert.StartsWith("§M{", e.GetProperty("calor").GetString()));
         }
         finally
         {
@@ -590,7 +596,7 @@ public class SyntaxHelpToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithEnvVarOverride_UsesCustomFile()
+    public async Task ExecuteAsync_ExplicitReference_WithEnvVarOverride_UsesCustomFile()
     {
         // Create a temporary file with custom content
         var tempFile = Path.GetTempFileName();
@@ -616,7 +622,7 @@ This is CUSTOM_UNIQUE_MARKER content for testing the CALOR_REFERENCE_FILE enviro
 
             var args = JsonDocument.Parse("""
                 {
-                    "feature": "test"
+                    "feature": "reference"
                 }
                 """).RootElement;
 
@@ -668,7 +674,7 @@ This is CUSTOM_UNIQUE_MARKER content for testing the CALOR_REFERENCE_FILE enviro
             Environment.SetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar,
                 "/nonexistent/path/reference.md");
             HelpTool.ResetCacheForTesting();
-            var result = await _tool.ExecuteAsync(JsonDocument.Parse("""{"feature":"contracts"}""").RootElement);
+            var result = await _tool.ExecuteAsync(JsonDocument.Parse("""{"feature":"reference"}""").RootElement);
             Assert.True(result.IsError);
             Assert.Contains("Failed to get syntax help", result.Content[0].Text);
         }
@@ -792,7 +798,7 @@ public class SyntaxHelpTelemetryTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_ManyResults_CapsMatchedSectionsAtFive()
+    public async Task ExecuteAsync_UncompiledOverride_IsNotASyntaxLookupHit()
     {
         var tempFile = Path.GetTempFileName();
         var originalValue = Environment.GetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar);
@@ -815,8 +821,8 @@ public class SyntaxHelpTelemetryTests
 
             var evt = Assert.Single(channel.Items.OfType<EventTelemetry>()
                 .Where(e => e.Name == "SyntaxHelpQuery" && e.Metrics["featureLength"] == "testtopic".Length));
-            Assert.Equal(8, evt.Metrics["resultCount"]);
-            Assert.Equal(5, evt.Metrics["matchedSectionCount"]);
+            Assert.Equal(0, evt.Metrics["resultCount"]);
+            Assert.Equal(0, evt.Metrics["matchedSectionCount"]);
         }
         finally
         {

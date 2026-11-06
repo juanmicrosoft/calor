@@ -54,6 +54,36 @@ Diagnostic-producing tools use the shared [schema 2.0 envelope](/docs/cli/envelo
 inside their result DTOs. In particular, verification uses `proven`, `refuted`,
 `assumed`, `unknown`, `timeout`, `unsupported`, and `unavailable`.
 
+## Examples-First Syntax Help
+
+```json
+{"name":"calor_help","arguments":{"query":"dictionary"}}
+```
+
+The default `syntax` action returns at most two complete programs closest to the
+topic. `feature` is an alias for `query`. Each example has `programId`, the exact
+canonical `calor` source, and C# context. Syntax metadata and capability caveats
+remain in `construct`, `calorSyntax`, and `description`.
+
+The examples come from the single teaching reference and are compiler-checked
+by the resource and help tests. Help lookup does not compile or run code. A
+precise match is not padded with an unrelated second example. Tied construct
+scores use ordinal IDs; tied examples retain their canonical order.
+
+Unknown topics return `found: false` and an empty `examples` array. Known topics
+without a canonical executable example do the same, preserving their caveats
+and directing conversion questions to `action=features`. Preserved C# is not
+presented as native authoring syntax.
+
+Ordinary `feature` responses now use `examples`, not prose `sections`.
+`query: "overview"` still returns a concise overview in `sections`.
+`query: "reference"` returns the full reference, also available at
+`calor://reference`. `CALOR_REFERENCE_FILE` overrides only this explicit full
+reference request; it cannot inject unchecked examples into topic results.
+The `features`, `error`, and `example` actions are unchanged.
+
+The two-example limit is not a measured model-token budget.
+
 `calor_fix` never renames declarations or call targets. The former `id_conflicts`
 source rule is rejected: durable declaration identities live in `.calor/ids.json`.
 Migration's fix phases follow the same rule.

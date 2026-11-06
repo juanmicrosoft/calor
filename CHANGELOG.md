@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Breaking changes
 
+- **Syntax help leads with complete examples.** MCP `calor_help` treats `query`
+  and `feature` as aliases and returns at most two relevant programs from the
+  compiler-checked teaching reference, rather than prose sections. Topics with
+  no executable example say so. Use `overview` for the summary, `reference` for
+  the full reference, and `action=features` for conversion capabilities.
 - **The `http` effect code is removed.** HTTP operations continue to use the
   existing `net`, `net:r`, `net:w` and `net:rw` codes. Source declarations and
   effect manifests reject `http`; network effect coverage is unchanged.
