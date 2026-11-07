@@ -1,0 +1,132 @@
+#!/usr/bin/env python3
+"""Mandatory-failure v0.29 compatibility control, not an experiment baseline."""
+
+import importlib.util
+import os
+from pathlib import Path
+import shutil
+import sys
+import tarfile
+import tempfile
+import time
+
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[2]
+OLD_COMMIT = "d82f3ae95175ecd09581c6922701706be72b0ca9"
+
+
+def load(name, path):
+    specification = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+def main():
+    verifier = load("verify_logic", HERE / "lib/verify-logic.py")
+    controls = load("logic_controls", HERE / "test-logic-verifiers.py")
+    current = controls.COMPILER_ROOT
+    configuration = os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug")
+    if not (current / "src/Calor.Compiler/bin" / configuration / "net10.0/calor.dll").is_file():
+        raise RuntimeError(f"Build the selected current compiler first: {current}")
+    deadline = time.monotonic() + 600
+    with tempfile.TemporaryDirectory(prefix="calor-v029-compatibility-") as temporary:
+        directory = Path(temporary)
+        archive = directory / "v029.tar"
+        old = directory / "v029"
+        old.mkdir()
+        verifier.run(["git", "cat-file", "-e", OLD_COMMIT + "^{commit}"], ROOT, deadline)
+        verifier.run(["git", "archive", "--format=tar", f"--output={archive}", OLD_COMMIT], ROOT, deadline)
+        with tarfile.open(archive) as archived:
+            archived.extractall(old, filter="data")
+        # These are gitignored build prerequisites, verified against the archived
+        # release's own manifest before its unchanged compiler source is built.
+        for relative in ("src/Calor.Compiler/z3", "src/Calor.Compiler/runtimes"):
+            source = current / relative
+            if not source.is_dir():
+                raise RuntimeError(f"Verified Z3 build prerequisite missing: {source}")
+            shutil.copytree(source, old / relative, dirs_exist_ok=True)
+        print(verifier.run([sys.executable, "scripts/verify-z3-assets.py"], old, deadline), end="")
+        print(verifier.run([
+            "dotnet", "restore", "src/Calor.Compiler/Calor.Compiler.csproj", "--locked-mode",
+            "--disable-build-servers", "-p:UseSharedCompilation=false", "-nodeReuse:false", "-v", "quiet",
+        ], old, deadline), end="")
+        print(verifier.run([
+            "dotnet", "build", "src/Calor.Compiler/Calor.Compiler.csproj", "--no-restore",
+            "-c", configuration, "--disable-build-servers", "-p:UseSharedCompilation=false",
+            "-nodeReuse:false", "--nologo", "-v", "quiet",
+        ], old, deadline), end="")
+        print(f"Built actual v0.29.0 source from Git commit {OLD_COMMIT}.")
+        test = controls.LogicVerifierTests()
+
+        def syntax(text, historical):
+            if not historical:
+                return text
+            text = text.replace("§M{Calculator}", "§M{m001:Calculator}")
+            for name in controls.TASK_NAMES:
+                text = text.replace(f"§F{{{name}:", f"§F{{f001:{name}:")
+            lines = []
+            conditional = 0
+            for line in text.splitlines():
+                if "§IF " in line:
+                    conditional += 1
+                    line = line.replace("§IF ", f"§IF{{if{conditional}}} ", 1)
+                lines.append(line)
+            return "\n".join(lines) + "\n"
+
+        def execute(root, arm, name, text, expected=True, detail=None):
+            if time.monotonic() >= deadline:
+                raise RuntimeError("Old/new compatibility control exceeded its 600-second deadline.")
+            remaining = min(120, deadline - time.monotonic())
+            output = test.verify(name, text, expected, env={
+                "CALOR_COMPILER_ROOT": str(root),
+                "CALOR_LOGIC_TIMEOUT_SECONDS": str(remaining),
+            }, detail=detail)
+            verdict = next((line for line in output.splitlines() if " ---> " in line), None)
+            verdict = verdict or next((line for line in output.splitlines() if "Verification passed:" in line
+                            or (detail and detail in line)
+                            or (not detail and ("System.InvalidOperationException:" in line
+                                                or "ContractViolationException:" in line))), output.splitlines()[0])
+            print(f"{arm} {name}: {verdict}")
+
+        weak = {
+            "Factorial": "§Q (>= n 0)\n§Q (<= n 5)\n§S (>= result 0)",
+            "Clamp": "§Q (<= min max)\n§S (|| (>= result min) (<= result max))",
+            "IsPositive": "§S (|| (! result) (> x 0))",
+            "Max": "§S (>= result a)\n§S (>= result b)",
+        }
+        for arm, root, historical in (("v0.29", old, True), ("current", current, False)):
+            for name in controls.TASK_NAMES:
+                declaration = controls.DECLARATIONS[name][0]
+                for expression, signature in (
+                    (False, declaration.replace("i32", "int")),
+                    (True, declaration.replace("i32:", "int:", 1)),
+                ):
+                    execute(root, arm, name, syntax(controls.source(
+                        name, signature=signature, expression=expression), historical))
+                execute(root, arm, name, syntax(controls.source(
+                    name, signature=declaration.replace("i32:", "i64:", 1),
+                    body="§R false" if name == "IsPositive" else "§R 1"), historical),
+                    False, "Wrong public signature")
+                required = controls.DECLARATIONS[name][1].splitlines()
+                execute(root, arm, name, syntax(controls.source(
+                    name, contracts="\n".join(line for line in required if not line.startswith("§S"))), historical),
+                    False, "Missing/weakened postconditions")
+                execute(root, arm, name, syntax(controls.source(name, contracts=weak[name]), historical),
+                    False, "Missing/weakened postconditions")
+                execute(root, arm, name, syntax(controls.source(
+                    name, body="§R false" if name == "IsPositive" else "§R 1"), historical), False)
+        execute(current, "current rejects old syntax", "Max",
+                syntax(controls.source("Max"), True), False, "Calor compilation failed")
+        if controls.LogicVerifierTests.entry_points_executed != 49:
+            raise RuntimeError("Expected exactly 49 executed compatibility controls.")
+        print(f"Compatibility passed: {controls.LogicVerifierTests.entry_points_executed} actual old/current entry-point controls.")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as error:
+        print(f"Compatibility failed: {error}", file=sys.stderr)
+        sys.exit(1)

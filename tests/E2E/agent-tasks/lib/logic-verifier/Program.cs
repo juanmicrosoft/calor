@@ -42,9 +42,9 @@ static void Verify(string name, string path)
     var function = functions[0];
     if (function.Visibility != Visibility.Public || function.IsAsync || function.TypeParameters.Count != 0
         || function.Output == null
-        || AttributeHelper.ToSurfaceSpelling(function.Output.TypeName) != (outputType == "bool" ? "bool" : "int")
+        || AttributeHelper.ExpandType(function.Output.TypeName) != (outputType == "bool" ? "BOOL" : "INT")
         || !function.Parameters.Select(parameter => parameter.Name).SequenceEqual(names)
-        || function.Parameters.Any(parameter => AttributeHelper.ToSurfaceSpelling(parameter.TypeName) != "int"
+        || function.Parameters.Any(parameter => AttributeHelper.ExpandType(parameter.TypeName) != "INT"
             || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None || parameter.InlineRefinement != null))
         throw new InvalidOperationException($"Wrong public signature for {name}.");
 

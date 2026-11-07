@@ -133,3 +133,30 @@ and stub declarations, misleading comments and unrelated contracts, wrong
 signatures and boundary outputs, missing/weakened/vacuous contracts, runtime
 errors, timeouts, and missing/corrupt/alternate selected compiler roots. They
 do not establish agent nonregression or complete the paired release experiment.
+
+Actual old-release API compatibility is a separate executable control:
+
+```bash
+python3 tests/E2E/agent-tasks/test-logic-old-release.py
+```
+
+It requires Python 3.12+, Git history containing v0.29.0 commit
+`d82f3ae95175ecd09581c6922701706be72b0ca9`, a prebuilt selected current compiler,
+its bootstrapped Z3 assets, the .NET 10 SDK, and NuGet restore access or cached
+locked dependencies. It archives that exact Git tree into a disposable directory,
+validates copied native build prerequisites against the old release's own
+manifest, restores locked packages, and builds the unchanged old compiler source.
+It runs 49 real verifier controls against actual old and current compilers:
+public integer/boolean signatures, statement and expression implementations,
+`int`/`i32` aliases, missing/weakened contracts, wrong signatures and runtime
+results, and current-parser rejection of historical source IDs.
+Historical IDs are used only in temporary old-parser inputs; current inputs
+remain ID-free. Both helpers link exclusively to their selected arm and use the
+shared public `AttributeHelper.ExpandType` API; no reflection-based API fallback
+or integration-compiler substitution is used.
+
+The archive/build/control run has a 600-second deadline. Missing history, assets,
+dependencies, incompatible APIs, failed builds, or failed controls are errors,
+not skips. No historical files or ledgers are changed. This is a v0.29
+compatibility control, not a selection of the final experimental baseline,
+an agent run, or agent nonregression evidence.
