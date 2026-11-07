@@ -1,0 +1,144 @@
+{
+  "Version": 1,
+  "Files": [
+    "generics.calr"
+  ],
+  "Declarations": [
+    {
+      "Id": "m_ny7bh5xwjjth",
+      "File": "generics.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "Generics",
+      "Signature": ""
+    },
+    {
+      "Id": "c_ptd9cnykskhc",
+      "File": "generics.calr",
+      "Container": "Generics",
+      "Kind": 2,
+      "Name": "Pair",
+      "Signature": "2"
+    },
+    {
+      "Id": "c_byz5a1z6npce",
+      "File": "generics.calr",
+      "Container": "Generics",
+      "Kind": 2,
+      "Name": "Repository",
+      "Signature": "1"
+    },
+    {
+      "Id": "f_879e8m9wc0zz",
+      "File": "generics.calr",
+      "Container": "Generics",
+      "Kind": 1,
+      "Name": "GetCount\u003CT\u003E",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022List\\u003CT\\u003E\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "f_27xrrq2zr3km",
+      "File": "generics.calr",
+      "Container": "Generics",
+      "Kind": 1,
+      "Name": "Identity\u003CT\u003E",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022T\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022T\u0022}"
+    },
+    {
+      "Id": "f_9wcjw0p80vrt",
+      "File": "generics.calr",
+      "Container": "Generics",
+      "Kind": 1,
+      "Name": "Main",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    },
+    {
+      "Id": "i_0kdzqp925x29",
+      "File": "generics.calr",
+      "Container": "Generics",
+      "Kind": 3,
+      "Name": "IRepository",
+      "Signature": "1"
+    },
+    {
+      "Id": "mt_x92r1r432ra5",
+      "File": "generics.calr",
+      "Container": "Generics.IRepository\u00601",
+      "Kind": 5,
+      "Name": "Add",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022T\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022void\u0022}"
+    },
+    {
+      "Id": "mt_wrvvpvtmdg7d",
+      "File": "generics.calr",
+      "Container": "Generics.IRepository\u00601",
+      "Kind": 5,
+      "Name": "GetAll",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022ReadList\\u003CT\\u003E\u0022}"
+    },
+    {
+      "Id": "ctor_hkhtmnq49bte",
+      "File": "generics.calr",
+      "Container": "Generics.Pair\u00602",
+      "Kind": 6,
+      "Name": ".ctor",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022T\u0022,\u0022modifier\u0022:\u0022None\u0022},{\u0022type\u0022:\u0022U\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022void\u0022}"
+    },
+    {
+      "Id": "fld_np7eey58rn2d",
+      "File": "generics.calr",
+      "Container": "Generics.Pair\u00602",
+      "Kind": 18,
+      "Name": "First",
+      "Signature": "T"
+    },
+    {
+      "Id": "fld_1e8b9z1ck3fb",
+      "File": "generics.calr",
+      "Container": "Generics.Pair\u00602",
+      "Kind": 18,
+      "Name": "Second",
+      "Signature": "U"
+    },
+    {
+      "Id": "ctor_xytm4p3ybnse",
+      "File": "generics.calr",
+      "Container": "Generics.Repository\u00601",
+      "Kind": 6,
+      "Name": ".ctor",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    },
+    {
+      "Id": "fld_7jyjhffe7q88",
+      "File": "generics.calr",
+      "Container": "Generics.Repository\u00601",
+      "Kind": 18,
+      "Name": "_items",
+      "Signature": "List\u003CT\u003E"
+    },
+    {
+      "Id": "mt_wdzwexhp45an",
+      "File": "generics.calr",
+      "Container": "Generics.Repository\u00601",
+      "Kind": 5,
+      "Name": "Add",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022T\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022void\u0022}"
+    },
+    {
+      "Id": "mt_7rdys4zt90x7",
+      "File": "generics.calr",
+      "Container": "Generics.Repository\u00601",
+      "Kind": 5,
+      "Name": "Count",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "mt_fkcc8wkm5p4p",
+      "File": "generics.calr",
+      "Container": "Generics.Repository\u00601",
+      "Kind": 5,
+      "Name": "GetAll",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022ReadList\\u003CT\\u003E\u0022}"
+    }
+  ]
+}

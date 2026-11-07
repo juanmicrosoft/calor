@@ -1,0 +1,40 @@
+{
+  "Version": 1,
+  "Files": [
+    "contracts.calr"
+  ],
+  "Declarations": [
+    {
+      "Id": "m_bses31zv94n9",
+      "File": "contracts.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "Contracts",
+      "Signature": ""
+    },
+    {
+      "Id": "f_c7qrmpxp352n",
+      "File": "contracts.calr",
+      "Container": "Contracts",
+      "Kind": 1,
+      "Name": "Divide",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022},{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "f_s663sk2bbn1p",
+      "File": "contracts.calr",
+      "Container": "Contracts",
+      "Kind": 1,
+      "Name": "Main",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    },
+    {
+      "Id": "f_wkpmbn4fvdrw",
+      "File": "contracts.calr",
+      "Container": "Contracts",
+      "Kind": 1,
+      "Name": "Square",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    }
+  ]
+}

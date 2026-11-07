@@ -1,0 +1,130 @@
+{
+  "Version": 1,
+  "Files": [
+    "mixed-contracts.calr",
+    "proven-contracts.calr",
+    "violation-detected.calr"
+  ],
+  "Declarations": [
+    {
+      "Id": "m_v38hkjz5xcny",
+      "File": "mixed-contracts.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "MixedContracts",
+      "Signature": ""
+    },
+    {
+      "Id": "f_rkcmanzsdynp",
+      "File": "mixed-contracts.calr",
+      "Container": "MixedContracts",
+      "Kind": 1,
+      "Name": "ClampPositive",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "f_d7vptwrwbekn",
+      "File": "mixed-contracts.calr",
+      "Container": "MixedContracts",
+      "Kind": 1,
+      "Name": "Increment",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "f_739ykb4tgny3",
+      "File": "mixed-contracts.calr",
+      "Container": "MixedContracts",
+      "Kind": 1,
+      "Name": "SafeDivide",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022},{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "f_9whpcggwcn3q",
+      "File": "mixed-contracts.calr",
+      "Container": "MixedContracts",
+      "Kind": 1,
+      "Name": "SumArray",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "m_wjeaf6zysqs0",
+      "File": "proven-contracts.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "ProvenContracts",
+      "Signature": ""
+    },
+    {
+      "Id": "f_ekk0p55r30rf",
+      "File": "proven-contracts.calr",
+      "Container": "ProvenContracts",
+      "Kind": 1,
+      "Name": "AbsoluteValue",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "f_1vgcnpbj4m2f",
+      "File": "proven-contracts.calr",
+      "Container": "ProvenContracts",
+      "Kind": 1,
+      "Name": "AddPositive",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022},{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "f_yz1eyqn8c238",
+      "File": "proven-contracts.calr",
+      "Container": "ProvenContracts",
+      "Kind": 1,
+      "Name": "Identity",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "f_8b918epft5vx",
+      "File": "proven-contracts.calr",
+      "Container": "ProvenContracts",
+      "Kind": 1,
+      "Name": "Max",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022},{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "f_n9wf99jtzhdd",
+      "File": "proven-contracts.calr",
+      "Container": "ProvenContracts",
+      "Kind": 1,
+      "Name": "Square",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "m_h6vyn6dhev3t",
+      "File": "violation-detected.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "ViolationDetected",
+      "Signature": ""
+    },
+    {
+      "Id": "f_tm0qxpvccqxn",
+      "File": "violation-detected.calr",
+      "Container": "ViolationDetected",
+      "Kind": 1,
+      "Name": "BadPostcondition",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "f_n4fzzafa3p54",
+      "File": "violation-detected.calr",
+      "Container": "ViolationDetected",
+      "Kind": 1,
+      "Name": "DivisionBug",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022},{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "f_b9z65vpyk2g5",
+      "File": "violation-detected.calr",
+      "Container": "ViolationDetected",
+      "Kind": 1,
+      "Name": "ImpossibleContract",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    }
+  ]
+}

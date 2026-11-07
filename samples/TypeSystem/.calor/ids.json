@@ -1,0 +1,40 @@
+{
+  "Version": 1,
+  "Files": [
+    "typesystem.calr"
+  ],
+  "Declarations": [
+    {
+      "Id": "m_hdjbex0xee06",
+      "File": "typesystem.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "TypeSystem",
+      "Signature": ""
+    },
+    {
+      "Id": "f_82zfnkpt66qk",
+      "File": "typesystem.calr",
+      "Container": "TypeSystem",
+      "Kind": 1,
+      "Name": "Divide",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022},{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "f_v1e6m9q271ct",
+      "File": "typesystem.calr",
+      "Container": "TypeSystem",
+      "Kind": 1,
+      "Name": "Main",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    },
+    {
+      "Id": "f_s2j9fr72tx9h",
+      "File": "typesystem.calr",
+      "Container": "TypeSystem",
+      "Kind": 1,
+      "Name": "TestNullable",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    }
+  ]
+}
