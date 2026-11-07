@@ -67,9 +67,8 @@ no substitute tokenizer or estimated result is reported here.
   and source fingerprints stream into the hash instead of building large
   intermediate strings. Serialized IDs and fingerprint values stay unchanged.
 - **C# conversion preserves indexer parameters and generic array element types.**
-  Both cases now survive the full C# → Calor → C# pipeline. The 100-snippet
-  scorecard reaches 100 round-trip compilations, with 98 fully native conversions.
-  Preserved C# does not count as native conversion.
+  Both cases now survive the full C# → Calor → C# pipeline. Record declarations
+  still use preserved C#, not native conversion.
 - **Pure scalar local self-recursion converts through existing lambdas.**
   Conversion declares and initializes a typed mutable delegate at the original
   declaration. It proves the complete body uses only built-in scalar operations
