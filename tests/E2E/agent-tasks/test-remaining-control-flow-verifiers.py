@@ -67,11 +67,30 @@ def historical_syntax(text):
     serial = 0
     lines = []
     for line in text.splitlines():
+        if line.lstrip().startswith("§F{") and " (i32:grade | " in line:
+            declaration, refinement = line.split(" (i32:grade | ", 1)
+            predicate, output = refinement.rsplit(") -> ", 1)
+            if output != "i32":
+                raise ValueError("Unexpected historical Grade refinement signature.")
+            indent = " " * (len(line) - len(line.lstrip()) + 2)
+            lines.extend((declaration, f"{indent}§I{{i32:grade}} | {predicate}",
+                          f"{indent}§O{{i32}}"))
+            continue
         if line.lstrip().startswith(("§EACHKV{", "§EACH{")):
             serial += 1
             line = line.replace("{", f"{{e{serial:03d}:", 1)
         lines.append(line)
     return "\n".join(lines) + "\n"
+
+
+class HistoricalSyntaxTests(unittest.TestCase):
+    def test_grade_refinement_uses_released_native_parameter_form(self):
+        for lower, upper in ((">=", 100), (">", 100), (">=", 101)):
+            predicate = f"(&& ({lower} # 0) (<= # {upper}))"
+            compact = f"§F{{GradeToLetter:pub}} (i32:grade | {predicate}) -> i32"
+            native = historical_syntax(source("GradeToLetter", signature=compact, contracts=""))
+            self.assertIn(f"    §I{{i32:grade}} | {predicate}\n    §O{{i32}}\n", native)
+            self.assertNotIn(" (i32:grade | ", native)
 
 
 class RemainingControlFlowTests(unittest.TestCase):

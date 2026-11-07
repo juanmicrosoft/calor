@@ -466,6 +466,9 @@ python3 tests/E2E/agent-tasks/test-logic-old-release.py --remaining-control-flow
 
 The second command builds actual released v0.29.0 using the same unchanged
 archive/manifest/locked-restore procedure and runs 117 real old/current entries.
+Temporary old controls use the released `§I` parameter-refinement form because
+v0.29 does not parse predicates inside compact signatures. Predicate bytes and
+domain expectations are unchanged; current controls retain compact signatures.
 The original 49 logic and 67 `cf-001..004` compatibility controls remain separate
 and unchanged. No task definitions, original fixtures, active corpus subjects,
 compiler product code, or release state are changed.
