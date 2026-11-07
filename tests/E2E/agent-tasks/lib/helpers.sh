@@ -13,7 +13,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENT_TASKS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$AGENT_TASKS_DIR/../../.." && pwd)"
-COMPILER="${CALOR_COMPILER_ROOT:-$REPO_ROOT}/src/Calor.Compiler/bin/${CALOR_COMPILER_CONFIGURATION:-Debug}/net10.0/calor"
+COMPILER_ROOT="${CALOR_COMPILER_ROOT:-$REPO_ROOT}"
+COMPILER_CONFIGURATION="${CALOR_COMPILER_CONFIGURATION:-Debug}"
+COMPILER="$COMPILER_ROOT/src/Calor.Compiler/bin/$COMPILER_CONFIGURATION/net10.0/calor"
 FIXTURES_DIR="$AGENT_TASKS_DIR/fixtures"
 TASKS_DIR="$AGENT_TASKS_DIR/tasks"
 
@@ -938,7 +940,7 @@ run_task_with_voting() {
 
 build_compiler() {
     log_info "Building Calor compiler..."
-    if ! dotnet build "$REPO_ROOT/src/Calor.Compiler/Calor.Compiler.csproj" -c Debug --nologo -v q 2>/dev/null; then
+    if ! dotnet build "$COMPILER_ROOT/src/Calor.Compiler/Calor.Compiler.csproj" -c "$COMPILER_CONFIGURATION" --nologo -v q; then
         log_fail "Failed to build compiler"
         exit 1
     fi

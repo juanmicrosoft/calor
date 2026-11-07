@@ -96,6 +96,9 @@ CALOR_COMPILER_ROOT=/absolute/path/to/new-root \
 compilation check and these verifiers honor the selected root/configuration.
 Without a selection, they use this checkout. A missing or incompatible selected
 compiler fails explicitly, without falling back to the integration compiler.
+The shared runner's build step also uses that root and configuration, and reports
+build errors without retrying against this checkout. Its no-provider selection
+controls run with `python3 tests/E2E/agent-tasks/test-compiler-selection.py`.
 The test-only helper builds in a disposable directory, referencing only the
 selected compiler's built assemblies and native Z3 assets. It requires Python 3,
 the .NET 10 SDK, and the selected compiler's public compilation, AST, Roslyn,
