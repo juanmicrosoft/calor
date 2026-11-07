@@ -32,8 +32,13 @@ static void Verify(string profile, string path)
     // needs no contract proof. A corrupt/mismatched asset must not go unused.
     using var nativePrerequisite = new Context();
     var basic = profile is "basic001" or "basic002" or "basic003" or "basic004";
+    var contractWriting = profile is "contract001" or "contract002" or "contract003" or "contract004" or "contract005";
     var name = profile switch
     {
+        "contract001" => "SquareRoot",
+        "contract002" or "contract003" => "Abs",
+        "contract004" => "SafeDivide",
+        "contract005" => "SumToN",
         "basic001" => "GetZero",
         "basic002" => "Multiply",
         "basic003" => "IsPositive",
@@ -46,6 +51,9 @@ static void Verify(string profile, string path)
         "GetZero" when basic => Array.Empty<string>(),
         "Multiply" when basic => new[] { "a", "b" },
         "PrintNumber" when basic => new[] { "x" },
+        "SquareRoot" or "Abs" when contractWriting => new[] { "x" },
+        "SafeDivide" when contractWriting => new[] { "a", "b" },
+        "SumToN" when contractWriting => new[] { "n" },
         "Factorial" => new[] { "n" },
         "Clamp" => new[] { "value", "min", "max" },
         "IsPositive" => new[] { "x" },
@@ -78,7 +86,7 @@ static void Verify(string profile, string path)
         || function.Parameters.Any(parameter => (dictionary
                 ? !IsDictionaryType(parameter.TypeName) : AttributeHelper.ExpandType(parameter.TypeName) != "INT")
             || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None
-            || !basic && name != "GradeToLetter" && parameter.InlineRefinement != null))
+            || !basic && !contractWriting && name != "GradeToLetter" && parameter.InlineRefinement != null))
         throw new InvalidOperationException($"Wrong public signature for {name}.");
 
     StatementNode[] witnesses = [];
@@ -97,7 +105,9 @@ static void Verify(string profile, string path)
             && effects.Split(',').Contains("console_write", StringComparer.Ordinal)))
             throw new InvalidOperationException("Declared console-write effect missing from PrintNumber.");
     }
-    if (basic)
+    if (contractWriting)
+        CheckWritingContracts(function, names);
+    else if (basic)
         CheckBasicEntryDomain(function, names);
     else if (!controlFlow || name == "GradeToLetter")
         CheckContracts(function, names, outputType, profile == "ControlMax");
@@ -192,7 +202,7 @@ static void Verify(string profile, string path)
         return;
     }
     var count = 0;
-    foreach (var (inputs, expected) in Cases(name))
+    foreach (var (inputs, expected) in contractWriting ? WritingCases(name) : Cases(name))
     {
         var actual = method.Invoke(null, inputs.Select(value => (object)value).ToArray());
         if (!Equals(actual, expected))
@@ -216,7 +226,303 @@ static void Verify(string profile, string path)
             {
             }
         }
+    if (contractWriting)
+    {
+        if (name == "SumToN")
+            CheckGaussFormula(compilation.Ast, trees[1], function, path);
+        var invalidCases = name switch
+        {
+            "SquareRoot" => new[] { new[] { int.MinValue }, [-100], [-1] },
+            "SafeDivide" => new[] { new[] { 0, 0 }, [1, 0], [int.MinValue, 0], [1, 2], [-7, 3], [7, -3] },
+            "SumToN" => new[] { new[] { int.MinValue }, [-100], [-1] },
+            _ => Array.Empty<int[]>()
+        };
+        foreach (var inputs in invalidCases)
+        {
+            try
+            {
+                method.Invoke(null, inputs.Select(value => (object)value).ToArray());
+                throw new InvalidOperationException($"{name}({string.Join(", ", inputs)}) did not fail its domain contract.");
+            }
+            catch (TargetInvocationException error) when (error.InnerException?.GetType().Name == "ContractViolationException"
+                || error.InnerException is ArgumentOutOfRangeException argument && names.Contains(argument.ParamName))
+            {
+            }
+        }
+        var limit = name switch
+        {
+            "Abs" => "Int32.MinValue has no representable absolute value; unspecified overflow behavior is not assessed",
+            "SafeDivide" => "Int32.MinValue / -1 is unrepresentable; overflowing hypothetical postcondition products are outside the proof scope",
+            "SumToN" => "0..46340 has representable Gauss intermediates; larger inputs have unspecified intermediate/result overflow",
+            _ => "full nonnegative Int32 input domain for predicate proofs"
+        };
+        Console.WriteLine($"Verification passed: {name}; contract-writing predicates and {count} runtime cases; "
+            + $"{invalidCases.Length} domain rejection cases. Limits: {limit}; no universal body proof.");
+        return;
+    }
     Console.WriteLine($"Verification passed: {name}; {(basic ? "basic signature/behavior" : controlFlow ? "native control flow" : "semantic contracts")} and {count} runtime cases.");
+}
+
+static void CheckWritingContracts(FunctionNode function, string[] names)
+{
+    using var context = new Context();
+    var translator = new ContractTranslator(context);
+    foreach (var name in names.Append("result"))
+        if (!translator.DeclareVariable(name, "i32"))
+            throw new InvalidOperationException($"Cannot model contract-writing variable {name}.");
+    BitVecExpr Integer(string name) => context.MkBVConst(name, 32);
+    BitVecNum Constant(int value) => context.MkBV(value, 32);
+    BoolExpr Fits(BitVecExpr value) => context.MkAnd(
+        context.MkBVSGE(value, context.MkBV(int.MinValue, 64)),
+        context.MkBVSLE(value, context.MkBV(int.MaxValue, 64)));
+    BitVecExpr Wide(BitVecExpr value) => context.MkSignExt(32, value);
+    BitVecExpr Value(ExpressionNode expression) => translator.TranslateBitVecExpr(expression) is { SortSize: 32 } value
+        && translator.Warnings.Count == 0 ? value
+        : throw new InvalidOperationException("Contract-writing arithmetic translation failed or is not signed Int32.");
+
+    BoolExpr Safe(ExpressionNode expression, bool entry)
+    {
+        switch (expression)
+        {
+            case IntLiteralNode literal when !literal.IsLong && !literal.IsUnsigned
+                && literal.Value >= int.MinValue && literal.Value <= int.MaxValue:
+            case BoolLiteralNode:
+                return context.MkTrue();
+            case ReferenceNode reference when names.Contains(reference.Name) || !entry && reference.Name == "result":
+                return context.MkTrue();
+            case SelfRefNode when entry:
+                _ = Value(expression);
+                return context.MkTrue();
+            case BinaryOperationNode binary when binary.Operator is BinaryOperator.Add or BinaryOperator.Subtract
+                or BinaryOperator.Multiply or BinaryOperator.Divide or BinaryOperator.Modulo:
+                var operands = context.MkAnd(Safe(binary.Left, entry), Safe(binary.Right, entry));
+                var left = Value(binary.Left);
+                var right = Value(binary.Right);
+                var arithmetic = binary.Operator switch
+                {
+                    BinaryOperator.Add => Fits(context.MkBVAdd(Wide(left), Wide(right))),
+                    BinaryOperator.Subtract => Fits(context.MkBVSub(Wide(left), Wide(right))),
+                    BinaryOperator.Multiply => Fits(context.MkBVMul(Wide(left), Wide(right))),
+                    _ => context.MkAnd(context.MkNot(context.MkEq(right, Constant(0))),
+                        context.MkNot(context.MkAnd(context.MkEq(left, Constant(int.MinValue)),
+                            context.MkEq(right, Constant(-1)))))
+                };
+                return context.MkAnd(operands, arithmetic);
+            case BinaryOperationNode binary when binary.Operator is BinaryOperator.Equal or BinaryOperator.NotEqual
+                or BinaryOperator.LessThan or BinaryOperator.LessOrEqual or BinaryOperator.GreaterThan
+                or BinaryOperator.GreaterOrEqual:
+                return context.MkAnd(Safe(binary.Left, entry), Safe(binary.Right, entry));
+            case BinaryOperationNode binary when binary.Operator is BinaryOperator.And or BinaryOperator.Or:
+                var first = Safe(binary.Left, entry);
+                var condition = Translate(binary.Left);
+                return context.MkAnd(first, context.MkImplies(
+                    binary.Operator == BinaryOperator.And ? condition : context.MkNot(condition), Safe(binary.Right, entry)));
+            case UnaryOperationNode unary when unary.Operator == UnaryOperator.Not:
+                return Safe(unary.Operand, entry);
+            case ConditionalExpressionNode conditional:
+                return context.MkAnd(Safe(conditional.Condition, entry),
+                    (BoolExpr)context.MkITE(Translate(conditional.Condition),
+                        Safe(conditional.WhenTrue, entry), Safe(conditional.WhenFalse, entry)));
+            case ImplicationExpressionNode implication:
+                return context.MkAnd(Safe(implication.Antecedent, entry),
+                    context.MkImplies(Translate(implication.Antecedent), Safe(implication.Consequent, entry)));
+            default:
+                throw new InvalidOperationException($"Contract-writing proof does not support {expression.GetType().Name} or foreign/scoped reference.");
+        }
+    }
+    BoolExpr Translate(ExpressionNode expression) => translator.TranslateBoolExpr(expression) is { } translated
+        && translator.Warnings.Count == 0 ? translated
+        : throw new InvalidOperationException($"Contract-writing translation failed: {string.Join("; ", translator.Warnings)}");
+    var entrySafety = new List<BoolExpr>();
+    var actualPre = context.MkAnd(TranslateEntryConditions(function, translator, expression =>
+    {
+        entrySafety.Add(Safe(expression, entry: true));
+        return Translate(expression);
+    }));
+    var postSafety = function.Postconditions.Select(contract => Safe(contract.Condition, entry: false)).ToArray();
+    var actualPost = context.MkAnd(function.Postconditions.Select(contract => Translate(contract.Condition)).ToArray());
+    var result = Integer("result");
+    var limit = context.MkTrue();
+    var postScope = context.MkTrue();
+    var requiredPre = context.MkTrue();
+    var requiredPost = context.MkTrue();
+    BoolExpr mathematicalOutput;
+    switch (function.Name)
+    {
+        case "SquareRoot":
+            requiredPre = context.MkBVSGE(Integer("x"), Constant(0));
+            mathematicalOutput = context.MkEq(result, Integer("x"));
+            break;
+        case "Abs":
+            var x = Integer("x");
+            limit = context.MkNot(context.MkEq(x, Constant(int.MinValue)));
+            mathematicalOutput = context.MkEq(result, context.MkITE(context.MkBVSLT(x, Constant(0)), context.MkBVNeg(x), x));
+            requiredPost = context.MkBVSGE(result, Constant(0));
+            break;
+        case "SafeDivide":
+            var a = Integer("a");
+            var b = Integer("b");
+            limit = context.MkNot(context.MkAnd(context.MkEq(a, Constant(int.MinValue)), context.MkEq(b, Constant(-1))));
+            requiredPre = context.MkAnd(context.MkNot(context.MkEq(b, Constant(0))),
+                context.MkEq(context.MkBVSRem(a, b), Constant(0)));
+            var product = context.MkBVMul(Wide(result), Wide(b));
+            postScope = Fits(product);
+            requiredPost = context.MkEq(product, Wide(a));
+            mathematicalOutput = requiredPost;
+            break;
+        case "SumToN":
+            var n = Integer("n");
+            limit = context.MkBVSLE(n, Constant(46340));
+            requiredPre = context.MkBVSGE(n, Constant(0));
+            requiredPost = context.MkBVSGE(result, Constant(0));
+            // Independent mathematical oracle; never evaluate the candidate body to
+            // establish its expected output or optional-contract admissibility.
+            var mathematicalN = context.MkBV2Int(n, true);
+            mathematicalOutput = context.MkEq(context.MkMul(context.MkInt(2), context.MkBV2Int(result, true)),
+                context.MkMul(mathematicalN, context.MkAdd(mathematicalN, context.MkInt(1))));
+            break;
+        default:
+            throw new InvalidOperationException("Unknown contract-writing oracle.");
+    }
+    void Prove(BoolExpr counterexample, string message)
+    {
+        using var solver = context.MkSolver();
+        using var settings = context.MkParams();
+        settings.Add("timeout", 5000u);
+        solver.Parameters = settings;
+        solver.Assert(counterexample);
+        var status = solver.Check();
+        if (status != Status.UNSATISFIABLE)
+            throw new InvalidOperationException($"{message}: {status}; "
+                + (status == Status.SATISFIABLE ? solver.Model.ToString() : solver.ReasonUnknown));
+    }
+    var entryLimit = function.Name == "SumToN" ? context.MkTrue() : limit;
+    Prove(context.MkAnd(entryLimit, context.MkNot(context.MkEq(actualPre, requiredPre))), "Missing/wrong writing preconditions");
+    Prove(context.MkAnd(limit, requiredPre, postScope, actualPost, context.MkNot(context.MkAnd(postSafety))),
+        "Contract-writing postcondition evidence has undefined/overflowing arithmetic");
+    Prove(context.MkAnd(limit, requiredPre, postScope, actualPost, context.MkNot(requiredPost)),
+        "Missing/weakened writing postconditions");
+    var correct = context.MkAnd(limit, requiredPre, mathematicalOutput);
+    Prove(context.MkAnd(correct, context.MkNot(context.MkAnd(entrySafety.Concat(postSafety).ToArray()))),
+        "Contract-writing arithmetic is undefined or overflows for required inputs/outputs");
+    Prove(context.MkAnd(correct, context.MkNot(actualPost)), "Writing postconditions exclude a required output");
+}
+
+static void CheckGaussFormula(ModuleNode module, SyntaxTree original, FunctionNode function, string path)
+{
+    bool IsN(ExpressionNode expression) => expression is ReferenceNode { Name: "n" };
+    bool IsOne(ExpressionNode expression) => expression is IntLiteralNode { Value: 1 };
+    bool IsSuccessor(ExpressionNode expression) => expression is BinaryOperationNode { Operator: BinaryOperator.Add } add
+        && (IsN(add.Left) && IsOne(add.Right) || IsOne(add.Left) && IsN(add.Right));
+    bool IsFormula(ExpressionNode expression)
+    {
+        var numerator = new List<ExpressionNode>();
+        var denominator = new List<ExpressionNode>();
+        void Factors(ExpressionNode node, bool divided)
+        {
+            if (node is BinaryOperationNode { Operator: BinaryOperator.Multiply or BinaryOperator.Divide } binary)
+            {
+                Factors(binary.Left, divided);
+                Factors(binary.Right, divided ^ binary.Operator == BinaryOperator.Divide);
+            }
+            else
+                (divided ? denominator : numerator).Add(node);
+        }
+        Factors(expression, false);
+        return numerator.Count == 2 && denominator.Count == 1 && denominator[0] is IntLiteralNode { Value: 2 }
+            && (IsN(numerator[0]) && IsSuccessor(numerator[1]) || IsSuccessor(numerator[0]) && IsN(numerator[1]));
+    }
+    var witnesses = RecursiveAstWalker.EnumerateStatements(function.Body).Where(statement => statement switch
+    {
+        ReturnStatementNode { Expression: { } expression } => IsFormula(expression),
+        BindStatementNode { Initializer: { } expression } => IsFormula(expression),
+        _ => false
+    }).ToArray();
+    if (witnesses.Length == 0)
+        throw new InvalidOperationException("Required native Gauss formula missing from SumToN; no loop/invariant is required.");
+    var options = new CSharpParseOptions(LanguageVersion.Preview);
+    var mapped = CSharpSyntaxTree.ParseText(
+        new CSharpEmitter(ContractMode.Debug) { LineDirectiveFilePath = path }.Emit(module), options);
+    if (!SyntaxFactory.AreEquivalent(original.GetRoot(), mapped.GetRoot()))
+        throw new InvalidOperationException("Cannot establish Gauss coupling: mapped emission differs from compiled C#.");
+    var root = mapped.GetCompilationUnitRoot();
+    var method = root.DescendantNodes().OfType<ClassDeclarationSyntax>()
+        .Single(type => type.Identifier.ValueText == module.Name + "Module")
+        .Members.OfType<MethodDeclarationSyntax>().Single(candidate => candidate.Identifier.ValueText == function.Name);
+    foreach (var witness in witnesses)
+    {
+        var matched = method.DescendantNodes().OfType<StatementSyntax>().Where(statement =>
+            (witness is ReturnStatementNode && (statement is ReturnStatementSyntax
+                    || statement is ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax })
+                || witness is BindStatementNode && statement is LocalDeclarationStatementSyntax)
+            && statement.GetFirstToken().LeadingTrivia.Any(trivia =>
+                trivia.GetStructure() is LineDirectiveTriviaSyntax directive && directive.IsActive
+                && directive.File.ValueText == path
+                && directive.Line.ValueText == witness.Span.Line.ToString(System.Globalization.CultureInfo.InvariantCulture))).ToArray();
+        if (matched.Length != 1)
+            throw new InvalidOperationException("Cannot establish Gauss coupling: ambiguous emitted formula witness.");
+        var statement = matched[0];
+        var expression = statement switch
+        {
+            ReturnStatementSyntax returned => returned.Expression,
+            ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax assignment } => assignment.Right,
+            LocalDeclarationStatementSyntax declaration when declaration.Declaration.Variables.Count == 1
+                => declaration.Declaration.Variables[0].Initializer?.Value,
+            _ => null
+        } ?? throw new InvalidOperationException("Cannot establish Gauss coupling: missing emitted formula expression.");
+        var changed = root.ReplaceNode(expression, SyntaxFactory.LiteralExpression(
+            SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(0)));
+        var runtime = CSharpCompilation.Create("GaussCoupling_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble, options), CSharpSyntaxTree.Create(changed, options)],
+            GeneratedCSharpCompiler.References, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var emitted = runtime.Emit(stream);
+        if (!emitted.Success)
+            throw new InvalidOperationException($"Gauss counterfactual compilation failed:\n{string.Join("\n", emitted.Diagnostics)}");
+        var target = Assembly.Load(stream.ToArray()).GetType($"{module.Name}.{module.Name}Module")
+            ?.GetMethod(function.Name, BindingFlags.Public | BindingFlags.Static, [typeof(int)])
+            ?? throw new InvalidOperationException("Gauss counterfactual signature missing.");
+        foreach (var (inputs, expected) in WritingCases(function.Name))
+        {
+            try
+            {
+                if (!Equals(target.Invoke(null, inputs.Select(value => (object)value).ToArray()), expected))
+                    return;
+            }
+            catch (TargetInvocationException error) when (error.InnerException?.GetType().Name == "ContractViolationException")
+            {
+                return;
+            }
+        }
+    }
+    throw new InvalidOperationException("Gauss coupling failed: native formulas do not affect any sampled result.");
+}
+
+static IEnumerable<(int[] Inputs, object Expected)> WritingCases(string name)
+{
+    var values = new[] { int.MinValue, int.MinValue + 1, -1073741824, -46340, -100, -7, -3, -2, -1,
+        0, 1, 2, 3, 7, 100, 46340, 1073741823, int.MaxValue - 1, int.MaxValue };
+    if (name == "SumToN")
+    {
+        foreach (var n in Enumerable.Range(0, 101).Concat(new[] { 127, 255, 1024, 32767, 46339, 46340 }))
+            yield return ([n], (int)((long)n * (n + 1L) / 2));
+        yield break;
+    }
+    foreach (var first in values)
+    {
+        if (name == "SquareRoot" && first >= 0)
+            yield return ([first], first);
+        else if (name == "Abs" && first != int.MinValue)
+            yield return ([first], (int)Math.Abs((long)first));
+        else if (name == "SafeDivide")
+            foreach (var second in values)
+                if (second != 0 && (long)first % second == 0)
+                {
+                    var quotient = (long)first / second;
+                    if (quotient >= int.MinValue && quotient <= int.MaxValue)
+                        yield return ([first, second], (int)quotient);
+                }
+    }
 }
 
 static void CheckBasicEntryDomain(FunctionNode function, string[] names)

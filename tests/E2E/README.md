@@ -476,3 +476,93 @@ domain expectations are unchanged; current controls retain compact signatures.
 The original 49 logic and 67 `cf-001..004` compatibility controls remain separate
 and unchanged. No task definitions, original fixtures, active corpus subjects,
 compiler product code, or release state are changed.
+
+### Contract-writing prompts (`contract-001` through `contract-005`)
+
+These five entries add separate `contract001..005` profiles to the existing
+selected-compiler helper. They load the selected native Z3, inspect the actual
+target function AST, compile emitted debug-contract C#, and invoke the reflected
+public/static Int32 signatures. `contract-003` selects `BuggyContracts.calr`;
+the other four select `Calculator.calr`. Required predicates must belong to the
+target, not another function, comments, or strings. Original explicit
+preconditions and inline parameter refinements use the selected public
+translator, including its push/pop scope for `#`; there is no textual predicate
+replacement. Existing logic/basic/control-flow profiles retain their separate
+requirements and oracles.
+
+`SquareRoot(x)` returns **x**, as its actual prompt requests, not a mathematical
+square root. Its preconditions must describe `x >= 0`; ten signed/boundary runtime
+cases check identity, and three negative inputs must fail a native contract.
+Both `Abs(x)` tasks require `result >= 0`, including zero, and run 18 independent
+absolute-value cases. The original buggy fixture is a negative control; changing
+only `result > 0` to `result >= 0` is a positive control.
+
+`SafeDivide(a,b)` requires both `b != 0` and `a % b == 0`, not merely a nonzero
+divisor. Its postconditions must imply `result * b == a` with representable
+mathematical products, and admit the independently determined exact quotient.
+109 signed/zero/boundary cases exercise exact divisions, including negative
+divisors and Int32.MinValue divided by representable divisors. Six zero-divisor
+or inexact-division inputs must fail a contract, not accidentally divide by
+zero. The native emitters evaluate explicit preconditions before an inline
+refinement guard: an inline `b != 0` plus an unguarded explicit `a % b == 0`
+throws before the inline guard on zero. Controls reject this ordering and
+accept a short-circuiting explicit predicate with the same inline refinement.
+
+`SumToN(n)` requires the Gauss formula, `n * (n + 1) / 2`, **not a loop or loop
+invariant**. 107 independent widened-arithmetic runtime cases cover `0..100`
+and larger boundaries through 46340; three negative inputs must fail a contract.
+Native return/binding formulas support commuted factors and multiplication/
+division rearrangements that retain the correct sampled results. Each formula
+maps to exactly one emitted statement; replacing its result with zero must
+change a sampled outcome or violate a contract. A loop-only implementation or
+an unused formula cannot provide that algorithm evidence. Unmapped witnesses,
+counterfactual compilation failures, or unexpected runtime failures reject
+explicitly. This is finite dependency evidence, not universal body correctness.
+
+Z3 checks entry-domain equivalence, required postcondition implication, and
+optional-contract admissibility for independently computed correct outputs.
+Supported contract expressions are signed Int32 literals/references, native
+scoped `#`, comparisons, boolean/conditional/implication expressions, and
+addition/subtraction/multiplication/division/remainder with explicit
+representability and definedness checks. Unknown references, calls, unsupported
+nodes or widths, translator warnings, and solver unknown/timeouts fail rather
+than becoming proof evidence. Optional predicates cannot narrow required
+representable inputs or reject their correct outputs.
+
+The prompts do not specify an overflow policy. Abs(Int32.MinValue) has no Int32
+absolute value, and Int32.MinValue / -1 has no Int32 quotient; those ambiguous
+cases are outside output/runtime proofs. Hypothetical overflowing products in
+the division postcondition are also outside its implication scope. Sum output
+proofs and runtime cases use `0..46340`, where the original Int32 Gauss
+intermediates fit. `46341..65535` have representable mathematical sums but
+overflow the original Int32 product; above 65535, the sum itself cannot fit.
+No behavior there is claimed and no checked/wrapping/widening policy is chosen.
+Sum's explicit precondition still must describe **all** `n >= 0`; adding a
+46340 cap is rejected, not silently accepted as the task's contract.
+Successful entries print these limits. Predicate proofs and finite executable
+oracles do not establish agent nonregression.
+
+```bash
+python3 tests/E2E/agent-tasks/test-contract-writing-verifiers.py
+python3 tests/E2E/agent-tasks/test-logic-old-release.py --contract-writing
+```
+
+The strict compatibility mode archives unchanged released v0.29.0 commit
+`d82f3ae95175ecd09581c6922701706be72b0ca9`, verifies its own native size/hash
+pins, locked-restores and builds its source, then runs 81 actual old/current
+entry-point controls. Only disposable old-parser strings receive historical IDs
+and native `§I{i32:x} | (predicate)` / `§O{i32}` parameter spellings; predicates
+and current inputs are unchanged. Missing history, prerequisites, APIs, builds,
+or controls fail without skips. No current compiler assemblies substitute for
+the released source build. The shared selected-root/configuration/native guards
+and 120-second process/EOF/cancellation cleanup remain unchanged.
+All task definitions, original fixtures, TestData, active corpus and historical
+inputs remain byte-unchanged. No provider/model/count API, paid run, push,
+publication, version, ledger, floor, or release/workflow change is involved.
+
+The current suite executes 146 real contract entry points plus eight preserved
+mandatory logic entry points. It includes native alternatives, aliases,
+equivalent/inline predicates, optional-contract restrictions, foreign/lexical
+decoys, missing/private/wrong-signature/stub targets, signed/zero/boundary
+results, checked and unchecked representable arithmetic, missing selected
+dependencies, compilation/runtime failures, and bounded nontermination.
