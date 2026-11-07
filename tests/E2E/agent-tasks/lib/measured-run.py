@@ -165,6 +165,8 @@ def capture(command, cwd, output, name, seconds, env=None):
                 stream.flush()
                 if digest(Path(stream.name)) != hashes[stream].hexdigest():
                     raise EvidenceError(f"{name}: raw capture was modified")
+            if time.monotonic() >= deadline:
+                raise EvidenceError(f"{name}: deadline expired (including output EOF and capture validation)")
             status["raw_sha256"] = {Path(stream.name).name: hashes[stream].hexdigest() for stream in (stdout, stderr)}
             status.update(returncode=process.returncode, status="completed")
     except BaseException as error:
@@ -300,6 +302,7 @@ def usage(transcript, model):
     if not assistants:
         raise EvidenceError("No observed assistant messages")
     return {**{field: counts[field] for field in fields},
+            "total_input_tokens": sum(counts[field] for field in fields if field != "output_tokens"),
             "total_tokens": sum(counts[field] for field in fields),
             "source": "sole final result.modelUsage[exact_model]; never sum result.usage or assistant counters",
             "main_loop_usage": {field: main_counts[field] for field in fields},
@@ -521,6 +524,8 @@ def main():
             result["vote_passed"] = result["passes"] >= required
             result["tokens_total"] = sum(attempt["usage"]["total_tokens"] for attempt in result["attempts"])
             result["tokens_per_attempt"] = result["tokens_total"] / runs
+            result["input_tokens_total"] = sum(attempt["usage"]["total_input_tokens"] for attempt in result["attempts"])
+            result["input_tokens_per_attempt"] = result["input_tokens_total"] / runs
         unchanged()
         record["artifact_hashes"] = inventory(output)
         attempts = [attempt for task in record["tasks"] for attempt in task["attempts"]]
@@ -532,6 +537,8 @@ def main():
                       pass_rate_units="fraction in [0, 1]; task votes and attempts are distinct",
                       tokens_total=sum(attempt["usage"]["total_tokens"] for attempt in attempts),
                       tokens_per_task_all_attempts=sum(attempt["usage"]["total_tokens"] for attempt in attempts) / len(record["tasks"]),
+                      input_tokens_total=sum(attempt["usage"]["total_input_tokens"] for attempt in attempts),
+                      input_tokens_per_task_all_attempts=sum(attempt["usage"]["total_input_tokens"] for attempt in attempts) / len(record["tasks"]),
                       skipped_tasks=0)
     except BaseException as error:
         record["error"] = f"{type(error).__name__}: {error}"

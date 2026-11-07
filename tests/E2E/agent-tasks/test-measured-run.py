@@ -66,6 +66,7 @@ class SchemaTests(unittest.TestCase):
     def test_authoritative_usage_and_distinct_turns(self):
         result = self.parse(events())
         self.assertEqual(result["total_tokens"], 100)
+        self.assertEqual(result["total_input_tokens"], 80)
         self.assertEqual(result["assistant_messages"], 1)
         self.assertEqual(result["tool_calls"], 1)
         self.assertEqual(result["cli_num_turns"], 2)
@@ -133,6 +134,25 @@ class SchemaTests(unittest.TestCase):
 
 
 class CaptureTests(unittest.TestCase):
+    def test_slow_identity_scan_cannot_accept_late_eof(self):
+        original = measured.supervision.ProcessTracker.scan
+        calls = 0
+
+        def delayed_scan(tracker):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                time.sleep(0.4)
+            return original(tracker)
+
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+            measured.supervision.ProcessTracker, "scan", delayed_scan
+        ):
+            path = Path(temporary).resolve()
+            with self.assertRaisesRegex(measured.EvidenceError, "deadline expired"):
+                measured.capture([sys.executable, "-c", "pass"], path, path, "late-eof", 0.2)
+            self.assertEqual(json.loads((path / "late-eof.process.json").read_text())["status"], "invalid")
+
     def test_exact_raw_bytes(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary).resolve()
@@ -235,6 +255,10 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(record["attempt_pass_rate"], 2 / 3)
         self.assertEqual(record["tasks"][0]["tokens_total"], 300)
         self.assertEqual(record["tasks"][0]["tokens_per_attempt"], 100)
+        self.assertEqual(record["tasks"][0]["input_tokens_total"], 240)
+        self.assertEqual(record["tasks"][0]["input_tokens_per_attempt"], 80)
+        self.assertEqual(record["input_tokens_total"], 240)
+        self.assertEqual(record["input_tokens_per_task_all_attempts"], 240)
         self.assertEqual(record["tasks"][0]["passes"], 2)
         self.assertFalse(record["tasks"][0]["attempts"][1]["passed"])
         calls = [json.loads(line) for line in self.calls.read_text().splitlines()]

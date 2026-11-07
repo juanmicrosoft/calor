@@ -87,8 +87,9 @@ malformed usage are invalid evidence, even when generated code passes.
 
 Tokens come **once** from final `result.modelUsage[MODEL]`: `inputTokens`,
 `outputTokens`, `cacheCreationInputTokens`, and `cacheReadInputTokens` map to the
-four snake-case fields in the report. Input excludes cache; `total_tokens` adds
-those four disjoint counts. These are query-pipeline totals (including internal
+four snake-case fields in the report. Input excludes cache; `total_input_tokens`
+adds input, cache creation, and cache read without output tokens. `total_tokens`
+adds all four disjoint counts. These are query-pipeline totals (including internal
 calls and same-model subagent activity); helper calls outside that pipeline are
 not included. Main-loop `result.usage` is validated and retained separately, never
 added. Repeated assistant blocks/cumulative envelopes cannot inflate totals.
@@ -99,6 +100,8 @@ Attempt pass counts and **task majority votes** are separate: by default all thr
 attempts run and two must pass; `--single-run` requires one of one. Reports retain
 both denominators. `tokens_per_attempt` divides task tokens by its attempt count;
 `tokens_per_task_all_attempts` averages task totals including every voted attempt.
+The separate `input_tokens_total`, `input_tokens_per_attempt`, and
+`input_tokens_per_task_all_attempts` fields use input plus both cache counts only.
 Neither divides by only successful attempts. Unique assistant message IDs and
 tool-use IDs give observed message/tool counts; CLI `num_turns` is labeled separately.
 None is called iterations-to-green. Agent compiler/build iteration counts and
@@ -107,7 +110,8 @@ status/logs are retained, not substituted for agent iteration metrics.
 
 Build/setup/verification each have a 300-second deadline, compiler version has
 30 seconds, and each agent uses the unchanged task timeout (v1 admits 1–3600
-seconds). Pipe EOF shares that deadline; each raw stream is capped at 64 MiB.
+seconds). Pipe EOF and final capture validation share that deadline; each raw
+stream is capped at 64 MiB. A slow identity scan cannot admit late completion.
 Cancellation/timeout cleanup reuses the repository's birth-identity-checked
 process tracker, signals only recorded groups/PIDs, and closes inherited pipes
 without an unbounded drain. Cleanup has a three-second signaling budget plus at
