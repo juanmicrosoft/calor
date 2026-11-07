@@ -11,6 +11,31 @@ import tempfile
 import time
 
 
+def stop(process, deadline):
+    deadline = min(deadline, time.monotonic() + 0.5)
+    process.poll()
+    termination_error = None
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    except OSError as error:
+        termination_error = error
+    try:
+        process.communicate(timeout=max(0, deadline - time.monotonic()))
+    except subprocess.TimeoutExpired:
+        # Escaped descendants may retain stdout after the original process group
+        # dies. Do not wait for their EOF beyond the overall deadline.
+        if process.stdout is not None:
+            process.stdout.close()
+        try:
+            process.wait(timeout=max(0, deadline - time.monotonic()))
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("Verifier cleanup timeout: child did not exit by the deadline.") from None
+    if termination_error is not None:
+        raise RuntimeError(f"Cannot terminate verifier process group {process.pid}: {termination_error}") from termination_error
+
+
 def run(command, cwd, deadline):
     timeout = deadline - time.monotonic()
     if timeout <= 0:
@@ -20,11 +45,14 @@ def run(command, cwd, deadline):
         text=True, start_new_session=True,
     )
     try:
-        output, _ = process.communicate(timeout=timeout)
+        # Reserve part of this same deadline for bounded termination and EOF cleanup.
+        output, _ = process.communicate(timeout=max(0, deadline - time.monotonic() - min(0.5, timeout / 2)))
     except subprocess.TimeoutExpired:
-        os.killpg(process.pid, signal.SIGKILL)
-        process.communicate()
+        stop(process, deadline)
         raise RuntimeError(f"Verifier timeout after {timeout}s: {command[0]}") from None
+    except BaseException:
+        stop(process, deadline)
+        raise
     if process.returncode:
         raise RuntimeError(f"Verifier command exited {process.returncode}:\n{output}")
     return output

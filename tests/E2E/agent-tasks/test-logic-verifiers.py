@@ -2,10 +2,14 @@
 """Executable controls for the real logic-task verify.sh entry points."""
 
 import os
+import importlib.util
 from pathlib import Path
 import shutil
+import signal
 import subprocess
+import sys
 import tempfile
+import time
 import unittest
 
 
@@ -87,6 +91,20 @@ class LogicVerifierTests(unittest.TestCase):
             for expression in (False, True):
                 with self.subTest(name=name, expression=expression):
                     self.verify(name, source(name, expression=expression))
+
+    def test_int_and_mixed_alias_signatures(self):
+        for name in TASK_NAMES:
+            declaration = DECLARATIONS[name][0]
+            signatures = (
+                declaration.replace("i32", "int"),
+                declaration.replace("i32:", "int:", 1),
+                declaration.replace("-> i32", "-> int") if name != "IsPositive"
+                else declaration.replace("i32:", "int:"),
+            )
+            for signature in dict.fromkeys(signatures):
+                for expression in (False, True):
+                    with self.subTest(name=name, signature=signature, expression=expression):
+                        self.verify(name, source(name, signature=signature, expression=expression))
 
     def test_equivalent_contract_forms(self):
         alternatives = {
@@ -184,7 +202,8 @@ class LogicVerifierTests(unittest.TestCase):
             self.verify("Max", source("Max"), False,
                         env={"CALOR_COMPILER_ROOT": str(arm)}, detail="Selected compiler dependency missing")
             shutil.copytree(COMPILER_ROOT / relative, arm / relative)
-            self.verify("Max", source("Max"), env={"CALOR_COMPILER_ROOT": str(arm)},
+            mixed = source("Max", signature="§F{Max:pub} (int:a, i32:b) -> int")
+            self.verify("Max", mixed, env={"CALOR_COMPILER_ROOT": str(arm)},
                         detail=str(arm / relative / "calor.dll"))
             (arm / relative / "calor.dll").write_bytes(b"not a compiler")
             self.verify("Max", source("Max"), False, env={"CALOR_COMPILER_ROOT": str(arm)},
@@ -200,6 +219,80 @@ class LogicVerifierTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stdout)
             self.assertEqual(result.stdout.strip(), f"{temporary}/src/Calor.Compiler/bin/Release/net10.0/calor")
+
+
+class TimeoutWrapperTests(unittest.TestCase):
+    def test_escaped_inherited_stdout_is_bounded(self):
+        specification = importlib.util.spec_from_file_location("verify_logic", TASKS.parents[1] / "lib/verify-logic.py")
+        verifier = importlib.util.module_from_spec(specification)
+        specification.loader.exec_module(verifier)
+        with tempfile.TemporaryDirectory(prefix="calor-inherited-pipe-") as temporary:
+            pid_file = Path(temporary) / "escaped.pid"
+            code = (
+                "import pathlib, subprocess, sys; "
+                "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'], "
+                "start_new_session=True); "
+                "pathlib.Path(sys.argv[1]).write_text(str(child.pid))"
+            )
+            started = time.monotonic()
+            try:
+                with self.assertRaisesRegex(RuntimeError, "Verifier timeout"):
+                    verifier.run([sys.executable, "-c", code, str(pid_file)], temporary, started + 1.5)
+                self.assertLess(time.monotonic() - started, 2.5)
+                self.assertTrue(pid_file.is_file(), "Escaped inherited-pipe child did not start.")
+            finally:
+                if pid_file.is_file():
+                    try:
+                        os.kill(int(pid_file.read_text()), signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+
+    def test_cancellation_terminates_child_without_waiting_for_escaped_eof(self):
+        with tempfile.TemporaryDirectory(prefix="calor-cancel-control-") as temporary:
+            child_file = Path(temporary) / "child.pid"
+            escaped_file = Path(temporary) / "escaped.pid"
+            child_code = (
+                "import os, pathlib, subprocess, sys, time; "
+                "pathlib.Path(sys.argv[1]).write_text(str(os.getpid())); "
+                "escaped = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'], "
+                "start_new_session=True); "
+                "pathlib.Path(sys.argv[2]).write_text(str(escaped.pid)); time.sleep(60)"
+            )
+            wrapper_code = """
+import importlib.util, sys, time
+spec = importlib.util.spec_from_file_location("verify_logic", sys.argv[1])
+verifier = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(verifier)
+try:
+    verifier.run([sys.executable, "-c", sys.argv[2], sys.argv[3], sys.argv[4]], ".", time.monotonic() + 2)
+except KeyboardInterrupt:
+    sys.exit(130)
+"""
+            wrapper = subprocess.Popen([
+                sys.executable, "-c", wrapper_code, str(TASKS.parents[1] / "lib/verify-logic.py"),
+                child_code, str(child_file), str(escaped_file),
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, start_new_session=True)
+            started = time.monotonic()
+            try:
+                while not escaped_file.is_file() and time.monotonic() - started < 1:
+                    time.sleep(0.01)
+                self.assertTrue(escaped_file.is_file(), "Cancellation child did not start.")
+                wrapper.send_signal(signal.SIGINT)
+                _, error = wrapper.communicate(timeout=3)
+                self.assertEqual(wrapper.returncode, 130, error)
+                self.assertLess(time.monotonic() - started, 3)
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(int(child_file.read_text()), 0)
+            finally:
+                if wrapper.poll() is None:
+                    wrapper.kill()
+                    wrapper.communicate(timeout=1)
+                for path in (child_file, escaped_file):
+                    if path.is_file():
+                        try:
+                            os.kill(int(path.read_text()), signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
 
 
 if __name__ == "__main__":

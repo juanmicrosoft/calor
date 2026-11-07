@@ -118,9 +118,15 @@ runtime contracts enabled. Factorial runs all six permitted inputs. Clamp runs
 including zero; Max runs 121 pairs including ties and integer boundaries.
 These finite runtime oracles are behavioral checks, not a universal proof of
 arbitrary function bodies. Statement and expression implementations both pass.
+Integer signatures use the selected compiler's type normalization, so `int`,
+`i32`, and mixed aliases pass the same CLR `Int32` signature check; IsPositive
+still requires a CLR boolean result.
 Compilation errors, execution errors, wrong results, missing inputs, and
 timeouts fail. `CALOR_LOGIC_TIMEOUT_SECONDS` may shorten the overall 120-second
 build-and-execution deadline; timed-out process groups are terminated.
+Termination and output cleanup share that deadline. Escaped descendants holding
+stdout open cannot cause an unbounded EOF wait; cancellation also terminates the
+original process group and bounds cleanup.
 
 The controls exercise the real entry points with valid alternatives, missing
 and stub declarations, misleading comments and unrelated contracts, wrong

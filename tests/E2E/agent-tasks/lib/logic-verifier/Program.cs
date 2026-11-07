@@ -2,6 +2,7 @@ using System.Reflection;
 using Calor.Compiler;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
+using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification.Z3;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -40,9 +41,10 @@ static void Verify(string name, string path)
         throw new InvalidOperationException($"Expected exactly one module function named {name}.");
     var function = functions[0];
     if (function.Visibility != Visibility.Public || function.IsAsync || function.TypeParameters.Count != 0
-        || function.Output?.TypeName != outputType
+        || function.Output == null
+        || AttributeHelper.ToSurfaceSpelling(function.Output.TypeName) != (outputType == "bool" ? "bool" : "int")
         || !function.Parameters.Select(parameter => parameter.Name).SequenceEqual(names)
-        || function.Parameters.Any(parameter => parameter.TypeName != "i32"
+        || function.Parameters.Any(parameter => AttributeHelper.ToSurfaceSpelling(parameter.TypeName) != "int"
             || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None || parameter.InlineRefinement != null))
         throw new InvalidOperationException($"Wrong public signature for {name}.");
 
