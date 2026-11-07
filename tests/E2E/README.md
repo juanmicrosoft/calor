@@ -14,6 +14,114 @@ End-to-end tests verifying Calor compilation and generated C# correctness.
 .\tests\E2E\run-tests.ps1
 ```
 
+### Opt-in measured agent-task evidence (POSIX)
+
+The normal `agent-tasks/run-agent-tests.sh` invocation is unchanged: it uses the
+existing prompt, teaching, unpinned CLI invocation, and cleanup behavior. It is
+not a measured baseline. To opt in, supply all three new options:
+
+```bash
+# Only after separately approving the model, arm, task selection, and spending.
+# MODEL must be the exact dated Claude model ID, not "sonnet"/"opus"/"default".
+CALOR_COMPILER_ROOT="$EXACT_WORKTREE_ROOT" \
+CALOR_COMPILER_CONFIGURATION=Debug \
+  ./tests/E2E/agent-tasks/run-agent-tests.sh \
+  --measured-output "$NEW_ABSOLUTE_OUTPUT_DIRECTORY" \
+  --model "$MODEL" --arm "$ARM_LABEL" --task logic-001 --single-run
+
+# Guarded local controls; never calls a provider:
+python3 tests/E2E/agent-tasks/test-measured-run.py
+python3 tests/E2E/agent-tasks/test-compiler-selection.py
+```
+
+This supplies capture plumbing, **not** an approved experiment, paired scheduler,
+baseline, budget, or release result. The caller must interleave old/new invocations
+on one approved exact model and select identical task/verifier inputs. No historical
+inputs, task prompts, primers, frozen ledgers, or compiler semantics are rewritten.
+`--arm` is attribution only. The default compiler root is this integration worktree;
+the configuration defaults to Debug. The selected root/configuration is built by
+the existing `build_compiler` helper, without retries or another-root fallback.
+Measured stages disable persistent MSBuild servers/shared compilation to keep
+their child lifetimes bounded.
+
+Measured mode supports `--task`, `--category`, `--filter` (case-insensitive regular
+expression), `--single-run`, and `--verbose`. It rejects unknown/duplicate options,
+conflicting selections, empty selection, invalid task JSON, missing local fixtures,
+GitHub clone inputs, symlinked input/output paths, and an existing output directory.
+Use canonical absolute paths (on macOS resolve `/var` or `/tmp` to `/private/...`).
+Output must be outside both compiler and integration roots; its parent must exist.
+There is no `--clean`, output reuse, automatic cleanup, or overwrite in this mode.
+The existing setup still preserves a fixture's CLAUDE.md, otherwise checks/copies
+the integration-generated teaching reference with the **selected** compiler.
+Unsupported old teaching APIs fail setup; they never fall back to another compiler.
+No old/new primer policy or syntax translation is inferred.
+
+Only `run.json` with `status: "accepted"` represents valid measured evidence.
+An accepted behavioral failure exits 1; invalid evidence exits 2 and is retained
+with an explicit error, without aggregate pass/token claims. Preflight failures
+before output reservation create no evidence directory and admit no agent.
+Do not consume an `attempt.json` alone: a later mutation/cancellation can invalidate
+the whole run. `skips` is explicit; v1 rejects invalid selected tasks instead of
+silently skipping them, so accepted runs have zero skips.
+
+Each attempt retains initial, pre-verifier agent-output, and final workspaces, raw `agent.stdout` JSONL and
+byte-exact `agent.stderr`, setup/verification logs, actual process argv/cwd/timing/
+exit/cleanup status, and a unique attempt identifier. The run retains selected
+task IDs/arm/model, CLI executable path/hash, compiler version and executable
+version check, compiler-image hashes/bytes, Git commit and complete worktree status.
+Source manifests/copies cover compiler `src/`, build `scripts/`, root-level build
+configuration, and the integration agent-task/teaching/supervision sources.
+Task, fixture, actual initial input, and teaching hashes are recorded separately.
+Compiler images, source manifests, inputs, and retained copies are checked before
+agent admission and after each stage; persistent mutation invalidates the run.
+Raw capture is checked against the bytes actually read from the pipes.
+
+Token schema v1 follows the documented
+[Claude SDK result schema](https://code.claude.com/docs/en/agent-sdk/typescript#sdkresultmessage)
+and [cost tracking](https://code.claude.com/docs/en/agent-sdk/cost-tracking).
+It accepts one init, one successful final result, one fresh session identity,
+and exactly the supplied model in init/assistant messages and `result.modelUsage`.
+Subagent message streams, extra result envelopes, model fallback, errors,
+aborted messages, unsupported event types/system subtypes, missing/empty or
+malformed usage are invalid evidence, even when generated code passes.
+
+Tokens come **once** from final `result.modelUsage[MODEL]`: `inputTokens`,
+`outputTokens`, `cacheCreationInputTokens`, and `cacheReadInputTokens` map to the
+four snake-case fields in the report. Input excludes cache; `total_tokens` adds
+those four disjoint counts. These are query-pipeline totals (including internal
+calls and same-model subagent activity); helper calls outside that pipeline are
+not included. Main-loop `result.usage` is validated and retained separately, never
+added. Repeated assistant blocks/cumulative envelopes cannot inflate totals.
+No token estimation, raw-text-length proxy, billing estimate, or zero-fill is used.
+Missing usage cannot supply an old/new comparison.
+
+Attempt pass counts and **task majority votes** are separate: by default all three
+attempts run and two must pass; `--single-run` requires one of one. Reports retain
+both denominators. `tokens_per_attempt` divides task tokens by its attempt count;
+`tokens_per_task_all_attempts` averages task totals including every voted attempt.
+Neither divides by only successful attempts. Unique assistant message IDs and
+tool-use IDs give observed message/tool counts; CLI `num_turns` is labeled separately.
+None is called iterations-to-green. Agent compiler/build iteration counts and
+iterations-to-green remain explicitly null/unobserved; real verification stage
+status/logs are retained, not substituted for agent iteration metrics.
+
+Build/setup/verification each have a 300-second deadline, compiler version has
+30 seconds, and each agent uses the unchanged task timeout (v1 admits 1–3600
+seconds). Pipe EOF shares that deadline; each raw stream is capped at 64 MiB.
+Cancellation/timeout cleanup reuses the repository's birth-identity-checked
+process tracker, signals only recorded groups/PIDs, and closes inherited pipes
+without an unbounded drain. Cleanup has a three-second signaling budget plus at
+most two bounded two-second process-table queries and a one-second root reap;
+an exhausted cleanup budget invalidates evidence rather than retrying forever.
+This is supervision, **not a sandbox**: a descendant
+that escapes and reparents before it is observed cannot safely be identified or
+killed. Such retained-pipe hangs fail the evidence deadline. Point-in-time hashes
+cannot prove absence of transient edit-and-restore attacks. CLI user/global
+settings, hooks, network helpers, and external toolchain dependencies are not
+hermetically frozen; no settings/teaching changes are silently imposed to hide
+that limitation. Keep raw artifacts private and audit these external influences
+before interpreting real paid results.
+
 ### Clean Generated Files
 ```bash
 ./tests/E2E/run-tests.sh --clean

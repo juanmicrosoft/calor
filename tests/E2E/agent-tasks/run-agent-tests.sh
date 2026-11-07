@@ -21,6 +21,16 @@
 
 set -euo pipefail
 
+# Measured runs have their own strict admission and bounded supervision. Leave
+# the legacy parser and invocation untouched unless explicitly opted in.
+for argument in "$@"; do
+    if [[ "$argument" == "--measured-output" || "$argument" == "--measured-output="* ||
+          "$argument" == "--model" || "$argument" == "--model="* ||
+          "$argument" == "--arm" || "$argument" == "--arm="* ]]; then
+        exec python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/measured-run.py" "$@"
+    fi
+done
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source helper library
@@ -277,6 +287,10 @@ Options:
   --filter <pattern>  Filter tasks by ID pattern (e.g., "calor" or "csharp")
                       Can be combined with --category
   --single-run        Run each task only once (skip majority voting)
+  --measured-output <new-absolute-directory>
+                      Opt in to retained, strict measured evidence (see README)
+  --model <exact-id>  Required dated Claude model ID in measured mode
+  --arm <label>       Required caller-selected arm label in measured mode
   --list              List all available tasks
   --clean             Clean up temporary workspaces only
   --verbose           Enable verbose debug output
