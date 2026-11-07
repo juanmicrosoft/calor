@@ -120,6 +120,51 @@ runner with integration base `89f298e99`. Original pair/canary bytes are never
 rewritten. Null-agent controls are plumbing, not agent outcomes, token-savings
 measurements, or release-gate evidence; no model/budget/publication decision is added.
 
+### Explicit selected-arm canary (unregistered admission controls)
+
+`--arm-canary <file> --arm-canary-sha256 <lowercase SHA-256>` selects exact canary
+bytes for an ordinary Calor arm. Both flags are required. The runner snapshots
+the input once, verifies that snapshot before compilation, and builds it through
+the selected arm's SDK and Calor.Tasks. The selected CLI must belong to
+`--arm-repo-root`, match the Tasks compiler image, and report that root's version.
+No source translation or automatic current-syntax selection occurs.
+
+For a zero-provider effect-gate check after building Release Compiler and Tasks:
+
+```bash
+CANARY=bench/phase0-agent-native/tests/fixtures/harness-capture/current-unknown-effect.calr
+PIN=$(shasum -a 256 "$CANARY" | cut -d' ' -f1)
+bash bench/phase0-agent-native/run-pair.sh \
+  --pair bench/phase0-agent-native/pairs/N1-001-string-utils --arm calor \
+  --canary-only --out /tmp/calor-selected-canary-new \
+  --arm-repo-root "$PWD" --calor-dll "$PWD/src/Calor.Compiler/bin/Release/net10.0/calor.dll" \
+  --arm-canary "$CANARY" --arm-canary-sha256 "$PIN"
+```
+
+`--out` must be an explicit, nonexistent, unregistered directory. Initialized
+arms, registered policy arms, frozen/seeded inputs, pinned epoch directories,
+spending/gateway bindings, and skipped canaries cannot use this override.
+Missing, empty, symlinked, or hash-mismatched input fails before admission.
+
+`arm-canary/` archives the selected bytes, input SHA-256, selected root/commit,
+CLI image SHA-256/version, rendered project, build output, and compiler build
+state. Explicit-selection preflight and run results carry `armCanaryInput`;
+each run retains the archive. Without these flags, original canary bytes,
+diagnostic classification, prompts, workspace inputs, and result schema stay
+unchanged, including the current compiler's rejection of historical source IDs.
+
+The ordinary current known-effect fixture keeps the original forbidden console
+write: `Calor0410` is an error under both current policies. The separate
+polymorphic-unknown fixture exercises the actual distinction: strict errors,
+permissive warns. The existing effect/policy classifiers are unchanged.
+Compiler-backed harness tests explicitly select these fixtures and use existing
+current pair sources only in temporary copies. This is admission/null-agent
+plumbing, not an agent outcome, token-savings measurement, or historical replay.
+
+```bash
+python3 -m unittest discover -s bench/phase0-agent-native/tests -p test_harness_capture.py -v
+```
+
 ### Per-run capture (v0.16 W1 — roadmap §3.1, gate 8, #1094)
 
 `run-pair.sh` and `run-bundle.sh` run the agent as

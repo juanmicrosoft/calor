@@ -458,6 +458,10 @@ def initialized_arm_admission(pair_json, key, arm, output=None):
     entry = pair.get("arms", {}).get(key, {})
     if arm != "calor" or key != "calor" or entry.get("config") != STRICT_CONFIG:
         raise ValueError("initialized workspace requires the ordinary strict calor arm")
+    unregistered_input_admission(pair, output, "initialized workspace")
+
+
+def unregistered_input_admission(pair, output, context):
     def frozen(value):
         if isinstance(value, dict):
             return any("frozen" in k.lower() or "registration" in k.lower() or frozen(v)
@@ -466,13 +470,60 @@ def initialized_arm_admission(pair_json, key, arm, output=None):
             return any(frozen(v) for v in value)
         return False
     if "sourceAssembly" in pair or "seeded" in pair or frozen(pair):
-        raise ValueError("initialized workspace cannot use registered/frozen pair inputs")
+        raise ValueError(context + " cannot use registered/frozen pair inputs")
     if output:
         path = Path(output).resolve()
         if "registrations" in path.parts or any(
                 (parent / name).exists() for parent in (path, *path.parents)
                 for name in ("pins.json", "registration.json")):
-            raise ValueError("initialized workspace cannot write inside a pinned/registered epoch")
+            raise ValueError(context + " cannot write inside a pinned/registered epoch")
+
+
+def arm_compiler_digest(root, dll):
+    allowed = [root / "src/Calor.Compiler/bin" / cfg / "net10.0/calor.dll"
+               for cfg in ("Release", "Debug")]
+    if dll not in allowed or not dll.is_file():
+        raise ValueError("compiler must be a build in the selected arm repo root")
+    task_compiler = root / "src/Calor.Tasks/bin/Release/net10.0/calor.dll"
+    digest = hashlib.sha256(dll.read_bytes()).hexdigest()
+    if not task_compiler.is_file() or hashlib.sha256(task_compiler.read_bytes()).hexdigest() != digest:
+        raise ValueError("selected compiler does not match the arm's Calor.Tasks compiler")
+    return digest
+
+
+def select_canary(source, expected_hash, output, repo_root, compiler, timeout):
+    """Snapshot explicit bytes once; never normalize or auto-select an input."""
+    source, out = Path(source).absolute(), Path(output)
+    root, dll = Path(repo_root).resolve(), Path(compiler).resolve()
+    unregistered_input_admission({}, out, "selected canary")
+    if not re.fullmatch(r"[0-9a-f]{64}", expected_hash):
+        raise ValueError("arm canary SHA-256 must be 64 lowercase hex digits")
+    if source.is_symlink() or not source.is_file():
+        raise ValueError("arm canary must be an existing regular, non-symlink file")
+    content = source.read_bytes()
+    if not content or hashlib.sha256(content).hexdigest() != expected_hash:
+        raise ValueError("arm canary bytes do not match the explicit SHA-256 pin")
+    digest = arm_compiler_digest(root, dll)
+    if timeout <= 0:
+        raise ValueError("canary command timeout must be positive")
+    with tempfile.TemporaryDirectory(prefix="p0-canary-home-") as home:
+        env = dict(os.environ, HOME=home, USERPROFILE=home, DOTNET_CLI_HOME=home,
+                   CALOR_TELEMETRY_OPTOUT="1", DOTNET_CLI_TELEMETRY_OPTOUT="1",
+                   DOTNET_SKIP_FIRST_TIME_EXPERIENCE="1")
+        version, _ = _initialized_command(["dotnet", str(dll), "--version"], root, env, timeout)
+        if version.strip() != ET.parse(root / "Directory.Build.props").findtext(".//Version"):
+            raise ValueError("selected compiler version does not match the arm repo root")
+    commit, _ = _initialized_command(["git", "-C", str(root), "rev-parse", "HEAD"],
+                                    root, os.environ, timeout)
+    out.mkdir()  # An existing archive must never be overwritten.
+    (out / "source.calr").write_bytes(content)
+    identity = {"source": str(source), "sha256": expected_hash,
+                "file": "arm-canary/source.calr", "repoRoot": str(root),
+                "repoCommit": commit.strip(), "compiler": str(dll),
+                "compilerSha256": digest, "version": version.strip()}
+    (out / "input.json").write_text(
+        json.dumps(identity, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return identity
 
 
 def _initialized_command(command, cwd, env, timeout, input_text=None):
@@ -519,14 +570,7 @@ def initialize_workspace(workspace, output, repo_root, compiler, template, timeo
                             (workspace, output, repo_root, compiler))
     if timeout <= 0:
         raise ValueError("initialization timeout must be positive")
-    allowed = [root / "src/Calor.Compiler/bin" / cfg / "net10.0/calor.dll"
-               for cfg in ("Release", "Debug")]
-    if dll not in allowed or not dll.is_file():
-        raise ValueError("initialized compiler must be a build in the selected arm repo root")
-    task_compiler = root / "src/Calor.Tasks/bin/Release/net10.0/calor.dll"
-    digest = hashlib.sha256(dll.read_bytes()).hexdigest()
-    if not task_compiler.is_file() or hashlib.sha256(task_compiler.read_bytes()).hexdigest() != digest:
-        raise ValueError("selected init compiler does not match the arm's Calor.Tasks compiler")
+    digest = arm_compiler_digest(root, dll)
     if not (ws / ".git").is_dir():
         raise ValueError("initialized workspace requires its own disposable git root")
     for relative in ("CLAUDE.md", ".claude", ".calor", ".mcp.json"):
@@ -1021,8 +1065,26 @@ def main(argv=None):
         p.add_argument(name)
     p.add_argument("--timeout", type=float, default=120)
     p.add_argument("--exemplar")
+    p = sub.add_parser("canary-admission")
+    p.add_argument("pair_json"); p.add_argument("output")
+    p = sub.add_parser("select-canary")
+    for name in ("source", "sha256", "output", "repo_root", "compiler"):
+        p.add_argument(name)
+    p.add_argument("--timeout", type=float, default=120)
     sub.add_parser("self-test")
     args = parser.parse_args(argv)
+    if args.cmd in ("canary-admission", "select-canary"):
+        try:
+            if args.cmd == "canary-admission":
+                pair = json.loads(Path(args.pair_json).read_text(encoding="utf-8"))
+                unregistered_input_admission(pair, args.output, "selected canary")
+            else:
+                select_canary(args.source, args.sha256, args.output, args.repo_root,
+                              args.compiler, args.timeout)
+            return 0
+        except (OSError, ValueError, ET.ParseError, subprocess.TimeoutExpired) as exc:
+            sys.stderr.write("invalid selected canary: %s\n" % exc)
+            return 3
     if args.cmd in ("initialize-workspace", "initialized-arm-admission"):
         try:
             if args.cmd == "initialized-arm-admission":

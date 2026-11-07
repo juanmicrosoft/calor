@@ -25,14 +25,17 @@ Run:  python3 -m unittest discover -s bench/phase0-agent-native/tests
 """
 
 import importlib.util
+import hashlib
 import json
 import os
+from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BENCH = os.path.dirname(HERE)
@@ -51,6 +54,10 @@ FIX = os.path.join(HERE, "fixtures", "harness-capture")
 TOKEN_FIX = os.path.join(HERE, "fixtures", "token-usage")
 PAIRS = os.path.join(BENCH, "pairs")
 N1_001 = os.path.join(PAIRS, "N1-001-string-utils")
+CURRENT_N1 = os.path.join(REPO, "tests", "TestData", "ActiveSyntax",
+                         "bench", "phase0-agent-native", "pairs", "N1-001-string-utils")
+CURRENT_CANARY = os.path.join(FIX, "current-known-effect.calr")
+CURRENT_UNKNOWN_CANARY = os.path.join(FIX, "current-unknown-effect.calr")
 
 RELEASE_CLI = os.path.join(REPO, "src", "Calor.Compiler", "bin", "Release", "net10.0", "calor.dll")
 RELEASE_TASKS = os.path.join(REPO, "src", "Calor.Tasks", "bin", "Release", "net10.0", "Calor.Tasks.dll")
@@ -67,6 +74,19 @@ def _load_helper():
 
 
 hc = _load_helper()
+
+
+def selected_canary_args(path=CURRENT_CANARY):
+    with open(path, "rb") as stream:
+        digest = hashlib.sha256(stream.read()).hexdigest()
+    return ["--arm-canary", path, "--arm-canary-sha256", digest]
+
+
+def use_current_pair_sources(pair):
+    """Use existing ordinary fixtures in disposable tests; never normalize at runtime."""
+    for relative in ("calor", "reference/calor"):
+        shutil.copytree(os.path.join(CURRENT_N1, relative), os.path.join(pair, relative),
+                        dirs_exist_ok=True)
 
 STRICT = {"enforceEffects": True, "permissiveEffects": False, "contractMode": "debug", "z3Required": True}
 PRE_ROWS = dict(STRICT, permissiveEffects=True, controlArmKind="pre-rows")
@@ -503,9 +523,11 @@ class PairConfigAdmission(unittest.TestCase):
             pair = self._synthetic_pair(tmp, STRICT, extra_arms={
                 "calor-pre-rows": {"fixture": "calor", "config": PRE_ROWS}})
             shutil.copytree(os.path.join(N1_001, "reference"), os.path.join(pair, "reference"))
+            use_current_pair_sources(pair)
             out = run(["bash", RUN_PAIR, "--pair", pair, "--arm", "calor",
                        "--arm-config", "calor-pre-rows", "--null-agent",
-                       "--out", os.path.join(tmp, "out")], timeout=900)
+                       "--out", os.path.join(tmp, "out")] +
+                      selected_canary_args(CURRENT_UNKNOWN_CANARY), timeout=900)
             if "MSB4064" in out.stderr or "MSB4063" in out.stderr:
                 self.skipTest("this checkout's Calor.Tasks assembly is stale or held by an "
                               "MSBuild node (dotnet build-server shutdown)")
@@ -517,6 +539,8 @@ class PairConfigAdmission(unittest.TestCase):
             self.assertEqual(r["controlArmKind"], "pre-rows")
             self.assertTrue(r["permissiveEffects"])
             self.assertEqual(r["templateSource"], "harness")
+            self.assertEqual(r["armCanaryInput"]["sha256"],
+                             selected_canary_args(CURRENT_UNKNOWN_CANARY)[3])
 
     @unittest.skipUnless(HAVE_PRODUCT and HAVE_JQ,
                          "Release product not built (dotnet build src/Calor.{Compiler,Tasks,Runtime} -c Release)")
@@ -526,8 +550,9 @@ class PairConfigAdmission(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             pair = self._synthetic_pair(tmp, STRICT)
             shutil.copytree(os.path.join(N1_001, "reference"), os.path.join(pair, "reference"))
+            use_current_pair_sources(pair)
             out = run(["bash", RUN_PAIR, "--pair", pair, "--arm", "calor", "--null-agent",
-                       "--out", os.path.join(tmp, "out")], timeout=900)
+                       "--out", os.path.join(tmp, "out")] + selected_canary_args(), timeout=900)
             if "MSB4064" in out.stderr or "MSB4063" in out.stderr:
                 self.skipTest("this checkout's Calor.Tasks assembly is stale or held by an "
                               "MSBuild node (dotnet build-server shutdown)")
@@ -725,7 +750,7 @@ class PreflightArmProof(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             pair = CanaryRefusals._pair(tmp)
             out = run(["bash", RUN_PAIR, "--pair", pair, "--arm", "calor", "--canary-only",
-                       "--out", os.path.join(tmp, "out")], timeout=900)
+                       "--out", os.path.join(tmp, "out")] + selected_canary_args(), timeout=900)
             if "MSB4064" in out.stderr or "MSB4063" in out.stderr or "MSB4062" in out.stderr:
                 self.skipTest("this checkout's Calor.Tasks assembly is stale or unloadable")
             self.assertEqual(out.returncode, 0, out.stderr[-3000:])
@@ -837,7 +862,11 @@ class TemplateCarriesPermissiveEffects(unittest.TestCase):
     @unittest.skipUnless(HAVE_PRODUCT, "Release calor.dll not built")
     def test_known_effect_canary_is_an_error_in_strict_and_permissive_modes(self):
         with tempfile.TemporaryDirectory() as tmp:
-            base = ["dotnet", RELEASE_CLI, "-i", CANARY, "--enforce-effects", "--no-telemetry",
+            selected = os.path.join(tmp, "selected")
+            hc.select_canary(CURRENT_CANARY, selected_canary_args()[3], selected,
+                             REPO, RELEASE_CLI, 30)
+            base = ["dotnet", RELEASE_CLI, "-i", os.path.join(selected, "source.calr"),
+                    "--enforce-effects", "--no-telemetry",
                     "--format", "json"]
             strict = run(base + ["-o", os.path.join(tmp, "s.g.cs")])
             self._assert_canary_diagnostics(strict, "error")
@@ -871,6 +900,163 @@ class TemplateCarriesPermissiveEffects(unittest.TestCase):
         self._assert_canary_diagnostics(result([diagnostic("Calor0410", "error")], 1), "error")
         self._assert_canary_diagnostics(result([diagnostic("Calor0410", "warning")], 0), "warning")
 
+
+@unittest.skipUnless(HAVE_PRODUCT and HAVE_JQ, "Release compiler and Tasks plus jq required")
+class ExplicitCanarySelection(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="p0-selected-canary-")
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.pair = CanaryRefusals._pair(self.tmp.name, {
+            "calor-new-permissive": {"fixture": "calor", "config": dict(
+                STRICT, permissiveEffects=True, controlArmKind="permissive")}})
+        guard = self.root / "guard"
+        guard.mkdir()
+        self.provider = self.root / "provider-called"
+        (guard / "claude").write_text(
+            "#!/bin/sh\nprintf called > '%s'\nexit 99\n" % self.provider)
+        (guard / "claude").chmod(0o755)
+        self.env = dict(os.environ, PATH=str(guard) + os.pathsep + os.environ["PATH"],
+                        CALOR_TELEMETRY_OPTOUT="1", CALOR_P0_SKIP_ARM_CANARY="0")
+        self.sequence = 0
+
+    def invoke(self, extra=(), path=CURRENT_CANARY, selected=True):
+        self.sequence += 1
+        output = self.root / ("out-%s" % self.sequence)
+        command = ["bash", RUN_PAIR, "--pair", self.pair, "--arm", "calor",
+                   "--canary-only", "--out", str(output),
+                   "--arm-repo-root", REPO, "--calor-dll", RELEASE_CLI]
+        if selected:
+            command += selected_canary_args(path)
+        result = run(command + list(extra), env=self.env, timeout=45)
+        self.assertFalse(self.provider.exists(), "canary control attempted provider execution")
+        return result, output
+
+    def test_actual_strict_and_permissive_admission_capture_exact_bytes(self):
+        for key in ("calor", "calor-pre-rows", "calor-new-permissive"):
+            if key == "calor-pre-rows":
+                pair = json.loads(Path(self.pair, "pair.json").read_text())
+                pair["arms"][key] = {"fixture": "calor", "config": PRE_ROWS}
+                Path(self.pair, "pair.json").write_text(json.dumps(pair))
+            result, output = self.invoke(
+                ["--arm-config", key], path=CURRENT_UNKNOWN_CANARY)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            doc = json.loads(result.stdout)
+            self.assertEqual(doc["armCanary"], "strict-ok" if key == "calor" else "permissive-ok")
+            expected = Path(CURRENT_UNKNOWN_CANARY).read_bytes()
+            self.assertEqual((output / "arm-canary/source.calr").read_bytes(), expected)
+            self.assertEqual(doc["armCanaryInput"]["sha256"], hashlib.sha256(expected).hexdigest())
+            self.assertEqual(doc["armCanaryInput"]["compiler"], RELEASE_CLI)
+            self.assertEqual(doc["armCanaryInput"]["repoRoot"], REPO)
+            state = json.loads((output / "arm-canary/calor-build-state.json").read_text())
+            self.assertEqual(doc["compilerHash"], state["compilerHash"])
+            log = (output / "arm-canary/build.log").read_text()
+            self.assertIn(("error" if key == "calor" else "warning") + " Calor0410", log)
+            print("SELECTED %s: %s, exact SHA-256=%s" %
+                  (key, doc["armCanary"], doc["armCanaryInput"]["sha256"]), flush=True)
+
+    def test_unchanged_default_rejects_original_canary(self):
+        original = Path(CANARY).read_bytes()
+        result, _ = self.invoke(selected=False)
+        self.assertEqual(result.returncode, 3, result.stdout + result.stderr)
+        self.assertIn("error Calor0100", result.stderr)
+        self.assertEqual(Path(CANARY).read_bytes(), original)
+
+    def test_missing_mismatched_symlink_and_invalid_pins_are_rejected(self):
+        missing = str(self.root / "missing.calr")
+        link = self.root / "linked.calr"
+        link.symlink_to(CURRENT_CANARY)
+        empty = self.root / "empty.calr"
+        empty.write_bytes(b"")
+        for flags in (
+                ["--arm-canary", missing, "--arm-canary-sha256", "0" * 64],
+                ["--arm-canary", CURRENT_CANARY, "--arm-canary-sha256", "0" * 64],
+                ["--arm-canary", str(link), "--arm-canary-sha256", selected_canary_args()[3]],
+                ["--arm-canary", str(empty), "--arm-canary-sha256", hashlib.sha256(b"").hexdigest()],
+                ["--arm-canary", str(self.root), "--arm-canary-sha256", "0" * 64],
+                ["--arm-canary", CURRENT_CANARY, "--arm-canary-sha256", "invalid"],
+                ["--arm-canary", CURRENT_CANARY],
+                ["--arm-canary-sha256", selected_canary_args()[3]],
+                selected_canary_args() + ["--arm-canary", CURRENT_CANARY],
+                selected_canary_args() + ["--arm-canary-sha256", selected_canary_args()[3]],
+                selected_canary_args() + ["--arm", "csharp"],
+                selected_canary_args() + ["--initialized-workspace"],
+                selected_canary_args() + ["--arm-config", "calor-strict"]):
+            with self.subTest(flags=flags):
+                result, _ = self.invoke(flags, selected=False)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_corrupt_but_hash_pinned_input_does_not_pass_the_effect_gate(self):
+        source = self.root / "corrupt.calr"
+        source.write_text("not Calor source\n")
+        result, output = self.invoke(path=str(source))
+        self.assertEqual(result.returncode, 3, result.stdout + result.stderr)
+        self.assertEqual((output / "arm-canary/source.calr").read_bytes(), source.read_bytes())
+        self.assertNotIn("arm canary OK", result.stderr)
+
+    def test_mismatched_selected_compiler_and_version_are_rejected(self):
+        foreign = self.root / "calor.dll"
+        shutil.copyfile(RELEASE_CLI, foreign)
+        result, _ = self.invoke(["--calor-dll", str(foreign)])
+        self.assertEqual(result.returncode, 3, result.stdout + result.stderr)
+        self.assertIn("selected arm repo root", result.stderr)
+        result, _ = self.invoke(["--arm-repo-root", str(self.root / "missing-root")])
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        arm_root = self.root / "foreign-arm"
+        dll = arm_root / "src/Calor.Compiler/bin/Release/net10.0/calor.dll"
+        tasks = arm_root / "src/Calor.Tasks/bin/Release/net10.0/calor.dll"
+        dll.parent.mkdir(parents=True)
+        tasks.parent.mkdir(parents=True)
+        shutil.copyfile(RELEASE_CLI, dll)
+        tasks.write_bytes(b"mismatched compiler image")
+        with self.assertRaisesRegex(ValueError, "Calor.Tasks compiler"):
+            hc.select_canary(CURRENT_CANARY, selected_canary_args()[3],
+                             self.root / "mismatch", arm_root, dll, 10)
+        with mock.patch.object(hc, "arm_compiler_digest", return_value="0" * 64):
+            with mock.patch.object(hc, "_initialized_command", return_value=("stale", "")):
+                with self.assertRaisesRegex(ValueError, "version"):
+                    hc.select_canary(CURRENT_CANARY, selected_canary_args()[3],
+                                     self.root / "stale", REPO, RELEASE_CLI, 10)
+
+    def test_registered_pairs_and_outputs_cannot_be_overridden(self):
+        pair_path = Path(self.pair, "pair.json")
+        pair = json.loads(pair_path.read_text())
+        pair["arms"]["calor"]["frozenAt"] = "historical"
+        pair_path.write_text(json.dumps(pair))
+        result, _ = self.invoke()
+        self.assertEqual(result.returncode, 3, result.stdout + result.stderr)
+        del pair["arms"]["calor"]["frozenAt"]
+        pair_path.write_text(json.dumps(pair))
+        epoch = self.root / "registered"
+        epoch.mkdir()
+        pins = epoch / "pins.json"
+        pins.write_text('{"keep":"registered"}')
+        result, _ = self.invoke(["--out", str(epoch / "new-child")])
+        self.assertEqual(result.returncode, 3, result.stdout + result.stderr)
+        self.assertFalse((epoch / "new-child").exists())
+        self.assertEqual(pins.read_text(), '{"keep":"registered"}')
+        self.assertIn("registered", result.stderr)
+
+    def test_snapshot_does_not_re_read_or_normalize_the_operator_input(self):
+        source = self.root / "operator.calr"
+        source.write_bytes(Path(CURRENT_CANARY).read_bytes())
+        digest = selected_canary_args(str(source))[3]
+        archive = self.root / "snapshot"
+        hc.select_canary(source, digest, archive, REPO, RELEASE_CLI, 30)
+        source.write_text("changed after selection")
+        self.assertEqual(hashlib.sha256((archive / "source.calr").read_bytes()).hexdigest(), digest)
+
+    def test_corrupted_archive_is_rejected_before_compilation(self):
+        wrapper = self.root / "guard/python3"
+        wrapper.write_text(
+            '#!/bin/sh\n"%s" "$@" || exit $?\n'
+            'if [ "$2" = select-canary ]; then printf corrupt > "$5/source.calr"; fi\n'
+            % shutil.which("python3"))
+        wrapper.chmod(0o755)
+        result, output = self.invoke()
+        self.assertEqual(result.returncode, 3, result.stdout + result.stderr)
+        self.assertIn("snapshot changed before compilation", result.stderr)
+        self.assertFalse((output / "arm-canary/build.log").exists())
 
 # ---------------------------------------------------------------------------
 class LegBPairsAreRegisteredInPins(unittest.TestCase):
@@ -1360,13 +1546,20 @@ class NullAgentEndToEnd(unittest.TestCase):
 
     def test_calor_arm_null_agent_run(self):
         with tempfile.TemporaryDirectory() as tmp:
-            out = run(["bash", RUN_PAIR, "--pair", N1_001, "--arm", "calor", "--null-agent", "--out", tmp], timeout=900)
+            pair = os.path.join(tmp, "current-pair")
+            shutil.copytree(N1_001, pair)
+            use_current_pair_sources(pair)
+            output = os.path.join(tmp, "out")
+            out = run(["bash", RUN_PAIR, "--pair", pair, "--arm", "calor", "--null-agent",
+                       "--out", output] + selected_canary_args(), timeout=900)
             self.assertEqual(out.returncode, 0, out.stderr[-3000:])
-            rd = os.path.join(tmp, "N1-001-string-utils", "calor", "run-1")
+            rd = os.path.join(output, "N1-001-string-utils", "calor", "run-1")
             for f in ("transcript.jsonl", "agent-builds.jsonl", "calor-build-state.json", "result.json", "agent.json"):
                 self.assertTrue(os.path.isfile(os.path.join(rd, f)), f)
             r = json.loads(_read(os.path.join(rd, "result.json")))
             self.assertFalse(r["invalid"])
+            self.assertTrue(r["finalBuild"]["ok"])
+            self.assertEqual(r["heldoutPassed"], 11)
             self.assertRegex(r["compilerHash"], r"^[0-9a-f]{64}$")
             self.assertEqual(r["buildState"]["archivedFrom"], "agent-workspace")
             self.assertEqual(r["turns"]["assistantMessages"], 0)
@@ -1375,6 +1568,15 @@ class NullAgentEndToEnd(unittest.TestCase):
             self.assertEqual((r["armConfigKey"], r["fixture"], r["permissiveEffects"], r["templateSource"]),
                              ("calor", "calor", False, "arm-repo-root"))
             self.assertEqual(r["agentBuilds"], {"count": 0, "file": "agent-builds.jsonl"})
+            self.assertEqual(Path(rd, "arm-canary/source.calr").read_bytes(),
+                             Path(CURRENT_CANARY).read_bytes())
+            self.assertEqual(r["armCanaryInput"],
+                             json.loads(Path(rd, "arm-canary/input.json").read_text()))
+            for name in ("Src.csproj", "build.log", "calor-build-state.json"):
+                self.assertTrue(Path(rd, "arm-canary", name).is_file(), name)
+            self.assertEqual(r["armCanaryInput"]["sha256"], selected_canary_args()[3])
+            print("SELECTED NULL: build=%s heldoutPassed=%s; plumbing only" %
+                  (r["finalBuild"]["ok"], r["heldoutPassed"]), flush=True)
 
 
 if __name__ == "__main__":
