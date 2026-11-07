@@ -1,7 +1,10 @@
 using System.Reflection;
+using System.Text;
 using Calor.Compiler;
+using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification.Z3;
 using Microsoft.CodeAnalysis;
@@ -11,7 +14,7 @@ using Microsoft.Z3;
 try
 {
     if (args.Length != 2)
-        throw new InvalidOperationException("Expected function name and Calculator.calr path.");
+        throw new InvalidOperationException("Expected function name and Calor source path.");
     Verify(args[0], args[1]);
     return 0;
 }
@@ -29,9 +32,12 @@ static void Verify(string name, string path)
         "Clamp" => new[] { "value", "min", "max" },
         "IsPositive" => new[] { "x" },
         "Max" => new[] { "a", "b" },
-        _ => throw new InvalidOperationException($"Unknown logic task: {name}")
+        "Classify" => new[] { "x" },
+        "PrintNumbers" or "Countdown" or "DoWhileDemo" => Array.Empty<string>(),
+        _ => throw new InvalidOperationException($"Unknown task: {name}")
     };
-    var outputType = name == "IsPositive" ? "bool" : "i32";
+    var controlFlow = name is "PrintNumbers" or "Countdown" or "DoWhileDemo" or "Classify";
+    var outputType = names.Length == 0 ? "void" : name == "IsPositive" ? "bool" : "i32";
     var compilation = Calor.Compiler.Program.Compile(
         File.ReadAllText(path), path, new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
     if (compilation.HasErrors || compilation.Ast == null)
@@ -42,13 +48,24 @@ static void Verify(string name, string path)
     var function = functions[0];
     if (function.Visibility != Visibility.Public || function.IsAsync || function.TypeParameters.Count != 0
         || function.Output == null
-        || AttributeHelper.ExpandType(function.Output.TypeName) != (outputType == "bool" ? "BOOL" : "INT")
+        || AttributeHelper.ExpandType(function.Output.TypeName) != AttributeHelper.ExpandType(outputType)
         || !function.Parameters.Select(parameter => parameter.Name).SequenceEqual(names)
         || function.Parameters.Any(parameter => AttributeHelper.ExpandType(parameter.TypeName) != "INT"
             || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None || parameter.InlineRefinement != null))
         throw new InvalidOperationException($"Wrong public signature for {name}.");
 
-    CheckContracts(function, names, outputType);
+    if (controlFlow)
+    {
+        // Inspect the parsed declaration before any compilation pass can synthesize effects.
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(File.ReadAllText(path), diagnostics).TokenizeAllForParser();
+        var parsed = new Parser(tokens, diagnostics).Parse();
+        if (diagnostics.HasErrors)
+            throw new InvalidOperationException($"Calor parsing failed:\n{string.Join("\n", diagnostics)}");
+        CheckControlFlow(parsed.Functions.Single(candidate => candidate.Name == name));
+    }
+    else
+        CheckContracts(function, names, outputType);
 
     var parseOptions = new CSharpParseOptions(LanguageVersion.Preview);
     var trees = new[]
@@ -69,8 +86,39 @@ static void Verify(string name, string path)
         ?? throw new InvalidOperationException("Generated module type not found.");
     var method = type.GetMethod(name, BindingFlags.Public | BindingFlags.Static, names.Select(_ => typeof(int)).ToArray())
         ?? throw new InvalidOperationException("Generated public signature not found.");
-    if (method.ReturnType != (outputType == "bool" ? typeof(bool) : typeof(int)))
-        throw new InvalidOperationException("Wrong generated return type.");
+    var returnType = outputType == "void" ? typeof(void) : outputType == "bool" ? typeof(bool) : typeof(int);
+    if (!type.IsPublic || !method.IsPublic || !method.IsStatic || method.IsGenericMethod
+        || method.ReturnType != returnType
+        || !method.GetParameters().Select(parameter => parameter.ParameterType)
+            .SequenceEqual(names.Select(_ => typeof(int))))
+        throw new InvalidOperationException("Wrong generated public/static scalar signature.");
+    if (outputType == "void")
+    {
+        var previous = Console.Out;
+        using var output = new BoundedOutput();
+        try
+        {
+            Console.SetOut(output);
+            method.Invoke(null, null);
+        }
+        finally
+        {
+            Console.SetOut(previous);
+        }
+        var expected = name switch
+        {
+            "PrintNumbers" => "1\n2\n3\n4\n5\n",
+            "Countdown" => "5\n4\n3\n2\n1\n",
+            "DoWhileDemo" => "0\n1\n2\n",
+            _ => throw new InvalidOperationException("Unknown stdout oracle.")
+        };
+        var actual = output.ToString().Replace("\r\n", "\n", StringComparison.Ordinal);
+        if (actual != expected)
+            throw new InvalidOperationException($"Wrong stdout for {name}: {System.Text.Json.JsonSerializer.Serialize(actual)}; "
+                + $"expected {System.Text.Json.JsonSerializer.Serialize(expected)}.");
+        Console.WriteLine($"Verification passed: {name}; native control flow and exact stdout.");
+        return;
+    }
     var count = 0;
     foreach (var (inputs, expected) in Cases(name))
     {
@@ -81,7 +129,27 @@ static void Verify(string name, string path)
     }
     if (count == 0)
         throw new InvalidOperationException("No runtime cases executed.");
-    Console.WriteLine($"Verification passed: {name}; semantic contracts and {count} runtime cases.");
+    Console.WriteLine($"Verification passed: {name}; {(controlFlow ? "native control flow" : "semantic contracts")} and {count} runtime cases.");
+}
+
+static void CheckControlFlow(FunctionNode function)
+{
+    var statements = RecursiveAstWalker.EnumerateStatements(function.Body).ToArray();
+    var valid = function.Name switch
+    {
+        "PrintNumbers" => statements.Any(statement => statement is ForStatementNode),
+        "Countdown" => statements.Any(statement => statement is WhileStatementNode),
+        "DoWhileDemo" => statements.Any(statement => statement is DoWhileStatementNode),
+        "Classify" => statements.Any(statement => statement is IfStatementNode conditional
+            && conditional.ElseIfClauses.Count > 0 && conditional.ElseBody != null),
+        _ => false
+    };
+    if (!valid)
+        throw new InvalidOperationException($"Required native control flow missing from {function.Name}.");
+    if (function.Name != "Classify"
+        && !(function.Effects?.Effects.TryGetValue("io", out var effects) == true
+            && effects.Split(',').Contains("console_write", StringComparer.Ordinal)))
+        throw new InvalidOperationException($"Declared console-write effect missing from {function.Name}.");
 }
 
 static void CheckContracts(FunctionNode function, string[] names, string outputType)
@@ -213,6 +281,11 @@ static IEnumerable<(int[] Inputs, object Expected)> Cases(string name)
             yield return ([first], first > 0);
             continue;
         }
+        if (name == "Classify")
+        {
+            yield return ([first], Math.Sign(first));
+            continue;
+        }
         foreach (var second in valuesToCheck)
         {
             if (name == "Max")
@@ -226,4 +299,19 @@ static IEnumerable<(int[] Inputs, object Expected)> Cases(string name)
                 yield return ([value, first, second], Math.Clamp(value, first, second));
         }
     }
+}
+
+sealed class BoundedOutput : TextWriter
+{
+    private readonly StringBuilder output = new();
+    public override Encoding Encoding => Encoding.UTF8;
+
+    public override void Write(char value)
+    {
+        if (output.Length >= 4096)
+            throw new InvalidOperationException("Excessive stdout: control-flow output exceeds 4096 characters.");
+        output.Append(value);
+    }
+
+    public override string ToString() => output.ToString();
 }

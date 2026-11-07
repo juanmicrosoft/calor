@@ -160,3 +160,53 @@ dependencies, incompatible APIs, failed builds, or failed controls are errors,
 not skips. No historical files or ledgers are changed. This is a v0.29
 compatibility control, not a selection of the final experimental baseline,
 an agent run, or agent nonregression evidence.
+
+## Control-flow task behavioral verification
+
+The `cf-001` through `cf-004` entry points under
+`agent-tasks/tasks/control-flow/` use the same selected-compiler helper and
+120-second overall deadline as the logic tasks. The first three read
+`Effects.calr`; `Classify` reads `Calculator.calr`. Task definitions and original
+fixtures remain unchanged.
+
+The selected compiler's parsed AST must contain the requested native `for`,
+`while`, `do-while`, or complete `if`/`elseif`/`else` construct inside the named
+public module function. The loop functions must declare console-write effects
+on that function. Effects are checked on the parsed declaration before compiler
+passes can synthesize them. The AST walker accepts nested statement containers,
+but does not count constructs in separate local functions or lambda expressions.
+Comments, unrelated functions, and source spellings are not structural evidence.
+
+Generated C# must compile, and reflection must confirm the actual public/static
+CLR scalar signature: no arguments and `void` for the loop functions, or one
+`Int32` argument and `Int32` result for `Classify`. Runtime checks require exactly
+`1..5`, `5..1`, and `0..2` on stdout, one number per line, in that order.
+Platform CRLF/LF differences are normalized, but extra text, missing lines, and
+wrong ordering fail. Captured loop output is capped at 4096 characters so an
+infinite printing loop cannot allocate unbounded memory. `Classify` runs 11
+negative/zero/positive cases, including both signed 32-bit boundaries and their
+neighbors, against an independent sign oracle.
+
+Run the current controls and actual old-release compatibility controls:
+
+```bash
+python3 tests/E2E/agent-tasks/test-control-flow-verifiers.py
+python3 tests/E2E/agent-tasks/test-logic-old-release.py --control-flow
+```
+
+The compatibility command reuses the unchanged v0.29 source archive, locked
+restore, verified native assets, and bounded build process described above. It
+runs 49 real old/current control-flow entry-point controls, with historical
+source IDs and do-while closer spellings only in temporary old-parser inputs.
+Current controls cover aliases, nesting, misleading comments, missing/private/
+stub functions, wrong signatures, misplaced constructs/effects, complete branch
+requirements, stdout errors, boundary misclassification, generated compilation
+and runtime failures, infinite loops, output limits, timeouts, and missing/corrupt
+selected roots. The existing logic suite retains its contract proofs and shared
+escaped-output/cancellation cleanup controls.
+
+These are structural and finite executable checks, not universal proofs of
+arbitrary control-flow bodies or evidence of agent nonregression. No additional
+active `.calr` corpus inputs are enrolled: test snippets live in strings and
+disposable workspaces. Completing these four verifiers does not complete the
+release or authorize an experiment baseline, paid evaluation, or publication.

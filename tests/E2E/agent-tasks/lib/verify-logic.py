@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compiler-backed oracle for the four logic tasks; never invokes an agent."""
+"""Compiler-backed logic/control-flow oracles; never invokes an agent."""
 
 import os
 from pathlib import Path
@@ -67,7 +67,8 @@ def main():
     for dependency in ("calor.dll", "Calor.Runtime.dll", "Microsoft.Z3.dll"):
         if not (compiler / dependency).is_file():
             raise RuntimeError(f"Selected compiler dependency missing: {compiler / dependency}; build the selected root first.")
-    source = Path(sys.argv[2]).resolve() / "Calculator.calr"
+    filename = "Effects.calr" if sys.argv[1] in ("PrintNumbers", "Countdown", "DoWhileDemo") else "Calculator.calr"
+    source = Path(sys.argv[2]).resolve() / filename
     if not source.is_file():
         raise RuntimeError(f"Input missing: {source}")
     timeout = float(os.environ.get("CALOR_LOGIC_TIMEOUT_SECONDS", "120"))
