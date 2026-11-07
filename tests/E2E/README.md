@@ -173,7 +173,8 @@ The selected compiler's parsed AST must contain the requested native `for`,
 `while`, `do-while`, or complete `if`/`elseif`/`else` construct inside the named
 public module function. The loop functions must declare console-write effects
 on that function. Effects are checked on the parsed declaration before compiler
-passes can synthesize them. The AST walker accepts nested statement containers,
+passes can synthesize them. Compilation and effect parsing share one immutable
+source string read by the helper. The AST walker accepts nested statement containers,
 but does not count constructs in separate local functions or lambda expressions.
 Comments, unrelated functions, and source spellings are not structural evidence.
 
@@ -187,6 +188,24 @@ infinite printing loop cannot allocate unbounded memory. `Classify` runs 11
 negative/zero/positive cases, including both signed 32-bit boundaries and their
 neighbors, against an independent sign oracle.
 
+Presence alone is not a behavior witness. A second executable check uses the
+selected emitter's `#line` mappings to locate each required AST construct in C#.
+The mapped emission must be syntactically equivalent to the original generated
+C#, and each witness must have an unambiguous mapping; otherwise verification
+fails explicitly. Test-only scope probes require every captured loop-output
+character to originate during a required loop body, including nested statements
+and calls. Dormant loops and executed nonprinting loops followed by hardcoded
+stdout fail. Header evaluation is not counted as loop-body output.
+
+For `Classify`, a required full conditional must execute on every sampled input.
+A separate compiled counterfactual replaces only the mapped required conditionals
+with no-ops and appends a sentinel return for direct-return bodies. At least one
+sampled classification must change. Dormant conditionals and executed unused
+conditionals followed by an equivalent ternary fail; branches that assign a
+variable returned afterward remain supported. Instrumented/counterfactual
+compilation or execution failures are verification errors, not successful
+coupling evidence. These extra runs share the same bounded wrapper deadline.
+
 Run the current controls and actual old-release compatibility controls:
 
 ```bash
@@ -196,13 +215,14 @@ python3 tests/E2E/agent-tasks/test-logic-old-release.py --control-flow
 
 The compatibility command reuses the unchanged v0.29 source archive, locked
 restore, verified native assets, and bounded build process described above. It
-runs 49 real old/current control-flow entry-point controls, with historical
+runs 67 real old/current control-flow entry-point controls, with historical
 source IDs and do-while closer spellings only in temporary old-parser inputs.
 Current controls cover aliases, nesting, misleading comments, missing/private/
 stub functions, wrong signatures, misplaced constructs/effects, complete branch
 requirements, stdout errors, boundary misclassification, generated compilation
 and runtime failures, infinite loops, output limits, timeouts, and missing/corrupt
-selected roots. The existing logic suite retains its contract proofs and shared
+selected roots. Both arms also reject dormant/unused construct witnesses while
+retaining nested and assigning implementations. The existing logic suite retains its contract proofs and shared
 escaped-output/cancellation cleanup controls.
 
 These are structural and finite executable checks, not universal proofs of

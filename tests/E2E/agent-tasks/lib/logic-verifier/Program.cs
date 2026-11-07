@@ -9,6 +9,7 @@ using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification.Z3;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Z3;
 
 try
@@ -38,8 +39,9 @@ static void Verify(string name, string path)
     };
     var controlFlow = name is "PrintNumbers" or "Countdown" or "DoWhileDemo" or "Classify";
     var outputType = names.Length == 0 ? "void" : name == "IsPositive" ? "bool" : "i32";
+    var source = File.ReadAllText(path);
     var compilation = Calor.Compiler.Program.Compile(
-        File.ReadAllText(path), path, new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
+        source, path, new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
     if (compilation.HasErrors || compilation.Ast == null)
         throw new InvalidOperationException($"Calor compilation failed:\n{string.Join("\n", compilation.Diagnostics)}");
     var functions = compilation.Ast.Functions.Where(function => function.Name == name).ToArray();
@@ -54,15 +56,16 @@ static void Verify(string name, string path)
             || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None || parameter.InlineRefinement != null))
         throw new InvalidOperationException($"Wrong public signature for {name}.");
 
+    StatementNode[] witnesses = [];
     if (controlFlow)
     {
         // Inspect the parsed declaration before any compilation pass can synthesize effects.
         var diagnostics = new DiagnosticBag();
-        var tokens = new Lexer(File.ReadAllText(path), diagnostics).TokenizeAllForParser();
+        var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
         var parsed = new Parser(tokens, diagnostics).Parse();
         if (diagnostics.HasErrors)
             throw new InvalidOperationException($"Calor parsing failed:\n{string.Join("\n", diagnostics)}");
-        CheckControlFlow(parsed.Functions.Single(candidate => candidate.Name == name));
+        witnesses = CheckControlFlow(parsed.Functions.Single(candidate => candidate.Name == name));
     }
     else
         CheckContracts(function, names, outputType);
@@ -116,6 +119,7 @@ static void Verify(string name, string path)
         if (actual != expected)
             throw new InvalidOperationException($"Wrong stdout for {name}: {System.Text.Json.JsonSerializer.Serialize(actual)}; "
                 + $"expected {System.Text.Json.JsonSerializer.Serialize(expected)}.");
+        CheckControlFlowCoupling(compilation.Ast, trees[1], function, witnesses, path, expected);
         Console.WriteLine($"Verification passed: {name}; native control flow and exact stdout.");
         return;
     }
@@ -129,27 +133,149 @@ static void Verify(string name, string path)
     }
     if (count == 0)
         throw new InvalidOperationException("No runtime cases executed.");
+    if (controlFlow)
+        CheckControlFlowCoupling(compilation.Ast, trees[1], function, witnesses, path, null);
     Console.WriteLine($"Verification passed: {name}; {(controlFlow ? "native control flow" : "semantic contracts")} and {count} runtime cases.");
 }
 
-static void CheckControlFlow(FunctionNode function)
+static StatementNode[] CheckControlFlow(FunctionNode function)
 {
     var statements = RecursiveAstWalker.EnumerateStatements(function.Body).ToArray();
-    var valid = function.Name switch
+    var witnesses = statements.Where(statement => function.Name switch
     {
-        "PrintNumbers" => statements.Any(statement => statement is ForStatementNode),
-        "Countdown" => statements.Any(statement => statement is WhileStatementNode),
-        "DoWhileDemo" => statements.Any(statement => statement is DoWhileStatementNode),
-        "Classify" => statements.Any(statement => statement is IfStatementNode conditional
-            && conditional.ElseIfClauses.Count > 0 && conditional.ElseBody != null),
+        "PrintNumbers" => statement is ForStatementNode,
+        "Countdown" => statement is WhileStatementNode,
+        "DoWhileDemo" => statement is DoWhileStatementNode,
+        "Classify" => statement is IfStatementNode conditional
+            && conditional.ElseIfClauses.Count > 0 && conditional.ElseBody != null,
         _ => false
-    };
-    if (!valid)
+    }).ToArray();
+    if (witnesses.Length == 0)
         throw new InvalidOperationException($"Required native control flow missing from {function.Name}.");
     if (function.Name != "Classify"
         && !(function.Effects?.Effects.TryGetValue("io", out var effects) == true
             && effects.Split(',').Contains("console_write", StringComparer.Ordinal)))
         throw new InvalidOperationException($"Declared console-write effect missing from {function.Name}.");
+    return witnesses;
+}
+
+static void CheckControlFlowCoupling(
+    ModuleNode module, SyntaxTree original, FunctionNode function, StatementNode[] witnesses, string path, string? expectedOutput)
+{
+    var options = new CSharpParseOptions(LanguageVersion.Preview);
+    var mapped = CSharpSyntaxTree.ParseText(
+        new CSharpEmitter(ContractMode.Debug) { LineDirectiveFilePath = path }.Emit(module, path), options);
+    if (!SyntaxFactory.AreEquivalent(original.GetRoot(), mapped.GetRoot()))
+        throw new InvalidOperationException("Cannot establish control-flow coupling: source-mapped emission differs from compiled C#.");
+    var root = mapped.GetCompilationUnitRoot();
+    var method = root.DescendantNodes().OfType<ClassDeclarationSyntax>()
+        .Single(type => type.Identifier.ValueText == module.Name + "Module")
+        .Members.OfType<MethodDeclarationSyntax>().Single(candidate => candidate.Identifier.ValueText == function.Name);
+    var marker = new SyntaxAnnotation("control-flow-witness");
+    var matched = witnesses.Select(witness =>
+    {
+        var candidates = method.DescendantNodes().OfType<StatementSyntax>().Where(statement =>
+            (witness is ForStatementNode && statement is BlockSyntax or ForStatementSyntax
+                || witness is WhileStatementNode && statement is WhileStatementSyntax
+                || witness is DoWhileStatementNode && statement is DoStatementSyntax
+                || witness is IfStatementNode && statement is IfStatementSyntax)
+            && statement.GetFirstToken().LeadingTrivia.Any(trivia =>
+                trivia.GetStructure() is LineDirectiveTriviaSyntax directive && directive.IsActive
+                && directive.File.ValueText == path
+                && directive.Line.ValueText == witness.Span.Line.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+            .ToArray();
+        if (candidates.Length != 1)
+            throw new InvalidOperationException($"Cannot establish control-flow coupling: expected one emitted witness at line {witness.Span.Line}, found {candidates.Length}.");
+        return candidates[0];
+    }).ToArray();
+    if (matched.Distinct().Count() != witnesses.Length)
+        throw new InvalidOperationException("Cannot establish control-flow coupling: ambiguous emitted witnesses.");
+    // Trace loop bodies, not headers: printing while evaluating a bound is not
+    // output produced by an iteration. Both selected emitters lower native for
+    // into a mapped block with one direct while; no generated names are matched.
+    var scopes = matched.Select(statement => statement switch
+    {
+        ForStatementSyntax loop => loop.Statement,
+        BlockSyntax block when function.Name == "PrintNumbers" =>
+            block.Statements.OfType<WhileStatementSyntax>().Single().Statement,
+        WhileStatementSyntax loop => loop.Statement,
+        DoStatementSyntax loop => loop.Statement,
+        IfStatementSyntax conditional => (StatementSyntax)conditional,
+        _ => throw new InvalidOperationException("Cannot establish control-flow coupling: unsupported emitted witness shape.")
+    }).ToArray();
+    var tracedRoot = root.ReplaceNodes(scopes, (_, rewritten) => rewritten.WithAdditionalAnnotations(marker));
+    var probe = "__CalorWitness_" + Guid.NewGuid().ToString("N");
+    var traced = new WitnessRewriter(marker, probe, neutralize: false).Visit(tracedRoot) as CompilationUnitSyntax
+        ?? throw new InvalidOperationException("Cannot instrument control-flow witnesses.");
+    traced = traced.AddMembers(SyntaxFactory.ParseMemberDeclaration(
+        $"internal static class {probe} {{ public static int Depth; public static int Visits; "
+        + "public static void Enter() { Depth++; Visits++; } public static void Exit() { Depth--; } }")
+        ?? throw new InvalidOperationException("Cannot declare witness instrumentation."));
+
+    Assembly Build(CompilationUnitSyntax unit)
+    {
+        var runtime = CSharpCompilation.Create(
+            "ControlFlowCoupling_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble, options),
+                CSharpSyntaxTree.Create(unit, options)],
+            GeneratedCSharpCompiler.References, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var emitted = runtime.Emit(stream);
+        if (!emitted.Success)
+            throw new InvalidOperationException($"Cannot establish control-flow coupling: instrumented C# compilation failed:\n{string.Join("\n", emitted.Diagnostics)}");
+        return Assembly.Load(stream.ToArray());
+    }
+    MethodInfo Target(Assembly assembly) => assembly.GetType($"{module.Name}.{module.Name}Module")
+        ?.GetMethod(function.Name, BindingFlags.Public | BindingFlags.Static)
+        ?? throw new InvalidOperationException("Coupling runtime signature missing.");
+
+    var tracedAssembly = Build(traced);
+    var target = Target(tracedAssembly);
+    var probeType = tracedAssembly.GetType(probe) ?? throw new InvalidOperationException("Witness probe missing.");
+    var depth = probeType.GetField("Depth") ?? throw new InvalidOperationException("Witness depth missing.");
+    var visits = probeType.GetField("Visits") ?? throw new InvalidOperationException("Witness visits missing.");
+    if (expectedOutput != null)
+    {
+        var previous = Console.Out;
+        using var output = new BoundedOutput(() => depth.GetValue(null) is int value && value > 0);
+        try
+        {
+            Console.SetOut(output);
+            target.Invoke(null, null);
+        }
+        finally
+        {
+            Console.SetOut(previous);
+        }
+        var actual = output.ToString();
+        if (actual.Replace("\r\n", "\n", StringComparison.Ordinal) != expectedOutput
+            || output.WitnessCharacters != actual.Length || actual.Length == 0)
+            throw new InvalidOperationException($"Control-flow coupling failed: {function.Name} stdout must be produced within a required native loop.");
+        return;
+    }
+    foreach (var (inputs, expected) in Cases(function.Name))
+    {
+        visits.SetValue(null, 0);
+        var actual = target.Invoke(null, inputs.Select(value => (object)value).ToArray());
+        if (!Equals(actual, expected) || Equals(visits.GetValue(null), 0))
+            throw new InvalidOperationException($"Control-flow coupling failed: {function.Name} must execute a required conditional for input {inputs[0]}.");
+    }
+    // A counterfactual removes only AST-mapped required conditionals. A sentinel
+    // return keeps direct-return implementations compilable without treating
+    // arbitrary compiler failures as evidence that the construct was necessary.
+    var neutralizedRoot = root.ReplaceNodes(matched, (_, rewritten) => rewritten.WithAdditionalAnnotations(marker));
+    var neutralized = new WitnessRewriter(marker, probe, neutralize: true).Visit(neutralizedRoot) as CompilationUnitSyntax
+        ?? throw new InvalidOperationException("Cannot neutralize control-flow witnesses.");
+    var neutralizedMethod = neutralized.DescendantNodes().OfType<MethodDeclarationSyntax>()
+        .Single(candidate => candidate.Identifier.ValueText == function.Name
+            && candidate.Parent is ClassDeclarationSyntax type && type.Identifier.ValueText == module.Name + "Module");
+    var body = neutralizedMethod.Body ?? throw new InvalidOperationException("Coupling method body missing.");
+    neutralized = neutralized.ReplaceNode(neutralizedMethod,
+        neutralizedMethod.WithBody(body.AddStatements(SyntaxFactory.ParseStatement("return int.MinValue;"))));
+    var counterfactual = Target(Build(neutralized));
+    if (Cases(function.Name).All(test => Equals(
+            counterfactual.Invoke(null, test.Inputs.Select(value => (object)value).ToArray()), test.Expected)))
+        throw new InvalidOperationException("Control-flow coupling failed: required conditionals do not affect any sampled classification result.");
 }
 
 static void CheckContracts(FunctionNode function, string[] names, string outputType)
@@ -301,9 +427,10 @@ static IEnumerable<(int[] Inputs, object Expected)> Cases(string name)
     }
 }
 
-sealed class BoundedOutput : TextWriter
+sealed class BoundedOutput(Func<bool>? isWitnessActive = null) : TextWriter
 {
     private readonly StringBuilder output = new();
+    public int WitnessCharacters { get; private set; }
     public override Encoding Encoding => Encoding.UTF8;
 
     public override void Write(char value)
@@ -311,7 +438,30 @@ sealed class BoundedOutput : TextWriter
         if (output.Length >= 4096)
             throw new InvalidOperationException("Excessive stdout: control-flow output exceeds 4096 characters.");
         output.Append(value);
+        if (isWitnessActive?.Invoke() == true)
+            WitnessCharacters++;
     }
 
     public override string ToString() => output.ToString();
+}
+
+sealed class WitnessRewriter(SyntaxAnnotation marker, string probe, bool neutralize) : CSharpSyntaxRewriter
+{
+    public override SyntaxNode? Visit(SyntaxNode? node)
+    {
+        if (node is StatementSyntax statement && node.HasAnnotation(marker))
+        {
+            if (neutralize)
+                return SyntaxFactory.EmptyStatement().WithTriviaFrom(statement);
+            var rewritten = base.Visit(node) as StatementSyntax
+                ?? throw new InvalidOperationException("Cannot rewrite witness statement.");
+            return SyntaxFactory.Block(
+                SyntaxFactory.ParseStatement($"global::{probe}.Enter();"),
+                SyntaxFactory.TryStatement(SyntaxFactory.Block(rewritten), [],
+                    SyntaxFactory.FinallyClause(SyntaxFactory.Block(
+                        SyntaxFactory.ParseStatement($"global::{probe}.Exit();")))))
+                .WithTriviaFrom(statement);
+        }
+        return base.Visit(node);
+    }
 }

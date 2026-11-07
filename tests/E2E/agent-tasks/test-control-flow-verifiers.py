@@ -27,6 +27,33 @@ BODIES = {
     "DoWhileDemo": "§B{~counter:i32} 0\n§DO\n  §P counter\n  §ASSIGN counter (+ counter 1)\n(< counter 3)",
     "Classify": "§IF (< x 0)\n  §R -1\n§EI (== x 0)\n  §R 0\n§EL\n  §R 1",
 }
+EXPECTED_STDOUT = {
+    "PrintNumbers": range(1, 6), "Countdown": range(5, 0, -1), "DoWhileDemo": range(3),
+}
+COUPLING_CASES = {
+    name: [
+        ("dormant", "§IF false\n" + "\n".join("  " + line for line in BODIES[name].splitlines())
+         + "\n" + ("§R (? (< x 0) -1 (? (== x 0) 0 1))" if name == "Classify"
+                    else "\n".join(f"§P {value}" for value in EXPECTED_STDOUT[name])))
+    ] for name in TASK_NAMES
+}
+for name in EXPECTED_STDOUT:
+    COUPLING_CASES[name].append((
+        "executed nonprinting",
+        BODIES[name].replace("§P index", "§B{discard:i32} index")
+        .replace("§P counter", "§B{discard:i32} counter")
+        + "\n" + "\n".join(f"§P {value}" for value in EXPECTED_STDOUT[name]),
+    ))
+COUPLING_CASES["Classify"].append((
+    "executed unused",
+    "§IF (< x 0)\n  §B{unused:i32} 0\n§EI (== x 0)\n  §B{unused:i32} 0\n§EL\n  §B{unused:i32} 0\n"
+    "§R (? (< x 0) -1 (? (== x 0) 0 1))",
+))
+ASSIGNING_CLASSIFY = (
+    "§B{~classification:int} 0\n"
+    "§IF (< x 0)\n  §ASSIGN classification -1\n§EI (== x 0)\n  §ASSIGN classification 0\n"
+    "§EL\n  §ASSIGN classification 1\n§R classification"
+)
 
 
 def source(name, *, body=None, signature=None, effect="cw", nested=False):
@@ -112,6 +139,13 @@ class ControlFlowVerifierTests(unittest.TestCase):
         self.verify("Classify", source("Classify", signature="§F{Classify:pub} (int:x) -> i32"))
         self.verify("Classify", source("Classify", body="§IF (> x 0)\n  §R 1\n§EI (< x 0)\n  §R -1\n§EL\n  §R 0"))
         self.verify("PrintNumbers", source("PrintNumbers", effect="cw,cr"))
+        self.verify("Classify", source("Classify", body=ASSIGNING_CLASSIFY))
+
+    def test_construct_witnesses_must_produce_behavior(self):
+        for name, cases in COUPLING_CASES.items():
+            for label, body in cases:
+                with self.subTest(name=name, label=label):
+                    self.verify(name, source(name, body=body), False, detail="Control-flow coupling failed")
 
     def test_missing_private_comment_only_and_stub_functions(self):
         for name in TASK_NAMES:
@@ -262,11 +296,16 @@ def run_compatibility(old, current, deadline):
             else:
                 execute(root, historical, name, source(name, body="§IF (== x INT:-2147483648)\n  §R 0\n"
                                                       + BODIES[name]), False, "expected")
+        for name, cases in COUPLING_CASES.items():
+            for label, body in cases:
+                execute(root, historical, name, source(name, body=body), False, "Control-flow coupling failed")
+                print(f"Coupling control: {label} {name} rejected.")
+        execute(root, historical, "Classify", source("Classify", body=ASSIGNING_CLASSIFY))
     test.verify("Classify", historical_syntax(source("Classify")), False,
                 env={"CALOR_COMPILER_ROOT": str(current)}, detail="Calor compilation failed")
     count = ControlFlowVerifierTests.entry_points_executed - before
-    if count != 49:
-        raise RuntimeError(f"Expected 49 actual old/current control-flow controls, executed {count}.")
+    if count != 67:
+        raise RuntimeError(f"Expected 67 actual old/current control-flow controls, executed {count}.")
     print(f"Compatibility passed: {count} actual old/current control-flow entry-point controls.")
 
 
