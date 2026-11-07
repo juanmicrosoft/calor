@@ -57,13 +57,13 @@
       "filter": "FullyQualifiedName~BinderDispatchCompletenessTests.DispatchTable_CoversEveryConcreteExpressionNode_Exactly"
     },
     {
-      "id": "migration-structural-id-recognition",
+      "id": "migration-sidecar-id-isolation",
       "component": "migration",
-      "file": "src/Calor.Compiler/Migration/StructuralIdDropper.cs",
-      "before": "if (!AttributeHelper.LooksLikeId(firstPositional))",
-      "after": "if (AttributeHelper.LooksLikeId(firstPositional))",
+      "file": "src/Calor.Compiler/Migration/CalorEmitter.cs",
+      "before": "AppendLine($\"§M{{{moduleName}{overflow}}}\");",
+      "after": "AppendLine($\"§M{{{node.Id}:{moduleName}{overflow}}}\");",
       "project": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
-      "filter": "FullyQualifiedName~StructuralIdDropperTests.T_5_7_a_DropsModuleId"
+      "filter": "FullyQualifiedName~IdentityFreeSyntaxTests.ConversionAndReemissionNeverSerializeDeclarationOrBlockIdentity"
     },
     {
       "id": "dataflow-branch-transfer",
