@@ -72,7 +72,7 @@ test('Calor 0.22 nullability guide is discoverable and its internal links and an
   }
 });
 
-test('0.25 C# interoperability guide is discoverable, version-scoped and bounded', async ({ page }) => {
+test('C# interoperability guide is discoverable, development-scoped and bounded', async ({ page }) => {
   const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
   const guide = '/docs/guides/csharp-interoperability/';
   await page.route('https://**/*', route => route.abort());
@@ -90,6 +90,7 @@ test('0.25 C# interoperability guide is discoverable, version-scoped and bounded
     await expect(article).toContainText(text);
   }
   await expect(article).not.toContainText(/independently (reviewed|verified)/i);
+  await expect(article).not.toContainText(/0\.24,\s+the\s+latest release/);
   const links = await article.locator('a[href^="/"]').evaluateAll(elements =>
     [...new Set(elements.map(element => element.getAttribute('href')!))]);
   for (const link of links) {

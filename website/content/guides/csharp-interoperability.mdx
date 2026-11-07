@@ -2,7 +2,7 @@
 title: "Converting C#: What Stays C# and Why"
 section: "guides"
 order: 1.5
-description: "Task-by-task guide to the 0.25 C# converter: by-reference calls, interpolated strings, local functions, arrays, iterator properties, and how to read the conversion report"
+description: "Task-by-task guide to C# conversion: by-reference calls, interpolated strings, local functions, arrays, iterator properties, and how to read the conversion report"
 ---
 
 This guide walks through the C# features you are most likely to hit when you convert
@@ -10,9 +10,10 @@ existing code with `calor convert`, `calor migrate`, or the MCP tools. For each 
 shows what becomes native Calor, what stays C#, and how the report tells you which
 happened.
 
-**Version scope.** This page describes the converter on the main branch for the 0.25
-release, which is **not released yet**. Each section says what differs in 0.24, the
-latest release. Every Calor block on this page is real `calor convert` output. CI compiles
+**Version scope.** These examples track the development compiler for the 0.30
+milestone, which is **not released yet**. The current release is 0.29.0.
+The "Changed since 0.24" notes describe historical additions in 0.25, not changes
+since the current release. Every Calor block on this page is real `calor convert` output. CI compiles
 each complete program, and checks each block against the converter's output for the C#
 shown (the interpolation block is a fragment of that output). The C# inputs and the full
 CLI and MCP transcripts are in the repository under `tests/TestData/InteropScope/W1/`.

@@ -61,6 +61,8 @@ Source contains declaration names, not identity fields. Tools maintain persisten
 IDs in `.calor/ids.json`, so supported renames and moves can preserve an exact
 target without relying on its current name or line number.
 
+IDs identify declarations; not every element must have one.
+
 Plain-text edits preserve identity only when reconciliation is unambiguous.
 Conflicting matches fail instead of redirecting existing references.
 See [stable identifiers](/docs/philosophy/stable-identifiers/) for synchronization,
