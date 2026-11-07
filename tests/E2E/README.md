@@ -301,8 +301,10 @@ the required entry domain or exclude correct outputs; the logic task retains
 its mandatory postcondition proofs.
 
 `GradeToLetter(grade)` runs all 101 valid grades and four out-of-domain contract
-failures. Z3 proves that the declared preconditions describe exactly `0..100`
-over signed 32-bit inputs. Native nested conditionals must execute on valid
+failures. Z3 proves that the combined preconditions and inline parameter
+refinements describe exactly `0..100` over signed 32-bit inputs. Inline `#`
+bindings use the selected translator's parameter scope; either native runtime
+guard form must reject out-of-domain inputs. Native nested conditionals must execute on valid
 inputs, and removing the mapped nested conditionals must change a result.
 Native nested ternaries returned directly or stored in a binding also qualify:
 their owning statement and exact nested-expression count are mapped, and only
@@ -351,7 +353,7 @@ python3 tests/E2E/agent-tasks/test-logic-old-release.py --remaining-control-flow
 ```
 
 The second command builds actual released v0.29.0 using the same unchanged
-archive/manifest/locked-restore procedure and runs 111 real old/current entries.
+archive/manifest/locked-restore procedure and runs 117 real old/current entries.
 The original 49 logic and 67 `cf-001..004` compatibility controls remain separate
 and unchanged. No task definitions, original fixtures, active corpus subjects,
 compiler product code, or release state are changed.

@@ -182,6 +182,16 @@ class RemainingControlFlowTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0, result.stdout)
             self.assertIn("Missing/weakened postconditions", result.stdout)
 
+    def test_equivalent_inline_grade_domains(self):
+        signature = "§F{GradeToLetter:pub} (i32:grade | (&& (>= # 0) (<= # 100))) -> i32"
+        self.verify("GradeToLetter", source("GradeToLetter", signature=signature, contracts=""))
+        lower_bound = "§F{GradeToLetter:pub} (i32:grade | (>= # 0)) -> i32"
+        self.verify("GradeToLetter", source("GradeToLetter", signature=lower_bound, contracts="§Q (<= grade 100)"))
+        for predicate in ("(&& (> # 0) (<= # 100))", "(&& (>= # -1) (<= # 101))", "false"):
+            invalid = f"§F{{GradeToLetter:pub}} (i32:grade | {predicate}) -> i32"
+            self.verify("GradeToLetter", source("GradeToLetter", signature=invalid, contracts=""), False,
+                        detail="Missing/wrong preconditions")
+
     def test_native_constructs_effects_and_coupling(self):
         for name in ("GradeToLetter", "PrintEvenNumbers", "PrintDictionary"):
             independent = GRADE_INDEPENDENT if name == "GradeToLetter" else (
@@ -319,11 +329,15 @@ def run_compatibility(old, current, deadline):
                 cases += [(source(name, body="§R (? (> a b) a b)"), True),
                           (source(name, contracts="§Q (> a b)"), False)]
             elif name == "GradeToLetter":
+                inline = "§F{GradeToLetter:pub} (i32:grade | (&& (>= # 0) (<= # 100))) -> i32"
                 cases += [(source(name, contracts="§Q (&& (<= 0 grade) (>= 100 grade))"), True),
                           (source(name, contracts="§Q (> grade 0)\n§Q (<= grade 100)"), False),
                           (source(name, body="§IF true\n  §IF false\n    §R 0\n" + GRADE_INDEPENDENT), False),
                           (source(name, body="§R " + GRADE_EXPRESSION), True),
                           (source(name, body=BODIES[name].replace("(>= grade 90)", "(> grade 90)")), False)]
+                cases += [(source(name, signature=inline, contracts=""), True),
+                          (source(name, signature=inline.replace("(>= # 0)", "(> # 0)"), contracts=""), False),
+                          (source(name, signature=inline.replace("(<= # 100)", "(<= # 101)"), contracts=""), False)]
                 cases += [(source(name, contracts=contracts), False) for contracts in (
                     "", "§Q false", "§Q (>= grade 0)", CONTRACTS + "\n§Q (! (== grade 37))")]
             elif name == "PrintEvenNumbers":
@@ -372,8 +386,8 @@ def run_compatibility(old, current, deadline):
     test.verify("PrintDictionary", historical_syntax(source("PrintDictionary")), False,
                 env={"CALOR_COMPILER_ROOT": str(current)}, detail="Calor compilation failed")
     count = RemainingControlFlowTests.entry_points_executed - before
-    if count != 111:
-        raise RuntimeError(f"Expected 111 remaining control-flow compatibility entries, executed {count}.")
+    if count != 117:
+        raise RuntimeError(f"Expected 117 remaining control-flow compatibility entries, executed {count}.")
     print(f"Compatibility passed: {count} actual old/current cf-005..008 entry-point controls.")
 
 

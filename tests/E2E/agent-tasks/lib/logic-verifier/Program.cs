@@ -77,7 +77,8 @@ static void Verify(string profile, string path)
         || function.Parameters.Count != names.Length
         || function.Parameters.Any(parameter => (dictionary
                 ? !IsDictionaryType(parameter.TypeName) : AttributeHelper.ExpandType(parameter.TypeName) != "INT")
-            || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None || !basic && parameter.InlineRefinement != null))
+            || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None
+            || !basic && name != "GradeToLetter" && parameter.InlineRefinement != null))
         throw new InvalidOperationException($"Wrong public signature for {name}.");
 
     StatementNode[] witnesses = [];
@@ -210,7 +211,8 @@ static void Verify(string profile, string path)
                 method.Invoke(null, [invalid]);
                 throw new InvalidOperationException($"GradeToLetter({invalid}) did not fail its domain contract.");
             }
-            catch (TargetInvocationException error) when (error.InnerException?.GetType().Name == "ContractViolationException")
+            catch (TargetInvocationException error) when (error.InnerException?.GetType().Name == "ContractViolationException"
+                || error.InnerException is ArgumentOutOfRangeException { ParamName: "grade" })
             {
             }
         }
@@ -226,27 +228,13 @@ static void CheckBasicEntryDomain(FunctionNode function, string[] names)
             throw new InvalidOperationException($"Cannot model parameter {name}.");
     BoolExpr Translate(ExpressionNode expression)
     {
-        CheckBasicPreconditionExpression(expression);
+        CheckEntryConditionExpression(expression);
         var translated = translator.TranslateBoolExpr(expression);
         if (translated == null || translator.Warnings.Count != 0)
             throw new InvalidOperationException($"Basic precondition translation failed: {string.Join("; ", translator.Warnings)}");
         return translated;
     }
-    var conditions = function.Preconditions.Select(contract => Translate(contract.Condition)).ToList();
-    foreach (var parameter in function.Parameters)
-    {
-        if (parameter.InlineRefinement == null)
-            continue;
-        translator.PushSelfVariable(parameter.Name);
-        try
-        {
-            conditions.Add(Translate(parameter.InlineRefinement.Predicate));
-        }
-        finally
-        {
-            translator.PopSelfVariable();
-        }
-    }
+    var conditions = TranslateEntryConditions(function, translator, Translate);
     BoolExpr domain = context.MkTrue();
     if (function.Name == "Multiply")
     {
@@ -261,37 +249,58 @@ static void CheckBasicEntryDomain(FunctionNode function, string[] names)
     using var settings = context.MkParams();
     settings.Add("timeout", 5000u);
     solver.Parameters = settings;
-    solver.Assert(context.MkAnd(domain, context.MkNot(context.MkAnd(conditions.ToArray()))));
+    solver.Assert(context.MkAnd(domain, context.MkNot(context.MkAnd(conditions))));
     var status = solver.Check();
     if (status != Status.UNSATISFIABLE)
         throw new InvalidOperationException($"Basic preconditions exclude prompt inputs: {status}; "
             + (status == Status.SATISFIABLE ? solver.Model.ToString() : solver.ReasonUnknown));
 }
 
-static void CheckBasicPreconditionExpression(ExpressionNode expression)
+static BoolExpr[] TranslateEntryConditions(
+    FunctionNode function, ContractTranslator translator, Func<ExpressionNode, BoolExpr> translate)
 {
-    // Unlike required logic proofs, optional basic entry guards can use #.
+    var conditions = function.Preconditions.Select(contract => translate(contract.Condition)).ToList();
+    foreach (var parameter in function.Parameters)
+    {
+        if (parameter.InlineRefinement == null)
+            continue;
+        translator.PushSelfVariable(parameter.Name);
+        try
+        {
+            conditions.Add(translate(parameter.InlineRefinement.Predicate));
+        }
+        finally
+        {
+            translator.PopSelfVariable();
+        }
+    }
+    return conditions.ToArray();
+}
+
+static void CheckEntryConditionExpression(ExpressionNode expression)
+{
+    // Entry predicates can reference the inline refinement's scoped # binding.
     if (expression is SelfRefNode)
         return;
     if (expression is BinaryOperationNode binary && binary.Operator is BinaryOperator.Equal or BinaryOperator.NotEqual
         or BinaryOperator.LessThan or BinaryOperator.LessOrEqual or BinaryOperator.GreaterThan
         or BinaryOperator.GreaterOrEqual or BinaryOperator.And or BinaryOperator.Or)
     {
-        CheckBasicPreconditionExpression(binary.Left);
-        CheckBasicPreconditionExpression(binary.Right);
+        CheckEntryConditionExpression(binary.Left);
+        CheckEntryConditionExpression(binary.Right);
     }
     else if (expression is UnaryOperationNode unary && unary.Operator == UnaryOperator.Not)
-        CheckBasicPreconditionExpression(unary.Operand);
+        CheckEntryConditionExpression(unary.Operand);
     else if (expression is ConditionalExpressionNode conditional)
     {
-        CheckBasicPreconditionExpression(conditional.Condition);
-        CheckBasicPreconditionExpression(conditional.WhenTrue);
-        CheckBasicPreconditionExpression(conditional.WhenFalse);
+        CheckEntryConditionExpression(conditional.Condition);
+        CheckEntryConditionExpression(conditional.WhenTrue);
+        CheckEntryConditionExpression(conditional.WhenFalse);
     }
     else if (expression is ImplicationExpressionNode implication)
     {
-        CheckBasicPreconditionExpression(implication.Antecedent);
-        CheckBasicPreconditionExpression(implication.Consequent);
+        CheckEntryConditionExpression(implication.Antecedent);
+        CheckEntryConditionExpression(implication.Consequent);
     }
     else
         CheckModeledExpression(expression);
@@ -591,9 +600,12 @@ static void CheckContracts(FunctionNode function, string[] names, string outputT
     if (!translator.DeclareVariable("result", outputType))
         throw new InvalidOperationException("Cannot model result.");
 
-    BoolExpr Translate(ExpressionNode expression)
+    BoolExpr Translate(ExpressionNode expression, bool entryCondition = false)
     {
-        CheckModeledExpression(expression);
+        if (entryCondition)
+            CheckEntryConditionExpression(expression);
+        else
+            CheckModeledExpression(expression);
         var result = translator.TranslateBoolExpr(expression);
         if (result == null || translator.Warnings.Count != 0)
             throw new InvalidOperationException($"Contract translation failed: {string.Join("; ", translator.Warnings)}");
@@ -602,7 +614,8 @@ static void CheckContracts(FunctionNode function, string[] names, string outputT
     BitVecExpr Integer(string name) => context.MkBVConst(name, 32);
     BitVecNum Constant(int value) => context.MkBV(value, 32);
     var resultValue = Integer("result");
-    var actualPre = context.MkAnd(function.Preconditions.Select(contract => Translate(contract.Condition)).ToArray());
+    var actualPre = context.MkAnd(TranslateEntryConditions(function, translator,
+        expression => Translate(expression, entryCondition: true)));
     var actualPost = context.MkAnd(function.Postconditions.Select(contract => Translate(contract.Condition)).ToArray());
     var requiredPre = context.MkTrue();
     BoolExpr requiredPost;
