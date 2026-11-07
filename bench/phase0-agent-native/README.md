@@ -129,10 +129,13 @@ the selected arm's SDK and Calor.Tasks. The selected CLI must belong to
 `--arm-repo-root`, match the Tasks compiler image, and report that root's version.
 No source translation or automatic current-syntax selection occurs.
 
+The checked-in `.calr.txt` files are test inputs, not active `.calr` corpus
+modules. The runner builds their exact bytes as `canary.calr` in its workspace.
+
 For a zero-provider effect-gate check after building Release Compiler and Tasks:
 
 ```bash
-CANARY=bench/phase0-agent-native/tests/fixtures/harness-capture/current-unknown-effect.calr
+CANARY=bench/phase0-agent-native/tests/fixtures/harness-capture/current-unknown-effect.calr.txt
 PIN=$(shasum -a 256 "$CANARY" | cut -d' ' -f1)
 bash bench/phase0-agent-native/run-pair.sh \
   --pair bench/phase0-agent-native/pairs/N1-001-string-utils --arm calor \

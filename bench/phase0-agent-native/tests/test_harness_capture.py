@@ -56,8 +56,8 @@ PAIRS = os.path.join(BENCH, "pairs")
 N1_001 = os.path.join(PAIRS, "N1-001-string-utils")
 CURRENT_N1 = os.path.join(REPO, "tests", "TestData", "ActiveSyntax",
                          "bench", "phase0-agent-native", "pairs", "N1-001-string-utils")
-CURRENT_CANARY = os.path.join(FIX, "current-known-effect.calr")
-CURRENT_UNKNOWN_CANARY = os.path.join(FIX, "current-unknown-effect.calr")
+CURRENT_CANARY = os.path.join(FIX, "current-known-effect.calr.txt")
+CURRENT_UNKNOWN_CANARY = os.path.join(FIX, "current-unknown-effect.calr.txt")
 
 RELEASE_CLI = os.path.join(REPO, "src", "Calor.Compiler", "bin", "Release", "net10.0", "calor.dll")
 RELEASE_TASKS = os.path.join(REPO, "src", "Calor.Tasks", "bin", "Release", "net10.0", "Calor.Tasks.dll")
