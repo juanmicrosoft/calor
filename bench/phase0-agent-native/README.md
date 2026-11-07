@@ -63,6 +63,53 @@ compile multisets are frozen in `pairs/ppw-seeded-compiles.json` (regenerate wit
 
 Extends `tests/E2E/agent-tasks/run-agent-tests.sh` (live-agent harness, majority voting). Additions needed (tracked below): pair-manifest support, two-arm dispatch, held-out test execution via the calor-arm template, transcript capture for the `.g.cs` dead-end metric, per-epoch pins.
 
+### Opt-in initialized workspace (unregistered plumbing)
+
+`run-pair.sh --initialized-workspace` adds a separate `calor+initialized` arm.
+It runs the selected compiler's real `calor init --ai claude --project src/Src.csproj`
+inside a fresh temporary Git workspace and a disposable home. Generated `CLAUDE.md`,
+Claude hooks, MCP registration, configuration, and the actual `calor://primer` MCP
+response are archived before execution. Hooks resolve `calor` through a wrapper
+bound to the selected DLL; MCP retains the generated arguments with its executable
+bound to that DLL. The user's home and existing agent templates are not modified.
+
+The generated project is archived verbatim, then adapted to the existing arm's
+SDK/Tasks build pin. The adapter imports the selected arm's SDK after init's inline
+targets and disables its duplicate generated-C# inclusion target. This preserves
+effect enforcement, held-out tests, and `compilerHash` capture; it is not an evaluation
+of an unmodified global-tool build. The new arm has a separate current-syntax strict
+canary. Without the flag, the original template, canary, prompt, and result schema
+remain unchanged.
+
+Use an ordinary strict `calor`/`raw`, non-probe pair and an explicit **new**
+unregistered `--out` directory. Frozen/seeded/registered pairs, pinned epoch
+directories (including their descendants), policy-control arms, gateway/spending
+bindings, label overrides, and `--canary-only` are rejected. `--exemplar` remains
+additive and its bytes are included in the initialized-input archive.
+`--arm-repo-root` selects both the initializer and compilation product. An explicit
+`--calor-dll` must be a Release/Debug build inside that root, match its declared
+version, and match the compiler copied into its Release Tasks output. Missing init
+or primer support and mismatches fail closed; there is no parent-compiler fallback.
+
+Each run records `initialization` in `result.json` and `initialization.json`:
+selected root/commit/version, DLL SHA-256, actual init command, and SHA-256 identities
+for every archived workspace input, generated home registration, primer response,
+exemplar (if any), original arm template, and bound project. Initialization commands
+have the pair's timeout and terminate their own process group on timeout/cancellation.
+
+Zero-provider validation:
+
+```bash
+python3 -m unittest discover -s bench/phase0-agent-native/tests -p test_initialized_workspace.py -v
+```
+
+Build Release Compiler and Tasks first. Compiler-backed controls execute real init,
+MCP primer reads, strict SDK compilation, and all 11 held-out tests for a **temporary
+current-syntax copy** of `N1-001-string-utils`. They also compare the absent-flag
+runner with integration base `89f298e99`. Original pair/canary bytes are never
+rewritten. Null-agent controls are plumbing, not agent outcomes, token-savings
+measurements, or release-gate evidence; no model/budget/publication decision is added.
+
 ### Per-run capture (v0.16 W1 — roadmap §3.1, gate 8, #1094)
 
 `run-pair.sh` and `run-bundle.sh` run the agent as

@@ -174,6 +174,7 @@ RUNS=1
 RUN_OFFSET=0
 OUT_DIR="$SCRIPT_DIR/epochs/adhoc"
 NULL_AGENT=0
+INITIALIZED_WORKSPACE=0
 ITERATION_BUDGET=10
 TIMEOUT_SECS=600
 EXEMPLAR_FILE=""
@@ -197,6 +198,7 @@ ARM_CONFIG_KEY=""
 # agent exists, and it writes the same build state #1094 reads, so the arms' compilers can
 # be proven distinct before a single paid run instead of after collection.
 CANARY_ONLY=0
+INVOCATION_ARGS=("$@")
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -207,6 +209,9 @@ while [[ $# -gt 0 ]]; do
         --runs) RUNS="$2"; shift 2 ;;
         --out) OUT_DIR="$2"; shift 2 ;;
         --null-agent) NULL_AGENT=1; shift ;;
+        --initialized-workspace)
+            [[ $INITIALIZED_WORKSPACE -eq 0 ]] || { echo "Duplicate --initialized-workspace" >&2; exit 2; }
+            INITIALIZED_WORKSPACE=1; shift ;;
         --exemplar) EXEMPLAR_FILE="$2"; shift 2 ;;
         --edit-mechanism) EDIT_MECHANISM="$2"; shift 2 ;;
         --calor-dll) CALOR_DLL_OVERRIDE="$2"; shift 2 ;;
@@ -224,7 +229,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-[[ -n "$PAIR_DIR" && -n "$ARM" ]] || { echo "Usage: --pair <dir> --arm calor|csharp [--arm-config <arms.key>] [--canary-only] [--runs N] [--null-agent] [--exemplar <file>] [--edit-mechanism raw|mcp-file|mcp-node] [--calor-dll <path>] [--arm-repo-root <path>] [--out <dir>]" >&2; exit 2; }
+[[ -n "$PAIR_DIR" && -n "$ARM" ]] || { echo "Usage: --pair <dir> --arm calor|csharp [--arm-config <arms.key>] [--canary-only] [--runs N] [--null-agent] [--initialized-workspace] [--exemplar <file>] [--edit-mechanism raw|mcp-file|mcp-node] [--calor-dll <path>] [--arm-repo-root <path>] [--out <dir>]" >&2; exit 2; }
 REDESIGNED_POLICY=0
 if [[ "$ARM_CONFIG_KEY" == "calor-permissive" || "$ARM_CONFIG_KEY" == "calor-strict" ]]; then
     REDESIGNED_POLICY=1
@@ -265,6 +270,23 @@ else
 fi
 [[ "$ARM" == "calor" || "$ARM" == "csharp" ]] || { echo "--arm must be calor|csharp" >&2; exit 2; }
 [[ -n "$ARM_CONFIG_KEY" ]] || ARM_CONFIG_KEY="$ARM"
+if [[ $INITIALIZED_WORKSPACE -eq 1 ]]; then
+    for flag in --arm --arm-config --arm-repo-root --calor-dll --out --runs --run-offset --exemplar --edit-mechanism; do
+        count=0
+        for arg in "${INVOCATION_ARGS[@]}"; do
+            [[ "$arg" != "$flag" ]] || count=$((count + 1))
+        done
+        [[ $count -le 1 ]] || { echo "Duplicate initialized-arm flag: $flag" >&2; exit 2; }
+    done
+    [[ "$ARM" == "calor" && "$ARM_CONFIG_KEY" == "calor" && "$EDIT_MECHANISM" == "raw" \
+       && $CANARY_ONLY -eq 0 && -z "$PPW_SPEND_TICKET$PPW_GATEWAY_CLIENT$PPW_SOURCE_INSPECTOR_RUNTIME" \
+       && -z "$ARM_LABEL_OVERRIDE" ]] \
+        || { echo "Initialized workspace requires a new ordinary calor/raw arm, not a registered slot or canary-only invocation" >&2; exit 2; }
+    [[ "$RUNS" =~ ^[1-9][0-9]*$ && "$RUN_OFFSET" =~ ^[0-9]+$ ]] \
+        || { echo "Initialized workspace requires positive --runs and nonnegative --run-offset" >&2; exit 2; }
+    [[ "$OUT_DIR" != "$SCRIPT_DIR/epochs/adhoc" && ! -e "$OUT_DIR" ]] \
+        || { echo "Initialized workspace requires --out pointing to a new unregistered directory" >&2; exit 3; }
+fi
 case "$EDIT_MECHANISM" in
     raw) ;;
     mcp-file)
@@ -313,7 +335,13 @@ fi
 if [[ -n "$ARM_LABEL_OVERRIDE" ]]; then
     ARM_LABEL="$ARM_LABEL_OVERRIDE"
 fi
+[[ $INITIALIZED_WORKSPACE -eq 0 ]] || ARM_LABEL="${ARM_LABEL}+initialized"
 PAIR_DIR="$(cd "$PAIR_DIR" && pwd)"
+if [[ $INITIALIZED_WORKSPACE -eq 1 ]]; then
+    python3 "$HARNESS_CAPTURE" initialized-arm-admission "$PAIR_DIR/pair.json" "$ARM_CONFIG_KEY" "$ARM" --output "$OUT_DIR"
+    [[ ! -d "$PAIR_DIR/smoke" && ! -f "$PAIR_DIR/defect.json" ]] \
+        || { echo "Initialized workspace currently supports non-probe pairs only" >&2; exit 3; }
+fi
 PAIR_ID="$(jq -r .id "$PAIR_DIR/pair.json")"
 SOURCE_FRAGMENT_GLOB="*.calr"
 SOURCE_ASSEMBLY_ENABLED=0
@@ -387,17 +415,23 @@ if [[ -n "$CALOR_DLL_OVERRIDE" ]]; then
     # arm would otherwise register `dotnet <bogus> mcp` (a server that never
     # starts), strand the agent behind the .calr edit hook, and fabricate
     # guaranteed-failure data — the hazard the mcp-file gate below guards.
-    if ! dotnet "$CALOR_CLI_DLL" --help >/dev/null 2>&1; then
+    if [[ $INITIALIZED_WORKSPACE -eq 0 ]] && ! dotnet "$CALOR_CLI_DLL" --help >/dev/null 2>&1; then
         echo "ERROR: --calor-dll is not a runnable calor CLI (dotnet '$CALOR_CLI_DLL' --help failed)" >&2
         exit 2
     fi
 else
     for cli_cfg in Release Debug; do
-        if [[ -f "$REPO_ROOT/src/Calor.Compiler/bin/$cli_cfg/net10.0/calor.dll" ]]; then
-            CALOR_CLI_DLL="$REPO_ROOT/src/Calor.Compiler/bin/$cli_cfg/net10.0/calor.dll"
+        cli_root="$REPO_ROOT"
+        [[ $INITIALIZED_WORKSPACE -eq 0 ]] || cli_root="$ARM_REPO_ROOT"
+        if [[ -f "$cli_root/src/Calor.Compiler/bin/$cli_cfg/net10.0/calor.dll" ]]; then
+            CALOR_CLI_DLL="$cli_root/src/Calor.Compiler/bin/$cli_cfg/net10.0/calor.dll"
             break
         fi
     done
+fi
+if [[ $INITIALIZED_WORKSPACE -eq 1 && -z "$CALOR_CLI_DLL" ]]; then
+    echo "ERROR: initialized workspace requires a built selected-arm compiler" >&2
+    exit 3
 fi
 if [[ "$ARM" == "calor" && -z "$CALOR_CLI_DLL" ]]; then
     echo "WARNING: calor.dll not found (build src/Calor.Compiler first); calor-arm records will carry envelope_valid=null and empty edit_target_ids" >&2
@@ -506,7 +540,12 @@ arm_canary() {
     fi
     mkdir -p "$dir/src"
     render_template "$dir/src/Src.csproj"
-    cp "$PERMISSIVE_CANARY" "$dir/src/canary.calr"
+    if [[ $INITIALIZED_WORKSPACE -eq 1 ]]; then
+        # New, unregistered arm control; never rewrite the historical canary.
+        printf '§M{InitializedArmCanary}\n  §F{Quiet:pub} () -> void\n    §E{}\n    §P "laundered"\n' > "$dir/src/canary.calr"
+    else
+        cp "$PERMISSIVE_CANARY" "$dir/src/canary.calr"
+    fi
     out="$(cd "$dir/src" && CALOR_P0_SHIM_OFF=1 DOTNET_CLI_UI_LANGUAGE=en dotnet build --nologo -v q 2>&1)" || rc=$?
     # The canary builds through the arm's own Calor.Tasks, so it leaves the same
     # obj/calor/.calor-build-state.json #1094 archives per run — which makes the arm's
@@ -654,7 +693,25 @@ materialize() {
     cp -R "$PAIR_DIR/$FIXTURE_DIR/." "$ws/src/"
     cp "$PAIR_DIR/spec.md" "$ws/spec.md"
 
-    if [[ "$ARM" == "calor" ]]; then
+    if [[ $INITIALIZED_WORKSPACE -eq 1 ]]; then
+        [[ ! -e "$ws/src/Src.csproj" ]] || { echo "Refusing to overwrite an existing fixture project" >&2; exit 3; }
+        cat > "$ws/src/Src.csproj" <<'EOF'
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+</Project>
+EOF
+        render_template "$ws_out/arm-template.csproj"
+        local init_exemplar_args=()
+        [[ -z "$EXEMPLAR_FILE" ]] || init_exemplar_args=(--exemplar "$EXEMPLAR_FILE")
+        python3 "$HARNESS_CAPTURE" initialize-workspace "$ws" "$ws_out" "$ARM_REPO_ROOT" \
+            "$CALOR_CLI_DLL" "$ws_out/arm-template.csproj" --timeout "$TIMEOUT_SECS" \
+            ${init_exemplar_args[@]+"${init_exemplar_args[@]}"}
+    elif [[ "$ARM" == "calor" ]]; then
         # Per-arm-native (A-1.3): the TEMPLATE comes from the arm's own product
         # checkout — the control arm's registered configuration includes its
         # template exactly as archived (pre-verify-gate), not main's. The
@@ -796,7 +853,7 @@ PROBEPROJ
     # in BOTH arms — "fixed, not agent-editable" must be enforced, not
     # asserted (review of #810 finding 4); the .smokehash re-check at
     # extract time backstops non-hook edit paths.
-    if [[ ($NULL_AGENT -eq 0) && ( "$ARM" == "calor" || -d "$PAIR_DIR/smoke" ) ]]; then
+    if [[ $INITIALIZED_WORKSPACE -eq 0 && ($NULL_AGENT -eq 0) && ( "$ARM" == "calor" || -d "$PAIR_DIR/smoke" ) ]]; then
         mkdir -p "$ws/.claude"
         local calr_block=""
         if [[ "$EDIT_MECHANISM" == "mcp-file" ]]; then
@@ -879,6 +936,10 @@ write_shim() {
     local real_dotnet
     real_dotnet="$(command -v dotnet)"
     mkdir -p "$shim_dir"
+    if [[ $INITIALIZED_WORKSPACE -eq 1 ]]; then
+        printf '#!/usr/bin/env bash\nexec %q %q "$@"\n' "$real_dotnet" "$CALOR_CLI_DLL" > "$shim_dir/calor"
+        chmod +x "$shim_dir/calor"
+    fi
     cat > "$shim_dir/dotnet" <<EOF
 #!/usr/bin/env bash
 set -uo pipefail
@@ -1561,6 +1622,11 @@ extract_metrics() {
           tokens:{input:$tin, output:$tout}, tokenUsage:$token_usage,
           nullAgent:($null_agent==1)}' \
         > "$ws_out/result.json"
+    if [[ $INITIALIZED_WORKSPACE -eq 1 ]]; then
+        jq --slurpfile init "$ws_out/initialization.json" '. + {initialization:$init[0]}' \
+            "$ws_out/result.json" > "$ws_out/.initialized-result.json"
+        mv "$ws_out/.initialized-result.json" "$ws_out/result.json"
+    fi
     cat "$ws_out/result.json"
 }
 
@@ -1613,6 +1679,11 @@ write_invalid_result() {
              | .tokenUsage={source:"missing",reason:"terminal-invalid"}
            else . end' \
         > "$ws_out/result.json"
+    if [[ $INITIALIZED_WORKSPACE -eq 1 ]]; then
+        jq --slurpfile init "$ws_out/initialization.json" '. + {initialization:$init[0]}' \
+            "$ws_out/result.json" > "$ws_out/.initialized-result.json"
+        mv "$ws_out/.initialized-result.json" "$ws_out/result.json"
+    fi
     cat "$ws_out/result.json"
 }
 
@@ -1649,6 +1720,10 @@ fi
 
 for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
     WS_OUT="$OUT_DIR/$PAIR_ID/$ARM_LABEL/run-$run"
+    if [[ $INITIALIZED_WORKSPACE -eq 1 && -e "$WS_OUT" ]]; then
+        echo "Initialized workspace output already exists; use a new unregistered output directory: $WS_OUT" >&2
+        exit 3
+    fi
     mkdir -p "$WS_OUT"
 
     # Invalid-run re-attempt loop (gates doc §0.2): a detected-invalid run is
@@ -1665,6 +1740,11 @@ for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
         # every contract-bearing calor-arm pair then fails held-out runs with
         # FileNotFoundException. One physical path removes the ambiguity.
         WS="$(cd "$WS" && pwd -P)"
+        if [[ $INITIALIZED_WORKSPACE -eq 1 ]]; then
+            trap '[[ -z "${WS:-}" ]] || rm -rf "$WS"' EXIT
+            git -c init.templateDir= init --quiet "$WS"
+            python3 "$HARNESS_CAPTURE" isolate-workspace "$WS"
+        fi
         SHIM_DIR="$WS_OUT/.shim"
         [[ -n "$PPW_GATEWAY_CLIENT" ]] && SHIM_DIR="$WS/.ppw-shim"
 
