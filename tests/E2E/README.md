@@ -22,7 +22,7 @@ not a measured baseline. To opt in, supply all three new options:
 
 ```bash
 # Only after separately approving the model, arm, task selection, and spending.
-# MODEL must be the exact dated Claude model ID, not "sonnet"/"opus"/"default".
+# MODEL must be the full versioned Claude model ID, not "sonnet"/"opus"/"default".
 CALOR_COMPILER_ROOT="$EXACT_WORKTREE_ROOT" \
 CALOR_COMPILER_CONFIGURATION=Debug \
   ./tests/E2E/agent-tasks/run-agent-tests.sh \
@@ -81,6 +81,10 @@ Token schema v1 follows the documented
 and [cost tracking](https://code.claude.com/docs/en/agent-sdk/cost-tracking).
 It accepts one init, one successful final result, one fresh session identity,
 and exactly the supplied model in init/assistant messages and `result.modelUsage`.
+Full versioned IDs may have a date suffix or omit one. Bare aliases and
+`latest`/`default` selectors are rejected; a selector resolving to another
+reported ID invalidates evidence. This records the observed model identifier,
+not an independently identifiable model-weight checkpoint.
 Subagent message streams, extra result envelopes, model fallback, errors,
 aborted messages, unsupported event types/system subtypes, missing/empty or
 malformed usage are invalid evidence, even when generated code passes.

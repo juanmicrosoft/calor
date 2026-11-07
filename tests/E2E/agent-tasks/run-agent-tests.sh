@@ -289,7 +289,7 @@ Options:
   --single-run        Run each task only once (skip majority voting)
   --measured-output <new-absolute-directory>
                       Opt in to retained, strict measured evidence (see README)
-  --model <exact-id>  Required dated Claude model ID in measured mode
+  --model <exact-id>  Required full versioned Claude model ID in measured mode
   --arm <label>       Required caller-selected arm label in measured mode
   --list              List all available tasks
   --clean             Clean up temporary workspaces only

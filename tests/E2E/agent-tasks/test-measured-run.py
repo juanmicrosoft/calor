@@ -57,6 +57,15 @@ def events():
 
 
 class SchemaTests(unittest.TestCase):
+    def test_explicit_model_identity_shapes(self):
+        for model in (MODEL, "claude-3-5-sonnet-20241022", "claude-opus-5-5"):
+            measured.validate_model_id(model)
+        for model in ("", "sonnet", "opus", "default", "claude-opus",
+                      "claude-sonnet-latest", "claude-opus-5-5-latest",
+                      "claude-opus-5-5-default", "claude-opus-5.5"):
+            with self.subTest(model=model), self.assertRaises(measured.EvidenceError):
+                measured.validate_model_id(model)
+
     def parse(self, value):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "stdout"
@@ -277,6 +286,34 @@ class RunnerTests(unittest.TestCase):
         self.assertIn("logic-001-attempt-3/attempt.json", record["artifact_hashes"])
         self.assertEqual((attempt / "agent-output-workspace/Calculator.calr").read_text(),
                          (attempt / "workspace/Calculator.calr").read_text())
+
+    def test_explicit_versioned_model_without_date(self):
+        model = "claude-opus-5-5"
+        value = events()
+        value[0]["model"] = model
+        for event in value:
+            if event["type"] == "assistant":
+                event["message"]["model"] = model
+        value[-1]["modelUsage"][model] = value[-1]["modelUsage"].pop(MODEL)
+        arguments = self.options()
+        arguments[arguments.index("--model") + 1] = model
+        result = self.run_control(*arguments, env=dict(self.env, GUARD_EVENTS=json.dumps(value)))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        record = json.loads((self.output / "run.json").read_text())
+        self.assertEqual(record["model"], model)
+        self.assertEqual(record["status"], "accepted")
+        self.assertEqual(json.loads(self.calls.read_text().splitlines()[0])[3], model)
+
+    def test_resolved_model_mismatch_cannot_rescue_correct_implementation(self):
+        arguments = self.options()
+        arguments[arguments.index("--model") + 1] = "claude-sonnet-4"
+        result = self.run_control(*arguments)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        record = json.loads((self.output / "run.json").read_text())
+        self.assertEqual(record["status"], "invalid")
+        self.assertIn("model mismatch", record["error"])
+        self.assertFalse((self.output / "logic-001-attempt-1/verify.stdout").exists())
+        self.assertNotIn("task_vote_passes", record)
 
     def test_correct_file_cannot_rescue_invocation_or_usage_error(self):
         for failure in ("exit", "usage"):

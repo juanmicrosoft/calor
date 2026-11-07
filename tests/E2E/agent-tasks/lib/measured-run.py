@@ -33,6 +33,14 @@ class EvidenceError(RuntimeError):
     pass
 
 
+def validate_model_id(model):
+    parts = model.split("-")
+    if (not re.fullmatch(r"claude-[a-z0-9]+(?:-[a-z0-9]+)*", model)
+            or not any(part.isdigit() for part in parts)
+            or any(part in ("latest", "default") for part in parts)):
+        raise EvidenceError("--model must be an explicit full versioned Claude ID, not an alias/default")
+
+
 def write_json(path, value):
     # Never follow an artifact symlink or replace an already published file.
     safe_path(path, directory=False)
@@ -382,8 +390,7 @@ def main():
                 raise EvidenceError(f"Duplicate option: {name}")
             seen.add(name)
     args = parser.parse_args()
-    if not re.fullmatch(r"claude-[a-z0-9.-]+-\d{8}", args.model):
-        raise EvidenceError("--model must be an explicit dated Claude ID, not an alias/default")
+    validate_model_id(args.model)
     if not re.fullmatch(r"[a-zA-Z0-9_-]+", args.arm):
         raise EvidenceError("Invalid arm label")
     output = safe_path(args.measured_output, directory=False)
@@ -417,6 +424,7 @@ def main():
     output.mkdir(mode=0o700)
     record = {"schema": 1, "run_id": str(uuid.uuid4()), "status": "invalid",
               "model": args.model, "arm": args.arm, "commandline": sys.argv,
+              "model_identity_policy": "Exact requested ID must match init, every assistant model, and the sole final modelUsage key; no model-weight checkpoint claim.",
               "provider_executable": provider_identity,
               "compiler": {**source, "configuration": configuration, "version": version},
               "runner": runner, "inputs": inputs, "tasks": [], "skips": [],
