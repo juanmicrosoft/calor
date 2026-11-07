@@ -341,6 +341,54 @@ optional unrelated/weakened contracts, narrowed guards, signatures, wrong
 behavior, raw effects, runtime errors, and bounded deadlines. This closes only
 four verifier prerequisites, not all agent tasks or release validation.
 
+## Enum task behavioral verification
+
+The `enum-001` through `enum-003` entry points read `Enums.calr` through the
+same selected-compiler helper, single immutable source read, debug-contract
+runtime, and bounded 120-second process/EOF supervision. Every profile checks
+the selected root, configuration, and native assets and unconditionally loads
+Z3, even though the enum prompts require no contract proof.
+
+```bash
+python3 tests/E2E/agent-tasks/test-enum-verifiers.py
+python3 tests/E2E/agent-tasks/test-logic-old-release.py --enums
+```
+
+The selected AST must contain the named native public module enum and every
+required member. The selected-generated C# is independently compiled, and
+reflection checks that each member belongs to the actual public CLR enum
+in that assembly. `Color` requires a native explicit assignment on each of
+`Red`, `Green`, and `Blue`, and their reflected values must be exactly `1`,
+`2`, and `4`. The prompt does not require a `Flags` attribute. `Status` and
+`Priority` impose no numeric assignments, member ordering, underlying type,
+or exclusion of additional members.
+
+`Priority.IsUrgent` must belong to the native `Priority` enum extension.
+Reflection requires a public, nongeneric static boolean extension method
+with one value parameter of the actual CLR `Priority` type. Parameter names
+and body constructs are not prescribed. All four required named inputs execute
+against independent expected results: false for `Low` and `Medium`, true for
+`High` and `Critical`. Optional contracts and inline parameter refinements
+must admit those inputs; guards never filter the runtime oracle. Contract and
+execution errors fail explicitly.
+
+The actual-old mode archives unchanged v0.29.0 commit
+`d82f3ae95175ecd09581c6922701706be72b0ca9`, verifies its native prerequisites,
+and uses locked restore/build through the existing 600-second runner. It runs
+127 real old/current entrypoint controls, including current-parser rejection
+of historical IDs. Old IDs and native old refinement syntax appear only in
+temporary inputs. Missing assets, history, APIs, builds, or controls fail rather
+than skip or substitute a current compiler.
+
+Current controls also cover interop/comment/unrelated decoys, duplicate and
+missing declarations, explicit assignment omissions and wrong values,
+private/wrong signatures, wrong urgency for each named input, narrowed guards,
+runtime errors, infinite loops, deadlines, and selected native-asset failures.
+These checks cover the required named enum values, not undefined underlying
+values or additional members' urgency. Finite body execution is not a universal
+proof of arbitrary implementations or agent nonregression. Original task
+definitions, fixtures, and corpus membership remain unchanged.
+
 ## Control-flow task behavioral verification
 
 The `cf-001` through `cf-004` entry points under

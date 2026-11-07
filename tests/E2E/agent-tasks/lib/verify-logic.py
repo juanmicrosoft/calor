@@ -77,7 +77,9 @@ def main():
     for dependency in ("calor.dll", "Calor.Runtime.dll", "Microsoft.Z3.dll", native):
         if not (compiler / dependency).is_file():
             raise RuntimeError(f"Selected compiler dependency missing: {compiler / dependency}; build the selected root first.")
-    filename = ("BuggyContracts.calr" if sys.argv[1] == "contract003" else "Collections.calr" if sys.argv[1] == "PrintDictionary" else "Effects.calr"
+    filename = ("Enums.calr" if sys.argv[1] in ("enum001", "enum002", "enum003") else
+                "BuggyContracts.calr" if sys.argv[1] == "contract003" else
+                "Collections.calr" if sys.argv[1] == "PrintDictionary" else "Effects.calr"
                 if sys.argv[1] in ("PrintNumbers", "Countdown", "DoWhileDemo", "PrintEvenNumbers") else "Calculator.calr")
     source = None if native_only else Path(sys.argv[2]).resolve() / filename
     if source is not None and not source.is_file():

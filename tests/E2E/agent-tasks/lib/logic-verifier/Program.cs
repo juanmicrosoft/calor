@@ -41,6 +41,16 @@ static void Verify(string profile, string path)
     // Every profile validates the selected native prerequisite, even when it
     // needs no contract proof. A corrupt/mismatched asset must not go unused.
     using var nativePrerequisite = new Context();
+    if (profile is "enum001" or "enum002" or "enum003")
+    {
+        var enumSource = File.ReadAllText(path);
+        var enumCompilation = Calor.Compiler.Program.Compile(
+            enumSource, path, new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
+        if (enumCompilation.HasErrors || enumCompilation.Ast == null)
+            throw new InvalidOperationException($"Calor compilation failed:\n{string.Join("\n", enumCompilation.Diagnostics)}");
+        VerifyEnum(profile, enumCompilation.Ast, enumCompilation.GeneratedCode);
+        return;
+    }
     var basic = profile is "basic001" or "basic002" or "basic003" or "basic004";
     var contractWriting = profile is "contract001" or "contract002" or "contract003" or "contract004" or "contract005";
     var name = profile switch
@@ -122,20 +132,7 @@ static void Verify(string profile, string path)
     else if (!controlFlow || name == "GradeToLetter")
         CheckContracts(function, names, outputType, profile == "ControlMax");
 
-    var parseOptions = new CSharpParseOptions(LanguageVersion.Preview);
-    var trees = new[]
-    {
-        CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble, parseOptions),
-        CSharpSyntaxTree.ParseText(compilation.GeneratedCode, parseOptions)
-    };
-    var runtime = CSharpCompilation.Create(
-        "LogicTaskRuntime", trees, GeneratedCSharpCompiler.References,
-        new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-    using var stream = new MemoryStream();
-    var emitted = runtime.Emit(stream);
-    if (!emitted.Success)
-        throw new InvalidOperationException($"Generated C# compilation failed:\n{string.Join("\n", emitted.Diagnostics)}");
-    var assembly = Assembly.Load(stream.ToArray());
+    var (assembly, trees) = CompileRuntime(compilation.GeneratedCode);
     var moduleName = compilation.Ast.Name;
     var type = assembly.GetType($"{moduleName}.{moduleName}Module")
         ?? throw new InvalidOperationException("Generated module type not found.");
@@ -533,6 +530,112 @@ static IEnumerable<(int[] Inputs, object Expected)> WritingCases(string name)
                         yield return ([first, second], (int)quotient);
                 }
     }
+}
+
+static (Assembly Assembly, SyntaxTree[] Trees) CompileRuntime(string generatedCode)
+{
+    var parseOptions = new CSharpParseOptions(LanguageVersion.Preview);
+    SyntaxTree[] trees =
+    [
+        CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble, parseOptions),
+        CSharpSyntaxTree.ParseText(generatedCode, parseOptions)
+    ];
+    var runtime = CSharpCompilation.Create(
+        "LogicTaskRuntime", trees, GeneratedCSharpCompiler.References,
+        new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    using var stream = new MemoryStream();
+    var emitted = runtime.Emit(stream);
+    if (!emitted.Success)
+        throw new InvalidOperationException($"Generated C# compilation failed:\n{string.Join("\n", emitted.Diagnostics)}");
+    return (Assembly.Load(stream.ToArray()), trees);
+}
+
+static void VerifyEnum(string profile, ModuleNode module, string generatedCode)
+{
+    var name = profile switch { "enum001" => "Status", "enum002" => "Color", _ => "Priority" };
+    string[] required = profile switch
+    {
+        "enum001" => ["Pending", "InProgress", "Completed"],
+        "enum002" => ["Red", "Green", "Blue"],
+        _ => ["Low", "Medium", "High", "Critical"]
+    };
+    var declarations = module.Enums.Where(candidate => candidate.Name == name).ToArray();
+    if (declarations.Length != 1)
+        throw new InvalidOperationException($"Expected exactly one native module enum named {name}.");
+    var declaration = declarations[0];
+    if (declaration.Visibility != Visibility.Public)
+        throw new InvalidOperationException($"Native enum {name} must be public.");
+    foreach (var memberName in required)
+    {
+        var members = declaration.Members.Where(member => member.Name == memberName).ToArray();
+        if (members.Length != 1)
+            throw new InvalidOperationException($"Expected exactly one native {name}.{memberName} member.");
+        if (profile == "enum002" && members[0].Value == null)
+            throw new InvalidOperationException($"Native {name}.{memberName} requires an explicit integer assignment.");
+    }
+
+    FunctionNode? urgent = null;
+    if (profile == "enum003")
+    {
+        var extensions = module.EnumExtensions.Where(extension => extension.EnumName == name).ToArray();
+        if (extensions.Length != 1)
+            throw new InvalidOperationException("Expected exactly one native Priority enum extension.");
+        var methods = extensions[0].Methods.Where(method => method.Name == "IsUrgent").ToArray();
+        if (methods.Length != 1)
+            throw new InvalidOperationException("Expected exactly one native IsUrgent method in the Priority extension.");
+        urgent = methods[0];
+        if (urgent.Visibility != Visibility.Public || urgent.IsAsync || urgent.TypeParameters.Count != 0
+            || urgent.Output == null || AttributeHelper.ExpandType(urgent.Output.TypeName) != "BOOL"
+            || urgent.Parameters.Count != 1 || urgent.Parameters[0].TypeName != name
+            || urgent.Parameters[0].Modifier != Calor.Compiler.Ast.ParameterModifier.None)
+            throw new InvalidOperationException("Wrong native public bool IsUrgent(Priority) extension signature.");
+    }
+
+    var (assembly, _) = CompileRuntime(generatedCode);
+    var type = assembly.GetType($"{module.Name}.{name}")
+        ?? throw new InvalidOperationException($"Generated CLR enum {name} not found.");
+    if (!type.IsEnum || !type.IsPublic || type.Assembly != assembly)
+        throw new InvalidOperationException($"Wrong generated public CLR enum identity for {name}.");
+    var values = new Dictionary<string, object>(StringComparer.Ordinal);
+    for (var index = 0; index < required.Length; index++)
+    {
+        var memberName = required[index];
+        var field = type.GetField(memberName, BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+            ?? throw new InvalidOperationException($"Generated CLR member {name}.{memberName} missing.");
+        if (!field.IsLiteral || field.FieldType != type)
+            throw new InvalidOperationException($"Wrong generated CLR enum member identity for {name}.{memberName}.");
+        var value = field.GetValue(null)
+            ?? throw new InvalidOperationException($"Generated CLR member {name}.{memberName} has no value.");
+        if (profile == "enum002"
+            && Convert.ToDecimal(value, System.Globalization.CultureInfo.InvariantCulture) != new[] { 1m, 2m, 4m }[index])
+            throw new InvalidOperationException($"Wrong explicit CLR value for Color.{memberName}; expected {new[] { 1, 2, 4 }[index]}.");
+        values.Add(memberName, value);
+    }
+    if (urgent != null)
+    {
+        var extension = assembly.GetType($"{module.Name}.PriorityExtensions")
+            ?? throw new InvalidOperationException("Generated Priority extension class not found.");
+        var methods = extension.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+            .Where(method => method.Name == "IsUrgent").ToArray();
+        if (!extension.IsPublic || !extension.IsAbstract || !extension.IsSealed || methods.Length != 1)
+            throw new InvalidOperationException("Wrong generated public Priority extension identity.");
+        var method = methods[0];
+        if (!method.IsPublic || !method.IsStatic || method.IsGenericMethod || method.ReturnType != typeof(bool)
+            || !method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { type })
+            || !method.IsDefined(typeof(System.Runtime.CompilerServices.ExtensionAttribute), false))
+            throw new InvalidOperationException("Wrong reflected public bool IsUrgent(Priority) extension signature.");
+        // Do not filter named values through optional guards. Runtime contracts
+        // must admit every required input, including inline parameter refinements.
+        foreach (var memberName in required)
+        {
+            var expected = memberName is "High" or "Critical";
+            var actual = method.Invoke(null, [values[memberName]]);
+            if (!Equals(actual, expected))
+                throw new InvalidOperationException($"IsUrgent(Priority.{memberName}) returned {actual}; expected {expected}.");
+        }
+    }
+    Console.WriteLine($"Verification passed: {name}; native public enum and {required.Length} reflected CLR members"
+        + (urgent == null ? "." : "; native/reflected extension and 4 named-value runtime cases."));
 }
 
 static void CheckBasicEntryDomain(FunctionNode function, string[] names)
