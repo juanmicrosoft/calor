@@ -7,9 +7,11 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -118,6 +120,70 @@ class AdmissionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "registered"):
                 hc.initialized_arm_admission(PAIR / "pair.json", "calor", "calor",
                                              output / "new-child")
+
+    def test_escaped_pipe_timeout_and_real_cancellation_are_bounded(self):
+        for mode in ("timeout-exited-root", "timeout-live-root", "cancel-live-root"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                child_pid = root / "escaped.pid"
+                command_pid = root / "command.pid"
+                child = (
+                    "import os,time; from pathlib import Path; "
+                    "Path(%r).write_text(str(os.getpid())); "
+                    "print('escaped pipe held open', flush=True); time.sleep(60)"
+                ) % str(child_pid)
+                command = (
+                    "import os,subprocess,sys,time; from pathlib import Path; "
+                    "Path(%r).write_text(str(os.getpid())); "
+                    "subprocess.Popen([sys.executable,'-c',%r], start_new_session=True)\n"
+                    "while not Path(%r).exists(): time.sleep(.01)\n"
+                ) % (str(command_pid), child, str(child_pid))
+                if mode != "timeout-exited-root":
+                    command += "time.sleep(60)\n"
+                driver = (
+                    "import importlib.util,json,os,subprocess,sys,time\n"
+                    "spec=importlib.util.spec_from_file_location('hc',%r)\n"
+                    "hc=importlib.util.module_from_spec(spec); spec.loader.exec_module(hc)\n"
+                    "start=time.monotonic()\n"
+                    "try:\n"
+                    " hc._initialized_command([sys.executable,'-c',%r],%r,os.environ,%r)\n"
+                    "except (subprocess.TimeoutExpired,KeyboardInterrupt) as error:\n"
+                    " print(json.dumps({'exception':type(error).__name__,"
+                    "'elapsed':time.monotonic()-start}),flush=True)\n"
+                    "else: raise AssertionError('escaped pipe was accepted')\n"
+                ) % (str(BENCH / "harness-capture.py"), command, tmp,
+                     60 if mode.startswith("cancel") else 0.2)
+                process = subprocess.Popen(
+                    [sys.executable, "-c", driver], stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE, text=True, start_new_session=True)
+                try:
+                    deadline = time.monotonic() + 5
+                    while not child_pid.exists() and time.monotonic() < deadline:
+                        time.sleep(0.01)
+                    self.assertTrue(child_pid.exists(), "escaped child did not become ready")
+                    escaped = int(child_pid.read_text())
+                    self.assertEqual(os.getpgid(escaped), escaped, "child did not escape the group")
+                    if mode.startswith("cancel"):
+                        process.send_signal(signal.SIGINT)
+                    stdout, stderr = process.communicate(timeout=5)
+                    self.assertEqual(process.returncode, 0, stdout + stderr)
+                    evidence = json.loads(stdout)
+                    self.assertEqual(evidence["exception"],
+                                     "KeyboardInterrupt" if mode.startswith("cancel") else "TimeoutExpired")
+                    self.assertLess(evidence["elapsed"], 3, evidence)
+                    os.kill(escaped, 0)  # EOF was abandoned while the escaped pipe holder was live.
+                    print("CLEANUP %s: %s returned in %.3fs with escaped pipe holder live" %
+                          (mode, evidence["exception"], evidence["elapsed"]), flush=True)
+                finally:
+                    for marker in (child_pid, command_pid):
+                        if marker.exists():
+                            try:
+                                os.kill(int(marker.read_text()), signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass
+                    if process.poll() is None:
+                        process.kill()
+                    process.communicate(timeout=2)
 
 
 @unittest.skipUnless(HAVE_PRODUCT, "build selected Release Compiler and Tasks, install jq")
@@ -266,6 +332,76 @@ class CompilerBackedTests(unittest.TestCase):
                 self.initialize()
         self.assertTrue((self.out / "initialized-inputs/CLAUDE.md").is_file())
         self.assertFalse((self.out / "initialization.json").exists())
+
+    def test_real_raw_agent_invocation_admits_generated_mcp_and_hooks(self):
+        pair = self.root / "invocation-pair"
+        control_pair(pair)
+        guard = self.root / "local-agent"
+        guard.mkdir()
+        capture = self.root / "invocation.json"
+        executable = guard / "claude"
+        executable.write_text(
+            "#!" + sys.executable + "\n"
+            "import hashlib,json,os,pathlib,shutil,subprocess,sys\n"
+            "cwd=pathlib.Path.cwd(); root=cwd.parent; argv=sys.argv[1:]\n"
+            "mcp_path=pathlib.Path(argv[argv.index('--mcp-config')+1])\n"
+            "settings=(root/'.claude/settings.json').read_text()\n"
+            "instructions=(root/'CLAUDE.md').read_text()\n"
+            "shim=pathlib.Path(shutil.which('calor'))\n"
+            "version=subprocess.run(['calor','--version'],capture_output=True,text=True,check=True).stdout.strip()\n"
+            "hook=subprocess.run(['calor','hook','validate-write',"
+            "json.dumps({'file_path':str(cwd/'Unwritten.cs'),'content':'class Unwritten {}'})],"
+            "capture_output=True,text=True,timeout=10)\n"
+            "record={'argv':argv,'cwd':str(cwd),'gitRoot':str(root),"
+            "'hasGitRoot':(root/'.git').is_dir(),'mcp':json.loads(mcp_path.read_text()),"
+            "'settings':settings,'instructions':instructions,'calorShim':str(shim),"
+            "'calorShimText':shim.read_text(),'calorVersion':version,"
+            "'hookExitCode':hook.returncode,'hookStderr':hook.stderr}\n"
+            "pathlib.Path(" + repr(str(capture)) + ").write_text(json.dumps(record))\n"
+            "reference=pathlib.Path(" + repr(str(pair / "reference/calor")) + ")\n"
+            "for source in reference.iterdir(): shutil.copyfile(source,cwd/source.name)\n"
+            "build=subprocess.run(['dotnet','build','--nologo','-v','q'],capture_output=True,text=True)\n"
+            "if build.returncode: print(build.stdout+build.stderr,file=sys.stderr); sys.exit(build.returncode)\n"
+            "print(json.dumps({'type':'result','subtype':'success','localControl':True,"
+            "'result':'local invocation plumbing only; no provider',"
+            "'usage':{'input_tokens':0,'output_tokens':0}}))\n")
+        executable.chmod(0o755)
+        output = self.root / "local-invocation"
+        env = dict(os.environ, PATH=str(guard) + os.pathsep + os.environ["PATH"],
+                   CALOR_TELEMETRY_OPTOUT="1", CALOR_P0_SKIP_ARM_CANARY="0")
+        self.assertEqual(shutil.which("claude", path=env["PATH"]), str(executable))
+        command = ["bash", str(RUNNER), "--pair", str(pair), "--arm", "calor",
+                   "--initialized-workspace", "--out", str(output),
+                   "--arm-repo-root", str(REPO), "--calor-dll", str(DLL)]
+        run = subprocess.run(command, capture_output=True, text=True, env=env, timeout=180)
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        boundary = json.loads(capture.read_text())
+        run_dir = output / "N1-001-string-utils/calor+initialized/run-1"
+        self.assertIn("--strict-mcp-config", boundary["argv"])
+        self.assertEqual(boundary["mcp"]["mcpServers"]["calor"]["args"],
+                         [str(DLL), "mcp", "--stdio"])
+        self.assertTrue(boundary["hasGitRoot"])
+        self.assertEqual(Path(boundary["cwd"]), Path(boundary["gitRoot"]) / "src")
+        self.assertEqual(boundary["instructions"],
+                         (run_dir / "initialized-inputs/CLAUDE.md").read_text())
+        self.assertEqual(boundary["settings"],
+                         (run_dir / "initialized-inputs/.claude/settings.json").read_text())
+        self.assertIn("calor hook", boundary["settings"])
+        self.assertIn(str(DLL), boundary["calorShimText"])
+        self.assertEqual(Path(boundary["calorShim"]), run_dir / ".shim/calor")
+        self.assertEqual(boundary["calorVersion"],
+                         hc.ET.parse(REPO / "Directory.Build.props").findtext(".//Version"))
+        self.assertNotEqual(boundary["hookExitCode"], 0)
+        self.assertIn("BLOCKED", boundary["hookStderr"])
+        self.assertIn("Calor-first", boundary["hookStderr"])
+        result = json.loads((run_dir / "result.json").read_text())
+        self.assertTrue(result["finalBuild"]["ok"])
+        self.assertEqual(result["heldoutPassed"], 11)
+        self.assertEqual(result["escapedBugs"], 0)
+        self.assertTrue(json.loads((run_dir / "agent.json").read_text())["localControl"])
+        print("INVOCATION calor/raw initialized: real run_agent admitted strict MCP, "
+              "root instructions/settings and selected calor shim; local stub only; heldout=11",
+              flush=True)
 
     def test_mismatched_root_compiler_and_missing_compiler_are_rejected(self):
         foreign = self.root / "calor.dll"

@@ -96,6 +96,16 @@ selected root/commit/version, DLL SHA-256, actual init command, and SHA-256 iden
 for every archived workspace input, generated home registration, primer response,
 exemplar (if any), original arm template, and bound project. Initialization commands
 have the pair's timeout and terminate their own process group on timeout/cancellation.
+Post-kill pipe draining is capped at one second; if an escaped descendant retains
+stdout/stderr, the harness closes those pipes and allows at most one further second
+to reap the root. Failure to signal or reap is reported without masking the original
+timeout/cancellation. Controls exercise exited/live roots with escaped pipe holders
+and real SIGINT, not only descendants that remain in the killed group.
+
+The initialized/raw arm's generated `mcp-config.json` reaches the existing
+`run_agent` invocation through `--mcp-config` and `--strict-mcp-config`; no edit-mode
+gate omits it. A local, non-provider agent stub verifies the actual argv, working
+directory, root instructions/settings, selected `calor` shim, and real hook rejection.
 
 Zero-provider validation:
 

@@ -487,7 +487,21 @@ def _initialized_command(command, cwd, env, timeout, input_text=None):
             os.killpg(process.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
-        process.communicate()
+        except PermissionError as exc:
+            sys.stderr.write("initialized command cleanup could not signal group %s: %s\n" %
+                             (process.pid, exc))
+        try:
+            process.communicate(timeout=1)
+        except subprocess.TimeoutExpired:
+            # An escaped descendant can retain the pipes after the group dies.
+            # Abandon EOF rather than turn timeout/cancellation into another wait.
+            for stream in (process.stdin, process.stdout, process.stderr):
+                if stream is not None:
+                    stream.close()
+            try:
+                process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                sys.stderr.write("initialized command cleanup could not reap pid %s\n" % process.pid)
         raise
     if process.returncode:
         raise ValueError("selected compiler command failed (%s): %s\n%s" %
