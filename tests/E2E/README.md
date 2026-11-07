@@ -164,6 +164,60 @@ not skips. No historical files or ledgers are changed. This is a v0.29
 compatibility control, not a selection of the final experimental baseline,
 an agent run, or agent nonregression evidence.
 
+## Basic-syntax task behavioral verification
+
+The four `basic-001` through `basic-004` `verify.sh` entry points use the same
+disposable helper, selected compiler assemblies, immutable source read, and
+bounded 120-second process/EOF cleanup as the logic tasks. They read
+`Calculator.calr`; their original task definitions and fixtures are unchanged.
+Run their controls with:
+
+```bash
+python3 tests/E2E/agent-tasks/test-basic-syntax-verifiers.py
+python3 tests/E2E/agent-tasks/test-logic-old-release.py --basic-syntax
+```
+
+The distinct `basic001`..`basic004` internal selectors prevent a name collision:
+basic `IsPositive` needs no contracts, while logic `IsPositive` still requires
+its original full contract proofs. Exact parsed public, non-async, non-generic
+signatures and generated public/static CLR signatures are checked. `GetZero`
+has zero parameters and an `Int32` result, not the loop profiles' inferred
+`void`. `int`, `i32`, and mixed aliases use selected-compiler type normalization.
+No new purity, body-shape, formatting, or mandatory contract requirements are
+imposed.
+
+Runtime contracts remain enabled when compiling and executing selected-generated
+C#. Optional preconditions (including inline `#` refinements) must admit every
+prompt input, proved with the selected Z3 translator and five-second solver
+limit. Entry proofs accept total comparison/boolean/conditional/implication
+expressions and fail explicitly on unsupported expressions or unknown results;
+they never discard runtime inputs to fit a guard. Optional postconditions are
+executed, not treated as a required basic proof. Logic's proof restrictions
+and control-flow's raw-effect and executable-coupling checks are unchanged.
+
+`GetZero` executes its one zero-argument case. `IsPositive` executes 11 signed
+boundary, negative, zero, and positive cases. `Multiply` executes 205 independently
+computed products from 19 varying factors, including zero, one, negatives,
+ties, commuted pairs, signed boundaries, and large signed products. Its oracle
+computes in `Int64` and admits only products representable by CLR `Int32`.
+Both checked and unchecked implementations pass; the prompt specifies no
+overflow policy. These finite body checks are not a universal arithmetic proof.
+
+`PrintNumber` must explicitly declare console-write on the original parsed
+function before effect synthesis. It executes 11 signed inputs against an
+independent exact numeric-line stdout oracle. CRLF/LF is normalized; extra
+text, wrong numbers, comment decoys, and output without the numeric line fail.
+Captured output retains the shared 4096-character cap.
+
+The separate old-release mode archives and builds the actual unchanged
+v0.29.0 tree using the same verified-asset/locked-restore mechanism as the
+existing modes. It executes 49 actual old/current basic entrypoint controls;
+missing prerequisites or errors fail, never skip or substitute a current
+compiler. Current controls additionally exercise basic/logic selector collisions,
+optional unrelated/weakened contracts, narrowed guards, signatures, wrong
+behavior, raw effects, runtime errors, and bounded deadlines. This closes only
+four verifier prerequisites, not all agent tasks or release validation.
+
 ## Control-flow task behavioral verification
 
 The `cf-001` through `cf-004` entry points under

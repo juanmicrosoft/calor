@@ -31,9 +31,21 @@ static void Verify(string profile, string path)
     // Every profile validates the selected native prerequisite, even when it
     // needs no contract proof. A corrupt/mismatched asset must not go unused.
     using var nativePrerequisite = new Context();
-    var name = profile == "ControlMax" ? "Max" : profile;
+    var basic = profile is "basic001" or "basic002" or "basic003" or "basic004";
+    var name = profile switch
+    {
+        "basic001" => "GetZero",
+        "basic002" => "Multiply",
+        "basic003" => "IsPositive",
+        "basic004" => "PrintNumber",
+        "ControlMax" => "Max",
+        _ => profile
+    };
     var names = name switch
     {
+        "GetZero" when basic => Array.Empty<string>(),
+        "Multiply" when basic => new[] { "a", "b" },
+        "PrintNumber" when basic => new[] { "x" },
         "Factorial" => new[] { "n" },
         "Clamp" => new[] { "value", "min", "max" },
         "IsPositive" => new[] { "x" },
@@ -47,7 +59,8 @@ static void Verify(string profile, string path)
     var controlFlow = name is "PrintNumbers" or "Countdown" or "DoWhileDemo" or "Classify"
         or "GradeToLetter" or "PrintEvenNumbers" or "PrintDictionary";
     var dictionary = name == "PrintDictionary";
-    var outputType = names.Length == 0 || dictionary ? "void" : name == "IsPositive" ? "bool" : "i32";
+    var outputType = name == "GetZero" ? "i32"
+        : name == "PrintNumber" || names.Length == 0 || dictionary ? "void" : name == "IsPositive" ? "bool" : "i32";
     var source = File.ReadAllText(path);
     var compilation = Calor.Compiler.Program.Compile(
         source, path, new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
@@ -64,11 +77,11 @@ static void Verify(string profile, string path)
         || function.Parameters.Count != names.Length
         || function.Parameters.Any(parameter => (dictionary
                 ? !IsDictionaryType(parameter.TypeName) : AttributeHelper.ExpandType(parameter.TypeName) != "INT")
-            || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None || parameter.InlineRefinement != null))
+            || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None || !basic && parameter.InlineRefinement != null))
         throw new InvalidOperationException($"Wrong public signature for {name}.");
 
     StatementNode[] witnesses = [];
-    if (controlFlow)
+    if (controlFlow || basic && name == "PrintNumber")
     {
         // Inspect the parsed declaration before any compilation pass can synthesize effects.
         var diagnostics = new DiagnosticBag();
@@ -76,11 +89,16 @@ static void Verify(string profile, string path)
         var parsed = new Parser(tokens, diagnostics).Parse();
         if (diagnostics.HasErrors)
             throw new InvalidOperationException($"Calor parsing failed:\n{string.Join("\n", diagnostics)}");
-        witnesses = CheckControlFlow(parsed.Functions.Single(candidate => candidate.Name == name));
-        if (name == "GradeToLetter")
-            CheckContracts(function, names, outputType);
+        var declared = parsed.Functions.Single(candidate => candidate.Name == name);
+        if (controlFlow)
+            witnesses = CheckControlFlow(declared);
+        else if (!(declared.Effects?.Effects.TryGetValue("io", out var effects) == true
+            && effects.Split(',').Contains("console_write", StringComparer.Ordinal)))
+            throw new InvalidOperationException("Declared console-write effect missing from PrintNumber.");
     }
-    else
+    if (basic)
+        CheckBasicEntryDomain(function, names);
+    else if (!controlFlow || name == "GradeToLetter")
         CheckContracts(function, names, outputType, profile == "ControlMax");
 
     var parseOptions = new CSharpParseOptions(LanguageVersion.Preview);
@@ -109,6 +127,32 @@ static void Verify(string profile, string path)
         || !method.GetParameters().Select(parameter => parameter.ParameterType)
             .SequenceEqual(parameterTypes))
         throw new InvalidOperationException("Wrong generated public/static scalar signature.");
+    if (basic && name == "PrintNumber")
+    {
+        var outputCaseCount = 0;
+        foreach (var (inputs, _) in Cases("IsPositive"))
+        {
+            var previous = Console.Out;
+            using var output = new BoundedOutput();
+            try
+            {
+                Console.SetOut(output);
+                method.Invoke(null, inputs.Select(value => (object)value).ToArray());
+            }
+            finally
+            {
+                Console.SetOut(previous);
+            }
+            var expected = inputs[0].ToString(System.Globalization.CultureInfo.InvariantCulture) + "\n";
+            var actual = output.ToString().Replace("\r\n", "\n", StringComparison.Ordinal);
+            if (actual != expected)
+                throw new InvalidOperationException($"Wrong stdout for PrintNumber({inputs[0]}): "
+                    + $"{System.Text.Json.JsonSerializer.Serialize(actual)}; expected {System.Text.Json.JsonSerializer.Serialize(expected)}.");
+            outputCaseCount++;
+        }
+        Console.WriteLine($"Verification passed: {name}; declared console-write and {outputCaseCount} exact stdout cases.");
+        return;
+    }
     if (outputType == "void")
     {
         if (dictionary)
@@ -170,7 +214,87 @@ static void Verify(string profile, string path)
             {
             }
         }
-    Console.WriteLine($"Verification passed: {name}; {(controlFlow ? "native control flow" : "semantic contracts")} and {count} runtime cases.");
+    Console.WriteLine($"Verification passed: {name}; {(basic ? "basic signature/behavior" : controlFlow ? "native control flow" : "semantic contracts")} and {count} runtime cases.");
+}
+
+static void CheckBasicEntryDomain(FunctionNode function, string[] names)
+{
+    using var context = new Context();
+    var translator = new ContractTranslator(context);
+    foreach (var name in names)
+        if (!translator.DeclareVariable(name, "i32"))
+            throw new InvalidOperationException($"Cannot model parameter {name}.");
+    BoolExpr Translate(ExpressionNode expression)
+    {
+        CheckBasicPreconditionExpression(expression);
+        var translated = translator.TranslateBoolExpr(expression);
+        if (translated == null || translator.Warnings.Count != 0)
+            throw new InvalidOperationException($"Basic precondition translation failed: {string.Join("; ", translator.Warnings)}");
+        return translated;
+    }
+    var conditions = function.Preconditions.Select(contract => Translate(contract.Condition)).ToList();
+    foreach (var parameter in function.Parameters)
+    {
+        if (parameter.InlineRefinement == null)
+            continue;
+        translator.PushSelfVariable(parameter.Name);
+        try
+        {
+            conditions.Add(Translate(parameter.InlineRefinement.Predicate));
+        }
+        finally
+        {
+            translator.PopSelfVariable();
+        }
+    }
+    BoolExpr domain = context.MkTrue();
+    if (function.Name == "Multiply")
+    {
+        // The prompt specifies no overflow policy. Only representable products
+        // constrain entry contracts or runtime cases, for checked and unchecked bodies.
+        var product = context.MkBVMul(context.MkSignExt(32, context.MkBVConst("a", 32)),
+            context.MkSignExt(32, context.MkBVConst("b", 32)));
+        domain = context.MkAnd(context.MkBVSGE(product, context.MkBV(int.MinValue, 64)),
+            context.MkBVSLE(product, context.MkBV(int.MaxValue, 64)));
+    }
+    using var solver = context.MkSolver();
+    using var settings = context.MkParams();
+    settings.Add("timeout", 5000u);
+    solver.Parameters = settings;
+    solver.Assert(context.MkAnd(domain, context.MkNot(context.MkAnd(conditions.ToArray()))));
+    var status = solver.Check();
+    if (status != Status.UNSATISFIABLE)
+        throw new InvalidOperationException($"Basic preconditions exclude prompt inputs: {status}; "
+            + (status == Status.SATISFIABLE ? solver.Model.ToString() : solver.ReasonUnknown));
+}
+
+static void CheckBasicPreconditionExpression(ExpressionNode expression)
+{
+    // Unlike required logic proofs, optional basic entry guards can use #.
+    if (expression is SelfRefNode)
+        return;
+    if (expression is BinaryOperationNode binary && binary.Operator is BinaryOperator.Equal or BinaryOperator.NotEqual
+        or BinaryOperator.LessThan or BinaryOperator.LessOrEqual or BinaryOperator.GreaterThan
+        or BinaryOperator.GreaterOrEqual or BinaryOperator.And or BinaryOperator.Or)
+    {
+        CheckBasicPreconditionExpression(binary.Left);
+        CheckBasicPreconditionExpression(binary.Right);
+    }
+    else if (expression is UnaryOperationNode unary && unary.Operator == UnaryOperator.Not)
+        CheckBasicPreconditionExpression(unary.Operand);
+    else if (expression is ConditionalExpressionNode conditional)
+    {
+        CheckBasicPreconditionExpression(conditional.Condition);
+        CheckBasicPreconditionExpression(conditional.WhenTrue);
+        CheckBasicPreconditionExpression(conditional.WhenFalse);
+    }
+    else if (expression is ImplicationExpressionNode implication)
+    {
+        CheckBasicPreconditionExpression(implication.Antecedent);
+        CheckBasicPreconditionExpression(implication.Consequent);
+    }
+    else
+        CheckModeledExpression(expression);
 }
 
 static StatementNode[] CheckControlFlow(FunctionNode function)
@@ -581,6 +705,24 @@ static void CheckModeledExpression(ExpressionNode expression)
 
 static IEnumerable<(int[] Inputs, object Expected)> Cases(string name)
 {
+    if (name == "GetZero")
+    {
+        yield return ([], 0);
+        yield break;
+    }
+    if (name == "Multiply")
+    {
+        var factors = new[] { int.MinValue, int.MinValue + 1, -1073741824, -46341, -46340,
+            -32768, -100, -2, -1, 0, 1, 2, 100, 32767, 46340, 46341, 1073741823, int.MaxValue - 1, int.MaxValue };
+        foreach (var first in factors)
+            foreach (var second in factors)
+            {
+                var product = (long)first * second;
+                if (product >= int.MinValue && product <= int.MaxValue)
+                    yield return ([first, second], (int)product);
+            }
+        yield break;
+    }
     if (name == "Factorial")
     {
         var values = new[] { 1, 1, 2, 6, 24, 120 };

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compiler-backed logic/control-flow oracles; never invokes an agent."""
+"""Compiler-backed logic/control-flow/basic oracles; never invokes an agent."""
 
 import os
 from pathlib import Path
