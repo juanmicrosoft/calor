@@ -22,15 +22,19 @@ TASKS = {
     "contract004": ("04_pre_and_post", "SafeDivide", "i32:a, i32:b",
                     "§Q (!= b 0)\n§Q (== (% a b) 0)\n§S (== (* result b) a)", "§R (/ a b)"),
     "contract005": ("05_loop_invariant", "SumToN", "i32:n",
-                    "§Q (>= n 0)\n§S (>= result 0)", "§R (/ (* n (+ n 1)) 2)"),
+                    "§Q (>= n 0)\n§S (>= result 0)", "§R (cast i32 (/ (* (cast i64 n) (+ n 1)) 2))"),
 }
 ALTERNATIVES = {
     "contract001": "§B{identity:int} x\n§R identity",
     "contract002": "§IF (< x 0)\n  §R (- 0 x)\n§R x",
     "contract003": "§IF (< x 0)\n  §R (- 0 x)\n§R x",
     "contract004": "§B{quotient:int} (/ a b)\n§R quotient",
-    "contract005": "§B{sum:int} (/ (* (+ n 1) n) 2)\n§R sum",
+    "contract005": "§B{wide:i64} n\n§B{sum:i64} (/ (+ (* wide wide) wide) 2)\n§R (cast i32 sum)",
 }
+FACTORED_SUM = ("§IF (== (% n 2) 0)\n  §R (* (/ n 2) (+ n 1))\n"
+                "§R (* n (/ (+ n 1) 2))")
+NAIVE_SUM = "§R (/ (* n (+ n 1)) 2)"
+STRONG_SUM_POST = "§Q (>= n 0)\n§S (>= result 0)\n§S (>= result n)"
 EQUIVALENT = {
     "contract001": "§Q (> x -1)\n§S (== result x)",
     "contract002": "§S (! (< result 0))",
@@ -53,7 +57,7 @@ COUNTS = {
     "contract003": len(INPUTS) - 1,
     "contract004": sum(b != 0 and a % b == 0 and -2147483648 <= a // b <= 2147483647
                        for a in INPUTS for b in INPUTS),
-    "contract005": 107,
+    "contract005": 65536,
 }
 
 
@@ -74,7 +78,7 @@ def historical_syntax(text):
     serial = 0
     for line in text.splitlines():
         stripped = line.lstrip()
-        if stripped.startswith(("§M{", "§F{")):
+        if stripped.startswith(("§M{", "§F{", "§L{")):
             serial += 1
             line = line.replace("{", f"{{id{serial}:", 1)
             if stripped.startswith("§F{") and " | " in line:
@@ -106,6 +110,23 @@ def inline_source(profile, *, narrowed=False):
     if narrowed and profile == "contract004":
         contracts += "\n§Q (> a 0)"
     return source(profile, signature=f"§F{{{name}:pub}} ({parameters}) -> i32", contracts=contracts)
+
+
+def sum_decoy(*, runtime_failure=False):
+    gate = "§B{check:i32} (/ 1 unused)" if runtime_failure else "§C{RequirePositive} §A unused §/C"
+    text = source("contract005", body="§B{unused:i32} (cast i32 (/ (* (cast i64 n) (+ n 1)) 2))\n"
+                  + "§IF (> n 0)\n  " + gate + "\n§R §C{Compute} §A n §/C")
+    text += "  §F{Compute:priv} (i32:n) -> i32\n    " + TASKS["contract005"][4] + "\n"
+    text += "  §F{RequirePositive:priv} (i32:value) -> i32\n    §Q (> value 0)\n    §R 0\n"
+    return text
+
+
+def sum_loop_decoy(*, widened=True):
+    formula = "(cast i32 (/ (* (cast i64 n) (+ n 1)) 2))" if widened else "(/ (* n (+ n 1)) 2)"
+    text = source("contract005", body=f"§B{{unused:i32}} {formula}\n"
+                  "§IF (> n 0)\n  §B{checkedValue:i32} §C{CheckPositive} §A unused §/C\n"
+                  "§B{~sum:i32} 0\n§L{i:0:n:1}\n  §ASSIGN sum (+ sum i)\n§R sum")
+    return text + "  §F{CheckPositive:pub} (i32:value) -> i32\n    §Q (> value 0)\n    §R value\n"
 
 
 class ContractWritingVerifierTests(unittest.TestCase):
@@ -222,11 +243,42 @@ class ContractWritingVerifierTests(unittest.TestCase):
                     body="§IF (== n 46340)\n  §R 1\n§R (/ (* n (+ n 1)) 2)"), False)
         self.verify("contract005", source("contract005", contracts=TASKS["contract005"][3] + "\n§Q (<= n 46340)"),
                     False, detail="Missing/wrong writing preconditions")
+        self.verify("contract005", source("contract005", contracts=TASKS["contract005"][3] + "\n§Q (<= n 65535)"),
+                    False, detail="Missing/wrong writing preconditions")
         loop = "§B{~sum:i32} 0\n§L{i:0:n:1}\n  §ASSIGN sum (+ sum i)\n§R sum"
         self.verify("contract005", source("contract005", body=loop), False, detail="Required native Gauss formula")
         self.verify("contract005", source("contract005",
-                    body="§B{unused:i32} (/ (* n (+ n 1)) 2)\n" + loop),
+                    body="§B{unused:i32} (cast i32 (/ (* (cast i64 n) (+ n 1)) 2))\n"
+                         "§R §C{Compute} §A n §/C")
+                    + "  §F{Compute:priv} (i32:n) -> i32\n    " + TASKS["contract005"][4] + "\n",
                     False, detail="Gauss coupling failed")
+
+    def test_all_representable_sums_widening_factoring_and_overflow_rejection(self):
+        for body in (TASKS["contract005"][4], ALTERNATIVES["contract005"], FACTORED_SUM,
+                     "§R (cast i32 (/ (* n (+ (cast i64 n) 1)) LONG:2))",
+                     "§R (cast i32 (/ (+ (* (cast i64 n) n) n) 2))"):
+            for overflow in ("checked", "unchecked"):
+                self.verify("contract005", source("contract005", body=body, overflow=overflow))
+        for overflow in ("checked", "unchecked"):
+            self.verify("contract005", source("contract005", body=NAIVE_SUM, overflow=overflow), False)
+        # Corrupt only the formerly omitted interval: all lower inputs stay correct.
+        for boundary, expected in ((46341, 1073767311), (50000, 1250025000), (65535, 2147450880)):
+            self.assertEqual(sum(range(boundary + 1)), expected)
+            self.verify("contract005", source("contract005",
+                        body=f"§IF (== n {boundary})\n  §R 1\n" + TASKS["contract005"][4]),
+                        False, detail=f"SumToN({boundary}) returned 1; expected {expected}")
+
+    def test_gauss_output_coupling_preserves_strong_contracts_and_rejects_errors(self):
+        for post in (STRONG_SUM_POST,
+                     TASKS["contract005"][3] + "\n§S (|| (== n 0) (> result 0))",
+                     TASKS["contract005"][3] + "\n§S (<= result INT:2147450880)"):
+            self.verify("contract005", source("contract005", contracts=post))
+        self.verify("contract005", sum_decoy(), False, detail="Gauss coupling failed")
+        self.verify("contract005", sum_decoy(runtime_failure=True), False, detail="Gauss counterfactual runtime failed")
+        self.verify("contract005", sum_loop_decoy(), False, detail="Gauss coupling failed")
+        self.verify("contract005", sum_loop_decoy(widened=False), False)
+        self.verify("contract005", source("contract005", body="§IF (== n 46341)\n  §R 0\n" + NAIVE_SUM),
+                    False, detail="SumToN(46341) returned 0; expected 1073767311")
 
     def test_failure_deadline_selection_and_original_profiles(self):
         self.verify("contract001", "invalid source", False, detail="Calor compilation failed")
@@ -266,6 +318,16 @@ def run_compatibility(old, current, deadline):
                 (source(profile, contracts=TASKS[profile][3] + "\n§S (> result 0)"),
                  False, "Writing postconditions exclude a required output"),
             ]
+            if profile == "contract005":
+                cases += [(source(profile, body=FACTORED_SUM), True, None),
+                          (source(profile, contracts=STRONG_SUM_POST), True, None),
+                          (source(profile, body=NAIVE_SUM, overflow="checked"), False, None),
+                          (source(profile, body=NAIVE_SUM, overflow="unchecked"), False, None),
+                          (sum_decoy(), False, "Gauss coupling failed"),
+                          (sum_decoy(runtime_failure=True), False, "Gauss counterfactual runtime failed"),
+                          (sum_loop_decoy(), False, "Gauss coupling failed"),
+                          (source(profile, body="§IF (== n 46341)\n  §R 0\n" + NAIVE_SUM),
+                           False, "SumToN(46341) returned 0; expected 1073767311")]
             for text, expected, detail in cases:
                 remaining = min(120, deadline - time.monotonic())
                 if remaining <= 0:
@@ -278,9 +340,9 @@ def run_compatibility(old, current, deadline):
                     raise RuntimeError("Contract compatibility did not report its selected compiler arm.")
     test.verify("contract001", historical_syntax(source("contract001")), False,
                 env={"CALOR_COMPILER_ROOT": str(current)}, detail="Calor compilation failed")
-    if ContractWritingVerifierTests.entry_points_executed != 81:
-        raise RuntimeError("Expected exactly 81 actual old/current contract-writing controls.")
-    print("Compatibility passed: 81 actual old/current contract-writing entry-point controls.")
+    if ContractWritingVerifierTests.entry_points_executed != 97:
+        raise RuntimeError("Expected exactly 97 actual old/current contract-writing controls.")
+    print("Compatibility passed: 97 actual old/current contract-writing entry-point controls.")
 
 
 if __name__ == "__main__":

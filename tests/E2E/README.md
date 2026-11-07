@@ -564,18 +564,38 @@ throws before the inline guard on zero. Controls reject this ordering and
 accept a short-circuiting explicit predicate with the same inline refinement.
 
 `SumToN(n)` requires the Gauss formula, `n * (n + 1) / 2`, **not a loop or loop
-invariant**. 107 independent widened-arithmetic runtime cases cover `0..100`
-and larger boundaries through 46340; three negative inputs must fail a contract.
-Native return/binding formulas support commuted factors and multiplication/
-division rearrangements that retain the correct sampled results. Each formula
-maps to exactly one emitted statement; replacing its result with zero must
-change a sampled outcome or violate a contract. A loop-only implementation or
-an unused formula cannot provide that algorithm evidence. Unmapped witnesses,
-counterfactual compilation failures, or unexpected runtime failures reject
-explicitly. This is finite dependency evidence, not universal body correctness.
+invariant**. All 65,536 inputs `0..65535` execute against an independent cumulative
+sum oracle, including `SumToN(46341) = 1073767311` and
+`SumToN(65535) = 2147450880`; three negative inputs must fail a contract.
+Gauss witness recognition normalizes native integer arithmetic algebraically,
+including signed Int32/Int64 casts, widened immutable bindings, expanded
+polynomials, commuted factors, and equivalent parity-based factoring.
+This recognition does not model cast truncation or division rounding as real
+arithmetic correctness: the actual selected-emitter body must separately
+produce the exact integer result for every representable input.
+
+The debug mapped emission must match the original compiled code. A separate
+contract-disabled selected-emitter probe must first produce the same correct
+outputs for all 65,536 inputs. Each recognized native return/binding witness
+maps to exactly one probe statement; its zero counterfactual must execute
+successfully on the entire domain. At least one successfully observed returned
+value must change. A contract violation, other runtime error, or compilation
+failure never supplies output-dependence evidence. Original Debug compilation,
+predicate proofs and runtime/domain contracts remain mandatory. This preserves
+correct strong postconditions such as `result >= n`: invalidating those guards
+in a mutant is neither success evidence nor a reason to reject the correct
+original body. A loop-only implementation, an unused formula, or a formula
+feeding only a helper precondition cannot provide output-dependence evidence.
+Unmapped/ambiguous witnesses and unsuccessful probes reject explicitly.
+This is finite dependency evidence, not a universal proof of arbitrary bodies.
 
 Z3 checks entry-domain equivalence, required postcondition implication, and
 optional-contract admissibility for independently computed correct outputs.
+Sum's admissibility and arithmetic-safety checks exhaust all 65,536 correct
+input/output pairs by substituting concrete bit vectors into the selected
+translator's original expressions and requiring each native Z3 simplification
+to be true. No textual predicate replacement, candidate-body output, skipped
+input, nonlinear approximation or solver-unknown fallback supplies that evidence.
 Supported contract expressions are signed Int32 literals/references, native
 scoped `#`, comparisons, boolean/conditional/implication expressions, and
 addition/subtraction/multiplication/division/remainder with explicit
@@ -588,12 +608,14 @@ The prompts do not specify an overflow policy. Abs(Int32.MinValue) has no Int32
 absolute value, and Int32.MinValue / -1 has no Int32 quotient; those ambiguous
 cases are outside output/runtime proofs. Hypothetical overflowing products in
 the division postcondition are also outside its implication scope. Sum output
-proofs and runtime cases use `0..46340`, where the original Int32 Gauss
-intermediates fit. `46341..65535` have representable mathematical sums but
-overflow the original Int32 product; above 65535, the sum itself cannot fit.
-No behavior there is claimed and no checked/wrapping/widening policy is chosen.
+checks cover **all** `0..65535` representable mathematical sums. The naive
+Int32 product/division body is rejected in both checked and unchecked modes:
+throwing or returning a wrapped, incorrect result for a representable sum is
+not an overflow-policy ambiguity. Legitimate widened intermediates and native
+factoring are positive controls on both compiler arms. Above 65535, the sum
+itself cannot fit, so no behavior is claimed and no overflow policy is chosen.
 Sum's explicit precondition still must describe **all** `n >= 0`; adding a
-46340 cap is rejected, not silently accepted as the task's contract.
+46340 or 65535 cap is rejected, not silently accepted as the task's contract.
 Successful entries print these limits. Predicate proofs and finite executable
 oracles do not establish agent nonregression.
 
@@ -604,7 +626,7 @@ python3 tests/E2E/agent-tasks/test-logic-old-release.py --contract-writing
 
 The strict compatibility mode archives unchanged released v0.29.0 commit
 `d82f3ae95175ecd09581c6922701706be72b0ca9`, verifies its own native size/hash
-pins, locked-restores and builds its source, then runs 81 actual old/current
+pins, locked-restores and builds its source, then runs 97 actual old/current
 entry-point controls. Only disposable old-parser strings receive historical IDs
 and native `§I{i32:x} | (predicate)` / `§O{i32}` parameter spellings; predicates
 and current inputs are unchanged. Missing history, prerequisites, APIs, builds,
@@ -615,9 +637,12 @@ All task definitions, original fixtures, TestData, active corpus and historical
 inputs remain byte-unchanged. No provider/model/count API, paid run, push,
 publication, version, ledger, floor, or release/workflow change is involved.
 
-The current suite executes 146 real contract entry points plus eight preserved
+The current suite executes 170 real contract entry points plus eight preserved
 mandatory logic entry points. It includes native alternatives, aliases,
 equivalent/inline predicates, optional-contract restrictions, foreign/lexical
 decoys, missing/private/wrong-signature/stub targets, signed/zero/boundary
 results, checked and unchecked representable arithmetic, missing selected
-dependencies, compilation/runtime failures, and bounded nontermination.
+dependencies, compilation/runtime failures, and bounded nontermination. Both
+arms include the formerly accepted `n == 46341` return-zero decoy and the native
+unused-formula/helper-precondition/ordinary-loop decoy. A separate mutant-only
+division-by-zero decoy also rejects; failed execution is never coupling success.
