@@ -24,8 +24,8 @@ def load(name, path):
 
 
 def main():
-    if sys.argv[1:] not in ([], ["--control-flow"]):
-        raise RuntimeError("Usage: test-logic-old-release.py [--control-flow]")
+    if sys.argv[1:] not in ([], ["--control-flow"], ["--remaining-control-flow"]):
+        raise RuntimeError("Usage: test-logic-old-release.py [--control-flow|--remaining-control-flow]")
     verifier = load("verify_logic", HERE / "lib/verify-logic.py")
     controls = load("logic_controls", HERE / "test-logic-verifiers.py")
     current = controls.COMPILER_ROOT
@@ -63,6 +63,10 @@ def main():
         if sys.argv[1:] == ["--control-flow"]:
             control_flow = load("control_flow_controls", HERE / "test-control-flow-verifiers.py")
             control_flow.run_compatibility(old, current, deadline)
+            return
+        if sys.argv[1:] == ["--remaining-control-flow"]:
+            remaining = load("remaining_cf_controls", HERE / "test-remaining-control-flow-verifiers.py")
+            remaining.run_compatibility(old, current, deadline)
             return
         test = controls.LogicVerifierTests()
 

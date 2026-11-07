@@ -62,12 +62,22 @@ def main():
     if len(sys.argv) != 3:
         raise RuntimeError("Usage: verify-logic.py FUNCTION WORKSPACE")
     helper = Path(__file__).resolve().parent
-    root = Path(os.environ.get("CALOR_COMPILER_ROOT", str(helper.parents[3]))).resolve()
-    compiler = root / "src/Calor.Compiler/bin" / os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug") / "net10.0"
-    for dependency in ("calor.dll", "Calor.Runtime.dll", "Microsoft.Z3.dll"):
+    selected_root = os.environ.get("CALOR_COMPILER_ROOT", str(helper.parents[3]))
+    if not selected_root.strip():
+        raise RuntimeError("CALOR_COMPILER_ROOT must name a compiler checkout, not an empty path.")
+    root = Path(selected_root).resolve()
+    configuration = os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug")
+    if not configuration.strip() or configuration in (".", "..") or "/" in configuration or "\\" in configuration:
+        raise RuntimeError("CALOR_COMPILER_CONFIGURATION must be a nonempty directory name within the selected compiler root.")
+    compiler = root / "src/Calor.Compiler/bin" / configuration / "net10.0"
+    native = {"darwin": "libz3.dylib", "linux": "libz3.so", "win32": "libz3.dll"}.get(sys.platform)
+    if native is None:
+        raise RuntimeError(f"Unsupported verifier native platform: {sys.platform}")
+    for dependency in ("calor.dll", "Calor.Runtime.dll", "Microsoft.Z3.dll", native):
         if not (compiler / dependency).is_file():
             raise RuntimeError(f"Selected compiler dependency missing: {compiler / dependency}; build the selected root first.")
-    filename = "Effects.calr" if sys.argv[1] in ("PrintNumbers", "Countdown", "DoWhileDemo") else "Calculator.calr"
+    filename = ("Collections.calr" if sys.argv[1] == "PrintDictionary" else "Effects.calr"
+                if sys.argv[1] in ("PrintNumbers", "Countdown", "DoWhileDemo", "PrintEvenNumbers") else "Calculator.calr")
     source = Path(sys.argv[2]).resolve() / filename
     if not source.is_file():
         raise RuntimeError(f"Input missing: {source}")
@@ -77,7 +87,8 @@ def main():
     deadline = time.monotonic() + timeout
     with tempfile.TemporaryDirectory(prefix="calor-logic-verifier-") as temporary:
         project = Path(temporary)
-        shutil.copytree(helper / "logic-verifier", project, dirs_exist_ok=True)
+        shutil.copytree(helper / "logic-verifier", project, dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns("bin", "obj"))
         run([
             "dotnet", "build", "LogicVerifier.csproj", "--nologo", "-v", "quiet",
             f"-p:CompilerDirectory={compiler}", "-p:UseSharedCompilation=false",

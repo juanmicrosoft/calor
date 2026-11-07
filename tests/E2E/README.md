@@ -233,3 +233,71 @@ arbitrary control-flow bodies or evidence of agent nonregression. No additional
 active `.calr` corpus inputs are enrolled: test snippets live in strings and
 disposable workspaces. Completing these four verifiers does not complete the
 release or authorize an experiment baseline, paid evaluation, or publication.
+
+### Remaining control-flow prompts (`cf-005` through `cf-008`)
+
+These four entries use the same helper, selected assemblies, debug-contract
+runtime, and bounded process cleanup. Empty root/configuration selections and
+configuration path traversal reject explicitly; every profile checks the
+selected native Z3 asset and loads it, including profiles needing no Z3 proof.
+`cf-005` checks `Max(a,b)` on 121 signed
+integer pairs. Unlike the separate logic `Max` task, its prompt requires no
+postconditions or particular arrow spelling. Optional contracts cannot restrict
+the required entry domain or exclude correct outputs; the logic task retains
+its mandatory postcondition proofs.
+
+`GradeToLetter(grade)` runs all 101 valid grades and four out-of-domain contract
+failures. Z3 proves that the declared preconditions describe exactly `0..100`
+over signed 32-bit inputs. Native nested conditionals must execute on valid
+inputs, and removing the mapped nested conditionals must change a result.
+Native nested ternaries returned directly or stored in a binding also qualify:
+their owning statement and exact nested-expression count are mapped, and only
+the nested expressions are observed and neutralized. Dormant expression arms
+and computed-but-unused nested expressions are not behavior evidence.
+This is complete behavior coverage of the finite valid grade domain, not a
+proof of arbitrary bodies outside it.
+
+`PrintEvenNumbers()` must declare console-write effects, produce exactly
+`2,4,6,8,10` on separate lines, and produce that output inside native `for`
+iterations. At least one AST-mapped inner conditional must take both decisions
+and affect the output under both constant-decision counterfactuals. Inverted
+tests and `continue` guards are supported; dormant or executed unused tests
+plus independent correct printing are rejected. Every expected printed value
+must disappear under at least one such decision counterfactual; gating just
+one value while independently printing the others is insufficient.
+
+`PrintDictionary(Dictionary<string,int>)` permits any parameter name, normalized
+string/integer aliases, native ordinary or deconstructing foreach, and any pair
+order. Five independent inputs cover empty/singleton/multiple dictionaries,
+changed key/value associations, zero, negatives, and both signed integer limits.
+The oracle retains independent input copies even if the function mutates its
+argument. Instrumented native iterations must visit each actual input pair once
+and print that pair during its own iteration. An unrelated/dormant foreach or
+one iteration printing the entire dictionary is insufficient.
+
+Dictionary formatting has a deliberately bounded interpretation: each pair is
+two adjacent key/integer tokens, in either orientation, separated by whitespace
+or punctuation (also `=`). Separate lines, colon/comma separators, tuple-like
+and JSON-like records, and optional `Key`/`Value` labels are accepted without
+selecting a parameter name, ordering, or separator style.
+Extra/missing/duplicated/mispaired tokens are errors. The
+samples use distinct nonnumeric keys: the prompt supplies no escaping or record
+grammar with which to resolve arbitrary numeric keys, embedded record text, or
+arbitrary prose labels unambiguously. Those formats and arbitrary dictionaries are not
+claimed as universally verified. Ambiguous native binding/mapping, nested
+instrumented foreach scopes, or failed counterfactual compilation/runtime
+reject explicitly rather than becoming evidence.
+Compilation remains mandatory: the current selected compiler rejects
+`§EACHKV` over a fully-qualified `System.Collections.Generic.Dictionary` type
+with `Calor0202`; the verifier does not bypass that product limitation.
+
+```bash
+python3 tests/E2E/agent-tasks/test-remaining-control-flow-verifiers.py
+python3 tests/E2E/agent-tasks/test-logic-old-release.py --remaining-control-flow
+```
+
+The second command builds actual released v0.29.0 using the same unchanged
+archive/manifest/locked-restore procedure and runs 111 real old/current entries.
+The original 49 logic and 67 `cf-001..004` compatibility controls remain separate
+and unchanged. No task definitions, original fixtures, active corpus subjects,
+compiler product code, or release state are changed.

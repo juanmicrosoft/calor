@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using Calor.Compiler;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
@@ -25,8 +26,12 @@ catch (Exception error)
     return 1;
 }
 
-static void Verify(string name, string path)
+static void Verify(string profile, string path)
 {
+    // Every profile validates the selected native prerequisite, even when it
+    // needs no contract proof. A corrupt/mismatched asset must not go unused.
+    using var nativePrerequisite = new Context();
+    var name = profile == "ControlMax" ? "Max" : profile;
     var names = name switch
     {
         "Factorial" => new[] { "n" },
@@ -34,11 +39,15 @@ static void Verify(string name, string path)
         "IsPositive" => new[] { "x" },
         "Max" => new[] { "a", "b" },
         "Classify" => new[] { "x" },
-        "PrintNumbers" or "Countdown" or "DoWhileDemo" => Array.Empty<string>(),
+        "GradeToLetter" => new[] { "grade" },
+        "PrintDictionary" => new[] { "dictionary" },
+        "PrintNumbers" or "Countdown" or "DoWhileDemo" or "PrintEvenNumbers" => Array.Empty<string>(),
         _ => throw new InvalidOperationException($"Unknown task: {name}")
     };
-    var controlFlow = name is "PrintNumbers" or "Countdown" or "DoWhileDemo" or "Classify";
-    var outputType = names.Length == 0 ? "void" : name == "IsPositive" ? "bool" : "i32";
+    var controlFlow = name is "PrintNumbers" or "Countdown" or "DoWhileDemo" or "Classify"
+        or "GradeToLetter" or "PrintEvenNumbers" or "PrintDictionary";
+    var dictionary = name == "PrintDictionary";
+    var outputType = names.Length == 0 || dictionary ? "void" : name == "IsPositive" ? "bool" : "i32";
     var source = File.ReadAllText(path);
     var compilation = Calor.Compiler.Program.Compile(
         source, path, new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
@@ -51,8 +60,10 @@ static void Verify(string name, string path)
     if (function.Visibility != Visibility.Public || function.IsAsync || function.TypeParameters.Count != 0
         || function.Output == null
         || AttributeHelper.ExpandType(function.Output.TypeName) != AttributeHelper.ExpandType(outputType)
-        || !function.Parameters.Select(parameter => parameter.Name).SequenceEqual(names)
-        || function.Parameters.Any(parameter => AttributeHelper.ExpandType(parameter.TypeName) != "INT"
+        || (!dictionary && !function.Parameters.Select(parameter => parameter.Name).SequenceEqual(names))
+        || function.Parameters.Count != names.Length
+        || function.Parameters.Any(parameter => (dictionary
+                ? !IsDictionaryType(parameter.TypeName) : AttributeHelper.ExpandType(parameter.TypeName) != "INT")
             || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None || parameter.InlineRefinement != null))
         throw new InvalidOperationException($"Wrong public signature for {name}.");
 
@@ -66,9 +77,11 @@ static void Verify(string name, string path)
         if (diagnostics.HasErrors)
             throw new InvalidOperationException($"Calor parsing failed:\n{string.Join("\n", diagnostics)}");
         witnesses = CheckControlFlow(parsed.Functions.Single(candidate => candidate.Name == name));
+        if (name == "GradeToLetter")
+            CheckContracts(function, names, outputType);
     }
     else
-        CheckContracts(function, names, outputType);
+        CheckContracts(function, names, outputType, profile == "ControlMax");
 
     var parseOptions = new CSharpParseOptions(LanguageVersion.Preview);
     var trees = new[]
@@ -87,16 +100,25 @@ static void Verify(string name, string path)
     var moduleName = compilation.Ast.Name;
     var type = assembly.GetType($"{moduleName}.{moduleName}Module")
         ?? throw new InvalidOperationException("Generated module type not found.");
-    var method = type.GetMethod(name, BindingFlags.Public | BindingFlags.Static, names.Select(_ => typeof(int)).ToArray())
+    var parameterTypes = names.Select(_ => dictionary ? typeof(Dictionary<string, int>) : typeof(int)).ToArray();
+    var method = type.GetMethod(name, BindingFlags.Public | BindingFlags.Static, parameterTypes)
         ?? throw new InvalidOperationException("Generated public signature not found.");
     var returnType = outputType == "void" ? typeof(void) : outputType == "bool" ? typeof(bool) : typeof(int);
     if (!type.IsPublic || !method.IsPublic || !method.IsStatic || method.IsGenericMethod
         || method.ReturnType != returnType
         || !method.GetParameters().Select(parameter => parameter.ParameterType)
-            .SequenceEqual(names.Select(_ => typeof(int))))
+            .SequenceEqual(parameterTypes))
         throw new InvalidOperationException("Wrong generated public/static scalar signature.");
     if (outputType == "void")
     {
+        if (dictionary)
+        {
+            foreach (var input in Dictionaries())
+                CheckDictionaryOutput(input, Capture(method, [new Dictionary<string, int>(input)]));
+            CheckControlFlowCoupling(compilation.Ast, trees[1], function, witnesses, path, null);
+            Console.WriteLine($"Verification passed: {name}; native control flow and 5 dictionary cases.");
+            return;
+        }
         var previous = Console.Out;
         using var output = new BoundedOutput();
         try
@@ -113,6 +135,7 @@ static void Verify(string name, string path)
             "PrintNumbers" => "1\n2\n3\n4\n5\n",
             "Countdown" => "5\n4\n3\n2\n1\n",
             "DoWhileDemo" => "0\n1\n2\n",
+            "PrintEvenNumbers" => "2\n4\n6\n8\n10\n",
             _ => throw new InvalidOperationException("Unknown stdout oracle.")
         };
         var actual = output.ToString().Replace("\r\n", "\n", StringComparison.Ordinal);
@@ -135,6 +158,18 @@ static void Verify(string name, string path)
         throw new InvalidOperationException("No runtime cases executed.");
     if (controlFlow)
         CheckControlFlowCoupling(compilation.Ast, trees[1], function, witnesses, path, null);
+    if (name == "GradeToLetter")
+        foreach (var invalid in new[] { int.MinValue, -1, 101, int.MaxValue })
+        {
+            try
+            {
+                method.Invoke(null, [invalid]);
+                throw new InvalidOperationException($"GradeToLetter({invalid}) did not fail its domain contract.");
+            }
+            catch (TargetInvocationException error) when (error.InnerException?.GetType().Name == "ContractViolationException")
+            {
+            }
+        }
     Console.WriteLine($"Verification passed: {name}; {(controlFlow ? "native control flow" : "semantic contracts")} and {count} runtime cases.");
 }
 
@@ -148,11 +183,21 @@ static StatementNode[] CheckControlFlow(FunctionNode function)
         "DoWhileDemo" => statement is DoWhileStatementNode,
         "Classify" => statement is IfStatementNode conditional
             && conditional.ElseIfClauses.Count > 0 && conditional.ElseBody != null,
+        "GradeToLetter" => GradeExpression(statement) is { } expression && ConditionalCount(expression) > 1
+            || statement is IfStatementNode inner && statements.OfType<IfStatementNode>()
+            .Any(outer => !ReferenceEquals(inner, outer)
+                && RecursiveAstWalker.EnumerateStatements(outer.ThenBody)
+                    .Concat(outer.ElseBody == null ? [] : RecursiveAstWalker.EnumerateStatements(outer.ElseBody))
+                    .Concat(outer.ElseIfClauses.SelectMany(clause => RecursiveAstWalker.EnumerateStatements(clause.Body)))
+                    .Any(candidate => ReferenceEquals(candidate, inner))),
+        "PrintEvenNumbers" => statement is ForStatementNode loop
+            && RecursiveAstWalker.EnumerateStatements(loop.Body).OfType<IfStatementNode>().Any(),
+        "PrintDictionary" => statement is ForeachStatementNode or DictionaryForeachNode,
         _ => false
     }).ToArray();
     if (witnesses.Length == 0)
         throw new InvalidOperationException($"Required native control flow missing from {function.Name}.");
-    if (function.Name != "Classify"
+    if (function.Name is not ("Classify" or "GradeToLetter")
         && !(function.Effects?.Effects.TryGetValue("io", out var effects) == true
             && effects.Split(',').Contains("console_write", StringComparer.Ordinal)))
         throw new InvalidOperationException($"Declared console-write effect missing from {function.Name}.");
@@ -164,7 +209,7 @@ static void CheckControlFlowCoupling(
 {
     var options = new CSharpParseOptions(LanguageVersion.Preview);
     var mapped = CSharpSyntaxTree.ParseText(
-        new CSharpEmitter(ContractMode.Debug) { LineDirectiveFilePath = path }.Emit(module, path), options);
+        new CSharpEmitter(ContractMode.Debug) { LineDirectiveFilePath = path }.Emit(module), options);
     if (!SyntaxFactory.AreEquivalent(original.GetRoot(), mapped.GetRoot()))
         throw new InvalidOperationException("Cannot establish control-flow coupling: source-mapped emission differs from compiled C#.");
     var root = mapped.GetCompilationUnitRoot();
@@ -172,13 +217,16 @@ static void CheckControlFlowCoupling(
         .Single(type => type.Identifier.ValueText == module.Name + "Module")
         .Members.OfType<MethodDeclarationSyntax>().Single(candidate => candidate.Identifier.ValueText == function.Name);
     var marker = new SyntaxAnnotation("control-flow-witness");
-    var matched = witnesses.Select(witness =>
+    StatementSyntax Match(StatementNode witness)
     {
         var candidates = method.DescendantNodes().OfType<StatementSyntax>().Where(statement =>
             (witness is ForStatementNode && statement is BlockSyntax or ForStatementSyntax
                 || witness is WhileStatementNode && statement is WhileStatementSyntax
                 || witness is DoWhileStatementNode && statement is DoStatementSyntax
-                || witness is IfStatementNode && statement is IfStatementSyntax)
+                || witness is IfStatementNode && statement is IfStatementSyntax
+                || function.Name == "GradeToLetter" && witness is ReturnStatementNode && statement is ReturnStatementSyntax
+                || function.Name == "GradeToLetter" && witness is BindStatementNode && statement is LocalDeclarationStatementSyntax
+                || witness is ForeachStatementNode or DictionaryForeachNode && statement is CommonForEachStatementSyntax)
             && statement.GetFirstToken().LeadingTrivia.Any(trivia =>
                 trivia.GetStructure() is LineDirectiveTriviaSyntax directive && directive.IsActive
                 && directive.File.ValueText == path
@@ -187,29 +235,60 @@ static void CheckControlFlowCoupling(
         if (candidates.Length != 1)
             throw new InvalidOperationException($"Cannot establish control-flow coupling: expected one emitted witness at line {witness.Span.Line}, found {candidates.Length}.");
         return candidates[0];
-    }).ToArray();
+    }
+    var matched = witnesses.Select(Match).ToArray();
     if (matched.Distinct().Count() != witnesses.Length)
         throw new InvalidOperationException("Cannot establish control-flow coupling: ambiguous emitted witnesses.");
     // Trace loop bodies, not headers: printing while evaluating a bound is not
     // output produced by an iteration. Both selected emitters lower native for
     // into a mapped block with one direct while; no generated names are matched.
-    var scopes = matched.Select(statement => statement switch
+    var scopes = matched.SelectMany((statement, index) => statement switch
     {
-        ForStatementSyntax loop => loop.Statement,
-        BlockSyntax block when function.Name == "PrintNumbers" =>
-            block.Statements.OfType<WhileStatementSyntax>().Single().Statement,
-        WhileStatementSyntax loop => loop.Statement,
-        DoStatementSyntax loop => loop.Statement,
-        IfStatementSyntax conditional => (StatementSyntax)conditional,
+        ReturnStatementSyntax or LocalDeclarationStatementSyntax when function.Name == "GradeToLetter" =>
+            NestedExpressions(statement, witnesses[index]).Cast<SyntaxNode>(),
+        ForStatementSyntax loop => [loop.Statement],
+        BlockSyntax block when function.Name is "PrintNumbers" or "PrintEvenNumbers" =>
+            [block.Statements.OfType<WhileStatementSyntax>().Single().Statement],
+        WhileStatementSyntax loop => [loop.Statement],
+        DoStatementSyntax loop => [loop.Statement],
+        IfStatementSyntax conditional => [(SyntaxNode)conditional],
+        CommonForEachStatementSyntax loop => [loop.Statement],
         _ => throw new InvalidOperationException("Cannot establish control-flow coupling: unsupported emitted witness shape.")
     }).ToArray();
-    var tracedRoot = root.ReplaceNodes(scopes, (_, rewritten) => rewritten.WithAdditionalAnnotations(marker));
+    var tracedRoot = root.ReplaceNodes(scopes, (originalScope, rewritten) =>
+    {
+        rewritten = rewritten.WithAdditionalAnnotations(marker);
+        if (function.Name != "PrintDictionary")
+            return rewritten;
+        var loop = originalScope.Parent as CommonForEachStatementSyntax
+            ?? throw new InvalidOperationException("Dictionary iteration scope missing.");
+        var binding = loop switch
+        {
+            ForEachStatementSyntax pair => $"{pair.Identifier.Text}.Key, {pair.Identifier.Text}.Value",
+            ForEachVariableStatementSyntax tuple when tuple.Variable is DeclarationExpressionSyntax
+            { Designation: ParenthesizedVariableDesignationSyntax { Variables.Count: 2 } designation }
+                && designation.Variables.All(variable => variable is SingleVariableDesignationSyntax)
+                => string.Join(", ", designation.Variables.Cast<SingleVariableDesignationSyntax>()
+                    .Select(variable => variable.Identifier.Text)),
+            _ => throw new InvalidOperationException("Cannot establish dictionary pair binding.")
+        };
+        return rewritten.WithAdditionalAnnotations(new SyntaxAnnotation("dictionary-binding", binding));
+    });
     var probe = "__CalorWitness_" + Guid.NewGuid().ToString("N");
     var traced = new WitnessRewriter(marker, probe, neutralize: false).Visit(tracedRoot) as CompilationUnitSyntax
         ?? throw new InvalidOperationException("Cannot instrument control-flow witnesses.");
-    traced = traced.AddMembers(SyntaxFactory.ParseMemberDeclaration(
-        $"internal static class {probe} {{ public static int Depth; public static int Visits; "
-        + "public static void Enter() { Depth++; Visits++; } public static void Exit() { Depth--; } }")
+    var probeDeclaration = function.Name == "PrintDictionary"
+        ? $"internal static class {probe} {{ public static int Depth; public static int Visits; "
+            + "public static readonly System.Collections.Generic.List<(string Key, int Value, string Output)> Records = new(); "
+            + "private static string Key = \"\"; private static int Value; private static System.Text.StringBuilder Output = new(); "
+            + "public static void Enter(string key, int value) { if (Depth != 0) throw new System.InvalidOperationException(\"Ambiguous nested dictionary iteration\"); "
+            + "Depth++; Visits++; Key = key; Value = value; Output.Clear(); } "
+            + "public static void Record(char value) { if (Depth > 0) Output.Append(value); } "
+            + "public static void Exit() { Records.Add((Key, Value, Output.ToString())); Depth--; } }"
+        : $"internal static class {probe} {{ public static int Depth; public static int Visits; "
+            + "public static void Enter() { Depth++; Visits++; } public static void Exit() { Depth--; } "
+            + "public static int Observe(int value) { Visits++; return value; } }";
+    traced = traced.AddMembers(SyntaxFactory.ParseMemberDeclaration(probeDeclaration)
         ?? throw new InvalidOperationException("Cannot declare witness instrumentation."));
 
     Assembly Build(CompilationUnitSyntax unit)
@@ -234,6 +313,30 @@ static void CheckControlFlowCoupling(
     var probeType = tracedAssembly.GetType(probe) ?? throw new InvalidOperationException("Witness probe missing.");
     var depth = probeType.GetField("Depth") ?? throw new InvalidOperationException("Witness depth missing.");
     var visits = probeType.GetField("Visits") ?? throw new InvalidOperationException("Witness visits missing.");
+    if (function.Name == "PrintDictionary")
+    {
+        foreach (var input in Dictionaries())
+        {
+            var record = probeType.GetMethod("Record") ?? throw new InvalidOperationException("Dictionary output probe missing.");
+            var records = probeType.GetField("Records")?.GetValue(null) as List<(string Key, int Value, string Output)>
+                ?? throw new InvalidOperationException("Dictionary iteration records missing.");
+            records.Clear();
+            using var output = new BoundedOutput(() => depth.GetValue(null) is int value && value > 0,
+                character => record.Invoke(null, [character]));
+            var actual = Capture(target, [new Dictionary<string, int>(input)], output);
+            CheckDictionaryOutput(input, actual);
+            if (output.WitnessCharacters != actual.Length || records.Count != input.Count)
+                throw new InvalidOperationException("Control-flow coupling failed: dictionary output must be produced within native foreach iterations.");
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var iteration in records)
+            {
+                if (!input.TryGetValue(iteration.Key, out var value) || value != iteration.Value || !seen.Add(iteration.Key))
+                    throw new InvalidOperationException("Control-flow coupling failed: foreach must iterate each actual input pair exactly once.");
+                CheckDictionaryOutput(new() { [iteration.Key] = iteration.Value }, iteration.Output);
+            }
+        }
+        return;
+    }
     if (expectedOutput != null)
     {
         var previous = Console.Out;
@@ -251,19 +354,75 @@ static void CheckControlFlowCoupling(
         if (actual.Replace("\r\n", "\n", StringComparison.Ordinal) != expectedOutput
             || output.WitnessCharacters != actual.Length || actual.Length == 0)
             throw new InvalidOperationException($"Control-flow coupling failed: {function.Name} stdout must be produced within a required native loop.");
+        if (function.Name == "PrintEvenNumbers")
+        {
+            // A native inner decision must take both outcomes and control stdout.
+            // Counterfactual decisions also support inverted tests/continue guards;
+            // merely executing a nonproducing conditional is not enough.
+            var conditionals = witnesses.OfType<ForStatementNode>()
+                .SelectMany(loop => RecursiveAstWalker.EnumerateStatements(loop.Body).OfType<IfStatementNode>())
+                .Distinct().Select(conditional => Match(conditional) as IfStatementSyntax
+                    ?? throw new InvalidOperationException("Cannot map native inner conditional.")).ToArray();
+            if (conditionals.Length == 0)
+                throw new InvalidOperationException("Control-flow coupling failed: missing emitted inner conditional.");
+            var useful = false;
+            var expectedLines = expectedOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            var gatedLines = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var conditional in conditionals)
+            {
+                var conditionalTrace = root.ReplaceNode(conditional, conditional.WithCondition(
+                    SyntaxFactory.ParseExpression($"global::{probe}.Decide({conditional.Condition})")));
+                conditionalTrace = conditionalTrace.AddMembers(SyntaxFactory.ParseMemberDeclaration(
+                    $"internal static class {probe} {{ public static int Taken; public static int NotTaken; "
+                    + "public static bool Decide(bool value) { if (value) Taken++; else NotTaken++; return value; } }")
+                    ?? throw new InvalidOperationException("Cannot declare conditional probe."));
+                var conditionalAssembly = Build(conditionalTrace);
+                var conditionalProbe = conditionalAssembly.GetType(probe)
+                    ?? throw new InvalidOperationException("Conditional probe missing.");
+                if (Capture(Target(conditionalAssembly), null).Replace("\r\n", "\n", StringComparison.Ordinal) != expectedOutput)
+                    throw new InvalidOperationException("Control-flow coupling failed: conditional instrumentation changed stdout.");
+                var taken = conditionalProbe.GetField("Taken")?.GetValue(null) is int trueCount && trueCount > 0;
+                var notTaken = conditionalProbe.GetField("NotTaken")?.GetValue(null) is int falseCount && falseCount > 0;
+                if (!taken || !notTaken)
+                    continue;
+                var dependent = true;
+                var disabledLines = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var value in new[] { true, false })
+                {
+                    var changed = root.ReplaceNode(conditional,
+                        conditional.WithCondition(SyntaxFactory.LiteralExpression(
+                            value ? SyntaxKind.TrueLiteralExpression : SyntaxKind.FalseLiteralExpression)));
+                    var changedOutput = Capture(Target(Build(changed)), null).Replace("\r\n", "\n", StringComparison.Ordinal);
+                    dependent &= changedOutput != expectedOutput;
+                    var changedLines = changedOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var line in expectedLines)
+                        if (!changedLines.Contains(line, StringComparer.Ordinal))
+                            disabledLines.Add(line);
+                }
+                useful |= dependent;
+                if (dependent)
+                    gatedLines.UnionWith(disabledLines);
+            }
+            if (!useful || expectedLines.Any(line => !gatedLines.Contains(line)))
+                throw new InvalidOperationException("Control-flow coupling failed: inner conditionals must gate every printed even number.");
+        }
         return;
     }
+    var executed = false;
     foreach (var (inputs, expected) in Cases(function.Name))
     {
         visits.SetValue(null, 0);
         var actual = target.Invoke(null, inputs.Select(value => (object)value).ToArray());
-        if (!Equals(actual, expected) || Equals(visits.GetValue(null), 0))
+        executed |= !Equals(visits.GetValue(null), 0);
+        if (!Equals(actual, expected) || (function.Name != "GradeToLetter" && Equals(visits.GetValue(null), 0)))
             throw new InvalidOperationException($"Control-flow coupling failed: {function.Name} must execute a required conditional for input {inputs[0]}.");
     }
+    if (!executed)
+        throw new InvalidOperationException("Control-flow coupling failed: nested conditionals are dormant.");
     // A counterfactual removes only AST-mapped required conditionals. A sentinel
     // return keeps direct-return implementations compilable without treating
     // arbitrary compiler failures as evidence that the construct was necessary.
-    var neutralizedRoot = root.ReplaceNodes(matched, (_, rewritten) => rewritten.WithAdditionalAnnotations(marker));
+    var neutralizedRoot = root.ReplaceNodes(scopes, (_, rewritten) => rewritten.WithAdditionalAnnotations(marker));
     var neutralized = new WitnessRewriter(marker, probe, neutralize: true).Visit(neutralizedRoot) as CompilationUnitSyntax
         ?? throw new InvalidOperationException("Cannot neutralize control-flow witnesses.");
     var neutralizedMethod = neutralized.DescendantNodes().OfType<MethodDeclarationSyntax>()
@@ -278,7 +437,27 @@ static void CheckControlFlowCoupling(
         throw new InvalidOperationException("Control-flow coupling failed: required conditionals do not affect any sampled classification result.");
 }
 
-static void CheckContracts(FunctionNode function, string[] names, string outputType)
+static ExpressionNode? GradeExpression(StatementNode statement) => statement switch
+{
+    ReturnStatementNode returned => returned.Expression is ConditionalExpressionNode ? returned.Expression : null,
+    BindStatementNode binding => binding.Initializer is ConditionalExpressionNode ? binding.Initializer : null,
+    _ => null
+};
+
+static int ConditionalCount(ExpressionNode expression) => expression is ConditionalExpressionNode conditional
+    ? 1 + ConditionalCount(conditional.Condition) + ConditionalCount(conditional.WhenTrue) + ConditionalCount(conditional.WhenFalse)
+    : 0;
+
+static ConditionalExpressionSyntax[] NestedExpressions(StatementSyntax statement, StatementNode witness)
+{
+    var expressions = statement.DescendantNodes().OfType<ConditionalExpressionSyntax>().ToArray();
+    var expression = GradeExpression(witness) ?? throw new InvalidOperationException("Native grade conditional expression missing.");
+    if (expressions.Length != ConditionalCount(expression))
+        throw new InvalidOperationException("Cannot establish control-flow coupling: conditional expression mapping is ambiguous.");
+    return expressions.Where(candidate => candidate.Ancestors().OfType<ConditionalExpressionSyntax>().Any()).ToArray();
+}
+
+static void CheckContracts(FunctionNode function, string[] names, string outputType, bool optionalMaxPost = false)
 {
     using var context = new Context();
     var translator = new ContractTranslator(context);
@@ -334,6 +513,16 @@ static void CheckContracts(FunctionNode function, string[] names, string outputT
             requiredPost = context.MkAnd(context.MkBVSGE(resultValue, a), context.MkBVSGE(resultValue, b),
                 context.MkOr(context.MkEq(resultValue, a), context.MkEq(resultValue, b)));
             expected = context.MkITE(context.MkBVSGE(a, b), a, b);
+            if (optionalMaxPost)
+                requiredPost = context.MkTrue();
+            break;
+        case "GradeToLetter":
+            var grade = Integer("grade");
+            requiredPre = context.MkAnd(context.MkBVSGE(grade, Constant(0)), context.MkBVSLE(grade, Constant(100)));
+            requiredPost = context.MkTrue();
+            expected = Constant(0);
+            for (var category = 1; category <= 4; category++)
+                expected = context.MkITE(context.MkBVSGE(grade, Constant(50 + category * 10)), Constant(category), expected);
             break;
         default:
             throw new InvalidOperationException("Unknown contract oracle.");
@@ -399,6 +588,12 @@ static IEnumerable<(int[] Inputs, object Expected)> Cases(string name)
             yield return ([n], values[n]);
         yield break;
     }
+    if (name == "GradeToLetter")
+    {
+        for (var grade = 0; grade <= 100; grade++)
+            yield return ([grade], grade >= 90 ? 4 : grade >= 80 ? 3 : grade >= 70 ? 2 : grade >= 60 ? 1 : 0);
+        yield break;
+    }
     var valuesToCheck = new[] { int.MinValue, int.MinValue + 1, -100, -2, -1, 0, 1, 2, 100, int.MaxValue - 1, int.MaxValue };
     foreach (var first in valuesToCheck)
     {
@@ -427,7 +622,86 @@ static IEnumerable<(int[] Inputs, object Expected)> Cases(string name)
     }
 }
 
-sealed class BoundedOutput(Func<bool>? isWitnessActive = null) : TextWriter
+static bool IsDictionaryType(string type)
+{
+    var normalized = type.Replace(" ", "", StringComparison.Ordinal);
+    foreach (var prefix in new[] { "Dictionary", "System.Collections.Generic.Dictionary" })
+        if (normalized.StartsWith(prefix + "<", StringComparison.Ordinal) && normalized.EndsWith('>'))
+        {
+            var arguments = normalized[(prefix.Length + 1)..^1].Split(',');
+            return arguments.Length == 2 && AttributeHelper.ExpandType(arguments[0]) == "STRING"
+                && AttributeHelper.ExpandType(arguments[1]) == "INT";
+        }
+    return false;
+}
+
+static string Capture(MethodInfo method, object[]? inputs, BoundedOutput? output = null)
+{
+    var previous = Console.Out;
+    using var owned = output == null ? new BoundedOutput() : null;
+    var writer = output ?? owned ?? throw new InvalidOperationException("Output capture missing.");
+    try
+    {
+        Console.SetOut(writer);
+        method.Invoke(null, inputs);
+        return writer.ToString();
+    }
+    finally
+    {
+        Console.SetOut(previous);
+    }
+}
+
+static IEnumerable<Dictionary<string, int>> Dictionaries()
+{
+    yield return new();
+    yield return new() { ["solo"] = -1 };
+    yield return new() { ["upper"] = int.MaxValue };
+    yield return new() { ["lower"] = int.MinValue, ["zero"] = 0, ["positive"] = 17, ["negative"] = -23 };
+    yield return new() { ["negative"] = int.MaxValue, ["positive"] = int.MinValue, ["zero"] = -97, ["lower"] = 42 };
+}
+
+static void CheckDictionaryOutput(Dictionary<string, int> input, string output)
+{
+    // Bounded formatting interpretation: adjacent key/integer tokens (either
+    // orientation), separated by whitespace/punctuation and optional Key/Value labels.
+    // This accepts separate lines, interpolation, tuple and JSON-like records;
+    // arbitrary prose/ambiguous numeric keys are not guessed into successful pairs.
+    if (input.Count == 0)
+    {
+        if (output.Length != 0)
+            throw new InvalidOperationException("Wrong dictionary output: empty input must produce no pairs/output.");
+        return;
+    }
+    var pattern = string.Join("|", input.Keys.OrderByDescending(key => key.Length).Select(Regex.Escape)) + @"|[+-]?\d+";
+    var matches = Regex.Matches(output, pattern, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+    var remainder = Regex.Replace(output, pattern, "", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+    foreach (var label in new[] { "Key", "Value" })
+    {
+        var labelPattern = $@"\b{label}\b";
+        if (Regex.Matches(remainder, labelPattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+                TimeSpan.FromSeconds(1)).Count > input.Count)
+            throw new InvalidOperationException("Wrong dictionary output: extra pair labels.");
+        remainder = Regex.Replace(remainder, labelPattern, "", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+            TimeSpan.FromSeconds(1));
+    }
+    if (matches.Count != input.Count * 2 || remainder.Any(character => !char.IsWhiteSpace(character) && !char.IsPunctuation(character)
+            && character != '='))
+        throw new InvalidOperationException("Wrong dictionary output: incomplete, extra or ambiguous pair tokens.");
+    var seen = new HashSet<string>(StringComparer.Ordinal);
+    for (var index = 0; index < matches.Count; index += 2)
+    {
+        var first = matches[index].Value;
+        var second = matches[index + 1].Value;
+        var key = input.ContainsKey(first) ? first : second;
+        var value = key == first ? second : first;
+        if (!input.TryGetValue(key, out var expected) || !seen.Add(key)
+            || !int.TryParse(value, System.Globalization.NumberStyles.AllowLeadingSign,
+                System.Globalization.CultureInfo.InvariantCulture, out var actual) || actual != expected)
+            throw new InvalidOperationException("Wrong dictionary output: key/value pairing or signed value mismatch.");
+    }
+}
+sealed class BoundedOutput(Func<bool>? isWitnessActive = null, Action<char>? observe = null) : TextWriter
 {
     private readonly StringBuilder output = new();
     public int WitnessCharacters { get; private set; }
@@ -438,6 +712,7 @@ sealed class BoundedOutput(Func<bool>? isWitnessActive = null) : TextWriter
         if (output.Length >= 4096)
             throw new InvalidOperationException("Excessive stdout: control-flow output exceeds 4096 characters.");
         output.Append(value);
+        observe?.Invoke(value);
         if (isWitnessActive?.Invoke() == true)
             WitnessCharacters++;
     }
@@ -449,6 +724,14 @@ sealed class WitnessRewriter(SyntaxAnnotation marker, string probe, bool neutral
 {
     public override SyntaxNode? Visit(SyntaxNode? node)
     {
+        if (node is ConditionalExpressionSyntax expression && node.HasAnnotation(marker))
+        {
+            if (neutralize)
+                return SyntaxFactory.ParseExpression("int.MinValue").WithTriviaFrom(expression);
+            var rewritten = base.Visit(expression) as ExpressionSyntax
+                ?? throw new InvalidOperationException("Cannot rewrite conditional expression.");
+            return SyntaxFactory.ParseExpression($"global::{probe}.Observe({rewritten})").WithTriviaFrom(expression);
+        }
         if (node is StatementSyntax statement && node.HasAnnotation(marker))
         {
             if (neutralize)
@@ -456,7 +739,7 @@ sealed class WitnessRewriter(SyntaxAnnotation marker, string probe, bool neutral
             var rewritten = base.Visit(node) as StatementSyntax
                 ?? throw new InvalidOperationException("Cannot rewrite witness statement.");
             return SyntaxFactory.Block(
-                SyntaxFactory.ParseStatement($"global::{probe}.Enter();"),
+                SyntaxFactory.ParseStatement($"global::{probe}.Enter({statement.GetAnnotations("dictionary-binding").SingleOrDefault()?.Data});"),
                 SyntaxFactory.TryStatement(SyntaxFactory.Block(rewritten), [],
                     SyntaxFactory.FinallyClause(SyntaxFactory.Block(
                         SyntaxFactory.ParseStatement($"global::{probe}.Exit();")))))
