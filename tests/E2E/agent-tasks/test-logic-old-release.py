@@ -24,8 +24,8 @@ def load(name, path):
 
 
 def main():
-    if sys.argv[1:] not in ([], ["--control-flow"], ["--remaining-control-flow"], ["--basic-syntax"], ["--contract-writing"]):
-        raise RuntimeError("Usage: test-logic-old-release.py [--control-flow|--remaining-control-flow|--basic-syntax|--contract-writing]")
+    if sys.argv[1:] not in ([], ["--control-flow"], ["--remaining-control-flow"], ["--basic-syntax"], ["--contract-writing"], ["--native-prerequisite"]):
+        raise RuntimeError("Usage: test-logic-old-release.py [--control-flow|--remaining-control-flow|--basic-syntax|--contract-writing|--native-prerequisite]")
     verifier = load("verify_logic", HERE / "lib/verify-logic.py")
     controls = load("logic_controls", HERE / "test-logic-verifiers.py")
     current = controls.COMPILER_ROOT
@@ -60,6 +60,25 @@ def main():
             "-nodeReuse:false", "--nologo", "-v", "quiet",
         ], old, deadline), end="")
         print(f"Built actual v0.29.0 source from Git commit {OLD_COMMIT}.")
+        if sys.argv[1:] == ["--native-prerequisite"]:
+            for arm, root in (("v0.29", old), ("current", current)):
+                root = root.resolve()
+                environment = dict(os.environ, CALOR_COMPILER_ROOT=str(root),
+                                   CALOR_COMPILER_CONFIGURATION=configuration,
+                                   CALOR_LOGIC_TIMEOUT_SECONDS=str(min(120, deadline - time.monotonic())))
+                output = verifier.run(
+                    [sys.executable, str(HERE / "lib/verify-logic.py"), "--check-native"],
+                    HERE, deadline, env=environment)
+                expected = [
+                    f"Selected compiler: {root / 'src/Calor.Compiler/bin' / configuration / 'net10.0/calor.dll'}",
+                    "Selected native Z3 prerequisite passed: SATISFIABLE.",
+                ]
+                if output.splitlines() != expected:
+                    raise RuntimeError(f"{arm}: native prerequisite identity/result mismatch: "
+                                       f"expected {expected!r}, observed {output.splitlines()!r}.")
+                print(f"{arm}: actual selected native prerequisite passed.")
+            print("Compatibility passed: 2 actual old/current native prerequisite controls.")
+            return
         if sys.argv[1:] == ["--contract-writing"]:
             contracts = load("contract_controls", HERE / "test-contract-writing-verifiers.py")
             contracts.run_compatibility(old, current, deadline)

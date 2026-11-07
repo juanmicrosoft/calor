@@ -69,6 +69,13 @@ byte-exact `agent.stderr`, setup/verification logs, actual process argv/cwd/timi
 exit/cleanup status, and a unique attempt identifier. The run retains selected
 task IDs/arm/model, CLI executable path/hash, compiler version and executable
 version check, compiler-image hashes/bytes, Git commit and complete worktree status.
+Before any agent admission, the existing selected-compiler helper loads native
+Z3 and solves a satisfiable control. Its selected-image identity, exact result,
+raw output, and process status are retained as `compiler-native` artifacts.
+Missing or corrupt native assets invalidate the run before a provider attempt;
+they are not counted as agent behavioral failures.
+`test-logic-old-release.py --native-prerequisite` runs the same control against
+unchanged archived v0.29 source and the current selected compiler.
 Source manifests/copies cover compiler `src/`, build `scripts/`, root-level build
 configuration, and the integration agent-task/teaching/supervision sources.
 Task, fixture, actual initial input, and teaching hashes are recorded separately.

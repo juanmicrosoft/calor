@@ -475,6 +475,22 @@ def main():
                     raise EvidenceError(f"Earlier attempt artifacts changed: {path}")
 
         unchanged()
+        native_env = os.environ.copy()
+        native_env.update(CALOR_COMPILER_ROOT=str(root),
+                          CALOR_COMPILER_CONFIGURATION=configuration,
+                          CALOR_LOGIC_TIMEOUT_SECONDS="120",
+                          DOTNET_CLI_USE_MSBUILD_SERVER="0",
+                          MSBUILDDISABLENODEREUSE="1", UseSharedCompilation="false")
+        if capture([sys.executable, str(HERE / "verify-logic.py"), "--check-native"],
+                   REPO, output, "compiler-native", 120, native_env):
+            raise EvidenceError("Selected compiler native prerequisite cannot execute")
+        expected_native = [
+            f"Selected compiler: {image / 'calor.dll'}",
+            "Selected native Z3 prerequisite passed: SATISFIABLE.",
+        ]
+        if (output / "compiler-native.stdout").read_text().splitlines() != expected_native:
+            raise EvidenceError("Selected compiler native prerequisite identity/result mismatch")
+        unchanged()
         runs = 1 if args.single_run else 3
         required = 1 if args.single_run else 2
         sessions = set()

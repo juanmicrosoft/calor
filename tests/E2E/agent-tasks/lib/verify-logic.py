@@ -36,13 +36,13 @@ def stop(process, deadline):
         raise RuntimeError(f"Cannot terminate verifier process group {process.pid}: {termination_error}") from termination_error
 
 
-def run(command, cwd, deadline):
+def run(command, cwd, deadline, env=None):
     timeout = deadline - time.monotonic()
     if timeout <= 0:
         raise RuntimeError("Verifier timeout: overall deadline expired.")
     process = subprocess.Popen(
         command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, start_new_session=True,
+        text=True, start_new_session=True, env=env,
     )
     try:
         # Reserve part of this same deadline for bounded termination and EOF cleanup.
@@ -59,8 +59,9 @@ def run(command, cwd, deadline):
 
 
 def main():
-    if len(sys.argv) != 3:
-        raise RuntimeError("Usage: verify-logic.py FUNCTION WORKSPACE")
+    native_only = sys.argv[1:] == ["--check-native"]
+    if not native_only and len(sys.argv) != 3:
+        raise RuntimeError("Usage: verify-logic.py FUNCTION WORKSPACE | --check-native")
     helper = Path(__file__).resolve().parent
     selected_root = os.environ.get("CALOR_COMPILER_ROOT", str(helper.parents[3]))
     if not selected_root.strip():
@@ -78,8 +79,8 @@ def main():
             raise RuntimeError(f"Selected compiler dependency missing: {compiler / dependency}; build the selected root first.")
     filename = ("BuggyContracts.calr" if sys.argv[1] == "contract003" else "Collections.calr" if sys.argv[1] == "PrintDictionary" else "Effects.calr"
                 if sys.argv[1] in ("PrintNumbers", "Countdown", "DoWhileDemo", "PrintEvenNumbers") else "Calculator.calr")
-    source = Path(sys.argv[2]).resolve() / filename
-    if not source.is_file():
+    source = None if native_only else Path(sys.argv[2]).resolve() / filename
+    if source is not None and not source.is_file():
         raise RuntimeError(f"Input missing: {source}")
     timeout = float(os.environ.get("CALOR_LOGIC_TIMEOUT_SECONDS", "120"))
     if not 0 < timeout <= 120:
@@ -97,7 +98,7 @@ def main():
         print(f"Selected compiler: {compiler / 'calor.dll'}")
         print(run([
             "dotnet", str(project / "bin/Debug/net10.0/LogicVerifier.dll"),
-            sys.argv[1], str(source),
+            *(["--check-native"] if native_only else [sys.argv[1], str(source)]),
         ], project, deadline), end="")
 
 

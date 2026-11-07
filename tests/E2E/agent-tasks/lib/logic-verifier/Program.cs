@@ -15,6 +15,16 @@ using Microsoft.Z3;
 
 try
 {
+    if (args is ["--check-native"])
+    {
+        using var context = new Context();
+        using var solver = context.MkSolver();
+        solver.Assert(context.MkTrue());
+        if (solver.Check() != Status.SATISFIABLE)
+            throw new InvalidOperationException("Selected native Z3 prerequisite did not solve the control.");
+        Console.WriteLine("Selected native Z3 prerequisite passed: SATISFIABLE.");
+        return 0;
+    }
     if (args.Length != 2)
         throw new InvalidOperationException("Expected function name and Calor source path.");
     Verify(args[0], args[1]);

@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shlex
 import shutil
 import signal
 import subprocess
@@ -410,10 +411,50 @@ class RunnerTests(unittest.TestCase):
         (root / ".git/info/exclude").write_text("bin/\n")
         return root, image
 
-    def test_missing_corrupt_and_version_mismatched_images_never_admit_provider(self):
+    def stub_selected_root_build(self):
+        dotnet = self.bin / "dotnet"
+        real_dotnet = shutil.which("dotnet")
+        self.assertIsNotNone(real_dotnet)
+        dotnet.write_text(
+            "#!/usr/bin/env bash\n"
+            'if [[ "$1" == "build" && "$2" == */Calor.Compiler.csproj ]]; then exit 0; fi\n'
+            f"exec {shlex.quote(real_dotnet)} \"$@\"\n"
+        )
+        dotnet.chmod(0o755)
+
+    def test_corrupt_native_image_never_admits_provider(self):
+        self.stub_selected_root_build()
+        native = {"darwin": "libz3.dylib", "linux": "libz3.so", "win32": "libz3.dll"}[sys.platform]
+        for failure in ("missing", "corrupt"):
+            with self.subTest(failure=failure):
+                root, image = self.compiler_control_root(f"native-{failure}")
+                self.output = self.base / f"evidence-native-{failure}"
+                if failure == "missing":
+                    (image / native).unlink()
+                else:
+                    (image / native).write_bytes(b"invalid native asset")
+                result = self.run_control(*self.options(), env=dict(
+                    self.env, CALOR_COMPILER_ROOT=str(root), CALOR_COMPILER_CONFIGURATION="Release"))
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertFalse(self.calls.exists())
+                record = json.loads((self.output / "run.json").read_text())
+                self.assertEqual(record["status"], "invalid")
+                self.assertNotIn("task_vote_passes", record)
+
+    def test_empty_native_control_cannot_supply_success(self):
         dotnet = self.bin / "dotnet"
         dotnet.write_text("#!/usr/bin/env bash\nexit 0\n")
         dotnet.chmod(0o755)
+        root, _ = self.compiler_control_root("native-empty")
+        result = self.run_control(*self.options(), env=dict(
+            self.env, CALOR_COMPILER_ROOT=str(root), CALOR_COMPILER_CONFIGURATION="Release"))
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertFalse(self.calls.exists())
+        record = json.loads((self.output / "run.json").read_text())
+        self.assertIn("native prerequisite identity/result mismatch", record["error"])
+
+    def test_missing_corrupt_and_version_mismatched_images_never_admit_provider(self):
+        self.stub_selected_root_build()
         for failure in ("missing", "corrupt", "version"):
             with self.subTest(failure=failure):
                 root, image = self.compiler_control_root(
@@ -435,9 +476,7 @@ class RunnerTests(unittest.TestCase):
 
     def test_selected_source_and_image_mutation_after_admission_invalidates_run(self):
         # Mutate only isolated control roots, never the real worktree/compiler.
-        dotnet = self.bin / "dotnet"
-        dotnet.write_text("#!/usr/bin/env bash\nexit 0\n")
-        dotnet.chmod(0o755)
+        self.stub_selected_root_build()
         for label, relative in (("source", "src/Calor.Compiler/Calor.Compiler.csproj"),
                                 ("image", "src/Calor.Compiler/bin/Release/net10.0/calor.dll")):
             with self.subTest(label=label):
