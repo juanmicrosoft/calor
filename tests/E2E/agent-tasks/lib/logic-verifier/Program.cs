@@ -53,8 +53,11 @@ static void Verify(string profile, string path)
     }
     var basic = profile is "basic001" or "basic002" or "basic003" or "basic004";
     var contractWriting = profile is "contract001" or "contract002" or "contract003" or "contract004" or "contract005";
+    var idiom = profile is "idiom001" or "idiom002";
     var name = profile switch
     {
+        "idiom001" => "Clamp",
+        "idiom002" => "IsEven",
         "contract001" => "SquareRoot",
         "contract002" or "contract003" => "Abs",
         "contract004" => "SafeDivide",
@@ -74,6 +77,8 @@ static void Verify(string profile, string path)
         "SquareRoot" or "Abs" when contractWriting => new[] { "x" },
         "SafeDivide" when contractWriting => new[] { "a", "b" },
         "SumToN" when contractWriting => new[] { "n" },
+        "Clamp" when idiom => new[] { "min", "max", "value" },
+        "IsEven" when idiom => new[] { "n" },
         "Factorial" => new[] { "n" },
         "Clamp" => new[] { "value", "min", "max" },
         "IsPositive" => new[] { "x" },
@@ -88,7 +93,7 @@ static void Verify(string profile, string path)
         or "GradeToLetter" or "PrintEvenNumbers" or "PrintDictionary";
     var dictionary = name == "PrintDictionary";
     var outputType = name == "GetZero" ? "i32"
-        : name == "PrintNumber" || names.Length == 0 || dictionary ? "void" : name == "IsPositive" ? "bool" : "i32";
+        : name == "PrintNumber" || names.Length == 0 || dictionary ? "void" : name is "IsPositive" or "IsEven" ? "bool" : "i32";
     var source = File.ReadAllText(path);
     var compilation = Calor.Compiler.Program.Compile(
         source, path, new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
@@ -106,7 +111,7 @@ static void Verify(string profile, string path)
         || function.Parameters.Any(parameter => (dictionary
                 ? !IsDictionaryType(parameter.TypeName) : AttributeHelper.ExpandType(parameter.TypeName) != "INT")
             || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None
-            || !basic && !contractWriting && name != "GradeToLetter" && parameter.InlineRefinement != null))
+            || !basic && !contractWriting && !idiom && name != "GradeToLetter" && parameter.InlineRefinement != null))
         throw new InvalidOperationException($"Wrong public signature for {name}.");
 
     StatementNode[] witnesses = [];
@@ -125,8 +130,8 @@ static void Verify(string profile, string path)
             && effects.Split(',').Contains("console_write", StringComparer.Ordinal)))
             throw new InvalidOperationException("Declared console-write effect missing from PrintNumber.");
     }
-    if (contractWriting)
-        CheckWritingContracts(function, names);
+    if (contractWriting || idiom)
+        CheckWritingContracts(function, names, outputType);
     else if (basic)
         CheckBasicEntryDomain(function, names);
     else if (!controlFlow || name == "GradeToLetter")
@@ -211,7 +216,7 @@ static void Verify(string profile, string path)
         return;
     }
     var count = 0;
-    foreach (var (inputs, expected) in contractWriting ? WritingCases(name) : Cases(name))
+    foreach (var (inputs, expected) in idiom ? IdiomCases(name) : contractWriting ? WritingCases(name) : Cases(name))
     {
         var actual = method.Invoke(null, inputs.Select(value => (object)value).ToArray());
         if (!Equals(actual, expected))
@@ -235,6 +240,28 @@ static void Verify(string profile, string path)
             {
             }
         }
+    if (idiom)
+    {
+        var invalidCases = name == "Clamp"
+            ? new[] { new[] { 1, 0, 0 }, [int.MaxValue, int.MinValue, 0], [0, -1, int.MaxValue] }
+            : Array.Empty<int[]>();
+        foreach (var inputs in invalidCases)
+        {
+            try
+            {
+                method.Invoke(null, inputs.Select(value => (object)value).ToArray());
+                throw new InvalidOperationException($"{name}({string.Join(", ", inputs)}) did not fail its domain contract.");
+            }
+            catch (TargetInvocationException error) when (error.InnerException?.GetType().Name == "ContractViolationException"
+                || error.InnerException is ArgumentOutOfRangeException argument && names.Contains(argument.ParamName))
+            {
+            }
+        }
+        Console.WriteLine($"Verification passed: {name}; idiom predicates and {count} runtime cases; "
+            + $"{invalidCases.Length} domain rejection cases. Limits: full signed Int32 prompt domain for predicate proofs; "
+            + "independent signed/boundary runtime sampling, not a universal body proof.");
+        return;
+    }
     if (contractWriting)
     {
         var invalidCases = name switch
@@ -270,13 +297,15 @@ static void Verify(string profile, string path)
     Console.WriteLine($"Verification passed: {name}; {(basic ? "basic signature/behavior" : controlFlow ? "native control flow" : "semantic contracts")} and {count} runtime cases.");
 }
 
-static void CheckWritingContracts(FunctionNode function, string[] names)
+static void CheckWritingContracts(FunctionNode function, string[] names, string outputType)
 {
     using var context = new Context();
     var translator = new ContractTranslator(context);
-    foreach (var name in names.Append("result"))
+    foreach (var name in names)
         if (!translator.DeclareVariable(name, "i32"))
             throw new InvalidOperationException($"Cannot model contract-writing variable {name}.");
+    if (!translator.DeclareVariable("result", outputType))
+        throw new InvalidOperationException("Cannot model contract-writing result.");
     BitVecExpr Integer(string name) => context.MkBVConst(name, 32);
     BitVecNum Constant(int value) => context.MkBV(value, 32);
     BoolExpr Fits(BitVecExpr value) => context.MkAnd(
@@ -383,6 +412,20 @@ static void CheckWritingContracts(FunctionNode function, string[] names)
             requiredPre = context.MkBVSGE(n, Constant(0));
             requiredPost = context.MkBVSGE(result, Constant(0));
             mathematicalOutput = context.MkTrue();
+            break;
+        case "Clamp":
+            var value = Integer("value");
+            var min = Integer("min");
+            var max = Integer("max");
+            requiredPre = context.MkBVSLE(min, max);
+            requiredPost = context.MkAnd(context.MkBVSGE(result, min), context.MkBVSLE(result, max));
+            mathematicalOutput = context.MkEq(result, context.MkITE(context.MkBVSLT(value, min), min,
+                context.MkITE(context.MkBVSGT(value, max), max, value)));
+            break;
+        case "IsEven":
+            requiredPost = context.MkEq(context.MkBoolConst("result"),
+                context.MkEq(context.MkBVSRem(Integer("n"), Constant(2)), Constant(0)));
+            mathematicalOutput = requiredPost;
             break;
         default:
             throw new InvalidOperationException("Unknown contract-writing oracle.");
@@ -602,6 +645,28 @@ static IEnumerable<(int[] Inputs, object Expected)> WritingCases(string name)
                         yield return ([first, second], (int)quotient);
                 }
     }
+}
+
+static IEnumerable<(int[] Inputs, object Expected)> IdiomCases(string name)
+{
+    var boundaries = new[] { int.MinValue, int.MinValue + 1, -1073741824, -46340, -100, -7, -3, -2, -1,
+        0, 1, 2, 3, 7, 100, 46340, 1073741823, int.MaxValue - 1, int.MaxValue };
+    if (name == "IsEven")
+    {
+        foreach (var n in boundaries.Concat(Enumerable.Range(-256, 513)).Distinct())
+            yield return ([n], (long)n % 2 == 0);
+        yield break;
+    }
+    if (name != "Clamp")
+        throw new InvalidOperationException($"Unknown idiom runtime oracle: {name}.");
+    foreach (var min in boundaries)
+        foreach (var max in boundaries)
+            if (min <= max)
+                foreach (var value in boundaries)
+                {
+                    var expected = value < min ? min : value > max ? max : value;
+                    yield return ([min, max, value], expected);
+                }
 }
 
 static (Assembly Assembly, SyntaxTree[] Trees) CompileRuntime(string generatedCode)

@@ -646,3 +646,68 @@ dependencies, compilation/runtime failures, and bounded nontermination. Both
 arms include the formerly accepted `n == 46341` return-zero decoy and the native
 unused-formula/helper-precondition/ordinary-loop decoy. A separate mutant-only
 division-by-zero decoy also rejects; failed execution is never coupling success.
+
+### Current idiom prompts (`idiom-001` and `idiom-002`)
+
+The historical directory names `01_option_return` and `02_match_option` do not
+describe these tasks. Their unchanged `task.json` prompts require
+`Clamp(min, max, value) -> i32` and `IsEven(n) -> bool`. Neither asks for Option
+syntax or a particular body construct. Both actual `verify.sh` entries select
+new `idiom001` / `idiom002` profiles in the existing compiler-backed helper.
+The original logic `Clamp(value, min, max)` selector, its 726 runtime cases,
+and all other existing profiles remain separate.
+
+The selected public AST and reflected public/static CLR signatures must match
+the prompt's parameter names, order, integer types and return type. Native
+aliases such as `int` are accepted through the existing `ExpandType` helper.
+Clamp requires entry-domain equivalence to `min <= max`; its postconditions
+must imply both inclusive result bounds and admit the mathematically correct
+clamp result. IsEven requires a mandatory postcondition equivalent to
+`result == (n % 2 == 0)`, using signed remainder, across the entire signed
+Int32 domain, including Int32.MinValue. One-way implications do not suffice.
+
+These profiles reuse the selected public contract translator and scoped
+inline-refinement entry mechanism. Explicit and inline predicates may describe
+the required domain equivalently; optional predicates cannot narrow it or
+exclude correct outputs. Arithmetic must be defined and representable in the
+evidence scope. Short-circuiting predicates are modeled with their evaluation
+guards. Unsupported nodes, foreign/scoped references, widths, calls, translator
+warnings, solver unknown and timeouts reject rather than supply proof evidence.
+No predicate from another function, comment, string or candidate body substitutes
+for the selected declaration's own contracts.
+
+Independent runtime oracles exercise 3,610 Clamp triples with `(min,max,value)`
+positional arguments, all combinations of 19 signed/boundary values with valid
+bounds. Three reversed-bound inputs must fail a native domain contract. IsEven
+runs 521 distinct inputs: the union of `-256..256` and 19 signed/boundary inputs
+against a widened signed-remainder oracle. These are executable samples, not universal body proofs;
+contract proofs do not establish body correctness. Constant/boundary/unused-
+expression decoys, wrong parameter order, weakened/vacuous contracts and
+optional-domain laundering are negative controls. Successful entries explicitly
+print the proof domain and runtime limitations.
+
+```bash
+python3 tests/E2E/agent-tasks/test-idiom-verifiers.py
+python3 tests/E2E/agent-tasks/test-logic-old-release.py --idioms
+```
+
+The additive strict `--idioms` mode archives unchanged released Git commit
+`d82f3ae95175ecd09581c6922701706be72b0ca9`, verifies its own pinned native
+manifest, locked-restores and builds that source, and links the same helper
+against each actual old/current arm. It executes 81 actual entry-point controls,
+including current-parser rejection of an old-ID input. Only temporary old
+controls receive historical IDs and native `§I` refinements through the existing
+adapter. Missing assets/history/APIs, build failures, skipped/empty controls and
+unknown proof results fail; no copied-current old arm or product API patch exists.
+The runner retains all old modes, its 600-second total bound and the shared
+120-second entry/process/EOF cleanup bound. Current controls also retain the
+logic/basic selector collisions, native-only prerequisite, selected-root/
+configuration rejection and bounded nontermination checks. The current suite
+executes 97 idiom entries, 14 preserved logic/basic/enum/flow entries and one
+native-only entry; successful output counts are checked, not merely printed.
+
+This unit replaces verification for only these two existing tasks. It does not
+complete all 129 task prerequisites or establish milestone/release acceptance.
+Task definitions, fixtures, TestData, active `.calr` corpus, historical ledgers,
+floors and product source remain unchanged. No provider/model/count/spending,
+publication/version/release or grammar change is involved.

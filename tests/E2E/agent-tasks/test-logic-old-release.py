@@ -24,8 +24,8 @@ def load(name, path):
 
 
 def main():
-    if sys.argv[1:] not in ([], ["--control-flow"], ["--remaining-control-flow"], ["--basic-syntax"], ["--contract-writing"], ["--native-prerequisite"], ["--enums"]):
-        raise RuntimeError("Usage: test-logic-old-release.py [--control-flow|--remaining-control-flow|--basic-syntax|--contract-writing|--native-prerequisite|--enums]")
+    if sys.argv[1:] not in ([], ["--control-flow"], ["--remaining-control-flow"], ["--basic-syntax"], ["--contract-writing"], ["--native-prerequisite"], ["--enums"], ["--idioms"]):
+        raise RuntimeError("Usage: test-logic-old-release.py [--control-flow|--remaining-control-flow|--basic-syntax|--contract-writing|--native-prerequisite|--enums|--idioms]")
     verifier = load("verify_logic", HERE / "lib/verify-logic.py")
     controls = load("logic_controls", HERE / "test-logic-verifiers.py")
     current = controls.COMPILER_ROOT
@@ -82,6 +82,10 @@ def main():
         if sys.argv[1:] == ["--contract-writing"]:
             contracts = load("contract_controls", HERE / "test-contract-writing-verifiers.py")
             contracts.run_compatibility(old, current, deadline)
+            return
+        if sys.argv[1:] == ["--idioms"]:
+            idioms = load("idiom_controls", HERE / "test-idiom-verifiers.py")
+            idioms.run_compatibility(old, current, deadline)
             return
         if sys.argv[1:] == ["--enums"]:
             enums = load("enum_controls", HERE / "test-enum-verifiers.py")
