@@ -55,6 +55,11 @@ static void Verify(string profile, string path)
         VerifyOop(profile, oopCompilation.Ast, oopCompilation.GeneratedCode, path);
         return;
     }
+    if (profile is "type005" or "type006")
+    {
+        VerifyTypeArithmetic(profile, path);
+        return;
+    }
     if (profile is "gen001" or "gen002" or "gen003")
     {
         var genericSource = File.ReadAllText(path);
@@ -419,6 +424,18 @@ static void CheckWritingContracts(FunctionNode function, string[] names, string 
     BoolExpr mathematicalOutput;
     switch (function.Name)
     {
+        case "ComputeWithTemp":
+            var sum = context.MkBVAdd(Wide(Integer("a")), Wide(Integer("b")));
+            var difference = context.MkBVSub(Wide(Integer("a")), Wide(Integer("b")));
+            var arithmeticProduct = context.MkBVMul(sum, difference);
+            limit = context.MkAnd(Fits(sum), Fits(difference), Fits(arithmeticProduct));
+            mathematicalOutput = context.MkEq(Wide(result), arithmeticProduct);
+            break;
+        case "Accumulate":
+            var accumulated = context.MkBVMul(Wide(Integer("n")), context.MkBV(3, 64));
+            limit = Fits(accumulated);
+            mathematicalOutput = context.MkEq(Wide(result), accumulated);
+            break;
         case "GetListLength":
             requiredPre = context.MkBVSGE(Integer("n"), Constant(0));
             mathematicalOutput = context.MkEq(result, Integer("n"));
@@ -521,6 +538,281 @@ static void CheckWritingContracts(FunctionNode function, string[] names, string 
     Prove(context.MkAnd(correct, context.MkNot(context.MkAnd(entrySafety.Concat(postSafety).ToArray()))),
         "Contract-writing arithmetic is undefined or overflows for required inputs/outputs");
     Prove(context.MkAnd(correct, context.MkNot(actualPost)), "Writing postconditions exclude a required output");
+}
+
+static void VerifyTypeArithmetic(string profile, string path)
+{
+    var name = profile == "type005" ? "ComputeWithTemp" : "Accumulate";
+    string[] names = profile == "type005" ? ["a", "b"] : ["n"];
+    var compiled = Calor.Compiler.Program.Compile(File.ReadAllText(path), path,
+        new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
+    if (compiled.HasErrors || compiled.Ast == null)
+        throw new InvalidOperationException($"Calor compilation failed:\n{string.Join("\n", compiled.Diagnostics)}");
+    var module = compiled.Ast;
+    var functions = module.Functions.Where(candidate => candidate.Name == name).ToArray();
+    if (functions.Length != 1)
+        throw new InvalidOperationException($"Expected exactly one module function named {name}.");
+    var function = functions[0];
+    if (function.Visibility != Visibility.Public || function.IsAsync || function.TypeParameters.Count != 0
+        || function.Output == null || AttributeHelper.ExpandType(function.Output.TypeName) != "INT"
+        || !function.Parameters.Select(parameter => parameter.Name).SequenceEqual(names)
+        || function.Parameters.Any(parameter => AttributeHelper.ExpandType(parameter.TypeName) != "INT"
+            || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None))
+        throw new InvalidOperationException($"Wrong public signature for {name}.");
+    var pending = new Stack<AstNode>();
+    var native = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+    pending.Push(function);
+    while (pending.TryPop(out var node))
+        if (native.Add(node))
+        {
+            if (node is CSharpInteropBlockNode or RawCSharpNode or RawCSharpExpressionNode or LocalFunctionStatementNode)
+                throw new InvalidOperationException("Arithmetic provenance requires native selected-function statements; raw/local-function fragments unsupported.");
+            foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+                pending.Push(child);
+        }
+    CheckWritingContracts(function, names, "i32");
+    var (assembly, trees) = CompileRuntime(compiled.GeneratedCode);
+    MethodInfo Target(Assembly runtime)
+    {
+        var type = runtime.GetType($"{module.Name}.{module.Name}Module")
+            ?? throw new InvalidOperationException("Arithmetic module CLR identity missing.");
+        var methods = type.GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Where(candidate => candidate.Name == name).ToArray();
+        if (!type.IsPublic || methods.Length != 1 || methods[0].IsGenericMethod || methods[0].ReturnType != typeof(int)
+            || !methods[0].GetParameters().Select(parameter => parameter.ParameterType)
+                .SequenceEqual(names.Select(_ => typeof(int))))
+            throw new InvalidOperationException("Wrong generated public/static arithmetic signature.");
+        return methods[0];
+    }
+    var cases = ArithmeticCases(name).ToArray();
+    long Expected(int[] input) => name == "Accumulate" ? 3L * input[0]
+        : ((long)input[0] + input[1]) * ((long)input[0] - input[1]);
+    object[] Arguments(int[] input) => input.Cast<object>().ToArray();
+    long Invoke(MethodInfo method, int[] input, string stage)
+    {
+        try
+        {
+            return (int)(method.Invoke(null, Arguments(input))
+                ?? throw new InvalidOperationException("Arithmetic runtime returned null."));
+        }
+        catch (TargetInvocationException error)
+        {
+            throw new InvalidOperationException($"Arithmetic {stage} runtime failed at ({string.Join(",", input)}); "
+                + "exceptions are not provenance/coupling evidence.", error);
+        }
+    }
+    void Check(MethodInfo method, int[] input, string stage)
+    {
+        var actual = Invoke(method, input, stage);
+        if (actual != Expected(input))
+            throw new InvalidOperationException($"Arithmetic {stage}: {name}({string.Join(",", input)}) returned {actual}; expected {Expected(input)}.");
+    }
+    var options = new CSharpParseOptions(LanguageVersion.Preview);
+    var debug = CSharpSyntaxTree.ParseText(
+        new CSharpEmitter(ContractMode.Debug) { LineDirectiveFilePath = path }.Emit(module), options);
+    if (!SyntaxFactory.AreEquivalent(trees[1].GetRoot(), debug.GetRoot()))
+        throw new InvalidOperationException("Arithmetic native mapping failed: debug emission differs from compiled C#.");
+    var mapped = CSharpSyntaxTree.ParseText(
+        new CSharpEmitter(ContractMode.Off) { LineDirectiveFilePath = path }.Emit(module), options);
+    var off = Target(CompileRuntime(mapped.ToString()).Assembly);
+    var baseline = Target(assembly);
+    foreach (var input in cases)
+    {
+        Check(baseline, input, "original baseline");
+        Check(off, input, "contract-disabled baseline");
+    }
+    var mappingCompilation = CSharpCompilation.Create("ArithmeticMapping",
+        [trees[0], mapped], GeneratedCSharpCompiler.References,
+        new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    var probe = "__CalorArithmetic_" + Guid.NewGuid().ToString("N");
+    var rewriter = new ArithmeticRewriter(mappingCompilation.GetSemanticModel(mapped), module.Name, function, path, probe);
+    var instrumented = rewriter.Visit(mapped.GetRoot()) as CompilationUnitSyntax
+        ?? throw new InvalidOperationException("Arithmetic instrumentation failed.");
+    instrumented = instrumented.AddMembers(SyntaxFactory.ParseMemberDeclaration(ArithmeticRewriter.Probe(probe))
+        ?? throw new InvalidOperationException("Arithmetic probe declaration failed."));
+    var tracedAssembly = CompileRuntime(instrumented.NormalizeWhitespace().ToFullString()).Assembly;
+    var traced = Target(tracedAssembly);
+    var probeType = tracedAssembly.GetType(probe) ?? throw new InvalidOperationException("Arithmetic probe identity missing.");
+    var records = probeType.GetField("Records")?.GetValue(null) as List<(string Key, bool Initial, long Value, int[] Reads, int Site)>
+        ?? throw new InvalidOperationException("Arithmetic trace records missing.");
+    var reset = probeType.GetMethod("Reset") ?? throw new InvalidOperationException("Arithmetic probe reset missing.");
+    void Reset(string key = "", int occurrence = -1, bool zero = false) => reset.Invoke(null, [key, occurrence, zero]);
+    bool Depends((string Key, bool Initial, long Value, int[] Reads, int Site)[] events, int from, int target)
+    {
+        var visited = new HashSet<int>();
+        var work = new Stack<int>();
+        work.Push(from);
+        while (work.TryPop(out var index))
+        {
+            if (index == target)
+                return true;
+            if (index < 0 || index >= events.Length || !visited.Add(index))
+                continue;
+            foreach (var read in events[index].Reads)
+                work.Push(read);
+        }
+        return false;
+    }
+    using var polynomial = new ArithmeticPolynomial();
+    var bindings = rewriter.Bindings;
+    var observations = cases.Select(input =>
+    {
+        Reset();
+        Check(traced, input, "instrumented baseline");
+        return records.ToArray();
+    }).ToArray();
+    var initialEvents = observations[0];
+    string[] Keys(string kind) => initialEvents.Select((record, index) => (record, index))
+        .Where(item => item.record.Initial && bindings.ContainsKey(item.record.Key)
+            && polynomial.IsEvent(initialEvents, item.index, rewriter.Expressions, bindings, kind, []))
+        .Select(item => item.record.Key).Distinct(StringComparer.Ordinal).ToArray();
+    var sumKeys = Keys("sum");
+    var differenceKeys = Keys("difference");
+    var accumulatorKeys = Keys("zero").Where(key => bindings[key].IsMutable).ToArray();
+    var candidates = name == "ComputeWithTemp"
+        ? sumKeys.SelectMany(sumKey => differenceKeys.Where(key => key != sumKey)
+            .Select(differenceKey => new[] { sumKey, differenceKey })).ToArray()
+        : accumulatorKeys.Select(key => new[] { key }).ToArray();
+    if (candidates.Length == 0 || candidates.Length > 64)
+        throw new InvalidOperationException("Arithmetic native provenance missing/overbound: required sum/difference bindings or mutable zero accumulator.");
+    var successful = 0;
+    string[]? selectedKeys = null;
+    foreach (var keys in candidates)
+    {
+        var valid = true;
+        var changes = new bool[keys.Length];
+        var count = 0;
+        for (var caseIndex = 0; caseIndex < cases.Length; caseIndex++)
+        {
+            var input = cases[caseIndex];
+            var events = observations[caseIndex];
+            var returned = Array.FindLastIndex(events, record => record.Key.StartsWith("r:", StringComparison.Ordinal));
+            if (returned < 0 || events.Count(record => record.Key.StartsWith("r:", StringComparison.Ordinal)) != 1)
+                throw new InvalidOperationException("Arithmetic trace requires one actual native selected return.");
+            var nRead = Array.FindIndex(events, record => record.Key == "p:n");
+            var writes = keys.Select(key => events.Select((record, index) => (record, index))
+                .Where(item => item.record.Key == key).ToArray()).ToArray();
+            if (name == "ComputeWithTemp")
+            {
+                for (var index = 0; index < 2; index++)
+                    valid &= writes[index].Length == 1 && writes[index][0].record.Initial
+                        && writes[index][0].record.Value == (index == 0 ? (long)input[0] + input[1] : (long)input[0] - input[1])
+                        && polynomial.IsEvent(events, writes[index][0].index, rewriter.Expressions, bindings,
+                            index == 0 ? "sum" : "difference", [])
+                        && Depends(events, returned, writes[index][0].index)
+                        && Depends(events, writes[index][0].index, 0) && Depends(events, writes[index][0].index, 1);
+                if (valid)
+                    valid &= polynomial.IsEvent(events, returned, rewriter.Expressions, bindings, "product",
+                        writes.Select(state => state[0].index).ToArray());
+            }
+            else
+            {
+                var state = writes[0];
+                valid &= state.Length == 4 && state[0].record.Initial && state[0].record.Value == 0
+                    && polynomial.IsEvent(events, state[0].index, rewriter.Expressions, bindings, "zero", [])
+                    && state.Skip(1).All(item => !item.record.Initial) && Depends(events, returned, state[^1].index);
+                if (valid)
+                    for (var update = 1; update <= 3; update++)
+                        valid &= state[update].record.Value == update * (long)input[0]
+                            && Depends(events, state[update].index, state[update - 1].index)
+                            && Depends(events, state[update].index, nRead)
+                            && polynomial.IsEvent(events, state[update].index, rewriter.Expressions, bindings, "update",
+                                [state[update - 1].index]);
+                if (valid)
+                    valid &= polynomial.IsEvent(events, returned, rewriter.Expressions, bindings, "return", [state[^1].index]);
+            }
+            if (!valid)
+                break;
+            for (var index = 0; index < keys.Length; index++)
+            {
+                var mutations = name == "ComputeWithTemp" ? 1 : 3;
+                for (var update = 1; update <= mutations; update++)
+                {
+                    Reset(keys[index], name == "ComputeWithTemp" ? 0 : update, name == "ComputeWithTemp");
+                    var actual = Invoke(traced, input, "counterfactual");
+                    var expected = name == "ComputeWithTemp" ? 0 : Expected(input) + 1;
+                    if (actual != expected)
+                    {
+                        valid = false;
+                        break;
+                    }
+                    changes[index] |= actual != Expected(input);
+                    count++;
+                }
+            }
+            if (!valid)
+                break;
+        }
+        if (valid && changes.All(changed => changed))
+        {
+            successful = count;
+            selectedKeys = keys;
+            break;
+        }
+    }
+    if (selectedKeys == null)
+        throw new InvalidOperationException("Arithmetic provenance/coupling failed: exact executed binding/state reads and complete successful counterfactual outputs required.");
+    var wider = 0;
+    if (name == "ComputeWithTemp")
+    {
+        // A representable product with an unrepresentable signed Int32 sum or
+        // difference is necessarily zero for integer a,b. Do not turn a checked
+        // Int32 intermediate overflow into admission or coupling evidence.
+        var wideBindings = selectedKeys.All(key => rewriter.HasWideInitializer(key, initialEvents));
+        var checkedArithmetic = mapped.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(method => method.Identifier.ValueText == name).DescendantNodes()
+            .Any(node => node is CheckedExpressionSyntax checkedExpression
+                && checkedExpression.Keyword.IsKind(SyntaxKind.CheckedKeyword));
+        if (wideBindings || !checkedArithmetic)
+            foreach (var input in ArithmeticWideCases())
+            {
+                Check(baseline, input, "wider-intermediate original");
+                Check(off, input, "wider-intermediate contract-disabled");
+                Reset();
+                Check(traced, input, "wider-intermediate instrumented");
+                wider++;
+            }
+    }
+    Console.WriteLine($"Verification passed: {name}; native/CLR signature; {cases.Length} representable runtime/state cases; "
+        + $"{successful} complete-case binding counterfactuals; {wider} wider-intermediate cases.");
+    Console.WriteLine("Limits: exact representable-domain entry/output contract proof; finite native polynomial/read/write/state provenance, "
+        + "not a universal body proof. Core requires signed Int32 mathematical sum, difference and product, or n,2n,3n. "
+        + "No invented overflow policy outside that domain. Wider-intermediate cases are six zero-product boundaries, "
+        + "run only for both Int64 bindings with widened initializer evaluation or unchecked emitted arithmetic; "
+        + "checked narrow intermediates are excluded, not accepted exceptions. "
+        + "Provenance supports selected-public polynomial arithmetic/casts/aliases and mapped executed loop/branch statements; helper-call result dependence, "
+        + "raw interop, local functions and unsupported proof fragments fail explicitly; no unknown-proof fallback.");
+}
+
+static IEnumerable<int[]> ArithmeticCases(string name)
+{
+    if (name == "Accumulate")
+    {
+        foreach (var n in new[] { -715827882, -715827881, -1000000, -46341, -31, -3, -2, -1,
+            0, 1, 2, 3, 31, 46341, 1000000, 715827881, 715827882 })
+            yield return [n];
+        yield break;
+    }
+    var seen = new HashSet<(int, int)>();
+    foreach (var a in new[] { -46340, -1024, -31, -2, -1, 0, 1, 2, 31, 1024, 46340 })
+        foreach (var b in new[] { -46340, -1024, -31, -2, -1, 0, 1, 2, 31, 1024, 46340 })
+            if (seen.Add((a, b)))
+                yield return [a, b];
+    foreach (var pair in new[] { (1073741824, 1073741823), (1073741823, 1073741824),
+        (-1073741824, -1073741823), (-1073741823, -1073741824),
+        (1073741824, -1073741823), (-1073741824, 1073741823),
+        (-1073741823, 1073741824), (1073741823, -1073741824),
+        (46341, 46340), (46340, 46341), (-46341, 46340), (46340, -46341) })
+        if (seen.Add(pair))
+            yield return [pair.Item1, pair.Item2];
+}
+
+static IEnumerable<int[]> ArithmeticWideCases()
+{
+    foreach (var pair in new[] { (int.MaxValue, int.MaxValue), (int.MinValue, int.MinValue),
+        (int.MaxValue, -int.MaxValue), (-int.MaxValue, int.MaxValue),
+        (1073741824, 1073741824), (-1073741824, -1073741824) })
+        yield return [pair.Item1, pair.Item2];
 }
 
 static void CheckGaussFormula(ModuleNode module, SyntaxTree original, FunctionNode function, string path)
@@ -2810,6 +3102,326 @@ static class StringTaskProbe
                     || !Appends[matches[0].Builder].SequenceEqual(new[] { "Hello, ", name, "!" }))
                     throw new System.InvalidOperationException("StringBuilder coupling failed: returned ToString must use the same new instance and ordered required appends.");
             }
+        }
+        """;
+}
+
+sealed class ArithmeticPolynomial : IDisposable
+{
+    private readonly Context context = new();
+    private readonly Params normalization;
+    public ArithmeticPolynomial()
+    {
+        normalization = context.MkParams();
+        normalization.Add("som", true);
+    }
+
+    private ArithExpr? Value(ExpressionNode expression, Func<ReferenceNode, ArithExpr?> referenceValue)
+    {
+        switch (expression)
+        {
+            case IntLiteralNode literal when !literal.IsUnsigned:
+                return context.MkReal(literal.Value);
+            case ReferenceNode reference:
+                return referenceValue(reference);
+            case TypeOperationNode { Operation: TypeOp.Cast } cast
+                when AttributeHelper.ExpandType(cast.TargetType) is "INT" or "INT[bits=64][signed=true]":
+                return Value(cast.Operand, referenceValue);
+            case UnaryOperationNode { Operator: UnaryOperator.Negate } unary:
+                return Value(unary.Operand, referenceValue) is { } operand ? context.MkUnaryMinus(operand) : null;
+            case ConditionalExpressionNode conditional:
+                var yes = Value(conditional.WhenTrue, referenceValue);
+                var no = Value(conditional.WhenFalse, referenceValue);
+                return yes != null && no != null && Same(yes, no) ? yes : null;
+            case BinaryOperationNode binary when binary.Operator is BinaryOperator.Add or BinaryOperator.Subtract
+                or BinaryOperator.Multiply or BinaryOperator.Divide:
+                var left = Value(binary.Left, referenceValue);
+                var right = Value(binary.Right, referenceValue);
+                if (left == null || right == null)
+                    return null;
+                return binary.Operator switch
+                {
+                    BinaryOperator.Add => context.MkAdd(left, right),
+                    BinaryOperator.Subtract => context.MkSub(left, right),
+                    BinaryOperator.Multiply => context.MkMul(left, right),
+                    BinaryOperator.Divide when right.Simplify(normalization) is RatNum denominator
+                        && !Same(denominator, context.MkReal(0)) => context.MkDiv(left, right),
+                    _ => null
+                };
+            default:
+                return null;
+        }
+    }
+
+    private bool Same(ArithExpr left, ArithExpr right) => context.MkEq(left, right).Simplify(normalization).IsTrue;
+    public bool IsEvent((string Key, bool Initial, long Value, int[] Reads, int Site)[] events, int target,
+        IReadOnlyDictionary<int, ExpressionNode> expressions, IReadOnlyDictionary<string, BindStatementNode> bindings,
+        string kind, int[] opaqueVersions)
+    {
+        var opaque = opaqueVersions.Select((version, index) => (version, value: (ArithExpr)context.MkRealConst("__version" + index)))
+            .ToDictionary(pair => pair.version, pair => pair.value);
+        var memo = new Dictionary<int, ArithExpr?>();
+        ArithExpr? Event(int index)
+        {
+            if (opaque.TryGetValue(index, out var independent))
+                return independent;
+            if (index < 0 || index >= events.Length)
+                throw new InvalidOperationException("Arithmetic polynomial read has an invalid write version.");
+            if (memo.TryGetValue(index, out var cached))
+                return cached;
+            var record = events[index];
+            if (record.Key.StartsWith("p:", StringComparison.Ordinal))
+                return context.MkRealConst(record.Key[2..]);
+            if (!expressions.TryGetValue(record.Site, out var expression))
+                throw new InvalidOperationException("Arithmetic polynomial write/return lacks its exact native expression.");
+            var result = Value(expression, reference =>
+            {
+                var versions = record.Reads.Distinct().Where(read =>
+                    events[read].Key == "p:" + reference.Name
+                    || bindings.TryGetValue(events[read].Key, out var binding) && binding.Name == reference.Name).ToArray();
+                if (versions.Length != 1)
+                    return null;
+                if (versions[0] >= index)
+                    throw new InvalidOperationException("Arithmetic polynomial read does not precede its write.");
+                return Event(versions[0]);
+            });
+            memo.Add(index, result);
+            return result;
+        }
+        // Preserve exact executed write versions, not source-name aliases or
+        // substituted input formulas. Overwritten/gated aliases cannot launder a product.
+        var expected = kind switch
+        {
+            "sum" => context.MkAdd(context.MkRealConst("a"), context.MkRealConst("b")),
+            "difference" => context.MkSub(context.MkRealConst("a"), context.MkRealConst("b")),
+            "zero" => (ArithExpr)context.MkReal(0),
+            "product" => context.MkMul(opaque[opaqueVersions[0]], opaque[opaqueVersions[1]]),
+            "update" => context.MkAdd(opaque[opaqueVersions[0]], context.MkRealConst("n")),
+            "return" => opaque[opaqueVersions[0]],
+            _ => throw new InvalidOperationException("Unknown arithmetic polynomial witness.")
+        };
+        return Event(target) is { } value && Same(value, expected);
+    }
+
+    public void Dispose()
+    {
+        normalization.Dispose();
+        context.Dispose();
+    }
+}
+
+sealed class ArithmeticRewriter : CSharpSyntaxRewriter
+{
+    private readonly SemanticModel model;
+    private readonly FunctionNode function;
+    private readonly string module;
+    private readonly string path;
+    private readonly string probe;
+    private readonly StatementNode[] native;
+    private readonly Dictionary<ISymbol, string> identities = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<int, ExpressionSyntax> evaluations = [];
+    public Dictionary<string, BindStatementNode> Bindings { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, SpecialType> Types { get; } = new(StringComparer.Ordinal);
+    public Dictionary<int, ExpressionNode> Expressions { get; } = [];
+
+    public ArithmeticRewriter(SemanticModel model, string module, FunctionNode function, string path, string probe)
+    {
+        this.model = model;
+        this.function = function;
+        this.module = module;
+        this.path = path;
+        this.probe = probe;
+        native = RecursiveAstWalker.EnumerateStatements(function.Body).ToArray();
+        var method = model.SyntaxTree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(candidate => candidate.Identifier.ValueText == function.Name
+                && candidate.Parent is ClassDeclarationSyntax type && type.Identifier.ValueText == module + "Module");
+        foreach (var parameter in method.ParameterList.Parameters)
+            identities.Add(model.GetDeclaredSymbol(parameter) ?? throw new InvalidOperationException("Arithmetic parameter CLR symbol missing."),
+                "p:" + parameter.Identifier.ValueText);
+        foreach (var declaration in method.DescendantNodes().OfType<LocalDeclarationStatementSyntax>())
+        {
+            var matched = Match(declaration, required: false);
+            if (matched is not BindStatementNode binding)
+                continue;
+            if (declaration.Declaration.Variables.Count != 1 || declaration.Declaration.Variables[0].Initializer == null)
+                throw new InvalidOperationException("Arithmetic mapped binding must have exactly one initializer.");
+            var variable = declaration.Declaration.Variables[0];
+            var symbol = model.GetDeclaredSymbol(variable) as ILocalSymbol
+                ?? throw new InvalidOperationException("Arithmetic binding CLR local identity missing.");
+            if (symbol.Name != binding.Name || symbol.Type.SpecialType is not (SpecialType.System_Int32 or SpecialType.System_Int64))
+                throw new InvalidOperationException("Arithmetic mapped binding requires matching native name and Int32/Int64 CLR type.");
+            var key = "b:" + binding.Span.Line.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            identities.Add(symbol, key);
+            Bindings.Add(key, binding);
+            Types.Add(key, symbol.Type.SpecialType);
+            evaluations.Add(binding.Span.Line, variable.Initializer!.Value);
+            Expressions.Add(binding.Span.Line, binding.Initializer
+                ?? throw new InvalidOperationException("Arithmetic native initializer missing."));
+        }
+    }
+
+    public bool HasWideInitializer(string key, (string Key, bool Initial, long Value, int[] Reads, int Site)[] events)
+    {
+        var index = Array.FindIndex(events, record => record.Key == key && record.Initial);
+        if (Types[key] != SpecialType.System_Int64
+            || index < 0 || model.GetTypeInfo(evaluations[events[index].Site]).Type?.SpecialType != SpecialType.System_Int64)
+            return false;
+        var visited = new HashSet<int>();
+        bool WideEvaluation(int version)
+        {
+            if (!visited.Add(version) || events[version].Key.StartsWith("p:", StringComparison.Ordinal))
+                return true;
+            var expression = evaluations[events[version].Site];
+            if (expression.DescendantNodesAndSelf().OfType<CheckedExpressionSyntax>().Any(node =>
+                node.Keyword.IsKind(SyntaxKind.CheckedKeyword)
+                && model.GetTypeInfo(node.Expression).Type?.SpecialType == SpecialType.System_Int32))
+                return false;
+            return events[version].Reads.All(WideEvaluation);
+        }
+        return WideEvaluation(index);
+    }
+
+    private StatementNode? Match(StatementSyntax statement, bool required = true)
+    {
+        var directives = statement.GetFirstToken().LeadingTrivia.Select(trivia => trivia.GetStructure())
+            .OfType<LineDirectiveTriviaSyntax>().Where(directive => directive.IsActive && directive.File.ValueText == path).ToArray();
+        if (directives.Length == 0 && !required)
+            return null;
+        if (directives.Length != 1 || !int.TryParse(directives[0].Line.ValueText, out var line))
+            throw new InvalidOperationException("Arithmetic native mapping failed: missing/ambiguous selected-emitter statement directive.");
+        var matches = native.Where(node => node.Span.Line == line).ToArray();
+        if (matches.Length != 1)
+            throw new InvalidOperationException("Arithmetic native mapping failed: ambiguous/foreign AST statement.");
+        return matches[0];
+    }
+
+    private ExpressionSyntax Wrap(string operation, string key, int initial, int site, ExpressionSyntax value)
+    {
+        var call = $"{probe}.{operation}({System.Text.Json.JsonSerializer.Serialize(key)}, {initial}, {site}, () => ({value.WithoutTrivia()}))";
+        return SyntaxFactory.ParseExpression(call).WithTriviaFrom(value);
+    }
+
+    public override SyntaxNode? VisitMethodDeclaration(MethodDeclarationSyntax node)
+    {
+        if (node.Identifier.ValueText != function.Name || node.Parent is not ClassDeclarationSyntax type
+            || type.Identifier.ValueText != module + "Module")
+            return node;
+        if (node.Body == null)
+            throw new InvalidOperationException("Arithmetic selected-public method has no body.");
+        var rewritten = (MethodDeclarationSyntax)(base.VisitMethodDeclaration(node)
+            ?? throw new InvalidOperationException("Arithmetic selected-public rewrite failed."));
+        var parameters = node.ParameterList.Parameters.Select(parameter => SyntaxFactory.ParseStatement(
+            $"{probe}.Parameter(\"p:{parameter.Identifier.ValueText}\", {parameter.Identifier.Text});")).ToArray();
+        return rewritten.WithBody(rewritten.Body!.WithStatements(rewritten.Body.Statements.InsertRange(0, parameters)));
+    }
+
+    public override SyntaxNode? VisitLocalDeclarationStatement(LocalDeclarationStatementSyntax node)
+    {
+        var rewritten = (LocalDeclarationStatementSyntax)base.VisitLocalDeclarationStatement(node)!;
+        var symbol = model.GetDeclaredSymbol(node.Declaration.Variables[0]);
+        if (symbol == null || !identities.TryGetValue(symbol, out var key))
+            return rewritten;
+        if (Match(node) is not BindStatementNode binding)
+            throw new InvalidOperationException("Arithmetic initialization has no native binding.");
+        var variable = rewritten.Declaration.Variables[0];
+        var initializer = variable.Initializer ?? throw new InvalidOperationException("Arithmetic initializer missing.");
+        return rewritten.WithDeclaration(rewritten.Declaration.WithVariables(SyntaxFactory.SingletonSeparatedList(
+            variable.WithInitializer(initializer.WithValue(Wrap("Write", key, 1, binding.Span.Line, initializer.Value))))));
+    }
+
+    public override SyntaxNode? VisitAssignmentExpression(AssignmentExpressionSyntax node)
+    {
+        var symbol = model.GetSymbolInfo(node.Left).Symbol;
+        if (symbol == null || !identities.TryGetValue(symbol, out var key))
+            return base.VisitAssignmentExpression(node);
+        if (!key.StartsWith("b:", StringComparison.Ordinal) || !node.IsKind(SyntaxKind.SimpleAssignmentExpression)
+            || node.Parent is not ExpressionStatementSyntax statement)
+            throw new InvalidOperationException("Arithmetic state provenance supports native simple local assignments only.");
+        var matched = Match(statement);
+        var expression = matched switch
+        {
+            AssignmentStatementNode { Target: ReferenceNode reference } assignment when reference.Name == symbol.Name => assignment.Value,
+            BindStatementNode binding when binding.IsMutable && binding.Name == symbol.Name && binding.Initializer != null => binding.Initializer,
+            _ => throw new InvalidOperationException("Arithmetic assignment has no matching native local write.")
+        };
+        Expressions.Add(matched!.Span.Line, expression);
+        evaluations.Add(matched.Span.Line, node.Right);
+        var right = (ExpressionSyntax)Visit(node.Right)!;
+        return node.WithRight(Wrap("Write", key, 0, matched.Span.Line, right));
+    }
+
+    public override SyntaxNode? VisitReturnStatement(ReturnStatementSyntax node)
+    {
+        if (Match(node) is not ReturnStatementNode { Expression: { } expression } returned || node.Expression == null)
+            throw new InvalidOperationException("Arithmetic returned value has no native selected return.");
+        var key = "r:" + returned.Span.Line.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        Expressions.Add(returned.Span.Line, expression);
+        var value = (ExpressionSyntax)Visit(node.Expression)!;
+        return node.WithExpression(Wrap("Returned", key, 0, returned.Span.Line, value));
+    }
+
+    public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node)
+    {
+        var symbol = model.GetSymbolInfo(node).Symbol;
+        if (symbol == null || !identities.TryGetValue(symbol, out var key))
+            return node;
+        return SyntaxFactory.ParseExpression($"{probe}.Read({System.Text.Json.JsonSerializer.Serialize(key)}, {node.Identifier.Text})")
+            .WithTriviaFrom(node);
+    }
+
+    public override SyntaxNode? VisitInvocationExpression(InvocationExpressionSyntax node)
+        => node.Expression is IdentifierNameSyntax { Identifier.ValueText: "nameof" } ? node : base.VisitInvocationExpression(node);
+
+    public static string Probe(string name) => $$"""
+        public static class {{name}}
+        {
+            public static readonly System.Collections.Generic.List<(string Key, bool Initial, long Value, int[] Reads, int Site)> Records = new();
+            private static readonly System.Collections.Generic.Dictionary<string, int> Versions = new();
+            private static readonly System.Collections.Generic.Dictionary<string, int> Counts = new();
+            private static readonly System.Collections.Generic.Stack<System.Collections.Generic.List<int>> Reading = new();
+            private static string Target = "";
+            private static int Occurrence = -1;
+            private static bool Zero;
+            public static void Reset(string target, int occurrence, bool zero)
+            {
+                Records.Clear(); Versions.Clear(); Counts.Clear(); Reading.Clear();
+                Target = target; Occurrence = occurrence; Zero = zero;
+            }
+            private static void Record(string key, bool initial, long value, int[] reads, int site)
+            {
+                if (Records.Count >= 10000) throw new System.InvalidOperationException("Arithmetic trace limit exceeded.");
+                Versions[key] = Records.Count;
+                Records.Add((key, initial, value, reads, site));
+            }
+            public static void Parameter(string key, int value) => Record(key, true, value, System.Array.Empty<int>(), -1);
+            public static T Read<T>(string key, T value)
+            {
+                if (!Versions.TryGetValue(key, out var version))
+                    throw new System.InvalidOperationException("Arithmetic read has no native-observed write.");
+                if (Reading.Count > 0) Reading.Peek().Add(version);
+                return value;
+            }
+            private static T Evaluate<T>(string key, bool initial, int site, System.Func<T> expression, bool mutate)
+            {
+                Reading.Push(new());
+                T value;
+                int[] reads;
+                try { value = expression(); }
+                finally { reads = Reading.Pop().ToArray(); }
+                if (value is not int && value is not long)
+                    throw new System.InvalidOperationException("Arithmetic probe requires an actual signed scalar.");
+                var count = Counts.TryGetValue(key, out var previous) ? previous : 0;
+                Counts[key] = count + 1;
+                if (mutate && key == Target && count == Occurrence)
+                    value = value is int integer ? (T)(object)(Zero ? 0 : checked(integer + 1))
+                        : (T)(object)(Zero ? 0L : checked((long)(object)value + 1));
+                Record(key, initial, System.Convert.ToInt64(value), reads, site);
+                return value;
+            }
+            public static T Write<T>(string key, int initial, int site, System.Func<T> expression)
+                => Evaluate(key, initial == 1, site, expression, true);
+            public static T Returned<T>(string key, int ignored, int site, System.Func<T> expression)
+                => Evaluate(key, false, site, expression, false);
         }
         """;
 }

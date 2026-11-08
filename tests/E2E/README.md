@@ -1090,3 +1090,120 @@ timeout-shaped negative successes, or fallback compiler roots. The existing
 120-second entry/process/EOF limit and 600-second historical total remain intact.
 No task.json, fixture, TestData, active .calr subject, corpus membership,
 historical ledger, floor, or product source is changed.
+
+### Original arithmetic binding prerequisites: type-005 and type-006
+
+Only the original variable-binding and variable-assignment wrappers dispatch
+internal `type005`/`type006` profiles to the existing selected-root engine.
+The unchanged prompts require public `ComputeWithTemp(int a, int b): int`
+and `Accumulate(int n): int`, respectively. Intermediate/accumulator names
+are not prescribed. The four Option/Result tasks are not changed or
+reinterpreted as nullable/exception tasks.
+
+Both profiles create the selected native Z3 Context, compile native source
+with debug contracts, and independently compile and inspect its actual CLR
+signature. Selected-emitter debug syntax must match the original compiled
+emission before its exact selected-public, file/line-mapped, contract-disabled
+emission can be instrumented. Original, contract-disabled and instrumented
+baselines must all produce independent expected outputs.
+
+`ComputeWithTemp` observes two executed native bindings whose values are
+`a+b` and `a-b`. Polynomial recognition accepts renamed variables, casts,
+widened intermediates and algebraically equivalent scalar bindings. Native
+return recognition keeps those binding identities as **independent symbols**:
+the return must normalize to their product, including through aliases.
+Substituting the original input formulas during this recognition would wrongly
+certify an unrelated `a*a-b*b` return. Actual CLR local-symbol/version reads
+must connect both binding writes to the executed return and each binding to
+both parameters. Each binding is independently replaced with zero, across
+every core case; every mutation must finish successfully and return exactly
+zero, with at least one changed output per binding. Unused bindings, zero-weight
+decoys, input-recomputed returns and conditional decoys that only react to
+mutations are not product provenance. A helper contract using unused bindings
+cannot establish dependence, and a mutant-only runtime error rejects explicitly.
+Alias expressions are resolved through their exact executed write sites and
+read versions, not their initializers: a mutable alias containing the product
+is accepted, but overwriting it with an input-recomputed/gated result rejects.
+
+The **133 core cases** comprise the Cartesian product of
+`[-46340,-1024,-31,-2,-1,0,1,2,31,1024,46340]`, plus twelve signed boundaries:
+`(1073741824,1073741823)`, `(1073741823,1073741824)`,
+`(-1073741824,-1073741823)`, `(-1073741823,-1073741824)`,
+`(1073741824,-1073741823)`, `(-1073741824,1073741823)`,
+`(-1073741823,1073741824)`, `(1073741823,-1073741824)`,
+`(46341,46340)`, `(46340,46341)`, `(-46341,46340)`, `(46340,-46341)`.
+Mathematical sums, differences and products fit signed Int32; the independent
+oracle uses signed Int64 arithmetic, not candidate outputs. There are exactly
+**266 successful complete-case binding counterfactuals**.
+
+Six supplementary zero-product pairs have representable final results but
+wider mathematical intermediates:
+`(Int32.MaxValue,Int32.MaxValue)`, `(Int32.MinValue,Int32.MinValue)`,
+`(Int32.MaxValue,-Int32.MaxValue)`, `(-Int32.MaxValue,Int32.MaxValue)`,
+`(1073741824,1073741824)`, `(-1073741824,-1073741824)`.
+All three baselines execute these only for both selected Int64 binding types
+with widened initializer evaluation (including aliases), or for unchecked
+selected-public emitted arithmetic. Merely declaring a long binding around
+an Int32 addition does not widen that addition. They do not add
+counterfactual/dependence claims. Checked narrow intermediate arithmetic
+excludes these six cases rather than accepting an overflow exception as
+evidence. Checked narrow, checked widened and unchecked narrow controls are
+tested separately. No universal overflow policy is inferred.
+
+`Accumulate` requires an actual native mutable zero initialization followed by
+exactly three executed writes to that same CLR local identity. Each native
+update normalizes to previous accumulator plus the supplied `n`; each actual
+write reads the previous version and the parameter, including through aliases.
+The observed states must be precisely `0,n,2n,3n`; the selected native return
+must normalize to that accumulator and read its final version. Three unrolled
+assignments and a three-iteration loop are accepted. Each update is independently
+perturbed by +1; every complete-case mutation must return precisely `3n+1`.
+Unused accumulators beside `3*n`, another nonzero-initialized variable,
+constant increments, unreachable bindings and wrong update counts reject.
+
+The **17 cases** are
+`[-715827882,-715827881,-1000000,-46341,-31,-3,-2,-1,0,1,2,3,31,46341,1000000,715827881,715827882]`.
+All mathematical intermediate states and the final result fit Int32.
+There are exactly **51 successful complete-case update counterfactuals**.
+Mutation states/results also fit Int32, including the positive boundary
+`3*715827882+1 = Int32.MaxValue`.
+
+The existing scoped selected contract translator and arithmetic-definedness
+guards prove optional entry/output contract admissibility over the corresponding
+representable core domain, not just sampled inputs. Contracts cannot cap that
+domain, exclude signed inputs, exclude correct outputs, or introduce foreign
+references. Unsupported fragments and solver unknown/timeouts fail, with no
+unknown-proof fallback. Body/provenance checks remain finite, **not a universal
+body proof**. Native polynomial provenance supports signed scalar
+arithmetic/casts/aliases and mapped executed loop/branch statements; helper-call
+results, arbitrary conditional formulas, raw interop, local functions and
+ambiguous mappings cannot supply these polynomial witnesses. There are at most
+64 witness candidates and 10,000 trace records per invocation.
+
+```bash
+python3 tests/E2E/agent-tasks/test-type-arithmetic-verifiers.py
+python3 tests/E2E/agent-tasks/test-logic-old-release.py --type-arithmetic
+```
+
+The current suite requires exactly **59 real arithmetic entrypoints**
+(19 accepted, 40 rejected), including the unchanged basic fixture plus added
+disposable functions, missing inputs and root/configuration selection controls.
+Python independently checks case uniqueness, representability and exact counts.
+All controls are Python strings or outside-repository temporary inputs.
+
+The additive strict historical mode archives unchanged actual v0.29 commit
+`d82f3ae95175ecd09581c6922701706be72b0ca9`, verifies its own Z3 manifest,
+locked-restores and source-builds it, then links this same test-only helper to
+each selected old/current arm. It requires exactly **105 real entrypoints**
+(34 accepted, 71 rejected), including current rejection of an old-ID input.
+Historical IDs appear only in disposable adapted inputs. The existing
+120-second per-entry/process/EOF bounds, 600-second historical total bound,
+process cleanup, native-only measured admission and all prior dispatch/proofs
+remain unchanged, including all 65,536 SumToN inputs/output-only mutants,
+generic behavioral storage selection, string control dependence and collection
+state tracing.
+
+This is only the two arithmetic prerequisites, not acceptance of all 129 tasks,
+an agent, the milestone or a release. Product code, other task wrappers,
+task definitions, original fixtures, TestData, active Calor subjects/corpus,
+historical inputs/ledgers/floors, versions and workflows remain byte-unchanged.
