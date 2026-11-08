@@ -7,71 +7,11 @@ namespace Calor.Compiler.Parsing;
 public static class SectionMarkerSuggestions
 {
     /// <summary>
-    /// All valid section markers in Calor.
+    /// Registered section markers eligible for canonical-syntax suggestions.
     /// </summary>
-    public static readonly IReadOnlyList<string> AllMarkers = new[]
-    {
-        // Core section markers
-        "M", "F", "C", "B", "R", "I", "O", "A", "E", "L", "W", "K", "Q", "S", "D", "U",
-
-        // Closing tags
-        "/M", "/F", "/C", "/I", "/L", "/W", "/K", "/D",
-
-        // Control flow
-        "IF", "EI", "EL", "WH", "/WH", "DO", "/DO", "BK", "CN",
-
-        // Option/Result types
-        "SM", "NN", "OK", "ERR", "FL", "IV",
-
-        // Arrays and collections
-        "ARR", "LIST", "DICT", "SET", "TUPLE", "SPAN", "RANGE", "NEW", "/NEW", "PUSH", "DEL", "IDX", "ITER",
-
-        // Async/Threading
-        "/ASYNC", "AWAIT", "LOCK", "/LOCK", "SEM", "ATOMIC",
-
-        // Access modifiers
-        "PUB", "PRIV", "INT", "PROT", "STAT", "RO", "CONST",
-
-        // Generics
-        "WHERE",
-
-        // Classes and interfaces
-        "CL", "/CL", "IFACE", "/IFACE", "IMPL", "EXT", "MT", "/MT",
-        "THIS", "/THIS", "BASE", "CTOR", "/CTOR", "OP", "/OP", "DTOR", "/DTOR", "PROP", "/PROP", "GET", "SET", "INIT",
-
-        // Patterns
-        "MATCH", "/MATCH", "ARM", "/ARM", "GUARD",
-
-        // Try/Catch
-        "TR", "/TR", "CA", "FI", "TH", "RT", "WHEN",
-
-        // Lambdas and delegates
-        "LAM", "/LAM", "DEL", "/DEL", "EVENT", "/EVENT", "FIRE", "SUBSCRIBE", "/SUBSCRIBE",
-
-        // Documentation
-        "DOC", "/DOC", "PARAM", "RETURNS", "THROWS", "SEE", "LINK", "NOTE", "WARN", "REF", "VER", "ID",
-
-        // Assembly
-        "ASM", "/ASM", "NAME", "DEPS", "/DEPS", "TESTS", "/TESTS", "SIG", "REST",
-
-        // Enums
-        "EN", "/EN", "EEXT", "/EEXT",
-
-        // Quick wins
-        "EX",
-
-        // Core features
-        "AS",
-
-        // Enhanced contracts
-        "SN", "DP", "BR",
-
-        // Property-based testing
-        "PT",
-
-        // Print aliases
-        "P", "Pf",
-    };
+    public static readonly IReadOnlyList<string> AllMarkers = Lexer.KeywordNames
+        .Where(marker => !marker.StartsWith('/') || marker is "/C" or "/LAM" or "/RAW" or "/CSHARP")
+        .ToArray();
 
     /// <summary>
     /// Common expansions/descriptions for section markers.
@@ -94,7 +34,6 @@ public static class SectionMarkerSuggestions
         ["K"] = "Case",
         ["Q"] = "Requires (precondition)",
         ["S"] = "Ensures (postcondition)",
-        ["D"] = "Record (data)",
         ["U"] = "Using",
 
         // Control flow
@@ -107,11 +46,7 @@ public static class SectionMarkerSuggestions
         ["CN"] = "Continue",
 
         // Types
-        ["SM"] = "Some (Option)",
-        ["NN"] = "None (Option)",
-        ["OK"] = "Ok (Result)",
-        ["ERR"] = "Error (Result)",
-        ["FL"] = "Field",
+        ["FLD"] = "Field",
         ["IV"] = "Invariant",
 
         // Collections
@@ -136,7 +71,6 @@ public static class SectionMarkerSuggestions
 
         // Misc
         ["LAM"] = "Lambda",
-        ["DOC"] = "Documentation",
         ["EN"] = "Enum",
         ["P"] = "Print (Console.WriteLine)",
     };
@@ -166,6 +100,7 @@ public static class SectionMarkerSuggestions
         ["SWITCH"] = "W",
         ["SW"] = "W",
         ["ENUM"] = "EN",
+        ["FL"] = "FLD",
         ["WR"] = "WHERE",
         ["ADD"] = "PUSH",
         ["CASE"] = "K",
@@ -181,7 +116,7 @@ public static class SectionMarkerSuggestions
         ["VARIANT"] = "V",
         ["USING"] = "U",
         // Closing tags
-        ["/IF"] = "/I",     // Most common mistake: §/IF instead of §/I for closing if-blocks
+        ["/IF"] = "/I",
         ["/FUNC"] = "/F",
         ["/FUNCTION"] = "/F",
         ["/MOD"] = "/M",
@@ -208,7 +143,7 @@ public static class SectionMarkerSuggestions
 
         // First, check for common expanded forms
         if (ExpandedForms.TryGetValue(upperUnknown, out var expandedMatch))
-            return expandedMatch;
+            return AllMarkers.Contains(expandedMatch, StringComparer.Ordinal) ? expandedMatch : null;
 
         string? bestMatch = null;
         var bestDistance = int.MaxValue;

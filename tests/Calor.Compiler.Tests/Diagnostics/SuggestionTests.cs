@@ -98,7 +98,10 @@ public class SuggestionTests
     [InlineData("ADD", "PUSH")]
     [InlineData("when", "WHEN")]
     [InlineData("LAM", "LAM")] // Exact match (lambda)
-    [InlineData("FL", "FL")] // Exact match (field)
+    [InlineData("FL", "FLD")]
+    [InlineData("HSETT", "HSET")]
+    [InlineData("PUTT", "PUT")]
+    [InlineData("ASSIG", "ASSIGN")]
     [InlineData("FF", "F")] // One character off from F
     public void FindSimilarMarker_WithTypoOrLongForm_ReturnsSuggestion(string input, string expected)
     {
@@ -109,15 +112,65 @@ public class SuggestionTests
     }
 
     [Theory]
-    [InlineData("/FU", "/F")]
-    [InlineData("/MOD", "/M")]
-    [InlineData("/CLL", "/CL")]
+    [InlineData("/CALL", "/C")]
+    [InlineData("/LMA", "/LAM")]
+    [InlineData("/RAWW", "/RAW")]
+    [InlineData("/CSHAR", "/CSHARP")]
     public void FindSimilarMarker_WithClosingTag_ReturnsSuggestion(string input, string expected)
     {
         var suggestion = SectionMarkerSuggestions.FindSimilarMarker(input);
 
         Assert.NotNull(suggestion);
         Assert.Equal(expected, suggestion);
+    }
+
+    [Theory]
+    [InlineData("RECORD")]
+    [InlineData("DATA")]
+    [InlineData("TYPE")]
+    [InlineData("VARIANT")]
+    [InlineData("/IF")]
+    [InlineData("/FUNC")]
+    [InlineData("/MOD")]
+    public void FindSimilarMarker_RemovedExpandedForm_DoesNotRecommendRemovedSyntax(string input)
+    {
+        Assert.Null(SectionMarkerSuggestions.FindSimilarMarker(input));
+    }
+
+    [Fact]
+    public void SectionMarkerCatalog_UsesRegisteredKeywordsAndRequiredDelimiters()
+    {
+        var expected = Lexer.KeywordNames
+            .Where(marker => !marker.StartsWith('/') || marker is "/C" or "/LAM" or "/RAW" or "/CSHARP")
+            .Order(StringComparer.Ordinal);
+        Assert.Equal(expected, SectionMarkerSuggestions.AllMarkers.Order(StringComparer.Ordinal));
+        Assert.All(SectionMarkerSuggestions.MarkerDescriptions.Keys,
+            marker => Assert.Contains(marker, SectionMarkerSuggestions.AllMarkers));
+    }
+
+    [Theory]
+    [InlineData("D")]
+    [InlineData("SM")]
+    [InlineData("NN")]
+    [InlineData("OK")]
+    [InlineData("ERR")]
+    [InlineData("SMX")]
+    [InlineData("NNE")]
+    [InlineData("ERRR")]
+    public void Lexer_RemovedCarrierAndRecordSyntax_NeverSuggestsUnregisteredMarkers(string marker)
+    {
+        var diagnostics = new DiagnosticBag();
+        new Lexer("§" + marker, diagnostics).TokenizeAll();
+
+        Assert.Contains(diagnostics.Errors, error => error.Code == DiagnosticCode.UnknownSectionMarker);
+        Assert.DoesNotContain(marker, SectionMarkerSuggestions.AllMarkers);
+        Assert.DoesNotContain(marker, SectionMarkerSuggestions.MarkerDescriptions.Keys);
+        Assert.All(diagnostics.DiagnosticsWithFixes, diagnostic =>
+        {
+            var edit = Assert.Single(diagnostic.Fix.Edits);
+            Assert.NotEqual("§" + marker, edit.NewText);
+            Assert.Contains(edit.NewText[1..], Lexer.KeywordNames);
+        });
     }
 
     [Fact]
@@ -218,7 +271,7 @@ public class SuggestionTests
     }
 
     [Fact]
-    public void Lexer_UnknownClosingTag_WithSuggestion_ShowsSingleSlash()
+    public void Lexer_RemovedModuleCloser_DoesNotRecommendAnotherStructuralCloser()
     {
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer("§M{test} §/MOD{test}", diagnostics);
@@ -228,7 +281,9 @@ public class SuggestionTests
         var error = diagnostics.First(d => d.IsError);
         Assert.Contains("§/MOD", error.Message);
         Assert.DoesNotContain("§//MOD", error.Message);
-        Assert.Contains("Did you mean", error.Message);
+        Assert.DoesNotContain("Did you mean", error.Message);
+        Assert.Contains("Common markers", error.Message);
+        Assert.Empty(diagnostics.DiagnosticsWithFixes);
     }
 
     [Fact]

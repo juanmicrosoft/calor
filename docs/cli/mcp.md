@@ -240,6 +240,10 @@ Analyze Calor code for security vulnerabilities and bug patterns.
 
 Get machine-readable diagnostics from Calor source code. Includes suggestions and fix information for errors when available.
 
+Section-marker suggestions use the current lexer vocabulary. They do not
+recommend removed record or Option/Result constructors, or structural closing
+tags. Calls, block lambdas, and raw C# blocks retain their required delimiters.
+
 **Input Schema:**
 ```json
 {
