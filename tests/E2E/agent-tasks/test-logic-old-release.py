@@ -24,8 +24,8 @@ def load(name, path):
 
 
 def main():
-    if sys.argv[1:] not in ([], ["--control-flow"], ["--remaining-control-flow"], ["--basic-syntax"], ["--contract-writing"], ["--native-prerequisite"], ["--enums"], ["--idioms"], ["--generics"], ["--strings"], ["--collections"], ["--scalar-patterns"], ["--oop"], ["--type-arithmetic"], ["--carriers"]):
-        raise RuntimeError("Usage: test-logic-old-release.py [--control-flow|--remaining-control-flow|--basic-syntax|--contract-writing|--native-prerequisite|--enums|--idioms|--generics|--strings|--collections|--scalar-patterns|--oop|--type-arithmetic|--carriers]")
+    if sys.argv[1:] not in ([], ["--control-flow"], ["--remaining-control-flow"], ["--basic-syntax"], ["--contract-writing"], ["--native-prerequisite"], ["--enums"], ["--idioms"], ["--generics"], ["--strings"], ["--collections"], ["--scalar-patterns"], ["--oop"], ["--type-arithmetic"], ["--carriers"], ["--async-functions"]):
+        raise RuntimeError("Usage: test-logic-old-release.py [--control-flow|--remaining-control-flow|--basic-syntax|--contract-writing|--native-prerequisite|--enums|--idioms|--generics|--strings|--collections|--scalar-patterns|--oop|--type-arithmetic|--carriers|--async-functions]")
     verifier = load("verify_logic", HERE / "lib/verify-logic.py")
     controls = load("logic_controls", HERE / "test-logic-verifiers.py")
     current = controls.COMPILER_ROOT
@@ -109,6 +109,10 @@ def main():
         if sys.argv[1:] == ["--carriers"]:
             carriers = load("carrier_controls", HERE / "test-carrier-verifiers.py")
             carriers.run_compatibility(old, current, deadline)
+            return
+        if sys.argv[1:] == ["--async-functions"]:
+            asynchronous = load("async_controls", HERE / "test-async-verifiers.py")
+            asynchronous.run_compatibility(old, current, deadline)
             return
         if sys.argv[1:] == ["--enums"]:
             enums = load("enum_controls", HERE / "test-enum-verifiers.py")

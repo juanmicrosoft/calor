@@ -1378,3 +1378,86 @@ existing **600-second total** deadline and 120-second subprocess bounds.
 These are bounded verifier prerequisites for four original tasks, not full
 milestone, task-set or agent acceptance. All 40 prior profiles, all 65,536
 SumToN probes and strict successful-output counterfactual requirements remain.
+
+### Original async-functions behavioral prerequisites
+
+The four `async-001..004` entrypoints use the same selected-root/configuration,
+native-only, bounded test engine as the prior profiles. They check the original
+task prompts, not additional behavior inferred from task titles. Parsed public
+native async declarations and independently compiled CLR `Task<int>` signatures
+with async state machines are both required. Native async `i32`/`int` outputs
+lower to `Task<int>`; explicit task outputs are also checked. DataService must
+be a public native class with a public instance async LoadAsync. Network-read
+rows on ProcessAsync/BackgroundProcessAsync and the network row on LoadAsync
+are read before compilation can synthesize effects.
+
+Actual native calls and awaits are mapped by expression and source-line identity
+to that same public emission. Immutable task aliases are supported. The mapped
+FetchDataAsync/SlowOperationAsync call must resolve to an ordinary native
+auxiliary function. Its body is not run: a test-only task probe supplies
+independent values and tracks exact call/task identity. ProcessAsync must double
+those results; BackgroundProcessAsync must return them unchanged and apply
+ConfigureAwait(false) to the actual awaited task. Unused calls/awaits/configuration,
+unrelated helpers, blocking Result, constants and wrong arithmetic cannot pass.
+Await neutralization must compile and execute successfully and change results;
+mutation errors are rejection, not dependence evidence.
+
+LoadAsync's mapped GetAsync must resolve semantically to the real BCL HttpClient
+in the System.Net.Http assembly, not a same-named or namespace-spoofing class.
+The admitted HTTP fragment uses native local construction
+of a default HttpClient (immutable aliases allowed) and a constant absolute
+HTTP(S) GetAsync(string) address. Receiver and input are validated before
+interception; null clients and invalid addresses reject. No HTTP call is executed.
+Its controlled task must finish before LoadAsync can return 100. Neutralizing the
+await must successfully remove this completion dependence. DataService is
+allocated without executing constructors; auxiliary bodies are not executed.
+Unmodeled calls, properties, custom operators/conversions, static initialization,
+lambdas, constructors/HTTP overloads and injected/field-based clients fail closed.
+This is a bounded admitted fragment, not universal HTTP or arbitrary async support.
+
+GetDataAsync runs three times and returns 42; it need not suspend or delay.
+ProcessAsync runs nine independent representable helper values, including both
+endpoints of the safe doubling interval, with completed and pending tasks.
+BackgroundProcessAsync additionally runs Int32.MinValue/MaxValue unchanged.
+LoadAsync runs two response statuses with completed/pending tasks. Each
+operation-bearing profile also checks completed/pending faults on the exact task.
+The admitted uncaught-await fragment must propagate those controlled faults.
+There are 3, 20, 24 and 6 runtime cases respectively (53 per complete positive
+set). No scheduling, elapsed delay, synchronization-context behavior or universal
+body proof is asserted. Every entry/process/EOF remains bounded by the shared
+120-second deadline; the old runner retains its total 600-second bound.
+The outer control reserves two seconds inside these bounds so the nested
+supervisor can terminate its own process groups before the outer deadline.
+
+```bash
+python3 tests/E2E/agent-tasks/test-async-verifiers.py
+python3 tests/E2E/agent-tasks/test-logic-old-release.py --async-functions
+```
+
+The current suite has four tests and 92 real entrypoint controls, including
+equivalents, fake/dead operations, receiver/input validation, corrupt native
+assets, compiler selection and bounded nontermination. The additive strict old
+mode requires exactly 123 selected actual controls: 61 per arm plus current
+rejection of an old-ID input. This bounded matrix retains every required behavior
+and adversarial category; redundant alias/signature permutations and supervision
+checks remain in the full current suite. It archives unchanged v0.29 commit
+`d82f3ae95175ecd09581c6922701706be72b0ca9`, verifies that release's own native
+manifest, performs locked restore and builds its own compiler source. Only
+disposable old inputs receive old IDs and explicit native input/output syntax.
+Missing APIs/assets/history, failed positive controls and skipped/empty runs
+fail; no reflection fallback or current-binary stand-in is allowed.
+
+Known native/API limits are explicit, not repaired by this test-only unit.
+The current binder rejects an explicitly typed Task<int> local initialized
+directly from a scalar-output native async function with Calor0202; inferred
+locals and native task-returning auxiliary functions are covered alternatives.
+The archived compiler rejects the inferred task.Result negative before CLR
+execution because its getter has unknown effect (Calor0410). The old mode
+asserts that exact blocker and does not label it CLR behavioral evidence.
+
+Only the four verifier scripts, shared test-only dispatch/engine, disposable
+Python controls and this dedicated documentation are changed. task.json files,
+fixtures (including the header-only AsyncOps/Domain inputs), TestData, active
+`.calr` subjects, corpus, historical ledgers/floors, product source, version and
+workflows remain unchanged. No agent/provider, paid call, network service,
+publication, release or milestone-wide acceptance is involved.

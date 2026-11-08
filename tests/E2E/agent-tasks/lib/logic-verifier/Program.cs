@@ -70,6 +70,11 @@ static void Verify(string profile, string path)
         VerifyCarrier(profile, carrierCompilation.Ast, carrierCompilation.GeneratedCode);
         return;
     }
+    if (profile is "async001" or "async002" or "async003" or "async004")
+    {
+        VerifyAsync(profile, path);
+        return;
+    }
     if (profile is "gen001" or "gen002" or "gen003")
     {
         var genericSource = File.ReadAllText(path);
@@ -1179,6 +1184,388 @@ static void VerifyScalarPatterns(string profile, string path)
     if (accepted == 0)
         throw new InvalidOperationException("Required native scalar pattern constructs missing or do not supply the output.");
     Console.WriteLine($"Verification passed: {name}; {inputs.Length} independent runtime cases, actual native arms and successful input/output coupling.");
+}
+
+static void VerifyAsync(string profile, string path)
+{
+    var name = profile switch
+    {
+        "async001" => "GetDataAsync", "async002" => "ProcessAsync",
+        "async003" => "BackgroundProcessAsync", _ => "LoadAsync"
+    };
+    var helperName = profile == "async002" ? "FetchDataAsync" : "SlowOperationAsync";
+    var http = profile == "async004";
+    var source = File.ReadAllText(path);
+    var diagnostics = new DiagnosticBag();
+    var parsed = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+    if (diagnostics.HasErrors)
+        throw new InvalidOperationException($"Calor parsing failed:\n{string.Join("\n", diagnostics)}");
+    void NativeOnly(AstNode node)
+    {
+        if (node is CSharpInteropBlockNode or RawCSharpNode or RawCSharpExpressionNode)
+            throw new InvalidOperationException("Async admission requires native Calor, not raw C#.");
+        foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+            NativeOnly(child);
+    }
+    NativeOnly(parsed);
+    AstNode declaration;
+    IReadOnlyList<StatementNode> body;
+    OutputNode? output;
+    EffectsNode? effects;
+    bool signature;
+    if (http)
+    {
+        var classes = parsed.Classes.Where(candidate => candidate.Name == "DataService").ToArray();
+        if (classes.Length != 1 || classes[0].Visibility != Visibility.Public || classes[0].TypeParameters.Count != 0)
+            throw new InvalidOperationException("Expected exactly one native public DataService class.");
+        var methods = classes[0].Methods.Where(candidate => candidate.Name == name).ToArray();
+        if (methods.Length != 1)
+            throw new InvalidOperationException($"Expected exactly one native method named {name}.");
+        var method = methods[0];
+        declaration = method;
+        body = method.Body;
+        output = method.Output;
+        effects = method.Effects;
+        signature = method.Visibility == Visibility.Public && method.IsAsync && method.TypeParameters.Count == 0
+            && method.Parameters.Count == 0 && method.Modifiers == MethodModifiers.None;
+    }
+    else
+    {
+        var functions = parsed.Functions.Where(candidate => candidate.Name == name).ToArray();
+        if (functions.Length != 1)
+            throw new InvalidOperationException($"Expected exactly one native module function named {name}.");
+        var function = functions[0];
+        declaration = function;
+        body = function.Body;
+        output = function.Output;
+        effects = function.Effects;
+        signature = function.Visibility == Visibility.Public && function.IsAsync && function.TypeParameters.Count == 0
+            && function.Parameters.Count == 0;
+    }
+    bool IntegerTaskOutput(string type)
+    {
+        if (AttributeHelper.ExpandType(type) == AttributeHelper.ExpandType("i32"))
+            return true;
+        var generic = type.IndexOf('<');
+        return generic > 0 && type.EndsWith('>')
+            && type[..generic] is "Task" or "System.Threading.Tasks.Task"
+            && AttributeHelper.ExpandType(type[(generic + 1)..^1]) == AttributeHelper.ExpandType("i32");
+    }
+    if (!signature || output == null || !IntegerTaskOutput(output.TypeName))
+        throw new InvalidOperationException($"Wrong native public async signature for {name}.");
+    if (profile != "async001" && !(effects?.Effects.TryGetValue("io", out var row) == true
+        && row.Split(',').Contains(http ? "network" : "network_read", StringComparer.Ordinal)))
+        throw new InvalidOperationException($"Declared native {(http ? "network" : "network-read")} effect missing.");
+    var compilation = Calor.Compiler.Program.Compile(source, path,
+        new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
+    if (compilation.HasErrors || compilation.Ast == null)
+        throw new InvalidOperationException($"Calor compilation failed:\n{string.Join("\n", compilation.Diagnostics)}");
+    var (originalAssembly, original) = CompileRuntime(compilation.GeneratedCode);
+    var module = compilation.Ast;
+    MethodInfo Method(Assembly assembly)
+    {
+        var type = assembly.GetType(http ? $"{module.Name}.DataService" : $"{module.Name}.{module.Name}Module")
+            ?? throw new InvalidOperationException("Generated async type missing.");
+        var method = type.GetMethod(name, BindingFlags.Public | (http ? BindingFlags.Instance : BindingFlags.Static),
+            Type.EmptyTypes) ?? throw new InvalidOperationException("Generated exact CLR async signature missing.");
+        if (!type.IsPublic || type.IsGenericType || method.IsGenericMethod || method.ReturnType != typeof(Task<int>)
+            || method.GetCustomAttribute<System.Runtime.CompilerServices.AsyncStateMachineAttribute>() == null)
+            throw new InvalidOperationException("Wrong reflected CLR async signature/state machine.");
+        return method;
+    }
+    _ = Method(originalAssembly);
+    var options = new CSharpParseOptions(LanguageVersion.Preview);
+    var mapped = CSharpSyntaxTree.ParseText(
+        new CSharpEmitter(ContractMode.Debug) { LineDirectiveFilePath = path }.Emit(module), options);
+    if (!SyntaxFactory.AreEquivalent(original[1].GetRoot(), mapped.GetRoot()))
+        throw new InvalidOperationException("Async mapping differs from independently compiled public emission.");
+    var root = mapped.GetCompilationUnitRoot();
+    var methodSyntax = root.DescendantNodes().OfType<ClassDeclarationSyntax>()
+        .Single(type => type.Identifier.ValueText == (http ? "DataService" : module.Name + "Module"))
+        .Members.OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == name);
+    var container = (ClassDeclarationSyntax)methodSyntax.Parent!;
+    if (container.Members.OfType<ConstructorDeclarationSyntax>().Any(constructor =>
+            constructor.Modifiers.Any(SyntaxKind.StaticKeyword))
+        || container.Members.OfType<FieldDeclarationSyntax>().Any(field =>
+            field.Modifiers.Any(SyntaxKind.StaticKeyword) && field.Declaration.Variables.Any(variable => variable.Initializer != null)))
+        throw new InvalidOperationException("Unmodeled async static initialization.");
+    var semanticCompilation = CSharpCompilation.Create("AsyncMapping", [
+        CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble, options), mapped],
+        GeneratedCSharpCompiler.References, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    var semantic = semanticCompilation.GetSemanticModel(mapped);
+    bool HttpClientType(ITypeSymbol type) => type.ToDisplayString() == "System.Net.Http.HttpClient"
+        && type.ContainingAssembly.Name == "System.Net.Http";
+    bool BclTaskType(ITypeSymbol type) => type.ContainingAssembly.Name == "System.Private.CoreLib"
+        && type.ContainingNamespace.ToDisplayString() == "System.Threading.Tasks"
+        && type.Name == "Task";
+    if (methodSyntax.DescendantNodes().Any(node => node is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax))
+        throw new InvalidOperationException("Unmodeled async lambda/local function in target.");
+    var natives = RecursiveAstWalker.EnumerateStatements(body)
+        .SelectMany(statement => StringNativeExpressions(statement).Select(expression => (Statement: statement, Expression: expression)))
+        .ToArray();
+    ExpressionSyntax Map(ExpressionNode native, StatementNode statement)
+    {
+        var emitted = SyntaxFactory.ParseExpression(native.Accept(new CSharpEmitter(ContractMode.Debug)));
+        var matches = methodSyntax.DescendantNodes().OfType<ExpressionSyntax>()
+            .Where(expression => SyntaxFactory.AreEquivalent(expression, emitted)
+                && expression.AncestorsAndSelf().OfType<StatementSyntax>()
+                    .SelectMany(container => container.GetFirstToken().LeadingTrivia)
+                    .Select(trivia => trivia.GetStructure()).OfType<LineDirectiveTriviaSyntax>()
+                    .FirstOrDefault(directive => directive.IsActive && directive.File.ValueText == path)
+                    ?.Line.ValueText == statement.Span.Line.ToString(System.Globalization.CultureInfo.InvariantCulture))
+            .ToArray();
+        if (matches.Length != 1)
+            throw new InvalidOperationException("Ambiguous/missing native async expression mapping.");
+        return matches[0];
+    }
+    var calls = natives.Where(native => native.Expression is CallExpressionNode)
+        .Select(native => Map(native.Expression, native.Statement)).OfType<InvocationExpressionSyntax>()
+        .Where(call => semantic.GetSymbolInfo(call).Symbol is IMethodSymbol symbol
+            && (http ? symbol.Name == "GetAsync" && HttpClientType(symbol.ContainingType)
+                : symbol.Name == helperName && SymbolEqualityComparer.Default.Equals(
+                    symbol.ContainingType, semantic.GetDeclaredSymbol(container))))
+        .Distinct().ToArray();
+    if (profile != "async001" && calls.Length != 1)
+        throw new InvalidOperationException("Expected exactly one mapped required native async call.");
+    if (!http && profile != "async001")
+    {
+        var helpers = parsed.Functions.Where(function => function.Name == helperName).ToArray();
+        if (helpers.Length != 1 || helpers[0].Parameters.Count != 0 || helpers[0].TypeParameters.Count != 0
+            || helpers[0].Output == null || !IntegerTaskOutput(helpers[0].Output!.TypeName)
+            || !helpers[0].IsAsync && AttributeHelper.ExpandType(helpers[0].Output!.TypeName) == AttributeHelper.ExpandType("i32")
+            || calls[0].ArgumentList.Arguments.Count != 0)
+            throw new InvalidOperationException("Required native auxiliary Task<int> function missing/wrong.");
+    }
+    // Nothing outside the mapped task call may execute a provider or arbitrary helper.
+    foreach (var call in methodSyntax.DescendantNodes().OfType<InvocationExpressionSyntax>())
+    {
+        var symbol = semantic.GetSymbolInfo(call).Symbol as IMethodSymbol;
+        if (calls.Contains(call))
+            continue;
+        if (symbol is { Name: "ConfigureAwait" } && BclTaskType(symbol.ContainingType)
+            && symbol.ContainingType.OriginalDefinition.ToDisplayString()
+            == "System.Threading.Tasks.Task<TResult>")
+            continue;
+        if (symbol is { Name: "FromResult" } && BclTaskType(symbol.ContainingType))
+            continue;
+        throw new InvalidOperationException("Unmodeled executable async call; no network/provider fallback.");
+    }
+    foreach (var creation in methodSyntax.DescendantNodes().OfType<ObjectCreationExpressionSyntax>())
+        if (semantic.GetSymbolInfo(creation).Symbol is not IMethodSymbol
+            { ContainingType: { } constructed } || !HttpClientType(constructed)
+            || creation.ArgumentList?.Arguments.Count != 0 || creation.Initializer != null)
+            throw new InvalidOperationException("Unmodeled async construction.");
+    foreach (var access in methodSyntax.DescendantNodes().OfType<ExpressionSyntax>())
+        if (semantic.GetSymbolInfo(access).Symbol is IPropertySymbol
+            or IFieldSymbol { IsStatic: true, IsConst: false }
+            or IMethodSymbol { MethodKind: MethodKind.UserDefinedOperator or MethodKind.Conversion })
+            throw new InvalidOperationException("Unmodeled async property access (blocking Result is not await).");
+    var bindings = RecursiveAstWalker.EnumerateStatements(body).OfType<BindStatementNode>()
+        .GroupBy(binding => binding.Name).Where(group => group.Count() == 1)
+        .ToDictionary(group => group.Key, group => group.Single(), StringComparer.Ordinal);
+    ExpressionSyntax Ungroup(ExpressionSyntax expression) => expression is ParenthesizedExpressionSyntax parenthesized
+        ? Ungroup(parenthesized.Expression) : expression;
+    ExpressionSyntax ResolveLocal(ExpressionSyntax expression, HashSet<string> resolving)
+    {
+        expression = Ungroup(expression);
+        if (expression is IdentifierNameSyntax identifier && semantic.GetSymbolInfo(expression).Symbol is ILocalSymbol
+            && resolving.Add(identifier.Identifier.ValueText)
+            && bindings.TryGetValue(identifier.Identifier.ValueText, out var binding)
+            && !binding.IsMutable && binding.Initializer != null)
+            return ResolveLocal(Map(binding.Initializer, binding), resolving);
+        return expression;
+    }
+    if (http)
+    {
+        var call = calls[0];
+        if (call.Expression is not MemberAccessExpressionSyntax member
+            || ResolveLocal(member.Expression, new(StringComparer.Ordinal)) is not ObjectCreationExpressionSyntax client
+            || semantic.GetSymbolInfo(client).Symbol is not IMethodSymbol constructor
+            || !HttpClientType(constructor.ContainingType)
+            || call.ArgumentList.Arguments.Count != 1
+            || semantic.GetConstantValue(ResolveLocal(call.ArgumentList.Arguments[0].Expression, new(StringComparer.Ordinal)))
+                is not { HasValue: true, Value: string address }
+            || !Uri.TryCreate(address, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
+            throw new InvalidOperationException("Unmodeled HTTP receiver/input: require a native new HttpClient and constant absolute HTTP(S) GetAsync(string) input.");
+    }
+    bool SameTask(ExpressionSyntax expression, HashSet<string> resolving)
+    {
+        expression = Ungroup(expression);
+        if (calls.Contains(expression))
+            return true;
+        if (expression is not IdentifierNameSyntax identifier
+            || semantic.GetSymbolInfo(expression).Symbol is not ILocalSymbol)
+            return false;
+        var alias = identifier.Identifier.ValueText;
+        if (!resolving.Add(alias) || !bindings.TryGetValue(alias, out var binding) || binding.IsMutable
+            || binding.Initializer == null)
+            return false;
+        return SameTask(Map(binding.Initializer, binding), resolving);
+    }
+    var witnesses = new List<(AwaitExpressionSyntax Await, ExpressionSyntax Task)>();
+    foreach (var native in natives.Where(native => native.Expression is AwaitExpressionNode))
+    {
+        var awaited = (AwaitExpressionSyntax)Map(native.Expression, native.Statement);
+        var operand = Ungroup(awaited.Expression);
+        var configuredFalse = false;
+        if (operand is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax member } configure
+            && semantic.GetSymbolInfo(configure).Symbol is IMethodSymbol { Name: "ConfigureAwait" } symbol
+            && BclTaskType(symbol.ContainingType)
+            && symbol.ContainingType.OriginalDefinition.ToDisplayString() == "System.Threading.Tasks.Task<TResult>")
+        {
+            configuredFalse = configure.ArgumentList.Arguments.Count == 1
+                && semantic.GetConstantValue(configure.ArgumentList.Arguments[0].Expression) is { HasValue: true, Value: false };
+            operand = Ungroup(member.Expression);
+        }
+        if (profile != "async001" && SameTask(operand, new(StringComparer.Ordinal))
+            && (profile != "async003" || configuredFalse))
+            witnesses.Add((awaited, operand));
+    }
+    if (profile != "async001" && witnesses.Count != 1)
+        throw new InvalidOperationException("Required actual same-task await/ConfigureAwait(false) missing or ambiguous.");
+    var probeSource = """
+        public static class AsyncTaskProbe
+        {
+            public static System.Threading.Tasks.Task<int> IntegerTask = null!;
+            public static System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage> HttpTask = null!;
+            public static int Calls, Awaits;
+            public static System.Threading.Tasks.Task<int> NextInt() { Calls++; return IntegerTask; }
+            public static System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage> NextHttp() { Calls++; return HttpTask; }
+            public static System.Threading.Tasks.Task<T> Track<T>(System.Threading.Tasks.Task<T> task)
+            {
+                if (!object.ReferenceEquals(task, typeof(T) == typeof(int) ? (object)IntegerTask : HttpTask))
+                    throw new System.InvalidOperationException("Wrong task identity.");
+                Awaits++;
+                return task;
+            }
+        }
+        """;
+    var targetNodes = profile == "async001" ? Array.Empty<ExpressionSyntax>()
+        : new[] { (ExpressionSyntax)calls[0], witnesses[0].Task }.Distinct().ToArray();
+    var instrumented = root.ReplaceNodes(targetNodes, (before, rewritten) =>
+    {
+        ExpressionSyntax replacement = calls.Contains(before)
+            ? SyntaxFactory.ParseExpression(http ? "global::AsyncTaskProbe.NextHttp()" : "global::AsyncTaskProbe.NextInt()")
+            : rewritten;
+        if (witnesses.Any(witness => witness.Task == before))
+            replacement = SyntaxFactory.ParseExpression($"global::AsyncTaskProbe.Track({replacement})");
+        return replacement.WithTriviaFrom(before);
+    }).AddMembers(SyntaxFactory.ParseMemberDeclaration(probeSource)
+        ?? throw new InvalidOperationException("Cannot parse async instrumentation."));
+    var probeAssembly = CompileRuntime(instrumented.ToFullString()).Assembly;
+    var target = Method(probeAssembly);
+    var probe = probeAssembly.GetType("AsyncTaskProbe") ?? throw new InvalidOperationException("Async probe missing.");
+    var instance = http ? System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(target.DeclaringType!) : null;
+    Task<int> Invoke() => target.Invoke(instance, null) as Task<int>
+        ?? throw new InvalidOperationException("Async invocation did not return Task<int>.");
+    var values = new[] { 0, 1, -1, 21, 42, -101, 103, int.MinValue / 2, int.MaxValue / 2 };
+    if (profile == "async003")
+        values = [.. values, int.MinValue, int.MaxValue];
+    int Expected(int value) => profile switch
+    {
+        "async001" => 42, "async002" => checked(value * 2), "async003" => value, _ => 100
+    };
+    var executed = 0;
+    if (profile == "async001")
+    {
+        for (var index = 0; index < 3; index++)
+        {
+            if (Invoke().WaitAsync(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult() != 42)
+                throw new InvalidOperationException("Wrong asynchronous GetDataAsync value.");
+            executed++;
+        }
+    }
+    else
+    {
+        foreach (var value in http ? new[] { 0, 1 } : values)
+        foreach (var pending in new[] { false, true })
+        {
+            var integer = new TaskCompletionSource<int>();
+            var response = new TaskCompletionSource<System.Net.Http.HttpResponseMessage>();
+            using var message = new System.Net.Http.HttpResponseMessage(
+                value == 0 ? System.Net.HttpStatusCode.OK : System.Net.HttpStatusCode.Accepted);
+            probe.GetField("IntegerTask")!.SetValue(null, integer.Task);
+            probe.GetField("HttpTask")!.SetValue(null, response.Task);
+            probe.GetField("Calls")!.SetValue(null, 0);
+            probe.GetField("Awaits")!.SetValue(null, 0);
+            if (!pending)
+            {
+                integer.SetResult(value);
+                response.SetResult(message);
+            }
+            var result = Invoke();
+            if ((int)probe.GetField("Calls")!.GetValue(null)! != 1
+                || (int)probe.GetField("Awaits")!.GetValue(null)! != 1)
+                throw new InvalidOperationException("Mapped required call/await did not execute exactly once.");
+            if (pending)
+            {
+                if (result.IsCompleted)
+                    throw new InvalidOperationException("Async target completed before its actual controlled operation.");
+                integer.SetResult(value);
+                response.SetResult(message);
+            }
+            if (result.WaitAsync(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult() != Expected(value))
+                throw new InvalidOperationException("Wrong controlled async result dependence.");
+            executed++;
+        }
+        // Fault propagation belongs to the same task; an unrelated/dead await cannot supply it.
+        foreach (var pending in new[] { false, true })
+        {
+            var integer = new TaskCompletionSource<int>();
+            var response = new TaskCompletionSource<System.Net.Http.HttpResponseMessage>();
+            var fault = new InvalidOperationException("independent controlled fault");
+            probe.GetField("IntegerTask")!.SetValue(null, integer.Task);
+            probe.GetField("HttpTask")!.SetValue(null, response.Task);
+            probe.GetField("Calls")!.SetValue(null, 0);
+            probe.GetField("Awaits")!.SetValue(null, 0);
+            if (!pending)
+            {
+                if (http) response.SetException(fault); else integer.SetException(fault);
+            }
+            var result = Invoke();
+            if ((int)probe.GetField("Calls")!.GetValue(null)! != 1
+                || (int)probe.GetField("Awaits")!.GetValue(null)! != 1 || pending && result.IsCompleted)
+                throw new InvalidOperationException("Wrong controlled fault call/await ordering.");
+            if (pending)
+            {
+                if (http) response.SetException(fault); else integer.SetException(fault);
+            }
+            try
+            {
+                _ = result.WaitAsync(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult();
+                throw new InvalidOperationException("Controlled task fault was swallowed.");
+            }
+            catch (InvalidOperationException error) when (ReferenceEquals(error, fault)) { }
+            executed++;
+        }
+        // Successful neutralization, not an exception, proves the await matters.
+        var witness = witnesses[0].Await;
+        var neutral = SyntaxFactory.ParseExpression(http ? "default(global::System.Net.Http.HttpResponseMessage)" : "0")
+            .WithTriviaFrom(witness);
+        var counterRoot = root.ReplaceNode(witness, neutral);
+        var mappedCall = counterRoot.DescendantNodes().OfType<InvocationExpressionSyntax>()
+            .Where(call => SyntaxFactory.AreEquivalent(call, calls[0])).ToArray();
+        counterRoot = counterRoot.ReplaceNodes(mappedCall, (before, _) =>
+            SyntaxFactory.ParseExpression(http ? "global::AsyncTaskProbe.NextHttp()" : "global::AsyncTaskProbe.NextInt()")
+                .WithTriviaFrom(before))
+            .AddMembers(SyntaxFactory.ParseMemberDeclaration(probeSource)!);
+        var counterAssembly = CompileRuntime(counterRoot.ToFullString()).Assembly;
+        var counter = Method(counterAssembly);
+        var counterProbe = counterAssembly.GetType("AsyncTaskProbe")!;
+        counterProbe.GetField("IntegerTask")!.SetValue(null, Task.FromResult(103));
+        counterProbe.GetField("HttpTask")!.SetValue(null, new TaskCompletionSource<System.Net.Http.HttpResponseMessage>().Task);
+        var counterInstance = http ? System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(counter.DeclaringType!) : null;
+        var counterResult = (Task<int>)counter.Invoke(counterInstance, null)!;
+        if (http)
+        {
+            if (!counterResult.IsCompletedSuccessfully || counterResult.GetAwaiter().GetResult() != 100)
+                throw new InvalidOperationException("Await-neutralized HTTP control did not successfully remove completion dependence.");
+        }
+        else if (counterResult.WaitAsync(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult() == Expected(103))
+            throw new InvalidOperationException("Async await neutralization did not change the result.");
+    }
+    Console.WriteLine($"Verification passed: {name}; exact native/CLR async signatures, {executed} controlled cases and same-task await coupling.");
+    Console.WriteLine("Limits: finite representable values and controlled completed/pending/faulted tasks; no scheduling/delay or universal body proof. No real network; auxiliary bodies and constructors are not executed.");
 }
 
 static void VerifyStrings(string profile, string path)
