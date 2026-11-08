@@ -773,3 +773,86 @@ The existing 120-second per-profile and 600-second historical total bounds,
 unconditional native prerequisite, other profiles, and measured no-admission
 gate remain unchanged. Original task definitions, fixtures, active .calr
 subjects, product code, corpus membership, ledgers, and floors are unchanged.
+
+### Original string prompts (`str-001` through `str-005`)
+
+The five unchanged `task.json` prompts are authoritative, not their broader
+directory titles. They require `StringLength(str s) -> i32`,
+`StringContains(str s, str sub) -> bool`, `GetFirstChar(str s) -> char` with
+`length(s) > 0`, `IsValidEmail(str email) -> bool` using regex pattern `"@"`,
+and `BuildGreeting(str name) -> str` using a newly constructed StringBuilder.
+There are no upper/lower, starts/ends, or RFC email-validation requirements.
+Each existing `verify.sh` now selects its own `str001`..`str005` profile in the
+shared selected-compiler helper. Native aliases and supported equivalent BCL
+forms are accepted, including `s.Length`, `s.Contains(sub)`, `Regex.IsMatch`,
+and builder method calls, not just one lexical spelling.
+
+The selected native/public AST and reflected public/static CLR method must
+have the exact names, parameter order, string parameters and int/bool/char/string
+return types. Debug public emission is independently compiled and compared
+against selected-public `#line` emission before mapping native witnesses.
+Length, contains, index-zero char access and pattern-`"@"` regex must contribute
+to returned data, directly or through unique immutable local bindings. Merely
+placing a builtin in an unused binding, branch condition, comment or unrelated
+helper cannot supply the witness. Independently compiled contract-disabled
+baselines must preserve behavior. Neutralizing mapped operations must change
+outputs; mapping ambiguity, compilation failures and counterfactual exceptions
+reject, rather than count as dependence evidence.
+
+Builder checks instrument native construction, appends and ToString in the
+selected public emission. Every sampled returned string must be the actual
+ToString result of the same newly created instance whose append arguments are
+exactly `"Hello, "`, the input name, and `"!"`, in order. Nested/chained appends,
+local aliases and BCL method calls are supported. Append neutralization must
+change the greeting. A dead builder followed by independent concatenation,
+different instances, constructor-seeded prefixes, wrong ordering and
+noncontributing appends cannot pass.
+
+Independent host CLR oracles use 23 strings: empty/nonempty values, case-sensitive
+matches, signed-like punctuation, `@` in otherwise invalid email-like strings,
+quotes, whitespace/newlines, composed/decomposed Unicode, non-BMP surrogate
+pairs, isolated surrogates and embedded NUL code units. Length runs 23 cases,
+contains runs all 529 ordered pairs against an explicit ordinal code-unit search,
+first-char runs 22 nonempty cases, regex runs 23 cases against literal-`@` search,
+and greetings run 23 cases against independent concatenation: 620 behavior
+cases per complete positive five-function set. GetFirstChar additionally must
+reject empty input via a native explicit or inline contract, not an index error.
+
+Contract equivalence is proved only in a test-only integer-length abstraction:
+each non-null CLR string has a length in `0..Int32.MaxValue`. Supported native
+length predicates use integer literal comparisons and Boolean conjunction,
+disjunction and negation, including native inline `#` refinements. GetFirstChar
+must admit exactly positive lengths; other profiles cannot narrow the non-null
+prompt domain. Optional supported predicates must be tautological on that
+domain. Arithmetic, calls, result predicates and nullability predicates outside
+this fragment fail closed. Solver unknown/timeouts do not count as proofs.
+No Z3 Unicode-string length is equated with CLR UTF-16 length. These finite
+runtime checks are not universal body proofs, and neither null behavior nor
+arbitrary string/char postconditions are proved.
+
+```bash
+python3 tests/E2E/agent-tasks/test-string-verifiers.py
+python3 tests/E2E/agent-tasks/test-logic-old-release.py --strings
+```
+
+The current suite executes six tests and 128 real `verify.sh` controls. It
+checks success counts, equivalent native/BCL forms, exact native/CLR types,
+missing and narrowed contracts, unused and control-only builtins, dead/different
+builders, ambiguous mappings, counterfactual runtime errors, corrupt native
+images, root/configuration rejection and bounded nontermination.
+
+The additive strict `--strings` mode executes 123 actual old/current entrypoint
+controls: 61 against each arm and current rejection of an old-ID input. It uses
+the existing archive of `d82f3ae95175ecd09581c6922701706be72b0ca9`, its own
+native manifest verification, locked restore and unchanged compiler build.
+Only disposable old inputs receive IDs and old native `§I` refinements.
+Both arms exercise genuine positives, signature/contract failures and
+behaviorally correct unused-builtin/dead-builder decoys. Missing native assets,
+history/APIs, build errors, skipped/empty controls or unknown proofs fail; there
+is no current-binary stand-in or fallback. Existing old modes, the 600-second
+total bound, and the shared 120-second entry/process/EOF bound are unchanged.
+
+This unit changes only these five behavioral prerequisites. Task definitions,
+fixtures, TestData, active `.calr` subjects, corpus membership, historical
+ledgers/floors and product source remain byte-unchanged. It does not run an
+agent/provider or establish milestone, experiment or release acceptance.

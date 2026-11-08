@@ -51,6 +51,11 @@ static void Verify(string profile, string path)
         VerifyGeneric(profile, genericCompilation.Ast, genericCompilation.GeneratedCode);
         return;
     }
+    if (profile is "str001" or "str002" or "str003" or "str004" or "str005")
+    {
+        VerifyStrings(profile, path);
+        return;
+    }
     if (profile is "enum001" or "enum002" or "enum003")
     {
         var enumSource = File.ReadAllText(path);
@@ -624,6 +629,406 @@ static void CheckGaussFormula(ModuleNode module, SyntaxTree original, FunctionNo
     }
     if (!changedOutput)
         throw new InvalidOperationException("Gauss coupling failed: native formulas do not affect any representable result.");
+}
+
+static void VerifyStrings(string profile, string path)
+{
+    var name = profile switch
+    {
+        "str001" => "StringLength", "str002" => "StringContains", "str003" => "GetFirstChar",
+        "str004" => "IsValidEmail", "str005" => "BuildGreeting",
+        _ => throw new InvalidOperationException("Unknown string profile.")
+    };
+    string[] names = profile switch
+    {
+        "str002" => ["s", "sub"], "str004" => ["email"], "str005" => ["name"], _ => ["s"]
+    };
+    var returnType = profile switch
+    {
+        "str001" => typeof(int), "str003" => typeof(char), "str005" => typeof(string), _ => typeof(bool)
+    };
+    var source = File.ReadAllText(path);
+    var compilation = Calor.Compiler.Program.Compile(source, path,
+        new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
+    if (compilation.HasErrors || compilation.Ast == null)
+        throw new InvalidOperationException($"Calor compilation failed:\n{string.Join("\n", compilation.Diagnostics)}");
+    var module = compilation.Ast;
+    var functions = module.Functions.Where(candidate => candidate.Name == name).ToArray();
+    if (functions.Length != 1)
+        throw new InvalidOperationException($"Expected exactly one native module function named {name}.");
+    var function = functions[0];
+    var output = profile switch { "str001" => "i32", "str003" => "char", "str005" => "str", _ => "bool" };
+    if (function.Visibility != Visibility.Public || function.IsAsync || function.TypeParameters.Count != 0
+        || function.Output == null || AttributeHelper.ExpandType(function.Output.TypeName) != AttributeHelper.ExpandType(output)
+        || !function.Parameters.Select(parameter => parameter.Name).SequenceEqual(names)
+        || function.Parameters.Any(parameter => AttributeHelper.ExpandType(parameter.TypeName) != AttributeHelper.ExpandType("str")
+            || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None))
+        throw new InvalidOperationException($"Wrong public string signature for {name}.");
+    CheckStringDomain(function, names, profile == "str003");
+    var (assembly, original) = CompileRuntime(compilation.GeneratedCode);
+    MethodInfo Method(Assembly runtime)
+    {
+        var type = runtime.GetType($"{module.Name}.{module.Name}Module")
+            ?? throw new InvalidOperationException("Generated string module type missing.");
+        var method = type.GetMethod(name, BindingFlags.Public | BindingFlags.Static, names.Select(_ => typeof(string)).ToArray())
+            ?? throw new InvalidOperationException("Generated exact CLR string signature missing.");
+        if (!type.IsPublic || method.IsGenericMethod || method.ReturnType != returnType
+            || !method.GetParameters().Select(parameter => parameter.Name).SequenceEqual(names))
+            throw new InvalidOperationException("Wrong reflected CLR string signature.");
+        return method;
+    }
+    var cases = StringCases(profile).ToArray();
+    void Behavior(MethodInfo method)
+    {
+        foreach (var (inputs, expected) in cases)
+            if (!Equals(method.Invoke(null, inputs.Cast<object>().ToArray()), expected))
+                throw new InvalidOperationException($"Wrong string behavior for {name}({System.Text.Json.JsonSerializer.Serialize(inputs)}).");
+    }
+    var target = Method(assembly);
+    Behavior(target);
+    if (profile == "str003")
+    {
+        try
+        {
+            target.Invoke(null, [""]);
+            throw new InvalidOperationException("GetFirstChar accepted an empty string.");
+        }
+        catch (TargetInvocationException error) when (error.InnerException?.GetType().FullName == "Calor.Runtime.ContractViolationException")
+        {
+            // An index exception is not precondition enforcement.
+        }
+        catch (TargetInvocationException error) when (function.Parameters[0].InlineRefinement != null
+            && error.InnerException is ArgumentOutOfRangeException { ParamName: "s" } refinement
+            && refinement.Message.StartsWith("Violation of inline refinement for parameter 's'", StringComparison.Ordinal))
+        {
+        }
+    }
+    var options = new CSharpParseOptions(LanguageVersion.Preview);
+    var debugMapped = CSharpSyntaxTree.ParseText(
+        new CSharpEmitter(ContractMode.Debug) { LineDirectiveFilePath = path }.Emit(module), options);
+    if (!SyntaxFactory.AreEquivalent(original[1].GetRoot(), debugMapped.GetRoot()))
+        throw new InvalidOperationException("String mapping differs from the independently compiled public emission.");
+    var mapped = CSharpSyntaxTree.ParseText(
+        new CSharpEmitter(ContractMode.Off) { LineDirectiveFilePath = path }.Emit(module), options);
+    var root = mapped.GetCompilationUnitRoot();
+    var methodSyntax = root.DescendantNodes().OfType<ClassDeclarationSyntax>()
+        .Single(type => type.Identifier.ValueText == module.Name + "Module").Members.OfType<MethodDeclarationSyntax>()
+        .Single(method => method.Identifier.ValueText == name);
+    var semanticCompilation = CSharpCompilation.Create("StringMapping", [
+        CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble, options), mapped],
+        GeneratedCSharpCompiler.References, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    var semantic = semanticCompilation.GetSemanticModel(mapped);
+    var bindings = RecursiveAstWalker.EnumerateStatements(function.Body).OfType<BindStatementNode>()
+        .GroupBy(binding => binding.Name).Where(group => group.Count() == 1)
+        .ToDictionary(group => group.Key, group => group.Single(), StringComparer.Ordinal);
+    var returnedData = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+    void ReturnData(AstNode node)
+    {
+        if (!returnedData.Add(node))
+            return;
+        if (node is ReferenceNode reference && bindings.TryGetValue(reference.Name, out var binding)
+            && !binding.IsMutable && binding.Initializer != null)
+            ReturnData(binding.Initializer);
+        if (node is ConditionalExpressionNode conditional)
+        {
+            ReturnData(conditional.WhenTrue);
+            ReturnData(conditional.WhenFalse);
+        }
+        else if (node is not LambdaExpressionNode)
+            foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+                ReturnData(child);
+    }
+    foreach (var returned in RecursiveAstWalker.EnumerateStatements(function.Body).OfType<ReturnStatementNode>())
+        if (returned.Expression != null)
+            ReturnData(returned.Expression);
+    var witnesses = new List<(ExpressionSyntax Expression, string Kind)>();
+    foreach (var statement in RecursiveAstWalker.EnumerateStatements(function.Body))
+    {
+        foreach (var native in StringNativeExpressions(statement).Cast<AstNode>()
+            .Concat(statement is CallStatementNode ? [statement] : []))
+        {
+            if (native is not (StringOperationNode or CharOperationNode or StringBuilderOperationNode
+                or FieldAccessNode or ArrayAccessNode or CallExpressionNode or NewExpressionNode or CallStatementNode or ReferenceNode))
+                continue;
+            var emitted = SyntaxFactory.ParseExpression(native.Accept(new CSharpEmitter(ContractMode.Off)).TrimEnd(';'));
+            var matches = methodSyntax.DescendantNodes().OfType<ExpressionSyntax>()
+                .Where(expression => SyntaxFactory.AreEquivalent(expression, emitted)
+                    && expression.AncestorsAndSelf().OfType<StatementSyntax>()
+                        .SelectMany(container => container.GetFirstToken().LeadingTrivia)
+                        .Select(trivia => trivia.GetStructure()).OfType<LineDirectiveTriviaSyntax>()
+                        .FirstOrDefault(directive => directive.IsActive && directive.File.ValueText == path)
+                        ?.Line.ValueText == statement.Span.Line.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                .ToArray();
+            if (matches.Length == 0)
+            {
+                if (native is StringOperationNode or CharOperationNode or StringBuilderOperationNode)
+                    throw new InvalidOperationException("Cannot map native string expression to selected public emission.");
+                continue;
+            }
+            foreach (var expression in matches)
+            {
+                var symbol = semantic.GetSymbolInfo(expression).Symbol;
+                var kind = symbol switch
+                {
+                    IPropertySymbol { Name: "Length", ContainingType.SpecialType: SpecialType.System_String } => "length",
+                    IPropertySymbol { IsIndexer: true, ContainingType.SpecialType: SpecialType.System_String } => "char",
+                    IMethodSymbol { Name: "Contains", ContainingType.SpecialType: SpecialType.System_String } => "contains",
+                    IMethodSymbol { Name: "IsMatch" } member when member.ContainingType.ToDisplayString() == "System.Text.RegularExpressions.Regex"
+                        => "regex",
+                    IMethodSymbol member when member.ContainingType.ToDisplayString() == "System.Text.StringBuilder"
+                        => member.MethodKind == MethodKind.Constructor ? "new" : member.Name,
+                    _ => null
+                };
+                if (kind == null)
+                    continue;
+                if (matches.Length != 1)
+                    throw new InvalidOperationException("Ambiguous native string expression mapping.");
+                if (kind == "regex" && expression is InvocationExpressionSyntax regex
+                    && (regex.ArgumentList.Arguments.Count != 2
+                        || !IsAtPattern(regex.ArgumentList.Arguments[1].Expression)))
+                    continue;
+                if (kind == "char" && expression is ElementAccessExpressionSyntax element
+                    && (element.ArgumentList.Arguments.Count != 1
+                        || semantic.GetConstantValue(element.ArgumentList.Arguments[0].Expression) is not { HasValue: true, Value: 0 }))
+                    continue;
+                if (kind is "length" or "contains" or "char" or "regex" or "ToString"
+                    && !returnedData.Contains(native))
+                    continue;
+                var operands = expression switch
+                {
+                    MemberAccessExpressionSyntax member => new[] { member.Expression },
+                    ElementAccessExpressionSyntax access => new[] { access.Expression },
+                    InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax member } call
+                        => kind == "regex" ? call.ArgumentList.Arguments.Select(argument => argument.Expression).ToArray()
+                            : new[] { member.Expression }.Concat(call.ArgumentList.Arguments.Select(argument => argument.Expression)).ToArray(),
+                    _ => Array.Empty<ExpressionSyntax>()
+                };
+                if (kind is "length" or "contains" or "char" or "regex"
+                    && (operands.Length == 0 || !IsInput(operands[0], names[0], new(StringComparer.Ordinal))
+                        || kind == "contains" && (operands.Length < 2 || !IsInput(operands[1], "sub", new(StringComparer.Ordinal)))))
+                    continue;
+                if (!witnesses.Any(witness => witness.Expression == expression))
+                    witnesses.Add((expression, kind));
+            }
+        }
+    }
+    var required = profile switch { "str001" => "length", "str002" => "contains", "str003" => "char", "str004" => "regex", _ => "ToString" };
+    var relevant = witnesses.Where(witness => witness.Kind == required).ToArray();
+    if (relevant.Length == 0)
+        throw new InvalidOperationException($"Required native string operation {required} missing.");
+    MethodInfo Build(CompilationUnitSyntax unit) => Method(CompileRuntime(unit.ToFullString()).Assembly);
+    Behavior(Build(root));
+    bool Changes(ExpressionSyntax expression, ExpressionSyntax replacement)
+    {
+        var probe = Build(root.ReplaceNode(expression, replacement));
+        var changed = false;
+        foreach (var (inputs, expected) in cases)
+        {
+            try
+            {
+                changed |= !Equals(probe.Invoke(null, inputs.Cast<object>().ToArray()), expected);
+            }
+            catch (TargetInvocationException error)
+            {
+                throw new InvalidOperationException("String counterfactual runtime failed; exceptions are not coupling evidence.", error);
+            }
+        }
+        return changed;
+    }
+    ExpressionSyntax Neutral() => SyntaxFactory.ParseExpression(profile switch
+    {
+        "str001" => "0", "str003" => "'\\0'", "str005" => "\"\"", _ => "false"
+    });
+    if (!relevant.Select(witness => Changes(witness.Expression, Neutral())).ToArray().Any(changed => changed))
+        throw new InvalidOperationException("String coupling failed: required operations do not contribute to returned results.");
+    if (profile == "str005")
+    {
+        if (!witnesses.Any(witness => witness.Kind == "new") || !witnesses.Any(witness => witness.Kind == "Append"))
+            throw new InvalidOperationException("Required native StringBuilder construction/appends missing.");
+        var instrumented = root.ReplaceNodes(witnesses.Where(witness => witness.Kind is "new" or "Append" or "ToString")
+            .Select(witness => witness.Expression), (before, rewritten) =>
+            {
+                var kind = witnesses.Single(witness => witness.Expression == before).Kind;
+                if (kind == "new")
+                    return SyntaxFactory.ParseExpression($"global::StringTaskProbe.New({rewritten})");
+                if (rewritten is not InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax member } invocation)
+                    throw new InvalidOperationException("Cannot instrument native builder call.");
+                if (kind == "Append" && invocation.ArgumentList.Arguments.Count != 1)
+                    throw new InvalidOperationException("Unmodeled StringBuilder append overload.");
+                return kind == "Append"
+                    ? SyntaxFactory.ParseExpression($"global::StringTaskProbe.Append({member.Expression}, {invocation.ArgumentList.Arguments})")
+                    : SyntaxFactory.ParseExpression($"global::StringTaskProbe.Text({member.Expression})");
+            });
+        instrumented = instrumented.AddMembers(SyntaxFactory.ParseMemberDeclaration(StringTaskProbe.Source)
+            ?? throw new InvalidOperationException("Cannot parse builder instrumentation."));
+        var probeAssembly = CompileRuntime(instrumented.ToFullString()).Assembly;
+        var probeMethod = Method(probeAssembly);
+        var probeType = probeAssembly.GetType("StringTaskProbe")
+            ?? throw new InvalidOperationException("Builder probe type missing.");
+        var reset = probeType.GetMethod("Reset", [typeof(int)])
+            ?? throw new InvalidOperationException("Builder probe reset signature missing.");
+        var check = probeType.GetMethod("Check", [typeof(object), typeof(string)])
+            ?? throw new InvalidOperationException("Builder probe check signature missing.");
+        foreach (var (inputs, expected) in cases)
+        {
+            reset.Invoke(null, [-1]);
+            var actual = probeMethod.Invoke(null, inputs.Cast<object>().ToArray());
+            if (!Equals(actual, expected))
+                throw new InvalidOperationException("Builder instrumented baseline changed behavior.");
+            check.Invoke(null, [actual, inputs[0]]);
+        }
+        for (var step = 0; step < 3; step++)
+        {
+            var changed = false;
+            foreach (var (inputs, expected) in cases)
+            {
+                reset.Invoke(null, [step]);
+                try
+                {
+                    changed |= !Equals(probeMethod.Invoke(null, inputs.Cast<object>().ToArray()), expected);
+                }
+                catch (TargetInvocationException error)
+                {
+                    throw new InvalidOperationException("StringBuilder counterfactual runtime failed; exceptions are not coupling evidence.", error);
+                }
+            }
+            if (!changed)
+                throw new InvalidOperationException($"Builder append {step + 1} does not contribute to the returned greeting.");
+        }
+    }
+    Console.WriteLine($"Verification passed: {name}; exact native/CLR signatures, {cases.Length} runtime cases and native return coupling.");
+    Console.WriteLine("Limits: finite non-null CLR UTF-16 cases, not a universal body proof; contracts use only modeled integer lengths, not Z3 Unicode strings.");
+
+    bool IsAtPattern(ExpressionSyntax expression)
+    {
+        if (semantic.GetConstantValue(expression) is { HasValue: true, Value: "@" })
+            return true;
+        if (expression is not IdentifierNameSyntax identifier)
+            return false;
+        return bindings.TryGetValue(identifier.Identifier.ValueText, out var binding)
+            && !binding.IsMutable && binding.Initializer is StringLiteralNode { Value: "@" };
+    }
+    bool IsInput(ExpressionSyntax expression, string name, HashSet<string> resolving)
+    {
+        if (expression is ParenthesizedExpressionSyntax grouped)
+            return IsInput(grouped.Expression, name, resolving);
+        if (expression is not IdentifierNameSyntax identifier)
+            return false;
+        var value = identifier.Identifier.ValueText;
+        if (value == name)
+            return semantic.GetSymbolInfo(expression).Symbol is IParameterSymbol;
+        bool Alias(string alias)
+        {
+            if (alias == name)
+                return true;
+            return resolving.Add(alias) && bindings.TryGetValue(alias, out var binding) && !binding.IsMutable
+                && binding.Initializer is ReferenceNode reference && Alias(reference.Name);
+        }
+        return semantic.GetSymbolInfo(expression).Symbol is ILocalSymbol && Alias(value);
+    }
+}
+
+static IEnumerable<ExpressionNode> StringNativeExpressions(AstNode node)
+{
+    foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+    {
+        if (child is ExpressionNode expression)
+            yield return expression;
+        if (child is not StatementNode && child is not LambdaExpressionNode)
+            foreach (var descendant in StringNativeExpressions(child))
+                yield return descendant;
+    }
+}
+
+static void CheckStringDomain(FunctionNode function, string[] names, bool nonempty)
+{
+    using var context = new Context();
+    var lengths = names.ToDictionary(name => name, name => context.MkIntConst(name + "_clr_length"));
+    ArithExpr Length(ExpressionNode expression, string? parameter) => expression switch
+    {
+        IntLiteralNode { IsUnsigned: false } literal => context.MkInt(literal.Value),
+        StringOperationNode { Operation: StringOp.Length, Arguments: [ReferenceNode reference] }
+            when lengths.ContainsKey(reference.Name == "#" ? parameter ?? "" : reference.Name)
+            => lengths[reference.Name == "#" ? parameter! : reference.Name],
+        StringOperationNode { Operation: StringOp.Length, Arguments: [SelfRefNode] }
+            when parameter != null => lengths[parameter],
+        FieldAccessNode { FieldName: "Length", Target: ReferenceNode reference }
+            when lengths.ContainsKey(reference.Name == "#" ? parameter ?? "" : reference.Name)
+            => lengths[reference.Name == "#" ? parameter! : reference.Name],
+        ReferenceNode reference when names.Any(name => reference.Name == name + ".Length")
+            => lengths[reference.Name[..^7]],
+        _ => throw new InvalidOperationException("Unmodeled string contract operand; no Unicode/nullability proof is inferred.")
+    };
+    BoolExpr Predicate(ExpressionNode expression, string? parameter) => expression switch
+    {
+        BoolLiteralNode literal => context.MkBool(literal.Value),
+        UnaryOperationNode { Operator: UnaryOperator.Not } unary => context.MkNot(Predicate(unary.Operand, parameter)),
+        BinaryOperationNode { Operator: BinaryOperator.And } binary => context.MkAnd(Predicate(binary.Left, parameter), Predicate(binary.Right, parameter)),
+        BinaryOperationNode { Operator: BinaryOperator.Or } binary => context.MkOr(Predicate(binary.Left, parameter), Predicate(binary.Right, parameter)),
+        BinaryOperationNode binary => binary.Operator switch
+        {
+            BinaryOperator.Equal => context.MkEq(Length(binary.Left, parameter), Length(binary.Right, parameter)),
+            BinaryOperator.NotEqual => context.MkNot(context.MkEq(Length(binary.Left, parameter), Length(binary.Right, parameter))),
+            BinaryOperator.GreaterThan => context.MkGt(Length(binary.Left, parameter), Length(binary.Right, parameter)),
+            BinaryOperator.GreaterOrEqual => context.MkGe(Length(binary.Left, parameter), Length(binary.Right, parameter)),
+            BinaryOperator.LessThan => context.MkLt(Length(binary.Left, parameter), Length(binary.Right, parameter)),
+            BinaryOperator.LessOrEqual => context.MkLe(Length(binary.Left, parameter), Length(binary.Right, parameter)),
+            _ => throw new InvalidOperationException("Unmodeled string contract operator.")
+        },
+        _ => throw new InvalidOperationException("Unmodeled string contract predicate.")
+    };
+    var preconditions = function.Preconditions.Select(pre => Predicate(pre.Condition, null)).ToList();
+    foreach (var parameter in function.Parameters)
+        if (parameter.InlineRefinement != null)
+            preconditions.Add(Predicate(parameter.InlineRefinement.Predicate, parameter.Name));
+    var domain = context.MkAnd(lengths.Values.SelectMany(length => new[] {
+        context.MkGe(length, context.MkInt(0)), context.MkLe(length, context.MkInt(int.MaxValue)) }).ToArray());
+    var expected = nonempty ? context.MkGt(lengths["s"], context.MkInt(0)) : context.MkTrue();
+    using var solver = context.MkSolver();
+    using var settings = context.MkParams();
+    settings.Add("timeout", 5000u);
+    solver.Parameters = settings;
+    solver.Assert(domain, context.MkNot(context.MkEq(context.MkAnd(preconditions.ToArray()), expected)));
+    if (solver.Check() != Status.UNSATISFIABLE)
+        throw new InvalidOperationException("Missing/wrong string preconditions or narrowed prompt domain.");
+    foreach (var postcondition in function.Postconditions)
+    {
+        solver.Reset();
+        solver.Assert(domain, expected, context.MkNot(Predicate(postcondition.Condition, null)));
+        if (solver.Check() != Status.UNSATISFIABLE)
+            throw new InvalidOperationException("String postconditions exclude prompt inputs or are unmodeled.");
+    }
+}
+
+static IEnumerable<(string[] Inputs, object Expected)> StringCases(string profile)
+{
+    string[] strings = ["", "a", "A", "-17", "+0", "@", "@@", "not an email@", "x@y", "x.y",
+        "Hello, !", "\"quoted\"", "line\nbreak", " \t\r\n", "caf\u00e9", "e\u0301", "\u4e2d\u6587",
+        "\ud83d\ude00", "a\ud83d\ude00z", "\ud800", "\udc00", "\0", "a\0b"];
+    foreach (var text in strings)
+    {
+        if (profile == "str001")
+            yield return ([text], text.Length);
+        else if (profile == "str003" && text.Length > 0)
+            yield return ([text], text[0]);
+        else if (profile == "str004")
+            yield return ([text], text.IndexOf('@') >= 0);
+        else if (profile == "str005")
+            yield return ([text], "Hello, " + text + "!");
+        else if (profile == "str002")
+            foreach (var substring in strings)
+            {
+                var found = false;
+                for (var index = 0; index <= text.Length - substring.Length; index++)
+                {
+                    var equal = true;
+                    for (var character = 0; character < substring.Length; character++)
+                        equal &= text[index + character] == substring[character];
+                    found |= equal;
+                }
+                yield return ([text, substring], found);
+            }
+    }
 }
 
 static IEnumerable<(int[] Inputs, object Expected)> WritingCases(string name)
@@ -1680,6 +2085,46 @@ sealed class BoundedOutput(Func<bool>? isWitnessActive = null, Action<char>? obs
     }
 
     public override string ToString() => output.ToString();
+}
+
+static class StringTaskProbe
+{
+    public const string Source = """
+        public static class StringTaskProbe
+        {
+            static readonly System.Collections.Generic.HashSet<System.Text.StringBuilder> Created = new();
+            static readonly System.Collections.Generic.Dictionary<System.Text.StringBuilder, System.Collections.Generic.List<string>> Appends = new();
+            static readonly System.Collections.Generic.List<(System.Text.StringBuilder Builder, string Text)> Returned = new();
+            static int Neutralized;
+            public static void Reset(int neutralized) { Created.Clear(); Appends.Clear(); Returned.Clear(); Neutralized = neutralized; }
+            public static System.Text.StringBuilder New(System.Text.StringBuilder builder)
+            {
+                if (!Created.Add(builder)) throw new System.InvalidOperationException("Duplicate builder construction.");
+                Appends.Add(builder, new());
+                return builder;
+            }
+            public static System.Text.StringBuilder Append(System.Text.StringBuilder builder, string value)
+            {
+                if (!Created.Contains(builder)) throw new System.InvalidOperationException("Append receiver was not constructed by the native witness.");
+                var index = Appends[builder].Count;
+                Appends[builder].Add(value);
+                return builder.Append(index == Neutralized ? "" : value);
+            }
+            public static string Text(System.Text.StringBuilder builder)
+            {
+                var text = builder.ToString();
+                Returned.Add((builder, text));
+                return text;
+            }
+            public static void Check(object result, string name)
+            {
+                var matches = Returned.FindAll(entry => object.ReferenceEquals(entry.Text, result));
+                if (matches.Count != 1 || !Created.Contains(matches[0].Builder)
+                    || !Appends[matches[0].Builder].SequenceEqual(new[] { "Hello, ", name, "!" }))
+                    throw new System.InvalidOperationException("StringBuilder coupling failed: returned ToString must use the same new instance and ordered required appends.");
+            }
+        }
+        """;
 }
 
 sealed class WitnessRewriter(SyntaxAnnotation marker, string probe, bool neutralize) : CSharpSyntaxRewriter
