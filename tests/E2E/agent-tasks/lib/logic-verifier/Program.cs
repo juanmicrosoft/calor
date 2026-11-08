@@ -2481,13 +2481,18 @@ static void VerifyEffects(string profile, string path)
     if (required.Any(effect => !Declares(effect)))
         throw new InvalidOperationException($"Original declared effects missing for {name}: {string.Join(",", required)}.");
     var pending = new Stack<AstNode>();
+    var seen = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
     pending.Push(parsed);
     while (pending.TryPop(out var node))
     {
+        if (!seen.Add(node))
+            continue;
         if (node is CSharpInteropBlockNode or RawCSharpNode or RawCSharpExpressionNode)
             throw new InvalidOperationException("Raw interop cannot establish native effects behavior.");
         foreach (var child in RecursiveAstWalker.GetAllChildren(node))
             pending.Push(child);
+        if (node is LocalFunctionStatementNode local)
+            pending.Push(local.Function);
     }
     var compilation = Calor.Compiler.Program.Compile(source, path,
         new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
@@ -2518,6 +2523,12 @@ static void VerifyEffects(string profile, string path)
             throw new InvalidOperationException("Unresolved effects call symbol.");
         var owner = symbol.ContainingType.ToDisplayString();
         if (symbol.ContainingAssembly.Equals(semanticCompilation.Assembly, SymbolEqualityComparer.Default))
+            continue;
+        if (symbol.MethodKind == MethodKind.DelegateInvoke
+            && invocation.Expression is IdentifierNameSyntax receiver
+            && semantic.GetSymbolInfo(receiver).Symbol is ILocalSymbol local
+            && local.DeclaringSyntaxReferences.Select(reference => reference.GetSyntax())
+                .OfType<VariableDeclaratorSyntax>().Any(variable => variable.Initializer?.Value is LambdaExpressionSyntax))
             continue;
         var supported = owner == "System.Console" && symbol.Name is "WriteLine" or "ReadLine" or "Write"
             || owner == "System.IO.File" && symbol.Name is "ReadAllText" or "WriteAllText" or "AppendAllText" or "ReadAllBytes" or "WriteAllBytes";

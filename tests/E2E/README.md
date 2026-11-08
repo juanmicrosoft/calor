@@ -1571,7 +1571,7 @@ python3 tests/E2E/agent-tasks/test-effects-verifiers.py
 python3 tests/E2E/agent-tasks/test-logic-old-release.py --effects-system
 ```
 
-The current suite executes 123 real effects entries (33 positive, 90 rejected)
+The current suite executes 131 real effects entries (34 positive, 97 rejected)
 and 35 preserved entries: one positive for every prior profile plus the
 selected native-only prerequisite. It checks aliases, extra effects,
 helper/Encoding equivalents, original declarations, private/wrong signatures,
@@ -1581,8 +1581,9 @@ errors, selected-root/configuration/native failures and bounded nontermination.
 
 The additive historical mode runs a bounded 60-case original-prompt subset against
 both selected arms, plus current rejection of an old-ID input and the two
-direct-ReadLine compatibility cases: exactly 123 real entries (36 positive,
-87 rejected). The subset retains all 18 positive/equivalent/alias inputs,
+direct-ReadLine compatibility cases and eight local-helper controls per arm:
+exactly 139 real entries (39 positive, 100 rejected).
+The subset retains all 18 positive/equivalent/alias inputs,
 original-effect and private-signature failures, metadata/comment/constant
 decoys, combined-effect omissions, wrong log arguments/overwrite, simulated
 network ordering/IO violations, and all four successful-baseline coupling/error
@@ -1599,6 +1600,38 @@ admission, root/configuration/native guards, scoped translators, every prior
 profile and all 65,536 Sum/counterfactual checks are unchanged. The shared
 120-second entry/process/EOF and 600-second historical total deadlines remain;
 the new control supervisor reserves one second for nested process cleanup.
+Two bounded workers run independent entries in disposable workspaces in each
+arm, preserving the entire previous strict matrix within that same total
+deadline. Compiler/helper builds are still selected-arm builds, not cached or
+substituted. Counters are synchronized and every positive effects entry checks
+the exact resolved selected `calor.dll` root and configuration, not a substring.
+
+Whole-module native rejection explicitly crosses `LocalFunctionStatementNode`
+boundaries with reference-identity visited-node protection. The general walker
+intentionally treats these nodes as separate-callable leaves; omitting this
+edge could hide raw statements or expressions in an archived native local
+helper. Actual v0.29 entry controls reject `§RAW` statements and `§CS` expressions
+inside both one-level and two-level local helpers, including unused helpers.
+Current nested `§F` inputs instead hit its explicit parser retirement error
+(`Calor0100`); those are syntax blockers, not behavioral/raw-scan evidence.
+A native nested helper passes with the genuine archived compiler, while a
+native lambda helper passes in both arms. The verifier admits only a resolved
+delegate invocation bound directly to a local lambda initializer. Raw
+statements/expressions inside lambda helpers are rejected in both arms.
+
+Finite negatives accept only command-exit failures; process/EOF/cleanup/global
+deadline errors propagate and cannot satisfy a negative with no diagnostic
+selector. Only the two explicitly opted-in bounded-timeout controls accept
+timeout rejection; cleanup/EOF errors still propagate. Synthetic supervisor
+tests cover wrapped and direct infrastructure errors and missing, duplicate,
+wrong-root and wrong-configuration compiler identity output. These synthetic
+checks are not counted as real entrypoints. The current suite has seven tests.
+Follow-up validation passed the full strict 139-entry old/current run and the
+focused eight-entry current local-helper run (one positive, seven rejections),
+plus the lightweight synthetic supervisor/identity test. The expanded full
+131-effects-plus-35-preserved current suite was not rerun during shared-host
+saturation. Its predecessor's 123-effects-plus-35-preserved run passed before
+the follow-up; that is not a result for the expanded current suite.
 
 **Limits:** this is finite process supervision, not a sandbox or universal
 proof. The interposer refuses non-owned supplied paths and unmodeled external

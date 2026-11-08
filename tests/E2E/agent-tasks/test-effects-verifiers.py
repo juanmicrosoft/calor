@@ -2,13 +2,16 @@
 """Six original effects prompts, actual entrypoints, no agent or host IO."""
 
 import importlib.util
+from concurrent.futures import ThreadPoolExecutor
 import os
 from pathlib import Path
 import shutil
 import sys
 import tempfile
 import time
+from threading import Lock
 import unittest
+from unittest.mock import patch
 
 
 HERE = Path(__file__).resolve().parent
@@ -112,7 +115,32 @@ def historical_syntax(text):
             line = line.replace("§WH ", f"§WH{{effects_wh{serial}}} ", 1)
         lines.append(line)
     # Only this disposable byte-codec list needs the released matching closer.
-    return ("\n".join(lines) + "\n").replace("§/LIST\n", "§/LIST{bytes}\n")
+    return (("\n".join(lines) + "\n").replace("§/LIST\n", "§/LIST{bytes}\n")
+            .replace("§LAM{static:value:str}", "§LAM{effects_local:static:value:str}")
+            .replace("§/LAM\n", "§/LAM{effects_local}\n"))
+
+
+def local_cases(historical=False):
+    raw = "Raw interop cannot establish native effects behavior."
+    retired = "Local §F declarations are removed. Use a §B binding with §LAM instead."
+    # The archived parser retains LocalFunctionStatementNode; the current parser
+    # explicitly rejects nested §F before an AST can reach the native scan.
+    for body in ('§RAW return "raw"; §/RAW', '§R §CS{"raw"}'):
+        yield (source("eff005", body="§F{Local} (str:value) -> str\n  " + body
+                      + '\n§R (+ "Response from: " url)'), False, raw if historical else retired)
+        yield (source("eff005", body="§F{Local} (str:value) -> str\n"
+                      "  §F{Nested} (str:item) -> str\n    " + body
+                      + '\n  §R value\n§R (+ "Response from: " url)'),
+               False, raw if historical else retired)
+    native = source("eff005", body="§F{Local} (str:value) -> str\n  §R value\n"
+                    '§R (+ "Response from: " §C{Local} §A url §/C)')
+    yield (native, historical, None if historical else retired)
+    lambda_body = "§B{Local:Func<str,str>} §LAM{static:value:str}\n  §R value\n§/LAM\n"
+    yield (source("eff005", body=lambda_body + '§R (+ "Response from: " §C{Local} §A url §/C)'),
+           True, None)
+    for body in ('§RAW return "raw"; §/RAW', '§R §CS{"raw"}'):
+        yield (source("eff005", body="§B{Local:Func<str,str>} §LAM{static:value:str}\n  "
+                      + body + '\n§/LAM\n§R (+ "Response from: " url)'), False, raw)
 
 
 def source(profile, *, body=None, effects=None, signature=None):
@@ -201,6 +229,7 @@ def cases(profile):
 
 
 class EffectsVerifierTests(unittest.TestCase):
+    count_lock = Lock()
     entry_points_executed = 0
     positives = 0
     negatives = 0
@@ -210,7 +239,10 @@ class EffectsVerifierTests(unittest.TestCase):
         print(f"Executed {cls.entry_points_executed} real effects verify.sh controls: "
               f"{cls.positives} positive, {cls.negatives} rejected.")
 
-    def verify(self, profile, text, expected=True, *, env=None, detail=None, deadline=None):
+    def verify(self, profile, text, expected=True, *, env=None, detail=None, deadline=None,
+               allow_timeout=False):
+        if allow_timeout and expected:
+            raise ValueError("Timeout rejection must be an explicitly negative bounded-timeout control.")
         with tempfile.TemporaryDirectory(prefix="calor-effects-control-") as temporary:
             workspace = Path(temporary)
             if text is not None:
@@ -232,16 +264,33 @@ class EffectsVerifierTests(unittest.TestCase):
                 passed = True
             except RuntimeError as error:
                 output = str(error)
+                if ("Verifier cleanup" in output or "Cannot terminate verifier process group" in output
+                    or "EOF" in output):
+                    raise
+                timeout = "Verifier timeout" in output
+                if timeout:
+                    if not allow_timeout:
+                        raise
+                elif not output.startswith("Verifier command exited"):
+                    raise
                 passed = False
-            type(self).entry_points_executed += 1
+            with type(self).count_lock:
+                type(self).entry_points_executed += 1
             self.assertEqual(passed, expected, output)
             if expected:
-                type(self).positives += 1
+                selected = Path(environment["CALOR_COMPILER_ROOT"]).resolve()
+                configuration = environment.get("CALOR_COMPILER_CONFIGURATION", "Debug")
+                identity = f"Selected compiler: {selected / 'src/Calor.Compiler/bin' / configuration / 'net10.0/calor.dll'}"
+                self.assertEqual([line for line in output.splitlines() if line.startswith("Selected compiler: ")],
+                                 [identity], output)
                 self.assertIn(f"Verification passed: {TASKS[profile][1]}; original declared effects, native/CLR signatures, "
                               f"{COUNTS[profile]} runtime cases and BCL output/state coupling.", output)
                 self.assertIn("process supervision, not a sandbox", output)
+                with type(self).count_lock:
+                    type(self).positives += 1
             else:
-                type(self).negatives += 1
+                with type(self).count_lock:
+                    type(self).negatives += 1
             if detail:
                 self.assertIn(detail, output)
             return output
@@ -251,6 +300,43 @@ class EffectsVerifierTests(unittest.TestCase):
             for text, expected, detail in cases(profile):
                 with self.subTest(profile=profile, expected=expected, detail=detail):
                     self.verify(profile, text, expected, detail=detail)
+
+    def test_native_local_helpers_and_nested_raw(self):
+        for text, expected, detail in local_cases():
+            with self.subTest(expected=expected, detail=detail):
+                self.verify("eff005", text, expected, detail=detail)
+
+    def test_supervision_failures_are_not_finite_rejections(self):
+        before = type(self).entry_points_executed
+        errors = [
+            "Verifier timeout: overall deadline expired.",
+            "Verifier cleanup timeout: child did not exit by the deadline.",
+            "EOF supervision failure",
+            "Verifier command exited 1:\nVerification failed: Verifier timeout after 2s: dotnet",
+            "Verifier command exited 1:\nVerifier cleanup timeout: inherited pipe did not close.",
+            "Verifier command exited 1:\nCannot terminate verifier process group 123",
+        ]
+        for error in errors:
+            with self.subTest(error=error), patch.object(ENGINE, "run", side_effect=RuntimeError(error)):
+                with self.assertRaisesRegex(RuntimeError, "timeout|EOF|Cannot terminate"):
+                    self.verify("eff005", source("eff005"), False)
+        configuration = os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug")
+        selected = COMPILER_ROOT / "src/Calor.Compiler/bin" / configuration / "net10.0/calor.dll"
+        success = (f"Selected compiler: {selected}\nVerification passed: FetchUrl; original declared effects, "
+                   "native/CLR signatures, 16 runtime cases and BCL output/state coupling.\n"
+                   "Limits: process supervision, not a sandbox\n")
+        invalid = [
+            success.replace(str(selected), str(selected) + ".other"),
+            success.replace(str(selected), str(selected.parent.parent.parent / "wrong-configuration/net10.0/calor.dll")),
+            success.replace(f"Selected compiler: {selected}\n", ""),
+            f"Selected compiler: {selected}\n" + success,
+        ]
+        for output in invalid:
+            with patch.object(ENGINE, "run", return_value=output):
+                with self.assertRaises(AssertionError):
+                    self.verify("eff005", source("eff005"))
+        # Synthetic supervisor checks are not real entrypoint controls.
+        type(self).entry_points_executed = before
 
     def test_independent_provenance_and_coupling(self):
         self.verify("eff001", source("eff001", body="§C{WriteLine} §A name §/C") +
@@ -327,16 +413,19 @@ class EffectsVerifierTests(unittest.TestCase):
                             env=dict(os.environ, CALOR_COMPILER_ROOT=str(COMPILER_ROOT),
                                      CALOR_LOGIC_TIMEOUT_SECONDS="119"))
         self.assertIn("Selected native Z3 prerequisite passed: SATISFIABLE.", output)
-        self.assertIn(str(COMPILER_ROOT / "src/Calor.Compiler/bin"), output)
+        configuration = os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug")
+        self.assertEqual([line for line in output.splitlines() if line.startswith("Selected compiler: ")],
+                         [f"Selected compiler: {COMPILER_ROOT / 'src/Calor.Compiler/bin' / configuration / 'net10.0/calor.dll'}"])
         print("Executed 34 preserved profile entrypoints and 1 selected native-only entrypoint.")
 
     def test_failure_guards(self):
         for profile in TASKS:
             self.verify(profile, None, False, detail="Input missing")
         self.verify("eff001", "invalid source", False, detail="Calor compilation failed")
-        self.verify("eff005", source("eff005"), False, env={"CALOR_LOGIC_TIMEOUT_SECONDS": "0.001"}, detail="timeout")
+        self.verify("eff005", source("eff005"), False, env={"CALOR_LOGIC_TIMEOUT_SECONDS": "0.001"},
+                    detail="timeout", allow_timeout=True)
         self.verify("eff005", source("eff005", body='§WH true\n  §CN\n§R ""'), False,
-                    env={"CALOR_LOGIC_TIMEOUT_SECONDS": "5"}, detail="timeout")
+                    env={"CALOR_LOGIC_TIMEOUT_SECONDS": "5"}, detail="timeout", allow_timeout=True)
         self.verify("eff005", source("eff005"), False, env={"CALOR_COMPILER_CONFIGURATION": "../Debug"},
                     detail="CALOR_COMPILER_CONFIGURATION")
         self.verify("eff002", source("eff002", body="§R §C{System.Console.ReadLine} §/C"), False,
@@ -370,17 +459,27 @@ def run_compatibility(old, current, deadline):
     if len(controls) != 60:
         raise RuntimeError(f"Expected exactly 60 bounded compatibility cases, observed {len(controls)}.")
     controls.sort(key=lambda case: not (case[3] and ("Effects coupling" in case[3] or "counterfactual runtime" in case[3])))
+    def execute(item):
+        arm, root, historical, profile, text, expected, detail, local = item
+        remaining = min(120, deadline - time.monotonic())
+        if remaining <= 0:
+            raise RuntimeError("Effects compatibility exceeded its 600-second deadline.")
+        test.verify(profile, historical_syntax(text) if historical else text, expected,
+                    env={"CALOR_COMPILER_ROOT": str(root), "CALOR_LOGIC_TIMEOUT_SECONDS": str(remaining)},
+                    detail=detail, deadline=min(deadline, time.monotonic() + 120))
+        verdict = "passed" if expected else detail if local else "rejected"
+        return f"{arm} {profile}{' local' if local else ''}: {verdict}"
+
     for arm, root, historical in (("v0.29", old, True), ("current", current, False)):
-        for profile, text, expected, detail in controls:
-            remaining = min(120, deadline - time.monotonic())
-            if remaining <= 0:
-                raise RuntimeError("Effects compatibility exceeded its 600-second deadline.")
-            output = test.verify(profile, historical_syntax(text) if historical else text, expected,
-                                 env={"CALOR_COMPILER_ROOT": str(root), "CALOR_LOGIC_TIMEOUT_SECONDS": str(remaining)},
-                                 detail=detail, deadline=min(deadline, time.monotonic() + 120))
-            if expected and str(root / "src/Calor.Compiler/bin") not in output:
-                raise RuntimeError("Effects compatibility selected-arm identity mismatch.")
-            print(f"{arm} {profile}: {'passed' if expected else 'rejected'}")
+        batch = [(arm, root, historical, "eff005", text, expected, detail, True)
+                 for text, expected, detail in local_cases(historical)]
+        batch += [(arm, root, historical, profile, text, expected, detail, False)
+                  for profile, text, expected, detail in controls]
+        # Every worker launches a real verify.sh with its own disposable workspace
+        # and the same absolute total deadline; no compiler/helper cache is reused.
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            for verdict in workers.map(execute, batch):
+                print(verdict)
     test.verify("eff005", historical_syntax(source("eff005")), False,
                 env={"CALOR_COMPILER_ROOT": str(current)},
                 detail="Calor compilation failed", deadline=min(deadline, time.monotonic() + 120))
@@ -394,7 +493,7 @@ def run_compatibility(old, current, deadline):
                     env={"CALOR_COMPILER_ROOT": str(root), "CALOR_LOGIC_TIMEOUT_SECONDS": str(remaining)},
                     detail="Calor0273", deadline=min(deadline, time.monotonic() + 120))
         print(f"{arm} eff002 direct nullable BCL return: Calor0273 rejection")
-    expected_count = 123
+    expected_count = 139
     if EffectsVerifierTests.entry_points_executed != expected_count:
         raise RuntimeError(f"Expected exactly {expected_count} actual old/current effects controls.")
     print(f"Compatibility passed: {expected_count} actual old/current effects controls: "
