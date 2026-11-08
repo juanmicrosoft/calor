@@ -1079,9 +1079,11 @@ The current suite requires exactly 160 actual verify.sh controls: 105 native
 identity/state/signature cases, 45 missing/invalid/comment/interop/named-module/ambiguity/
 unrelated-member cases, and 10 selected-root/configuration/native-asset/runtime/
 deadline cases. Overall, 39 controls succeed and 121 are rejected.
-The strict separate `--oop` lane executes the same explicit 64 native cases
-and six interop controls in each actual old/current arm, plus current rejection
-of historical syntax: exactly 141 controls. It archives unchanged Git commit
+The strict separate `--oop` lane executes the same named representative matrix
+in each actual old/current arm: 43 native cases, six recursive-interop controls,
+and four missing/comment/named-module/unrelated-owner controls, plus current
+rejection of historical syntax: exactly 107 controls (32 positive, 75 negative).
+It archives unchanged Git commit
 `d82f3ae95175ecd09581c6922701706be72b0ca9`, verifies that release's own
 native-asset manifest, restores locked dependencies, and builds its own compiler.
 Only disposable old input strings acquire historical IDs and section-form
@@ -1207,3 +1209,32 @@ This is only the two arithmetic prerequisites, not acceptance of all 129 tasks,
 an agent, the milestone or a release. Product code, other task wrappers,
 task definitions, original fixtures, TestData, active Calor subjects/corpus,
 historical inputs/ledgers/floors, versions and workflows remain byte-unchanged.
+
+### OOP strict compatibility matrix
+
+The historical matrix is deliberately smaller than the unchanged full current
+suite. Each entry still launches its real individual verify.sh, builds the same
+helper against that arm, and performs all native/CLR/runtime checks for its
+profile. Native Z3 loading, immutable old bootstrap, entry/process/EOF supervision,
+and the 600-second total are not cached, relaxed, or bypassed.
+
+| Profile | Strict representatives retained |
+|---------|---------------------------------|
+| Person | Empty sealed class, private class rejection, source field and explicit constructor rejection |
+| IRepository | Integer alias, exact parameter name/width, nullable substitution rejection, wrong closed generic argument, implementation rejection, excluding and admitting scoped refinements |
+| Calculator | Checked/unchecked signed sums, private method, parameter name/width, constant stub, excluding and unmodeled preconditions, failing output contract, real nonpublic constructor |
+| Product | Getter-only, init, private setter, static get/set, private property and wrong width, behaviorally equivalent manual implementation, unsupported real-constructor setup |
+| Counter | Integer alias, readonly and constant fields, wrong visibility and name |
+| Point | Integer alias with real instance isolation, readonly/static field state, wrong field/constructor visibility, constructor parameter width, swapped values and missing assignment |
+| Shared adversaries | Recursive raw interop in every profile; missing input, comment-only declarations, named-module substitution and unrelated member owner; current rejection of historical IDs |
+
+The omitted permutations remain covered by all 160 current controls: canonical
+spellings duplicated by accepted aliases/modifiers, repeated wrong type/name/
+visibility mutations, alternate source-member kinds, alternate non-Option return
+types, duplicate equivalent admitting/excluding guards on other profiles, extra
+generic arity and overload permutations, additional initial-value/static/setup
+variants, subtraction/zero/decoy state variants, and repeated missing/comment/
+interop/ambiguity/selection/deadline cases. The strict matrix retains the distinct
+native signature, closed CLR identity, auto-property provenance/accessor state,
+constructor setup/state/isolation, guard proof, runtime contract-failure, and
+adversarial ownership categories rather than every permutation of them.

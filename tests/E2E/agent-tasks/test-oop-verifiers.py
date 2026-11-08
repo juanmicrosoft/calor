@@ -285,35 +285,78 @@ class OopVerifierTests(unittest.TestCase):
 
 def run_compatibility(old, current, deadline):
     test = OopVerifierTests()
-    # Keep the historical lane bounded independently of the larger current suite.
-    # Both real compiler arms execute this same explicit selection.
+    # Named representatives keep both real arms well within the unchanged total
+    # deadline. All omitted permutations still run in the full current suite.
     selected = {
-        "Person": [0, 1, 4, 5, 6, 9],
-        "IRepository": [0, 3, 4, 5, 6, 8, 10, 11, 12, 14, 15],
-        "Calculator": [0, 4, 6, 7, 9, 10, 12, 14, 15, 17, 18, 19, 20, 21, 22],
-        "Product": [0, 4, 5, 6, 7, 8, 10, 11, 13, 16],
-        "Counter": [0, 4, 5, 6, 7, 9, 10, 11],
-        "Point": [0, 4, 5, 6, 7, 8, 11, 13, 14, 16, 17, 18, 20, 21],
+        "Person": {
+            "empty-sealed": 4, "private-class": 1,
+            "source-field": 5, "source-constructor": 6,
+        },
+        "IRepository": {
+            "integer-alias": 3, "parameter-name": 4, "parameter-width": 5,
+            "nullable-not-option": 6, "closed-generic-argument": 8,
+            "implementation": 10, "excluding-refinement": 14,
+            "admitting-refinement": 15,
+        },
+        "Calculator": {
+            "checked-signed-sums": 19, "unchecked-signed-sums": 20,
+            "private-method": 7, "parameter-name": 9, "parameter-width": 10,
+            "constant-stub": 12, "excluding-precondition": 14,
+            "failing-output-contract": 16, "real-nonpublic-constructor": 17,
+            "unmodeled-precondition": 23,
+        },
+        "Product": {
+            "get-only": 5, "init": 6, "private-setter": 7, "static-get-set": 8,
+            "private-property": 10, "property-width": 11,
+            "behaviorally-equivalent-manual-property": 13,
+            "unsupported-constructor": 16,
+        },
+        "Counter": {
+            "integer-alias": 4, "readonly": 6, "constant": 7,
+            "public-field": 9, "field-name": 10,
+        },
+        "Point": {
+            "integer-alias-and-instance-state": 4, "readonly-state": 5, "static-state": 6,
+            "public-field": 7, "private-constructor": 11, "parameter-width": 13,
+            "swapped-state": 14, "missing-assignment": 16,
+        },
     }
     for arm, root, historical in (("v0.29", old, True), ("current", current, False)):
         for name in TASKS:
-            controls = [cases(name)[index] for index in selected[name]]
-            controls.append((source(name) + "  §CSHARP{public class Unrelated { }}§/CSHARP\n",
-                             False, "Raw interop"))
-            for index, (text, expected, detail) in enumerate(controls):
+            controls = [(category, cases(name)[index]) for category, index in selected[name].items()]
+            controls.append(("recursive-interop", (
+                source(name) + "  §CSHARP{public class Unrelated { }}§/CSHARP\n", False, "Raw interop")))
+            for category, (text, expected, detail) in controls:
                 remaining = min(120, deadline - time.monotonic())
                 if remaining <= 0:
                     raise RuntimeError("OOP compatibility exceeded its 600-second deadline.")
                 test.verify(name, historical_syntax(text) if historical else text, expected,
                             env={"CALOR_COMPILER_ROOT": str(root),
                                  "CALOR_LOGIC_TIMEOUT_SECONDS": str(remaining)}, detail=detail)
-                print(f"{arm} {name} {index}: {'passed' if expected else 'rejected'}", flush=True)
+                print(f"{arm} {name} {category}: {'passed' if expected else 'rejected'}", flush=True)
+        text = source("Calculator")
+        adversarial = {
+            "missing-input": None,
+            "comment-only-native-decoy": "// " + text.replace("\n", " ") + "\n§M{Domain}\n",
+            "named-module-not-class": text.replace("§CL{Calculator:pub}", "§M{Calculator:pub}")
+                .replace("§MT{", "§F{"),
+            "unrelated-owner": text.replace("  §CL{Calculator:pub}",
+                "  §CL{Calculator:pub}\n  §CL{Unrelated:pub}"),
+        }
+        for category, text in adversarial.items():
+            remaining = min(120, deadline - time.monotonic())
+            if remaining <= 0:
+                raise RuntimeError("OOP compatibility exceeded its 600-second deadline.")
+            test.verify("Calculator", historical_syntax(text) if historical and text is not None else text, False,
+                        env={"CALOR_COMPILER_ROOT": str(root),
+                             "CALOR_LOGIC_TIMEOUT_SECONDS": str(remaining)})
+            print(f"{arm} Calculator {category}: rejected", flush=True)
     test.verify("Person", historical_syntax(source("Person")), False,
                 env={"CALOR_COMPILER_ROOT": str(current),
                      "CALOR_LOGIC_TIMEOUT_SECONDS": str(min(120, deadline - time.monotonic()))},
                 detail="Calor compilation failed")
-    expected_count = 2 * sum(len(indices) + 1 for indices in selected.values()) + 1
-    if expected_count != 141 or OopVerifierTests.entry_points_executed != expected_count:
+    expected_count = 2 * (sum(len(indices) + 1 for indices in selected.values()) + 4) + 1
+    if expected_count != 107 or OopVerifierTests.entry_points_executed != expected_count:
         raise RuntimeError(f"Expected {expected_count} actual OOP compatibility controls.")
     print(f"Compatibility passed: {expected_count} actual old/current OOP entry-point controls.")
 
