@@ -1276,3 +1276,100 @@ interop/ambiguity/selection/deadline cases. The strict matrix retains the distin
 native signature, closed CLR identity, auto-property provenance/accessor state,
 constructor setup/state/isolation, guard proof, runtime contract-failure, and
 adversarial ownership categories rather than every permutation of them.
+
+### Original Option/Result carrier tasks (type-001 through type-004)
+
+These four entries now observe actual returned carriers instead of grepping
+retired constructor markers. Their original prompts and fixture are unchanged:
+`TryDouble(int x)` returns `Option<int>` with Some(`x * 2`) exactly when `x > 0`;
+`GetNothing()` always returns None; `SafeDivide(int a, int b)` returns
+`Result<int, string>` with Ok(`a / b`) when `b != 0`, otherwise
+Err(`"Division by zero"`); `AlwaysFail()` returns
+Err(`"Operation not supported"`). They are not nullable-return or exception-based
+substitutes.
+
+The helper requires exactly one public, synchronous, nongeneric native module
+function with the original parameter names and types. It rejects raw C#,
+interop, comment decoys, duplicate declarations and wrong signatures. The
+selected compiler's public AST and emitter remain authoritative. Its generated
+C# is compiled independently with nullable analysis and **warnings as errors**.
+Reflection checks the actual closed CLR return identity: `Option<int>` or
+`Result<int, string>`, from a matching native auxiliary generic class in the
+module namespace or the selected historical `Calor.Runtime` assembly. A matching
+name, scalar return or fixed-type field masquerading as a generic payload is not
+enough.
+
+The bounded observable model is anchored in the released public APIs:
+`IsSome`/`IsNone`, `IsOk`/`IsErr`, `Unwrap()` and `UnwrapErr()`. A case tag must
+be a named public instance boolean field or readable, non-indexed property.
+At least one of each carrier's complementary case tags must exist; every tag
+that exists must agree with the independently expected case. Active payloads
+are read through a public instance zero-argument accessor or an explicitly named
+`Value`/`Error` field or readable property. Their generic-definition types must
+be the corresponding generic parameters, and the closed types must be exactly
+`int`/`string`. When both an accessor and named payload member exist, **both**
+must agree. Malformed, throwing or contradictory authoritative APIs reject; a
+decoy member cannot override them. Unrelated boolean or payload fields are not
+guessed as witnesses.
+
+Native auxiliary declarations are permitted in disposable candidate/control
+source, never injected secretly or written into original fixtures. The portable
+old/current positives explicitly declare tagged `Option<T>`/`Result<T,E>` classes
+with nullable generic payload annotations. Those annotations preserve the
+actual closed CLR generic-parameter types and avoid `CS8618`. They qualify the
+function's return with its module namespace and infer the local allocation's
+type. This avoids the old binder's `Calor0275` distinction between reference
+values and its built-in runtime Option, without modifying either compiler.
+The model does **not** promise full old API restoration, arbitrary third-party
+carrier compatibility, inactive accessor behavior or a universal body proof.
+In particular, an inactive payload is not examined merely because a member
+exists.
+
+Each correct TryDouble positive executes **137** distinct signed/boundary
+inputs, including zero, negative extremes and `1073741823 -> 2147483646`.
+Only positive inputs whose doubled mathematical value exceeds `Int32.MaxValue`
+are excluded; negatives remain required even though doubling them would overflow.
+SafeDivide executes **399** Cartesian signed/boundary pairs: 20 zero-denominator
+errors and 379 successes, including zero quotients, negative operands, truncation
+toward zero and large representable results. Only `Int32.MinValue / -1` is
+excluded. GetNothing and AlwaysFail each execute **8** repeated invocations.
+There is no invented overflow policy or positive-only/nonzero-only precondition.
+Optional contracts execute on the required probes and cannot conceal those
+sampled cases. Compilation, runtime, observation and timeout failures reject
+explicitly.
+
+```bash
+CALOR_COMPILER_CONFIGURATION=Release python3 tests/E2E/agent-tasks/test-carrier-verifiers.py
+CALOR_COMPILER_CONFIGURATION=Release python3 tests/E2E/agent-tasks/test-logic-old-release.py --carriers
+```
+
+The current suite requires exactly **137 real verify.sh entrypoints**, plus
+**2 actual helper-build selected-image substitution controls**. It includes
+native fields/properties, accessor-only payloads, complementary-only tags,
+conflicting/decoy members, wrong cases and payloads, exact errors, signed
+division, boundary corruption, restrictive pre/postconditions, wrong signatures,
+missing/invalid/raw/duplicate source, retired constructors, missing/corrupt/
+foreign compiler/native assets and bounded nontermination/output. The four
+canonical current constructor controls reject with `Calor0006`; no retired
+`SM`/`NN`/`OK`/`ERR` lexer, parser or runtime support is restored.
+
+The additive strict `--carriers` mode requires exactly **116 representative
+actual old/current entrypoints**. It archives unchanged released Git commit
+`d82f3ae95175ecd09581c6922701706be72b0ca9`, verifies that tree's own native asset
+manifest, locked-restores and builds its own source. Both real arms execute
+portable native auxiliary positives and negative controls; four historical
+native constructor positives remain positive on the old arm and reject on the
+current arm. No current-assembly substitution, skip, empty run or fixture
+mutation counts as compatibility.
+
+Carrier selection also checks the selected checkout's managed/native Z3 output
+against its own pinned manifest. It snapshots every selected managed/native
+image, requires byte-identical helper copies, and rechecks before execution and
+before reporting success. Existing profiles keep their original selection and
+native Context behavior. Entry/process/EOF cleanup is bounded to **120 seconds**;
+each carrier invocation and its observations have the shared **4096-character**
+stdout cap. Historical compatibility, including archive/restore/build, has the
+existing **600-second total** deadline and 120-second subprocess bounds.
+These are bounded verifier prerequisites for four original tasks, not full
+milestone, task-set or agent acceptance. All 40 prior profiles, all 65,536
+SumToN probes and strict successful-output counterfactual requirements remain.

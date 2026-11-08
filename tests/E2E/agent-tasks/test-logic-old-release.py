@@ -24,8 +24,8 @@ def load(name, path):
 
 
 def main():
-    if sys.argv[1:] not in ([], ["--control-flow"], ["--remaining-control-flow"], ["--basic-syntax"], ["--contract-writing"], ["--native-prerequisite"], ["--enums"], ["--idioms"], ["--generics"], ["--strings"], ["--collections"], ["--scalar-patterns"], ["--oop"], ["--type-arithmetic"]):
-        raise RuntimeError("Usage: test-logic-old-release.py [--control-flow|--remaining-control-flow|--basic-syntax|--contract-writing|--native-prerequisite|--enums|--idioms|--generics|--strings|--collections|--scalar-patterns|--oop|--type-arithmetic]")
+    if sys.argv[1:] not in ([], ["--control-flow"], ["--remaining-control-flow"], ["--basic-syntax"], ["--contract-writing"], ["--native-prerequisite"], ["--enums"], ["--idioms"], ["--generics"], ["--strings"], ["--collections"], ["--scalar-patterns"], ["--oop"], ["--type-arithmetic"], ["--carriers"]):
+        raise RuntimeError("Usage: test-logic-old-release.py [--control-flow|--remaining-control-flow|--basic-syntax|--contract-writing|--native-prerequisite|--enums|--idioms|--generics|--strings|--collections|--scalar-patterns|--oop|--type-arithmetic|--carriers]")
     verifier = load("verify_logic", HERE / "lib/verify-logic.py")
     controls = load("logic_controls", HERE / "test-logic-verifiers.py")
     current = controls.COMPILER_ROOT
@@ -33,13 +33,16 @@ def main():
     if not (current / "src/Calor.Compiler/bin" / configuration / "net10.0/calor.dll").is_file():
         raise RuntimeError(f"Build the selected current compiler first: {current}")
     deadline = time.monotonic() + 600
+    def bootstrap_deadline():
+        return min(deadline, time.monotonic() + 120) if sys.argv[1:] == ["--carriers"] else deadline
+
     with tempfile.TemporaryDirectory(prefix="calor-v029-compatibility-") as temporary:
         directory = Path(temporary)
         archive = directory / "v029.tar"
         old = directory / "v029"
         old.mkdir()
-        verifier.run(["git", "cat-file", "-e", OLD_COMMIT + "^{commit}"], ROOT, deadline)
-        verifier.run(["git", "archive", "--format=tar", f"--output={archive}", OLD_COMMIT], ROOT, deadline)
+        verifier.run(["git", "cat-file", "-e", OLD_COMMIT + "^{commit}"], ROOT, bootstrap_deadline())
+        verifier.run(["git", "archive", "--format=tar", f"--output={archive}", OLD_COMMIT], ROOT, bootstrap_deadline())
         with tarfile.open(archive) as archived:
             archived.extractall(old, filter="data")
         # These are gitignored build prerequisites, verified against the archived
@@ -49,16 +52,16 @@ def main():
             if not source.is_dir():
                 raise RuntimeError(f"Verified Z3 build prerequisite missing: {source}")
             shutil.copytree(source, old / relative, dirs_exist_ok=True)
-        print(verifier.run([sys.executable, "scripts/verify-z3-assets.py"], old, deadline), end="")
+        print(verifier.run([sys.executable, "scripts/verify-z3-assets.py"], old, bootstrap_deadline()), end="")
         print(verifier.run([
             "dotnet", "restore", "src/Calor.Compiler/Calor.Compiler.csproj", "--locked-mode",
             "--disable-build-servers", "-p:UseSharedCompilation=false", "-nodeReuse:false", "-v", "quiet",
-        ], old, deadline), end="")
+        ], old, bootstrap_deadline()), end="")
         print(verifier.run([
             "dotnet", "build", "src/Calor.Compiler/Calor.Compiler.csproj", "--no-restore",
             "-c", configuration, "--disable-build-servers", "-p:UseSharedCompilation=false",
             "-nodeReuse:false", "--nologo", "-v", "quiet",
-        ], old, deadline), end="")
+        ], old, bootstrap_deadline()), end="")
         print(f"Built actual v0.29.0 source from Git commit {OLD_COMMIT}.")
         if sys.argv[1:] == ["--native-prerequisite"]:
             for arm, root in (("v0.29", old), ("current", current)):
@@ -102,6 +105,10 @@ def main():
         if sys.argv[1:] == ["--type-arithmetic"]:
             arithmetic = load("arithmetic_controls", HERE / "test-type-arithmetic-verifiers.py")
             arithmetic.run_compatibility(old, current, deadline)
+            return
+        if sys.argv[1:] == ["--carriers"]:
+            carriers = load("carrier_controls", HERE / "test-carrier-verifiers.py")
+            carriers.run_compatibility(old, current, deadline)
             return
         if sys.argv[1:] == ["--enums"]:
             enums = load("enum_controls", HERE / "test-enum-verifiers.py")

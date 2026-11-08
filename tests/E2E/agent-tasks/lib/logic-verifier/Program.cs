@@ -60,6 +60,16 @@ static void Verify(string profile, string path)
         VerifyTypeArithmetic(profile, path);
         return;
     }
+    if (profile is "type001" or "type002" or "type003" or "type004")
+    {
+        var carrierSource = File.ReadAllText(path);
+        var carrierCompilation = Calor.Compiler.Program.Compile(
+            carrierSource, path, new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
+        if (carrierCompilation.HasErrors || carrierCompilation.Ast == null)
+            throw new InvalidOperationException($"Calor compilation failed:\n{string.Join("\n", carrierCompilation.Diagnostics)}");
+        VerifyCarrier(profile, carrierCompilation.Ast, carrierCompilation.GeneratedCode);
+        return;
+    }
     if (profile is "gen001" or "gen002" or "gen003")
     {
         var genericSource = File.ReadAllText(path);
@@ -1601,7 +1611,198 @@ static IEnumerable<(int[] Inputs, object Expected)> IdiomCases(string name)
                 }
 }
 
-static (Assembly Assembly, SyntaxTree[] Trees) CompileRuntime(string generatedCode)
+static void VerifyCarrier(string profile, ModuleNode module, string generatedCode)
+{
+    var name = profile switch
+    {
+        "type001" => "TryDouble", "type002" => "GetNothing",
+        "type003" => "SafeDivide", _ => "AlwaysFail"
+    };
+    var option = profile is "type001" or "type002";
+    var carrierName = option ? "Option" : "Result";
+    var names = profile switch
+    {
+        "type001" => new[] { "x" }, "type003" => new[] { "a", "b" }, _ => Array.Empty<string>()
+    };
+    var pending = new Stack<AstNode>();
+    var seen = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+    pending.Push(module);
+    while (pending.TryPop(out var node))
+    {
+        if (!seen.Add(node))
+            continue;
+        if (node is CSharpInteropBlockNode or RawCSharpNode or RawCSharpExpressionNode)
+            throw new InvalidOperationException("Raw interop cannot establish native carrier behavior.");
+        foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+            pending.Push(child);
+        if (node is LocalFunctionStatementNode local)
+            pending.Push(local.Function);
+    }
+    var functions = module.Functions.Where(function => function.Name == name).ToArray();
+    if (functions.Length != 1)
+        throw new InvalidOperationException($"Expected exactly one native {name} function.");
+    var function = functions[0];
+    var output = function.Output == null ? null : SyntaxFactory.ParseTypeName(function.Output.TypeName);
+    var genericOutput = output switch
+    {
+        GenericNameSyntax generic => generic,
+        QualifiedNameSyntax { Right: GenericNameSyntax generic } qualified
+            when qualified.Left.ToString() == module.Name || qualified.Left.ToString() == "Calor.Runtime" => generic,
+        _ => null
+    };
+    if (function.Visibility != Visibility.Public || function.IsAsync || function.TypeParameters.Count != 0
+        || !function.Parameters.Select(parameter => parameter.Name).SequenceEqual(names)
+        || function.Parameters.Any(parameter => AttributeHelper.ExpandType(parameter.TypeName) != "INT"
+            || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None)
+        || genericOutput == null || genericOutput.Identifier.ValueText != carrierName
+        || !genericOutput.TypeArgumentList.Arguments.Select(argument => AttributeHelper.ExpandType(argument.ToString()))
+            .SequenceEqual(option ? new[] { "INT" } : new[] { "INT", "STRING" }))
+        throw new InvalidOperationException($"Wrong native public carrier signature for {name}.");
+
+    var (assembly, _) = CompileRuntime(generatedCode, warningsAsErrors: true);
+    const BindingFlags members = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
+        | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+    var owner = assembly.GetType($"{module.Name}.{module.Name}Module")
+        ?? throw new InvalidOperationException("Missing emitted carrier function owner.");
+    var methods = owner.GetMethods(members).Where(method => method.Name == name).ToArray();
+    if (!owner.IsPublic || methods.Length != 1)
+        throw new InvalidOperationException("Wrong reflected carrier function identity.");
+    var method = methods[0];
+    var closed = method.ReturnType;
+    var arguments = option ? new[] { typeof(int) } : new[] { typeof(int), typeof(string) };
+    if (!method.IsPublic || !method.IsStatic || method.IsGenericMethod
+        || !method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(names.Select(_ => typeof(int)))
+        || !closed.IsGenericType || closed.ContainsGenericParameters
+        || closed.Name != $"{carrierName}`{arguments.Length}" || !closed.GetGenericArguments().SequenceEqual(arguments))
+        throw new InvalidOperationException("Wrong reflected closed CLR carrier signature.");
+    var definition = closed.GetGenericTypeDefinition();
+    if (closed.Assembly == assembly)
+    {
+        var native = module.Classes.Where(candidate => candidate.Name == carrierName).ToArray();
+        if (native.Length != 1 || native[0].Visibility != Visibility.Public || native[0].IsStatic
+            || native[0].TypeParameters.Count != arguments.Length || !definition.IsPublic
+            || definition.FullName != $"{module.Name}.{carrierName}`{arguments.Length}")
+            throw new InvalidOperationException("Missing exact native auxiliary generic carrier declaration.");
+    }
+    else if (definition.Namespace != "Calor.Runtime"
+        || definition.Assembly != typeof(Calor.Runtime.ContractKind).Assembly)
+        throw new InvalidOperationException("Foreign CLR carrier identity.");
+
+    var parameters = definition.GetGenericArguments();
+    // Only named public instance case APIs count. A present API must be valid
+    // and agree with every other recognized observation; fallback never hides it.
+    MemberInfo? ValueMember(string memberName, Type expected)
+    {
+        var candidates = closed.GetMember(memberName, members);
+        if (candidates.Length == 0)
+            return null;
+        if (candidates.Length != 1)
+            throw new InvalidOperationException($"Ambiguous carrier member {memberName}.");
+        var member = candidates[0];
+        var genericMember = definition.GetMember(memberName, members).Single();
+        var valid = (member, genericMember) switch
+        {
+            (FieldInfo field, FieldInfo genericField) => field.IsPublic && !field.IsStatic
+                && genericField.FieldType == expected,
+            (PropertyInfo property, PropertyInfo genericProperty) => property.GetMethod is { IsPublic: true, IsStatic: false }
+                && property.GetIndexParameters().Length == 0 && genericProperty.PropertyType == expected,
+            _ => false
+        };
+        if (!valid)
+            throw new InvalidOperationException($"Wrong carrier member shape/type: {memberName}.");
+        return member;
+    }
+    MethodInfo? Accessor(string accessorName, Type expected)
+    {
+        var candidates = closed.GetMember(accessorName, members);
+        if (candidates.Length == 0)
+            return null;
+        if (candidates.Length != 1 || candidates[0] is not MethodInfo accessor
+            || !accessor.IsPublic || accessor.IsStatic || accessor.IsGenericMethod || accessor.GetParameters().Length != 0
+            || definition.GetMethods(members).Single(candidate => candidate.Name == accessorName).ReturnType != expected)
+            throw new InvalidOperationException($"Wrong carrier accessor shape/type: {accessorName}.");
+        return accessor;
+    }
+    var positiveTag = ValueMember(option ? "IsSome" : "IsOk", typeof(bool));
+    var negativeTag = ValueMember(option ? "IsNone" : "IsErr", typeof(bool));
+    if (positiveTag == null && negativeTag == null)
+        throw new InvalidOperationException("Missing authoritative carrier case tag.");
+    var value = ValueMember("Value", parameters[0]);
+    var unwrap = Accessor("Unwrap", parameters[0]);
+    var error = option ? null : ValueMember("Error", parameters[1]);
+    var unwrapError = option ? null : Accessor("UnwrapErr", parameters[1]);
+    if (value == null && unwrap == null || !option && error == null && unwrapError == null)
+        throw new InvalidOperationException("Missing typed carrier payload observation.");
+    object? Read(MemberInfo member, object instance) => member switch
+    {
+        FieldInfo field => field.GetValue(instance),
+        PropertyInfo property => property.GetValue(instance),
+        MethodInfo accessor => accessor.Invoke(instance, null),
+        _ => throw new InvalidOperationException("Unsupported carrier observation.")
+    };
+    void Payload(object instance, object expected, MemberInfo? field, MethodInfo? accessor)
+    {
+        foreach (var observation in new[] { field, accessor }.OfType<MemberInfo>())
+            if (!Equals(Read(observation, instance), expected))
+                throw new InvalidOperationException($"Wrong carrier payload from {observation.Name}; expected {expected}.");
+    }
+    var count = 0;
+    foreach (var (inputs, isPositive, expected) in CarrierCases(profile))
+    {
+        var previous = Console.Out;
+        using var outputCapture = new BoundedOutput();
+        try
+        {
+            Console.SetOut(outputCapture);
+            var instance = method.Invoke(null, inputs.Select(input => (object)input).ToArray())
+                ?? throw new InvalidOperationException("Null returned carrier.");
+            if (instance.GetType() != closed)
+                throw new InvalidOperationException("Wrong actual returned carrier identity.");
+            if (positiveTag != null && !Equals(Read(positiveTag, instance), isPositive)
+                || negativeTag != null && !Equals(Read(negativeTag, instance), !isPositive))
+                throw new InvalidOperationException($"Wrong/contradictory carrier case for {name}({string.Join(", ", inputs)}).");
+            if (isPositive)
+                Payload(instance, expected!, value, unwrap);
+            else if (!option)
+                Payload(instance, expected!, error, unwrapError);
+        }
+        finally
+        {
+            Console.SetOut(previous);
+        }
+        count++;
+    }
+    if (count == 0)
+        throw new InvalidOperationException("No carrier cases executed.");
+    Console.WriteLine($"Verification passed: {name}; native/reflected closed CLR {carrierName} identity; {count} runtime cases. "
+        + "Limits: named case tags and active typed payload observations, not universal carrier API/body equivalence; "
+        + "TryDouble excludes only positive doubled values above Int32.MaxValue; SafeDivide excludes only Int32.MinValue/-1; "
+        + "optional contracts execute on every sampled required case.");
+}
+
+static IEnumerable<(int[] Inputs, bool Positive, object? Payload)> CarrierCases(string profile)
+{
+    var values = new[] { int.MinValue, int.MinValue + 1, -1073741824, -46340, -100, -7, -3, -2, -1,
+        0, 1, 2, 3, 7, 100, 46340, 1073741823, 1073741824, int.MaxValue - 1, int.MaxValue };
+    if (profile == "type001")
+    {
+        foreach (var x in values.Concat(Enumerable.Range(-64, 129)).Distinct())
+            if (x <= 0 || (long)x * 2 <= int.MaxValue)
+                yield return ([x], x > 0, x > 0 ? (int)((long)x * 2) : null);
+    }
+    else if (profile == "type003")
+    {
+        foreach (var a in values)
+            foreach (var b in values)
+                if (a != int.MinValue || b != -1)
+                    yield return ([a, b], b != 0, b == 0 ? "Division by zero" : (object)(a / b));
+    }
+    else
+        for (var repetition = 0; repetition < 8; repetition++)
+            yield return ([], false, profile == "type004" ? "Operation not supported" : null);
+}
+
+static (Assembly Assembly, SyntaxTree[] Trees) CompileRuntime(string generatedCode, bool warningsAsErrors = false)
 {
     var parseOptions = new CSharpParseOptions(LanguageVersion.Preview);
     SyntaxTree[] trees =
@@ -1611,7 +1812,9 @@ static (Assembly Assembly, SyntaxTree[] Trees) CompileRuntime(string generatedCo
     ];
     var runtime = CSharpCompilation.Create(
         "LogicTaskRuntime", trees, GeneratedCSharpCompiler.References,
-        new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+            nullableContextOptions: warningsAsErrors ? NullableContextOptions.Enable : NullableContextOptions.Disable,
+            generalDiagnosticOption: warningsAsErrors ? ReportDiagnostic.Error : ReportDiagnostic.Default));
     using var stream = new MemoryStream();
     var emitted = runtime.Emit(stream);
     if (!emitted.Success)

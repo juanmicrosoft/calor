@@ -2,6 +2,8 @@
 """Compiler-backed logic/control-flow/basic oracles; never invokes an agent."""
 
 import os
+import hashlib
+import platform
 from pathlib import Path
 import shutil
 import signal
@@ -90,6 +92,44 @@ def main():
     if not 0 < timeout <= 120:
         raise RuntimeError("CALOR_LOGIC_TIMEOUT_SECONDS must be in (0, 120].")
     deadline = time.monotonic() + timeout
+    carrier = not native_only and sys.argv[1] in ("type001", "type002", "type003", "type004")
+    images = {}
+    manifest_digest = None
+    if carrier:
+        manifest = root / ".github/z3-binaries-4.15.7.sha256"
+        manifest_digest = hashlib.sha256(manifest.read_bytes()).digest()
+        pins = {}
+        for line in manifest.read_text(encoding="utf-8").splitlines():
+            if line.strip() and not line.lstrip().startswith("#"):
+                digest, name, size = line.split()
+                if name in pins or len(digest) != 64:
+                    raise RuntimeError(f"Invalid selected native manifest: {manifest}")
+                pins[name] = (digest, int(size))
+        architecture = {"aarch64": "arm64", "arm64": "arm64", "amd64": "x64", "x86_64": "x64"}.get(
+            platform.machine().lower())
+        platform_name = {"darwin": "osx", "linux": "linux", "win32": "win"}[sys.platform]
+        extension = {"darwin": "dylib", "linux": "so", "win32": "dll"}[sys.platform]
+        for file, name in (("Microsoft.Z3.dll", "Microsoft.Z3.dll"),
+                           (native, f"libz3-{platform_name}-{architecture}.{extension}")):
+            image = compiler / file
+            if name not in pins or (hashlib.sha256(image.read_bytes()).hexdigest(), image.stat().st_size) != pins[name]:
+                raise RuntimeError(f"Selected native manifest mismatch: {image}")
+        images = {
+            image.relative_to(compiler): hashlib.sha256(image.read_bytes()).digest()
+            for image in compiler.rglob("*")
+            if image.is_file() and (image.suffix == ".dll" or image.name.startswith("libz3."))
+        }
+
+    def check_images(output):
+        if hashlib.sha256(manifest.read_bytes()).digest() != manifest_digest:
+            raise RuntimeError(f"Selected native manifest changed: {manifest}")
+        for relative, expected in images.items():
+            for image in (compiler / relative, output / relative):
+                if not image.is_file() or hashlib.sha256(image.read_bytes()).digest() != expected:
+                    raise RuntimeError(f"Selected compiler/native image changed or was substituted: {image}")
+        if time.monotonic() >= deadline:
+            raise RuntimeError("Verifier timeout: selected image validation exceeded the overall deadline.")
+
     with tempfile.TemporaryDirectory(prefix="calor-logic-verifier-") as temporary:
         project = Path(temporary)
         shutil.copytree(helper / "logic-verifier", project, dirs_exist_ok=True,
@@ -99,11 +139,16 @@ def main():
             f"-p:CompilerDirectory={compiler}", "-p:UseSharedCompilation=false",
             "-nodeReuse:false", "--disable-build-servers",
         ], project, deadline)
+        if carrier:
+            check_images(project / "bin/Debug/net10.0")
         print(f"Selected compiler: {compiler / 'calor.dll'}")
-        print(run([
+        output = run([
             "dotnet", str(project / "bin/Debug/net10.0/LogicVerifier.dll"),
             *(["--check-native"] if native_only else [sys.argv[1], str(source)]),
-        ], project, deadline), end="")
+        ], project, deadline)
+        if carrier:
+            check_images(project / "bin/Debug/net10.0")
+        print(output, end="")
 
 
 if __name__ == "__main__":
