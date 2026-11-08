@@ -56,6 +56,11 @@ static void Verify(string profile, string path)
         VerifyStrings(profile, path);
         return;
     }
+    if (profile is "coll001" or "coll002" or "coll003" or "coll004" or "coll005" or "coll006")
+    {
+        VerifyCollection(profile, path);
+        return;
+    }
     if (profile is "enum001" or "enum002" or "enum003")
     {
         var enumSource = File.ReadAllText(path);
@@ -400,6 +405,21 @@ static void CheckWritingContracts(FunctionNode function, string[] names, string 
     BoolExpr mathematicalOutput;
     switch (function.Name)
     {
+        case "GetListLength":
+            requiredPre = context.MkBVSGE(Integer("n"), Constant(0));
+            mathematicalOutput = context.MkEq(result, Integer("n"));
+            break;
+        case "HasValue":
+            mathematicalOutput = context.MkEq(context.MkBoolConst("result"), context.MkOr(
+                new[] { 10, 20, 30 }.Select(value => context.MkEq(Integer("value"), Constant(value))).ToArray()));
+            break;
+        case "SumList":
+        case "CreateScores":
+        case "UniqueCount":
+        case "BuildCollection":
+            mathematicalOutput = context.MkEq(result, Constant(function.Name switch
+                { "SumList" => 60, "BuildCollection" => 5, _ => 3 }));
+            break;
         case "SquareRoot":
             requiredPre = context.MkBVSGE(Integer("x"), Constant(0));
             mathematicalOutput = context.MkEq(result, Integer("x"));
@@ -1408,6 +1428,211 @@ static void VerifyEnum(string profile, ModuleNode module, string generatedCode)
         + (urgent == null ? "." : "; native/reflected extension and 4 named-value runtime cases."));
 }
 
+static void VerifyCollection(string profile, string path)
+{
+    var name = profile switch
+    {
+        "coll001" => "SumList", "coll002" => "CreateScores", "coll003" => "UniqueCount",
+        "coll004" => "BuildCollection", "coll005" => "HasValue", _ => "GetListLength"
+    };
+    string[] names = name == "HasValue" ? ["value"] : name == "GetListLength" ? ["n"] : [];
+    var outputType = name == "HasValue" ? "bool" : "i32";
+    var compiled = Calor.Compiler.Program.Compile(File.ReadAllText(path), path,
+        new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
+    if (compiled.HasErrors || compiled.Ast == null)
+        throw new InvalidOperationException($"Calor compilation failed:\n{string.Join("\n", compiled.Diagnostics)}");
+    var module = compiled.Ast;
+    var selected = module.Functions.Where(candidate => candidate.Name == name).ToArray();
+    if (selected.Length != 1)
+        throw new InvalidOperationException($"Expected exactly one module function named {name}.");
+    var function = selected[0];
+    if (function.Visibility != Visibility.Public || function.IsAsync || function.TypeParameters.Count != 0
+        || function.Output == null
+        || AttributeHelper.ExpandType(function.Output.TypeName) != AttributeHelper.ExpandType(outputType)
+        || !function.Parameters.Select(parameter => parameter.Name).SequenceEqual(names)
+        || function.Parameters.Any(parameter => AttributeHelper.ExpandType(parameter.TypeName) != "INT"
+            || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None))
+        throw new InvalidOperationException($"Wrong public signature for {name}.");
+    CheckWritingContracts(function, names, outputType);
+    var (assembly, trees) = CompileRuntime(compiled.GeneratedCode);
+    MethodInfo Target(Assembly runtime)
+    {
+        var type = runtime.GetType($"{module.Name}.{module.Name}Module")
+            ?? throw new InvalidOperationException("Collection module CLR identity missing.");
+        var methods = type.GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Where(candidate => candidate.Name == name).ToArray();
+        if (!type.IsPublic || methods.Length != 1 || methods[0].IsGenericMethod
+            || methods[0].ReturnType != (outputType == "bool" ? typeof(bool) : typeof(int))
+            || !methods[0].GetParameters().Select(parameter => parameter.ParameterType)
+                .SequenceEqual(names.Select(_ => typeof(int))))
+            throw new InvalidOperationException("Wrong generated public/static collection signature.");
+        return methods[0];
+    }
+    var cases = name == "HasValue"
+        ? new[] { int.MinValue, int.MinValue + 1, -1000000, -31, -10, -1, 0, 1, 9, 10, 11, 19,
+            20, 21, 29, 30, 31, 100, 1000000, int.MaxValue - 1, int.MaxValue }
+        : name == "GetListLength" ? new[] { 0, 1, 2, 3, 5, 7, 16, 31, 64, 127, 257 } : new[] { 0 };
+    object Expected(int input) => name switch
+        { "HasValue" => input is 10 or 20 or 30, "GetListLength" => input, "SumList" => 60,
+            "BuildCollection" => 5, _ => 3 };
+    object[] Arguments(int input) => names.Length == 0 ? [] : [input];
+    void Check(MethodInfo method, int input, string stage)
+    {
+        var actual = method.Invoke(null, Arguments(input));
+        if (!Equals(actual, Expected(input)))
+            throw new InvalidOperationException($"Collection {stage}: {name}({input}) returned {actual}; expected {Expected(input)}.");
+    }
+    var baseline = Target(assembly);
+    foreach (var input in cases)
+        Check(baseline, input, "runtime");
+    if (name == "GetListLength")
+        foreach (var input in new[] { int.MinValue, -17, -1 })
+        {
+            try
+            {
+                baseline.Invoke(null, [input]);
+            }
+            catch (TargetInvocationException error) when (error.InnerException is Calor.Runtime.ContractViolationException
+                || error.InnerException is ArgumentOutOfRangeException { ParamName: "n" }
+                    && function.Parameters.Single().InlineRefinement != null)
+            {
+                continue;
+            }
+            throw new InvalidOperationException("GetListLength must reject negative inputs with a native contract.");
+        }
+
+    var options = new CSharpParseOptions(LanguageVersion.Preview);
+    var debug = CSharpSyntaxTree.ParseText(
+        new CSharpEmitter(ContractMode.Debug) { LineDirectiveFilePath = path }.Emit(module), options);
+    if (!SyntaxFactory.AreEquivalent(trees[1].GetRoot(), debug.GetRoot()))
+        throw new InvalidOperationException("Collection native mapping failed: debug emission differs from compiled C#.");
+    var mapped = CSharpSyntaxTree.ParseText(
+        new CSharpEmitter(ContractMode.Off) { LineDirectiveFilePath = path }.Emit(module), options);
+    var mappingCompilation = CSharpCompilation.Create("CollectionMapping",
+        [trees[0], mapped], GeneratedCSharpCompiler.References,
+        new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    var probe = "__CalorCollections_" + Guid.NewGuid().ToString("N");
+    var rewriter = new CollectionRewriter(mappingCompilation.GetSemanticModel(mapped), module, path, probe);
+    var instrumented = rewriter.Visit(mapped.GetRoot()) as CompilationUnitSyntax
+        ?? throw new InvalidOperationException("Collection native instrumentation failed.");
+    instrumented = instrumented.AddMembers(SyntaxFactory.ParseMemberDeclaration(CollectionRewriter.Probe(probe))
+        ?? throw new InvalidOperationException("Collection probe declaration failed."));
+    var (tracedAssembly, _) = CompileRuntime(instrumented.NormalizeWhitespace().ToFullString());
+    var traced = Target(tracedAssembly);
+    var probeType = tracedAssembly.GetType(probe)
+        ?? throw new InvalidOperationException("Collection probe identity missing.");
+    var records = probeType.GetField("Records")?.GetValue(null)
+        as List<(object Collection, string Operation, object? Key, object? Value, object[] State, int Depth)>
+        ?? throw new InvalidOperationException("Collection trace records missing.");
+    var reset = probeType.GetMethod("Reset") ?? throw new InvalidOperationException("Collection probe reset missing.");
+    var snapshots = probeType.GetMethod("Snapshot") ?? throw new InvalidOperationException("Collection snapshot missing.");
+    object[] Snapshot(object collection) => (object[])(snapshots.Invoke(null, [collection])
+        ?? throw new InvalidOperationException("Collection snapshot returned null."));
+    var couplingChecks = 0;
+    foreach (var input in cases)
+    {
+        reset.Invoke(null, [-1, "", 0]);
+        Check(traced, input, "instrumented baseline");
+        var originalRecords = records.ToArray();
+        var created = originalRecords.Where(record => record.Operation == "create").ToArray();
+        var requirements = name switch
+        {
+            "CreateScores" => new[] { (typeof(Dictionary<string, int>), Array.Empty<object>(),
+                new object[] { ("Alice", 95), ("Bob", 87), ("Carol", 92) }, "count") },
+            "UniqueCount" => new[] { (typeof(HashSet<int>), Array.Empty<object>(),
+                new object[] { 1, 2, 2, 3, 3, 3 }, "count") },
+            "BuildCollection" => new[]
+            {
+                (typeof(List<int>), Array.Empty<object>(), new object[] { 1, 2 }, "count"),
+                (typeof(Dictionary<int, string>), Array.Empty<object>(),
+                    new object[] { (1, "one"), (2, "two"), (3, "three") }, "count")
+            },
+            "HasValue" => new[] { (typeof(List<int>), new object[] { 10, 20, 30 }, Array.Empty<object>(), "contains") },
+            "GetListLength" => new[] { (typeof(List<int>), Array.Empty<object>(),
+                Enumerable.Range(1, input).Cast<object>().ToArray(), "count") },
+            _ => new[] { (typeof(List<int>), Array.Empty<object>(), new object[] { 10, 20, 30 }, "iteration") }
+        };
+        foreach (var (requiredType, initial, additions, operation) in requirements)
+        {
+            var candidates = new List<(int Identity, int Count)>();
+            for (var identity = 0; identity < created.Length; identity++)
+            {
+                var creation = created[identity];
+                var collection = creation.Collection;
+                if (collection.GetType() != requiredType || !creation.State.SequenceEqual(initial))
+                    continue;
+                var events = originalRecords.Where(record => ReferenceEquals(record.Collection, collection)).ToArray();
+                var adds = events.Where(record => record.Operation == "add").ToArray();
+                object Added((object Collection, string Operation, object? Key, object? Value, object[] State, int Depth) record)
+                    => requiredType == typeof(Dictionary<string, int>) ? ((string)record.Key!, (int)record.Value!)
+                        : requiredType == typeof(Dictionary<int, string>) ? ((int)record.Key!, (string)record.Value!)
+                        : record.Value!;
+                if (!adds.Select(Added).SequenceEqual(additions)
+                    || name == "GetListLength" && adds.Any(record => record.Depth == 0))
+                    continue;
+                object[] ExpectedState(int added)
+                {
+                    var state = initial.Concat(additions.Take(added));
+                    return requiredType == typeof(HashSet<int>)
+                        ? state.Distinct().OrderBy(value => (int)value).ToArray() : state.ToArray();
+                }
+                // Each Add is observed after the actual BCL operation, including
+                // all three duplicate HashSet Adds. Snapshots are not proxy counts.
+                if (adds.Where((record, index) => !record.State.SequenceEqual(ExpectedState(index + 1))).Any()
+                    || !Snapshot(collection).SequenceEqual(ExpectedState(additions.Length)))
+                    continue;
+                var final = ExpectedState(additions.Length);
+                if (operation == "iteration")
+                {
+                    var reads = events.Where(record => record.Operation is "iteration" or "index").ToArray();
+                    if (reads.Length != final.Length || reads.Any(record => record.Depth == 0
+                            || !record.State.SequenceEqual(final))
+                        || !reads.Select(record => (int)record.Value!).Order().SequenceEqual(final.Cast<int>().Order()))
+                        continue;
+                }
+                else if (!events.Any(record => record.Operation == operation && record.State.SequenceEqual(final)
+                    && (operation != "contains" || Equals(record.Key, input) && Equals(record.Value, Expected(input)))))
+                    continue;
+                candidates.Add((identity, final.Length));
+            }
+            if (candidates.Count == 0)
+                throw new InvalidOperationException($"Collection provenance failed: {name} requires actual {requiredType.Name} "
+                    + $"with exact initial state, Add sequence, snapshots and {operation} observations.");
+            var coupled = false;
+            foreach (var (identity, count) in candidates)
+            {
+                reset.Invoke(null, [identity, operation, count]);
+                object? changed;
+                try
+                {
+                    changed = traced.Invoke(null, Arguments(input));
+                }
+                catch (TargetInvocationException error)
+                {
+                    throw new InvalidOperationException("Collection counterfactual runtime failed; exceptions are not coupling evidence.", error);
+                }
+                var counterfactualExpected = operation == "contains" ? (object)!(bool)Expected(input)
+                    : operation == "iteration" ? 60 + 7 * additions.Length : (int)Expected(input) + 1;
+                if (Equals(changed, counterfactualExpected))
+                {
+                    coupled = true;
+                    couplingChecks++;
+                    break;
+                }
+            }
+            if (!coupled)
+                throw new InvalidOperationException($"Collection output coupling failed: actual {requiredType.Name} {operation} "
+                    + "does not supply the independently expected counterfactual result.");
+        }
+    }
+    Console.WriteLine($"Verification passed: {name}; native/CLR signature; {cases.Length} runtime cases; "
+        + $"{couplingChecks} successful identity-specific output counterfactuals.");
+    Console.WriteLine("Limits: exact prompt entry-domain proof; finite runtime/state/provenance checks, not a universal body proof; "
+        + (name == "GetListLength" ? "n=0,1,2,3,5,7,16,31,64,127,257; large allocations/large-input bodies untested; no accepted precondition cap."
+            : name == "HasValue" ? "21 signed/boundary Contains inputs; unsampled bodies unproven."
+            : "parameterless observed execution only."));
+}
+
 static void CheckBasicEntryDomain(FunctionNode function, string[] names)
 {
     using var context = new Context();
@@ -2099,6 +2324,296 @@ static class StringTaskProbe
                 if (matches.Count != 1 || !Created.Contains(matches[0].Builder)
                     || !Appends[matches[0].Builder].SequenceEqual(new[] { "Hello, ", name, "!" }))
                     throw new System.InvalidOperationException("StringBuilder coupling failed: returned ToString must use the same new instance and ordered required appends.");
+            }
+        }
+        """;
+}
+
+sealed class CollectionRewriter : CSharpSyntaxRewriter
+{
+    private readonly SemanticModel model;
+    private readonly string path;
+    private readonly string probe;
+    private readonly Dictionary<string, AstNode[]> native;
+
+    public CollectionRewriter(SemanticModel model, ModuleNode module, string path, string probe)
+    {
+        this.model = model;
+        this.path = path;
+        this.probe = probe;
+        AstNode[] Walk(AstNode root)
+        {
+            var visited = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+            var pending = new Stack<AstNode>();
+            pending.Push(root);
+            while (pending.TryPop(out var node))
+                if (visited.Add(node))
+                    foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+                        pending.Push(child);
+            return visited.ToArray();
+        }
+        var all = Walk(module);
+        native = all.Where(node => node is FunctionNode or MethodNode)
+            .GroupBy(node => node is FunctionNode function ? function.Name : ((MethodNode)node).Name, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.SelectMany(Walk).Distinct().ToArray(), StringComparer.Ordinal);
+    }
+
+    private void RequireNative(SyntaxNode node)
+    {
+        var method = node.Ancestors().OfType<MethodDeclarationSyntax>().FirstOrDefault();
+        if (method == null || !native.TryGetValue(method.Identifier.ValueText, out var nodes))
+            throw new InvalidOperationException("Collection native mapping failed: operation is outside a native module function.");
+        foreach (var statement in node.AncestorsAndSelf().OfType<StatementSyntax>())
+        {
+            var directives = statement.GetFirstToken().LeadingTrivia.Select(trivia => trivia.GetStructure())
+                .OfType<LineDirectiveTriviaSyntax>().Where(directive => directive.IsActive
+                    && directive.File.ValueText == path).ToArray();
+            if (directives.Length == 0)
+                continue;
+            if (directives.Length != 1 || !int.TryParse(directives[0].Line.ValueText, out var line)
+                || !nodes.Any(candidate => candidate is StatementNode && candidate.Span.Line == line)
+                || nodes.Any(candidate => candidate is CSharpInteropBlockNode && candidate.Span.Line == line))
+                throw new InvalidOperationException("Collection native mapping failed: unmapped/foreign statement.");
+            return;
+        }
+        throw new InvalidOperationException("Collection native mapping failed: operation has no selected-emitter statement directive.");
+    }
+
+    private string? Kind(ExpressionSyntax receiver)
+    {
+        if (model.GetTypeInfo(receiver).Type is not INamedTypeSymbol type
+            || type.ContainingNamespace.ToDisplayString() != "System.Collections.Generic")
+            return null;
+        var arguments = type.TypeArguments.Select(argument => argument.SpecialType).ToArray();
+        return type.Name switch
+        {
+            "List" or "HashSet" or "ICollection" or "IList" or "ISet" or "IEnumerable"
+                when arguments.SequenceEqual(new[] { SpecialType.System_Int32 }) => "integer",
+            "Dictionary" or "IDictionary"
+                when arguments.SequenceEqual(new[] { SpecialType.System_String, SpecialType.System_Int32 })
+                    || arguments.SequenceEqual(new[] { SpecialType.System_Int32, SpecialType.System_String }) => "dictionary",
+            _ => null
+        };
+    }
+
+    private ExpressionSyntax Call(string operation, SyntaxNode original, params ExpressionSyntax[] arguments)
+        => SyntaxFactory.InvocationExpression(SyntaxFactory.ParseExpression($"global::{probe}.{operation}"),
+            SyntaxFactory.ArgumentList(SyntaxFactory.SeparatedList(arguments.Select(argument =>
+                SyntaxFactory.Argument(argument.WithoutTrivia())))))
+            .WithTriviaFrom(original);
+
+    public override SyntaxNode? VisitObjectCreationExpression(ObjectCreationExpressionSyntax node)
+    {
+        var rewritten = (ObjectCreationExpressionSyntax)base.VisitObjectCreationExpression(node)!;
+        if (Kind(node) == null)
+            return rewritten;
+        RequireNative(node);
+        return Call("Created", node, rewritten.WithoutTrivia());
+    }
+
+    public override SyntaxNode? VisitImplicitObjectCreationExpression(ImplicitObjectCreationExpressionSyntax node)
+    {
+        var rewritten = (ImplicitObjectCreationExpressionSyntax)base.VisitImplicitObjectCreationExpression(node)!;
+        if (Kind(node) == null)
+            return rewritten;
+        RequireNative(node);
+        var type = model.GetTypeInfo(node).Type
+            ?? throw new InvalidOperationException("Collection implicit constructor type missing.");
+        var explicitCreation = SyntaxFactory.ObjectCreationExpression(
+            SyntaxFactory.ParseTypeName(type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)),
+            rewritten.ArgumentList, rewritten.Initializer);
+        return Call("Created", node, explicitCreation);
+    }
+
+    public override SyntaxNode? VisitInvocationExpression(InvocationExpressionSyntax node)
+    {
+        var rewritten = (InvocationExpressionSyntax)base.VisitInvocationExpression(node)!;
+        if (Kind(node) != null && model.GetSymbolInfo(node).Symbol is IMethodSymbol factory
+            && factory.ContainingType.ToDisplayString() == "System.Linq.Enumerable"
+            && factory.Name is "ToList" or "ToHashSet" or "ToDictionary")
+        {
+            RequireNative(node);
+            return Call("Created", node, rewritten.WithoutTrivia());
+        }
+        if (node.Expression is not MemberAccessExpressionSyntax access
+            || Kind(access.Expression) is not { } kind
+            || model.GetSymbolInfo(node).Symbol is not IMethodSymbol method
+            || method.ContainingNamespace.ToDisplayString() != "System.Collections.Generic")
+            return rewritten;
+        var operation = method.Name switch
+        {
+            "Add" when kind == "integer" => "Add",
+            "Add" when kind == "dictionary" => "DictionaryAdd",
+            "Contains" when kind == "integer" => "Contains",
+            _ => null
+        };
+        if (operation == null)
+            return rewritten;
+        RequireNative(node);
+        var receiver = ((MemberAccessExpressionSyntax)rewritten.Expression).Expression;
+        return Call(operation, node, new[] { receiver }.Concat(rewritten.ArgumentList.Arguments
+            .Select(argument => argument.Expression)).ToArray());
+    }
+
+    public override SyntaxNode? VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
+    {
+        var rewritten = (MemberAccessExpressionSyntax)base.VisitMemberAccessExpression(node)!;
+        if (Kind(node.Expression) == null || model.GetSymbolInfo(node).Symbol is not IPropertySymbol { Name: "Count" })
+            return rewritten;
+        RequireNative(node);
+        return Call("Count", node, rewritten.Expression);
+    }
+
+    public override SyntaxNode? VisitAssignmentExpression(AssignmentExpressionSyntax node)
+    {
+        var rewritten = (AssignmentExpressionSyntax)base.VisitAssignmentExpression(node)!;
+        if (node.Left is not ElementAccessExpressionSyntax element || Kind(element.Expression) != "dictionary")
+            return rewritten;
+        RequireNative(node);
+        if (!node.IsKind(SyntaxKind.SimpleAssignmentExpression) || element.ArgumentList.Arguments.Count != 1)
+            throw new InvalidOperationException("Collection dictionary assignment mapping is unsupported.");
+        var left = (ElementAccessExpressionSyntax)rewritten.Left;
+        return Call("Put", node, left.Expression, left.ArgumentList.Arguments[0].Expression, rewritten.Right);
+    }
+
+    public override SyntaxNode? VisitElementAccessExpression(ElementAccessExpressionSyntax node)
+    {
+        var rewritten = (ElementAccessExpressionSyntax)base.VisitElementAccessExpression(node)!;
+        if (Kind(node.Expression) != "integer" || node.Parent is AssignmentExpressionSyntax { Left: var left }
+            && ReferenceEquals(left, node))
+            return rewritten;
+        RequireNative(node);
+        if (node.ArgumentList.Arguments.Count != 1)
+            throw new InvalidOperationException("Collection list index mapping is unsupported.");
+        return Call("Index", node, rewritten.Expression, rewritten.ArgumentList.Arguments[0].Expression);
+    }
+
+    private StatementSyntax LoopBody(StatementSyntax body)
+        => SyntaxFactory.Block(
+            SyntaxFactory.ParseStatement($"global::{probe}.Depth++;"),
+            SyntaxFactory.TryStatement(SyntaxFactory.Block(body), [],
+                SyntaxFactory.FinallyClause(SyntaxFactory.Block(
+                    SyntaxFactory.ParseStatement($"global::{probe}.Depth--;")))));
+
+    public override SyntaxNode? VisitForEachStatement(ForEachStatementSyntax node)
+    {
+        RequireNative(node);
+        var rewritten = (ForEachStatementSyntax)base.VisitForEachStatement(node)!;
+        if (Kind(node.Expression) == "integer")
+            rewritten = rewritten.WithExpression(Call("Iterate", node.Expression, rewritten.Expression));
+        return rewritten.WithStatement(LoopBody(rewritten.Statement));
+    }
+
+    public override SyntaxNode? VisitForEachVariableStatement(ForEachVariableStatementSyntax node)
+    {
+        RequireNative(node);
+        var rewritten = (ForEachVariableStatementSyntax)base.VisitForEachVariableStatement(node)!;
+        return rewritten.WithStatement(LoopBody(rewritten.Statement));
+    }
+
+    public override SyntaxNode? VisitWhileStatement(WhileStatementSyntax node)
+    {
+        RequireNative(node);
+        var rewritten = (WhileStatementSyntax)base.VisitWhileStatement(node)!;
+        return rewritten.WithStatement(LoopBody(rewritten.Statement));
+    }
+
+    public override SyntaxNode? VisitForStatement(ForStatementSyntax node)
+    {
+        RequireNative(node);
+        var rewritten = (ForStatementSyntax)base.VisitForStatement(node)!;
+        return rewritten.WithStatement(LoopBody(rewritten.Statement));
+    }
+
+    public override SyntaxNode? VisitDoStatement(DoStatementSyntax node)
+    {
+        RequireNative(node);
+        var rewritten = (DoStatementSyntax)base.VisitDoStatement(node)!;
+        return rewritten.WithStatement(LoopBody(rewritten.Statement));
+    }
+
+    public static string Probe(string name) => $$"""
+        internal static class {{name}}
+        {
+            public static int Depth;
+            private static int Target;
+            private static string Mode = "";
+            private static int FinalCount;
+            private static readonly System.Collections.Generic.List<object> Identities = new();
+            public static readonly System.Collections.Generic.List<(object Collection, string Operation,
+                object? Key, object? Value, object[] State, int Depth)> Records = new();
+            public static void Reset(int target, string mode, int count)
+            {
+                Depth = 0; Target = target; Mode = mode; FinalCount = count;
+                Identities.Clear(); Records.Clear();
+            }
+            public static object[] Snapshot(object collection) => collection switch
+            {
+                System.Collections.Generic.List<int> list => System.Linq.Enumerable.Cast<object>(list).ToArray(),
+                System.Collections.Generic.HashSet<int> set => System.Linq.Enumerable.Cast<object>(
+                    System.Linq.Enumerable.OrderBy(set, value => value)).ToArray(),
+                System.Collections.Generic.Dictionary<string,int> dictionary =>
+                    System.Linq.Enumerable.Select(dictionary, pair => (object)(pair.Key, pair.Value)).ToArray(),
+                System.Collections.Generic.Dictionary<int,string> dictionary =>
+                    System.Linq.Enumerable.Select(dictionary, pair => (object)(pair.Key, pair.Value)).ToArray(),
+                _ => throw new System.InvalidOperationException("Unsupported actual collection CLR identity.")
+            };
+            private static void Record(object collection, string operation, object? key, object? value, int? depth = null)
+            {
+                if (Records.Count >= 10000) throw new System.InvalidOperationException("Collection trace limit exceeded.");
+                if (!Identities.Any(candidate => object.ReferenceEquals(candidate, collection)))
+                    throw new System.InvalidOperationException("Collection use has no native-observed construction.");
+                Records.Add((collection, operation, key, value, Snapshot(collection), depth ?? Depth));
+            }
+            private static bool Changed(object collection, string operation)
+                => Target >= 0 && Target < Identities.Count && object.ReferenceEquals(collection, Identities[Target])
+                    && Mode == operation && Snapshot(collection).Length == FinalCount;
+            public static T Created<T>(T collection) where T : class
+            {
+                Identities.Add(collection); Record(collection, "create", null, null); return collection;
+            }
+            public static void Add(System.Collections.Generic.ICollection<int> collection, int value)
+            {
+                collection.Add(value); Record(collection, "add", null, value);
+            }
+            public static bool Add(System.Collections.Generic.HashSet<int> collection, int value)
+            {
+                var result = collection.Add(value); Record(collection, "add", null, value); return result;
+            }
+            public static bool Add(System.Collections.Generic.ISet<int> collection, int value)
+            {
+                var result = collection.Add(value); Record(collection, "add", null, value); return result;
+            }
+            public static void DictionaryAdd<K,V>(System.Collections.Generic.IDictionary<K,V> collection, K key, V value)
+            {
+                collection.Add(key, value); Record(collection, "add", key, value);
+            }
+            public static V Put<K,V>(System.Collections.Generic.IDictionary<K,V> collection, K key, V value)
+            {
+                collection[key] = value; Record(collection, "add", key, value); return value;
+            }
+            public static int Count<T>(System.Collections.Generic.ICollection<T> collection)
+            {
+                var result = collection.Count; Record(collection, "count", null, result);
+                return Changed(collection, "count") ? result + 1 : result;
+            }
+            public static bool Contains(System.Collections.Generic.ICollection<int> collection, int value)
+            {
+                var result = collection.Contains(value); Record(collection, "contains", value, result);
+                return Changed(collection, "contains") ? !result : result;
+            }
+            public static int Index(System.Collections.Generic.IList<int> collection, int index)
+            {
+                var result = collection[index]; Record(collection, "index", index, result);
+                return Changed(collection, "iteration") ? result + 7 : result;
+            }
+            public static System.Collections.Generic.IEnumerable<int> Iterate(System.Collections.Generic.IEnumerable<int> collection)
+            {
+                foreach (var value in collection)
+                {
+                    Record(collection, "iteration", null, value, Depth + 1);
+                    yield return Changed(collection, "iteration") ? value + 7 : value;
+                }
             }
         }
         """;

@@ -862,3 +862,107 @@ This unit changes only these five behavioral prerequisites. Task definitions,
 fixtures, TestData, active `.calr` subjects, corpus membership, historical
 ledgers/floors and product source remain byte-unchanged. It does not run an
 agent/provider or establish milestone, experiment or release acceptance.
+
+### Collection construction and behavior (`coll-001` through `coll-006`)
+
+The six existing collection entries use the shared compiler-backed helper,
+with separate `coll001` through `coll006` selectors. Their unchanged prompts
+require `SumList() -> int`, `CreateScores() -> int`, `UniqueCount() -> int`,
+`BuildCollection() -> int`, `HasValue(value: int) -> bool`, and
+`GetListLength(n: int) -> int`. Titles do not add requirements.
+The selected native public AST and reflected public/static CLR signatures
+must agree on names, parameter order, scalar widths and return types.
+`int`/`i32` aliases use the existing public `ExpandType` helper.
+
+The original Debug compilation must first produce independently correct
+results. Debug emission with the selected emitter's `#line` mapping must be
+syntax-equivalent to that compiled C#. A contract-disabled emission is then
+instrumented using resolved BCL symbols and native statement mappings, not
+identifier spelling or source-text matches. Its unchanged baseline must also
+produce the correct results before any counterfactual executes.
+Construction, Add, Count, Contains and iteration records retain the actual
+collection object identity and snapshots of its actual elements or key/value
+pairs. Native constructors/operations, BCL Add/Count, concrete aliases, native
+helpers, and supported BCL factories are exercised without changing product APIs.
+
+`SumList` requires an initially empty `List<int>`, actual Adds of 10, 20, 30,
+and native iteration/indexed-loop reads of those actual values. Its result is
+60. A counterfactual changes each observed iteration value by 7 and must
+successfully return the independently expected sum, 81. A loop adding constant
+20, an unrelated range loop, unused actual iteration, or a conditional constant
+that merely changes under mutation cannot supply this evidence.
+
+`CreateScores` requires an initially empty `Dictionary<string,int>` and the
+actual Alice/95, Bob/87, Carol/92 Add sequence and snapshots, then returns its
+count, 3. `UniqueCount` requires an initially empty `HashSet<int>` and all six
+actual Adds, 1, 2, 2, 3, 3, 3. Every duplicate Add executes and is observed even
+though it does not change the set. Actual snapshots grow to `{1,2,3}`; only the
+returned Count must affect output, not each duplicate Add.
+`BuildCollection` independently observes its empty integer list, Adds 1 and 2,
+and empty integer/string dictionary, Adds 1/one, 2/two, 3/three. It returns
+their actual combined count, 5. Each collection must independently supply its
+contribution. Identity-specific Count counterfactuals must return the expected
+original result plus 1, not simply any different result.
+
+`HasValue` observes the actual constructed list's initial state, `[10,20,30]`,
+and a real Contains call with the supplied value. A list populated only after
+construction is not an initialized-list witness. All 21 signed/boundary inputs
+have independent membership oracles, including Int32.MinValue, Int32.MaxValue,
+the three members and their adjacent nonmembers. Inverting the observed Contains
+result must successfully invert the returned bool.
+
+`GetListLength` proves exact entry-domain equivalence to **all** `n >= 0`
+through the existing selected public/scoped contract translator, including
+inline refinements and arithmetic definedness/admissibility. Optional guards
+cannot exclude required inputs; finite runtime limits never become accepted
+precondition caps. Native runtime contracts must reject Int32.MinValue, -17
+and -1. Executable inputs are exactly
+`0,1,2,3,5,7,16,31,64,127,257`. Each execution observes an initially empty list,
+actual loop-body Adds of precisely `1..n` to that same list, its exact snapshots,
+and its returned Count. Adding `n` repeatedly, adding 1 repeatedly, an unrelated
+loop, or returning `n` beside unused Count observations rejects.
+Large allocations, large-input bodies and arbitrary unsampled behavior remain
+unproven. These checks are not a universal body proof.
+
+Unsupported native mappings, compilation failures, runtime failures, solver
+unknown/timeouts and unsuccessful mutants reject explicitly. The current native
+compiler rejects implicit `List<i32>` to `IList<i32>` assignments/native PUSH on
+that interface (`Calor0202`). A nested
+`Enumerable.ToList(Enumerable.Select(..., native lambda))` spelling also reports
+unknown effects (`Calor0411`/`Calor0410`); it is a failing control, not an accepted
+factory or a skipped proof. The valid List constructor taking the same Select
+sequence is exercised instead. No native-grammar/API or effect-enforcement patch
+works around these limitations. The unchanged collection fixture's initialized
+SumList is rejected for lacking the prompt's empty construction/Add sequence;
+its existing native initialized-list block is separately a HasValue positive.
+
+```bash
+python3 tests/E2E/agent-tasks/test-collection-verifiers.py
+python3 tests/E2E/agent-tasks/test-logic-old-release.py --collections
+python3 tests/E2E/agent-tasks/test-compiler-selection.py
+python3 tests/E2E/agent-tasks/test-logic-verifiers.py TimeoutWrapperTests LogicVerifierTests.test_selected_arm_has_no_parent_fallback LogicVerifierTests.test_shared_compilation_selects_same_arm
+```
+
+The current suite requires exactly **119 real collection entrypoints**, plus
+26 preserved logic/basic/control-flow/enum/contract/idiom profile controls and
+one selected native-only control. It covers exact states, wrong values/keys,
+missing/reordered duplicate Adds, dead/unrelated collections, initialized versus
+empty construction, private/missing/wrong signatures, optional-contract
+restrictions, helpers/aliases, successful counterfactual oracles, mutant-only
+exceptions and bounded nontermination. The last two commands add nine selection,
+process/EOF and cancellation tests, including three actual preserved logic
+entrypoints. The 120-second entry/process/EOF cleanup mechanism is unchanged.
+
+The additive strict `--collections` mode archives unchanged released Git commit
+`d82f3ae95175ecd09581c6922701706be72b0ca9`, verifies its own native asset manifest,
+locked-restores and builds that source, and links the same helper to each actual
+old/current compiler arm. It requires exactly **103 actual entrypoints**, with
+old IDs/native `§I` refinements only in disposable historical inputs, and checks
+current-parser rejection of an old-ID input. No copied-current arm, skip,
+empty/unknown run, fallback evidence or historical fixture mutation is accepted.
+All previous strict modes and the 600-second total historical deadline remain.
+
+This unit completes only these six behavioral-verifier prerequisites. Task
+definitions, original fixtures, TestData, active corpus membership, historical
+inputs, ledgers, floors and product code remain byte-unchanged. It does not
+establish full task-set, agent, milestone or release acceptance.
