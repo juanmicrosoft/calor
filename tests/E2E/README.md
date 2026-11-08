@@ -711,3 +711,60 @@ complete all 129 task prerequisites or establish milestone/release acceptance.
 Task definitions, fixtures, TestData, active `.calr` corpus, historical ledgers,
 floors and product source remain unchanged. No provider/model/count/spending,
 publication/version/release or grammar change is involved.
+
+## Generic behavioral prerequisites (gen-001..003)
+
+The three existing generic tasks use the shared selected-compiler verifier, not
+text searches. They require native public `Identity<T>`, `Container<T>`, or
+`Repository<T>` declarations. The verifier independently compiles the emitted
+C# and reflects its actual CLR generic parameter, signatures, private storage
+field, and (for Repository) reference-type constraint. Raw C# interop anywhere
+in the input, comments, and unrelated declarations cannot satisfy these checks.
+This closes only three verifier prerequisites for #1605, not all 129 tasks or
+the 0.30 milestone.
+
+Identity runs 21 input/return identity cases across Int32, Int64, Guid, string,
+object, and List<Int32>. Container runs 42 state steps across the same six closed
+types, using two real instances per type. Each step independently writes the
+actual private T field, checks Get, changes that field to a different value,
+executes Set, and checks both the stored value and Get. Repository runs 24 append
+steps across string, object, and List<Int32>. It snapshots the actual private
+List<T>, then checks every appended element's reference identity, order, count,
+prior contents, and isolation from a second instance. Inputs include null,
+empty strings, equal-content distinct references, repeated values, and value-type
+extremes. These are finite behavioral oracles, not universal verification.
+
+Parameter and field names are unrestricted. Container Get/Set need not be
+public; Add must be public. Set/Add return types are not prescribed. Extra
+generic constraints are allowed; both `class` and `class?` establish the required
+CLR reference-type constraint. The independently selected closed-type pool
+must contain at least two valid instantiations, or the verifier reports
+`Unsupported finite closed-type setup` rather than guessing suitable types.
+Class setup uses real public or nonpublic parameterless constructors, or an
+unambiguous one-argument T/List<T> constructor. List constructor inputs contain
+independent seed values. Other constructor shapes report `Unsupported finite
+constructor setup`; no uninitialized-object bypass is used. Initial stored
+values/list contents need not be default or empty. Repository may initialize
+its list lazily inside Add. Multiple matching private generic storage fields
+are an unsupported ambiguity, not a guessed storage choice.
+
+```bash
+python3 tests/E2E/agent-tasks/test-generic-verifiers.py
+python3 tests/E2E/agent-tasks/test-logic-old-release.py --generics
+```
+
+The current suite executes exactly 93 real verify.sh controls: 67 native
+acceptance/rejection cases (19 positive, 48 negative), 15 missing/invalid/
+interop/ambiguity controls, three runtime/deadline controls, and eight selected
+root/configuration/native-asset controls. It requires 20 successful controls
+and 73 rejections overall. The historical mode archives unchanged release
+commit `d82f3ae95175ecd09581c6922701706be72b0ca9`, verifies its own native-asset
+manifest, restores locked dependencies, and builds that release's own compiler.
+Only disposable inputs acquire historical declaration IDs. The mode executes
+the same 67 cases in each actual old/current arm, plus rejection of historical
+syntax by the current compiler: exactly 135 controls (38 positive, 97 negative).
+There is no copied-current baseline, fallback, skip, or empty successful run.
+The existing 120-second per-profile and 600-second historical total bounds,
+unconditional native prerequisite, other profiles, and measured no-admission
+gate remain unchanged. Original task definitions, fixtures, active .calr
+subjects, product code, corpus membership, ledgers, and floors are unchanged.

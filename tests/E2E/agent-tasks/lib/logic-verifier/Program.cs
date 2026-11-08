@@ -41,6 +41,16 @@ static void Verify(string profile, string path)
     // Every profile validates the selected native prerequisite, even when it
     // needs no contract proof. A corrupt/mismatched asset must not go unused.
     using var nativePrerequisite = new Context();
+    if (profile is "gen001" or "gen002" or "gen003")
+    {
+        var genericSource = File.ReadAllText(path);
+        var genericCompilation = Calor.Compiler.Program.Compile(
+            genericSource, path, new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
+        if (genericCompilation.HasErrors || genericCompilation.Ast == null)
+            throw new InvalidOperationException($"Calor compilation failed:\n{string.Join("\n", genericCompilation.Diagnostics)}");
+        VerifyGeneric(profile, genericCompilation.Ast, genericCompilation.GeneratedCode);
+        return;
+    }
     if (profile is "enum001" or "enum002" or "enum003")
     {
         var enumSource = File.ReadAllText(path);
@@ -685,6 +695,236 @@ static (Assembly Assembly, SyntaxTree[] Trees) CompileRuntime(string generatedCo
     if (!emitted.Success)
         throw new InvalidOperationException($"Generated C# compilation failed:\n{string.Join("\n", emitted.Diagnostics)}");
     return (Assembly.Load(stream.ToArray()), trees);
+}
+
+static void VerifyGeneric(string profile, ModuleNode module, string generatedCode)
+{
+    const BindingFlags members = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+        | BindingFlags.Static | BindingFlags.DeclaredOnly;
+    var name = profile switch { "gen001" => "Identity", "gen002" => "Container", _ => "Repository" };
+    var pending = new Stack<AstNode>();
+    var seen = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+    pending.Push(module);
+    while (pending.TryPop(out var node))
+    {
+        if (!seen.Add(node))
+            continue;
+        if (node is CSharpInteropBlockNode or RawCSharpNode or RawCSharpExpressionNode)
+            throw new InvalidOperationException("Raw interop cannot establish native generic behavior.");
+        foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+            pending.Push(child);
+        if (node is LocalFunctionStatementNode local)
+            pending.Push(local.Function);
+    }
+    var (assembly, _) = CompileRuntime(generatedCode);
+    Type generic;
+    MethodInfo? identity = null;
+    string? fieldName = null;
+    if (profile == "gen001")
+    {
+        var native = module.Functions.Where(function => function.Name == name).ToArray();
+        if (native.Length != 1)
+            throw new InvalidOperationException("Expected exactly one native Identity function.");
+        var function = native[0];
+        if (function.Visibility != Visibility.Public || function.IsAsync
+            || function.TypeParameters.Count != 1 || function.TypeParameters[0].Name != "T"
+            || function.Parameters.Count != 1 || function.Parameters[0].TypeName != "T"
+            || function.Parameters[0].Modifier != Calor.Compiler.Ast.ParameterModifier.None
+            || function.Output?.TypeName != "T")
+            throw new InvalidOperationException("Wrong native generic Identity signature.");
+        var owner = assembly.GetType($"{module.Name}.{module.Name}Module")
+            ?? throw new InvalidOperationException("Missing emitted Identity owner.");
+        var methods = owner.GetMethods(members).Where(method => method.Name == name).ToArray();
+        if (!owner.IsPublic || methods.Length != 1)
+            throw new InvalidOperationException("Wrong reflected Identity identity.");
+        identity = methods[0];
+        if (!identity.IsPublic || !identity.IsStatic || !identity.IsGenericMethodDefinition
+            || identity.GetGenericArguments().Length != 1)
+            throw new InvalidOperationException("Wrong reflected generic Identity signature.");
+        generic = identity.GetGenericArguments()[0];
+        if (generic.Name != "T")
+            throw new InvalidOperationException("Wrong reflected Identity type-parameter name.");
+        if (identity.ReturnType != generic || identity.GetParameters().Length != 1
+            || identity.GetParameters()[0].ParameterType != generic)
+            throw new InvalidOperationException("Wrong reflected Identity parameter/return type.");
+    }
+    else
+    {
+        var native = module.Classes.Where(type => type.Name == name).ToArray();
+        if (native.Length != 1)
+            throw new InvalidOperationException($"Expected exactly one native {name} class.");
+        var declaration = native[0];
+        if (declaration.Visibility != Visibility.Public || declaration.IsStatic
+            || declaration.TypeParameters.Count != 1 || declaration.TypeParameters[0].Name != "T")
+            throw new InvalidOperationException($"Wrong native public generic {name} identity.");
+        if (profile == "gen003" && !declaration.TypeParameters[0].Constraints.Any(
+            constraint => constraint.Kind is TypeConstraintKind.Class or TypeConstraintKind.ClassNullable))
+            throw new InvalidOperationException("Missing native reference-type constraint.");
+        bool ListType(string type) => Regex.Replace(type, @"\s+", "") is "List<T>" or "System.Collections.Generic.List<T>";
+        var fields = declaration.Fields.Where(field => field.Visibility == Visibility.Private && !field.IsStatic
+            && (profile == "gen002" ? field.TypeName == "T" : ListType(field.TypeName))).ToArray();
+        if (fields.Length != 1)
+            throw new InvalidOperationException("Expected one unambiguous native private generic storage field.");
+        fieldName = fields[0].Name;
+        foreach (var required in profile == "gen002" ? new[] { "Get", "Set" } : new[] { "Add" })
+        {
+            var methods = declaration.Methods.Where(method => method.Name == required).ToArray();
+            if (methods.Length != 1)
+                throw new InvalidOperationException($"Expected exactly one native {name}.{required} method.");
+            var method = methods[0];
+            var get = required == "Get";
+            if (method.IsStatic || method.IsAsync || method.TypeParameters.Count != 0
+                || (required == "Add" && method.Visibility != Visibility.Public)
+                || method.Parameters.Count != (get ? 0 : 1)
+                || (!get && (method.Parameters[0].TypeName != "T"
+                    || method.Parameters[0].Modifier != Calor.Compiler.Ast.ParameterModifier.None))
+                || (get && method.Output?.TypeName != "T"))
+                throw new InvalidOperationException($"Wrong native {name}.{required} signature.");
+        }
+        generic = assembly.GetType($"{module.Name}.{name}`1")
+            ?? throw new InvalidOperationException($"Missing emitted generic {name}.");
+        if (!generic.IsPublic || !generic.IsClass || !generic.IsGenericTypeDefinition
+            || generic.GetGenericArguments().Length != 1 || generic.GetGenericArguments()[0].Name != "T")
+            throw new InvalidOperationException($"Wrong reflected public generic {name} identity.");
+        if (profile == "gen003" && !generic.GetGenericArguments()[0].GenericParameterAttributes
+            .HasFlag(GenericParameterAttributes.ReferenceTypeConstraint))
+            throw new InvalidOperationException("Missing reflected reference-type constraint.");
+        var field = generic.GetField(fieldName, members);
+        var parameter = generic.GetGenericArguments()[0];
+        var expected = profile == "gen002" ? parameter : typeof(List<>).MakeGenericType(parameter);
+        if (field == null || !field.IsPrivate || field.IsStatic || field.FieldType != expected)
+            throw new InvalidOperationException("Wrong reflected actual generic storage field.");
+    }
+
+    // Independently chosen CLR types/values, not values supplied by the candidate.
+    (Type Type, object?[] Values)[] candidates =
+    [
+        (typeof(int), [0, -7, 42, int.MinValue]),
+        (typeof(long), [0L, -11L, long.MaxValue]),
+        (typeof(Guid), [Guid.Empty, new Guid("835cdf34-c9f7-49db-a954-d0a8a2f38021")]),
+        (typeof(string), [null, "", new string('x', 3), new string('x', 3), "different"]),
+        (typeof(object), [null, new object(), new object()]),
+        (typeof(List<int>), [null, new List<int> { 1 }, new List<int> { 1 }, new List<int>()])
+    ];
+    var closedCount = 0;
+    var caseCount = 0;
+    foreach (var (argument, values) in candidates)
+    {
+        if (profile == "gen003" && argument.IsValueType)
+            continue;
+        MethodInfo? closedIdentity = null;
+        Type? closedClass = null;
+        try
+        {
+            if (identity != null)
+                closedIdentity = identity.MakeGenericMethod(argument);
+            else
+                closedClass = generic.MakeGenericType(argument);
+        }
+        catch (ArgumentException)
+        {
+            // Additional prompt-unspecified constraints are allowed. They can
+            // leave this finite setup unsupported, never silently accepted.
+            continue;
+        }
+        closedCount++;
+        bool Same(object? actual, object? expected) => argument.IsValueType
+            ? Equals(actual, expected) : ReferenceEquals(actual, expected);
+        void Require(bool condition, string detail)
+        {
+            if (!condition)
+                throw new InvalidOperationException($"{name}<{argument}>: {detail}.");
+        }
+        if (closedIdentity != null)
+        {
+            foreach (var value in values)
+            {
+                Require(Same(closedIdentity.Invoke(null, [value]), value), "expected unchanged input identity");
+                caseCount++;
+            }
+            continue;
+        }
+        var type = closedClass!;
+        var storage = type.GetField(fieldName!, members)!;
+        object Construct()
+        {
+            var constructors = type.GetConstructors(members).Where(constructor => !constructor.IsStatic).ToArray();
+            var empty = constructors.SingleOrDefault(constructor => constructor.GetParameters().Length == 0);
+            if (empty != null)
+                return empty.Invoke([]);
+            var unary = constructors.Where(constructor => constructor.GetParameters().Length == 1
+                && (constructor.GetParameters()[0].ParameterType == argument
+                    || constructor.GetParameters()[0].ParameterType == typeof(List<>).MakeGenericType(argument))).ToArray();
+            if (unary.Length != 1)
+                throw new InvalidOperationException("Unsupported finite constructor setup: need a real zero-argument or unambiguous T/List<T> constructor.");
+            var inputType = unary[0].GetParameters()[0].ParameterType;
+            object? input = values.First(value => value != null);
+            if (inputType != argument)
+            {
+                var seed = (System.Collections.IList)(Activator.CreateInstance(inputType)
+                    ?? throw new InvalidOperationException("Cannot create constructor list input."));
+                foreach (var value in values)
+                    seed.Add(value);
+                input = seed;
+            }
+            return unary[0].Invoke([input]);
+        }
+        var instance = Construct();
+        var other = Construct();
+        MethodInfo Method(string methodName, bool get)
+        {
+            var methods = type.GetMethods(members).Where(method => method.Name == methodName).ToArray();
+            Require(methods.Length == 1, $"expected one reflected {methodName}");
+            var method = methods[0];
+            Require(!method.IsStatic && !method.IsGenericMethod && method.GetParameters().Length == (get ? 0 : 1)
+                && (get ? method.ReturnType == argument : method.GetParameters()[0].ParameterType == argument)
+                && (methodName != "Add" || method.IsPublic), $"wrong reflected {methodName} signature");
+            return method;
+        }
+        if (profile == "gen002")
+        {
+            var get = Method("Get", true);
+            var set = Method("Set", false);
+            var untouched = storage.GetValue(other);
+            foreach (var value in values.Concat(values.Reverse()))
+            {
+                storage.SetValue(instance, value);
+                Require(Same(get.Invoke(instance, []), value), "expected Get to read actual private T field");
+                storage.SetValue(instance, values.First(candidate => !Same(candidate, value)));
+                set.Invoke(instance, [value]);
+                Require(Same(storage.GetValue(instance), value), "expected Set to update actual private T field");
+                Require(Same(get.Invoke(instance, []), value), "expected Get to return stored identity");
+                Require(Same(storage.GetValue(other), untouched), "Set changed another instance");
+                caseCount++;
+            }
+        }
+        else
+        {
+            var add = Method("Add", false);
+            var list = (System.Collections.IList?)storage.GetValue(instance);
+            var expected = list == null ? [] : list.Cast<object?>().ToList();
+            var otherList = (System.Collections.IList?)storage.GetValue(other);
+            var untouched = otherList?.Cast<object?>().ToArray();
+            foreach (var value in values.Concat(values.Reverse()))
+            {
+                add.Invoke(instance, [value]);
+                expected.Add(value);
+                list = storage.GetValue(instance) as System.Collections.IList
+                    ?? throw new InvalidOperationException("Add destroyed actual private List<T>.");
+                Require(list.Count == expected.Count && list.Cast<object?>().Zip(expected).All(pair => Same(pair.First, pair.Second)),
+                    "expected Add to append input identity to actual private List<T> and preserve prior state");
+                otherList = (System.Collections.IList?)storage.GetValue(other);
+                Require(untouched == null ? otherList == null
+                    : otherList != null && otherList.Count == untouched.Length
+                        && otherList.Cast<object?>().Zip(untouched).All(pair => Same(pair.First, pair.Second)),
+                    "Add changed another instance");
+                caseCount++;
+            }
+        }
+    }
+    if (closedCount < 2)
+        throw new InvalidOperationException("Unsupported finite closed-type setup: fewer than two independent CLR types satisfy the declared constraints.");
+    Console.WriteLine($"Verification passed: {name}; native/reflected generic identity and actual private storage; {closedCount} closed types, {caseCount} runtime cases.");
 }
 
 static void VerifyEnum(string profile, ModuleNode module, string generatedCode)
