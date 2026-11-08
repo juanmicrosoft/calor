@@ -924,7 +924,9 @@ static void VerifyGeneric(string profile, ModuleNode module, string generatedCod
     }
     if (closedCount < 2)
         throw new InvalidOperationException("Unsupported finite closed-type setup: fewer than two independent CLR types satisfy the declared constraints.");
-    Console.WriteLine($"Verification passed: {name}; native/reflected generic identity and actual private storage; {closedCount} closed types, {caseCount} runtime cases.");
+    Console.WriteLine($"Verification passed: {name}; native/reflected generic identity"
+        + (identity == null ? " and actual private storage" : "")
+        + $"; {closedCount} closed types, {caseCount} runtime cases.");
 }
 
 static void VerifyEnum(string profile, ModuleNode module, string generatedCode)

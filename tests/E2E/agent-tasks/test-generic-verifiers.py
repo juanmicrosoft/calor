@@ -156,6 +156,10 @@ class GenericVerifierTests(unittest.TestCase):
             self.assertEqual(result.returncode == 0, expected, result.stdout)
             if expected:
                 self.assertIn(f"Verification passed: {name}; native/reflected generic identity", result.stdout)
+                if name == "Identity":
+                    self.assertNotIn("actual private storage", result.stdout)
+                else:
+                    self.assertIn("actual private storage", result.stdout)
                 self.assertRegex(result.stdout, r"; [2-6] closed types, [1-9][0-9]* runtime cases\.")
                 if text == source(name):
                     count = {"Identity": "6 closed types, 21", "Container": "6 closed types, 42",

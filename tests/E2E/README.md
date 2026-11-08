@@ -723,7 +723,8 @@ in the input, comments, and unrelated declarations cannot satisfy these checks.
 This closes only three verifier prerequisites for #1605, not all 129 tasks or
 the 0.30 milestone.
 
-Identity runs 21 input/return identity cases across Int32, Int64, Guid, string,
+Identity reports return identity, not private storage evidence. It runs 21
+input/return identity cases across Int32, Int64, Guid, string,
 object, and List<Int32>. Container runs 42 state steps across the same six closed
 types, using two real instances per type. Each step independently writes the
 actual private T field, checks Get, changes that field to a different value,
