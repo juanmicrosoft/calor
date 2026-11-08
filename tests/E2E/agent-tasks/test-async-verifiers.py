@@ -208,7 +208,7 @@ class AsyncVerifierTests(unittest.TestCase):
             environment = dict(os.environ, CALOR_COMPILER_ROOT=str(COMPILER_ROOT))
             environment.pop("CALOR_LOGIC_TIMEOUT_SECONDS", None)
             environment.update(env or {})
-            command = ["bash", str(HERE / "tasks/async-functions" / TASKS[profile][0] / "verify.sh"), str(workspace)]
+            command = [str(HERE / "tasks/async-functions" / TASKS[profile][0] / "verify.sh"), str(workspace)]
             try:
                 entry_deadline = time.monotonic() + 120
                 if deadline is not None:
