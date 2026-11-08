@@ -970,3 +970,48 @@ This unit completes only these six behavioral-verifier prerequisites. Task
 definitions, original fixtures, TestData, active corpus membership, historical
 inputs, ledgers, floors and product code remain byte-unchanged. It does not
 establish full task-set, agent, milestone or release acceptance.
+
+### Scalar pattern verifier prerequisites
+
+The original `pm-001`, `pm-002`, `pm-003`, and `pm-006` wrappers use the shared
+selected-compiler helper rather than text matching:
+
+```bash
+python3 tests/E2E/agent-tasks/test-scalar-pattern-verifiers.py
+python3 tests/E2E/agent-tasks/test-logic-old-release.py --scalar-patterns
+```
+
+The controls exercise 79 current entrypoints (34 acceptance, 45 rejection).
+The strict historical mode requires 97 actual unchanged released/current
+entrypoints, including current rejection of an old declaration-ID input.
+Both compiler arms execute the same explicit bounded selection, covering every
+task's native behavior and coupling, aliases, contracts, and decisive decoys.
+It archives and builds release `d82f3ae95175ecd09581c6922701706be72b0ca9`
+using that tree's locked dependencies and verified native asset manifest.
+The 600-second total and 120-second entry/process/EOF bounds are unchanged.
+
+Exact public native and reflected CLR scalar signatures are required. DayName
+and IsSingleDigit require their literal cases and wildcard default in a native
+switch expression. ScoreCategory requires supplying relational cases; reversed
+less-than threshold ordering is also supported. DescribeNumber supports native
+expression or statement switches with two executed variable-pattern guards and
+a wildcard default. Guards must reference their actual captured variables.
+Parameter names, integer aliases, immutable input/result aliases, harmless
+additional switches, and optional valid contracts are supported.
+
+Baseline signatures each execute 1,031 signed, boundary and nearby-value cases.
+Other native integer literals add their representable neighbors to the pool.
+The helper checks original Debug runtime contracts and proves entry predicates
+admit all signed Int32 inputs. A separately compiled contract-disabled baseline
+must agree. Controlled traces then record each actual native switch arm and its
+returned value; both must supply the independent expected output. An exact
+selected-public-emitter/source-mapped intervention replaces only the supplying
+switch input with its bitwise complement. Every counterfactual must return the
+independently expected complemented-input output; compile/runtime errors reject.
+Unused switches, constant-input switches, dead required arms/defaults and
+tautological captured-variable decoys cannot supply this evidence.
+
+These are four bounded behavioral prerequisites, not universal arbitrary-body,
+output-predicate, agent-nonregression or milestone acceptance. Carrier pattern
+tasks `pm-004` and `pm-005` remain separate. Original tasks, fixtures, TestData,
+active corpus membership, historical ledgers/floors and product code are unchanged.

@@ -24,8 +24,8 @@ def load(name, path):
 
 
 def main():
-    if sys.argv[1:] not in ([], ["--control-flow"], ["--remaining-control-flow"], ["--basic-syntax"], ["--contract-writing"], ["--native-prerequisite"], ["--enums"], ["--idioms"], ["--generics"], ["--strings"], ["--collections"]):
-        raise RuntimeError("Usage: test-logic-old-release.py [--control-flow|--remaining-control-flow|--basic-syntax|--contract-writing|--native-prerequisite|--enums|--idioms|--generics|--strings|--collections]")
+    if sys.argv[1:] not in ([], ["--control-flow"], ["--remaining-control-flow"], ["--basic-syntax"], ["--contract-writing"], ["--native-prerequisite"], ["--enums"], ["--idioms"], ["--generics"], ["--strings"], ["--collections"], ["--scalar-patterns"]):
+        raise RuntimeError("Usage: test-logic-old-release.py [--control-flow|--remaining-control-flow|--basic-syntax|--contract-writing|--native-prerequisite|--enums|--idioms|--generics|--strings|--collections|--scalar-patterns]")
     verifier = load("verify_logic", HERE / "lib/verify-logic.py")
     controls = load("logic_controls", HERE / "test-logic-verifiers.py")
     current = controls.COMPILER_ROOT
@@ -94,6 +94,10 @@ def main():
         if sys.argv[1:] == ["--collections"]:
             collections = load("collection_controls", HERE / "test-collection-verifiers.py")
             collections.run_compatibility(old, current, deadline)
+            return
+        if sys.argv[1:] == ["--scalar-patterns"]:
+            patterns = load("scalar_pattern_controls", HERE / "test-scalar-pattern-verifiers.py")
+            patterns.run_compatibility(old, current, deadline)
             return
         if sys.argv[1:] == ["--enums"]:
             enums = load("enum_controls", HERE / "test-enum-verifiers.py")

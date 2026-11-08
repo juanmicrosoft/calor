@@ -41,6 +41,11 @@ static void Verify(string profile, string path)
     // Every profile validates the selected native prerequisite, even when it
     // needs no contract proof. A corrupt/mismatched asset must not go unused.
     using var nativePrerequisite = new Context();
+    if (profile is "pm001" or "pm002" or "pm003" or "pm006")
+    {
+        VerifyScalarPatterns(profile, path);
+        return;
+    }
     if (profile is "gen001" or "gen002" or "gen003")
     {
         var genericSource = File.ReadAllText(path);
@@ -649,6 +654,220 @@ static void CheckGaussFormula(ModuleNode module, SyntaxTree original, FunctionNo
     }
     if (!changedOutput)
         throw new InvalidOperationException("Gauss coupling failed: native formulas do not affect any representable result.");
+}
+
+static void VerifyScalarPatterns(string profile, string path)
+{
+    var name = profile switch
+    {
+        "pm001" => "DayName", "pm002" => "ScoreCategory",
+        "pm003" => "DescribeNumber", "pm006" => "IsSingleDigit",
+        _ => throw new InvalidOperationException("Unknown scalar pattern profile.")
+    };
+    var boolean = profile == "pm006";
+    object Expected(int value) => profile switch
+    {
+        "pm001" => value is >= 1 and <= 5 ? 100 : value is 6 or 7 ? 200 : 0,
+        "pm002" => value >= 90 ? 3 : value >= 70 ? 2 : value >= 50 ? 1 : 0,
+        "pm003" => value > 0 ? 1 : value < 0 ? -1 : 0,
+        "pm006" => value is >= 0 and <= 9,
+        _ => throw new InvalidOperationException("Unknown pattern oracle.")
+    };
+    IEnumerable<AstNode> Nodes(AstNode node)
+    {
+        yield return node;
+        foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+            foreach (var descendant in Nodes(child))
+                yield return descendant;
+    }
+    var compiled = Calor.Compiler.Program.Compile(File.ReadAllText(path), path,
+        new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
+    if (compiled.HasErrors || compiled.Ast == null)
+        throw new InvalidOperationException($"Calor compilation failed:\n{string.Join("\n", compiled.Diagnostics)}");
+    var module = compiled.Ast;
+    if (Nodes(module).Any(node => node is CSharpInteropBlockNode or RawCSharpNode or RawCSharpExpressionNode))
+        throw new InvalidOperationException("Raw interop cannot establish native pattern behavior.");
+    var targets = module.Functions.Where(candidate => candidate.Name == name).ToArray();
+    if (targets.Length != 1)
+        throw new InvalidOperationException($"Expected exactly one native module function named {name}.");
+    var function = targets[0];
+    if (function.Visibility != Visibility.Public || function.IsAsync || function.TypeParameters.Count != 0
+        || function.Parameters.Count != 1
+        || function.Parameters[0].Modifier != Calor.Compiler.Ast.ParameterModifier.None
+        || AttributeHelper.ExpandType(function.Parameters[0].TypeName) != "INT"
+        || function.Output == null
+        || AttributeHelper.ExpandType(function.Output.TypeName) != (boolean ? "BOOL" : "INT"))
+        throw new InvalidOperationException($"Wrong native public scalar signature for {name}.");
+    CheckBasicEntryDomain(function, [function.Parameters[0].Name]);
+    var aliases = new HashSet<string>(StringComparer.Ordinal) { function.Parameters[0].Name };
+    foreach (var binding in function.Body.OfType<BindStatementNode>())
+        if (!binding.IsMutable && binding.Initializer is ReferenceNode reference && aliases.Contains(reference.Name))
+            aliases.Add(binding.Name);
+    var matches = Nodes(function).Where(node => node switch
+    {
+        MatchExpressionNode match => match.Target is ReferenceNode reference && aliases.Contains(reference.Name),
+        MatchStatementNode match when profile == "pm003"
+            => match.Target is ReferenceNode reference && aliases.Contains(reference.Name),
+        _ => false
+    }).ToArray();
+    if (matches.Length == 0)
+        throw new InvalidOperationException("Required native input-dependent switch missing.");
+    var values = Enumerable.Range(-512, 1025).Concat(
+        [int.MinValue, int.MinValue + 1, int.MaxValue - 1, int.MaxValue, -65536, 65536]).ToHashSet();
+    foreach (var literal in Nodes(function).OfType<IntLiteralNode>())
+    {
+        var value = (long)literal.Value;
+        if (value >= int.MinValue && value <= int.MaxValue)
+        {
+            values.Add((int)value);
+            if (value > int.MinValue) values.Add((int)value - 1);
+            if (value < int.MaxValue) values.Add((int)value + 1);
+        }
+    }
+    var inputs = values.Order().ToArray();
+    MethodInfo Method(Assembly assembly)
+    {
+        var type = assembly.GetType($"{module.Name}.{module.Name}Module")
+            ?? throw new InvalidOperationException("Generated pattern module missing.");
+        var method = type.GetMethod(name, BindingFlags.Public | BindingFlags.Static, [typeof(int)])
+            ?? throw new InvalidOperationException("Generated exact public pattern signature missing.");
+        if (!type.IsPublic || method.IsGenericMethod || method.ReturnType != (boolean ? typeof(bool) : typeof(int)))
+            throw new InvalidOperationException("Wrong reflected pattern signature.");
+        return method;
+    }
+    void Behavior(MethodInfo method)
+    {
+        foreach (var input in inputs)
+            if (!Equals(method.Invoke(null, [input]), Expected(input)))
+                throw new InvalidOperationException($"Wrong {name} output for {input}.");
+    }
+    var (original, trees) = CompileRuntime(compiled.GeneratedCode);
+    Behavior(Method(original));
+    var options = new CSharpParseOptions(LanguageVersion.Preview);
+    var debug = CSharpSyntaxTree.ParseText(
+        new CSharpEmitter(ContractMode.Debug) { LineDirectiveFilePath = path }.Emit(module), options);
+    if (!SyntaxFactory.AreEquivalent(debug.GetRoot(), trees[1].GetRoot()))
+        throw new InvalidOperationException("Mapped selected pattern emission differs from compiled C#.");
+    var off = CSharpSyntaxTree.ParseText(
+        new CSharpEmitter(ContractMode.Off) { LineDirectiveFilePath = path }.Emit(module), options).GetCompilationUnitRoot();
+    Behavior(Method(CompileRuntime(off.ToFullString()).Assembly));
+    var declaration = off.DescendantNodes().OfType<ClassDeclarationSyntax>()
+        .Single(type => type.Identifier.ValueText == module.Name + "Module")
+        .Members.OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == name);
+    bool Default(MatchCaseNode arm) => arm.Pattern is WildcardPatternNode
+        && (arm.Guard == null || arm.Guard is BoolLiteralNode { Value: true });
+    var accepted = 0;
+    foreach (var match in matches)
+    {
+        var cases = match is MatchExpressionNode expression ? expression.Cases : ((MatchStatementNode)match).Cases;
+        var nativeRequired = profile switch
+        {
+            "pm001" => Enumerable.Range(1, 7).All(value =>
+                cases.Any(arm => Nodes(arm.Pattern).OfType<LiteralPatternNode>()
+                    .Any(pattern => pattern.Literal is IntLiteralNode literal && literal.Value == value))),
+            "pm006" => Enumerable.Range(0, 10).All(value =>
+                cases.Any(arm => Nodes(arm.Pattern).OfType<LiteralPatternNode>()
+                    .Any(pattern => pattern.Literal is IntLiteralNode literal && literal.Value == value))),
+            "pm002" => cases.Count(arm => Nodes(arm.Pattern).Any(node => node is RelationalPatternNode)) >= 3,
+            "pm003" => cases.Count(arm => arm.Guard != null && arm.Pattern is VarPatternNode or VariablePatternNode) >= 2,
+            _ => false
+        };
+        if (!nativeRequired || !cases.Any(Default))
+            continue;
+        var emitted = declaration.DescendantNodes().Where(node =>
+            (match is MatchExpressionNode && node is SwitchExpressionSyntax
+                || match is MatchStatementNode && node is SwitchStatementSyntax)
+            && node.GetLocation().GetMappedLineSpan().Path == path
+            && node.GetLocation().GetMappedLineSpan().StartLinePosition.Line + 1 == match.Span.Line).ToArray();
+        if (emitted.Length != 1)
+            throw new InvalidOperationException("Ambiguous native-to-emitted pattern witness.");
+        var selected = emitted[0];
+        var probeName = "PatternTrace_" + Guid.NewGuid().ToString("N");
+        ExpressionSyntax Observe(ExpressionSyntax value, int index) => SyntaxFactory.ParseExpression(
+            $"{probeName}.Observe({index}, ({value.ToFullString()}))");
+        SyntaxNode traced;
+        ExpressionSyntax governing;
+        if (selected is SwitchExpressionSyntax switchExpression)
+        {
+            if (switchExpression.Arms.Count != cases.Count)
+                throw new InvalidOperationException("Native/emitted pattern arm count differs.");
+            traced = switchExpression.WithArms(SyntaxFactory.SeparatedList(switchExpression.Arms.Select((arm, index) =>
+                arm.WithExpression(Observe(arm.Expression, index)))));
+            governing = switchExpression.GoverningExpression;
+        }
+        else
+        {
+            var statement = (SwitchStatementSyntax)selected;
+            if (statement.Sections.Count != cases.Count)
+                throw new InvalidOperationException("Native/emitted pattern section count differs.");
+            traced = statement.WithSections(SyntaxFactory.List(statement.Sections.Select((section, index) =>
+                section.ReplaceNodes(section.DescendantNodes().OfType<ReturnStatementSyntax>()
+                    .Where(returned => returned.Expression != null),
+                    (returned, _) => returned.WithExpression(Observe(returned.Expression!, index))))));
+            governing = statement.Expression;
+        }
+        var traceType = SyntaxFactory.ParseMemberDeclaration(
+            $"internal static class {probeName} {{ public static int Arm = -1; public static object? Value; "
+            + "public static T Observe<T>(int arm, T value) { Arm = arm; Value = value; return value; } }")
+            ?? throw new InvalidOperationException("Controlled pattern trace declaration failed.");
+        var instrumented = off.ReplaceNode(selected, traced).AddMembers(traceType);
+        var traceAssembly = CompileRuntime(instrumented.ToFullString()).Assembly;
+        var traceMethod = Method(traceAssembly);
+        var trace = traceAssembly.GetType(probeName)
+            ?? throw new InvalidOperationException("Controlled pattern trace type missing.");
+        var armField = trace.GetField("Arm") ?? throw new InvalidOperationException("Pattern arm trace missing.");
+        var valueField = trace.GetField("Value") ?? throw new InvalidOperationException("Pattern value trace missing.");
+        var hits = new HashSet<int>();
+        var suppliesRequiredOutput = true;
+        foreach (var input in inputs)
+        {
+            armField.SetValue(null, -1);
+            valueField.SetValue(null, null);
+            if (!Equals(traceMethod.Invoke(null, [input]), Expected(input)))
+                throw new InvalidOperationException("Pattern instrumentation changed the original output.");
+            suppliesRequiredOutput &= Equals(valueField.GetValue(null), Expected(input));
+            var index = (int)(armField.GetValue(null) ?? throw new InvalidOperationException("Missing pattern arm trace."));
+            if (index < 0 || index >= cases.Count)
+                suppliesRequiredOutput = false;
+            else
+                hits.Add(index);
+        }
+        if (!suppliesRequiredOutput)
+            continue;
+        if (!hits.Any(index => Default(cases[index])))
+            continue;
+        var literalCoverage = true;
+        if (profile is "pm001" or "pm006")
+            foreach (var value in Enumerable.Range(profile == "pm001" ? 1 : 0, profile == "pm001" ? 7 : 10))
+                if (!hits.Any(index => Nodes(cases[index].Pattern).OfType<LiteralPatternNode>()
+                    .Any(pattern => pattern.Literal is IntLiteralNode literal && literal.Value == value)))
+                    literalCoverage = false;
+        if (!literalCoverage)
+            continue;
+        if (profile == "pm002" && hits.Count(index => Nodes(cases[index].Pattern).Any(node => node is RelationalPatternNode)) < 3)
+            continue;
+        if (profile == "pm003")
+        {
+            var guarded = hits.Where(index => cases[index].Guard != null
+                && cases[index].Pattern is VarPatternNode or VariablePatternNode).ToArray();
+            if (guarded.Length < 2 || guarded.Any(index =>
+            {
+                var capture = cases[index].Pattern is VarPatternNode variable ? variable.Name : ((VariablePatternNode)cases[index].Pattern).Name;
+                return !Nodes(cases[index].Guard!).OfType<ReferenceNode>().Any(reference => reference.Name == capture);
+            }))
+                continue;
+        }
+        var flipped = off.ReplaceNode(governing, SyntaxFactory.ParseExpression($"~({governing.ToFullString()})"));
+        var counterfactual = Method(CompileRuntime(flipped.ToFullString()).Assembly);
+        var coupled = true;
+        foreach (var input in inputs)
+            coupled &= Equals(counterfactual.Invoke(null, [input]), Expected(~input));
+        if (coupled)
+            accepted++;
+    }
+    if (accepted == 0)
+        throw new InvalidOperationException("Required native scalar pattern constructs missing or do not supply the output.");
+    Console.WriteLine($"Verification passed: {name}; {inputs.Length} independent runtime cases, actual native arms and successful input/output coupling.");
 }
 
 static void VerifyStrings(string profile, string path)
