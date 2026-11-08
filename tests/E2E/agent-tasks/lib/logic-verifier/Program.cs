@@ -1559,7 +1559,10 @@ static void VerifyCollection(string profile, string path)
             {
                 var creation = created[identity];
                 var collection = creation.Collection;
-                if (collection.GetType() != requiredType || !creation.State.SequenceEqual(initial))
+                // HasValue initialization may finish with Adds before Contains.
+                var expectedInitial = name == "HasValue" ? initial.Take(creation.State.Length).ToArray() : initial;
+                var expectedAdditions = name == "HasValue" ? initial.Skip(creation.State.Length).ToArray() : additions;
+                if (collection.GetType() != requiredType || !creation.State.SequenceEqual(expectedInitial))
                     continue;
                 var events = originalRecords.Where(record => ReferenceEquals(record.Collection, collection)).ToArray();
                 var adds = events.Where(record => record.Operation == "add").ToArray();
@@ -1567,21 +1570,21 @@ static void VerifyCollection(string profile, string path)
                     => requiredType == typeof(Dictionary<string, int>) ? ((string)record.Key!, (int)record.Value!)
                         : requiredType == typeof(Dictionary<int, string>) ? ((int)record.Key!, (string)record.Value!)
                         : record.Value!;
-                if (!adds.Select(Added).SequenceEqual(additions)
+                if (!adds.Select(Added).SequenceEqual(expectedAdditions)
                     || name == "GetListLength" && adds.Any(record => record.Depth == 0))
                     continue;
                 object[] ExpectedState(int added)
                 {
-                    var state = initial.Concat(additions.Take(added));
+                    var state = expectedInitial.Concat(expectedAdditions.Take(added));
                     return requiredType == typeof(HashSet<int>)
                         ? state.Distinct().OrderBy(value => (int)value).ToArray() : state.ToArray();
                 }
                 // Each Add is observed after the actual BCL operation, including
                 // all three duplicate HashSet Adds. Snapshots are not proxy counts.
                 if (adds.Where((record, index) => !record.State.SequenceEqual(ExpectedState(index + 1))).Any()
-                    || !Snapshot(collection).SequenceEqual(ExpectedState(additions.Length)))
+                    || !Snapshot(collection).SequenceEqual(ExpectedState(expectedAdditions.Length)))
                     continue;
-                var final = ExpectedState(additions.Length);
+                var final = ExpectedState(expectedAdditions.Length);
                 if (operation == "iteration")
                 {
                     var reads = events.Where(record => record.Operation is "iteration" or "index").ToArray();

@@ -116,6 +116,12 @@ def shared_cases(name):
         result.append((source(name, signature="§F{GetListLength:pub} (i32:n | (>= # 0)) -> i32", contracts=""), True, None))
     elif name == "HasValue":
         result.append((source(name, contracts="§Q (>= value 0)"), False, "writing preconditions"))
+        result.append((source(name, body=BODIES["SumList"].split("§B{~sum")[0] + "§R §HAS{items} value"), True, None))
+        for count in (1, 2):
+            body = original.replace("§A 1 §A 3 §/C", f"§A 1 §A {count} §/C").replace(
+                "§R §HAS{items} value",
+                "".join(f"§PUSH{{items}} {value}\n" for value in (10, 20, 30)[count:]) + "§R §HAS{items} value")
+            result.append((source(name, body=body), True, None))
     else:
         result.append((source(name, contracts="§Q false"), False, "writing preconditions"))
     return result
@@ -196,7 +202,8 @@ class CollectionVerifierTests(unittest.TestCase):
                 BODIES["BuildCollection"].replace('2 "two"', '2 "one"'),
             ],
             "HasValue": [
-                BODIES["SumList"].split("§B{~sum")[0] + "§R §HAS{items} value",
+                (BODIES["SumList"].split("§B{~sum")[0] + "§R §HAS{items} value").replace(
+                    "§PUSH{items} 20", "§SETIDX{items} 0 11\n§PUSH{items} 20\n§SETIDX{items} 0 10"),
                 BODIES["HasValue"].replace("§R §HAS{items} value", "§B{unused:bool} §HAS{items} value\n§R " + EXPECTED["HasValue"]),
                 BODIES["HasValue"].replace("§R §HAS{items} value",
                     "§B{other:List<i32>} §NEW{List<i32>} §A items\n§R " + EXPECTED["HasValue"]),
@@ -339,8 +346,8 @@ def run_compatibility(old, current, deadline):
                      "CALOR_LOGIC_TIMEOUT_SECONDS": str(min(120, deadline - time.monotonic()))})
     expected_count = 2 * sum(len(shared_cases(name)) for name in TASKS) + 1
     observed = CollectionVerifierTests.entry_points_executed - initial
-    if observed != expected_count or observed != 103:
-        raise RuntimeError(f"Expected exactly 103 nonempty actual old/current collection controls; observed {observed}.")
+    if observed != expected_count or observed != 109:
+        raise RuntimeError(f"Expected exactly 109 nonempty actual old/current collection controls; observed {observed}.")
     print(f"Compatibility passed: {observed} actual old/current collection entry-point controls.")
 
 
@@ -348,5 +355,5 @@ if __name__ == "__main__":
     result = unittest.main(exit=False).result
     if not result.wasSuccessful():
         sys.exit(1)
-    if len(sys.argv) == 1 and CollectionVerifierTests.entry_points_executed != 119:
-        raise RuntimeError(f"Expected exactly 119 current collection entrypoints; observed {CollectionVerifierTests.entry_points_executed}.")
+    if len(sys.argv) == 1 and CollectionVerifierTests.entry_points_executed != 122:
+        raise RuntimeError(f"Expected exactly 122 current collection entrypoints; observed {CollectionVerifierTests.entry_points_executed}.")

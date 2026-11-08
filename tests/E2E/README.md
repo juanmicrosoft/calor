@@ -904,9 +904,13 @@ their actual combined count, 5. Each collection must independently supply its
 contribution. Identity-specific Count counterfactuals must return the expected
 original result plus 1, not simply any different result.
 
-`HasValue` observes the actual constructed list's initial state, `[10,20,30]`,
-and a real Contains call with the supplied value. A list populated only after
-construction is not an initialized-list witness. All 21 signed/boundary inputs
+`HasValue` observes initialization completed before membership on the same
+actual list, with the exact state `[10,20,30]`, and a real Contains call with
+the supplied value. Constructor initialization, an empty construction followed
+by Adds of 10, 20, 30, and constructor prefixes `[10]` or `[10,20]` followed by
+the remaining Adds are accepted. Every Add must have the exact expected
+sequence and per-Add snapshot; restoring a wrong intermediate snapshot before
+Contains does not supply that evidence. All 21 signed/boundary inputs
 have independent membership oracles, including Int32.MinValue, Int32.MaxValue,
 the three members and their adjacent nonmembers. Inverting the observed Contains
 result must successfully invert the returned bool.
@@ -943,7 +947,7 @@ python3 tests/E2E/agent-tasks/test-compiler-selection.py
 python3 tests/E2E/agent-tasks/test-logic-verifiers.py TimeoutWrapperTests LogicVerifierTests.test_selected_arm_has_no_parent_fallback LogicVerifierTests.test_shared_compilation_selects_same_arm
 ```
 
-The current suite requires exactly **119 real collection entrypoints**, plus
+The current suite requires exactly **122 real collection entrypoints**, plus
 26 preserved logic/basic/control-flow/enum/contract/idiom profile controls and
 one selected native-only control. It covers exact states, wrong values/keys,
 missing/reordered duplicate Adds, dead/unrelated collections, initialized versus
@@ -956,7 +960,7 @@ entrypoints. The 120-second entry/process/EOF cleanup mechanism is unchanged.
 The additive strict `--collections` mode archives unchanged released Git commit
 `d82f3ae95175ecd09581c6922701706be72b0ca9`, verifies its own native asset manifest,
 locked-restores and builds that source, and links the same helper to each actual
-old/current compiler arm. It requires exactly **103 actual entrypoints**, with
+old/current compiler arm. It requires exactly **109 actual entrypoints**, with
 old IDs/native `§I` refinements only in disposable historical inputs, and checks
 current-parser rejection of an old-ID input. No copied-current arm, skip,
 empty/unknown run, fallback evidence or historical fixture mutation is accepted.
