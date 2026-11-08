@@ -42,6 +42,19 @@ DECOYS = {
     "str005": '§B{unused} (sb-append (sb-append (sb-append (sb-new) "Hello, ") name) "!")\n'
               '§R (+ (+ "Hello, " name) "!")',
 }
+DECISIONS = {
+    "str002": (
+        "§IF (contains s sub)\n  §R true\n§R false",
+        "§R (? (! (contains s sub)) false true)",
+        "§B{found:bool} (contains s sub)\n§IF found\n  §R true\n§R false",
+    ),
+    "str004": (
+        '§IF (regex-test email "@")\n  §R true\n§R false',
+        '§R (? (! (regex-test email "@")) false true)',
+        '§B{found:bool} (regex-test email "@")\n§IF found\n  §R true\n§R false',
+    ),
+}
+TAUTOLOGICAL_BRANCH = "§IF (>= (len s) 0)\n  §R §C{System.Linq.Enumerable.Count} §A s §/C\n§R 0"
 
 
 def load(name, filename):
@@ -83,13 +96,18 @@ def cases(profile):
         (source(profile, body=WRONG[profile]) + unrelated, False, None),
         ("// " + source(profile).replace("\n", " ") + "\n§M{Calculator}\n", False, "Expected exactly one"),
         (source(profile) + unrelated.replace("§F{Decoy:", f"§F{{{name}:"), False, None),
-        (source(profile, body=DECOYS[profile]), False, "Required native string operation"),
+        (source(profile, body=DECOYS[profile]), False,
+         "Required native string operation" if profile == "str005" else "String coupling failed"),
         (source(profile, contracts="§Q (>= (len s) 0)" if profile == "str003" else "§Q true\n§S false"),
          False, "Missing/wrong string preconditions" if profile == "str003" else "String postconditions"),
     ]
     if profile == "str003":
         controls.append((source(profile, signature="§F{GetFirstChar:pub} (str:s | (> (len #) 0)) -> char",
                                 contracts=""), True, None))
+    for body in DECISIONS.get(profile, ()):
+        controls.append((source(profile, body=body), True, None))
+    if profile == "str001":
+        controls.append((source(profile, body=TAUTOLOGICAL_BRANCH), False, "String coupling failed"))
     return controls
 
 
@@ -131,12 +149,12 @@ class StringVerifierTests(unittest.TestCase):
         for profile in TASKS:
             self.verify(profile, None, False, detail="Input missing")
             self.verify(profile, source(profile, body=""), False)
-        self.verify("str002", source("str002", body=DECOYS["str002"]), False, detail="Required native string operation")
-        self.verify("str004", source("str004", body=DECOYS["str004"]), False, detail="Required native string operation")
+        self.verify("str002", source("str002", body=DECOYS["str002"]), False, detail="String coupling failed")
+        self.verify("str004", source("str004", body=DECOYS["str004"]), False, detail="String coupling failed")
         self.verify("str005", source("str005", body=DECOYS["str005"]), False)
         self.verify("str001", source("str001", body=DECOYS["str001"]),
-                    False, detail="Required native string operation")
-        self.verify("str003", source("str003", body=DECOYS["str003"]), False, detail="Required native string operation")
+                    False, detail="String coupling failed")
+        self.verify("str003", source("str003", body=DECOYS["str003"]), False, detail="String coupling failed")
         self.verify("str003", source("str003", body='§B{unused:char} (char-at s 0)\n§R (char-lit "x")'), False)
         self.verify("str004", source("str004", body='§R (regex-test email "^.+@.+\\\\..+$")'), False)
         self.verify("str004", source("str004", body='§R (regex-test email "[@]")'),
@@ -153,9 +171,8 @@ class StringVerifierTests(unittest.TestCase):
                     False, detail="Ambiguous native string expression mapping")
         self.verify("str001", source("str001", body="§B{l:i32} s.Length\n§B{square:i32} (* l l)\n"
                     "§IF (== l 0)\n  §R 0\n§R (/ square (len s))"), False, detail="counterfactual runtime failed")
-        self.verify("str001", source("str001", body="§IF (>= (len s) 0)\n"
-                    "  §R §C{System.Linq.Enumerable.Count} §A s §/C\n§R 0"),
-                    False, detail="Required native string operation")
+        self.verify("str001", source("str001", body=TAUTOLOGICAL_BRANCH),
+                    False, detail="String coupling failed")
 
     def test_equivalent_native_and_bcl_forms(self):
         self.verify("str001", source("str001", body="§R s.Length"))
@@ -230,9 +247,9 @@ def run_compatibility(old, current, deadline):
     test.verify("str003", historical_syntax(source("str003")), False,
                 env={"CALOR_COMPILER_ROOT": str(current), "CALOR_LOGIC_TIMEOUT_SECONDS": str(remaining)},
                 detail="Calor compilation failed")
-    if StringVerifierTests.entry_points_executed != 123:
-        raise RuntimeError("Expected exactly 123 actual old/current string entrypoint controls.")
-    print("Compatibility passed: 123 actual old/current string entry-point controls.")
+    if StringVerifierTests.entry_points_executed != 137:
+        raise RuntimeError("Expected exactly 137 actual old/current string entrypoint controls.")
+    print("Compatibility passed: 137 actual old/current string entry-point controls.")
 
 
 if __name__ == "__main__":

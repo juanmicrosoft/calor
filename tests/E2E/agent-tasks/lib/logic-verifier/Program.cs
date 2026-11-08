@@ -721,26 +721,6 @@ static void VerifyStrings(string profile, string path)
     var bindings = RecursiveAstWalker.EnumerateStatements(function.Body).OfType<BindStatementNode>()
         .GroupBy(binding => binding.Name).Where(group => group.Count() == 1)
         .ToDictionary(group => group.Key, group => group.Single(), StringComparer.Ordinal);
-    var returnedData = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
-    void ReturnData(AstNode node)
-    {
-        if (!returnedData.Add(node))
-            return;
-        if (node is ReferenceNode reference && bindings.TryGetValue(reference.Name, out var binding)
-            && !binding.IsMutable && binding.Initializer != null)
-            ReturnData(binding.Initializer);
-        if (node is ConditionalExpressionNode conditional)
-        {
-            ReturnData(conditional.WhenTrue);
-            ReturnData(conditional.WhenFalse);
-        }
-        else if (node is not LambdaExpressionNode)
-            foreach (var child in RecursiveAstWalker.GetAllChildren(node))
-                ReturnData(child);
-    }
-    foreach (var returned in RecursiveAstWalker.EnumerateStatements(function.Body).OfType<ReturnStatementNode>())
-        if (returned.Expression != null)
-            ReturnData(returned.Expression);
     var witnesses = new List<(ExpressionSyntax Expression, string Kind)>();
     foreach (var statement in RecursiveAstWalker.EnumerateStatements(function.Body))
     {
@@ -790,9 +770,6 @@ static void VerifyStrings(string profile, string path)
                 if (kind == "char" && expression is ElementAccessExpressionSyntax element
                     && (element.ArgumentList.Arguments.Count != 1
                         || semantic.GetConstantValue(element.ArgumentList.Arguments[0].Expression) is not { HasValue: true, Value: 0 }))
-                    continue;
-                if (kind is "length" or "contains" or "char" or "regex" or "ToString"
-                    && !returnedData.Contains(native))
                     continue;
                 var operands = expression switch
                 {

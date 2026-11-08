@@ -792,10 +792,12 @@ have the exact names, parameter order, string parameters and int/bool/char/strin
 return types. Debug public emission is independently compiled and compared
 against selected-public `#line` emission before mapping native witnesses.
 Length, contains, index-zero char access and pattern-`"@"` regex must contribute
-to returned data, directly or through unique immutable local bindings. Merely
-placing a builtin in an unused binding, branch condition, comment or unrelated
-helper cannot supply the witness. Independently compiled contract-disabled
-baselines must preserve behavior. Neutralizing mapped operations must change
+to returned outputs, through data or control dependence. Statement decisions,
+conditional expressions and immutable local decision bindings are supported.
+Merely placing a builtin in an unused binding, output-independent branch
+condition, comment or unrelated helper cannot supply the witness. Independently
+compiled contract-disabled baselines must preserve behavior.
+Neutralizing mapped operations must change
 outputs; mapping ambiguity, compilation failures and counterfactual exceptions
 reject, rather than count as dependence evidence.
 
@@ -835,19 +837,23 @@ python3 tests/E2E/agent-tasks/test-string-verifiers.py
 python3 tests/E2E/agent-tasks/test-logic-old-release.py --strings
 ```
 
-The current suite executes six tests and 128 real `verify.sh` controls. It
+The current suite executes six tests and 135 real `verify.sh` controls. It
 checks success counts, equivalent native/BCL forms, exact native/CLR types,
-missing and narrowed contracts, unused and control-only builtins, dead/different
-builders, ambiguous mappings, counterfactual runtime errors, corrupt native
+missing and narrowed contracts, builtin-dependent decisions, unused and
+output-independent builtins, dead/different builders, ambiguous mappings,
+counterfactual runtime errors, corrupt native
 images, root/configuration rejection and bounded nontermination.
 
-The additive strict `--strings` mode executes 123 actual old/current entrypoint
-controls: 61 against each arm and current rejection of an old-ID input. It uses
+The additive strict `--strings` mode executes 137 actual old/current entrypoint
+controls: 68 against each arm and current rejection of an old-ID input. It uses
 the existing archive of `d82f3ae95175ecd09581c6922701706be72b0ca9`, its own
 native manifest verification, locked restore and unchanged compiler build.
 Only disposable old inputs receive IDs and old native `§I` refinements.
-Both arms exercise genuine positives, signature/contract failures and
-behaviorally correct unused-builtin/dead-builder decoys. Missing native assets,
+Both arms exercise genuine positives (including statement, conditional-expression
+and immutable-binding decisions), signature/contract failures and behaviorally
+correct unused-builtin/dead-builder decoys. The tautological `length(s) >= 0`
+branch followed by independent Enumerable.Count is rejected because neutralizing
+the builtin leaves every output unchanged. Missing native assets,
 history/APIs, build errors, skipped/empty controls or unknown proofs fail; there
 is no current-binary stand-in or fallback. Existing old modes, the 600-second
 total bound, and the shared 120-second entry/process/EOF bound are unchanged.
