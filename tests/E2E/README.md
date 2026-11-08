@@ -1196,14 +1196,52 @@ All controls are Python strings or outside-repository temporary inputs.
 The additive strict historical mode archives unchanged actual v0.29 commit
 `d82f3ae95175ecd09581c6922701706be72b0ca9`, verifies its own Z3 manifest,
 locked-restores and source-builds it, then links this same test-only helper to
-each selected old/current arm. It requires exactly **105 real entrypoints**
-(34 accepted, 71 rejected), including current rejection of an old-ID input.
+each selected old/current arm. It requires exactly **71 real entrypoints**
+(22 accepted, 49 rejected), including current rejection of an old-ID input.
 Historical IDs appear only in disposable adapted inputs. The existing
 120-second per-entry/process/EOF bounds, 600-second historical total bound,
 process cleanup, native-only measured admission and all prior dispatch/proofs
 remain unchanged, including all 65,536 SumToN inputs/output-only mutants,
 generic behavioral storage selection, string control dependence and collection
 state tracing.
+
+The strict matrix is representative, not the full 59-control current suite.
+It executes the same **35 categories per arm**: 23 ComputeWithTemp cases
+(8 accepted, 15 rejected) and 12 Accumulate cases (3 accepted, 9 rejected).
+Every entrypoint still recompiles the test helper against that selected arm,
+compiles the actual candidate source, and executes its complete original,
+contract-disabled, instrumented and applicable counterfactual cases. No
+compiler/body evidence is cached, substituted or shared across entrypoints.
+
+ComputeWithTemp retains `int` aliases with checked unrolled bindings, genuinely
+widened algebra, long declarations with narrow initializer evaluation, unchecked
+narrow arithmetic, mutable and assigned-product aliases, overwritten/gated
+write-version decoys, admissible entry/output contracts, unused bindings beside
+input-recomputed returns, zero-weight decoys, wrong binding values, unreachable
+bindings, helper-contract decoys, baseline and mutant-only runtime errors,
+admissible/narrowed scoped refinements, narrowed preconditions, excluded outputs,
+foreign contract references, and private/wide-parameter/wide-return signatures.
+Accumulate retains checked unrolled updates, three-iteration loops, widened
+increment aliases, unused accumulators beside independent returns, two/four
+updates, nonzero initialization, constant increments, another variable's
+updates, unreachable accumulators, and baseline/mutant-only runtime errors.
+All accepted entries retain exact native/CLR signatures, independent signed
+oracles and complete 266 zero-binding or 51 +1-update counterfactual checks.
+
+Only redundant permutations are omitted from strict replay, and all remain
+in the unchanged full current suite: ComputeWithTemp's canonical `i32` positive
+(`int` positive retained), immutable alias (mutable/assigned aliases retained),
+direct conditional decoy (overwritten/gated alias retained), and binding-free
+return (unused/unreachable binding decoys retained). Accumulate omits `int`,
+unchecked and tautological-contract permutations (covered by ComputeWithTemp);
+its zero-weight and binding-free returns (other output/state decoys retained);
+and its admissible/narrowed refinements, narrowed precondition, excluded output,
+foreign reference, private/wide-parameter/wide-return permutations (the same
+selected guards and signature rejection categories run in ComputeWithTemp).
+The full current suite still tests every omitted task-specific permutation.
+This avoids repeating cross-profile categories inside the historical budget:
+the **600-second total and 120-second entry/process/EOF deadlines are unchanged**.
+Exhausting either deadline remains a mandatory failure, not accepted evidence.
 
 This is only the two arithmetic prerequisites, not acceptance of all 129 tasks,
 an agent, the milestone or a release. Product code, other task wrappers,

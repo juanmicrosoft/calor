@@ -20,7 +20,7 @@ BODIES = {
 }
 PARAMETERS = {"ComputeWithTemp": "i32:a, i32:b", "Accumulate": "i32:n"}
 CURRENT_ENTRYPOINTS = 59
-COMPATIBILITY_ENTRYPOINTS = 105
+COMPATIBILITY_ENTRYPOINTS = 71
 
 
 def load(name, filename):
@@ -149,6 +149,61 @@ def independent_cases(name):
     return cases, expected
 
 
+def compatibility_cases(name):
+    """Representative strict categories; the full current matrix stays unchanged."""
+    selections = {
+        "ComputeWithTemp": (
+            (1, "int-alias-checked-unrolled"),
+            (2, "genuinely-widened-algebra"),
+            (3, "long-declaration-narrow-evaluation"),
+            (4, "unchecked-narrow"),
+            (6, "mutable-binding-alias"),
+            (7, "assigned-product-alias"),
+            (8, "overwritten-gated-alias"),
+            (9, "admissible-entry-output-contracts"),
+            (10, "unused-bindings-input-recomputed-return"),
+            (11, "zero-weight-decoy"),
+            (13, "wrong-binding-value"),
+            (15, "unreachable-bindings"),
+            (16, "helper-contract-decoy"),
+            (17, "mutant-only-runtime-error"),
+            (18, "baseline-runtime-error"),
+            (19, "admissible-scoped-refinement"),
+            (20, "narrowed-scoped-refinement"),
+            (21, "narrowed-precondition"),
+            (22, "excluded-correct-output"),
+            (23, "foreign-contract-reference"),
+            (24, "private-signature"),
+            (25, "wide-parameter-signature"),
+            (26, "wide-return-signature"),
+        ),
+        "Accumulate": (
+            (0, "checked-unrolled-state-updates"),
+            (2, "three-iteration-loop"),
+            (3, "widened-increment-alias"),
+            (6, "unused-accumulator-independent-return"),
+            (8, "two-updates"),
+            (9, "four-updates"),
+            (10, "nonzero-initialization"),
+            (11, "constant-increments"),
+            (12, "other-variable-updates"),
+            (13, "unreachable-accumulator"),
+            (15, "mutant-only-runtime-error"),
+            (16, "baseline-runtime-error"),
+        ),
+    }
+    full = shared_cases(name)
+    expected_full, expected_selected, accepted = (
+        (27, 23, 8) if name == "ComputeWithTemp" else (25, 12, 3))
+    selected = selections[name]
+    if (len(full) != expected_full or len(selected) != expected_selected
+            or len({index for index, _ in selected}) != expected_selected
+            or len({category for _, category in selected}) != expected_selected
+            or sum(full[index][1] for index, _ in selected) != accepted):
+        raise RuntimeError(f"Arithmetic representative matrix/count mismatch for {name}.")
+    return [(category, *full[index]) for index, category in selected]
+
+
 class TypeArithmeticVerifierTests(unittest.TestCase):
     entry_points_executed = 0
 
@@ -220,18 +275,18 @@ def run_compatibility(old, current, deadline):
     initial = TypeArithmeticVerifierTests.entry_points_executed
     for label, root, historical in (("v0.29", old, True), ("current", current, False)):
         for name in TASKS:
-            for text, expected, detail in shared_cases(name):
+            for category, text, expected, detail in compatibility_cases(name):
                 if time.monotonic() >= deadline:
                     raise RuntimeError("Arithmetic compatibility exceeded its 600-second total deadline.")
                 test.verify(name, adapter(text) if historical else text, expected, detail=detail,
                             overall_deadline=deadline, env={"CALOR_COMPILER_ROOT": str(root),
                             "CALOR_LOGIC_TIMEOUT_SECONDS": str(min(120, deadline - time.monotonic()))})
-                print(f"{label} {name}: {'accepted' if expected else 'rejected'} actual entrypoint.")
+                print(f"{label} {name} [{category}]: {'accepted' if expected else 'rejected'} actual entrypoint.")
     test.verify("Accumulate", adapter(source("Accumulate")), False, detail="Calor compilation failed",
                 overall_deadline=deadline, env={"CALOR_COMPILER_ROOT": str(current),
                 "CALOR_LOGIC_TIMEOUT_SECONDS": str(min(120, deadline - time.monotonic()))})
     observed = TypeArithmeticVerifierTests.entry_points_executed - initial
-    expected_count = 2 * sum(len(shared_cases(name)) for name in TASKS) + 1
+    expected_count = 2 * sum(len(compatibility_cases(name)) for name in TASKS) + 1
     if observed != expected_count or observed != COMPATIBILITY_ENTRYPOINTS:
         raise RuntimeError(f"Expected exactly {COMPATIBILITY_ENTRYPOINTS} arithmetic old/current controls; observed {observed}.")
     print(f"Compatibility passed: {observed} actual old/current arithmetic entry-point controls.")
