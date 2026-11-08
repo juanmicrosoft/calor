@@ -24,8 +24,8 @@ def load(name, path):
 
 
 def main():
-    if sys.argv[1:] not in ([], ["--control-flow"], ["--remaining-control-flow"], ["--basic-syntax"], ["--contract-writing"], ["--native-prerequisite"], ["--enums"], ["--idioms"], ["--generics"], ["--strings"], ["--collections"], ["--scalar-patterns"]):
-        raise RuntimeError("Usage: test-logic-old-release.py [--control-flow|--remaining-control-flow|--basic-syntax|--contract-writing|--native-prerequisite|--enums|--idioms|--generics|--strings|--collections|--scalar-patterns]")
+    if sys.argv[1:] not in ([], ["--control-flow"], ["--remaining-control-flow"], ["--basic-syntax"], ["--contract-writing"], ["--native-prerequisite"], ["--enums"], ["--idioms"], ["--generics"], ["--strings"], ["--collections"], ["--scalar-patterns"], ["--oop"]):
+        raise RuntimeError("Usage: test-logic-old-release.py [--control-flow|--remaining-control-flow|--basic-syntax|--contract-writing|--native-prerequisite|--enums|--idioms|--generics|--strings|--collections|--scalar-patterns|--oop]")
     verifier = load("verify_logic", HERE / "lib/verify-logic.py")
     controls = load("logic_controls", HERE / "test-logic-verifiers.py")
     current = controls.COMPILER_ROOT
@@ -106,6 +106,10 @@ def main():
         if sys.argv[1:] == ["--generics"]:
             generics = load("generic_controls", HERE / "test-generic-verifiers.py")
             generics.run_compatibility(old, current, deadline)
+            return
+        if sys.argv[1:] == ["--oop"]:
+            oop = load("oop_controls", HERE / "test-oop-verifiers.py")
+            oop.run_compatibility(old, current, deadline)
             return
         if sys.argv[1:] == ["--basic-syntax"]:
             basic = load("basic_controls", HERE / "test-basic-syntax-verifiers.py")

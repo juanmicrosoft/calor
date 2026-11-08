@@ -46,6 +46,15 @@ static void Verify(string profile, string path)
         VerifyScalarPatterns(profile, path);
         return;
     }
+    if (profile is "oop001" or "oop002" or "oop003" or "oop004" or "oop005" or "oop006")
+    {
+        var oopCompilation = Calor.Compiler.Program.Compile(
+            File.ReadAllText(path), path, new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
+        if (oopCompilation.HasErrors || oopCompilation.Ast == null)
+            throw new InvalidOperationException($"Calor compilation failed:\n{string.Join("\n", oopCompilation.Diagnostics)}");
+        VerifyOop(profile, oopCompilation.Ast, oopCompilation.GeneratedCode, path);
+        return;
+    }
     if (profile is "gen001" or "gen002" or "gen003")
     {
         var genericSource = File.ReadAllText(path);
@@ -1323,20 +1332,7 @@ static void VerifyGeneric(string profile, ModuleNode module, string generatedCod
     const BindingFlags members = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
         | BindingFlags.Static | BindingFlags.DeclaredOnly;
     var name = profile switch { "gen001" => "Identity", "gen002" => "Container", _ => "Repository" };
-    var pending = new Stack<AstNode>();
-    var seen = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
-    pending.Push(module);
-    while (pending.TryPop(out var node))
-    {
-        if (!seen.Add(node))
-            continue;
-        if (node is CSharpInteropBlockNode or RawCSharpNode or RawCSharpExpressionNode)
-            throw new InvalidOperationException("Raw interop cannot establish native generic behavior.");
-        foreach (var child in RecursiveAstWalker.GetAllChildren(node))
-            pending.Push(child);
-        if (node is LocalFunctionStatementNode local)
-            pending.Push(local.Function);
-    }
+    RejectRawInterop(module, "generic behavior");
     var (assembly, _) = CompileRuntime(generatedCode);
     Type generic;
     MethodInfo? identity = null;
@@ -1557,6 +1553,261 @@ static void VerifyGeneric(string profile, ModuleNode module, string generatedCod
     Console.WriteLine($"Verification passed: {name}; native/reflected generic identity"
         + (identity == null ? " and actual private storage" : "")
         + $"; {closedCount} closed types, {caseCount} runtime cases.");
+}
+
+static void RejectRawInterop(ModuleNode module, string purpose)
+{
+    var pending = new Stack<AstNode>();
+    var seen = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+    pending.Push(module);
+    while (pending.TryPop(out var node))
+    {
+        if (!seen.Add(node))
+            continue;
+        if (node is CSharpInteropBlockNode or RawCSharpNode or RawCSharpExpressionNode)
+            throw new InvalidOperationException($"Raw interop cannot establish native {purpose}.");
+        foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+            pending.Push(child);
+        if (node is LocalFunctionStatementNode local)
+            pending.Push(local.Function);
+    }
+}
+
+static void VerifyOop(string profile, ModuleNode module, string generatedCode, string path)
+{
+    const BindingFlags members = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+        | BindingFlags.Static | BindingFlags.DeclaredOnly;
+    var name = profile switch
+    {
+        "oop001" => "Person", "oop002" => "IRepository", "oop003" => "Calculator",
+        "oop004" => "Product", "oop005" => "Counter", _ => "Point"
+    };
+    void Require(bool condition, string detail)
+    {
+        if (!condition)
+            throw new InvalidOperationException($"{name}: {detail}.");
+    }
+    bool Integer(string type) => AttributeHelper.ExpandType(type) == "INT";
+    bool Parameters(IReadOnlyList<ParameterNode> parameters, string[] names) =>
+        parameters.Select(parameter => parameter.Name).SequenceEqual(names)
+        && parameters.All(parameter => Integer(parameter.TypeName)
+            && parameter.Modifier == Calor.Compiler.Ast.ParameterModifier.None);
+    bool ReflectedParameters(ParameterInfo[] parameters, string[] names) =>
+        parameters.Select(parameter => parameter.Name).SequenceEqual(names)
+        && parameters.All(parameter => parameter.ParameterType == typeof(int));
+    RejectRawInterop(module, "OOP declarations");
+    var (assembly, trees) = CompileRuntime(generatedCode);
+    var mapped = CSharpSyntaxTree.ParseText(
+        new CSharpEmitter(ContractMode.Debug) { LineDirectiveFilePath = path }.Emit(module),
+        new CSharpParseOptions(LanguageVersion.Preview));
+    Require(SyntaxFactory.AreEquivalent(trees[1].GetRoot(), mapped.GetRoot()),
+        "source-mapped native emission differs from independently compiled C#");
+    var type = assembly.GetType($"{module.Name}.{name}")
+        ?? throw new InvalidOperationException($"{name}: missing reflected CLR type.");
+    Require(type.IsPublic && !type.IsGenericType, "wrong public reflected CLR identity");
+    var caseCount = 0;
+    if (profile == "oop002")
+    {
+        var declarations = module.Interfaces.Where(candidate => candidate.Name == name).ToArray();
+        Require(declarations.Length == 1, "Expected exactly one native interface");
+        var declaration = declarations[0];
+        // Native interfaces have no visibility slot; the selected emitter makes them public.
+        Require(declaration.TypeParameters.Count == 0 && type.IsInterface, "wrong native public interface identity");
+        var signatures = declaration.Methods.Where(method => method.Name == "GetById"
+            && method.TypeParameters.Count == 0 && Parameters(method.Parameters, ["id"])
+            && Regex.Replace(method.Output?.TypeName ?? "", @"\s+", "") == "Option<Entity>").ToArray();
+        Require(signatures.Length == 1, "wrong native GetById signature; exact Option<Entity> required");
+        var signature = signatures[0];
+        CheckScalarEntryDomain(signature.Parameters, signature.Preconditions, "GetById");
+        var methods = type.GetMethods(members).Where(method => method.Name == "GetById"
+            && ReflectedParameters(method.GetParameters(), ["id"])).ToArray();
+        Require(methods.Length == 1, "Expected exactly one reflected GetById signature");
+        var method = methods[0];
+        var option = assembly.GetType($"{module.Name}.Option`1");
+        var entity = assembly.GetType($"{module.Name}.Entity");
+        Require(method.IsPublic && method.IsAbstract && !method.IsStatic && !method.IsGenericMethod
+            && method.GetMethodBody() == null && ReflectedParameters(method.GetParameters(), ["id"])
+            && method.ReturnType.IsConstructedGenericType
+            && method.ReturnType.GetGenericTypeDefinition().Name == "Option`1"
+            && method.ReturnType.GetGenericArguments().Length == 1
+            && method.ReturnType.GetGenericArguments()[0].Name == "Entity"
+            && (option == null || method.ReturnType.GetGenericTypeDefinition() == option)
+            && (entity == null || method.ReturnType.GetGenericArguments()[0] == entity),
+            "wrong abstract reflected closed Option<Entity> signature");
+        var syntax = mapped.GetRoot().DescendantNodes().OfType<InterfaceDeclarationSyntax>()
+            .Single(candidate => candidate.Identifier.ValueText == name);
+        var emitted = syntax.Members.OfType<MethodDeclarationSyntax>()
+            .Where(candidate => candidate.Identifier.ValueText == "GetById"
+                && candidate.ParameterList.Parameters.Count == 1
+                && candidate.ParameterList.Parameters[0].Identifier.ValueText == "id"
+                && SyntaxFactory.AreEquivalent(candidate.ReturnType, SyntaxFactory.ParseTypeName("Option<Entity>"))).ToArray();
+        Require(emitted.Length == 1 && emitted[0].Body == null && emitted[0].ExpressionBody == null,
+            "interface signature has an implementation");
+    }
+    else
+    {
+        var declarations = module.Classes.Where(candidate => candidate.Name == name).ToArray();
+        Require(declarations.Length == 1, "Expected exactly one native class");
+        var declaration = declarations[0];
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(File.ReadAllText(path), diagnostics).TokenizeAllForParser();
+        Require(!diagnostics.HasErrors && tokens.Any(token => token.Kind == TokenKind.Class
+            && token.Span.Start == declaration.Span.Start), "expected a native class declaration, not a named module");
+        Require(declaration.Visibility == Visibility.Public && !declaration.IsStruct
+            && declaration.TypeParameters.Count == 0 && type.IsClass, "wrong native public class identity");
+        var syntax = mapped.GetRoot().DescendantNodes().OfType<ClassDeclarationSyntax>()
+            .Single(candidate => candidate.Identifier.ValueText == name);
+        int[] values = [int.MinValue, int.MinValue + 1, -1073741824, -100, -7, -1, 0, 1, 7, 100,
+            1073741823, int.MaxValue - 1, int.MaxValue];
+        object Construct()
+        {
+            var constructors = type.GetConstructors(members).Where(constructor => !constructor.IsStatic).ToArray();
+            var empty = constructors.SingleOrDefault(constructor => constructor.GetParameters().Length == 0);
+            if (empty != null)
+                return empty.Invoke([]);
+            var finite = constructors.Where(constructor => constructor.GetParameters().Length is 1 or 2
+                && constructor.GetParameters().All(parameter => parameter.ParameterType == typeof(int))).ToArray();
+            if (finite.Length != 1)
+                throw new InvalidOperationException($"{name}: Unsupported finite constructor setup: need a real zero-argument or unambiguous one/two-integer constructor.");
+            return finite[0].Invoke(new object[] { -7, 11 }.Take(finite[0].GetParameters().Length).ToArray());
+        }
+        FieldInfo Field(string fieldName)
+        {
+            var fields = declaration.Fields.Where(field => field.Name == fieldName).ToArray();
+            Require(fields.Length == 1 && fields[0].Visibility == Visibility.Private && Integer(fields[0].TypeName),
+                $"wrong native private integer field {fieldName}");
+            var field = type.GetField(fieldName, members);
+            Require(field != null && field.IsPrivate && field.FieldType == typeof(int)
+                && field.IsStatic == (fields[0].IsStatic || fields[0].Modifiers.HasFlag(MethodModifiers.Const)),
+                $"wrong reflected private integer field {fieldName}");
+            return field!;
+        }
+        if (profile == "oop001")
+        {
+            Require(declaration.Fields.Count + declaration.Properties.Count + declaration.Indexers.Count
+                + declaration.Methods.Count + declaration.Constructors.Count + declaration.Events.Count
+                + declaration.OperatorOverloads.Count + declaration.NestedClasses.Count
+                + declaration.NestedInterfaces.Count + declaration.NestedEnums.Count
+                + declaration.NestedDelegates.Count + declaration.PreprocessorBlocks.Count == 0
+                && declaration.Items.Count == 0 && syntax.Members.Count == 0, "Person must have no source members");
+            Require(type.GetMembers(members).All(member => member is ConstructorInfo constructor
+                && !constructor.IsStatic && constructor.GetParameters().Length == 0),
+                "Person has non-synthesized CLR members");
+        }
+        else if (profile == "oop005")
+            _ = Field("_count");
+        else if (profile == "oop003")
+        {
+            var methods = declaration.Methods.Where(method => method.Name == "Add"
+                && method.Visibility == Visibility.Public && !method.IsAsync && method.TypeParameters.Count == 0
+                && Parameters(method.Parameters, ["a", "b"]) && Integer(method.Output?.TypeName ?? "")).ToArray();
+            Require(methods.Length == 1, "wrong native public Add signature");
+            var native = methods[0];
+            CheckScalarEntryDomain(native.Parameters, native.Preconditions, "Add");
+            var reflected = type.GetMethods(members).Where(method => method.Name == "Add"
+                && ReflectedParameters(method.GetParameters(), ["a", "b"])).ToArray();
+            Require(reflected.Length == 1, "Expected exactly one reflected Add method");
+            var method = reflected[0];
+            Require(method.IsPublic && !method.IsGenericMethod && method.ReturnType == typeof(int)
+                && method.IsStatic == native.IsStatic && ReflectedParameters(method.GetParameters(), ["a", "b"]),
+                "wrong reflected public Add signature");
+            var instance = method.IsStatic ? null : Construct();
+            foreach (var a in values)
+                foreach (var b in values)
+                {
+                    var sum = (long)a + b;
+                    if (sum < int.MinValue || sum > int.MaxValue)
+                        continue;
+                    Require(Equals(method.Invoke(instance, [a, b]), (int)sum), $"Add({a}, {b}) expected {sum}");
+                    caseCount++;
+                }
+        }
+        else if (profile == "oop006")
+        {
+            var xField = Field("_x");
+            var yField = Field("_y");
+            var constructors = declaration.Constructors.Where(constructor => constructor.Visibility == Visibility.Public
+                && !constructor.IsStatic && Parameters(constructor.Parameters, ["x", "y"])).ToArray();
+            Require(constructors.Length == 1, "Expected exactly one native public Point(x, y) constructor");
+            CheckScalarEntryDomain(constructors[0].Parameters, constructors[0].Preconditions, "Point");
+            var constructor = type.GetConstructor(members, null, [typeof(int), typeof(int)], null);
+            Require(constructor != null && constructor.IsPublic
+                && ReflectedParameters(constructor.GetParameters(), ["x", "y"]), "wrong reflected public Point constructor");
+            foreach (var x in values)
+                foreach (var y in values)
+                {
+                    var instance = constructor!.Invoke([x, y]);
+                    Require(Equals(xField.GetValue(instance), x) && Equals(yField.GetValue(instance), y),
+                        $"Point({x}, {y}) expected actual _x/_y state");
+                    // Static fields are not prohibited by the prompt. Only instance fields promise isolation.
+                    var other = constructor.Invoke([y, x]);
+                    Require(Equals(xField.GetValue(other), y) && Equals(yField.GetValue(other), x)
+                        && (xField.IsStatic || Equals(xField.GetValue(instance), x))
+                        && (yField.IsStatic || Equals(yField.GetValue(instance), y)), "Point changed isolated instance fields");
+                    caseCount += 2;
+                }
+        }
+        else
+        {
+            var properties = declaration.Properties.Where(property => property.Name == "Price").ToArray();
+            Require(properties.Length == 1, "Expected exactly one native Price property");
+            var native = properties[0];
+            Require(native.Visibility == Visibility.Public && Integer(native.TypeName) && native.IsAutoProperty
+                && new[] { native.Getter, native.Setter, native.Initer }.Any(accessor => accessor != null),
+                "Price must be a native public integer auto-property");
+            foreach (var accessor in new[] { native.Getter, native.Setter, native.Initer }.OfType<PropertyAccessorNode>())
+                CheckScalarEntryDomain([], accessor.Preconditions, "Price");
+            var emitted = syntax.Members.OfType<PropertyDeclarationSyntax>()
+                .Where(property => property.Identifier.ValueText == "Price").ToArray();
+            Require(emitted.Length == 1 && emitted[0].ExpressionBody == null
+                && emitted[0].AccessorList is { Accessors.Count: > 0 } accessors
+                && accessors.Accessors.All(accessor => accessor.Body == null && accessor.ExpressionBody == null
+                    && !accessor.SemicolonToken.IsMissing), "Price lacks emitted auto-property provenance");
+            var property = type.GetProperty("Price", members);
+            var storage = type.GetField("<Price>k__BackingField", members);
+            Require(property != null && property.PropertyType == typeof(int) && property.GetIndexParameters().Length == 0
+                && property.GetAccessors(true).Any(accessor => accessor.IsPublic)
+                && storage != null && storage.IsPrivate && storage.FieldType == typeof(int)
+                && storage.IsStatic == native.IsStatic
+                && storage.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), false),
+                "wrong reflected Price/backing-field identity");
+            var get = property!.GetGetMethod(true);
+            var set = property.GetSetMethod(true);
+            Require((get != null) == (native.Getter != null)
+                && (set != null) == (native.Setter != null || native.Initer != null)
+                && property.GetAccessors(true).All(accessor => accessor.IsStatic == native.IsStatic
+                    && accessor.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), false)),
+                "wrong reflected auto-accessor identity");
+            var instance = native.IsStatic ? null : Construct();
+            var other = native.IsStatic ? null : Construct();
+            var untouched = native.IsStatic ? null : storage!.GetValue(other);
+            if (storage!.IsStatic && storage.IsInitOnly)
+            {
+                Require(get != null && Equals(get.Invoke(null, []), storage.GetValue(null)),
+                    "Price getter expected actual readonly static backing state");
+                caseCount++;
+            }
+            else
+                foreach (var value in values)
+                {
+                    storage.SetValue(instance, value);
+                    if (get != null)
+                        Require(Equals(get.Invoke(instance, []), value), "Price getter expected actual backing state");
+                    if (set != null)
+                    {
+                        storage.SetValue(instance, value == 0 ? 1 : 0);
+                        set.Invoke(instance, [value]);
+                        Require(Equals(storage.GetValue(instance), value), "Price setter expected actual backing state");
+                        if (get != null)
+                            Require(Equals(get.Invoke(instance, []), value), "Price getter/setter state mismatch");
+                    }
+                    Require(native.IsStatic || Equals(storage.GetValue(other), untouched),
+                        "Price changed another instance");
+                    caseCount++;
+                }
+        }
+    }
+    Console.WriteLine($"Verification passed: {name}; native/reflected OOP identity; {caseCount} finite runtime cases.");
 }
 
 static void VerifyEnum(string profile, ModuleNode module, string generatedCode)
@@ -1857,11 +2108,17 @@ static void VerifyCollection(string profile, string path)
 
 static void CheckBasicEntryDomain(FunctionNode function, string[] names)
 {
+    CheckScalarEntryDomain(function.Parameters, function.Preconditions, function.Name);
+}
+
+static void CheckScalarEntryDomain(
+    IReadOnlyList<ParameterNode> parameters, IReadOnlyList<RequiresNode> preconditions, string name)
+{
     using var context = new Context();
     var translator = new ContractTranslator(context);
-    foreach (var name in names)
-        if (!translator.DeclareVariable(name, "i32"))
-            throw new InvalidOperationException($"Cannot model parameter {name}.");
+    foreach (var parameter in parameters)
+        if (!translator.DeclareVariable(parameter.Name, "i32"))
+            throw new InvalidOperationException($"Cannot model parameter {parameter.Name}.");
     BoolExpr Translate(ExpressionNode expression)
     {
         CheckEntryConditionExpression(expression);
@@ -1870,14 +2127,15 @@ static void CheckBasicEntryDomain(FunctionNode function, string[] names)
             throw new InvalidOperationException($"Basic precondition translation failed: {string.Join("; ", translator.Warnings)}");
         return translated;
     }
-    var conditions = TranslateEntryConditions(function, translator, Translate);
+    var conditions = TranslateScalarEntryConditions(parameters, preconditions, translator, Translate);
     BoolExpr domain = context.MkTrue();
-    if (function.Name == "Multiply")
+    if (name is "Multiply" or "Add")
     {
-        // The prompt specifies no overflow policy. Only representable products
+        // The prompts specify no overflow policy. Only representable results
         // constrain entry contracts or runtime cases, for checked and unchecked bodies.
-        var product = context.MkBVMul(context.MkSignExt(32, context.MkBVConst("a", 32)),
-            context.MkSignExt(32, context.MkBVConst("b", 32)));
+        var a = context.MkSignExt(32, context.MkBVConst("a", 32));
+        var b = context.MkSignExt(32, context.MkBVConst("b", 32));
+        var product = name == "Add" ? context.MkBVAdd(a, b) : context.MkBVMul(a, b);
         domain = context.MkAnd(context.MkBVSGE(product, context.MkBV(int.MinValue, 64)),
             context.MkBVSLE(product, context.MkBV(int.MaxValue, 64)));
     }
@@ -1894,9 +2152,14 @@ static void CheckBasicEntryDomain(FunctionNode function, string[] names)
 
 static BoolExpr[] TranslateEntryConditions(
     FunctionNode function, ContractTranslator translator, Func<ExpressionNode, BoolExpr> translate)
+    => TranslateScalarEntryConditions(function.Parameters, function.Preconditions, translator, translate);
+
+static BoolExpr[] TranslateScalarEntryConditions(
+    IReadOnlyList<ParameterNode> parameters, IReadOnlyList<RequiresNode> preconditions,
+    ContractTranslator translator, Func<ExpressionNode, BoolExpr> translate)
 {
-    var conditions = function.Preconditions.Select(contract => translate(contract.Condition)).ToList();
-    foreach (var parameter in function.Parameters)
+    var conditions = preconditions.Select(contract => translate(contract.Condition)).ToList();
+    foreach (var parameter in parameters)
     {
         if (parameter.InlineRefinement == null)
             continue;

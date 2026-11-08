@@ -1015,3 +1015,78 @@ These are four bounded behavioral prerequisites, not universal arbitrary-body,
 output-predicate, agent-nonregression or milestone acceptance. Carrier pattern
 tasks `pm-004` and `pm-005` remain separate. Original tasks, fixtures, TestData,
 active corpus membership, historical ledgers/floors and product code are unchanged.
+
+## OOP prerequisites (oop-001..006)
+
+Only the six existing `oop-features` entry points change. They read
+`Domain.calr` through the shared selected-root/configuration verifier, load
+that compiler's native Z3 prerequisite, inspect native AST declarations,
+and independently compile and reflect the emitted C#. Recursive raw-interoperability
+rejection and syntax-equivalent source-mapped emission prevent comments,
+interop, lexical decoys, and unrelated members from supplying the evidence.
+These are six verifier prerequisites for #1605, not agent acceptance, all
+129 tasks, or milestone/release validation.
+
+| Task | Required evidence | Canonical runtime cases |
+|------|-------------------|-------------------------|
+| oop-001 | Public Person class with no source members; compiler-synthesized default constructor allowed | 0 |
+| oop-002 | Public IRepository interface, abstract body-free GetById(integer id), actual closed CLR Option&lt;Entity&gt; return type | 0 |
+| oop-003 | Public Calculator and public Add(integer a, integer b), correct representable signed sums | 133 |
+| oop-004 | Public Product, public integer Price native auto-property, emitted body-free accessors, actual compiler-generated CLR backing field and accessor state | 13 |
+| oop-005 | Public Counter, actual private integer field named _count | 0 |
+| oop-006 | Public Point, actual private integer _x/_y fields, public constructor(integer x, integer y), correct field state on two real instances per argument pair | 338 |
+
+The original prompts, not the task titles, define the checks. Price's prompt
+does not prescribe getter/setter visibility or require a setter. Getter-only,
+get/set, get/init, private-setter, and static auto-properties are supported.
+Existing accessors must operate on their actual backing state; a manual getter
+with identical behavior is not an auto-property. For a readonly static backing
+field, the finite check observes the getter's actual stored value instead of
+attempting an unsupported write. Initial values are not prescribed.
+Static members, readonly/constant fields, and unrelated overloads are not
+prohibited when the selected compiler accepts them. Point checks isolation
+only for instance fields; the prompt does not prohibit static fields.
+
+The exact `Option<Entity>` spelling is retained. Disposable positive controls
+declare ordinary native `Option<T>` and `Entity` classes; no built-in option
+grammar, runtime feature, nullable substitution, or absence semantics is added.
+Native interfaces have no visibility slot and emit as public interfaces.
+Integer aliases are resolved by the selected public `AttributeHelper.ExpandType`
+API, then checked against actual CLR Int32 signatures. Parameter names
+id/a/b/x/y and field names _count/_x/_y are checked where the prompts specify them.
+
+Add uses a long oracle and 13 independently chosen signed boundary values,
+excluding only sums outside Int32's representable range. Both checked and
+unchecked compiler modes must pass. Point varies all 169 ordered boundary
+pairs and reads the actual private fields after each construction. Optional
+entry contracts and scoped inline refinements must admit the entire prompt
+domain, not just the finite probes; unmodeled predicates and unknown proof
+results fail. Field and empty-class checks are finite structural evidence,
+not universal behavior proofs.
+
+Calculator/Product instance setup uses a real public or nonpublic zero-argument
+constructor, otherwise an unambiguous one/two-integer constructor with fixed
+independent seeds (-7, 11). Other setup shapes fail explicitly with
+`Unsupported finite constructor setup`; constructor/runtime exceptions fail,
+and no uninitialized-object bypass or guessed defaults are used.
+
+```bash
+python3 tests/E2E/agent-tasks/test-oop-verifiers.py
+python3 tests/E2E/agent-tasks/test-logic-old-release.py --oop
+```
+
+The current suite requires exactly 160 actual verify.sh controls: 105 native
+identity/state/signature cases, 45 missing/invalid/comment/interop/named-module/ambiguity/
+unrelated-member cases, and 10 selected-root/configuration/native-asset/runtime/
+deadline cases. Overall, 39 controls succeed and 121 are rejected.
+The strict separate `--oop` lane executes the same explicit 64 native cases
+and six interop controls in each actual old/current arm, plus current rejection
+of historical syntax: exactly 141 controls. It archives unchanged Git commit
+`d82f3ae95175ecd09581c6922701706be72b0ca9`, verifies that release's own
+native-asset manifest, restores locked dependencies, and builds its own compiler.
+Only disposable old input strings acquire historical IDs and section-form
+`§I` refinements. There are no copied-current baselines, skips, empty passes,
+timeout-shaped negative successes, or fallback compiler roots. The existing
+120-second entry/process/EOF limit and 600-second historical total remain intact.
+No task.json, fixture, TestData, active .calr subject, corpus membership,
+historical ledger, floor, or product source is changed.
