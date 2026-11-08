@@ -1375,18 +1375,70 @@ static void VerifyAsync(string profile, string path)
             return ResolveLocal(Map(binding.Initializer, binding), resolving);
         return expression;
     }
+    ObjectCreationExpressionSyntax? httpReceiverCreation = null;
+    string? httpAddress = null;
+    var httpCreations = new List<ObjectCreationExpressionSyntax>();
+    var httpFieldCount = 0;
     if (http)
     {
+        var nativeClass = parsed.Classes.Single(candidate => candidate.Name == "DataService");
+        if (nativeClass.IsAbstract || nativeClass.IsStatic || nativeClass.IsStruct || nativeClass.BaseClass != null
+            || container.BaseList != null || container.Members.Any(member =>
+                member is not (MethodDeclarationSyntax or FieldDeclarationSyntax or ConstructorDeclarationSyntax))
+            || container.Members.OfType<ConstructorDeclarationSyntax>().Any(constructor =>
+                !constructor.Modifiers.Any(SyntaxKind.PublicKeyword) || constructor.ParameterList.Parameters.Count != 0
+                || constructor.Initializer != null || constructor.ExpressionBody != null
+                || constructor.Body == null || constructor.Body.Statements.Count != 0))
+            throw new InvalidOperationException("Unmodeled HTTP instance construction: require a real safe public zero-argument constructor.");
+        foreach (var field in container.Members.OfType<FieldDeclarationSyntax>())
+        {
+            foreach (var variable in field.Declaration.Variables)
+            {
+                var nativeFields = nativeClass.Fields.Where(candidate => candidate.Name == variable.Identifier.ValueText).ToArray();
+                if (nativeFields.Length != 1 || nativeFields[0].Visibility != Visibility.Private
+                    || nativeFields[0].Modifiers != MethodModifiers.Readonly || nativeFields[0].DefaultValue is not NewExpressionNode
+                    || semantic.GetDeclaredSymbol(variable) is not IFieldSymbol
+                        { IsStatic: false, IsReadOnly: true, DeclaredAccessibility: Accessibility.Private } symbol
+                    || !HttpClientType(symbol.Type) || variable.Initializer?.Value is not ObjectCreationExpressionSyntax creation
+                    || creation.ArgumentList?.Arguments.Count != 0 || creation.Initializer != null
+                    || semantic.GetSymbolInfo(creation).Symbol is not IMethodSymbol fieldConstructor
+                    || !HttpClientType(fieldConstructor.ContainingType)
+                    || !SyntaxFactory.AreEquivalent(creation, SyntaxFactory.ParseExpression(
+                        nativeFields[0].DefaultValue!.Accept(new CSharpEmitter(ContractMode.Debug)))))
+                    throw new InvalidOperationException("Unmodeled HTTP field: require a native private readonly default HttpClient initializer.");
+                httpCreations.Add(creation);
+                httpFieldCount++;
+            }
+        }
+        foreach (var native in natives.Where(native => native.Expression is NewExpressionNode))
+            httpCreations.Add((ObjectCreationExpressionSyntax)Map(native.Expression, native.Statement));
+        foreach (var attribute in root.DescendantNodes().OfType<AttributeSyntax>())
+            if (semantic.GetSymbolInfo(attribute).Symbol is IMethodSymbol initializerAttribute
+                && initializerAttribute.ContainingType.ToDisplayString() == "System.Runtime.CompilerServices.ModuleInitializerAttribute")
+                throw new InvalidOperationException("Unmodeled HTTP module initializer.");
+        ExpressionSyntax ResolveReceiver(ExpressionSyntax expression)
+        {
+            expression = ResolveLocal(expression, new(StringComparer.Ordinal));
+            if (semantic.GetSymbolInfo(expression).Symbol is IFieldSymbol field
+                && SymbolEqualityComparer.Default.Equals(field.ContainingType, semantic.GetDeclaredSymbol(container)))
+                return container.Members.OfType<FieldDeclarationSyntax>().SelectMany(field => field.Declaration.Variables)
+                    .Single(variable => variable.Identifier.ValueText == field.Name).Initializer!.Value;
+            return expression;
+        }
         var call = calls[0];
         if (call.Expression is not MemberAccessExpressionSyntax member
-            || ResolveLocal(member.Expression, new(StringComparer.Ordinal)) is not ObjectCreationExpressionSyntax client
+            || Ungroup(member.Expression) is not (IdentifierNameSyntax or MemberAccessExpressionSyntax)
+            || ResolveReceiver(member.Expression) is not ObjectCreationExpressionSyntax client
+            || !httpCreations.Contains(client)
             || semantic.GetSymbolInfo(client).Symbol is not IMethodSymbol constructor
             || !HttpClientType(constructor.ContainingType)
             || call.ArgumentList.Arguments.Count != 1
             || semantic.GetConstantValue(ResolveLocal(call.ArgumentList.Arguments[0].Expression, new(StringComparer.Ordinal)))
                 is not { HasValue: true, Value: string address }
             || !Uri.TryCreate(address, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
-            throw new InvalidOperationException("Unmodeled HTTP receiver/input: require a native new HttpClient and constant absolute HTTP(S) GetAsync(string) input.");
+            throw new InvalidOperationException("Unmodeled HTTP receiver/input: require a native local or readonly-field HttpClient and constant absolute HTTP(S) GetAsync(string) input.");
+        httpReceiverCreation = client;
+        httpAddress = address;
     }
     bool SameTask(ExpressionSyntax expression, HashSet<string> resolving)
     {
@@ -1423,6 +1475,190 @@ static void VerifyAsync(string profile, string path)
     }
     if (profile != "async001" && witnesses.Count != 1)
         throw new InvalidOperationException("Required actual same-task await/ConfigureAwait(false) missing or ambiguous.");
+    if (http)
+    {
+        VerifyActualHttp();
+        return;
+    }
+
+    void VerifyActualHttp()
+    {
+        var witness = witnesses[0];
+        var expectedSite = httpCreations.IndexOf(httpReceiverCreation!);
+        const string httpProbeSource = """
+            public static class AsyncTaskProbe
+            {
+                public static System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage> ResponseTask = null!;
+                public static System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage> HttpTask = null!;
+                public static string Address = "";
+                public static int Site, Calls, Awaits, Requests, Creates;
+                static readonly System.Collections.Generic.Dictionary<System.Net.Http.HttpClient, int> Clients = new();
+                public static void Reset(System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage> response, string address, int site)
+                {
+                    DisposeAll();
+                    ResponseTask = response; HttpTask = null!; Address = address; Site = site;
+                    Calls = Awaits = Requests = Creates = 0;
+                }
+                public static System.Net.Http.HttpClient NewClient(int site)
+                {
+                    var handler = new Handler();
+                    var client = new System.Net.Http.HttpClient(handler, true);
+                    handler.Client = client;
+                    Clients.Add(client, site); Creates++;
+                    return client;
+                }
+                sealed class Handler : System.Net.Http.HttpMessageHandler
+                {
+                    public System.Net.Http.HttpClient Client = null!;
+                    protected override System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage> SendAsync(
+                        System.Net.Http.HttpRequestMessage request, System.Threading.CancellationToken cancellation)
+                    {
+                        if (!Clients.TryGetValue(Client, out var site) || site != Site
+                            || request.Method != System.Net.Http.HttpMethod.Get
+                            || request.RequestUri != new System.Uri(Address) || cancellation.IsCancellationRequested)
+                            throw new System.InvalidOperationException("Wrong actual HTTP receiver/request.");
+                        Requests++;
+                        return ResponseTask;
+                    }
+                }
+                public static System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage> Observe(
+                    System.Net.Http.HttpClient client, string address,
+                    System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage> actual)
+                {
+                    if (!Clients.TryGetValue(client, out var site) || site != Site
+                        || address != Address || Requests != 1 || Calls != 0)
+                        throw new System.InvalidOperationException("Wrong actual GetAsync receiver/address/call.");
+                    Calls++; HttpTask = actual;
+                    return actual;
+                }
+                public static System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage> Track(
+                    System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage> task)
+                {
+                    if (!object.ReferenceEquals(task, HttpTask) || Calls != 1 || Requests != 1)
+                        throw new System.InvalidOperationException("Awaited task is not the actual GetAsync task.");
+                    Awaits++;
+                    return task;
+                }
+                public static System.Net.Http.HttpResponseMessage Ignore(
+                    System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage> task)
+                {
+                    if (!object.ReferenceEquals(task, HttpTask))
+                        throw new System.InvalidOperationException("Wrong await-neutralized GetAsync task.");
+                    return null!;
+                }
+                public static void DisposeAll()
+                {
+                    foreach (var client in Clients.Keys) client.Dispose();
+                    Clients.Clear();
+                }
+            }
+            """;
+        var annotation = new SyntaxAnnotation("ActualHttpAwait");
+        var nodes = httpCreations.Cast<ExpressionSyntax>().Concat([calls[0], witness.Task, witness.Await]).Distinct().ToArray();
+        var controlled = root.ReplaceNodes(nodes, (before, rewritten) =>
+        {
+            ExpressionSyntax replacement = rewritten;
+            if (before is ObjectCreationExpressionSyntax creation && httpCreations.Contains(creation))
+                replacement = SyntaxFactory.ParseExpression($"global::AsyncTaskProbe.NewClient({httpCreations.IndexOf(creation)})");
+            if (before == calls[0])
+            {
+                var actualCall = (InvocationExpressionSyntax)rewritten;
+                var receiver = ((MemberAccessExpressionSyntax)actualCall.Expression).Expression;
+                replacement = SyntaxFactory.ParseExpression(
+                    $"global::AsyncTaskProbe.Observe({receiver}, {actualCall.ArgumentList.Arguments[0].Expression}, {actualCall})");
+            }
+            if (before == witness.Task)
+                replacement = SyntaxFactory.ParseExpression($"global::AsyncTaskProbe.Track({replacement})");
+            if (before == witness.Await)
+                replacement = replacement.WithAdditionalAnnotations(annotation);
+            return replacement.WithTriviaFrom(before);
+        }).AddMembers(SyntaxFactory.ParseMemberDeclaration(httpProbeSource)
+            ?? throw new InvalidOperationException("Cannot parse real HTTP instrumentation."));
+        var awaitSyntax = (AwaitExpressionSyntax)controlled.GetAnnotatedNodes(annotation).Single();
+        ExpressionSyntax actualTask = awaitSyntax.Expression;
+        if (actualTask is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "ConfigureAwait" } } configured)
+            actualTask = ((MemberAccessExpressionSyntax)configured.Expression).Expression;
+        var counter = controlled.ReplaceNode(awaitSyntax,
+            SyntaxFactory.ParseExpression($"global::AsyncTaskProbe.Ignore({actualTask})").WithTriviaFrom(awaitSyntax));
+        // Neutralization keeps GetAsync and its request; only awaiting is removed.
+        var trackCalls = counter.DescendantNodes().OfType<InvocationExpressionSyntax>().Where(invocation =>
+            invocation.Expression.ToString() == "global::AsyncTaskProbe.Track").ToArray();
+        counter = counter.ReplaceNodes(trackCalls, (_, rewritten) => rewritten.ArgumentList.Arguments[0].Expression);
+        var baselineAssembly = CompileRuntime(controlled.ToFullString()).Assembly;
+        var counterAssembly = CompileRuntime(counter.ToFullString()).Assembly;
+        int Read(Type probe, string field) => (int)probe.GetField(field)!.GetValue(null)!;
+        void Run(Assembly assembly, bool pending, bool faulted, int status, bool neutralized = false)
+        {
+            var method = Method(assembly);
+            var probe = assembly.GetType("AsyncTaskProbe") ?? throw new InvalidOperationException("HTTP probe missing.");
+            var response = new TaskCompletionSource<System.Net.Http.HttpResponseMessage>();
+            using var message = new System.Net.Http.HttpResponseMessage((System.Net.HttpStatusCode)status);
+            var fault = new InvalidOperationException("independent actual HTTP handler fault");
+            probe.GetMethod("Reset")!.Invoke(null, [response.Task, httpAddress!, expectedSite]);
+            if (!pending)
+            {
+                if (faulted) response.SetException(fault); else response.SetResult(message);
+            }
+            try
+            {
+                var constructor = method.DeclaringType!.GetConstructor(Type.EmptyTypes)
+                    ?? throw new InvalidOperationException("Real public zero-argument DataService constructor missing.");
+                var instance = constructor.Invoke(null);
+                if (Read(probe, "Creates") != httpFieldCount)
+                    throw new InvalidOperationException("Native field initializers did not execute in real instance construction.");
+                var result = (Task<int>)method.Invoke(instance, null)!;
+                var actual = (Task<System.Net.Http.HttpResponseMessage>)probe.GetField("HttpTask")!.GetValue(null)!;
+                if (Read(probe, "Calls") != 1 || Read(probe, "Requests") != 1
+                    || Read(probe, "Awaits") != (neutralized ? 0 : 1) || Read(probe, "Creates") < 1
+                    || ReferenceEquals(actual, response.Task))
+                    throw new InvalidOperationException("Actual BCL GetAsync/request/task/constructor evidence missing.");
+                if (pending && actual.IsCompleted)
+                    throw new InvalidOperationException("Actual GetAsync task completed before the controlled handler operation.");
+                if (neutralized)
+                {
+                    if (!result.IsCompletedSuccessfully || result.GetAwaiter().GetResult() != 100)
+                        throw new InvalidOperationException("Await-neutralized HTTP control did not successfully remove completion dependence.");
+                }
+                else if (pending && result.IsCompleted)
+                    throw new InvalidOperationException("LoadAsync completed before its actual BCL GetAsync operation.");
+                if (pending)
+                {
+                    if (faulted) response.SetException(fault); else response.SetResult(message);
+                }
+                if (faulted)
+                {
+                    foreach (Task task in new Task[] { actual, result })
+                    {
+                        try
+                        {
+                            task.WaitAsync(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult();
+                            throw new InvalidOperationException("Actual controlled HTTP fault was swallowed.");
+                        }
+                        catch (InvalidOperationException error) when (ReferenceEquals(error, fault)) { }
+                    }
+                }
+                else
+                {
+                    if (!ReferenceEquals(actual.WaitAsync(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult(), message)
+                        || result.WaitAsync(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult() != 100)
+                        throw new InvalidOperationException("Wrong controlled async result from actual HTTP operation.");
+                }
+            }
+            finally
+            {
+                probe.GetMethod("DisposeAll")!.Invoke(null, null);
+            }
+        }
+        foreach (var status in new[] { 200, 202 })
+        foreach (var pending in new[] { false, true })
+            Run(baselineAssembly, pending, false, status);
+        foreach (var pending in new[] { false, true })
+            Run(baselineAssembly, pending, true, 200);
+        Run(counterAssembly, true, false, 200, true);
+        Console.WriteLine("Verification passed: LoadAsync; exact native/CLR async signatures, 6 controlled cases and same-task await coupling.");
+        Console.WriteLine("Actual HTTP evidence: real zero-argument instance/field construction, BCL GetAsync, controlled handler receiver/address/GET request, actual returned task and successful await-only neutralization.");
+        Console.WriteLine("Limits: finite completed/pending/faulted tasks; no scheduling/delay or universal body proof. No real network; native local/default readonly-field clients and safe zero-argument constructors only.");
+    }
     var probeSource = """
         public static class AsyncTaskProbe
         {
@@ -1455,7 +1691,7 @@ static void VerifyAsync(string profile, string path)
     var probeAssembly = CompileRuntime(instrumented.ToFullString()).Assembly;
     var target = Method(probeAssembly);
     var probe = probeAssembly.GetType("AsyncTaskProbe") ?? throw new InvalidOperationException("Async probe missing.");
-    var instance = http ? System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(target.DeclaringType!) : null;
+    object? instance = null;
     Task<int> Invoke() => target.Invoke(instance, null) as Task<int>
         ?? throw new InvalidOperationException("Async invocation did not return Task<int>.");
     var values = new[] { 0, 1, -1, 21, 42, -101, 103, int.MinValue / 2, int.MaxValue / 2 };
@@ -1554,7 +1790,7 @@ static void VerifyAsync(string profile, string path)
         var counterProbe = counterAssembly.GetType("AsyncTaskProbe")!;
         counterProbe.GetField("IntegerTask")!.SetValue(null, Task.FromResult(103));
         counterProbe.GetField("HttpTask")!.SetValue(null, new TaskCompletionSource<System.Net.Http.HttpResponseMessage>().Task);
-        var counterInstance = http ? System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(counter.DeclaringType!) : null;
+        object? counterInstance = null;
         var counterResult = (Task<int>)counter.Invoke(counterInstance, null)!;
         if (http)
         {

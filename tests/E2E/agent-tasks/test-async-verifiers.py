@@ -57,9 +57,11 @@ def historical_syntax(text):
     serial = 0
     for line in text.splitlines():
         stripped = line.lstrip()
-        if stripped.startswith(("§M{", "§AF{", "§F{", "§CL{", "§AMT{", "§MT{")):
+        if stripped.startswith(("§M{", "§AF{", "§F{", "§CL{", "§AMT{", "§MT{", "§CTOR{")):
             serial += 1
             line = line.replace("{", f"{{id{serial}:", 1)
+            if stripped.startswith("§CTOR{") and line.endswith(" ()"):
+                line = line[:-3]
             if "} (" in line and ") -> " in line:
                 header, tail = line.split("} (", 1)
                 parameters, output = tail.rsplit(") -> ", 1)
@@ -71,6 +73,34 @@ def historical_syntax(text):
                 continue
         lines.append(line)
     return "\n".join(lines) + "\n"
+
+
+def http_field_source(*, aliases=False, constructor=False):
+    body = ('§B{client} _client\n§B{address:str} "https://invalid.example/field"\n'
+            '§B{task} §C{client.GetAsync} §A address §/C\n§B{response} §AWAIT task\n§R 100') if aliases else (
+            '§B{response} §AWAIT §C{_client.GetAsync} §A "https://invalid.example/field" §/C\n§R 100')
+    text = source("async004", body=body, effect="§E{net}")
+    fields = "    §FLD{System.Net.Http.HttpClient:_client:priv:readonly} = §NEW{System.Net.Http.HttpClient}\n"
+    if constructor:
+        fields += "    §CTOR{pub} ()\n"
+    return text.replace("  §CL{DataService:pub}\n", "  §CL{DataService:pub}\n" + fields)
+
+
+def http_instance_cases():
+    return [
+        (http_field_source(), True, None),
+        (http_field_source(aliases=True), True, None),
+        (http_field_source(constructor=True), True, None),
+        (http_field_source().replace(":priv:readonly", ":priv"), False, "Unmodeled HTTP field"),
+        (http_field_source().replace("= §NEW{System.Net.Http.HttpClient}", "= null"), False, "Unmodeled HTTP field"),
+        (http_field_source(constructor=True).replace("§CTOR{pub} ()", "§CTOR{priv} ()"),
+         False, "HTTP instance construction"),
+        (http_field_source(constructor=True).replace("§CTOR{pub} ()\n", "§CTOR{pub} ()\n      §B{unused:i32} 1\n"),
+         False, "HTTP instance construction"),
+        (http_field_source().replace("§R 100", "§B{denominator:i32} (? (== response null) 0 1)\n"
+                                    "      §R (/ 100 denominator)"),
+         False, "Await-neutralized HTTP control"),
+    ]
 
 
 def cases(profile):
@@ -232,6 +262,8 @@ class AsyncVerifierTests(unittest.TestCase):
                 self.assertIn(f"Verification passed: {TASKS[profile][1]}; exact native/CLR async signatures, "
                               f"{TASKS[profile][3]} controlled cases and same-task await coupling.", output)
                 self.assertIn("No real network", output)
+                if profile == "async004":
+                    self.assertIn("Actual HTTP evidence: real zero-argument instance/field construction, BCL GetAsync", output)
             if detail:
                 self.assertIn(detail, output)
             return output
@@ -272,6 +304,11 @@ class AsyncVerifierTests(unittest.TestCase):
         self.verify("async002", source("async002", body="§B{task:Task<int>} §C{FetchDataAsync} §/C\n"
                     "§B{value} §AWAIT task\n§R (* value 2)"), False, detail="Calor0202")
 
+    def test_actual_http_default_instances(self):
+        for text, expected, detail in http_instance_cases():
+            with self.subTest(expected=expected, detail=detail):
+                self.verify("async004", text, expected, detail=detail)
+
 
 def compatibility_cases(profile):
     # Keep the old matrix within its existing 600-second source-build/run bound.
@@ -286,7 +323,8 @@ def compatibility_cases(profile):
                         "async003": (0, 1, 4), "async004": (0, 1, 2, 3, 4, 5)}[profile]
     base = cases(profile)
     coupling = coupling_cases(profile)
-    return [base[index] for index in base_indices] + [coupling[index] for index in coupling_indices]
+    selected = [base[index] for index in base_indices] + [coupling[index] for index in coupling_indices]
+    return selected + http_instance_cases() if profile == "async004" else selected
 
 
 def run_compatibility(old, current, deadline):
@@ -314,7 +352,7 @@ def run_compatibility(old, current, deadline):
                      "CALOR_LOGIC_TIMEOUT_SECONDS": str(min(120, deadline - time.monotonic()))},
                 detail="Calor parsing failed", deadline=deadline)
     count += 1
-    expected_count = 123
+    expected_count = 139
     if count != expected_count or AsyncVerifierTests.entry_points_executed != expected_count:
         raise RuntimeError("Async compatibility skipped/empty/missing controls.")
     print(f"Compatibility passed: {count} actual old/current async entry-point controls.")

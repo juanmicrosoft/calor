@@ -1404,15 +1404,26 @@ mutation errors are rejection, not dependence evidence.
 
 LoadAsync's mapped GetAsync must resolve semantically to the real BCL HttpClient
 in the System.Net.Http assembly, not a same-named or namespace-spoofing class.
-The admitted HTTP fragment uses native local construction
-of a default HttpClient (immutable aliases allowed) and a constant absolute
-HTTP(S) GetAsync(string) address. Receiver and input are validated before
-interception; null clients and invalid addresses reject. No HTTP call is executed.
-Its controlled task must finish before LoadAsync can return 100. Neutralizing the
-await must successfully remove this completion dependence. DataService is
-allocated without executing constructors; auxiliary bodies are not executed.
-Unmodeled calls, properties, custom operators/conversions, static initialization,
-lambdas, constructors/HTTP overloads and injected/field-based clients fail closed.
+The admitted HTTP fragment uses native local construction or a native private
+readonly HttpClient field initialized with parameterless `§NEW`. Immutable
+client/address aliases and a constant absolute HTTP(S) GetAsync(string) address
+are supported. The mapped BCL GetAsync call executes with its actual receiver
+and argument evaluation intact. Only validated client construction is changed:
+it creates a real HttpClient backed by a controlled no-network HttpMessageHandler.
+The handler observes the actual receiver, address and GET request; instrumentation
+records the actual returned GetAsync task, not just the handler's response task.
+Null clients, invalid addresses and wrong receiver/task provenance reject.
+
+Real public zero-argument DataService construction executes every admitted field
+initializer. Implicit default constructors and explicit empty public constructors
+are supported; construction is never skipped. The actual GetAsync task must
+complete before LoadAsync can return 100. Await-only neutralization preserves
+GetAsync and the request, and must successfully return 100 while that actual task
+is still pending. Constructor, runtime and mutation errors reject rather than
+count as evidence. Clients and handlers are disposed after each control.
+Unmodeled calls, properties, custom operators/conversions, static/module
+initialization, inheritance, lambdas, nonempty/nonpublic/parameterized constructors,
+HTTP overloads, mutable fields and arbitrary injected clients fail closed.
 This is a bounded admitted fragment, not universal HTTP or arbitrary async support.
 
 GetDataAsync runs three times and returns 42; it need not suspend or delay.
@@ -1421,6 +1432,10 @@ endpoints of the safe doubling interval, with completed and pending tasks.
 BackgroundProcessAsync additionally runs Int32.MinValue/MaxValue unchanged.
 LoadAsync runs two response statuses with completed/pending tasks. Each
 operation-bearing profile also checks completed/pending faults on the exact task.
+Each positive LoadAsync control executes seven real controlled GETs: those six
+baseline states plus the successful await-only counterfactual. The additional
+error control passes every real-call baseline but must reject its faulting
+await-neutralized runtime; the exception is not completion-dependence evidence.
 The admitted uncaught-await fragment must propagate those controlled faults.
 There are 3, 20, 24 and 6 runtime cases respectively (53 per complete positive
 set). No scheduling, elapsed delay, synchronization-context behavior or universal
@@ -1434,12 +1449,13 @@ python3 tests/E2E/agent-tasks/test-async-verifiers.py
 python3 tests/E2E/agent-tasks/test-logic-old-release.py --async-functions
 ```
 
-The current suite has four tests and 92 real entrypoint controls, including
+The current suite has five tests and 100 real entrypoint controls, including
 equivalents, fake/dead operations, receiver/input validation, corrupt native
 assets, compiler selection and bounded nontermination. The additive strict old
-mode requires exactly 123 selected actual controls: 61 per arm plus current
+mode requires exactly 139 selected actual controls: 69 per arm plus current
 rejection of an old-ID input. This bounded matrix retains every required behavior
-and adversarial category; redundant alias/signature permutations and supervision
+and adversarial category, plus all eight real-instance/readonly-field controls;
+redundant alias/signature permutations and supervision
 checks remain in the full current suite. It archives unchanged v0.29 commit
 `d82f3ae95175ecd09581c6922701706be72b0ca9`, verifies that release's own native
 manifest, performs locked restore and builds its own compiler source. Only
