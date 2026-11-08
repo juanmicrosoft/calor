@@ -269,6 +269,9 @@ class CarrierVerifierTests(unittest.TestCase):
             (arm / ".github").mkdir()
             shutil.copyfile(COMPILER_ROOT / ".github/z3-binaries-4.15.7.sha256",
                             arm / ".github/z3-binaries-4.15.7.sha256")
+            publish = arm / relative / "publish"
+            publish.mkdir(exist_ok=True)
+            (publish / "unreferenced.dll").write_bytes(b"unreferenced publish artifact")
             self.verify("GetNothing", source("GetNothing"), env={"CALOR_COMPILER_ROOT": str(arm)})
             native = {"darwin": "libz3.dylib", "linux": "libz3.so", "win32": "libz3.dll"}[sys.platform]
             (arm / relative / native).write_bytes(b"corrupt native asset")

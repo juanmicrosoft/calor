@@ -1363,8 +1363,9 @@ current arm. No current-assembly substitution, skip, empty run or fixture
 mutation counts as compatibility.
 
 Carrier selection also checks the selected checkout's managed/native Z3 output
-against its own pinned manifest. It snapshots every selected managed/native
-image, requires byte-identical helper copies, and rechecks before execution and
+against its own pinned manifest. It snapshots the top-level managed/native
+images and `runtimes/` images copied by the helper project, requires byte-identical
+helper copies, and rechecks before execution and
 before reporting success. Existing profiles keep their original selection and
 native Context behavior. Every successful control checks the exact resolved
 selected compiler root and configuration. Finite controls accept rejection only

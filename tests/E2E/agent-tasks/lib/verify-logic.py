@@ -116,7 +116,7 @@ def main():
                 raise RuntimeError(f"Selected native manifest mismatch: {image}")
         images = {
             image.relative_to(compiler): hashlib.sha256(image.read_bytes()).digest()
-            for image in compiler.rglob("*")
+            for image in (*compiler.iterdir(), *(compiler / "runtimes").rglob("*"))
             if image.is_file() and (image.suffix == ".dll" or image.name.startswith("libz3."))
         }
 
