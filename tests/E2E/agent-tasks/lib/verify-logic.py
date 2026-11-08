@@ -85,7 +85,8 @@ def main():
                 "Enums.calr" if sys.argv[1] in ("enum001", "enum002", "enum003") else
                 "BuggyContracts.calr" if sys.argv[1] == "contract003" else
                 "Collections.calr" if sys.argv[1] in ("PrintDictionary", "coll001", "coll002", "coll003", "coll004", "coll005", "coll006") else "Effects.calr"
-                if sys.argv[1] in ("PrintNumbers", "Countdown", "DoWhileDemo", "PrintEvenNumbers") else "Calculator.calr")
+                if sys.argv[1] in ("PrintNumbers", "Countdown", "DoWhileDemo", "PrintEvenNumbers",
+                                    "eff001", "eff002", "eff003", "eff004", "eff005", "eff006") else "Calculator.calr")
     source = None if native_only else Path(sys.argv[2]).resolve() / filename
     if source is not None and not source.is_file():
         raise RuntimeError(f"Input missing: {source}")

@@ -75,6 +75,11 @@ static void Verify(string profile, string path)
         VerifyAsync(profile, path);
         return;
     }
+    if (profile is "eff001" or "eff002" or "eff003" or "eff004" or "eff005" or "eff006")
+    {
+        VerifyEffects(profile, path);
+        return;
+    }
     if (profile is "gen001" or "gen002" or "gen003")
     {
         var genericSource = File.ReadAllText(path);
@@ -2425,6 +2430,239 @@ static IEnumerable<(int[] Inputs, bool Positive, object? Payload)> CarrierCases(
             yield return ([], false, profile == "type004" ? "Operation not supported" : null);
 }
 
+static void VerifyEffects(string profile, string path)
+{
+    var name = profile switch
+    {
+        "eff001" => "SayHello", "eff002" => "ReadInput", "eff003" => "ReadFile",
+        "eff004" => "WriteFile", "eff005" => "FetchUrl", _ => "LogToFileAndConsole"
+    };
+    string[] names = profile switch
+    {
+        "eff001" => ["name"], "eff002" => [], "eff003" => ["path"],
+        "eff004" => ["path", "content"], "eff005" => ["url"], _ => ["path", "message"]
+    };
+    string[] required = profile switch
+    {
+        "eff001" => ["console_write"], "eff002" => ["console_read"], "eff003" => ["file_read"],
+        "eff004" => ["file_write"], "eff005" => ["network_read"], _ => ["console_write", "file_write"]
+    };
+    string[] operations = profile switch
+    {
+        "eff001" => ["WriteLine"], "eff002" => ["ReadLine"], "eff003" => ["ReadAllText"],
+        "eff004" => ["WriteAllText"], "eff005" => [], _ => ["WriteLine", "AppendAllText"]
+    };
+    var output = profile is "eff002" or "eff003" or "eff005" ? typeof(string) : typeof(void);
+    var source = File.ReadAllText(path);
+    var diagnostics = new DiagnosticBag();
+    var parsed = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+    if (diagnostics.HasErrors)
+        throw new InvalidOperationException($"Calor compilation failed (original parse):\n{string.Join("\n", diagnostics)}");
+    var functions = parsed.Functions.Where(function => function.Name == name).ToArray();
+    if (functions.Length != 1)
+        throw new InvalidOperationException($"Expected exactly one native module function named {name}.");
+    var function = functions[0];
+    if (function.Visibility != Visibility.Public || function.IsAsync || function.TypeParameters.Count != 0
+        || function.Output == null
+        || AttributeHelper.ExpandType(function.Output.TypeName) != AttributeHelper.ExpandType(output == typeof(void) ? "void" : "str")
+        || !function.Parameters.Select(parameter => parameter.Name).SequenceEqual(names)
+        || function.Parameters.Any(parameter => AttributeHelper.ExpandType(parameter.TypeName) != AttributeHelper.ExpandType("str")
+            || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None))
+        throw new InvalidOperationException($"Wrong public effects signature for {name}.");
+    var declared = function.Effects?.Effects.TryGetValue("io", out var effects) == true
+        ? effects.Split(',').ToHashSet(StringComparer.Ordinal) : new HashSet<string>(StringComparer.Ordinal);
+    bool Declares(string effect) => declared.Contains(effect) || effect switch
+    {
+        "file_read" => declared.Contains("filesystem_read") || declared.Contains("filesystem_readwrite"),
+        "file_write" => declared.Contains("filesystem_write") || declared.Contains("filesystem_readwrite"),
+        "network_read" => declared.Contains("network") || declared.Contains("network_readwrite"),
+        _ => false
+    };
+    if (required.Any(effect => !Declares(effect)))
+        throw new InvalidOperationException($"Original declared effects missing for {name}: {string.Join(",", required)}.");
+    var pending = new Stack<AstNode>();
+    pending.Push(parsed);
+    while (pending.TryPop(out var node))
+    {
+        if (node is CSharpInteropBlockNode or RawCSharpNode or RawCSharpExpressionNode)
+            throw new InvalidOperationException("Raw interop cannot establish native effects behavior.");
+        foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+            pending.Push(child);
+    }
+    var compilation = Calor.Compiler.Program.Compile(source, path,
+        new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
+    if (compilation.HasErrors || compilation.Ast == null)
+        throw new InvalidOperationException($"Calor compilation failed:\n{string.Join("\n", compilation.Diagnostics)}");
+    var (assembly, trees) = CompileRuntime(compilation.GeneratedCode);
+    MethodInfo Method(Assembly candidate)
+    {
+        var type = candidate.GetType($"{parsed.Name}.{parsed.Name}Module")
+            ?? throw new InvalidOperationException("Effects CLR module missing.");
+        var matches = type.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+            .Where(method => method.Name == name).ToArray();
+        if (!type.IsPublic || matches.Length != 1 || matches[0].IsGenericMethod || matches[0].ReturnType != output
+            || !matches[0].GetParameters().Select(parameter => parameter.Name).SequenceEqual(names)
+            || matches[0].GetParameters().Any(parameter => parameter.ParameterType != typeof(string)))
+            throw new InvalidOperationException($"Wrong reflected CLR effects signature for {name}.");
+        return matches[0];
+    }
+    var original = Method(assembly);
+    var root = trees[1].GetCompilationUnitRoot();
+    var semanticCompilation = CSharpCompilation.Create("EffectsMapping", trees,
+        GeneratedCSharpCompiler.References, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    var semantic = semanticCompilation.GetSemanticModel(trees[1]);
+    var witnesses = new List<(InvocationExpressionSyntax Call, string Operation)>();
+    foreach (var invocation in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
+    {
+        if (semantic.GetSymbolInfo(invocation).Symbol is not IMethodSymbol symbol)
+            throw new InvalidOperationException("Unresolved effects call symbol.");
+        var owner = symbol.ContainingType.ToDisplayString();
+        if (symbol.ContainingAssembly.Equals(semanticCompilation.Assembly, SymbolEqualityComparer.Default))
+            continue;
+        var supported = owner == "System.Console" && symbol.Name is "WriteLine" or "ReadLine" or "Write"
+            || owner == "System.IO.File" && symbol.Name is "ReadAllText" or "WriteAllText" or "AppendAllText" or "ReadAllBytes" or "WriteAllBytes";
+        if (supported)
+        {
+            if (profile == "eff005")
+                throw new InvalidOperationException("FetchUrl is a simulation; actual IO is not requested.");
+            var types = symbol.Parameters.Select(parameter => parameter.Type.ToDisplayString()).ToArray();
+            var bytes = symbol.Name is "ReadAllBytes" or "WriteAllBytes";
+            var strings = symbol.Name is "WriteAllText" or "AppendAllText" ? 2 : symbol.Name == "ReadLine" ? 0 : 1;
+            if (types.Length < strings || types.Take(strings).Any(type => type is not ("string" or "string?"))
+                || bytes && (types.Length != (symbol.Name == "ReadAllBytes" ? 1 : 2)
+                    || symbol.Name == "WriteAllBytes" && types[^1] != "byte[]")
+                || !bytes && types.Length > strings && (owner != "System.IO.File" || types.Length != strings + 1
+                    || types[^1] != "System.Text.Encoding")
+                || invocation.ArgumentList.Arguments.Any(argument => argument.NameColon != null || argument.RefKindKeyword.Kind() != SyntaxKind.None))
+                throw new InvalidOperationException("Unsupported finite effects BCL overload instrumentation.");
+            witnesses.Add((invocation, symbol.Name));
+        }
+        else if (!(owner == "System.String" || owner == "string" || owner == "System.Math"
+            || owner == "System.Text.Encoding" || owner == "System.Text.StringBuilder"
+            || owner == "System.Collections.Generic.List<byte>" && symbol.Name is "Add" or "ToArray"
+            || owner.StartsWith("Calor.Runtime.", StringComparison.Ordinal)))
+            throw new InvalidOperationException($"Unsupported effects call {owner}.{symbol.Name}; no arbitrary IO/service execution is permitted.");
+    }
+    if (operations.Any(operation => !witnesses.Any(witness => witness.Operation == operation)))
+        throw new InvalidOperationException("Required resolved BCL effects operation missing.");
+    if (root.DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Any(creation =>
+            semantic.GetSymbolInfo(creation).Symbol is not IMethodSymbol constructor
+            || !(constructor.ContainingAssembly.Equals(semanticCompilation.Assembly, SymbolEqualityComparer.Default)
+                || constructor.ContainingType.ToDisplayString() is "System.Exception" or "System.Text.StringBuilder" or "System.Collections.Generic.List<byte>"
+                || constructor.ContainingType.ToDisplayString().StartsWith("Calor.Runtime.", StringComparison.Ordinal)))
+        || root.DescendantNodes().OfType<ImplicitObjectCreationExpressionSyntax>().Any())
+        throw new InvalidOperationException("Unsupported effects object construction; finite supervision is not a sandbox.");
+    var instrumented = root.ReplaceNodes(witnesses.Select(witness => witness.Call), (before, rewritten) =>
+        rewritten.WithExpression(SyntaxFactory.ParseExpression("global::EffectsTaskProbe." +
+            witnesses.Single(witness => witness.Call == before).Operation)));
+    instrumented = instrumented.AddMembers(SyntaxFactory.ParseMemberDeclaration(EffectsTaskProbe.Source)
+        ?? throw new InvalidOperationException("Cannot parse effects instrumentation."));
+    var instrumentedAssembly = CompileRuntime(instrumented.ToFullString()).Assembly;
+    var instrumentedMethod = Method(instrumentedAssembly);
+    var probe = instrumentedAssembly.GetType("EffectsTaskProbe")
+        ?? throw new InvalidOperationException("Effects probe missing.");
+    var reset = probe.GetMethod("Reset") ?? throw new InvalidOperationException("Effects reset missing.");
+    var events = probe.GetField("Events") ?? throw new InvalidOperationException("Effects events missing.");
+    string[] values = ["", "alpha", "BETA", " \t ", "line\nbreak", "\r\n", "caf\u00e9", "\u4e2d\ud83d\ude00"];
+    string[] lines = ["", "alpha", "BETA", " \t ", "caf\u00e9", "\u4e2d\ud83d\ude00"];
+    var directory = Directory.CreateTempSubdirectory("calor-effects-owned-");
+    try
+    {
+        var paths = new[] { Path.Combine(directory.FullName, "first \u00e9.txt"), Path.Combine(directory.FullName, "second \u4e2d.txt") };
+        var sentinel = Path.Combine(directory.FullName, "unrelated.txt");
+        var cases = (from index in Enumerable.Range(0, 2)
+                     from value in profile == "eff002" ? lines : values
+                     from seed in profile is "eff003" or "eff004" or "eff006" ? values : new[] { "seed" }
+                     select (Index: index, Value: value, Seed: seed)).ToArray();
+        bool Execute(MethodInfo method, string mode, int index, string value, string seed, bool traced)
+        {
+            File.WriteAllText(paths[0], seed);
+            File.WriteAllText(paths[1], value + "\nindependent second seed");
+            File.WriteAllText(sentinel, "unrelated sentinel");
+            var before = paths.Select(File.ReadAllText).ToArray();
+            var previousIn = Console.In;
+            var previousOut = Console.Out;
+            var previousError = Console.Error;
+            using var input = new StringReader(value + "\nindependent next line\n");
+            using var written = new StringWriter(System.Globalization.CultureInfo.InvariantCulture);
+            using var errors = new StringWriter(System.Globalization.CultureInfo.InvariantCulture);
+            object? result;
+            reset.Invoke(null, [mode, paths]);
+            try
+            {
+                Console.SetIn(input);
+                Console.SetOut(written);
+                Console.SetError(errors);
+                object[] arguments = profile switch
+                {
+                    "eff001" => [value], "eff002" => [], "eff003" => [paths[index]],
+                    "eff004" or "eff006" => [paths[index], value], _ => [value]
+                };
+                result = method.Invoke(null, arguments);
+            }
+            catch (TargetInvocationException error)
+            {
+                throw new InvalidOperationException(mode == "" ? "Effects baseline runtime failed."
+                    : "Effects counterfactual runtime failed; exceptions are not dependence evidence.", error);
+            }
+            finally
+            {
+                Console.SetIn(previousIn);
+                Console.SetOut(previousOut);
+                Console.SetError(previousError);
+            }
+            if (traced && mode == "")
+            {
+                var trace = (List<string[]>)events.GetValue(null)!;
+                foreach (var operation in operations)
+                {
+                    var matching = trace.Where(entry => entry[0] == operation).ToArray();
+                    if (matching.Length == 0 || matching.Any(entry => operation switch
+                    {
+                        "WriteLine" => entry[1] != value,
+                        "ReadLine" => entry[1] != value,
+                        "ReadAllText" => entry[1] != paths[index] || entry[2] != before[index],
+                        _ => entry[1] != paths[index] || entry[2] != value
+                    }))
+                        throw new InvalidOperationException("Effects BCL provenance/arguments differ from supplied inputs.");
+                }
+            }
+            var expectedConsole = profile is "eff001" or "eff006" ? value + written.NewLine : "";
+            var expectedFile = profile == "eff004" ? value : profile == "eff006" ? before[index] + value : before[index];
+            var expectedReturn = profile switch
+            {
+                "eff002" => value, "eff003" => before[index], "eff005" => "Response from: " + value, _ => null
+            };
+            var correct = Equals(result, expectedReturn) && written.ToString() == expectedConsole
+                && errors.ToString() == "" && File.ReadAllText(paths[index]) == expectedFile
+                && File.ReadAllText(paths[1 - index]) == before[1 - index]
+                && File.ReadAllText(sentinel) == "unrelated sentinel";
+            return correct;
+        }
+        // Guarded, instrumented correctness and provenance precede original IO.
+        foreach (var (index, value, seed) in cases)
+            if (!Execute(instrumentedMethod, "", index, value, seed, true))
+                throw new InvalidOperationException("Wrong instrumented effects baseline behavior/state.");
+        foreach (var (index, value, seed) in cases)
+            if (!Execute(original, "", index, value, seed, false))
+                throw new InvalidOperationException("Wrong original effects baseline behavior/state.");
+        foreach (var operation in operations)
+        {
+            var changed = false;
+            foreach (var (index, value, seed) in cases)
+                changed |= !Execute(instrumentedMethod, operation, index, value, seed, false);
+            if (!changed)
+                throw new InvalidOperationException($"Effects coupling failed: {operation} does not contribute to successful output/state.");
+        }
+        Console.WriteLine($"Verification passed: {name}; original declared effects, native/CLR signatures, {cases.Length} runtime cases and BCL output/state coupling.");
+        Console.WriteLine("Limits: finite non-null strings and owned IO, deterministic restored console; process supervision, not a sandbox or universal body proof. No real network, EOF/null, missing-file or encoding policy.");
+    }
+    finally
+    {
+        directory.Delete(true);
+    }
+}
+
 static (Assembly Assembly, SyntaxTree[] Trees) CompileRuntime(string generatedCode, bool warningsAsErrors = false)
 {
     var parseOptions = new CSharpParseOptions(LanguageVersion.Preview);
@@ -4536,6 +4774,91 @@ sealed class CollectionRewriter : CSharpSyntaxRewriter
                 {
                     Record(collection, "iteration", null, value, Depth + 1);
                     yield return Changed(collection, "iteration") ? value + 7 : value;
+                }
+            }
+        }
+        """;
+}
+
+static class EffectsTaskProbe
+{
+    public const string Source = """
+        public static class EffectsTaskProbe
+        {
+            public static readonly System.Collections.Generic.List<string[]> Events = new();
+            static string mode = "";
+            static string[] owned = System.Array.Empty<string>();
+            public static void Reset(string mutation, string[] paths)
+            {
+                mode = mutation;
+                owned = paths;
+                Events.Clear();
+            }
+            static void Guard(string path)
+            {
+                if (!System.Array.Exists(owned, candidate => candidate == path))
+                    throw new System.InvalidOperationException("Effects probe refused non-owned path.");
+            }
+            public static void WriteLine(string value)
+            {
+                Events.Add(new[] { "WriteLine", value });
+                if (mode != "WriteLine") System.Console.WriteLine(value);
+            }
+            public static void Write(string value)
+            {
+                Events.Add(new[] { "Write", value });
+                System.Console.Write(value);
+            }
+            public static string ReadLine()
+            {
+                var value = System.Console.ReadLine();
+                if (value == null) throw new System.InvalidOperationException("Control supplied no line.");
+                Events.Add(new[] { "ReadLine", value });
+                return mode == "ReadLine" ? "counterfactual console line" : value;
+            }
+            public static string ReadAllText(string path)
+                => ReadAllText(path, null);
+            public static string ReadAllText(string path, System.Text.Encoding encoding)
+            {
+                Guard(path);
+                var value = encoding == null ? System.IO.File.ReadAllText(path) : System.IO.File.ReadAllText(path, encoding);
+                Events.Add(new[] { "ReadAllText", path, value });
+                return mode == "ReadAllText" ? "counterfactual file content" : value;
+            }
+            public static byte[] ReadAllBytes(string path)
+            {
+                Guard(path);
+                Events.Add(new[] { "ReadAllBytes", path });
+                return System.IO.File.ReadAllBytes(path);
+            }
+            public static void WriteAllBytes(string path, byte[] content)
+            {
+                Guard(path);
+                Events.Add(new[] { "WriteAllBytes", path });
+                System.IO.File.WriteAllBytes(path, content);
+            }
+            public static void WriteAllText(string path, string content)
+                => WriteAllText(path, content, null);
+            public static void WriteAllText(string path, string content, System.Text.Encoding encoding)
+            {
+                Guard(path);
+                Events.Add(new[] { "WriteAllText", path, content });
+                if (mode != "WriteAllText")
+                {
+                    if (encoding == null) System.IO.File.WriteAllText(path, content);
+                    else System.IO.File.WriteAllText(path, content, encoding);
+                }
+            }
+            public static void AppendAllText(string path, string content)
+                => AppendAllText(path, content, null);
+            public static void AppendAllText(string path, string content, System.Text.Encoding encoding)
+            {
+                Guard(path);
+                Events.Add(new[] { "AppendAllText", path, content });
+                if (mode != "AppendAllText")
+                {
+                    if (encoding == null) System.IO.File.AppendAllText(path, content);
+                    else System.IO.File.AppendAllText(path, content, encoding);
                 }
             }
         }

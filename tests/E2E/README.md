@@ -1506,3 +1506,112 @@ fixtures (including the header-only AsyncOps/Domain inputs), TestData, active
 `.calr` subjects, corpus, historical ledgers/floors, product source, version and
 workflows remain unchanged. No agent/provider, paid call, network service,
 publication, release or milestone-wide acceptance is involved.
+
+### Original effects-system prompts (`eff-001` through `eff-006`)
+
+Only the six original effects-task `verify.sh` entries use the new `eff001`..
+`eff006` profiles in the existing selected-compiler engine. The unchanged
+`task.json` prompts require public native `SayHello(str name) -> void`,
+`ReadInput() -> str`, `ReadFile(str path) -> str`,
+`WriteFile(str path, str content) -> void`, `FetchUrl(str url) -> str`, and
+`LogToFileAndConsole(str path, str message) -> void`.
+SayHello prints the supplied name with Console.WriteLine; no greeting prefix
+is prescribed. ReadInput returns the supplied console line. ReadFile returns
+the actual File.ReadAllText content. WriteFile uses File.WriteAllText.
+FetchUrl is only `"Response from: " + url`, with a conceptual network-read
+declaration: it never performs HTTP. Logging prints the message with
+Console.WriteLine and appends it with File.AppendAllText, preserving prior
+file content. No cross-output ordering beyond these operations is imposed.
+
+The verifier reads source once, parses its original declarations before
+compiler inference, and checks required declared console/file/network effects.
+Additional declared effects and read/write supersets are allowed. Native
+public names, parameter order and types, and return types must match the
+independently compiled and reflected CLR method. Raw interop cannot establish
+native behavior. Roslyn resolves actual BCL call symbols across the native
+module, including helpers. A same-named user helper, comment, unused helper,
+or effect annotation cannot replace an executed required BCL operation.
+
+An independently compiled interposed baseline checks actual BCL arguments,
+results, stdin/stdout/stderr and file state before the unmodified generated
+baseline runs. Both baselines must pass. Instrumentation then neutralizes
+each required operation family: reads return a distinct non-null string and
+writes become no-ops. Each family must change successful outputs or state
+in at least one case. Counterfactual compilation/runtime errors are failures,
+not dependence evidence. File byte-read/write alternatives are guarded too,
+so correct-baseline decoys that ignore ReadAllText or overwrite the result
+of WriteAllText/AppendAllText independently fail coupling. Disposable native
+UTF-8 codec helpers make those decoys compilable without changing effect
+manifests or weakening compilation. There is no universal codec claim.
+
+The console streams are deterministic and restored in `finally` after each
+invocation, including failures. Eight independently varied strings include
+empty, distinct values, whitespace, LF/CRLF, composed Unicode and a non-BMP
+pair. ReadInput instead uses six actual line values (no embedded terminator),
+followed by a different next line; EOF/null is outside the tested domain.
+Files live exclusively in one freshly owned temporary directory. Every file-profile case
+initializes two independent existing files (including empty content), supplies
+one of their actual paths, varies content/message and initial state separately,
+and observes both files plus an unchanged unrelated sentinel.
+SayHello and FetchUrl run 16 cases each, ReadInput 12, and each file profile
+128: 428 cases for a complete six-function positive set, repeated for both
+baselines and applicable counterfactuals.
+
+Both current and genuine v0.29 native nullable annotations reject a direct
+Console.ReadLine return from non-null `ReadInput` with `Calor0273`
+(a typed non-null binding also fails).
+The positive controls bind its nullable result and explicitly guard the
+non-null branch; the fallback is never exercised or adjudicated. This is a
+compiler/API accommodation, not a new EOF, exception or null policy.
+Compatibility controls require that rejection in both actual compiler arms
+rather than change the product, signature or oracle.
+
+```bash
+python3 tests/E2E/agent-tasks/test-effects-verifiers.py
+python3 tests/E2E/agent-tasks/test-logic-old-release.py --effects-system
+```
+
+The current suite executes 123 real effects entries (33 positive, 90 rejected)
+and 35 preserved entries: one positive for every prior profile plus the
+selected native-only prerequisite. It checks aliases, extra effects,
+helper/Encoding equivalents, original declarations, private/wrong signatures,
+constant and wrong-argument outputs, non-owned/other-file writes, append versus
+overwrite, correct-baseline independent-output decoys, counterfactual runtime
+errors, selected-root/configuration/native failures and bounded nontermination.
+
+The additive historical mode runs a bounded 60-case original-prompt subset against
+both selected arms, plus current rejection of an old-ID input and the two
+direct-ReadLine compatibility cases: exactly 123 real entries (36 positive,
+87 rejected). The subset retains all 18 positive/equivalent/alias inputs,
+original-effect and private-signature failures, metadata/comment/constant
+decoys, combined-effect omissions, wrong log arguments/overwrite, simulated
+network ordering/IO violations, and all four successful-baseline coupling/error
+controls. Redundant wrong-type/duplicate cases remain in the full current suite;
+they are not all replayed historically within the 600-second total bound.
+Both arms reject correct-baseline byte-codec decoys only on
+coupling and reject counterfactual exceptions as non-evidence.
+It archives unchanged v0.29 commit
+`d82f3ae95175ecd09581c6922701706be72b0ca9`, verifies that archive's own native
+manifest, restores locked dependencies and builds its original source.
+Only disposable old inputs acquire declaration IDs. Missing assets/history,
+build/API errors, skips or empty runs fail. Existing old modes, native-only
+admission, root/configuration/native guards, scoped translators, every prior
+profile and all 65,536 Sum/counterfactual checks are unchanged. The shared
+120-second entry/process/EOF and 600-second historical total deadlines remain;
+the new control supervisor reserves one second for nested process cleanup.
+
+**Limits:** this is finite process supervision, not a sandbox or universal
+proof. The interposer refuses non-owned supplied paths and unmodeled external
+call/constructor surfaces before original IO. Supported console/string/math,
+StringBuilder, byte-list and modeled file BCL calls can be observed precisely;
+unsupported overloads or other services fail explicitly. This does not prove
+that arbitrary hostile code is confined, deterministic, or incapable of
+distinguishing instrumentation. Tests access no non-owned host files or
+external service. No missing-file, EOF/null, encoding, greeting-prefix or
+exception policy is added, and no model/provider is invoked.
+
+This local unit closes only these six verifier prerequisites. Product source,
+task definitions, original fixtures, TestData, active `.calr` subjects, corpus
+membership, historical inputs/ledgers/floors, versions and workflows remain
+byte-unchanged. It does not claim all 129 prerequisites, agent or milestone
+acceptance, or release readiness.
