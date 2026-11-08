@@ -223,6 +223,25 @@ def coupling_cases(profile):
     return [(source(profile).replace("-> i32", "-> Task<int>"), True, None)]
 
 
+def control_failure(error, *, allow_timeout=False):
+    output = str(error)
+    timeout = "Verifier timeout:" in output or "Verifier timeout after " in output
+    cleanup = "Verifier cleanup timeout:" in output or "Cannot terminate verifier process group" in output
+    if cleanup or timeout and not allow_timeout:
+        raise error
+    if not output.startswith("Verifier command exited ") and not (allow_timeout and timeout):
+        raise error
+    return output
+
+
+def assert_selected_compiler(test, output, environment):
+    root = Path(environment["CALOR_COMPILER_ROOT"]).resolve()
+    configuration = environment.get("CALOR_COMPILER_CONFIGURATION", "Debug")
+    expected = f"Selected compiler: {root / 'src/Calor.Compiler/bin' / configuration / 'net10.0/calor.dll'}"
+    test.assertEqual([line for line in output.splitlines() if line.startswith("Selected compiler:")],
+                     [expected], output)
+
+
 class AsyncVerifierTests(unittest.TestCase):
     entry_points_executed = 0
 
@@ -230,7 +249,9 @@ class AsyncVerifierTests(unittest.TestCase):
     def tearDownClass(cls):
         print(f"Executed {cls.entry_points_executed} real async verify.sh controls.")
 
-    def verify(self, profile, text, expected=True, *, env=None, detail=None, deadline=None):
+    def verify(self, profile, text, expected=True, *, env=None, detail=None, deadline=None, allow_timeout=False):
+        if allow_timeout and (expected or detail != "timeout"):
+            raise ValueError("Only explicit negative bounded-timeout controls may opt in.")
         with tempfile.TemporaryDirectory(prefix="calor-async-control-") as temporary:
             workspace = Path(temporary)
             if text is not None:
@@ -254,11 +275,12 @@ class AsyncVerifierTests(unittest.TestCase):
                 output = load_verifier().run(command, HERE, entry_deadline, env=environment)
                 passed = True
             except RuntimeError as error:
-                output = str(error)
+                output = control_failure(error, allow_timeout=allow_timeout)
                 passed = False
             type(self).entry_points_executed += 1
             self.assertEqual(passed, expected, output)
             if expected:
+                assert_selected_compiler(self, output, environment)
                 self.assertIn(f"Verification passed: {TASKS[profile][1]}; exact native/CLR async signatures, "
                               f"{TASKS[profile][3]} controlled cases and same-task await coupling.", output)
                 self.assertIn("No real network", output)
@@ -280,7 +302,7 @@ class AsyncVerifierTests(unittest.TestCase):
         self.verify("async001", source("async001"), False,
                     env={"CALOR_COMPILER_CONFIGURATION": "../Debug"}, detail="CALOR_COMPILER_CONFIGURATION")
         self.verify("async001", source("async001"), False,
-                    env={"CALOR_LOGIC_TIMEOUT_SECONDS": "0.001"}, detail="timeout")
+                    env={"CALOR_LOGIC_TIMEOUT_SECONDS": "0.001"}, detail="timeout", allow_timeout=True)
         with tempfile.TemporaryDirectory(prefix="calor-async-native-arm-") as temporary:
             arm = Path(temporary)
             self.verify("async001", source("async001"), False, env={"CALOR_COMPILER_ROOT": str(arm)},
@@ -298,7 +320,7 @@ class AsyncVerifierTests(unittest.TestCase):
                 with self.subTest(profile=profile, expected=expected, detail=detail):
                     self.verify(profile, text, expected, detail=detail)
         self.verify("async001", source("async001", body="§WH true\n  §CN\n§R 42"), False,
-                    env={"CALOR_LOGIC_TIMEOUT_SECONDS": "10"}, detail="timeout")
+                    env={"CALOR_LOGIC_TIMEOUT_SECONDS": "10"}, detail="timeout", allow_timeout=True)
 
     def test_current_native_task_binding_blocker(self):
         self.verify("async002", source("async002", body="§B{task:Task<int>} §C{FetchDataAsync} §/C\n"
@@ -308,6 +330,31 @@ class AsyncVerifierTests(unittest.TestCase):
         for text, expected, detail in http_instance_cases():
             with self.subTest(expected=expected, detail=detail):
                 self.verify("async004", text, expected, detail=detail)
+
+    def test_failure_admission_and_selected_identity(self):
+        for message in ("Verifier timeout: overall deadline expired.",
+                        "Verifier timeout after 120s: dotnet",
+                        "Verifier cleanup timeout: child did not exit by the deadline.",
+                        "Cannot terminate verifier process group 123: denied",
+                        "unexpected process/EOF failure",
+                        "Verifier command exited 1:\nVerification failed: Verifier timeout after 118s: dotnet"):
+            with self.subTest(message=message), self.assertRaises(RuntimeError):
+                control_failure(RuntimeError(message))
+        for message in ("Verifier cleanup timeout: child did not exit by the deadline.",
+                        "unexpected process/EOF failure"):
+            with self.subTest(message=message), self.assertRaises(RuntimeError):
+                control_failure(RuntimeError(message), allow_timeout=True)
+        self.assertIn("Verifier timeout", control_failure(
+            RuntimeError("Verifier command exited 1:\nVerifier timeout after 10s: dotnet"), allow_timeout=True))
+        self.assertEqual(control_failure(RuntimeError("Verifier command exited 1:\nWrong result")),
+                         "Verifier command exited 1:\nWrong result")
+        environment = {"CALOR_COMPILER_ROOT": str(COMPILER_ROOT), "CALOR_COMPILER_CONFIGURATION": "Debug"}
+        identity = f"Selected compiler: {COMPILER_ROOT / 'src/Calor.Compiler/bin/Debug/net10.0/calor.dll'}"
+        assert_selected_compiler(self, identity, environment)
+        for output in ("", identity.replace("/Debug/", "/Release/"), identity.replace("calor.dll", "other.dll"),
+                       identity + "\n" + identity):
+            with self.subTest(output=output), self.assertRaises(AssertionError):
+                assert_selected_compiler(self, output, environment)
 
 
 def compatibility_cases(profile):

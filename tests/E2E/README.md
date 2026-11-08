@@ -1449,7 +1449,7 @@ python3 tests/E2E/agent-tasks/test-async-verifiers.py
 python3 tests/E2E/agent-tasks/test-logic-old-release.py --async-functions
 ```
 
-The current suite has five tests and 100 real entrypoint controls, including
+The current suite has six tests and 100 real entrypoint controls, including
 equivalents, fake/dead operations, receiver/input validation, corrupt native
 assets, compiler selection and bounded nontermination. The additive strict old
 mode requires exactly 139 selected actual controls: 69 per arm plus current
@@ -1462,6 +1462,13 @@ manifest, performs locked restore and builds its own compiler source. Only
 disposable old inputs receive old IDs and explicit native input/output syntax.
 Missing APIs/assets/history, failed positive controls and skipped/empty runs
 fail; no reflection fallback or current-binary stand-in is allowed.
+Finite negative controls admit only an explicit `Verifier command exited`
+failure. Unexpected process/EOF, global/entry deadline and cleanup failures
+re-raise, including nested supervisor timeouts inside command-exit output.
+Only the two explicit bounded-timeout controls opt into timeout admission;
+cleanup errors still fail. Every positive control asserts exactly one selected
+`calor.dll` identity with the resolved requested root and configuration. A
+separate in-process admission/identity test adds no real entrypoint controls.
 
 Known native/API limits are explicit, not repaired by this test-only unit.
 The current binder rejects an explicitly typed Task<int> local initialized
