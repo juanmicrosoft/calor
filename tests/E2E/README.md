@@ -1366,7 +1366,11 @@ Carrier selection also checks the selected checkout's managed/native Z3 output
 against its own pinned manifest. It snapshots every selected managed/native
 image, requires byte-identical helper copies, and rechecks before execution and
 before reporting success. Existing profiles keep their original selection and
-native Context behavior. Entry/process/EOF cleanup is bounded to **120 seconds**;
+native Context behavior. Every successful control checks the exact resolved
+selected compiler root and configuration. Finite controls accept rejection only
+from an exited verifier command; supervision, EOF and deadline failures propagate.
+Only the two explicitly declared bounded-timeout controls may accept a verifier
+timeout, never a cleanup/supervision failure. Entry/process/EOF cleanup is bounded to **120 seconds**;
 each carrier invocation and its observations have the shared **4096-character**
 stdout cap. Historical compatibility, including archive/restore/build, has the
 existing **600-second total** deadline and 120-second subprocess bounds.

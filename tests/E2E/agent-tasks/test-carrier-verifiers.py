@@ -9,7 +9,7 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
@@ -173,7 +173,9 @@ class CarrierVerifierTests(unittest.TestCase):
             raise RuntimeError(f"Expected exactly 137 current carrier entrypoints, observed {cls.entry_points_executed}.")
         print(f"Executed {cls.entry_points_executed} actual carrier verify.sh controls.")
 
-    def verify(self, name, text, expected=True, *, env=None, detail=None, deadline=None):
+    def verify(self, name, text, expected=True, *, env=None, detail=None, deadline=None, expect_timeout=False):
+        if expect_timeout and expected:
+            raise ValueError("A bounded-timeout control must expect rejection.")
         helper = load("carrier_process", HERE / "lib/verify-logic.py")
         with tempfile.TemporaryDirectory(prefix="calor-carrier-control-") as temporary:
             workspace = Path(temporary)
@@ -193,10 +195,23 @@ class CarrierVerifierTests(unittest.TestCase):
                 passed = True
             except RuntimeError as error:
                 output = str(error)
+                timed_out = "Verifier timeout" in output
+                if expected or "Verifier cleanup timeout" in output or "Cannot terminate verifier process group" in output:
+                    raise
+                if expect_timeout:
+                    if not timed_out:
+                        raise
+                elif timed_out or not output.startswith("Verifier command exited"):
+                    raise
                 passed = False
             type(self).entry_points_executed += 1
             self.assertEqual(passed, expected, output)
             if expected:
+                selected = Path(environment["CALOR_COMPILER_ROOT"]).resolve() / "src/Calor.Compiler/bin" \
+                    / environment.get("CALOR_COMPILER_CONFIGURATION", "Debug") / "net10.0/calor.dll"
+                self.assertEqual(
+                    [line for line in output.splitlines() if line.startswith("Selected compiler:")],
+                    [f"Selected compiler: {selected}"], output)
                 self.assertIn(f"Verification passed: {name}; native/reflected closed CLR", output)
                 self.assertIn(f"{COUNTS[name]} runtime cases.", output)
                 self.assertIn("optional contracts execute", output)
@@ -233,9 +248,9 @@ class CarrierVerifierTests(unittest.TestCase):
     def test_bounds_and_selected_image(self):
         self.verify("TryDouble", source("TryDouble").replace("    §R result",
                     "    §WH (>= x -2147483648)\n      §CN\n    §R result"), False,
-                    env={"CALOR_LOGIC_TIMEOUT_SECONDS": "10"}, detail="timeout")
+                    env={"CALOR_LOGIC_TIMEOUT_SECONDS": "10"}, detail="timeout", expect_timeout=True)
         self.verify("GetNothing", source("GetNothing"), False,
-                    env={"CALOR_LOGIC_TIMEOUT_SECONDS": "0.001"}, detail="timeout")
+                    env={"CALOR_LOGIC_TIMEOUT_SECONDS": "0.001"}, detail="timeout", expect_timeout=True)
         self.verify("GetNothing", source("GetNothing").replace("§E{alloc,mut}", "§E{alloc,mut,cw}")
                     .replace("    §R result", "    §L{i:1:5000:1}\n      §P i\n    §R result"),
                     False, detail="Excessive stdout")
@@ -308,6 +323,56 @@ class CarrierVerifierTests(unittest.TestCase):
                         self.assertRaisesRegex(RuntimeError, "image changed or was substituted"):
                     helper.main()
         print("Executed 2 selected-image substitution controls with actual helper builds.")
+
+
+class CarrierControlSupervisionTests(unittest.TestCase):
+    def test_finite_controls_never_accept_supervision_failures(self):
+        errors = [
+            "Verifier timeout: overall deadline expired.",
+            "Verifier command exited 1:\nVerification failed: Verifier timeout after 120s: dotnet",
+            "Verifier cleanup timeout: child did not exit by the deadline.",
+            "Verifier command exited 1:\nVerification failed: Cannot terminate verifier process group 123",
+            "Unexpected process/EOF supervision failure",
+        ]
+        helper = Mock()
+        with patch.dict(CarrierVerifierTests.verify.__globals__, {"load": lambda *_: helper}), \
+                patch.object(CarrierVerifierTests, "entry_points_executed", 0):
+            for expected in (True, False):
+                for message in errors:
+                    with self.subTest(expected=expected, error=message):
+                        error = RuntimeError(message)
+                        helper.run.side_effect = error
+                        with self.assertRaises(RuntimeError) as raised:
+                            CarrierVerifierTests().verify("GetNothing", source("GetNothing"), expected)
+                        self.assertIs(raised.exception, error)
+            helper.run.side_effect = RuntimeError("Verifier command exited 1:\nwrong carrier case")
+            CarrierVerifierTests().verify("GetNothing", source("GetNothing"), False)
+            for message in errors[:2]:
+                helper.run.side_effect = RuntimeError(message)
+                CarrierVerifierTests().verify("GetNothing", source("GetNothing"), False, expect_timeout=True)
+            for message in errors[2:] + ["Verifier command exited 1:\nwrong carrier case"]:
+                helper.run.side_effect = RuntimeError(message)
+                with self.assertRaises(RuntimeError):
+                    CarrierVerifierTests().verify("GetNothing", source("GetNothing"), False, expect_timeout=True)
+
+    def test_every_success_requires_exact_selected_root_and_configuration(self):
+        helper = Mock()
+        root = Path(tempfile.gettempdir()) / "carrier selected root"
+        selected = root.resolve() / "src/Calor.Compiler/bin/Release/net10.0/calor.dll"
+        success = "Verification passed: GetNothing; native/reflected closed CLR Option identity; " \
+                  "8 runtime cases. Limits: optional contracts execute.\n"
+        environment = {"CALOR_COMPILER_ROOT": str(root / ".." / root.name),
+                       "CALOR_COMPILER_CONFIGURATION": "Release"}
+        with patch.dict(CarrierVerifierTests.verify.__globals__, {"load": lambda *_: helper}), \
+                patch.object(CarrierVerifierTests, "entry_points_executed", 0):
+            helper.run.return_value = f"Selected compiler: {selected}\n" + success
+            CarrierVerifierTests().verify("GetNothing", source("GetNothing"), env=environment)
+            for identity in ("", f"Selected compiler: {selected.parents[2] / 'Debug/net10.0/calor.dll'}\n",
+                             f"Selected compiler: {root.resolve() / 'foreign/src/Calor.Compiler/bin/Release/net10.0/calor.dll'}\n",
+                             f"Selected compiler: {selected}\nSelected compiler: {selected}\n"):
+                helper.run.return_value = identity + success
+                with self.subTest(identity=identity), self.assertRaises(AssertionError):
+                    CarrierVerifierTests().verify("GetNothing", source("GetNothing"), env=environment)
 
 
 def run_compatibility(old, current, deadline):
