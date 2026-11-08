@@ -746,24 +746,28 @@ unambiguous one-argument T/List<T> constructor. List constructor inputs contain
 independent seed values. Other constructor shapes report `Unsupported finite
 constructor setup`; no uninitialized-object bypass is used. Initial stored
 values/list contents need not be default or empty. Repository may initialize
-its list lazily inside Add. Multiple matching private generic storage fields
-are an unsupported ambiguity, not a guessed storage choice.
+its list lazily inside Add. Additional private generic storage fields are
+allowed. Every candidate field is tested using fresh real instances; at least
+one field must satisfy all state, identity, and isolation checks for each closed
+type. Storage is established by behavior, not declaration order or a guessed
+field name. Runtime errors still reject; they are not treated as unsuccessful
+field matches.
 
 ```bash
 python3 tests/E2E/agent-tasks/test-generic-verifiers.py
 python3 tests/E2E/agent-tasks/test-logic-old-release.py --generics
 ```
 
-The current suite executes exactly 93 real verify.sh controls: 67 native
-acceptance/rejection cases (19 positive, 48 negative), 15 missing/invalid/
+The current suite executes exactly 103 real verify.sh controls: 77 native
+acceptance/rejection cases (25 positive, 52 negative), 15 missing/invalid/
 interop/ambiguity controls, three runtime/deadline controls, and eight selected
-root/configuration/native-asset controls. It requires 20 successful controls
-and 73 rejections overall. The historical mode archives unchanged release
+root/configuration/native-asset controls. It requires 26 successful controls
+and 77 rejections overall. The historical mode archives unchanged release
 commit `d82f3ae95175ecd09581c6922701706be72b0ca9`, verifies its own native-asset
 manifest, restores locked dependencies, and builds that release's own compiler.
 Only disposable inputs acquire historical declaration IDs. The mode executes
-the same 67 cases in each actual old/current arm, plus rejection of historical
-syntax by the current compiler: exactly 135 controls (38 positive, 97 negative).
+the same 77 cases in each actual old/current arm, plus rejection of historical
+syntax by the current compiler: exactly 155 controls (50 positive, 105 negative).
 There is no copied-current baseline, fallback, skip, or empty successful run.
 The existing 120-second per-profile and 600-second historical total bounds,
 unconditional native prerequisite, other profiles, and measured no-admission

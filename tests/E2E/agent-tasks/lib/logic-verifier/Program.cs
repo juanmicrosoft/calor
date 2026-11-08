@@ -719,7 +719,7 @@ static void VerifyGeneric(string profile, ModuleNode module, string generatedCod
     var (assembly, _) = CompileRuntime(generatedCode);
     Type generic;
     MethodInfo? identity = null;
-    string? fieldName = null;
+    string[] fieldNames = [];
     if (profile == "gen001")
     {
         var native = module.Functions.Where(function => function.Name == name).ToArray();
@@ -763,9 +763,9 @@ static void VerifyGeneric(string profile, ModuleNode module, string generatedCod
         bool ListType(string type) => Regex.Replace(type, @"\s+", "") is "List<T>" or "System.Collections.Generic.List<T>";
         var fields = declaration.Fields.Where(field => field.Visibility == Visibility.Private && !field.IsStatic
             && (profile == "gen002" ? field.TypeName == "T" : ListType(field.TypeName))).ToArray();
-        if (fields.Length != 1)
-            throw new InvalidOperationException("Expected one unambiguous native private generic storage field.");
-        fieldName = fields[0].Name;
+        if (fields.Length == 0)
+            throw new InvalidOperationException("Expected a native private generic storage field.");
+        fieldNames = fields.Select(field => field.Name).ToArray();
         foreach (var required in profile == "gen002" ? new[] { "Get", "Set" } : new[] { "Add" })
         {
             var methods = declaration.Methods.Where(method => method.Name == required).ToArray();
@@ -789,11 +789,14 @@ static void VerifyGeneric(string profile, ModuleNode module, string generatedCod
         if (profile == "gen003" && !generic.GetGenericArguments()[0].GenericParameterAttributes
             .HasFlag(GenericParameterAttributes.ReferenceTypeConstraint))
             throw new InvalidOperationException("Missing reflected reference-type constraint.");
-        var field = generic.GetField(fieldName, members);
         var parameter = generic.GetGenericArguments()[0];
         var expected = profile == "gen002" ? parameter : typeof(List<>).MakeGenericType(parameter);
-        if (field == null || !field.IsPrivate || field.IsStatic || field.FieldType != expected)
-            throw new InvalidOperationException("Wrong reflected actual generic storage field.");
+        foreach (var fieldName in fieldNames)
+        {
+            var field = generic.GetField(fieldName, members);
+            if (field == null || !field.IsPrivate || field.IsStatic || field.FieldType != expected)
+                throw new InvalidOperationException("Wrong reflected actual generic storage field.");
+        }
     }
 
     // Independently chosen CLR types/values, not values supplied by the candidate.
@@ -845,7 +848,6 @@ static void VerifyGeneric(string profile, ModuleNode module, string generatedCod
             continue;
         }
         var type = closedClass!;
-        var storage = type.GetField(fieldName!, members)!;
         object Construct()
         {
             var constructors = type.GetConstructors(members).Where(constructor => !constructor.IsStatic).ToArray();
@@ -869,8 +871,6 @@ static void VerifyGeneric(string profile, ModuleNode module, string generatedCod
             }
             return unary[0].Invoke([input]);
         }
-        var instance = Construct();
-        var other = Construct();
         MethodInfo Method(string methodName, bool get)
         {
             var methods = type.GetMethods(members).Where(method => method.Name == methodName).ToArray();
@@ -881,46 +881,55 @@ static void VerifyGeneric(string profile, ModuleNode module, string generatedCod
                 && (methodName != "Add" || method.IsPublic), $"wrong reflected {methodName} signature");
             return method;
         }
-        if (profile == "gen002")
+        bool MatchesStorage(FieldInfo storage)
         {
-            var get = Method("Get", true);
-            var set = Method("Set", false);
-            var untouched = storage.GetValue(other);
-            foreach (var value in values.Concat(values.Reverse()))
+            var instance = Construct();
+            var other = Construct();
+            if (profile == "gen002")
             {
-                storage.SetValue(instance, value);
-                Require(Same(get.Invoke(instance, []), value), "expected Get to read actual private T field");
-                storage.SetValue(instance, values.First(candidate => !Same(candidate, value)));
-                set.Invoke(instance, [value]);
-                Require(Same(storage.GetValue(instance), value), "expected Set to update actual private T field");
-                Require(Same(get.Invoke(instance, []), value), "expected Get to return stored identity");
-                Require(Same(storage.GetValue(other), untouched), "Set changed another instance");
-                caseCount++;
+                var get = Method("Get", true);
+                var set = Method("Set", false);
+                var untouched = storage.GetValue(other);
+                foreach (var value in values.Concat(values.Reverse()))
+                {
+                    storage.SetValue(instance, value);
+                    if (!Same(get.Invoke(instance, []), value))
+                        return false;
+                    storage.SetValue(instance, values.First(candidate => !Same(candidate, value)));
+                    set.Invoke(instance, [value]);
+                    if (!Same(storage.GetValue(instance), value)
+                        || !Same(get.Invoke(instance, []), value)
+                        || !Same(storage.GetValue(other), untouched))
+                        return false;
+                }
             }
-        }
-        else
-        {
-            var add = Method("Add", false);
-            var list = (System.Collections.IList?)storage.GetValue(instance);
-            var expected = list == null ? [] : list.Cast<object?>().ToList();
-            var otherList = (System.Collections.IList?)storage.GetValue(other);
-            var untouched = otherList?.Cast<object?>().ToArray();
-            foreach (var value in values.Concat(values.Reverse()))
+            else
             {
-                add.Invoke(instance, [value]);
-                expected.Add(value);
-                list = storage.GetValue(instance) as System.Collections.IList
-                    ?? throw new InvalidOperationException("Add destroyed actual private List<T>.");
-                Require(list.Count == expected.Count && list.Cast<object?>().Zip(expected).All(pair => Same(pair.First, pair.Second)),
-                    "expected Add to append input identity to actual private List<T> and preserve prior state");
-                otherList = (System.Collections.IList?)storage.GetValue(other);
-                Require(untouched == null ? otherList == null
-                    : otherList != null && otherList.Count == untouched.Length
-                        && otherList.Cast<object?>().Zip(untouched).All(pair => Same(pair.First, pair.Second)),
-                    "Add changed another instance");
-                caseCount++;
+                var add = Method("Add", false);
+                var list = (System.Collections.IList?)storage.GetValue(instance);
+                var expected = list == null ? [] : list.Cast<object?>().ToList();
+                var otherList = (System.Collections.IList?)storage.GetValue(other);
+                var untouched = otherList?.Cast<object?>().ToArray();
+                foreach (var value in values.Concat(values.Reverse()))
+                {
+                    add.Invoke(instance, [value]);
+                    expected.Add(value);
+                    list = storage.GetValue(instance) as System.Collections.IList;
+                    if (list == null || list.Count != expected.Count
+                        || !list.Cast<object?>().Zip(expected).All(pair => Same(pair.First, pair.Second)))
+                        return false;
+                    otherList = (System.Collections.IList?)storage.GetValue(other);
+                    if (!(untouched == null ? otherList == null
+                        : otherList != null && otherList.Count == untouched.Length
+                            && otherList.Cast<object?>().Zip(untouched).All(pair => Same(pair.First, pair.Second))))
+                        return false;
+                }
             }
+            return true;
         }
+        var matchingFields = fieldNames.Count(fieldName => MatchesStorage(type.GetField(fieldName, members)!));
+        Require(matchingFields > 0, "expected one actual private storage field to satisfy every state and identity check");
+        caseCount += values.Length * 2;
     }
     if (closedCount < 2)
         throw new InvalidOperationException("Unsupported finite closed-type setup: fewer than two independent CLR types satisfy the declared constraints.");

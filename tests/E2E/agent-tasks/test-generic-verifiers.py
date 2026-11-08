@@ -79,7 +79,13 @@ def cases(name):
             (text.replace("    §R value", "    §WHERE T : class, new\n    §R value"), True, None),
         ]
     elif name == "Container":
+        extra = text.replace("    §MT{Get", "    §FLD{T:cache:priv}\n    §MT{Get", 1)
         result += [
+            (extra, True, None),
+            (text.replace("    §FLD{T:stored", "    §FLD{T:cache:priv}\n    §FLD{T:stored", 1), True, None),
+            (extra.replace("§ASSIGN stored value", "§ASSIGN stored value\n      §ASSIGN cache value"), True, None),
+            (extra.replace("§R stored", "§R cache"), False, "expected"),
+            (extra.replace("§ASSIGN stored value", "§ASSIGN cache value"), False, "expected"),
             (text.replace("stored", "_other").replace("value", "input"), True, None),
             (text.replace("Get:pub", "Get:priv").replace("Set:pub", "Set:priv"), True, None),
             (text.replace("    §MT{Get", "    §CTOR{priv} (T:initial)\n      §ASSIGN stored initial\n    §MT{Get"), True, None),
@@ -102,7 +108,13 @@ def cases(name):
                  .replace("      §ASSIGN stored value", "      §Q (!= value null)\n      §ASSIGN stored value"), False, None),
         ]
     else:
+        extra = text.replace("    §MT{Add", "    §FLD{List<T>:cache:priv} = §NEW{List<T>}\n    §MT{Add", 1)
         result += [
+            (extra, True, None),
+            (text.replace("    §FLD{List<T>:items", "    §FLD{List<T>:cache:priv}\n    §FLD{List<T>:items", 1), True, None),
+            (extra.replace("      §/C", "      §/C\n      §C{cache.Add} §A value §/C"), True, None),
+            (extra.replace("§A value", "§A null"), False, "expected"),
+            (extra.replace("      §C{items.Add}", "      §C{items.Clear} §/C\n      §C{items.Add}"), False, "expected"),
             (text.replace("items", "_storage").replace("value", "input"), True, None),
             (text.replace("List<T>", "System.Collections.Generic.List<T>"), True, None),
             (text.replace(" = §NEW{List<T>}", "")
@@ -137,8 +149,8 @@ class GenericVerifierTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        if cls.entry_points_executed != 93:
-            raise RuntimeError(f"Expected exactly 93 actual generic controls, observed {cls.entry_points_executed}.")
+        if cls.entry_points_executed != 103:
+            raise RuntimeError(f"Expected exactly 103 actual generic controls, observed {cls.entry_points_executed}.")
         print(f"Executed {cls.entry_points_executed} actual generic verify.sh controls.")
 
     def verify(self, name, text, expected=True, *, env=None, detail=None):
@@ -235,7 +247,7 @@ def run_compatibility(old, current, deadline):
     test.verify("Identity", historical_syntax(source("Identity")), False,
                 env={"CALOR_COMPILER_ROOT": str(current)}, detail="Calor compilation failed")
     expected_count = 2 * sum(len(cases(name)) for name in TASKS) + 1
-    if expected_count != 135 or GenericVerifierTests.entry_points_executed != expected_count:
+    if expected_count != 155 or GenericVerifierTests.entry_points_executed != expected_count:
         raise RuntimeError(f"Expected {expected_count} actual generic compatibility controls.")
     print(f"Compatibility passed: {expected_count} actual old/current generic entry-point controls.")
 
