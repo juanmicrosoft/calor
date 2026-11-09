@@ -5,9 +5,13 @@ order: 3
 ---
 
 
-Version: 1.0.0
+Semantics Version: 2.0.0
 
-This document specifies the Calor Normal Form (CNF), an intermediate representation that makes evaluation semantics explicit.
+Calor Normal Form (CNF) is a retained intermediate-representation prototype.
+`CnfLowering` can lower a subset of the AST to explicit temporaries and branches.
+**The production compiler does not route C# generation through CNF.**
+The native programs below run on the production C# path; the IR diagrams are
+explanations, not a claim that the prototype handles every program.
 
 ---
 
@@ -25,32 +29,41 @@ Direct compilation to C# might produce:
 var result = f(a(), b()) + c();
 ```
 
-This **delegates** evaluation order to C#. If C# changes its evaluation order (or if a different backend has different rules), the code's behavior changes silently.
+C# specifies left-to-right operand and argument evaluation. Direct emission
+can rely on that rule. A different backend would need its own conforming
+implementation; Calor does not currently supply the IL or LLVM backends
+described in the original CNF design.
 
-**CNF prevents this by making every semantic decision explicit in the IR.**
+CNF explores making selected evaluation decisions explicit in an IR. Its
+existence alone does not establish backend-independent conformance.
 
 ---
 
 ## Purpose
 
-CNF is an intermediate representation (IR) between the Calor AST and backend code generation. Its purpose is to:
+The prototype's design goals are to:
 
 1. **Make evaluation order explicit** - Temporaries enforce left-to-right evaluation
 2. **Introduce explicit temporaries** - All intermediate values have names
 3. **Linearize control flow** - Branch/label/goto instead of structured control
 4. **Remove implicit conversions** - All conversions are explicit nodes
 
-By lowering to CNF before emitting backend code, we guarantee that **Calor semantics are enforced regardless of backend**.
+These are not guarantees of the current production pipeline. The lowerer still
+skips some unsupported statements and substitutes placeholders for some
+unsupported expressions. It must not be used as an authority for accepting
+arbitrary native source.
 
 ---
 
 ## Pipeline Position
 
 ```
-Source -> Parser -> AST -> TypeChecker -> Binder -> CNF Lowering -> CNF -> Backend -> Output
-                                                    ^^^^^^^^^^^^^^^^^^^^^^^^
-                                                    Semantics enforced here
+Production: Source -> Lexer/Parser -> AST -> Binder/Checks/Analysis -> C# Emitter -> C#
+Prototype:  AST -> CnfLowering -> CNF -> CnfValidator / CnfPrettyPrinter
 ```
+
+The prototype is exercised separately. It is not a hidden backend stage or a
+replacement for ordinary binding, type checking, effects, and runtime tests.
 
 ---
 
@@ -58,7 +71,9 @@ Source -> Parser -> AST -> TypeChecker -> Binder -> CNF Lowering -> CNF -> Backe
 
 ### Expressions (Atomic)
 
-CNF expressions are always atomic—they reference either literals, variables, or the results of previous operations.
+The lowerer stores operation results in temporaries. Operands to its binary,
+unary, and call nodes are intended to be literals or variable references; the
+operation nodes themselves are not atomic.
 
 | Node | Description |
 |:-----|:------------|
@@ -90,8 +105,13 @@ CNF expressions are always atomic—they reference either literals, variables, o
 
 **Source:**
 ```calor
-§R (+ (* a b) c)
+module NormalBinary
+  func Value (int:a, int:b, int:c) → int
+    !
+    return a * b + c
 ```
+
+`Value(2, 3, 4)` returns `10`.
 
 **CNF:**
 ```
@@ -106,50 +126,72 @@ The evaluation order is now explicit: `a * b` is computed first, stored in `t1`,
 
 **Source:**
 ```calor
-§R (&& A B)
+module NormalAnd
+  func Both (bool:left, bool:right) → bool
+    !
+    return left && right
 ```
 
 **CNF:**
 ```
 t_result = false
-branch A -> then_block, end_block
+branch left -> then_block, end_block
 then_block:
-  t_result = B
+  t_result = right
   goto end_block
 end_block:
 return t_result
 ```
 
-Short-circuit semantics are now explicit control flow. If `A` is false, `B` is never evaluated.
+The branch represents short-circuit control flow. If `left` is false, the
+right operand is not evaluated. `Both(false, true)` returns `false`.
 
 ### Short-Circuit OR
 
 **Source:**
 ```calor
-§R (|| A B)
+module NormalOr
+  func Either (bool:left, bool:right) → bool
+    !
+    return left || right
 ```
 
 **CNF:**
 ```
 t_result = true
-branch A -> end_block, else_block
+branch left -> end_block, else_block
 else_block:
-  t_result = B
+  t_result = right
   goto end_block
 end_block:
 return t_result
 ```
 
-If `A` is true, `B` is never evaluated.
+If `left` is true, the right operand is not evaluated.
+`Either(true, false)` returns `true`.
 
 ### Function Call
 
 **Source:**
 ```calor
-§R (f (a) (b) (c))
+module NormalCalls
+  func Mark (int:value) → int
+    ! cw
+    System.Console.Write(value)
+    return value
+
+  func Combine (int:a, int:b, int:c) → int
+    !
+    return a * 100 + b * 10 + c
+
+  func Main () → int
+    ! cw
+    return Combine(Mark(1), Mark(2), Mark(3))
 ```
 
-**CNF:**
+`Main()` writes `123` once and returns `123` on the production path.
+
+**CNF argument-temporary pattern:**
 ```
 t1 = call a()
 t2 = call b()
@@ -160,13 +202,20 @@ return t4
 
 Arguments are evaluated left-to-right, stored in temporaries, then the function is called.
 
+The prototype can lower this program's simple named calls. More complex
+callee forms represented by `ExpressionCallNode` are explicitly rejected with
+`NotSupportedException`. Testing this program's CNF shape is separate from
+testing its production execution; it does not prove complete call, type, or
+effect support in the prototype.
+
 ---
 
 ## Design Principles
 
 ### Explicit Over Implicit
 
-Every semantic operation is a visible node. There are no hidden evaluation orders or implicit conversions.
+The design represents operations as nodes. The prototype does not yet cover
+every native operation or make every implicit conversion explicit.
 
 ### Flat Structure
 
@@ -174,20 +223,19 @@ No deeply nested expressions. Every intermediate value has a name.
 
 ### Backend Agnostic
 
-The same CNF serves all backends. Whether emitting C#, IL, or LLVM IR, the semantics are already decided.
+An IR could be shared by multiple backends. Only the C# production emitter
+exists here, and it does not consume this IR.
 
 ### Verifiable
 
-CNF can be validated against the semantics specification. A `CnfValidator` checks:
-- Variables are defined before use
-- Types are consistent
-- Control flow is well-formed
+`CnfValidator` checks selected structural invariants, not full language
+semantics or execution equivalence.
 
 ---
 
 ## CNF Validation
 
-The `CnfValidator` checks CNF for correctness:
+For an already constructed `CnfFunction` named `func`, the API is:
 
 ```csharp
 var validator = new CnfValidator();
@@ -204,10 +252,14 @@ if (!validator.IsValid)
 
 ### Validation Rules
 
-1. **Definition before use**: Variables must be assigned before referenced
-2. **Type consistency**: Operations must have compatible operand types
-3. **Label targets**: All branch targets must exist
-4. **Return paths**: All code paths must return or throw
+1. **Atomic operands**: Binary, unary, and call operands must be literals or variable references.
+2. **Recorded definitions**: Variable references must name a parameter or an assignment encountered by the visitor.
+3. **Label targets**: Recorded branch and goto targets must exist.
+
+The visitor is not a path-sensitive definite-assignment checker. It does not
+establish type consistency, all-path return coverage, correct effects, or
+faithful lowering of unsupported nodes. Use a fresh validator per function;
+its current error collection persists between validations.
 
 ---
 

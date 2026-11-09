@@ -176,6 +176,29 @@ public class DocDriftCheckerTests
         new[] { "DesignContracts" }, new[] { "4" }, new[] { "GlobalModule.Divide(9, 2)" })]
     [InlineData("semantics/versioning.mdx", 1, 0,
         new[] { "InstalledSemantics" }, new[] { "42" }, new[] { "GlobalModule.Next(41)" })]
+    [InlineData("semantics/core.mdx", 7, 0,
+        new[] { "CoreScopes", "CoreNestedReturn", "CoreOverflow", "CoreConversions", "CoreRequires",
+            "CoreEnsures", "CoreNullableValues" },
+        new[] { "2:1", "42", "42", "45", "1", "1", "none" },
+        new[] { "GlobalModule.Read(true) + \":\" + GlobalModule.Read(false)", "GlobalModule.Read(true)",
+            "GlobalModule.Increment(41)", "GlobalModule.Value()", "GlobalModule.Positive(1)",
+            "GlobalModule.Positive(1)", "GlobalModule.Fallback(null)" })]
+    [InlineData("semantics/normal-form.mdx", 4, 0,
+        new[] { "NormalBinary", "NormalAnd", "NormalOr", "NormalCalls" },
+        new[] { "10", "False", "True", "123:123" },
+        new[] { "GlobalModule.Value(2, 3, 4)", "GlobalModule.Both(false, true)", "GlobalModule.Either(true, false)",
+            """
+            ((System.Func<string>)(() => {
+                var previousOutput = System.Console.Out;
+                using var output = new System.IO.StringWriter();
+                try {
+                    System.Console.SetOut(output);
+                    var value = GlobalModule.Main();
+                    return output.ToString() + ":" + value;
+                }
+                finally { System.Console.SetOut(previousOutput); }
+            }))()
+            """ })]
     [InlineData("structure-tags.mdx", 22, 1,
         new[] { "StructureModules", "BlockNamespace", "FunctionHeaders", "AsyncFunctions", "AsyncMethods",
             "AwaitExpressions", "ConfigureAwaitLimit", "LambdaExamples", "AsyncLambdas", "LocalCallables", "DelegateDefinitions",
@@ -555,6 +578,82 @@ public class DocDriftCheckerTests
         Assert.Equal(expectedStatus, postcondition.GetProperty("status").GetString());
         if (expectedError)
             Assert.NotEmpty(postcondition.GetProperty("counterexample").GetProperty("bindings").EnumerateArray());
+    }
+
+    [Theory]
+    [InlineData("CoreOverflow", "GlobalModule.Increment(int.MaxValue)", "!OverflowException", "!OverflowException")]
+    [InlineData("CoreRequires", "GlobalModule.Positive(0)", "!ContractViolationException", "0")]
+    [InlineData("CoreRequires", "GlobalModule.Positive(-1)", "!ContractViolationException", "-1")]
+    [InlineData("CoreEnsures", "GlobalModule.Positive(0)", "!ContractViolationException", "0")]
+    [InlineData("CoreNullableValues", "GlobalModule.Fallback(null)", "none", "none")]
+    [InlineData("CoreNullableValues", "GlobalModule.Fallback(\"abc\")", "abc", "abc")]
+    [InlineData("CoreNullableValues",
+        "((System.Func<int>)(() => { GlobalModule.Fail(); return 0; }))()",
+        "!InvalidOperationException", "!InvalidOperationException")]
+    public void PublicCoreSemantics_ExercisesEnabledReleaseAndOffBoundaries(
+        string module, string expression, string enabled, string disabled)
+    {
+        const string path = "website/content/semantics/core.mdx";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith($"module {module}\n", StringComparison.Ordinal)).Source;
+        foreach (var mode in new[] { ContractMode.Debug, ContractMode.Release, ContractMode.Off })
+        {
+            var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = mode });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run() => {{expression}};
+                }
+                """);
+            Assert.Equal(mode == ContractMode.Off ? disabled : enabled, observed);
+        }
+    }
+
+    [Theory]
+    [InlineData("NormalBinary")]
+    [InlineData("NormalAnd")]
+    [InlineData("NormalOr")]
+    public void PublicNormalForm_ValidatesThePublishedPrimitiveIrSubsetSeparatelyFromProduction(
+        string module)
+    {
+        const string path = "website/content/semantics/normal-form.mdx";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith($"module {module}\n", StringComparison.Ordinal)).Source;
+        var compiled = Program.Compile(source, path);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var cnf = new IR.CnfLowering().LowerModule(Assert.IsType<Ast.ModuleNode>(compiled.Ast));
+        var function = Assert.Single(cnf.Functions);
+        var validator = new IR.CnfValidator();
+        validator.ValidateFunction(function);
+        Assert.True(validator.IsValid, string.Join("\n", validator.Errors));
+        Assert.Equal(module == "NormalBinary" ? IR.CnfType.Int : IR.CnfType.Bool, function.ReturnType);
+        if (module != "NormalBinary")
+            Assert.Single(function.Body.Statements.OfType<IR.CnfBranch>());
+    }
+
+    [Fact]
+    public void PublicNormalForm_SeparatesNativeExecutionFromThePrototypeNamedCallShape()
+    {
+        const string path = "website/content/semantics/normal-form.mdx";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith("module NormalCalls\n", StringComparison.Ordinal)).Source;
+        var compiled = Program.Compile(source, path);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var cnf = new IR.CnfLowering().LowerModule(Assert.IsType<Ast.ModuleNode>(compiled.Ast));
+        var main = cnf.Functions.Single(function => function.Name == "Main");
+        var assignments = main.Body.Statements.OfType<IR.CnfAssign>()
+            .Where(assignment => assignment.Value is IR.CnfCall).ToArray();
+        var calls = assignments.Select(assignment => Assert.IsType<IR.CnfCall>(assignment.Value)).ToArray();
+        Assert.Equal(new[] { "Mark", "Mark", "Mark", "Combine" }, calls.Select(call => call.FunctionName));
+        Assert.Equal(new[] { "1", "2", "3" }, calls.Take(3).Select(call =>
+            Assert.IsType<IR.CnfLiteral>(Assert.Single(call.Arguments)).Value.ToString()));
+        Assert.Equal(assignments.Take(3).Select(assignment => assignment.Target),
+            calls[3].Arguments.Select(argument => Assert.IsType<IR.CnfVariableRef>(argument).Name));
     }
 
     [Theory]
