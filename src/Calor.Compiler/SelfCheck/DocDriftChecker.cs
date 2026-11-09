@@ -1288,7 +1288,6 @@ public static class WebsiteExampleChecker
     /// <summary>MDX cannot hold HTML comments, so the drift suppression marker takes JSX-comment form.</summary>
     public const string MdxSuppressionMarker = "{/* drift:ignore */}";
 
-    private static readonly Regex CompleteProgramStart = new(@"^§M(?:\s|\{|$)", RegexOptions.Compiled);
     private static readonly Regex CodePattern = new(@"^Calor\d{4}$", RegexOptions.Compiled);
     private static readonly Regex GroupPattern = new(@"^[A-Za-z0-9_-]+$", RegexOptions.Compiled);
     private static readonly Regex Heading = new(@"^#{1,6}\s", RegexOptions.Compiled);
@@ -1334,8 +1333,7 @@ public static class WebsiteExampleChecker
         public string Source => string.Join("\n", Lines) + "\n";
 
         public bool IsCompleteProgram => Language == "calor"
-            && Lines.FirstOrDefault(l => !string.IsNullOrWhiteSpace(l)) is { } first
-            && CompleteProgramStart.IsMatch(first.TrimStart());
+            && ExemplarCompileChecker.StartsWithModule(Lines);
 
         public string? Value(string key) => Tokens
             .Where(t => t.StartsWith(key + "=", StringComparison.Ordinal))
@@ -1609,7 +1607,7 @@ public static class WebsiteExampleChecker
         if (fence.Language == "calor" && fence.Tokens.Count > 0 && !fence.IsCompleteProgram)
         {
             diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteAnnotation,
-                "`expect=`/`group=` apply only to complete programs (first line starts with §M); " +
+                "`expect=`/`group=` apply only to complete programs (first non-comment content line starts with module); " +
                 "on a fragment they would be silently ignored", page.Path, fence.OpenLine));
             ok = false;
         }
@@ -1630,12 +1628,10 @@ public static class WebsiteExampleChecker
         }
 
         // A non-calor fence holding a complete program would bypass every check above.
-        if (fence.Language != "calor"
-            && fence.Lines.FirstOrDefault(l => !string.IsNullOrWhiteSpace(l)) is { } first
-            && CompleteProgramStart.IsMatch(first.TrimStart()))
+        if (fence.Language != "calor" && ExemplarCompileChecker.StartsWithModule(fence.Lines))
         {
             diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteAnnotation,
-                $"A complete Calor program (starts with §M) is fenced as ```{fence.Language}; label it ```calor so it is checked",
+                $"A complete Calor program (starts with module) is fenced as ```{fence.Language}; label it ```calor so it is checked",
                 page.Path, fence.OpenLine));
             ok = false;
         }

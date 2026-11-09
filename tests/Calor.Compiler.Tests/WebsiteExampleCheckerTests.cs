@@ -31,6 +31,22 @@ public sealed class WebsiteExampleCheckerTests
 
     private static string Fence(string info, string body) => $"```{info}\n{body}\n```\n";
 
+    [Theory]
+    [InlineData("// Header\n")]
+    [InlineData("/// Header\n")]
+    [InlineData("\n// Header\n\n")]
+    public void NativeModuleAfterLeadingComments_IsChecked(string prefix)
+    {
+        var source = prefix + "module Good\n  func Value () → int\n    return 1\n";
+        var coverage = new WebsiteExampleChecker.Coverage();
+        Assert.Empty(Check(Fence("calor", source), coverage));
+        Assert.Equal(1, coverage.CompletePrograms);
+        Assert.Contains(Check(Fence("calor", source.Replace("return 1", "return \"wrong\"", StringComparison.Ordinal))),
+            diagnostic => diagnostic.Code == DiagnosticCode.DocDriftWebsiteExampleMismatch);
+        Assert.Contains(Check(Fence("text", source)),
+            diagnostic => diagnostic.Code == DiagnosticCode.DocDriftWebsiteAnnotation);
+    }
+
     [Fact]
     public void CompleteProgramThatCompiles_Passes()
     {
@@ -470,6 +486,21 @@ public sealed class WebsiteExampleCheckerTests
         Assert.Equal(6, coverage.LandingPrograms);
         Assert.Equal(4, coverage.LandingFragments);
         Assert.Equal(1, coverage.LandingNegativePrograms);
+    }
+
+    [Fact]
+    public void Landing_NativeContextsAfterLeadingComments_PreserveExactDiagnostics()
+    {
+        var (source, components) = LandingInputs();
+        var commented = MutateLanding(source, json =>
+        {
+            foreach (var (_, entry) in json.AsObject())
+            {
+                var key = string.IsNullOrEmpty(entry!["before"]!.GetValue<string>()) ? "code" : "before";
+                entry[key] = "\n// Native context\n" + entry[key]!.GetValue<string>();
+            }
+        });
+        Assert.Empty(WebsiteExampleChecker.CheckLanding(commented, components));
     }
 
     [Theory]
