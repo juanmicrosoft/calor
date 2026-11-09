@@ -410,11 +410,15 @@ public sealed class Binder
         var visibleScopes = scopes.Select(scope => scope.Id).ToHashSet(StringComparer.Ordinal);
         var imports = _metadataUsings.Where(import =>
             import.NamespaceScopeId is null || visibleScopes.Contains(import.NamespaceScopeId)).ToArray();
-        if (imports.Length == 0 && string.IsNullOrEmpty(namespaceIdentity))
+        // Predefined keywords do not depend on imports; retain their existing binding/nullability path.
+        if (imports.Length == 0 && string.IsNullOrEmpty(namespaceIdentity)
+            && SyntaxFactory.ParseTypeName(name) is PredefinedTypeSyntax)
             return _scopedMetadataTypes[key] = (false, null);
 
         var emitter = new CodeGen.CSharpEmitter();
         var source = new System.Text.StringBuilder();
+        // The production emitter always imports System, including in otherwise import-free modules.
+        source.AppendLine("using System;");
         foreach (var import in imports.Where(import => import.NamespaceScopeId is null))
             source.AppendLine(import.Accept(emitter));
         var namespaceCount = 0;

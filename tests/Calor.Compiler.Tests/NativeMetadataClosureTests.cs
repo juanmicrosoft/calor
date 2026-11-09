@@ -1,4 +1,5 @@
 using System.Reflection;
+using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.CodeGen;
@@ -14,6 +15,101 @@ namespace Calor.Compiler.Tests;
 
 public sealed class NativeMetadataClosureTests
 {
+    [Theory]
+    [InlineData("", "", "StringComparison.Ordinal")]
+    [InlineData(" Demo", "", "StringComparison.Ordinal")]
+    [InlineData("", "  using System\n", "StringComparison.Ordinal")]
+    [InlineData("", "  using Comparison = System.StringComparison\n", "Comparison.Ordinal")]
+    [InlineData("", "", "System.StringComparison.Ordinal")]
+    public void NativeImplicitSystemImport_RetainsTheActualStringComparisonFieldAndSelectedOverload(
+        string namespaceSuffix, string imports, string comparison)
+    {
+        var source = $$"""
+            module Strings{{namespaceSuffix}}
+            {{imports}}  func FirstField (string:line) → string
+                !
+                let int:i = line.IndexOf(",", {{comparison}})
+                if i < 0
+                  return line
+                return line.Substring(0, i)
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+        var field = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundFieldAccessExpression>()
+            .Single(member => member.FieldName == "Ordinal");
+        var metadataField = Assert.IsAssignableFrom<IFieldSymbol>(field.ResolvedMetadataMember);
+        Assert.True(metadataField.IsConst);
+        Assert.True(metadataField.IsStatic);
+        Assert.Equal("System.StringComparison", metadataField.ContainingType.ToDisplayString());
+        Assert.Equal(TypeKind.Enum, metadataField.Type.TypeKind);
+        Assert.False(field.HasUnknownInferredType);
+        var call = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundBindStatement>(Assert.Single(bound.Functions).Body[0]).Initializer);
+        var selected = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+        Assert.Equal(SpecialType.System_String, selected.ContainingType.SpecialType);
+        Assert.Equal(2, selected.Parameters.Length);
+        Assert.Equal(SpecialType.System_String, selected.Parameters[0].Type.SpecialType);
+        Assert.True(SymbolEqualityComparer.Default.Equals(metadataField.Type, selected.Parameters[1].Type));
+        var result = Program.Compile(source);
+        Assert.Empty(result.Diagnostics);
+        var assembly = CompileAssembly(result.GeneratedCode);
+        var method = assembly.GetTypes().SelectMany(type => type.GetMethods())
+            .Single(method => method.Name == "FirstField");
+        foreach (var (input, expected) in new[]
+        {
+            ("a,b", "a"), ("abc", "abc"), ("", ""), (",b", ""), ("a,b,c", "a")
+        })
+            Assert.Equal(expected, method.Invoke(null, [input]));
+    }
+
+    [Theory]
+    [InlineData("  enum StringComparison\n    Ordinal\n", "", "", "StringComparison.Ordinal")]
+    [InlineData("", "", ", int:StringComparison", "StringComparison.Ordinal")]
+    [InlineData("", "<StringComparison>", "", "StringComparison.Ordinal")]
+    [InlineData("  using StringComparison = System.ConsoleColor\n", "", "", "StringComparison.Red")]
+    [InlineData("  using StringComparison = System.StringComparison\n  using StringComparison = System.ConsoleColor\n",
+        "", "", "StringComparison.Ordinal")]
+    public void NativeImplicitSystemImport_DoesNotBorrowTheEnumThroughShadowedOrConflictingOwners(
+        string declarations, string typeParameters, string parameters, string comparison)
+    {
+        var source = $$"""
+            module ShadowedComparison
+            {{declarations}}  func FirstField{{typeParameters}} (string:line{{parameters}}) → string
+                !
+                let int:i = line.IndexOf(",", {{comparison}})
+                if i < 0
+                  return line
+                return line.Substring(0, i)
+            """;
+        var bound = new Binder(new DiagnosticBag()).Bind(Parse(source));
+        var call = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundBindStatement>(Assert.Single(bound.Functions).Body[0]).Initializer);
+        Assert.Null(call.ResolvedMetadataMethod);
+        var result = Program.Compile(source);
+        Assert.True(result.HasErrors);
+        Assert.Empty(result.GeneratedCode);
+    }
+
+    [Fact]
+    public void NativeImplicitSystemImport_DoesNotManufactureObjectDelegateResultNullability()
+    {
+        const string source = """
+            module DelegateResult
+              func Pick (object:value) → int
+                !
+                return 7
+              func Probe () → int
+                !
+                return Pick(((Func<object>)(() => null))())
+            """;
+        var bound = new Binder(new DiagnosticBag()).Bind(Parse(source));
+        var cast = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundTypeOperationExpression>().Single();
+        var signature = Assert.IsType<Calor.Compiler.Binding.BoundTypes.FunctionBoundType>(cast.Type);
+        Assert.Equal(Calor.Compiler.Binding.BoundTypes.NullableAnnotation.Oblivious,
+            Assert.IsType<Calor.Compiler.Binding.BoundTypes.NominalBoundType>(signature.ReturnType).NullableAnnotation);
+    }
+
     [Theory]
     [InlineData("(Func<int>)(() => 9)", true)]
     [InlineData("(f)(1)", false)]

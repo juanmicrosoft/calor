@@ -824,7 +824,7 @@
         "using alias"
       ],
       "calorSyntax": "using System.Text; using Text = System.Text; using type:name = resource",
-      "description": "At compilation-unit scope, imports a namespace or declares an alias. In a function body, using introduces a resource and an indented body that disposes it on exit, including exceptions. Preserve the distinction between imports and resource lifetime management.",
+      "description": "At compilation-unit scope, imports a namespace or declares an alias. In a function body, using introduces a resource and an indented body that disposes it on exit, including exceptions. Preserve the distinction between imports and resource lifetime management.\n\nGenerated C# already imports `System`, so names such as `StringComparison` do not need an explicit `using System`. Source declarations, parameters, type parameters and aliases still participate in name lookup; the import does not override them.",
       "programs": [
         "complete_using",
         "complete_namespace",
@@ -2468,7 +2468,7 @@
         }
       ],
       "syntax": "using System.Text; using Text = System.Text; using type:name = resource",
-      "description": "At compilation-unit scope, imports a namespace or declares an alias. In a function body, using introduces a resource and an indented body that disposes it on exit, including exceptions. Preserve the distinction between imports and resource lifetime management.",
+      "description": "At compilation-unit scope, imports a namespace or declares an alias. In a function body, using introduces a resource and an indented body that disposes it on exit, including exceptions. Preserve the distinction between imports and resource lifetime management.\n\nGenerated C# already imports `System`, so names such as `StringComparison` do not need an explicit `using System`. Source declarations, parameters, type parameters and aliases still participate in name lookup; the import does not override them.",
       "csharpEquivalent": "using (var stream = File.OpenRead(path)) { ... }\nusing var connection = new SqlConnection(connStr);"
     },
     "try": {

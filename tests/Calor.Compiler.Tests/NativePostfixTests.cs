@@ -637,7 +637,7 @@ public sealed class NativePostfixTests
                 Assert.Equal(8, Assert.IsType<BoundIntLiteral>(boundInitializer.Value).Value);
                 var unknown = result.Diagnostics.Where(diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall).ToArray();
                 Assert.Equal(3, unknown.Length);
-                Assert.Contains(unknown, diagnostic => diagnostic.Message.Contains("Lazy<System.Text.StringBuilder>..ctor(Func)", StringComparison.Ordinal));
+                Assert.Contains(unknown, diagnostic => diagnostic.Message.Contains("System.Lazy<T>..ctor(Func)", StringComparison.Ordinal));
                 Assert.Contains(unknown, diagnostic => diagnostic.Message.Contains("Lazy`1<StringBuilder>.get_Value", StringComparison.Ordinal));
                 Assert.Contains(unknown, diagnostic => diagnostic.Message.Contains("?.get_Capacity", StringComparison.Ordinal));
                 Assert.Contains(result.Diagnostics.Errors, diagnostic =>
