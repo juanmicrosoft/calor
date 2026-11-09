@@ -19,7 +19,7 @@ public class RenameHandlerTests
         var root = CreateWorkspaceDirectory();
         try
         {
-            var source = "§M{Demo}\n  §CL{A:pub}\n    §MT{Echo:pub} (A:value) -> A\n      §R value\n";
+            var source = "module Demo\n  class A\n    func Echo (A:value) → A\n      return value\n";
             var file = Path.Combine(root, "active.calr");
             File.WriteAllText(file, source);
             var store = new Calor.Compiler.Ids.DeclarationIdentityStore(root);
@@ -28,7 +28,7 @@ public class RenameHandlerTests
             var uri = DocumentUri.FromFileSystemPath(file);
             var workspace = new WorkspaceState();
             workspace.GetOrCreate(uri, source, version: 3);
-            var edit = await RenameAtAsync(workspace, uri, source, "A:pub", "B",
+            var edit = await RenameAtAsync(workspace, uri, source, "A\n", "B",
                 supportsTransactionalEdits: true);
             var changes = edit!.DocumentChanges!.ToArray();
             var sidecarEdit = Assert.Single(changes.Where(change =>
@@ -39,7 +39,7 @@ public class RenameHandlerTests
             {
                 DocumentChanges = new Container<WorkspaceEditDocumentChange>(sourceEdit)
             });
-            Assert.Contains("(B:value) -> B", updated);
+            Assert.Contains("(B:value) → B", updated);
             Assert.Equal(source, File.ReadAllText(file));
             Assert.Equal(originalSidecar, File.ReadAllText(store.SidecarPath));
             File.WriteAllText(file, updated);
@@ -66,7 +66,7 @@ public class RenameHandlerTests
         var root = CreateWorkspaceDirectory();
         try
         {
-            const string source = "§M{Demo}\n  §F{Compute:pub} () -> i32\n    §R 42\n";
+            const string source = "module Demo\n  func Compute () → int\n    return 42\n";
             var file = Path.Combine(root, "active.calr");
             File.WriteAllText(file, source);
             var store = new Calor.Compiler.Ids.DeclarationIdentityStore(root);
@@ -96,11 +96,11 @@ public class RenameHandlerTests
         try
         {
             const string source = """
-                §M{Demo}
-                  §F{Compute:pub} () -> i32
-                    §R 42
-                  §F{Use:pub} () -> i32
-                    §R §C{Compute} §/C
+                module Demo
+                  func Compute () → int
+                    return 42
+                  func Use () → int
+                    return Compute()
                 """;
             var file = Path.Combine(root, "active.calr");
             File.WriteAllText(file, source);
@@ -145,11 +145,11 @@ public class RenameHandlerTests
     public async Task RenameUsesVersionedDocumentChangesAndExactTokenRangesAsync()
     {
         const string source = """
-            §M{TestModule}
-              §F{Compute:pub} () -> i32
-                §R 42
-              §F{Use:pub} () -> i32
-                §R §C{Compute} §/C
+            module TestModule
+              func Compute () → int
+                return 42
+              func Use () → int
+                return Compute()
             """;
         var uri = DocumentUri.From("file:///rename.calr");
         var workspace = new WorkspaceState();
