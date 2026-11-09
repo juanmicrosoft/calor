@@ -868,13 +868,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     /// <summary>
     /// Format inline parameter list for compact signatures: (type:name, type:name, ...)
-    /// Returns null if a parameter still needs the legacy attribute/default layout.
     /// </summary>
     private string? TryFormatInlineParams(IReadOnlyList<ParameterNode> parameters)
     {
-        if (parameters.Any(p => p.CSharpAttributes.Count > 0))
-            return null;
-
         return string.Join(", ", parameters.Select((p, index) =>
         {
             var typeName = TypeMapper.ToSurfaceType(p.TypeName);
@@ -888,9 +884,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
             if (p.Modifier.HasFlag(ParameterModifier.In)) modifiers.Add("in");
             if (p.Modifier.HasFlag(ParameterModifier.Params)) modifiers.Add("params");
             var modStr = modifiers.Count > 0 ? $"{string.Join(" ", modifiers)} " : "";
+            var attributes = p.CSharpAttributes.Count == 0 ? "" : $" {EmitCSharpAttributes(p.CSharpAttributes)}";
             var refinement = p.InlineRefinement == null ? "" : $" | {p.InlineRefinement.Predicate.Accept(this)}";
             var defaultValue = p.DefaultValue == null ? "" : $" = {p.DefaultValue.Accept(this)}";
-            return $"{modStr}{typeName}:{EscapeCalorIdentifier(p.Name)}{FormatEffectRow(p.Row)}{refinement}{defaultValue}";
+            return $"{modStr}{typeName}:{EscapeCalorIdentifier(p.Name)}{attributes}{FormatEffectRow(p.Row)}{refinement}{defaultValue}";
         }));
     }
 
@@ -993,9 +990,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.IsRecord)
         {
             var positional = node.RecordParameters == null ? "" :
-                " (" + string.Join(", ", node.RecordParameters.Select(parameter =>
-                    $"{TypeMapper.ToSurfaceType(parameter.TypeName)}:{EscapeCalorIdentifier(parameter.Name)}{FormatEffectRow(parameter.Row)}"
-                    + (parameter.DefaultValue == null ? "" : $" = {parameter.DefaultValue.Accept(this)}"))) + ")";
+                " (" + TryFormatInlineParams(node.RecordParameters) + ")";
             var baseCall = node.RecordBaseArguments == null ? "" :
                 $" : {TypeMapper.ToSurfaceType(node.BaseClass!)}({string.Join(", ", node.RecordBaseArguments.Select(argument => argument.Accept(this)))})";
             AppendLine($"record {EscapeCalorIdentifier(node.Name)}{typeParams}{vis}{modStr}{attrs}{positional}{baseCall}");

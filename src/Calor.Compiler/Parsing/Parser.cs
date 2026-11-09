@@ -15039,6 +15039,8 @@ public sealed class Parser
                     }
                 }
 
+                var csharpAttributes = ParseCSharpAttributes();
+
                 // Position 5 (§3.3): (Func<i32,i32>:f §E{cw}, i32:v). The inline
                 // parameter list is one of the four positions with no §E arm behind it,
                 // so a non-adjacent §E here is Calor0405 with recovery rather than the
@@ -15080,7 +15082,7 @@ public sealed class Parser
                     paramType,
                     modifier,
                     paramAttrs,
-                    Array.Empty<CalorAttributeNode>(),
+                    csharpAttributes,
                     defaultValue,
                     inlineRefinement,
                     identifierSpan: parameterIdentifierSpan,
