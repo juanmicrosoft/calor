@@ -21,7 +21,9 @@ public enum TokenKind
     Question,           // ?
     OpenParen,          // (
     CloseParen,         // )
-    Arrow,              // → or ->
+    Arrow,              // →
+    FatArrow,           // => (postcondition header or lambda)
+    Semicolon,          // ; (re-evaluated for clauses)
     At,                 // @ (for C#-style attributes)
     Comma,              // , (for attribute arguments)
 
@@ -84,6 +86,10 @@ public enum TokenKind
     Label,
     SemVer,             // §SEMVER{MAJOR.MINOR.PATCH} - module semantics-version declaration
     Bind,
+    Let,
+    From,
+    To,
+    Step,
 
     // Phase 3: Type System
     Match,

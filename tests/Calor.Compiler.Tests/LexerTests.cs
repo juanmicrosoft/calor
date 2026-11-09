@@ -8,6 +8,52 @@ namespace Calor.Compiler.Tests;
 
 public class LexerTests
 {
+    [Fact]
+    public void CanonicalWords_ExposeTheSharedParserInterface()
+    {
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer("module class record func let var for from to step each in do while return set ! => → ;", diagnostics)
+            .TokenizeAll();
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(new[]
+        {
+            TokenKind.Module, TokenKind.Class, TokenKind.Record, TokenKind.Func,
+            TokenKind.Let, TokenKind.Var, TokenKind.For, TokenKind.From, TokenKind.To,
+            TokenKind.Step, TokenKind.Foreach, TokenKind.In, TokenKind.Do, TokenKind.While,
+            TokenKind.Return, TokenKind.Assign, TokenKind.Exclamation, TokenKind.FatArrow,
+            TokenKind.Arrow, TokenKind.Semicolon, TokenKind.Eof
+        }, tokens.Select(token => token.Kind));
+    }
+
+    [Fact]
+    public void CanonicalEscapedNames_KeepSourceTextAndUnescapedIdentity()
+    {
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer("@new(x) upper(x) @module.Module Module", diagnostics).TokenizeAll();
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal("@new", tokens[0].Text);
+        Assert.Equal("new", tokens[0].Value);
+        Assert.Equal(TokenKind.Identifier, tokens[0].Kind);
+        Assert.Equal(TokenKind.Identifier, tokens[4].Kind);
+        Assert.Equal("upper", tokens[4].Text);
+        Assert.Equal("@module", tokens[8].Text);
+        Assert.Equal("module", tokens[8].Value);
+        Assert.Equal(TokenKind.Dot, tokens[9].Kind);
+        Assert.Equal(TokenKind.Identifier, tokens[10].Kind);
+        Assert.Equal("Module", tokens[11].Text);
+        Assert.Equal(TokenKind.Identifier, tokens[11].Kind);
+    }
+
+    [Fact]
+    public void CanonicalDocumentation_RemainsAttachedWithoutInterpretingProse()
+    {
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer("/// since 1.2.0\n/// deprecated reason\nfunc F", diagnostics).TokenizeAll();
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(TokenKind.Func, tokens[0].Kind);
+        Assert.Equal("since 1.2.0\ndeprecated reason", tokens[0].DocComment);
+    }
+
     [Theory]
     [InlineData("§M{Bad}\n  §F{Main:pub} () -> void\n    §INVALID_TAG\n", DiagnosticCode.UnknownSectionMarker)]
     [InlineData("§M{Bad}\n  §F{Main:pub} () -> void\n    §E{cw}\n    §P \"unfinished\n", DiagnosticCode.UnterminatedString)]

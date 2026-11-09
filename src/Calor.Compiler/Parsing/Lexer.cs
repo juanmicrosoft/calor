@@ -19,6 +19,65 @@ public sealed class Lexer
     private readonly List<string> _docComments = new();
     private int _lastDocLine;
 
+    private static readonly Dictionary<string, TokenKind> CanonicalKeywords = new(StringComparer.Ordinal)
+    {
+        ["module"] = TokenKind.Module,
+        ["namespace"] = TokenKind.Namespace,
+        ["class"] = TokenKind.Class,
+        ["record"] = TokenKind.Record,
+        ["interface"] = TokenKind.Interface,
+        ["func"] = TokenKind.Func,
+        ["let"] = TokenKind.Let,
+        ["var"] = TokenKind.Var,
+        ["return"] = TokenKind.Return,
+        ["set"] = TokenKind.Assign,
+        ["if"] = TokenKind.If,
+        ["else"] = TokenKind.Else,
+        ["for"] = TokenKind.For,
+        ["from"] = TokenKind.From,
+        ["to"] = TokenKind.To,
+        ["step"] = TokenKind.Step,
+        ["each"] = TokenKind.Foreach,
+        ["in"] = TokenKind.In,
+        ["do"] = TokenKind.Do,
+        ["while"] = TokenKind.While,
+        ["break"] = TokenKind.Break,
+        ["continue"] = TokenKind.Continue,
+        ["match"] = TokenKind.Match,
+        ["case"] = TokenKind.Case,
+        ["using"] = TokenKind.Using,
+        ["extends"] = TokenKind.Extends,
+        ["implements"] = TokenKind.Implements,
+        ["where"] = TokenKind.Where,
+        ["new"] = TokenKind.New,
+        ["this"] = TokenKind.This,
+        ["base"] = TokenKind.Base,
+        ["try"] = TokenKind.Try,
+        ["catch"] = TokenKind.Catch,
+        ["finally"] = TokenKind.Finally,
+        ["throw"] = TokenKind.Throw,
+        ["when"] = TokenKind.When,
+        ["await"] = TokenKind.Await,
+        ["with"] = TokenKind.With,
+        ["enum"] = TokenKind.Enum,
+        ["event"] = TokenKind.Event,
+        ["delegate"] = TokenKind.Delegate,
+        ["ctor"] = TokenKind.Constructor,
+        ["property"] = TokenKind.Property,
+        ["indexer"] = TokenKind.Indexer,
+        ["field"] = TokenKind.FieldDef,
+        ["out"] = TokenKind.Out,
+        ["get"] = TokenKind.Get,
+        ["init"] = TokenKind.Init,
+        ["requires"] = TokenKind.Requires,
+        ["invariant"] = TokenKind.Invariant,
+        ["assume"] = TokenKind.Assume,
+        ["proof"] = TokenKind.Proof,
+        ["unsafe"] = TokenKind.Unsafe,
+        ["fixed"] = TokenKind.Fixed,
+        ["lock"] = TokenKind.SyncBlock,
+    };
+
     private static readonly Dictionary<string, TokenKind> Keywords = new(StringComparer.Ordinal)
     {
         // Single-letter keywords (compact syntax)
@@ -670,7 +729,7 @@ public sealed class Lexer
             '~' => ScanSingle(TokenKind.Tilde),
             '#' => ScanSingle(TokenKind.Hash),
             '?' => ScanQuestionOrOperator(),
-            '@' => ScanSingle(TokenKind.At),
+            '@' => ScanEscapedIdentifier(),
             ',' => ScanSingle(TokenKind.Comma),
             '"' => ScanStringLiteral(),
             '\r' or '\n' => ScanNewline(),
@@ -696,7 +755,7 @@ public sealed class Lexer
             '`' => ScanBacktickIdentifier(),
             '\'' => ScanCharLiteral(),
             '$' => ScanDollarString(),
-            ';' => ScanSkipSemicolon(),
+            ';' => ScanSingle(TokenKind.Semicolon),
             _ when char.IsLetter(Current) || Current == '_' => ScanIdentifierOrTypedLiteral(),
             _ when char.IsDigit(Current) => ScanNumber(),
             _ => ScanError()
@@ -710,6 +769,11 @@ public sealed class Lexer
         {
             Advance(); // consume second '='
             return MakeToken(TokenKind.EqualEqual);
+        }
+        if (Current == '>')
+        {
+            Advance();
+            return MakeToken(TokenKind.FatArrow);
         }
         return MakeToken(TokenKind.Equals);
     }
@@ -907,6 +971,17 @@ public sealed class Lexer
     {
         Advance();
         return MakeToken(kind);
+    }
+
+    private Token ScanEscapedIdentifier()
+    {
+        Advance();
+        if (!char.IsLetter(Current) && Current != '_')
+            return MakeToken(TokenKind.At);
+        var start = _position;
+        while (char.IsLetterOrDigit(Current) || Current == '_')
+            Advance();
+        return MakeToken(TokenKind.Identifier, _source[start.._position]);
     }
 
     private Token ScanColonOrTypedLiteral()
@@ -2423,6 +2498,9 @@ public sealed class Lexer
         {
             return MakeToken(TokenKind.BoolLiteral, false);
         }
+
+        if (CanonicalKeywords.TryGetValue(text, out var keyword))
+            return MakeToken(keyword);
 
         return MakeToken(TokenKind.Identifier);
     }
