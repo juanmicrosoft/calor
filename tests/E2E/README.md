@@ -338,15 +338,23 @@ runtime contracts enabled. Factorial runs all six permitted inputs. Clamp runs
 including zero; Max runs 121 pairs including ties and integer boundaries.
 These finite runtime oracles are behavioral checks, not a universal proof of
 arbitrary function bodies. Statement and expression implementations both pass.
-Integer signatures use the selected compiler's type normalization, so `int`,
-`i32`, and mixed aliases pass the same CLR `Int32` signature check; IsPositive
-still requires a CLR boolean result.
+Current controls author canonical `module`/`func` programs with infix expressions,
+`requires`, and `=>` postconditions. Integer signatures use `int`, `System.Int32`,
+and mixed spellings for the same CLR `Int32` signature; IsPositive still requires
+a CLR boolean result. The original 103-control oracle, including both statement
+and expression bodies, remains unchanged in scope. Retired section markers and
+`i32` source spellings are not aliases at candidate entrypoints. Legacy selected
+compilers must receive their original legacy programs, not canonical programs.
+CLR module ownership follows the parsed function's namespace identity, including
+the canonical global namespace, rather than assuming the module label is a namespace.
 Compilation errors, execution errors, wrong results, missing inputs, and
 timeouts fail. `CALOR_LOGIC_TIMEOUT_SECONDS` may shorten the overall 120-second
 build-and-execution deadline; timed-out process groups are terminated.
 Termination and output cleanup share that deadline. Escaped descendants holding
 stdout open cannot cause an unbounded EOF wait; cancellation also terminates the
 original process group and bounds cleanup.
+Cleanup failures are reported on stderr and attached to the primary exception;
+they cannot replace a timeout or turn cancellation into an ordinary exit-1 rejection.
 
 The controls exercise the real entry points with valid alternatives, missing
 and stub declarations, misleading comments and unrelated contracts, wrong
@@ -487,6 +495,14 @@ The four `advanced-001`..`advanced-004` tasks live under
 `MathUtils.calr` functions, not GitHub integrations. Their shell entrypoints
 select `advanced001`..`advanced004` in the shared native/CLR verifier.
 The task JSON and `advanced-calor-project` fixture are not rewritten.
+Current controls independently author canonical programs, including equivalent
+Add/Negate/IsEven scaffold declarations. Archived controls retain their original
+legacy programs and the existing archived-parser syntax adapter. The current
+candidate entrypoints never translate section markers, prefix expressions, or
+retired scalar type names. Native and archived matrices must retain identical
+category/profile/positive-or-negative sequences; canonical semantic negatives
+also require their actual proof, behavior, or supplying-path diagnostic, not just
+any compilation failure.
 
 ```bash
 python3 tests/E2E/agent-tasks/test-advanced-math-verifiers.py
@@ -508,9 +524,12 @@ provider, network package source, paid experiment, or release action is used.
 Admission uses actual `Program.Compile` with Debug contracts and ordinary
 compiler effect checking. The parsed module function and reflected public,
 static CLR method must have the exact requested owner, parameter order,
-Int32 widths, and result type. `int` aliases, equivalent predicates, optional
-total refinements, harmless declared effects, and extra total contracts remain
-valid. Raw/opaque C# cannot establish a feature. Executable external state, IO,
+Int32 widths, and result type. Namespace-aware ownership and instrumentation
+support both global and explicitly namespaced native modules without accepting
+foreign Min parameter provenance. Canonical `int`/`System.Int32` spellings,
+equivalent predicates, optional total refinements, harmless declared effects,
+and extra total contracts remain valid. Raw/opaque C# cannot establish a feature.
+Executable external state, IO,
 allocations, and unsupported contract translations are bounded refusals, not
 guessed behavior. In particular, this finite runner is not an IO sandbox.
 

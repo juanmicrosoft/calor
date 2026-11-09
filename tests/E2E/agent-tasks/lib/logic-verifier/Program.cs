@@ -191,11 +191,11 @@ static void Verify(string profile, string path)
     var function = functions[0];
     if (function.Visibility != Visibility.Public || function.IsAsync || function.TypeParameters.Count != 0
         || function.Output == null
-        || AttributeHelper.ExpandType(function.Output.TypeName) != AttributeHelper.ExpandType(outputType)
+        || ScalarType(function.Output.TypeName) != ScalarType(outputType)
         || (!dictionary && !function.Parameters.Select(parameter => parameter.Name).SequenceEqual(names))
         || function.Parameters.Count != names.Length
         || function.Parameters.Any(parameter => (dictionary
-                ? !IsDictionaryType(parameter.TypeName) : AttributeHelper.ExpandType(parameter.TypeName) != "INT")
+                ? !IsDictionaryType(parameter.TypeName) : ScalarType(parameter.TypeName) != "INT")
             || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None
             || !basic && !contractWriting && !idiom && name != "GradeToLetter" && parameter.InlineRefinement != null))
         throw new InvalidOperationException($"Wrong public signature for {name}.");
@@ -224,8 +224,7 @@ static void Verify(string profile, string path)
         CheckContracts(function, names, outputType, profile == "ControlMax");
 
     var (assembly, trees) = CompileRuntime(compilation.GeneratedCode);
-    var moduleName = compilation.Ast.Name;
-    var type = assembly.GetType($"{moduleName}.{moduleName}Module")
+    var type = assembly.GetType(ScalarModuleTypeName(compilation.Ast, function))
         ?? throw new InvalidOperationException("Generated module type not found.");
     var parameterTypes = names.Select(_ => dictionary ? typeof(Dictionary<string, int>) : typeof(int)).ToArray();
     var method = type.GetMethod(name, BindingFlags.Public | BindingFlags.Static, parameterTypes)
@@ -383,6 +382,20 @@ static void Verify(string profile, string path)
     Console.WriteLine($"Verification passed: {name}; {(basic ? "basic signature/behavior" : controlFlow ? "native control flow" : "semantic contracts")} and {count} runtime cases.");
 }
 
+static string ScalarType(string type) => AttributeHelper.ExpandType(type) switch
+{
+    "System.Int32" => "INT",
+    "System.Boolean" => "BOOL",
+    var expanded => expanded
+};
+
+static string ScalarModuleTypeName(ModuleNode module, FunctionNode function)
+{
+    var namespaceName = function.NamespaceIdentity ?? module.NamespaceIdentity ?? module.Name;
+    return namespaceName.Length == 0 ? "GlobalModule"
+        : $"{namespaceName}.{namespaceName.Split('.').Last()}Module";
+}
+
 static void VerifyAdvancedMath(string profile, string path)
 {
     var source = File.ReadAllText(path);
@@ -456,17 +469,18 @@ static void VerifyAdvancedMath(string profile, string path)
         if (functions.Length != 1)
             throw new InvalidOperationException($"Expected exactly one native Math module function named {name}.");
         var function = functions[0];
+        var ownerName = ScalarModuleTypeName(module, function);
         if (function.Visibility != Visibility.Public || function.IsAsync || function.TypeParameters.Count != 0
-            || function.Output == null || AttributeHelper.ExpandType(function.Output.TypeName) !=
-                AttributeHelper.ExpandType(name == "InRange" ? "bool" : "i32")
+            || function.Output == null || ScalarType(function.Output.TypeName) !=
+                ScalarType(name == "InRange" ? "bool" : "i32")
             || !function.Parameters.Select(parameter => parameter.Name).SequenceEqual(names)
-            || function.Parameters.Any(parameter => AttributeHelper.ExpandType(parameter.TypeName) != "INT"
+            || function.Parameters.Any(parameter => ScalarType(parameter.TypeName) != "INT"
                 || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None))
             throw new InvalidOperationException($"Wrong public signature for Math {name}.");
         CheckMathPredicates(function);
         MethodInfo Target(Assembly image)
         {
-            var owner = image.GetType("MathUtils.MathUtilsModule")
+            var owner = image.GetType(ownerName)
                 ?? throw new InvalidOperationException("Math reflected module owner missing.");
             var methods = owner.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
                 | BindingFlags.Static | BindingFlags.DeclaredOnly).Where(method => method.Name == name).ToArray();
@@ -550,12 +564,15 @@ static void VerifyAdvancedMath(string profile, string path)
             .Where(node => node.Operator == (name == "SafeDiv" ? BinaryOperator.Divide : BinaryOperator.Modulo))
             .Select(node => node.Span.Line).ToHashSet();
         var probe = "__Math_" + Guid.NewGuid().ToString("N");
-        var rewriter = new MathAdmissionRewriter(semantic, name, nestedLines, arithmeticLines, path, probe);
+        var rewriter = new MathAdmissionRewriter(semantic, name, ownerName, nestedLines, arithmeticLines, path, probe);
         var tracedRoot = (CompilationUnitSyntax)rewriter.Visit(off.GetRoot())!;
         tracedRoot = tracedRoot.AddMembers(SyntaxFactory.ParseMemberDeclaration(MathAdmissionRewriter.Probe(probe))!);
         var tracedImage = CompileRuntime(tracedRoot.NormalizeWhitespace().ToFullString()).Assembly;
         var traced = Target(tracedImage);
-        var probeType = tracedImage.GetType(probe)!;
+        var probeNamespace = tracedRoot.Members.OfType<FileScopedNamespaceDeclarationSyntax>()
+            .SingleOrDefault()?.Name.ToString().Replace("@", "", StringComparison.Ordinal);
+        var probeType = tracedImage.GetType(probeNamespace == null ? probe : $"{probeNamespace}.{probe}")
+            ?? throw new InvalidOperationException("Math instrumentation CLR identity missing.");
         var reset = probeType.GetMethod("Reset")!;
         var records = (List<(string Kind, int Site, object Value)>)probeType.GetField("Records")!.GetValue(null)!;
         var innerSupplying = new Dictionary<int, HashSet<bool>>();
@@ -6274,7 +6291,7 @@ static void CheckDictionaryOutput(Dictionary<string, int> input, string output)
     }
 }
 sealed class MathAdmissionRewriter(
-    SemanticModel semantic, string target, HashSet<int> nestedLines, HashSet<int> arithmeticLines,
+    SemanticModel semantic, string target, string ownerName, HashSet<int> nestedLines, HashSet<int> arithmeticLines,
     string path, string probe) : CSharpSyntaxRewriter
 {
     private int serial;
@@ -6323,7 +6340,7 @@ sealed class MathAdmissionRewriter(
         if (symbol == null || !seen.Add(symbol)) return null;
         if (symbol is IParameterSymbol parameter && parameter.ContainingSymbol is IMethodSymbol
                 { Name: "Min", MethodKind: Microsoft.CodeAnalysis.MethodKind.Ordinary, ContainingType: { } owner }
-            && owner.ToDisplayString() == "MathUtils.MathUtilsModule"
+            && owner.ToDisplayString().Replace("@", "", StringComparison.Ordinal) == ownerName
             && parameter.Name is "a" or "b")
             return parameter.Name;
         if (symbol is ILocalSymbol local && local.DeclaringSyntaxReferences.Length == 1

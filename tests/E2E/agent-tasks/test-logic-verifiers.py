@@ -22,28 +22,28 @@ TASK_NAMES = {
 }
 DECLARATIONS = {
     "Factorial": (
-        "§F{Factorial:pub} (i32:n) -> i32",
-        "§Q (>= n 0)\n§Q (<= n 5)\n§S (>= result 1)",
-        "§IF (<= n 1)\n  §R 1\n§EI (== n 2)\n  §R 2\n§EI (== n 3)\n  §R 6\n§EI (== n 4)\n  §R 24\n§R 120",
-        "§R (? (<= n 1) 1 (? (== n 2) 2 (? (== n 3) 6 (? (== n 4) 24 120))))",
+        "func Factorial (int:n) → int",
+        "requires n >= 0\nrequires n <= 5\n=> result >= 1",
+        "if n <= 1\n  return 1\nelse if n == 2\n  return 2\nelse if n == 3\n  return 6\nelse if n == 4\n  return 24\nreturn 120",
+        "return n <= 1 ? 1 : (n == 2 ? 2 : (n == 3 ? 6 : (n == 4 ? 24 : 120)))",
     ),
     "Clamp": (
-        "§F{Clamp:pub} (i32:value, i32:min, i32:max) -> i32",
-        "§Q (<= min max)\n§S (>= result min)\n§S (<= result max)",
-        "§IF (< value min)\n  §R min\n§IF (> value max)\n  §R max\n§R value",
-        "§R (? (< value min) min (? (> value max) max value))",
+        "func Clamp (int:value, int:min, int:max) → int",
+        "requires min <= max\n=> result >= min\n=> result <= max",
+        "if value < min\n  return min\nif value > max\n  return max\nreturn value",
+        "return value < min ? min : (value > max ? max : value)",
     ),
     "IsPositive": (
-        "§F{IsPositive:pub} (i32:x) -> bool",
-        "§S (== result (> x 0))",
-        "§IF (> x 0)\n  §R true\n§R false",
-        "§R (> x 0)",
+        "func IsPositive (int:x) → bool",
+        "=> result == (x > 0)",
+        "if x > 0\n  return true\nreturn false",
+        "return x > 0",
     ),
     "Max": (
-        "§F{Max:pub} (i32:a, i32:b) -> i32",
-        "§S (>= result a)\n§S (>= result b)\n§S (|| (== result a) (== result b))",
-        "§IF (>= a b)\n  §R a\n§R b",
-        "§R (? (>= a b) a b)",
+        "func Max (int:a, int:b) → int",
+        "=> result >= a\n=> result >= b\n=> result == a || result == b",
+        "if a >= b\n  return a\nreturn b",
+        "return a >= b ? a : b",
     ),
 }
 
@@ -52,7 +52,7 @@ def source(name, *, contracts=None, body=None, signature=None, expression=False)
     declaration, required, statement, alternative = DECLARATIONS[name]
     lines = (required if contracts is None else contracts).splitlines()
     lines += (body if body is not None else alternative if expression else statement).splitlines()
-    return "§M{Calculator}\n  " + (signature or declaration) + "\n" + "".join(
+    return "module Calculator\n  " + (signature or declaration) + "\n" + "".join(
         "    " + line + "\n" for line in lines
     )
 
@@ -96,10 +96,10 @@ class LogicVerifierTests(unittest.TestCase):
         for name in TASK_NAMES:
             declaration = DECLARATIONS[name][0]
             signatures = (
-                declaration.replace("i32", "int"),
-                declaration.replace("i32:", "int:", 1),
-                declaration.replace("-> i32", "-> int") if name != "IsPositive"
-                else declaration.replace("i32:", "int:"),
+                declaration.replace("int", "System.Int32"),
+                declaration.replace("int:", "System.Int32:", 1),
+                declaration.replace("→ int", "→ System.Int32") if name != "IsPositive"
+                else declaration.replace("int:", "System.Int32:"),
             )
             for signature in dict.fromkeys(signatures):
                 for expression in (False, True):
@@ -108,10 +108,10 @@ class LogicVerifierTests(unittest.TestCase):
 
     def test_equivalent_contract_forms(self):
         alternatives = {
-            "Factorial": "§Q (&& (<= 0 n) (>= 5 n))\n§S (<= 1 result)",
-            "Clamp": "§Q (! (> min max))\n§S (&& (<= min result) (>= max result))",
-            "IsPositive": "§S (&& (|| (! result) (> x 0)) (|| result (<= x 0)))",
-            "Max": "§S (&& (<= a result) (&& (<= b result) (|| (== a result) (== b result))))",
+            "Factorial": "requires 0 <= n && 5 >= n\n=> 1 <= result",
+            "Clamp": "requires !(min > max)\n=> min <= result && max >= result",
+            "IsPositive": "=> (!result || x > 0) && (result || x <= 0)",
+            "Max": "=> a <= result && b <= result && (a == result || b == result)",
         }
         for name, contracts in alternatives.items():
             with self.subTest(name=name):
@@ -120,22 +120,22 @@ class LogicVerifierTests(unittest.TestCase):
     def test_missing_wrong_and_comment_only_functions(self):
         for name in TASK_NAMES:
             with self.subTest(name=name):
-                self.verify(name, source(name).replace(f"§F{{{name}:", f"§F{{Other:"), False,
+                self.verify(name, source(name).replace(f"func {name} ", "func Other "), False,
                             detail="Expected exactly one")
-                self.verify(name, "// " + " ".join(DECLARATIONS[name]) + "\n§M{Calculator}\n", False)
-                self.verify(name, source(name, signature=DECLARATIONS[name][0].replace(":pub", ":priv")),
+                self.verify(name, "// " + " ".join(DECLARATIONS[name]) + "\nmodule Calculator\n", False)
+                self.verify(name, source(name, signature=DECLARATIONS[name][0].replace(f"func {name} ", f"func {name} private ")),
                             False, detail="Wrong public signature")
-                self.verify(name, source(name, body="§R false" if name == "IsPositive" else "§R 1"), False)
+                self.verify(name, source(name, body="return false" if name == "IsPositive" else "return 1"), False)
                 self.verify(name, source(name, body=""), False)
 
     def test_wrong_signatures(self):
         for name in TASK_NAMES:
             with self.subTest(name=name):
-                signature = DECLARATIONS[name][0].replace("i32:", "i64:", 1)
+                signature = DECLARATIONS[name][0].replace("int:", "long:", 1)
                 self.verify(name, source(name, signature=signature), False)
-        self.verify("IsPositive", source("IsPositive", signature="§F{IsPositive:pub} (i32:x) -> i32",
-                                        body="§R 1", contracts="§S (>= result 1)"), False)
-        self.verify("Max", source("Max", signature="§F{Max:pub} (i32:b, i32:a) -> i32"), False,
+        self.verify("IsPositive", source("IsPositive", signature="func IsPositive (int:x) → int",
+                                        body="return 1", contracts="=> result >= 1"), False)
+        self.verify("Max", source("Max", signature="func Max (int:b, int:a) → int"), False,
                     detail="Wrong public signature")
 
     def test_missing_each_contract_and_unrelated_contracts(self):
@@ -145,52 +145,52 @@ class LogicVerifierTests(unittest.TestCase):
                 with self.subTest(name=name, index=index):
                     text = source(name, contracts="\n".join(required[:index] + required[index + 1:]))
                     unrelated = (
-                        "  §F{Unrelated:pub} (i32:n, i32:value, i32:min, i32:max, i32:x, i32:a, i32:b) -> "
-                        + ("bool" if name == "IsPositive" else "i32") + "\n"
+                        "  func Unrelated (int:n, int:value, int:min, int:max, int:x, int:a, int:b) → "
+                        + ("bool" if name == "IsPositive" else "int") + "\n"
                         + "".join("    " + line + "\n" for line in required)
-                        + "    §R " + ("(> x 0)" if name == "IsPositive" else "1") + "\n"
+                        + "    return " + ("x > 0" if name == "IsPositive" else "1") + "\n"
                     )
                     self.verify(name, text + unrelated, False)
 
     def test_weakened_and_vacuous_contracts(self):
         weak = {
-            "Factorial": "§Q (>= n 0)\n§Q (<= n 5)\n§S (>= result 0)",
-            "Clamp": "§Q (<= min max)\n§S (|| (>= result min) (<= result max))",
-            "IsPositive": "§S (|| (! result) (> x 0))",
-            "Max": "§S (>= result a)\n§S (>= result b)\n§S (|| (>= result a) (>= result b))",
+            "Factorial": "requires n >= 0\nrequires n <= 5\n=> result >= 0",
+            "Clamp": "requires min <= max\n=> result >= min || result <= max",
+            "IsPositive": "=> !result || x > 0",
+            "Max": "=> result >= a\n=> result >= b\n=> result >= a || result >= b",
         }
         for name, contracts in weak.items():
             with self.subTest(name=name):
                 self.verify(name, source(name, contracts=contracts), False, detail="Missing/weakened postconditions")
-                self.verify(name, source(name, contracts=DECLARATIONS[name][1] + "\n§S false"),
+                self.verify(name, source(name, contracts=DECLARATIONS[name][1] + "\n=> false"),
                             False, detail="Postconditions exclude")
-                self.verify(name, source(name, contracts=DECLARATIONS[name][1] + "\n§Q false"),
+                self.verify(name, source(name, contracts=DECLARATIONS[name][1] + "\nrequires false"),
                             False, detail="Missing/wrong preconditions")
-        self.verify("Factorial", source("Factorial", contracts="§Q (>= n 0)\n§Q (<= n 4)\n§S (>= result 1)"),
+        self.verify("Factorial", source("Factorial", contracts="requires n >= 0\nrequires n <= 4\n=> result >= 1"),
                     False, detail="Missing/wrong preconditions")
 
     def test_wrong_boundary_results(self):
         for n, wrong in ((0, 2), (1, 2), (2, 3), (3, 7), (4, 25), (5, 121)):
             with self.subTest(n=n):
-                self.verify("Factorial", source("Factorial", body=f"§IF (== n {n})\n  §R {wrong}\n"
+                self.verify("Factorial", source("Factorial", body=f"if n == {n}\n  return {wrong}\n"
                                                + DECLARATIONS["Factorial"][2]), False, detail="expected")
-        self.verify("Clamp", source("Clamp", body="§R min"), False, detail="expected")
-        self.verify("Clamp", source("Clamp", body="§R max"), False, detail="expected")
-        self.verify("IsPositive", source("IsPositive", body="§R (>= x 0)"), False)
-        self.verify("IsPositive", source("IsPositive", body="§R (!= x 0)"), False)
-        self.verify("Max", source("Max", body="§R (+ a b)"), False)
-        self.verify("Max", source("Max", body="§IF (== a b)\n  §R 0\n" + DECLARATIONS["Max"][2]), False)
-        self.verify("Max", source("Max", body="§IF (== a INT:2147483647)\n  §R b\n"
+        self.verify("Clamp", source("Clamp", body="return min"), False, detail="expected")
+        self.verify("Clamp", source("Clamp", body="return max"), False, detail="expected")
+        self.verify("IsPositive", source("IsPositive", body="return x >= 0"), False)
+        self.verify("IsPositive", source("IsPositive", body="return x != 0"), False)
+        self.verify("Max", source("Max", body="return a + b"), False)
+        self.verify("Max", source("Max", body="if a == b\n  return 0\n" + DECLARATIONS["Max"][2]), False)
+        self.verify("Max", source("Max", body="if a == 2147483647\n  return b\n"
                                 + DECLARATIONS["Max"][2]), False)
-        self.verify("Clamp", source("Clamp", body="§IF (== min INT:-2147483648)\n  §R max\n"
+        self.verify("Clamp", source("Clamp", body="if min == -2147483648\n  return max\n"
                                   + DECLARATIONS["Clamp"][2]), False)
 
     def test_input_compile_execution_and_timeout_failures(self):
         self.verify("Factorial", None, False, detail="Input missing")
         self.verify("Factorial", "invalid source", False, detail="Calor compilation failed")
-        self.verify("Max", source("Max", body='§E{throw}\n§TH STR:"deliberate runtime failure"'),
+        self.verify("Max", source("Max", body='! throw\nthrow "deliberate runtime failure"'),
                     False, detail="deliberate runtime failure")
-        self.verify("Max", source("Max", body="§WH true\n  §CN\n§R a"),
+        self.verify("Max", source("Max", body="while true\n  continue\nreturn a"),
                     False, env={"CALOR_LOGIC_TIMEOUT_SECONDS": "10"}, detail="timeout")
         self.verify("Max", source("Max"), False,
                     env={"CALOR_LOGIC_TIMEOUT_SECONDS": "0.001"}, detail="timeout")
@@ -202,7 +202,7 @@ class LogicVerifierTests(unittest.TestCase):
             self.verify("Max", source("Max"), False,
                         env={"CALOR_COMPILER_ROOT": str(arm)}, detail="Selected compiler dependency missing")
             shutil.copytree(COMPILER_ROOT / relative, arm / relative)
-            mixed = source("Max", signature="§F{Max:pub} (int:a, i32:b) -> int")
+            mixed = source("Max", signature="func Max (int:a, System.Int32:b) → int")
             self.verify("Max", mixed, env={"CALOR_COMPILER_ROOT": str(arm)},
                         detail=str(arm / relative / "calor.dll"))
             (arm / relative / "calor.dll").write_bytes(b"not a compiler")

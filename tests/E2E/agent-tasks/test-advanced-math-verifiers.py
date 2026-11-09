@@ -72,7 +72,7 @@ EQUIVALENT = {
 }
 
 
-def source(profile, *, body=None, contracts=None, signature=None, mod_body=None, mod_contracts=None):
+def legacy_source(profile, *, body=None, contracts=None, signature=None, mod_body=None, mod_contracts=None):
     _, name, parameters, output, required, original, _ = TASKS[profile]
     name = name.split("+")[0]
     declaration = signature or f"§F{{{name}:pub}} ({parameters}) -> {output}"
@@ -86,7 +86,8 @@ def source(profile, *, body=None, contracts=None, signature=None, mod_body=None,
     return text
 
 
-def matrix():
+def legacy_matrix():
+    source = legacy_source
     controls = []
     def add(category, profile, text, positive=False, detail=None):
         controls.append((category, profile, text, positive, detail))
@@ -154,6 +155,164 @@ def matrix():
     add("division-dead-operation", "advanced004", source("advanced004", body="§B{unused:i32} (/ a b)\n§R §C{Independent} §A a §A b §/C") +
         "  §F{Independent:priv} (i32:a, i32:b) -> i32\n    §R (cast i32 (/ (cast i64 a) (cast i64 b)))\n",
         detail="Math successful supplying-path/output/contract coupling failed")
+    return controls
+
+
+NATIVE_FIXTURE = """module MathUtils
+  func Add (int:a, int:b) → int
+    return a + b
+
+  func Negate (int:x) → int
+    return 0 - x
+
+  func IsEven (int:x) → bool
+    return x % 2 == 0
+
+"""
+NATIVE_TASKS = {
+    "advanced001": ("int:x", "int",
+                    "=> result == -1 || result == 0 || result == 1",
+                    "return x < 0 ? -1 : (x == 0 ? 0 : 1)"),
+    "advanced002": ("int:value, int:min, int:max", "bool",
+                    "requires min <= max\n=> result == (value >= min && value <= max)",
+                    "return value >= min && value <= max"),
+    "advanced003": ("int:a, int:b", "int",
+                    "=> result <= a\n=> result <= b\n=> result == a || result == b",
+                    "return a <= b ? a : b"),
+    "advanced004": ("int:a, int:b", "int",
+                    "requires b != 0\n=> result == a / b",
+                    "return a / b"),
+}
+NATIVE_ALTERNATIVES = {
+    "advanced001": "let int:sign = x > 0 ? 1 : (x < 0 ? -1 : 0)\nreturn sign",
+    "advanced002": "if value < min\n  return false\nreturn !(value > max)",
+    "advanced003": "let int:left = a\nlet int:right = b\nif left <= right\n  return left\nreturn right",
+    "advanced004": "let int:quotient = a / b\nreturn quotient",
+}
+NATIVE_EQUIVALENT = {
+    "advanced001": "=> result >= -1 && result <= 1",
+    "advanced002": "requires !(min > max)\n"
+                   "=> (!result || (value >= min && value <= max)) && (!(value >= min && value <= max) || result)",
+    "advanced003": "=> !(result > a)\n=> !(result > b)\n=> a == result || b == result",
+    "advanced004": "requires 0 != b\n=> a / b == result",
+}
+
+
+def source(profile, *, body=None, contracts=None, signature=None, mod_body=None, mod_contracts=None):
+    parameters, output, required, original = NATIVE_TASKS[profile]
+    name = TASKS[profile][1].split("+")[0]
+    declaration = signature or f"func {name} ({parameters}) → {output}"
+    lines = (required if contracts is None else contracts).splitlines()
+    lines += (original if body is None else body).splitlines()
+    text = NATIVE_FIXTURE + "  " + declaration + "\n" + "".join("    " + line + "\n" for line in lines)
+    if profile == "advanced004":
+        lines = ("requires b != 0\n=> result == a % b" if mod_contracts is None else mod_contracts).splitlines()
+        lines += ("return a % b" if mod_body is None else mod_body).splitlines()
+        text += "  func SafeMod (int:a, int:b) → int\n" + "".join("    " + line + "\n" for line in lines)
+    return text
+
+
+def matrix():
+    controls = []
+    semantic_failures = {
+        "raw-opaque": "Raw interop cannot establish native advanced MathUtils",
+        "foreign-contracts": "Math missing/weakened postconditions",
+        "narrowed-entry": "Math missing/wrong entry",
+        "excluded-required-output": "Math output predicates exclude",
+        "wrong-behavior": "Math baseline native postcondition rejected",
+        "declared-effect": "Unsupported Math executable call surface",
+        "external-state": "Unsupported Math executable property",
+        "non-nested-sign": "Math successful supplying-path/output/contract coupling failed",
+        "dead-nested-helper": "Math successful supplying-path/output/contract coupling failed",
+        "tautological-nested": "Math successful supplying-path/output/contract coupling failed",
+        "sign-missing-negative-bound": "Math missing/weakened postconditions",
+        "sign-missing-positive-bound": "Math missing/weakened postconditions",
+        "range-one-way-iff": "Math missing/weakened postconditions",
+        "range-other-way-iff": "Math missing/weakened postconditions",
+        "range-exclusive-boundary": "Math baseline native postcondition rejected",
+        "min-wrong-tie-supplier": "Math successful supplying-path/output/contract coupling failed",
+        "division-divisibility-narrowing": "Math missing/wrong entry",
+        "division-overflow-guard-narrowing": "Math missing/wrong entry",
+        "mod-missing-precondition": "Math missing/wrong entry",
+        "mod-missing-postcondition": "Math missing/weakened postconditions",
+        "mod-wrong-sign": "Math baseline native postcondition rejected",
+    }
+    def add(category, profile, text, positive=False, detail=None):
+        if category == "foreign-contracts" and profile in ("advanced002", "advanced004"):
+            detail = "Math missing/wrong entry"
+        if category == "wrong-behavior" and profile == "advanced001":
+            detail = "Wrong Math independent"
+        controls.append((category, profile, text, positive,
+                         detail or semantic_failures.get(category)
+                         or ("Math missing/weakened postconditions" if category.startswith("min-missing-symmetric-") else None)))
+    for profile, (parameters, output, required, original) in NATIVE_TASKS.items():
+        name = TASKS[profile][1].split("+")[0]
+        add("native-positive", profile, source(profile), True)
+        add("equivalent-alias-body", profile, source(profile, body=NATIVE_ALTERNATIVES[profile],
+            contracts=NATIVE_EQUIVALENT[profile],
+            signature=f"func {name} ({parameters.replace('int', 'System.Int32')}) → {output}"), True)
+        add("total-extra-contracts", profile, source(profile, contracts=required + "\nrequires true\n=> true",
+            body="! throw\n" + original), True)
+        add("scoped-inline-refinement", profile, source(profile,
+            signature=f"func {name} ({parameters} | true) → {output}"), True)
+        add("missing-file", profile, None, detail="Input missing")
+        add("missing-native-function", profile, NATIVE_FIXTURE, detail="Expected exactly one native Math")
+        add("comment-only", profile, NATIVE_FIXTURE + "// " + source(profile).replace("\n", "\n// "))
+        add("duplicate-native", profile, source(profile) + source(profile)[len(NATIVE_FIXTURE):])
+        add("private-signature", profile, source(profile, signature=f"func {name} private ({parameters}) → {output}"))
+        add("wide-signature", profile, source(profile, signature=f"func {name} ({parameters.replace('int', 'long')}) → {output}"))
+        add("wrong-output", profile, source(profile, signature=f"func {name} ({parameters}) → string"))
+        add("wrong-parameter-order", profile, source(profile).replace(
+            "int:a, int:b", "int:b, int:a") if profile in ("advanced003", "advanced004") else
+            source(profile).replace("int:value, int:min, int:max", "int:min, int:value, int:max")
+            if profile == "advanced002" else source(profile).replace("int:x", "int:y"))
+        add("wrong-owner", profile, source(profile).replace("module MathUtils", "module Other"))
+        add("raw-opaque", profile, source(profile, body="raw statement 13\nreturn 0;"))
+        add("missing-contracts", profile, source(profile, contracts=""))
+        add("vacuous-contracts", profile, source(profile, contracts="requires true\n=> true"))
+        add("foreign-contracts", profile, source(profile, contracts="") +
+            f"  func Foreign ({parameters}) → {output}\n" +
+            "".join("    " + line + "\n" for line in (required + "\nreturn " + ("false" if output == "bool" else "0")).splitlines()))
+        add("narrowed-entry", profile, source(profile, contracts=required + "\nrequires false"))
+        add("excluded-required-output", profile, source(profile, contracts=required + "\n=> false"))
+        add("wrong-behavior", profile, source(profile, body="return false" if output == "bool" else "return 0"))
+        add("declared-effect", profile, source(profile, body='! cw\nSystem.Console.WriteLine("unexpected")\n' + original))
+        add("external-state", profile, source(profile, body="return System.Environment.TickCount"))
+    add("non-nested-sign", "advanced001", source("advanced001",
+        body="if x < 0\n  return -1\nif x == 0\n  return 0\nreturn 1"))
+    add("dead-nested-helper", "advanced001", source("advanced001",
+        body="if x < 0\n  return -1\nif x == 0\n  return 0\nreturn 1") +
+        "  func Unused private (int:x) → int\n    return x < 0 ? -1 : (x == 0 ? 0 : 1)\n")
+    add("tautological-nested", "advanced001", source("advanced001",
+        body="return x == x ? Independent(x) : (true ? Independent(x) : 0)") +
+        "  func Independent private (int:x) → int\n    if x < 0\n      return -1\n    if x == 0\n      return 0\n    return 1\n")
+    add("sign-missing-negative-bound", "advanced001", source("advanced001", contracts="=> result <= 1"))
+    add("sign-missing-positive-bound", "advanced001", source("advanced001", contracts="=> result >= -1"))
+    add("range-one-way-iff", "advanced002", source("advanced002",
+        contracts="requires min <= max\n=> !result || (value >= min && value <= max)"))
+    add("range-other-way-iff", "advanced002", source("advanced002",
+        contracts="requires min <= max\n=> !(value >= min && value <= max) || result"))
+    add("range-exclusive-boundary", "advanced002", source("advanced002", body="return value > min && value < max"))
+    for index in range(3):
+        add("min-missing-symmetric-" + str(index), "advanced003", source("advanced003",
+            contracts="\n".join(line for serial, line in enumerate(NATIVE_TASKS["advanced003"][2].splitlines()) if serial != index)))
+    add("min-wrong-tie-supplier", "advanced003", source("advanced003", body="return a < b ? a : b"))
+    add("min-call-input-is-not-chosen-value", "advanced003", source("advanced003",
+        body="return System.Math.Min(a, b)"), detail="Math successful supplying-path/output/contract coupling failed")
+    add("division-divisibility-narrowing", "advanced004", source("advanced004",
+        contracts=NATIVE_TASKS["advanced004"][2] + "\nrequires a % b == 0"))
+    add("division-overflow-guard-narrowing", "advanced004", source("advanced004",
+        contracts=NATIVE_TASKS["advanced004"][2] + "\nrequires !(a == -2147483648 && b == -1)"))
+    add("mod-missing-function", "advanced004", source("advanced004").split("  func SafeMod ")[0])
+    add("mod-missing-precondition", "advanced004", source("advanced004", mod_contracts="=> result == a % b"))
+    add("mod-missing-postcondition", "advanced004", source("advanced004", mod_contracts="requires b != 0"))
+    add("mod-wrong-sign", "advanced004", source("advanced004", mod_body="return a < 0 ? 0 - a % b : a % b"))
+    add("division-dead-operation", "advanced004", source("advanced004", body="let int:unused = a / b\nreturn Independent(a, b)") +
+        "  func Independent private (int:a, int:b) → int\n    return (int)((long)a / (long)b)\n",
+        detail="Math successful supplying-path/output/contract coupling failed")
+    if [(item[0], item[1], item[3]) for item in controls] != [
+            (item[0], item[1], item[3]) for item in legacy_matrix()]:
+        raise RuntimeError("Canonical Math controls changed the original category/profile/expectation census.")
     return controls
 
 
@@ -249,7 +408,7 @@ class MathTests(unittest.TestCase):
 
     def test_declared_timeout(self):
         before = self.totals.copy()
-        self.verify("advanced001", source("advanced001", body="§WH true\n  §CN\n§R 0"),
+        self.verify("advanced001", source("advanced001", body="while true\n  continue\nreturn 0"),
                     False, detail="timeout", declared_timeout=5)
         self.assertEqual([after - prior for after, prior in zip(self.totals, before)], [0, 0, 0, 0, 1])
 
@@ -311,14 +470,16 @@ def archived():
                 or sum(item[3] for item in strict) != 16):
             raise RuntimeError("Math compatibility lost a distinct positive variant or adversarial category.")
         for arm, root, historical in (("v0.29", old, True), ("current", ROOT, False)):
+            candidates = [item for item in (legacy_matrix() if historical else matrix())
+                          if item[0] not in shared or item[1] == "advanced001"]
             def execute(item):
                 category, profile, text, positive, detail = item
                 adapted = SHARED.historical_syntax(text) if historical and text is not None else text
                 test.verify(profile, adapted, positive, root=root, deadline=deadline, detail=detail)
                 return f"{arm} {profile} {category}: {'passed' if positive else 'finite rejected'}"
             with ThreadPoolExecutor(max_workers=2) as workers:
-                for offset in range(0, len(strict), 2):
-                    for verdict in workers.map(execute, strict[offset:offset + 2]):
+                for offset in range(0, len(candidates), 2):
+                    for verdict in workers.map(execute, candidates[offset:offset + 2]):
                         print(verdict, flush=True)
         wanted = [126, 32, 94, 0, 0]
         actual = [after - prior for after, prior in zip(test.totals, before)]
