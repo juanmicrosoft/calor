@@ -1613,6 +1613,33 @@ public class AsyncAwaitTests
     [Theory]
     [InlineData("Task")]
     [InlineData("ValueTask")]
+    public async Task Convert_LocalAsyncFunction_PreservesClassCarrierTypeParameter(string parameter)
+    {
+        var conversion = new CSharpToCalorConverter().Convert($$"""
+            public class Box<{{parameter}}>
+            {
+                public System.Threading.Tasks.Task<{{parameter}}> Produce({{parameter}} value)
+                {
+                    async System.Threading.Tasks.Task<{{parameter}}> Local({{parameter}} item)
+                    {
+                        await System.Threading.Tasks.Task.Yield();
+                        return item;
+                    }
+                    return Local(value);
+                }
+            }
+            """);
+        Assert.True(conversion.Success, GetErrorMessage(conversion));
+        var assembly = CompileAndLoad(conversion.CalorSource!);
+        var type = Assert.Single(assembly.GetTypes(), candidate => candidate.Name == "Box`1").MakeGenericType(typeof(int));
+        var method = type.GetMethod("Produce")!;
+        Assert.Equal(typeof(Task<int>), method.ReturnType);
+        Assert.Equal(42, await (Task<int>)method.Invoke(Activator.CreateInstance(type), [42])!);
+    }
+
+    [Theory]
+    [InlineData("Task")]
+    [InlineData("ValueTask")]
     public void Compile_ContractAdapter_PreservesAsyncAndEnclosingClassParameters(string parameter)
     {
         var compilation = Program.Compile($$"""
