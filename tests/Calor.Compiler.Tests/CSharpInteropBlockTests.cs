@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
@@ -11,6 +12,179 @@ namespace Calor.Compiler.Tests;
 
 public class CSharpInteropBlockTests
 {
+    [Theory]
+    [InlineData("checked { int n = 1; }", "checked-block")]
+    [InlineData("for (int i = 0; i < 1; (i, i) = (1, 2)) { }", "tuple-deconstruction")]
+    [InlineData("for (byte i = 0; i < 1; i++) { }", "for")]
+    [InlineData("foreach (var (a, b, c) in values) { }", "tuple-deconstruction")]
+    [InlineData("(values[0], values[1]) = (1, 2);", "tuple-deconstruction")]
+    public void ConverterMarkers_StatementFallbacksCarryTheirRecordedReason(string body, string feature)
+    {
+        var source = "public class MarkerCases { int value; int[] values = new int[2]; "
+            + "public void Run() { " + body + " } }";
+        var result = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossless,
+            ValidateRoundTripCSharp = false
+        }).Convert(source);
+        Assert.True(result.Success, string.Join("\n", result.Issues.Select(issue => issue.Message)));
+        var statements = MarkerNodes(Assert.IsType<ModuleNode>(result.Ast)).OfType<RawCSharpNode>().ToArray();
+        Assert.NotEmpty(statements);
+        Assert.Contains(statements, statement =>
+            RawCSharpFrame.TryParseReason(statement.FramingReason!, out var frame)
+            && frame.FeatureName == feature);
+        foreach (var statement in statements)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(statement.FramingReason));
+            Assert.True(RawCSharpFrame.TryParseReason(statement.FramingReason!, out var frame));
+            Assert.False(string.IsNullOrWhiteSpace(frame.FeatureName));
+            Assert.False(string.IsNullOrWhiteSpace(frame.Reason));
+            Assert.Contains(result.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved
+                && loss.Feature == frame.FeatureName && loss.Description == frame.Reason);
+        }
+        AssertMarkerPayloadsRoundTrip(result);
+    }
+
+    [Theory]
+    [InlineData("ConvertBlockAsStatement", "{ int n = 1; }", "standalone-block")]
+    [InlineData("ConvertForStatements", "for (ref int i = ref value; i < 1; i++) { }", "for")]
+    [InlineData("HandleUnsupportedStatement", "goto End;", "goto")]
+    [InlineData("CreateFallbackStatement", "goto End;", "goto")]
+    public void ConverterMarkers_StatementProducerEntriesKeepTheirExactRecordedLoss(
+        string producer, string code, string feature)
+    {
+        var context = new ConversionContext { PassthroughOnError = true };
+        var visitor = new RoslynSyntaxVisitor(context);
+        var syntax = Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseStatement(code);
+        var arguments = producer is "HandleUnsupportedStatement" or "CreateFallbackStatement"
+            ? new object[] { syntax, feature } : [syntax];
+        var method = Assert.Single(typeof(RoslynSyntaxVisitor)
+            .GetMethods(BindingFlags.Instance | BindingFlags.NonPublic)
+            .Where(method => method.Name == producer && method.GetParameters().Length == arguments.Length));
+        var produced = method.Invoke(visitor, arguments);
+        var statement = produced is IEnumerable<StatementNode> statements
+            ? Assert.Single(statements) : Assert.IsAssignableFrom<StatementNode>(produced);
+        var raw = Assert.IsType<RawCSharpNode>(statement);
+        Assert.Equal(code, raw.CSharpCode);
+        var loss = Assert.Single(context.Losses);
+        Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+        Assert.Equal(feature, loss.Feature);
+        Assert.True(RawCSharpFrame.TryParseReason(raw.FramingReason!, out var frame));
+        Assert.Equal(loss.Feature, frame.FeatureName);
+        Assert.Equal(loss.Description, frame.Reason);
+        var module = new ModuleNode(TextSpan.Empty, "m1", "Producer", [],
+            [new FunctionNode(TextSpan.Empty, "f1", "Run", Visibility.Public, [], null, null,
+                [raw], new AttributeCollection())], new AttributeCollection());
+        var emitted = new CalorEmitter().Emit(module);
+        Assert.Contains($"raw {raw.FramingReason} {System.Text.Encoding.UTF8.GetByteCount(code)}", emitted);
+        Assert.Equal(code, Assert.IsType<RawCSharpFrame>(
+            Assert.Single(RawFrameAssertions.GetFrames(emitted)).Value).Code);
+    }
+
+    [Theory]
+    [InlineData("// \u03c0\U0001F600 }§/CSHARP\r\nbroken \" {\r\n")]
+    [InlineData("    arbitrary < malformed > text\r\n")]
+    public void ConverterMarkers_InactiveMalformedStatementsKeepTheirExactPayload(string payload)
+    {
+        var source = "public class C {\r\npublic void Run() {\r\n#if NEVER\r\n"
+            + payload + "#endif\r\n}\r\n}\r\n";
+        var result = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossless,
+            ValidateRoundTripCSharp = false
+        }).Convert(source);
+        Assert.True(result.Success, string.Join("\n", result.Issues.Select(issue => issue.Message)));
+        var raw = Assert.Single(MarkerNodes(Assert.IsType<ModuleNode>(result.Ast)).OfType<RawCSharpNode>());
+        Assert.Equal(payload, raw.CSharpCode);
+        Assert.True(RawCSharpFrame.TryParseReason(raw.FramingReason!, out var frame));
+        Assert.Equal("preprocessor-disabled", frame.FeatureName);
+        Assert.Equal(Assert.Single(result.Losses, loss => loss.Feature == "preprocessor-disabled").Description,
+            frame.Reason);
+        AssertMarkerPayloadsRoundTrip(result);
+    }
+
+    [Theory]
+    [InlineData("public class C { ~C() { } }", false)]
+    [InlineData("public record struct C(int Value);", false)]
+    [InlineData("#if NEVER\r\nmalformed \" \u03c0\r\n#endif\r\npublic class C { }", false)]
+    [InlineData("using System.Reflection;\r\n[assembly: AssemblyTitle(\"\u03c0\")]", true)]
+    [InlineData("namespace A { class C { } }\r\nnamespace B { class D { } }", true)]
+    public void ConverterMarkers_MemberAndUnitFallbacksKeepNonemptyMetadata(string source, bool wholeUnit)
+    {
+        var result = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossless,
+            ValidateRoundTripCSharp = false
+        }).Convert(source);
+        Assert.True(result.Success, string.Join("\n", result.Issues.Select(issue => issue.Message)));
+        var blocks = MarkerNodes(Assert.IsType<ModuleNode>(result.Ast)).OfType<CSharpInteropBlockNode>().ToArray();
+        Assert.NotEmpty(blocks);
+        Assert.All(blocks, block => Assert.Equal(wholeUnit, block.IsCompilationUnitPassthrough));
+        if (wholeUnit)
+            Assert.Equal(source, Assert.Single(blocks).CSharpCode);
+        Assert.All(blocks, block =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(block.FeatureName));
+            Assert.False(string.IsNullOrWhiteSpace(block.Reason));
+        });
+        AssertMarkerPayloadsRoundTrip(result);
+    }
+
+    private static void AssertMarkerPayloadsRoundTrip(ConversionResult result)
+    {
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(result.CalorSource!, diagnostics).TokenizeAllForParser();
+        var parsed = new Parser(tokens, diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var before = MarkerNodes(result.Ast!).Where(node => node is RawCSharpNode or CSharpInteropBlockNode).ToArray();
+        var after = MarkerNodes(parsed).Where(node => node is RawCSharpNode or CSharpInteropBlockNode).ToArray();
+        Assert.Equal(before.Length, after.Length);
+        for (var index = 0; index < before.Length; index++)
+        {
+            if (before[index] is RawCSharpNode statement)
+            {
+                var again = Assert.IsType<RawCSharpNode>(after[index]);
+                Assert.Equal(statement.CSharpCode, again.CSharpCode);
+                Assert.Equal(statement.FramingReason, again.FramingReason);
+            }
+            else
+            {
+                var block = Assert.IsType<CSharpInteropBlockNode>(before[index]);
+                var again = Assert.IsType<CSharpInteropBlockNode>(after[index]);
+                Assert.Equal(block.CSharpCode, again.CSharpCode);
+                Assert.Equal(block.FeatureName, again.FeatureName);
+                Assert.Equal(block.Reason, again.Reason);
+                Assert.Equal(block.MemberKind, again.MemberKind);
+                Assert.Equal(block.IsCompilationUnitPassthrough, again.IsCompilationUnitPassthrough);
+            }
+        }
+        var frames = tokens.Select(token => token.Value).OfType<RawCSharpFrame>()
+            .Where(frame => !frame.IsCompilerDirective).ToArray();
+        Assert.Equal(before.Length, frames.Length);
+        Assert.All(frames, frame =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(frame.FeatureName));
+            Assert.False(string.IsNullOrWhiteSpace(frame.Reason));
+            Assert.Contains($"raw {frame.ReasonMarker} {System.Text.Encoding.UTF8.GetByteCount(frame.Code)}\n{frame.Code}",
+                result.CalorSource);
+        });
+    }
+
+    private static IEnumerable<AstNode> MarkerNodes(AstNode root)
+    {
+        var seen = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+        var pending = new Stack<AstNode>();
+        pending.Push(root);
+        while (pending.TryPop(out var node))
+        {
+            if (!seen.Add(node))
+                continue;
+            yield return node;
+            foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node).Reverse())
+                pending.Push(child);
+        }
+    }
+
     [Theory]
     [InlineData("// \u03c0\U0001f600\r\n  // }§/CSHARP\r\n")]
     [InlineData("#if NEVER\r\n\"\"\" unmatched { }\r\n#endif\r\n// no final newline")]

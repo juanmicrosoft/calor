@@ -130,7 +130,7 @@
       "description": "Generic type arguments like <T> in call expressions are not yet fully supported in expression contexts.",
       "wrongExample": "§C{EnumCache<T>.GetInfo} §/C   // Parser rejects <T> in expressions",
       "correctExample": "§B{~info} §C{EnumCache.GetInfo} §/C   // Use without type param, let C# infer",
-      "explanation": "When converting generic method calls, remove the type arguments from the call expression if C# type inference can resolve them. For explicit type args, use a §CSHARP interop block."
+      "explanation": "When converting generic method calls, remove the type arguments from the call expression if C# type inference can resolve them. For explicit type arguments that cannot be converted natively, use calor convert and retain its converter-owned fallback; do not handwrite passthrough."
     },
     {
       "id": "if-id-mismatch",

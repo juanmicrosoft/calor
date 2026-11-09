@@ -58,6 +58,20 @@ public class AgentDocsSyntaxGuardTests
     }
 
     [Fact]
+    public void ErrorSuggestions_DoNotRecommendHandwrittenInterop()
+    {
+        var root = FindRepoRoot() ?? throw new InvalidOperationException("Repository root not found.");
+        using var suggestions = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "src",
+            "Calor.Compiler", "Resources", "error-suggestions.json")));
+        var pattern = Assert.Single(suggestions.RootElement.GetProperty("patterns").EnumerateArray()
+            .Where(item => item.GetProperty("id").GetString() == "generic-type-in-expr"));
+        var explanation = pattern.GetProperty("explanation").GetString()!;
+        Assert.DoesNotContain("§CSHARP", explanation);
+        Assert.Contains("calor convert", explanation);
+        Assert.Contains("do not handwrite passthrough", explanation);
+    }
+
+    [Fact]
     public void ErrorSuggestions_ArrayTypeExamples_CompileAndRun()
     {
         var root = FindRepoRoot() ?? throw new InvalidOperationException("Repository root not found.");

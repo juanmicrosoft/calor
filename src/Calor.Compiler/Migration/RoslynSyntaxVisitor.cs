@@ -1988,10 +1988,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // the statement itself is the complete boundary. Preserve it
             // verbatim and count the loss (#770).
             _pendingStatements.Clear();
-            _context.RecordLoss(ConversionLossKind.InteropPreserved, esc.FeatureName,
+            _topLevelStatements.Add(PreserveRawStatement(
+                GetTextSpan(node), node.Statement.ToFullString(), esc.FeatureName,
                 $"Top-level statement preserved as raw C#: {TruncateForMessage(node.Statement.ToString())}",
-                node.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-            _topLevelStatements.Add(new RawCSharpNode(GetTextSpan(node), node.Statement.ToFullString()));
+                node.GetLocation().GetLineSpan().StartLinePosition.Line + 1));
         }
     }
 
@@ -5495,13 +5495,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         if (string.IsNullOrEmpty(disabledText))
             return [];
-        _context.RecordLoss(
-            ConversionLossKind.InteropPreserved,
+        return [PreserveRawStatement(
+            TextSpan.Empty, disabledText,
             "preprocessor-disabled",
-            $"Inactive statement branch preserved verbatim: {TruncateForMessage(disabledText.Trim())}");
-        return [new RawCSharpNode(
-            TextSpan.Empty,
-            disabledText)];
+            $"Inactive statement branch preserved verbatim: {TruncateForMessage(disabledText.Trim())}")];
     }
 
     /// <summary>
@@ -7250,8 +7247,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 statement.SpanStart);
         if (conditionalFragment || compilerDirectivePlacement)
         {
-            _context.RecordLoss(
-                ConversionLossKind.InteropPreserved,
+            return PreserveRawStatement(
+                GetTextSpan(statement), statement.ToFullString(),
                 conditionalFragment
                     ? "conditional-expression-fragment"
                     : "compiler-directive-placement",
@@ -7259,9 +7256,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     ? $"Statement preserved verbatim because conditional directives occur inside its expression: {TruncateForMessage(statement.ToFullString().Trim())}"
                     : $"Statement preserved verbatim because a compiler directive occurs in an unmodeled nested statement scope: {TruncateForMessage(statement.ToFullString().Trim())}",
                 statement.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-            return new RawCSharpNode(
-                GetTextSpan(statement),
-                statement.ToFullString());
         }
         _context.Stats.StatementsConverted++;
 
@@ -7312,11 +7306,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // to the verbatim preservation (#836 C1).
             _pendingStatements.Clear();
             _context.IncrementSkipped();
-            _context.RecordLoss(ConversionLossKind.InteropPreserved,
+            return PreserveRawStatement(
+                GetTextSpan(statement), statement.ToFullString(),
                 ex is MemberInteropEscalationException esc ? esc.FeatureName : "conversion-error",
                 $"Statement preserved as raw C#: {TruncateForMessage(statement.ToString())}",
                 statement.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-            return new RawCSharpNode(GetTextSpan(statement), statement.ToFullString());
         }
     }
 
@@ -7339,10 +7333,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // In Interop mode, preserve unsupported statements as raw C# passthrough
         if (_context.ShouldPreserveCSharp)
         {
-            _context.RecordLoss(ConversionLossKind.InteropPreserved, featureName,
+            return PreserveRawStatement(
+                GetTextSpan(statement), statement.ToFullString(), featureName,
                 $"Statement preserved as raw C#: {TruncateForMessage(statement.ToString())}",
                 lineSpan.StartLinePosition.Line + 1);
-            return new RawCSharpNode(GetTextSpan(statement), statement.ToFullString());
         }
 
         // Return a fallback comment node instead of null
@@ -7457,10 +7451,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var keyword = node.IsKind(SyntaxKind.CheckedStatement) ? "checked" : "unchecked";
         if (_context.ShouldPreserveCSharp)
         {
-            _context.RecordLoss(ConversionLossKind.InteropPreserved, "checked-block",
+            result.Add(PreserveRawStatement(
+                GetTextSpan(node), node.ToFullString(), "checked-block",
                 $"{keyword} overflow block preserved verbatim",
-                node.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-            result.Add(new RawCSharpNode(GetTextSpan(node), node.ToFullString()));
+                node.GetLocation().GetLineSpan().StartLinePosition.Line + 1));
             return result;
         }
         _context.RecordLoss(
@@ -9967,10 +9961,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 .OfType<AssignmentExpressionSyntax>().Any(IsTupleAssignment) == true)
         {
             _context.RecordFeatureUsage("tuple-deconstruction");
-            _context.RecordLoss(ConversionLossKind.InteropPreserved, "tuple-deconstruction",
+            return [PreserveRawStatement(
+                GetTextSpan(node), node.ToString(), "tuple-deconstruction",
                 "For loop preserved to retain atomic tuple assignment and continue semantics.",
-                node.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-            return [new RawCSharpNode(GetTextSpan(node), node.ToString())];
+                node.GetLocation().GetLineSpan().StartLinePosition.Line + 1)];
         }
 
         if (node.Declaration?.Type is RefTypeSyntax
@@ -9978,10 +9972,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 .SelectMany(part => part.DescendantNodesAndSelf())
                 .Any(part => part is DeclarationExpressionSyntax or SingleVariableDesignationSyntax))
         {
-            _context.RecordLoss(ConversionLossKind.InteropPreserved, "for",
+            return [PreserveRawStatement(
+                GetTextSpan(node), node.ToFullString(), "for",
                 "For-loop header variable storage preserved verbatim",
-                node.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-            return [new RawCSharpNode(GetTextSpan(node), node.ToFullString())];
+                node.GetLocation().GetLineSpan().StartLinePosition.Line + 1)];
         }
 
         if (TryConvertCountedFor(node) is { } counted)
@@ -10231,10 +10225,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 or SpecialType.System_UInt64 or SpecialType.System_Single or SpecialType.System_Double
                 or SpecialType.System_Decimal)))
         {
-            _context.RecordLoss(ConversionLossKind.InteropPreserved, "for",
+            return PreserveRawStatement(
+                GetTextSpan(expression), expression + ";", "for",
                 "For-header operation preserved verbatim to retain overloads, narrowing and evaluation order",
                 expression.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-            return new RawCSharpNode(GetTextSpan(expression), expression + ";");
         }
         return ConvertExpressionToStatement(expression, GetTextSpan(expression));
     }
@@ -10288,10 +10282,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             || names.Variables[0] is not SingleVariableDesignationSyntax key
             || names.Variables[1] is not SingleVariableDesignationSyntax value)
         {
-            _context.RecordLoss(ConversionLossKind.InteropPreserved, "tuple-deconstruction",
+            return PreserveRawStatement(
+                GetTextSpan(node), node.ToFullString(), "tuple-deconstruction",
                 "Only synchronous two-name var foreach deconstruction has a native each header.",
                 node.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-            return new RawCSharpNode(GetTextSpan(node), node.ToFullString());
         }
         _context.RecordFeatureUsage("foreach");
         _context.RecordFeatureUsage("tuple-deconstruction");
@@ -10512,14 +10506,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private StatementNode ConvertBlockAsStatement(BlockSyntax block)
     {
-        _context.RecordLoss(
-            ConversionLossKind.InteropPreserved,
+        return PreserveRawStatement(
+            GetTextSpan(block), block.ToFullString(),
             "standalone-block",
             $"Standalone block preserved as raw C#: {TruncateForMessage(block.ToString())}",
             block.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-        return new RawCSharpNode(
-            GetTextSpan(block),
-            block.ToFullString());
     }
 
     private MatchStatementNode ConvertSwitchStatement(SwitchStatementSyntax node)
@@ -12612,10 +12603,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 ConvertExpression(assignment.Left), ConvertExpression(assignment.Right));
         }
 
-        _context.RecordLoss(ConversionLossKind.InteropPreserved, "tuple-deconstruction",
+        return PreserveRawStatement(
+            span, assignment.ToString() + ";", "tuple-deconstruction",
             "Tuple assignment preserved atomically to retain target evaluation, conversions and writes.",
             assignment.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-        return new RawCSharpNode(span, assignment.ToString() + ";");
     }
 
     private List<StatementNode>? TryConvertTupleDeclaration(
@@ -17125,6 +17116,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private ExpressionNode CreateFallbackExpression(SyntaxNode node, string featureName)
         => throw EscalateExpression(node, featureName);
 
+    private RawCSharpNode PreserveRawStatement(
+        TextSpan span, string code, string featureName, string reason, int? line = null)
+    {
+        _context.RecordLoss(ConversionLossKind.InteropPreserved, featureName, reason, line);
+        var loss = _context.Losses[^1];
+        return new RawCSharpNode(span, code,
+            new RawCSharpFrame(code, loss.Feature, loss.Description).ReasonMarker);
+    }
+
     /// <summary>
     /// Creates a fallback comment node for unsupported statements.
     /// Records the unsupported feature for explanation output.
@@ -17145,12 +17145,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 feature: featureName, line: line, suggestion: suggestion);
         }
 
-        // When PassthroughOnError is enabled, wrap in §CSHARP block instead of TODO comment
+        // When PassthroughOnError is enabled, preserve raw C# instead of a TODO comment.
         if (_context.PassthroughOnError)
         {
-            _context.RecordLoss(ConversionLossKind.InteropPreserved, featureName,
+            return PreserveRawStatement(GetTextSpan(node), node.ToFullString(), featureName,
                 $"Statement preserved as raw C#: {TruncateForMessage(node.ToString())}", line);
-            return new RawCSharpNode(GetTextSpan(node), node.ToFullString());
         }
 
         _context.RecordLoss(ConversionLossKind.FallbackTodo, featureName,
