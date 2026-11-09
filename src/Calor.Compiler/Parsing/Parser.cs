@@ -3762,7 +3762,10 @@ public sealed class Parser
         var typeText = string.Concat(_tokens.Skip(_position + 1).Take(close - _position - 1)
             .Select(token => token.Text));
         var type = SyntaxFactory.ParseTypeName(typeText);
-        if (type.ContainsDiagnostics)
+        if (type.ContainsDiagnostics
+            || type.DescendantNodesAndSelf().OfType<ArrayTypeSyntax>()
+                .Any(array => array.RankSpecifiers.Any(rank =>
+                    rank.Sizes.Any(size => size is not OmittedArraySizeExpressionSyntax))))
             return false;
         var unambiguousType = type is PredefinedTypeSyntax or NullableTypeSyntax or ArrayTypeSyntax
             or PointerTypeSyntax or TupleTypeSyntax;

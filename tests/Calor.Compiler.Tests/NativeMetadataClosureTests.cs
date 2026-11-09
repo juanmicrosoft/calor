@@ -14,6 +14,54 @@ namespace Calor.Compiler.Tests;
 
 public sealed class NativeMetadataClosureTests
 {
+    [Fact]
+    public void IndexedSubtraction_RetainsCastAndUtf16ScalarArithmetic()
+    {
+        const string authored = """
+            module CodecArithmetic
+              func Scalar (string:text, int:i, int:scalar) → int
+                return ((65536 + ((scalar - 55296) * 1024)) + ((int)(text[i]) - 56320))
+              func Previous (byte[]:values, int:i) → int
+                return (values[i]) - 1
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var result = Compile(source);
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+            var methods = CompileAssembly(result.GeneratedCode).GetTypes()
+                .SelectMany(type => type.GetMethods()).ToArray();
+            Assert.Equal(0x1F600, methods.Single(method => method.Name == "Scalar")
+                .Invoke(null, ["\uD83D\uDE00", 1, 0xD83D]));
+            Assert.Equal(254, methods.Single(method => method.Name == "Previous")
+                .Invoke(null, [new byte[] { 255 }, 0]));
+        }
+    }
+
+    [Theory]
+    [InlineData("int[]")]
+    [InlineData("int[,]")]
+    [InlineData("int[][]")]
+    public void ArrayCasts_RetainActualClrArrayIdentity(string type)
+    {
+        var authored = $"module ArrayCasts\n  func Preserve (object:value) → {type}\n    return ({type})value\n";
+        object input = type switch
+        {
+            "int[]" => new[] { 42 },
+            "int[,]" => new int[,] { { 42 } },
+            "int[][]" => new[] { new[] { 42 } },
+            _ => throw new ArgumentOutOfRangeException(nameof(type))
+        };
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var result = Compile(source);
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+            var method = CompileAssembly(result.GeneratedCode).GetTypes().SelectMany(owner => owner.GetMethods())
+                .Single(method => method.Name == "Preserve");
+            Assert.Equal(input.GetType(), method.ReturnType);
+            Assert.Same(input, method.Invoke(null, [input]));
+        }
+    }
+
     [Theory]
     [InlineData("System.SByte", "int")]
     [InlineData("System.Byte", "int")]

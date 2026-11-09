@@ -13,6 +13,39 @@ namespace Calor.Compiler.Tests;
 public sealed class FinalExpressionGrammarTests
 {
     [Theory]
+    [InlineData("(values[i]) - 1")]
+    [InlineData("(values[i, j]) - 1")]
+    [InlineData("(values[i][j]) - 1")]
+    [InlineData("(int)(text[i]) - 56320")]
+    [InlineData("((int)(text[i]) - 56320)")]
+    public void IndexedOperandsBeforeSubtraction_AreNotSizedArrayCasts(string source)
+    {
+        var binary = Assert.IsType<BinaryOperationNode>(Parse(source));
+        Assert.Equal(BinaryOperator.Subtract, binary.Operator);
+        var reparsed = Assert.IsType<BinaryOperationNode>(Parse(binary.Accept(new CalorEmitter())));
+        Assert.Equal(BinaryOperator.Subtract, reparsed.Operator);
+    }
+
+    [Theory]
+    [InlineData("(int[])value")]
+    [InlineData("(int[,])value")]
+    [InlineData("(int[][])value")]
+    [InlineData("(List<int[]>)value")]
+    public void ArrayCasts_RetainOmittedRankSizes(string source)
+        => Assert.IsType<TypeOperationNode>(Parse(source));
+
+    [Theory]
+    [InlineData("(int[3])value")]
+    [InlineData("(int[i])value")]
+    [InlineData("(List<int[3]>)value")]
+    public void SizedArrayTypes_AreNotAcceptedAsCasts(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        Parse(source, diagnostics);
+        Assert.True(diagnostics.HasErrors);
+    }
+
+    [Theory]
     [InlineData("Call(ref first, out second, in third)")]
     [InlineData("Call(a: ref first, b: out second, c: in third)")]
     public void NativeCallModifiers_RetainKeywordTokensAndOrderedChannels(string source)
