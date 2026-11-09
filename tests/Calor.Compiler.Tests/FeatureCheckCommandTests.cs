@@ -300,7 +300,6 @@ public class FeatureCheckCommandTests
     [InlineData("public interface I { int P { get => 1; } }", "interface-property-semantics")]
     [InlineData("public interface I { int this[int i] { get => i; } }", "interface-indexer-semantics")]
     [InlineData("public interface I { event System.Action Changed; }", "interface-member")]
-    [InlineData("internal interface I { void M(); }", "interface-semantics")]
     [InlineData("public void M() { { int x = 1; } }", "standalone-block")]
     [InlineData("public delegate T Factory<T>(T value);", "delegate-semantics")]
     [InlineData("[System.Obsolete] public delegate void Legacy();", "delegate-semantics")]
@@ -321,6 +320,28 @@ public class FeatureCheckCommandTests
         Assert.True(detection.Column > 0);
         Assert.True(detection.SpanLength > 0);
         Assert.Contains(expectedFeature, SyntaxCapabilityClassifier.RequiredUnsupportedFeatures);
+    }
+
+    [Fact]
+    public void SyntaxCapabilityClassifier_InternalInterfaceConvertsNativelyWithItsVisibility()
+    {
+        const string source = "internal interface I { void M(); }";
+        var root = CSharpSyntaxTree.ParseText(source).GetRoot();
+        Assert.Empty(SyntaxCapabilityClassifier.Detect(root));
+
+        var converted = new CSharpToCalorConverter(new ConversionOptions
+        {
+            ValidateRoundTripCSharp = false
+        }).Convert(source);
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        var definition = Assert.Single(converted.Ast!.Interfaces);
+        Assert.Equal(Calor.Compiler.Ast.Visibility.Internal, definition.Visibility);
+        Assert.Empty(converted.Ast.InteropBlocks);
+        Assert.Empty(converted.Losses);
+
+        var compiled = Program.Compile(converted.CalorSource!);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Contains("internal interface I", compiled.GeneratedCode);
     }
 
     #endregion
