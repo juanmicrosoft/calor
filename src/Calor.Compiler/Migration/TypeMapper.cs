@@ -6,9 +6,7 @@ namespace Calor.Compiler.Migration;
 public static class TypeMapper
 {
     /// <summary>Renders parser and converter types using the measured C# surface spellings.</summary>
-    public static string ToSurfaceType(string type) =>
-        Parsing.AttributeHelper.ToSurfaceSpelling(
-            CSharpToCalor(Parsing.AttributeHelper.ToSurfaceSpelling(type)));
+    public static string ToSurfaceType(string type) => CalorToCSharp(type);
 
     /// <summary>
     /// Maps C# type names to Calor type names.

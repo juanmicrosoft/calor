@@ -335,8 +335,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Context != null) Visit(node.Context);
         // Module header — sanitize backtick (C# generic arity) and @ from name
         var moduleName = node.Name.Replace("`", "").Replace("@", "");
-        var overflow = node.Attributes["overflow"] is { } mode ? $":overflow={mode}" : "";
-        AppendLine($"§M{{{moduleName}{overflow}}}");
+        var overflow = node.Attributes["overflow"] is { } mode ? $" overflow={mode}" : "";
+        AppendLine($"module {EscapeCalorIdentifier(moduleName)}{overflow}");
         Indent();
 
         if (node.DeclaredSemanticsVersion != null)
@@ -865,7 +865,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     /// </summary>
     private string? TryFormatInlineParams(IReadOnlyList<ParameterNode> parameters)
     {
-        if (parameters.Any(p => p.CSharpAttributes.Count > 0 || p.DefaultValue != null))
+        if (parameters.Any(p => p.CSharpAttributes.Count > 0))
             return null;
 
         return string.Join(", ", parameters.Select(p =>
@@ -877,9 +877,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
             if (p.Modifier.HasFlag(ParameterModifier.Out)) modifiers.Add("out");
             if (p.Modifier.HasFlag(ParameterModifier.In)) modifiers.Add("in");
             if (p.Modifier.HasFlag(ParameterModifier.Params)) modifiers.Add("params");
-            var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
+            var modStr = modifiers.Count > 0 ? $"{string.Join(" ", modifiers)} " : "";
             var refinement = p.InlineRefinement == null ? "" : $" | {p.InlineRefinement.Predicate.Accept(this)}";
-            return $"{typeName}:{EscapeCalorIdentifier(p.Name)}{modStr}{FormatEffectRow(p.Row)}{refinement}";
+            var defaultValue = p.DefaultValue == null ? "" : $" = {p.DefaultValue.Accept(this)}";
+            return $"{modStr}{typeName}:{EscapeCalorIdentifier(p.Name)}{FormatEffectRow(p.Row)}{refinement}{defaultValue}";
         }));
     }
 
@@ -965,15 +966,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         EmitDocComment(node);
         var modifiers = new List<string>();
-        if (node.IsAbstract) modifiers.Add("abs");
-        if (node.IsSealed) modifiers.Add("seal");
+        if (node.IsAbstract) modifiers.Add("abstract");
+        if (node.IsSealed) modifiers.Add("sealed");
         if (node.IsPartial) modifiers.Add("partial");
-        if (node.IsStatic && !node.IsModule) modifiers.Add("stat");
+        if (node.IsStatic && !node.IsModule) modifiers.Add("static");
         if (node.IsStruct) modifiers.Add("struct");
         if (node.IsReadOnly) modifiers.Add("readonly");
 
-        var vis = GetVisibilityShorthand(node.Visibility);
-        var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
+        var vis = node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
+        var modStr = modifiers.Count > 0 ? $" {string.Join(" ", modifiers)}" : "";
 
         var typeParams = node.TypeParameters.Count > 0
             ? $"<{string.Join(",", node.TypeParameters.Select(tp => Visit(tp)))}>"
@@ -989,10 +990,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
                     + (parameter.DefaultValue == null ? "" : $" = {parameter.DefaultValue.Accept(this)}"))) + ")";
             var baseCall = node.RecordBaseArguments == null ? "" :
                 $" : {TypeMapper.ToSurfaceType(node.BaseClass!)}({string.Join(", ", node.RecordBaseArguments.Select(argument => argument.Accept(this)))})";
-            AppendLine($"record {node.Name}{typeParams}:{vis}{modStr}{attrs}{positional}{baseCall}");
+            AppendLine($"record {EscapeCalorIdentifier(node.Name)}{typeParams}{vis}{modStr}{attrs}{positional}{baseCall}");
         }
         else
-            AppendLine($"§{declarationTag}{{{node.Name}{typeParams}:{vis}{modStr}}}{attrs}");
+            AppendLine($"{(node.IsModule ? "module" : "class")} {EscapeCalorIdentifier(node.Name)}{typeParams}{vis}{modStr}{attrs}");
         Indent();
 
         // Emit type parameter constraints
@@ -1001,13 +1002,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Emit base class as §EXT tag (not positional)
         if (node.BaseClass != null && node.RecordBaseArguments == null)
         {
-            AppendLine($"§EXT{{{TypeMapper.ToSurfaceType(node.BaseClass)}}}");
+            AppendLine($"extends {TypeMapper.ToSurfaceType(node.BaseClass)}");
         }
 
         // Emit implemented interfaces
         foreach (var iface in node.ImplementedInterfaces)
         {
-            AppendLine($"§IMPL{{{TypeMapper.ToSurfaceType(iface)}}}");
+            AppendLine($"implements {TypeMapper.ToSurfaceType(iface)}");
         }
         if (node.BaseClass != null || node.ImplementedInterfaces.Count > 0 || node.TypeParameters.Any(tp => tp.Constraints.Count > 0))
             AppendLine();
@@ -1547,19 +1548,20 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(MethodNode node)
     {
         EmitDocComment(node);
-        var visibility = GetVisibilityShorthand(node.Visibility);
+        var visibility = node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
         var modifiers = new List<string>();
 
-        if (node.IsPartial) modifiers.Add("part");
-        if (node.IsVirtual) modifiers.Add("virt");
-        if (node.IsOverride) modifiers.Add("over");
-        if (node.IsAbstract) modifiers.Add("abs");
-        if (node.IsSealed) modifiers.Add("seal");
-        if (node.IsStatic && !_emittingModuleMembers) modifiers.Add("stat");
+        if (node.IsPartial) modifiers.Add("partial");
+        if (node.IsVirtual) modifiers.Add("virtual");
+        if (node.IsOverride) modifiers.Add("override");
+        if (node.IsAbstract) modifiers.Add("abstract");
+        if (node.IsSealed) modifiers.Add("sealed");
+        if (node.IsStatic && !_emittingModuleMembers) modifiers.Add("static");
+        if (node.IsAsync) modifiers.Add("async");
         if (node.IsUnsafe) modifiers.Add("unsafe");
-        if (node.IsExtern) modifiers.Add("ext");
+        if (node.IsExtern) modifiers.Add("extern");
 
-        var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
+        var modStr = modifiers.Count > 0 ? $" {string.Join(" ", modifiers)}" : "";
 
         var (typeParams, typeParamsAfterGroup) =
             SplitTypeParameterList(node.TypeParameters, node.EffectParameters);
@@ -1576,12 +1578,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null || NeedsEmptyPostfixSignature(node.Body)
                 ? $" ({inlineFmt})" : "";
-            var inlineReturn = node.Output != null ? $" -> {output}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendEffectRowDeclaration(node, $"§{methodTag}{{{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}{modStr}}}{attrs}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
+            var inlineReturn = node.Output != null ? $" → {output}{FormatEffectRow(node.Output.Row)}" : "";
+            AppendEffectRowDeclaration(node, $"func {EscapeCalorIdentifier(node.Name)}{typeParams}{typeParamsAfterGroup}{visibility}{modStr}{attrs}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendEffectRowDeclaration(node, $"§{methodTag}{{{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}{modStr}}}{attrs}{typeParamsAfterGroup}");
+            throw new InvalidOperationException("Canonical function parameters must be representable in an inline signature.");
         }
         Indent();
 
@@ -1617,7 +1619,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             {
                 // Empty method body — emit a void return placeholder so the parser
                 // doesn't see EndMethod immediately after the opening tag
-                AppendLine("§R");
+                AppendLine("return");
             }
             foreach (var stmt in node.Body)
             {
@@ -1638,6 +1640,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(FunctionNode node)
     {
         EmitDocComment(node);
+        if (node.Since != null && !(node.DocComment ?? "").Split('\n')
+            .Any(line => line.TrimStart().StartsWith("since ", StringComparison.Ordinal)))
+            AppendLine($"/// since {node.Since.Version}");
         foreach (var issue in node.Issues) Visit(issue);
         if (node.Uses != null) Visit(node.Uses);
         if (node.UsedBy != null) Visit(node.UsedBy);
@@ -1646,7 +1651,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Author != null) Visit(node.Author);
         if (node.TaskRef != null) Visit(node.TaskRef);
         var visibility = GetVisibilityShorthand(node.Visibility);
-        var visibilitySegment = ":" + visibility;
+        var visibilitySegment = node.Visibility == Visibility.Public ? "" : " " + visibility;
         var (typeParams, typeParamsAfterGroup) =
             SplitTypeParameterList(node.TypeParameters, node.EffectParameters);
         var functionName = node.Name;
@@ -1667,12 +1672,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null || NeedsEmptyPostfixSignature(node.Body)
                 ? $" ({inlineFmt})" : "";
-            var inlineReturn = node.Output != null ? $" -> {output}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendEffectRowDeclaration(node, $"§{funcTag}{{{EscapeCalorIdentifier(functionName)}{typeParams}{visibilitySegment}}}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
+            var inlineReturn = node.Output != null ? $" → {output}{FormatEffectRow(node.Output.Row)}" : "";
+            AppendEffectRowDeclaration(node, $"func {EscapeCalorIdentifier(functionName)}{typeParams}{typeParamsAfterGroup}{visibilitySegment}{(node.IsAsync ? " async" : "")}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendEffectRowDeclaration(node, $"§{funcTag}{{{EscapeCalorIdentifier(functionName)}{typeParams}{visibilitySegment}}}{typeParamsAfterGroup}");
+            throw new InvalidOperationException("Canonical function parameters must be representable in an inline signature.");
         }
         Indent();
 
@@ -1702,7 +1707,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         foreach (var example in node.Examples) Visit(example);
         foreach (var assumption in node.Assumptions) Visit(assumption);
-        if (node.Since != null) Visit(node.Since);
         if (node.Deprecated != null) Visit(node.Deprecated);
         foreach (var breaking in node.BreakingChanges) Visit(breaking);
         foreach (var property in node.Properties) Visit(property);
@@ -1711,7 +1715,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _memberBodyDepth++;
         if (node.Body.Count == 0)
         {
-            AppendLine("§R");
+            AppendLine("return");
         }
         foreach (var stmt in node.Body)
         {
@@ -1771,8 +1775,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(EnsuresNode node)
     {
         var condition = node.Condition.Accept(this);
-        var head = node.Message != null ? $"§S{{\"{node.Message}\"}}" : "§S";
-        AppendLine($"{head} {condition}");
+        if (node.Message != null)
+            throw new InvalidOperationException("Canonical postcondition message syntax has not been selected.");
+        AppendLine($"=> {condition}");
         return "";
     }
 
@@ -2078,64 +2083,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(BindStatementNode node)
     {
-        // Handle collection initializers specially - emit as collection block syntax
-        if (node.Initializer is ListCreationNode listNode)
-        {
-            EmitListCreationWithName(listNode, node.Name);
-            return "";
-        }
-        if (node.Initializer is DictionaryCreationNode dictNode)
-        {
-            EmitDictionaryCreationWithName(dictNode, node.Name);
-            return "";
-        }
-        if (node.Initializer is SetCreationNode setNode)
-        {
-            EmitSetCreationWithName(setNode, node.Name);
-            return "";
-        }
-        // #1132: `object[] xs = new[] { "a" }` creates a string[] but declares object[]; the
-        // block form would declare string[] (overloads and effects follow the static type).
-        if (node.Initializer is ArrayCreationNode arrNode
-            && (node.TypeName is null or "var" || node.TypeName.StartsWith("ARRAY[", StringComparison.Ordinal)
-                || OneDimensional(node.TypeName) == OneDimensional(arrNode.ElementType + "[]")))
-        {
-            EmitArrayCreationWithName(arrNode, node.Name, node.IsMutable);
-            return "";
-        }
-        if (node.Initializer is MultiDimArrayCreationNode mdArrNode)
-        {
-            EmitMultiDimArrayCreationWithName(mdArrNode, node.Name, node.TypeName, node.IsMutable);
-            return "";
-        }
-
-        // Simplify function pointer types (delegate* unmanaged[...]<...>) that break attribute parsing
         var mappedType = node.TypeName != null ? TypeMapper.ToSurfaceType(node.TypeName) : null;
-        if (mappedType != null && mappedType.Contains("delegate*"))
-            mappedType = "nint"; // function pointers are pointer-sized; use nint as safe placeholder
-        // Compact NULLABLE[inner=T] → ?T to avoid bracket issues in attribute blocks.
-        // Stop capture at ) or > to avoid swallowing tuple/generic closers.
-        while (mappedType != null && mappedType.Contains("NULLABLE["))
-            mappedType = System.Text.RegularExpressions.Regex.Replace(mappedType, @"NULLABLE\[inner=([^\]\)>]+)\]", "?$1");
-
-        // Build the §B{...} header (without trailing initializer) so we can emit it
-        // either inline-with-initializer (default) or inline-with-§W{...:expr} target
-        // (when the initializer is a match expression that must respect block indent).
-        string bindHeader;
-        if (node.IsMutable)
-        {
-            var typePostfix = mappedType != null ? $":{mappedType}" : "";
-            bindHeader = $"§B{{~{EscapeCalorIdentifier(node.Name)}{typePostfix}}}";
-        }
-        else
-        {
-            // #1635: a one-letter or all-caps type (`T item`) spelled type-first read back as a
-            // variable `T` of type `item`; pick the header spelling the parser reads correctly.
-            var escapedName = EscapeCalorIdentifier(node.Name);
-            bindHeader = mappedType != null
-                ? $"§B{{{AttributeHelper.FormatImmutableBindHeader(escapedName, mappedType)}}}"
-                : $"§B{{{escapedName}}}";
-        }
+        var typedName = mappedType is null or "var"
+            ? EscapeCalorIdentifier(node.Name)
+            : $"{mappedType}:{EscapeCalorIdentifier(node.Name)}";
+        var bindHeader = $"{(node.IsMutable ? "var" : "let")} {typedName}";
 
         // Position 7 (§3.3): the row sits between the header group and the initializer.
         bindHeader += FormatEffectRow(node.Row);
@@ -2181,7 +2133,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         // Parser expects: §B[type:name] expression (no = sign)
-        var initPart = node.Initializer != null ? $" {node.Initializer.Accept(this)}" : "";
+        var initPart = node.Initializer != null ? $" = {node.Initializer.Accept(this)}" : "";
         AppendLine($"{bindHeader}{initPart}");
         return "";
     }
@@ -4607,13 +4559,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         return visibility switch
         {
-            Visibility.Public => "pub",
-            Visibility.ProtectedInternal => "prot-int",
-            Visibility.PrivateProtected => "priv-prot",
-            Visibility.Protected => "prot",
-            Visibility.Internal => "int",
-            Visibility.Private => "priv",
-            _ => "priv"
+            Visibility.Public => "public",
+            Visibility.ProtectedInternal => "protected-internal",
+            Visibility.PrivateProtected => "private-protected",
+            Visibility.Protected => "protected",
+            Visibility.Internal => "internal",
+            Visibility.Private => "private",
+            _ => throw new InvalidOperationException($"Unsupported visibility: {visibility}.")
         };
     }
 
@@ -4677,12 +4629,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         // Strip @ prefix if present (Roslyn's Identifier.Text includes it for verbatim identifiers)
         var bareName = name.StartsWith('@') ? name[1..] : name;
-        return CSharpReservedWords.Contains(bareName) ? $"`{bareName}`" : bareName;
+        return CSharpReservedWords.Contains(bareName) || Lexer.KeywordNames.Contains(bareName)
+            ? $"@{bareName}" : bareName;
     }
 
     private void EmitEffects(EffectsNode? effects)
     {
-        if (effects == null || (effects.Effects.Count == 0 && effects.EffectVariables.Count == 0))
+        if (effects == null)
             return;
 
         AppendLine(FormatEffectsTag(effects));
@@ -4699,7 +4652,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
             .SelectMany(kvp => kvp.Value.Split(',').Select(v => EffectCodes.ToCompact(kvp.Key, v.Trim())))
             .Distinct()
             .Concat(effects.EffectVariables);
-        return $"§E{{{string.Join(",", effectCodes)}}}";
+        var codes = string.Join(", ", effectCodes);
+        return codes.Length == 0 ? "!" : $"! {codes}";
     }
 
     /// <summary>

@@ -1089,7 +1089,7 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Module);
         _moduleIndentColumn = LineIndentColumnAt(_position - 1);
-        var attrs = ParseAttributes();
+        var attrs = ParseDeclarationAttributes(startToken);
         ValidateIdentityFreeHeader(startToken, attrs, 2);
         var overflowModifier = attrs["_pos1"];
         if (overflowModifier?.StartsWith("overflow=", StringComparison.Ordinal) == true)
@@ -1690,7 +1690,7 @@ public sealed class Parser
         var startToken = Expect(TokenKind.Func);
         _lastIfToken = null; // scope Calor0117 fixes to this function's §IFs
         var headerOpen = Current;
-        var attrs = ParseAttributes();
+        var attrs = ParseDeclarationAttributes(startToken);
         ValidateIdentityFreeHeader(startToken, attrs, 2);
         CheckMalformedFunctionHeader(startToken, attrs, headerOpen, Peek(-1));
 
@@ -1704,13 +1704,15 @@ public sealed class Parser
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "FUNC", "name");
             funcName = "";
         }
-        var visibility = ParseVisibility(visibilityStr, startToken.Span);
-
         // NEW: Parse optional type parameters §F{...}<T, U>
         var effectParameters = new List<EffectParameterInfo>();
         var typeParameters = ParseOptionalTypeParameterList(
             startToken.Span,
             effectParameters: effectParameters);
+        ConsumeCanonicalDeclarationModifiers(startToken, attrs);
+        var visibility = IsCanonicalDeclaration(startToken)
+            ? ParseVisibility(attrs["_pos1"], startToken.Span)
+            : ParseVisibility(visibilityStr, startToken.Span);
         // §7.3 position 1: this declaration binds its own effect variables, and they
         // stay in scope for its own row and its parameters' rows until it is parsed out.
         using var effectScope = PushEffectVariableScope(effectParameters);
@@ -1731,7 +1733,7 @@ public sealed class Parser
         UsedByNode? usedBy = null;
         var assumptions = new List<AssumeNode>();
         ComplexityNode? complexity = null;
-        SinceNode? since = null;
+        SinceNode? since = ParseDocumentationSince(startToken);
         DeprecatedNode? deprecated = null;
         var breakingChanges = new List<BreakingChangeNode>();
         var properties = new List<PropertyTestNode>();
@@ -1755,7 +1757,7 @@ public sealed class Parser
             {
                 output = ParseOutput();
             }
-            else if (Check(TokenKind.Effects))
+            else if (Check(TokenKind.Effects) || Check(TokenKind.Exclamation))
             {
                 effects = ParseEffects();
             }
@@ -1763,7 +1765,7 @@ public sealed class Parser
             {
                 preconditions.Add(ParseRequires());
             }
-            else if (Check(TokenKind.Ensures))
+            else if (Check(TokenKind.Ensures) || Check(TokenKind.FatArrow))
             {
                 postconditions.Add(ParseEnsures());
             }
@@ -1817,7 +1819,9 @@ public sealed class Parser
         return WithDocumentation(new FunctionNode(span, id, funcName, visibility, typeParameters, parameters, output, effects,
             preconditions, postconditions, body, attrs,
             examples, issues, uses, usedBy, assumptions, complexity, since, deprecated, breakingChanges,
-            properties, lockNode, author, taskRef, identifierSpan: identifierSpan)
+            properties, lockNode, author, taskRef,
+            isAsync: (attrs["_pos2"] ?? "").Split(',').Contains("async"),
+            identifierSpan: identifierSpan)
         {
             EffectParameters = effectParameters,
         }, startToken);
@@ -2137,10 +2141,32 @@ public sealed class Parser
         return -1;
     }
 
+    internal EffectsNode ParseNativeEffectsRow()
+    {
+        if (!Check(TokenKind.Exclamation))
+            _diagnostics.ReportUnexpectedToken(Current.Span, "'!' effect row", Current.Kind);
+        return ParseEffects();
+    }
+
     private EffectsNode ParseEffects(EffectRowPosition position = EffectRowPosition.Declaration)
     {
-        var startToken = Expect(TokenKind.Effects);
-        var attrs = ParseAttributes();
+        var canonical = Check(TokenKind.Exclamation);
+        var startToken = canonical ? Advance() : Expect(TokenKind.Effects);
+        var attrs = canonical ? new AttributeCollection() : ParseAttributes();
+        if (canonical)
+        {
+            var index = 0;
+            while (!IsAtEnd && Current.Span.Line == startToken.Span.Line
+                   && (Check(TokenKind.Identifier) || Check(TokenKind.Star)))
+            {
+                var effect = Advance();
+                var code = effect.Text;
+                while (Match(TokenKind.Colon))
+                    code += ":" + Expect(TokenKind.Identifier).Text;
+                attrs.Add($"_pos{index++}", code, effect.Span);
+                if (!Match(TokenKind.Comma)) break;
+            }
+        }
 
         var variables = new List<string>();
 
@@ -2197,7 +2223,7 @@ public sealed class Parser
     /// </summary>
     private EffectsNode? TryParseSameLineRow(EffectRowPosition position)
     {
-        if (!Check(TokenKind.Effects))
+        if (!Check(TokenKind.Effects) && !Check(TokenKind.Exclamation))
             return null;
 
         if (Current.Span.Line != PreviousToken.Span.Line)
@@ -2266,8 +2292,9 @@ public sealed class Parser
 
     private EnsuresNode ParseEnsures()
     {
-        var startToken = Expect(TokenKind.Ensures);
-        var attrs = ParseAttributes();
+        var canonical = Check(TokenKind.FatArrow);
+        var startToken = canonical ? Advance() : Expect(TokenKind.Ensures);
+        var attrs = canonical ? new AttributeCollection() : ParseAttributes();
         // v2 syntax: message is first positional §S{"message"} (condition)
         var message = attrs["_pos0"];
 
@@ -2474,7 +2501,7 @@ public sealed class Parser
         {
             return ParseIfStatement();
         }
-        else if (Check(TokenKind.Bind))
+        else if (Check(TokenKind.Bind) || Check(TokenKind.Let) || Check(TokenKind.Var))
         {
             return ParseBindStatement();
         }
@@ -6487,6 +6514,8 @@ public sealed class Parser
 
     private BindStatementNode ParseBindStatement()
     {
+        if (Check(TokenKind.Let) || Check(TokenKind.Var))
+            return ParseCanonicalBinding();
         var startToken = Expect(TokenKind.Bind);
         // A bind has exactly one header group. A following brace group is a
         // collection initializer expression, not another header group.
@@ -6525,69 +6554,110 @@ public sealed class Parser
         // (pinned), so the initializer parse below can never swallow one.
         var row = TryParseSameLineRow(EffectRowPosition.Binding);
 
-        // Parse optional initializer expression.
-        // Don't consume a following §IF as the initializer when it's a block IF statement
-        // (no → arrow after the condition). Block IFs are separate statements.
         ExpressionNode? initializer = null;
-        if (IsExpressionStart())
-        {
-            if (Check(TokenKind.If) && !IsExpressionIfAhead())
-            {
-                // Block IF -- leave for statement parser
-            }
-            else
-            {
-                // #1574: a next-line expression at the binding's own indent is still the
-                // initializer (changing that would silently change valid code), but it reads
-                // like a separate statement, so say so.
-                if (_position > 0 && Current.Span.Line > PreviousToken.Span.Line
-                    && Current.Span.Column <= startToken.Span.Column)
-                {
-                    _diagnostics.ReportWarning(Current.Span, DiagnosticCode.BareBindingNextLineInitializer,
-                        $"Binding '{name}' has nothing after its header on its line, so the expression on line {Current.Span.Line}, " +
-                        "at the same indent, is its initializer. Move the initializer onto the §B line, or give the binding an " +
-                        "explicit initializer such as `default` if that line is a separate statement.");
-                }
-                initializer = ParseExpression();
-                // If the initializer is a dotted reference followed by ( -- this is raw C# method
-                // call syntax the converter couldn't decompose. The lexer includes dots in
-                // identifiers (cache.Get → single token), so check ReferenceNode with dots.
-                if (initializer is ReferenceNode dottedRef && dottedRef.Name.Contains('.') && Check(TokenKind.OpenParen))
-                {
-                    Advance(); // consume (
-                    int depth = 1;
-                    while (!IsAtEnd && depth > 0)
-                    {
-                        if (Check(TokenKind.OpenParen)) depth++;
-                        else if (Check(TokenKind.CloseParen)) depth--;
-                        if (depth > 0) Advance();
-                    }
-                    if (Check(TokenKind.CloseParen)) Advance();
-                    initializer = new CallExpressionNode(initializer.Span,
-                        dottedRef.Name, new List<ExpressionNode>());
-                }
-            }
-        }
-
-        // §3.1 recovery for position 7. Executed baseline Z2: four Calor0100 today,
-        // none of which mentions effects.
+        if (IsExpressionStart() && (!Check(TokenKind.If) || IsExpressionIfAhead()))
+            initializer = ParseExpression();
         TryRecoverTrailingEffectRow(name, "§B");
-
         var span = initializer != null ? startToken.Span.Union(initializer.Span) : startToken.Span;
         var rawPos0 = attrs["_pos0"] ?? "";
         var nameKey = rawPos0 == name || rawPos0 == $"~{name}" ? "_pos0" : "_pos1";
         var leadingCharacters = rawPos0 == $"~{name}" ? 1 : 0;
         var identifierSpan = GetIdentifierSpan(attrs, nameKey, name, leadingCharacters);
-        return new BindStatementNode(
-            span,
-            name,
-            typeName,
-            isMutable,
-            initializer,
-            attrs,
-            identifierSpan,
-            GetBindTypeSpan(attrs, typeName),
-            row);
+        return new BindStatementNode(span, name, typeName, isMutable, initializer, attrs,
+            identifierSpan, GetBindTypeSpan(attrs, typeName), row);
+    }
+
+    private BindStatementNode ParseCanonicalBinding()
+    {
+        var start = Advance();
+        var typeStart = _position;
+        var firstToken = Current;
+        var first = ReadInlineTypeToken();
+        string? type = null;
+        var name = firstToken.Value as string ?? first;
+        var identifierSpan = GetConsumedSpan(typeStart);
+        TextSpan? typeSpan = null;
+        if (Match(TokenKind.Colon))
+        {
+            type = first;
+            typeSpan = identifierSpan;
+            var identifier = Expect(TokenKind.Identifier);
+            name = identifier.Value as string ?? identifier.Text;
+            identifierSpan = identifier.Span;
+        }
+        else if (first.Length == 0 || first.IndexOfAny([':', '<', '[', '?', '.', '*']) >= 0)
+        {
+            _diagnostics.ReportError(identifierSpan, DiagnosticCode.TypeFirstBindingHeader,
+                "A binding is 'let name = expression' or 'var type:name = expression'.");
+        }
+        var attributes = new AttributeCollection();
+        attributes.Add("_pos0", name, identifierSpan);
+        if (type != null) attributes.Add("_pos1", type, typeSpan!.Value);
+        var row = TryParseSameLineRow(EffectRowPosition.Binding);
+        ExpressionNode? initializer = null;
+        if (Current.Span.Line == start.Span.Line && Match(TokenKind.Equals))
+        {
+            if (Current.Span.Line == start.Span.Line && IsExpressionStart())
+                initializer = ParseExpression();
+            else
+                _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                    "A binding initializer must follow '=' on the same line.");
+        }
+        else if (type == null)
+            _diagnostics.ReportError(start.Span, DiagnosticCode.UnexpectedToken,
+                "An inferred binding requires '= expression'.");
+        return new BindStatementNode(start.Span.Union(initializer?.Span ?? identifierSpan),
+            name, type, start.Kind == TokenKind.Var, initializer, attributes, identifierSpan, typeSpan, row);
+    }
+
+    private static bool IsCanonicalDeclaration(Token token) => !token.Text.StartsWith('§');
+
+    private AttributeCollection ParseDeclarationAttributes(Token start)
+    {
+        if (!IsCanonicalDeclaration(start))
+            return ParseAttributes();
+        var attributes = new AttributeCollection();
+        var name = Expect(TokenKind.Identifier);
+        attributes.Add("_pos0", name.Value as string ?? name.Text, name.Span);
+        ConsumeCanonicalDeclarationModifiers(start, attributes);
+        return attributes;
+    }
+
+    private void ConsumeCanonicalDeclarationModifiers(Token start, AttributeCollection attributes)
+    {
+        if (!IsCanonicalDeclaration(start)) return;
+        var modifiers = new List<string>();
+        if (attributes["_pos2"] is { } existing)
+            modifiers.AddRange(existing.Split(','));
+        while (Current.Span.Line == start.Span.Line && Check(TokenKind.Identifier))
+        {
+            var token = Advance();
+            var word = token.Text;
+            if (TryParseVisibilityWord(word, out _))
+                attributes.Add("_pos1", word, token.Span);
+            else if (word == "overflow" && Match(TokenKind.Equals))
+                attributes.Add("overflow", Expect(TokenKind.Identifier).Text);
+            else
+                modifiers.Add(word);
+        }
+        if (modifiers.Count != 0) attributes.Add("_pos2", string.Join(",", modifiers));
+    }
+
+    private SinceNode? ParseDocumentationSince(Token start)
+    {
+        SinceNode? result = null;
+        foreach (var line in (start.DocComment ?? "").Split('\n'))
+        {
+            var text = line.Trim();
+            if (!text.StartsWith("since ", StringComparison.Ordinal)) continue;
+            var version = text["since ".Length..].Trim();
+            if (result != null || !Version.TryParse(version, out _))
+                _diagnostics.ReportError(start.Span, DiagnosticCode.UnexpectedToken,
+                    "A declaration accepts one '/// since version' with a valid version.");
+            else
+                result = new SinceNode(start.Span, version, new AttributeCollection());
+        }
+        return result;
     }
 
     /// <summary>
@@ -7970,6 +8040,12 @@ public sealed class Parser
     {
         Visibility? parsed = value switch
         {
+            "public" => Visibility.Public,
+            "protected-internal" => Visibility.ProtectedInternal,
+            "private-protected" => Visibility.PrivateProtected,
+            "internal" => Visibility.Internal,
+            "protected" => Visibility.Protected,
+            "private" => Visibility.Private,
             "pub" => Visibility.Public,
             "prot-int" => Visibility.ProtectedInternal,
             "priv-prot" => Visibility.PrivateProtected,
@@ -7978,7 +8054,7 @@ public sealed class Parser
             "priv" => Visibility.Private,
             _ => null
         };
-        visibility = parsed ?? Visibility.Private;
+        visibility = parsed ?? Visibility.Public;
         return parsed.HasValue;
     }
 
@@ -9465,7 +9541,13 @@ public sealed class Parser
         var closer = isModule ? TokenKind.EndModule : TokenKind.EndClass;
         var attrs = new AttributeCollection();
         List<TypeParameterNode>? recordTypeParameters = null;
-        if (isRecord)
+        if (IsCanonicalDeclaration(startToken))
+        {
+            attrs = ParseDeclarationAttributes(startToken);
+            recordTypeParameters = ParseOptionalTypeParameterList(startToken.Span, effectOwner: "a type");
+            ConsumeCanonicalDeclarationModifiers(startToken, attrs);
+        }
+        else if (isRecord)
         {
             var recordName = Expect(TokenKind.Identifier);
             attrs.Add("_pos0", recordName.Text, recordName.Span);
@@ -9503,7 +9585,7 @@ public sealed class Parser
         string modifiers;
         string? baseClass = null;
         TextSpan? baseClassSpan = null;
-        Visibility visibility = Visibility.Internal;
+        Visibility visibility = IsCanonicalDeclaration(startToken) ? Visibility.Public : Visibility.Internal;
 
         foreach (var word in pos2.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries))
         {
@@ -9512,7 +9594,12 @@ public sealed class Parser
                     $"Removed visibility '{word}'. Use '{replacement}' instead.");
         }
 
-        if (pos3 != null)
+        if (IsCanonicalDeclaration(startToken))
+        {
+            visibility = ParseVisibility(attrs["_pos1"], startToken.Span);
+            modifiers = attrs["_pos2"] ?? "";
+        }
+        else if (pos3 != null)
         {
             // 4 positionals: §CL{id:name:vis:modifiers} or §CL{id:name:BaseClass:modifiers}
             if (IsVisibilityKeyword(pos2))
@@ -9698,15 +9785,29 @@ public sealed class Parser
             }
             else if (Check(TokenKind.Extends))
             {
-                Expect(TokenKind.Extends);
-                var extAttrs = ParseAttributes();
-                baseClass = extAttrs["_pos0"] ?? "";
-                baseClassSpan = extAttrs.GetSpan("_pos0");
+                var extends = Expect(TokenKind.Extends);
+                if (IsCanonicalDeclaration(extends))
+                {
+                    var typeStart = _position;
+                    baseClass = ReadInlineTypeToken();
+                    baseClassSpan = GetConsumedSpan(typeStart);
+                }
+                else
+                {
+                    var extAttrs = ParseAttributes();
+                    baseClass = extAttrs["_pos0"] ?? "";
+                    baseClassSpan = extAttrs.GetSpan("_pos0");
+                }
             }
             else if (Check(TokenKind.Implements))
             {
-                Expect(TokenKind.Implements);
-                var implAttrs = ParseAttributes();
+                var implements = Expect(TokenKind.Implements);
+                var implAttrs = IsCanonicalDeclaration(implements) ? new AttributeCollection() : ParseAttributes();
+                if (IsCanonicalDeclaration(implements))
+                {
+                    var typeStart = _position;
+                    implAttrs.Add("_pos0", ReadInlineTypeToken(), GetConsumedSpan(typeStart));
+                }
                 var iface = implAttrs["_pos0"] ?? "";
                 if (!string.IsNullOrEmpty(iface))
                 {
@@ -9748,7 +9849,7 @@ public sealed class Parser
                     classItems.Add(node);
                 }
             }
-            else if (Check(TokenKind.Method) || (isModule && Check(TokenKind.Func)))
+            else if (Check(TokenKind.Method) || Check(TokenKind.Func))
             {
                 var node = ParseMethodDefinition();
                 methods.Add(node);
@@ -9969,11 +10070,11 @@ public sealed class Parser
     /// </summary>
     private MethodNode ParseMethodDefinition()
     {
-        var isModuleFunction = _parsingModuleMembers && Check(TokenKind.Func);
+        var isModuleFunction = Check(TokenKind.Func);
         var startToken = Expect(isModuleFunction ? TokenKind.Func : TokenKind.Method);
         var closer = isModuleFunction ? TokenKind.EndFunc : TokenKind.EndMethod;
         _lastIfToken = null; // scope Calor0117 fixes to this method's §IFs
-        var attrs = ParseAttributes();
+        var attrs = ParseDeclarationAttributes(startToken);
         ValidateIdentityFreeHeader(startToken, attrs, 3);
         var csharpAttrs = ParseCSharpAttributes();
 
@@ -9985,16 +10086,18 @@ public sealed class Parser
         var modStr = attrs["_pos2"] ?? "";
 
 
-        var visibility = ParseVisibility(visStr, startToken.Span);
-        var modifiers = ParseMethodModifiers(modStr, startToken.Span);
-        if (_parsingModuleMembers)
-            modifiers |= MethodModifiers.Static;
-
         // NEW: Parse optional type parameters §MT{...}<T, U>
         var effectParameters = new List<EffectParameterInfo>();
         var typeParameters = ParseOptionalTypeParameterList(
             startToken.Span,
             effectParameters: effectParameters);
+        ConsumeCanonicalDeclarationModifiers(startToken, attrs);
+        var visibility = ParseVisibility(IsCanonicalDeclaration(startToken) ? attrs["_pos1"] : visStr, startToken.Span);
+        var methodModifiers = (attrs["_pos2"] ?? modStr).Split(',');
+        var isAsync = methodModifiers.Contains("async");
+        var modifiers = ParseMethodModifiers(string.Join(",", methodModifiers.Where(modifier => modifier != "async")), startToken.Span);
+        if (_parsingModuleMembers)
+            modifiers |= MethodModifiers.Static;
         // §7.3 position 1: this declaration binds its own effect variables, and they
         // stay in scope for its own row and its parameters' rows until it is parsed out.
         using var effectScope = PushEffectVariableScope(effectParameters);
@@ -10051,8 +10154,11 @@ public sealed class Parser
                 output = ParseOutput();
                 bodyHadContent = true;
             }
-            else if (Check(TokenKind.Effects))
+            else if (Check(TokenKind.Effects) || Check(TokenKind.Exclamation))
             {
+                if (body.Count != 0)
+                    _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                        "Effect clauses must precede the first method body statement.");
                 effects = ParseEffects();
                 bodyHadContent = true;
             }
@@ -10061,8 +10167,11 @@ public sealed class Parser
                 preconditions.Add(ParseRequires());
                 bodyHadContent = true;
             }
-            else if (Check(TokenKind.Ensures))
+            else if (Check(TokenKind.Ensures) || Check(TokenKind.FatArrow))
             {
+                if (body.Count != 0)
+                    _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                        "Postcondition clauses must precede the first method body statement.");
                 postconditions.Add(ParseEnsures());
                 bodyHadContent = true;
             }
@@ -10086,7 +10195,7 @@ public sealed class Parser
 
         var span = startToken.Span.Union(endToken.Span);
         return WithDocumentation(new MethodNode(span, id, name, visibility, modifiers, typeParameters, parameters,
-            output, effects, preconditions, postconditions, body, attrs, csharpAttrs,
+            output, effects, preconditions, postconditions, body, attrs, csharpAttrs, isAsync: isAsync,
             identifierSpan: GetIdentifierSpan(attrs, methodNameKey, name))
         {
             EffectParameters = effectParameters,
@@ -14269,6 +14378,11 @@ public sealed class Parser
             {
                 // Parse optional parameter modifier (this, ref, out, in, params)
                 var modifier = ParameterModifier.None;
+                while (Current.Text is "this" or "ref" or "out" or "in" or "params")
+                {
+                    var modifierToken = Advance();
+                    modifier |= ParseParameterModifiers(modifierToken.Text, modifierToken.Span);
+                }
 
                 var typeStartPosition = _position;
                 var paramType = ReadInlineTypeToken();
@@ -14283,27 +14397,28 @@ public sealed class Parser
                     if (Check(TokenKind.Identifier))
                     {
                         var nameToken = Advance();
-                        paramName = nameToken.Text;
+                        paramName = nameToken.Value as string ?? nameToken.Text;
                         parameterIdentifierSpan = nameToken.Span;
                     }
 
-                    // Check for optional modifier suffix :mod1,mod2
                     if (Check(TokenKind.Colon))
                     {
-                        Advance(); // consume :
-                        if (Check(TokenKind.Identifier))
-                        {
-                            var modToken = Advance();
-                            modifier |= ParseParameterModifiers(modToken.Text, modToken.Span);
-                        }
+                        _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                            "Parameter modifiers precede the type in a canonical signature.");
+                        Advance();
+                        if (Check(TokenKind.Identifier)) Advance();
                     }
                 }
-                else if (Check(TokenKind.Identifier))
+                else
                 {
-                    // Space-separated: type name
-                    var nameToken = Advance();
-                    paramName = nameToken.Text;
-                    parameterIdentifierSpan = nameToken.Span;
+                    _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                        "Expected a type:name parameter.");
+                    if (Check(TokenKind.Identifier))
+                    {
+                        var nameToken = Advance();
+                        paramName = nameToken.Value as string ?? nameToken.Text;
+                        parameterIdentifierSpan = nameToken.Span;
+                    }
                 }
 
                 // Position 5 (§3.3): (Func<i32,i32>:f §E{cw}, i32:v). The inline
@@ -14365,7 +14480,7 @@ public sealed class Parser
             Advance(); // consume ->
             // Handle ref/in/out return type modifiers
             var prefix = "";
-            if (Check(TokenKind.Identifier) && Current.Text is "ref" or "in" or "out" or "scoped")
+            if (Current.Text is "ref" or "in" or "out" or "scoped")
             {
                 prefix = Current.Text + " ";
                 Advance();
@@ -14431,7 +14546,7 @@ public sealed class Parser
         }
 
         // Handle ref/in/out/scoped modifiers (e.g., ?ref T, ref readonly T)
-        if (Check(TokenKind.Identifier) && Current.Text is "ref" or "in" or "out" or "scoped")
+        if (Current.Text is "ref" or "in" or "out" or "scoped")
         {
             sb.Append(Advance().Text);
             sb.Append(' ');
