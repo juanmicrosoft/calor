@@ -15,9 +15,9 @@ public class BindingDiagnosticRoutingTests
     {
         foreach (var (source, target, shape) in new[]
         {
-            ("[?str]", "[str]", BindingReceivingShape.Array),
-            ("List<?str>", "List<str>", BindingReceivingShape.Generic),
-            ("?Widget", "Widget", BindingReceivingShape.Nominal)
+            ("string?[]", "string[]", BindingReceivingShape.Array),
+            ("List<string?>", "List<string>", BindingReceivingShape.Generic),
+            ("Widget?", "Widget", BindingReceivingShape.Nominal)
         })
         foreach (var code in new[] { "Calor0272", "Calor0273", "Calor0274" })
             yield return [source, target, shape, code];
@@ -30,26 +30,33 @@ public class BindingDiagnosticRoutingTests
     {
         var statement = code switch
         {
-            "Calor0272" => $"§B{{required:{targetType}}} value",
-            "Calor0273" => "§R value",
-            _ => "§C{Take} §A value §/C"
+            "Calor0272" => $"let {targetType}:required = value",
+            "Calor0273" => "return value",
+            _ => "Take(value)"
         };
         var source = $$"""
-            §M{StageBLsp}
-              §CL{Widget:pub}
-                §MT{Id:pub} () -> i32
-                  §E{}
-                  §R 1
-              §F{Take:pub} ({{targetType}}:value) -> void
-                §E{}
-              §F{Probe:pub} ({{sourceType}}:value) -> {{(code == "Calor0273" ? targetType : "void")}}
-                §E{}
+            module StageBLsp
+              class Widget
+                func Id () → int
+                  !
+                  return 1
+              func Take ({{targetType}}:value) → void
+                !
+              func Probe ({{sourceType}}:value) → {{(code == "Calor0273" ? targetType : "void")}}
+                !
                 {{statement}}
             """;
         var path = Path.Combine(Path.GetTempPath(), $"stage-b-lsp-{Guid.NewGuid():N}.calr");
         using var document = new DocumentState(new Uri(path), source);
         await document.ReanalyzeAsync();
+        AssertNativeSyntax(document);
         var diagnostic = Assert.Single(document.Diagnostics.Where(d => d.Code == code));
+        Assert.Equal(code switch
+        {
+            "Calor0272" => BindingReceivingBoundary.Initializer,
+            "Calor0273" => BindingReceivingBoundary.NativeReturn,
+            _ => BindingReceivingBoundary.MethodArgument
+        }, diagnostic.BindingContext?.Boundary);
         Assert.Equal(shape, diagnostic.BindingContext?.Shape);
         Assert.Equal("value", source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
         var lsp = DiagnosticConverter.ToLspDiagnostic(diagnostic, source);
@@ -61,32 +68,35 @@ public class BindingDiagnosticRoutingTests
         Assert.Equal(diagnostic.Span, propagated.Span);
         Assert.Equal(diagnostic.Severity, propagated.Severity);
         var safe = source.Replace($"({sourceType}:value)", $"({targetType}:value)", StringComparison.Ordinal);
+        Assert.NotEqual(source, safe);
         var update = await document.UpdateAsync(safe, 1);
         Assert.True(update.Accepted);
         Assert.DoesNotContain(update.Snapshot.Diagnostics, d => d.Code == code);
-        Assert.False(Compiler.Program.Compile(safe, path).HasErrors);
+        var safeResult = Compiler.Program.Compile(safe, path);
+        Assert.False(safeResult.HasErrors, string.Join(Environment.NewLine, safeResult.Diagnostics));
     }
 
     [Theory]
-    [InlineData("?[str]", "container")]
-    [InlineData("[?str]", "elements")]
-    [InlineData("?[?str]", "container and STRING elements")]
+    [InlineData("string[]?", "container")]
+    [InlineData("string?[]", "elements")]
+    [InlineData("string?[]?", "container and STRING elements")]
     public async Task StageB_ArrayInputs_UseActiveArrayContextAndExactSpanAsync(string sourceType, string component)
     {
         var source = $$"""
-            §M{ArrayRouting}
-              §F{Take:pub} ([str]:items) -> i32
-                §E{}
-                §R 1
-              §F{Caller:pub} ({{sourceType}}:values) -> i32
-                §E{}
-                §B{first} values
-                §B{second} first
-                §R §C{Take} §A[items] second §/C
+            module ArrayRouting
+              func Take (string[]:items) → int
+                !
+                return 1
+              func Caller ({{sourceType}}:values) → int
+                !
+                let first = values
+                let second = first
+                return Take(items:second)
             """;
         var path = Path.Combine(Environment.CurrentDirectory, "array-routing-" + Guid.NewGuid().ToString("N") + ".calr");
         using var document = new DocumentState(new Uri(path), source);
         await document.ReanalyzeAsync();
+        AssertNativeSyntax(document);
         var diagnostic = Assert.Single(document.Diagnostics.Where(d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
         Assert.Equal(BindingReceivingBoundary.MethodArgument, diagnostic.BindingContext?.Boundary);
         Assert.Equal(BindingReceivingShape.Array, diagnostic.BindingContext?.Shape);
@@ -110,16 +120,17 @@ public class BindingDiagnosticRoutingTests
         bool expression, bool objectOverload)
     {
         var extra = objectOverload
-            ? "  §F{Take:pub} (object:value) -> i32\n    §E{}\n    §R 2\n"
+            ? "  func Take (object:value) → int\n    !\n    return 2\n"
             : "";
-        var source = "§M{Routing}\n  §F{Take:pub} (str:value) -> i32\n    §E{}\n    §R 1\n"
+        var source = "module Routing\n  func Take (string:value) → int\n    !\n    return 1\n"
             + extra
-            + "  §F{Caller:pub} (?str:value) -> i32\n    §E{}\n    "
-            + (expression ? "§R " : "") + "§C{Take} §A value §/C\n"
-            + (expression ? "" : "    §R 0\n");
+            + "  func Caller (string?:value) → int\n    !\n    "
+            + (expression ? "return " : "") + "Take(value)\n"
+            + (expression ? "" : "    return 0\n");
         var path = Path.Combine(Path.GetTempPath(), "native-routing-" + Guid.NewGuid().ToString("N") + ".calr");
         using var document = new DocumentState(new Uri(path), source);
         await document.ReanalyzeAsync();
+        AssertNativeSyntax(document);
         var diagnostic = Assert.Single(document.Diagnostics.Where(d =>
             d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
         Assert.Equal(!objectOverload, diagnostic.BindingContext!.ReplacesNativeOverloadError);
@@ -132,7 +143,8 @@ public class BindingDiagnosticRoutingTests
         Assert.Equal(diagnostic.Span, compiler.Span);
         Assert.Equal(diagnostic.Severity, compiler.Severity);
 
-        var safe = source.Replace("(str:value)", "(?str:value)", StringComparison.Ordinal);
+        var safe = source.Replace("(string:value)", "(string?:value)", StringComparison.Ordinal);
+        Assert.NotEqual(source, safe);
         var update = await document.UpdateAsync(safe, 1);
         Assert.True(update.Accepted);
         Assert.DoesNotContain(update.Snapshot.Diagnostics, d =>
@@ -143,12 +155,12 @@ public class BindingDiagnosticRoutingTests
     public async Task CodeActions_PreserveAnalysisOnlyProvenanceAsync()
     {
         const string source = """
-            §M{Routing}
-              §F{Helper:pub} () -> i32
-                §R 42
-              §F{Main:pub} () -> i32
-                §B{x} Helper
-                §R x
+            module Routing
+              func Helper () → int
+                return 42
+              func Main () → int
+                let x = Helper
+                return x
             """;
         var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(
             new Uri(Path.Combine(Path.GetTempPath(), "routing-action-" + Guid.NewGuid().ToString("N") + ".calr")));
@@ -157,6 +169,7 @@ public class BindingDiagnosticRoutingTests
         try
         {
             await document.ReanalyzeAsync();
+            AssertNativeSyntax(document);
             var handler = new LanguageServer.Handlers.CodeActionHandler(workspace);
             var actions = await handler.Handle(new OmniSharp.Extensions.LanguageServer.Protocol.Models.CodeActionParams
             {
@@ -182,17 +195,20 @@ public class BindingDiagnosticRoutingTests
     }
 
     [Theory]
-    [InlineData("§B{x:str} §C{System.Environment.GetEnvironmentVariable} §A \"ROUTING_UNSET\" §/C", "void", "Calor0272")]
-    [InlineData("§R §C{System.Environment.GetEnvironmentVariable} §A \"ROUTING_UNSET\" §/C", "str", "Calor0273")]
-    [InlineData("§R §C{System.Int32.Parse} §A §C{System.Environment.GetEnvironmentVariable} §A \"ROUTING_UNSET\" §/C §/C", "i32", "Calor0274")]
+    [InlineData("let string:x = System.Environment.GetEnvironmentVariable(\"ROUTING_UNSET\")", "void", "Calor0272")]
+    [InlineData("return System.Environment.GetEnvironmentVariable(\"ROUTING_UNSET\")", "string", "Calor0273")]
+    [InlineData("return System.Int32.Parse(System.Environment.GetEnvironmentVariable(\"ROUTING_UNSET\"))", "int", "Calor0274")]
     public async Task ActiveScalarFindings_AreLabeledWithoutChangingBinderSeverityOrSpanAsync(
         string body, string returnType, string code)
     {
-        var source = $"§M{{Routing}}\n  §F{{Probe:pub}} () -> {returnType}\n    §E{{env}}\n    {body}\n";
+        var source = $"module Routing\n  func Probe () → {returnType}\n    ! env\n    {body}\n";
         var path = Path.Combine(Path.GetTempPath(), "routing-" + Guid.NewGuid().ToString("N") + ".calr");
         using var document = new DocumentState(new Uri(path), source);
         await document.ReanalyzeAsync();
-        var diagnostic = Assert.Single(document.Diagnostics.Where(d => d.Code == code));
+        AssertNativeSyntax(document);
+        var findings = document.Diagnostics.Where(d => d.Code == code).ToArray();
+        Assert.True(findings.Length == 1, string.Join(Environment.NewLine, document.Diagnostics));
+        var diagnostic = Assert.Single(findings);
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Equal(BindingReceivingShape.ScalarString, diagnostic.BindingContext?.Shape);
         var lsp = DiagnosticConverter.ToLspDiagnostic(diagnostic, source);
@@ -207,7 +223,7 @@ public class BindingDiagnosticRoutingTests
         var compiler = Assert.Single(compiled.Diagnostics.Where(d => d.Code == code));
         Assert.Equal(diagnostic.Span, compiler.Span);
         Assert.Equal(diagnostic.Severity, compiler.Severity);
-        var update = await document.UpdateAsync("§M{Routing}\n  §F{Probe:pub} () -> str\n    §R \"safe\"\n", 1);
+        var update = await document.UpdateAsync("module Routing\n  func Probe () → string\n    return \"safe\"\n", 1);
         Assert.True(update.Accepted);
         Assert.DoesNotContain(update.Snapshot.Diagnostics, d => d.Code == code);
     }
@@ -216,15 +232,16 @@ public class BindingDiagnosticRoutingTests
     public async Task ActiveBinderError_AgreesWithApiAcrossOptOutModesAsync()
     {
         const string source = """
-            §M{Routing}
-              §F{Probe:pub} () -> i32
-                §R 1
-              §F{Probe:pub} () -> i32
-                §R 2
+            module Routing
+              func Probe () → int
+                return 1
+              func Probe () → int
+                return 2
             """;
         var path = Path.Combine(Path.GetTempPath(), "routing-" + Guid.NewGuid().ToString("N") + ".calr");
         using var document = new DocumentState(new Uri(path), source);
         await document.ReanalyzeAsync();
+        AssertNativeSyntax(document);
         var editor = Assert.Single(document.Diagnostics.Where(d => d.Code == DiagnosticCode.DuplicateFunctionSignature));
         var lsp = DiagnosticConverter.ToLspDiagnostic(editor, source);
         Assert.Equal("calor", lsp.Source);
@@ -245,6 +262,16 @@ public class BindingDiagnosticRoutingTests
             Assert.Equal(editor.Severity, compiler.Severity);
             // Declaration identities use URI vs file-path provenance; code/span/severity are the parity contract.
         }
+    }
+
+    private static void AssertNativeSyntax(DocumentState document)
+    {
+        Assert.StartsWith("module ", document.Source);
+        Assert.NotNull(document.Ast);
+        Assert.DoesNotContain(document.Diagnostics, diagnostic => diagnostic.IsError
+            && (diagnostic.Code.StartsWith("Calor00", StringComparison.Ordinal)
+                || diagnostic.Code.StartsWith("Calor01", StringComparison.Ordinal)
+                || diagnostic.Code.StartsWith("Calor083", StringComparison.Ordinal)));
     }
 
     [Fact]
