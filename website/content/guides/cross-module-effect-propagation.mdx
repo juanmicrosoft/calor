@@ -97,7 +97,7 @@ and `Calor0421` stay errors under every flag. See
 
 ## Bare-name vs. qualified calls
 
-The intended lookup forms are:
+The supported lookup forms are:
 
 ```calor
 SaveOrder()                     // bare name, when unambiguous across modules
@@ -163,11 +163,9 @@ MSBuild projects using `Calor.Sdk` get cross-module enforcement automatically �
 
 The cross-module effect pass works at the AST level, so it's independent of the generated C#. But the **generated C#** still has to compile — which means your call target must resolve as a C# symbol too.
 
-The original examples use two patterns. The using-directive pattern below
-compiles and runs. The native module-qualified example currently exposes a
-compiler regression: its target is treated as an unknown external call rather
-than the declared module function. It remains shown unchanged, not replaced by
-a bare call or granted an `unknown` effect.
+Both patterns below compile and run. The module-qualified form resolves to the
+callee's actual generated C# container and preserves the same declared effect
+boundary as the using-directive form.
 
 ### 1. Using directive + bare name
 
@@ -188,9 +186,9 @@ func HandleRequest () → void
   OrderService.SaveOrder()
 ```
 
-Both forms must preserve the same declared effect boundary. The native
-module-qualified regression must be repaired before the second pattern is a
-working alternative; a successful bare-call control does not validate it.
+Both forms preserve the same declared effect boundary. Omitting `db:w` from
+either caller still reports `Calor0410`; qualifying the name does not waive
+the callee's declared effects.
 
 ---
 
