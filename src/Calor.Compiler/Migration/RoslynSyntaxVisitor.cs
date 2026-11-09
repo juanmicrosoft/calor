@@ -2660,7 +2660,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 var memberName = member.Identifier.Text;
                 var memberValue = GetEnumMemberValueText(member.EqualsValue);
                 var memberAttrs = ConvertAttributes(member.AttributeLists);
-                members.Add(new EnumMemberNode(GetTextSpan(member), memberName, memberValue, memberAttrs));
+                members.Add(new EnumMemberNode(GetTextSpan(member), memberName, memberValue, memberAttrs,
+                    GetTextSpan(member.Identifier)));
             }
 
             var visibility = GetVisibility(node.Modifiers, Visibility.Internal);
@@ -3078,7 +3079,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     if (nestedEnum.BaseList?.Types.Count > 0)
                         nestedUnderlying = TypeMapper.CSharpToCalor(nestedEnum.BaseList.Types.First().Type.ToString());
                     var nestedMembers = nestedEnum.Members
-                        .Select(m => new EnumMemberNode(GetTextSpan(m), m.Identifier.Text, GetEnumMemberValueText(m.EqualsValue), ConvertAttributes(m.AttributeLists)))
+                        .Select(m => new EnumMemberNode(GetTextSpan(m), m.Identifier.Text, GetEnumMemberValueText(m.EqualsValue),
+                            ConvertAttributes(m.AttributeLists), GetTextSpan(m.Identifier)))
                         .ToList();
                     var nestedVis = GetVisibility(nestedEnum.Modifiers, Visibility.Private);
                     var nestedAttrs = ConvertAttributes(nestedEnum.AttributeLists);
@@ -3654,7 +3656,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     if (ne.BaseList?.Types.Count > 0)
                         nestedUnderlying = TypeMapper.CSharpToCalor(ne.BaseList.Types.First().Type.ToString());
                     var nestedMembers = ne.Members
-                        .Select(m => new EnumMemberNode(GetTextSpan(m), m.Identifier.Text, GetEnumMemberValueText(m.EqualsValue), ConvertAttributes(m.AttributeLists)))
+                        .Select(m => new EnumMemberNode(GetTextSpan(m), m.Identifier.Text, GetEnumMemberValueText(m.EqualsValue),
+                            ConvertAttributes(m.AttributeLists), GetTextSpan(m.Identifier)))
                         .ToList();
                     var nestedVis = GetVisibility(ne.Modifiers, Visibility.Private);
                     var nestedAttrs = ConvertAttributes(ne.AttributeLists);

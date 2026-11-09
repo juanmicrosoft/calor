@@ -1305,6 +1305,7 @@ public sealed class VariableSymbol : Symbol
     public bool IsField { get; }
     public bool IsProperty { get; }
     public bool IsStatic { get; }
+    internal bool IsEnumMember { get; init; }
     public ParameterModifier Modifier { get; }
     public ExpressionNode? DefaultValue { get; }
     public bool IsOptional => DefaultValue != null;
@@ -1518,6 +1519,7 @@ public sealed class TypeSymbol : Symbol
     public Visibility Visibility { get; }
     public bool IsReferenceType { get; init; }
     public bool IsRecord { get; init; }
+    public bool IsEnum { get; init; }
 
     /// <summary>
     /// v0.15 E1 slice 2b — true for a type declared with <c>§DEL</c>. This is
@@ -1859,7 +1861,8 @@ public sealed class Scope
         IReadOnlyList<string>? typeArguments,
         Func<string, string, int?>? implicitConversionCost,
         bool allowNullableStringCompatibility,
-        Func<string, string, bool>? isBetterNullConversionTarget = null)
+        Func<string, string, bool>? isBetterNullConversionTarget = null,
+        Func<FunctionSymbol, string, string>? resolveParameterType = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(argumentTypes);
@@ -1876,7 +1879,8 @@ public sealed class Scope
                     typeArguments,
                     implicitConversionCost,
                     allowNullableStringCompatibility,
-                    isBetterNullConversionTarget)
+                    isBetterNullConversionTarget,
+                    resolveParameterType)
                 ?? OverloadResolutionResult.NotFound();
         }
 
@@ -1891,6 +1895,7 @@ public sealed class Scope
                     typeArguments,
                     implicitConversionCost,
                     allowNullableStringCompatibility,
+                    resolveParameterType,
                     out var resolvedReturnType,
                     out var score,
                     out var usesNullableStringCompatibility,
@@ -2187,6 +2192,7 @@ public sealed class Scope
         IReadOnlyList<string>? typeArguments,
         Func<string, string, int?>? implicitConversionCost,
         bool allowNullableStringCompatibility,
+        Func<FunctionSymbol, string, string>? resolveParameterType,
         out string resolvedReturnType,
         out int score,
         out bool usesNullableStringCompatibility,
@@ -2239,6 +2245,7 @@ public sealed class Scope
                     matches = false;
                     break;
                 }
+                parameterType = resolveParameterType?.Invoke(function, parameterType) ?? parameterType;
                 parameterTypes[argumentIndex] = parameterType;
 
                 if (TypeIdentity.TryUnify(

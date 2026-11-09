@@ -14555,7 +14555,7 @@ public sealed class Parser
                 }
 
                 var memberSpan = memberStartToken.Span.Union(Current.Span);
-                members.Add(new EnumMemberNode(memberSpan, memberName, memberValue, memberAttrs));
+                members.Add(new EnumMemberNode(memberSpan, memberName, memberValue, memberAttrs, memberNameToken.Span));
             }
             else
             {

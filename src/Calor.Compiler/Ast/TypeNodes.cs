@@ -233,6 +233,7 @@ public sealed class FieldAccessNode : ExpressionNode
 public sealed class EnumMemberNode : AstNode
 {
     public string Name { get; }
+    public TextSpan IdentifierSpan { get; }
     public string? Value { get; }
     public IReadOnlyList<CalorAttributeNode> CSharpAttributes { get; }
 
@@ -240,14 +241,17 @@ public sealed class EnumMemberNode : AstNode
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = span;
         Value = value;
         CSharpAttributes = Array.Empty<CalorAttributeNode>();
     }
 
-    public EnumMemberNode(TextSpan span, string name, string? value, IReadOnlyList<CalorAttributeNode> csharpAttributes)
+    public EnumMemberNode(TextSpan span, string name, string? value, IReadOnlyList<CalorAttributeNode> csharpAttributes,
+        TextSpan? identifierSpan = null)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = identifierSpan ?? span;
         Value = value;
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
     }

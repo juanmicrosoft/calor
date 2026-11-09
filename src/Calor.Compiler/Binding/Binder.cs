@@ -100,6 +100,7 @@ public sealed class Binder
     private readonly Dictionary<string, ClassDefinitionNode> _classesByQualifiedName = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<ClassDefinitionNode>> _classesBySimpleName = new(StringComparer.Ordinal);
     private readonly Dictionary<SymbolId, (TypeSymbol Symbol, InterfaceDefinitionNode Declaration)> _interfacesBySymbolId = new();
+    private readonly Dictionary<SymbolId, IReadOnlyList<VariableSymbol>> _enumMembers = new();
     private readonly Dictionary<string, DelegateDefinitionNode> _delegateDefinitions = new(StringComparer.Ordinal);
     private readonly Dictionary<VariableSymbol, VariableSymbol> _flowNarrowingSources = new();
     private readonly Dictionary<VariableSymbol, CallableMutationSummary> _callableState =
@@ -963,6 +964,7 @@ public sealed class Binder
         _classSymbols.Clear();
         _classesByQualifiedName.Clear();
         _interfacesBySymbolId.Clear();
+        _enumMembers.Clear();
         _classesBySimpleName.Clear();
         _delegateDefinitions.Clear();
         _flowNarrowingSources.Clear();
@@ -1077,15 +1079,7 @@ public sealed class Binder
 
         foreach (var @enum in module.Enums)
         {
-            RegisterTypeSymbol(
-                _moduleSymbolId,
-                "enum",
-                @enum.Id,
-                @enum.Name,
-                GetQualifiedTypeName(@enum),
-                @enum.Visibility,
-                @enum.IdentifierSpan,
-                @enum.Span);
+            RegisterEnum(@enum, _moduleSymbolId, GetQualifiedTypeName(@enum));
         }
 
         foreach (var @delegate in module.Delegates)
@@ -1143,10 +1137,29 @@ public sealed class Binder
             // symbol is what lets a consumer ask the type instead of the string.
             isDelegate: kind == "delegate")
         {
-            IsReferenceType = kind is "interface" or "delegate"
+            IsReferenceType = kind is "interface" or "delegate",
+            IsEnum = kind == "enum"
         };
         TrackSymbol(symbol);
         return symbol;
+    }
+
+    private void RegisterEnum(EnumDefinitionNode declaration, SymbolId parentIdentity, string qualifiedName)
+    {
+        var owner = RegisterTypeSymbol(parentIdentity, "enum", declaration.Id, declaration.Name,
+            qualifiedName, declaration.Visibility, declaration.IdentifierSpan, declaration.Span);
+        _enumMembers.Add(owner.Id, declaration.Members.Select(member =>
+        {
+            var symbol = new VariableSymbol(
+                CreateDeclarationId(owner.Id, "enum-member", stableAstId: null, member.Name),
+                member.Name, qualifiedName, isMutable: false, declarationSpan: member.IdentifierSpan,
+                declaringTypeName: qualifiedName, isField: true, isStatic: true)
+            {
+                IsEnumMember = true
+            };
+            TrackSymbol(symbol);
+            return symbol;
+        }).ToArray());
     }
 
     private void RegisterInterface(InterfaceDefinitionNode declaration, SymbolId parentIdentity, string qualifiedName)
@@ -1406,15 +1419,7 @@ public sealed class Binder
         }
         foreach (var nested in cls.NestedEnums)
         {
-            RegisterTypeSymbol(
-                classIdentity,
-                "enum",
-                nested.Id,
-                nested.Name,
-                $"{qualifiedClassName}.{nested.Name}",
-                nested.Visibility,
-                nested.IdentifierSpan,
-                nested.Span);
+            RegisterEnum(nested, classIdentity, $"{qualifiedClassName}.{nested.Name}");
         }
         foreach (var nested in cls.NestedDelegates)
         {
@@ -3991,8 +3996,25 @@ public sealed class Binder
         bool isPatternMember = false)
     {
         var target = boundTarget
+            ?? TryBindSourceEnumTypeReceiver(fieldAccess.Target)
             ?? TryBindMetadataTypeReceiver(fieldAccess.Target)
             ?? BindExpression(fieldAccess.Target);
+        if (target is BoundTypeReferenceExpression { ResolvedType: { IsEnum: true } enumType })
+        {
+            var members = _enumMembers[enumType.Id].Where(member => member.Name == fieldAccess.FieldName).ToArray();
+            if (members is [var member] && IsSourceEnumAccessible(enumType))
+                return new BoundFieldAccessExpression(fieldAccess.Span, target, fieldAccess.FieldName,
+                    enumType.QualifiedName, member, fieldAccess.FieldNameSpan,
+                    resolvedType: new BoundTypes.NominalBoundType(enumType.QualifiedName, declaration: enumType));
+            _diagnostics.ReportError(fieldAccess.FieldNameSpan, DiagnosticCode.UndefinedReference,
+                $"Enum member '{enumType.QualifiedName}.{fieldAccess.FieldName}' is missing, ambiguous or inaccessible.");
+            return new BoundFieldAccessExpression(fieldAccess.Span, target, fieldAccess.FieldName, typeName: null,
+                fieldNameSpan: fieldAccess.FieldNameSpan,
+                resolvedType: new BoundTypes.UnresolvedBoundType("Unresolved source enum member", reported: true))
+            {
+                HasUnknownInferredType = true
+            };
+        }
         if (fieldAccess.FieldName == "Length" && IsArrayReceiver(target))
             return new BoundArrayLength(fieldAccess.Span, target);
         if (fieldAccess.FieldName == "Length" && target is BoundStringLiteral
@@ -4030,10 +4052,12 @@ public sealed class Binder
         BoundTypes.BoundType? resolvedType = null;
         if (fields is [var field])
         {
+            if (ResolveVariableEnumType(field) is { } fieldEnum)
+                resolvedType = new BoundTypes.NominalBoundType(fieldEnum.QualifiedName, declaration: fieldEnum);
             var identity = TryBuildVariableReference(field);
             var isString = TryBuildDeclaredNullabilityShape(field.TypeName, out var declared)
                 && declared is BoundTypes.NominalBoundType { QualifiedName: "STRING" };
-            if (identity is not null || isString)
+            if (resolvedType is null && (identity is not null || isString))
                 resolvedType = new BoundTypes.NominalBoundType(
                     field.TypeName, field.NullableAnnotation, identity?.Declaration, identity?.RoslynSymbol);
         }
@@ -4139,6 +4163,8 @@ public sealed class Binder
         var head = name.Split('.')[0];
         if (IsTypeReceiverHeadShadowed(head, allowDeclaredTypes: false))
             return null;
+        if (ResolveSourceType(name, _currentClassName, _currentNamespaceIdentity, _currentNamespaceScopeId).Handled)
+            return null;
         if (expression is ReferenceNode { IsVerbatim: true }
             && SyntaxFactory.ParseTypeName(name) is PredefinedTypeSyntax)
             return null;
@@ -4152,6 +4178,134 @@ public sealed class Binder
                 ? new BoundTypeReferenceExpression(expression.Span, name,
                     Metadata.MetadataBinderResult.ToNominalBoundType(symbol))
                 : null;
+    }
+
+    private BoundTypeReferenceExpression? TryBindSourceEnumTypeReceiver(ExpressionNode expression)
+    {
+        var name = DottedReferenceName(expression);
+        if (name is null
+            || !name.StartsWith("global::", StringComparison.Ordinal)
+                && IsTypeReceiverHeadShadowed(name.Split('.')[0], allowDeclaredTypes: true))
+            return null;
+        var resolved = ResolveSourceType(name, _currentClassName, _currentNamespaceIdentity, _currentNamespaceScopeId);
+        return resolved.Type is { IsEnum: true } owner
+            ? new BoundTypeReferenceExpression(expression.Span, name,
+                new BoundTypes.NominalBoundType(owner.QualifiedName, declaration: owner), owner)
+            : null;
+    }
+
+    private (bool Handled, TypeSymbol? Type) ResolveSourceType(
+        string name, string? containingTypeName, string? namespaceIdentity, string? scopeId)
+    {
+        if (_enumMembers.Count == 0)
+            return default;
+        var global = name.StartsWith("global::", StringComparison.Ordinal);
+        var spelling = global ? name["global::".Length..] : name;
+        spelling = string.Join(".", spelling.Split('.').Select(part => part.TrimStart('@')));
+        var head = spelling.Split('.')[0];
+        var visibleScopes = new HashSet<string>(StringComparer.Ordinal);
+        for (var id = scopeId; id is not null;)
+        {
+            if (!visibleScopes.Add(id) || !_metadataNamespaceScopes.TryGetValue(id, out var scope))
+                return (true, null);
+            id = scope.ParentScopeId;
+        }
+        var imports = _metadataUsings.Where(import =>
+            import.NamespaceScopeId is null || visibleScopes.Contains(import.NamespaceScopeId)).ToArray();
+        var aliases = global ? [] : imports.Where(import => import.Alias == head).ToArray();
+        if (aliases.Length > 1)
+            return (true, null);
+        var types = _symbolsById.Values.OfType<TypeSymbol>().ToArray();
+        foreach (var lookup in ReferenceLookupNames(
+            global ? "global::" + spelling : spelling, containingTypeName ?? namespaceIdentity))
+        {
+            var matches = types.Where(type => type.QualifiedName == lookup).Take(2).ToArray();
+            if (matches.Length > 0)
+                return aliases.Length == 0 && matches is [var match] ? (true, match) : (true, null);
+            var separator = lookup.Length - spelling.Length - 1;
+            if (separator > 0 && _classesByQualifiedName.TryGetValue(lookup[..separator], out var owner)
+                && EnumerateCurrentClassInteropBlocks(owner).Any(block =>
+                    CSharpSyntaxTree.ParseText("class __Host { " + block.CSharpCode + " }").GetCompilationUnitRoot()
+                        .Members.OfType<ClassDeclarationSyntax>().SelectMany(host => host.Members).Any(member => member switch
+                        {
+                            BaseTypeDeclarationSyntax type => type.Identifier.ValueText == head,
+                            DelegateDeclarationSyntax type => type.Identifier.ValueText == head,
+                            _ => false
+                        })))
+                return (true, null);
+        }
+        if (aliases is [var alias])
+        {
+            var target = alias.Namespace.Replace("global::", "", StringComparison.Ordinal)
+                + spelling[head.Length..];
+            var matches = types.Where(type => type.QualifiedName == target).Take(2).ToArray();
+            return matches.Length == 0 ? default : (true, matches is [var match] ? match : null);
+        }
+        if (global)
+            return default;
+        var imported = imports.Where(import => import.Alias is null && !import.IsStatic)
+            .SelectMany(import => types.Where(type => type.QualifiedName == import.Namespace + "." + spelling))
+            .Distinct().Take(2).ToArray();
+        if (imported.Length == 0)
+            return default;
+        // A metadata import can compete with a source import; neither spelling wins by itself.
+        if (GetOrCreateMetadataBinder() is { } metadata
+            && ResolveScopedMetadataType(metadata.Context, spelling, 0, scopeId, namespaceIdentity).Type is not null)
+            return (true, null);
+        return (true, imported is [var importedType] ? importedType : null);
+    }
+
+    private bool IsSourceEnumAccessible(TypeSymbol type)
+    {
+        while (true)
+        {
+            var separator = type.QualifiedName.LastIndexOf('.');
+            if (separator < 0 || !_classesByQualifiedName.TryGetValue(type.QualifiedName[..separator], out var owner))
+                return type.Visibility is Visibility.Public or Visibility.Internal;
+            var accessible = type.Visibility switch
+            {
+                Visibility.Private => IsWithinDeclaringType(type.QualifiedName[..separator]),
+                Visibility.Protected or Visibility.PrivateProtected =>
+                    _currentClass != null && IsSameOrDerivedClass(_currentClass, type.QualifiedName[..separator]),
+                _ => true
+            };
+            if (!accessible)
+                return false;
+            type = _classSymbols[owner];
+        }
+    }
+
+    private TypeSymbol? ResolveCallableEnumType(FunctionSymbol function, string typeName)
+    {
+        if (_enumMembers.Count == 0 || function.TypeParameters.Contains(typeName, StringComparer.Ordinal))
+            return null;
+        _functionNamespaces.TryGetValue(function.Id, out var ns);
+        var scopeId = _functionSymbols.FirstOrDefault(pair => pair.Value == function).Key?.NamespaceScopeId;
+        if (function.ContainingTypeName is not null
+            && _classesByQualifiedName.TryGetValue(function.ContainingTypeName, out var owner))
+        {
+            if (ReturnShape.GetCallableTypeParameters(owner, _asyncTypeModule).Any(parameter => parameter.Name == typeName))
+                return null;
+            ns = owner.NamespaceIdentity;
+            scopeId = owner.NamespaceScopeId;
+        }
+        return ResolveSourceType(typeName, function.ContainingTypeName, ns, scopeId).Type
+            is { IsEnum: true } type ? type : null;
+    }
+
+    private string ResolveEnumParameterType(FunctionSymbol function, string typeName) =>
+        ResolveCallableEnumType(function, typeName) is { } type ? "global::" + type.QualifiedName : typeName;
+
+    private TypeSymbol? ResolveVariableEnumType(VariableSymbol variable)
+    {
+        var owner = variable.DeclaringTypeName is { } ownerName
+            ? _classesByQualifiedName.GetValueOrDefault(ownerName) : null;
+        if (owner is null ? GetTypeParameterConstraints(variable.TypeName) is not null
+            : ReturnShape.GetCallableTypeParameters(owner, _asyncTypeModule).Any(parameter => parameter.Name == variable.TypeName))
+            return null;
+        return ResolveSourceType(variable.TypeName, variable.DeclaringTypeName ?? _currentClassName,
+            owner?.NamespaceIdentity ?? _currentNamespaceIdentity,
+            owner?.NamespaceScopeId ?? _currentNamespaceScopeId).Type is { IsEnum: true } type ? type : null;
     }
 
     private BoundTypeReferenceExpression? TryBindPredefinedTypeReceiver(ExpressionNode expression)
@@ -4204,13 +4358,18 @@ public sealed class Binder
                 BoundTypes.NullableAnnotation.NotAnnotated,
             _ => BoundTypes.NullableAnnotation.Oblivious
         };
+        BoundTypes.BoundType? resolvedType = callable;
+        if (typeOp.Operation == TypeOp.Cast && GetTypeParameterConstraints(typeOp.TargetType) is null
+            && ResolveSourceType(typeOp.TargetType, _currentClassName, _currentNamespaceIdentity,
+                _currentNamespaceScopeId).Type is { IsEnum: true } enumType)
+            resolvedType = new BoundTypes.NominalBoundType(enumType.QualifiedName, declaration: enumType);
         return new BoundTypeOperationExpression(
             typeOp.Span,
             typeOp.Operation,
             operand,
             typeOp.TargetType,
             annotation,
-            resolvedType: callable);
+            resolvedType: resolvedType);
     }
 
     private BoundExpression BindIsPattern(IsPatternNode isPattern)
@@ -5778,10 +5937,12 @@ public sealed class Binder
                 var receiverSpan = new Parsing.TextSpan(
                     refNode.Span.Start, lastDot, refNode.Span.Line, refNode.Span.Column);
                 var receiverNode = new ReferenceNode(receiverSpan, receiverName, refNode.IsVerbatim);
-                BoundExpression? receiver = TryBindMetadataTypeReceiver(receiverNode);
+                BoundExpression? receiver = TryBindSourceEnumTypeReceiver(receiverNode)
+                    ?? TryBindMetadataTypeReceiver(receiverNode);
                 if (receiver is null && _scope.Lookup(receiverName) is VariableSymbol)
                     receiver = BindReferenceExpression(receiverNode);
-                if (receiver?.Type is BoundTypes.NominalBoundType { RoslynSymbol: not null }
+                if (receiver is BoundTypeReferenceExpression { ResolvedType.IsEnum: true }
+                    || receiver?.Type is BoundTypes.NominalBoundType { RoslynSymbol: not null }
                     || receiver is not null && ResolveMetadataArrayProperty(receiver, refNode.Name[(lastDot + 1)..]) is not null
                     || refNode.Name[(lastDot + 1)..] == "Length"
                         && receiver is not null && (IsArrayReceiver(receiver)
@@ -5861,6 +6022,9 @@ public sealed class Binder
             var identity = variables.Length == 1
                 ? TryBuildVariableReference(variables[0])
                 : null;
+            if (variables is [var variable] && ResolveVariableEnumType(variable) is { } enumType)
+                return new BoundVariableExpression(refNode.Span, variable, variables,
+                    typeOverride: new BoundTypes.NominalBoundType(enumType.QualifiedName, declaration: enumType));
             return new BoundVariableExpression(refNode.Span, variables[0], variables,
                 typeOverride: null, referenceIdentity: identity);
         }
@@ -6390,8 +6554,10 @@ public sealed class Binder
         if (annotatedReturn is null
             && resolution.Function is { } calorReturnee)
         {
+            if (ResolveCallableEnumType(calorReturnee, returnType) is { } returnEnum)
+                annotatedReturn = new BoundTypes.NominalBoundType(returnEnum.QualifiedName, declaration: returnEnum);
             var declaredAnnotation = TryReadDeclaredStringAnnotation(calorReturnee.ReturnType);
-            if (declaredAnnotation != BoundTypes.NullableAnnotation.Oblivious)
+            if (annotatedReturn is null && declaredAnnotation != BoundTypes.NullableAnnotation.Oblivious)
             {
                 var identity = TryBuildCallableReference(calorReturnee.ReturnType, calorReturnee);
                 annotatedReturn = new BoundTypes.NominalBoundType(
@@ -6830,12 +6996,13 @@ public sealed class Binder
         var lookupNames = interfaceCandidates is not null ? ["<interface-call>"]
             : computedReceiver is null ? GetCallLookupNames(target)
             : EnumerateHierarchyLookupNames(ResolveClass(computedReceiver.Type.DisplayString), computedMethodName!);
-        var opaqueTarget = computedReceiver switch
-        {
-            null => target,
-            BoundThisExpression => computedMethodName,
-            _ => null
-        };
+        var overloadTypeArguments = typeArguments?.Select(typeArgument =>
+            GetTypeParameterConstraints(typeArgument) is null
+                && ResolveSourceType(typeArgument, _currentClassName, _currentNamespaceIdentity,
+                    _currentNamespaceScopeId).Type is { IsEnum: true } enumType
+                    ? "global::" + enumType.QualifiedName : typeArgument).ToArray();
+        var opaqueOwner = computedReceiver is null ? _currentClass : ResolveClass(computedReceiver.Type.FullyQualifiedName);
+        var opaqueTarget = computedReceiver is null ? target : computedMethodName;
         foreach (var lookupName in lookupNames.Distinct(StringComparer.Ordinal))
         {
             var requireStatic = computedReceiver is BoundTypeReferenceExpression
@@ -6845,7 +7012,7 @@ public sealed class Binder
                 argumentTypes,
                 argumentNames,
                 argumentModifiers,
-                typeArguments,
+                overloadTypeArguments,
                 allowNullableStringCompatibility,
                 requireStatic,
                 requireInstance: computedReceiver is not null and not BoundTypeReferenceExpression,
@@ -6857,7 +7024,7 @@ public sealed class Binder
                     || resolution.Kind == OverloadResolutionKind.Resolved
                         && !resolution.Functions.Any(_localFunctionSymbols.Contains))
                 && opaqueTarget != null
-                && CurrentClassHasOpaqueMethodDeclaration(opaqueTarget, typeArguments?.Count))
+                && HasOpaqueMethodDeclaration(opaqueOwner, opaqueTarget, typeArguments?.Count))
             {
                 // A native winner is not authoritative when a preserved overload
                 // can compete; leave the call unresolved for downstream analysis.
@@ -6887,7 +7054,7 @@ public sealed class Binder
                 // Preserve actual prior rejection, not a guess based on the new
                 // winner: an OBJECT overload may already have accepted this call.
                 var previous = ResolveAccessibleOverload(
-                    lookupName, argumentTypes, argumentNames, argumentModifiers, typeArguments,
+                    lookupName, argumentTypes, argumentNames, argumentModifiers, overloadTypeArguments,
                     requireStatic: requireStatic,
                     requireInstance: computedReceiver is not null and not BoundTypeReferenceExpression,
                     candidateOverrides: interfaceCandidates);
@@ -6920,9 +7087,9 @@ public sealed class Binder
         return OverloadResolutionResult.NotFound();
     }
 
-    private bool CurrentClassHasOpaqueMethodDeclaration(string target, int? typeArgumentCount)
+    private bool HasOpaqueMethodDeclaration(ClassDefinitionNode? owner, string target, int? typeArgumentCount)
     {
-        if (_currentClass == null)
+        if (owner == null)
             return false;
 
         var methodName = target.StartsWith("this.", StringComparison.Ordinal)
@@ -6931,10 +7098,16 @@ public sealed class Binder
         if (methodName.Contains('.', StringComparison.Ordinal))
             return false;
 
-        return EnumerateCurrentClassInteropBlocks(_currentClass)
-            .Any(block => GetInteropMethodArities(block).Any(method =>
-                string.Equals(method.Name, methodName, StringComparison.Ordinal)
-                && (typeArgumentCount == null || method.Arity == typeArgumentCount)));
+        var visited = new HashSet<ClassDefinitionNode>();
+        for (var current = owner; current != null && visited.Add(current); current = ResolveBaseClass(current))
+        {
+            if (EnumerateCurrentClassInteropBlocks(current)
+                .Any(block => GetInteropMethodArities(block).Any(method =>
+                    string.Equals(method.Name, methodName, StringComparison.Ordinal)
+                    && (typeArgumentCount == null || method.Arity == typeArgumentCount))))
+                return true;
+        }
+        return false;
     }
 
     private static IEnumerable<CSharpInteropBlockNode> EnumerateCurrentClassInteropBlocks(
@@ -6971,6 +7144,8 @@ public sealed class Binder
 
     private string GetOverloadArgumentType(BoundExpression argument, string? argumentModifier)
     {
+        if (argument.Type is BoundTypes.NominalBoundType { Declaration.IsEnum: true } enumType)
+            return "global::" + enumType.Declaration.QualifiedName;
         if (argument is not BoundVariableExpression variable
             || argumentModifier is not ("ref" or "out"))
         {
@@ -7028,7 +7203,8 @@ public sealed class Binder
             typeArguments,
             GetImplicitConversionCost,
             allowNullableStringCompatibility,
-            IsBetterNullConversionTarget);
+            IsBetterNullConversionTarget,
+            ResolveEnumParameterType);
         return resolved.Function is { } winner && duplicates.TryGetValue(winner, out var ambiguous)
             ? OverloadResolutionResult.Ambiguous(ambiguous) : resolved;
     }
@@ -7356,7 +7532,9 @@ public sealed class Binder
         if (GetTypeParameterConstraints(head) != null)
             return false;
 
-        return ResolveClass(head) == null;
+        return ResolveClass(head) == null
+            && ResolveSourceType(head, _currentClassName, _currentNamespaceIdentity, _currentNamespaceScopeId).Type
+                is not { IsEnum: true };
     }
 
     /// <summary>

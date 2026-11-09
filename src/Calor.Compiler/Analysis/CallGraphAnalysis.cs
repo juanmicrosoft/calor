@@ -90,6 +90,8 @@ public sealed class CallGraphAnalysis
             MetadataMemberReceiverTypes { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), Microsoft.CodeAnalysis.IFieldSymbol>
             MetadataEnumConstants { get; } = new();
+        internal Dictionary<(string CallerId, int Start, int End), VariableSymbol>
+            SourceEnumConstants { get; } = new();
         internal HashSet<(string CallerId, int Start, int End)> UnresolvedArgumentCalls { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), Microsoft.CodeAnalysis.IArrayTypeSymbol>
             MetadataArrayTypes { get; } = new();
@@ -130,6 +132,12 @@ public sealed class CallGraphAnalysis
 
     internal Microsoft.CodeAnalysis.IFieldSymbol? MetadataEnumConstant(string callerId, TextSpan span) =>
         _boundValues.MetadataEnumConstants.GetValueOrDefault((callerId, span.Start, span.End));
+
+    internal VariableSymbol? SourceEnumConstant(string callerId, TextSpan span) =>
+        _boundValues.SourceEnumConstants.GetValueOrDefault((callerId, span.Start, span.End));
+
+    internal bool IsResolvedEnumConstant(string callerId, TextSpan span) =>
+        SourceEnumConstant(callerId, span) is not null || MetadataEnumConstant(callerId, span) is not null;
 
     internal bool HasUnresolvedCallArguments(string callerId, TextSpan span) =>
         _boundValues.UnresolvedArgumentCalls.Contains((callerId, span.Start, span.End));
@@ -906,6 +914,12 @@ public sealed class CallGraphAnalysis
 
                 foreach (var node in DescendantsAndSelf(function))
                 {
+                    if (node is BoundFieldAccessExpression
+                        {
+                            Target: BoundTypeReferenceExpression { ResolvedType.IsEnum: true },
+                            ResolvedField: { IsEnumMember: true } sourceConstant
+                        })
+                        boundValues.SourceEnumConstants.TryAdd((callerId, node.Span.Start, node.Span.End), sourceConstant);
                     if (node is BoundFieldAccessExpression
                         {
                             Target: BoundTypeReferenceExpression,
