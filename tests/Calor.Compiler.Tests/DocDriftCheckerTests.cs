@@ -129,6 +129,12 @@ public class DocDriftCheckerTests
         new[] { "ContractReview", "LoopReview", "BoundedFactorial", "ExtractedCalculation" },
         new[] { "42", "15", "120", "25" },
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()" })]
+    [InlineData("getting-started/index.mdx", 1, 0,
+        new[] { "MyApp" }, new[] { "0" },
+        new[] { "((System.Func<int>)(() => { GlobalModule.Main(); return 0; }))()" })]
+    [InlineData("getting-started/installation.mdx", 1, 0,
+        new[] { "InstalledHello" }, new[] { "0" },
+        new[] { "((System.Func<int>)(() => { GlobalModule.Main(); return 0; }))()" })]
     [InlineData("cli/init.mdx", 1, 0,
         new[] { "InitializedExample" }, new[] { "42" }, new[] { "GlobalModule.Answer()" })]
     [InlineData("cli/compile.mdx", 2, 1,
@@ -746,6 +752,28 @@ public class DocDriftCheckerTests
                     public static object? Run() => {{call}};
                 }
                 """));
+    }
+
+    [Theory]
+    [InlineData("getting-started/index.mdx")]
+    [InlineData("getting-started/installation.mdx")]
+    public void PublicGettingStarted_ExecutesPublishedEntryPointWithNormalEnforcement(string page)
+    {
+        var path = "website/content/" + page;
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path));
+        var source = Assert.Single(ExemplarCompileChecker.ExtractCompletePrograms(content)).Source;
+        var directory = Path.Combine(Path.GetTempPath(), "calor-published-start-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var input = Path.Combine(directory, "Program.calr");
+            File.WriteAllText(input, source);
+            var run = CliTestHarness.RunCli(directory, "run", input);
+            Assert.True(run.ExitCode == 0, run.StdOut + run.StdErr);
+            Assert.EndsWith("Hello from Calor!\n", run.StdOut.Replace("\r\n", "\n"));
+            Assert.DoesNotContain("Hello, World!", run.StdOut);
+        }
+        finally { Directory.Delete(directory, recursive: true); }
     }
 
     [Fact]

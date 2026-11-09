@@ -156,12 +156,19 @@ If you want to contribute to Calor or build from source:
 git clone https://github.com/juanmicrosoft/calor.git
 cd calor
 
+# Download the verified Z3 assets required by the compiler build
+src/Calor.Compiler/scripts/download-z3.sh
+
 # Build the entire solution
 dotnet build
 
 # Verify the build
 dotnet run --project src/Calor.Compiler -- --help
 ```
+
+On Windows, run `src/Calor.Compiler/scripts/download-z3.ps1` instead of the
+shell script. Building from source needs these assets even if you are not
+using contract verification.
 
 Expected output:
 ```text illustrative
@@ -214,30 +221,32 @@ After compilation, you need a C# project to run the generated code:
 
 ### Option 1: Use the HelloWorld Sample
 
-```bash
-# Compile your Calor file
-dotnet run --project src/Calor.Compiler -- \
-  --input your-program.calr \
-  --output samples/HelloWorld/your-program.g.cs
+From the repository root, build and run the checked-in sample:
 
-# Run it (requires modifying HelloWorld.csproj or including the file)
+```bash
+dotnet run --project src/Calor.Compiler -- \
+  --input samples/HelloWorld/hello.calr \
+  --output samples/HelloWorld/hello.g.cs
+
 dotnet run --project samples/HelloWorld
 ```
 
+Do not add another generated file containing a second `Main` to that sample.
+
 ### Option 2: Create a New Project
 
+For an independent project, use the complete
+[Hello World walkthrough](/docs/getting-started/hello-world/). It covers both
+`calor run Program.calr` and generating C# for a new console project, including
+removal of only the new template entry point.
+
+When using the source-built compiler instead of an installed tool, run this
+from the repository root, replacing the paths with your files:
+
 ```bash
-# Create a new console project
-dotnet new console -o MyCalorProgram
-cd MyCalorProgram
-
-# Compile Calor to the project directory
-dotnet run --project ../src/Calor.Compiler -- \
-  --input ../my-code.calr \
-  --output my-code.g.cs
-
-# Run the program
-dotnet run
+dotnet run --project src/Calor.Compiler -- \
+  --input path/to/Program.calr \
+  --output path/to/Program.g.cs
 ```
 
 ---
@@ -268,6 +277,14 @@ dotnet run --project tests/Calor.Evaluation -- --output report.md --format markd
 
 ## Troubleshooting
 
+### Tool Not Found
+
+If installation succeeds but `calor --version` is not found, ensure the .NET
+global-tool directory is on your `PATH`: `$HOME/.dotnet/tools` on macOS and Linux,
+or `%USERPROFILE%\.dotnet\tools` on Windows. Reopen the terminal after changing
+`PATH`. Run `dotnet tool list -g` to check that `calor` is installed for the
+current user.
+
 ### Build Errors
 
 **"SDK not found":**
@@ -290,12 +307,20 @@ ls src/
 ### Runtime Errors
 
 **"Main method not found":**
-- Ensure your Calor code has a public `Main` function:
-  ```
-  §F{Main:pub}
-    §O{void}
-    // ...
-  ```
+
+Use a complete program with an entry point:
+
+```calor
+module InstalledHello
+  func Main public () → void
+    ! cw
+    System.Console.WriteLine("Hello from Calor!")
+```
+
+The generated entry point is `GlobalModule.Main`, not
+`InstalledHello.Main`. A console project's template `Program.cs` takes
+precedence over that entry point. Remove it only when it is the untouched
+template created for this walkthrough, not an existing application's source.
 
 ---
 

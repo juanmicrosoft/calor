@@ -57,12 +57,14 @@ dotnet tool update -g calor
 
 ## Quick Start
 
-Calor integrates into any .NET project. Start with a C# project (new or existing), enable Calor, and from that point forward all new code is written in Calor.
+This walkthrough creates a new console project and replaces its template entry
+point with Calor. For an existing application, keep its entry point and follow
+the [adoption guide](/docs/guides/adoption-playbook/) instead.
 
 ### Step 1: Start with a C# Project
 
 ```bash
-# Create a new project, or use an existing one
+# Create a new project in a new directory
 dotnet new console -o MyApp
 cd MyApp
 ```
@@ -108,21 +110,39 @@ hooks. GitHub Copilot is guidance-based with MCP tool support.
 
 ### Step 4: Write Calor Code
 
-After init, create `.calr` files and they compile automatically. Create `Program.calr`:
+Remove only the `Program.cs` just created by `dotnet new console`. Its top-level
+entry point would otherwise run instead of the Calor `Main`.
+
+```bash
+# macOS or Linux, inside the new MyApp directory
+rm Program.cs
+```
+
+In PowerShell, use `Remove-Item Program.cs`. Do not remove an existing
+application's entry point.
+
+Create `Program.calr` with this complete program:
 
 ```calor
-§M{MyApp}
-  §F{Main:pub}
-    §O{void}
-    §E{cw}
-    §P "Hello from Calor!"
+module MyApp
+  func Main public () → void
+    ! cw
+    System.Console.WriteLine("Hello from Calor!")
 ```
 
 Then build:
 
 ```bash
 dotnet build
+dotnet run --no-build --no-launch-profile
 ```
+
+The program prints `Hello from Calor!`. `! cw` declares console output; the
+indented call is the function body. The file label `MyApp` is not a C# namespace
+or static class. This program emits `GlobalModule.Main`.
+
+Builds maintain declaration identities in `.calor/ids.json`. Commit that sidecar
+alongside your `.calr` files; do not put declaration IDs in source.
 
 See [Hello World](/docs/getting-started/hello-world/) for a detailed explanation of the syntax.
 
