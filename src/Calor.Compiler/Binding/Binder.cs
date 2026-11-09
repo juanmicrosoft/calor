@@ -228,7 +228,9 @@ public sealed class Binder
         BoundExpression? computedReceiver = null,
         IReadOnlyList<string>? typeArguments = null)
     {
-        if (args.Any(argument => argument.HasUnknownInferredType)
+        if (args.Where((argument, index) => argument.HasUnknownInferredType
+                || argument is BoundVariableExpression { Variable: { Id.IsNone: true, Name: var name } }
+                    && (name != "_" || argumentModifiers?.ElementAtOrDefault(index) != "out")).Any()
             || computedReceiver?.HasUnknownInferredType == true
             || computedReceiver is BoundVariableExpression { Variable.Id.IsNone: true })
             return null;
@@ -4052,8 +4054,11 @@ public sealed class Binder
         if (fields.Length == 0
             && target.Type is BoundTypes.NominalBoundType
             {
-                RoslynSymbol: { IsReferenceType: true, IsGenericType: false } receiverType
-            })
+                RoslynSymbol: { IsGenericType: false } receiverType
+            }
+            && (receiverType.IsReferenceType
+                || target is BoundTypeReferenceExpression
+                    && receiverType.TypeKind == Microsoft.CodeAnalysis.TypeKind.Enum))
         {
             var metadataBinder = GetOrCreateMetadataBinder();
             string? reason = "The metadata context is unavailable.";
@@ -4065,8 +4070,10 @@ public sealed class Binder
                 Microsoft.CodeAnalysis.IFieldSymbol metadataField => metadataField.Type,
                 _ => null
             };
-            if (memberType is Microsoft.CodeAnalysis.INamedTypeSymbol
-                { IsReferenceType: true, IsGenericType: false })
+            if (memberType is Microsoft.CodeAnalysis.INamedTypeSymbol namedMemberType
+                && (namedMemberType is { IsReferenceType: true, IsGenericType: false }
+                    || member is Microsoft.CodeAnalysis.IFieldSymbol { IsConst: true, Type.TypeKind: Microsoft.CodeAnalysis.TypeKind.Enum }
+                        && Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(namedMemberType, receiverType)))
             {
                 return new BoundFieldAccessExpression(
                     fieldAccess.Span, target, fieldAccess.FieldName, typeName: null,

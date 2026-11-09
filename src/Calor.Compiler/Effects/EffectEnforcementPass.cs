@@ -5541,6 +5541,8 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromMemberAccess(ExpressionNode target, string memberName, TextSpan span)
         {
+            if (_context.CallGraph.MetadataEnumConstant(_context.CurrentFunctionId, span) is not null)
+                return EffectSet.Empty;
             var effects = InferFromExpression(target);
             var targetType = InferExpressionType(target);
             if (memberName == "Length"
@@ -5614,6 +5616,8 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromReference(ReferenceNode reference, bool chargeMethodGroup = true)
         {
+            if (_context.CallGraph.MetadataEnumConstant(_context.CurrentFunctionId, reference.Span) is not null)
+                return EffectSet.Empty;
             if (!TrySplitMemberReference(reference.Name, out var receiver, out var member))
             {
                 if (!chargeMethodGroup

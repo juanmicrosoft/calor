@@ -88,6 +88,8 @@ public sealed class CallGraphAnalysis
             MetadataValueTypes { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), Binding.BoundTypes.NominalBoundType>
             MetadataMemberReceiverTypes { get; } = new();
+        internal Dictionary<(string CallerId, int Start, int End), Microsoft.CodeAnalysis.IFieldSymbol>
+            MetadataEnumConstants { get; } = new();
         internal HashSet<(string CallerId, int Start, int End)> UnresolvedArgumentCalls { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), Microsoft.CodeAnalysis.IArrayTypeSymbol>
             MetadataArrayTypes { get; } = new();
@@ -125,6 +127,9 @@ public sealed class CallGraphAnalysis
 
     internal Binding.BoundTypes.NominalBoundType? MetadataMemberReceiverType(string callerId, TextSpan span) =>
         _boundValues.MetadataMemberReceiverTypes.GetValueOrDefault((callerId, span.Start, span.End));
+
+    internal Microsoft.CodeAnalysis.IFieldSymbol? MetadataEnumConstant(string callerId, TextSpan span) =>
+        _boundValues.MetadataEnumConstants.GetValueOrDefault((callerId, span.Start, span.End));
 
     internal bool HasUnresolvedCallArguments(string callerId, TextSpan span) =>
         _boundValues.UnresolvedArgumentCalls.Contains((callerId, span.Start, span.End));
@@ -901,6 +906,13 @@ public sealed class CallGraphAnalysis
 
                 foreach (var node in DescendantsAndSelf(function))
                 {
+                    if (node is BoundFieldAccessExpression
+                        {
+                            Target: BoundTypeReferenceExpression,
+                            ResolvedMetadataMember: Microsoft.CodeAnalysis.IFieldSymbol
+                                { IsConst: true, Type.TypeKind: Microsoft.CodeAnalysis.TypeKind.Enum } constant
+                        })
+                        boundValues.MetadataEnumConstants.TryAdd((callerId, node.Span.Start, node.Span.End), constant);
                     if (node is BoundFieldAccessExpression
                         { Target.Type: Binding.BoundTypes.NominalBoundType { RoslynSymbol: not null } memberReceiver })
                         boundValues.MetadataMemberReceiverTypes.TryAdd(

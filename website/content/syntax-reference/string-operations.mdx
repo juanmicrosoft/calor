@@ -4,155 +4,157 @@ section: "syntax-reference"
 order: 11
 ---
 
-Calor string operations use the same prefix notation as other expressions and
-emit the corresponding .NET operations.
+Use ordinary .NET string members, postfix calls and indexing. Calor strings use
+the same UTF-16 representation as C# strings; `Length` counts code units, not
+displayed characters.
 
-## Core Operations
+## Core operations
 
-| Operation | Syntax | C# equivalent |
-|:----------|:-------|:--------------|
-| Length | `(len s)` | `s.Length` |
-| Case | `(upper s)`, `(lower s)` | `s.ToUpper()`, `s.ToLower()` |
-| Trim | `(trim s)` | `s.Trim()` |
-| Search | `(contains s sub)`, `(starts s prefix)`, `(ends s suffix)` | Matching string methods |
-| Index | `(indexof s sub)` | `s.IndexOf(sub)` |
-| Index from | `(indexof s sub start)`, `(indexof s sub start count)` | `s.IndexOf(sub, start)`, `s.IndexOf(sub, start, count)` |
-| Slice | `(substr s start len)` | `s.Substring(start, len)` |
-| Replace | `(replace s old new)` | `s.Replace(old, new)` |
-| Concatenate | `(concat a b)` | `a + b` |
-| Equality | `(equals a b)` | `a.Equals(b)` |
-
-```calor
-§B{length:i32} (len "hello")
-§B{found:bool} (contains "hello world" "world")
-§B{sub:str} (substr "hello" 1 3)
-```
-
-## Operand counts
-
-Every built-in operation checks its operand count. Too many or too few operands
-is error `Calor0110`, which names the allowed count. Before 0.27, extra operands
-to `contains`, `starts`, `ends`, `equals`, `indexof` and `str` were accepted and
-silently dropped, so `(indexof s "@" 3)` compiled to `s.IndexOf("@")`. Comparison
-operators (`==`, `!=`, `<`, `<=`, `>`, `>=`) and `**` take exactly two operands;
-`(< a b c)` is `Calor0110` rather than `(a < b) < c`.
-
-## Comparison Modes
-
-`contains`, `starts`, `ends`, `indexof`, and `equals` accept an optional mode:
-
-| Mode | .NET comparison |
-|:-----|:----------------|
-| `:ordinal` | `StringComparison.Ordinal` |
-| `:ignore-case` | `StringComparison.OrdinalIgnoreCase` |
-| `:invariant` | `StringComparison.InvariantCulture` |
-| `:invariant-ignore-case` | `StringComparison.InvariantCultureIgnoreCase` |
-
-Omitting a mode is not uniform in .NET. `contains` and instance `equals` are
-ordinal, while `starts`, `ends`, and `indexof` use the current culture. Specify
-`:ordinal` when culture-independent runtime behavior is required.
-
-### Verification boundary
-
-The verifier refuses non-ordinal comparison modes. It also refuses bare
-`starts`, `ends`, and `indexof`, because those overloads are culture-sensitive.
-Those obligations are `unsupported`, and their runtime checks remain.
-
-Even ordinal string obligations cannot produce an elision-authorizing proof in
-0.13.2. Z3 strings are null-free and measure UTF-8 units, while .NET strings are
-nullable references whose `Length` counts UTF-16 code units. Any otherwise
-modeled proof that depends on the Z3 string sort is therefore demoted to
-`assumed`, which does not authorize proof-based guard removal. Checks still require
-an enabled contract mode and supported lowering. See [verification guarantees](/docs/guides/verification-guarantees/).
-
-## Regex, Character, and StringBuilder Operations
-
-- Regex: `regex-test`, `regex-match`, `regex-replace`, `regex-split`
-- Character access and classification: `char-at`, `char-code`,
-  `char-from-code`, `is-letter`, `is-digit`, `is-whitespace`, `is-upper`,
-  `is-lower`, `char-upper`, `char-lower`
-- StringBuilder: `sb-new`, `sb-append`, `sb-appendline`, `sb-insert`,
-  `sb-remove`, `sb-clear`, `sb-tostring`, `sb-length`
-
-Backslashes in regex patterns must be escaped in Calor strings, so regex `\d`
-is written as `"\\d"`.
-
-## Interpolated Strings
-
-A `${...}` hole inside a string literal is an interpolation hole. The hole holds a Calor
-expression, optionally followed by an alignment (`,10`) and a format specifier (`:F2`), as in C#.
-The compiler emits a C# interpolated string (`$"..."`), so formatting uses the same .NET rules,
-including the current culture.
+| Operation | Native Calor |
+|:----------|:-------------|
+| Length | `text.Length` |
+| Case | `text.ToUpperInvariant()`, `text.ToLowerInvariant()` |
+| Trim | `text.Trim()` |
+| Search | `text.Contains(part, System.StringComparison.Ordinal)` |
+| Prefix and suffix | `text.StartsWith(prefix, System.StringComparison.Ordinal)`, `text.EndsWith(suffix, System.StringComparison.Ordinal)` |
+| Index | `text.IndexOf(part, System.StringComparison.Ordinal)` |
+| Slice | `text.Substring(start, length)` |
+| Replace | `text.Replace(oldValue, newValue)` |
+| Concatenate | `left + right` |
+| Equality | `System.String.Equals(left, right, System.StringComparison.Ordinal)` |
+| Character access | `text[index]` |
 
 ```calor
-§M{Receipt}
-  §F{Line:pub} (str:item, f64:amount) -> str
-    §E{}
-    §R "${item,-8}|${amount,10:F2}|${(* amount 2):F1}"
-
-  §F{Main:pub} () -> void
-    §E{cw}
-    §P §C{Line} §A "coffee" §A 3.5 §/C
+module StringBasics
+  func Main () → string
+    !
+    let string:text = "  hello world  ".Trim()
+    return "${text.Length}:${text.ToUpperInvariant()}:${text.Substring(1, 3)}:${text.Replace("world", "Calor")}"
 ```
 
-Under the invariant or `en-US` culture this prints `coffee  |      3.50|7.0`. Under `de-DE` it
-prints `coffee  |      3,50|7,0`, exactly as the same C# would.
+`Main()` returns `11:HELLO WORLD:ell:hello Calor`. Strings are immutable:
+methods such as `Trim` and `Replace` return a value rather than changing `text`.
+Arguments and overloads are checked as ordinary .NET calls. There is no separate
+prefix-string-operation syntax or operand-count convention.
 
-To write the characters `${` as text, escape the dollar sign: `"\${x}"` is the five characters
-`${x}`.
+## Comparison modes
 
-### Holes are checked like other expressions
+Pass a `System.StringComparison` value when the comparison must not depend on
+the current culture.
 
-Names in a hole are bound, and calls in a hole are effect-checked. An undefined name is reported
-at the hole's own line and column. A call written in C# form, such as `${Console.ReadLine()}`, is
-analyzed as an ordinary call when its target is a dotted name and each argument is a literal, a
-name or a Calor expression. This function must declare `cr` (console read). With `§E{}` it fails
-with `Calor0410`, the "undeclared effect" error:
+| Value | Meaning |
+|:------|:--------|
+| `Ordinal` | Compare without linguistic culture rules |
+| `OrdinalIgnoreCase` | Ordinal comparison, ignoring case |
+| `InvariantCulture` | Use invariant linguistic culture rules |
+| `InvariantCultureIgnoreCase` | Invariant linguistic comparison, ignoring case |
+
+The overloads without a comparison argument do not all behave alike.
+`Contains(string)` and instance `Equals(string)` are ordinal; `StartsWith(string)`,
+`EndsWith(string)` and `IndexOf(string)` use the current culture.
+`ToUpperInvariant` and `ToLowerInvariant` also avoid the current culture.
 
 ```calor
-§M{Greeting}
-  §F{Greet:pub} () -> str
-    §E{cr}
-    §R "hello ${Console.ReadLine()}"
+module StringComparisons
+  func Main () → string
+    !
+    let string:text = "hello world"
+    return "${text.Contains("WORLD", System.StringComparison.OrdinalIgnoreCase)}:${text.StartsWith("hello", System.StringComparison.Ordinal)}:${text.IndexOf("world", System.StringComparison.Ordinal)}:${System.String.Equals("I", "i", System.StringComparison.OrdinalIgnoreCase)}"
 ```
 
-A hole that is not in that form, for example a call with named arguments, stays raw C#. Its
-effects are then *assumed*, and the compiler says so with warning `Calor0419`.
+`Main()` returns `True:True:6:True`.
 
-### Converting C# interpolated strings
+Choosing `Ordinal` defines runtime behavior; it does not by itself establish a
+verification proof. Read the verifier's actual outcome. Only an assumption-free,
+non-vacuous `proven` postcondition is eligible for proof-based guard removal.
+Inconclusive outcomes do not authorize removal. Runtime checks require an enabled
+contract mode and supported lowering. See
+[verification guarantees](/docs/guides/verification-guarantees/).
 
-In C#, the type an interpolated string converts to (its *target type*) can change which overload
-runs. `calor convert` keeps that choice:
+## Regex, characters and StringBuilder
 
-| C# target | Conversion |
-|:----------|:-----------|
-| `string`, `object`, or a return of either | Native Calor string with `${...}` holes. Format specifiers, alignment, culture and left-to-right hole order are kept. |
-| `FormattableString` or `IFormattable`, with at least one hole | Native, wrapped in an explicit cast such as `(cast global::System.FormattableString "x=${x}")`. The cast keeps the overload C# selected, for example `Kind(FormattableString)` over `Kind(object)`. |
-| An `[InterpolatedStringHandler]` parameter: custom logging and assertion APIs, and .NET overloads such as `StringBuilder.Append($"...")` and `string.Create(provider, $"...")` | Not representable. The enclosing statement (as `§RAW`) or member (as `§CSHARP`) is kept as C# interop, so the call still builds its handler, and the report counts it as `string-interpolation-handler`. With fallback disabled (`--no-fallback`) the conversion fails and names that feature instead. |
+Use `System.Text.RegularExpressions.Regex` for regular expressions, `char`
+methods for character classification and `System.Text.StringBuilder` for a
+mutable buffer. Backslashes in a regex pattern must also be escaped in the
+Calor string: regex `\d` is written as `"\\d"`.
 
-A `FormattableString` target with no holes, such as `FormattableString.Invariant($"text")`, has
-no Calor form either, so its statement is kept as C#.
-
-Holes convert natively when they are names, string, character, `bool` and `int` literals,
-`double` literals with a fractional part, dotted member access (`order.Total`), operators,
-`nameof`, `typeof`, or calls with a dotted target and positional arguments
-(`Math.Max(a, b)`). Any other hole, for example `{items[i]}`, `{customer?.Name}` or
-`{value.GetType().Name}`, keeps its original C# text as `§CS{...}` inside the hole. The conversion
-report counts it as interop, and its effects are assumed (`Calor0419`). A call argument that is
-`null` or a member of something other than a name (`typeof(T).Name`) also keeps the hole as C#.
-A verbatim or raw interpolated string (`$@"..."`, `$"""..."""`) whose format clause contains a
-backslash keeps its whole statement as C#.
-
-For example, this C# selects `Kind(FormattableString)`, and so does the converted program:
-
-```csharp
-public static string Kind(FormattableString f) => "fs:" + f.Format;
-public static string Kind(object o) => "object:" + o;
-public static string Run(int x) => Kind($"k={x}");   // "fs:k={0}"
+```calor
+module TextTools
+  func Main () → string
+    ! alloc, mut
+    let bool:digits = System.Text.RegularExpressions.Regex.IsMatch("42", "^[0-9]+$")
+    let char:letter = "Cat"[0]
+    let System.Text.StringBuilder:builder = new System.Text.StringBuilder()
+    builder.Append(letter)
+    builder.Append("at")
+    return "${digits}:${char.IsDigit('4')}:${builder.ToString()}"
 ```
 
-`calor feature-check string-interpolation` reports **<SupportLevel feature="string-interpolation" />** because of the handler row.
-Interpolation is converted using the C# semantic model of the single file being converted. If a
-target type cannot be resolved there, for example a method from an assembly the converter was not
-given, the literal converts as a string-target literal and C# applies target typing again when
-the generated code is compiled.
+`Main()` returns `True:True:Cat`. The effect row declares allocation (`alloc`)
+and mutation (`mut`) for the buffer.
+
+## Interpolated strings
+
+A `${...}` hole inside a string holds an expression. It can include alignment
+(`,10`) and a format specifier (`:F2`), as in C#. Holes are evaluated from left
+to right. Formatting normally uses the current .NET culture.
+
+```calor
+module Receipt
+  func Line (string:item, double:amount) → string
+    !
+    return "${item,-8}|${amount,10:F2}|${amount * 2:F1}"
+
+  func Main () → string
+    !
+    return Line("coffee", 3.5) + ":\${x}"
+```
+
+Under the invariant or `en-US` culture, `Main()` returns
+`coffee  |      3.50|7.0:${x}`. Under `de-DE`, it returns
+`coffee  |      3,50|7,0:${x}`. For culture-independent numeric text, pass
+`System.Globalization.CultureInfo.InvariantCulture` to an appropriate numeric
+`ToString` overload.
+
+Escape the dollar sign to write a literal hole: `"\${x}"` contains the four
+characters `${x}` and does not read a variable named `x`.
+
+### Holes are ordinary expressions
+
+Names, calls, indexing and operators in a hole use normal binding and effect
+checking. Named arguments are ordinary call syntax, not an instruction to treat
+the hole as raw C#. An undefined name still reports `Calor0200` at its source
+location:
+
+```calor expect=Calor0200
+module MissingInterpolationName
+  func Main () → string
+    !
+    return "hello ${missing}"
+```
+
+Calls must also fit the enclosing function's effect row. For example,
+`System.Console.ReadLine()` needs `cr`, the console-read effect, even inside a
+hole.
+
+## Converting C# interpolation
+
+The C# target type can change overload selection. The converter uses its
+semantic context to retain that choice.
+
+| C# target | Conversion behavior |
+|:----------|:--------------------|
+| `string` or `object` | Native interpolation when the expression is representable |
+| `FormattableString` or `IFormattable`, with holes | An explicit target-type cast retains the selected overload |
+| A custom interpolated-string handler | Preserve the enclosing C# statement or member; report `string-interpolation-handler` |
+| `FormattableString` with no holes | Preserve the enclosing C# boundary because a plain Calor string cannot express that conversion |
+
+Unsupported holes and special raw/verbatim format clauses can also require
+preservation. Converter-owned C# payloads are not native Calor expressions and
+do not establish native effect or verification acceptance. With fallback
+disabled, an unsupported conversion fails instead of producing that payload.
+
+`calor feature-check string-interpolation` reports
+**<SupportLevel feature="string-interpolation" />**. Inspect the conversion
+report and supply the original references and parse context; a missing target
+type is not evidence that the original overload choice was recovered.

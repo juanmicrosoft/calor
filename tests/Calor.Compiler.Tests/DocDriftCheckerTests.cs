@@ -64,6 +64,10 @@ public class DocDriftCheckerTests
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()",
             "GlobalModule.Main()",
             "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Demo()" })]
+    [InlineData("string-operations.mdx", 5, 1,
+        new[] { "StringBasics", "StringComparisons", "TextTools", "Receipt" },
+        new[] { "11:HELLO WORLD:ell:hello Calor", "True:True:6:True", "True:True:Cat", "coffee  |      3.50|7.0:${x}" },
+        new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()" })]
     public void PublicNativeReference_CompilesPositiveAndExactNegativeExamples(
         string page, int completeCount, int negativeCount, string[] moduleNames, string[] expectedResults,
         string[] expressions)
@@ -89,12 +93,52 @@ public class DocDriftCheckerTests
 
                 public static class Probe
                 {
-                    public static object? Run() => {{expressions[index]}};
+                    public static object? Run()
+                    {
+                        var previous = System.Globalization.CultureInfo.CurrentCulture;
+                        try
+                        {
+                            System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+                            return {{expressions[index]}};
+                        }
+                        finally { System.Globalization.CultureInfo.CurrentCulture = previous; }
+                    }
                 }
                 """);
             Assert.Equal(expectedResults[index], observed);
         }
         Assert.True(diagnostics.Count == 0, string.Join("\n", diagnostics));
+    }
+
+    [Theory]
+    [InlineData("en-US", "coffee  |      3.50|7.0:${x}")]
+    [InlineData("de-DE", "coffee  |      3,50|7,0:${x}")]
+    public void PublicStringInterpolation_PreservesThePublishedCultureBehavior(string culture, string expected)
+    {
+        var path = "website/content/syntax-reference/string-operations.mdx";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path));
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(content)
+            .Single(program => program.Source.StartsWith("module Receipt", StringComparison.Ordinal)).Source;
+        var compiled = Program.Compile(source, path);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+            public static class Probe
+            {
+                public static object? Run()
+                {
+                    var previous = System.Globalization.CultureInfo.CurrentCulture;
+                    try
+                    {
+                        System.Globalization.CultureInfo.CurrentCulture =
+                            System.Globalization.CultureInfo.GetCultureInfo("{{culture}}");
+                        return GlobalModule.Main();
+                    }
+                    finally { System.Globalization.CultureInfo.CurrentCulture = previous; }
+                }
+            }
+            """);
+        Assert.Equal(expected, observed);
     }
 
     [Fact]

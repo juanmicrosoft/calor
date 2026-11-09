@@ -17,6 +17,74 @@ namespace Calor.Compiler.Tests;
 public sealed class NativePostfixTests
 {
     [Theory]
+    [InlineData("\"hello\".Contains(\"HELLO\", System.StringComparison.OrdinalIgnoreCase)", "True", "Contains")]
+    [InlineData("\"hello\".StartsWith(\"he\", System.StringComparison.Ordinal)", "True", "StartsWith")]
+    [InlineData("\"hello\".IndexOf(\"l\", System.StringComparison.Ordinal)", "2", "IndexOf")]
+    [InlineData("System.String.Equals(\"I\", \"i\", System.StringComparison.OrdinalIgnoreCase)", "True", "Equals")]
+    public void MetadataEnumConstant_RetainsTheSelectedMethodAndArgumentIdentity(
+        string expression, string expected, string methodName)
+    {
+        var source = Source(expression, type: methodName == "IndexOf" ? "int" : "bool");
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        var method = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+        Assert.Equal(methodName, method.Name);
+        var argument = Assert.IsType<BoundFieldAccessExpression>(call.Arguments.Last());
+        var field = Assert.IsAssignableFrom<IFieldSymbol>(argument.ResolvedMetadataMember);
+        Assert.True(field.IsConst);
+        var type = Assert.IsType<Calor.Compiler.Binding.BoundTypes.NominalBoundType>(argument.Type);
+        Assert.Equal(TypeKind.Enum, type.RoslynSymbol!.TypeKind);
+        Assert.True(SymbolEqualityComparer.Default.Equals(field.Type, type.RoslynSymbol));
+        Assert.Equal("System.StringComparison", type.RoslynSymbol.ToDisplayString());
+        Assert.Equal(expected, Invoke(Compile(source), "Probe")!.ToString());
+    }
+
+    [Theory]
+    [InlineData("System.StringComparison", "Ordinal")]
+    [InlineData("System.DayOfWeek", "Monday")]
+    public void MetadataEnumConstant_AliasesRetainTheActualEnumIdentity(string enumType, string member)
+    {
+        var source = $$"""
+            module Native Native
+              using Mode = {{enumType}}
+              func Probe () → object
+                !
+                return Mode.{{member}}
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var read = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundFieldAccessExpression>());
+        var field = Assert.IsAssignableFrom<IFieldSymbol>(read.ResolvedMetadataMember);
+        Assert.Equal(enumType, field.ContainingType.ToDisplayString());
+        Assert.Equal(member, field.Name);
+        Assert.False(read.HasUnknownInferredType);
+        Assert.Equal(member, Invoke(Compile(source), "Probe")!.ToString());
+    }
+
+    [Theory]
+    [InlineData("System.DayOfWeek", "Monday")]
+    [InlineData("System.StringComparison", "Missing")]
+    [InlineData("Missing.Enum", "Ordinal")]
+    public void MetadataEnumConstant_InvalidArgumentsDoNotAcquireAComparisonContract(string enumType, string member)
+    {
+        var source = $$"""
+            module Native Native
+              using Mode = {{enumType}}
+              func Probe () → bool
+                !
+                return "hello".Contains("he", Mode.{{member}})
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.True(call.ResolvedMetadataMethod is null,
+            $"{call.ResolvedMetadataMethod}; argument {call.Arguments.Last().Type}: "
+            + string.Join("; ", diagnostics));
+        var compiled = Program.Compile(source);
+        Assert.True(compiled.HasErrors);
+    }
+
+    [Theory]
     [InlineData("", "", false)]
     [InlineData("cw", "", true)]
     [InlineData("cw", "cw", false)]
