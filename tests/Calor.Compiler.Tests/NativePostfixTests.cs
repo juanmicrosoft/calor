@@ -43,12 +43,26 @@ public sealed class NativePostfixTests
     [InlineData("dict.GetOrAdd(key, () => new V { P = 1 }),8")]
     public void CSharpLambdaInitializerHole_PreservesTheOriginalRawSource(string hole)
     {
-        var ast = Parse(Source($"\"${{{hole}}}\"", type: "string"));
-        var interpolation = Assert.IsType<InterpolatedStringNode>(Assert.IsType<ReturnStatementNode>(
-            Assert.Single(Assert.Single(ast.Functions).Body)).Expression);
-        var part = Assert.IsType<InterpolatedStringExpressionNode>(Assert.Single(interpolation.Parts));
-        Assert.IsType<RawCSharpExpressionNode>(part.Expression);
-        Assert.Contains("$\"{" + hole + "}\"", ast.Accept(new CSharpEmitter()));
+        var source = Source($"\"${{{hole}}}\"", type: "string");
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var part = InterpolationPart(Parse(candidate));
+            Assert.Equal(hole.EndsWith(",8", StringComparison.Ordinal) ? "8" : null, part.AlignmentClause);
+            var call = Assert.IsType<ExpressionCallNode>(part.Expression);
+            var member = Assert.IsType<FieldAccessNode>(call.TargetExpression);
+            Assert.Equal("GetOrAdd", member.FieldName);
+            Assert.Equal("dict", Assert.IsType<ReferenceNode>(member.Target).Name);
+            Assert.Equal(2, call.Arguments.Count);
+            Assert.Equal("key", Assert.IsType<ReferenceNode>(call.Arguments[0]).Name);
+            var lambda = Assert.IsType<LambdaExpressionNode>(call.Arguments[1]);
+            Assert.Empty(lambda.Parameters);
+            var creation = Assert.IsType<NewExpressionNode>(lambda.ExpressionBody);
+            Assert.Equal("V", creation.TypeName);
+            Assert.Empty(creation.Arguments);
+            var initializer = Assert.Single(creation.Initializers);
+            Assert.Equal("P", initializer.PropertyName);
+            Assert.Equal(1, Assert.IsType<IntLiteralNode>(initializer.Value).Value);
+        }
     }
 
     [Theory]
@@ -58,9 +72,75 @@ public sealed class NativePostfixTests
     public void UnsupportedCSharpHoleChildren_KeepTheirRawRuntimeSemantics(string hole, string expected)
     {
         var source = Source($"\"${{{hole}}}\"", type: "string");
-        var result = Program.Compile(source);
-        Assert.Equal(expected, Invoke(Compile(source, enforceEffects: false), "Probe"));
-        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0419");
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            // Preserve the original runtime lane; effect enforcement is checked separately below.
+            Assert.Equal(expected, Invoke(Compile(candidate, enforceEffects: false), "Probe"));
+            var (ast, bound, diagnostics) = Bind(candidate);
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+            var expression = InterpolationPart(ast).Expression;
+            var result = Program.Compile(candidate);
+            Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0419");
+            if (hole.StartsWith("new Lazy", StringComparison.Ordinal))
+            {
+                var capacity = Assert.IsType<FieldAccessNode>(expression);
+                Assert.Equal("Capacity", capacity.FieldName);
+                var value = Assert.IsType<FieldAccessNode>(capacity.Target);
+                Assert.Equal("Value", value.FieldName);
+                var lazy = Assert.IsType<NewExpressionNode>(value.Target);
+                Assert.Equal("Lazy<System.Text.StringBuilder>", lazy.TypeName);
+                Assert.Empty(lazy.TypeArguments);
+                var factory = Assert.IsType<LambdaExpressionNode>(Assert.Single(lazy.Arguments));
+                Assert.Empty(factory.Parameters);
+                var builder = Assert.IsType<NewExpressionNode>(factory.ExpressionBody);
+                Assert.Equal("System.Text.StringBuilder", builder.TypeName);
+                Assert.Empty(builder.Arguments);
+                var initializer = Assert.Single(builder.Initializers);
+                Assert.Equal("Capacity", initializer.PropertyName);
+                Assert.Equal(8, Assert.IsType<IntLiteralNode>(initializer.Value).Value);
+                var boundFactory = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundLambdaExpression>());
+                var boundBuilder = Assert.IsType<BoundNewExpression>(boundFactory.ExpressionBody);
+                var boundInitializer = Assert.Single(boundBuilder.Initializers);
+                Assert.Equal("Capacity", boundInitializer.MemberName);
+                Assert.Equal(8, Assert.IsType<BoundIntLiteral>(boundInitializer.Value).Value);
+                var unknown = result.Diagnostics.Where(diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall).ToArray();
+                Assert.Equal(3, unknown.Length);
+                Assert.Contains(unknown, diagnostic => diagnostic.Message.Contains("Lazy<System.Text.StringBuilder>..ctor(Func)", StringComparison.Ordinal));
+                Assert.Contains(unknown, diagnostic => diagnostic.Message.Contains("Lazy`1<StringBuilder>.get_Value", StringComparison.Ordinal));
+                Assert.Contains(unknown, diagnostic => diagnostic.Message.Contains("?.get_Capacity", StringComparison.Ordinal));
+                Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            }
+            else if (hole.StartsWith("Array.IndexOf", StringComparison.Ordinal))
+            {
+                var call = Assert.IsType<ExpressionCallNode>(expression);
+                var member = Assert.IsType<FieldAccessNode>(call.TargetExpression);
+                Assert.Equal("IndexOf", member.FieldName);
+                Assert.Equal("Array", Assert.IsType<ReferenceNode>(member.Target).Name);
+                Assert.Equal(2, call.Arguments.Count);
+                var array = Assert.IsType<ArrayCreationNode>(call.Arguments[0]);
+                Assert.Equal([1L, 2L], array.Initializer.Select(element => Assert.IsType<IntLiteralNode>(element).Value));
+                Assert.Equal(2, Assert.IsType<IntLiteralNode>(call.Arguments[1]).Value);
+                var selected = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+                Assert.Equal("System.Array", selected.ResolvedMetadataMethod!.ContainingType.ToDisplayString());
+                Assert.Equal("IndexOf", selected.ResolvedMetadataMethod.Name);
+                Assert.Equal(SpecialType.System_Int32, Assert.Single(selected.ResolvedMetadataMethod.TypeArguments).SpecialType);
+                Assert.IsType<BoundArrayCreation>(selected.Arguments[0]);
+                Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+                Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'alloc'", StringComparison.Ordinal));
+            }
+            else
+            {
+                var call = Assert.IsType<ExpressionCallNode>(expression);
+                var cast = Assert.IsType<TypeOperationNode>(call.TargetExpression);
+                Assert.Equal(TypeOp.Cast, cast.Operation);
+                Assert.Equal("Func<int>", cast.TargetType);
+                Assert.Equal(9, Assert.IsType<IntLiteralNode>(
+                    Assert.IsType<LambdaExpressionNode>(cast.Operand).ExpressionBody).Value);
+                Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            }
+        }
     }
 
     [Fact]
@@ -795,32 +875,100 @@ public sealed class NativePostfixTests
               func Probe (int:n) → string
                 return "${{{hole}}}"
             """;
-        var interpolation = Assert.IsType<InterpolatedStringNode>(Assert.IsType<ReturnStatementNode>(
-            Assert.Single(Assert.Single(Parse(source).Functions).Body)).Expression);
-        Assert.Equal(expected, Invoke(Compile(source), "Probe", 12));
-        Assert.IsType<RawCSharpExpressionNode>(Assert.IsType<InterpolatedStringExpressionNode>(
-            Assert.Single(interpolation.Parts)).Expression);
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            Assert.Equal(expected, Invoke(Compile(candidate), "Probe", 12));
+            var (ast, bound, diagnostics) = Bind(candidate);
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+            var part = InterpolationPart(ast);
+            Assert.Equal(hole.EndsWith(",3", StringComparison.Ordinal) ? "3" : null, part.AlignmentClause);
+            var operand = part.Expression;
+            if (hole == "nameof(n).Length")
+            {
+                var member = Assert.IsType<FieldAccessNode>(operand);
+                Assert.Equal("Length", member.FieldName);
+                operand = member.Target;
+                var read = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundFieldAccessExpression>());
+                Assert.Equal("Length", read.FieldName);
+                Assert.Equal("n", Assert.IsType<BoundStringLiteral>(read.Target).Value);
+            }
+            Assert.Equal("n", Assert.IsType<NameOfExpressionNode>(operand).Name);
+            Assert.Equal("n", Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundStringLiteral>()).Value);
+            var result = Program.Compile(candidate);
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code.StartsWith("Calor04", StringComparison.Ordinal));
+        }
     }
 
     [Theory]
-    [InlineData("String.Concat(\"\\x41\")", "A")]
-    [InlineData("String.Concat(\"${x}\")", "${x}")]
-    [InlineData("String.Concat(\"\\x41\"),4", "   A")]
-    [InlineData("String.Concat(\"${x}\"),8", "    ${x}")]
-    [InlineData("String.Concat(String.Concat(\"\\x41\"))", "A")]
-    [InlineData("String.Concat(\"${x}\").Length", "4")]
-    public void NativeCallInterpolation_UnsafeStringOperandsKeepTheirCSharpRuntimeValue(string hole, string expected)
+    [InlineData("String.Concat(\"\\x41\")", "String.Concat(\"\\u0041\")", "A")]
+    [InlineData("String.Concat(\"${x}\")", "String.Concat(\"\\${x}\")", "${x}")]
+    [InlineData("String.Concat(\"\\x41\"),4", "String.Concat(\"\\u0041\"),4", "   A")]
+    [InlineData("String.Concat(\"${x}\"),8", "String.Concat(\"\\${x}\"),8", "    ${x}")]
+    [InlineData("String.Concat(String.Concat(\"\\x41\"))", "String.Concat(String.Concat(\"\\u0041\"))", "A")]
+    [InlineData("String.Concat(\"${x}\").Length", "String.Concat(\"\\${x}\").Length", "4")]
+    public void NativeCallInterpolation_UnsafeStringOperandsKeepTheirCSharpRuntimeValue(
+        string originalHole, string hole, string expected)
     {
+        var original = $$"""
+            namespace Native
+            {
+                public static class NativeModule
+                {
+                    public static string Probe(int x) => $"{{{originalHole}}}";
+                }
+            }
+            """;
+        Assert.Equal(expected, Invoke(CompileCSharp(original), "Probe", 7));
         var source = $$"""
             module Native Native
               func Probe (int:x) → string
                 return "${{{hole}}}"
             """;
-        var interpolation = Assert.IsType<InterpolatedStringNode>(Assert.IsType<ReturnStatementNode>(
-            Assert.Single(Assert.Single(Parse(source).Functions).Body)).Expression);
-        Assert.Equal(expected, Invoke(Compile(source, enforceEffects: false), "Probe", 7));
-        Assert.IsType<RawCSharpExpressionNode>(Assert.IsType<InterpolatedStringExpressionNode>(
-            Assert.Single(interpolation.Parts)).Expression);
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            Assert.Equal(expected, Invoke(Compile(candidate, enforceEffects: false), "Probe", 7));
+            var (ast, bound, diagnostics) = Bind(candidate);
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+            var part = InterpolationPart(ast);
+            Assert.Equal(hole.EndsWith(",4", StringComparison.Ordinal) ? "4"
+                : hole.EndsWith(",8", StringComparison.Ordinal) ? "8" : null, part.AlignmentClause);
+            ExpressionNode operand = part.Expression;
+            if (hole.EndsWith(".Length", StringComparison.Ordinal))
+            {
+                var member = Assert.IsType<FieldAccessNode>(operand);
+                Assert.Equal("Length", member.FieldName);
+                operand = member.Target;
+            }
+            var call = Assert.IsType<ExpressionCallNode>(operand);
+            var concat = Assert.IsType<FieldAccessNode>(call.TargetExpression);
+            Assert.Equal("Concat", concat.FieldName);
+            Assert.Equal("String", Assert.IsType<ReferenceNode>(concat.Target).Name);
+            var argument = Assert.Single(call.Arguments);
+            if (hole.StartsWith("String.Concat(String.Concat", StringComparison.Ordinal))
+            {
+                var inner = Assert.IsType<ExpressionCallNode>(argument);
+                var innerConcat = Assert.IsType<FieldAccessNode>(inner.TargetExpression);
+                Assert.Equal("Concat", innerConcat.FieldName);
+                Assert.Equal("String", Assert.IsType<ReferenceNode>(innerConcat.Target).Name);
+                argument = Assert.Single(inner.Arguments);
+            }
+            var value = hole.Contains("\\u0041", StringComparison.Ordinal) ? "A" : "${x}";
+            Assert.Equal(value, Assert.IsType<StringLiteralNode>(argument).Value);
+            var children = BoundNodeHelpers.DescendantsAndSelf(bound).ToArray();
+            Assert.Equal(value, Assert.Single(children.OfType<BoundStringLiteral>()).Value);
+            Assert.Empty(children.OfType<BoundVariableExpression>());
+            var calls = children.OfType<BoundCallExpression>().ToArray();
+            Assert.Equal(hole.StartsWith("String.Concat(String.Concat", StringComparison.Ordinal) ? 2 : 1, calls.Length);
+            Assert.All(calls, selected =>
+            {
+                Assert.Equal(SpecialType.System_String, selected.ResolvedMetadataMethod!.ContainingType.SpecialType);
+                Assert.Equal("Concat", selected.ResolvedMetadataMethod.Name);
+            });
+            var result = Program.Compile(candidate);
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code.StartsWith("Calor04", StringComparison.Ordinal));
+        }
     }
 
     [Fact]
@@ -894,18 +1042,30 @@ public sealed class NativePostfixTests
     private static object? Invoke(Type type, string name, params object?[] arguments) =>
         type.GetMethod(name)!.Invoke(null, arguments);
 
+    private static InterpolatedStringExpressionNode InterpolationPart(ModuleNode ast)
+    {
+        var interpolation = Assert.IsType<InterpolatedStringNode>(Assert.IsType<ReturnStatementNode>(
+            Assert.Single(Assert.Single(ast.Functions).Body)).Expression);
+        return Assert.IsType<InterpolatedStringExpressionNode>(Assert.Single(interpolation.Parts));
+    }
+
     private static Type Compile(string source, bool enforceEffects = true)
     {
         var result = Program.Compile(source, "native-postfix.calr", new CompilationOptions
             { EnableTypeChecking = true, EnforceEffects = enforceEffects, StatusWriter = TextWriter.Null });
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        return CompileCSharp(result.GeneratedCode);
+    }
+
+    private static Type CompileCSharp(string code)
+    {
         var compilation = CSharpCompilation.Create("Postfix_" + Guid.NewGuid().ToString("N"),
-            [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble + result.GeneratedCode)],
+            [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble + code)],
             GeneratedCSharpCompiler.References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         using var stream = new MemoryStream();
         var emission = compilation.Emit(stream);
-        Assert.True(emission.Success, string.Join("\n", emission.Diagnostics) + "\n" + result.GeneratedCode);
+        Assert.True(emission.Success, string.Join("\n", emission.Diagnostics) + "\n" + code);
         return Assembly.Load(stream.ToArray()).GetType("Native.NativeModule", throwOnError: true)!;
     }
 }
