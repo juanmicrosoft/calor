@@ -402,6 +402,82 @@ public sealed class CanonicalControlFlowTests
             """, "20");
 
     [Theory]
+    [InlineData(false, "GHAGHR")]
+    [InlineData(true, "GHNGHN")]
+    public void EventNodes_EvaluateReceiverThenHandlerOnceWithoutReadingTheEvent(
+        bool nullReceiver, string expected)
+    {
+        var target = new FieldAccessNode(default, new CallExpressionNode(default, "Source", []), "Changed");
+        var handler = new CallExpressionNode(default, "MakeHandler", []);
+        var subscribe = new EventSubscribeNode(default, target, handler).Accept(new CSharpEmitter());
+        var unsubscribe = new EventUnsubscribeNode(default, target, handler).Accept(new CSharpEmitter());
+        var source = $$"""
+            public class EventProbe
+            {
+                private static string Trace = "";
+                public event System.Action Changed
+                {
+                    add { Trace += "A"; }
+                    remove { Trace += "R"; }
+                }
+                private static EventProbe Source()
+                {
+                    Trace += "G";
+                    return {{(nullReceiver ? "null" : "new EventProbe()")}};
+                }
+                private static System.Action MakeHandler() { Trace += "H"; return Handle; }
+                private static void Handle() { }
+                public static string Probe()
+                {
+                    try { {{subscribe}} } catch (System.NullReferenceException) { Trace += "N"; }
+                    try { {{unsubscribe}} } catch (System.NullReferenceException) { Trace += "N"; }
+                    return Trace;
+                }
+            }
+            """;
+        var type = Load(source);
+        Assert.Equal(expected, type.GetMethod("Probe")!.Invoke(null, null));
+    }
+
+    [Fact]
+    public void EventProbeEnvelope_PreservesAccessorSemanticsWithExplicitStatementInterop()
+    {
+        const string source = """
+            module EventProbe
+              class Hub
+                field int:Calls public = 0
+                event System.Action:Changed
+                  add
+                    set Calls Calls + 1
+                  remove
+                    set Calls Calls + 10
+                func Handle private () → void
+                  return
+                func Source private () → Hub
+                  return this
+                func MakeHandler private () → System.Action
+                  return Handle
+                func Probe () → int
+                  ! mut
+                  let System.Action:handler = Handle
+                  raw statement 19
+            Changed += handler;
+                  raw statement 19
+            Changed -= handler;
+                  raw statement 34
+            Source().Changed += MakeHandler();
+                  raw statement 34
+            Source().Changed -= MakeHandler();
+                  return Calls
+            """;
+        foreach (var program in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var type = Load(Compile(program).GeneratedCode);
+            Assert.Equal(22, type.GetMethod("Probe")!.Invoke(Activator.CreateInstance(type), null));
+        }
+    }
+
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public void PrintVisitor_EmitsNativeConsoleCallAndEvaluatesItsOperandOnce(bool writeLine)
