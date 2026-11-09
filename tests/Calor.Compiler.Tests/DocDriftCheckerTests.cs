@@ -18,6 +18,29 @@ public class DocDriftCheckerTests
     private const string ValidTeachingProgram = "module Good\n  func Value () → int\n    return 1\n";
 
     [Theory]
+    [InlineData("CLAUDE.md")]
+    [InlineData("AGENTS.md")]
+    public void RepositoryAgentManual_UsesNativeSyntaxAndCompilablePrograms(string relativePath)
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var content = File.ReadAllText(Path.Combine(root, relativePath));
+        Assert.DoesNotContain("§", content);
+        Assert.DoesNotContain("INT:42", content);
+        Assert.DoesNotContain("STR:\"", content);
+        var programs = ExemplarCompileChecker.ExtractAgentTaskPrograms(content);
+        Assert.NotEmpty(programs);
+        foreach (var program in programs)
+        {
+            Assert.False(program.Wrapped, relativePath);
+            var compiled = Program.Compile(program.Source, relativePath);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            var validated = CodeGen.GeneratedCSharpCompiler.Validate(compiled.GeneratedCode);
+            Assert.True(validated.CompilationSuccess, string.Join("\n", validated.CompilationErrors));
+        }
+        Assert.Empty(ExemplarCompileChecker.CheckAgentTaskReference(new DocFile(relativePath, content)));
+    }
+
+    [Theory]
     [InlineData("module Good\n  func Value () → int\n    return 1\n", false)]
     [InlineData("// Header\nmodule Good\n  func Value () → int\n    return 1\n", false)]
     [InlineData("// Header\nfunc Value () → int\n  return 1\n", true)]
