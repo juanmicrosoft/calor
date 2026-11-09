@@ -2171,7 +2171,8 @@ The pre-cutover compiler arms accept native type-capture/guard patterns and
 combined type/property patterns. Positive controls include scalar aliases, complementary
 tags, all active observations, immutable input/result bindings, an unused match
 beside a genuinely supplying match, and namespace-qualified factory return
-annotations with inferred allocations. Bare nested property payload capture
+annotations with inferred allocations. In the unchanged archived compiler,
+bare property payload capture
 (`§PPROP §PMATCH{Value} §VAR{v}` with arm result `v`) currently fails with
 `Calor0200 Undefined variable 'v'`. These prerequisites use the supported native
 forms; no retired carrier grammar or built-in carrier runtime is restored.
@@ -2188,9 +2189,17 @@ retain their tested types, captures and member predicates in the AST and emitted
 C#. Both required pattern forms pass the actual selected-root Option and Result
 profiles, including their complete independent case and counterfactual sets.
 They are not replaced by guarded-var controls or credited as finite rejections.
-Malformed properties and retired type spellings remain errors. This bounded
-support does not implement nested property-variable capture typing or repair
-the existing escaped generic-capture field-access checker limitation.
+Malformed properties and retired type spellings remain errors. Direct
+`{ IsSome: true, Value: var v }` captures and nested native property captures now
+bind their actual declared member types. Generic arguments, nullable payloads
+and class-versus-struct identity come from the native declarations; no unrelated
+type alias or unknown-type fallback supplies capture types. CLR controls cover
+fields, readable properties, wrong closed generic inputs, wrong payload types,
+null receivers and null nested members. Source emission and reparsing retain
+these observations. Unresolved members report diagnostics.
+This bounded member lookup covers directly declared native fields and readable
+properties; it does not add inherited or BCL member modeling. Escaped generic
+capture member reads still have an independent effect-resolution limitation.
 The other categories use a real guarded carrier-input match as their canonical
 baseline. Their independent API, contract, output and coupling checks therefore
 do not depend on support for the separately required typed/property syntax.
@@ -2199,8 +2208,9 @@ Carrier reflection follows native declaration namespaces, not the compilation-un
 label. The trace helper honors emitted file-scoped namespaces. Global-namespace
 functions and qualified `System.Int32`/`System.String` signatures retain exact CLR
 checks. The verifier bridge does not modify any other profile; the separate native
-pattern prerequisite changes only parsing, type-pattern source emission and
-matched-input propagation through conjunction patterns.
+pattern prerequisite adds native parsing and type-pattern source emission,
+matched-input/member propagation through patterns, and declaration-backed
+generic member typing.
 
 Each Option positive checks **210** independent runtime cases and **1,050**
 successful counterfactuals. Each Result positive checks **90** runtime cases and

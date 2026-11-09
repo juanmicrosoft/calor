@@ -247,6 +247,7 @@ public sealed class NullableReferenceType : CalorType
     {
         ReferentType = referentType ?? throw new ArgumentNullException(nameof(referentType));
         if (referentType is not (ExternalType or ArrayType)
+            && referentType is not GenericInstanceType { NativeDeclaration.IsStruct: false }
             && !referentType.Equals(PrimitiveType.String)
             && !referentType.Equals(PrimitiveType.Object))
             throw new ArgumentException("A supported reference type is required.", nameof(referentType));
@@ -614,6 +615,7 @@ public sealed class TypeParameterType : CalorType
 public sealed class GenericInstanceType : CalorType
 {
     public string BaseName { get; }
+    internal ClassDefinitionNode? NativeDeclaration { get; init; }
     public IReadOnlyList<CalorType> TypeArguments { get; }
     public override string Name
     {

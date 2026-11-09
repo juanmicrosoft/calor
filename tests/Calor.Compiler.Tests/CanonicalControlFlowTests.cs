@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text;
 using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
@@ -746,6 +747,226 @@ public sealed class CanonicalControlFlowTests
     }
 
     [Theory]
+    [InlineData("Calculator.Option<int>", "{ IsSome: true, Value: var v }", false)]
+    [InlineData("object", "Calculator.Option<int> { IsSome: true, Value: var v }", false)]
+    [InlineData("object", "Calculator.Option<int> { IsSome: true, Value: var v } carrier", false)]
+    [InlineData("Calculator.Option<int>", "{ IsSome: true, Value: var v }", true)]
+    public void NativePropertyPayloadCapture_UsesDeclaredGenericMemberType(
+        string inputType, string pattern, bool properties)
+    {
+        var source = $$"""
+            module Captures Calculator
+              class Option<T>
+                field bool:IsSome public
+                field T?:Value public
+              func Probe ({{inputType}}:value) → int
+                return match value
+                  case {{pattern}} → v
+                  case _ → -1
+            """;
+        if (properties)
+            source = source.Replace("field bool:IsSome public", "property bool:IsSome public\n      get\n      set")
+                .Replace("field T?:Value public", "property T?:Value public\n      get\n      set");
+        void Set(Type type, object instance, string name, object value)
+        {
+            if (properties)
+                type.GetProperty(name)!.SetValue(instance, value);
+            else
+                type.GetField(name)!.SetValue(instance, value);
+        }
+        foreach (var program in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var diagnostics = new DiagnosticBag();
+            var bound = new Binding.Binder(diagnostics).Bind(Parse(program));
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+            var capture = Assert.Single(bound.SymbolsById.Values.OfType<VariableSymbol>()
+                .Where(symbol => symbol.Name == "v"));
+            Assert.Equal("INT", capture.TypeName);
+            Assert.False(capture.HasUnknownInferredType);
+            var owner = Load(Compile(program).GeneratedCode);
+            var integers = owner.Assembly.GetType("Calculator.Option`1")!.MakeGenericType(typeof(int));
+            foreach (var present in new[] { true, false })
+                foreach (var payload in new[] { int.MinValue, -1, 0, 7, int.MaxValue })
+                {
+                    var input = Activator.CreateInstance(integers)!;
+                    Set(integers, input, "IsSome", present);
+                    Set(integers, input, "Value", payload);
+                    Assert.Equal(present ? payload : -1, owner.GetMethod("Probe")!.Invoke(null, [input]));
+                }
+            Assert.Equal(-1, owner.GetMethod("Probe")!.Invoke(null, [null]));
+            if (inputType == "object")
+            {
+                var strings = integers.GetGenericTypeDefinition().MakeGenericType(typeof(string));
+                var wrong = Activator.CreateInstance(strings)!;
+                Set(strings, wrong, "IsSome", true);
+                Set(strings, wrong, "Value", "not an integer");
+                Assert.Equal(-1, owner.GetMethod("Probe")!.Invoke(null, [wrong]));
+                Assert.Equal(-1, owner.GetMethod("Probe")!.Invoke(null, [new object()]));
+            }
+        }
+    }
+
+    [Fact]
+    public void NativeNestedPropertyCapture_PreservesConstructedMemberTypesAndNullChecks()
+    {
+        const string source = """
+            module Captures Calculator
+              class Option<T>
+                field bool:IsSome public
+                field T?:Value public
+              class Envelope<T>
+                field T?:Inner public
+              func Probe (object:value) → int
+                return match value
+                  case Calculator.Envelope<Calculator.Option<int>> { Inner: { IsSome: true, Value: var v } } → v
+                  case _ → -1
+            """;
+        foreach (var program in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var diagnostics = new DiagnosticBag();
+            var bound = new Binding.Binder(diagnostics).Bind(Parse(program));
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+            Assert.Equal("INT", Assert.Single(bound.SymbolsById.Values.OfType<VariableSymbol>()
+                .Where(symbol => symbol.Name == "v")).TypeName);
+            var owner = Load(Compile(program).GeneratedCode);
+            var option = owner.Assembly.GetType("Calculator.Option`1")!.MakeGenericType(typeof(int));
+            var envelope = owner.Assembly.GetType("Calculator.Envelope`1")!.MakeGenericType(option);
+            var outer = Activator.CreateInstance(envelope)!;
+            var inner = Activator.CreateInstance(option)!;
+            envelope.GetField("Inner")!.SetValue(outer, inner);
+            foreach (var present in new[] { true, false })
+                foreach (var payload in new[] { int.MinValue, 0, 7, int.MaxValue })
+                {
+                    option.GetField("IsSome")!.SetValue(inner, present);
+                    option.GetField("Value")!.SetValue(inner, payload);
+                    Assert.Equal(present ? payload : -1, owner.GetMethod("Probe")!.Invoke(null, [outer]));
+                }
+            envelope.GetField("Inner")!.SetValue(outer, null);
+            Assert.Equal(-1, owner.GetMethod("Probe")!.Invoke(null, [outer]));
+            foreach (var input in new[] { inner, new object(), null })
+                Assert.Equal(-1, owner.GetMethod("Probe")!.Invoke(null, [input]));
+        }
+    }
+
+    [Theory]
+    [InlineData("string", "string?", "STRING?", "payload")]
+    [InlineData("int?", "int?", "INT?", 7)]
+    public void NativeNullablePropertyCapture_PreservesActualClosedPayloadType(
+        string argument, string result, string capturedType, object payload)
+    {
+        var source = $$"""
+            module Captures Calculator
+              class Option<T>
+                field T?:Value public
+              func Probe (Calculator.Option<{{argument}}>:value) → {{result}}
+                return match value
+                  case { Value: var v } → v
+                  case _ → null
+            """;
+        foreach (var program in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var diagnostics = new DiagnosticBag();
+            var bound = new Binding.Binder(diagnostics).Bind(Parse(program));
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+            Assert.Equal(capturedType, Assert.Single(bound.SymbolsById.Values.OfType<VariableSymbol>()
+                .Where(symbol => symbol.Name == "v")).TypeName);
+            var owner = Load(Compile(program).GeneratedCode);
+            var closed = owner.Assembly.GetType("Calculator.Option`1")!
+                .MakeGenericType(argument == "string" ? typeof(string) : typeof(int?));
+            var input = Activator.CreateInstance(closed)!;
+            foreach (var value in new[] { payload, null })
+            {
+                closed.GetField("Value")!.SetValue(input, value);
+                Assert.Equal(value, owner.GetMethod("Probe")!.Invoke(null, [input]));
+            }
+            Assert.Null(owner.GetMethod("Probe")!.Invoke(null, [null]));
+        }
+    }
+
+    [Fact]
+    public void NativeTypedPropertyPayloadCapture_RejectsWrongRuntimePayloadTypesAndNulls()
+    {
+        const string source = """
+            module Captures Calculator
+              class Option<T>
+                field bool:IsSome public
+                field T?:Value public
+              func Probe (object:value) → int
+                return match value
+                  case Calculator.Option<object> { IsSome: true, Value: int v } → v
+                  case _ → -1
+            """;
+        foreach (var program in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var owner = Load(Compile(program).GeneratedCode);
+            var closed = owner.Assembly.GetType("Calculator.Option`1")!.MakeGenericType(typeof(object));
+            var input = Activator.CreateInstance(closed)!;
+            foreach (var present in new[] { true, false })
+                foreach (var payload in new object?[] { int.MinValue, 0, int.MaxValue, "wrong", new object(), null })
+                {
+                    closed.GetField("IsSome")!.SetValue(input, present);
+                    closed.GetField("Value")!.SetValue(input, payload);
+                    Assert.Equal(present && payload is int value ? value : -1,
+                        owner.GetMethod("Probe")!.Invoke(null, [input]));
+                }
+            Assert.Equal(-1, owner.GetMethod("Probe")!.Invoke(null, [null]));
+        }
+    }
+
+    [Theory]
+    [InlineData("Value: var v", "string", "int", "v")]
+    [InlineData("Missing: var v", "int", "int", "v")]
+    [InlineData("Value: true", "int", "int", "1")]
+    public void NativePropertyCapture_RejectsWrongPayloadTypesAndUnknownMembers(
+        string memberPattern, string argument, string result, string body)
+    {
+        var source = $$"""
+            module Captures Calculator
+              class Option<T>
+                field T?:Value public
+              func Probe (Calculator.Option<{{argument}}>:value) → {{result}}
+                return match value
+                  case { {{memberPattern}} } → {{body}}
+                  case _ → 0
+            """;
+        var compiled = Program.Compile(source, "bad-capture.calr", new CompilationOptions
+        {
+            EnableTypeChecking = true,
+            StatusWriter = TextWriter.Null
+        });
+        Assert.True(compiled.HasErrors);
+        Assert.Contains(compiled.Diagnostics.Errors, error =>
+            error.Code is DiagnosticCode.TypeMismatch or DiagnosticCode.UndefinedReference);
+    }
+
+    [Fact]
+    public void NativePropertyCapture_DoesNotAliasAnUnrelatedQualifiedType()
+    {
+        const string source = """
+            module Captures Calculator
+              class Option<T>
+                field T?:Value public
+              func Probe (object:value) → int
+                return match value
+                  case Other.Option<int> { Value: var v } → v
+                  case _ → 0
+            """;
+        var compiled = Program.Compile(source, "bad-qualified-capture.calr", new CompilationOptions
+        {
+            EnableTypeChecking = true,
+            StatusWriter = TextWriter.Null
+        });
+        Assert.True(compiled.HasErrors);
+        Assert.Contains(compiled.Diagnostics.Errors, error => error.Message.Contains(
+            "Cannot resolve native property-pattern member 'Value' on type 'Other.Option", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void NullableGenericReference_RequiresAnActualNativeClassDeclaration()
+        => Assert.Throws<ArgumentException>(() => new TypeChecking.NullableReferenceType(
+            new TypeChecking.GenericInstanceType("Unresolved", [TypeChecking.PrimitiveType.Int])));
+
+    [Theory]
     [InlineData("int", 1)]
     [InlineData("string", 0)]
     [InlineData("System.Int32 _", 1)]
@@ -792,6 +1013,8 @@ public sealed class CanonicalControlFlowTests
     [InlineData("{ Active: }")]
     [InlineData("{ Active: true")]
     [InlineData("Calculator.Box<i32> v")]
+    [InlineData("{ Value: §VAR{v} }")]
+    [InlineData("§PPROP §PMATCH{Value} §VAR{v}")]
     public void NativeCarrierPatterns_RejectMalformedPropertiesAndRetiredTypeAliases(string pattern)
     {
         var source = $"module Bad\n  func Probe (object:value) → int\n    return match value\n" +

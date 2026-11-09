@@ -1768,7 +1768,28 @@ public sealed class TypeChecker
             // Composites: recurse so nested bindings land in scope.
             case AndPatternNode andPat:
                 CheckPattern(andPat.Left, expectedType, bindVariables);
-                CheckPattern(andPat.Right, expectedType, bindVariables);
+                CheckPattern(andPat.Right, andPat.Left is TypePatternNode typed
+                    ? InferTypePatternBindingType(typed.TypeName, typed.TypeNameSpan, typed.Span)
+                    : expectedType, bindVariables);
+                break;
+
+            case PropertyPatternNode property:
+                var receiverType = property.TypeName is { } testedType
+                    ? InferTypePatternBindingType(testedType, property.TypeNameSpan ?? property.Span, property.Span)
+                    : expectedType;
+                foreach (var member in property.Matches)
+                {
+                    if (_module != null && Binding.TypeIdentity.TryResolveNativeInstanceMemberType(
+                        _module, receiverType.SurfaceName, member.PropertyName, out var memberName))
+                    {
+                        CheckPattern(member.Pattern, ResolveTypeName(memberName, member.Span), bindVariables);
+                    }
+                    else
+                    {
+                        _diagnostics.ReportError(member.Span, DiagnosticCode.UndefinedReference,
+                            $"Cannot resolve native property-pattern member '{member.PropertyName}' on type '{receiverType.SurfaceName}'");
+                    }
+                }
                 break;
 
             case OrPatternNode orPat:
@@ -1792,8 +1813,7 @@ public sealed class TypeChecker
                 break;
 
             default:
-                // Silent. `CheckPattern` models 7 of the 19 pattern kinds in the AST, and the rest
-                // — relational, property, positional, constant, is — are simply not implemented
+                // Silent. Some pattern kinds — relational, positional, constant, is — remain unimplemented
                 // here. Reporting "Unsupported pattern type" made the CHECKER's gap the user's
                 // error, and once the checker runs by default that is a hard error on any program
                 // using one. Any name a pattern binds and this arm misses will surface as a normal
@@ -3987,7 +4007,8 @@ public sealed class TypeChecker
                 => replacement,
             GenericInstanceType generic => new GenericInstanceType(
                 generic.BaseName,
-                generic.TypeArguments.Select(argument => SubstituteTypeParameters(argument, substitutions)).ToArray()),
+                generic.TypeArguments.Select(argument => SubstituteTypeParameters(argument, substitutions)).ToArray())
+                { NativeDeclaration = generic.NativeDeclaration },
             NullableReferenceType nullable => new NullableReferenceType(
                 SubstituteTypeParameters(nullable.ReferentType, substitutions),
                 nullable.RequiresTransitionalAssignmentCheck),
@@ -4895,6 +4916,10 @@ public sealed class TypeChecker
             && (targetType is ArrayType || targetType.Equals(PrimitiveType.String)))
             return PrimitiveType.Int;
 
+        if (_module != null && Binding.TypeIdentity.TryResolveNativeInstanceMemberType(
+            _module, targetType.SurfaceName, field.FieldName, out var nativeMember))
+            return ResolveTypeName(nativeMember, field.Span);
+
         // Same rule as the bool conditions: only complain when the receiver's type is actually
         // known. An unmodeled receiver — a `new` expression, an external call result — is the
         // checker's blind spot, not the program's error, and C# resolves the member itself.
@@ -5057,6 +5082,10 @@ public sealed class TypeChecker
                         ? nominal
                         : null;
             if (supportedReference is null
+                && _module != null
+                && Binding.TypeIdentity.ResolveNativeClass(_module, referentSurface) is { IsStruct: false })
+                supportedReference = ResolveTypeName(referentSurface, span);
+            if (supportedReference is null
                 && (referentSurface.EndsWith("[]", StringComparison.Ordinal)
                     || referentSurface.Length > 2 && referentSurface[0] == '['
                         && referentSurface[^1] == ']' && !referentSurface.Contains(',')))
@@ -5106,7 +5135,10 @@ public sealed class TypeChecker
             var args = SplitGenericArgs(argsStr);
 
             return new GenericInstanceType(AttributeHelper.ResolveAsyncCarrierName(baseName, _module),
-                args.Select(arg => ResolveTypeName(arg, span)).ToList());
+                args.Select(arg => ResolveTypeName(arg, span)).ToList())
+            {
+                NativeDeclaration = _module == null ? null : Binding.TypeIdentity.ResolveNativeClass(_module, typeName)
+            };
         }
 
         // Handle generic types with angle bracket syntax: List<T>, Dictionary<K, V>
@@ -5124,7 +5156,10 @@ public sealed class TypeChecker
             {
                 resolvedArgs.Add(ResolveTypeName(arg, span));
             }
-            return new GenericInstanceType(AttributeHelper.ResolveAsyncCarrierName(baseName, _module), resolvedArgs);
+            return new GenericInstanceType(AttributeHelper.ResolveAsyncCarrierName(baseName, _module), resolvedArgs)
+            {
+                NativeDeclaration = _module == null ? null : Binding.TypeIdentity.ResolveNativeClass(_module, typeName)
+            };
         }
 
         // Try primitive type

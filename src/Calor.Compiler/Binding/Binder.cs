@@ -3886,7 +3886,8 @@ public sealed class Binder
                 : "'base' is unavailable outside an instance member");
     }
 
-    private BoundExpression BindFieldAccess(FieldAccessNode fieldAccess, BoundExpression? boundTarget = null)
+    private BoundExpression BindFieldAccess(FieldAccessNode fieldAccess, BoundExpression? boundTarget = null,
+        bool isPatternMember = false)
     {
         var target = boundTarget
             ?? TryBindMetadataTypeReceiver(fieldAccess.Target)
@@ -3901,8 +3902,17 @@ public sealed class Binder
                 fieldAccess.FieldName),
             // #943 (D1 RO-COPY-1): a field of an in-module struct value (`(§IDX{pts} 0).X`) is
             // one storage path; resolving it keeps the operand typed instead of OBJECT.
+            _ when isPatternMember => ResolveAccessibleMembers(
+                ResolveClass(target.Type.DisplayString), fieldAccess.FieldName),
             _ => ResolveStructFieldPath(target.Type.DisplayString, fieldAccess.FieldName),
         };
+        if (isPatternMember && _asyncTypeModule != null
+            && resolvedFields.OfType<VariableSymbol>().ToArray() is [var nativeMember]
+            && TypeIdentity.TryResolveNativeInstanceMemberType(
+                _asyncTypeModule, target.Type.DisplayString, fieldAccess.FieldName, out var nativeMemberType))
+            return new BoundFieldAccessExpression(
+                fieldAccess.Span, target, fieldAccess.FieldName, nativeMemberType, nativeMember,
+                fieldAccess.FieldNameSpan, resolvedFields.OfType<VariableSymbol>().ToArray());
         var fields = resolvedFields.OfType<VariableSymbol>().ToArray();
         var fieldTypes = fields
             .Select(field => TypeIdentity.Canonicalize(field.TypeName))
@@ -5077,6 +5087,13 @@ public sealed class Binder
                     metadata: new Dictionary<string, object?> { ["TypeName"] = positional.TypeName },
                     patterns: positional.Patterns.Select(child => BindPattern(child, allowBindings)).ToArray());
             case PropertyPatternNode property:
+                var propertyTarget = property.TypeName is { } typeName
+                    ? new BoundStructuralExpression(property.Span, nameof(PropertyPatternNode), typeName,
+                        children: matchedValue == null ? [] : [matchedValue])
+                    : matchedValue;
+                var memberValues = property.Matches.Select(match => propertyTarget == null ? null : BindFieldAccess(
+                    new FieldAccessNode(match.Span, new ReferenceNode(match.Span, ""),
+                        match.PropertyName), propertyTarget, isPatternMember: true)).ToArray();
                 return Pattern(
                     property,
                     metadata: new Dictionary<string, object?>
@@ -5084,7 +5101,9 @@ public sealed class Binder
                         ["TypeName"] = property.TypeName,
                         ["PropertyNames"] = property.Matches.Select(match => match.PropertyName).ToArray(),
                     },
-                    patterns: property.Matches.Select(match => BindPattern(match.Pattern, allowBindings)).ToArray());
+                    expressions: memberValues.OfType<BoundExpression>().ToArray(),
+                    patterns: property.Matches.Select((match, index) =>
+                        BindPattern(match.Pattern, allowBindings, memberValues[index])).ToArray());
             case ListPatternNode list:
                 var listPatterns = list.Patterns.Select(child => BindPattern(child, allowBindings)).ToList();
                 if (list.SlicePattern != null)
@@ -5103,7 +5122,9 @@ public sealed class Binder
                 return Pattern(orPattern, patterns: [BindPattern(orPattern.Left, allowBindings: false), BindPattern(orPattern.Right, allowBindings: false)]);
             case AndPatternNode andPattern:
                 return Pattern(andPattern, patterns: [BindPattern(andPattern.Left, allowBindings, matchedValue),
-                    BindPattern(andPattern.Right, allowBindings, matchedValue)]);
+                    BindPattern(andPattern.Right, allowBindings, andPattern.Left is TypePatternNode typed
+                        ? new BoundStructuralExpression(typed.Span, nameof(TypePatternNode), typed.TypeName,
+                            children: matchedValue == null ? [] : [matchedValue]) : matchedValue)]);
             default:
                 return Pattern(
                     pattern,

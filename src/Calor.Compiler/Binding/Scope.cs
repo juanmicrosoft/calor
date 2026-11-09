@@ -700,6 +700,82 @@ public static class TypeIdentity
     public static string Substitute(string typeName, IReadOnlyDictionary<string, string> substitutions) =>
         Canonicalize(ReplaceIdentifiers(typeName, substitutions));
 
+    internal static bool TryResolveNativeInstanceMemberType(
+        ModuleNode module, string receiverType, string memberName, out string memberType)
+    {
+        memberType = "";
+        var receiver = AttributeHelper.ToSurfaceSpelling(receiverType);
+        if (AttributeHelper.TryUnwrapNullableAnnotation(receiver, out var referent))
+            receiver = referent;
+        if (receiver.EndsWith(']') || receiver.EndsWith('*'))
+            return false;
+        var declaration = ResolveNativeClass(module, receiver);
+        if (declaration == null)
+            return false;
+        var members = declaration.Fields.Where(field => field.Name == memberName && !field.IsStatic)
+            .Select(field => field.TypeName)
+            .Concat(declaration.Properties.Where(property => property.Name == memberName
+                && !property.IsStatic && property.Getter != null).Select(property => property.TypeName)).ToArray();
+        if (members.Length != 1)
+            return false;
+        var arguments = TrySplitGeneric(receiver, out _, out var supplied) ? supplied : [];
+        if (arguments.Count != declaration.TypeParameters.Count)
+            return false;
+        var substitutions = declaration.TypeParameters.Select((parameter, index) => (parameter.Name, arguments[index]))
+            .ToDictionary(pair => pair.Name, pair => pair.Item2, StringComparer.Ordinal);
+        memberType = SubstituteMember(AttributeHelper.ToSurfaceSpelling(members[0]));
+        return true;
+
+        string SubstituteMember(string type)
+        {
+            if (AttributeHelper.TryUnwrapNullableAnnotation(type, out var inner))
+            {
+                var substituted = SubstituteMember(inner);
+                var parameter = declaration.TypeParameters.FirstOrDefault(parameter => parameter.Name == inner);
+                // Unconstrained T? is an annotation, not Nullable<T> for a value-type argument.
+                var annotatedValueParameter = parameter != null
+                    && !parameter.Constraints.Any(constraint =>
+                        constraint.Kind is TypeConstraintKind.Struct or TypeConstraintKind.Unmanaged)
+                    && (IsBuiltinCanonicalName(Canonicalize(substituted))
+                            && Canonicalize(substituted) is not ("STRING" or "OBJECT" or "VOID" or "NEVER")
+                        || substituted is "char" or "CHAR"
+                        || ResolveNativeClass(module, substituted) is { IsStruct: true });
+                return annotatedValueParameter || AttributeHelper.TryUnwrapNullableAnnotation(substituted, out _)
+                    ? substituted : substituted + "?";
+            }
+            if (TryStripPostfix(type, out var element, out var suffix))
+                return SubstituteMember(element) + suffix;
+            if (TrySplitGeneric(type, out var name, out var children))
+                return $"{name}<{string.Join(",", children.Select(SubstituteMember))}>";
+            return Substitute(type, substitutions);
+        }
+    }
+
+    internal static ClassDefinitionNode? ResolveNativeClass(ModuleNode module, string typeName)
+    {
+        var lookup = ToLookupName(typeName);
+        var declarations = Classes(module.Classes, null).ToArray();
+        var candidates = declarations.Where(candidate => candidate.Name == lookup).ToArray();
+        if (candidates.Length == 0 && !lookup.Contains('.'))
+            candidates = declarations.Where(candidate =>
+                ToLookupName(candidate.Declaration.Name, candidate.Declaration.TypeParameters.Count) == lookup).ToArray();
+        return candidates.Length == 1 ? candidates[0].Declaration : null;
+
+        IEnumerable<(ClassDefinitionNode Declaration, string Name)> Classes(
+            IReadOnlyList<ClassDefinitionNode> classes, string? enclosing)
+        {
+            foreach (var cls in classes)
+            {
+                var prefix = enclosing ?? cls.NamespaceIdentity ?? module.NamespaceIdentity ?? module.Name;
+                var name = ToLookupName(string.IsNullOrEmpty(prefix) ? cls.Name : $"{prefix}.{cls.Name}",
+                    cls.TypeParameters.Count);
+                yield return (cls, name);
+                foreach (var nested in Classes(cls.NestedClasses, name))
+                    yield return nested;
+            }
+        }
+    }
+
     private static bool TryUnifyCanonical(
         string parameterType,
         string argumentType,
