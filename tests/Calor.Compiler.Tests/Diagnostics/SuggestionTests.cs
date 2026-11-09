@@ -223,7 +223,7 @@ public class SuggestionTests
     #region Lexer Integration Tests
 
     [Fact]
-    public void Lexer_UnknownSectionMarker_WithTypo_ShowsSuggestion()
+    public void Lexer_UnknownSectionMarker_WithTypo_DoesNotSuggestAnotherSigil()
     {
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer("§FUNC", diagnostics);
@@ -232,15 +232,16 @@ public class SuggestionTests
         Assert.True(diagnostics.HasErrors);
         var error = diagnostics.First(d => d.IsError);
         Assert.Contains("FUNC", error.Message);
-        Assert.Contains("§F", error.Message);
-        Assert.Contains("Did you mean", error.Message);
+        Assert.Contains("removed", error.Message);
+        Assert.DoesNotContain("Did you mean", error.Message);
+        Assert.Empty(diagnostics.DiagnosticsWithFixes);
     }
 
     [Fact]
     public void Lexer_UnknownClosingTag_WithTypo_ShowsSuggestion()
     {
         var diagnostics = new DiagnosticBag();
-        var lexer = new Lexer("§M{test} §/MODULE{test}", diagnostics);
+        var lexer = new Lexer("module test\n§/MODULE{test}", diagnostics);
         lexer.TokenizeAll();
 
         Assert.True(diagnostics.HasErrors);
@@ -265,7 +266,7 @@ public class SuggestionTests
     public void Lexer_RemovedModuleCloser_DoesNotRecommendAnotherStructuralCloser()
     {
         var diagnostics = new DiagnosticBag();
-        var lexer = new Lexer("§M{test} §/MOD{test}", diagnostics);
+        var lexer = new Lexer("module test\n§/MOD{test}", diagnostics);
         lexer.TokenizeAll();
 
         Assert.True(diagnostics.HasErrors);
@@ -273,12 +274,12 @@ public class SuggestionTests
         Assert.Contains("§/MOD", error.Message);
         Assert.DoesNotContain("§//MOD", error.Message);
         Assert.DoesNotContain("Did you mean", error.Message);
-        Assert.Contains("Common markers", error.Message);
+        Assert.Contains("dedent", error.Message);
         Assert.Empty(diagnostics.DiagnosticsWithFixes);
     }
 
     [Fact]
-    public void Lexer_UnknownSectionMarker_NoSuggestion_ShowsCommonMarkers()
+    public void Lexer_UnknownSectionMarker_NoSuggestion_ShowsNativeBoundaryGuidance()
     {
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer("§XYZQWERTY", diagnostics);
@@ -287,11 +288,11 @@ public class SuggestionTests
         Assert.True(diagnostics.HasErrors);
         var error = diagnostics.First(d => d.IsError);
         Assert.Contains("XYZQWERTY", error.Message);
-        Assert.Contains("Common markers", error.Message);
+        Assert.Contains("canonical lowercase words", error.Message);
     }
 
     [Fact]
-    public void Lexer_CastSectionMarker_ShowsCastSyntaxHint()
+    public void Lexer_CastSectionMarker_RejectsPrefixSyntax()
     {
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer("§CAST", diagnostics);
@@ -299,12 +300,13 @@ public class SuggestionTests
 
         Assert.True(diagnostics.HasErrors);
         var error = diagnostics.First(d => d.IsError);
-        Assert.Contains("(cast", error.Message);
+        Assert.Contains("removed", error.Message);
+        Assert.Contains("ordinary C# expression punctuation", error.Message);
         Assert.DoesNotContain("Did you mean '§CA", error.Message);
     }
 
     [Fact]
-    public void Lexer_CastSectionMarker_CaseInsensitive()
+    public void Lexer_MixedCaseCastSectionMarker_IsAlsoRetired()
     {
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer("§Cast", diagnostics);
@@ -312,7 +314,8 @@ public class SuggestionTests
 
         Assert.True(diagnostics.HasErrors);
         var error = diagnostics.First(d => d.IsError);
-        Assert.Contains("(cast", error.Message);
+        Assert.Contains("'§Cast'", error.Message);
+        Assert.Contains("removed", error.Message);
     }
 
     [Fact]
@@ -340,7 +343,7 @@ public class SuggestionTests
     }
 
     [Fact]
-    public void Lexer_InvalidSectionOperator_EmitsCalor0007()
+    public void Lexer_InvalidSectionOperator_IsRejectedAtTheSectionBoundary()
     {
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer("§?X", diagnostics);
@@ -348,10 +351,22 @@ public class SuggestionTests
 
         Assert.True(diagnostics.HasErrors);
         var error = diagnostics.First(d => d.IsError);
+        Assert.Equal(DiagnosticCode.UnknownSectionMarker, error.Code);
+        Assert.Contains("§?X", error.Message);
+        Assert.Contains("removed", error.Message);
+        Assert.DoesNotContain("§??", error.Message);
+        Assert.DoesNotContain("§?.", error.Message);
+    }
+
+    [Fact]
+    public void Lexer_AsciiArrow_EmitsCalor0007WithNativeGuidance()
+    {
+        var diagnostics = new DiagnosticBag();
+        new Lexer("->", diagnostics).TokenizeAll();
+        var error = Assert.Single(diagnostics.Errors);
         Assert.Equal(DiagnosticCode.InvalidSectionOperator, error.Code);
-        Assert.Contains("§?", error.Message);
-        Assert.Contains("§??", error.Message);
-        Assert.Contains("§?.", error.Message);
+        Assert.Contains("→", error.Message);
+        Assert.Contains("!p || q", error.Message);
     }
 
     [Fact]
@@ -636,17 +651,18 @@ public class SuggestionTests
     }
 
     [Fact]
-    public void Lexer_ClosingTagWithTypo_GeneratesSuggestion()
+    public void Lexer_ClosingTagWithTypo_StillRequiresDedent()
     {
         // Closing tag with a typo
         var diagnostics = new DiagnosticBag();
-        var lexer = new Lexer("§M{test} §/MODUL{test}", diagnostics);
+        var lexer = new Lexer("module test\n§/MODUL{test}", diagnostics);
         lexer.TokenizeAll();
 
         Assert.True(diagnostics.HasErrors);
         var error = diagnostics.First(d => d.IsError);
-        // Should suggest §/M for §/MODUL
         Assert.Contains("MODUL", error.Message);
+        Assert.Contains("dedent", error.Message);
+        Assert.Empty(diagnostics.DiagnosticsWithFixes);
     }
 
     [Theory]
