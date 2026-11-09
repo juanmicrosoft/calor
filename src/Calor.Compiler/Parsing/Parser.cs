@@ -66,6 +66,7 @@ public sealed class Parser
             [TokenKind.Minus] = static parser => parser.ParsePrefixUnary(),
             [TokenKind.Exclamation] = static parser => parser.ParsePrefixUnary(),
             [TokenKind.Tilde] = static parser => parser.ParsePrefixUnary(),
+            [TokenKind.Caret] = static parser => parser.ParseIndexFromEnd(),
         };
 
     internal static IReadOnlyCollection<TokenKind> RegisteredExpressionStartTokens
@@ -76,6 +77,7 @@ public sealed class Parser
     private int _position;
     private bool _insideArgContext;
     private bool _insideRefinementPredicate;
+    private int _quantifierRangeDelimiterPosition = -1;
     private readonly Dictionary<ReferenceNode, TextSpan> _groupedReferenceSpans = new();
 
     /// <summary>
@@ -3190,6 +3192,7 @@ public sealed class Parser
 
     private ExpressionNode ParseExpressionCore(int minimumPrecedence, bool allowSpacedCall)
     {
+        var parsedRange = Check(TokenKind.RangeOp);
         var expr = ExpressionParsers.TryGetValue(Current.Kind, out var parser)
             ? parser(this)
             : RecoverFromUnexpectedToken();
@@ -3200,6 +3203,19 @@ public sealed class Parser
 
         while (Current.Span.Line == TokenEndLine(PreviousToken))
         {
+            if (_position != _quantifierRangeDelimiterPosition
+                && minimumPrecedence <= 14 && Check(TokenKind.RangeOp))
+            {
+                var range = Advance();
+                if (parsedRange || Check(TokenKind.RangeOp))
+                    _diagnostics.ReportError(range.Span, DiagnosticCode.UnexpectedToken,
+                        "Range operators cannot be chained without parentheses.");
+                var end = Current.Span.Line == TokenEndLine(range) && IsExpressionStart()
+                    ? ParseExpression(15) : null;
+                expr = new RangeExpressionNode(expr.Span.Union(end?.Span ?? range.Span), expr, end);
+                parsedRange = true;
+                continue;
+            }
             if (minimumPrecedence <= 13 && Check(TokenKind.With))
             {
                 expr = ParseWithExpression(expr);
@@ -5734,7 +5750,17 @@ public sealed class Parser
             if (ranged.Value)
             {
                 var inToken = ExpectOnHeadLine(TokenKind.In);
-                var lower = ParseInfixOperand(inToken, 0);
+                ExpressionNode lower;
+                var previousDelimiter = _quantifierRangeDelimiterPosition;
+                _quantifierRangeDelimiterPosition = FindQuantifierRangeDelimiter();
+                try
+                {
+                    lower = ParseInfixOperand(inToken, 0);
+                }
+                finally
+                {
+                    _quantifierRangeDelimiterPosition = previousDelimiter;
+                }
                 var range = ExpectOnHeadLine(TokenKind.RangeOp);
                 var upper = ParseInfixOperand(range, 0);
                 var reference = new ReferenceNode(name.Span, TokenIdentifier(name), isVerbatim: true);
@@ -13884,48 +13910,37 @@ public sealed class Parser
         return new NullConditionalNode(span, target, memberName);
     }
 
-    /// <summary>
-    /// Parses a range expression.
-    /// §RANGE 1 5
-    /// §RANGE §^ 1   (open start to ^1)
-    /// </summary>
+    private int FindQuantifierRangeDelimiter()
+    {
+        var depth = 0;
+        for (var position = _position; position < _tokens.Count
+            && _tokens[position].Span.Line == Current.Span.Line; position++)
+        {
+            var kind = _tokens[position].Kind;
+            if (kind is TokenKind.OpenParen or TokenKind.OpenBracket or TokenKind.OpenBrace)
+                depth++;
+            else if (kind is TokenKind.CloseParen or TokenKind.CloseBracket or TokenKind.CloseBrace)
+            {
+                if (depth == 0)
+                    return -1;
+                depth--;
+            }
+            else if (depth == 0 && kind == TokenKind.RangeOp)
+                return position;
+        }
+        return -1;
+    }
+
     private RangeExpressionNode ParseRangeExpression()
     {
         var startToken = Expect(TokenKind.RangeOp);
 
-        ExpressionNode? start = null;
-        ExpressionNode? end = null;
-
-        // Parse start if present -- only accept lightweight expressions (not §IF, §C, etc.)
-        if (IsRangeOperandStart())
-        {
-            start = ParseExpression();
-        }
-
-        // Parse end if present
-        if (IsRangeOperandStart())
-        {
-            end = ParseExpression();
-        }
-
-        var span = end != null ? startToken.Span.Union(end.Span)
-                 : start != null ? startToken.Span.Union(start.Span)
-                 : startToken.Span;
-        return new RangeExpressionNode(span, start, end);
-    }
-
-    /// <summary>
-    /// Returns true if the current token can start a range operand expression.
-    /// More restrictive than IsExpressionStart -- excludes section markers like §IF, §C, etc.
-    /// Also excludes identifiers followed by '=' (property assignments in §NEW initializers).
-    /// </summary>
-    private bool IsRangeOperandStart()
-    {
-        if (Current.Kind == TokenKind.Identifier && Peek(1).Kind == TokenKind.Equals)
-            return false; // Don't consume property assignments as range operands
-        return Current.Kind is TokenKind.IntLiteral or TokenKind.FloatLiteral
-            or TokenKind.DecimalLiteral or TokenKind.StrLiteral or TokenKind.CharLiteral
-            or TokenKind.Identifier or TokenKind.OpenParen or TokenKind.IndexEnd;
+        if (Check(TokenKind.RangeOp))
+            _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                "Range operators cannot be chained without parentheses.");
+        var end = Current.Span.Line == TokenEndLine(startToken) && IsExpressionStart()
+            ? ParseExpression(15) : null;
+        return new RangeExpressionNode(startToken.Span.Union(end?.Span ?? startToken.Span), null, end);
     }
 
     /// <summary>
@@ -13934,9 +13949,8 @@ public sealed class Parser
     /// </summary>
     private IndexFromEndNode ParseIndexFromEnd()
     {
-        var startToken = Expect(TokenKind.IndexEnd);
-
-        var offset = ParseExpression();
+        var startToken = Check(TokenKind.Caret) ? Advance() : Expect(TokenKind.IndexEnd);
+        var offset = ParseInfixOperand(startToken, 15);
 
         var span = startToken.Span.Union(offset.Span);
         return new IndexFromEndNode(span, offset);

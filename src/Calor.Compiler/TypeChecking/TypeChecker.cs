@@ -4626,6 +4626,10 @@ public sealed class TypeChecker
         var arrayType = InferExpressionType(arrayAccess.Array);
         var indexType = InferExpressionType(arrayAccess.Index);
 
+        if (arrayAccess.Index is RangeExpressionNode
+            && (arrayType is ArrayType || arrayType.Equals(PrimitiveType.String)))
+            return arrayType;
+
         // Index should be numeric for arrays/lists
         if (!IsNumeric(indexType) && indexType is not ErrorType)
         {

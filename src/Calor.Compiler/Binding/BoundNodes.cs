@@ -1091,7 +1091,7 @@ public sealed class BoundArrayAccess : BoundExpression
     {
         Array = array; Index = index;
         HasUnknownInferredType = array.HasUnknownInferredType;
-        if (array.MethodInputArrayType is
+        if (index is not BoundRangeExpression && array.MethodInputArrayType is
             {
                 ElementType: NominalBoundType
                 {

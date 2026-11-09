@@ -4398,6 +4398,22 @@ public sealed class Binder
     {
         var array = BindExpression(arrayAccess.Array);
         var index = BindExpression(arrayAccess.Index);
+        if (index is BoundRangeExpression && GetOrCreateMetadataBinder() is { } sliceMetadata
+            && ResolveComputedMetadataType(sliceMetadata.Context, array.Type.DisplayString) is { } slicedType
+            && (slicedType is Microsoft.CodeAnalysis.IArrayTypeSymbol { Rank: 1 }
+                || slicedType.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_String))
+        {
+            var inputArray = NullabilityChecker.GetMethodInputArrayType(array) is { } originalArray
+                ? new BoundTypes.ArrayBoundType(originalArray.ElementType, originalArray.Rank,
+                    BoundTypes.NullableAnnotation.NotAnnotated) : null;
+            return new BoundArrayAccess(arrayAccess.Span, array, index, resolvedType:
+                inputArray ?? Metadata.MetadataBinderResult.ToBoundType(slicedType.WithNullableAnnotation(
+                    Microsoft.CodeAnalysis.NullableAnnotation.NotAnnotated)))
+            {
+                MethodInputArrayType = inputArray,
+                MetadataArrayResultType = slicedType as Microsoft.CodeAnalysis.IArrayTypeSymbol
+            };
+        }
         var metadataArray = array is BoundVariableExpression { Variable.IsTypeInferred: false }
             && GetOrCreateMetadataBinder() is { } metadata
             && ResolveBclArgumentType(metadata.Context, array.Type.DisplayString)

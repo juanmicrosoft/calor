@@ -47,6 +47,119 @@ public sealed class FinalExpressionGrammarTests
     }
 
     [Theory]
+    [InlineData("1..3")]
+    [InlineData("..3")]
+    [InlineData("1..")]
+    [InlineData("..")]
+    [InlineData("^3..^1")]
+    [InlineData("(start + 1)..(end - 1)")]
+    public void NativeRanges_RetainEndpointsSpansAndRoundtrip(string source)
+    {
+        var range = Assert.IsType<RangeExpressionNode>(Parse(source));
+        Assert.Equal(source, source.Substring(range.Span.Start, range.Span.Length));
+        var emitted = range.Accept(new CalorEmitter());
+        Assert.DoesNotContain('§', emitted);
+        var reparsed = Assert.IsType<RangeExpressionNode>(Parse(emitted));
+        Assert.Equal(range.Accept(new CSharpEmitter()), reparsed.Accept(new CSharpEmitter()));
+    }
+
+    [Fact]
+    public void NativeRanges_UseCSharpPrecedenceAndKeepXorBinary()
+    {
+        var sum = Assert.IsType<BinaryOperationNode>(Parse("a + b..c * d"));
+        Assert.IsType<BinaryOperationNode>(sum.Right);
+        Assert.IsType<RangeExpressionNode>(Assert.IsType<BinaryOperationNode>(sum.Right).Left);
+        var range = Assert.IsType<RangeExpressionNode>(Parse("-a..^b"));
+        Assert.IsType<UnaryOperationNode>(range.Start);
+        Assert.IsType<IndexFromEndNode>(range.End);
+        var xor = Assert.IsType<BinaryOperationNode>(Parse("a ^ b"));
+        Assert.Equal(BinaryOperator.BitwiseXor, xor.Operator);
+        var indexSum = Assert.IsType<BinaryOperationNode>(Parse("^a + b"));
+        Assert.IsType<IndexFromEndNode>(indexSum.Left);
+    }
+
+    [Theory]
+    [InlineData("1..2..3")]
+    [InlineData("....")]
+    [InlineData("^")]
+    public void NativeRanges_RejectMissingOffsetsAndUnparenthesizedChains(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        Parse(source, diagnostics);
+        Assert.True(diagnostics.HasErrors);
+    }
+
+    [Fact]
+    public void NativeRanges_KeepArgumentInterpolationAndPhysicalLineBoundaries()
+    {
+        var call = Assert.IsType<CallExpressionNode>(Parse("Use(1.., ..^1)"));
+        Assert.Null(Assert.IsType<RangeExpressionNode>(call.Arguments[0]).End);
+        Assert.Null(Assert.IsType<RangeExpressionNode>(call.Arguments[1]).Start);
+        var interpolation = Assert.IsType<InterpolatedStringNode>(Parse("\"slice=${text[1..^1]}\""));
+        var hole = Assert.Single(interpolation.Parts.OfType<InterpolatedStringExpressionNode>());
+        Assert.IsType<RangeExpressionNode>(Assert.IsType<ArrayAccessNode>(hole.Expression).Index);
+
+        const string source = """
+            module Ranges
+              func Run () → int
+                let range = 1..
+                return 42
+            """;
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
+        var statements = Assert.Single(module.Functions).Body;
+        Assert.Equal(2, statements.Count);
+        var binding = Assert.IsType<BindStatementNode>(statements[0]);
+        Assert.Null(Assert.IsType<RangeExpressionNode>(binding.Initializer).End);
+        Assert.IsType<ReturnStatementNode>(statements[1]);
+    }
+
+    [Fact]
+    public void NativeRanges_RetainLazySingleEndpointEvaluationAndSliceResults()
+    {
+        foreach (var authored in new[]
+        {
+            "take ? Numbers()[Start()..^End()] : new int[] { 9 }",
+            "take ? Text()[Start()..^End()] : \"no\""
+        })
+        {
+            var expression = Parse(authored);
+            foreach (var node in new[] { expression, Parse(expression.Accept(new CalorEmitter())) })
+            {
+                var resultType = authored.Contains("Numbers") ? "int[]" : "string";
+                var generated = node.Accept(new CSharpEmitter());
+                var source = $$"""
+                    public static class Probe
+                    {
+                        public static string Trace = "";
+                        public static int[] Numbers() { Trace += "T"; return new[] {10, 20, 30, 40}; }
+                        public static string Text() { Trace += "T"; return "abcd"; }
+                        public static int Start() { Trace += "S"; return 1; }
+                        public static int End() { Trace += "E"; return 1; }
+                        public static {{resultType}} Run(bool take) => {{generated}};
+                    }
+                    """;
+                var compilation = CSharpCompilation.Create("RangeOrder_" + Guid.NewGuid().ToString("N"),
+                    [CSharpSyntaxTree.ParseText(source)], GeneratedCSharpCompiler.References,
+                    new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                using var stream = new MemoryStream();
+                var result = compilation.Emit(stream);
+                Assert.True(result.Success, source + Environment.NewLine + string.Join(Environment.NewLine, result.Diagnostics));
+                var type = Assembly.Load(stream.ToArray()).GetType("Probe")!;
+                type.GetMethod("Run")!.Invoke(null, [false]);
+                Assert.Equal("", type.GetField("Trace")!.GetValue(null));
+                var slice = type.GetMethod("Run")!.Invoke(null, [true]);
+                Assert.Equal("TSE", type.GetField("Trace")!.GetValue(null));
+                if (slice is int[] numbers)
+                    Assert.Equal(new[] {20, 30}, numbers);
+                else
+                    Assert.Equal("bc", slice);
+            }
+        }
+    }
+
+    [Theory]
     [InlineData("item with { X = 1, Y = next() }")]
     [InlineData("item with { }")]
     [InlineData("item with { @class = 1, }")]
@@ -465,6 +578,8 @@ public sealed class FinalExpressionGrammarTests
     [InlineData("exists int:i in 0..xs.Length : xs[i] < 0", false)]
     [InlineData("forall int:i in 0..n, int:j in i..n : i <= j", true)]
     [InlineData("exists int:i in 0..n, int:j in i..n : i == j", false)]
+    [InlineData("forall int:i in xs[1..^1].Length + 1..n - 1 : i >= 0", true)]
+    [InlineData("exists int:i in Limit(1..^1)..n : i >= 0", false)]
     [InlineData("forall int:i where i >= 0 && i < n : i < n", true)]
     [InlineData("exists int:i where i >= 0 && i < n : i == 1", false)]
     public void Quantifiers_PreserveNativeAstBindingsAndAuthoredSpans(string source, bool universal)

@@ -185,6 +185,53 @@ public sealed class NativeMetadataClosureTests
     }
 
     [Theory]
+    [InlineData("int[]", "new int[] {10, 20, 30, 40}")]
+    [InlineData("string", "\"abcd\"")]
+    [InlineData("string[]", "new string[] {\"a\", \"b\", \"c\", \"d\"}")]
+    public void NativeSlices_RetainTheirContainerType(string typeName, string value)
+    {
+        var source = $$"""
+            module Slices
+              func Slice ({{typeName}}:values) → {{typeName}}
+                ! alloc
+                let {{typeName}}:copy = values[1..^1]
+                return copy
+              func Direct () → {{typeName}}
+                ! alloc
+                return ({{value}})[1..^1]
+            """;
+        var result = Compile(source);
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        var assembly = CompileAssembly(result.GeneratedCode);
+        var methods = assembly.GetTypes().SelectMany(type => type.GetMethods()).ToArray();
+        var direct = methods.Single(method => method.Name == "Direct").Invoke(null, null);
+        if (typeName == "int[]")
+            Assert.Equal(new[] {20, 30}, Assert.IsType<int[]>(direct));
+        else if (typeName == "string[]")
+            Assert.Equal(new[] {"b", "c"}, Assert.IsType<string[]>(direct));
+        else
+            Assert.Equal("bc", direct);
+        var bound = new Binder(new DiagnosticBag()).Bind(Parse(source));
+        var slice = Assert.IsType<BoundArrayAccess>(
+            Assert.IsType<BoundBindStatement>(bound.Functions[0].Body[0]).Initializer);
+        if (typeName.EndsWith("[]", StringComparison.Ordinal))
+            Assert.IsAssignableFrom<IArrayTypeSymbol>(slice.MetadataArrayResultType);
+        else
+            Assert.Equal(SpecialType.System_String,
+                Assert.IsType<Calor.Compiler.Binding.BoundTypes.NominalBoundType>(slice.Type).RoslynSymbol!.SpecialType);
+    }
+
+    [Theory]
+    [InlineData("values[\"bad\"..]")]
+    [InlineData("values[1..true]")]
+    [InlineData("values[^\"bad\"]")]
+    public void NativeSlices_InvalidEndpointTypesRemainErrors(string expression)
+    {
+        var source = $"module InvalidSlice\n  func Slice (int[]:values) → int[]\n    ! alloc\n    return {expression}";
+        Assert.True(Compile(source).HasErrors);
+    }
+
+    [Theory]
     [InlineData("let List<string>:lines = File.ReadAllLines(path)\n    return lines.Count", "int")]
     [InlineData("return File.ReadAllLines(path)", "List<string>")]
     [InlineData("let List<string>:lines = System.IO.File.ReadAllLines(path)\n    return lines.Count", "int")]

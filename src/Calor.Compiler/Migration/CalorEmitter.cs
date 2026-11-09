@@ -4199,34 +4199,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
     // Modern operator nodes
     public string Visit(RangeExpressionNode node)
     {
-        var parts = new List<string> { "§RANGE" };
-        if (node.Start != null)
-        {
-            // AcceptInInlineSibling: §RANGE start end emits space-separated operands;
-            // a naked zero-arg §C{Foo} start would absorb end as inline arg on re-parse.
-            // Defect: v0.6.1 loop-4 devil's-advocate finding #3.
-            var start = AcceptInInlineSibling(node.Start);
-            if (ContainsSectionMarker(start))
-                start = HoistToTempVar(start);
-            parts.Add(start);
-        }
-        if (node.End != null)
-        {
-            var end = AcceptInInlineSibling(node.End);
-            // Don't hoist §^ expressions — they're lightweight range operands
-            if (ContainsSectionMarker(end) && !end.StartsWith("§^"))
-                end = HoistToTempVar(end);
-            parts.Add(end);
-        }
-        return string.Join(" ", parts);
+        var start = node.Start is null ? "" : AcceptInConditionalRegion(node.Start);
+        var end = node.End is null ? "" : AcceptInConditionalRegion(node.End);
+        return $"({start}..{end})";
     }
 
     public string Visit(IndexFromEndNode node)
     {
-        var offset = node.Offset.Accept(this);
-        if (ContainsSectionMarker(offset))
-            offset = HoistToTempVar(offset);
-        return $"§^ {offset}";
+        var offset = AcceptInConditionalRegion(node.Offset);
+        return $"(^{offset})";
     }
 
     public string Visit(WithExpressionNode node)
