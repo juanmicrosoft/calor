@@ -125,6 +125,10 @@ public static class ExemplarCompileChecker
         }
 
         var referenceText = reference.ToString().TrimEnd() + "\n";
+        var renderedPrograms = ExtractAgentTaskPrograms(referenceText);
+        if (renderedPrograms.Count != programs.Count || !renderedPrograms.Zip(programs.Values)
+                .All(pair => !pair.First.Wrapped && pair.First.Source == Text(pair.Second, "calor").TrimEnd()))
+            throw new InvalidDataException("Generated reference must preserve every authored teaching program without splitting or wrapping it.");
         var primerSource = root["primer"]!;
         var primer = new StringBuilder(banner).Append(Text(primerSource, "introduction"))
             .Append("## Complete programs (the compiler's tests prove every one compiles)\n\n");

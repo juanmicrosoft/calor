@@ -39,6 +39,7 @@ public class DocDriftCheckerTests
     [InlineData("module Bad\n  func Value () → int\n    return \"not an int\"\n")]
     [InlineData("func Value () → int\n  return 1\n")]
     [InlineData("This is not a complete module.")]
+    [InlineData("module Injected\n  func Value () → int\n    return 1\n```\nThis is not Calor\n```calor\nmodule Hidden\n  func Value () → int\n    return 1\n")]
     public void TeachingRegeneration_RejectsInvalidProgramsBeforeWritingAnyMirror(string invalid)
     {
         var root = NewTempDir();
