@@ -8,6 +8,41 @@ namespace Calor.Compiler.Tests;
 
 public class LexerTests
 {
+    public static IEnumerable<object[]> CanonicalWordSpellings =>
+        Lexer.KeywordNames.Where(word => word != "raw").Select(word => new object[] { word });
+
+    [Theory]
+    [MemberData(nameof(CanonicalWordSpellings))]
+    public void CanonicalKeywordBoundary_IsExactCaseAndEscapable(string word)
+    {
+        var tokens = Tokenize($"{word} {char.ToUpperInvariant(word[0])}{word[1..]} {word.ToUpperInvariant()} @{word}", out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+        Assert.True(tokens[0].IsKeyword);
+        Assert.Equal(TokenKind.Identifier, tokens[1].Kind);
+        Assert.Equal(TokenKind.Identifier, tokens[2].Kind);
+        Assert.Equal(TokenKind.Identifier, tokens[3].Kind);
+        Assert.Equal("@" + word, tokens[3].Text);
+        Assert.Equal(word, tokens[3].Value);
+    }
+
+    [Theory]
+    [InlineData("and")]
+    [InlineData("or")]
+    [InlineData("not")]
+    [InlineData("mod")]
+    [InlineData("upper")]
+    [InlineData("lower")]
+    [InlineData("cast")]
+    [InlineData("raw")]
+    public void CanonicalOrdinaryNames_DoNotCaptureWordOperatorsOrBuiltins(string name)
+    {
+        var diagnostics = new DiagnosticBag();
+        var expression = new Parser(new Lexer($"{name}(x, y)", diagnostics).TokenizeAllForParser(), diagnostics)
+            .ParseStandaloneExpression();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+        Assert.Equal(name, Assert.IsType<Calor.Compiler.Ast.CallExpressionNode>(expression).Target);
+    }
+
     [Theory]
     [InlineData("§M")]
     [InlineData("§F")]
