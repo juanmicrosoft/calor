@@ -1,0 +1,9 @@
+module MediatR.Pipeline overflow unchecked
+  using System.Threading
+  using System.Threading.Tasks
+  // Defines a request post-processor for a request
+  // @typeparam TRequest — Request type
+  // @typeparam TResponse — Response type
+  interface IRequestPostProcessor<in TRequest,in TResponse>
+    where TRequest : notnull
+    fn Process (TRequest:request, TResponse:response, CancellationToken:cancellationToken) -> Task

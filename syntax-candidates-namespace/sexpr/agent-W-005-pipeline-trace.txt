@@ -1,0 +1,24 @@
+module MediatR.Pipeline
+  using System.Collections.Generic
+  using System.Threading
+  using System.Threading.Tasks
+  interface IRequestPreProcessor<in TRequest>
+    fn Process (TRequest:request, CancellationToken:cancellationToken) -> Task
+  interface IPipelineBehavior<TRequest,TResponse>
+    fn Handle <eff e> (TRequest:request, RequestHandlerDelegate<TResponse>:next effects e, CancellationToken:cancellationToken) -> Task<TResponse>
+      effects e
+  class RequestPreProcessorBehavior<TRequest,TResponse> pub
+    implements IPipelineBehavior<TRequest,TResponse>
+    field Seq<IRequestPreProcessor<TRequest>>:_preProcessors priv readonly
+    ctor pub (Seq<IRequestPreProcessor<TRequest>>:preProcessors)
+      set _preProcessors preProcessors
+    fn async Handle pub <eff e> (TRequest:request, RequestHandlerDelegate<TResponse>:next effects e, CancellationToken:cancellationToken) -> TResponse
+      effects e
+      each processor in _preProcessors
+        let _chainProcess010 = (processor.Process request cancellationToken)
+        let _ = (await (_chainProcess010.ConfigureAwait false))
+      let _chainNext011 = (next)
+      return (await (_chainNext011.ConfigureAwait false))
+  raw delegate <<CALOR_RAW
+public delegate Task<TResponse> RequestHandlerDelegate<TResponse>();
+CALOR_RAW

@@ -1,0 +1,563 @@
+{
+  "schema_version": 1,
+  "source_commit": "d82f3ae95175ecd09581c6922701706be72b0ca9",
+  "target_model": "Claude Opus 5.5",
+  "baseline": "current",
+  "population": {
+    "primer": 1,
+    "converted": 20,
+    "agent": 20
+  },
+  "selection": "6 MediatR +6 Serilog +6 FluentValidation +1 Synthetic +1 Synthetic2; hand-selected, declaration-heavy convenience sample, not the 283-file corpus census. Agent files: 9 guarantees +6 higher-order +3 e1 +2 w5, all run-1; not 20 independent tasks.",
+  "comparison": "current vs modern families is a combined migration/teaching comparison, not additive savings. infix/sexpr/line-call families share identical non-expression scaffolding. Focused probes isolate spellings and are never pooled into population totals.",
+  "semantic_status": "current/ is frozen historical measurement source, not active new-grammar source. Other families are speculative hand-authored design payloads, NOT accepted compiler syntax, migrated active benchmark copies or runtime-equivalence evidence. Preserve invalid agent mutability and the inclusive map-doubler bound rather than silently fixing historical outputs. Future migrated active copies remain separate from frozen originals.",
+  "historical_inputs": "Frozen baseline originals are retained unchanged. current/ is an immutable historical measurement copy, not active new-grammar source. Future migrated active copies must be separate; speculative infix/sexpr/line-call files are session-only design payloads, not migrated benchmark originals.",
+  "active_refresh": {
+    "commit": "abcaa63af601935c12e8b209aa9f0ecbf702825a",
+    "labeling": "Probe variant 'current' is always the frozen HISTORICAL input; 'active-abcaa63af' is the integrated grammar. Population samples (41) are unchanged and carry no active arm.",
+    "converted": "20/20 converted via converter API with baseline options; calor format --check found 0 parse errors (12 conservatively unchanged for lack of project/effects context). Provenance: active-abcaa63af/converted-provenance.json.",
+    "agent_gate": "Superseded by translated copies: 20 paired probes (population active-agent, probe-translated-agent-*) pair each frozen historical agent file with a session-only active-abcaa63af translation (active-agent/provenance.json). Dispositions: 17 equivalent (abcaa63af MSBuild + held-out oracle equals historical pass count); W-005 equivalent-nonbuilding (reproduces frozen starter Calor0410/0411 multiset); W-004/W-006 translated unedited starters from invalid runs, held-out oracle not applicable. Not agent outputs or an evaluation arm; the 41-sample population has no active arm.",
+    "unpaired_context": "Teaching/Generated server-instructions.md (== MCP initialize instructions, captured in active-abcaa63af/mcp/mcp-instructions.md), overview.md and current-language-reference.md have no d82f3ae source counterpart; recorded as context, not paired probes."
+  },
+  "samples": [
+    {
+      "id": "converted-MediatR-IMediator",
+      "population": "converted",
+      "source": "MediatR/src/MediatR/IMediator.cs",
+      "variants": {
+        "current": "current/converted-MediatR-IMediator.txt",
+        "infix": "infix/converted-MediatR-IMediator.txt",
+        "sexpr": "sexpr/converted-MediatR-IMediator.txt",
+        "line-call": "line-call/converted-MediatR-IMediator.txt"
+      }
+    },
+    {
+      "id": "converted-MediatR-RequestExceptionActionProcessorStrategy",
+      "population": "converted",
+      "source": "MediatR/src/MediatR/MicrosoftExtensionsDI/RequestExceptionActionProcessorStrategy.cs",
+      "variants": {
+        "current": "current/converted-MediatR-RequestExceptionActionProcessorStrategy.txt",
+        "infix": "infix/converted-MediatR-RequestExceptionActionProcessorStrategy.txt",
+        "sexpr": "sexpr/converted-MediatR-RequestExceptionActionProcessorStrategy.txt",
+        "line-call": "line-call/converted-MediatR-RequestExceptionActionProcessorStrategy.txt"
+      }
+    },
+    {
+      "id": "converted-MediatR-INotificationPublisher",
+      "population": "converted",
+      "source": "MediatR/src/MediatR/INotificationPublisher.cs",
+      "variants": {
+        "current": "current/converted-MediatR-INotificationPublisher.txt",
+        "infix": "infix/converted-MediatR-INotificationPublisher.txt",
+        "sexpr": "sexpr/converted-MediatR-INotificationPublisher.txt",
+        "line-call": "line-call/converted-MediatR-INotificationPublisher.txt"
+      }
+    },
+    {
+      "id": "converted-MediatR-IRequestPreProcessor",
+      "population": "converted",
+      "source": "MediatR/src/MediatR/Pipeline/IRequestPreProcessor.cs",
+      "variants": {
+        "current": "current/converted-MediatR-IRequestPreProcessor.txt",
+        "infix": "infix/converted-MediatR-IRequestPreProcessor.txt",
+        "sexpr": "sexpr/converted-MediatR-IRequestPreProcessor.txt",
+        "line-call": "line-call/converted-MediatR-IRequestPreProcessor.txt"
+      }
+    },
+    {
+      "id": "converted-MediatR-IRequestPostProcessor",
+      "population": "converted",
+      "source": "MediatR/src/MediatR/Pipeline/IRequestPostProcessor.cs",
+      "variants": {
+        "current": "current/converted-MediatR-IRequestPostProcessor.txt",
+        "infix": "infix/converted-MediatR-IRequestPostProcessor.txt",
+        "sexpr": "sexpr/converted-MediatR-IRequestPostProcessor.txt",
+        "line-call": "line-call/converted-MediatR-IRequestPostProcessor.txt"
+      }
+    },
+    {
+      "id": "converted-MediatR-ForeachAwaitPublisher",
+      "population": "converted",
+      "source": "MediatR/src/MediatR/NotificationPublishers/ForeachAwaitPublisher.cs",
+      "variants": {
+        "current": "current/converted-MediatR-ForeachAwaitPublisher.txt",
+        "infix": "infix/converted-MediatR-ForeachAwaitPublisher.txt",
+        "sexpr": "sexpr/converted-MediatR-ForeachAwaitPublisher.txt",
+        "line-call": "line-call/converted-MediatR-ForeachAwaitPublisher.txt"
+      }
+    },
+    {
+      "id": "converted-Serilog-ILoggerSettings",
+      "population": "converted",
+      "source": "Serilog/src/Serilog/Configuration/ILoggerSettings.cs",
+      "variants": {
+        "current": "current/converted-Serilog-ILoggerSettings.txt",
+        "infix": "infix/converted-Serilog-ILoggerSettings.txt",
+        "sexpr": "sexpr/converted-Serilog-ILoggerSettings.txt",
+        "line-call": "line-call/converted-Serilog-ILoggerSettings.txt"
+      }
+    },
+    {
+      "id": "converted-Serilog-ILogEventEnricher",
+      "population": "converted",
+      "source": "Serilog/src/Serilog/Core/ILogEventEnricher.cs",
+      "variants": {
+        "current": "current/converted-Serilog-ILogEventEnricher.txt",
+        "infix": "infix/converted-Serilog-ILogEventEnricher.txt",
+        "sexpr": "sexpr/converted-Serilog-ILogEventEnricher.txt",
+        "line-call": "line-call/converted-Serilog-ILogEventEnricher.txt"
+      }
+    },
+    {
+      "id": "converted-Serilog-ILogEventFilter",
+      "population": "converted",
+      "source": "Serilog/src/Serilog/Core/ILogEventFilter.cs",
+      "variants": {
+        "current": "current/converted-Serilog-ILogEventFilter.txt",
+        "infix": "infix/converted-Serilog-ILogEventFilter.txt",
+        "sexpr": "sexpr/converted-Serilog-ILogEventFilter.txt",
+        "line-call": "line-call/converted-Serilog-ILogEventFilter.txt"
+      }
+    },
+    {
+      "id": "converted-Serilog-Constants",
+      "population": "converted",
+      "source": "Serilog/src/Serilog/Core/Constants.cs",
+      "variants": {
+        "current": "current/converted-Serilog-Constants.txt",
+        "infix": "infix/converted-Serilog-Constants.txt",
+        "sexpr": "sexpr/converted-Serilog-Constants.txt",
+        "line-call": "line-call/converted-Serilog-Constants.txt"
+      }
+    },
+    {
+      "id": "converted-Serilog-AlignmentDirection",
+      "population": "converted",
+      "source": "Serilog/src/Serilog/Parsing/AlignmentDirection.cs",
+      "variants": {
+        "current": "current/converted-Serilog-AlignmentDirection.txt",
+        "infix": "infix/converted-Serilog-AlignmentDirection.txt",
+        "sexpr": "sexpr/converted-Serilog-AlignmentDirection.txt",
+        "line-call": "line-call/converted-Serilog-AlignmentDirection.txt"
+      }
+    },
+    {
+      "id": "converted-Serilog-LoggingFailureKind",
+      "population": "converted",
+      "source": "Serilog/src/Serilog/Core/LoggingFailureKind.cs",
+      "variants": {
+        "current": "current/converted-Serilog-LoggingFailureKind.txt",
+        "infix": "infix/converted-Serilog-LoggingFailureKind.txt",
+        "sexpr": "sexpr/converted-Serilog-LoggingFailureKind.txt",
+        "line-call": "line-call/converted-Serilog-LoggingFailureKind.txt"
+      }
+    },
+    {
+      "id": "converted-FluentValidation-IValidatorSelector",
+      "population": "converted",
+      "source": "FluentValidation/src/FluentValidation/Internal/IValidatorSelector.cs",
+      "variants": {
+        "current": "current/converted-FluentValidation-IValidatorSelector.txt",
+        "infix": "infix/converted-FluentValidation-IValidatorSelector.txt",
+        "sexpr": "sexpr/converted-FluentValidation-IValidatorSelector.txt",
+        "line-call": "line-call/converted-FluentValidation-IValidatorSelector.txt"
+      }
+    },
+    {
+      "id": "converted-FluentValidation-ChildRulesContainer",
+      "population": "converted",
+      "source": "FluentValidation/src/FluentValidation/Internal/ChildRulesContainer.cs",
+      "variants": {
+        "current": "current/converted-FluentValidation-ChildRulesContainer.txt",
+        "infix": "infix/converted-FluentValidation-ChildRulesContainer.txt",
+        "sexpr": "sexpr/converted-FluentValidation-ChildRulesContainer.txt",
+        "line-call": "line-call/converted-FluentValidation-ChildRulesContainer.txt"
+      }
+    },
+    {
+      "id": "converted-FluentValidation-NoopPropertyValidator",
+      "population": "converted",
+      "source": "FluentValidation/src/FluentValidation/Validators/NoopPropertyValidator.cs",
+      "variants": {
+        "current": "current/converted-FluentValidation-NoopPropertyValidator.txt",
+        "infix": "infix/converted-FluentValidation-NoopPropertyValidator.txt",
+        "sexpr": "sexpr/converted-FluentValidation-NoopPropertyValidator.txt",
+        "line-call": "line-call/converted-FluentValidation-NoopPropertyValidator.txt"
+      }
+    },
+    {
+      "id": "converted-FluentValidation-InlineValidator",
+      "population": "converted",
+      "source": "FluentValidation/src/FluentValidation/InlineValidator.cs",
+      "variants": {
+        "current": "current/converted-FluentValidation-InlineValidator.txt",
+        "infix": "infix/converted-FluentValidation-InlineValidator.txt",
+        "sexpr": "sexpr/converted-FluentValidation-InlineValidator.txt",
+        "line-call": "line-call/converted-FluentValidation-InlineValidator.txt"
+      }
+    },
+    {
+      "id": "converted-FluentValidation-ILanguageManager",
+      "population": "converted",
+      "source": "FluentValidation/src/FluentValidation/Resources/ILanguageManager.cs",
+      "variants": {
+        "current": "current/converted-FluentValidation-ILanguageManager.txt",
+        "infix": "infix/converted-FluentValidation-ILanguageManager.txt",
+        "sexpr": "sexpr/converted-FluentValidation-ILanguageManager.txt",
+        "line-call": "line-call/converted-FluentValidation-ILanguageManager.txt"
+      }
+    },
+    {
+      "id": "converted-FluentValidation-CompositeValidatorSelector",
+      "population": "converted",
+      "source": "FluentValidation/src/FluentValidation/Internal/CompositeValidatorSelector.cs",
+      "variants": {
+        "current": "current/converted-FluentValidation-CompositeValidatorSelector.txt",
+        "infix": "infix/converted-FluentValidation-CompositeValidatorSelector.txt",
+        "sexpr": "sexpr/converted-FluentValidation-CompositeValidatorSelector.txt",
+        "line-call": "line-call/converted-FluentValidation-CompositeValidatorSelector.txt"
+      }
+    },
+    {
+      "id": "converted-Synthetic-StringUtils",
+      "population": "converted",
+      "source": "Synthetic/SyntheticLib/StringUtils.cs",
+      "variants": {
+        "current": "current/converted-Synthetic-StringUtils.txt",
+        "infix": "infix/converted-Synthetic-StringUtils.txt",
+        "sexpr": "sexpr/converted-Synthetic-StringUtils.txt",
+        "line-call": "line-call/converted-Synthetic-StringUtils.txt"
+      }
+    },
+    {
+      "id": "converted-Synthetic2-Grid",
+      "population": "converted",
+      "source": "Synthetic2/GeoLib/Grid.cs",
+      "variants": {
+        "current": "current/converted-Synthetic2-Grid.txt",
+        "infix": "infix/converted-Synthetic2-Grid.txt",
+        "sexpr": "sexpr/converted-Synthetic2-Grid.txt",
+        "line-call": "line-call/converted-Synthetic2-Grid.txt"
+      }
+    },
+    {
+      "id": "agent-W5A-001-report-audit",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/guarantees-probe-001/W5A-001-report-audit/calor-v10-verify/run-1/final-src/Report.calr",
+      "variants": {
+        "current": "current/agent-W5A-001-report-audit.txt",
+        "infix": "infix/agent-W5A-001-report-audit.txt",
+        "sexpr": "sexpr/agent-W5A-001-report-audit.txt",
+        "line-call": "line-call/agent-W5A-001-report-audit.txt"
+      }
+    },
+    {
+      "id": "agent-W5A-002-inventory-log",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/guarantees-probe-001/W5A-002-inventory-log/calor-v10-verify/run-1/final-src/Inventory.calr",
+      "variants": {
+        "current": "current/agent-W5A-002-inventory-log.txt",
+        "infix": "infix/agent-W5A-002-inventory-log.txt",
+        "sexpr": "sexpr/agent-W5A-002-inventory-log.txt",
+        "line-call": "line-call/agent-W5A-002-inventory-log.txt"
+      }
+    },
+    {
+      "id": "agent-W5A-003-config-echo",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/guarantees-probe-001/W5A-003-config-echo/calor-v10-verify/run-1/final-src/Config.calr",
+      "variants": {
+        "current": "current/agent-W5A-003-config-echo.txt",
+        "infix": "infix/agent-W5A-003-config-echo.txt",
+        "sexpr": "sexpr/agent-W5A-003-config-echo.txt",
+        "line-call": "line-call/agent-W5A-003-config-echo.txt"
+      }
+    },
+    {
+      "id": "agent-W5B-001-shipping-quote",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/guarantees-probe-001/W5B-001-shipping-quote/calor-v10-verify/run-1/final-src/Quote.calr",
+      "variants": {
+        "current": "current/agent-W5B-001-shipping-quote.txt",
+        "infix": "infix/agent-W5B-001-shipping-quote.txt",
+        "sexpr": "sexpr/agent-W5B-001-shipping-quote.txt",
+        "line-call": "line-call/agent-W5B-001-shipping-quote.txt"
+      }
+    },
+    {
+      "id": "agent-W5B-002-loyalty-points",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/guarantees-probe-001/W5B-002-loyalty-points/calor-v10-verify/run-1/final-src/Loyalty.calr",
+      "variants": {
+        "current": "current/agent-W5B-002-loyalty-points.txt",
+        "infix": "infix/agent-W5B-002-loyalty-points.txt",
+        "sexpr": "sexpr/agent-W5B-002-loyalty-points.txt",
+        "line-call": "line-call/agent-W5B-002-loyalty-points.txt"
+      }
+    },
+    {
+      "id": "agent-W5B-003-request-quota",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/guarantees-probe-001/W5B-003-request-quota/calor-v10-verify/run-1/final-src/Quota.calr",
+      "variants": {
+        "current": "current/agent-W5B-003-request-quota.txt",
+        "infix": "infix/agent-W5B-003-request-quota.txt",
+        "sexpr": "sexpr/agent-W5B-003-request-quota.txt",
+        "line-call": "line-call/agent-W5B-003-request-quota.txt"
+      }
+    },
+    {
+      "id": "agent-W5C-001-catalog-cache",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/guarantees-probe-001/W5C-001-catalog-cache/calor-v10-verify/run-1/final-src/Catalog.calr",
+      "variants": {
+        "current": "current/agent-W5C-001-catalog-cache.txt",
+        "infix": "infix/agent-W5C-001-catalog-cache.txt",
+        "sexpr": "sexpr/agent-W5C-001-catalog-cache.txt",
+        "line-call": "line-call/agent-W5C-001-catalog-cache.txt"
+      }
+    },
+    {
+      "id": "agent-W5C-002-ledger-view",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/guarantees-probe-001/W5C-002-ledger-view/calor-v10-verify/run-1/final-src/Ledger.calr",
+      "variants": {
+        "current": "current/agent-W5C-002-ledger-view.txt",
+        "infix": "infix/agent-W5C-002-ledger-view.txt",
+        "sexpr": "sexpr/agent-W5C-002-ledger-view.txt",
+        "line-call": "line-call/agent-W5C-002-ledger-view.txt"
+      }
+    },
+    {
+      "id": "agent-W5C-003-session-index",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/guarantees-probe-001/W5C-003-session-index/calor-v10-verify/run-1/final-src/Session.calr",
+      "variants": {
+        "current": "current/agent-W5C-003-session-index.txt",
+        "infix": "infix/agent-W5C-003-session-index.txt",
+        "sexpr": "sexpr/agent-W5C-003-session-index.txt",
+        "line-call": "line-call/agent-W5C-003-session-index.txt"
+      }
+    },
+    {
+      "id": "agent-W-001-middleware-stage",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/w-rows-dry-001/W-001-middleware-stage/calor+v0.15.0/run-1/final-src/A3-middleware.calr",
+      "variants": {
+        "current": "current/agent-W-001-middleware-stage.txt",
+        "infix": "infix/agent-W-001-middleware-stage.txt",
+        "sexpr": "sexpr/agent-W-001-middleware-stage.txt",
+        "line-call": "line-call/agent-W-001-middleware-stage.txt"
+      }
+    },
+    {
+      "id": "agent-W-002-map-and-report",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/w-rows-dry-001/W-002-map-and-report/calor+v0.15.0/run-1/final-src/A3-map.calr",
+      "variants": {
+        "current": "current/agent-W-002-map-and-report.txt",
+        "infix": "infix/agent-W-002-map-and-report.txt",
+        "sexpr": "sexpr/agent-W-002-map-and-report.txt",
+        "line-call": "line-call/agent-W-002-map-and-report.txt"
+      }
+    },
+    {
+      "id": "agent-W-006-map-doubler",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/w-rows-dry-001/W-006-map-doubler/calor+v0.15.0/run-1/final-src/A3-map.calr",
+      "variants": {
+        "current": "current/agent-W-006-map-doubler.txt",
+        "infix": "infix/agent-W-006-map-doubler.txt",
+        "sexpr": "sexpr/agent-W-006-map-doubler.txt",
+        "line-call": "line-call/agent-W-006-map-doubler.txt"
+      }
+    },
+    {
+      "id": "agent-W-003-match-fallback",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/w-rows-dry-001/W-003-match-fallback/calor+v0.15.0/run-1/final-src/A3-match.calr",
+      "variants": {
+        "current": "current/agent-W-003-match-fallback.txt",
+        "infix": "infix/agent-W-003-match-fallback.txt",
+        "sexpr": "sexpr/agent-W-003-match-fallback.txt",
+        "line-call": "line-call/agent-W-003-match-fallback.txt"
+      }
+    },
+    {
+      "id": "agent-W-004-counter-peek",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/w-rows-dry-001/W-004-counter-peek/calor+v0.15.0/run-1/final-src/A3-callback.calr",
+      "variants": {
+        "current": "current/agent-W-004-counter-peek.txt",
+        "infix": "infix/agent-W-004-counter-peek.txt",
+        "sexpr": "sexpr/agent-W-004-counter-peek.txt",
+        "line-call": "line-call/agent-W-004-counter-peek.txt"
+      }
+    },
+    {
+      "id": "agent-W-005-pipeline-trace",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/w-rows-dry-001/W-005-pipeline-trace/calor+v0.15.0/run-1/final-src/A2.calr",
+      "variants": {
+        "current": "current/agent-W-005-pipeline-trace.txt",
+        "infix": "infix/agent-W-005-pipeline-trace.txt",
+        "sexpr": "sexpr/agent-W-005-pipeline-trace.txt",
+        "line-call": "line-call/agent-W-005-pipeline-trace.txt"
+      }
+    },
+    {
+      "id": "agent-N1-001-string-utils",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/e1-rows-parity-001/N1-001-string-utils/calor+0.15.0/run-1/final-src/TextUtils.calr",
+      "variants": {
+        "current": "current/agent-N1-001-string-utils.txt",
+        "infix": "infix/agent-N1-001-string-utils.txt",
+        "sexpr": "sexpr/agent-N1-001-string-utils.txt",
+        "line-call": "line-call/agent-N1-001-string-utils.txt"
+      }
+    },
+    {
+      "id": "agent-N1-002-inventory",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/e1-rows-parity-001/N1-002-inventory/calor+0.15.0/run-1/final-src/Inventory.calr",
+      "variants": {
+        "current": "current/agent-N1-002-inventory.txt",
+        "infix": "infix/agent-N1-002-inventory.txt",
+        "sexpr": "sexpr/agent-N1-002-inventory.txt",
+        "line-call": "line-call/agent-N1-002-inventory.txt"
+      }
+    },
+    {
+      "id": "agent-N1-003-csv-row",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/e1-rows-parity-001/N1-003-csv-row/calor+0.15.0/run-1/final-src/CsvRow.calr",
+      "variants": {
+        "current": "current/agent-N1-003-csv-row.txt",
+        "infix": "infix/agent-N1-003-csv-row.txt",
+        "sexpr": "sexpr/agent-N1-003-csv-row.txt",
+        "line-call": "line-call/agent-N1-003-csv-row.txt"
+      }
+    },
+    {
+      "id": "agent-N1-001-string-utils-w5",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/w5-parity-002/N1-001-string-utils/calor+treatment/run-1/final-src/TextUtils.calr",
+      "variants": {
+        "current": "current/agent-N1-001-string-utils-w5.txt",
+        "infix": "infix/agent-N1-001-string-utils-w5.txt",
+        "sexpr": "sexpr/agent-N1-001-string-utils-w5.txt",
+        "line-call": "line-call/agent-N1-001-string-utils-w5.txt"
+      }
+    },
+    {
+      "id": "agent-N1-002-inventory-w5",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/w5-parity-002/N1-002-inventory/calor+treatment/run-1/final-src/Inventory.calr",
+      "variants": {
+        "current": "current/agent-N1-002-inventory-w5.txt",
+        "infix": "infix/agent-N1-002-inventory-w5.txt",
+        "sexpr": "sexpr/agent-N1-002-inventory-w5.txt",
+        "line-call": "line-call/agent-N1-002-inventory-w5.txt"
+      }
+    },
+    {
+      "id": "primer",
+      "population": "primer",
+      "source": "src/Calor.Compiler/Resources/agent-syntax-exemplar.md",
+      "variants": {
+        "current": "current/primer.txt",
+        "infix": "infix/primer.txt",
+        "sexpr": "sexpr/primer.txt",
+        "line-call": "line-call/primer.txt"
+      }
+    }
+  ],
+  "probes": [
+    {
+      "id": "probe-ns-equal-short-file",
+      "population": "namespace-header",
+      "source": "hand-authored/namespace-header/equal-short-file",
+      "note": "SPECULATIVE spelling payload, NOT accepted syntax and not compiled; token measurement only. Tool baseline label: current = namespace arm. Body is byte-identical in every arm (accepted rows 2-5/8: no sigil, public default, C# types, func, →); only line 1 differs. Header M is the compilation-unit wrapper label (ModuleNode.Name): no C# type, not namespace proof, never a static container; the static container is the body's `class Area stat` (ClassDefinitionNode.IsModule) and keeps its own name (#1619). Origin: no marker = file-scoped (as all 26 file-scoped population/converted headers), trailing `block` = block-scoped; identical in every arm. Header word order: module <M> <namespace clause> [block] overflow unchecked. Control: M == N. The `conflated` arm is the existing population form (module name doubles as namespace); it is NOT a candidate for, and its count must not be cited for, any M != N case.",
+      "variants": {
+        "current": "probes-ns/equal-short-file/namespace.txt",
+        "in": "probes-ns/equal-short-file/in.txt",
+        "positional": "probes-ns/equal-short-file/positional.txt",
+        "compact": "probes-ns/equal-short-file/compact.txt",
+        "conflated": "probes-ns/equal-short-file/conflated.txt"
+      }
+    },
+    {
+      "id": "probe-ns-unequal-short-file",
+      "population": "namespace-header",
+      "source": "hand-authored/namespace-header/unequal-short-file",
+      "note": "SPECULATIVE spelling payload, NOT accepted syntax and not compiled; token measurement only. Tool baseline label: current = namespace arm. Body is byte-identical in every arm (accepted rows 2-5/8: no sigil, public default, C# types, func, →); only line 1 differs. Header M is the compilation-unit wrapper label (ModuleNode.Name): no C# type, not namespace proof, never a static container; the static container is the body's `class Area stat` (ClassDefinitionNode.IsModule) and keeps its own name (#1619). Origin: no marker = file-scoped (as all 26 file-scoped population/converted headers), trailing `block` = block-scoped; identical in every arm. Header word order: module <M> <namespace clause> [block] overflow unchecked. M != N, one-segment namespace, file-scoped.",
+      "variants": {
+        "current": "probes-ns/unequal-short-file/namespace.txt",
+        "in": "probes-ns/unequal-short-file/in.txt",
+        "positional": "probes-ns/unequal-short-file/positional.txt",
+        "compact": "probes-ns/unequal-short-file/compact.txt"
+      }
+    },
+    {
+      "id": "probe-ns-unequal-dotted-file",
+      "population": "namespace-header",
+      "source": "hand-authored/namespace-header/unequal-dotted-file",
+      "note": "SPECULATIVE spelling payload, NOT accepted syntax and not compiled; token measurement only. Tool baseline label: current = namespace arm. Body is byte-identical in every arm (accepted rows 2-5/8: no sigil, public default, C# types, func, →); only line 1 differs. Header M is the compilation-unit wrapper label (ModuleNode.Name): no C# type, not namespace proof, never a static container; the static container is the body's `class Area stat` (ClassDefinitionNode.IsModule) and keeps its own name (#1619). Origin: no marker = file-scoped (as all 26 file-scoped population/converted headers), trailing `block` = block-scoped; identical in every arm. Header word order: module <M> <namespace clause> [block] overflow unchecked. M != N, dotted namespace, file-scoped.",
+      "variants": {
+        "current": "probes-ns/unequal-dotted-file/namespace.txt",
+        "in": "probes-ns/unequal-dotted-file/in.txt",
+        "positional": "probes-ns/unequal-dotted-file/positional.txt",
+        "compact": "probes-ns/unequal-dotted-file/compact.txt"
+      }
+    },
+    {
+      "id": "probe-ns-unequal-dotted-block",
+      "population": "namespace-header",
+      "source": "hand-authored/namespace-header/unequal-dotted-block",
+      "note": "SPECULATIVE spelling payload, NOT accepted syntax and not compiled; token measurement only. Tool baseline label: current = namespace arm. Body is byte-identical in every arm (accepted rows 2-5/8: no sigil, public default, C# types, func, →); only line 1 differs. Header M is the compilation-unit wrapper label (ModuleNode.Name): no C# type, not namespace proof, never a static container; the static container is the body's `class Area stat` (ClassDefinitionNode.IsModule) and keeps its own name (#1619). Origin: no marker = file-scoped (as all 26 file-scoped population/converted headers), trailing `block` = block-scoped; identical in every arm. Header word order: module <M> <namespace clause> [block] overflow unchecked. Same as unequal-dotted-file with block origin; block vs file is metadata (NamespaceScopeInfo.IsFileScoped) and must not be flattened silently.",
+      "variants": {
+        "current": "probes-ns/unequal-dotted-block/namespace.txt",
+        "in": "probes-ns/unequal-dotted-block/in.txt",
+        "positional": "probes-ns/unequal-dotted-block/positional.txt",
+        "compact": "probes-ns/unequal-dotted-block/compact.txt"
+      }
+    },
+    {
+      "id": "probe-ns-named-underscore-global",
+      "population": "namespace-header",
+      "source": "hand-authored/namespace-header/named-underscore-global",
+      "note": "SPECULATIVE spelling payload, NOT accepted syntax and not compiled; token measurement only. Tool baseline label: current = namespace arm. Body is byte-identical in every arm (accepted rows 2-5/8: no sigil, public default, C# types, func, →); only line 1 differs. Header M is the compilation-unit wrapper label (ModuleNode.Name): no C# type, not namespace proof, never a static container; the static container is the body's `class Area stat` (ClassDefinitionNode.IsModule) and keeps its own name (#1619). Origin: no marker = file-scoped (as all 26 file-scoped population/converted headers), trailing `block` = block-scoped; identical in every arm. Header word order: module <M> <namespace clause> [block] overflow unchecked. Namespace literally named `_global` (Kind=Named); written plainly, no sentinel/`:named` suffix. True global (Kind=Global, identity \"\") omits the namespace clause in EVERY arm, so its text is identical across arms and is not probed (delta 0 by construction); omission must set explicit global identity, not legacy null.",
+      "variants": {
+        "current": "probes-ns/named-underscore-global/namespace.txt",
+        "in": "probes-ns/named-underscore-global/in.txt",
+        "positional": "probes-ns/named-underscore-global/positional.txt",
+        "compact": "probes-ns/named-underscore-global/compact.txt"
+      }
+    },
+    {
+      "id": "probe-ns-escaped-keyword-file",
+      "population": "namespace-header",
+      "source": "hand-authored/namespace-header/escaped-keyword-file",
+      "note": "SPECULATIVE spelling payload, NOT accepted syntax and not compiled; token measurement only. Tool baseline label: current = namespace arm. Body is byte-identical in every arm (accepted rows 2-5/8: no sigil, public default, C# types, func, →); only line 1 differs. Header M is the compilation-unit wrapper label (ModuleNode.Name): no C# type, not namespace proof, never a static container; the static container is the body's `class Area stat` (ClassDefinitionNode.IsModule) and keeps its own name (#1619). Origin: no marker = file-scoped (as all 26 file-scoped population/converted headers), trailing `block` = block-scoped; identical in every arm. Header word order: module <M> <namespace clause> [block] overflow unchecked. C# keyword segment requires @. Spelling only: current RoslynSyntaxVisitor.VisitNamespaceScope strips @ (Replace(\"@\", \"\")), so exact lexical escape retention needs a converter fix/control.",
+      "variants": {
+        "current": "probes-ns/escaped-keyword-file/namespace.txt",
+        "in": "probes-ns/escaped-keyword-file/in.txt",
+        "positional": "probes-ns/escaped-keyword-file/positional.txt",
+        "compact": "probes-ns/escaped-keyword-file/compact.txt"
+      }
+    },
+    {
+      "id": "probe-ns-header-word-collision-block",
+      "population": "namespace-header",
+      "source": "hand-authored/namespace-header/header-word-collision-block",
+      "note": "SPECULATIVE spelling payload, NOT accepted syntax and not compiled; token measurement only. Tool baseline label: current = namespace arm. Body is byte-identical in every arm (accepted rows 2-5/8: no sigil, public default, C# types, func, →); only line 1 differs. Header M is the compilation-unit wrapper label (ModuleNode.Name): no C# type, not namespace proof, never a static container; the static container is the body's `class Area stat` (ClassDefinitionNode.IsModule) and keeps its own name (#1619). Origin: no marker = file-scoped (as all 26 file-scoped population/converted headers), trailing `block` = block-scoped; identical in every arm. Header word order: module <M> <namespace clause> [block] overflow unchecked. Namespace named `overflow` (legal C# identifier) collides with a header attribute word. The positional arm must escape it as @overflow (C#-equivalent identifier, same semantics); keyword and compact arms parse without escape. Counts include that per-arm cost.",
+      "variants": {
+        "current": "probes-ns/header-word-collision-block/namespace.txt",
+        "in": "probes-ns/header-word-collision-block/in.txt",
+        "positional": "probes-ns/header-word-collision-block/positional.txt",
+        "compact": "probes-ns/header-word-collision-block/compact.txt"
+      }
+    }
+  ],
+  "supplemental": "LOCAL #1620 namespace-header probe payload for review. Population: the 41 ce134ec samples and 4 families byte-identical (reproduction controls vs runs 41665665387/42545537256). Adds only probes-ns/ (7 probes; arms namespace/in/positional/compact, plus conflated control for M == N). ce134ec's 84 probes are omitted (already measured; immutable). Compact `N/M` chosen because row 3 rejected `{}`/`:` attribute delimiters and `:` is the type:name separator; judgment call. Single-scope spelling only: nested/sibling/repeated namespaces, mixed global+named declarations and conditional namespace placement are NOT representable in a one-namespace header and need faithful conversion preservation (not flattening, not N->M mapping). Token counts never imply semantic acceptance. THIRD-PARTY-NOTICES.md and third-party-licenses/ are unmeasured ancillary notices. Not published, not counted, not authorized for dispatch."
+}

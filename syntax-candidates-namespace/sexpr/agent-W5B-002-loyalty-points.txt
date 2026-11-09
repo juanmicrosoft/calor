@@ -1,0 +1,28 @@
+module Loyalty
+  fn BasePoints pub stat (int:spend) -> int
+    effects
+    return (* spend 2)
+  fn BonusPoints pub stat (int:visits) -> int
+    effects
+    return (* visits 5)
+  fn AwardWithFloor pub stat (int:earned, int:bonus, int:minPoints) -> int
+    effects
+    ensures (>= result minPoints)
+    let int:total = (+ earned bonus)
+    if (< total minPoints)
+      return minPoints
+    return total
+  fn TotalAward pub stat (int:spend, int:visits, int:minPoints) -> int
+    effects
+    let int:earned = (BasePoints spend)
+    let int:bonus = (BonusPoints visits)
+    return (AwardWithFloor earned bonus minPoints)
+  fn AwardWithCap pub stat (int:earned, int:bonus, int:minPoints, int:maxPoints) -> int
+    effects
+    let int:floored = (AwardWithFloor earned bonus minPoints)
+    if (> floored maxPoints)
+      return maxPoints
+    return floored
+  fn FormatAward pub stat (int:points) -> string
+    effects
+    return (+ "points: " (points.ToString))

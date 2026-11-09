@@ -1,0 +1,23 @@
+module Config
+  fn FormatEntry pub stat (string:key, string:val) -> string
+    effects
+    return key + ("=" + val)
+  fn QuoteValue pub stat (string:val) -> string
+    effects
+    return "'" + (val + "'")
+  fn FormatConfig pub stat (string:key, string:val) -> string
+    effects
+    let string:quoted = QuoteValue(val)
+    let string:line = FormatEntry(key, quoted)
+    return line
+  fn SaveConfig pub stat (string:path, string:key, string:val) -> void
+    effects fs:w
+    let string:line = FormatConfig(key, val)
+    File.WriteAllText(path, line)
+  fn FormatSection pub stat (string:name) -> string
+    effects
+    return "[" + (name + "]")
+  fn LoadConfig pub stat (string:path) -> string
+    effects fs:r
+    let string:text = File.ReadAllText(path)
+    return text

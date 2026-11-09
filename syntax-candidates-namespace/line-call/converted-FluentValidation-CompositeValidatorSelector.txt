@@ -1,0 +1,11 @@
+module FluentValidation.Internal overflow unchecked
+  using System.Collections.Generic
+  using System.Linq
+  class CompositeValidatorSelector int
+    implements IValidatorSelector
+    field Seq<IValidatorSelector>:_selectors priv
+    ctor pub (Seq<IValidatorSelector>:selectors)
+      set _selectors selectors
+    fn CanExecute pub (IValidationRule:rule, string?:propertyPath, IValidationContext:context) -> bool
+      let _lam006 = (lambda (IValidatorSelector:s) (s.CanExecute rule propertyPath context))
+      return §C{_selectors.Any} _lam006

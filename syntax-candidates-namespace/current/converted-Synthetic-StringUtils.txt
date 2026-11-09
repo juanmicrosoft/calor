@@ -1,0 +1,53 @@
+§M{m001:SyntheticLib:overflow=unchecked}
+  §NS{ns001:SyntheticLib:file}
+    §CL{c002:StringUtils:pub}
+      §MT{m003:Reverse:pub:stat} (str:input) -> str
+        §E{throw,alloc,mut}
+        §IF{if004} (== input null)
+          §TH §NEW{ArgumentNullException} §A (nameof input) §/NEW
+        §B{char[]:chars} §C{input.ToCharArray}
+        §C{Array.Reverse} chars
+        §R §NEW{string} §A chars §/NEW
+
+      §MT{m005:IsPalindrome:pub:stat} (str:input) -> bool
+        §E{throw,alloc,mut}
+        §IF{if006} (== input null)
+          §R false
+        §B{str:cleaned} §C{input.ToLowerInvariant}
+        §B{str:reversed} §C{Reverse} cleaned
+        §R (== cleaned reversed)
+
+      §MT{m007:CountOccurrences:pub:stat} (str:text, char:target) -> i32
+        §IF{if008} (== text null)
+          §R 0
+        §B{~count:i32} 0
+        §IF{scope015} true
+          §B{~i:i32} 0
+          §B{~_forFirst009:bool} true
+          §WH{while014} true
+            §IF{if010} _forFirst009
+              §ASSIGN _forFirst009 false
+            §EL
+              §ASSIGN i (+ i 1)
+            §IF{if011} (< i (len text))
+            §EL
+              §BK
+            §IF{body013} true
+              §IF{if012} (== §IDX{text} i target)
+                §ASSIGN count (+ count 1)
+        §R count
+
+      §MT{m016:Truncate:pub:stat} (str:input, i32:maxLength) -> str
+        §IF{if017} (== input null)
+          §R ""
+        §IF{if018} (<= (len input) maxLength)
+          §R input
+        §R (+ (substr input 0 maxLength) "...")
+
+      §MT{m019:Capitalize:pub:stat} (str:input) -> str
+        §IF{if020} (isempty input)
+          §R (?? input "")
+        §R (+ §C{char.ToUpperInvariant} §A §IDX{input} 0 §/C (substr input 1))
+
+
+

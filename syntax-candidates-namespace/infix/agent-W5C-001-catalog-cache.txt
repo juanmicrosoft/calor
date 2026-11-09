@@ -1,0 +1,33 @@
+module Catalog
+  fn SnapshotLine pub stat (string:name, int:count) -> string
+    effects
+    return name + ("=" + count.ToString())
+  fn SaveSnapshot pub stat (string:path, string:name, int:count) -> void
+    effects fs:w
+    let string:line = SnapshotLine(name, count)
+    File.WriteAllText(path, line)
+  fn ReadSnapshot pub stat (string:path) -> string
+    effects fs:r
+    let bool:exists = File.Exists(path)
+    if !exists
+      return ""
+    return File.ReadAllText(path)
+  fn SummaryOf pub stat (string:content) -> string
+    effects
+    return "catalog[" + (content.Length.ToString() + "]")
+  fn LoadSummary pub stat (string:path) -> string
+    effects fs:r
+    let string:content = ReadSnapshot(path)
+    return SummaryOf(content)
+  fn HasCatalog pub stat (string:path) -> bool
+    effects fs:r
+    let string:content = ReadSnapshot(path)
+    return content.Length > 0
+  fn DescribeCatalog pub stat (string:path) -> string
+    effects fs:r
+    let string:summary = LoadSummary(path)
+    return "catalog: " + summary
+  fn CatalogSize pub stat (string:path) -> int
+    effects fs:r
+    let string:content = ReadSnapshot(path)
+    return content.Length

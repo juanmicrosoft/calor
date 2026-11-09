@@ -1,0 +1,10 @@
+§M{m001:FluentValidation.Internal:overflow=unchecked}
+  §NS{ns001:FluentValidation.Internal:file}
+    // AbstractValidator implementation for containing child rules.
+    §CL{c002:ChildRulesContainer<T>:int}
+      §EXT{InlineValidator<T>}
+
+      §FLD{str[]:RuleSetsToApplyToChildRules:int}
+
+
+

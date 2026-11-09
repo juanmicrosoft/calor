@@ -1,0 +1,4 @@
+module Microsoft.Extensions.DependencyInjection overflow unchecked
+  enum RequestExceptionActionProcessorStrategy pub
+    ApplyForUnhandledExceptions
+    ApplyForAllExceptions

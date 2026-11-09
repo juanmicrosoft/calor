@@ -1,0 +1,6 @@
+module CallbackAfter
+  class Counter pub
+    field Action<int>:onChange priv effects cw
+    fn Bump pub (int:n) -> void
+      effects cw
+      onChange(n)
