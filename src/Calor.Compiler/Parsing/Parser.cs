@@ -10912,9 +10912,11 @@ public sealed class Parser
             }
             Expect(TokenKind.CloseBrace);
         }
+        var typeReference = ParseTypeReference(typeSpan);
         return new NewExpressionNode(start.Span.Union(PreviousToken.Span), type, [], arguments,
             collectionInitializers.Count == 0 ? initializers : [],
-            typeSpan, argumentNames: names.Any(name => name is not null) ? names : null,
+            typeReference?.Span ?? typeSpan, typeReference,
+            argumentNames: names.Any(name => name is not null) ? names : null,
             collectionInitializers: collectionInitializers);
     }
 
