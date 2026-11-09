@@ -135,6 +135,11 @@ public class DocDriftCheckerTests
         new[] { "ServerContracts", "BankingContracts", "MissingFundsContract", "DivisionContracts" },
         new[] { "10", "70", "70", "-2" },
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()" })]
+    [InlineData("benchmarking/metrics/effect-soundness.mdx", 7, 2,
+        new[] { "OrderEffects", "HiddenNetwork", "DatabasePermissions", "PureComposition", "DeclaredPipeline" },
+        new[] { "True", "200", "42", "42", "42" },
+        new[] { "GlobalModule.ProcessOrder()", "GlobalModule.Calculate()", "GlobalModule.GetUser(42)",
+            "GlobalModule.Calculate()", "GlobalModule.GetUser(42)" })]
     [InlineData("structure-tags.mdx", 20, 2,
         new[] { "StructureModules", "BlockNamespace", "FunctionHeaders", "AsyncFunctions", "AsyncMethods",
             "AwaitExpressions", "LambdaExamples", "AsyncLambdas", "LocalCallables", "DelegateDefinitions",

@@ -4,215 +4,221 @@ section: "benchmarking"
 order: 11
 ---
 
-> **Syntax and measurement:** Source illustrations use current ID-free headers. The published numerical results and archived output remain historical; these illustrations are not a remeasurement of those results.
+> **Syntax and measurement:** These are current native compiler examples, not
+> a remeasurement of historical benchmark results. The database and network
+> examples use explicitly labelled synthetic dependency rows, not live services.
 
 **Feature:** Compiler-enforced effect declarations
-**Related metric:** [Effect Discipline](/docs/benchmarking/metrics/effect-discipline/) (measures side effect management quality)
-**C# equivalent:** None (no effect system)
 
----
+**Related metric:** [Effect Discipline](/docs/benchmarking/metrics/effect-discipline/)
+
+**C# comparison:** C# has no built-in Calor-style effect rows; libraries,
+analyzers and API contracts can still convey effect information.
 
 ## Overview
 
-Calor's compiler checks declared effects against direct recognized operations
-and the resolved Calor call graph. A function marked `§E{}` cannot contain a
-known I/O operation or call a resolved effectful function without a matching
-declaration.
+The compiler checks declared effects against recognized operations and resolved
+calls. `!` declares a pure row; `! cw` admits console writes. For ordinary
+resolved internal calls, available computed body effects propagate to callers.
+Declared rows remain permission ceilings, not evidence that the body actually
+performs every admitted effect. Dispatch and callback boundaries also use
+declared rows.
 
-Unknown external calls and raw interop are explicit soundness boundaries: the
-compiler surfaces diagnostics or assumptions rather than proving their
-behavior. Calling a callback is no longer one of them — since 0.15 the compiler
-reads the callback's declared `§E{…}` and charges it to the caller, and reports
-`Calor0425` when one side carries no `§E{…}` and it cannot tell.
+Unresolved calls, preserved C# and other opaque boundaries require explicit
+diagnostics or assumptions. A clean-looking row alone is not proof that those
+boundaries were resolved. Callback rows also participate in checking; missing
+or incompatible rows have their own diagnostics.
 
-`--permissive-effects` waives the "cannot tell" boundary — `Calor0411` and
-`Calor0425` go unreported and `Calor0410` becomes a warning — which voids the
-effect guarantee, since unknown calls are then counted as doing nothing. It
-never waives `Calor0424`, `Calor0420`, or `Calor0421`. See
-[Effects](/docs/syntax-reference/effects/#turning-the-checks-down).
-
----
+`--permissive-effects` changes that policy. It waives unknown-call diagnostics
+and demotes ordinary undeclared-effect errors. It is not evidence that an
+unknown operation is pure and must not count as ordinary enforced native
+acceptance. See [Effects](/docs/syntax-reference/effects/).
 
 ## Why It Matters
 
-Hidden side effects cause real bugs:
+Undeclared I/O can make tests, refactoring and dependency analysis unreliable.
+Effect rows expose permissions that callers must account for on the checked
+surface.
 
-- **Testing failures** - "Pure" functions that secretly log make tests non-deterministic
-- **Concurrency bugs** - Functions assumed safe for parallel execution have hidden state
-- **Performance surprises** - What looks like a calculation actually hits the network
-- **Security issues** - Code assumed side-effect-free modifies databases
-
-Effect soundness means:
-- You can rely on declarations for the resolved graph when there are no
-  unresolved-call, interop-assumption, or waiver diagnostics
-- Refactoring across that checked surface exposes newly introduced known effects
-- Testing strategy follows directly from effects
-
-It does not by itself prove thread safety, determinism, or freedom from effects
-hidden behind an unresolved boundary.
-
----
+They do **not** by themselves establish determinism, thread safety, bounded
+execution, exception freedom or complete knowledge of external libraries.
+Those are separate properties.
 
 ## How It's Measured
 
-The compiler traces effect violations through the resolved call graph:
+An effect-checking evaluation must keep the original programs, compilation
+options and expected outcomes fixed. Report direct and transitive violations,
+unresolved calls, assumptions and waivers separately. A parse success or
+preserved C# frame is not a native effect-checking result.
 
-1. **Direct effects** - Does the function body contain effectful operations?
-2. **Transitive effects** - Do called functions have effects?
-3. **Declaration match** - Are all effects properly declared in `§E{...}`?
-
-Violations produce compile errors with full call chains:
-
-```text illustrative
-error Calor0410: Function 'ProcessOrder' uses effect 'network'
-                 but does not declare it
-  Call chain: ProcessOrder → NotifyCustomer → SendEmail → HttpClient.PostAsync
-```
-
----
+The executable controls below cover known direct console output and declared
+rows in a closed source call graph. They do not measure actual database or
+network implementation effects.
 
 ## Example
 
-A function declared with only database effects:
+This complete example contains actual console output in a resolved source
+callee. Its pure caller is rejected with `Calor0410`:
+
+```calor expect=Calor0410
+module TransitiveLogging
+  func LogMessage private (string:message) → void
+    ! cw
+    Console.WriteLine(message)
+
+  func Process () → int
+    !
+    LogMessage("Saved")
+    return 42
+```
+
+If logging is intended, the caller must admit `cw`. Otherwise remove or replace
+the operation. Changing the declaration is an API policy decision, not proof
+that the original program already met its row.
+
+The following dependencies, in contrast, are **synthetic stubs**. Their
+declarations admit database and network effects, but their bodies only return
+constants:
 
 ```calor
-§F{ProcessOrder:pub}
-  §I{Order:order}
-  §O{bool}
-  §E{db:rw}                    // Declares: only database effects
+module OrderEffects
+  func SaveOrder private () → bool
+    ! db:rw
+    return true
 
-  §C{SaveOrder} order          // OK: SaveOrder has db effect
-  §C{SendConfirmation} order   // ERROR: has network effect!
-  §R true
+  func SendConfirmation private () → bool
+    ! net:w
+    return true
+
+  func ProcessOrder () → bool
+    ! db:rw
+    SaveOrder()
+    SendConfirmation()
+    return true
 ```
 
-The compiler catches this:
-
-```text illustrative
-error Calor0410: Function 'ProcessOrder' uses effect 'net:w'
-                 but does not declare it
-  Call chain: ProcessOrder → SendConfirmation → EmailService.Send → HttpClient.PostAsync
-```
-
-To fix, either:
-1. Add the effect: `§E{db:rw,net:w}`
-2. Remove the effectful call
-3. Use a different implementation without network effects
-
----
+`ProcessOrder()` returns `true` and compiles. The available computed effects of
+these source bodies are empty. This is **not** a negative network-effect
+example: merely naming a function `SendConfirmation` and writing a broad row
+does not make it perform network I/O.
 
 ## What It Catches
 
 ### Hidden Network Calls
 
-```calor
-§F{Calculate:pub}
-  §O{i32}
-  §E{}                         // Claims to be pure
+Real network operations need recognized or otherwise justified effect facts.
+This synthetic dependency does not exercise a real HTTP client:
 
-  §B{rate:i32} §C{FetchExchangeRate} §/C  // ERROR: network!
-  §R (* 100 rate)
+```calor
+module HiddenNetwork
+  func FetchExchangeRate private () → int
+    ! net:r
+    return 2
+
+  func Calculate () → int
+    !
+    return 100 * FetchExchangeRate()
 ```
+
+`Calculate()` returns `200` and compiles: the known source callee returns a
+constant. It must not be counted as detection of an undeclared network call.
 
 ### Undeclared Database Writes
 
-```calor
-§F{GetUser:pub}
-  §I{i32:id}
-  §O{User}
-  §E{db:r}                     // Claims read-only
+Likewise, these synthetic dependencies declare different permissions but
+perform no database operations:
 
-  §B{user:User} §C{Repository.GetById} id §/C
-  §C{AuditLog.Write} id        // ERROR: this is db:w!
-  §R user
+```calor
+module DatabasePermissions
+  func GetById private (int:id) → int
+    ! db:r
+    return id
+
+  func WriteAudit private (int:id) → bool
+    ! db:w
+    return true
+
+  func GetUser (int:id) → int
+    ! db:r
+    let int:user = GetById(id)
+    WriteAudit(id)
+    return user
 ```
+
+`GetUser(42)` returns `42` and compiles. A real database-write control needs an
+actual supported operation and its reference/effect context. This stub is not
+such a control.
 
 ### Logging in "Pure" Functions
 
-```calor
-§F{ValidateEmail:pub}
-  §I{str:email}
-  §O{bool}
-  §E{}                         // Claims no effects
+This example uses an actual recognized .NET console operation, not a synthetic
+logger whose effects were guessed from its name:
 
-  §C{Logger.Debug} email       // ERROR: console write!
-  §R §C{IsValidFormat} email §/C
+```calor expect=Calor0410
+module UndeclaredLogging
+  func Report (string:message) → bool
+    !
+    Console.WriteLine(message)
+    return true
 ```
 
----
+Normal enforcement rejects the missing `cw` permission with `Calor0410`.
 
 ## Effect Propagation
 
-Callers must include all effects of their callees:
+Pure calls can compose without adding permissions:
 
 ```calor
-// Callee has console write effect
-§F{LogMessage:priv}
-  §I{str:msg}
-  §O{void}
-  §E{cw}
-  §P msg
+module PureComposition
+  func Increment private (int:value) → int
+    !
+    return value + 1
 
-// Caller MUST include cw effect
-§F{ProcessAndLog:pub}
-  §I{Data:data}
-  §O{void}
-  §E{db:rw,cw}                 // Must include cw because we call LogMessage
-
-  §C{SaveData} data
-  §C{f002:LogMessage} "Saved"
+  func Calculate () → int
+    !
+    return Increment(41)
 ```
 
-If `ProcessAndLog` declared only `§E{db:rw}`, the compiler would error:
-
-```text illustrative
-error Calor0410: Function 'ProcessAndLog' uses effect 'cw'
-                 but does not declare it
-  Call chain: ProcessAndLog → LogMessage → Console.WriteLine
-```
-
----
+`Calculate()` returns `42`. This observation is not a proof over all integer
+inputs: checked overflow remains possible for `Increment(int.MaxValue)`.
 
 ## Effect Checking Modes
 
 ### Default Mode (Warnings)
 
-Unknown external calls produce warnings:
+Known undeclared effects are errors. Unknown-call diagnostics such as
+`Calor0411` are warnings by default, but an unknown effect can also make an
+under-declared caller fail with `Calor0410`. A warning is not a purity proof.
 
 ```bash
 calor -i app.calr -o app.g.cs
 ```
 
-```text illustrative
-warning Calor0411: Unknown effects for call to 'ThirdParty.DoSomething'
-```
-
 ### Strict Mode (Errors)
 
-Promote unknown effects to errors:
+Strict effects promote applicable unknown-effect warnings to errors:
 
 ```bash
 calor -i app.calr -o app.g.cs --strict-effects
 ```
 
-```text illustrative
-error Calor0411: Unknown effects for call to 'ThirdParty.DoSomething'
-  Add effect declaration to manifest or declare pessimistic effects
-```
-
----
+Inspect binding errors separately: a missing type or reference is not repaired
+by changing effect-checking mode. Permissive mode also does not waive every
+callback-row or effect-manifest error.
 
 ## Comparison with Implicit Effects
 
-| Aspect | C# (Implicit) | Calor (Explicit) |
-|:-------|:--------------|:-----------------|
-| Side effects visible? | No - must read implementation | Yes - in function signature |
-| Compiler enforcement | None | Resolved-call graph analysis with explicit unknowns |
-| "Pure" guarantee | Convention only | Enforced when calls resolve; assumptions are surfaced |
-| Refactoring safety | Must manually verify | Known-effect violations are caught within the checked surface |
-| Testing strategy | Guesswork | Follows from effects |
+| Aspect | C# | Calor |
+|:-------|:---|:------|
+| Effect information | API contracts, implementation, analyzers and conventions | Explicit rows plus compiler resolution |
+| Native row enforcement | Not a built-in language feature | Checked for supported resolved operations and calls |
+| External boundaries | Need dependency context | Also need context; unresolved effects remain explicit |
+| Thread safety | Needs separate reasoning | Also needs separate reasoning |
 
 ### C# Example
+
+This original fragment has unspecified dependencies and is not a standalone
+execution fixture:
 
 ```csharp
 // C#: What effects does this have?
@@ -226,49 +232,60 @@ public async Task<User> GetUser(int id)
 // Answer: You have NO IDEA without reading every dependency
 ```
 
-### Calor Equivalent
+The comment overstates the comparison: dependency interfaces and documentation
+can provide information without reading every implementation. They are not,
+however, Calor's checked source effect rows.
+
+### Calor Example
+
+This **separate synthetic pipeline** demonstrates row propagation. It is not a
+conversion or runtime-equivalent implementation of the C# fragment. None of
+these stub bodies performs database, console or network I/O:
 
 ```calor
-§F{GetUser:pub}
-  §I{i32:id}
-  §O{User}
-  §E{db:r,cw,net:rw}           // EXPLICIT: database read, console, network
+module DeclaredPipeline
+  func ReadUser private (int:id) → int
+    ! db:r
+    return id
 
-  §B{user:User} §C{GetById} id §/C
-  §C{Log} (concat "Retrieved user " (str id))
-  §C{CacheSet} user
-  §R user
+  func LogUser private (int:user) → void
+    ! cw
+    return
+
+  func CacheUser private (int:user) → int
+    ! net:rw
+    return user
+
+  func GetUser (int:id) → int
+    ! db:r,cw,net:rw
+    let int:user = ReadUser(id)
+    LogUser(user)
+    return CacheUser(user)
 ```
 
----
+`GetUser(42)` returns `42`. Its declared permissions are conservative: admitting
+an effect does not mean every invocation performs that effect.
 
 ## Benefits for AI Agents
 
 ### 1. Filtering by Effect
 
-Find all functions that access the database:
-```
-// Agent searches for §E{..db..}
-```
+Use compiler/project-index tooling to inspect rows and resolved callees.
+Text searches are useful navigation, not a substitute for semantic resolution.
 
 ### 2. Refactoring Safety
 
-Use `§E{}` as a checked pure surface only when compilation has no unresolved or
-waived effect assumptions:
-```
-// §E{} does not alone prove that a function is safe to parallelize
-```
+Recompile the exact changed program with normal enforcement. Inspect unknown
+calls and assumptions instead of treating a written pure row as proof.
 
 ### 3. Test Planning
 
-- `§E{}` - Unit test directly
-- `§E{cw}` - Mock console
-- `§E{db:rw}` - Mock database
-- `§E{net:rw}` - Mock HTTP
-
----
+Rows can identify dependency boundaries worth isolating in tests. A `cw` row
+does not prove a function is a console mock, and a pure row does not eliminate
+the need for boundary and exception tests.
 
 ## Next
 
-- [Effect Discipline](/docs/benchmarking/metrics/effect-discipline/) - Side effect management benchmark
-- [Correctness](/docs/benchmarking/metrics/correctness/) - Edge case handling benchmark
+- [Effect Discipline](/docs/benchmarking/metrics/effect-discipline/) — effect-management evaluation
+- [Effects](/docs/syntax-reference/effects/) — rows, diagnostics and limitations
+- [Correctness](/docs/benchmarking/metrics/correctness/) — edge-case testing
