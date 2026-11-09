@@ -236,6 +236,12 @@ public sealed class NativeMetadataClosureTests
             Assert.Single(Assert.Single(collection.CollectionInitializers).Arguments));
         Assert.Equal("WidgetException", nested.ResolvedType!.Name);
         Assert.Equal("WidgetException", source.Substring(nested.TypeNameSpan.Start, nested.TypeNameSpan.Length));
+        var widget = bound.SymbolsById.Values.OfType<TypeSymbol>().Single(type => type.Name == "WidgetException");
+        var factory = Calor.Compiler.Analysis.Dataflow.BoundNodeHelpers.DescendantsAndSelf(bound)
+            .OfType<BoundCallExpression>().Single(call => call.ResolvedSymbol?.Name == "WidgetException.Create");
+        Assert.Equal(widget.Id, factory.ReceiverTypeSymbolId);
+        Assert.Equal("WidgetException",
+            source.Substring(factory.ReceiverSpan!.Value.Start, factory.ReceiverSpan.Value.Length));
         Assert.Contains("new List<WidgetException>", new CSharpEmitter().Emit(module));
         CompileAssembly(new CSharpEmitter().Emit(module));
     }

@@ -6178,9 +6178,11 @@ public sealed class Binder
         var receiverSymbol = computedReceiver is null ? ResolveCallReceiver(
             callExpr.Target,
             callExpr.ReceiverSpan ?? callExpr.CalleeSpan) : (computedReceiver as BoundVariableExpression)?.Variable;
-        var receiverTypeSymbol = computedReceiver is null && receiverSymbol == null
-            ? ResolveCallReceiverType(callExpr.Target)
-            : null;
+        var receiverTypeSymbol = computedReceiver is BoundTypeReferenceExpression computedTypeReceiver
+            ? computedTypeReceiver.ResolvedType
+            : computedReceiver is null && receiverSymbol == null
+                ? ResolveCallReceiverType(callExpr.Target)
+                : null;
         var resolution = ResolveCall(
             callExpr.Span,
             callExpr.Target,
