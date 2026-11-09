@@ -217,24 +217,16 @@ public sealed class ProjectSymbolIndex
 
     private void Populate()
     {
-        // A module, and a type declared across several files, is one declaration
-        // in the language but one symbol per file here. Renaming from such a
-        // declaration would edit a single part and split it, with no Calor
-        // diagnostic to show for it (the break surfaces only in generated C#).
-        // They are marked so the engine can refuse. See #922.
-        var moduleDocumentCounts = Documents
-            .GroupBy(document => document.Ast.Name, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
-        var importedNamespaces = Documents
-            .SelectMany(document => document.Ast.Usings)
-            .Select(directive => directive.Namespace)
-            .ToHashSet(StringComparer.Ordinal);
+        // Type parts share CLR identity, not compilation-unit labels. A per-file
+        // occurrence set cannot safely rename one part of that declaration.
         var typeDocumentCounts = Documents
             .SelectMany(document => document.BoundModule.SymbolsById.Values
                 .OfType<TypeSymbol>()
-                .Select(symbol => (Module: document.Ast.Name, Type: symbol.Name)))
-            .GroupBy(pair => pair)
-            .ToDictionary(group => group.Key, group => group.Count());
+                .Select(symbol => (symbol.QualifiedName, document.FilePath)))
+            .GroupBy(part => part.QualifiedName, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key,
+                group => group.Select(part => part.FilePath).Distinct(StringComparer.Ordinal).Count(),
+                StringComparer.Ordinal);
 
         var seen = new HashSet<(string File, SymbolId Id, int Start, SymbolOccurrenceKind Kind)>();
 
@@ -245,9 +237,9 @@ public sealed class ProjectSymbolIndex
                 if (symbol.Id.IsNone || !IsExactDeclaration(document.Source, symbol))
                     continue;
 
-                var split = symbol is TypeSymbol
+                var split = symbol is TypeSymbol typeSymbol
                     && typeDocumentCounts.TryGetValue(
-                        (document.Ast.Name, symbol.Name),
+                        typeSymbol.QualifiedName,
                         out var declaringDocuments)
                     && declaringDocuments > 1;
                 Add(document, symbol.Id, symbol.DeclarationSpan,
@@ -367,8 +359,7 @@ public sealed class ProjectSymbolIndex
                 }
             }
 
-            // Module names are indexed so a rename can be refused explicitly
-            // rather than silently doing nothing.
+            // Root module names are independent per-file labels, not namespaces.
             var moduleId = document.Ast.ToolingId != null
                 ? SymbolId.Create("declaration", document.Ast.ToolingId)
                 : SymbolId.Create(
@@ -376,12 +367,8 @@ public sealed class ProjectSymbolIndex
                 SymbolSourceIdentity.Canonicalize(document.FilePath),
                 "module",
                 document.Ast.Name);
-            var moduleSplit =
-                (moduleDocumentCounts.TryGetValue(document.Ast.Name, out var declaringModules)
-                    && declaringModules > 1)
-                || importedNamespaces.Contains(document.Ast.Name);
             Add(document, moduleId, document.Ast.IdentifierSpan,
-                SymbolOccurrenceKind.Definition, moduleSplit);
+                SymbolOccurrenceKind.Definition, isSplitDeclaration: false);
         }
 
         // Each file is bound on its own, so a call into another module resolves

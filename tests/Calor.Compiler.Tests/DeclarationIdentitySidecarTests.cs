@@ -263,6 +263,65 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
             result.Declarations.Single(d => d.Name == "B").Id);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task McpFileLabelRenamePreservesNamespaceAndEveryPersistedIdentity(bool importedNamespace)
+    {
+        var source = importedNamespace
+            ? "module Shared Shared\n  class LeftType\n    field int:Value\n"
+            : "module Shared\n  class Worker partial\n    field int:Left\n";
+        var other = importedNamespace
+            ? "module Other\n  using Shared\n  class RightType\n    field LeftType:Value\n"
+            : "module Shared\n  class Worker partial\n    field int:Right\n";
+        var file = Write("target.calr", source);
+        var otherFile = Write("other.calr", other);
+        var before = Store.Sync([file, otherFile]);
+        var labelId = before.Declarations.Single(declaration =>
+            declaration.File == "target.calr" && declaration.Kind == IdKind.Module).Id;
+        var sidecar = File.ReadAllText(Store.SidecarPath);
+        var compiledBefore = Program.Compile(source, file);
+        Assert.False(compiledBefore.HasErrors, string.Join("; ", compiledBefore.Diagnostics));
+        var tool = new FileWriteTool(new ProjectSessionManager(), _root);
+        foreach (var preview in new[] { true, false })
+        {
+            var result = await tool.ExecuteAsync(JsonSerializer.SerializeToElement(new
+            {
+                action = "rename", projectDirectory = _root, filePath = file,
+                line = 1, column = 8, newName = "Renamed", preview
+            }));
+            Assert.False(result.IsError, result.Content.Single().Text);
+            using var response = JsonDocument.Parse(result.Content.Single().Text!);
+            Assert.True(response.RootElement.GetProperty("success").GetBoolean());
+            Assert.Equal(!preview, response.RootElement.GetProperty("applied").GetBoolean());
+            Assert.Equal([CanonicalPath.Resolve(file)], response.RootElement.GetProperty("changedFiles")
+                .EnumerateArray().Select(value => value.GetString()));
+            Assert.Equal(other, File.ReadAllText(otherFile));
+            if (preview)
+            {
+                Assert.Equal(source, File.ReadAllText(file));
+                Assert.Equal(sidecar, File.ReadAllText(Store.SidecarPath));
+            }
+        }
+        var renamed = source.Replace("module Shared", "module Renamed", StringComparison.Ordinal);
+        Assert.Equal(renamed, File.ReadAllText(file));
+        Assert.False(File.Exists(PathFor(".calor/ids.transaction.json")));
+        var after = Store.Sync();
+        Assert.Equal(before.Files, after.Files);
+        Assert.Equal(before.Declarations.Select(declaration => declaration.Id).Order(),
+            after.Declarations.Select(declaration => declaration.Id).Order());
+        foreach (var original in before.Declarations)
+        {
+            var current = after.Declarations.Single(declaration => declaration.Id == original.Id);
+            Assert.Equal(original with { Name = original.Id == labelId ? "Renamed" : original.Name }, current);
+        }
+        Assert.Equal(labelId, CalorSourceHelper.Parse(renamed, file).Ast!.Id);
+        var compiledAfter = Program.Compile(renamed, file);
+        Assert.False(compiledAfter.HasErrors, string.Join("; ", compiledAfter.Diagnostics));
+        Assert.True(Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(compiledBefore.GeneratedCode).GetRoot()
+            .IsEquivalentTo(Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(compiledAfter.GeneratedCode).GetRoot()));
+    }
+
     [Fact]
     public async Task McpClassRenameReportsExistingTypeIndexLimitationWithoutEdits()
     {
