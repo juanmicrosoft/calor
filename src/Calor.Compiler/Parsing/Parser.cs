@@ -53,7 +53,6 @@ public sealed class Parser
             [TokenKind.NullConditional] = static parser => parser.ParseNullConditional(),
             [TokenKind.RangeOp] = static parser => parser.ParseRangeExpression(),
             [TokenKind.IndexEnd] = static parser => parser.ParseIndexFromEnd(),
-            [TokenKind.With] = static parser => parser.ParseWithExpression(),
             [TokenKind.StackAlloc] = static parser => parser.ParseStackAlloc(),
             [TokenKind.AddressOf] = static parser => parser.ParseAddressOf(),
             [TokenKind.Deref] = static parser => parser.ParsePointerDereference(),
@@ -3201,6 +3200,11 @@ public sealed class Parser
 
         while (Current.Span.Line == TokenEndLine(PreviousToken))
         {
+            if (minimumPrecedence <= 13 && Check(TokenKind.With))
+            {
+                expr = ParseWithExpression(expr);
+                continue;
+            }
             if (minimumPrecedence <= 9 && Current.Text is "is" or "as")
             {
                 var operation = Advance();
@@ -3476,7 +3480,7 @@ public sealed class Parser
         ExpressionNode operand;
         try
         {
-            operand = ParseInfixOperand(op, 13);
+            operand = ParseInfixOperand(op, 15);
         }
         finally
         {
@@ -13800,7 +13804,7 @@ public sealed class Parser
     private AwaitExpressionNode ParseAwaitExpression()
     {
         var startToken = Expect(TokenKind.Await);
-        var awaited = ParseInfixOperand(startToken, 13);
+        var awaited = ParseInfixOperand(startToken, 15);
 
         var span = startToken.Span.Union(awaited.Span);
         return new AwaitExpressionNode(span, awaited);
@@ -13941,41 +13945,26 @@ public sealed class Parser
     // Phase 10: Advanced Patterns
 
     /// <summary>
-    /// Parses a with-expression for non-destructive mutation.
-    /// §WITH §REF[name=person]
-    ///   §SET[Name] "New Name"
-    /// §/WITH
+    /// Parses a native record clone with ordered property initializers.
     /// </summary>
-    private WithExpressionNode ParseWithExpression()
+    private WithExpressionNode ParseWithExpression(ExpressionNode target)
     {
-        var startToken = Expect(TokenKind.With);
-
-        // Parse the target expression
-        var target = ParseExpression();
-
-        // Parse property assignments
+        Expect(TokenKind.With);
+        Expect(TokenKind.OpenBrace);
         var assignments = new List<WithPropertyAssignmentNode>();
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndWith))
+        while (!IsAtEnd && !Check(TokenKind.CloseBrace) && !Check(TokenKind.Dedent))
         {
-            if (Check(TokenKind.Set))
-            {
-                var setToken = Expect(TokenKind.Set);
-                var setAttrs = ParseAttributes();
-                var propName = setAttrs["_pos0"] ?? "";
-                var value = ParseExpression();
-                var assignSpan = setToken.Span.Union(value.Span);
-                assignments.Add(new WithPropertyAssignmentNode(assignSpan, propName, value));
-            }
-            else
-            {
-                // Skip unknown tokens
-                Advance();
-            }
+            var escaped = Match(TokenKind.At);
+            var property = escaped && Current.IsKeyword ? Advance() : Expect(TokenKind.Identifier);
+            Expect(TokenKind.Equals);
+            var value = ParseExpression();
+            assignments.Add(new WithPropertyAssignmentNode(
+                property.Span.Union(value.Span), TokenIdentifier(property), value));
+            if (!Match(TokenKind.Comma))
+                break;
         }
-
-        var endToken = ExpectBlockEnd(TokenKind.EndWith);
-        var span = startToken.Span.Union(endToken.Span);
-        return new WithExpressionNode(span, target, assignments);
+        var close = Expect(TokenKind.CloseBrace);
+        return new WithExpressionNode(target.Span.Union(close.Span), target, assignments);
     }
 
     /// <summary>

@@ -491,6 +491,31 @@ public sealed class NativeMetadataClosureTests
         Assert.Contains(invalidRef.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.InvalidByReferenceOperand);
     }
 
+    [Fact]
+    public void NativeRecordClone_PreservesTheOriginalAndActualCopy()
+    {
+        const string source = """
+            module RecordClone
+              record Item (int:X, int:Y)
+              func Copy (Item:value) → Item
+                ! alloc, mut
+                return value with { X = value.X + 1 }
+            """;
+        var result = Compile(source);
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        var assembly = CompileAssembly(result.GeneratedCode);
+        var type = assembly.GetTypes().Single(type => type.Name == "Item");
+        var original = Activator.CreateInstance(type, 4, 8);
+        var method = assembly.GetTypes().SelectMany(type => type.GetMethods()).Single(method => method.Name == "Copy");
+        var clone = method.Invoke(null, [original]);
+        Assert.NotSame(original, clone);
+        Assert.Equal(4, type.GetProperty("X")!.GetValue(original));
+        Assert.Equal(5, type.GetProperty("X")!.GetValue(clone));
+        Assert.Equal(8, type.GetProperty("Y")!.GetValue(clone));
+        var pure = Compile(source.Replace("! alloc, mut", "!", StringComparison.Ordinal));
+        Assert.Contains(pure.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
     private static CompilationResult Compile(string source) => Program.Compile(source, "native-metadata.calr",
         new CompilationOptions { EnableTypeChecking = true, EnforceEffects = true, StatusWriter = TextWriter.Null });
 

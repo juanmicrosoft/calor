@@ -4231,21 +4231,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(WithExpressionNode node)
     {
-        // Inline-sibling context for the target: §WITH target ... §/WITH is
-        // emitted on a single line, so an elided one-arg §C{f} target form
-        // (v0.6.3 RFC §2.1) would absorb the following §SET / §/WITH as its
-        // inline argument.
-        var target = AcceptInInlineSibling(node.Target);
-        var assignments = string.Join(" ", node.Assignments.Select(a => AcceptInInlineSibling(a)));
-        if (assignments.Length > 0)
-            return $"§WITH {target} {assignments} §/WITH";
-        return $"§WITH {target} §/WITH";
+        var target = AcceptInConditionalRegion(node.Target);
+        var assignments = string.Join(", ", node.Assignments.Select(a => a.Accept(this)));
+        return $"({target} with {{ {assignments} }})";
     }
 
     public string Visit(WithPropertyAssignmentNode node)
     {
-        var value = AcceptInInlineSibling(node.Value);
-        return $"§SET{{{node.PropertyName}}} {value}";
+        var value = AcceptInConditionalRegion(node.Value);
+        return $"{EscapeCalorIdentifier(node.PropertyName)} = {value}";
     }
 
     // Retained semantic metadata keeps its current syntax until its replacement is measured.

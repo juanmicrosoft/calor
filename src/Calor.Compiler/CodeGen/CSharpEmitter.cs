@@ -7813,7 +7813,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(WithExpressionNode node)
     {
-        var target = node.Target.Accept(this);
+        var target = EmitGroupedOperand(node.Target);
         var assignments = string.Join(", ", node.Assignments.Select(a =>
             $"{SanitizeIdentifier(a.PropertyName)} = {a.Value.Accept(this)}"));
         return $"{target} with {{ {assignments} }}";

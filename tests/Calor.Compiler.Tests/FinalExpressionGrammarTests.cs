@@ -46,6 +46,69 @@ public sealed class FinalExpressionGrammarTests
     }
 
     [Theory]
+    [InlineData("item with { X = 1, Y = next() }")]
+    [InlineData("item with { }")]
+    [InlineData("item with { @class = 1, }")]
+    public void NativeRecordClone_UsesExistingOrderedAstAndRoundtrips(string source)
+    {
+        var clone = Assert.IsType<WithExpressionNode>(Parse(source));
+        Assert.Equal("item", Assert.IsType<ReferenceNode>(clone.Target).Name);
+        Assert.Equal(source, source.Substring(clone.Span.Start, clone.Span.Length));
+        var emitted = clone.Accept(new CalorEmitter());
+        Assert.DoesNotContain('§', emitted);
+        var reparsed = Assert.IsType<WithExpressionNode>(Parse(emitted));
+        Assert.Equal(clone.Assignments.Select(assignment => assignment.PropertyName),
+            reparsed.Assignments.Select(assignment => assignment.PropertyName));
+    }
+
+    [Fact]
+    public void NativeRecordClone_UsesCSharpPrecedence()
+    {
+        var multiply = Assert.IsType<BinaryOperationNode>(Parse("a * b with { X = 1 }"));
+        Assert.IsType<WithExpressionNode>(multiply.Right);
+        var clone = Assert.IsType<WithExpressionNode>(Parse("-a with { X = 1 }"));
+        Assert.IsType<UnaryOperationNode>(clone.Target);
+        var conditional = Assert.IsType<ConditionalExpressionNode>(Parse("flag ? a with { X = 1 } : b"));
+        Assert.IsType<WithExpressionNode>(conditional.WhenTrue);
+    }
+
+    [Fact]
+    public void NativeRecordClone_RetainsLazyOrderedSingleEvaluation()
+    {
+        var expression = Parse("take ? Target() with { X = Next(), Y = Next() } : Original");
+        foreach (var node in new[] { expression, Parse(expression.Accept(new CalorEmitter())) })
+        {
+            var emitted = node.Accept(new CSharpEmitter());
+            var source = $$"""
+                public record Item(int X, int Y);
+                public static class Probe
+                {
+                    public static string Trace = "";
+                    public static Item Original = new(7, 8);
+                    public static Item Target() { Trace += "T"; return Original; }
+                    public static int Next() { Trace += "N"; return Trace.Length; }
+                    public static Item Run(bool take) => {{emitted}};
+                }
+                """;
+            var compilation = CSharpCompilation.Create("CloneOrder_" + Guid.NewGuid().ToString("N"),
+                [CSharpSyntaxTree.ParseText(source)], GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var result = compilation.Emit(stream);
+            Assert.True(result.Success, source + Environment.NewLine + string.Join(Environment.NewLine, result.Diagnostics));
+            var type = Assembly.Load(stream.ToArray()).GetType("Probe")!;
+            var original = type.GetField("Original")!.GetValue(null);
+            Assert.Same(original, type.GetMethod("Run")!.Invoke(null, [false]));
+            Assert.Equal("", type.GetField("Trace")!.GetValue(null));
+            var clone = type.GetMethod("Run")!.Invoke(null, [true])!;
+            Assert.NotSame(original, clone);
+            Assert.Equal("TNN", type.GetField("Trace")!.GetValue(null));
+            Assert.Equal(2, clone.GetType().GetProperty("X")!.GetValue(clone));
+            Assert.Equal(3, clone.GetType().GetProperty("Y")!.GetValue(clone));
+        }
+    }
+
+    [Theory]
     [InlineData("Call(ref first, out second, in third)")]
     [InlineData("Call(a: ref first, b: out second, c: in third)")]
     public void NativeCallModifiers_RetainKeywordTokensAndOrderedChannels(string source)
