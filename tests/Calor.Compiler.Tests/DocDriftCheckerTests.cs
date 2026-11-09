@@ -73,6 +73,9 @@ public class DocDriftCheckerTests
         new[] { "4", "5", "15", "42" },
         new[] { "GlobalModule.Divide(9, 2)", "GlobalModule.Abs(-5)", "GlobalModule.Main()",
             "GlobalModule.First(new int[] { 42 })" })]
+    [InlineData("index.mdx", 2, 0,
+        new[] { "LabelExample", "FizzBuzz" }, new[] { "42", "FizzBuzz:Fizz:Buzz:7" },
+        new[] { "Demo.DemoModule.Main()", "GlobalModule.Main()" })]
     public void PublicNativeReference_CompilesPositiveAndExactNegativeExamples(
         string page, int completeCount, int negativeCount, string[] moduleNames, string[] expectedResults,
         string[] expressions)
