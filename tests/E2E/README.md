@@ -2135,6 +2135,17 @@ direct/wrapped process, deadline, EOF, cleanup, OS/launch, abnormal-exit and
 success-shaped failure output propagate before counting. Even declared timeout
 controls cannot admit EOF/cleanup failure.
 
+Admission parses the complete canonical outer/nested failure wrapper chain:
+every finite-rejection wrapper must say exactly `Verifier command exited 1:`.
+Malformed, duplicated or displaced wrappers and other exit codes propagate.
+Successful output requires one canonical compiler identity and one exact verdict,
+without failure, EOF, cleanup, timeout or OS-error contamination. Timeout opt-in
+requires an independently declared negative/detail control and a positive numeric
+entry timeout for the actual wrapper or `dotnet`; global deadlines, malformed
+durations, extra failures and abnormal/OS exits cannot be counted as timeouts.
+Execute-path mocks restore all real counters, and the full command asserts the
+exact nonempty total and each positive/finite-negative/declared-timeout count.
+
 The named **representative strict matrix** retains all 46 distinct categories:
 every profile's native body and alias/equivalent variant, substantive proof
 negatives, original empty/sign cases, scalar preservation/message cases,
@@ -2155,6 +2166,12 @@ Current validation passed all seven tests: **139 real advanced controls**
 and **66 preserved-profile positives**, counted separately. The additional
 SumToN widening/factoring and strong-contract coupling regressions passed
 23 genuine contract-writing controls, retaining all 65,536 representable inputs.
+Admission-guard repair reran the complete seven-test current suite with these
+exact totals asserted. Six real success-output contamination probes and the
+counter-restored execute-path mocks contribute zero entries. The two explicit
+entry-timeout controls use two and five seconds; an expired bootstrap/global
+deadline is never timeout credit. The 120-second entry, 600-second archived
+replay and 5,000-millisecond solver bounds remain unchanged.
 
 **Archived replay remains blocked, not accepted.** The genuine archived arm
 verified its own native size/hash manifest, locked-restored and source-built

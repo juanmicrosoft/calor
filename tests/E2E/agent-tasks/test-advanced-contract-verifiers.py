@@ -71,8 +71,8 @@ EQUIVALENT = {
 def source(profile, *, body=None, contracts=None, signature=None):
     _, name, parameters, output, required, original = TASKS[profile]
     declaration = signature or f"§F{{{name}:pub}} ({parameters}) -> {output}"
-    # A spaced dot produces a native member node in both lexers, rather than an
-    # old-parser qualified-name token. This changes no predicate or input type.
+    # Preserve native member spelling without changing the predicate. The old
+    # compiler still rejects this postcondition; its validation stays enabled.
     lines = (required if contracts is None else contracts).replace("arr.Length", "arr . Length").splitlines()
     # The native array-length expression is shared by both compiler arms. Keep
     # .Length in contracts, where the certified quantifier lowerer requires it.
@@ -188,30 +188,45 @@ def matrix():
     return controls
 
 
-INFRASTRUCTURE = re.compile(
-    r"timeout|timed out|deadline|(?-i:\bEOF\b)|cleanup|Cannot terminate|solver infrastructure|(?-i:UNKNOWN)|"
-    r"OutOfMemory|DllNotFound|BadImageFormat|FileNotFoundException|AccessViolation|"
-    r"Aborted|segmentation|killed|MSB\d+|Build FAILED|NU\d+|cannot launch|permission denied|"
-    r"Selected native manifest|Selected compiler dependency|native manifest changed|image changed or was substituted|"
-    r"\[Errno \d+\]|OSError|WinError|UnauthorizedAccessException|IOException|success-shaped failure",
-    re.IGNORECASE)
+FULL_TOTALS = (139, 23, 114, 2)
 
 
-def classify(error, allow_timeout=False):
+def classify(error, *, timeout_seconds=None, commands=()):
     output = str(error)
-    if re.search(r"EOF supervision|cleanup|Cannot terminate", output, re.IGNORECASE):
-        raise error
-    if INFRASTRUCTURE.search(output):
-        if not (allow_timeout and re.search(r"Verifier timeout", output)
-                and not re.search(r"UNKNOWN|solver|EOF|cleanup", output, re.IGNORECASE)):
+    payload = output
+    if output.startswith("Verifier command exited 1:\n"):
+        payload = output.removeprefix("Verifier command exited 1:\n")
+        while payload.startswith("Verification failed: Verifier command exited "):
+            header = "Verification failed: Verifier command exited 1:\n"
+            if not payload.startswith(header):
+                raise error
+            payload = payload.removeprefix(header)
+        if not payload.startswith("Verification failed: "):
             raise error
-        return output
-    match = re.match(r"Verifier command exited (\d+):\n", output)
-    if match is None or int(match[1]) != 1 or "Verification failed:" not in output:
+        payload = payload.removeprefix("Verification failed: ")
+    elif timeout_seconds is None:
         raise error
-    if any(int(code) != 1 for code in re.findall(r"Verifier command exited (-?\d+):", output)):
+
+    # Only the contiguous canonical wrapper chain above is process evidence.
+    # A malformed, duplicated or displaced wrapper cannot disappear in findall.
+    if re.search(r"Verifier\s+command\s+exited|Verification\s+(?:passed|failed)\b", payload, re.IGNORECASE):
         raise error
-    if re.search(r"^\s*Verification passed:", output, re.MULTILINE):
+    if timeout_seconds is not None:
+        lines = [line for line in payload.splitlines()
+                 if line and not re.search(r"Selected\s+compiler\b", line, re.IGNORECASE)]
+        if len(lines) != 1:
+            raise error
+        ordinary = re.fullmatch(
+            r"Verifier timeout after (\d+(?:\.\d+)?(?:e[+-]?\d+)?)s: (.+)", lines[0])
+        if (ordinary is None or not 0 < float(ordinary[1]) <= timeout_seconds
+                or ordinary[2] not in commands):
+            raise error
+        # No global deadline, solver, OS, abnormal exit or extra failure output
+        # is admitted by the separately declared ordinary entry timeout.
+        remaining = output.replace(lines[0], "")
+        if ENGINE.ADVANCED_INFRASTRUCTURE.search(remaining):
+            raise error
+    elif ENGINE.ADVANCED_INFRASTRUCTURE.search(output):
         raise error
     return output
 
@@ -222,14 +237,32 @@ class AdvancedContractTests(unittest.TestCase):
     negatives = 0
     bounded_timeouts = 0
     lock = threading.Lock()
+    require_full_totals = False
+
+    @classmethod
+    def totals(cls):
+        return cls.entry_points_executed, cls.positives, cls.negatives, cls.bounded_timeouts
+
+    @classmethod
+    def setUpClass(cls):
+        cls.entry_points_executed = cls.positives = cls.negatives = cls.bounded_timeouts = 0
 
     @classmethod
     def tearDownClass(cls):
+        if cls.require_full_totals and cls.totals() != FULL_TOTALS:
+            raise AssertionError(f"Advanced full nonempty totals {cls.totals()} != {FULL_TOTALS}.")
         print(f"Executed {cls.entry_points_executed} real advanced controls: {cls.positives} positive, "
               f"{cls.negatives} finite rejected, {cls.bounded_timeouts} separately declared bounded timeouts.")
 
     def verify(self, profile, text, expected=True, *, env=None, detail=None, deadline=None,
                allow_timeout=False, real=True):
+        declared = None
+        if allow_timeout:
+            if expected or detail != "timeout" or deadline is not None:
+                raise ValueError("Declared timeout must be an explicit negative/detail control, not a global deadline.")
+            declared = float((env or {}).get("CALOR_LOGIC_TIMEOUT_SECONDS", "nan"))
+            if not 0 < declared <= 120:
+                raise ValueError("Declared timeout requires an explicit numeric entry bound in (0, 120].")
         with tempfile.TemporaryDirectory(prefix="calor-advanced-control-") as temporary:
             workspace = Path(temporary)
             if text is not None:
@@ -248,20 +281,23 @@ class AdvancedContractTests(unittest.TestCase):
                 output = ENGINE.run(command, HERE, end, env=environment)
                 passed = True
             except RuntimeError as error:
-                output = classify(error, allow_timeout)
+                output = classify(error, timeout_seconds=declared, commands=(command[0], "dotnet"))
                 passed = False
             self.assertEqual(passed, expected, output)
+            root = Path(environment["CALOR_COMPILER_ROOT"]).resolve()
+            configuration = environment.get("CALOR_COMPILER_CONFIGURATION", "Debug")
+            identity = f"Selected compiler: {root / 'src/Calor.Compiler/bin' / configuration / 'net10.0/calor.dll'}"
+            identities = [line for line in output.splitlines()
+                          if re.search(r"Selected\s+compiler\b", line, re.IGNORECASE)]
+            if identities and identities != [identity]:
+                raise RuntimeError("Advanced noncanonical or duplicate selected compiler identity.")
             if expected:
-                root = Path(environment["CALOR_COMPILER_ROOT"]).resolve()
-                configuration = environment.get("CALOR_COMPILER_CONFIGURATION", "Debug")
-                identity = f"Selected compiler: {root / 'src/Calor.Compiler/bin' / configuration / 'net10.0/calor.dll'}"
-                identities = [line for line in output.splitlines() if re.search(r"Selected\s+compiler:", line, re.IGNORECASE)]
-                self.assertEqual(identities, [identity], output)
-                self.assertNotRegex(output, r"(?im)Verification failed:|UNKNOWN|infrastructure failure")
+                ENGINE.check_advanced_success(output, identity)
                 count, rejections, coupling = COUNTS[profile]
-                self.assertIn(f"Verification passed: {TASKS[profile][1]}; advanced native/CLR predicates; "
-                              f"{count} runtime cases; {rejections} entry rejections; "
-                              f"{coupling} successful array output counterfactuals.", output)
+                self.assertEqual([line for line in output.splitlines() if line.startswith("Verification passed: ")],
+                                 [f"Verification passed: {TASKS[profile][1]}; advanced native/CLR predicates; "
+                                  f"{count} runtime cases; {rejections} entry rejections; "
+                                  f"{coupling} successful array output counterfactuals."], output)
                 self.assertIn("Limits:", output)
             if detail:
                 self.assertIn(detail, output)
@@ -277,19 +313,23 @@ class AdvancedContractTests(unittest.TestCase):
             return output
 
     def test_native_positives(self):
+        before = self.totals()
         for category, profile, text, expected, detail in matrix():
             if expected:
                 with self.subTest(profile=profile, category=category):
                     self.verify(profile, text, expected, detail=detail)
+        self.assertEqual(tuple(after - prior for after, prior in zip(self.totals(), before)), (22, 22, 0, 0))
 
     def test_finite_rejections(self):
+        before = self.totals()
         for category, profile, text, expected, detail in matrix():
             if not expected:
                 with self.subTest(profile=profile, category=category):
                     self.verify(profile, text, expected, detail=detail)
+        self.assertEqual(tuple(after - prior for after, prior in zip(self.totals(), before)), (114, 0, 114, 0))
 
     def test_supervision_and_identity_guards(self):
-        before = type(self).entry_points_executed
+        before = self.totals()
         errors = [
             "Verifier timeout: overall deadline expired.",
             "Verifier cleanup timeout: inherited pipe did not close.",
@@ -307,7 +347,8 @@ class AdvancedContractTests(unittest.TestCase):
         for error in errors:
             with patch.object(ENGINE, "run", side_effect=RuntimeError(error)):
                 with self.assertRaises(RuntimeError):
-                    self.verify("ac003", source("ac003"), False, real=False)
+                    self.verify("ac003", source("ac003"), False)
+            self.assertEqual(self.totals(), before)
         selected = COMPILER_ROOT / "src/Calor.Compiler/bin" / os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug") / "net10.0/calor.dll"
         identity = f"Selected compiler: {selected}\n"
         success = identity + ("Verification passed: SafeIncrement; advanced native/CLR predicates; "
@@ -318,29 +359,130 @@ class AdvancedContractTests(unittest.TestCase):
             success.replace(str(selected), str(selected) + ".other"),
             success.replace("/net10.0/", "/net9.0/"),
             success + "Verification failed: disguised success\n",
+            success + "eof supervision failure\n",
+            success + "Verifier cleanup timeout\n",
+            success + "Verifier timeout after 1s: dotnet\n",
+            success + "OSError: process launch failed\n",
+            success + "Verifier command exited 1:\n",
+            success + "Verification passed: duplicated\n",
+            success + "System.IO.IOException: unavailable\n",
         ]
         for output in invalid:
             with patch.object(ENGINE, "run", return_value=output):
-                with self.assertRaises(AssertionError):
-                    self.verify("ac003", source("ac003"), real=False)
+                with self.assertRaises(RuntimeError):
+                    self.verify("ac003", source("ac003"))
+            self.assertEqual(self.totals(), before)
         with patch.object(ENGINE, "run", side_effect=OSError("launch failure")):
             with self.assertRaises(OSError):
-                self.verify("ac003", source("ac003"), False, real=False)
-        self.assertEqual(before, type(self).entry_points_executed)
+                self.verify("ac003", source("ac003"), False)
+        self.assertEqual(self.totals(), before)
+
+        finite = "Verifier command exited 1:\nVerification failed: wrong native signature\n"
+        nested = "Verifier command exited 1:\nVerification failed: " + finite
+        native_diagnostic = finite.replace("wrong native signature",
+            "Calor0206 Duplicate signature at calor-advanced-control-1bklnu2u/Contracts.calr")
+        malformed = [
+            finite.replace("exited 1:", f"exited {code}:")
+            for code in ("2", "11", "-9", "nonnumeric", "nan", "01", "+1", "1 ")
+        ] + [
+            nested.replace("Verification failed: Verifier command exited 1:",
+                           f"Verification failed: Verifier command exited {code}:")
+            for code in ("2", "11", "-9", "nonnumeric", "01", "+1", "1 ")
+        ] + [
+            finite + finite, finite + "Verifier command exited malformed:\n",
+            finite.replace("exited 1:\n", "exited 1: inline\n"),
+            finite + identity + identity, finite + "  " + identity,
+            finite + "Verification passed: SafeIncrement\n",
+            nested + "EOF supervision failure\n",
+        ]
+        for message in malformed:
+            with patch.object(ENGINE, "run", side_effect=RuntimeError(message)):
+                with self.assertRaises(RuntimeError):
+                    self.verify("ac003", source("ac003"), False)
+            self.assertEqual(self.totals(), before)
+
+        entry = str(HERE / "tasks/advanced-contracts" / TASKS["ac003"][0] / "verify.sh")
+        ordinary = f"Verifier timeout after 0.5s: {entry}"
+        wrapped = "Verifier command exited 1:\nVerification failed: Verifier timeout after 0.5s: dotnet\n"
+        timeout_options = dict(env={"CALOR_LOGIC_TIMEOUT_SECONDS": "1"}, detail="timeout", allow_timeout=True)
+        contaminated = [
+            "Verifier timeout: overall deadline expired.", "Verifier timeout after nans: dotnet",
+            "Verifier timeout after 0s: dotnet", "Verifier timeout after 2s: dotnet",
+            "Verifier timeout after 0.5s: unknown-command",
+            ordinary + "\nOSError: launch failure", ordinary + "\nEOF supervision failure",
+            ordinary + "\nVerifier cleanup timeout", ordinary + "\nGlobal deadline expired",
+            ordinary + "\nVerification failed: additional failure",
+            ordinary + "\nSelected compiler: foreign", ordinary + "\n" + identity + identity,
+            wrapped.replace("exited 1:", "exited 2:"),
+            wrapped.replace("exited 1:", "exited abnormal:"),
+            wrapped.replace("exited 1:", "exited 01:"),
+            "Verifier command exited 1:\nVerification failed: " + wrapped.replace("exited 1:", "exited 11:"),
+            wrapped + "System.IO.IOException: unavailable",
+            wrapped + "Advanced solver infrastructure failure: UNKNOWN",
+            wrapped + "Verification passed: disguised success", finite,
+        ]
+        for message in contaminated:
+            with patch.object(ENGINE, "run", side_effect=RuntimeError(message)):
+                with self.assertRaises(RuntimeError):
+                    self.verify("ac003", source("ac003"), False, **timeout_options)
+            self.assertEqual(self.totals(), before)
+        invalid_declarations = [
+            (True, timeout_options),
+            (False, dict(timeout_options, detail=None)),
+            (False, dict(timeout_options, deadline=time.monotonic() + 120)),
+            (False, dict(timeout_options, env={})),
+            (False, dict(timeout_options, env={"CALOR_LOGIC_TIMEOUT_SECONDS": "nonnumeric"})),
+            (False, dict(timeout_options, env={"CALOR_LOGIC_TIMEOUT_SECONDS": "nan"})),
+            (False, dict(timeout_options, env={"CALOR_LOGIC_TIMEOUT_SECONDS": "121"})),
+        ]
+        for expected, options in invalid_declarations:
+            with patch.object(ENGINE, "run") as execute:
+                with self.assertRaises(ValueError):
+                    self.verify("ac003", source("ac003"), expected, **options)
+                execute.assert_not_called()
+            self.assertEqual(self.totals(), before)
+
+        # Exercise the actual counter branch, but synthetic admission contributes
+        # nothing to the full real matrix, even if an assertion fails.
+        try:
+            with patch.object(ENGINE, "run", return_value=success):
+                self.verify("ac003", source("ac003"))
+            for message in (finite, nested, native_diagnostic):
+                with patch.object(ENGINE, "run", side_effect=RuntimeError(message)):
+                    self.verify("ac003", source("ac003"), False)
+            for message in (ordinary, wrapped + identity):
+                with patch.object(ENGINE, "run", side_effect=RuntimeError(message)):
+                    self.verify("ac003", source("ac003"), False, **timeout_options)
+            self.assertEqual(tuple(after - prior for after, prior in zip(self.totals(), before)), (6, 1, 3, 2))
+        finally:
+            (type(self).entry_points_executed, type(self).positives,
+             type(self).negatives, type(self).bounded_timeouts) = before
+        self.assertEqual(self.totals(), before)
+        for totals in ((0, 0, 0, 0), (139, 22, 115, 2), (138, 23, 114, 1), (139, 23, 114, 1)):
+            with patch.object(type(self), "require_full_totals", True), patch.object(type(self), "totals", return_value=totals):
+                with self.assertRaises(AssertionError):
+                    type(self).tearDownClass()
+        self.assertEqual(self.totals(), before)
 
     def test_declared_bounded_timeouts(self):
+        before = self.totals()
         self.verify("ac003", source("ac003"), False,
-                    env={"CALOR_LOGIC_TIMEOUT_SECONDS": "0.001"}, detail="timeout", allow_timeout=True)
+                    env={"CALOR_LOGIC_TIMEOUT_SECONDS": "2"}, detail="timeout", allow_timeout=True)
         self.verify("ac003", source("ac003", body="§WH true\n  §CN\n§R 0"), False,
                     env={"CALOR_LOGIC_TIMEOUT_SECONDS": "5"}, detail="timeout", allow_timeout=True)
+        self.assertEqual(tuple(after - prior for after, prior in zip(self.totals(), before)), (2, 0, 0, 2))
 
     def test_real_success_shaped_output_is_infrastructure(self):
-        for message in ("  Selected compiler: forged", "Verification failed: disguised"):
+        before = self.totals()
+        for message in ("  Selected compiler: forged", "Verification failed: disguised", "EOF supervision failure",
+                        "Verifier cleanup timeout", "Verifier timeout after 1s: dotnet", "OSError: launch failure"):
             text = source("ac003", body='§E{cw}\n§P "' + message + '"\n§R (+ x 1)')
             with self.assertRaisesRegex(RuntimeError, "success-shaped failure"):
                 self.verify("ac003", text, False)
+        self.assertEqual(self.totals(), before)
 
     def test_selected_images(self):
+        before = self.totals()
         relative = Path("src/Calor.Compiler/bin") / os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug") / "net10.0"
         with tempfile.TemporaryDirectory(prefix="calor-advanced-images-") as temporary:
             arm = Path(temporary)
@@ -357,6 +499,7 @@ class AdvancedContractTests(unittest.TestCase):
             for profile in TASKS:
                 with self.assertRaisesRegex(RuntimeError, "manifest mismatch"):
                     self.verify(profile, source(profile), False, env={"CALOR_COMPILER_ROOT": str(arm)})
+        self.assertEqual(tuple(after - prior for after, prior in zip(self.totals(), before)), (1, 1, 0, 0))
 
     def test_preserved_profiles(self):
         profiles = [
@@ -440,4 +583,5 @@ def run_compatibility(old, current, deadline):
 
 
 if __name__ == "__main__":
+    AdvancedContractTests.require_full_totals = len(sys.argv) == 1
     unittest.main(verbosity=2)

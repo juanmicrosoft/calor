@@ -14,6 +14,31 @@ import tempfile
 import time
 
 
+ADVANCED_INFRASTRUCTURE = re.compile(
+    r"timeout|timed out|deadline|\bEOF\b|cleanup|Cannot terminate|infrastructure|(?-i:\bUNKNOWN\b)|"
+    r"OutOfMemory|DllNotFound|BadImageFormat|FileNotFoundException|AccessViolation|"
+    r"Aborted|abnormal|segmentation|killed|\b(?:MSB|NU)\d+\b|Build FAILED|cannot launch|permission denied|"
+    r"Selected native manifest|Selected compiler dependency|native manifest changed|image changed or was substituted|"
+    r"\[Errno\b|OSError|WinError|Win32Exception|UnauthorizedAccessException|IOException|"
+    r"FileNotFoundError|PermissionError|ProcessLookupError|EOFError|"
+    r"\bOS\b|Traceback|ConnectionError|TimeoutError|success-shaped failure",
+    re.IGNORECASE,
+)
+
+
+def check_advanced_success(output, identity=None):
+    identities = [line for line in output.splitlines()
+                  if re.search(r"Selected\s+compiler\b", line, re.IGNORECASE)]
+    verdicts = [line for line in output.splitlines()
+                if re.search(r"Verification\s+passed\b", line, re.IGNORECASE)]
+    if (identities != ([] if identity is None else [identity])
+            or len(verdicts) != 1 or not verdicts[0].startswith("Verification passed: ")
+            or ADVANCED_INFRASTRUCTURE.search(output)
+            or re.search(r"Verifier\s+command\s+exited|\b(?:failure|failed|error)\b|Exception\b",
+                         output, re.IGNORECASE)):
+        raise RuntimeError("Advanced verifier returned success-shaped failure or extra identity/verdict output.")
+
+
 def stop(process, deadline):
     deadline = min(deadline, time.monotonic() + 0.5)
     process.poll()
@@ -158,9 +183,8 @@ def main():
         ], project, deadline)
         if carrier:
             check_images(project / "bin/Debug/net10.0")
-        if advanced and (re.search(r"Selected\s+compiler:|Verification failed:", output, re.IGNORECASE)
-                         or len(re.findall(r"^\s*Verification passed:", output, re.MULTILINE)) != 1):
-            raise RuntimeError("Advanced verifier returned success-shaped failure or extra identity/verdict output.")
+        if advanced:
+            check_advanced_success(output)
         print(output, end="")
 
 
