@@ -990,6 +990,16 @@ It archives and builds release `d82f3ae95175ecd09581c6922701706be72b0ca9`
 using that tree's locked dependencies and verified native asset manifest.
 The 600-second total and 120-second entry/process/EOF bounds are unchanged.
 
+Finite negative admission requires an exact outer exit-1 wrapper and the same
+exact status/format for every nested wrapper, plus the existing failure
+diagnostics. UNKNOWN, solver timeouts, OS/launch errors, EOF, cleanup, inherited
+pipes, process-group failures and global deadlines propagate before real
+counters change. Positive output must contain exactly one complete selected
+compiler identity for the requested resolved root, configuration and
+`net10.0/calor.dll`, with no infrastructure or failure-shaped contamination.
+`ScalarAdmissionTests` mocks the actual `execute()` path; its synthetic calls
+do not contribute to the 79/97 real controls.
+
 Exact public native and reflected CLR scalar signatures are required. DayName
 and IsSingleDigit require their literal cases and wildcard default in a native
 switch expression. ScoreCategory requires supplying relational cases; reversed
@@ -1092,6 +1102,23 @@ timeout-shaped negative successes, or fallback compiler roots. The existing
 120-second entry/process/EOF limit and 600-second historical total remain intact.
 No task.json, fixture, TestData, active .calr subject, corpus membership,
 historical ledger, floor, or product source is changed.
+
+`OopAdmissionTests` mocks the actual `verify()` path without adding real
+controls. It enforces exact outer and nested exit-1 wrappers, the existing
+behavioral diagnostics, and one complete requested selected-compiler identity.
+Infrastructure, UNKNOWN, solver timeouts and failure-contaminated success
+propagate before counters change. Only the existing explicitly negative
+numeric verifier-timeout control opts into an ordinary timeout; EOF, cleanup,
+OS errors and global deadlines still propagate. The existing corrupt-native
+control is a separately validated prerequisite refusal, not a behavioral
+negative: both exit-1 wrappers, the native-loader diagnostic, exact selected
+identity and owned corrupt bytes are checked without other contamination.
+Invalid root/configuration and missing owned dependency controls likewise
+validate their exact intended prerequisite refusal without behavioral credit.
+Only complete native-loader alternative-probe lines may contain the loader's
+ordinary missing-library text; appended OS/EOF/cleanup diagnostics still fail.
+These guards preserve the 160/107 real controls and unchanged limits; they do
+not establish milestone acceptance.
 
 ### Original arithmetic binding prerequisites: type-005 and type-006
 

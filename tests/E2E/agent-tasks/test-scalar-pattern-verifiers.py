@@ -4,10 +4,12 @@
 import importlib.util
 import os
 from pathlib import Path
+import re
 import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 HERE = Path(__file__).resolve().parent
 ROOT = Path(os.environ.get("CALOR_COMPILER_ROOT", str(HERE.parents[2]))).resolve()
@@ -21,6 +23,46 @@ TASKS = {
     "pm006": ("06_wildcard_default", "IsSingleDigit", "n", "bool"),
 }
 COUNT = 0
+
+# Keep the effects/async finite-admission boundary local to this test unit.
+INFRASTRUCTURE = re.compile(
+    r"\b(?:EOF|EOFError|cleanup|OSError|FileNotFoundError|PermissionError|TimeoutError|Traceback|errno"
+    r"|DllNotFoundException|BadImageFormatException|Win32Exception|Z3Exception)\b"
+    r"|inherited (?:pipe|stdout|stderr)|broken pipe|cannot terminate|process[ -]group"
+    r"|permission denied|no such file|(?:failed|unable) to (?:launch|start)|could not (?:launch|start)"
+    r"|launch failure|OS error|operating.system error|supervision (?:failure|failed)"
+    r"|process (?:failure|failed|exited|terminated)"
+    r"|segmentation fault|core dumped|\baborted\b|\bsignal\s+-?\d+"
+    r"|\b(?-i:UNKNOWN)\b|solver[^\n]*(?:unknown|timeout|timed out)|(?:unknown|timeout)[^\n]*solver",
+    re.IGNORECASE,
+)
+TIMEOUT = re.compile(r"timeout|timed out|deadline", re.IGNORECASE)
+
+
+def control_failure(error):
+    output = str(error)
+    wrappers = list(re.finditer(r"verifier\s+command\s+exited", output, re.IGNORECASE))
+    if (INFRASTRUCTURE.search(output) or TIMEOUT.search(output)
+        or any(not output[wrapper.start():].startswith("Verifier command exited 1:\n") for wrapper in wrappers)
+        or re.search(r"verification\s+passed\s*:", output, re.IGNORECASE)
+        or not output.startswith("Verifier command exited 1:\n")
+        or "Verification failed:" not in output):
+        raise error
+    return output
+
+
+def assert_positive_output(output, environment):
+    if (INFRASTRUCTURE.search(output) or TIMEOUT.search(output)
+        or re.search(r"verifier\s+command\s+exited|verification\s+failed\s*:", output, re.IGNORECASE)
+        or len(re.findall(r"verification\s+passed\s*:", output, re.IGNORECASE)) != 1):
+        raise AssertionError(f"Infrastructure-shaped positive output:\n{output}")
+    root = Path(environment["CALOR_COMPILER_ROOT"]).resolve()
+    configuration = environment.get("CALOR_COMPILER_CONFIGURATION", "Debug")
+    expected = f"Selected compiler: {root / 'src/Calor.Compiler/bin' / configuration / 'net10.0/calor.dll'}"
+    identities = [line for line in output.splitlines()
+                  if re.search(r"selected\s+compiler\s*:", line, re.IGNORECASE)]
+    if identities != [expected]:
+        raise AssertionError(f"Wrong selected compiler identity:\n{output}")
 
 
 def source(profile):
@@ -47,7 +89,7 @@ def historical(text):
     return "\n".join(lines) + "\n"
 
 
-def execute(profile, text, expected=True, root=ROOT, deadline=None):
+def execute(profile, text, expected=True, root=ROOT, deadline=None, *, detail=None):
     global COUNT
     with tempfile.TemporaryDirectory(prefix="calor-pattern-control-") as temporary:
         workspace = Path(temporary)
@@ -58,25 +100,22 @@ def execute(profile, text, expected=True, root=ROOT, deadline=None):
         deadline = deadline if deadline is not None else time.monotonic() + 130
         environment["CALOR_LOGIC_TIMEOUT_SECONDS"] = str(min(120, deadline - time.monotonic()))
         command = ["bash", str(HERE / "tasks/pattern-matching" / TASKS[profile][0] / "verify.sh"), str(workspace)]
-        COUNT += 1
         try:
             output = PROCESS.run(command, HERE, deadline, environment)
         except RuntimeError as error:
+            output = control_failure(error)
             if expected:
                 raise AssertionError(f"{profile}: {error}") from error
-            if "Verifier timeout" in str(error):
-                raise AssertionError(f"{profile}: infrastructure timeout is not a behavioral rejection") from error
-            if "Verifier command exited 1:" not in str(error):
-                raise
-            return str(error)
+            if detail is not None and detail not in output:
+                raise AssertionError(f"{profile}: missing behavioral diagnostic {detail!r}:\n{output}")
+            COUNT += 1
+            return output
+        assert_positive_output(output, environment)
         if not expected:
             raise AssertionError(f"{profile}: unexpected acceptance:\n{output}")
         if "actual native arms and successful input/output coupling." not in output:
             raise AssertionError(f"{profile}: missing native behavioral evidence:\n{output}")
-        configuration = os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug")
-        selected = root.resolve() / "src/Calor.Compiler/bin" / configuration / "net10.0/calor.dll"
-        if f"Selected compiler: {selected}" not in output.splitlines():
-            raise AssertionError(f"{profile}: wrong selected compiler identity:\n{output}")
+        COUNT += 1
         return output
 
 
@@ -156,6 +195,81 @@ class ScalarPatternVerifierTests(unittest.TestCase):
         for profile, text, expected in controls():
             with self.subTest(profile=profile, expected=expected, text=text):
                 execute(profile, text, expected)
+
+
+class ScalarAdmissionTests(unittest.TestCase):
+    def test_actual_execute_finite_failure_and_identity_guards(self):
+        global COUNT
+        before = COUNT
+        outer = "Verifier command exited 1:\n"
+        diagnostic = "Verification failed: Wrong output: expected 100"
+        infrastructure = [
+            "UNKNOWN", "solver returned unknown", "solver timed out", "solver timeout",
+            "EOF failure", "EOFError: pipe closed", "cleanup failure", "inherited stdout pipe",
+            "inherited stderr pipe", "broken pipe", "Cannot terminate verifier process group 123",
+            "OSError: launch failure", "FileNotFoundError: missing executable",
+            "PermissionError: denied", "TimeoutError: process start", "errno 8",
+            "permission denied", "no such file", "unable to launch dotnet", "could not start process",
+            "OS error: denied", "operating-system error", "process failure", "Traceback",
+            "supervision failure",
+            "process exited 139", "process terminated by signal 6", "Segmentation fault", "Aborted (core dumped)",
+            "System.DllNotFoundException", "System.BadImageFormatException",
+            "System.Win32Exception", "Microsoft.Z3.Z3Exception",
+            "global deadline expired", "Verifier timeout: overall deadline expired.",
+            "Verifier timeout after 2s: dotnet", "Verification passed: DayName",
+        ]
+        errors = [error + "\n" + diagnostic for error in infrastructure]
+        errors += [outer + diagnostic + "\n" + error for error in infrastructure]
+        for status in ("0", "2", "-6", "137", "139", "1garbage", "+1", "01", ""):
+            errors += [f"Verifier command exited {status}:\n" + diagnostic,
+                       outer + f"Verification failed: Verifier command exited {status}:\n" + diagnostic]
+        errors += [
+            "unclassified failure\n" + diagnostic,
+            "Verifier command exited 1\n" + diagnostic,
+            outer + "Verifier command exited 1: " + diagnostic,
+            outer + "Verifier command exited 1:\r\n" + diagnostic,
+            outer + "verifier command exited 1:\n" + diagnostic,
+            outer + "Verifier command exited1:\n" + diagnostic,
+        ]
+        try:
+            for output in errors:
+                with self.subTest(output=output), patch.object(PROCESS, "run", side_effect=RuntimeError(output)):
+                    with self.assertRaises(RuntimeError):
+                        execute("pm001", source("pm001"), False, detail="expected")
+                    self.assertEqual(COUNT, before)
+            for error in (OSError("launch failed"), EOFError("pipe closed"), TimeoutError("expired")):
+                with patch.object(PROCESS, "run", side_effect=error), self.assertRaises(type(error)):
+                    execute("pm001", source("pm001"), False, detail="expected")
+                self.assertEqual(COUNT, before)
+
+            configuration = os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug")
+            selected = ROOT / "src/Calor.Compiler/bin" / configuration / "net10.0/calor.dll"
+            identity = f"Selected compiler: {selected}\n"
+            success = identity + ("Verification passed: DayName; 1031 independent runtime cases, "
+                                  "actual native arms and successful input/output coupling.\n")
+            invalid = [
+                success.replace(str(selected), str(selected) + ".other"),
+                success.replace(str(selected), str(selected.parent.parent / "wrong/net10.0/calor.dll")),
+                success.replace(str(selected), str(selected.parent / "other.dll")),
+                success.replace(str(ROOT), str(ROOT) + "-other"),
+                success.replace("/net10.0/", "/net9.0/"),
+                success.replace(identity, ""), identity + success, "  " + success,
+                success + "  Selected compiler: wrong\n", success + "warning: Selected compiler: wrong\n",
+                success.replace("Selected compiler:", "selected compiler:"),
+            ] + [success + error + "\n" for error in infrastructure + [diagnostic, outer]]
+            for output in invalid:
+                with self.subTest(positive=output), patch.object(PROCESS, "run", return_value=output):
+                    with self.assertRaises(AssertionError):
+                        execute("pm001", source("pm001"))
+                    self.assertEqual(COUNT, before)
+            for output in (outer + diagnostic, outer + "Verification failed: " + outer + diagnostic):
+                with patch.object(PROCESS, "run", side_effect=RuntimeError(output)):
+                    execute("pm001", source("pm001"), False, detail="expected")
+            with patch.object(PROCESS, "run", return_value=success):
+                execute("pm001", source("pm001"))
+            self.assertEqual(COUNT, before + 3)
+        finally:
+            COUNT = before
 
 
 if __name__ == "__main__":
