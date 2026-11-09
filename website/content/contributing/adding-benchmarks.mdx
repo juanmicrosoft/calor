@@ -16,27 +16,30 @@ Each benchmark needs:
 1. **Calor source file** - The Calor implementation
 2. **C# source file** - Semantically equivalent C# implementation
 3. **Metadata** - Description and expected behavior
-4. **Both must compile** - 100% compilation success required
+4. **Explicit validation** - Record compilation, execution and equivalence separately
+
+Design cases that are representative, including cases where C# is more compact.
+Do not rewrite measured sources, runtime oracles, policies or denominators to
+improve a result. A compile-only success does not establish semantic equivalence.
 
 ---
 
 ## Directory Structure
 
 ```
-tests/Calor.Evaluation/Benchmarks/
-├── HelloWorld/
-│   ├── hello.calr
-│   ├── hello.cs
-│   └── metadata.json
-├── FizzBuzz/
-│   ├── fizzbuzz.calr
-│   ├── fizzbuzz.cs
-│   └── metadata.json
+tests/TestData/Benchmarks/
+├── manifest.json
+├── TokenEconomics/
+│   ├── HelloWorld.calr
+│   └── HelloWorld.cs
 └── YourNewBenchmark/
     ├── program.calr
-    ├── program.cs
-    └── metadata.json
+    └── program.cs
 ```
+
+`tests/Calor.Evaluation/Benchmarks/` contains the loader and runner code, not
+the benchmark source tree. The manifest associates each logical case with its
+Calor and C# paths. A per-directory `metadata.json` is not automatically loaded.
 
 ---
 
@@ -45,25 +48,25 @@ tests/Calor.Evaluation/Benchmarks/
 ### Step 1: Create Directory
 
 ```bash
-mkdir tests/Calor.Evaluation/Benchmarks/YourBenchmark
-cd tests/Calor.Evaluation/Benchmarks/YourBenchmark
+mkdir -p tests/TestData/Benchmarks/YourNewBenchmark
 ```
+
+Run the later commands from the repository root.
 
 ### Step 2: Write Calor Code
 
 Create `program.calr`:
 
 ```calor
-§M{YourModule}
-  §F{Main:pub}
-    §O{void}
-    §E{cw}
-  // Your implementation
+module YourModule
+  func Main () → void
+    !
+    return
 ```
 
 **Guidelines:**
-- Use Lisp-style expressions for operations
-- Include all required IDs
+- Use current native declarations and infix expressions
+- Let tooling maintain declaration IDs in `.calor/ids.json`, not source headers
 - Declare effects explicitly
 - Add contracts where meaningful
 - Ensure it compiles
@@ -87,39 +90,74 @@ namespace YourModule
 
 **Guidelines:**
 - Match the Calor logic exactly
-- Include equivalent contracts if Calor has them (using Debug.Assert or exceptions)
+- Match contract behavior and build configuration; `Debug.Assert` is not interchangeable with a throwing runtime guard
 - Keep structure as parallel as possible
+
+These empty programs are starting templates, not a finished benchmark pair.
+Their generated type names differ; register the intended entry points and
+compare any public API shape the benchmark claims to preserve.
 
 ### Step 4: Add Metadata
 
-Create `metadata.json`:
+Add an entry to the suite's manifest. For a separate local suite, the complete
+manifest shape is:
 
 ```json
 {
-  "id": "your-benchmark",
-  "name": "Your Benchmark Name",
-  "description": "What this benchmark tests",
-  "category": "category-name",
-  "complexity": "simple|medium|complex",
-  "features": ["loops", "contracts", "effects"],
-  "expectedOutput": "Expected console output if any"
+  "version": "2.0",
+  "description": "Describe the comparison and its limits",
+  "benchmarks": [
+    {
+      "id": "your-benchmark",
+      "name": "Your Benchmark Name",
+      "category": "TokenEconomics",
+      "calorFile": "YourNewBenchmark/program.calr",
+      "csharpFile": "YourNewBenchmark/program.cs",
+      "level": 1,
+      "features": ["function"],
+      "notes": "State the tested behavior and relevant exclusions"
+    }
+  ]
 }
 ```
+
+`level` is numeric. Store and execute the actual behavioral oracle through the
+relevant test/metric mechanism; an invented `expectedOutput` metadata field
+does not make the runner assert that output. Do not select an expected
+advantage to favor Calor.
 
 ### Step 5: Verify
 
 ```bash
-# Compile Calor
+# Compile the exact Calor source with normal enforcement
 dotnet run --project src/Calor.Compiler -- \
-  --input tests/Calor.Evaluation/Benchmarks/YourBenchmark/program.calr \
-  --output /tmp/test.g.cs
+  --input tests/TestData/Benchmarks/YourNewBenchmark/program.calr \
+  --output /tmp/your-benchmark.g.cs
 
-# Verify C# compiles
-dotnet build tests/Calor.Evaluation/Benchmarks/YourBenchmark/program.cs
+# Inspect supported evaluation commands before selecting a run
+dotnet run --project tests/Calor.Evaluation -- run --help
 
-# Run evaluation
-dotnet run --project tests/Calor.Evaluation -- --output report.json
+# Run a reviewed, bounded manifest without enabling provider-backed evaluation
+dotnet run --project tests/Calor.Evaluation -- run \
+  --manifest /absolute/path/to/reviewed-manifest.json --output report.json
 ```
+
+Compile C# as part of an SDK-style project or the established Roslyn harness,
+with the declared references, options and entry point. Do not assume
+`dotnet build program.cs` is a valid standalone source-file build command.
+Then run independent behavioral comparisons, including exceptions, mutations,
+evaluation order and output where relevant.
+
+The current evaluation adapter resolves explicitly registered active Calor
+copies and records original/resolved paths. That is a **current-compiler**
+input contract, not replay of historical producer bytes. Preserve historical
+sources and use their dedicated replay lanes. Adding a `.calr` file can also
+affect repository-wide source censuses; update only the intended suite through
+its established process.
+
+Do not add `--llm` or dispatch paid agent evaluation without separate approval
+of the model, task selection and spending. These documentation examples are not
+a measured run.
 
 ---
 
@@ -127,13 +165,13 @@ dotnet run --project tests/Calor.Evaluation -- --output report.json
 
 | Category | Description | Examples |
 |:---------|:------------|:---------|
-| `basic` | Simple programs | Hello World, Print Numbers |
-| `loops` | Iteration patterns | FizzBuzz, Sum 1-N |
-| `conditionals` | Branching logic | Min/Max, Absolute Value |
-| `contracts` | Preconditions/postconditions | Safe Divide, Factorial |
-| `effects` | Side effect patterns | File I/O, Network |
-| `types` | Type system features | Nullable values, generics |
-| `complex` | Multi-feature programs | Full applications |
+| `TokenEconomics` | Source/token comparison | Small and larger programs, including unfavorable cases |
+| `Comprehension` | Understanding tasks | Explicit questions and answers |
+| `EditPrecision` | Editing tasks | Defined change and allowed scope |
+| `ErrorDetection` | Bug scenarios | Known faults with independent expectations |
+
+Use feature tags such as `loops`, `contracts` and `effects` to describe a case.
+Do not confuse those tags with measured outcomes or complexity denominators.
 
 ---
 
@@ -142,23 +180,23 @@ dotnet run --project tests/Calor.Evaluation -- --output report.json
 ### Calor (`factorial.calr`)
 
 ```calor
-§M{Math}
-  §F{Factorial:pub}
-    §I{i32:n}
-    §O{i32}
-    §Q (>= n 0)
-    §Q (<= n 12)
-    §S (>= result 1)
-    §IF (<= n 1)
-      §R 1
-    §EL
-      §R (* n §C{Factorial} §A (- n 1) §/C)
+module FactorialBenchmark Math
+  func Factorial (int:n) → int
+    !
+    requires n >= 0
+    requires n <= 12
+    => result >= 1
+    if n <= 1
+      return 1
+    return n * Factorial(n - 1)
 
-  §F{Main:pub}
-    §O{void}
-    §E{cw}
-    §P §C{Factorial} §A 5 §/C
+  func Main () → void
+    ! cw
+    Console.WriteLine(Factorial(5))
 ```
+
+`Math.MathModule.Factorial(5)` returns `120`; `Main()` prints that value.
+The upper bound prevents checked integer overflow.
 
 ### C# (`factorial.cs`)
 
@@ -191,6 +229,15 @@ namespace Math
 
 ### Metadata (`metadata.json`)
 
+The original C# fragment above assumes `System` is imported by its project
+context. Its `Debug.Assert` calls can be compiled out and do not match Calor's
+throwing contract checks on invalid inputs. It demonstrates the same factorial
+calculation on the declared valid domain, **not** an established full-API
+equivalence benchmark.
+
+The following legacy metadata is illustrative only; it is not the manifest
+schema shown earlier and does not register or execute an oracle:
+
 ```json
 {
   "id": "factorial",
@@ -215,12 +262,14 @@ Both implementations must be semantically equivalent:
 - Same edge case handling
 
 ### Same Contracts
-- If Calor has `§Q`, C# should have equivalent check
-- If Calor has `§S`, C# should have equivalent assertion
+- Match `requires` entry checks and `=>` postconditions under the actual modes
+- Compare exception types and timing, not just condition text
+- Do not substitute assertions that disappear in the measured build
 
 ### Same Effects
-- If Calor has `§E{cw}`, C# should write to console
-- If Calor has `§E{fs:r}`, C# should read files
+- Compare actual operations and observable behavior, not just declared rows
+- An admitted `cw` or `fs:r` permission does not prove that the body performs I/O
+- Unknown effects, waivers and preserved C# are separate outcomes, not native credit
 
 ---
 
@@ -231,12 +280,14 @@ Before submitting:
 - [ ] Calor compiles without errors
 - [ ] C# compiles without errors
 - [ ] Both produce identical output (if applicable)
-- [ ] Uses Lisp-style expressions
-- [ ] IDs are unique and meaningful
+- [ ] Uses current native syntax
+- [ ] Tool-owned declaration identities are maintained
 - [ ] Effects are declared
-- [ ] Contracts are equivalent
+- [ ] Contract modes and exception behavior are equivalent
 - [ ] Metadata is complete
 - [ ] Code is clean and readable
+- [ ] Original inputs, options, oracles and denominators are retained
+- [ ] Compile-only, native, round-trip and runtime outcomes are reported separately
 
 ---
 
@@ -268,6 +319,11 @@ OUTPUT_FILE="$SCENARIO_DIR/output.g.cs"
 grep -q "Console.WriteLine" "$OUTPUT_FILE" || exit 1
 grep -q "namespace" "$OUTPUT_FILE" || exit 1
 ```
+
+Text-pattern checks alone are not runtime equivalence tests. Also compile and
+execute the generated program through the established scenario harness, with
+independent expected results. Keep agent-task/model runs separate from local
+compiler E2E tests.
 
 ---
 

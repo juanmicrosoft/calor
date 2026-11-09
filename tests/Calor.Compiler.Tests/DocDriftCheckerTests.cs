@@ -140,6 +140,10 @@ public class DocDriftCheckerTests
         new[] { "True", "200", "42", "42", "42" },
         new[] { "GlobalModule.ProcessOrder()", "GlobalModule.Calculate()", "GlobalModule.GetUser(42)",
             "GlobalModule.Calculate()", "GlobalModule.GetUser(42)" })]
+    [InlineData("contributing/adding-benchmarks.mdx", 2, 0,
+        new[] { "YourModule", "FactorialBenchmark" }, new[] { "0", "120" },
+        new[] { "((System.Func<int>)(() => { GlobalModule.Main(); return 0; }))()",
+            "global::Math.MathModule.Factorial(5)" })]
     [InlineData("structure-tags.mdx", 22, 4,
         new[] { "StructureModules", "BlockNamespace", "FunctionHeaders", "AsyncFunctions", "AsyncMethods",
             "AwaitExpressions", "LambdaExamples", "AsyncLambdas", "LocalCallables", "DelegateDefinitions",
@@ -513,6 +517,57 @@ public class DocDriftCheckerTests
         Assert.Equal(expectedStatus, postcondition.GetProperty("status").GetString());
         if (expectedError)
             Assert.NotEmpty(postcondition.GetProperty("counterexample").GetProperty("bindings").EnumerateArray());
+    }
+
+    [Theory]
+    [InlineData(0, "1")]
+    [InlineData(1, "1")]
+    [InlineData(5, "120")]
+    [InlineData(12, "479001600")]
+    public void PublicBenchmarkGuide_OriginalCSharpAndNativeFactorialAgreeOnDeclaredValidDomain(int input, string expected)
+    {
+        var path = "website/content/contributing/adding-benchmarks.mdx";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)).Replace("\r\n", "\n");
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(content)
+            .Single(program => program.Source.StartsWith("module FactorialBenchmark Math\n", StringComparison.Ordinal)).Source;
+        var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = ContractMode.Debug });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var originalCSharp = System.Text.RegularExpressions.Regex.Matches(content,
+            @"```csharp\n(?<body>.*?)\n```", System.Text.RegularExpressions.RegexOptions.Singleline)[1]
+            .Groups["body"].Value;
+        foreach (var (csharp, call) in new[]
+        {
+            (compiled.GeneratedCode, "global::Math.MathModule.Factorial"),
+            ("global using System;\n" + originalCSharp, "global::Math.Program.Factorial")
+        })
+        {
+            var observed = InteropScope.RefOutImplementationTests.Run(csharp + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run() => {{call}}({{input}});
+                }
+                """);
+            Assert.Equal(expected, observed);
+        }
+    }
+
+    [Fact]
+    public void PublicBenchmarkGuide_UsesActualManifestEntrySchema()
+    {
+        var path = "website/content/contributing/adding-benchmarks.mdx";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)).Replace("\r\n", "\n");
+        var json = System.Text.RegularExpressions.Regex.Match(content,
+            @"```json\n(?<body>.*?)\n```", System.Text.RegularExpressions.RegexOptions.Singleline);
+        Assert.True(json.Success);
+        var manifest = JsonSerializer.Deserialize<Calor.Evaluation.Benchmarks.BenchmarkManifest>(
+            json.Groups["body"].Value, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        var entry = Assert.Single(Assert.IsType<Calor.Evaluation.Benchmarks.BenchmarkManifest>(manifest).Benchmarks);
+        Assert.Equal("your-benchmark", entry.Id);
+        Assert.Equal("YourNewBenchmark/program.calr", entry.CalorFile);
+        Assert.Equal("YourNewBenchmark/program.cs", entry.CSharpFile);
+        Assert.Equal(1, entry.Level);
+        Assert.Null(entry.ExpectedAdvantage);
     }
 
     [Fact]
