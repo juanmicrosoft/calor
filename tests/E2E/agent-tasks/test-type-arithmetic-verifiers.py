@@ -208,7 +208,7 @@ def compatibility_cases(name):
 
 
 def require_finite_process_result(output):
-    if (re.search(r"timeout|timed\s*out|deadline|\beof\b|cleanup|"
+    if (re.search(r"timeout|timed\s*out|deadline|\beof\b|cleanup|\b(?-i:UNKNOWN)\b|"
                   r"cannot terminate verifier process group|"
                   r"\b(?:OSError|FileNotFoundError|PermissionError|BrokenPipeError|ChildProcessError)\b|"
                   r"failed to (?:start|launch)|process infrastructure|"
@@ -322,6 +322,7 @@ class TypeArithmeticGuardTests(unittest.TestCase):
             "Verifier command exited 137:\nprocess terminated",
             "Verifier command exited 1:\nprocess infrastructure failure",
             "Missing/wrong writing preconditions: UNKNOWN; timeout",
+            "Missing/wrong writing preconditions: UNKNOWN; incomplete theory",
         ]
         for failure in failures:
             for wrapped in (failure, "Verifier command exited 1:\nVerification failed: " + failure):
