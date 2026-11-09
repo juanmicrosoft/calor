@@ -1287,6 +1287,260 @@ public static class FeatureSupport
         int SpanStart,
         int SpanLength);
 
+    internal enum PreservationDecisionKind
+    {
+        StillRequired,
+        NowNative,
+        UnknownOrMismatch,
+        InsufficientContext,
+        ChangedBoundary
+    }
+
+    internal sealed record PreservationDecision(
+        PreservationDecisionKind Kind,
+        string Explanation,
+        string? RequiredFeature = null);
+
+    // Producer keys, not support levels or evidence that a marker is applicable.
+    // These require semantic, conditional-ownership or failed-pipeline context.
+    private static readonly IReadOnlySet<string> ContextualPreservationReasons =
+        new HashSet<string>(StringComparer.Ordinal)
+        {
+            "alias-qualified-value", "array-element-block", "async-return-signature", "attributes",
+            "checked-block", "class", "collection-expression", "compilation-unit-attribute",
+            "compilation-unit-using-ordering", "compiler-directive-placement",
+            "complex-declaration", "complex-is-pattern", "complex-recursive-pattern",
+            "compound-assignment-narrowing", "compound-assignment-order",
+            "conditional-access-shape", "conditional-declaration-header",
+            "conditional-delegate-placement", "conditional-enum-member",
+            "conditional-enum-placement", "conditional-expression-fragment",
+            "conditional-expression-hoisting", "conditional-interface-member",
+            "conditional-interface-placement", "conditional-top-level-statement",
+            "conditional-type-placement", "conditional-unmodeled-placement",
+            "conversion-error", "csharp-script", "default-member-collision",
+            "delegate", "dictionary-initializer", "embedded-assignment", "enum", "event-definition",
+            "explicit-interface", "extern-alias", "foreach-collection-order", "in-parameter",
+            "initializer-interop", "interface", "iterator-accessor",
+            "labeled-statement", "line-directive", "linq-query", "local-function",
+            "multidim-array", "named-argument", "namespace-topology", "null-forgiving-expression", "out-parameter",
+            "out-var", "partial-property", "post-validation-fallback", "postfix-operator",
+            "preprocessor-disabled", "preprocessor-member", "preprocessor-ownership-fallback",
+            "preprocessor-unparsed-remainder", "record-base-argument-metadata",
+            "record-conditional-members", "record-nested-declaration", "record-unresolved-base-kind",
+            "ref-parameter", "string-interpolation-formattable-constant",
+            "string-interpolation-handler", "string-interpolation-hole", "struct",
+            "symbol-directive", "top-level-directive-ordering", "unknown-expression",
+            "unknown-literal", "unknown-pattern", "unsupported-binary-operator",
+            "unsupported-compound-assignment", "unsupported-initializer",
+            "unsupported-pattern-operator", "unsupported-prefix-operator",
+            "unsupported-slice-subpattern", "unsupported-switch-label", "whole-file-preservation"
+        };
+
+    private static readonly IReadOnlySet<string> SyntaxDerivedPreservationReasons =
+        Enum.GetValues<SyntaxKind>()
+            .Where(kind => kind.ToString().EndsWith("Declaration", StringComparison.Ordinal))
+            .SelectMany(kind => new[] { GetMemberFallbackFeature(kind), "record-member-" + kind })
+            .Concat(Enum.GetValues<SyntaxKind>()
+                .Where(kind => kind.ToString().EndsWith("Statement", StringComparison.Ordinal))
+                .Select(GetStatementFallbackFeature))
+            .Concat(["incompletemember", "record-member-IncompleteMember"])
+            .ToHashSet(StringComparer.Ordinal);
+
+    internal static bool IsKnownPreservationReason(string featureName)
+        => ContextualPreservationReasons.Contains(featureName)
+            || SyntaxCapabilityClassifier.RequiredUnsupportedFeatures.Contains(featureName)
+            || featureName is "record-struct" or "record-partial"
+                or "record-positional-parameter-metadata" or "unsafe" or "for" or "tuple-deconstruction"
+            || featureName is "binary pattern (and)" or "binary pattern (or)"
+            || SyntaxDerivedPreservationReasons.Contains(featureName);
+
+    /// <summary>
+    /// Rechecks an existing pure guard at caller-resolved original syntax, not at
+    /// a reparsed payload. This is not marker authentication or a complete native
+    /// conversion query. NowNative requires that separate query; a missing guard
+    /// never establishes it.
+    /// </summary>
+    internal static PreservationDecision AssessPreservation(
+        string? featureName,
+        SyntaxNode? originalGuardNode,
+        SyntaxNode? originalBoundary)
+    {
+        const string guidance = "Resolve the exact original C# context and run calor convert; do not edit reason markers.";
+        if (string.IsNullOrWhiteSpace(featureName) || !IsKnownPreservationReason(featureName))
+            return new(PreservationDecisionKind.UnknownOrMismatch, $"Unknown preservation reason. {guidance}");
+        if (originalGuardNode == null || originalBoundary == null)
+            return new(PreservationDecisionKind.InsufficientContext, $"Original syntax and boundary are required. {guidance}");
+        if (!ReferenceEquals(originalGuardNode.SyntaxTree, originalBoundary.SyntaxTree)
+            || originalGuardNode.SyntaxTree.GetRoot() is not CompilationUnitSyntax root
+            || !originalGuardNode.AncestorsAndSelf().Any(node => ReferenceEquals(node, originalBoundary)))
+        {
+            return new(PreservationDecisionKind.InsufficientContext,
+                $"Original syntax and boundary must have the same enclosing source tree and owner. {guidance}");
+        }
+        if (root.ContainsDiagnostics || root.ContainsDirectives
+            || root.AttributeLists.Count > 0 || root.Externs.Count > 0
+            || root.SyntaxTree.Options.Kind == SourceCodeKind.Script
+            || CSharpToCalorConverter.RequiresWholeFileNamespaceInterop(root))
+        {
+            return new(PreservationDecisionKind.InsufficientContext,
+                $"Parse, conditional or whole-unit preservation context needs revalidation. {guidance}");
+        }
+        foreach (var owner in originalGuardNode.Ancestors().OfType<TypeDeclarationSyntax>())
+        {
+            if (SyntaxCapabilityClassifier.FindDeclaredTypeModifier(owner) is { } ownerRequirement)
+                return new(PreservationDecisionKind.ChangedBoundary,
+                    $"The enclosing declaration has a required preservation guard. {guidance}",
+                    ownerRequirement.FeatureName);
+            if (owner is RecordDeclarationSyntax || owner.Modifiers.Any(SyntaxKind.UnsafeKeyword))
+                return new(PreservationDecisionKind.InsufficientContext,
+                    $"The enclosing record or unsafe declaration needs its own conversion context. {guidance}");
+        }
+
+        string? requiredFeature;
+        if (originalGuardNode is RecordDeclarationSyntax record
+            && featureName is "record-struct" or "file-scoped-type" or "record-partial"
+                or "unsafe" or "record-positional-parameter-metadata")
+        {
+            if (record.Parent is TypeDeclarationSyntax)
+                return new(PreservationDecisionKind.InsufficientContext,
+                    $"Nested records use a different preservation producer. {guidance}");
+            requiredFeature = GetRecordHeaderPreservationFeature(record);
+        }
+        else if (originalGuardNode is ForStatementSyntax loop
+            && featureName is "for" or "tuple-deconstruction")
+        {
+            var callable = loop.Ancestors().OfType<BaseMethodDeclarationSyntax>().FirstOrDefault();
+            if (callable == null
+                || callable.ParameterList.Parameters.Any(parameter => parameter.Modifiers.Count > 0)
+                || callable.DescendantNodes().OfType<LocalFunctionStatementSyntax>().Any()
+                || loop.Ancestors().TakeWhile(node => !ReferenceEquals(node, callable))
+                    .OfType<AnonymousFunctionExpressionSyntax>().Any()
+                || callable.Modifiers.Any(SyntaxKind.AsyncKeyword)
+                || callable.Modifiers.Any(SyntaxKind.UnsafeKeyword))
+            {
+                return new(PreservationDecisionKind.InsufficientContext,
+                    $"The enclosing callable needs semantic and local-function preflight context. {guidance}");
+            }
+            if (SyntaxCapabilityClassifier.FindFirst(callable) is { } enclosingRequirement)
+                return new(PreservationDecisionKind.ChangedBoundary,
+                    $"The enclosing member has a required preservation guard. {guidance}",
+                    enclosingRequirement.FeatureName);
+            if (callable.Body is { } body && FindBlockByReferencePreservation(body) != null)
+                return new(PreservationDecisionKind.ChangedBoundary,
+                    $"The enclosing block requires by-reference preservation before loop conversion. {guidance}",
+                    "ref-parameter");
+            requiredFeature = GetForHeaderPreservationFeature(loop);
+            if (requiredFeature == null)
+                return new(PreservationDecisionKind.InsufficientContext,
+                    $"Other loop preservation decisions need semantic and evaluation-order context. {guidance}");
+        }
+        else if (ContextualPreservationReasons.Contains(featureName)
+            || !SyntaxCapabilityClassifier.RequiredUnsupportedFeatures.Contains(featureName))
+        {
+            return new(PreservationDecisionKind.InsufficientContext,
+                $"This producer reason needs its original semantic, ownership or validation context. {guidance}");
+        }
+        else
+        {
+            if (originalGuardNode is MethodDeclarationSyntax or ConstructorDeclarationSyntax
+                && originalGuardNode.DescendantNodes().OfType<LocalFunctionStatementSyntax>().Any())
+            {
+                return new(PreservationDecisionKind.InsufficientContext,
+                    $"Member preflight depends on the local-function conversion decision. {guidance}");
+            }
+            requiredFeature = originalGuardNode switch
+            {
+                InterfaceDeclarationSyntax declaration =>
+                    SyntaxCapabilityClassifier.FindUnsupportedInterface(declaration)?.FeatureName,
+                BaseTypeDeclarationSyntax declaration when featureName is "file-scoped-type" or "ref-struct" =>
+                    SyntaxCapabilityClassifier.FindDeclaredTypeModifier(declaration)?.FeatureName,
+                DelegateDeclarationSyntax declaration =>
+                    SyntaxCapabilityClassifier.FindFirst(declaration)?.FeatureName,
+                MemberDeclarationSyntax member when member.Parent is InterfaceDeclarationSyntax =>
+                    SyntaxCapabilityClassifier.GetUnsupportedInterfaceFeature(member),
+                MethodDeclarationSyntax or ConstructorDeclarationSyntax
+                    when !originalGuardNode.DescendantNodes().OfType<LocalFunctionStatementSyntax>().Any() =>
+                    SyntaxCapabilityClassifier.FindFirst(originalGuardNode)?.FeatureName,
+                GlobalStatementSyntax global =>
+                    SyntaxCapabilityClassifier.FindFirst(global.Statement)?.FeatureName,
+                _ => null
+            };
+        }
+
+        if (requiredFeature != featureName && featureName == "interface-member")
+            return new(PreservationDecisionKind.InsufficientContext,
+                $"This reason can also come from interface-member rescue; its failed conversion context is required. {guidance}");
+        if (requiredFeature != featureName)
+            return new(PreservationDecisionKind.UnknownOrMismatch,
+                $"The original guard does not establish this reason; native support is not proven. {guidance}",
+                requiredFeature);
+        if (!ReferenceEquals(originalGuardNode, originalBoundary))
+            return new(PreservationDecisionKind.ChangedBoundary,
+                $"The guard's source boundary differs from the mapped preserved boundary. {guidance}",
+                requiredFeature);
+        return new(PreservationDecisionKind.StillRequired,
+            "The existing pure converter guard still requires preservation at this original boundary.",
+            requiredFeature);
+    }
+
+    internal static string? GetRecordHeaderPreservationFeature(RecordDeclarationSyntax node)
+    {
+        if (node.ClassOrStructKeyword.IsKind(SyntaxKind.StructKeyword))
+            return "record-struct";
+        if (node.Modifiers.Any(SyntaxKind.FileKeyword))
+            return "file-scoped-type";
+        if (node.Modifiers.Any(SyntaxKind.PartialKeyword))
+            return "record-partial";
+        if (node.Modifiers.Any(SyntaxKind.UnsafeKeyword))
+            return "unsafe";
+        return node.ParameterList?.Parameters.Any(parameter =>
+            parameter.AttributeLists.Count > 0 || parameter.Modifiers.Count > 0) == true
+                ? "record-positional-parameter-metadata"
+                : null;
+    }
+
+    internal static string? GetForHeaderPreservationFeature(ForStatementSyntax node)
+    {
+        if (node.Initializers.Concat(node.Incrementors)
+            .Any(expression => expression.DescendantNodesAndSelf()
+                .OfType<AssignmentExpressionSyntax>().Any(IsTupleAssignment))
+            || node.Condition?.DescendantNodesAndSelf()
+                .OfType<AssignmentExpressionSyntax>().Any(IsTupleAssignment) == true)
+            return "tuple-deconstruction";
+        return node.Declaration?.Type is RefTypeSyntax
+            || node.ChildNodes().Where(part => part != node.Statement)
+                .SelectMany(part => part.DescendantNodesAndSelf())
+                .Any(part => part is DeclarationExpressionSyntax or SingleVariableDesignationSyntax)
+                ? "for"
+                : null;
+    }
+
+    internal static bool IsTupleAssignment(AssignmentExpressionSyntax assignment)
+        => assignment.IsKind(SyntaxKind.SimpleAssignmentExpression)
+            && (assignment.Left is TupleExpressionSyntax
+                || assignment.Left is DeclarationExpressionSyntax
+                {
+                    Designation: ParenthesizedVariableDesignationSyntax
+                });
+
+    internal static SyntaxNode? FindBlockByReferencePreservation(BlockSyntax block)
+        => block.DescendantNodes().FirstOrDefault(node =>
+            node is RefExpressionSyntax or RefTypeSyntax
+            || node is ParameterSyntax parameter && parameter.Parent?.Parent is AnonymousFunctionExpressionSyntax
+                && IsByReferenceParameter(parameter)
+            || node is ArgumentSyntax { RefKindKeyword.RawKind: not (int)SyntaxKind.None } argument
+                && argument.Parent?.Parent is not InvocationExpressionSyntax);
+
+    internal static bool IsByReferenceParameter(ParameterSyntax parameter)
+        => parameter.Modifiers.Any(modifier =>
+            modifier.Kind() is SyntaxKind.RefKeyword or SyntaxKind.OutKeyword or SyntaxKind.InKeyword);
+
+    internal static string GetMemberFallbackFeature(SyntaxKind kind)
+        => kind.ToString().Replace("Declaration", "").Replace("Syntax", "").ToLowerInvariant();
+
+    internal static string GetStatementFallbackFeature(SyntaxKind kind)
+        => kind.ToString().Replace("Statement", "").ToLowerInvariant();
+
     /// <summary>
     /// Central classifier for syntax whose semantics require exact C# interop
     /// preservation rather than native Calor conversion.
@@ -1431,7 +1685,7 @@ public static class FeatureSupport
             }
         }
 
-        private static string? GetUnsupportedInterfaceFeature(
+        internal static string? GetUnsupportedInterfaceFeature(
             MemberDeclarationSyntax member)
             => member switch
             {
@@ -1450,7 +1704,7 @@ public static class FeatureSupport
                 _ => "interface-member"
             };
 
-        private static bool IsRepresentableInterfaceMethod(
+        internal static bool IsRepresentableInterfaceMethod(
             MethodDeclarationSyntax method)
             => method.Body == null
                 && method.ExpressionBody == null
@@ -1459,7 +1713,7 @@ public static class FeatureSupport
                 && method.ReturnType is not RefTypeSyntax
                 && HasOnlyAbstractPublicModifiers(method.Modifiers);
 
-        private static bool IsRepresentableInterfaceProperty(
+        internal static bool IsRepresentableInterfaceProperty(
             PropertyDeclarationSyntax property)
             => property.ExpressionBody == null
                 && property.Initializer == null
@@ -1471,7 +1725,7 @@ public static class FeatureSupport
                     && accessor.SemicolonToken.IsKind(SyntaxKind.SemicolonToken))
                 && HasOnlyAbstractPublicModifiers(property.Modifiers);
 
-        private static bool IsRepresentableInterfaceIndexer(
+        internal static bool IsRepresentableInterfaceIndexer(
             IndexerDeclarationSyntax indexer)
             => indexer.ExpressionBody == null
                 && indexer.ExplicitInterfaceSpecifier == null

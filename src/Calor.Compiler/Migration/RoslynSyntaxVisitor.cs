@@ -2355,43 +2355,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private static bool IsRepresentableInterfaceMethod(
         MethodDeclarationSyntax method)
-        => method.Body == null
-            && method.ExpressionBody == null
-            && method.SemicolonToken.IsKind(SyntaxKind.SemicolonToken)
-            && method.ExplicitInterfaceSpecifier == null
-            && method.ReturnType is not RefTypeSyntax
-            && method.Modifiers.All(modifier =>
-                modifier.IsKind(SyntaxKind.PublicKeyword)
-                || modifier.IsKind(SyntaxKind.AbstractKeyword));
+        => SyntaxCapabilityClassifier.IsRepresentableInterfaceMethod(method);
 
     private static bool IsRepresentableInterfaceProperty(
         PropertyDeclarationSyntax property)
-        => property.ExpressionBody == null
-            && property.Initializer == null
-            && property.ExplicitInterfaceSpecifier == null
-            && property.Modifiers.All(modifier =>
-                modifier.IsKind(SyntaxKind.PublicKeyword)
-                || modifier.IsKind(SyntaxKind.AbstractKeyword))
-            && property.AccessorList != null
-            && property.AccessorList.Accessors.All(accessor =>
-                accessor.Body == null
-                && accessor.ExpressionBody == null
-                && accessor.SemicolonToken.IsKind(
-                    SyntaxKind.SemicolonToken));
+        => SyntaxCapabilityClassifier.IsRepresentableInterfaceProperty(property);
 
     private static bool IsRepresentableInterfaceIndexer(
         IndexerDeclarationSyntax indexer)
-        => indexer.ExpressionBody == null
-            && indexer.ExplicitInterfaceSpecifier == null
-            && indexer.Modifiers.All(modifier =>
-                modifier.IsKind(SyntaxKind.PublicKeyword)
-                || modifier.IsKind(SyntaxKind.AbstractKeyword))
-            && indexer.AccessorList != null
-            && indexer.AccessorList.Accessors.All(accessor =>
-                accessor.Body == null
-                && accessor.ExpressionBody == null
-                && accessor.SemicolonToken.IsKind(
-                    SyntaxKind.SemicolonToken));
+        => SyntaxCapabilityClassifier.IsRepresentableInterfaceIndexer(indexer);
 
     private MemberPreprocessorBlockNode BuildInterfacePreprocessorNode(
         TextSpan span,
@@ -3323,17 +3295,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ClassDefinitionNode ConvertRecord(RecordDeclarationSyntax node)
     {
-        if (node.ClassOrStructKeyword.IsKind(SyntaxKind.StructKeyword))
-            throw EscalateExpression(node, "record-struct");
-        if (node.Modifiers.Any(SyntaxKind.FileKeyword))
-            throw EscalateExpression(node, "file-scoped-type");
-        if (node.Modifiers.Any(SyntaxKind.PartialKeyword))
-            throw EscalateExpression(node, "record-partial");
-        if (node.Modifiers.Any(SyntaxKind.UnsafeKeyword))
-            throw EscalateExpression(node, "unsafe");
-        if (node.ParameterList?.Parameters.Any(parameter =>
-            parameter.AttributeLists.Count > 0 || parameter.Modifiers.Count > 0) == true)
-            throw EscalateExpression(node, "record-positional-parameter-metadata");
+        if (FeatureSupport.GetRecordHeaderPreservationFeature(node) is { } headerFeature)
+            throw EscalateExpression(node, headerFeature);
         if (ExtractMemberPreprocessorRegions(node).Count > 0)
             throw EscalateExpression(node, "record-conditional-members");
 
@@ -6911,12 +6874,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 throw EscalateExpression(localFn, "local-function");
             // #943 (D1 RO-UNS-1): ref locals/returns, conditional refs, by-reference lambdas and
             // by-reference arguments to constructors or indexers have no native form.
-            var byReference = block.DescendantNodes().FirstOrDefault(node =>
-                node is RefExpressionSyntax or RefTypeSyntax
-                || node is ParameterSyntax parameter && parameter.Parent?.Parent is AnonymousFunctionExpressionSyntax
-                    && IsByReferenceParameter(parameter)
-                || node is ArgumentSyntax { RefKindKeyword.RawKind: not (int)SyntaxKind.None } argument
-                    && argument.Parent?.Parent is not InvocationExpressionSyntax);
+            var byReference = FeatureSupport.FindBlockByReferencePreservation(block);
             if (byReference != null)
                 throw EscalateExpression(byReference, "ref-parameter");
         }
@@ -7317,7 +7275,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private StatementNode? HandleUnsupportedStatement(StatementSyntax statement)
     {
-        var featureName = statement.Kind().ToString().Replace("Statement", "").ToLowerInvariant();
+        var featureName = FeatureSupport.GetStatementFallbackFeature(statement.Kind());
         return HandleUnsupportedStatement(statement, featureName);
     }
 
@@ -9955,11 +9913,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         // A tuple incrementor is not a numeric step. Preserve the entire loop
         // rather than moving it into a while body, where continue would skip it.
-        if (node.Initializers.Concat(node.Incrementors)
-            .Any(expression => expression.DescendantNodesAndSelf()
-                .OfType<AssignmentExpressionSyntax>().Any(IsTupleAssignment))
-            || node.Condition?.DescendantNodesAndSelf()
-                .OfType<AssignmentExpressionSyntax>().Any(IsTupleAssignment) == true)
+        var headerFeature = FeatureSupport.GetForHeaderPreservationFeature(node);
+        if (headerFeature == "tuple-deconstruction")
         {
             _context.RecordFeatureUsage("tuple-deconstruction");
             return [PreserveRawStatement(
@@ -9968,10 +9923,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 node.GetLocation().GetLineSpan().StartLinePosition.Line + 1)];
         }
 
-        if (node.Declaration?.Type is RefTypeSyntax
-            || node.ChildNodes().Where(part => part != node.Statement)
-                .SelectMany(part => part.DescendantNodesAndSelf())
-                .Any(part => part is DeclarationExpressionSyntax or SingleVariableDesignationSyntax))
+        if (headerFeature == "for")
         {
             return [PreserveRawStatement(
                 GetTextSpan(node), node.ToFullString(), "for",
@@ -11666,8 +11618,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return result;
     }
 
-    private static bool IsByReferenceParameter(ParameterSyntax parameter) =>
-        parameter.Modifiers.Any(modifier => modifier.Kind() is SyntaxKind.RefKeyword or SyntaxKind.OutKeyword or SyntaxKind.InKeyword);
+    private static bool IsByReferenceParameter(ParameterSyntax parameter)
+        => FeatureSupport.IsByReferenceParameter(parameter);
 
     // RO-NULL-3: flow attributes such as [NotNullWhen] stay inert metadata on a native declaration;
     // callers that type-check only through them are refused by the nullability checks.
@@ -12580,12 +12532,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     }
 
     private static bool IsTupleAssignment(AssignmentExpressionSyntax assignment)
-        => assignment.IsKind(SyntaxKind.SimpleAssignmentExpression)
-            && (assignment.Left is TupleExpressionSyntax
-                || assignment.Left is DeclarationExpressionSyntax
-                {
-                    Designation: ParenthesizedVariableDesignationSyntax
-                });
+        => FeatureSupport.IsTupleAssignment(assignment);
 
     private StatementNode ConvertTupleAssignmentStatement(AssignmentExpressionSyntax assignment, TextSpan span)
     {
@@ -17221,7 +17168,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var line = lineSpan.StartLinePosition.Line + 1;
 
         // Determine feature name from syntax kind if not provided
-        featureName ??= node.Kind().ToString().Replace("Declaration", "").Replace("Syntax", "").ToLowerInvariant();
+        featureName ??= FeatureSupport.GetMemberFallbackFeature(node.Kind());
 
         var reason = $"Unsupported {kind}: {(node.ToString().Length > 80 ? node.ToString().Substring(0, 77) + "..." : node.ToString())}";
 
