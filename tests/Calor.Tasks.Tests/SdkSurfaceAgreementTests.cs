@@ -26,6 +26,27 @@ namespace Calor.Tasks.Tests;
 /// </summary>
 public sealed class SdkSurfaceAgreementTests : IDisposable
 {
+    [Theory]
+    [InlineData("module Gate\n  func Run () \u2192 void\n    ", "statement", "return;")]
+    [InlineData("module Gate\n  class Host\n    ", "member", "public int Value => 7;")]
+    [InlineData("module _global\n  ", "unit", "public class Kept { }")]
+    public void InteropReasonGate_SdkTaskAndCliProcessRejectIdentically(
+        string prefix, string marker, string payload)
+    {
+        var workspace = CreateTempDir();
+        var path = Path.Combine(workspace, "ReasonGate.calr");
+        File.WriteAllText(path,
+            $"{prefix}raw {marker} {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n");
+        Assert.Equal(
+            Calor.Compiler.Incremental.BuildStateCache.ComputeCompilerHash(
+                [typeof(Calor.Compiler.Program).Assembly.Location]),
+            Calor.Compiler.Incremental.BuildStateCache.ComputeCompilerHash([FindCalorDll()]));
+        var sdk = CompileThroughTask(workspace, [path], "effects-off");
+        var cli = CompileThroughCliProcess(workspace, [path], "effects-off");
+        Assert.Equal(cli, sdk);
+        Assert.Contains("|Calor1012|error|", Assert.Single(sdk));
+    }
+
     private readonly List<string> _tempDirs = [];
 
     public void Dispose()

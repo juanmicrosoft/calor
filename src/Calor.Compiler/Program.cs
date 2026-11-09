@@ -778,6 +778,7 @@ public class Program
         phaseSw.Restart();
         var parser = new Parser(tokens, diagnostics);
         var ast = parser.Parse();
+        RawCSharpFrame.ValidateInteropReasons(tokens, diagnostics);
         if (!diagnostics.HasErrors)
         {
             try

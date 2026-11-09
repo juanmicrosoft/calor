@@ -9,6 +9,26 @@ public class CompileToolTests
 {
     private readonly CompileTool _tool = new();
 
+    [Theory]
+    [InlineData("module Gate\n  func Run () \u2192 void\n    ", "statement", "return;")]
+    [InlineData("module Gate\n  class Host\n    ", "member", "public int Value => 7;")]
+    [InlineData("module _global\n  ", "unit", "public class Kept { }")]
+    public async Task InteropReasonGate_McpRejectsUnmarkedWhenEffectsAreDisabled(
+        string prefix, string marker, string payload)
+    {
+        var source = $"{prefix}raw {marker} {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
+        var result = await _tool.ExecuteAsync(JsonSerializer.SerializeToElement(new
+        {
+            source, options = new { enforceEffects = false }
+        }));
+        Assert.True(result.IsError);
+        Assert.Contains("Calor1012", result.Content[0].Text);
+        Assert.Contains("calor convert", result.Content[0].Text);
+        using var output = JsonDocument.Parse(result.Content[0].Text!);
+        Assert.False(output.RootElement.GetProperty("success").GetBoolean());
+        Assert.False(output.RootElement.TryGetProperty("generatedCode", out _));
+    }
+
     [Fact]
     public void Name_ReturnsCalorCompile()
     {

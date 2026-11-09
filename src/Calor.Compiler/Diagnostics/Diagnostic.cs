@@ -1091,6 +1091,12 @@ public static class DiagnosticCode
     /// </summary>
     public const string CSharpInteropBlockPreserved = "Calor1011";
 
+    /// <summary>
+    /// Error: Ordinary raw C# passthrough is missing nonempty feature/reason metadata.
+    /// Reason applicability and staleness require separate validation.
+    /// </summary>
+    public const string InvalidCSharpInteropReason = "Calor1012";
+
     // Refinement type diagnostics (Calor1100-1109)
 
     /// <summary>

@@ -823,7 +823,8 @@ public sealed class Lexer
             Advance();
         var marker = _source[reasonStart.._position];
         if (marker.Length == 0 || !RawCSharpFrame.TryParseReason(marker, out var frame))
-            return Fail("raw requires a valid reason marker followed by a UTF-8 byte length.");
+            return Fail("raw requires a valid URI-encoded reason marker followed by a UTF-8 byte length. "
+                + "Write native Calor instead, or run calor convert on the original C# and retain its marked fallback.");
         while (Current is ' ' or '\t')
             Advance();
         if (IsAtEnd || Current is '\r' or '\n')

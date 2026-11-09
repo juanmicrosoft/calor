@@ -10,6 +10,46 @@ namespace Calor.LanguageServer.Tests.State;
 public class DocumentStateTests
 {
     [Theory]
+    [InlineData("module Gate\n  func Run () \u2192 void\n    ", "statement", "return;", "Calor1012")]
+    [InlineData("module Gate\n  class Host\n    ", "member", "public int Value => 7;", "Calor1012")]
+    [InlineData("module _global\n  ", "unit", "public class Kept { }", "Calor1012")]
+    [InlineData("module _global\n  ", "unit:feature:Other:%20", "public class Kept { }", "Calor1012")]
+    [InlineData("module _global\n  ", "unit:feature:Other:%ZZ", "public class Kept { }", "Calor0013")]
+    [InlineData("module _global\n  ", "unit:feature:Other:%FF", "public class Kept { }", "Calor0013")]
+    public void InteropReasonGate_EditorMatchesSharedCompilation(
+        string prefix, string marker, string payload, string code)
+    {
+        var source = $"{prefix}raw {marker} {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
+        var state = LspTestHarness.CreateDocument(source);
+        var editor = Assert.Single(state.Diagnostics.Where(d => d.Code == code));
+        var result = Compiler.Program.Compile(source, "editor-reason.calr",
+            new Compiler.CompilationOptions
+            {
+                EnforceEffects = false, EnableTypeChecking = false, UnsafeTranspileOnly = true
+            });
+        var compiler = Assert.Single(result.Diagnostics.Where(d => d.Code == code));
+        Assert.Equal(compiler.Span, editor.Span);
+        Assert.Equal(compiler.Message, editor.Message);
+        Assert.Equal(compiler.Severity, editor.Severity);
+        Assert.Empty(result.GeneratedCode);
+    }
+
+    [Fact]
+    public void InteropReasonGate_EditorAndCompilerExemptValidatedDirectives()
+    {
+        const string payload = "#nullable enable";
+        var source = "module Directives\n  raw directive:nullable-directive "
+            + System.Text.Encoding.UTF8.GetByteCount(payload) + "\n" + payload
+            + "\n  func Value () \u2192 int\n    return 7\n";
+        var state = LspTestHarness.CreateDocument(source);
+        Assert.False(state.Diagnostics.HasErrors, string.Join("\n", state.Diagnostics));
+        var result = Compiler.Program.Compile(source);
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        Assert.DoesNotContain(result.Diagnostics,
+            diagnostic => diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.InvalidCSharpInteropReason);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void N3_NamedCall_EditorRetainsActualArgumentSpanAndActiveRoute(bool expression)

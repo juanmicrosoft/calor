@@ -390,6 +390,7 @@ public sealed class DocumentState : IDisposable
             var parserTokens = new Lexer(source, new DiagnosticBag()).TokenizeAllForParser();
             cancellationToken.ThrowIfCancellationRequested();
             ast = new Parser(parserTokens, diagnostics).Parse();
+            RawCSharpFrame.ValidateInteropReasons(parserTokens, diagnostics);
             cancellationToken.ThrowIfCancellationRequested();
 
             if (!diagnostics.HasErrors && Uri.IsFile)

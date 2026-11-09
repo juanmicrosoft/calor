@@ -12,6 +12,115 @@ namespace Calor.Compiler.Tests;
 
 public class CSharpInteropBlockTests
 {
+    public static IEnumerable<object[]> InteropReasonGateCases()
+    {
+        foreach (var channel in new[] { "statement", "member", "unit" })
+        {
+            var prefix = channel == "unit" ? "unit" : "member";
+            foreach (var marker in new[]
+            {
+                channel, "delegate", $"{prefix}:~:Other:reason", $"{prefix}:feature:Other:~",
+                $"{prefix}::Other:reason", $"{prefix}:feature:Other:",
+                $"{prefix}:%20:Other:reason", $"{prefix}:feature:Other:%0A",
+                $"{prefix}:feature:Other:%", $"{prefix}:feature%ZZ:Other:reason",
+                $"{prefix}:feature:Other:%FF", $"{prefix}:feature:Other:%ED%A0%80",
+                $"{prefix}:feature:Other:%E2%82", $"{prefix}:feature:BadKind:reason",
+                $"{prefix}:feature:Other"
+            })
+                foreach (var optionsOff in new[] { false, true })
+                    yield return [channel, marker, optionsOff];
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(InteropReasonGateCases))]
+    public void InteropReasonGate_RejectsUnmarkedEmptyAndMalformedAtEveryBoundary(
+        string channel, string marker, bool optionsOff)
+    {
+        var source = InteropReasonGateSource(channel, marker);
+        var result = Program.Compile(source, "reason-gate.calr", optionsOff
+            ? new CompilationOptions
+            {
+                EnforceEffects = false, EnableTypeChecking = false, UnsafeTranspileOnly = true,
+                DeferGeneratedOutputValidation = true
+            } : new CompilationOptions());
+        Assert.True(result.HasErrors);
+        Assert.Empty(result.GeneratedCode);
+        var diagnostic = Assert.Single(result.Diagnostics.Where(diagnostic =>
+            diagnostic.Code is DiagnosticCode.InvalidCSharpInteropReason or DiagnosticCode.InvalidRawFrame));
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains("native Calor", diagnostic.Message);
+        Assert.Contains("calor convert", diagnostic.Message);
+        Assert.Equal(source.IndexOf("raw ", StringComparison.Ordinal), diagnostic.Span.Start);
+    }
+
+    [Fact]
+    public void InteropReasonGate_RejectsInvalidUtf16MetadataWithoutThrowing()
+    {
+        Assert.False(RawCSharpFrame.TryParseReason("member:feature:Other:\ud800", out _));
+        Assert.False(RawCSharpFrame.TryParseReason("member:\udc00:Other:reason", out _));
+    }
+
+    [Theory]
+    [InlineData(TokenKind.RawCSharp)]
+    [InlineData(TokenKind.CSharpInterop)]
+    public void InteropReasonGate_LegacyTokenValuesCannotEscapeMetadataCheck(TokenKind kind)
+    {
+        var diagnostics = new DiagnosticBag();
+        RawCSharpFrame.ValidateInteropReasons(
+            [new Token(kind, "legacy raw", TextSpan.Empty, "return;")], diagnostics);
+        Assert.Equal(DiagnosticCode.InvalidCSharpInteropReason, Assert.Single(diagnostics).Code);
+    }
+
+    [Fact]
+    public void InteropReasonGate_WholeUnitCannotBypassSharedCompilation()
+    {
+        var source = InteropReasonGateSource("unit", "unit");
+        var result = Program.Compile(source);
+        Assert.True(Assert.Single(result.Ast!.InteropBlocks).IsCompilationUnitPassthrough);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.InvalidCSharpInteropReason);
+        Assert.Empty(result.GeneratedCode);
+    }
+
+    [Theory]
+    [InlineData("public class C { public void Run() { checked { int n = 1; } } }")]
+    [InlineData("public class C { ~C() { } }")]
+    [InlineData("using System.Reflection;\r\n[assembly: AssemblyTitle(\"\u03c0\")]")]
+    public void InteropReasonGate_AcceptsRealConverterOutputWithoutChangingPayloads(string source)
+    {
+        var converted = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossless, ValidateRoundTripCSharp = false
+        }).Convert(source);
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        AssertMarkerPayloadsRoundTrip(converted);
+        var result = Program.Compile(converted.CalorSource!, "converted-reasons.calr",
+            new CompilationOptions { EnforceEffects = false, EnableTypeChecking = false });
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        Assert.NotEmpty(result.GeneratedCode);
+    }
+
+    [Fact]
+    public void InteropReasonGate_ShapeIsNotOriginOrReasonApplicabilityAuthority()
+    {
+        // Phase B1 checks shape only; this deliberately unknown feature needs the B2 authority design.
+        var source = InteropReasonGateSource("unit", "unit:unresolved-feature:Other:not%20origin%20proof");
+        var result = Program.Compile(source);
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        Assert.Equal("public class Kept { }", result.GeneratedCode);
+    }
+
+    private static string InteropReasonGateSource(string channel, string marker)
+    {
+        var (prefix, indent, payload) = channel switch
+        {
+            "statement" => ("module Gate\n  func Run () \u2192 void\n", "    ", "return;"),
+            "member" => ("module Gate\n  class Host\n", "    ", "public int Value => 7;"),
+            _ => ("module _global\n", "  ", "public class Kept { }")
+        };
+        return $"{prefix}{indent}raw {marker} {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
+    }
+
     [Theory]
     [InlineData("checked { int n = 1; }", "checked-block")]
     [InlineData("for (int i = 0; i < 1; (i, i) = (1, 2)) { }", "tuple-deconstruction")]

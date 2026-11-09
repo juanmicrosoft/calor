@@ -437,6 +437,8 @@ internal sealed record RawCSharpFrame(
     bool IsCompilationUnitPassthrough = false,
     bool IsCompilerDirective = false)
 {
+    private static readonly System.Text.UTF8Encoding StrictMetadataUtf8 = new(false, true);
+
     internal static string NormalizeLineEndings(string source)
     {
         if (!source.Contains("\r\n", StringComparison.Ordinal))
@@ -558,6 +560,65 @@ internal sealed record RawCSharpFrame(
     private static string Encode(string? value) =>
         value == null ? "~" : Uri.EscapeDataString(value).Replace("~", "%7E", StringComparison.Ordinal);
 
+    internal static void ValidateInteropReasons(
+        IReadOnlyList<Token> tokens, Diagnostics.DiagnosticBag diagnostics)
+    {
+        foreach (var token in tokens)
+        {
+            if (token.Value is RawCSharpFrame { IsCompilerDirective: true }
+                || token.Kind is not (TokenKind.RawCSharp or TokenKind.CSharpInterop))
+                continue;
+            if (token.Value is not RawCSharpFrame frame
+                || string.IsNullOrWhiteSpace(frame.FeatureName) || string.IsNullOrWhiteSpace(frame.Reason))
+                diagnostics.ReportError(token.Span, Diagnostics.DiagnosticCode.InvalidCSharpInteropReason,
+                    "Raw C# passthrough requires nonempty feature and reason metadata. "
+                    + "Write native Calor instead, or run calor convert on the original C# and retain its marked fallback. "
+                    + "A marker alone does not establish converter origin or reason applicability.");
+        }
+    }
+
+    private static bool TryDecodeMetadata(string encoded, out string? decoded)
+    {
+        decoded = null;
+        if (encoded == "~")
+            return true;
+        for (var index = 0; index < encoded.Length; index++)
+        {
+            if (encoded[index] != '%')
+                continue;
+            var bytes = new List<byte>();
+            while (index < encoded.Length && encoded[index] == '%')
+            {
+                if (index + 2 >= encoded.Length
+                    || !byte.TryParse(encoded.AsSpan(index + 1, 2),
+                        System.Globalization.NumberStyles.AllowHexSpecifier,
+                        System.Globalization.CultureInfo.InvariantCulture, out var value))
+                    return false;
+                bytes.Add(value);
+                index += 3;
+            }
+            try
+            {
+                _ = StrictMetadataUtf8.GetCharCount(bytes.ToArray());
+            }
+            catch (System.Text.DecoderFallbackException)
+            {
+                return false;
+            }
+            index--;
+        }
+        decoded = Uri.UnescapeDataString(encoded);
+        try
+        {
+            _ = StrictMetadataUtf8.GetByteCount(decoded);
+        }
+        catch (System.Text.EncoderFallbackException)
+        {
+            return false;
+        }
+        return true;
+    }
+
     internal static bool TryParseReason(string marker, out RawCSharpFrame frame)
     {
         frame = new RawCSharpFrame("");
@@ -582,18 +643,22 @@ internal sealed record RawCSharpFrame(
                 frame = frame with { IsCompilationUnitPassthrough = true };
                 return true;
             }
-            frame = frame with { FeatureName = Uri.UnescapeDataString(marker) };
+            if (!TryDecodeMetadata(marker, out var compactFeature))
+                return false;
+            frame = frame with { FeatureName = compactFeature };
             return true;
         }
         if (parts.Length != 4 || parts[0] is not ("member" or "unit")
             || !Enum.TryParse<Ast.InteropMemberKind>(parts[2], out var kind)
-            || !Enum.IsDefined(kind))
+            || !Enum.IsDefined(kind)
+            || !TryDecodeMetadata(parts[1], out var interopFeature)
+            || !TryDecodeMetadata(parts[3], out var reason))
             return false;
         frame = frame with
         {
-            FeatureName = parts[1] == "~" ? null : Uri.UnescapeDataString(parts[1]),
+            FeatureName = interopFeature,
             MemberKind = kind,
-            Reason = parts[3] == "~" ? null : Uri.UnescapeDataString(parts[3]),
+            Reason = reason,
             IsCompilationUnitPassthrough = parts[0] == "unit"
         };
         return true;
