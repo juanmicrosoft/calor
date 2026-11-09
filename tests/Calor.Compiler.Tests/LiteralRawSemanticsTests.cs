@@ -1,4 +1,6 @@
 using System.Reflection;
+using System.Text;
+using System.Text.Json;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
@@ -65,11 +67,28 @@ public sealed class LiteralRawSemanticsTests
     [MemberData(nameof(IntegerBoundaryCorpus))]
     public void IntegerBoundaryCorpus_EmitsFaithfulCSharp(string source, string expected)
     {
-        var expression = ParseExpression(source, out var diagnostics);
+        var current = source switch
+        {
+            "INT:0xFFFF_FFFF" => "0xFFFF_FFFFL",
+            "INT:-0x8000_0000" => "-2147483648",
+            "LONG:-0x8000_0000_0000_0000" => "-0x8000_0000_0000_0000L",
+            "ULONG:18_446_744_073_709_551_615" => "18_446_744_073_709_551_615UL",
+            "LONG:9_223_372_036_854_775_807" => "9_223_372_036_854_775_807L",
+            "UINT:4_294_967_295" => "4_294_967_295U",
+            _ => source
+        };
+        if (current != source)
+            AssertRetiredTypedLiteral(source);
+        var expression = ParseExpression(current, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
 
         var literal = Assert.IsType<IntLiteralNode>(expression);
-        Assert.Equal(expected, literal.Accept(new CSharpEmitter()));
+        var emitted = literal.Accept(new CSharpEmitter());
+        Assert.Equal(source == "INT:-0x8000_0000" ? "-2147483648" : expected, emitted);
+        var originalValue = EvaluateLiteralObject(expected);
+        var currentValue = EvaluateLiteralObject(emitted);
+        Assert.Equal(originalValue.GetType(), currentValue.GetType());
+        Assert.Equal(originalValue, currentValue);
     }
 
     [Theory]
@@ -79,13 +98,22 @@ public sealed class LiteralRawSemanticsTests
     [InlineData("-0x1UL")]
     public void UnsignedNegative_IsDiagnosed(string source)
     {
+        var current = source switch
+        {
+            "UINT:-1" => "-1U",
+            "ULONG:-0x1" => "-0x1UL",
+            _ => source
+        };
+        if (current != source)
+            AssertRetiredTypedLiteral(source);
         var diagnostics = new DiagnosticBag();
-        var program = $"§M{{Unsigned}}\n  §F{{Value:pub}} () -> object\n    §R {source}";
+        var program = $"module Unsigned\n  func Value public () \u2192 object\n    return {current}";
         _ = new Parser(new Lexer(program, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
 
         Assert.Contains(
             diagnostics,
             diagnostic => diagnostic.Code == DiagnosticCode.UnsignedNegativeLiteral);
+        Assert.True(Program.Compile(program).HasErrors);
     }
 
     [Theory]
@@ -96,18 +124,20 @@ public sealed class LiteralRawSemanticsTests
     [InlineData("LONG:9223372036854775808")]
     public void ExplicitSignedLongOverflow_IsDiagnosedWithoutUnsignedFallback(string source)
     {
+        var current = source == "LONG:9223372036854775808" ? "9223372036854775808L" : source;
+        if (current != source)
+            AssertRetiredTypedLiteral(source);
         var diagnostics = new DiagnosticBag();
-        var tokens = new Lexer(source, diagnostics).TokenizeAll();
-
+        var tokens = new Lexer(current, diagnostics).TokenizeAll();
         Assert.Contains(tokens, token => token.Kind == TokenKind.Error);
         Assert.Contains(
             diagnostics,
             diagnostic => diagnostic.Code == DiagnosticCode.SignedIntegerLiteralOverflow);
 
         var compilation = Program.Compile(
-            $"§M{{Overflow}}\n  §F{{Value:pub}} () -> object\n    §R {source}",
+            $"module Overflow\n  func Value public () \u2192 long\n    return {current}",
             "signed-long-overflow.calr",
-            new CompilationOptions { EnforceEffects = false });
+            new CompilationOptions { EnforceEffects = true });
         Assert.True(compilation.HasErrors);
         Assert.Contains(
             compilation.Diagnostics,
@@ -171,10 +201,20 @@ public sealed class LiteralRawSemanticsTests
     [InlineData("0x7FFF_FFFF", int.MaxValue)]
     public void NumericSeparators_WorkInTypedAndBareIntegers(string source, long expected)
     {
-        var literal = Assert.IsType<IntLiteralNode>(ParseExpression(source, out var diagnostics));
+        var current = source switch
+        {
+            "INT:2_147_483_647" => "2_147_483_647",
+            "INT:-2_147_483_648" => "-2_147_483_648",
+            _ => source
+        };
+        if (current != source)
+            AssertRetiredTypedLiteral(source);
+        var literal = Assert.IsType<IntLiteralNode>(ParseExpression(current, out var diagnostics));
 
         Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
         Assert.Equal(expected, literal.Value);
+        Assert.Equal(IntegerLiteralWidth.Bits32, literal.Width);
+        Assert.Equal(IntegerLiteralSignedness.Signed, literal.Signedness);
     }
 
     [Theory]
@@ -185,15 +225,26 @@ public sealed class LiteralRawSemanticsTests
         string source,
         double expected)
     {
-        var expression = ParseExpression(source, out var diagnostics);
+        var current = source switch
+        {
+            "FLOAT:1_234.5_6" => "1_234.5_6d",
+            "DEC:1_234.5_6" => "1_234.5_6m",
+            _ => source
+        };
+        if (current != source)
+            AssertRetiredTypedLiteral(source);
+        var expression = ParseExpression(current, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
         switch (expression)
         {
             case FloatLiteralNode floating:
+                Assert.False(floating.IsSingle);
+                Assert.False(source.StartsWith("DEC:", StringComparison.Ordinal));
                 Assert.Equal(expected, floating.Value, precision: 8);
                 break;
             case DecimalLiteralNode decimalLiteral:
+                Assert.StartsWith("DEC:", source);
                 Assert.Equal((decimal)expected, decimalLiteral.Value);
                 break;
             default:
@@ -275,7 +326,9 @@ public sealed class LiteralRawSemanticsTests
     [InlineData("\"\"\"${1,4:D2} \\${0}\"\"\"", "  01 ${0}")]
     public void MeasuredInterpolation_RoundTripsRuntimeAndLiteralHoles(string source, string expected)
     {
-        var expression = ParseExpression(source, out var diagnostics);
+        var current = source == "\"${(+ 1 2)} lit=\\${0}\""
+            ? "\"${1 + 2} lit=\\${0}\"" : source;
+        var expression = ParseExpression(current, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
         Assert.Equal(expected, EvaluateStringExpression(expression.Accept(new CSharpEmitter())));
         var emitted = expression.Accept(new CalorEmitter());
@@ -311,16 +364,27 @@ public sealed class LiteralRawSemanticsTests
         Assert.False(replayDiagnostics.HasErrors, string.Join("\n", replayDiagnostics.Errors));
         Assert.Equal(expression.Accept(new CSharpEmitter()), replay.Accept(new CSharpEmitter()));
         Assert.Equal(emitted, replay.Accept(new CalorEmitter()));
-        if (expression is DecimalLiteralNode originalDecimal)
+        if (expression is DecimalLiteralNode originalLiteral)
         {
             var replayDecimal = Assert.IsType<DecimalLiteralNode>(replay);
-            Assert.Equal(decimal.GetBits(originalDecimal.Value), decimal.GetBits(replayDecimal.Value));
-            var runtimeDecimal = Assert.IsType<decimal>(
-                InvokeObject(CompileCSharp(
-                    $"public static class DecimalProbe {{ public static object Value() => {emitted}; }}"),
-                    "DecimalProbe", "Value"));
-            Assert.Equal(decimal.GetBits(originalDecimal.Value), decimal.GetBits(runtimeDecimal));
+            Assert.Equal(decimal.GetBits(originalLiteral.Value), decimal.GetBits(replayDecimal.Value));
         }
+        var originalValue = EvaluateLiteralObject(source);
+        var runtimeValue = EvaluateLiteralObject(replay.Accept(new CSharpEmitter()));
+        Assert.Equal(originalValue.GetType(), runtimeValue.GetType());
+        if (originalValue is decimal originalDecimal)
+        {
+            Assert.Equal(decimal.GetBits(originalDecimal),
+                decimal.GetBits(Assert.IsType<decimal>(runtimeValue)));
+        }
+        else if (originalValue is float originalSingle)
+            Assert.Equal(BitConverter.SingleToInt32Bits(originalSingle),
+                BitConverter.SingleToInt32Bits(Assert.IsType<float>(runtimeValue)));
+        else if (originalValue is double originalDouble)
+            Assert.Equal(BitConverter.DoubleToInt64Bits(originalDouble),
+                BitConverter.DoubleToInt64Bits(Assert.IsType<double>(runtimeValue)));
+        else
+            Assert.Equal(originalValue, runtimeValue);
     }
 
     [Theory]
@@ -389,9 +453,9 @@ public sealed class LiteralRawSemanticsTests
             Assert.Equal(TokenKind.Error, tokens[0].Kind);
 
             var result = Program.Compile(
-                $"§M{{Utf8}}\n  §F{{Value:pub}} (i32:value) -> object\n    §R {literal}",
+                $"module Utf8\n  func Value public (int:value) \u2192 object\n    return {literal}",
                 "interpolated-u8.calr",
-                new CompilationOptions { EnforceEffects = false });
+                new CompilationOptions { EnforceEffects = true });
             Assert.True(result.HasErrors);
             Assert.Contains(
                 result.Diagnostics,
@@ -515,6 +579,8 @@ public sealed class LiteralRawSemanticsTests
         Assert.Equal(expected, expression.Accept(new CSharpEmitter()));
     }
 
+    // Keep historical case identities and payloads; the selected raw boundary is
+    // byte-counted, not a C# lexical scanner. These are opaque-byte controls.
     [Fact]
     public void RawInteropScanner_IgnoresSentinelsInAllCSharpLexicalForms()
     {
@@ -530,14 +596,7 @@ public sealed class LiteralRawSemanticsTests
             var ch = '}';
             if (true) { var nested = new { Value = 1 }; }
             """"";
-        var source = $"§CSHARP{{{payload}}}§/CSHARP";
-        var diagnostics = new DiagnosticBag();
-        var token = Assert.Single(
-            new Lexer(source, diagnostics).TokenizeAll().Where(t => t.Kind != TokenKind.Eof));
-
-        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
-        Assert.Equal(TokenKind.CSharpInterop, token.Kind);
-        Assert.Equal(payload, token.Value);
+        AssertCountedRawPayload(payload, "member");
     }
 
     [Fact]
@@ -557,15 +616,10 @@ public sealed class LiteralRawSemanticsTests
                 2
             }
             """"";
-        var diagnostics = new DiagnosticBag();
-        var token = Assert.Single(
-            new Lexer($"§CS{{{payload}}}", diagnostics)
-                .TokenizeAll()
-                .Where(t => t.Kind != TokenKind.Eof));
-
-        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
-        Assert.Equal(TokenKind.RawCSharpExpression, token.Kind);
-        Assert.Equal(payload, token.Value);
+        // Inline raw expressions remain unadmitted. A counted statement preserves
+        // these bytes, but does not restore the retired expression channel.
+        AssertRetiredRawSyntax($"§CS{{{payload}}}");
+        AssertCountedRawPayload(payload);
     }
 
     [Fact]
@@ -578,19 +632,10 @@ public sealed class LiteralRawSemanticsTests
             var conditional = "§/RAW";
             #endif
             """;
-        var diagnostics = new DiagnosticBag();
-        var rawToken = Assert.Single(
-            new Lexer($"§RAW\n{rawPayload}§/RAW", diagnostics)
-                .TokenizeAll()
-                .Where(t => t.Kind != TokenKind.Eof));
-        Assert.Equal(rawPayload, rawToken.Value);
+        AssertCountedRawPayload(rawPayload);
 
         const string interopPayload = "\r\npublic int X => 1;\r\n";
-        var interopToken = Assert.Single(
-            new Lexer($"§CSHARP{{{interopPayload}}}§/CSHARP", diagnostics)
-                .TokenizeAll()
-                .Where(t => t.Kind != TokenKind.Eof));
-        Assert.Equal(interopPayload, interopToken.Value);
+        AssertCountedRawPayload(interopPayload, "member", "\r\n");
     }
 
     [Fact]
@@ -602,15 +647,7 @@ public sealed class LiteralRawSemanticsTests
             + "#else // another §/RAW\r\n"
             + "#endif /* final §/RAW */\r\n"
             + "var after = 1;\r\n";
-        var diagnostics = new DiagnosticBag();
-        var token = Assert.Single(
-            new Lexer($"§RAW\r\n{payload}§/RAW", diagnostics)
-                .TokenizeAll()
-                .Where(candidate => candidate.Kind != TokenKind.Eof));
-
-        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
-        Assert.Equal(TokenKind.RawCSharp, token.Kind);
-        Assert.Equal(payload, token.Value);
+        AssertCountedRawPayload(payload, lineEnding: "\r\n");
     }
 
     [Fact]
@@ -623,15 +660,7 @@ public sealed class LiteralRawSemanticsTests
             + "#pragma payload $\"{\"§/RAW\"}\"\r\n"
             + "#pragma payload $$\"\"\"{{\"§/RAW\"}}\"\"\"\r\n"
             + "#pragma payload '§'/RAW\r\n";
-        var diagnostics = new DiagnosticBag();
-        var token = Assert.Single(
-            new Lexer($"§RAW\r\n{payload}§/RAW", diagnostics)
-                .TokenizeAll()
-                .Where(candidate => candidate.Kind != TokenKind.Eof));
-
-        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
-        Assert.Equal(TokenKind.RawCSharp, token.Kind);
-        Assert.Equal(payload, token.Value);
+        AssertCountedRawPayload(payload, lineEnding: "\r\n");
     }
 
     [Fact]
@@ -652,15 +681,7 @@ public sealed class LiteralRawSemanticsTests
             + "#else\r\n"
             + "var branch = 2;\r\n"
             + "#endif\r\n";
-        var diagnostics = new DiagnosticBag();
-        var token = Assert.Single(
-            new Lexer($"§RAW\r\n{payload}§/RAW", diagnostics)
-                .TokenizeAll()
-                .Where(candidate => candidate.Kind != TokenKind.Eof));
-
-        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
-        Assert.Equal(TokenKind.RawCSharp, token.Kind);
-        Assert.Equal(payload, token.Value);
+        AssertCountedRawPayload(payload, lineEnding: "\r\n");
     }
 
     [Fact]
@@ -687,17 +708,7 @@ public sealed class LiteralRawSemanticsTests
                 + "#else\r\n"
                 + "var inactive = 2;\r\n"
                 + "#endif\r\n";
-            var diagnostics = new DiagnosticBag();
-            var token = Assert.Single(
-                new Lexer($"§RAW\r\n{payload}§/RAW", diagnostics)
-                    .TokenizeAll()
-                    .Where(candidate => candidate.Kind != TokenKind.Eof));
-
-            Assert.False(
-                diagnostics.HasErrors,
-                string.Join(Environment.NewLine, diagnostics.Errors));
-            Assert.Equal(TokenKind.RawCSharp, token.Kind);
-            Assert.Equal(payload, token.Value);
+            AssertCountedRawPayload(payload, lineEnding: "\r\n");
         }
     }
 
@@ -713,15 +724,7 @@ public sealed class LiteralRawSemanticsTests
             + "#else\r\n"
             + "var active = 1;\r\n"
             + "#endif\r\n";
-        var diagnostics = new DiagnosticBag();
-        var token = Assert.Single(
-            new Lexer($"§RAW\r\n{payload}§/RAW", diagnostics)
-                .TokenizeAll()
-                .Where(candidate => candidate.Kind != TokenKind.Eof));
-
-        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
-        Assert.Equal(TokenKind.RawCSharp, token.Kind);
-        Assert.Equal(payload, token.Value);
+        AssertCountedRawPayload(payload, lineEnding: "\r\n");
     }
 
     [Fact]
@@ -742,15 +745,7 @@ public sealed class LiteralRawSemanticsTests
             + "#else\r\n"
             + "var active = 1;\r\n"
             + "#endif\r\n";
-        var diagnostics = new DiagnosticBag();
-        var token = Assert.Single(
-            new Lexer($"§RAW\r\n{payload}§/RAW", diagnostics)
-                .TokenizeAll()
-                .Where(candidate => candidate.Kind != TokenKind.Eof));
-
-        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
-        Assert.Equal(TokenKind.RawCSharp, token.Kind);
-        Assert.Equal(payload, token.Value);
+        AssertCountedRawPayload(payload, lineEnding: "\r\n");
     }
 
     [Fact]
@@ -764,37 +759,24 @@ public sealed class LiteralRawSemanticsTests
                 "var broken = \"unterminated active string"
             })
             {
-                var source =
-                    $"§RAW\n#if {condition}\n{malformed}\n"
-                    + "#else\nvar fallback = 1;\n#endif\n§/RAW";
-                var diagnostics = new DiagnosticBag();
-                var tokens = new Lexer(source, diagnostics).TokenizeAll();
-
-                Assert.Equal(TokenKind.Error, tokens[0].Kind);
-                Assert.Contains(
-                    diagnostics,
-                    diagnostic => diagnostic.Code == DiagnosticCode.UnterminatedRawBlock);
+                var payload = $"#if {condition}\n{malformed}\n"
+                    + "#else\nvar fallback = 1;\n#endif\n";
+                AssertRetiredRawSyntax($"§RAW\n{payload}§/RAW");
+                AssertCountedRawPayload(payload);
             }
         }
 
+        // C# lexical validity no longer determines the raw boundary: only the
+        // byte count does. Unterminated C# stays opaque, not native or validated.
         const string activeElse =
-            "§RAW\n#if false\nvar disabled = \"unterminated\n"
-            + "#else\n/* unterminated active else\n#endif\n§/RAW";
-        var elseDiagnostics = new DiagnosticBag();
-        var elseTokens = new Lexer(activeElse, elseDiagnostics).TokenizeAll();
-        Assert.Equal(TokenKind.Error, elseTokens[0].Kind);
-        Assert.Contains(
-            elseDiagnostics,
-            diagnostic => diagnostic.Code == DiagnosticCode.UnterminatedRawBlock);
+            "#if false\nvar disabled = \"unterminated\n"
+            + "#else\n/* unterminated active else\n#endif\n";
+        AssertRetiredRawSyntax($"§RAW\n{activeElse}§/RAW");
+        AssertCountedRawPayload(activeElse);
 
-        const string unknownUnclosed =
-            "§RAW\n#if UNKNOWN_SYMBOL\nvar value = 1;\n§/RAW";
-        var unknownDiagnostics = new DiagnosticBag();
-        var unknownTokens = new Lexer(unknownUnclosed, unknownDiagnostics).TokenizeAll();
-        Assert.Equal(TokenKind.Error, unknownTokens[0].Kind);
-        Assert.Contains(
-            unknownDiagnostics,
-            diagnostic => diagnostic.Code == DiagnosticCode.UnterminatedRawBlock);
+        const string unknownUnclosed = "#if UNKNOWN_SYMBOL\nvar value = 1;\n";
+        AssertRetiredRawSyntax($"§RAW\n{unknownUnclosed}§/RAW");
+        AssertCountedRawPayload(unknownUnclosed);
     }
 
     [Fact]
@@ -809,18 +791,31 @@ public sealed class LiteralRawSemanticsTests
             .Where(line => line.Length > 0 && !line.StartsWith('#'))
             .Select(line => line.Split('|'))
             .ToList();
-        Assert.NotEmpty(seeds);
+        Assert.Equal(12, seeds.Count);
+        using var currentInputs = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            Path.GetDirectoryName(seedPath)!, "integer-current-inputs.json")));
+        var inputs = currentInputs.RootElement.EnumerateArray().ToArray();
+        Assert.Equal(seeds.Select(seed => seed[0]),
+            inputs.Select(input => input.GetProperty("original").GetString()));
 
-        foreach (var seed in seeds)
+        foreach (var (seed, input) in seeds.Zip(inputs))
         {
+            var current = input.GetProperty("current").GetString()!;
+            if (current != seed[0])
+                AssertRetiredTypedLiteral(seed[0]);
             var literal = Assert.IsType<IntLiteralNode>(
-                ParseExpression(seed[0], out var diagnostics));
+                ParseExpression(current, out var diagnostics));
             Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
 
             var emitted = literal.Accept(new CSharpEmitter());
             var expected = decimal.Parse(seed[1], System.Globalization.CultureInfo.InvariantCulture);
             var runtime = EvaluateInteger(emitted);
             Assert.Equal(expected, runtime);
+            Assert.Equal(input.GetProperty("runtimeType").GetString(),
+                EvaluateLiteralObject(emitted).GetType().FullName);
+            var replay = ParseExpression(literal.Accept(new CalorEmitter()), out var replayDiagnostics);
+            Assert.False(replayDiagnostics.HasErrors, string.Join("\n", replayDiagnostics));
+            Assert.Equal(emitted, replay.Accept(new CSharpEmitter()));
         }
     }
 
@@ -836,7 +831,7 @@ public sealed class LiteralRawSemanticsTests
             .Where(line => line.Length > 0 && !line.StartsWith('#'))
             .Select(int.Parse)
             .ToList();
-        Assert.NotEmpty(seeds);
+        Assert.Equal(3, seeds.Count);
 
         foreach (var seed in seeds)
         {
@@ -845,7 +840,9 @@ public sealed class LiteralRawSemanticsTests
             {
                 var magnitude = (ulong)random.NextInt64();
                 var negative = random.Next(2) == 0;
-                var source = $"LONG:{(negative ? "-" : "")}0x{magnitude:X}";
+                var original = $"LONG:{(negative ? "-" : "")}0x{magnitude:X}";
+                AssertRetiredTypedLiteral(original);
+                var source = $"{(negative ? "-" : "")}0x{magnitude:X}L";
                 var expected = negative ? -(decimal)magnitude : magnitude;
                 var literal = Assert.IsType<IntLiteralNode>(
                     ParseExpression(source, out var diagnostics));
@@ -854,6 +851,10 @@ public sealed class LiteralRawSemanticsTests
                     diagnostics.HasErrors,
                     $"seed={seed}, iteration={iteration}: "
                     + string.Join(Environment.NewLine, diagnostics.Errors));
+                Assert.Equal(IntegerLiteralWidth.Bits64, literal.Width);
+                Assert.Equal(IntegerLiteralSignedness.Signed, literal.Signedness);
+                Assert.Equal(magnitude, literal.Magnitude);
+                Assert.Equal(negative ? IntegerLiteralSign.Negative : IntegerLiteralSign.Positive, literal.Sign);
                 Assert.Equal(expected, EvaluateInteger(literal.Accept(new CSharpEmitter())));
             }
         }
@@ -863,7 +864,7 @@ public sealed class LiteralRawSemanticsTests
     {
         diagnostics = new DiagnosticBag();
         var parser = new Parser(
-            new Lexer($"§M{{Test}}\n  §F{{Value:pub}} () -> object\n    §R {source}", diagnostics)
+            new Lexer($"module Test\n  func Value public () \u2192 object\n    return {source}", diagnostics)
                 .TokenizeAllForParser(),
             diagnostics);
         var module = parser.Parse();
@@ -873,6 +874,9 @@ public sealed class LiteralRawSemanticsTests
     }
 
     private static decimal EvaluateInteger(string emitted)
+        => Convert.ToDecimal(EvaluateLiteralObject(emitted), System.Globalization.CultureInfo.InvariantCulture);
+
+    private static object EvaluateLiteralObject(string emitted)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(
             $"public static class LiteralProbe {{ public static object Value() => {emitted}; }}");
@@ -886,7 +890,58 @@ public sealed class LiteralRawSemanticsTests
         Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
         var assembly = Assembly.Load(stream.ToArray());
         var value = assembly.GetType("LiteralProbe")!.GetMethod("Value")!.Invoke(null, null)!;
-        return Convert.ToDecimal(value, System.Globalization.CultureInfo.InvariantCulture);
+        return value;
+    }
+
+    private static void AssertRetiredTypedLiteral(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(source, diagnostics).TokenizeAll();
+        Assert.Contains(tokens, token => token.Kind == TokenKind.Error);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.InvalidTypedLiteral);
+    }
+
+    private static void AssertRetiredRawSyntax(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(source, diagnostics).TokenizeAll();
+        Assert.Equal(TokenKind.Error, tokens[0].Kind);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownSectionMarker);
+        Assert.DoesNotContain(tokens, token => token.Kind == TokenKind.RawCSharpExpression);
+    }
+
+    private static void AssertCountedRawPayload(string payload, string reason = "statement", string lineEnding = "\n")
+    {
+        var utf8 = new UTF8Encoding(false, true);
+        var count = utf8.GetByteCount(payload);
+        var source = $"raw {reason} {count}{lineEnding}{payload}";
+        var diagnostics = new DiagnosticBag();
+        var token = Assert.Single(new Lexer(source, diagnostics).TokenizeAll()
+            .Where(token => token.Kind != TokenKind.Eof));
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        Assert.Equal(reason == "statement" ? TokenKind.RawCSharp : TokenKind.CSharpInterop, token.Kind);
+        var frame = Assert.IsType<RawCSharpFrame>(token.Value);
+        Assert.Equal(payload, frame.Code);
+        Assert.Equal(utf8.GetBytes(payload), utf8.GetBytes(frame.Code));
+        Assert.Equal(source.Length, token.Span.End);
+        Assert.False(frame.IsCompilerDirective);
+
+        var module = new Parser(new Lexer(
+            $"module RawPayload\n  func Value () \u2192 void\n    {source}", diagnostics)
+            .TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var statement = Assert.IsType<RawCSharpNode>(Assert.Single(Assert.Single(module.Functions).Body));
+        Assert.Equal(payload, statement.CSharpCode);
+        var emitted = new CalorEmitter().Emit(module);
+        var replay = Assert.Single(RawCSharpFrame.ReadTokens(emitted)
+            .Where(token => token.Value is RawCSharpFrame));
+        Assert.Equal(frame, Assert.IsType<RawCSharpFrame>(replay.Value));
+
+        var truncatedDiagnostics = new DiagnosticBag();
+        var truncated = new Lexer($"raw {reason} {count + 1}{lineEnding}{payload}",
+            truncatedDiagnostics).TokenizeAll();
+        Assert.Equal(TokenKind.Error, truncated[0].Kind);
+        Assert.Contains(truncatedDiagnostics, diagnostic => diagnostic.Code == DiagnosticCode.InvalidRawFrame);
     }
 
     private static string EvaluateStringExpression(string expression)
