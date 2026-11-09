@@ -9,6 +9,12 @@ namespace Calor.LanguageServer.Tests.Handlers;
 
 public class CompletionHandlerTests
 {
+    private static void AssertNativeSource(string source)
+    {
+        var result = Compiler.Program.Compile(source);
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+    }
+
     [Theory]
     [InlineData("", "func")]
     [InlineData("mod", "module")]
