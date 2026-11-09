@@ -42,7 +42,7 @@ public class Program
 
         var strictApiOption = new Option<bool>(
             aliases: ["--strict-api"],
-            description: "Enable strict API mode: requires §BREAKING markers for public API changes");
+            description: "Enable strict API mode: requires /// breaking metadata for public API changes");
 
         var requireDocsOption = new Option<bool>(
             aliases: ["--require-docs"],
@@ -682,7 +682,7 @@ public class Program
         writer.WriteLine("  calor coverage <file>                            Analyze C# file for conversion coverage");
         writer.WriteLine();
         writer.WriteLine("Strictness options:");
-        writer.WriteLine("  --strict-api      Require §BREAKING markers for public API changes");
+        writer.WriteLine("  --strict-api      Require /// breaking metadata for public API changes");
         writer.WriteLine("  --require-docs    Require documentation on public functions");
         writer.WriteLine("  --enforce-effects Enforce effect declarations (default: true as of v0.11)");
         writer.WriteLine("  --no-enforce-effects  Disable effect enforcement (opt-out)");
@@ -1288,7 +1288,7 @@ public sealed class CompilationOptions
     public TextWriter? StatusWriter { get; init; }
 
     /// <summary>
-    /// Enable strict API mode: requires §BREAKING markers for public API changes.
+    /// Enable strict API mode: requires explicit breaking-change metadata for public API changes.
     /// </summary>
     public bool StrictApi { get; init; }
 

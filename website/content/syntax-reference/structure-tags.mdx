@@ -230,20 +230,24 @@ initializer. Custom awaitables are not admitted merely by their names.
 
 ### ConfigureAwait limitation
 
-The .NET spelling is `task.ConfigureAwait(false)`, but the current effect
-resolver does not resolve the constructed generic call below. This complete
-negative example reports `Calor0410` for an undeclared unknown effect,
-`Calor0411` for the unresolved call effects, and `Calor0200` for deferred awaiter
-resolution. It is not a supported pure library recipe. Do not waive enforcement
-or add an `unknown` row to present it as one.
+The earlier constructed-type limitation is fixed. This .NET call now resolves
+under normal effect enforcement; awaiting `Read()` returns `42` with the pure
+row shown. The compiler retains the constructed `Task<int>` and awaiter types
+rather than rebuilding their identity from display strings.
 
-```calor expect=Calor0200,Calor0410,Calor0411
+```calor
 module ConfigureAwaitLimit
   using System.Threading.Tasks
   func Read async () → int
     !
     return await Task.FromResult(42).ConfigureAwait(false)
 ```
+
+The bool overload accepts both `false` and `true`. Configured non-generic
+`Task`, `ValueTask` and `ValueTask<T>` carriers are also supported. Receiver and
+argument effects still count, and a wrong argument cannot borrow this pure
+framework contract. This is not arbitrary custom-awaitable support or inference
+for an uninstantiated generic metadata definition.
 
 ## Lambda Expressions
 

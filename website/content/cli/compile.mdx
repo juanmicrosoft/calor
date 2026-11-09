@@ -16,6 +16,8 @@ calor --input <file.calr> --output <file.cs>
 ## Overview
 
 The default `calor` command (when no subcommand is specified) compiles Calor source files to C#. This is the core functionality of the Calor compiler.
+Use `calor -i file.calr`, not `calor compile file.calr`: there is no `compile`
+subcommand.
 
 > **Guard behavior since 0.15:** with `--verify`, a clean, non-vacuous,
 > assumption-free `proven` verdict drops its runtime guard by default. Pass
@@ -27,6 +29,17 @@ The default `calor` command (when no subcommand is specified) compiles Calor sou
 ---
 
 ## Quick Start
+
+Save this complete native program as `MyModule.calr`:
+
+```calor
+module CompileExample
+  func Increment public (int:value) → int
+    !
+    return value + 1
+```
+
+Calling the generated `GlobalModule.Increment(41)` returns `42`.
 
 ```bash
 # Compile a single file
@@ -86,20 +99,20 @@ This indicates "generated C#" and helps distinguish Calor-generated code from ex
 ## Error Reporting
 
 When compilation fails, each diagnostic is printed to stderr as
-`file(line,column): severity code: message`, and `calor` exits with code 1.
+`file:line:column code message`, and `calor` exits with code 1.
 This file uses a variable it never declared:
 
 ```calor expect=Calor0200
-§M{Calculator}
-  §F{Increment:pub} (i32:value) -> i32
-    §E{}
-    §R (+ x 1)
+module Calculator
+  func Increment public (int:value) → int
+    !
+    return x + 1
 ```
 
 `calor --input Calculator.calr` reports (the full path is shortened here):
 
 ```text output
-Calculator.calr(4,11): error Calor0200: Undefined variable 'x'
+Calculator.calr:4:12 Calor0200 Undefined variable 'x'
 ```
 
 For machine-readable diagnostics, use `--format json|sarif` or the

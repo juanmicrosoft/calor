@@ -131,6 +131,8 @@ public class DocDriftCheckerTests
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()" })]
     [InlineData("cli/init.mdx", 1, 0,
         new[] { "InitializedExample" }, new[] { "42" }, new[] { "GlobalModule.Answer()" })]
+    [InlineData("cli/compile.mdx", 2, 1,
+        new[] { "CompileExample" }, new[] { "42" }, new[] { "GlobalModule.Increment(41)" })]
     [InlineData("guides/dependent-types-tutorial.mdx", 4, 0,
         new[] { "ServerContracts", "BankingContracts", "MissingFundsContract", "DivisionContracts" },
         new[] { "10", "70", "70", "-2" },
@@ -154,16 +156,17 @@ public class DocDriftCheckerTests
     [InlineData("benchmarking/metrics/task-completion.mdx", 2, 0,
         new[] { "TaskSafeDivide", "TaskNormalizeScore" }, new[] { "3", "75" },
         new[] { "GlobalModule.SafeDivide(6, 2)", "GlobalModule.NormalizeScore(75, 100)" })]
-    [InlineData("structure-tags.mdx", 22, 4,
+    [InlineData("structure-tags.mdx", 22, 3,
         new[] { "StructureModules", "BlockNamespace", "FunctionHeaders", "AsyncFunctions", "AsyncMethods",
-            "AwaitExpressions", "LambdaExamples", "AsyncLambdas", "LocalCallables", "DelegateDefinitions",
+            "AwaitExpressions", "ConfigureAwaitLimit", "LambdaExamples", "AsyncLambdas", "LocalCallables", "DelegateDefinitions",
             "EnumDefinitions", "EnumExtensions", "EventDefinitions", "ParameterArrays", "ArrayDeclarations",
             "IndentedBlocks", "GenericDeclarations", "AttributeDeclarations" },
-        new[] { "42", "42", "10", "21:7:9", "42", "42", "24", "42", "3", "5", "True",
+        new[] { "42", "42", "10", "21:7:9", "42", "42", "42", "24", "42", "3", "5", "True",
             "#FF0000:True", "0", "7", "2:7", "15", "42", "7" },
         new[] { "Demo.DemoModule.Main()", "new Demo.Tools.Box().Read()", "GlobalModule.Main()",
             "GlobalModule.Read().GetAwaiter().GetResult() + \":\" + GlobalModule.ExplicitTask().GetAwaiter().GetResult() + \":\" + GlobalModule.ExplicitValueTask().GetAwaiter().GetResult()",
             "GlobalModule.Main().GetAwaiter().GetResult()", "GlobalModule.Main().GetAwaiter().GetResult()",
+            "GlobalModule.Read().GetAwaiter().GetResult()",
             "GlobalModule.Main()", "GlobalModule.Main().GetAwaiter().GetResult()", "GlobalModule.Use(2)",
             "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()",
             "new SubscriptionCounter().Count", "GlobalModule.Main()",
@@ -245,6 +248,11 @@ public class DocDriftCheckerTests
                     && typeof(GlobalModule).GetMethod("ExplicitTask")!.ReturnType == typeof(System.Threading.Tasks.Task<int>)
                     && typeof(GlobalModule).GetMethod("ExplicitValueTask")!.ReturnType == typeof(System.Threading.Tasks.ValueTask<int>)
                     && typeof(GlobalModule).GetMethod("Wait")!.ReturnType == typeof(System.Threading.Tasks.Task);
+                """, "True"),
+            ("ConfigureAwaitLimit", """
+                var method = typeof(GlobalModule).GetMethod("Read")!;
+                return method.ReturnType == typeof(System.Threading.Tasks.Task<int>)
+                    && method.IsDefined(typeof(System.Runtime.CompilerServices.AsyncStateMachineAttribute), false);
                 """, "True"),
             ("DelegateDefinitions", """
                 var calculator = typeof(Calculator).GetMethod("Invoke")!;
@@ -738,6 +746,50 @@ public class DocDriftCheckerTests
                     public static object? Run() => {{call}};
                 }
                 """));
+    }
+
+    [Fact]
+    public void PublicCompileGuide_UsesActualRootInvocationDiagnosticsAndNativeHelp()
+    {
+        const string path = "website/content/cli/compile.mdx";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)).Replace("\r\n", "\n");
+        var positive = Assert.Single(ExemplarCompileChecker.ExtractCompletePrograms(content)).Source;
+        var negative = System.Text.RegularExpressions.Regex.Match(content,
+            @"```calor expect=Calor0200\n(?<body>.*?)\n```",
+            System.Text.RegularExpressions.RegexOptions.Singleline);
+        Assert.True(negative.Success);
+        var directory = Path.Combine(Path.GetTempPath(), "calor-published-compile-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var input = Path.Combine(directory, "Calculator.calr");
+            var output = Path.Combine(directory, "Calculator.g.cs");
+            File.WriteAllText(input, negative.Groups["body"].Value + "\n");
+            var refused = CliTestHarness.RunCli(directory, "-i", input, "-o", output);
+            Assert.Equal(1, refused.ExitCode);
+            Assert.Contains("Calculator.calr:4:12 Calor0200 Undefined variable 'x'", refused.StdErr);
+            Assert.False(File.Exists(output));
+
+            input = Path.Combine(directory, "MyModule.calr");
+            output = Path.Combine(directory, "MyModule.g.cs");
+            File.WriteAllText(input, positive);
+            var accepted = CliTestHarness.RunCli(directory, "-i", input, "-o", output, "--format", "json");
+            Assert.True(accepted.ExitCode == 0, accepted.StdOut + accepted.StdErr);
+            using var diagnostics = JsonDocument.Parse(accepted.StdOut);
+            Assert.Empty(diagnostics.RootElement.GetProperty("diagnostics").EnumerateArray());
+            Assert.Equal("42", InteropScope.RefOutImplementationTests.Run(File.ReadAllText(output) + """
+
+                public static class Probe
+                {
+                    public static object? Run() => GlobalModule.Increment(41);
+                }
+                """));
+            var help = CliTestHarness.RunCli(directory, "--help");
+            Assert.Equal(0, help.ExitCode);
+            Assert.Contains("/// breaking", help.StdOut);
+            Assert.DoesNotContain("§BREAKING", help.StdOut);
+        }
+        finally { Directory.Delete(directory, recursive: true); }
     }
 
     [Theory]
