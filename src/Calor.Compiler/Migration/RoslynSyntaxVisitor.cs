@@ -9982,13 +9982,24 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return [new RawCSharpNode(GetTextSpan(node), node.ToString())];
         }
 
+        if (node.Declaration?.Type is RefTypeSyntax
+            || node.ChildNodes().Where(part => part != node.Statement)
+                .SelectMany(part => part.DescendantNodesAndSelf())
+                .Any(part => part is DeclarationExpressionSyntax or SingleVariableDesignationSyntax))
+        {
+            _context.RecordLoss(ConversionLossKind.InteropPreserved, "for",
+                "For-loop header variable storage preserved verbatim",
+                node.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+            return [new RawCSharpNode(GetTextSpan(node), node.ToFullString())];
+        }
+
         if (TryConvertCountedFor(node) is { } counted)
-            return [counted];
+            return [.. counted.Initializers, counted.Loop];
 
         return [ConvertReevaluatedFor(node)];
     }
 
-    private ForStatementNode? TryConvertCountedFor(ForStatementSyntax node)
+    private (ForStatementNode Loop, List<StatementNode> Initializers)? TryConvertCountedFor(ForStatementSyntax node)
     {
         if (_semanticModel == null
             || node.Declaration is not { Variables.Count: 1 } declaration
@@ -10002,7 +10013,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var incrementor = node.Incrementors[0];
         var (from, initialHoists) = ConvertLoopCondition(initializer.Value);
         var (test, conditionHoists) = ConvertLoopCondition(condition);
-        if (initialHoists.Count != 0 || conditionHoists.Count != 0)
+        if (conditionHoists.Count != 0)
             return null;
         var span = GetTextSpan(node);
         StatementNode? update = null;
@@ -10095,30 +10106,18 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var next = new BinaryOperationNode(GetTextSpan(incrementor), operation, variableReference, delta);
         return CreateLoop(new AssignmentStatementNode(GetTextSpan(incrementor), variableReference, next));
 
-        ForStatementNode CreateLoop(StatementNode update)
+        (ForStatementNode Loop, List<StatementNode> Initializers) CreateLoop(StatementNode update)
         {
             var bound = test is BinaryOperationNode comparison ? comparison.Right : from;
-            return new ForStatementNode(span, _context.GenerateId("for"), variable.Name, from, bound, null,
+            var loop = new ForStatementNode(span, _context.GenerateId("for"), variable.Name, from, bound, null,
                 ConvertEmbeddedStatement(node.Statement), new AttributeCollection(),
                 GetTextSpan(declarator.Identifier), test, update, variable.Type.ToDisplayString());
+            return (loop, initialHoists);
         }
     }
 
     private StatementNode ConvertReevaluatedFor(ForStatementSyntax node)
     {
-        // Header-declared aliases/out variables need a storage lifetime that this
-        // lowering does not represent. Preserve those unusual headers explicitly.
-        if (node.Declaration?.Type is RefTypeSyntax
-            || node.ChildNodes().Where(part => part != node.Statement)
-                .SelectMany(part => part.DescendantNodesAndSelf())
-                .Any(part => part is DeclarationExpressionSyntax or SingleVariableDesignationSyntax))
-        {
-            _context.RecordLoss(ConversionLossKind.InteropPreserved, "for",
-                "For-loop header variable storage preserved verbatim",
-                node.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-            return new RawCSharpNode(GetTextSpan(node), node.ToFullString());
-        }
-
         var span = GetTextSpan(node);
         var savedPending = new List<StatementNode>(_pendingStatements);
         _pendingStatements.Clear();
@@ -10203,6 +10202,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         if (!RequiresExactForHeaderEvaluation(expression))
             return ConvertExpression(expression);
+
+        var containsUpdate = expression.DescendantNodesAndSelf().Any(part =>
+            part is AssignmentExpressionSyntax
+            || part.IsKind(SyntaxKind.PreIncrementExpression) || part.IsKind(SyntaxKind.PreDecrementExpression)
+            || part.IsKind(SyntaxKind.PostIncrementExpression) || part.IsKind(SyntaxKind.PostDecrementExpression));
+        if (!containsUpdate)
+        {
+            var (converted, hoisted) = ConvertLoopCondition(expression);
+            if (hoisted.Count == 0 && !EmitterMayHoist(converted))
+                return converted;
+        }
 
         _context.RecordLoss(ConversionLossKind.InteropPreserved, "for",
             "For-header expression preserved inline to retain evaluation order and conditional execution",
@@ -12788,6 +12798,18 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     }
                 }
             } => local.UsingKeyword.IsKind(SyntaxKind.None) && !local.IsConst && IsStatementListPosition(local),
+            EqualsValueClauseSyntax
+            {
+                Parent: VariableDeclaratorSyntax
+                {
+                    Parent: VariableDeclarationSyntax
+                    {
+                        Variables.Count: 1,
+                        Type: not RefTypeSyntax,
+                        Parent: ForStatementSyntax
+                    }
+                }
+            } => true,
             _ => false,
         };
         if (!siteOk)

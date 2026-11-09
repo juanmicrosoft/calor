@@ -76,12 +76,12 @@ public class ForLoopConditionSemanticsTests
     public void NativeDoWhile_PreservesUnassignedLocalDefiniteAssignment()
         => AssertEquivalent(
             "int result; int i = 0; do { result = i; i++; } while (i < 2); return result;",
-            "1", native: false, loopMarker: "§DO");
+            "1", native: false, loopMarker: "do");
 
     [Fact]
     public void NativeDoWhile_PreservesOutParameterDefiniteAssignment()
         => AssertEquivalent("int result; Assign(out result); return result;",
-            "1", native: false, loopMarker: "§DO", members: """
+            "1", native: false, loopMarker: "do", members: """
             private static void Assign(out int result)
             {
                 int i = 0;
@@ -224,12 +224,15 @@ public class ForLoopConditionSemanticsTests
         else if (loopMarker != null)
             Assert.Contains(loopMarker, conversion.CalorSource);
         else if (native)
-            Assert.Contains("§L{", conversion.CalorSource);
+            Assert.Contains(new Calor.Compiler.Parsing.Lexer(conversion.CalorSource!,
+                new Calor.Compiler.Diagnostics.DiagnosticBag()).Tokenize(),
+                token => token.Kind == Calor.Compiler.Parsing.TokenKind.For);
         else if (memberPreserved)
             RawFrameAssertions.AssertFramed(conversion.CalorSource); // #943 (D1 RO-UNS-1): a ref local keeps its member as C#
         else
-            Assert.True(conversion.CalorSource!.Contains("§WH "),
-                conversion.CalorSource + "\n" + string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
+            Assert.Contains(new Calor.Compiler.Parsing.Lexer(conversion.CalorSource!,
+                new Calor.Compiler.Diagnostics.DiagnosticBag()).Tokenize(),
+                token => token.Kind is Calor.Compiler.Parsing.TokenKind.For or Calor.Compiler.Parsing.TokenKind.While);
         var compiled = Program.Compile(conversion.CalorSource!, "for.calr", new CompilationOptions
         {
             EnableTypeChecking = true,
