@@ -5813,7 +5813,7 @@ public sealed class Parser
             if (type == "bool")
                 return new BoolLiteralNode(span, false);
             if (type is "string" or "object")
-                return new ReferenceNode(span, "null");
+                return new TypeOperationNode(span, TypeOp.Cast, new ReferenceNode(span, "null"), type, typeSpan);
             if (type is "sbyte" or "byte" or "short" or "ushort" or "int" or "uint"
                 or "long" or "ulong" or "nint" or "nuint" or "char" or "float" or "double" or "decimal")
                 return new TypeOperationNode(span, TypeOp.Cast, new IntLiteralNode(span, 0), type, typeSpan);

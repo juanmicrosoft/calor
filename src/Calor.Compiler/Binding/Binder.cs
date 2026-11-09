@@ -4067,6 +4067,8 @@ public sealed class Binder
         var operand = BindExpression(typeOp.Operand);
         var annotation = typeOp.Operation switch
         {
+            TypeOp.Cast when operand is BoundNullLiteral =>
+                BoundTypes.NullableAnnotation.Annotated,
             TypeOp.As when IsScalarStringTypeName(typeOp.TargetType) =>
                 BoundTypes.NullableAnnotation.Annotated,
             TypeOp.Cast when IsScalarStringTypeName(typeOp.TargetType)

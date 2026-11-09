@@ -185,6 +185,89 @@ public sealed class NativeMetadataClosureTests
     }
 
     [Fact]
+    public void NativeReferenceDefaults_RetainSourceAndMetadataOverloadIdentityAfterReemission()
+    {
+        const string authored = """
+            module Defaults
+              func Pick (object:value) → int
+                return 1
+              func Pick (string?:value) → int
+                return 2
+              func ObjectChoice () → int
+                return Pick(default(object))
+              func StringChoice () → int
+                return Pick(default(string))
+              func ObjectText () → string?
+                return System.Convert.ToString(default(object))
+              func StringText () → string?
+                return System.Convert.ToString(default(string))
+            """;
+        var module = Parse(authored);
+        string ReemitDefault(string functionName)
+        {
+            var statement = Assert.IsType<ReturnStatementNode>(
+                module.Functions.Single(function => function.Name == functionName).Body[0]);
+            return Assert.IsType<CallExpressionNode>(statement.Expression).Arguments[0].Accept(new CalorEmitter());
+        }
+        var objectDefault = ReemitDefault("ObjectChoice");
+        var stringDefault = ReemitDefault("StringChoice");
+        var reemitted = authored.Replace("default(object)", objectDefault, StringComparison.Ordinal)
+            .Replace("default(string)", stringDefault, StringComparison.Ordinal);
+        foreach (var source in new[] { authored, reemitted })
+        {
+            var result = Compile(source);
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+            var methods = CompileAssembly(result.GeneratedCode).GetTypes()
+                .SelectMany(type => type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                .ToArray();
+            Assert.Equal(1, methods.Single(method => method.Name == "ObjectChoice").Invoke(null, null));
+            Assert.Equal(2, methods.Single(method => method.Name == "StringChoice").Invoke(null, null));
+            Assert.Equal("", methods.Single(method => method.Name == "ObjectText").Invoke(null, null));
+            Assert.Null(methods.Single(method => method.Name == "StringText").Invoke(null, null));
+
+            var bound = new Binder(new DiagnosticBag()).Bind(Parse(source));
+            foreach (var (name, selectedIndex) in new[] { ("ObjectChoice", 0), ("StringChoice", 1) })
+            {
+                var function = bound.Functions.Single(function => function.Symbol.Name == name);
+                var call = Assert.IsType<BoundCallExpression>(
+                    Assert.IsType<BoundReturnStatement>(function.Body[0]).Expression);
+                Assert.Equal(bound.Functions[selectedIndex].Symbol.Id, call.ResolvedSymbol!.Id);
+            }
+            foreach (var (name, expectedType) in new[]
+            {
+                ("ObjectText", SpecialType.System_Object), ("StringText", SpecialType.System_String)
+            })
+            {
+                var function = bound.Functions.Single(function => function.Symbol.Name == name);
+                var call = Assert.IsType<BoundCallExpression>(
+                    Assert.IsType<BoundReturnStatement>(function.Body[0]).Expression);
+                Assert.Equal("System.Convert", call.ResolvedMetadataMethod!.ContainingType.ToDisplayString());
+                Assert.Equal(expectedType, Assert.Single(call.ResolvedMetadataMethod.Parameters).Type.SpecialType);
+                Assert.Equal(Calor.Compiler.Binding.BoundTypes.NullableAnnotation.Annotated,
+                    Assert.IsType<Calor.Compiler.Binding.BoundTypes.NominalBoundType>(call.Arguments[0].Type).NullableAnnotation);
+            }
+        }
+    }
+
+    [Fact]
+    public void NativeStringDefault_DoesNotAcquireANonNullGuaranteeFromItsCast()
+    {
+        var binding = Compile("""
+            module DefaultNull
+              func Run () → string
+                let string:value = default(string)
+                return value
+            """);
+        Assert.Contains(binding.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NullableToNonNullableBinding);
+        var returning = Compile("""
+            module DefaultNull
+              func Run () → string
+                return default(string)
+            """);
+        Assert.Contains(returning.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NullableReturnFromNonNullable);
+    }
+
+    [Fact]
     public void NativeInventory_ByReferenceCallsRetainMetadataThroughTheProjectDriver()
     {
         const string source = """
