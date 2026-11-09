@@ -1,12 +1,12 @@
 class Logger
-  #if DEBUG
+  pp if DEBUG
     func Log (string:m) → void
       ! cw
       Console.WriteLine(m)
-  #elif TRACE
+  pp elif TRACE
     func Log (string:m) → void
       ! cw
       Trace.WriteLine(m)
-  #else
+  pp else
     func Log (string:m) → void
       return
