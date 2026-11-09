@@ -491,8 +491,13 @@ internal sealed record RawCSharpFrame(
 
     internal static string RewriteOutsideFrames(string source, Func<string, string> rewrite)
     {
-        var frames = ReadTokens(source).Where(t => t.Value is RawCSharpFrame).ToList();
-        if (frames.Count == 0)
+        return RewriteOutsideTokens(source,
+            ReadTokens(source).Where(t => t.Value is RawCSharpFrame).ToList(), rewrite);
+    }
+
+    internal static string RewriteOutsideTokens(string source, IReadOnlyList<Token> tokens, Func<string, string> rewrite)
+    {
+        if (tokens.Count == 0)
             return rewrite(source);
         var prefix = "__CALOR_OPAQUE_FRAME_";
         while (source.Contains(prefix, StringComparison.Ordinal))
@@ -500,7 +505,7 @@ internal sealed record RawCSharpFrame(
         var masked = new System.Text.StringBuilder();
         var replacements = new List<(string Marker, string Text, bool EndsLine)>();
         var cursor = 0;
-        foreach (var token in frames)
+        foreach (var token in tokens)
         {
             var marker = prefix + replacements.Count + "__";
             var endsLine = token.Text[^1] is '\r' or '\n';

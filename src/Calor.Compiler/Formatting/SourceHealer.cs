@@ -1,5 +1,4 @@
 using System.Text;
-using Calor.Compiler.Migration;
 
 namespace Calor.Compiler.Formatting;
 
@@ -10,23 +9,19 @@ namespace Calor.Compiler.Formatting;
 /// healer works on raw text, so it can repair exactly the class of files the
 /// AST formatter cannot touch:
 ///
-///   1. Forbidden structural closers (<c>§/F</c>, <c>§/M</c>, …, Calor0830)
-///      are stripped via <see cref="CloserHealMigrator"/>; a line left
-///      whitespace-only by the strip is deleted.
+///   1. Retired source grammar is preserved so the compiler still diagnoses it.
 ///   2. Indentation is re-derived from the file's own relative nesting and
 ///      normalized to 2 spaces per level: tabs are expanded, 3-/4-space
 ///      levels collapse to 2, and misaligned dedents snap to the nearest
 ///      enclosing level.
-///   3. Chain clauses (<c>§EI</c>/<c>§EL</c> for <c>§IF</c>, <c>§CA</c>/
-///      <c>§FI</c> for <c>§TR</c>) are re-aligned to the column of the
+///   3. Chain clauses (<c>else</c> for <c>if</c>, <c>catch</c>/
+///      <c>finally</c> for <c>try</c>) are re-aligned to the column of the
 ///      opener they belong to, even when the author put them at body level
 ///      or dedented them too far.
 ///   4. Trailing whitespace is stripped and line endings normalize to LF.
 ///
-/// Verbatim regions are preserved untouched: <c>§RAW…§/RAW</c> and
-/// <c>§CSHARP…§/CSHARP</c> blocks, plus any line that starts inside an
-/// unclosed bracket/brace (multi-line expressions, <c>§CS{…}</c>).
-/// Length-prefixed raw frames are shielded before line-based healing.
+/// Strings and length-prefixed raw frames are shielded before line-based
+/// healing. Bracket-continuation lines also retain their written indentation.
 ///
 /// The transform is idempotent: healed output re-heals to itself, because
 /// every emitted indent is exactly the canonical column its own structure
@@ -46,7 +41,7 @@ namespace Calor.Compiler.Formatting;
 /// counts brackets textually (skipping strings/char literals/<c>//</c>
 /// comments) instead of tracking token-level depth, and continuations are
 /// capped (<see cref="MaxBracketContinuationLines"/> lines, ended by any
-/// §-tag line) whereas the lexer's are unbounded;
+/// canonical structural-word line) whereas the lexer's are unbounded;
 /// (2) block structure is inferred empirically (a line followed by a deeper
 /// line opens a block) instead of from tag semantics.
 /// Tab measurement is deliberately kept ALIGNED at 2 columns per tab, the
@@ -60,18 +55,18 @@ public sealed class SourceHealer
     /// <summary>Chain-clause tags and the opener tag each aligns with.</summary>
     private static readonly Dictionary<string, string> ChainClauseOpeners = new(StringComparer.Ordinal)
     {
-        ["EI"] = "IF",
-        ["EL"] = "IF",
-        ["CA"] = "TR",
-        ["FI"] = "TR",
+        ["else"] = "if",
+        ["catch"] = "try",
+        ["finally"] = "try",
+        ["while"] = "do",
     };
 
     private readonly List<HealAmbiguity> _ambiguities = new();
 
     /// <summary>
     /// Control-flow guesses made by the most recent <see cref="Heal"/> call.
-    /// Healing is NOT semantics-preserving: when a chain clause (<c>§EI</c>/
-    /// <c>§EL</c>/<c>§CA</c>/<c>§FI</c>) was written deeper than its opener,
+    /// Healing is NOT semantics-preserving: when a chain clause (<c>else</c>/
+    /// <c>catch</c>/<c>finally</c>) was written deeper than its opener,
     /// any following statement written at the clause's own column is
     /// ambiguous — it could belong to the clause body or be a sibling after
     /// the chain. The healer keeps it inside the clause body and records the
@@ -84,8 +79,10 @@ public sealed class SourceHealer
     {
         var shifts = new List<(int MaskedLine, int RemovedBreaks)>();
         var removed = 0;
-        foreach (var token in Parsing.RawCSharpFrame.ReadTokens(source)
-            .Where(t => t.Value is Parsing.RawCSharpFrame))
+        var protectedTokens = Parsing.RawCSharpFrame.ReadTokens(source)
+            .Where(t => t.Value is Parsing.RawCSharpFrame
+                || t.Kind == Parsing.TokenKind.StrLiteral).ToList();
+        foreach (var token in protectedTokens)
         {
             var breaks = token.Text.Replace("\r\n", "\n", StringComparison.Ordinal)
                 .Count(c => c is '\r' or '\n');
@@ -93,7 +90,7 @@ public sealed class SourceHealer
             shifts.Add((token.Span.Line - removed, delta));
             removed += delta;
         }
-        return Parsing.RawCSharpFrame.RewriteOutsideFrames(source, masked =>
+        return Parsing.RawCSharpFrame.RewriteOutsideTokens(source, protectedTokens, masked =>
             HealUnprotected(masked, line => line
                 + shifts.Where(shift => line > shift.MaskedLine).Sum(shift => shift.RemovedBreaks)));
     }
@@ -108,26 +105,12 @@ public sealed class SourceHealer
 
         bool endsWithNewline = source.EndsWith('\n');
 
-        // Step 1 — strip forbidden structural closers at the source level.
-        var (stripped, removals) = new CloserHealMigrator().Process(source, "heal");
-
-        // The migrator removes closer text but keeps the line; delete lines
-        // that were non-blank before the strip and whitespace-only after it.
-        // Original 1-based line numbers ride along so ambiguity reports
-        // reference the file as the author wrote it.
-        var originalLines = SplitLines(source);
-        var strippedLines = SplitLines(stripped);
-        bool canDropEmptied = removals.Count > 0 && originalLines.Length == strippedLines.Length;
-        var lines = new List<(string Text, int OriginalLine)>(strippedLines.Length);
-        for (int i = 0; i < strippedLines.Length; i++)
+        // Native healing repairs layout, not retired grammar. Legacy closers remain errors.
+        var sourceLines = SplitLines(source);
+        var lines = new List<(string Text, int OriginalLine)>(sourceLines.Length);
+        for (int i = 0; i < sourceLines.Length; i++)
         {
-            if (canDropEmptied
-                && string.IsNullOrWhiteSpace(strippedLines[i])
-                && !string.IsNullOrWhiteSpace(originalLines[i]))
-            {
-                continue; // line emptied by the closer strip
-            }
-            lines.Add((strippedLines[i], originalLine(i + 1)));
+            lines.Add((sourceLines[i], originalLine(i + 1)));
         }
 
         // Step 2 — classify lines (verbatim regions, bracket continuations)
@@ -181,8 +164,6 @@ public sealed class SourceHealer
     private static LineInfo[] ClassifyLines(List<(string Text, int OriginalLine)> lines)
     {
         var infos = new LineInfo[lines.Count];
-        bool inRawBlock = false;
-        string rawEndMarker = "";
         int bracketDepth = 0;
         int continuationRun = 0;
 
@@ -192,23 +173,13 @@ public sealed class SourceHealer
             var info = new LineInfo { Original = line, OriginalLine = lines[i].OriginalLine };
             infos[i] = info;
 
-            if (inRawBlock)
-            {
-                info.Verbatim = true;
-                if (line.Contains(rawEndMarker, StringComparison.Ordinal))
-                {
-                    inRawBlock = false;
-                }
-                continue;
-            }
-
             if (bracketDepth > 0)
             {
                 // A continuation may not cross a line that starts a §-tag,
                 // and may not exceed MaxBracketContinuationLines: past either
                 // bound the open bracket is assumed to be an authoring typo
                 // (never closed), and the line is treated as structural again.
-                bool startsStructuralTag = line.TrimStart(' ', '\t').StartsWith('§');
+                bool startsStructuralTag = LeadingTag(line.TrimStart(' ', '\t')) != null;
                 if (!startsStructuralTag && continuationRun < MaxBracketContinuationLines)
                 {
                     // Continuation of a multi-line bracketed expression: the
@@ -250,18 +221,6 @@ public sealed class SourceHealer
 
             bracketDepth = Math.Max(0, bracketDepth + BracketDelta(trimmedEnd));
 
-            // Verbatim block openers: content until the end marker must not
-            // be touched. (A same-line end marker needs no mode change.)
-            if (ContainsMarker(info.Content, "§RAW") && !info.Content.Contains("§/RAW", StringComparison.Ordinal))
-            {
-                inRawBlock = true;
-                rawEndMarker = "§/RAW";
-            }
-            else if (ContainsMarker(info.Content, "§CSHARP") && !info.Content.Contains("§/CSHARP", StringComparison.Ordinal))
-            {
-                inRawBlock = true;
-                rawEndMarker = "§/CSHARP";
-            }
         }
 
         // Opener detection input: raw indent of the next structural line.
@@ -329,6 +288,7 @@ public sealed class SourceHealer
             int level;
 
             if (info.Tag != null && ChainClauseOpeners.TryGetValue(info.Tag, out var openerTag)
+                && (info.Tag != "while" || info.NextStructuralIndent <= r)
                 && TryFindChainOpener(stack, openerTag, r, out int openerIndex))
             {
                 // Chain clause: align with its opener's column, popping any
@@ -369,7 +329,7 @@ public sealed class SourceHealer
                 if (stack.Count > 0 && stack[^1].ClauseRaw == r)
                 {
                     ambiguities.Add(new HealAmbiguity(info.OriginalLine,
-                        $"statement is at the same column as the §{stack[^1].ClauseTag} on line " +
+                        $"statement is at the same column as the '{stack[^1].ClauseTag}' on line " +
                         $"{stack[^1].ClauseLine}; heal kept it inside that clause's body, but it may have " +
                         "been intended as a statement after the chain — review the healed control flow"));
                 }
@@ -417,37 +377,16 @@ public sealed class SourceHealer
         return index >= 0;
     }
 
-    /// <summary>Extracts the leading §-tag letters of a line ("IF", "EI", "/C", …), or null.</summary>
+    /// <summary>Extracts a canonical structural word without treating strings or prose as headers.</summary>
     private static string? LeadingTag(string content)
     {
-        if (content.Length < 2 || content[0] != '§')
-        {
+        int i = 0;
+        while (i < content.Length && char.IsAsciiLetterLower(content[i]))
+            i++;
+        if (i == 0 || i < content.Length && (char.IsLetterOrDigit(content[i]) || content[i] == '_'))
             return null;
-        }
-        int i = 1;
-        if (i < content.Length && content[i] == '/')
-        {
-            i++;
-        }
-        int start = 1;
-        while (i < content.Length && (char.IsAsciiLetterUpper(content[i]) || char.IsAsciiDigit(content[i])))
-        {
-            i++;
-        }
-        return i > start ? content[start..i] : null;
-    }
-
-    /// <summary>True when the line begins with the given marker followed by a non-tag character.</summary>
-    private static bool ContainsMarker(string content, string marker)
-    {
-        int idx = content.IndexOf(marker, StringComparison.Ordinal);
-        if (idx < 0)
-        {
-            return false;
-        }
-        int after = idx + marker.Length;
-        return after >= content.Length
-            || !(char.IsAsciiLetterUpper(content[after]) || char.IsAsciiDigit(content[after]));
+        var word = content[..i];
+        return Parsing.Lexer.KeywordNames.Contains(word, StringComparer.Ordinal) ? word : null;
     }
 
     /// <summary>

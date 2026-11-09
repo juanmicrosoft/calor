@@ -16,6 +16,63 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class WritePathRobustnessTests
 {
+    [Fact]
+    public void CanonicalHealing_AlignsWordClausesAndReportsAmbiguity()
+    {
+        const string source = "module M\n    func F () → int\n        if true\n            return 1\n            else\n            return 2";
+        var healer = new SourceHealer();
+        var healed = healer.Heal(source);
+        Assert.Equal("module M\n  func F () → int\n    if true\n      return 1\n    else\n      return 2", healed);
+        Assert.Contains(healer.Ambiguities, ambiguity => ambiguity.Line == 6);
+        Assert.Equal(healed, healer.Heal(healed));
+        Assert.Empty(healer.Ambiguities);
+    }
+
+    [Fact]
+    public void CanonicalHealing_DoesNotEraseLegacyCloserErrors()
+    {
+        const string source = "module M\n  func F () → int\n    return 1\n§/M";
+        var healed = new SourceHealer().Heal(source);
+        Assert.Contains("§/M", healed);
+        var diagnostics = new DiagnosticBag();
+        new Lexer(healed, diagnostics).TokenizeAll();
+        Assert.Equal(DiagnosticCode.UnknownSectionMarker, Assert.Single(diagnostics.Errors).Code);
+    }
+
+    [Fact]
+    public void CanonicalHealing_PreservesRawUtf8BytesAndEscapedStringText()
+    {
+        const string payload = "§/M\r\nif (true) { /* 😀 */ }\r\n/// else";
+        var source = $"module M\n    raw member {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n    func F () → string\n        return \"§/M \\${{0}}\"";
+        var healed = new SourceHealer().Heal(source);
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(healed, diagnostics).TokenizeAll();
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(payload, Assert.IsType<RawCSharpFrame>(tokens.Single(token => token.Value is RawCSharpFrame).Value).Code);
+        Assert.Contains("return \"§/M \\${0}\"", healed);
+        Assert.Equal(healed, new SourceHealer().Heal(healed));
+    }
+
+    [Fact]
+    public void CanonicalHealing_MultilineStringsRemainByteExact()
+    {
+        const string literal = "\"\"\"first\r\n       else\r\n§/M ${n}\r\nlast\"\"\"";
+        var source = "module M\n    func F (int:n) → string\n        return " + literal;
+        var healed = new SourceHealer().Heal(source);
+        Assert.Equal("module M\n  func F (int:n) → string\n    return " + literal, healed);
+        Assert.Equal(healed, new SourceHealer().Heal(healed));
+    }
+
+    [Fact]
+    public void CanonicalHealing_DoTailAlignsWithoutCapturingNestedWhileLoops()
+    {
+        const string source = "module M\n    func F () → void\n        do\n            while true\n                break\n            while false\n        return";
+        const string expected = "module M\n  func F () → void\n    do\n      while true\n        break\n    while false\n    return";
+        var healer = new SourceHealer();
+        Assert.Equal(expected, healer.Heal(source));
+        Assert.Equal(expected, healer.Heal(expected));
+    }
+
     private const string CanonicalFizzBuzz = """
         §M{FizzBuzz}
           §F{Main:pub} () -> void
