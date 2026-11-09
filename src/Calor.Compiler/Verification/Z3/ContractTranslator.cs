@@ -225,7 +225,7 @@ public sealed class ContractTranslator
         {
             case ReferenceNode reference when reference.Name.LastIndexOf('.') is var dot && dot > 0:
                 return NormalizeBclProperty(expression,
-                    new ReferenceNode(reference.Span, reference.Name[..dot]),
+                    new ReferenceNode(reference.Span, reference.Name[..dot], reference.IsVerbatim),
                     reference.Name[(dot + 1)..], variables) ?? expression;
             case FieldAccessNode field:
                 return NormalizeBclProperty(expression, field.Target, field.FieldName, variables)
@@ -321,7 +321,7 @@ public sealed class ContractTranslator
         var dot = call.Target.LastIndexOf('.');
         if (dot <= 0)
             return null;
-        var receiver = new ReferenceNode(call.Span, call.Target[..dot]);
+        var receiver = new ReferenceNode(call.Span, call.Target[..dot], isVerbatim: true);
         var bound = BindBclReceiver(receiver, variables);
         if (bound?.Type is not NominalBoundType
             { RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String })
@@ -752,6 +752,11 @@ public sealed class ContractTranslator
 
     private Expr? TranslateReference(ReferenceNode node)
     {
+        if (node.IsNullLiteral)
+        {
+            LastRefusalReason = "Null literals are not modeled by the contract translator.";
+            return null;
+        }
         if (_variables.TryGetValue(node.Name, out var variable))
             return variable.Expr;
 
@@ -1389,7 +1394,7 @@ public sealed class ContractTranslator
     {
         // For array access like arr{i}, we need to model it as an array select
         // First, get or create an array variable for the base array
-        if (node.Array is ReferenceNode arrayRef)
+        if (node.Array is ReferenceNode { IsNullLiteral: false } arrayRef)
         {
             var index = Translate(node.Index);
             if (index == null || index is not BitVecExpr indexBv)
@@ -2360,7 +2365,7 @@ public sealed class ContractTranslator
         // For now we look this up via the variable registry when the target is a plain reference.
         string? receiverType = node.Target switch
         {
-            ReferenceNode r when _variables.TryGetValue(r.Name, out var v) => v.Type,
+            ReferenceNode { IsNullLiteral: false } r when _variables.TryGetValue(r.Name, out var v) => v.Type,
             _ => null,
         };
         if (receiverType is null)
@@ -2442,7 +2447,7 @@ public sealed class ContractTranslator
     /// </summary>
     private Expr? TranslateArrayLength(ArrayLengthNode node)
     {
-        if (node.Array is ReferenceNode arrayRef)
+        if (node.Array is ReferenceNode { IsNullLiteral: false } arrayRef)
         {
             var lengthVarName = $"{arrayRef.Name}$length";
 
@@ -2779,7 +2784,7 @@ public sealed class ContractTranslator
 
     private string? DiagnoseArrayAccess(ArrayAccessNode node)
     {
-        if (node.Array is ReferenceNode baseRef
+        if (node.Array is ReferenceNode { IsNullLiteral: false } baseRef
             && _variables.TryGetValue(baseRef.Name, out var baseVar)
             && !baseVar.Type.Contains('[')
             && !baseVar.Type.StartsWith("array<", StringComparison.Ordinal))

@@ -623,7 +623,7 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
                 RecordPositionalProperties.Select(property => (StatementNode)new AssignmentStatementNode(
                     property.Span,
                     new FieldAccessNode(property.Span, new ThisExpressionNode(property.Span), property.Name),
-                    new ReferenceNode(property.Span, property.Name))).ToArray(),
+                    new ReferenceNode(property.Span, property.Name, isVerbatim: true))).ToArray(),
                 new AttributeCollection());
             Constructors = constructors.Append(RecordPrimaryConstructor).ToArray();
         }
@@ -634,7 +634,7 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
             RecordCopyConstructor = new ConstructorNode(copySpan, $"{id}:copy",
                 isSealed ? Visibility.Private : Visibility.Protected, [original], [],
                 baseClass == null ? null : new ConstructorInitializerNode(copySpan, true,
-                    [new ReferenceNode(copySpan, original.Name)]),
+                    [new ReferenceNode(copySpan, original.Name, isVerbatim: true)]),
                 [], new AttributeCollection());
             Constructors = Constructors.Append(RecordCopyConstructor).ToArray();
         }

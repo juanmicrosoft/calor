@@ -2661,9 +2661,7 @@ public sealed class TypeChecker
             ReferenceNode { Name.Length: >= 3 } reference
                 when TryParseCharacterCase(reference.Name, out var character)
                 => $"char:{(int)character}",
-            ReferenceNode { Name: "null" } => "null",
-            ReferenceNode { Name: "true" } => "bool:True",
-            ReferenceNode { Name: "false" } => "bool:False",
+            ReferenceNode { IsNullLiteral: true } => "null",
             ReferenceNode reference => $"reference:{reference.Name}",
             _ => null
         };
@@ -4678,6 +4676,9 @@ public sealed class TypeChecker
 
     private CalorType InferReferenceType(ReferenceNode refNode)
     {
+        if (refNode.IsNullLiteral)
+            return NullType.Instance;
+
         // `this.x` inside a class member is the member's declared type (#1676).
         if (TryGetThisMemberName(refNode.Name, out var thisMember) && LookupThisMember(thisMember) is { } memberType)
             return memberType;
@@ -4707,12 +4708,7 @@ public sealed class TypeChecker
         // C# expression keywords that reach the checker as bare references. `default` is the one
         // observed (generic code emits `default`); the others are listed because they arrive by
         // the same route and reporting any of them as an undefined VARIABLE is simply wrong.
-        if (refNode.Name == "null")
-        {
-            return NullType.Instance;
-        }
-
-        if (refNode.Name is "default" or "this" or "base" or "value")
+        if (!refNode.IsVerbatim && refNode.Name is ("default" or "this" or "base" or "value"))
         {
             return ErrorType.Instance;
         }

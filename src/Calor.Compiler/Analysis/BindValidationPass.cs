@@ -1505,7 +1505,7 @@ public sealed class BindValidationPass
 
     private void CheckStrictInitializer(BindStatementNode bind, ExpressionNode init)
     {
-        if (init is ReferenceNode refNode && refNode.Name == "null")
+        if (init is ReferenceNode { IsNullLiteral: true })
         {
             var msg = $"Binding '{bind.Name}' is initialised to 'null' with no declared type. " +
                 "Inference cannot pick a concrete type. " +

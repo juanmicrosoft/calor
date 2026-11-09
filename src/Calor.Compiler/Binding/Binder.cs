@@ -4071,7 +4071,7 @@ public sealed class Binder
         if (condition is BinaryOperationNode { Operator: BinaryOperator.NotEqual } comparison
             && boundCondition is BoundBinaryExpression boundComparison)
         {
-            if (comparison.Left is ReferenceNode { Name: "null" }
+            if (comparison.Left is ReferenceNode { IsNullLiteral: true }
                 && comparison.Right is ReferenceNode right
                 && boundComparison.Right is BoundVariableExpression rightVariable)
             {
@@ -4079,7 +4079,7 @@ public sealed class Binder
                     return;
                 DeclareNarrowedNonNullVariable(right, rightVariable.Variable);
             }
-            else if (comparison.Right is ReferenceNode { Name: "null" }
+            else if (comparison.Right is ReferenceNode { IsNullLiteral: true }
                      && comparison.Left is ReferenceNode left
                      && boundComparison.Left is BoundVariableExpression leftVariable)
             {
@@ -4468,7 +4468,7 @@ public sealed class Binder
 
     private BoundExpression BindCollectionContains(CollectionContainsNode contains)
     {
-        var collection = BindReferenceExpression(new ReferenceNode(contains.Span, contains.CollectionName));
+        var collection = BindReferenceExpression(new ReferenceNode(contains.Span, contains.CollectionName, isVerbatim: true));
         var value = BindExpression(contains.KeyOrValue);
         return new BoundCollectionContains(
             contains.Span,
@@ -4582,8 +4582,8 @@ public sealed class Binder
         var rightValueType = Parsing.AttributeHelper.TryUnwrapNullableAnnotation(right.Type.DisplayString, out var rightReferent)
             ? NormalizeTypeName(rightReferent) : right.Type.DisplayString;
         var resultName = ExpressionResultTypes.IsNever(left.Type) ? "NEVER"
-            : coalesce.Left is ReferenceNode { Name: "null" } ? right.Type.DisplayString
-            : coalesce.Right is ReferenceNode { Name: "null" } ? leftValueType
+            : coalesce.Left is ReferenceNode { IsNullLiteral: true } ? right.Type.DisplayString
+            : coalesce.Right is ReferenceNode { IsNullLiteral: true } ? leftValueType
             : GetCommonType(leftValueType, rightValueType);
         var shape = NullabilityResultTypes.Coalesce(left, right);
         return new BoundStructuralExpression(
@@ -5289,7 +5289,7 @@ public sealed class Binder
 
     private BoundExpression BindReferenceExpression(ReferenceNode refNode)
     {
-        if (refNode.Name == "null")
+        if (refNode.IsNullLiteral)
             return new BoundNullLiteral(refNode.Span);
 
         var symbols = _scope.LookupAll(refNode.Name);
@@ -5311,7 +5311,7 @@ public sealed class Binder
                 var receiverName = refNode.Name[..lastDot];
                 var receiverSpan = new Parsing.TextSpan(
                     refNode.Span.Start, lastDot, refNode.Span.Line, refNode.Span.Column);
-                var receiverNode = new ReferenceNode(receiverSpan, receiverName);
+                var receiverNode = new ReferenceNode(receiverSpan, receiverName, refNode.IsVerbatim);
                 BoundExpression? receiver = TryBindMetadataTypeReceiver(receiverNode);
                 if (receiver is null && _scope.Lookup(receiverName) is VariableSymbol)
                     receiver = BindReferenceExpression(receiverNode);

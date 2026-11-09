@@ -848,10 +848,12 @@ public sealed class ContractInheritanceChecker : IDisposable
     {
         if (expression is ReferenceNode reference)
         {
+            if (reference.IsNullLiteral)
+                return reference;
             var rewritten = RewriteValueReference(reference.Name, replacements, typeReplacements);
             return rewritten.Equals(reference.Name, StringComparison.Ordinal)
                 ? reference
-                : new ReferenceNode(reference.Span, rewritten);
+                : new ReferenceNode(reference.Span, rewritten, isVerbatim: true);
         }
         if (expression is BinaryOperationNode binary)
         {

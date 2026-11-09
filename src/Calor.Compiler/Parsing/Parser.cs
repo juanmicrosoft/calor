@@ -6218,7 +6218,7 @@ public sealed class Parser
                     else if (Check(TokenKind.Dot)) { sb.Append('.'); Advance(); }
                     else break;
                 }
-                expr = new ReferenceNode(refNode.Span, sb.ToString());
+                expr = new ReferenceNode(refNode.Span, sb.ToString(), refNode.IsVerbatim);
             }
             return new ConstantPatternNode(expr.Span, expr);
         }

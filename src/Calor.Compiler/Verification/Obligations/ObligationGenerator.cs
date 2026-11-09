@@ -379,7 +379,7 @@ public sealed class ObligationGenerator
             var condition = FactCollector.SubstituteSelfRefStatic(
                 GetEffectiveRefinementPredicate(refinementType),
                 bind.Initializer
-                    ?? new ReferenceNode(bind.Span, bind.Name));
+                    ?? new ReferenceNode(bind.Span, bind.Name, isVerbatim: true));
             var obligation = _tracker.Add(
                 ObligationKind.Subtype,
                 functionId,
@@ -809,7 +809,7 @@ public sealed class ObligationGenerator
             GenerateIndexBounds(
                 new ArrayAccessNode(
                     write.Span,
-                    new ReferenceNode(write.Span, write.CollectionName),
+                    new ReferenceNode(write.Span, write.CollectionName, isVerbatim: true),
                     write.Index),
                 indexedParams,
                 functionId,
@@ -832,7 +832,7 @@ public sealed class ObligationGenerator
             // Build obligation condition: (&& (>= index INT:0) (< index sizeParam))
             var indexExpr = access.Index;
             var zeroLit = new IntLiteralNode(dummySpan, 0);
-            var sizeRef = new ReferenceNode(dummySpan, info.IType.SizeParam);
+            var sizeRef = new ReferenceNode(dummySpan, info.IType.SizeParam, isVerbatim: true);
 
             var geZero = new BinaryOperationNode(dummySpan, BinaryOperator.GreaterOrEqual, indexExpr, zeroLit);
             var ltSize = new BinaryOperationNode(dummySpan, BinaryOperator.LessThan, indexExpr, sizeRef);

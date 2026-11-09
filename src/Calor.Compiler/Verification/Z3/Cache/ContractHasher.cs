@@ -234,7 +234,7 @@ public sealed class ContractHasher
                 break;
 
             case ReferenceNode refNode:
-                sb.Append("REF:");
+                sb.Append(refNode.IsNullLiteral ? "NULL:" : "REF:");
                 AppendRaw(sb, refNode.Name);
                 break;
 

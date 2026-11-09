@@ -33,6 +33,13 @@ public sealed class FinalExpressionGrammarTests
             diagnostics = new DiagnosticBag();
             module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
             Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
+            var checkedResult = Program.Compile(source, "native-identity.calr", new CompilationOptions
+            {
+                EnableTypeChecking = true,
+                EnforceEffects = true,
+                StatusWriter = TextWriter.Null
+            });
+            Assert.False(checkedResult.HasErrors, string.Join(Environment.NewLine, checkedResult.Diagnostics.Errors));
             var generated = new CSharpEmitter().Emit(module);
             var compilation = CSharpCompilation.Create("NativeIdentity_" + Guid.NewGuid().ToString("N"),
                 [CSharpSyntaxTree.ParseText(generated)], GeneratedCSharpCompiler.References,

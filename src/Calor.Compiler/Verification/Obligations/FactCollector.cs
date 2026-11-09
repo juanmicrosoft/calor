@@ -656,7 +656,7 @@ public sealed class FactCollector
     private bool CollectFromForLoop(ForStatementNode forStmt)
     {
         var dummySpan = new TextSpan(0, 0, 1, 1);
-        var loopVar = new ReferenceNode(dummySpan, forStmt.VariableName);
+        var loopVar = new ReferenceNode(dummySpan, forStmt.VariableName, isVerbatim: true);
 
         var isPositiveStep = forStmt.Step is IntLiteralNode { Value: > 0 }
             or UnaryOperationNode
@@ -873,7 +873,7 @@ public sealed class FactCollector
     public static ExpressionNode SubstituteSelfRefStatic(ExpressionNode expr, string variableName)
         => SubstituteSelfRefStatic(
             expr,
-            new ReferenceNode(expr.Span, variableName));
+            new ReferenceNode(expr.Span, variableName, isVerbatim: true));
 
     /// <summary>
     /// Substitutes SelfRefNode (#) with an arbitrary expression.
@@ -891,7 +891,7 @@ public sealed class FactCollector
     internal static ExpressionNode SubstituteContractSelf(ExpressionNode expression, string name)
         // A failed substitution must remain unmodeled, not become false and
         // manufacture an unsatisfiable precondition set (a vacuous proof).
-        => SubstituteSelfRef(expression, new ReferenceNode(expression.Span, name));
+        => SubstituteSelfRef(expression, new ReferenceNode(expression.Span, name, isVerbatim: true));
 
     internal static bool IsPlainCallArgument(ExpressionNode argument)
         => DescendantsAndSelf(argument).All(IsPlainDefinitionNode);

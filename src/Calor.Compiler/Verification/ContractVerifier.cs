@@ -63,8 +63,7 @@ public sealed class ContractVerifier
                 case SelfRefNode or IntLiteralNode or FloatLiteralNode or DecimalLiteralNode
                     or BoolLiteralNode or StringLiteralNode:
                     return;
-                case ReferenceNode { Name: "null" or "true" or "false" }:
-                    // The emitter always treats these as literals, never as use-site storage.
+                case ReferenceNode { IsNullLiteral: true }:
                     return;
                 case ReferenceNode reference:
                     if (!bound.Contains(reference.Name))
@@ -404,7 +403,7 @@ public sealed class ContractVerifier
             ForallExpressionNode => PrimitiveType.Bool, // Quantifiers return bool
             ExistsExpressionNode => PrimitiveType.Bool,
             ImplicationExpressionNode => PrimitiveType.Bool,
-            ReferenceNode reference => _contractVariables.FirstOrDefault(variable => variable.Name == reference.Name)
+            ReferenceNode { IsNullLiteral: false } reference => _contractVariables.FirstOrDefault(variable => variable.Name == reference.Name)
                 is { Type: { } type } ? PrimitiveType.FromName(type) : null,
             ConditionalExpressionNode conditional
                 when InferExpressionType(conditional.WhenTrue) is { } type
@@ -419,7 +418,7 @@ public sealed class ContractVerifier
         if (dot <= 0)
             return null;
         var receiver = _contractBinder.BindVerificationReceiver(
-            new ReferenceNode(call.Span, call.Target[..dot]), _contractVariables);
+            new ReferenceNode(call.Span, call.Target[..dot], isVerbatim: true), _contractVariables);
         if (receiver.Type is not NominalBoundType
             { RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String })
             return null;
@@ -485,6 +484,8 @@ public sealed class ContractVerifier
     {
         if (expr is ReferenceNode reference)
         {
+            if (reference.IsNullLiteral)
+                return;
             var root = reference.Name.Split('.')[0];
             if (reference.Name.Contains('.')
                 && (root is "StringComparison" || reference.Name.StartsWith("System.StringComparison.", StringComparison.Ordinal))
@@ -502,9 +503,9 @@ public sealed class ContractVerifier
             {
                 var name = call.Target[..dot];
                 var receiver = _contractBinder.BindVerificationReceiver(
-                    new ReferenceNode(call.Span, name), _contractVariables);
+                    new ReferenceNode(call.Span, name, isVerbatim: true), _contractVariables);
                 if (receiver is not BoundTypeReferenceExpression)
-                    CollectReferencesInternal(new ReferenceNode(call.Span, name), references, boundVariables);
+                    CollectReferencesInternal(new ReferenceNode(call.Span, name, isVerbatim: true), references, boundVariables);
             }
         }
 

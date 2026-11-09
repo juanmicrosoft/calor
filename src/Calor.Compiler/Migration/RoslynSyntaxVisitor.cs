@@ -2883,7 +2883,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 ctorBody.Add(new AssignmentStatementNode(
                     span,
                     new FieldAccessNode(span, new ThisExpressionNode(span), fieldName),
-                    new ReferenceNode(span, fieldName)));
+                    new ReferenceNode(span, fieldName, isVerbatim: true)));
             }
 
             ConstructorInitializerNode? initializer = null;
@@ -3527,7 +3527,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 ctorBody.Add(new AssignmentStatementNode(
                     span,
                     new FieldAccessNode(span, new ThisExpressionNode(span), fieldName),
-                    new ReferenceNode(span, fieldName)));
+                    new ReferenceNode(span, fieldName, isVerbatim: true)));
             }
 
             constructors.Add(new ConstructorNode(
@@ -4858,7 +4858,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     var valueName = _context.GenerateId("_localResult");
                     _pendingStatements.Add(new BindStatementNode(expression.Span, valueName, returnType,
                         isMutable: false, expression, new AttributeCollection()));
-                    expression = new ReferenceNode(expression.Span, valueName);
+                    expression = new ReferenceNode(expression.Span, valueName, isVerbatim: true);
                 }
                 if (_pendingStatements.Count > 0)
                 {
@@ -4890,7 +4890,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     new BindStatementNode(span, name, delegateType, isMutable: true,
                         initializer: null, new AttributeCollection(),
                         row: new EffectsNode(span, new Dictionary<string, string>())),
-                    new AssignmentStatementNode(span, new ReferenceNode(span, name), lambda)
+                    new AssignmentStatementNode(span, new ReferenceNode(span, name, isVerbatim: true), lambda)
                 ];
             }
             return [new BindStatementNode(span, name, delegateType,
@@ -10053,7 +10053,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (!SymbolEqualityComparer.Default.Equals(_semanticModel.GetSymbolInfo(target).Symbol, variable))
             return null;
 
-        var variableReference = new ReferenceNode(GetTextSpan(target), variable.Name);
+        var variableReference = new ReferenceNode(GetTextSpan(target), variable.Name, isVerbatim: true);
         ExpressionNode delta;
         if (amount.SyntaxTree == _semanticModel.SyntaxTree)
         {
@@ -10419,7 +10419,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 variableName = variable.Identifier.ValueText;
                 resource = variable.Initializer != null
                     ? ConvertExpression(variable.Initializer.Value)
-                    : new ReferenceNode(GetTextSpan(variable), variableName);
+                    : new ReferenceNode(GetTextSpan(variable), variableName, isVerbatim: true);
             }
             else
             {
@@ -11504,7 +11504,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // #943 (D1 RO-DECL-1): only a lowered declaration converts; any other out declaration
         // (loop or using header, lambda, query, expression body, initializer) is preserved.
         if (_loweredOutDeclarations.Contains(declExpr) && declExpr.Designation is SingleVariableDesignationSyntax lowered)
-            return new ReferenceNode(GetTextSpan(declExpr), lowered.Identifier.ValueText);
+            return new ReferenceNode(GetTextSpan(declExpr), lowered.Identifier.ValueText, isVerbatim: true);
         if (declExpr.Parent is ArgumentSyntax { RefKindKeyword.RawKind: not (int)SyntaxKind.None }
             && declExpr.Designation is SingleVariableDesignationSyntax)
             throw EscalateExpression(declExpr, "out-var");
@@ -11528,7 +11528,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 initializer: null,
                 new AttributeCollection()));
 
-            return new ReferenceNode(GetTextSpan(declExpr), varName);
+            return new ReferenceNode(GetTextSpan(declExpr), varName, isVerbatim: true);
         }
 
         // Discard pattern: `out _`
@@ -11557,7 +11557,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
             // Return a reference to the first variable as the expression value
             var firstName = parenVar.Variables.OfType<SingleVariableDesignationSyntax>().FirstOrDefault()?.Identifier.Text ?? "_";
-            return new ReferenceNode(GetTextSpan(declExpr), firstName);
+            return new ReferenceNode(GetTextSpan(declExpr), firstName, isVerbatim: true);
         }
 
         return CreateFallbackExpression(declExpr, "complex-declaration");
@@ -11786,7 +11786,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 : left;
             _pendingStatements.Add(new BindStatementNode(
                 span, varName, varType, isMutable: false, castExpr, new AttributeCollection()));
-            subject = new ReferenceNode(span, varName);
+            subject = new ReferenceNode(span, varName, isVerbatim: true);
         }
 
         // Add property checks: x is { Prop: val } → (x != null) && (x.Prop == val)
@@ -12638,7 +12638,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         FlushPendingStatements(statements);
         statements.Add(new AssignmentStatementNode(span,
             new TupleLiteralNode(span, locals.Select(local =>
-                (ExpressionNode)new ReferenceNode(span, local.Name)).ToList()),
+                (ExpressionNode)new ReferenceNode(span, local.Name, isVerbatim: true)).ToList()),
             value));
         return statements;
     }
@@ -13104,7 +13104,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         ExpressionNode updated = new BinaryOperationNode(span,
             update.Kind() is SyntaxKind.PreIncrementExpression or SyntaxKind.PostIncrementExpression
                 ? BinaryOperator.Add : BinaryOperator.Subtract,
-            new ReferenceNode(span, original), new IntLiteralNode(span, 1));
+            new ReferenceNode(span, original, isVerbatim: true), new IntLiteralNode(span, 1));
         if (_semanticModel != null && update.SyntaxTree == _semanticModel.SyntaxTree
             && NarrowingCastType(update, operandSyntax) is { } castType)
             updated = new TypeOperationNode(span, TypeOp.Cast, updated, castType);
@@ -14396,7 +14396,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         var letExpr = ConvertExpression(letClause.Expression);
                         var anonObj = new AnonymousObjectCreationNode(span, new List<ObjectInitializerAssignment>
                         {
-                            new ObjectInitializerAssignment(rangeVar, new ReferenceNode(span, rangeVar)),
+                            new ObjectInitializerAssignment(rangeVar, new ReferenceNode(span, rangeVar, isVerbatim: true)),
                             new ObjectInitializerAssignment(letVar, letExpr)
                         });
                         var lambda = MakeLinqLambda(span, rangeVar, anonObj);
@@ -14418,8 +14418,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         // This will be replaced if a select clause immediately follows.
                         var resultProjection = new AnonymousObjectCreationNode(span, new List<ObjectInitializerAssignment>
                         {
-                            new ObjectInitializerAssignment(rangeVar, new ReferenceNode(span, rangeVar)),
-                            new ObjectInitializerAssignment(joinVar, new ReferenceNode(span, joinVar))
+                            new ObjectInitializerAssignment(rangeVar, new ReferenceNode(span, rangeVar, isVerbatim: true)),
+                            new ObjectInitializerAssignment(joinVar, new ReferenceNode(span, joinVar, isVerbatim: true))
                         });
 
                         var outerKeyLambda = MakeLinqLambda(span, rangeVar, leftKey);
@@ -15643,7 +15643,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var arrayName = _context.GenerateId("_initializedArray");
             _pendingStatements.Add(new BindStatementNode(span, arrayName, null, false,
                 Allocate(dimensions), new AttributeCollection()));
-            var array = new ReferenceNode(span, arrayName);
+            var array = new ReferenceNode(span, arrayName, isVerbatim: true);
             void Fill(InitializerExpressionSyntax level, List<ExpressionNode> indices)
             {
                 for (var index = 0; index < level.Expressions.Count; index++)

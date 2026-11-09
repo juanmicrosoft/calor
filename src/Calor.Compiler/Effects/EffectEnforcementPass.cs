@@ -5880,7 +5880,7 @@ public sealed class EffectEnforcementPass
             {
                 var effects = InferFromReference(readValue
                     ? reference
-                    : new ReferenceNode(reference.Span, receiver));
+                    : new ReferenceNode(reference.Span, receiver, reference.IsVerbatim));
                 return effects.Union(EffectSet.From("mut"))
                     .Union(InferSetterEffects(receiver, member, reference.Span));
             }
