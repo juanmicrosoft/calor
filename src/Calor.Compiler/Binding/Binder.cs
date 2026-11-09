@@ -2351,6 +2351,9 @@ public sealed class Binder
     private BoundForStatement BindForStatement(ForStatementNode forStmt)
     {
         using var _ = PushScope(_scope.CreateChild());
+        var from = BindExpression(forStmt.From);
+        var snapshotTo = !forStmt.ReevaluatesCondition ? BindExpression(forStmt.To) : null;
+        var step = !forStmt.ReevaluatesCondition && forStmt.Step != null ? BindExpression(forStmt.Step) : null;
 
         // Declare loop variable
         var loopVar = CreateLocalVariable(
@@ -2368,10 +2371,10 @@ public sealed class Binder
                 $"Variable '{forStmt.VariableName}' is already defined");
         }
 
-        var from = BindExpression(forStmt.From);
         var condition = forStmt.Condition != null ? BindExpression(forStmt.Condition) : null;
-        var to = condition ?? BindExpression(forStmt.To);
-        var step = !forStmt.ReevaluatesCondition && forStmt.Step != null ? BindExpression(forStmt.Step) : null;
+        var to = snapshotTo ?? BindExpression(forStmt.To);
+        if (forStmt.Condition != null && condition != null)
+            DeclareSuccessfulConditionPatterns(forStmt.Condition, condition);
         var update = forStmt.Update != null ? BindStatement(forStmt.Update) : null;
         PrepareLoopCallableState(forStmt.Body);
         var headerCallables = CaptureCallableState();

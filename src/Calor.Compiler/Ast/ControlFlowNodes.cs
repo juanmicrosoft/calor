@@ -15,7 +15,7 @@ public sealed class ForStatementNode : StatementNode
     public ExpressionNode To { get; }
     public ExpressionNode? Step { get; }
     public ExpressionNode? Condition { get; }
-    public AssignmentStatementNode? Update { get; }
+    public StatementNode? Update { get; }
     public string VariableType { get; }
     public bool ReevaluatesCondition => Condition != null;
     public IReadOnlyList<StatementNode> Body { get; }
@@ -32,7 +32,7 @@ public sealed class ForStatementNode : StatementNode
         AttributeCollection attributes,
         TextSpan? variableSpan = null,
         ExpressionNode? condition = null,
-        AssignmentStatementNode? update = null,
+        StatementNode? update = null,
         string variableType = "int")
         : base(span)
     {

@@ -6164,7 +6164,7 @@ public sealed class Parser
         ExpressionNode to;
         ExpressionNode? step = null;
         ExpressionNode? condition = null;
-        AssignmentStatementNode? update = null;
+        StatementNode? update = null;
         if (Match(TokenKind.From))
         {
             from = ParseExpression(allowSpacedCall: false);
@@ -6180,11 +6180,14 @@ public sealed class Parser
             Expect(TokenKind.Semicolon);
             condition = ParseExpression(allowSpacedCall: false);
             Expect(TokenKind.Semicolon);
-            var target = Expect(TokenKind.Identifier);
-            Expect(TokenKind.Equals);
-            var value = ParseExpression(allowSpacedCall: false);
-            update = new AssignmentStatementNode(target.Span.Union(value.Span),
-                new ReferenceNode(target.Span, target.Text), value);
+            var target = ParseExpression(allowSpacedCall: false);
+            if (Match(TokenKind.Equals))
+            {
+                var value = ParseExpression(allowSpacedCall: false);
+                update = new AssignmentStatementNode(target.Span.Union(value.Span), target, value);
+            }
+            else
+                update = new ExpressionStatementNode(target.Span, target);
             // The bound is descriptive only in this mode; condition/update carry
             // executable semantics and verification must not use snapshot facts.
             to = condition is BinaryOperationNode comparison ? comparison.Right : from;
@@ -6445,9 +6448,14 @@ public sealed class Parser
 
         // Parse ELSEIF clauses
         var chainOwner = clauseOwner;
-        while (Check(TokenKind.ElseIf) && ContinuesChain(chainOwner))
+        while ((Check(TokenKind.ElseIf)
+                || Check(TokenKind.Else) && Peek(1).Kind == TokenKind.If
+                    && Peek(1).Span.Line == Current.Span.Line)
+               && ContinuesChain(chainOwner))
         {
-            var elseIfToken = Expect(TokenKind.ElseIf);
+            var elseIfToken = Advance();
+            if (elseIfToken.Kind == TokenKind.Else)
+                Expect(TokenKind.If);
             var elseIfCondition = ParseExpression();
             var elseIfBody = new List<StatementNode>();
             if (Check(TokenKind.Arrow))
@@ -6488,6 +6496,27 @@ public sealed class Parser
                 {
                     elseBody.Add(stmt);
                 }
+            }
+            if (elseBody is [IfStatementNode nested])
+            {
+                var file = _diagnostics.CurrentFilePath ?? "";
+                var edits = new List<TextEdit>
+                {
+                    TextEdit.Replace(file, elseToken.Span.Line, elseToken.Span.Column,
+                        elseToken.Span.Line + 1, 1, "")
+                };
+                var firstIf = _tokens.First(token => token.Kind == TokenKind.If
+                    && token.Span.Start >= nested.Span.Start);
+                edits.Add(TextEdit.Insert(file, firstIf.Span.Line, firstIf.Span.Column, "else "));
+                var width = firstIf.Span.Column - elseToken.Span.Column;
+                foreach (var line in _tokens.Where(token => token.Kind is not (TokenKind.Indent or TokenKind.Dedent)
+                        && token.Span.Start >= nested.Span.Start && token.Span.End <= nested.Span.End
+                        && token.Span.Column > width)
+                    .Select(token => token.Span.Line).Distinct())
+                    edits.Add(TextEdit.Replace(file, line, 1, line, width + 1, ""));
+                _diagnostics.ReportErrorWithFix(elseToken.Span, DiagnosticCode.UnexpectedToken,
+                    "An else body containing only an if is removed; use an 'else if' clause.",
+                    new SuggestedFix("Flatten the nested else/if into an else if clause", edits));
             }
         }
 
@@ -12071,27 +12100,35 @@ public sealed class Parser
     /// </summary>
     private UsingStatementNode ParseUsingStatement()
     {
-        var startToken = Expect(TokenKind.Use);
-        var attrs = ParseAttributes();
-        ValidateIdentityFreeHeader(startToken, attrs, 2);
-
-        // Positional: {id:variableName:variableType}
+        var startToken = Expect(Check(TokenKind.Using) ? TokenKind.Using : TokenKind.Use);
+        RejectLegacyLoopHeader(startToken, "using [type:]name = resource or using resource");
         var id = GenerateParserAutoId("use");
-        var variableName = attrs["_pos0"];
-        var variableType = attrs["_pos1"];
-
-
-        // Parse resource expression
-        var resource = ParseExpression();
+        string? variableName = null;
+        string? variableType = null;
+        TextSpan? variableSpan = null;
+        if (Check(TokenKind.Identifier) && Peek(1).Kind == TokenKind.Equals)
+        {
+            var binder = Advance();
+            variableName = binder.Text;
+            variableSpan = binder.Span;
+            Advance();
+        }
+        else if (Check(TokenKind.Identifier) && Peek(1).Kind == TokenKind.Colon)
+        {
+            variableType = ParseValue();
+            Expect(TokenKind.Colon);
+            var binder = Expect(TokenKind.Identifier);
+            variableName = binder.Text;
+            variableSpan = binder.Span;
+            Expect(TokenKind.Equals);
+        }
+        var resource = ParseExpression(allowSpacedCall: false);
 
         // Parse body statements
         var bodyOwner = BeginBlockBody(startToken, TokenKind.EndUse, id);
         var body = ParseOwnedStatementBlock(bodyOwner, TokenKind.EndUse);
 
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndUse, bodyOwner);
-        var endAttrs = ParseAttributes();
-
-
         var span = startToken.Span.Union(endToken.Span);
         return new UsingStatementNode(
             span,
@@ -12100,16 +12137,14 @@ public sealed class Parser
             variableType,
             resource,
             body,
-            variableName == null
-                ? null
-                : GetIdentifierSpan(attrs, "_pos0", variableName));
+            variableSpan);
     }
 
     private TryStatementNode ParseTryStatement()
     {
         var startToken = Expect(TokenKind.Try);
-        var attrs = ParseAttributes();
-        ValidateIdentityFreeHeader(startToken, attrs, 0);
+        RejectLegacyLoopHeader(startToken, "try with catch and/or finally clauses");
+        var attrs = new AttributeCollection();
 
         // Positional: [id]
         var id = GenerateParserAutoId("tr");
@@ -12159,9 +12194,9 @@ public sealed class Parser
         }
 
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndTry, clauseOwner);
-        var endAttrs = ParseAttributes();
-
-
+        if (catchClauses.Count == 0 && finallyBody == null)
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnexpectedToken,
+                "A try statement requires a catch or finally clause.");
         var span = startToken.Span.Union(endToken.Span);
         return new TryStatementNode(span, id, tryBody, catchClauses, finallyBody, attrs);
     }
@@ -12174,11 +12209,23 @@ public sealed class Parser
     private CatchClauseNode ParseCatchClause(string tryId, out BlockOwner clauseOwner)
     {
         var startToken = Expect(TokenKind.Catch);
-        var attrs = ParseAttributes();
-
-        // Positional: [exceptionType:variableName?] or empty for catch-all
-        var exceptionType = attrs["_pos0"];
-        var variableName = attrs["_pos1"];
+        RejectLegacyLoopHeader(startToken, "catch [ExceptionType[:name]] [when condition]");
+        var attrs = new AttributeCollection();
+        string? exceptionType = null;
+        string? variableName = null;
+        TextSpan? exceptionSpan = null;
+        TextSpan? variableSpan = null;
+        if (Current.Span.Line == startToken.Span.Line && Check(TokenKind.Identifier))
+        {
+            exceptionSpan = Current.Span;
+            exceptionType = ParseValue();
+            if (Match(TokenKind.Colon))
+            {
+                var variable = Expect(TokenKind.Identifier);
+                variableName = variable.Text;
+                variableSpan = variable.Span;
+            }
+        }
 
         // Catch filters accept the exact-case WHEN keyword.
         ExpressionNode? filter = null;
@@ -12186,16 +12233,6 @@ public sealed class Parser
         {
             Expect(TokenKind.When);
             filter = ParseExpression();
-        }
-        else if (Check(TokenKind.Identifier) && Current.Text == "WHEN")
-        {
-            Advance();
-            filter = ParseExpression();
-        }
-        else if (Check(TokenKind.Identifier) && Current.Text.Equals("when", StringComparison.OrdinalIgnoreCase))
-        {
-            _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
-                $"Removed catch-filter spelling '{Current.Text}'. Use §WHEN instead.");
         }
 
         // Parse catch body (#1485: only lines indented under the §CA).
@@ -12222,10 +12259,8 @@ public sealed class Parser
             filter,
             body,
             attrs,
-            variableName == null
-                ? null
-                : GetIdentifierSpan(attrs, "_pos1", variableName),
-            exceptionType == null ? null : attrs.GetSpan("_pos0"));
+            variableSpan,
+            exceptionSpan);
     }
 
     private ThrowExpressionNode ParseThrowExpression()
@@ -12244,7 +12279,7 @@ public sealed class Parser
         var startToken = Expect(TokenKind.Throw);
 
         ExpressionNode? exception = null;
-        if (IsExpressionStart())
+        if (Current.Span.Line == startToken.Span.Line && IsExpressionStart())
         {
             exception = ParseExpression();
         }
@@ -15033,14 +15068,9 @@ public sealed class Parser
     private SyncBlockNode ParseSyncBlock()
     {
         var startToken = Expect(TokenKind.SyncBlock);
-        var attrs = ParseAttributes();
-        ValidateIdentityFreeHeader(startToken, attrs, 0);
+        RejectLegacyLoopHeader(startToken, "lock expression");
         var id = GenerateParserAutoId("sync");
-
-        // Parse lock expression in parentheses
-        Expect(TokenKind.OpenParen);
-        var lockExpr = ParseExpression();
-        Expect(TokenKind.CloseParen);
+        var lockExpr = ParseExpression(allowSpacedCall: false);
 
         // #1485: the body owns only lines indented under the opener.
         var bodyOwner = BeginBlockBody(startToken, TokenKind.EndSyncBlock, id);
@@ -15060,8 +15090,7 @@ public sealed class Parser
     private UnsafeBlockNode ParseUnsafeBlock()
     {
         var startToken = Expect(TokenKind.Unsafe);
-        var attrs = ParseAttributes();
-        ValidateIdentityFreeHeader(startToken, attrs, 0);
+        RejectLegacyLoopHeader(startToken, "unsafe with an indented body");
         var id = GenerateParserAutoId("unsafe");
 
         // #1485: the body owns only lines indented under the opener.
@@ -15082,23 +15111,14 @@ public sealed class Parser
     private FixedStatementNode ParseFixedStatement()
     {
         var startToken = Expect(TokenKind.Fixed);
-        var attrs = ParseAttributes();
-        ValidateIdentityFreeHeader(startToken, attrs, 3);
+        RejectLegacyLoopHeader(startToken, "fixed pointerType:name = initializer");
         var id = GenerateParserAutoId("fixed");
-        var pointerName = attrs["_pos0"] ?? "ptr";
-        var pointerType = attrs["_pos1"] ?? "i32*";
-        // The init expression is in _pos2 or we parse after
-        var initStr = attrs["_pos2"];
-
-        ExpressionNode initializer;
-        if (initStr != null)
-        {
-            initializer = new ReferenceNode(startToken.Span, initStr);
-        }
-        else
-        {
-            initializer = ParseExpression();
-        }
+        var typeSpan = Current.Span;
+        var pointerType = ParseValue();
+        Expect(TokenKind.Colon);
+        var pointer = Expect(TokenKind.Identifier);
+        Expect(TokenKind.Equals);
+        var initializer = ParseExpression(allowSpacedCall: false);
 
         // #1485: the body owns only lines indented under the opener.
         var bodyOwner = BeginBlockBody(startToken, TokenKind.EndFixed, id);
@@ -15112,11 +15132,11 @@ public sealed class Parser
         return new FixedStatementNode(
             startToken.Span,
             id,
-            pointerName,
+            pointer.Text,
             pointerType,
             initializer,
             body,
-            attrs.GetSpan("_pos1"));
+            typeSpan);
     }
 
     #endregion

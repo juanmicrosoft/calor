@@ -9954,126 +9954,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (TryConvertCountedFor(node) is { } counted)
             return [counted];
 
-        if (!CanUseNativeForRange(node, out var stepValue))
-        {
-            return [ConvertReevaluatedFor(node)];
-        }
-
-        var id = _context.GenerateId("for");
-        var span = GetTextSpan(node);
-        var result = new List<StatementNode>();
-
-        var declaration = node.Declaration!.Variables[0];
-        var varName = declaration.Identifier.Text;
-        var from = ConvertForHeaderExpression(declaration.Initializer!.Value);
-        var condition = (BinaryExpressionSyntax)node.Condition!;
-        var to = ConvertExpression(condition.Right);
-        if (condition.IsKind(SyntaxKind.LessThanExpression))
-            to = new BinaryOperationNode(span, Ast.BinaryOperator.Subtract, to, new IntLiteralNode(span, 1));
-        else if (condition.IsKind(SyntaxKind.GreaterThanExpression))
-            to = new BinaryOperationNode(span, Ast.BinaryOperator.Add, to, new IntLiteralNode(span, 1));
-        var step = new IntLiteralNode(span, stepValue);
-
-        var body = ConvertEmbeddedStatement(node.Statement);
-
-        bool CanUseNativeForRange(ForStatementSyntax node, out int step)
-        {
-            step = 0;
-            if (_semanticModel == null
-                || node.Declaration?.Variables.Count != 1
-                || node.Declaration.Variables[0] is not { Initializer: { } initializer } declaration
-                || _semanticModel.GetDeclaredSymbol(declaration) is not ILocalSymbol variable
-                || variable.Type.SpecialType != SpecialType.System_Int32
-                || _semanticModel.GetTypeInfo(initializer.Value).ConvertedType?.SpecialType != SpecialType.System_Int32
-                || node.Condition is not BinaryExpressionSyntax condition
-                || !SymbolEqualityComparer.Default.Equals(
-                    _semanticModel.GetSymbolInfo(condition.Left).Symbol, variable)
-                || _semanticModel.GetConstantValue(condition.Right) is not { HasValue: true, Value: int bound }
-                || node.Incrementors.Count != 1)
-                return false;
-
-            var incrementor = node.Incrementors[0];
-            var operand = incrementor switch
-            {
-                PostfixUnaryExpressionSyntax postfix => postfix.Operand,
-                PrefixUnaryExpressionSyntax prefix => prefix.Operand,
-                AssignmentExpressionSyntax assignment when assignment.IsKind(SyntaxKind.AddAssignmentExpression)
-                    || assignment.IsKind(SyntaxKind.SubtractAssignmentExpression) => assignment.Left,
-                _ => null
-            };
-            if (operand == null
-                || !SymbolEqualityComparer.Default.Equals(_semanticModel.GetSymbolInfo(operand).Symbol, variable))
-                return false;
-
-            if (incrementor.IsKind(SyntaxKind.PostIncrementExpression)
-                || incrementor.IsKind(SyntaxKind.PreIncrementExpression))
-                step = 1;
-            else if (incrementor.IsKind(SyntaxKind.PostDecrementExpression)
-                || incrementor.IsKind(SyntaxKind.PreDecrementExpression))
-                step = -1;
-            else if (incrementor is AssignmentExpressionSyntax assignment
-                && _semanticModel.GetConstantValue(assignment.Right) is { HasValue: true, Value: int amount })
-            {
-                var signedAmount = assignment.IsKind(SyntaxKind.SubtractAssignmentExpression) ? -(long)amount : amount;
-                if (signedAmount < int.MinValue || signedAmount > int.MaxValue)
-                    return false;
-                step = (int)signedAmount;
-            }
-            if (step == 0)
-                return false;
-
-            // Native ranges stop at overflow. C# may wrap or throw instead, so the
-            // final increment must remain representable as well as the endpoint.
-            var safeCondition = step > 0
-                ? condition.IsKind(SyntaxKind.LessThanExpression) && bound > int.MinValue
-                    && (long)bound - 1 + step <= int.MaxValue
-                    || condition.IsKind(SyntaxKind.LessThanOrEqualExpression) && (long)bound + step <= int.MaxValue
-                : condition.IsKind(SyntaxKind.GreaterThanExpression) && bound < int.MaxValue
-                    && (long)bound + 1 + step >= int.MinValue
-                    || condition.IsKind(SyntaxKind.GreaterThanOrEqualExpression) && (long)bound + step >= int.MinValue;
-            var flow = _semanticModel.AnalyzeDataFlow(node.Statement);
-            return safeCondition && flow is { Succeeded: true }
-                && !flow.WrittenInside.Contains(variable, SymbolEqualityComparer.Default)
-                && !flow.UnsafeAddressTaken.Contains(variable, SymbolEqualityComparer.Default)
-                // Readonly references can still escape to unsafe callees. Dataflow's
-                // write set does not see those writes, including implicit `in` calls.
-                && !node.Statement.DescendantNodesAndSelf().Any(syntax =>
-                    syntax is RefExpressionSyntax or MakeRefExpressionSyntax
-                    || syntax is ArgumentSyntax argument
-                        && _semanticModel.GetOperation(argument) is
-                            Microsoft.CodeAnalysis.Operations.IArgumentOperation
-                            { Parameter.RefKind: not RefKind.None }
-                    || syntax is InvocationExpressionSyntax invocation
-                        && _semanticModel.GetSymbolInfo(invocation).Symbol is IMethodSymbol
-                            { ReducedFrom: { } extension }
-                        && extension.Parameters[0].RefKind != RefKind.None);
-        }
-
-        // Hoist complex from/to/step expressions to temp bindings.
-        // The §L{...} header is colon-delimited — nested section markers (§IDX, §C, §NEW) would break parsing.
-        if (ContainsNestedMarker(from))
-        {
-            var tempFrom = _context.GenerateId("_from");
-            result.Add(new BindStatementNode(span, tempFrom, null, false, from, new AttributeCollection()));
-            from = new ReferenceNode(span, tempFrom);
-        }
-        if (ContainsNestedMarker(to))
-        {
-            var tempTo = _context.GenerateId("_to");
-            result.Add(new BindStatementNode(span, tempTo, null, false, to, new AttributeCollection()));
-            to = new ReferenceNode(span, tempTo);
-        }
-
-        result.Add(new ForStatementNode(
-            span,
-            id,
-            varName,
-            from,
-            to,
-            step,
-            body,
-            new AttributeCollection()));
-        return result;
+        return [ConvertReevaluatedFor(node)];
     }
 
     private ForStatementNode? TryConvertCountedFor(ForStatementSyntax node)
@@ -10083,17 +9964,44 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             || declaration.Type is RefTypeSyntax
             || declaration.Variables[0] is not { Initializer: { } initializer } declarator
             || _semanticModel.GetDeclaredSymbol(declarator) is not ILocalSymbol variable
-            || variable.Type.SpecialType is not (SpecialType.System_Int32 or SpecialType.System_Int64
-                or SpecialType.System_UInt32 or SpecialType.System_UInt64
-                or SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_Decimal)
-            || node.Condition is not BinaryExpressionSyntax condition
-            || condition.Kind() is not (SyntaxKind.LessThanExpression or SyntaxKind.LessThanOrEqualExpression
-                or SyntaxKind.GreaterThanExpression or SyntaxKind.GreaterThanOrEqualExpression)
-            || !SymbolEqualityComparer.Default.Equals(_semanticModel.GetSymbolInfo(condition.Left).Symbol, variable)
+            || node.Condition is not { } condition
             || node.Incrementors.Count != 1)
             return null;
 
         var incrementor = node.Incrementors[0];
+        var (from, initialHoists) = ConvertLoopCondition(initializer.Value);
+        var (test, conditionHoists) = ConvertLoopCondition(condition);
+        if (initialHoists.Count != 0 || conditionHoists.Count != 0)
+            return null;
+        var span = GetTextSpan(node);
+        StatementNode? update = null;
+        if (incrementor is InvocationExpressionSyntax)
+        {
+            var (call, hoisted) = ConvertLoopCondition(incrementor);
+            if (hoisted.Count != 0)
+                return null;
+            update = new ExpressionStatementNode(GetTextSpan(incrementor), call);
+        }
+        else if (incrementor is AssignmentExpressionSyntax simple && simple.IsKind(SyntaxKind.SimpleAssignmentExpression))
+        {
+            var (assigned, targetHoists) = ConvertLoopCondition(simple.Left);
+            var (value, valueHoists) = ConvertLoopCondition(simple.Right);
+            if (targetHoists.Count != 0 || valueHoists.Count != 0)
+                return null;
+            update = new AssignmentStatementNode(GetTextSpan(simple), assigned, value);
+        }
+        if (update != null)
+            return CreateLoop(update);
+
+        if (variable.Type.SpecialType is not (SpecialType.System_Int32 or SpecialType.System_Int64
+            or SpecialType.System_UInt32 or SpecialType.System_UInt64
+            or SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_Decimal))
+            return null;
+        if (incrementor is AssignmentExpressionSyntax
+            && _semanticModel.GetOperation(incrementor) is not
+                Microsoft.CodeAnalysis.Operations.ICompoundAssignmentOperation
+                { OperatorMethod: null, OutConversion.IsIdentity: true })
+            return null;
         ExpressionSyntax? target;
         ExpressionSyntax amount;
         Ast.BinaryOperator operation;
@@ -10115,11 +10023,26 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 break;
             case AssignmentExpressionSyntax assignment when assignment.Kind() is
                 SyntaxKind.AddAssignmentExpression or SyntaxKind.SubtractAssignmentExpression
-                && _semanticModel.GetConstantValue(assignment.Right).HasValue:
+                or SyntaxKind.MultiplyAssignmentExpression or SyntaxKind.DivideAssignmentExpression
+                or SyntaxKind.ModuloAssignmentExpression or SyntaxKind.LeftShiftAssignmentExpression
+                or SyntaxKind.RightShiftAssignmentExpression or SyntaxKind.AndAssignmentExpression
+                or SyntaxKind.OrAssignmentExpression or SyntaxKind.ExclusiveOrAssignmentExpression:
                 target = assignment.Left;
                 amount = assignment.Right;
-                operation = assignment.IsKind(SyntaxKind.AddAssignmentExpression)
-                    ? Ast.BinaryOperator.Add : Ast.BinaryOperator.Subtract;
+                operation = assignment.Kind() switch
+                {
+                    SyntaxKind.AddAssignmentExpression => Ast.BinaryOperator.Add,
+                    SyntaxKind.SubtractAssignmentExpression => Ast.BinaryOperator.Subtract,
+                    SyntaxKind.MultiplyAssignmentExpression => Ast.BinaryOperator.Multiply,
+                    SyntaxKind.DivideAssignmentExpression => Ast.BinaryOperator.Divide,
+                    SyntaxKind.ModuloAssignmentExpression => Ast.BinaryOperator.Modulo,
+                    SyntaxKind.LeftShiftAssignmentExpression => Ast.BinaryOperator.LeftShift,
+                    SyntaxKind.RightShiftAssignmentExpression => Ast.BinaryOperator.RightShift,
+                    SyntaxKind.AndAssignmentExpression => Ast.BinaryOperator.BitwiseAnd,
+                    SyntaxKind.OrAssignmentExpression => Ast.BinaryOperator.BitwiseOr,
+                    SyntaxKind.ExclusiveOrAssignmentExpression => Ast.BinaryOperator.BitwiseXor,
+                    _ => throw new InvalidOperationException()
+                };
                 break;
             default:
                 return null;
@@ -10127,22 +10050,27 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (!SymbolEqualityComparer.Default.Equals(_semanticModel.GetSymbolInfo(target).Symbol, variable))
             return null;
 
-        // Headers stay inline. If conversion still requires statements, retain
-        // the exact existing fallback rather than executing a hoist only once.
-        var (from, initialHoists) = ConvertLoopCondition(initializer.Value);
-        var (test, conditionHoists) = ConvertLoopCondition(condition);
-        if (initialHoists.Count != 0 || conditionHoists.Count != 0)
-            return null;
-        var span = GetTextSpan(node);
         var variableReference = new ReferenceNode(GetTextSpan(target), variable.Name);
-        var delta = amount.SyntaxTree == _semanticModel.SyntaxTree
-            ? ConvertExpression(amount) : new IntLiteralNode(span, 1);
+        ExpressionNode delta;
+        if (amount.SyntaxTree == _semanticModel.SyntaxTree)
+        {
+            var (converted, hoisted) = ConvertLoopCondition(amount);
+            if (hoisted.Count != 0)
+                return null;
+            delta = converted;
+        }
+        else
+            delta = new IntLiteralNode(span, 1);
         var next = new BinaryOperationNode(GetTextSpan(incrementor), operation, variableReference, delta);
-        var update = new AssignmentStatementNode(GetTextSpan(incrementor), variableReference, next);
-        var bound = test is BinaryOperationNode comparison ? comparison.Right : from;
-        return new ForStatementNode(span, _context.GenerateId("for"), variable.Name, from, bound, null,
-            ConvertEmbeddedStatement(node.Statement), new AttributeCollection(),
-            GetTextSpan(declarator.Identifier), test, update, variable.Type.ToDisplayString());
+        return CreateLoop(new AssignmentStatementNode(GetTextSpan(incrementor), variableReference, next));
+
+        ForStatementNode CreateLoop(StatementNode update)
+        {
+            var bound = test is BinaryOperationNode comparison ? comparison.Right : from;
+            return new ForStatementNode(span, _context.GenerateId("for"), variable.Name, from, bound, null,
+                ConvertEmbeddedStatement(node.Statement), new AttributeCollection(),
+                GetTextSpan(declarator.Identifier), test, update, variable.Type.ToDisplayString());
+        }
     }
 
     private StatementNode ConvertReevaluatedFor(ForStatementSyntax node)

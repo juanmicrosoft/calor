@@ -3829,10 +3829,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             PushDeclScope();
             DeclareVarInScope(varName);
             var condition = node.Condition.Accept(this);
-            var updateTarget = node.Update.Target.Accept(this);
-            var updateValue = node.Update.Value.Accept(this);
+            var update = node.Update switch
+            {
+                AssignmentStatementNode assignment =>
+                    $"{assignment.Target.Accept(this)} = {assignment.Value.Accept(this)}",
+                ExpressionStatementNode expression => expression.Expression.Accept(this),
+                _ => throw new InvalidOperationException("For update must be an assignment or invocation.")
+            };
             var type = TypeMapper.CalorToCSharp(node.VariableType);
-            AppendLine($"for ({type} {varName} = {initializer}; {condition}; {updateTarget} = {updateValue})");
+            AppendLine($"for ({type} {varName} = {initializer}; {condition}; {update})");
             AppendLine("{");
             Indent();
             foreach (var stmt in node.Body)
