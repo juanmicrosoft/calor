@@ -4945,12 +4945,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(CompilerDirectiveNode node)
     {
-        var encoded = Convert.ToBase64String(
-                System.Text.Encoding.UTF8.GetBytes(node.Code))
-            .TrimEnd('=')
-            .Replace('+', '-')
-            .Replace('/', '_');
-        AppendLine($"§CDIR{{{node.Feature}:{encoded}}}");
+        var frame = new RawCSharpFrame(node.Code, node.Feature, IsCompilerDirective: true);
+        if (!frame.TryValidateCompilerDirective(out var error))
+            throw new InvalidOperationException(error);
+        EmitRawFrame(frame.ReasonMarker, node.Code);
         return "";
     }
 

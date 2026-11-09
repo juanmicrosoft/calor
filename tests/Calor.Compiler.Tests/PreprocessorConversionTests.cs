@@ -1124,7 +1124,7 @@ public class Test
             Assert.DoesNotContain(
                 result.Losses,
                 loss => loss.Kind == ConversionLossKind.InteropPreserved);
-            Assert.Contains("§CDIR{", result.CalorSource);
+            Assert.Contains("raw directive:", result.CalorSource);
         }
     }
 
@@ -1137,7 +1137,7 @@ public class Test
             "ErrorDirective.cs");
 
         Assert.False(result.Success);
-        Assert.Contains("§CDIR{", result.CalorSource);
+        Assert.Contains("raw directive:error-directive", result.CalorSource);
         Assert.Contains(
             result.Ast!.Items,
             item => item is CompilerDirectiveNode node

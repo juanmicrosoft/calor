@@ -1681,16 +1681,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private static string GetCompilerDirectiveFeature(
         DirectiveTriviaSyntax directive)
-        => directive switch
-        {
-            NullableDirectiveTriviaSyntax => "nullable-directive",
-            PragmaWarningDirectiveTriviaSyntax or PragmaChecksumDirectiveTriviaSyntax => "pragma",
-            WarningDirectiveTriviaSyntax => "warning-directive",
-            ErrorDirectiveTriviaSyntax => "error-directive",
-            LineDirectiveTriviaSyntax or LineSpanDirectiveTriviaSyntax => "line-directive",
-            DefineDirectiveTriviaSyntax or UndefDirectiveTriviaSyntax => "symbol-directive",
-            _ => "compiler-directive"
-        };
+        => RawCSharpFrame.GetCompilerDirectiveFeature(directive) ?? "compiler-directive";
 
     private void RecordCompilerDirectivePreservation(
         DirectiveTriviaSyntax directive,

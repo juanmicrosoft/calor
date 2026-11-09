@@ -193,7 +193,7 @@ public sealed class RawCSharpNode : StatementNode
 
 /// <summary>
 /// A nonconditional C# compiler directive preserved exactly at its source
-/// position. The Calor surface stores the UTF-8 bytes as base64 in §CDIR.
+/// position. The Calor surface uses a validated, byte-counted raw directive frame.
 /// </summary>
 public sealed class CompilerDirectiveNode : StatementNode
 {

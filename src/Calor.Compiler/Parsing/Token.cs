@@ -1,3 +1,7 @@
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
 namespace Calor.Compiler.Parsing;
 
 /// <summary>
@@ -259,7 +263,7 @@ public enum TokenKind
     RawCSharp,          // §RAW ... §/RAW - Raw C# content emitted verbatim
     RawCSharpExpression,  // §CS{...} - Inline C# expression
     CSharpInterop,      // §CSHARP{...}§/CSHARP - C# interop block (member-level)
-    CompilerDirective,  // §CDIR{base64} - exact nonconditional C# directive
+    CompilerDirective,  // raw directive:<feature> N - validated nonconditional C# directive
 
     // Preprocessor Directives
     Preprocessor,       // pp; Value is exact physical-line remainder, excluding CR/LF
@@ -430,7 +434,8 @@ internal sealed record RawCSharpFrame(
     string? FeatureName = null,
     string? Reason = null,
     Ast.InteropMemberKind MemberKind = Ast.InteropMemberKind.Other,
-    bool IsCompilationUnitPassthrough = false)
+    bool IsCompilationUnitPassthrough = false,
+    bool IsCompilerDirective = false)
 {
     internal static string NormalizeLineEndings(string source)
     {
@@ -534,6 +539,8 @@ internal sealed record RawCSharpFrame(
     {
         get
         {
+            if (IsCompilerDirective)
+                return "directive:" + Uri.EscapeDataString(FeatureName!);
             if (!IsCompilationUnitPassthrough
                 && Reason == null && MemberKind == Ast.InteropMemberKind.Other)
             {
@@ -555,6 +562,17 @@ internal sealed record RawCSharpFrame(
     {
         frame = new RawCSharpFrame("");
         var parts = marker.Split(':');
+        if (parts[0] == "directive" && parts.Length > 1)
+        {
+            if (parts.Length != 2)
+                return false;
+            var feature = Uri.UnescapeDataString(parts[1]);
+            if (!IsCompilerDirectiveFeature(feature)
+                || Uri.EscapeDataString(feature) != parts[1])
+                return false;
+            frame = frame with { FeatureName = feature, IsCompilerDirective = true };
+            return true;
+        }
         if (parts.Length == 1)
         {
             if (marker is "statement" or "member")
@@ -579,6 +597,51 @@ internal sealed record RawCSharpFrame(
             IsCompilationUnitPassthrough = parts[0] == "unit"
         };
         return true;
+    }
+
+    internal static string? GetCompilerDirectiveFeature(DirectiveTriviaSyntax directive) => directive switch
+    {
+        NullableDirectiveTriviaSyntax => "nullable-directive",
+        PragmaWarningDirectiveTriviaSyntax or PragmaChecksumDirectiveTriviaSyntax => "pragma",
+        WarningDirectiveTriviaSyntax => "warning-directive",
+        ErrorDirectiveTriviaSyntax => "error-directive",
+        LineDirectiveTriviaSyntax or LineSpanDirectiveTriviaSyntax => "line-directive",
+        DefineDirectiveTriviaSyntax or UndefDirectiveTriviaSyntax => "symbol-directive",
+        _ => null
+    };
+
+    private static bool IsCompilerDirectiveFeature(string feature) =>
+        feature is "nullable-directive" or "pragma" or "warning-directive"
+            or "error-directive" or "line-directive" or "symbol-directive";
+
+    internal bool TryValidateCompilerDirective(out string error)
+    {
+        error = "A directive frame must contain only complete nonconditional C# directives matching its declared feature and comments or whitespace.";
+        if (!IsCompilerDirective || FeatureName == null || !IsCompilerDirectiveFeature(FeatureName))
+            return false;
+        var root = SyntaxFactory.ParseCompilationUnit(Code);
+        if (root.Members.Count != 0 || root.Usings.Count != 0
+            || root.Externs.Count != 0 || root.AttributeLists.Count != 0
+            || root.GetDiagnostics().Any(diagnostic => diagnostic.Id is not ("CS1029" or "CS1030")))
+            return false;
+        var directives = 0;
+        foreach (var trivia in root.DescendantTrivia())
+        {
+            if (trivia.GetStructure() is DirectiveTriviaSyntax directive)
+            {
+                if (GetCompilerDirectiveFeature(directive) != FeatureName)
+                    return false;
+                directives++;
+            }
+            else if (!trivia.IsKind(SyntaxKind.WhitespaceTrivia)
+                && !trivia.IsKind(SyntaxKind.EndOfLineTrivia)
+                && !trivia.IsKind(SyntaxKind.SingleLineCommentTrivia)
+                && !trivia.IsKind(SyntaxKind.MultiLineCommentTrivia)
+                && !trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
+                && !trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
+                return false;
+        }
+        return directives > 0;
     }
 }
 

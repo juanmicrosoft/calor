@@ -874,6 +874,12 @@ public sealed class Lexer
             && _source[_position - 1] is not '\r' and not '\n')
             return Fail("Raw payload must be followed by a newline or end of file, outside its byte count.");
         frame = frame with { Code = _source[payloadStart.._position] };
+        if (frame.IsCompilerDirective)
+        {
+            if (!frame.TryValidateCompilerDirective(out var error))
+                return Fail(error);
+            return MakeToken(TokenKind.CompilerDirective, frame);
+        }
         return MakeToken(marker == "statement" ? TokenKind.RawCSharp : TokenKind.CSharpInterop, frame);
     }
 

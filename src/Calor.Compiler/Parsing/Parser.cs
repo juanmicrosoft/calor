@@ -1277,7 +1277,7 @@ public sealed class Parser
             }
             else if (Check(TokenKind.CompilerDirective))
             {
-                moduleItems.Add(ParseCompilerDirective());
+                moduleItems.Add(ParseCompilerDirective(moduleItems.All(IsCompilerDirectivePrefix)));
             }
             else if (Check(TokenKind.RefinedType))
             {
@@ -1293,7 +1293,8 @@ public sealed class Parser
             }
             else if (Check(TokenKind.Preprocessor))
             {
-                var node = ParseTypePreprocessorBlock();
+                var node = ParseTypePreprocessorBlock(
+                    allowSymbolDirectives: moduleItems.All(IsCompilerDirectivePrefix));
                 typePreprocessorBlocks.Add(node);
                 moduleItems.Add(node);
             }
@@ -9770,6 +9771,7 @@ public sealed class Parser
             interopBlocks: interopBlocks,
             preprocessorBlocks: preprocessorBlocks,
             items: preprocessorBlocks.Count > 0
+                || interfaceItems.Any(item => item is CompilerDirectiveNode)
                 || interopBlocks.Any(block =>
                     block.CSharpCode.TrimStart().StartsWith("#", StringComparison.Ordinal))
                     ? interfaceItems
@@ -12821,38 +12823,29 @@ public sealed class Parser
         return new RawCSharpNode(token.Span, content, reason);
     }
 
-    private CompilerDirectiveNode ParseCompilerDirective()
+    private static bool IsCompilerDirectivePrefix(AstNode item) => item switch
+    {
+        CompilerDirectiveNode => true,
+        TypePreprocessorBlockNode block => block.Items.All(IsCompilerDirectivePrefix)
+            && (block.ElseBranch == null || IsCompilerDirectivePrefix(block.ElseBranch)),
+        _ => false
+    };
+
+    private CompilerDirectiveNode ParseCompilerDirective(bool allowSymbolDirective = false)
     {
         var token = Expect(TokenKind.CompilerDirective);
-        var attrs = ParseAttributes();
-        var feature = attrs["_pos0"] ?? "compiler-directive";
-        var encoded = attrs["_pos1"] ?? "";
-        try
+        if (token.Value is not RawCSharpFrame { IsCompilerDirective: true, FeatureName: { } feature } frame)
         {
-            var padded = encoded
-                .Replace('-', '+')
-                .Replace('_', '/');
-            padded = padded.PadRight(
-                padded.Length + (4 - padded.Length % 4) % 4,
-                '=');
-            var code = System.Text.Encoding.UTF8.GetString(
-                Convert.FromBase64String(padded));
-            return new CompilerDirectiveNode(
-                token.Span,
-                code,
-                feature);
+            _diagnostics.ReportError(token.Span, DiagnosticCode.InvalidRawFrame,
+                "A compiler directive requires a validated raw directive frame.");
+            return new CompilerDirectiveNode(token.Span, "", "compiler-directive");
         }
-        catch (FormatException)
-        {
-            _diagnostics.ReportError(
-                token.Span,
-                DiagnosticCode.InvalidModifier,
-                "Invalid §CDIR base64 payload.");
-            return new CompilerDirectiveNode(
-                token.Span,
-                "",
-                feature);
-        }
+        if (!frame.TryValidateCompilerDirective(out var error))
+            _diagnostics.ReportError(token.Span, DiagnosticCode.InvalidRawFrame, error);
+        if (frame.FeatureName == "symbol-directive" && !allowSymbolDirective)
+            _diagnostics.ReportError(token.Span, DiagnosticCode.InvalidRawFrame,
+                "#define and #undef are allowed only before C# declarations or using directives at compilation-unit scope.");
+        return new CompilerDirectiveNode(token.Span, frame.Code, feature);
     }
 
     /// <summary>
@@ -13007,7 +13000,8 @@ public sealed class Parser
     /// Parses a type-level preprocessor block at module level.
     /// §PP{CONDITION} ... type declarations ... §PPE ... §/PP{CONDITION}
     /// </summary>
-    private TypePreprocessorBlockNode ParseTypePreprocessorBlock(bool continuation = false)
+    private TypePreprocessorBlockNode ParseTypePreprocessorBlock(
+        bool continuation = false, bool allowSymbolDirectives = false)
     {
         var startToken = Expect(TokenKind.Preprocessor);
         var canonical = IsCanonicalDeclaration(startToken);
@@ -13037,7 +13031,8 @@ public sealed class Parser
                 usings,
                 nestedBlocks,
                 items,
-                interopBlocks);
+                interopBlocks,
+                allowSymbolDirectives);
         }
         ConsumeOwnedDedentBeforeChain(
             ppOwner,
@@ -13049,7 +13044,8 @@ public sealed class Parser
         if (canonical)
         {
             if (condition.Length != 0 && IsNativePreprocessorContinuation(startToken))
-                elseBranch = ParseTypePreprocessorBlock(continuation: true);
+                elseBranch = ParseTypePreprocessorBlock(
+                    continuation: true, allowSymbolDirectives: allowSymbolDirectives);
             else
                 ExpectOwnedBlockEnd(TokenKind.EndPreprocessor, ppOwner);
             return new TypePreprocessorBlockNode(startToken.Span, condition,
@@ -13061,7 +13057,7 @@ public sealed class Parser
             var ppeToken = Advance();
             if (Check(TokenKind.Preprocessor))
             {
-                elseBranch = ParseTypePreprocessorBlock();
+                elseBranch = ParseTypePreprocessorBlock(allowSymbolDirectives: allowSymbolDirectives);
             }
             else
             {
@@ -13085,7 +13081,8 @@ public sealed class Parser
                         elseUsings,
                         elseNestedBlocks,
                         elseItems,
-                        elseInteropBlocks);
+                        elseInteropBlocks,
+                        allowSymbolDirectives);
                 }
                 ConsumeOwnedDedentBeforeChain(ppOwner, TokenKind.EndPreprocessor);
 
@@ -13161,7 +13158,8 @@ public sealed class Parser
         List<UsingDirectiveNode>? usings = null,
         List<TypePreprocessorBlockNode>? nestedBlocks = null,
         List<AstNode>? items = null,
-        List<CSharpInteropBlockNode>? interopBlocks = null)
+        List<CSharpInteropBlockNode>? interopBlocks = null,
+        bool allowSymbolDirectives = false)
     {
         if (usings != null && Check(TokenKind.Using))
         {
@@ -13195,7 +13193,8 @@ public sealed class Parser
         }
         else if (nestedBlocks != null && Check(TokenKind.Preprocessor))
         {
-            var node = ParseTypePreprocessorBlock();
+            var node = ParseTypePreprocessorBlock(allowSymbolDirectives:
+                allowSymbolDirectives && items != null && items.All(IsCompilerDirectivePrefix));
             nestedBlocks.Add(node);
             items?.Add(node);
         }
@@ -13207,7 +13206,8 @@ public sealed class Parser
         }
         else if (Check(TokenKind.CompilerDirective))
         {
-            items?.Add(ParseCompilerDirective());
+            items?.Add(ParseCompilerDirective(
+                allowSymbolDirectives && items != null && items.All(IsCompilerDirectivePrefix)));
         }
         else if (Check(TokenKind.Preprocessor))
         {
