@@ -178,17 +178,17 @@ public class CompletionHandlerTests
     }
 
     [Theory]
-    [InlineData("i32", "Task<i32>")]
-    [InlineData("ValueTask<i32>", "ValueTask<i32>")]
+    [InlineData("int", "Task<int>")]
+    [InlineData("ValueTask<int>", "ValueTask<int>")]
     public void AsyncMemberCompletion_ReportsCallableCarrier(string output, string carrier)
     {
         var source = $$"""
-            §M{AsyncCompletion}
-              §CL{Probe:pub}
-                §AMT{Produce:pub} () -> {{output}}
-                  §R 42
-              §F{Use:pub} (Probe:probe) -> void
-                §C{probe.Produce} §/C
+            module AsyncCompletion
+              class Probe
+                func Produce async () → {{output}}
+                  return 42
+              func Use (Probe:probe) → void
+                probe.Produce()
             """;
         var compilation = Compiler.Program.Compile(source, "async-completion.calr",
             new Compiler.CompilationOptions { StatusWriter = TextWriter.Null });
@@ -221,15 +221,15 @@ public class CompletionHandlerTests
     public void GetAst_WithClass_HasClassMembers()
     {
         var source = """
-            §M{TestModule}
-              §CL{Person}
-                §FLD{str:name}
-                §FLD{i32:age}
-                §MT{GetName}
-                  §O{str}
-                  §R name
+            module TestModule
+              class Person
+                field string:name private
+                field int:age private
+                func GetName private () → string
+                  return name
             """;
 
+        AssertNativeSource(source);
         var ast = LspTestHarness.GetAst(source);
 
         Assert.NotNull(ast);
@@ -244,14 +244,14 @@ public class CompletionHandlerTests
     public void GetAst_WithEnum_HasEnumMembers()
     {
         var source = """
-            §M{TestModule}
-              §EN{Color}
-              §EM{Red}
-              §EM{Green}
-              §EM{Blue}
-              §/EN
+            module TestModule
+              enum Color
+                Red
+                Green
+                Blue
             """;
 
+        AssertNativeSource(source);
         var ast = LspTestHarness.GetAst(source);
 
         Assert.NotNull(ast);
@@ -265,12 +265,12 @@ public class CompletionHandlerTests
     public void GetAst_WithInterface_HasMethods()
     {
         var source = """
-            §M{TestModule}
-              §IFACE{IShape}
-                §MT{GetArea}
-                  §O{f64}
+            module TestModule
+              interface IShape
+                func GetArea () → double
             """;
 
+        AssertNativeSource(source);
         var ast = LspTestHarness.GetAst(source);
 
         Assert.NotNull(ast);
@@ -284,13 +284,11 @@ public class CompletionHandlerTests
     public void GetAst_WithDelegate_HasDelegate()
     {
         var source = """
-            §M{TestModule}
-              §DEL{Callback}
-              §I{i32:value}
-              §O{void}
-              §/DEL
+            module TestModule
+              delegate Callback (int:value) → void
             """;
 
+        AssertNativeSource(source);
         var ast = LspTestHarness.GetAst(source);
 
         Assert.NotNull(ast);
@@ -447,13 +445,13 @@ public class CompletionHandlerTests
     public void MemberCompletion_ClassField_ShowsFields()
     {
         var source = """
-            §M{TestModule}
-              §CL{Person}
-                §FLD{str:name}
-                §FLD{i32:age}
-              §F{Test}
-                §B{p:Person} §NEW Person
-                §R p.
+            module TestModule
+              class Person
+                field string:name private
+                field int:age private
+              func Test private () → void
+                let Person:p = new Person()
+                return p.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "p.");
@@ -467,16 +465,13 @@ public class CompletionHandlerTests
     public void MemberCompletion_ClassMethod_ShowsMethods()
     {
         var source = """
-            §M{TestModule}
-              §CL{Calculator}
-                §MT{Add}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §R a + b
-              §F{Test}
-                §B{calc:Calculator} §NEW Calculator
-                §R calc.
+            module TestModule
+              class Calculator
+                func Add private (int:a, int:b) → int
+                  return a + b
+              func Test private () → void
+                let Calculator:calc = new Calculator()
+                return calc.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "calc.");
@@ -489,15 +484,13 @@ public class CompletionHandlerTests
     public void MemberCompletion_EnumMembers_ShowsMembers()
     {
         var source = """
-            §M{TestModule}
-              §EN{Color}
-              §EM{Red}
-              §EM{Green}
-              §EM{Blue}
-              §/EN
-              §F{Test}
-                §O{Color}
-                §R Color.
+            module TestModule
+              enum Color
+                Red
+                Green
+                Blue
+              func Test private () → Color
+                return Color.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "Color.");
@@ -531,13 +524,11 @@ public class CompletionHandlerTests
     public void MemberCompletion_Parameter_ResolvesType()
     {
         var source = """
-            §M{TestModule}
-              §CL{Person}
-                §FLD{str:name}
-              §F{Greet}
-                §I{Person:person}
-                §O{str}
-                §R person.
+            module TestModule
+              class Person
+                field string:name private
+              func Greet private (Person:person) → string
+                return person.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "person.");
@@ -552,16 +543,14 @@ public class CompletionHandlerTests
     public void ChainedAccess_TwoLevels_ShowsNestedMembers()
     {
         var source = """
-            §M{TestModule}
-              §CL{Address}
-                §FLD{str:city}
-                §FLD{str:street}
-              §CL{Person}
-                §FLD{Address:address}
-              §F{Test}
-                §I{Person:person}
-                §O{str}
-                §R person.address.
+            module TestModule
+              class Address
+                field string:city private
+                field string:street private
+              class Person
+                field Address:address private
+              func Test private (Person:person) → string
+                return person.address.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "person.address.");
@@ -575,18 +564,16 @@ public class CompletionHandlerTests
     public void ChainedAccess_ThreeLevels_ShowsDeeplyNestedMembers()
     {
         var source = """
-            §M{TestModule}
-              §CL{PostalCode}
-                §FLD{str:code}
-                §FLD{str:region}
-              §CL{Address}
-                §FLD{PostalCode:postal}
-              §CL{Person}
-                §FLD{Address:address}
-              §F{Test}
-                §I{Person:person}
-                §O{str}
-                §R person.address.postal.
+            module TestModule
+              class PostalCode
+                field string:code private
+                field string:region private
+              class Address
+                field PostalCode:postal private
+              class Person
+                field Address:address private
+              func Test private (Person:person) → string
+                return person.address.postal.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "person.address.postal.");
@@ -600,17 +587,14 @@ public class CompletionHandlerTests
     public void ChainedAccess_MethodReturnType_ShowsMembersOfReturnType()
     {
         var source = """
-            §M{TestModule}
-              §CL{Address}
-                §FLD{str:city}
-              §CL{Person}
-                §MT{GetAddress}
-                  §O{Address}
-                  §R §NEW Address
-              §F{Test}
-                §I{Person:person}
-                §O{str}
-                §R person.GetAddress().
+            module TestModule
+              class Address
+                field string:city private
+              class Person
+                func GetAddress private () → Address
+                  return new Address()
+              func Test private (Person:person) → string
+                return person.GetAddress().
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "person.GetAddress().");
@@ -623,19 +607,16 @@ public class CompletionHandlerTests
     public void ChainedAccess_MixedFieldsAndMethods_WorksCorrectly()
     {
         var source = """
-            §M{TestModule}
-              §CL{Name}
-                §FLD{str:first}
-                §FLD{str:last}
-              §CL{Person}
-                §FLD{Name:name}
-                §MT{GetName}
-                  §O{Name}
-                  §R name
-              §F{Test}
-                §I{Person:person}
-                §O{str}
-                §R person.name.first.
+            module TestModule
+              class Name
+                field string:first private
+                field string:last private
+              class Person
+                field Name:name private
+                func GetName private () → Name
+                  return name
+              func Test private (Person:person) → string
+                return person.name.first.
             """;
 
         // String completions for the final "first" field
@@ -670,18 +651,15 @@ public class CompletionHandlerTests
     public void ChainedAccess_PropertyThenMethod_WorksCorrectly()
     {
         var source = """
-            §M{TestModule}
-              §CL{Container}
-                §FLD{str:value}
-                §MT{GetValue}
-                  §O{str}
-                  §R value
-              §CL{Wrapper}
-                §FLD{Container:inner}
-              §F{Test}
-                §I{Wrapper:wrapper}
-                §O{str}
-                §R wrapper.inner.GetValue().
+            module TestModule
+              class Container
+                field string:value private
+                func GetValue private () → string
+                  return value
+              class Wrapper
+                field Container:inner private
+              func Test private (Wrapper:wrapper) → string
+                return wrapper.inner.GetValue().
             """;
 
         // GetValue() returns str, so should show string members
@@ -695,14 +673,13 @@ public class CompletionHandlerTests
     public void ChainedAccess_ThisKeyword_WorksWithChaining()
     {
         var source = """
-            §M{TestModule}
-              §CL{Address}
-                §FLD{str:city}
-              §CL{Person}
-                §FLD{Address:address}
-                §MT{GetCity}
-                  §O{str}
-                  §R this.address.
+            module TestModule
+              class Address
+                field string:city private
+              class Person
+                field Address:address private
+                func GetCity private () → string
+                  return this.address.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "this.address.");
@@ -719,17 +696,14 @@ public class CompletionHandlerTests
     public void Inheritance_DerivedClass_ShowsInheritedFields()
     {
         var source = """
-            §M{TestModule}
-              §CL{Animal}
-                §FLD{str:name}
-                §FLD{i32:age}
-              §CL{Dog}
-                §EXT{Animal}
-                §FLD{str:breed}
-              §F{Test}
-                §I{Dog:dog}
-                §O{str}
-                §R dog.
+            module TestModule
+              class Animal
+                field string:name private
+                field int:age private
+              class Dog extends Animal
+                field string:breed private
+              func Test private (Dog:dog) → string
+                return dog.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "dog.");
@@ -746,20 +720,15 @@ public class CompletionHandlerTests
     public void Inheritance_DerivedClass_ShowsInheritedMethods()
     {
         var source = """
-            §M{TestModule}
-              §CL{Animal}
-                §MT{Speak}
-                  §O{str}
-                  §R "sound"
-              §CL{Dog}
-                §EXT{Animal}
-                §MT{Bark}
-                  §O{str}
-                  §R "woof"
-              §F{Test}
-                §I{Dog:dog}
-                §O{str}
-                §R dog.
+            module TestModule
+              class Animal
+                func Speak private () → string
+                  return "sound"
+              class Dog extends Animal
+                func Bark private () → string
+                  return "woof"
+              func Test private (Dog:dog) → string
+                return dog.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "dog.");
@@ -775,18 +744,15 @@ public class CompletionHandlerTests
     public void Inheritance_ChainedAccess_WorksWithInheritedMembers()
     {
         var source = """
-            §M{TestModule}
-              §CL{Address}
-                §FLD{str:city}
-              §CL{Person}
-                §FLD{Address:address}
-              §CL{Employee}
-                §EXT{Person}
-                §FLD{str:department}
-              §F{Test}
-                §I{Employee:emp}
-                §O{str}
-                §R emp.address.
+            module TestModule
+              class Address
+                field string:city private
+              class Person
+                field Address:address private
+              class Employee extends Person
+                field string:department private
+              func Test private (Employee:emp) → string
+                return emp.address.
             """;
 
         // Should be able to access inherited 'address' field and chain to Address members
@@ -800,19 +766,15 @@ public class CompletionHandlerTests
     public void Inheritance_MultiLevel_ShowsAllInheritedMembers()
     {
         var source = """
-            §M{TestModule}
-              §CL{Animal}
-                §FLD{str:name}
-              §CL{Mammal}
-                §EXT{Animal}
-                §FLD{bool:warmBlooded}
-              §CL{Dog}
-                §EXT{Mammal}
-                §FLD{str:breed}
-              §F{Test}
-                §I{Dog:dog}
-                §O{str}
-                §R dog.
+            module TestModule
+              class Animal
+                field string:name private
+              class Mammal extends Animal
+                field bool:warmBlooded private
+              class Dog extends Mammal
+                field string:breed private
+              func Test private (Dog:dog) → string
+                return dog.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "dog.");
@@ -830,6 +792,27 @@ public class CompletionHandlerTests
 
     #region Generic Type Tests
 
+    [Theory]
+    [InlineData("System.Collections.Generic.List<int>", "Add", true)]
+    [InlineData("System.Collections.Generic.Dictionary<string,int>", "ContainsKey", true)]
+    [InlineData("LIST<int>", "Add", false)]
+    [InlineData("list<int>", "Add", false)]
+    [InlineData("Dict<string,int>", "ContainsKey", false)]
+    [InlineData("DICT<string,int>", "ContainsKey", false)]
+    [InlineData("dict<string,int>", "ContainsKey", false)]
+    public void CanonicalCompletion_CollectionsUseExactCSharpNames(string type, string member, bool recognized)
+    {
+        var header = $$"""
+            module CollectionCompletion
+              func Test private ({{type}}:items) → int
+            """;
+        if (recognized)
+            AssertNativeSource(header + "\n    return 0");
+
+        var completions = LspTestHarness.GetCompletions(header + "\n    return items.", "items.");
+        Assert.Equal(recognized, completions.Any(item => item.Label == member));
+    }
+
     // NOTE: Index access completion (e.g., list[0].) requires proper extraction
     // of the expression before the dot and type resolution of generic parameters.
     // These tests verify the implementation works correctly.
@@ -839,15 +822,13 @@ public class CompletionHandlerTests
     {
         // Test basic index access on a generic list parameter
         var source = """
-            §M{TestModule}
-              §CL{Person}
-                §FLD{str:name}
-                §FLD{i32:age}
-              §F{Test}
-                §I{List<Person>:people}
-                §O{str}
-                §B{p:Person} people[0]
-                §R p.
+            module TestModule
+              class Person
+                field string:name private
+                field int:age private
+              func Test private (System.Collections.Generic.List<Person>:people) → string
+                let Person:p = people[0]
+                return p.
             """;
 
         // Using intermediate variable to simplify - direct index access completions
@@ -863,16 +844,14 @@ public class CompletionHandlerTests
     public void GenericList_ChainedIndexAccess_WorksCorrectly()
     {
         var source = """
-            §M{TestModule}
-              §CL{Address}
-                §FLD{str:city}
-              §CL{Person}
-                §FLD{Address:address}
-              §F{Test}
-                §I{List<Person>:people}
-                §O{str}
-                §B{p:Person} people[0]
-                §R p.address.
+            module TestModule
+              class Address
+                field string:city private
+              class Person
+                field Address:address private
+              func Test private (System.Collections.Generic.List<Person>:people) → string
+                let Person:p = people[0]
+                return p.address.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "p.address.");
@@ -885,14 +864,12 @@ public class CompletionHandlerTests
     public void ArraySyntax_IndexAccess_ResolvesElementType()
     {
         var source = """
-            §M{TestModule}
-              §CL{Item}
-                §FLD{str:name}
-              §F{Test}
-                §I{Item[]:items}
-                §O{str}
-                §B{item:Item} items[0]
-                §R item.
+            module TestModule
+              class Item
+                field string:name private
+              func Test private (Item[]:items) → string
+                let Item:item = items[0]
+                return item.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "item.");
@@ -924,15 +901,13 @@ public class CompletionHandlerTests
     public void NestedGenericType_WorksCorrectly()
     {
         var source = """
-            §M{TestModule}
-              §CL{Person}
-                §FLD{str:name}
-              §F{Test}
-                §I{List<List<Person>>:nestedPeople}
-                §O{str}
-                §B{innerList:List<Person>} nestedPeople[0]
-                §B{p:Person} innerList[0]
-                §R p.
+            module TestModule
+              class Person
+                field string:name private
+              func Test private (System.Collections.Generic.List<System.Collections.Generic.List<Person>>:nestedPeople) → string
+                let System.Collections.Generic.List<Person>:innerList = nestedPeople[0]
+                let Person:p = innerList[0]
+                return p.
             """;
 
         // Using intermediate variables to verify generic type resolution
@@ -947,13 +922,11 @@ public class CompletionHandlerTests
     {
         // Test that generic type parameters like List<Person> are correctly parsed
         var source = """
-            §M{TestModule}
-              §CL{Person}
-                §FLD{str:name}
-              §F{Test}
-                §I{List<Person>:people}
-                §O{i32}
-                §R people.
+            module TestModule
+              class Person
+                field string:name private
+              func Test private (System.Collections.Generic.List<Person>:people) → int
+                return people.
             """;
 
         // List should show list methods
@@ -1034,14 +1007,14 @@ public class CompletionHandlerTests
     public void ScopeCompletion_MethodHasThisAndFields()
     {
         var source = """
-            §M{TestModule}
-              §CL{MyClass}
-                §FLD{str:myField}
-                §MT{MyMethod}
-                  §O{str}
-                  §R this.myField
+            module TestModule
+              class MyClass
+                field string:myField private
+                func MyMethod private () → string
+                  return this.myField
             """;
 
+        AssertNativeSource(source);
         var doc = LspTestHarness.CreateDocument(source);
         Assert.NotNull(doc.Ast);
 
@@ -1233,16 +1206,17 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_MethodContext_HasThisAndFields()
     {
         var source = """
-            §M{TestModule}
-              §CL{Counter}
-                §FLD{i32:count}
-                §FLD{str:name}
-                §MT{Increment}
-                  §O{i32}
-                  §R _CURSOR_
+            module TestModule
+              class Counter
+                field int:count private
+                field string:name private
+                func Increment private () → int
+                  return count
             """;
 
-        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+        AssertNativeSource(source);
+        var completions = LspTestHarness.GetExpressionCompletions(source,
+            source.LastIndexOf("count", StringComparison.Ordinal));
 
         // 'this' keyword should be available
         Assert.Contains(completions, c => c.Label == "this");
@@ -1255,16 +1229,14 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_MethodContext_HasMethodParameters()
     {
         var source = """
-            §M{TestModule}
-              §CL{Calculator}
-                §MT{Add}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §R _CURSOR_
+            module TestModule
+              class Calculator
+                func Add private (int:a, int:b) → int
+                  return a + b
             """;
 
-        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+        AssertNativeSource(source);
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "a + b");
 
         Assert.Contains(completions, c => c.Label == "a");
         Assert.Contains(completions, c => c.Label == "b");
@@ -1341,16 +1313,17 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_MatchStatement_PatternVariable()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §I{i32:value}
-                §O{str}
-                §W value
-                §K §VAR{x} §WHEN (> x 0) → _CURSOR_
-                §K _ → "other"
+            module TestModule
+              func Test (int:value) → string
+                match value
+                  case var x when x > 0
+                    return "positive"
+                  case _
+                    return "other"
             """;
 
-        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+        AssertNativeSource(source);
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "\"positive\"");
 
         Assert.Contains(completions, c => c.Label == "x");
     }
@@ -1359,18 +1332,18 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_ConstructorBody()
     {
         var source = """
-            §M{TestModule}
-              §CL{Person}
-                §FLD{str:_name}
-                §FLD{i32:_age}
-                §CTOR{pub}
-                §I{str:name}
-                §I{i32:age}
-                §ASSIGN §THIS._name _CURSOR_
-                §/CTOR
+            module TestModule
+              class Person
+                field string:_name private
+                field int:_age private
+                ctor (string:name, int:age)
+                  set this._name name
+                  set this._age age
             """;
 
-        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+        AssertNativeSource(source);
+        var completions = LspTestHarness.GetExpressionCompletions(source,
+            source.IndexOf("set this._name name", StringComparison.Ordinal) + "set this._name ".Length);
 
         Assert.Contains(completions, c => c.Label == "name");
         Assert.Contains(completions, c => c.Label == "age");
@@ -1405,17 +1378,16 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_TryCatch_ExceptionVariable()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §O{str}
-                §TR
-                §R "success"
-                §CA{Exception:ex}
-                §R _CURSOR_
-                §/TR
+            module TestModule
+              func Test () → string
+                try
+                  return "success"
+                catch System.Exception:ex
+                  return "failure"
             """;
 
-        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+        AssertNativeSource(source);
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "\"failure\"");
 
         // Exception variable 'ex' should be in scope in catch block
         Assert.Contains(completions, c => c.Label == "ex");
@@ -1425,18 +1397,17 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_ClassProperties()
     {
         var source = """
-            §M{TestModule}
-              §CL{Rectangle}
-                §FLD{f64:_width}
-                §FLD{f64:_height}
-                §PROP{Area:pub}
-                §GET
-                §R _CURSOR_
-                §/GET
-                §/PROP
+            module TestModule
+              class Rectangle
+                field double:_width private
+                field double:_height private
+                property double:Area
+                  get
+                    return _width * _height
             """;
 
-        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+        AssertNativeSource(source);
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_width * _height");
 
         // Fields should be accessible from property getter
         Assert.Contains(completions, c => c.Label == "_width");

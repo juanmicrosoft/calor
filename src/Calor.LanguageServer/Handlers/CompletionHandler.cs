@@ -619,7 +619,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
         var (baseType, typeArgs) = ParseGenericType(collectionType);
 
         // Handle generic collections
-        if (baseType is "List" or "LIST" or "list" or "Array" or "ARRAY")
+        if (baseType is "List" or "System.Collections.Generic.List" or "Array" or "System.Array")
         {
             return typeArgs.Count > 0 ? typeArgs[0] : "object";
         }
@@ -745,14 +745,12 @@ public sealed class CompletionHandler : CompletionHandlerBase
             return ResolveBuiltInStringMember(memberName, isMethodCall);
         }
 
-        if (baseTypeName is "List" or "LIST" or "list" ||
-            typeName.StartsWith("List<") || typeName.StartsWith("LIST<") || typeName.StartsWith("list<"))
+        if (baseTypeName is "List" or "System.Collections.Generic.List")
         {
             return ResolveBuiltInListMember(typeName, memberName, isMethodCall, typeArgs);
         }
 
-        if (baseTypeName is "Dict" or "DICT" or "dict" ||
-            typeName.StartsWith("Dict<") || typeName.StartsWith("DICT<") || typeName.StartsWith("dict<"))
+        if (baseTypeName is "Dictionary" or "System.Collections.Generic.Dictionary")
         {
             return ResolveBuiltInDictMember(typeName, memberName, isMethodCall, typeArgs);
         }
@@ -1124,14 +1122,12 @@ public sealed class CompletionHandler : CompletionHandlerBase
         }
 
         // Built-in collection methods
-        if (baseTypeName is "List" or "LIST" or "list" ||
-            typeName.StartsWith("List<") || typeName.StartsWith("LIST<") || typeName.StartsWith("list<"))
+        if (baseTypeName is "List" or "System.Collections.Generic.List")
         {
             items.AddRange(GetListMembers());
         }
 
-        if (baseTypeName is "Dict" or "DICT" or "dict" ||
-            typeName.StartsWith("Dict<") || typeName.StartsWith("DICT<") || typeName.StartsWith("dict<"))
+        if (baseTypeName is "Dictionary" or "System.Collections.Generic.Dictionary")
         {
             items.AddRange(GetDictMembers());
         }
