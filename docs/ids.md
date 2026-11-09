@@ -71,6 +71,18 @@ Frozen original inputs, historical replay probes, and immutable ledgers retain
 their original bytes. They are not active inputs to current identity tooling.
 Do not register them merely because they have a `.calr` extension.
 
+The eight registered edit scripts keep their original `script.json` files and
+source bytes. Current compiler and CLI checks resolve all 57 source snapshots
+through `tests/TestData/ActiveSyntax/inputs.json`. The active ES-08 copies retain
+the registered diagnostic positions, including padding before its delegate
+invocation; its expected diagnostics are unchanged. These checks are current
+regressions, not historical remeasurements.
+
+The in-process edit-script harness synchronizes its explicit workspace inputs
+before calling the compilation driver, as the CLI does. It checks persisted
+declaration IDs across each sequence, unchanged sidecar bytes on resynchronization,
+and the original cache-reuse witnesses.
+
 ## Conservative reconciliation
 
 Synchronization preserves identity for an exact declaration key: file, container,

@@ -1,0 +1,17 @@
+module App
+  func Double (int:x) → int
+    !
+    return x * 2
+
+  func Announce (int:x) → int
+    ! cw
+    Console.WriteLine(x)
+    return x
+
+  func UsePure (int[]:xs) → int[]
+    ! alloc, mut
+    return Map(xs, Double)
+
+  func UseImpure (int[]:xs) → int[]
+    ! alloc, mut, cw
+    return Map(xs, Announce)

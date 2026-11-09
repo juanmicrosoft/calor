@@ -1,0 +1,4 @@
+module Ledger
+  func Post () → void
+    !
+    Console.WriteLine("posting")

@@ -1,0 +1,4 @@
+module Undocumented
+  func Speak () → void
+    ! cw
+    Console.WriteLine("no module context, no contracts")

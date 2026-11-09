@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Calor.Compiler;
+using Calor.Compiler.Tests;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Indexing;
 using Xunit;
@@ -69,7 +70,8 @@ internal static class EditScriptCorpus
             File.Delete(Path.ChangeExtension(existing, ".g.cs"));
         }
         foreach (var source in Directory.GetFiles(stepDirectory, "*.calr"))
-            File.Copy(source, Path.Combine(workspace, Path.GetFileName(source)), overwrite: true);
+            File.Copy(ActiveSyntaxInputs.ForCurrentCompiler(RepoRoot, source),
+                Path.Combine(workspace, Path.GetFileName(source)), overwrite: true);
     }
 
     internal static IReadOnlyList<string> Canonicalize(DiagnosticBag diagnostics, string workspace) =>

@@ -1,0 +1,6 @@
+/// documented, edited every step to keep the build warm
+module Churn
+  /// prints one fixed line
+  func Tick () → void
+    ! cw
+    Console.WriteLine("tick 2")

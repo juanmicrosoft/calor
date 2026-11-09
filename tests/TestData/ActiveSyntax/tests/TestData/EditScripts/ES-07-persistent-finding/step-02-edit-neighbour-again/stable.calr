@@ -1,0 +1,6 @@
+/// documented, and never edited: this file is the cache hit
+module Stable
+  /// prints one fixed line
+  func Wave () → void
+    ! cw
+    Console.WriteLine("wave")

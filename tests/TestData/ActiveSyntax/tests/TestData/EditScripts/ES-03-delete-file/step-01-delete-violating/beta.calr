@@ -1,0 +1,4 @@
+module Beta
+  func Wave () → void
+    ! cw
+    Console.WriteLine("wave")

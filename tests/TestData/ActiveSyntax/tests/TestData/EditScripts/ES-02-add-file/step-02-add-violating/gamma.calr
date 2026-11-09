@@ -1,0 +1,4 @@
+module Gamma
+  func Shout () → void
+    ! cw
+    Console.WriteLine("gamma")

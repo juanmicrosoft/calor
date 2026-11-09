@@ -1,0 +1,4 @@
+module Alpha
+  func Greet () → void
+    ! cw
+    Console.WriteLine("hello there")

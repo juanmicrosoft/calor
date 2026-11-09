@@ -56,10 +56,12 @@ public sealed class EditScriptIdentityTests : IDisposable
         // sequence, mutated in place the way an editing session mutates it.
         var incremental = new List<StepOutcome>();
         var incrementalWorkspace = CreateTempDir();
+        var allocatedIdentities = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var step in script.Steps)
         {
             SyncWorkspace(incrementalWorkspace, step.SourceDirectory);
             incremental.Add(RunStep(incrementalWorkspace, step, clearFirst: false));
+            AssertDeclarationIdentityContinuity(incrementalWorkspace, allocatedIdentities);
         }
 
         for (var index = 0; index < script.Steps.Count; index++)
@@ -373,7 +375,7 @@ public sealed class EditScriptIdentityTests : IDisposable
                     Directory.GetFiles(step.SourceDirectory, "*.calr")
                         .OrderBy(path => path, StringComparer.Ordinal)
                         .Select(path =>
-                            $"{Path.GetFileName(path)}\n{File.ReadAllText(path)}")),
+                            $"{Path.GetFileName(path)}\n{File.ReadAllText(ActiveSyntaxInputs.ForCurrentCompiler(RepoRoot, path))}")),
                 step.Options))
             .ToArray();
 
@@ -387,6 +389,29 @@ public sealed class EditScriptIdentityTests : IDisposable
     }
 
     // --- harness -----------------------------------------------------------
+
+    private static void AssertDeclarationIdentityContinuity(
+        string workspace, Dictionary<string, string> allocated)
+    {
+        var store = new Ids.DeclarationIdentityStore(workspace);
+        Assert.True(File.Exists(store.SidecarPath), "The build inputs must have persisted declaration identity.");
+        var persisted = File.ReadAllBytes(store.SidecarPath);
+        var state = store.Sync();
+        Assert.Equal(persisted, File.ReadAllBytes(store.SidecarPath));
+        Assert.NotEmpty(state.Declarations);
+        Assert.Equal(
+            Directory.GetFiles(workspace, "*.calr").Select(Path.GetFileName).Order(StringComparer.Ordinal),
+            state.Files.Order(StringComparer.Ordinal));
+        foreach (var declaration in state.Declarations)
+        {
+            if (allocated.TryGetValue(declaration.Key, out var previous))
+                Assert.Equal(previous, declaration.Id);
+            else
+                allocated.Add(declaration.Key, declaration.Id);
+            Assert.DoesNotContain(declaration.Id,
+                File.ReadAllText(Path.Combine(workspace, declaration.File)));
+        }
+    }
 
     private sealed record StepOutcome(
         IReadOnlyList<string> Diagnostics,
@@ -402,6 +427,7 @@ public sealed class EditScriptIdentityTests : IDisposable
             .ToList();
         var sink = new DiagnosticBag();
         var compiled = 0;
+        Ids.DeclarationIdentityStore.SyncActiveInputs(sources.Select(file => file.FullName), workspace);
 
         var result = CompilationDriver.CompileAll(
             sources,

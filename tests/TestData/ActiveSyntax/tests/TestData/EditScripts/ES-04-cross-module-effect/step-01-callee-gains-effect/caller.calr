@@ -1,0 +1,4 @@
+module App
+  func Main () → void
+    ! db:w
+    SaveOrder()

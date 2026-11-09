@@ -1,0 +1,4 @@
+module Delta
+  func Quiet () → void
+    !
+    Console.WriteLine("delta")
