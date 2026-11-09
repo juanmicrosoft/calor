@@ -135,6 +135,8 @@ public class DocDriftCheckerTests
     [InlineData("getting-started/installation.mdx", 1, 0,
         new[] { "InstalledHello" }, new[] { "0" },
         new[] { "((System.Func<int>)(() => { GlobalModule.Main(); return 0; }))()" })]
+    [InlineData("getting-started/gemini-integration.mdx", 1, 0,
+        new[] { "GeminiDivision" }, new[] { "4" }, new[] { "GlobalModule.Divide(9, 2)" })]
     [InlineData("cli/init.mdx", 1, 0,
         new[] { "InitializedExample" }, new[] { "42" }, new[] { "GlobalModule.Answer()" })]
     [InlineData("cli/compile.mdx", 2, 1,
@@ -752,6 +754,33 @@ public class DocDriftCheckerTests
                     public static object? Run() => {{call}};
                 }
                 """));
+    }
+
+    [Theory]
+    [InlineData("9, 2", "4", "4")]
+    [InlineData("9, -2", "-4", "-4")]
+    [InlineData("-9, 2", "-4", "-4")]
+    [InlineData("9, 0", "!ContractViolationException", "!DivideByZeroException")]
+    [InlineData("int.MinValue, -1", "!OverflowException", "!OverflowException")]
+    public void PublicGeminiGuide_PreservesDivisionContractAndCheckedOverflow(
+        string arguments, string enabled, string disabled)
+    {
+        var path = "website/content/getting-started/gemini-integration.mdx";
+        var source = Assert.Single(ExemplarCompileChecker.ExtractCompletePrograms(
+            File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))).Source;
+        foreach (var (mode, expected) in new[] { (ContractMode.Debug, enabled), (ContractMode.Off, disabled) })
+        {
+            var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = mode });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run() => GlobalModule.Divide({{arguments}});
+                }
+                """);
+            Assert.Equal(expected, observed);
+        }
     }
 
     [Theory]
