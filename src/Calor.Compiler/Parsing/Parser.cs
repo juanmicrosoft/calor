@@ -6582,11 +6582,18 @@ public sealed class Parser
         ExpressionNode? initializer = null;
         if (Current.Span.Line == start.Span.Line && Match(TokenKind.Equals))
         {
-            if (Current.Span.Line == start.Span.Line && IsExpressionStart())
+            var continuation = Current.Span.Line > start.Span.Line
+                && LineIndentColumnAt(_position) > LineIndentColumnAt(IndexOfRecentToken(start));
+            if ((Current.Span.Line == start.Span.Line || continuation) && IsExpressionStart())
+            {
                 initializer = ParseExpression();
+                if (continuation && Check(TokenKind.Dedent)
+                    && Current.IndentationDepth == start.IndentationDepth)
+                    Advance();
+            }
             else
                 _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
-                    "A binding initializer must follow '=' on the same line.");
+                    "A binding initializer must follow '=' on the same line or on a deeper-indented continuation.");
         }
         else if (type == null)
             _diagnostics.ReportError(start.Span, DiagnosticCode.UnexpectedToken,
