@@ -173,8 +173,8 @@ int i = checked((int)f);
 
 ### Preconditions
 
-**Schematic C# implementation** (the actual exception API uses positional
-message, function ID, and kind arguments):
+**Schematic C# implementation** (the ID and spans are placeholders; the emitter
+supplies the actual declaration identity and source location):
 ```csharp
 public int MyFunction(int x)
 {
@@ -183,28 +183,30 @@ public int MyFunction(int x)
     {
         throw new Calor.Runtime.ContractViolationException(
             "Precondition failed", "f001", Calor.Runtime.ContractKind.Requires,
+            startOffset: 0, length: 0,
             condition: "x > 0");
     }
 
     // Body
-    return x * 2;
+    return checked(x * 2);
 }
 ```
 
 ### Postconditions
 
-**C# Implementation:**
+**Schematic C# implementation:**
 ```csharp
 public int MyFunction(int x)
 {
     // Body
-    var __result = x * 2;
+    var __result = checked(x * 2);
 
     // ENSURES: result > x
     if (!(__result > x))
     {
         throw new Calor.Runtime.ContractViolationException(
             "Postcondition failed", "f001", Calor.Runtime.ContractKind.Ensures,
+            startOffset: 0, length: 0,
             condition: "__result > x");
     }
 

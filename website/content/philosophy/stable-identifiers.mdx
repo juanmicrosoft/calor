@@ -9,11 +9,14 @@ source. Persistent identities belong in the tooling-maintained per-project
 sidecar, `.calor/ids.json`.
 
 ```calor
-§M{Calculator}
-  §F{Calculate:pub} (i32:x) -> i32
-    §E{}
-    §R (* x 2)
+module Calculator
+  func Calculate public (int:x) → int
+    !
+    return x * 2
 ```
+
+`Calculate(21)` returns `42`. The file label `Calculator` is not a static
+class name; this top-level function is emitted in `GlobalModule`.
 
 There is no optional ID-first source form. Agents edit the program, not identity
 fields. Build and project tools synchronize active compilation inputs

@@ -174,6 +174,12 @@ public class DocDriftCheckerTests
         new[] { "GlobalModule.Divide(9, 2)", "GlobalModule.Add(20, 22)" })]
     [InlineData("philosophy/design-principles.mdx", 1, 0,
         new[] { "DesignContracts" }, new[] { "4" }, new[] { "GlobalModule.Divide(9, 2)" })]
+    [InlineData("philosophy/stable-identifiers.mdx", 1, 0,
+        new[] { "Calculator" }, new[] { "42" }, new[] { "GlobalModule.Calculate(21)" })]
+    [InlineData("philosophy/effects-contracts-enforcement.mdx", 4, 1,
+        new[] { "VisibleConsoleEffect", "EnforcedDivide", "DeclaredConsoleEffect" },
+        new[] { "42", "4", "True" },
+        new[] { "GlobalModule.LogRetrieval(42)", "GlobalModule.Divide(9, 2)", "GlobalModule.ProcessOrder(42)" })]
     [InlineData("semantics/versioning.mdx", 1, 0,
         new[] { "InstalledSemantics" }, new[] { "42" }, new[] { "GlobalModule.Next(41)" })]
     [InlineData("semantics/core.mdx", 7, 0,
@@ -578,6 +584,111 @@ public class DocDriftCheckerTests
         Assert.Equal(expectedStatus, postcondition.GetProperty("status").GetString());
         if (expectedError)
             Assert.NotEmpty(postcondition.GetProperty("counterexample").GetProperty("bindings").EnumerateArray());
+    }
+
+    [Theory]
+    [InlineData("VisibleConsoleEffect", "GlobalModule.LogRetrieval(42)", "Retrieved user 42|:42")]
+    [InlineData("DeclaredConsoleEffect", "GlobalModule.ProcessOrder(42)", "Order 42|:True")]
+    public void PublicEnforcementOpportunity_ExecutesTheActualConsoleEffectsOnce(
+        string module, string expression, string expected)
+    {
+        const string path = "website/content/philosophy/effects-contracts-enforcement.mdx";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith($"module {module}\n", StringComparison.Ordinal)).Source;
+        var compiled = Program.Compile(source, path);
+        Assert.Empty(compiled.Diagnostics);
+        var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+            public static class Probe
+            {
+                public static object? Run()
+                {
+                    var previous = System.Console.Out;
+                    using var output = new System.IO.StringWriter();
+                    try
+                    {
+                        System.Console.SetOut(output);
+                        var value = {{expression}};
+                        return output.ToString().Replace(System.Environment.NewLine, "|") + ":" + value;
+                    }
+                    finally { System.Console.SetOut(previous); }
+                }
+            }
+            """);
+        Assert.Equal(expected, observed);
+    }
+
+    [Fact]
+    public void PublicEnforcementOpportunity_RejectsTheSelectedConsoleChainRatherThanAnUnknownCall()
+    {
+        const string path = "website/content/philosophy/effects-contracts-enforcement.mdx";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path));
+        var negative = Assert.Single(System.Text.RegularExpressions.Regex.Matches(content,
+            @"```calor expect=Calor0410\r?\n(?<body>.*?)\r?\n```",
+            System.Text.RegularExpressions.RegexOptions.Singleline));
+        var compiled = Program.Compile(negative.Groups["body"].Value, path);
+        Assert.True(compiled.HasErrors);
+        Assert.Empty(compiled.GeneratedCode);
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("'ProcessOrder'", StringComparison.Ordinal)
+            && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == "Calor0411");
+    }
+
+    [Theory]
+    [InlineData("GlobalModule.Divide(9, 0)", "!ContractViolationException", "!DivideByZeroException")]
+    [InlineData("GlobalModule.Divide(int.MinValue, -1)", "!OverflowException", "!OverflowException")]
+    public void PublicEnforcementOpportunity_SeparatesContractGuardsFromArithmetic(
+        string expression, string enabled, string disabled)
+    {
+        const string path = "website/content/philosophy/effects-contracts-enforcement.mdx";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith("module EnforcedDivide\n", StringComparison.Ordinal)).Source;
+        foreach (var mode in new[] { ContractMode.Debug, ContractMode.Release, ContractMode.Off })
+        {
+            var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = mode });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run() => {{expression}};
+                }
+                """);
+            Assert.Equal(mode == ContractMode.Off ? disabled : enabled, observed);
+        }
+    }
+
+    [Theory]
+    [InlineData(2, "4")]
+    [InlineData(0, "!ContractViolationException")]
+    [InlineData(int.MaxValue, "!OverflowException")]
+    public void PublicBackendReference_CompilesAndExecutesBothPublishedCSharpContractApis(int input, string expected)
+    {
+        const string path = "website/content/semantics/dotnet-backend.mdx";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path));
+        var implementations = System.Text.RegularExpressions.Regex.Matches(content,
+                @"```csharp\r?\n(?<body>.*?)\r?\n```",
+                System.Text.RegularExpressions.RegexOptions.Singleline)
+            .Select(match => match.Groups["body"].Value)
+            .Where(body => body.Contains("public int MyFunction(int x)", StringComparison.Ordinal)).ToArray();
+        Assert.Equal(2, implementations.Length);
+        foreach (var implementation in implementations)
+        {
+            var observed = InteropScope.RefOutImplementationTests.Run($$"""
+                public class BackendContractExample
+                {
+                    {{implementation}}
+                }
+                public static class Probe
+                {
+                    public static object? Run() => new BackendContractExample().MyFunction({{input}});
+                }
+                """);
+            Assert.Equal(expected, observed);
+        }
     }
 
     [Theory]
