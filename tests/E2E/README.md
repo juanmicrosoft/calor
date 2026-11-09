@@ -2132,7 +2132,7 @@ behavioral or entry-timeout credit), and two actual helper-build image
 substitution controls. Finite negatives require exited verifier failures with
 declared behavioral diagnostics and exact outer and nested exit-1 wrappers.
 Direct or wrapped timeout, EOF, cleanup, build, native-loading, OS/launch,
-UNKNOWN and abnormal-status failures propagate even when an expected behavioral
+`UNKNOWN`/solver-unknown and abnormal-status failures propagate even when an expected behavioral
 diagnostic is also present. Positive evidence rejects infrastructure and failure
 contamination and requires one complete canonical compiler identity, including
 rejection of indented or mixed-prefix extra identities. Explicit prerequisite
@@ -2155,6 +2155,10 @@ locked-restores only from the local package cache and builds its own source.
 Historical IDs occur only in disposable old inputs; current rejection of those
 IDs is mandatory. Each positive checks the exact selected root/configuration/
 `calor.dll` path. Missing cached dependencies fail without a network fallback.
+Each arm uses at most two isolated workers; arms remain sequential. Every entry
+keeps its own source workspace, fresh helper build, image checks and owned
+subprocess IO. Locked counters require all 97 outcomes under the same original
+total deadline; no helper cache or prebuilt compatibility arm is substituted.
 
 The shared selected-image checks retain their top-level/`runtimes/` copy scope,
 excluding unrelated publish artifacts. Native `Context` loading, per-process/

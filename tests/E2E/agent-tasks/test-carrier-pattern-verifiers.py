@@ -2,6 +2,8 @@
 """Disposable original pm-004/005 native carrier matching controls."""
 
 import importlib.util
+from concurrent.futures import ThreadPoolExecutor
+import io
 import os
 from pathlib import Path
 import re
@@ -9,8 +11,9 @@ import shutil
 import sys
 import tempfile
 import time
+from threading import Barrier, Lock
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 HERE = Path(__file__).resolve().parent
 ROOT = Path(os.environ.get("CALOR_COMPILER_ROOT", str(HERE.parents[2]))).resolve()
@@ -18,6 +21,7 @@ TASKS = {"pm004": ("04_option_some_matching", "UnwrapOrDefault"),
          "pm005": ("05_result_ok_err_matching", "HandleResult")}
 COUNTS = {"pm004": (210, 1050), "pm005": (90, 360)}
 EXECUTED = {"accepted": 0, "rejected": 0}
+COUNTER_LOCK = Lock()
 REJECTIONS = {
     "missing": ("Input missing:",),
     "invalid-source": ("Calor compilation failed:",),
@@ -159,12 +163,13 @@ def controls(profile):
 INFRASTRUCTURE = re.compile(
     r"\b(?:EOF|cleanup|OSError|EOFError|FileNotFoundError|PermissionError|TimeoutError|Traceback|errno"
     r"|DllNotFoundException|TypeInitializationException|FileNotFoundException|BadImageFormatException"
-    r"|OutOfMemoryException|Win32Exception|Z3Exception|unknown|unmodeled|unclassified|supervision|infrastructure)\b"
+    r"|OutOfMemoryException|Win32Exception|Z3Exception|unmodeled|unclassified|supervision|infrastructure)\b"
     r"|inherited (?:pipe|stdout|stderr)|broken pipe|cannot terminate|process group"
     r"|permission denied|no such file|(?:failed|unable) to (?:launch|start)|could not (?:launch|start)"
     r"|launch failure|OS error|operating.system error"
     r"|selected compiler dependency|selected native manifest|selected compiler/native image"
-    r"|image changed or was substituted|build failed",
+    r"|image changed or was substituted|build failed"
+    r"|\b(?-i:UNKNOWN)\b|solver[^\n]*(?:unknown|timeout|timed out)|(?:unknown|timeout)[^\n]*solver",
     re.IGNORECASE,
 )
 TIMEOUT = re.compile(r"timeout|timed out|deadline", re.IGNORECASE)
@@ -230,6 +235,16 @@ def assert_selected_compiler(output, environment):
         raise AssertionError(f"Wrong selected compiler identity:\n{output}")
 
 
+def record_outcome(expected):
+    with COUNTER_LOCK:
+        EXECUTED["accepted" if expected else "rejected"] += 1
+
+
+def execution_counts():
+    with COUNTER_LOCK:
+        return dict(EXECUTED)
+
+
 def execute(profile, text, expected, root=ROOT, deadline=None, environment=None, category=None):
     with tempfile.TemporaryDirectory(prefix="calor-carrier-pattern-control-") as temporary:
         workspace = Path(temporary)
@@ -259,7 +274,7 @@ def execute(profile, text, expected, root=ROOT, deadline=None, environment=None,
                 raise
             if category not in REJECTIONS or not any(marker in output for marker in REJECTIONS[category]):
                 raise RuntimeError(f"Unknown/unmodeled {profile}/{category} rejection:\n{output}") from error
-            EXECUTED["rejected"] += 1
+            record_outcome(False)
             return output
         if not expected:
             raise AssertionError(f"{profile}: unexpected acceptance:\n{output}")
@@ -269,12 +284,12 @@ def execute(profile, text, expected, root=ROOT, deadline=None, environment=None,
                     f"{cases} independent runtime cases; {counterfactuals} successful complete-case")
         if required not in output or "optional contracts execute." not in output:
             raise AssertionError(f"{profile}: missing complete native behavioral evidence:\n{output}")
-        EXECUTED["accepted"] += 1
+        record_outcome(True)
         return output
 
 
 def run_compatibility(old, current, deadline):
-    before = dict(EXECUTED)
+    before = execution_counts()
     representatives = []
     shared_rejections = set()
     # All positive forms run for both exact signatures. Each distinct shared
@@ -297,19 +312,29 @@ def run_compatibility(old, current, deadline):
     if len(representatives) != 48 or shared_rejections != set(REJECTIONS) - {"historical-ids"}:
         raise AssertionError("Incomplete representative carrier pattern categories.")
     representatives.sort(key=lambda control: control[3])
+    def run_case(item):
+        label, root, profile, category, text, expected = item
+        if time.monotonic() >= deadline:
+            raise RuntimeError("Carrier pattern compatibility exceeded its 600-second deadline.")
+        try:
+            execute(profile, historical(text) if label == "v0.29" else text, expected, root, deadline,
+                    category=category)
+        except Exception as error:
+            raise RuntimeError(f"{label}/{profile}/{category}: {error}") from error
+
     for label, root in (("v0.29", old), ("current", current)):
-        for profile, category, text, expected in representatives:
-            try:
-                execute(profile, historical(text) if label == "v0.29" else text, expected, root, deadline,
-                        category=category)
-            except Exception as error:
-                raise RuntimeError(f"{label}/{profile}/{category}: {error}") from error
+        batch = [(label, root, *control) for control in representatives]
+        # Each entry owns its workspace, helper build, images and subprocesses.
+        # Arms stay sequential; two workers share only the absolute deadline.
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            for _ in workers.map(run_case, batch):
+                pass
         print(f"{label}: all distinct native carrier pattern positive/adversarial categories executed.")
     execute("pm004", historical(source("pm004")), False, current, deadline, category="historical-ids")
     expected_accepts = 2 * sum(expected for _, _, _, expected in representatives)
     expected_rejects = 2 * sum(not expected for _, _, _, expected in representatives) + 1
-    if EXECUTED != {"accepted": before["accepted"] + expected_accepts,
-                    "rejected": before["rejected"] + expected_rejects}:
+    if execution_counts() != {"accepted": before["accepted"] + expected_accepts,
+                              "rejected": before["rejected"] + expected_rejects}:
         raise AssertionError("Incomplete actual old/current carrier pattern matrix.")
     print(f"Compatibility passed: {expected_accepts + expected_rejects} actual old/current carrier pattern entrypoints "
           f"({expected_accepts} accepted, {expected_rejects} rejected).")
@@ -465,6 +490,25 @@ class CarrierPatternAdmissionTests(unittest.TestCase):
             self.assertEqual(EXECUTED, {"accepted": 0, "rejected": 0})
         print("Checked 6 actual OSError/EOFError/TimeoutError propagation paths; synthetic counters isolated.")
 
+    def test_native_unknown_visibility_does_not_mask_solver_unknown(self):
+        output = ("Verifier command exited 1:\nVerification failed: Verifier command exited 1:\n"
+                  "Verification failed: System.InvalidOperationException: Calor compilation failed:\n"
+                  "Calculator.calr:5:3 Calor0100 Source IDs are removed from '§F'.\n"
+                  "Calculator.calr:5:3 Calor0122 Unknown visibility 'UnwrapOrDefault'. "
+                  "Valid visibility words: pub, int, prot, priv, prot-int, priv-prot.\n")
+        with patch.dict(EXECUTED, {"accepted": 0, "rejected": 0}, clear=True):
+            with patch.object(PROCESS, "run", side_effect=RuntimeError(output)):
+                execute("pm004", historical(source("pm004")), False, category="historical-ids")
+            for contamination in ("UNKNOWN", "solver returned unknown", "unknown result from solver"):
+                error = RuntimeError(output + contamination + "\n")
+                with self.subTest(contamination=contamination), patch.object(PROCESS, "run", side_effect=error):
+                    with self.assertRaises(RuntimeError) as raised:
+                        execute("pm004", historical(source("pm004")), False, category="historical-ids")
+                    self.assertIs(raised.exception, error)
+            self.assertEqual(execution_counts(), {"accepted": 0, "rejected": 1})
+        print("Checked native Calor0122 Unknown visibility versus 3 UNKNOWN/solver-unknown contaminations; "
+              "synthetic counters isolated.")
+
     def test_execute_positive_unique_complete_identity_and_clean_evidence(self):
         environment = {"CALOR_COMPILER_ROOT": str(ROOT) + "/../" + ROOT.name,
                        "CALOR_COMPILER_CONFIGURATION": "Release"}
@@ -553,6 +597,73 @@ class CarrierPatternAdmissionTests(unittest.TestCase):
                 reject_prerequisite(["unused"], {}, refusal)
         print(f"Checked {rejected} contaminated prerequisite/timeout refusals, 4 exact refusals, "
               "2 bootstrap non-admission paths, 3 direct exception paths and 1 success-shaped refusal.")
+
+
+class CarrierPatternSchedulingTests(unittest.TestCase):
+    def test_isolated_two_worker_arms_keep_all_cases_and_exact_counters(self):
+        old, current = Path("/synthetic/carrier-old"), Path("/synthetic/carrier-current")
+        total_deadline = time.monotonic() + 30
+        barrier = Barrier(2)
+        state_lock = Lock()
+        active = 0
+        peak = 0
+        seen = []
+
+        def verify(profile, text, expected, root=ROOT, deadline=None, environment=None, category=None):
+            nonlocal active, peak
+            self.assertIsNone(environment)
+            self.assertEqual(deadline, total_deadline)
+            if category == "historical-ids":
+                self.assertEqual(root, current)
+                self.assertEqual(active, 0)
+                self.assertEqual(len(seen), 96)
+            else:
+                original = next(t for c, t, e in controls(profile) if c == category and e == expected)
+                self.assertEqual(text, historical(original) if root == old else original)
+                with state_lock:
+                    if root == current:
+                        self.assertEqual(sum(r == old for r, _, _ in seen), 48)
+                    active += 1
+                    peak = max(peak, active)
+                    self.assertLessEqual(active, 2)
+                barrier.wait(timeout=5)
+                with state_lock:
+                    active -= 1
+            with state_lock:
+                seen.append((root, profile, category))
+            record_outcome(expected)
+
+        with patch.dict(EXECUTED, {"accepted": 7, "rejected": 9}, clear=True), \
+                patch.dict(run_compatibility.__globals__, {"execute": verify}), \
+                patch("sys.stdout", new_callable=io.StringIO) as output:
+            run_compatibility(old, current, total_deadline)
+            self.assertEqual(execution_counts(), {"accepted": 55, "rejected": 58})
+            self.assertIn("97 actual old/current carrier pattern entrypoints (48 accepted, 49 rejected)", output.getvalue())
+        self.assertEqual(peak, 2)
+        self.assertEqual(len(seen), len(set(seen)))
+        old_cases = {(profile, category) for root, profile, category in seen if root == old}
+        current_cases = {(profile, category) for root, profile, category in seen
+                         if root == current and category != "historical-ids"}
+        self.assertEqual(len(old_cases), 48)
+        self.assertEqual(old_cases, current_cases)
+        self.assertEqual({category for _, category in old_cases},
+                         {category for profile in TASKS for category, _, _ in controls(profile)})
+        print("Checked 97 synthetic scheduled cases: two-worker maximum, sequential arms, "
+              "unchanged category/text sets and exact locked counters; zero actual entrypoint credit.")
+
+    def test_expired_deadline_and_worker_infrastructure_never_complete(self):
+        with patch.dict(EXECUTED, {"accepted": 0, "rejected": 0}, clear=True), \
+                patch.dict(run_compatibility.__globals__, {"execute": Mock()}) as namespace:
+            with self.assertRaisesRegex(RuntimeError, "600-second deadline"):
+                run_compatibility(Path("/synthetic/old"), ROOT, time.monotonic() - 1)
+            namespace["execute"].assert_not_called()
+            error = EOFError("inherited stdout EOF supervision failure")
+            namespace["execute"].side_effect = error
+            with self.assertRaises(RuntimeError) as raised:
+                run_compatibility(Path("/synthetic/old"), ROOT, time.monotonic() + 30)
+            self.assertIs(raised.exception.__cause__, error)
+            self.assertEqual(execution_counts(), {"accepted": 0, "rejected": 0})
+        print("Checked scheduler global-deadline and worker-EOF propagation; zero entrypoint credit.")
 
 
 if __name__ == "__main__":
