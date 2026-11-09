@@ -17,16 +17,18 @@ public sealed class ReceivingAndEffectDocumentationTests
     private const string Effects = "syntax-reference/effects";
 
     [Theory]
-    [InlineData(Nullability, 10, 3)]
-    [InlineData(CrossModule, 3, 1)]
-    [InlineData(Effects, 3, 0)]
-    public void CompleteExamples_PreserveCoverageAndExactNegativeContracts(string page, int programs, int negatives)
+    [InlineData(Nullability, 10, 3, 10)]
+    [InlineData(CrossModule, 3, 1, 6)]
+    [InlineData(Effects, 3, 0, 18)]
+    public void CompleteExamples_PreserveCoverageAndExactNegativeContracts(string page, int programs, int negatives,
+        int fences)
     {
         var coverage = new WebsiteExampleChecker.Coverage();
         var findings = WebsiteExampleChecker.Check([new DocFile(PagePath(page), Page(page))], coverage);
         Assert.True(findings.Count == 0, string.Join(Environment.NewLine, findings));
         Assert.Equal(programs, coverage.CompletePrograms);
         Assert.Equal(negatives, coverage.NegativePrograms);
+        Assert.Equal(fences, Fences(page).Count());
         Assert.Equal(programs, Fences(page).Count(source => ExemplarCompileChecker.StartsWithModule(source.Split('\n'))));
     }
 
@@ -127,15 +129,13 @@ public sealed class ReceivingAndEffectDocumentationTests
             string[] arguments = reverse
                 ? ["--input", "Handler.calr", "--input", "OrderService.calr", "--format", "json"]
                 : ["--input", "OrderService.calr", "--input", "Handler.calr", "--format", "json"];
-            var rejected = CliTestHarness.RunCli(directory, arguments);
-            Assert.Equal(1, rejected.ExitCode);
-            Assert.Equal(new[] { "Calor0410", "Calor0417" }, Codes(rejected.StdOut));
-            var diagnostics = JsonNode.Parse(rejected.StdOut)!["diagnostics"]!.AsArray();
-            Assert.Equal("error", Assert.Single(diagnostics.Where(diagnostic =>
-                diagnostic!["code"]!.GetValue<string>() == "Calor0410"))!["severity"]!.GetValue<string>());
-            Assert.Equal("warning", Assert.Single(diagnostics.Where(diagnostic =>
-                diagnostic!["code"]!.GetValue<string>() == "Calor0417"))!["severity"]!.GetValue<string>());
-            Assert.Contains("via cross-module call", rejected.StdOut);
+            AssertOriginalCrossModuleRejection(CliTestHarness.RunCli(directory, arguments));
+            if (qualified)
+            {
+                File.WriteAllText(Path.Combine(directory, "Handler.calr"),
+                    original.Replace("SaveOrder()", "OrderService.SaveOrder()", StringComparison.Ordinal));
+                AssertOriginalCrossModuleRejection(CliTestHarness.RunCli(directory, arguments));
+            }
 
             File.WriteAllText(Path.Combine(directory, "Handler.calr"), corrected);
             foreach (var warm in new[] { false, true })
@@ -146,6 +146,7 @@ public sealed class ReceivingAndEffectDocumentationTests
                 var assembly = Compile(
                     File.ReadAllText(Path.Combine(directory, "OrderService.g.cs")),
                     File.ReadAllText(Path.Combine(directory, "Handler.g.cs")));
+                Assert.Equal("OrderService", Method(assembly, "SaveOrder").DeclaringType!.Namespace);
                 Assert.Null(Method(assembly, "HandleRequest").Invoke(null, []));
             }
         }
@@ -195,6 +196,18 @@ public sealed class ReceivingAndEffectDocumentationTests
     private static string[] Codes(string json) =>
         JsonNode.Parse(json)!["diagnostics"]!.AsArray()
             .Select(diagnostic => diagnostic!["code"]!.GetValue<string>()).Order(StringComparer.Ordinal).ToArray();
+
+    private static void AssertOriginalCrossModuleRejection((int ExitCode, string StdOut, string StdErr) result)
+    {
+        Assert.Equal(1, result.ExitCode);
+        Assert.Equal(new[] { "Calor0410", "Calor0417" }, Codes(result.StdOut));
+        var diagnostics = JsonNode.Parse(result.StdOut)!["diagnostics"]!.AsArray();
+        Assert.Equal("error", Assert.Single(diagnostics.Where(diagnostic =>
+            diagnostic!["code"]!.GetValue<string>() == "Calor0410"))!["severity"]!.GetValue<string>());
+        Assert.Equal("warning", Assert.Single(diagnostics.Where(diagnostic =>
+            diagnostic!["code"]!.GetValue<string>() == "Calor0417"))!["severity"]!.GetValue<string>());
+        Assert.Contains("via cross-module call", result.StdOut);
+    }
 
     private static string TemporaryDirectory()
     {

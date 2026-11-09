@@ -156,11 +156,6 @@ field int:count private
 ! cw // Wrong: count is not a function value, and this is a separate line.
 ```
 
-The native parser currently reports `Calor0100` instead of the original
-`Calor0405` for this separate-line field example. That diagnostic regression
-remains to be repaired; this is not a valid field declaration or an accepted
-replacement diagnostic.
-
 `Calor0404` means an effect placeholder is declared or used somewhere it is
 not allowed, or is named after a real effect code.
 
