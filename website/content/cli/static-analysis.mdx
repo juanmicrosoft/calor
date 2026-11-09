@@ -35,13 +35,13 @@ By default, only **verified findings** are reported — issues that are proven b
 
 ```bash
 # Analyze a Calor file for bugs
-calor -i MyModule.calr --analyze --permissive-effects
+calor -i MyModule.calr --analyze
 
 # Analyze with all findings (including inconclusive)
-calor -i MyModule.calr --analyze --all-findings --permissive-effects
+calor -i MyModule.calr --analyze --all-findings
 
 # Combine with contract verification
-calor -i MyModule.calr --analyze --verify --permissive-effects
+calor -i MyModule.calr --analyze --verify
 ```
 
 ---
@@ -104,13 +104,17 @@ The `--analyze` flag uses **verification-gated reporting** by default. This mean
 | Multi-hop taint flows (2+ hops) | Reported | Reported |
 | Single-hop taint flows | **Suppressed** | Reported |
 
-This approach follows the principle used by tools like Infer, Error Prone, and the Rust compiler: **report only what you can prove.**
+The default filters reduce speculative reports; they do not prove whole-program
+safety. Taint paths, heuristic classifications and unsupported operations still
+need review. Converter-preserved C# is not native analysis coverage.
 
 ---
 
 ## Real-World Findings
 
-The analysis has found verified issues across 51 open-source C# projects converted to Calor:
+Earlier reports described findings across 51 converted C# projects. The examples
+below are historical reports, not a fresh run of the current compiler or
+independently confirmed vulnerabilities in the current upstream projects:
 
 | Project | Finding | Type |
 |:--------|:--------|:-----|
@@ -127,12 +131,12 @@ The analysis has found verified issues across 51 open-source C# projects convert
 
 The analysis covers all executable class members:
 
-- **Methods** (`§MT`) — including overloaded methods with arity-aware resolution
-- **Constructors** (`§CTOR`) — including initializer argument analysis
-- **Property accessors** (`§PROP` get/set/init) — with implicit `value` parameter
-- **Operator overloads** (`§OP`) — arithmetic operators checked for overflow
-- **Indexers** (`§IXER`) — getter/setter bodies
-- **Event accessors** (`§EVT` add/remove) — with implicit `value` parameter
+- **Methods** (`func`) — including overloaded methods with arity-aware resolution
+- **Constructors** (`constructor`) — including initializer argument analysis
+- **Property accessors** (`property`, with `get`/`set`/`init`) — with implicit `value` parameter
+- **Operator overloads** (`op`) — arithmetic operators checked for overflow
+- **Indexers** (`indexer`) — getter/setter bodies
+- **Event accessors** (`event`, with `add`/`remove`) — with implicit `value` parameter
 
 Class fields are in scope for all member bodies, preventing false uninitialized-variable reports.
 
@@ -144,19 +148,14 @@ For machine-readable diagnostics in CI/CD pipelines, use the `calor_check` MCP t
 
 ```bash
 # Combine compile with static analysis output
-calor -i MyModule.calr --analyze --permissive-effects 2> analysis-output.txt
+calor -i MyModule.calr --analyze 2> analysis-output.txt
 ```
 
 ---
 
 ## Performance
 
-Analysis adds minimal overhead to compilation:
-
-| File size | Methods | Analysis time |
-|:----------|:--------|:-------------|
-| Small (50 tokens) | 2-5 | < 100ms |
-| Medium (1K tokens) | 10-30 | 200-500ms |
-| Large (5K tokens) | 50-100 | 500ms-2s |
-
-Z3 verification adds 1-5 seconds per file depending on the number of contracts and the `--verification-timeout` setting.
+Measure analysis time on your actual sources, metadata and hardware. This page
+does not publish a current latency benchmark. Solver cost depends on the number
+and shape of obligations; `--verification-timeout` limits individual checks,
+not total command duration. Use `--verbose` to inspect the analysis summary.
