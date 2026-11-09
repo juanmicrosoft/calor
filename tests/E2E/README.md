@@ -1265,6 +1265,22 @@ refinement controls; the archived replay stopped at the same inline guard.
 Those runs are not passing full-suite evidence. The engine and solver deadlines
 were not changed to hide or work around the failures.
 
+The subsequent arithmetic entry-proof fix substitutes the existing independent
+representable `ArithmeticCases` inputs into the **same translated entry
+counterexample**, including its exact domain constraint, before invoking Z3.
+An exactly true substituted predicate supplies a concrete rejected input.
+False or unresolved substitutions never admit a candidate: the original
+universal proof still runs for every positive and every unsolved entry
+counterexample, with the unchanged 5,000 ms solver limit. Other profiles are
+unaffected. The existing narrowed-precondition/refinement controls now also
+require explicit concrete representable witness evidence; timeout diagnostics
+cannot satisfy that assertion or the infrastructure guard.
+Serial validation of the combined guard/entry-proof revision passed all 59
+current controls and all 71 genuine archived-old/current controls. The two
+ComputeWithTemp narrowing forms reject concretely at `a=-46340,b=-46340`;
+the two Accumulate forms reject at `n=-715827882`. Positive runtime, state and
+complete-case counterfactual requirements remain 133/266 and 17/51.
+
 This is only the two arithmetic prerequisites, not acceptance of all 129 tasks,
 an agent, the milestone or a release. Product code, other task wrappers,
 task definitions, original fixtures, TestData, active Calor subjects/corpus,

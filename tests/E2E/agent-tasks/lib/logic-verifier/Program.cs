@@ -529,7 +529,21 @@ static void CheckWritingContracts(FunctionNode function, string[] names, string 
                 + (status == Status.SATISFIABLE ? solver.Model.ToString() : solver.ReasonUnknown));
     }
     var entryLimit = function.Name == "SumToN" ? context.MkTrue() : limit;
-    Prove(context.MkAnd(entryLimit, context.MkNot(context.MkEq(actualPre, requiredPre))), "Missing/wrong writing preconditions");
+    var entryCounterexample = context.MkAnd(entryLimit, context.MkNot(context.MkEq(actualPre, requiredPre)));
+    if (function.Name is "ComputeWithTemp" or "Accumulate")
+    {
+        var variables = names.Select(name => (Expr)Integer(name)).ToArray();
+        foreach (var inputs in ArithmeticCases(function.Name))
+        {
+            var values = inputs.Select(value => (Expr)Constant(value)).ToArray();
+            // A concrete true counterexample is sufficient to reject. False or
+            // unresolved substitutions never replace the universal entry proof.
+            if (entryCounterexample.Substitute(variables, values).Simplify().IsTrue)
+                throw new InvalidOperationException("Missing/wrong writing preconditions: "
+                    + $"Concrete representable entry counterexample ({string.Join(", ", names.Zip(inputs, (name, value) => $"{name}={value}"))}).");
+        }
+    }
+    Prove(entryCounterexample, "Missing/wrong writing preconditions");
     Prove(context.MkAnd(limit, requiredPre, postScope, actualPost, context.MkNot(context.MkAnd(postSafety))),
         "Contract-writing postcondition evidence has undefined/overflowing arithmetic");
     Prove(context.MkAnd(limit, requiredPre, postScope, actualPost, context.MkNot(requiredPost)),

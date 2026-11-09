@@ -259,6 +259,8 @@ class TypeArithmeticVerifierTests(unittest.TestCase):
                 self.assertIn(f"{wider} wider-intermediate cases.", output)
             if detail:
                 self.assertIn(detail, output)
+                if not passed and detail == "writing preconditions":
+                    self.assertIn("Concrete representable entry counterexample", output)
             return output
 
     def test_shared_controls(self):
