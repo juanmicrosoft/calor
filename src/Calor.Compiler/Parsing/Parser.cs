@@ -12466,8 +12466,11 @@ public sealed class Parser
                 preconditions.Add(ParseRequires());
                 bodyHadContent = true;
             }
-            else if (Check(TokenKind.Ensures))
+            else if (Check(TokenKind.Ensures) || Check(TokenKind.FatArrow))
             {
+                if (body.Count != 0)
+                    _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                        "Postcondition clauses must precede the first operator body statement.");
                 postconditions.Add(ParseEnsures());
                 bodyHadContent = true;
             }
