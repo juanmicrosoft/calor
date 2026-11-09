@@ -1025,6 +1025,7 @@ public sealed class NewExpressionNode : ExpressionNode
     /// Object initializer property assignments (e.g., new Person { Name = "John", Age = 30 }).
     /// </summary>
     public IReadOnlyList<ObjectInitializerAssignment> Initializers { get; }
+    public IReadOnlyList<CallExpressionNode> CollectionInitializers { get; }
 
     public NewExpressionNode(
         TextSpan span,
@@ -1043,7 +1044,8 @@ public sealed class NewExpressionNode : ExpressionNode
         IReadOnlyList<ObjectInitializerAssignment> initializers,
         TextSpan? typeNameSpan = null,
         TypeReferenceNode? typeReference = null,
-        IReadOnlyList<string?>? argumentNames = null)
+        IReadOnlyList<string?>? argumentNames = null,
+        IReadOnlyList<CallExpressionNode>? collectionInitializers = null)
         : base(span)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
@@ -1060,6 +1062,9 @@ public sealed class NewExpressionNode : ExpressionNode
             throw new ArgumentException("Argument names must align with constructor arguments.", nameof(argumentNames));
         ArgumentNames = argumentNames;
         Initializers = initializers ?? Array.Empty<ObjectInitializerAssignment>();
+        CollectionInitializers = collectionInitializers ?? Array.Empty<CallExpressionNode>();
+        if (Initializers.Count > 0 && CollectionInitializers.Count > 0)
+            throw new ArgumentException("Object and collection initializer entries cannot be mixed.", nameof(collectionInitializers));
     }
 
 

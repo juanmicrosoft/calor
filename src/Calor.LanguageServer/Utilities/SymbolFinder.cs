@@ -303,7 +303,8 @@ public static class SymbolFinder
                     references.Add(field.FieldNameSpan);
                     break;
                 case BoundCallExpression call
-                    when call.ResolvedSymbols.Any(symbol => symbol.Id == symbolId):
+                    when call.CalleeSpan.Length > 0
+                        && call.ResolvedSymbols.Any(symbol => symbol.Id == symbolId):
                     references.Add(call.CalleeSpan);
                     break;
                 case BoundCallExpression call when call.ReceiverSymbolId == symbolId:

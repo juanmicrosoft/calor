@@ -10864,20 +10864,58 @@ public sealed class Parser
             _diagnostics.ReportUnexpectedToken(Current.Span, "constructor argument list", Current.Kind);
         }
         var initializers = new List<ObjectInitializerAssignment>();
+        var collectionInitializers = new List<CallExpressionNode>();
         if (Match(TokenKind.OpenBrace))
         {
             while (!IsAtEnd && !Check(TokenKind.CloseBrace))
             {
-                var property = TokenIdentifier(Expect(TokenKind.Identifier));
-                Expect(TokenKind.Equals);
-                initializers.Add(new ObjectInitializerAssignment(property, ParseExpression()));
+                if (Check(TokenKind.Identifier) && Peek(1).Kind == TokenKind.Equals)
+                {
+                    if (collectionInitializers.Count > 0)
+                        _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                            "Object and collection initializer entries cannot be mixed.");
+                    var property = TokenIdentifier(Advance());
+                    Advance();
+                    initializers.Add(new ObjectInitializerAssignment(property, ParseExpression()));
+                }
+                else
+                {
+                    if (initializers.Count > 0)
+                        _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                            "Object and collection initializer entries cannot be mixed.");
+                    var elementStart = Current.Span;
+                    var elements = new List<ExpressionNode>();
+                    if (Match(TokenKind.OpenBrace))
+                    {
+                        if (Check(TokenKind.CloseBrace))
+                            _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                                "A collection initializer entry requires at least one argument.");
+                        while (!IsAtEnd && !Check(TokenKind.CloseBrace))
+                        {
+                            elements.Add(ParseExpression());
+                            if (!Match(TokenKind.Comma))
+                                break;
+                            if (Check(TokenKind.CloseBrace))
+                                _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                                    "A grouped collection initializer entry cannot end with a comma.");
+                        }
+                        Expect(TokenKind.CloseBrace);
+                    }
+                    else
+                        elements.Add(ParseExpression());
+                    collectionInitializers.Add(new CallExpressionNode(
+                        elementStart.Union(PreviousToken.Span), $"{type}.Add", elements,
+                        null, null, null, calleeSpan: TextSpan.Empty));
+                }
                 if (!Match(TokenKind.Comma))
                     break;
             }
             Expect(TokenKind.CloseBrace);
         }
         return new NewExpressionNode(start.Span.Union(PreviousToken.Span), type, [], arguments,
-            initializers, typeSpan, argumentNames: names.Any(name => name is not null) ? names : null);
+            collectionInitializers.Count == 0 ? initializers : [],
+            typeSpan, argumentNames: names.Any(name => name is not null) ? names : null,
+            collectionInitializers: collectionInitializers);
     }
 
     private ExpressionNode ParseNativeArrayCreation(Token start, string elementType, TextSpan typeSpan,

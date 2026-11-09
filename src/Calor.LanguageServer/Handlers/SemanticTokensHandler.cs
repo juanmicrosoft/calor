@@ -497,6 +497,8 @@ public sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                     PushToken(newExpr.TypeNameSpan, SemanticTokenType.Class);
                     foreach (var arg in newExpr.Arguments)
                         VisitExpression(arg);
+                    foreach (var arg in newExpr.CollectionInitializers.SelectMany(entry => entry.Arguments))
+                        VisitExpression(arg);
                     break;
                 case ThisExpressionNode:
                 case BaseExpressionNode:

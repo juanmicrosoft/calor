@@ -511,7 +511,17 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
             }
         }
 
-        return argsChanged || initializersChanged
+        var collectionChanged = false;
+        var collection = new List<CallExpressionNode>();
+        foreach (var entry in node.CollectionInitializers)
+        {
+            var arguments = entry.Arguments.Select(argument => argument.Accept(this)).ToArray();
+            var changed = arguments.Where((argument, index) => !ReferenceEquals(argument, entry.Arguments[index])).Any();
+            collectionChanged |= changed;
+            collection.Add(changed ? new CallExpressionNode(entry.Span, entry.Target, arguments,
+                entry.ArgumentNames, entry.ArgumentModifiers, entry.TypeArguments, entry.CalleeSpan, entry.ReceiverSpan) : entry);
+        }
+        return argsChanged || initializersChanged || collectionChanged
             ? new NewExpressionNode(
                 node.Span,
                 node.TypeName,
@@ -520,7 +530,8 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
                 newInitializers,
                 node.TypeNameSpan,
                 node.TypeReference,
-                node.ArgumentNames)
+                node.ArgumentNames,
+                collection)
             : node;
     }
 

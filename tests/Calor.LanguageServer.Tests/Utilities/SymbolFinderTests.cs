@@ -10,6 +10,54 @@ namespace Calor.LanguageServer.Tests.Utilities;
 public class SymbolFinderTests
 {
     [Theory]
+    [InlineData("WidgetException", "new WidgetException()", "WidgetException")]
+    [InlineData("int", "value", "value")]
+    public void NativeCollectionInitializers_ExposeNestedConstructorAndArgumentSymbols(
+        string elementType, string element, string expected)
+    {
+        var source = $$"""
+            module CollectionSymbols
+              using System.Collections.Generic
+              class WidgetException
+              func Make (int:value) → List<{{elementType}}>
+                ! alloc, mut
+                return new List<{{elementType}}> { {{element}} }
+            """;
+        var ast = LspTestHarness.GetAst(source);
+        Assert.NotNull(ast);
+        var offset = source.LastIndexOf(element, StringComparison.Ordinal)
+            + (element.StartsWith("new ", StringComparison.Ordinal) ? "new ".Length : 0);
+        var symbol = new SymbolFinderVisitor(offset, source).FindSymbol(ast);
+        Assert.Equal(expected, symbol?.Name);
+        Assert.Equal(expected, source.Substring(symbol!.Span.Start, symbol.Span.Length));
+    }
+
+    [Fact]
+    public void NativeCollectionImplicitAdd_HasNoAuthoredRenameSite()
+    {
+        const string source = """
+            module CollectionReferences
+              class Tracked extends System.Collections.Generic.List<int>
+                func Add (int:value) → void
+                  return
+              func Make () → Tracked
+                ! alloc, mut
+                return new Tracked {1}
+            """;
+        var state = LspTestHarness.CreateDocument(source);
+        Assert.NotNull(state.BoundModule);
+        var add = state.BoundModule.SymbolsById.Values.OfType<FunctionSymbol>()
+            .Single(function => function.Name == "Tracked.Add");
+        var creation = Assert.IsType<BoundNewExpression>(
+            Assert.IsType<BoundReturnStatement>(
+                Assert.Single(state.BoundModule.Functions.Single(function => function.Symbol.Name == "Make").Body)).Expression);
+        Assert.Contains(Assert.Single(creation.CollectionInitializers).ResolvedSymbols, symbol => symbol.Id == add.Id);
+        Assert.Empty(SymbolFinder.FindBoundReferences(state.BoundModule, add.Id, includeDeclaration: false));
+        Assert.Equal([add.DeclarationSpan],
+            SymbolFinder.FindBoundReferences(state.BoundModule, add.Id, includeDeclaration: true));
+    }
+
+    [Theory]
     [InlineData("§R ")]
     [InlineData("")]
     public void ComputedCalls_ExposeNestedReceiverAndArgumentReferences(string prefix)

@@ -1115,7 +1115,8 @@ public sealed class SymbolFinderVisitor
                 break;
 
             case NewExpressionNode newExpr:
-                foreach (var argument in newExpr.Arguments)
+                foreach (var argument in newExpr.Arguments.Concat(
+                    newExpr.CollectionInitializers.SelectMany(entry => entry.Arguments)))
                 {
                     if (SpanContainsOffset(argument.Span))
                     {

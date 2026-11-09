@@ -2093,6 +2093,8 @@ public sealed class TypeChecker
         {
             InferExpressionType(initializer.Value);
         }
+        foreach (var argument in newExpression.CollectionInitializers.SelectMany(entry => entry.Arguments))
+            InferExpressionType(argument);
 
         return _env.LookupType(newExpression.TypeName) ?? new ExternalType(newExpression.TypeName);
     }

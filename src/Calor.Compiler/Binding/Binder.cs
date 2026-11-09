@@ -4443,6 +4443,89 @@ public sealed class Binder
             argumentModifiers: null,
             typeArguments: null);
 
+        var metadata = GetOrCreateMetadataBinder();
+        var fullTypeName = newExpr.TypeArguments.Count == 0 ? newExpr.TypeName
+            : $"{newExpr.TypeName}<{string.Join(",", newExpr.TypeArguments)}>";
+        var metadataType = boundTypeReference.ResolvedType is null && metadata is not null
+            ? ResolveComputedMetadataType(metadata.Context, fullTypeName) as Microsoft.CodeAnalysis.INamedTypeSymbol
+            : null;
+        var collectionDefinition = metadataType?.OriginalDefinition;
+        if (newExpr.CollectionInitializers.Count > 0 && collectionDefinition is null
+            && boundTypeReference.ResolvedType is null && metadata is not null
+            && TypeIdentity.TrySplitGeneric(fullTypeName, out var root, out var typeArguments)
+            && ResolveTypeSymbol(root, typeArguments.Count) is null)
+        {
+            var scoped = ResolveScopedMetadataType(metadata.Context, root, typeArguments.Count,
+                _currentNamespaceScopeId, _currentNamespaceIdentity);
+            collectionDefinition = scoped.Handled ? scoped.Type
+                : metadata.Context.TryResolveType(TypeIdentity.MapShortTypeNameToFullName(fullTypeName));
+        }
+        if (newExpr.CollectionInitializers.Count > 0
+            && boundTypeReference.ResolvedType is not null
+            && (ResolveClass(fullTypeName) is not { } sourceClass
+                || !IsEnumerableCollectionClass(sourceClass, new HashSet<ClassDefinitionNode>())))
+            _diagnostics.ReportError(newExpr.TypeNameSpan, DiagnosticCode.TypeMismatch,
+                $"Collection initializer type '{fullTypeName}' requires a resolved System.Collections.IEnumerable implementation.");
+        var collectionCalls = new List<BoundCallExpression>();
+        foreach (var entry in newExpr.CollectionInitializers)
+        {
+            var arguments = BindExpressions(entry.Arguments);
+            var source = ResolveCall(entry.Span, entry.Target, arguments, null, null, null);
+            // This side-band receiver describes the fresh instance, not the enclosing class.
+            var receiver = new BoundThisExpression(newExpr.TypeNameSpan, fullTypeName,
+                metadataType is null ? null : Metadata.MetadataBinderResult.ToNominalBoundType(metadataType));
+            var selected = source.Functions.Count == 0
+                ? TryResolveBclCall(entry.Target, arguments, null, null, computedReceiver: receiver)
+                : null;
+            var sourceListEntry = false;
+            var sourceAddDefinition = collectionDefinition is not null && metadata is not null
+                && Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(
+                    collectionDefinition, metadata.Context.TryResolveType("System.Collections.Generic.List`1"))
+                ? collectionDefinition.GetMembers("Add")
+                .OfType<Microsoft.CodeAnalysis.IMethodSymbol>().SingleOrDefault(method =>
+                    !method.IsStatic && !method.IsGenericMethod && method.ReturnsVoid
+                    && method.DeclaredAccessibility == Microsoft.CodeAnalysis.Accessibility.Public
+                    && method.Parameters is [{ RefKind: Microsoft.CodeAnalysis.RefKind.None,
+                        Type: Microsoft.CodeAnalysis.ITypeParameterSymbol { Ordinal: 0 } parameter }]
+                    && Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(
+                        parameter.ContainingSymbol, collectionDefinition)) : null;
+            if (selected is null && source.Functions.Count == 0
+                && sourceAddDefinition is not null
+                && TypeIdentity.TrySplitGeneric(fullTypeName, out _, out var listArguments)
+                && listArguments.Count == 1
+                && GetTypeParameterConstraints(listArguments[0]) is null
+                && ResolveTypeSymbol(listArguments[0], 0) is { IsReferenceType: true } elementType)
+            {
+                sourceListEntry = arguments is [var argument]
+                    && GetTypeParameterConstraints(argument.Type.DisplayString) is null
+                    && (argument is BoundNewExpression constructed ? constructed.ResolvedType
+                        : (argument.Type as BoundTypes.NominalBoundType)?.Declaration)?.Id == elementType.Id
+                    && argument.Type is BoundTypes.NominalBoundType
+                        { NullableAnnotation: BoundTypes.NullableAnnotation.NotAnnotated };
+            }
+            if (source.Functions.Count == 0 && selected is null && !sourceListEntry)
+                _diagnostics.ReportError(entry.Span, DiagnosticCode.NoMatchingOverload,
+                    $"Collection initializer cannot resolve an instance Add overload for '{fullTypeName}'.");
+            if (metadataType is not null && !metadataType.AllInterfaces.Any(type =>
+                    type.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_Collections_IEnumerable))
+                _diagnostics.ReportError(newExpr.TypeNameSpan, DiagnosticCode.TypeMismatch,
+                    $"Collection initializer type '{fullTypeName}' must implement System.Collections.IEnumerable.");
+            var call = new BoundCallExpression(entry.Span, entry.Target, arguments,
+                selected?.Symbol?.ReturnType.ToDisplayString() ?? source.Function?.ReturnType ?? "VOID",
+                resolvedTypeName: selected?.Symbol?.ContainingType.ToDisplayString(),
+                resolvedMethodName: selected?.Symbol?.Name,
+                resolvedParameterTypes: selected?.Symbol?.Parameters.Select(parameter => parameter.Type.ToDisplayString()).ToArray(),
+                resolvedSymbol: source.Function,
+                receiver: receiver,
+                resolvedSymbols: source.Functions,
+                calleeSpan: TextSpan.Empty)
+            {
+                ResolvedMetadataMethod = selected?.Symbol,
+                CollectionMethodDefinition = sourceListEntry ? sourceAddDefinition : null
+            };
+            collectionCalls.Add(call);
+            InvalidateByReferenceParameterNarrowing();
+        }
         return new BoundNewExpression(
             newExpr.Span,
             newExpr.TypeName,
@@ -4455,11 +4538,38 @@ public sealed class Binder
             resolution.Functions,
             boundTypeReference,
             newExpr.ArgumentNames,
-            boundTypeReference.ResolvedType is null && GetOrCreateMetadataBinder() is { } metadata
-                ? ResolveComputedMetadataType(metadata.Context, newExpr.TypeArguments.Count == 0
-                    ? newExpr.TypeName : $"{newExpr.TypeName}<{string.Join(",", newExpr.TypeArguments)}>")
-                    as Microsoft.CodeAnalysis.INamedTypeSymbol
-                : null);
+            metadataType,
+            collectionCalls);
+    }
+
+    private bool IsEnumerableCollectionClass(ClassDefinitionNode cls, HashSet<ClassDefinitionNode> visited)
+    {
+        if (!visited.Add(cls) || cls.TypeParameters.Count > 0 || GetOrCreateMetadataBinder() is not { } metadata)
+            return false;
+        var oldNamespace = _currentNamespaceIdentity;
+        var oldScope = _currentNamespaceScopeId;
+        _currentNamespaceIdentity = cls.NamespaceIdentity;
+        _currentNamespaceScopeId = cls.NamespaceScopeId;
+        try
+        {
+            foreach (var name in cls.ImplementedInterfaces.Concat(
+                         cls.BaseClass is { } baseClass ? [baseClass] : Array.Empty<string>()))
+            {
+                if (ResolveComputedMetadataType(metadata.Context, name) is Microsoft.CodeAnalysis.INamedTypeSymbol type
+                    && (type.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_Collections_IEnumerable
+                        || type.AllInterfaces.Any(parent =>
+                            parent.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_Collections_IEnumerable)))
+                    return true;
+                if (ResolveClass(name) is { } parent && IsEnumerableCollectionClass(parent, visited))
+                    return true;
+            }
+            return false;
+        }
+        finally
+        {
+            _currentNamespaceIdentity = oldNamespace;
+            _currentNamespaceScopeId = oldScope;
+        }
     }
 
     private BoundTypeReference BindTypeReference(TypeReferenceNode typeReference)

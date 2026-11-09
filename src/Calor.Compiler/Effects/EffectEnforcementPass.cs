@@ -5549,12 +5549,10 @@ public sealed class EffectEnforcementPass
             }
 
             var manifestType = MapShortTypeNameToFullName(targetType);
-            var resolution = _context.Resolver.Resolve(ResolverKey(
-                GetReferencePath(target),
-                manifestType,
-                memberName,
-                null,
-                EffectMemberKind.Getter));
+            var metadata = _context.CallGraph.MetadataMemberReceiverType(_context.CurrentFunctionId, span);
+            var resolution = _context.Resolver.Resolve(metadata is not null
+                ? EffectResolverKey.FromBoundReceiver(metadata, memberName, null, EffectMemberKind.Getter)
+                : ResolverKey(GetReferencePath(target), manifestType, memberName, null, EffectMemberKind.Getter));
             return resolution.Status == EffectResolutionStatus.Unknown
                 ? effects.Union(UnknownResolvedOperation(
                     $"{manifestType}.get_{memberName}",
@@ -6200,6 +6198,28 @@ public sealed class EffectEnforcementPass
                 effects = effects.Union(ResolveInitializerSetterEffects(
                     newExpr.TypeName,
                     initializer));
+            }
+            foreach (var initializer in newExpr.CollectionInitializers)
+            {
+                effects = effects.Union(InferFromMany(initializer.Arguments));
+                var ids = _context.CallGraph.ResolveCallSites(
+                    _context.CurrentFunctionId, initializer.Target, initializer.Span);
+                if (ids.Count > 0)
+                {
+                    effects = effects.Union(InferFromInternalFunctions(ids));
+                    continue;
+                }
+                var bound = _context.CallGraph.ComputedMemberCall(_context.CurrentFunctionId, initializer.Span);
+                EffectResolution? add = null;
+                if (bound?.ResolvedMetadataMethod is { } method && bound.Receiver is { } receiver)
+                    add = _context.Resolver.Resolve(EffectResolverKey.FromBoundReceiver(
+                        receiver.Type, method.Name, bound.ResolvedParameterTypes));
+                else if (bound?.CollectionMethodDefinition is { } definition)
+                    add = _context.Resolver.Resolve(EffectResolverKey.FromStrings(
+                        definition.ContainingNamespace.ToDisplayString() + "." + definition.ContainingType.MetadataName,
+                        definition.Name, initializer.Arguments.Select(InferExpressionType).ToArray()));
+                effects = effects.Union(add is { Status: not EffectResolutionStatus.Unknown }
+                    ? add.Effects : UnknownResolvedOperation(initializer.Target, initializer.Span));
             }
 
             return effects;

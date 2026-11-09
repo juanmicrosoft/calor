@@ -3302,6 +3302,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var initializers = node.Initializers.Count == 0 ? ""
             : " { " + string.Join(", ", node.Initializers.Select(initializer =>
                 $"{EscapeCalorIdentifier(initializer.PropertyName)} = {AcceptInConditionalRegion(initializer.Value)}")) + " }";
+        if (node.CollectionInitializers.Count > 0)
+            initializers = " { " + string.Join(", ", node.CollectionInitializers.Select(entry =>
+                entry.Arguments.Count == 1 ? AcceptInConditionalRegion(entry.Arguments[0])
+                : "{ " + string.Join(", ", entry.Arguments.Select(AcceptInConditionalRegion)) + " }")) + " }";
         return $"new {TypeMapper.ToSurfaceType(node.TypeName)}{types}({string.Join(", ", arguments)}){initializers}";
     }
 

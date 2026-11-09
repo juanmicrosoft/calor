@@ -760,6 +760,7 @@ public sealed class BoundUnaryExpression : BoundExpression
 public class BoundCallExpression : BoundExpression
 {
     internal Microsoft.CodeAnalysis.IMethodSymbol? ResolvedMetadataMethod { get; init; }
+    internal Microsoft.CodeAnalysis.IMethodSymbol? CollectionMethodDefinition { get; init; }
     internal VariableSymbol? CallableStorageIdentity { get; init; }
     internal CallableMutationSummary ObservedCallableEffects { get; init; } = CallableMutationSummary.Empty;
     public string Target { get; }
@@ -1718,9 +1719,9 @@ public sealed class BoundThisExpression : BoundExpression
 {
     public override BoundType Type { get; }
 
-    public BoundThisExpression(TextSpan span, string className) : base(span)
+    public BoundThisExpression(TextSpan span, string className, BoundType? typeOverride = null) : base(span)
     {
-        Type = new NominalBoundType(
+        Type = typeOverride ?? new NominalBoundType(
             className ?? "UNKNOWN",
             BoundTypes.NullableAnnotation.NotAnnotated);
     }
@@ -1858,6 +1859,7 @@ public sealed class BoundTypeReference
 /// </summary>
 public sealed class BoundNewExpression : BoundExpression
 {
+    public IReadOnlyList<BoundCallExpression> CollectionInitializers { get; }
     public override BoundType Type { get; }
     public TextSpan TypeNameSpan { get; }
     public BoundTypeReference TypeReference { get; }
@@ -1872,7 +1874,7 @@ public sealed class BoundNewExpression : BoundExpression
     public SymbolId? ResolvedTypeSymbolId => ResolvedType?.Id;
     public override IReadOnlyList<BoundExpression> Children { get; }
     public override IEnumerable<BoundNode> ChildNodes =>
-        Arguments.Cast<BoundNode>().Concat(Initializers);
+        Arguments.Cast<BoundNode>().Concat(Initializers).Concat(CollectionInitializers);
 
     public BoundNewExpression(TextSpan span, string typeName, IReadOnlyList<BoundExpression> arguments)
         : this(
@@ -1897,7 +1899,8 @@ public sealed class BoundNewExpression : BoundExpression
         IReadOnlyList<FunctionSymbol>? resolvedConstructors = null,
         BoundTypeReference? typeReference = null,
         IReadOnlyList<string?>? argumentNames = null,
-        Microsoft.CodeAnalysis.INamedTypeSymbol? resolvedMetadataType = null)
+        Microsoft.CodeAnalysis.INamedTypeSymbol? resolvedMetadataType = null,
+        IReadOnlyList<BoundCallExpression>? collectionInitializers = null)
         : base(span)
     {
         // v0.14 nullability §NEW annotation flow — a `§NEW{Foo}` expression
@@ -1917,6 +1920,7 @@ public sealed class BoundNewExpression : BoundExpression
             throw new ArgumentException("Argument names must align with constructor arguments.", nameof(argumentNames));
         ArgumentNames = argumentNames;
         Initializers = initializers ?? Array.Empty<BoundObjectInitializer>();
+        CollectionInitializers = collectionInitializers ?? Array.Empty<BoundCallExpression>();
         ResolvedConstructor = resolvedConstructor;
         ResolvedConstructors = resolvedConstructors
             ?? (resolvedConstructor == null ? Array.Empty<FunctionSymbol>() : [resolvedConstructor]);
@@ -1931,7 +1935,7 @@ public sealed class BoundNewExpression : BoundExpression
                     resolvedType: null))
                 .ToArray());
         ResolvedType = resolvedType ?? TypeReference.ResolvedType;
-        Children = [.. Arguments, .. Initializers.Select(initializer => initializer.Value)];
+        Children = [.. Arguments, .. Initializers.Select(initializer => initializer.Value), .. CollectionInitializers];
     }
 }
 

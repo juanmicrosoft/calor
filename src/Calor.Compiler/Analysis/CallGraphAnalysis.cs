@@ -905,6 +905,9 @@ public sealed class CallGraphAnalysis
                             callees = creation.ResolvedConstructor == null
                                 ? Array.Empty<FunctionSymbol>()
                                 : [creation.ResolvedConstructor];
+                            foreach (var initializer in creation.CollectionInitializers)
+                                boundValues.ComputedMemberCalls[
+                                    (callerId, initializer.Span.Start, initializer.Span.End)] = initializer;
                             break;
                         case BoundExpressionCallExpression:
                             target = "<expression-call>";

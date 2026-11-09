@@ -6557,6 +6557,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 $"{SanitizeIdentifier(i.PropertyName)} = {i.Value.Accept(this)}");
             result += $" {{ {string.Join(", ", inits)} }}";
         }
+        if (node.CollectionInitializers.Count > 0)
+        {
+            var elements = node.CollectionInitializers.Select(entry =>
+                entry.Arguments.Count == 1 ? entry.Arguments[0].Accept(this)
+                : "{ " + string.Join(", ", entry.Arguments.Select(argument => argument.Accept(this))) + " }");
+            result += $" {{ {string.Join(", ", elements)} }}";
+        }
 
         return result;
     }

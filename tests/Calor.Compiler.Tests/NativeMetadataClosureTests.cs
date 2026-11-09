@@ -14,6 +14,414 @@ namespace Calor.Compiler.Tests;
 
 public sealed class NativeMetadataClosureTests
 {
+    [Theory]
+    [InlineData("module Demo\n  func Run () → void\n    let items = new System.Collections.Generic.List<int> {1, 2}")]
+    [InlineData("module Demo\n  func Run () → void\n    let items = new System.Collections.Generic.Dictionary<string,int> {{\"a\", 1}}")]
+    [InlineData("module Demo\n  func Run () → void\n    let items = new System.Collections.Generic.HashSet<string> {\"a\"}")]
+    [InlineData("module Demo\n  func Run () → void\n    let System.Collections.Generic.List<int>:items = new System.Collections.Generic.List<int> {1, 2}")]
+    public void OriginalIdentityFreeCollectionInitializers_RetainTheirNativeTypes(string source)
+    {
+        var module = Parse(source);
+        var creation = Assert.IsType<NewExpressionNode>(
+            Assert.IsType<BindStatementNode>(Assert.Single(Assert.Single(module.Functions).Body)).Initializer);
+        Assert.NotEmpty(creation.CollectionInitializers);
+        Assert.Empty(creation.Initializers);
+        var generated = new CSharpEmitter().Emit(module);
+        Assert.Contains("new System.Collections.Generic.", generated);
+        var method = CompileAssembly(generated).GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+            .Single(method => method.Name == "Run");
+        method.Invoke(null, null);
+    }
+
+    [Theory]
+    [InlineData("System.Collections.Generic.List<int>", "1, 2")]
+    [InlineData("System.Collections.Generic.HashSet<string>", "\"a\", \"a\", \"b\"")]
+    [InlineData("System.Collections.Generic.Dictionary<string,int>", "{\"a\", 1}, {\"b\", 2}")]
+    public void NativeCollectionInitializers_RetainClrAddSemanticsAndReemit(string typeName, string entries)
+    {
+        var authored = $$"""
+            module Collections
+              func Make () → {{typeName}}
+                ! alloc, mut
+                return new {{typeName}} { {{entries}} }
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var result = Compile(source);
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+            var method = CompileAssembly(result.GeneratedCode).GetTypes()
+                .SelectMany(type => type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                .Single(method => method.Name == "Make");
+            var value = method.Invoke(null, null);
+            switch (value)
+            {
+                case List<int> list:
+                    Assert.Equal(new[] { 1, 2 }, list);
+                    break;
+                case HashSet<string> set:
+                    Assert.Equal(new[] { "a", "b" }, set.Order().ToArray());
+                    break;
+                case Dictionary<string, int> dictionary:
+                    Assert.Equal(2, dictionary.Count);
+                    Assert.Equal(1, dictionary["a"]);
+                    Assert.Equal(2, dictionary["b"]);
+                    break;
+                case System.Collections.ArrayList arrayList:
+                    Assert.Equal(new object[] { 1, "two" }, arrayList.ToArray());
+                    break;
+                default:
+                    Assert.Fail($"Unexpected collection runtime type: {value?.GetType()}");
+                    break;
+            }
+        }
+    }
+
+    [Fact]
+    public void NativeArrayListInitializer_DoesNotInventAnEffectContract()
+    {
+        const string source = """
+            module UnknownCollectionEffects
+              func Make () → System.Collections.ArrayList
+                ! alloc, mut
+                return new System.Collections.ArrayList {1, "two"}
+            """;
+        var result = Compile(source);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+        var generated = new CSharpEmitter().Emit(Parse(source));
+        var method = CompileAssembly(generated).GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+            .Single(method => method.Name == "Make");
+        var list = Assert.IsType<System.Collections.ArrayList>(method.Invoke(null, null));
+        Assert.Equal(new object[] { 1, "two" }, list.ToArray());
+    }
+
+    [Fact]
+    public void NativeCollectionInitializers_PreserveConstructorAndElementOrderAndConditionalLaziness()
+    {
+        const string authored = """
+            module CollectionOrder
+              using System.Collections.Generic
+              func Next (ref int:counter) → int
+                ! mut
+                set counter (counter + 1)
+                return counter
+              func Make () → List<int>
+                ! alloc, mut
+                var int:counter = 0
+                return new List<int>(Next(ref counter)) {Next(ref counter), Next(ref counter)}
+              func Conditional (bool:take) → int
+                ! alloc, mut
+                var int:counter = 0
+                let List<int>:values = take ? new List<int> {Next(ref counter)} : new List<int>()
+                return counter
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var result = Compile(source);
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+            var methods = CompileAssembly(result.GeneratedCode).GetTypes()
+                .SelectMany(type => type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                .ToArray();
+            var list = Assert.IsType<List<int>>(methods.Single(method => method.Name == "Make").Invoke(null, null));
+            Assert.Equal(new[] { 2, 3 }, list);
+            Assert.Equal(2, list.Capacity);
+            var conditional = methods.Single(method => method.Name == "Conditional");
+            Assert.Equal(0, conditional.Invoke(null, [false]));
+            Assert.Equal(1, conditional.Invoke(null, [true]));
+        }
+    }
+
+    [Fact]
+    public void NativeDictionaryInitializer_DuplicateKeysThrowRatherThanUpsert()
+    {
+        const string source = """
+            module DuplicateKeys
+              func Make () → System.Collections.Generic.Dictionary<string,int>
+                ! alloc, mut
+                return new System.Collections.Generic.Dictionary<string,int> {{"a", 1}, {"a", 2}}
+            """;
+        var result = Compile(source);
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+        var method = CompileAssembly(result.GeneratedCode).GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+            .Single(method => method.Name == "Make");
+        var error = Assert.Throws<TargetInvocationException>(() => method.Invoke(null, null));
+        Assert.IsType<ArgumentException>(error.InnerException);
+    }
+
+    [Theory]
+    [InlineData("System.Collections.Generic.List<int>", "\"wrong\"")]
+    [InlineData("System.Collections.Generic.Dictionary<string,int>", "{\"a\"}")]
+    [InlineData("System.Text.StringBuilder", "\"not an Add\"")]
+    public void NativeCollectionInitializers_RejectMissingOrIncompatibleAddOverloads(string typeName, string entries)
+    {
+        var result = Compile($$"""
+            module InvalidCollection
+              func Make () → {{typeName}}
+                ! alloc, mut
+                return new {{typeName}} { {{entries}} }
+            """);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+    }
+
+    [Fact]
+    public void NativeSourceTypedList_RetainsTheOriginalNestedConstructorAndSourceIdentity()
+    {
+        const string authored = """
+            module SourceList
+              using System.Collections.Generic
+              class WidgetException
+                field int:Value public = 23
+              func Make () → List<WidgetException>
+                ! alloc, mut
+                let List<WidgetException>:values = new List<WidgetException> {new WidgetException()}
+                return values
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var bound = new Binder(new DiagnosticBag()).Bind(Parse(source));
+            var creation = Assert.IsType<BoundNewExpression>(
+                Assert.IsType<BoundBindStatement>(Assert.Single(bound.Functions).Body[0]).Initializer);
+            var entry = Assert.Single(creation.CollectionInitializers);
+            var element = Assert.IsType<BoundNewExpression>(Assert.Single(entry.Arguments));
+            Assert.Equal("WidgetException", element.ResolvedType!.Name);
+            var result = Compile(source);
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+            var method = CompileAssembly(result.GeneratedCode).GetTypes()
+                .SelectMany(type => type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                .Single(method => method.Name == "Make");
+            var list = Assert.IsAssignableFrom<System.Collections.IList>(method.Invoke(null, null));
+            Assert.Equal(typeof(List<>), list.GetType().GetGenericTypeDefinition());
+            var value = Assert.Single(list.Cast<object>());
+            Assert.Equal("WidgetException", value.GetType().Name);
+            Assert.Equal(23, value.GetType().GetField("Value")!.GetValue(value));
+        }
+    }
+
+    [Fact]
+    public void OriginalTypeRenameProgram_RetainsItsListAndNestedConstructor()
+    {
+        const string source = """
+            module TypeRefactor
+              using System.Collections.Generic
+              interface IWidget
+                func Marker () → void
+              class WidgetException
+                extends System.Exception
+                implements IWidget
+                func Create static () → WidgetException
+                  return new WidgetException()
+                func Marker () → void
+                  System.Console.WriteLine("marker")
+              class DerivedException
+                extends WidgetException
+                field int:Code
+              func Use (object:value) → WidgetException
+                let WidgetException[]:items = new WidgetException[1]
+                let List<WidgetException>:values = new List<WidgetException> {new WidgetException()}
+                try
+                  return (WidgetException)value
+                catch WidgetException:ex
+                  return WidgetException.Create()
+            """;
+        var module = Parse(source);
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(module);
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+        var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
+        var collection = Assert.IsType<BoundNewExpression>(
+            Assert.IsType<BoundBindStatement>(use.Body[1]).Initializer);
+        var nested = Assert.IsType<BoundNewExpression>(
+            Assert.Single(Assert.Single(collection.CollectionInitializers).Arguments));
+        Assert.Equal("WidgetException", nested.ResolvedType!.Name);
+        Assert.Equal("WidgetException", source.Substring(nested.TypeNameSpan.Start, nested.TypeNameSpan.Length));
+        Assert.Contains("new List<WidgetException>", new CSharpEmitter().Emit(module));
+        CompileAssembly(new CSharpEmitter().Emit(module));
+    }
+
+    [Fact]
+    public void NativeCollectionAlias_RetainsActualAddIdentity()
+    {
+        const string source = """
+            module CollectionAlias
+              using Items = System.Collections.Generic.List<int>
+              func Make () → Items
+                ! alloc, mut
+                return new Items {1, 2}
+            """;
+        var result = Compile(source);
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+        var method = CompileAssembly(result.GeneratedCode).GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+            .Single(method => method.Name == "Make");
+        Assert.Equal(new[] { 1, 2 }, Assert.IsType<List<int>>(method.Invoke(null, null)));
+    }
+
+    [Theory]
+    [InlineData("Bag", "Bag")]
+    [InlineData("Bag<T>", "Bag<int>")]
+    public void NativeCollectionInitializer_DoesNotInferEnumerableFromAnAddName(string declaration, string constructed)
+    {
+        var source = $$"""
+            module NonEnumerable
+              class {{declaration}}
+                func Add (int:value) → void
+                  return
+              func Make () → {{constructed}}
+                ! alloc, mut
+                return new {{constructed}} {1}
+            """;
+        var diagnostics = new DiagnosticBag();
+        new Binder(diagnostics).Bind(Parse(source));
+        Assert.Contains(diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.TypeMismatch
+            && diagnostic.Message.Contains("System.Collections.IEnumerable"));
+        Assert.True(Compile(source).HasErrors);
+    }
+
+    [Fact]
+    public void NativeCollectionInitializer_SimplificationRetainsOrderedAddArguments()
+    {
+        var module = Parse("""
+            module SimplifiedCollection
+              func Make () → System.Collections.Generic.List<int>
+                ! alloc, mut
+                return new System.Collections.Generic.List<int>(1 + 1) {1 + 2, 2 + 3}
+            """);
+        var statement = Assert.IsType<ReturnStatementNode>(Assert.Single(Assert.Single(module.Functions).Body));
+        var simplifier = new Calor.Compiler.Verification.ExpressionSimplifier();
+        var creation = Assert.IsType<NewExpressionNode>(simplifier.Simplify(statement.Expression!));
+        Assert.True(simplifier.Changed);
+        Assert.Equal(2, Assert.IsType<IntLiteralNode>(Assert.Single(creation.Arguments)).Value);
+        Assert.Equal(new long[] { 3, 5 }, creation.CollectionInitializers.Select(entry =>
+            Assert.IsType<IntLiteralNode>(Assert.Single(entry.Arguments)).Value));
+        Assert.All(creation.CollectionInitializers, entry => Assert.Equal(TextSpan.Empty, entry.CalleeSpan));
+    }
+
+    [Fact]
+    public void NativeCollectionInitializer_InheritedContractRewritingRetainsElements()
+    {
+        var module = Parse("""
+            module RewrittenCollection
+              func Make (int:value) → System.Collections.Generic.List<int>
+                ! alloc, mut
+                return new System.Collections.Generic.List<int>(value) {value, value + 1}
+            """);
+        var original = Assert.IsType<NewExpressionNode>(
+            Assert.IsType<ReturnStatementNode>(Assert.Single(Assert.Single(module.Functions).Body)).Expression);
+        var rewrite = typeof(Calor.Compiler.Verification.ContractInheritanceChecker)
+            .GetMethod("RewriteReferences", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(rewrite);
+        var creation = Assert.IsType<NewExpressionNode>(rewrite.Invoke(null,
+            [original, new Dictionary<string, string> { ["value"] = "renamed" }, null]));
+        Assert.Equal("renamed", Assert.IsType<ReferenceNode>(Assert.Single(creation.Arguments)).Name);
+        Assert.Equal(2, creation.CollectionInitializers.Count);
+        Assert.Equal("renamed", Assert.IsType<ReferenceNode>(
+            Assert.Single(creation.CollectionInitializers[0].Arguments)).Name);
+        Assert.Equal("renamed", Assert.IsType<ReferenceNode>(Assert.IsType<BinaryOperationNode>(
+            Assert.Single(creation.CollectionInitializers[1].Arguments)).Left).Name);
+        Assert.Equal(original.CollectionInitializers.Select(entry => entry.Span),
+            creation.CollectionInitializers.Select(entry => entry.Span));
+        Assert.All(creation.CollectionInitializers, entry => Assert.Equal(TextSpan.Empty, entry.CalleeSpan));
+    }
+
+    [Fact]
+    public void NativeCollectionInitializer_RetainsMultilineAndInterpolationBoundaries()
+    {
+        const string authored = """
+            module CollectionBoundaries
+              using System.Collections.Generic
+              func Make () → List<int>
+                ! alloc, mut
+                return new List<int> {
+                  1,
+                  2,
+                }
+              func Format () → string
+                ! alloc, mut
+                return "${new List<int> {1, 2}.Count}"
+              func After () → int
+                return 9
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var result = Compile(source);
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+            var methods = CompileAssembly(result.GeneratedCode).GetTypes()
+                .SelectMany(type => type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                .ToArray();
+            Assert.Equal(new[] { 1, 2 },
+                Assert.IsType<List<int>>(methods.Single(method => method.Name == "Make").Invoke(null, null)));
+            Assert.Equal("2", methods.Single(method => method.Name == "Format").Invoke(null, null));
+            Assert.Equal(9, methods.Single(method => method.Name == "After").Invoke(null, null));
+        }
+    }
+
+    [Theory]
+    [InlineData("alloc", "mut")]
+    [InlineData("mut", "alloc")]
+    public void NativeCollectionInitializer_ChargesAllocationAndAddEffects(string declared, string missing)
+    {
+        var result = Compile($$"""
+            module CollectionEffects
+              func Make () → System.Collections.Generic.List<int>
+                ! {{declared}}
+                return new System.Collections.Generic.List<int> {1}
+            """);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains($"'{missing}'"));
+    }
+
+    [Fact]
+    public void NativeCollectionInitializer_DoesNotDropElementCallEffects()
+    {
+        const string source = """
+            module ElementEffects
+              func Next () → int
+                ! cw
+                System.Console.WriteLine("element")
+                return 1
+              func Make () → System.Collections.Generic.List<int>
+                ! alloc, mut
+                return new System.Collections.Generic.List<int> {Next()}
+            """;
+        var result = Compile(source);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'cw'"));
+    }
+
+    [Fact]
+    public void NativeCollectionInitializer_ChargesASourceAddRatherThanABclNameMatch()
+    {
+        const string source = """
+            module SourceAdd
+              class Tracked extends System.Collections.Generic.List<int>
+                func Add (int:value) → void
+                  ! cw
+                  System.Console.WriteLine(value)
+              func Make () → Tracked
+                ! alloc, mut
+                return new Tracked {1}
+            """;
+        var result = Compile(source);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'cw'"));
+        Assert.DoesNotContain(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+    }
+
+    [Theory]
+    [InlineData("new System.Collections.Generic.List<int> {1, Name = 2}")]
+    [InlineData("new System.Collections.Generic.List<int> {{}}")]
+    [InlineData("new System.Collections.Generic.List<int> {{1,}}")]
+    public void NativeCollectionInitializer_RejectsMalformedOrMixedEntries(string expression)
+    {
+        var diagnostics = new DiagnosticBag();
+        new Parser(new Lexer($"module Invalid\n  func Make () → void\n    let value = {expression}",
+            diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.True(diagnostics.HasErrors);
+    }
+
     [Fact]
     public void IndexedSubtraction_RetainsCastAndUtf16ScalarArithmetic()
     {
