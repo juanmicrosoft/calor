@@ -91,6 +91,23 @@ public class MemberAccessReferenceTests
         // Should NOT contain the pattern where the enum value is quoted as a string literal
         // (i.e., should not have ("...AttributeTargets.Method..."))
         Assert.DoesNotMatch(@"\(""[^""]*AttributeTargets\.Method[^""]*""\)", emittedCSharp);
+        var native = new CalorEmitter().Emit(toCalorResult.Ast!);
+        Assert.DoesNotContain('§', native);
+        var roundtrip = Program.Compile(native);
+        Assert.False(roundtrip.HasErrors, string.Join("\n", roundtrip.Diagnostics));
+        const string probe = """
+
+            public static class Probe
+            {
+                public static string Run()
+                {
+                    var usage = (System.AttributeUsageAttribute)System.Attribute.GetCustomAttribute(
+                        typeof(MyAttribute), typeof(System.AttributeUsageAttribute))!;
+                    return usage.ValidOn.ToString();
+                }
+            }
+            """;
+        Assert.Equal("Method", InteropScope.RefOutImplementationTests.Run(roundtrip.GeneratedCode + probe));
     }
 
     [Fact]
@@ -239,8 +256,8 @@ public class MemberAccessReferenceTests
     {
         // Parse Calor DSL with an attribute containing a qualified identifier
         var calorSource = """
-            §M{TestModule}
-                §CL{MyAttribute:pub}[@AttributeUsage(AttributeTargets.Method)]
+            module TestModule
+              class MyAttribute public [@AttributeUsage(AttributeTargets.Method)]
             """;
 
         var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
@@ -266,8 +283,8 @@ public class MemberAccessReferenceTests
     {
         // A bare (non-dotted) identifier in an attribute should also be emitted unquoted
         var calorSource = """
-            §M{TestModule}
-                §CL{TestClass:pub}[@DefaultValue(SomeConstant)]
+            module TestModule
+              class TestClass public [@DefaultValue(SomeConstant)]
             """;
 
         var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
