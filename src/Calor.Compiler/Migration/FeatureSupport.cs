@@ -1572,9 +1572,12 @@ public static class FeatureSupport
     {
         if (!Features.TryGetValue(featureName, out var info))
             return null;
-        return info.Workaround
-            ?? (info.Support == SupportLevel.NotSupported
-                ? "Preserve the complete C# boundary as explicit interop."
-                : null);
+        return GetWorkaroundText(info);
     }
+
+    internal static string? GetWorkaroundText(FeatureInfo info) =>
+        info.Workaround
+            ?? (info.Support == SupportLevel.NotSupported
+                ? "Run calor convert on the original C# and retain its converter-marked fallback; do not handwrite passthrough."
+                : null);
 }

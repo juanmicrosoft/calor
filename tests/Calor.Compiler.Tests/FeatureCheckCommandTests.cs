@@ -146,8 +146,48 @@ public class FeatureCheckCommandTests
     {
         var workaround = FeatureSupport.GetWorkaround("await-foreach");
 
+        Assert.Equal("Keep the containing member as exact C# interop", workaround);
+    }
+
+    [Fact]
+    public void FeatureCheck_GetWorkaround_DefaultDoesNotRecommendHandwrittenInterop()
+    {
+        var feature = new FeatureInfo
+        {
+            Name = "unsupported-without-workaround",
+            Support = SupportLevel.NotSupported
+        };
+
+        var workaround = FeatureSupport.GetWorkaroundText(feature);
+
         Assert.NotNull(workaround);
-        Assert.NotEmpty(workaround);
+        Assert.DoesNotContain("explicit interop", workaround);
+        Assert.Contains("calor convert", workaround);
+        Assert.Contains("original C#", workaround);
+        Assert.Contains("converter-marked fallback", workaround);
+        Assert.Contains("do not handwrite passthrough", workaround);
+    }
+
+    [Theory]
+    [InlineData(SupportLevel.Full)]
+    [InlineData(SupportLevel.Partial)]
+    [InlineData(SupportLevel.ManualRequired)]
+    public void FeatureCheck_GetWorkaround_NoDefaultForOtherSupportLevels(SupportLevel support)
+    {
+        var feature = new FeatureInfo { Name = "without-workaround", Support = support };
+
+        Assert.Null(FeatureSupport.GetWorkaroundText(feature));
+    }
+
+    [Fact]
+    public void FeatureCheck_GetWorkaround_PreservesExplicitWorkarounds()
+    {
+        foreach (var feature in FeatureSupport.GetAllFeatures().Where(feature => feature.Workaround != null))
+        {
+            Assert.Equal(feature.Workaround, FeatureSupport.GetWorkaround(feature.Name));
+        }
+
+        Assert.Null(FeatureSupport.GetWorkaround("unknown-feature"));
     }
 
     #endregion
