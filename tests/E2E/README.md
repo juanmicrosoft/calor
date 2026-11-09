@@ -2055,37 +2055,6 @@ are admitted. No new full heavy run was started in the child.
 The body/IO matrix, engine, task inputs, strict
 categories and 120/600-second limits are unchanged.
 
-The parent's later frozen `9e1160ad2` run passed six of seven tests in
-972.585 seconds but failed the old 0.001-second expectation on a global
-bootstrap deadline. It completed only 120 effects controls (34 positive,
-86 rejected), plus 34 preserved and one native-only; neither the complete
-131-entry matrix nor the archived chain completed. That run gives no
-six-task acceptance.
-
-The bootstrap-accounting repair's focused actual failure-guards run took
-59.233 seconds: 18 entrypoints were attempted and 17 controls validated
-(10 finite negatives, six native-image prerequisite refusals and one
-zero-credit bootstrap refusal). The five-second infinite-candidate probe
-failed admission: it timed out during bootstrap without selected-runtime
-identity. Remaining configuration, nullable API, missing-root and native
-corruption guards completed. This is not candidate nontermination evidence
-or a passing failure-guards test. Lightweight synthetic admission controls
-and a separate actual 0.001-second bootstrap refusal passed after the
-accounting change. No repeated heavy rerun was started under shared-host
-saturation. Full current and genuine-old/current parent matrices remain
-required after integration; the expected counts are not new passing results.
-
-The subsequent phase-budget correction adds only this opt-in test-helper
-watchdog; ordinary profiles and the shared Python supervisor are unchanged.
-The final focused run passed three tests in 43.600 seconds, with 19 actual controls:
-one phase-enabled positive, 10 finite negatives, one entered-body runtime
-timeout, six native-image refusals and one zero-credit bootstrap refusal.
-Synthetic admission mocks are separate and excluded from those real counts.
-The watchdog is opt-in and limited to active body invocations; ordinary
-profiles allocate no timer. Owned helper/IO cleanup was checked after the actual timeout.
-These supersede the earlier bootstrap-only timeout evidence, not the pending
-full parent current/strict matrices.
-
 **Limits:** this is finite process supervision, not a sandbox or universal
 proof. The interposer refuses non-owned supplied paths and unmodeled external
 call/constructor surfaces before original IO. Supported console/string/math,
