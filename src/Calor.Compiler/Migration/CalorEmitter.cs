@@ -1822,12 +1822,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
                     }
                 }
 
-                AppendLine($"§R {expr}");
+                if (string.IsNullOrWhiteSpace(expr))
+                    throw new InvalidOperationException("A returned expression must emit a native value.");
+                AppendLine($"return {expr}");
             }
         }
         else
         {
-            AppendLine("§R");
+            AppendLine("return");
         }
         return "";
     }
@@ -1910,6 +1912,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     public string Visit(CallStatementNode node)
+    {
+        AppendLine(new CallExpressionNode(node.Span, node.Target, node.Arguments,
+            node.ArgumentNames, node.ArgumentModifiers, node.TypeArguments).Accept(this));
+        return "";
+    }
+
+    private string EmitLegacyCallStatement(CallStatementNode node)
     {
         // Emit named argument labels as §A[name] value when present.
         // Argument expressions are visited in inline-sibling context so that
@@ -3297,25 +3306,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ConditionalExpressionNode node)
     {
-        // AcceptInInlineSibling: condition/branches in Lisp (? c t f) form are space-separated,
-        // so a nested zero-arg call without explicit §/C would absorb the next operand.
-        // For the §IF expression form we keep it too — the condition slot is followed by
-        // " → whenTrue", and a bare §C{X} could absorb the → as a primary token.
         var condition = AcceptInConditionalRegion(node.Condition);
         var whenTrue = AcceptInConditionalRegion(node.WhenTrue);
         var whenFalse = AcceptInConditionalRegion(node.WhenFalse);
 
-        // If either branch contains section markers (§C, §NEW, §LAM, etc.) or commas
-        // (tuple literals), decompose into §IF/§EL/§/I expression form.
-        // Section markers and commas are invalid inside Lisp (?) expressions
-        // but valid in §IF expression branches.
-        if (ContainsSectionMarker(whenTrue) || ContainsSectionMarker(whenFalse)
-            || whenTrue.Contains(',') || whenFalse.Contains(','))
-        {
-            return $"§IF {condition} → {whenTrue} §EL → {whenFalse}";
-        }
-
-        return $"(? {condition} {whenTrue} {whenFalse})";
+        return $"({condition} ? {whenTrue} : {whenFalse})";
     }
 
     private static bool ContainsSectionMarker(string expr)
@@ -3447,7 +3442,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var right = AcceptInConditionalRegion(node.Right);
         var opSymbol = GetCalorOperatorSymbol(node.Operator);
 
-        return $"({opSymbol} {left} {right})";
+        return $"({left} {opSymbol} {right})";
     }
 
     public string Visit(UnaryOperationNode node)
@@ -3464,10 +3459,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             _ => throw new ArgumentOutOfRangeException(nameof(node.Operator), node.Operator, null)
         };
 
-        if (ContainsSectionMarker(operand))
-            operand = HoistToTempVar(operand);
-
-        return $"({opSymbol} {operand})";
+        return $"({opSymbol}{operand})";
     }
 
     public string Visit(FieldAccessNode node)
@@ -3503,6 +3495,20 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     public string Visit(NewExpressionNode node)
+    {
+        var types = node.TypeArguments.Count == 0 ? ""
+            : $"<{string.Join(", ", node.TypeArguments.Select(TypeMapper.ToSurfaceType))}>";
+        var arguments = node.Arguments.Select((argument, index) =>
+            (node.ArgumentNames?.ElementAtOrDefault(index) is { } name
+                ? $"{EscapeCalorIdentifier(name)}: " : "")
+            + AcceptInConditionalRegion(argument));
+        var initializers = node.Initializers.Count == 0 ? ""
+            : " { " + string.Join(", ", node.Initializers.Select(initializer =>
+                $"{EscapeCalorIdentifier(initializer.PropertyName)} = {AcceptInConditionalRegion(initializer.Value)}")) + " }";
+        return $"new {TypeMapper.ToSurfaceType(node.TypeName)}{types}({string.Join(", ", arguments)}){initializers}";
+    }
+
+    private string EmitLegacyNew(NewExpressionNode node)
     {
         var typeArgs = node.TypeArguments.Count > 0
             ? $"<{string.Join(",", node.TypeArguments.Select(TypeMapper.ToSurfaceType))}>"
@@ -3601,121 +3607,31 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(CallExpressionNode node)
     {
-        // Build type arguments suffix for generic method calls
-        var typeArgsSuffix = node.TypeArguments is { Count: > 0 }
+        var types = node.TypeArguments is { Count: > 0 }
             ? $"<{string.Join(", ", node.TypeArguments.Select(TypeMapper.ToSurfaceType))}>"
             : "";
-
-        // Inside interpolation expressions, section markers (§C, §A, §/C) would be
-        // treated as literal text by the parser. Use function-call syntax instead.
-        if (_inInterpolation)
+        var target = NormalizeCallTarget(node.Target);
+        if (target.IndexOfAny(['(', ')', '[', ']']) >= 0)
+            throw new InvalidOperationException("A computed call requires an expression-valued callee.");
+        var arguments = node.Arguments.Select((argument, index) =>
         {
-            if (node.Arguments.Count == 0)
-                return $"{node.Target}{typeArgsSuffix}()";
+            var name = node.ArgumentNames?.ElementAtOrDefault(index);
+            var modifier = node.ArgumentModifiers?.ElementAtOrDefault(index);
+            return (name is null ? "" : $"{EscapeCalorIdentifier(name)}: ")
+                + (modifier is null ? "" : $"{modifier} ")
+                + AcceptInConditionalRegion(argument);
+        });
+        return $"{target}{types}({string.Join(", ", arguments)})";
+    }
 
-            if (node.ArgumentModifiers?.Any(modifier => modifier != null) == true)
-                RecordEmitterFallback(node, "interpolation-call-modifiers",
-                    "Modified call arguments are preserved using C# interpolation expression syntax");
-            var inlineArgs = node.Arguments.Select((a, i) =>
-            {
-                var argValue = a.Accept(this);
-                if (node.ArgumentModifiers != null && i < node.ArgumentModifiers.Count
-                    && node.ArgumentModifiers[i] is { } modifier)
-                    argValue = $"{modifier} {argValue}";
-                if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
-                    return $"{node.ArgumentNames[i]}: {argValue}";
-                return argValue;
-            });
-            return $"{node.Target}{typeArgsSuffix}({string.Join(", ", inlineArgs)})";
-        }
+    public string Visit(ThisExpressionNode node)
+    {
+        return "§THIS";
+    }
 
-        // If the target contains characters that would break §C{} attribute parsing
-        // (parentheses, brackets from raw C# chains the converter couldn't decompose),
-        // emit the entire expression as raw §CS{...} to avoid cascading parse errors.
-        if (node.Target.IndexOfAny(['(', ')', '[', ']']) >= 0)
-        {
-            var rawArgs = node.Arguments.Count > 0
-                ? $"({string.Join(", ", node.Arguments.Select(a => a.Accept(this)))})"
-                : "()";
-            // §CS{...} uses balanced-brace scanning with string/char literal awareness.
-            // Strip // comments (which may contain apostrophes that confuse the char scanner).
-            var innerCode = (node.Target + typeArgsSuffix + rawArgs)
-                .Replace("\r\n", "\n");
-            innerCode = System.Text.RegularExpressions.Regex.Replace(innerCode, @"//[^\n]*", " ");
-            innerCode = innerCode.Replace("\n", " ");
-            RecordEmitterFallback(
-                node,
-                "raw-call-target",
-                "Call target could not be represented natively and was preserved as §CS");
-            return $"§CS{{{innerCode}}}";
-        }
-
-        // Escape braces in target to avoid conflicts with Calor tag syntax,
-        // but preserve braces inside quoted string portions (e.g. "text {0}".FormatWith)
-        var escapedTarget = EscapeBracesInIdentifier(NormalizeCallTarget(node.Target).Replace("->", "."));
-        var fullTarget = escapedTarget + typeArgsSuffix;
-
-        if (node.Arguments.Count == 0)
-        {
-            // Phase 2 (RFC v0.6 call-closer-elision): zero-arg form may drop §/C
-            // when emitted at a "leaf" expression position (immediately
-            // followed by a newline / indent boundary / structural close).
-            // It is NOT safe inside an inline-sibling context (§A arg chain,
-            // §ARR / §ROW / §SALLOC initializer): the parser would absorb the
-            // next same-line sibling as this call's inline argument and
-            // silently corrupt the AST (e.g. `§ARR{...} §C{A} §C{B}` would
-            // parse as ONE element `A(B())` instead of TWO elements `A(), B()`).
-            // Flag defaults to true as of v0.6.1 (was false in v0.6.0). Set
-            // ConversionContext.UseImplicitCallCloser = false to restore the
-            // explicit closer form everywhere.
-            bool canElide = _context?.UseImplicitCallCloser != false
-                         && _inInlineSiblingContext == 0;
-            return canElide
-                ? $"§C{{{fullTarget}}}"
-                : $"§C{{{fullTarget}}} §/C";
-        }
-
-        // Emit named argument labels as §A[name] value when present.
-        // Argument expressions are visited in inline-sibling context so that
-        // nested zero-arg calls keep their explicit §/C (see comment above).
-        var args = node.Arguments.Select((a, i) =>
-        {
-            var argValue = AcceptInInlineSibling(a);
-            bool named = node.ArgumentNames != null
-                      && i < node.ArgumentNames.Count
-                      && node.ArgumentNames[i] != null;
-            var modifier = node.ArgumentModifiers != null && i < node.ArgumentModifiers.Count
-                ? node.ArgumentModifiers[i] : null;
-            var marker = modifier == null ? "§A" : $"§A{{{modifier}}}";
-            var wrapped = named
-                ? $"{marker}[{node.ArgumentNames![i]!.TrimStart('@')}] {argValue}"
-                : $"{marker} {argValue}";
-            return (named, modifier, wrapped, argValue);
-        }).ToList();
-
-        // RFC v0.6 call-closer-elision §2.1 / §2.2 — expression-context
-        // one-arg elision. Mirrors the stmt-context path at Visit(CallStatementNode).
-        // Parser side: Parser.cs `ParseCallExpression` accepts `§C{target} primary_expr`
-        // (no §A, no §/C) when followed by a syntactic terminator (RFC §2).
-        // Held back inside _inInlineSiblingContext (§A chain / §ARR / §ROW / §SALLOC
-        // initializer / §NEW arg) — there a same-line sibling would be absorbed as
-        // this call's inline argument and silently corrupt the AST (e.g.
-        // `§ARR{...} §C{f} x §C{g} y §/ARR` would re-parse as one element `f(x, g(y))`
-        // instead of two elements `f(x), g(y)`). Trailing-postfix safety (RFC §3.2
-        // case A: `§C{Box.unwrap} y.Length`) is handled by FieldAccessNode and
-        // peers detecting section markers in the inner emission and hoisting via
-        // HoistToTempVar — the same mechanism that protects zero-arg elision.
-        // Named args, multi-arg, or args whose first token is not in
-        // IsExpressionStart() keep the standard §A ... §/C form.
-        if (args.Count == 1 && !args[0].named && args[0].modifier == null)
-        {
-            bool canElide = _context?.UseImplicitCallCloser != false
-                         && _inInlineSiblingContext == 0
-                         && StartsWithExpressionStarter(args[0].argValue);
-            if (canElide)
-                return $"§C{{{fullTarget}}} {args[0].argValue}";
-        }
-        return $"§C{{{fullTarget}}} {string.Join(" ", args.Select(a => a.wrapped))} §/C";
+    public string Visit(BaseExpressionNode node)
+    {
+        return "§BASE";
     }
 
     /// <summary>
@@ -3814,16 +3730,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return sb.ToString();
     }
 
-    public string Visit(ThisExpressionNode node)
-    {
-        return "§THIS";
-    }
-
-    public string Visit(BaseExpressionNode node)
-    {
-        return "§BASE";
-    }
-
     public string Visit(TupleLiteralNode node)
     {
         // Hoist elements that start with '(' to avoid tuple/lisp ambiguity
@@ -3912,20 +3818,30 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // or for the index, the next outer §A) as the call's inline argument.
         var array = AcceptInInlineSibling(node.Array);
         var index = AcceptInInlineSibling(node.Index);
-        if (_inInterpolation)
-            return $"{array}[{index}]";
-        if (node.Array is ReferenceNode)
-            return $"§IDX{{{array}}} {index}";
-        return $"§IDX {array} {index}";
+        return $"{EmitPostfixOperand(node.Array)}[{index}]";
     }
 
     public string Visit(ArrayLengthNode node)
     {
         var array = node.Array.Accept(this);
-        return $"{array}.len";
+        return $"{array}.Length";
     }
 
     public string Visit(LambdaExpressionNode node)
+    {
+        if (node.Effects is not null)
+            throw new NotSupportedException("Native lambda effect-row integration requires the shared declaration row parser.");
+        var parameters = string.Join(", ", node.Parameters.Select(parameter =>
+            (parameter.TypeName is null ? "" : $"{TypeMapper.ToSurfaceType(parameter.TypeName)}:")
+            + EscapeCalorIdentifier(parameter.Name)));
+        var head = (node.IsStatic ? "static " : "") + $"({parameters}) => ";
+        if (node.ExpressionBody is not null)
+            return head + AcceptInConditionalRegion(node.ExpressionBody);
+        var statements = CaptureLambdaStatements(node, inlineSibling: false);
+        return head + "{\n" + string.Join("\n", statements.Select(statement => "  " + statement)) + "\n}";
+    }
+
+    private string EmitLegacyLambda(LambdaExpressionNode node)
     {
         // Build §LAM{p1:t1:p2:t2} header
         var header = BuildLambdaHeader(node);
@@ -4071,7 +3987,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // so a nested zero-arg call without explicit §/C would absorb b as its inline arg.
         var left = AcceptInConditionalRegion(node.Left);
         var right = AcceptInConditionalRegion(node.Right);
-        return $"(?? {left} {right})";
+        return $"({left} ?? {right})";
     }
 
     public string Visit(NullConditionalNode node)
@@ -5051,9 +4967,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var operand = AcceptInInlineSibling(node.Operand);
         return node.Operation switch
         {
-            TypeOp.Cast => $"(cast {TypeMapper.ToSurfaceType(node.TargetType)} {operand})",
-            TypeOp.Is => $"(is {operand} {TypeMapper.ToSurfaceType(node.TargetType)})",
-            TypeOp.As => $"(as {operand} {TypeMapper.ToSurfaceType(node.TargetType)})",
+            TypeOp.Cast => $"(({TypeMapper.ToSurfaceType(node.TargetType)}){operand})",
+            TypeOp.Is => $"({operand} is {TypeMapper.ToSurfaceType(node.TargetType)})",
+            TypeOp.As => $"({operand} as {TypeMapper.ToSurfaceType(node.TargetType)})",
             _ => throw new NotSupportedException($"Unknown type operation: {node.Operation}")
         };
     }
@@ -5066,8 +4982,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Defect: v0.6.1 loop-4 devil's-advocate finding #2.
         var operand = AcceptInInlineSibling(node.Operand);
         return node.VariableName != null
-            ? $"(is {operand} {TypeMapper.ToSurfaceType(node.TargetType)} {node.VariableName})"
-            : $"(is {operand} {TypeMapper.ToSurfaceType(node.TargetType)})";
+            ? $"({operand} is {TypeMapper.ToSurfaceType(node.TargetType)} {EscapeCalorIdentifier(node.VariableName)})"
+            : $"({operand} is {TypeMapper.ToSurfaceType(node.TargetType)})";
     }
 
     // Fallback nodes for unsupported C# constructs
@@ -5108,7 +5024,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(TypeOfExpressionNode node)
     {
-        return $"(typeof {TypeMapper.ToSurfaceType(node.TypeName)})";
+        return $"typeof({TypeMapper.ToSurfaceType(node.TypeName)})";
     }
 
     public string Visit(NameOfExpressionNode node)
@@ -5122,7 +5038,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             if (lastDot >= 0)
                 name = name[(lastDot + 1)..];
         }
-        return $"(nameof {name})";
+        return $"nameof({name})";
     }
 
     public string Visit(ExpressionCallNode node)

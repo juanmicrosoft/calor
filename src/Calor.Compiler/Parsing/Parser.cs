@@ -3047,6 +3047,19 @@ public sealed class Parser
 
         while (Current.Span.Line == TokenEndLine(PreviousToken))
         {
+            if (minimumPrecedence <= 9 && Current.Text is "is" or "as")
+            {
+                var operation = Advance();
+                var type = ParseLispTypeName(out var typeSpan);
+                string? variable = null;
+                if (operation.Text == "is" && Check(TokenKind.Identifier)
+                    && Current.Span.Line == TokenEndLine(PreviousToken))
+                    variable = TokenIdentifier(Advance());
+                expr = operation.Text == "is"
+                    ? new IsPatternNode(expr.Span.Union(PreviousToken.Span), expr, type, variable, typeSpan)
+                    : new TypeOperationNode(expr.Span.Union(typeSpan), TypeOp.As, expr, type, typeSpan);
+                continue;
+            }
             if (Check(TokenKind.Question) && minimumPrecedence <= 1)
             {
                 var question = Advance();
@@ -3405,6 +3418,10 @@ public sealed class Parser
     /// </summary>
     private ExpressionNode ParseParenExpressionOrInlineLambda()
     {
+        if (TryParseNativeLambda(out var lambda))
+            return lambda;
+        if (TryParseNativeCast(out var cast))
+            return cast;
         // Look ahead to determine if this is an inline lambda: () → or (params) →
         // We need to see if after the closing paren there's an arrow
         var savedPosition = _position;
@@ -3414,7 +3431,7 @@ public sealed class Parser
         if (Check(TokenKind.CloseParen))
         {
             Advance(); // consume )
-            if (Check(TokenKind.Arrow))
+            if (Check(TokenKind.FatArrow))
             {
                 // This is an inline lambda with no parameters
                 Advance(); // consume →
@@ -3430,9 +3447,9 @@ public sealed class Parser
                     stmtBody, // statementBody
                     new AttributeCollection());
             }
-            // Not a lambda, restore and parse as Lisp (though empty Lisp is likely an error)
-            _position = savedPosition;
-            return ParseLispExpression();
+            _diagnostics.ReportError(startToken.Span.Union(PreviousToken.Span),
+                DiagnosticCode.UnexpectedToken, "Empty parentheses require an invocation target or a lambda body.");
+            return new IntLiteralNode(startToken.Span, 0);
         }
 
         // Check for single parameter: (param) → or (type:param) →
@@ -3456,7 +3473,7 @@ public sealed class Parser
             if (Check(TokenKind.CloseParen))
             {
                 Advance(); // consume )
-                if (Check(TokenKind.Arrow))
+                if (Check(TokenKind.FatArrow))
                 {
                     // This is an inline lambda with one parameter
                     Advance(); // consume →
@@ -3488,21 +3505,12 @@ public sealed class Parser
             _position = savedPosition;
         }
 
-        // Legacy type operations parse their own types; generic commas are not tuple separators.
-        if (Peek(1).Kind == TokenKind.Identifier && Peek(1).Text is "cast" or "is" or "as"
-            && Peek(2).Kind != TokenKind.Comma
-            && (IsStagedPrefixExpression() || IsStagedNullableCast()))
-            return ParseLispExpression();
-
         // Check for tuple literal: (expr, expr, ...)
         // Tuples contain commas at depth 0; Lisp expressions do not.
         if (LookaheadIsTupleLiteral())
         {
             return ParseTupleLiteral();
         }
-
-        if (IsStagedPrefixExpression())
-            return ParseLispExpression();
 
         var open = Expect(TokenKind.OpenParen);
         var grouped = ParseExpression(allowSpacedCall: true);
@@ -3513,126 +3521,104 @@ public sealed class Parser
         return grouped;
     }
 
-    private bool IsStagedNullableCast()
+    private bool TryParseNativeLambda(out ExpressionNode expression)
     {
-        if (Peek(1).Text != "cast" || Peek(2).Kind != TokenKind.Question)
-            return false;
-
-        var savedPosition = _position;
+        expression = null!;
         var depth = 0;
-        var genericDepth = 0;
-        var conditionalDepth = 0;
-        try
+        var close = _position;
+        for (; close < _tokens.Count; close++)
         {
-            for (_position += 3; !IsAtEnd; Advance())
+            if (_tokens[close].Kind == TokenKind.OpenParen)
+                depth++;
+            else if (_tokens[close].Kind == TokenKind.CloseParen && --depth == 0)
+                break;
+        }
+        if (close + 1 >= _tokens.Count || _tokens[close + 1].Kind != TokenKind.FatArrow)
+            return false;
+        var open = Advance();
+        var parameters = new List<LambdaParameterNode>();
+        while (!IsAtEnd && !Check(TokenKind.CloseParen))
+        {
+            var start = Current.Span;
+            var nameToken = Expect(TokenKind.Identifier);
+            var name = TokenIdentifier(nameToken);
+            string? type = null;
+            TextSpan? typeSpan = null;
+            if (Match(TokenKind.Colon))
             {
-                var kind = Current.Kind;
-                if (kind is TokenKind.OpenParen or TokenKind.OpenBracket or TokenKind.OpenBrace)
-                    depth++;
-                else if (kind is TokenKind.CloseParen or TokenKind.CloseBracket or TokenKind.CloseBrace)
-                {
-                    if (depth == 0)
-                        break;
-                    depth--;
-                }
-                else if (depth == 0)
-                {
-                    if (kind == TokenKind.Less && (genericDepth > 0 || IsGenericTypeBracket()))
-                        genericDepth++;
-                    else if (kind == TokenKind.Greater && genericDepth > 0)
-                        genericDepth--;
-                    else if (kind == TokenKind.GreaterGreater && genericDepth > 0)
-                        genericDepth = System.Math.Max(0, genericDepth - 2);
-                    else if (genericDepth == 0)
-                    {
-                        if (kind == TokenKind.Question)
-                            conditionalDepth++;
-                        else if (kind == TokenKind.Colon)
-                        {
-                            // Alias qualifiers and the operand's own conditionals do not
-                            // supply the colon belonging to the leading '?'.
-                            if (Peek(1).Kind == TokenKind.Colon)
-                                Advance();
-                            else if (conditionalDepth == 0)
-                                return false;
-                            else
-                                conditionalDepth--;
-                        }
-                    }
-                }
+                type = name;
+                typeSpan = nameToken.Span;
+                nameToken = Expect(TokenKind.Identifier);
+                name = TokenIdentifier(nameToken);
             }
-            return true;
+            parameters.Add(new LambdaParameterNode(start.Union(nameToken.Span),
+                name, type, nameToken.Span, typeSpan));
+            if (!Match(TokenKind.Comma))
+                break;
         }
-        finally
-        {
-            _position = savedPosition;
-        }
+        Expect(TokenKind.CloseParen);
+        Expect(TokenKind.FatArrow);
+        var (body, statements, end) = ParseLambdaBody();
+        expression = new LambdaExpressionNode(open.Span.Union(end), "inline", parameters,
+            null, false, body, statements, new AttributeCollection());
+        return true;
     }
 
-    // Prefix forms remain during the header/emitter cutover. Infix operators
-    // inside the outer parentheses distinguish (-x + y) from legacy (- x y).
-    private bool IsStagedPrefixExpression()
+    private bool TryParseNativeCast(out ExpressionNode expression)
     {
-        var head = Peek(1);
-        if (head.Kind == TokenKind.OpenParen)
-            return false;
-        if (head.Kind is TokenKind.NullCoalesce or TokenKind.NullConditional
-            && !head.Text.StartsWith('§'))
-            return true;
-        if (head.Kind == TokenKind.Identifier
-            && Peek(2).Kind is TokenKind.Dot or TokenKind.NullConditional or TokenKind.OpenBrace
-                or TokenKind.OpenBracket)
-            return false;
-        if (head.Kind == TokenKind.Identifier && Peek(2).Kind == TokenKind.OpenParen
-            && (head.Span.End == Peek(2).Span.Start
-                || !OperatorSuggestions.AllOperators.Contains(head.Text)))
-            return false;
-        if (head.Kind == TokenKind.Identifier)
+        expression = null!;
+        var depth = 0;
+        var close = _position;
+        for (; close < _tokens.Count; close++)
         {
-            var name = head.Text;
-            var i = _position + 2;
-            while (i + 1 < _tokens.Count && _tokens[i].Kind == TokenKind.Minus
-                && _tokens[i + 1].Kind == TokenKind.Identifier)
-            {
-                name += "-" + _tokens[i + 1].Text;
-                i += 2;
-            }
-            if (name != head.Text && OperatorSuggestions.AllOperators.Contains(name))
-                return true;
-            return Peek(2).Kind != TokenKind.CloseParen
-                && InfixPrecedence(Peek(2).Kind) == 0 && Peek(2).Kind != TokenKind.Question;
+            if (_tokens[close].Kind == TokenKind.OpenParen)
+                depth++;
+            else if (_tokens[close].Kind == TokenKind.CloseParen && --depth == 0)
+                break;
         }
-        if (head.Kind is TokenKind.Minus or TokenKind.Exclamation or TokenKind.Tilde)
+        if (close + 1 >= _tokens.Count)
+            return false;
+        var following = _tokens[close + 1];
+        if (following.Kind == TokenKind.FatArrow || following.Span.Line != TokenEndLine(_tokens[close]))
+            return false;
+        var typeText = string.Concat(_tokens.Skip(_position + 1).Take(close - _position - 1)
+            .Select(token => token.Text));
+        var type = SyntaxFactory.ParseTypeName(typeText);
+        if (type.ContainsDiagnostics)
+            return false;
+        var unambiguousType = type is PredefinedTypeSyntax or NullableTypeSyntax or ArrayTypeSyntax
+            or PointerTypeSyntax or TupleTypeSyntax;
+        if (!unambiguousType && following.Kind is TokenKind.Minus or TokenKind.Exclamation
+            or TokenKind.Tilde or TokenKind.OpenParen)
+            return false;
+        var saved = _position;
+        _position = close + 1;
+        var hasOperand = IsExpressionStart();
+        _position = saved;
+        if (!hasOperand)
+            return false;
+        var open = Advance();
+        var typeStart = Current.Span;
+        _position = close;
+        var typeSpan = typeStart.Union(_tokens[close - 1].Span);
+        Advance();
+        var operand = ParseExpression(13);
+        expression = new TypeOperationNode(open.Span.Union(operand.Span),
+            TypeOp.Cast, operand, type.ToString(), typeSpan);
+        return true;
+    }
+
+    private static string TokenIdentifier(Token token) => token.Value as string ?? token.Text.TrimStart('@');
+
+    internal ExpressionNode ParseStandaloneExpression()
+    {
+        var expression = ParseExpression();
+        while (Match(TokenKind.Dedent))
         {
-            var depth = 0;
-            for (var i = _position + 2; i < _tokens.Count; i++)
-            {
-                var kind = _tokens[i].Kind;
-                if (kind is TokenKind.OpenParen or TokenKind.OpenBrace or TokenKind.OpenBracket)
-                    depth++;
-                else if (kind is TokenKind.CloseParen or TokenKind.CloseBrace or TokenKind.CloseBracket)
-                {
-                    if (depth == 0)
-                        return head.Kind != TokenKind.Identifier || i > _position + 2;
-                    depth--;
-                }
-                else if (depth == 0 && (InfixPrecedence(kind) != 0 || kind == TokenKind.Question))
-                {
-                    // Staged emitters still write (- x -1). Preserve the signed
-                    // second prefix operand only when the head is spaced and
-                    // the later sign is attached to its literal. (-x - 1) groups.
-                    if (kind == TokenKind.Minus && head.Span.End < Peek(2).Span.Start
-                        && i + 1 < _tokens.Count && _tokens[i].Span.End == _tokens[i + 1].Span.Start
-                        && _tokens[i + 1].Kind is TokenKind.IntLiteral or TokenKind.FloatLiteral or TokenKind.DecimalLiteral)
-                        continue;
-                    return false;
-                }
-            }
         }
-        return head.Kind != TokenKind.IntLiteral && head.Kind != TokenKind.FloatLiteral
-            && head.Kind != TokenKind.DecimalLiteral && head.Kind != TokenKind.StrLiteral
-            && head.Kind != TokenKind.BoolLiteral && head.Kind != TokenKind.CharLiteral
-            && head.Kind != TokenKind.At && !head.IsKeyword;
+        if (!Check(TokenKind.Eof))
+            _diagnostics.ReportUnexpectedToken(Current.Span, "end of expression", Current.Kind);
+        return expression;
     }
 
     /// <summary>
@@ -5543,7 +5529,17 @@ public sealed class Parser
     private ExpressionNode ParseReference(bool verbatim = false)
     {
         var token = Expect(TokenKind.Identifier);
-        var name = token.Text;
+        var name = TokenIdentifier(token);
+        verbatim |= token.Text.StartsWith('@');
+        if (!verbatim && name is "typeof" or "nameof")
+        {
+            Expect(TokenKind.OpenParen);
+            var value = ParseLispTypeName(out var typeSpan);
+            var close = Expect(TokenKind.CloseParen);
+            return name == "typeof"
+                ? new TypeOfExpressionNode(token.Span.Union(close.Span), value, typeSpan)
+                : new NameOfExpressionNode(token.Span.Union(close.Span), value);
+        }
 
         // Qualified identifier tokens retain dots; @ starts a separate token.
         if (name.EndsWith('.') && Check(TokenKind.At))
@@ -10318,6 +10314,50 @@ public sealed class Parser
     /// §NEW[Circle] §A "MyCircle" §A 5.0 §/NEW
     /// </summary>
     private ExpressionNode ParseNewExpression()
+    {
+        var start = Expect(TokenKind.New);
+        var type = ParseLispTypeName(out var typeSpan);
+        var arguments = new List<ExpressionNode>();
+        var names = new List<string?>();
+        if (Match(TokenKind.OpenParen))
+        {
+            while (!IsAtEnd && !Check(TokenKind.CloseParen))
+            {
+                string? name = null;
+                if (Check(TokenKind.Identifier) && Peek(1).Kind == TokenKind.Colon)
+                {
+                    name = TokenIdentifier(Advance());
+                    Advance();
+                }
+                arguments.Add(ParseExpression());
+                names.Add(name);
+                if (!Match(TokenKind.Comma))
+                    break;
+            }
+            Expect(TokenKind.CloseParen);
+        }
+        else if (!Check(TokenKind.OpenBrace))
+        {
+            _diagnostics.ReportUnexpectedToken(Current.Span, "constructor argument list", Current.Kind);
+        }
+        var initializers = new List<ObjectInitializerAssignment>();
+        if (Match(TokenKind.OpenBrace))
+        {
+            while (!IsAtEnd && !Check(TokenKind.CloseBrace))
+            {
+                var property = TokenIdentifier(Expect(TokenKind.Identifier));
+                Expect(TokenKind.Equals);
+                initializers.Add(new ObjectInitializerAssignment(property, ParseExpression()));
+                if (!Match(TokenKind.Comma))
+                    break;
+            }
+            Expect(TokenKind.CloseBrace);
+        }
+        return new NewExpressionNode(start.Span.Union(PreviousToken.Span), type, [], arguments,
+            initializers, typeSpan, argumentNames: names.Any(name => name is not null) ? names : null);
+    }
+
+    private ExpressionNode ParseLegacyNewExpression()
     {
         var startToken = Expect(TokenKind.New);
         var attrs = ParseAttributes();
