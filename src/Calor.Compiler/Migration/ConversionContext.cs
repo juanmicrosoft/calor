@@ -396,7 +396,8 @@ internal sealed record ConversionReceipt(
     }
 
     internal static IReadOnlyList<ConversionInputSnapshot> CaptureInputs(
-        string sourcePath, IEnumerable<MetadataReference> references, ConversionOptions options)
+        string sourcePath, IEnumerable<MetadataReference> references, ConversionOptions options,
+        CancellationToken cancellationToken = default)
     {
         var paths = new[] { sourcePath }
             .Concat(references.OfType<PortableExecutableReference>().Select(reference => reference.FilePath)
@@ -405,21 +406,32 @@ internal sealed record ConversionReceipt(
             .Concat(options.AdditionalSemanticSyntaxTrees.Select(tree => tree.FilePath)
                 .Where(path => !string.IsNullOrEmpty(path) && File.Exists(path)));
         return paths.Select(Path.GetFullPath).Distinct(StringComparer.Ordinal)
-            .Select(path => new ConversionInputSnapshot(path, FileHash(path))).ToArray();
+            .Select(path => new ConversionInputSnapshot(path, FileHash(path, cancellationToken))).ToArray();
     }
 
-    internal static void VerifyInputs(IReadOnlyList<ConversionInputSnapshot> inputs)
+    internal static void VerifyInputs(IReadOnlyList<ConversionInputSnapshot> inputs,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         foreach (var input in inputs)
             if (input == null || !Path.IsPathFullyQualified(input.Path)
-                || !File.Exists(input.Path) || FileHash(input.Path) != input.Sha256)
+                || !File.Exists(input.Path) || FileHash(input.Path, cancellationToken) != input.Sha256)
                 throw new IOException($"Original conversion input changed or is unavailable: {input?.Path}. Reconvert with its complete original project context.");
     }
 
-    private static string FileHash(string path)
+    private static string FileHash(string path, CancellationToken cancellationToken)
     {
         using var stream = File.OpenRead(path);
-        return Convert.ToHexString(SHA256.HashData(stream));
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        Span<byte> buffer = stackalloc byte[8192];
+        int read;
+        while ((read = stream.Read(buffer)) > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            hash.AppendData(buffer[..read]);
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        return Convert.ToHexString(hash.GetHashAndReset());
     }
 
     private static IReadOnlyList<Parsing.RawCSharpFrame> ReadFrames(string source)

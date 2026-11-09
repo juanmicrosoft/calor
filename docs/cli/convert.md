@@ -30,6 +30,24 @@ UTF-16/UTF-32 inputs therefore do **not** retain their original encoding or byte
 Exact-byte controls cover preserved UTF-8 sources, including BOMs, CRLF, and EOF comments.
 Malformed input encodings fail explicitly rather than using replacement text.
 
+### Generated output and refresh
+
+C#→Calor conversion saves an adjacent `<output>.conversion.json` receipt containing
+the original C# source, parse options, observed inputs and exact generated Calor.
+Keep this receipt with its output; it contains the original source, not just hashes.
+Generated Calor validation is mandatory before either file is written.
+
+An unchanged generated file can be refreshed from its original C# path. Edited
+outputs, missing receipts and outputs associated with another original path are
+refused without overwriting either file. Keep those files and convert to a new
+destination. A neighboring `.conversion.lock` serializes cooperating conversions.
+
+Output and receipt are not one atomic transaction. If the receipt cannot be saved
+after output commits, the command reports the written output and exits with an
+error. A missing or mismatched receipt blocks automatic refresh. Receipts detect
+edit conflicts and associate original context; they do not authenticate converter
+origin or prove that a preservation reason is still necessary.
+
 ---
 
 ## Quick Start

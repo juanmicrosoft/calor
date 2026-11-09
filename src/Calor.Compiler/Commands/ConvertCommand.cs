@@ -22,6 +22,11 @@ public static class ConvertCommand
     /// </summary>
     internal static readonly AsyncLocal<Action<ConversionOptions>?> ConversionOptionsObserver = new();
 
+    // Test-only race/cancellation controls at the actual CLI conversion boundary.
+    internal static readonly AsyncLocal<Action<ConversionResult, CancellationTokenSource?>?> ConversionCompletedObserver = new();
+    // Can add a rejection, never suppress the independent mandatory validator.
+    internal static readonly AsyncLocal<Func<string, Diagnostic?>?> AdditionalValidationError = new();
+
     /// <summary>
     /// Exit code for preserved output that was written but
     /// failed the round-trip compile check (<c>conversionPaths.outcome: "unverified"</c>).
@@ -472,6 +477,7 @@ public static class ConvertCommand
             ? new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds))
             : null;
         var cancellationToken = timeoutCts?.Token ?? CancellationToken.None;
+        using var generation = converter.CreateGeneration(inputPath, outputPath);
 
         ConversionResult result;
         if (timeoutCts != null)
@@ -482,7 +488,7 @@ public static class ConvertCommand
                 // interrupt even CPU-bound conversion hangs (e.g. infinite loops
                 // in preprocessor region extraction).
                 result = await Task.Run(
-                    () => converter.ConvertFileAsync(inputPath, cancellationToken),
+                    () => generation.ConvertAsync(cancellationToken),
                     cancellationToken);
             }
             catch (OperationCanceledException)
@@ -494,8 +500,9 @@ public static class ConvertCommand
         }
         else
         {
-            result = await converter.ConvertFileAsync(inputPath, cancellationToken);
+            result = await generation.ConvertAsync(cancellationToken);
         }
+        ConversionCompletedObserver.Value?.Invoke(result, timeoutCts);
 
         if (envelope != null)
         {
@@ -555,6 +562,8 @@ public static class ConvertCommand
         if (result.CalorSource != null)
         {
             validationErrors = ValidateCalorSource(result.CalorSource);
+            if (AdditionalValidationError.Value?.Invoke(result.CalorSource) is { } additionalError)
+                validationErrors.Add(additionalError);
             if (envelope != null)
             {
                 envelope.Data.Validated = true;
@@ -587,14 +596,13 @@ public static class ConvertCommand
 
         // #1144: record losses before writing, so a write failure still reports them.
         envelope?.SetConversionSummary(result);
-        var writeEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
         try
         {
-            await ConversionFileWriter.WriteAtomicAsync(
-                outputPath,
-                result.CalorSource!,
-                writeEncoding,
-                cancellationToken);
+            await generation.WriteAsync(result, cancellationToken, outputWritten: () =>
+            {
+                if (envelope != null)
+                    envelope.OutputWritten = true;
+            });
         }
         catch (OperationCanceledException)
         {
@@ -606,9 +614,6 @@ public static class ConvertCommand
             Console.Error.WriteLine("Destination was not modified.");
             return (1, result);
         }
-
-        if (envelope != null)
-            envelope.OutputWritten = true;
 
         // #770: structured loss accounting. The unconditional "✓ Conversion
         // successful" line was a false-success vector — it is now printed ONLY
