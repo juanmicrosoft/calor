@@ -2148,14 +2148,29 @@ error cases. Payload members must use the actual generic type parameters, not
 fixed-width stand-ins. Unrelated flags such as `IsSuccess` are not guessed as
 case evidence. Observations run before and after calls, including interventions.
 
-Native type-capture/guard patterns and combined type/property patterns work on
-both real compiler arms. Positive controls include scalar aliases, complementary
+The pre-cutover compiler arms accept native type-capture/guard patterns and
+combined type/property patterns. Positive controls include scalar aliases, complementary
 tags, all active observations, immutable input/result bindings, an unused match
 beside a genuinely supplying match, and namespace-qualified factory return
 annotations with inferred allocations. Bare nested property payload capture
 (`§PPROP §PMATCH{Value} §VAR{v}` with arm result `v`) currently fails with
 `Calor0200 Undefined variable 'v'`. These prerequisites use the supported native
 forms; no parser, binder or retired carrier runtime is restored.
+
+The canonical-current bridge renders only these disposable controls into
+word/infix syntax, using the explicitly selected checkout's lexer declaration.
+Unknown or mixed source grammars fail. The archived arm retains its original
+sigils and historical IDs; the mandatory final historical input is also unchanged.
+Current rejection must report source-ID removal or the exact `Calor0006` retired
+module-marker diagnostic, never merely a compilation failure. Canonical controls
+retain all 71 categories and expectations, including distinct property and typed
+patterns. Missing current pattern support remains a failing positive requirement;
+it is not replaced by a guarded-var control or credited as a finite rejection.
+
+Carrier reflection follows native declaration namespaces, not the compilation-unit
+label. The trace helper honors emitted file-scoped namespaces. Global-namespace
+functions and qualified `System.Int32`/`System.String` signatures retain exact CLR
+checks. These changes do not modify any other verifier profile or product grammar.
 
 Each Option positive checks **210** independent runtime cases and **1,050**
 successful counterfactuals. Each Result positive checks **90** runtime cases and

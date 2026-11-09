@@ -3206,24 +3206,34 @@ static void VerifyCarrierPatterns(string profile, string path)
     if (functions.Length != 1)
         throw new InvalidOperationException($"Expected exactly one native {name} function.");
     var function = functions[0];
+    var functionNamespace = function.NamespaceIdentity ?? module.Name;
+    var ownerName = string.IsNullOrEmpty(functionNamespace)
+        ? "GlobalModule" : functionNamespace.Split('.').Last() + "Module";
+    string Qualified(string ns, string local) => string.IsNullOrEmpty(ns) ? local : $"{ns}.{local}";
+    string Scalar(string type) => AttributeHelper.ExpandType(type) switch
+    {
+        "System.Int32" => "INT",
+        "System.String" => "STRING",
+        var expanded => expanded
+    };
     var parameterType = function.Parameters.Count == 0 ? null
         : SyntaxFactory.ParseTypeName(function.Parameters[0].TypeName);
     var generic = parameterType switch
     {
         GenericNameSyntax simple => simple,
         QualifiedNameSyntax { Right: GenericNameSyntax simple } qualified
-            when qualified.Left.ToString() == module.Name => simple,
+            when qualified.Left.ToString() == functionNamespace => simple,
         _ => null
     };
     if (function.Visibility != Visibility.Public || function.IsAsync || function.TypeParameters.Count != 0
-        || function.Output == null || AttributeHelper.ExpandType(function.Output.TypeName) != "INT"
+        || function.Output == null || Scalar(function.Output.TypeName) != "INT"
         || function.Parameters.Count != (option ? 2 : 1)
         || !function.Parameters.Select(parameter => parameter.Name)
             .SequenceEqual(option ? new[] { "opt", "defaultVal" } : new[] { "res" })
         || function.Parameters.Any(parameter => parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None)
-        || option && AttributeHelper.ExpandType(function.Parameters[1].TypeName) != "INT"
+        || option && Scalar(function.Parameters[1].TypeName) != "INT"
         || generic == null || generic.Identifier.ValueText != carrierName
-        || !generic.TypeArgumentList.Arguments.Select(argument => AttributeHelper.ExpandType(argument.ToString()))
+        || !generic.TypeArgumentList.Arguments.Select(argument => Scalar(argument.ToString()))
             .SequenceEqual(option ? new[] { "INT" } : new[] { "INT", "STRING" }))
         throw new InvalidOperationException($"Wrong native public carrier matching signature for {name}.");
     var native = module.Classes.Where(candidate => candidate.Name == carrierName).ToArray();
@@ -3260,13 +3270,14 @@ static void VerifyCarrierPatterns(string profile, string path)
         => input.Positive ? input.Value : option ? input.Default : -1;
     (MethodInfo Method, CarrierPatternInput Carrier) Target(Assembly assembly)
     {
-        var definition = assembly.GetType($"{module.Name}.{carrierName}`{(option ? 1 : 2)}")
+        var carrierNamespace = native[0].NamespaceIdentity ?? module.Name;
+        var definition = assembly.GetType(Qualified(carrierNamespace, $"{carrierName}`{(option ? 1 : 2)}"))
             ?? throw new InvalidOperationException("Missing actual native CLR carrier identity.");
         if (!definition.IsPublic || !definition.IsClass || definition.IsAbstract
             || definition.Assembly != assembly || !definition.IsGenericTypeDefinition)
             throw new InvalidOperationException("Wrong reflected generic input carrier identity.");
         var closed = definition.MakeGenericType(option ? new[] { typeof(int) } : new[] { typeof(int), typeof(string) });
-        var owner = assembly.GetType($"{module.Name}.{module.Name}Module")
+        var owner = assembly.GetType(Qualified(functionNamespace, ownerName))
             ?? throw new InvalidOperationException("Missing native carrier pattern module.");
         var methods = owner.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
             | BindingFlags.Instance | BindingFlags.DeclaredOnly).Where(method => method.Name == name).ToArray();
@@ -3320,7 +3331,7 @@ static void VerifyCarrierPatterns(string profile, string path)
             .GetCompilationUnitRoot();
         Behavior(Target(CompileRuntime(off.ToFullString(), warningsAsErrors: true).Assembly));
         var declaration = off.DescendantNodes().OfType<ClassDeclarationSyntax>()
-            .Single(type => type.Identifier.ValueText == module.Name + "Module")
+            .Single(type => type.Identifier.ValueText == ownerName)
             .Members.OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == name);
         var accepted = 0;
         foreach (var match in matches)
@@ -3339,9 +3350,15 @@ static void VerifyCarrierPatterns(string profile, string path)
                     _ => null
                 };
                 return binding != null && arm.Guard != null
-                    && Nodes(arm.Guard).OfType<ReferenceNode>().Any(reference =>
-                        reference.Name == $"{binding}.{(option ? "IsSome" : "IsOk")}"
-                        || reference.Name == $"{binding}.{(option ? "IsNone" : "IsErr")}");
+                    && Nodes(arm.Guard).Any(node => node switch
+                    {
+                        ReferenceNode reference => reference.Name == $"{binding}.{(option ? "IsSome" : "IsOk")}"
+                            || reference.Name == $"{binding}.{(option ? "IsNone" : "IsErr")}",
+                        FieldAccessNode { Target: ReferenceNode reference } field => reference.Name == binding
+                            && (field.FieldName == (option ? "IsSome" : "IsOk")
+                                || field.FieldName == (option ? "IsNone" : "IsErr")),
+                        _ => false
+                    });
             }
             if (!match.Cases.Any(CaseArm))
                 continue;
@@ -3365,7 +3382,10 @@ static void VerifyCarrierPatterns(string profile, string path)
             var instrumented = off.ReplaceNode(selected, traced).AddMembers(traceType);
             var assembly = CompileRuntime(instrumented.ToFullString(), warningsAsErrors: true).Assembly;
             var target = Target(assembly);
-            var trace = assembly.GetType(probe) ?? throw new InvalidOperationException("Missing carrier trace identity.");
+            var traceNamespace = off.Members.OfType<FileScopedNamespaceDeclarationSyntax>().SingleOrDefault()
+                ?.Name.ToString() ?? "";
+            var trace = assembly.GetType(Qualified(traceNamespace, probe))
+                ?? throw new InvalidOperationException("Missing carrier trace identity.");
             var armField = trace.GetField("Arm") ?? throw new InvalidOperationException("Missing carrier arm trace.");
             var valueField = trace.GetField("Value") ?? throw new InvalidOperationException("Missing carrier payload trace.");
             var flip = trace.GetField("Flip") ?? throw new InvalidOperationException("Missing carrier arm intervention.");

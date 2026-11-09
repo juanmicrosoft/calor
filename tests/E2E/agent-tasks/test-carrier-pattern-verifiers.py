@@ -48,7 +48,8 @@ REJECTIONS = {
     "wrong-tag-polarity": ("Wrong carrier matching output",),
     "single-arm-decoy": ("Required native carrier case arms missing or do not supply the output",),
     "comment-only": ("Expected exactly one native",),
-    "historical-ids": ("Source IDs are removed",),
+    "historical-ids": ("Source IDs are removed",
+                       "Calor0006 Legacy section marker '§M' is removed. Use 'module Name'."),
 }
 
 
@@ -100,6 +101,59 @@ def historical(text):
         line = line.replace("§W ", f"§W{{w{index}}} ")
         lines.append(line)
     return "\n".join(lines) + "\n"
+
+
+def canonical_source(text, category=None):
+    """Render only these disposable controls, never compiler input or old sources."""
+    if text is None:
+        return None
+    text = re.sub(
+        r"(?m)^(\s*)§CSHARP\{(.*)\}§/CSHARP$",
+        lambda match: f"{match[1]}raw member {len(match[2].encode('utf-8'))}\n{match[2]}", text)
+    text = text.replace("§M{Calculator}", "module CarrierPatterns Calculator")
+    text = re.sub(r"§CL\{(\w+):pub\}(<[^>]+>)", r"class \1\2", text)
+    text = re.sub(r"§F\{(\w+):(pub|priv)\}",
+                  lambda match: f"func {match[1]} {'public' if match[2] == 'pub' else 'private'}", text)
+    text = re.sub(r"§MT\{(\w+):pub\}", r"func \1 public", text)
+    text = re.sub(r"§FLD\{([^:}]+):(\w+):(pub|priv)\}",
+                  lambda match: f"field {match[1]}:{match[2]} "
+                  f"{'public' if match[3] == 'pub' else 'private'}", text)
+    text = re.sub(r"§PROP\{(\w+):([^:}]+):pub\}", r"property \2:\1 public", text)
+    text = re.sub(r"§B\{(\w+):([^}]+)\}", r"let \2:\1 =", text)
+    text = re.sub(r"§B\{(\w+)\}", r"let \1 =", text)
+    text = re.sub(r"§NEW\{([^}]+)\}", r"new \1()", text)
+    text = re.sub(
+        r"\(and §PTYPE\{([^:}]+):(\w+)\} §PPROP §PMATCH\{(\w+)\} (true|false)\)",
+        r"\1 { \3: \4 } \2", text)
+    text = re.sub(r"§PTYPE\{([^:}]+):(\w+)\}", r"\1 \2", text)
+    text = re.sub(r"§VAR\{(\w+)\}", r"var \1", text)
+    text = re.sub(r"§E\{([^}]+)\}", r"! \1", text)
+    text = re.sub(r"\(! (\w+)\)", r"!\1", text)
+    text = text.replace('(== (len "x") 0)', '"x".Length == 0')
+    text = re.sub(r"\(\? ([\w.]+) ([\w.]+) ([\w-]+)\)", r"\1 ? \2 : \3", text)
+    text = text.replace("(cast i32 v.Value)", "(int)v.Value")
+    for before, after in (("§GET", "get"), ("§R ", "return "), ("§W ", "match "),
+                          ("§K ", "case "), ("§WHEN ", "when "), ("§Q ", "requires "),
+                          ("§S ", "=> "), (" -> ", " → ")):
+        text = text.replace(before, after)
+    for before, after in (("i32", "int"), ("i64", "long"), ("str", "string")):
+        text = re.sub(rf"\b{before}\b", after, text)
+    text = re.sub(r"\?([TE])\b", r"\1?", text)
+    if category == "scalar-aliases":
+        text = re.sub(r"\bint\b", "System.Int32", text)
+        text = re.sub(r"\bstring\b", "System.String", text)
+    if "§" in text:
+        raise AssertionError(f"Unmodeled disposable canonical carrier control:\n{text}")
+    return text
+
+
+def canonical_root(root):
+    lexer = (root / "src/Calor.Compiler/Parsing/Lexer.cs").read_text(encoding="utf-8")
+    native = '["module"] = TokenKind.Module' in lexer
+    legacy = '["M"] = TokenKind.Module' in lexer
+    if native == legacy:
+        raise AssertionError(f"Unknown or ambiguous selected carrier source grammar: {root}")
+    return native
 
 
 def controls(profile):
@@ -312,12 +366,14 @@ def run_compatibility(old, current, deadline):
     if len(representatives) != 48 or shared_rejections != set(REJECTIONS) - {"historical-ids"}:
         raise AssertionError("Incomplete representative carrier pattern categories.")
     representatives.sort(key=lambda control: control[3])
+    native_current = canonical_root(current)
     def run_case(item):
         label, root, profile, category, text, expected = item
         if time.monotonic() >= deadline:
             raise RuntimeError("Carrier pattern compatibility exceeded its 600-second deadline.")
         try:
-            execute(profile, historical(text) if label == "v0.29" else text, expected, root, deadline,
+            selected = historical(text) if label == "v0.29" else canonical_source(text, category) if native_current else text
+            execute(profile, selected, expected, root, deadline,
                     category=category)
         except Exception as error:
             raise RuntimeError(f"{label}/{profile}/{category}: {error}") from error
@@ -343,10 +399,11 @@ def run_compatibility(old, current, deadline):
 class CarrierPatternVerifierTests(unittest.TestCase):
     def test_current_controls(self):
         before = dict(EXECUTED)
+        native = canonical_root(ROOT)
         for profile in TASKS:
             for category, text, expected in controls(profile):
                 with self.subTest(profile=profile, category=category):
-                    execute(profile, text, expected, category=category)
+                    execute(profile, canonical_source(text, category) if native else text, expected, category=category)
         self.assertEqual(EXECUTED, {"accepted": before["accepted"] + 24, "rejected": before["rejected"] + 47})
 
     def test_finite_rejections_reraise_supervision_and_infrastructure(self):
@@ -599,6 +656,84 @@ class CarrierPatternAdmissionTests(unittest.TestCase):
               "2 bootstrap non-admission paths, 3 direct exception paths and 1 success-shaped refusal.")
 
 
+class CarrierPatternCanonicalBridgeTests(unittest.TestCase):
+    def test_disposable_native_rendering_preserves_all_original_categories(self):
+        counts = {"accepted": 0, "rejected": 0}
+        for profile in TASKS:
+            original = list(controls(profile))
+            rendered = [(category, canonical_source(text, category), expected)
+                        for category, text, expected in original]
+            self.assertEqual([(category, expected) for category, _, expected in original],
+                             [(category, expected) for category, _, expected in rendered])
+            self.assertEqual(original, list(controls(profile)))
+            for category, text, expected in rendered:
+                counts["accepted" if expected else "rejected"] += 1
+                if text is not None:
+                    self.assertNotIn("§", text)
+                if category in ("property", "type-guard"):
+                    self.assertIn("case Calculator.", text)
+                    self.assertNotIn("case var ", text)
+                if category == "scalar-aliases":
+                    self.assertIn("System.Int32", text)
+                if category == "raw-interop":
+                    header, payload = text.split("  raw member ")
+                    length, code = payload.split("\n", 1)
+                    self.assertEqual(int(length), len(code.rstrip("\n").encode("utf-8")))
+                    self.assertIn("module CarrierPatterns Calculator", header)
+            guarded = canonical_source(source(profile, "guard", api=True))
+            self.assertIn("case var v when v.", guarded)
+            self.assertIn("func Unwrap public () → T?", guarded)
+        self.assertEqual(counts, {"accepted": 24, "rejected": 47})
+        with self.assertRaisesRegex(AssertionError, "Unmodeled disposable canonical"):
+            canonical_source("§UNMODELED{}")
+        print("Checked 71 canonical control renderings with unchanged categories/expectations; "
+              "property/type forms remain required, not substituted; zero actual entrypoint credit.")
+
+    def test_selected_source_grammar_is_explicit_and_fail_closed(self):
+        with tempfile.TemporaryDirectory(prefix="calor-carrier-grammar-") as temporary:
+            root = Path(temporary)
+            lexer = root / "src/Calor.Compiler/Parsing/Lexer.cs"
+            lexer.parent.mkdir(parents=True)
+            for contents, expected in (('["module"] = TokenKind.Module', True),
+                                       ('["M"] = TokenKind.Module', False)):
+                lexer.write_text(contents, encoding="utf-8")
+                self.assertIs(canonical_root(root), expected)
+            for contents in ("unknown", '["module"] = TokenKind.Module\n["M"] = TokenKind.Module'):
+                lexer.write_text(contents, encoding="utf-8")
+                with self.assertRaisesRegex(AssertionError, "Unknown or ambiguous"):
+                    canonical_root(root)
+            lexer.unlink()
+            with self.assertRaises(FileNotFoundError):
+                canonical_root(root)
+
+    def test_native_current_scheduler_never_rewrites_archived_or_final_sources(self):
+        old, current = Path("/synthetic/carrier-old"), Path("/synthetic/carrier-native")
+        seen = []
+        lock = Lock()
+
+        def verify(profile, text, expected, root=ROOT, deadline=None, environment=None, category=None):
+            if category == "historical-ids":
+                self.assertEqual(root, current)
+                self.assertEqual(text, historical(source("pm004")))
+            else:
+                original = next(t for c, t, e in controls(profile) if c == category and e == expected)
+                self.assertEqual(text, historical(original) if root == old
+                                 else canonical_source(original, category))
+            with lock:
+                seen.append((root, profile, category))
+            record_outcome(expected)
+
+        with patch.dict(EXECUTED, {"accepted": 0, "rejected": 0}, clear=True), \
+                patch.dict(run_compatibility.__globals__, {"execute": verify, "canonical_root": lambda _: True}), \
+                patch("sys.stdout", new_callable=io.StringIO):
+            run_compatibility(old, current, time.monotonic() + 30)
+            self.assertEqual(execution_counts(), {"accepted": 48, "rejected": 49})
+        self.assertEqual(len(seen), len(set(seen)))
+        self.assertEqual(len(seen), 97)
+        print("Checked 97 synthetic cross-grammar scheduled entries: original archived inputs and final "
+              "historical source unchanged; only current inputs rendered; zero actual entrypoint credit.")
+
+
 class CarrierPatternSchedulingTests(unittest.TestCase):
     def test_isolated_two_worker_arms_keep_all_cases_and_exact_counters(self):
         old, current = Path("/synthetic/carrier-old"), Path("/synthetic/carrier-current")
@@ -634,7 +769,7 @@ class CarrierPatternSchedulingTests(unittest.TestCase):
             record_outcome(expected)
 
         with patch.dict(EXECUTED, {"accepted": 7, "rejected": 9}, clear=True), \
-                patch.dict(run_compatibility.__globals__, {"execute": verify}), \
+                patch.dict(run_compatibility.__globals__, {"execute": verify, "canonical_root": lambda _: False}), \
                 patch("sys.stdout", new_callable=io.StringIO) as output:
             run_compatibility(old, current, total_deadline)
             self.assertEqual(execution_counts(), {"accepted": 55, "rejected": 58})
@@ -653,7 +788,7 @@ class CarrierPatternSchedulingTests(unittest.TestCase):
 
     def test_expired_deadline_and_worker_infrastructure_never_complete(self):
         with patch.dict(EXECUTED, {"accepted": 0, "rejected": 0}, clear=True), \
-                patch.dict(run_compatibility.__globals__, {"execute": Mock()}) as namespace:
+                patch.dict(run_compatibility.__globals__, {"execute": Mock(), "canonical_root": lambda _: False}) as namespace:
             with self.assertRaisesRegex(RuntimeError, "600-second deadline"):
                 run_compatibility(Path("/synthetic/old"), ROOT, time.monotonic() - 1)
             namespace["execute"].assert_not_called()
