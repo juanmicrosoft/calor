@@ -3737,7 +3737,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(LambdaExpressionNode node)
     {
         if (node.Effects is not null)
-            throw new NotSupportedException("Native lambda effect-row integration requires the shared declaration row parser.");
+            throw new NotSupportedException("Native lambda effect-row spelling awaits the supplemental syntax decision.");
         var parameters = string.Join(", ", node.Parameters.Select(parameter =>
             (parameter.TypeName is null ? "" : $"{TypeMapper.ToSurfaceType(parameter.TypeName)}:")
             + EscapeCalorIdentifier(parameter.Name)));
@@ -4797,28 +4797,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     public string Visit(ForallExpressionNode node)
-    {
-        // AcceptInInlineSibling: body in Lisp (forall (vars) body) is space-separated
-        // from the var list; a nested zero-arg call without §/C would absorb the trailing ')'.
-        var vars = string.Join(" ", node.BoundVariables.Select(v => v.Accept(this)));
-        var body = AcceptInInlineSibling(node.Body);
-        return $"(forall ({vars}) {body})";
-    }
+        => throw new NotSupportedException("Native quantified-contract spelling awaits the supplemental syntax decision.");
 
     public string Visit(ExistsExpressionNode node)
-    {
-        // See ForallExpressionNode.
-        var vars = string.Join(" ", node.BoundVariables.Select(v => v.Accept(this)));
-        var body = AcceptInInlineSibling(node.Body);
-        return $"(exists ({vars}) {body})";
-    }
+        => throw new NotSupportedException("Native quantified-contract spelling awaits the supplemental syntax decision.");
 
     public string Visit(ImplicationExpressionNode node)
     {
-        // AcceptInInlineSibling: operands in Lisp (-> a b) form are space-separated,
-        // so a nested zero-arg antecedent without §/C would absorb the consequent.
-        var ante = AcceptInInlineSibling(node.Antecedent);
-        var cons = AcceptInInlineSibling(node.Consequent);
+        var ante = AcceptInConditionalRegion(node.Antecedent);
+        var cons = AcceptInConditionalRegion(node.Consequent);
         return $"(!({ante}) || {cons})";
     }
 

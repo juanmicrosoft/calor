@@ -3462,7 +3462,7 @@ public sealed class Parser
         if (Check(TokenKind.CloseParen))
         {
             Advance(); // consume )
-            if (Check(TokenKind.FatArrow))
+            if (Check(TokenKind.FatArrow) && Current.Span.Line == TokenEndLine(PreviousToken))
             {
                 // This is an inline lambda with no parameters
                 Advance(); // consume →
@@ -3504,7 +3504,7 @@ public sealed class Parser
             if (Check(TokenKind.CloseParen))
             {
                 Advance(); // consume )
-                if (Check(TokenKind.FatArrow))
+                if (Check(TokenKind.FatArrow) && Current.Span.Line == TokenEndLine(PreviousToken))
                 {
                     // This is an inline lambda with one parameter
                     Advance(); // consume →
@@ -3564,7 +3564,8 @@ public sealed class Parser
             else if (_tokens[close].Kind == TokenKind.CloseParen && --depth == 0)
                 break;
         }
-        if (close + 1 >= _tokens.Count || _tokens[close + 1].Kind != TokenKind.FatArrow)
+        if (close + 1 >= _tokens.Count || _tokens[close + 1].Kind != TokenKind.FatArrow
+            || _tokens[close + 1].Span.Line != TokenEndLine(_tokens[close]))
             return false;
         var open = Advance();
         var parameters = new List<LambdaParameterNode>();

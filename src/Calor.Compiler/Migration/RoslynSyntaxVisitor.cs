@@ -13816,12 +13816,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private bool HasComputedCallTarget(InvocationExpressionSyntax invocation)
     {
-        // Keep contextual lambda staging and the existing assignment-target/counted-loop
-        // lowering boundaries until their coordinated source cutover.
-        if (invocation.DescendantNodes().Any(node => node is AnonymousFunctionExpressionSyntax)
-            || invocation.Ancestors().Any(node => node is AnonymousFunctionExpressionSyntax
-                || node is AssignmentExpressionSyntax
-                || node is ForStatementSyntax loop && !loop.Statement.Span.Contains(invocation.Span)))
+        if (invocation.Ancestors().Any(node => node is AssignmentExpressionSyntax
+            || node is ForStatementSyntax loop && !loop.Statement.Span.Contains(invocation.Span)))
             return false;
         if (invocation.Expression is MemberAccessExpressionSyntax member)
             return !WouldChainUseNativeOps(invocation)

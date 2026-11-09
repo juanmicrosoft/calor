@@ -17,6 +17,8 @@ public sealed class FinalExpressionGrammarTests
     [InlineData("trim(lower(x))")]
     [InlineData("cast(x)")]
     [InlineData("@new(x)")]
+    [InlineData("forall(x)")]
+    [InlineData("exists(x)")]
     public void NamesAndBuiltinCollisions_AreOrdinaryCalls(string source)
     {
         var call = Assert.IsType<CallExpressionNode>(Parse(source));
@@ -180,6 +182,38 @@ public sealed class FinalExpressionGrammarTests
         Assert.True(diagnostics.HasErrors);
     }
 
+    [Theory]
+    [InlineData("(result >= 0)")]
+    [InlineData("(true)")]
+    [InlineData("((result >= 0))")]
+    public void GroupedPostconditions_DoNotCaptureFollowingClauseAsLambda(string condition)
+    {
+        var source = $"module P\n  func F (int:x) → int\n    => {condition}\n    => result == x\n    => result <= 100\n    return x";
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
+        var function = Assert.Single(module.Functions);
+        Assert.Equal(3, function.Postconditions.Count);
+        Assert.IsType<ReturnStatementNode>(Assert.Single(function.Body));
+    }
+
+    [Fact]
+    public void UnmeasuredQuantifierSpelling_IsNotEmittedAsRetiredPrefixOrOpaqueClr()
+    {
+        var variable = new QuantifierVariableNode(default, "i", "int");
+        var body = new BoolLiteralNode(default, true);
+        ExpressionNode[] quantifiers =
+        [
+            new ForallExpressionNode(default, [variable], body),
+            new ExistsExpressionNode(default, [variable], body)
+        ];
+        foreach (var quantifier in quantifiers)
+        {
+            var error = Assert.Throws<NotSupportedException>(() => quantifier.Accept(new CalorEmitter()));
+            Assert.Contains("supplemental syntax decision", error.Message);
+        }
+    }
+
     [Fact]
     public void NativeBlockLambda_KeepsCallArgumentsOutsideItsBody()
     {
@@ -225,6 +259,105 @@ public sealed class FinalExpressionGrammarTests
         Assert.Equal(1, array.GetLength(0));
         Assert.Equal(2, array.GetLength(1));
         Assert.Equal([1, 2], trace);
+    }
+
+    [Fact]
+    public void ConvertedComputedExpressionFragments_StayInsideLambdaAndLazyOperandRegions()
+    {
+        var sourceTree = CSharpSyntaxTree.ParseText("""
+            public static class Probe
+            {
+                public static System.Func<int> Build(System.Func<System.Func<int>> factory)
+                    => () => factory()();
+                public static int Select(bool take, System.Func<System.Func<int>> factory)
+                    => take ? factory()() : 7;
+            }
+            """);
+        var originalCompilation = CSharpCompilation.Create("ComputedOriginal",
+            [sourceTree], GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
+        var context = new ConversionContext();
+        var module = new RoslynSyntaxVisitor(context, originalCompilation.GetSemanticModel(sourceTree))
+            .Convert(sourceTree.GetCompilationUnitRoot(), "NativeComputed");
+        Assert.Empty(context.Losses);
+        var methods = Assert.Single(module.Classes).Methods;
+        var build = methods.Single(method => method.Name == "Build");
+        var lambda = Assert.IsType<LambdaExpressionNode>(
+            Assert.IsType<ReturnStatementNode>(Assert.Single(build.Body)).Expression);
+        Assert.Null(lambda.StatementBody);
+        Assert.IsType<ExpressionCallNode>(lambda.ExpressionBody);
+        foreach (var method in methods)
+        {
+            var expression = Assert.IsType<ReturnStatementNode>(Assert.Single(method.Body)).Expression!;
+            var native = expression.Accept(new CalorEmitter());
+            Assert.DoesNotContain("_chain", native);
+            Assert.DoesNotContain("_expr", native);
+            Assert.IsType(expression.GetType(), Parse(native));
+        }
+        var generated = new CSharpEmitter().Emit(module);
+        var compilation = CSharpCompilation.Create("NativeComputed_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(generated)], GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        Assert.True(result.Success, generated + Environment.NewLine + string.Join(Environment.NewLine, result.Diagnostics));
+        var type = Assembly.Load(stream.ToArray()).GetTypes().Single(type => type.Name == "Probe");
+        var trace = new List<int>();
+        Func<Func<int>> factory = () =>
+        {
+            trace.Add(1);
+            return () => { trace.Add(2); return 42; };
+        };
+        var delayed = Assert.IsType<Func<int>>(type.GetMethod("Build")!.Invoke(null, [factory]));
+        Assert.Empty(trace);
+        Assert.Equal(42, delayed());
+        Assert.Equal([1, 2], trace);
+        trace.Clear();
+        Assert.Equal(7, type.GetMethod("Select")!.Invoke(null, [false, factory]));
+        Assert.Empty(trace);
+        Assert.Equal(42, type.GetMethod("Select")!.Invoke(null, [true, factory]));
+        Assert.Equal([1, 2], trace);
+    }
+
+    [Fact]
+    public void MeasuredBlockLambda_ParsesEmitsAndRunsWithoutHoistsOrClosers()
+    {
+        const string source = """
+            module NativeLambda
+              func Run (int:x) → int
+                let Func<int,int>:f =
+                  (int:y) =>
+                    let int:z = y + 1
+                    return z
+                return f(x)
+            """;
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
+        var function = Assert.Single(module.Functions);
+        Assert.Equal(2, function.Body.Count);
+        var binding = Assert.IsType<BindStatementNode>(function.Body[0]);
+        var lambda = Assert.IsType<LambdaExpressionNode>(binding.Initializer);
+        Assert.Equal(2, lambda.StatementBody!.Count);
+        var emitted = new CalorEmitter().Emit(module);
+        Assert.DoesNotContain('§', emitted);
+        Assert.DoesNotContain("_hoist", emitted);
+        Assert.DoesNotContain('{', emitted);
+        diagnostics = new DiagnosticBag();
+        var reparsed = new Parser(new Lexer(emitted, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, emitted + Environment.NewLine + string.Join(Environment.NewLine, diagnostics.Errors));
+        Assert.Equal(2, Assert.Single(reparsed.Functions).Body.Count);
+        var generated = new CSharpEmitter().Emit(reparsed);
+        var compilation = CSharpCompilation.Create("NativeLambda_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(generated)], GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        Assert.True(result.Success, string.Join(Environment.NewLine, result.Diagnostics));
+        var method = Assembly.Load(stream.ToArray()).GetTypes().SelectMany(type => type.GetMethods())
+            .Single(method => method.Name == "Run");
+        Assert.Equal(42, method.Invoke(null, [41]));
     }
 
     private static ExpressionNode Parse(string source, DiagnosticBag? diagnostics = null)
