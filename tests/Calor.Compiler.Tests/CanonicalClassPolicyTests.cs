@@ -3,6 +3,7 @@ using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
+using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
@@ -11,6 +12,52 @@ namespace Calor.Compiler.Tests;
 
 public sealed class CanonicalClassPolicyTests
 {
+    [Theory]
+    [InlineData(false, "Serializable")]
+    [InlineData(true, "Serializable")]
+    [InlineData(false, "System.Serializable")]
+    [InlineData(true, "System.Serializable")]
+    public void InlineAttributesSurviveNativeEscapedIdentifierLexing(bool roundtrip, string attribute)
+    {
+        var original = $"""
+            module Values
+              class Point struct [@{attribute}]
+                property int:X
+                  get
+                  set
+            """;
+        var source = roundtrip ? new CalorEmitter().Emit(Parse(original)) : original;
+        Assert.Equal(attribute, Parse(source).Classes.Single().CSharpAttributes.Single().Name);
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        using var stream = new MemoryStream();
+        var emitted = Compile(compiled.GeneratedCode).Emit(stream);
+        Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+        stream.Position = 0;
+        var context = new AssemblyLoadContext("NativeAttribute", isCollectible: true);
+        try
+        {
+            var type = context.LoadFromStream(stream).GetType("Point", throwOnError: true)!;
+            Assert.True(type.IsDefined(typeof(SerializableAttribute), inherit: false));
+        }
+        finally { context.Unload(); }
+    }
+
+    [Theory]
+    [InlineData("[@@event]", "@event", null)]
+    [InlineData("[@return:MaybeNull]", "MaybeNull", "return")]
+    [InlineData("[@return:@event]", "@event", "return")]
+    public void AttributeMarkerDoesNotRemoveActualNameEscapes(string header, string name, string? target)
+    {
+        var source = $"module Values\n  class Point {header}";
+        foreach (var input in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var attribute = Parse(input).Classes.Single().CSharpAttributes.Single();
+            Assert.Equal(name, attribute.Name);
+            Assert.Equal(target, attribute.Target);
+        }
+    }
+
     [Theory]
     [InlineData("public", Visibility.Public, Accessibility.Public)]
     [InlineData("internal", Visibility.Internal, Accessibility.Internal)]

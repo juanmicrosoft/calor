@@ -7854,10 +7854,13 @@ public sealed class Parser
         var attributes = new List<CalorAttributeNode>();
 
         // Keep parsing while we see [@
-        while (Check(TokenKind.OpenBracket) && Peek(1).Kind == TokenKind.At)
+        while (Check(TokenKind.OpenBracket)
+            && (Peek(1).Kind == TokenKind.At
+                || Peek(1).Kind == TokenKind.Identifier && Peek(1).Text.StartsWith('@')))
         {
             var startToken = Advance(); // consume [
-            Advance(); // consume @
+            var attachedMarker = !Check(TokenKind.At);
+            if (Check(TokenKind.At)) Advance();
 
             // Parse optional target prefix: [@target:Name(args)]
             // Accept any identifier before ':' as a target, matching C# grammar.
@@ -7868,9 +7871,10 @@ public sealed class Parser
                 && Peek(2).Kind != TokenKind.Colon
                 && Peek(2).Kind == TokenKind.Identifier)
             {
-                target = Current.Text;
+                target = Current.Value as string ?? Current.Text;
                 Advance(); // consume target
                 Advance(); // consume :
+                attachedMarker = false;
             }
 
             // Parse attribute name
@@ -7890,7 +7894,7 @@ public sealed class Parser
             }
 
             var nameToken = Advance();
-            var name = nameToken.Text;
+            var name = attachedMarker ? nameToken.Value as string ?? nameToken.Text[1..] : nameToken.Text;
 
             // Handle alias-qualified names like global::System.ComponentModel.Description
             if (Check(TokenKind.Colon) && Peek(1).Kind == TokenKind.Colon)
