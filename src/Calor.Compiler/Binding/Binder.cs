@@ -90,6 +90,9 @@ public sealed class Binder
     private readonly string _sourceIdentity;
     private Scope _scope;
     private readonly Dictionary<AstNode, FunctionSymbol> _functionSymbols = new();
+    private readonly Dictionary<AwaitExpressionNode, BoundStructuralExpression> _boundAwaits =
+        new(ReferenceEqualityComparer.Instance);
+    internal IReadOnlyDictionary<AwaitExpressionNode, BoundStructuralExpression> BoundAwaits => _boundAwaits;
     private readonly HashSet<FunctionSymbol> _staticMethodSymbols = new();
     private readonly Dictionary<SymbolId, string?> _functionNamespaces = new();
     private readonly Dictionary<ClassDefinitionNode, Scope> _classScopes = new();
@@ -956,6 +959,7 @@ public sealed class Binder
         _asyncTypeModule = module;
         _scope = new Scope();
         _functionSymbols.Clear();
+        _boundAwaits.Clear();
         CrossModuleCallTargets.Clear();
         _staticMethodSymbols.Clear();
         _functionNamespaces.Clear();
@@ -5115,7 +5119,7 @@ public sealed class Binder
         var resultType = awaiter?.GetResultMethod is { } getResult
             ? Metadata.MetadataBinderResult.ToBoundType(getResult.ReturnType)
             : metadataType is null ? GetAwaitedResultType(awaited.Type) : null;
-        return new BoundStructuralExpression(
+        var bound = new BoundStructuralExpression(
             awaitExpression.Span,
             nameof(AwaitExpressionNode),
             resultType?.DisplayString ?? "OBJECT",
@@ -5133,6 +5137,8 @@ public sealed class Binder
         {
             HasUnknownInferredType = resultType is null || awaited.HasUnknownInferredType
         };
+        _boundAwaits[awaitExpression] = bound;
+        return bound;
     }
 
     private BoundTypes.BoundType? GetAwaitedResultType(BoundTypes.BoundType awaitedType)

@@ -11,6 +11,7 @@ public sealed class TypeChecker
 {
     private readonly DiagnosticBag _diagnostics;
     private readonly TypeEnvironment _env;
+    private readonly IReadOnlyDictionary<AwaitExpressionNode, Binding.BoundStructuralExpression>? _boundAwaits;
     private ModuleNode? _module;
     private readonly Dictionary<IsPatternNode, CalorType> _patternBindingTypes = new();
     private readonly Dictionary<MatchStatementNode, CalorType> _matchTargetTypes = new();
@@ -59,9 +60,16 @@ public sealed class TypeChecker
     }
 
     public TypeChecker(DiagnosticBag diagnostics)
+        : this(diagnostics, null)
+    {
+    }
+
+    internal TypeChecker(DiagnosticBag diagnostics,
+        IReadOnlyDictionary<AwaitExpressionNode, Binding.BoundStructuralExpression>? boundAwaits)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _env = new TypeEnvironment();
+        _boundAwaits = boundAwaits;
     }
 
     /// <summary>
@@ -1873,6 +1881,10 @@ public sealed class TypeChecker
     private CalorType InferAwaitType(AwaitExpressionNode awaited)
     {
         var carrier = InferExpressionType(awaited.Awaited);
+        if (_boundAwaits?.TryGetValue(awaited, out var bound) == true
+            && !bound.HasUnknownInferredType
+            && bound.Metadata["GetResult"] is Microsoft.CodeAnalysis.IMethodSymbol)
+            return ResolveTypeName(bound.Type.DisplayString, awaited.Span);
         if (AttributeHelper.TryGetAsyncResultType(carrier.SurfaceName, _module, out var result))
             return ResolveTypeName(result, awaited.Span);
         if (carrier is ErrorType or ExternalType)

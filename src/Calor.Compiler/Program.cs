@@ -825,11 +825,21 @@ public class Program
             return new CompilationResult(diagnostics, ast, "");
         }
 
+        // Bind once before type checking so identity-sensitive expression facts are available.
+        // Route binding diagnostics at the existing semantic-validation boundary below.
+        phaseSw.Restart();
+        var bindingDiagnostics = new DiagnosticBag();
+        bindingDiagnostics.SetFilePath(filePath);
+        var binder = new Binder(bindingDiagnostics, filePath);
+        binder.Bind(ast);
+        phaseSw.Stop();
+        var semanticBindingMilliseconds = phaseSw.ElapsedMilliseconds;
+
         // Type checking (optional)
         if (options.EnableTypeChecking && !options.UnsafeTranspileOnly)
         {
             phaseSw.Restart();
-            var typeChecker = new TypeChecking.TypeChecker(diagnostics);
+            var typeChecker = new TypeChecking.TypeChecker(diagnostics, binder.BoundAwaits);
             typeChecker.Check(ast);
             phaseSw.Stop();
             telemetry?.TrackPhase("TypeChecker", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
@@ -880,14 +890,8 @@ public class Program
         // resolution, static-context instance access, and related diagnostics).
         // Optional verification may bind again for its bound tree, so propagate
         // only compilation errors and deduplicate them through the shared policy.
-        phaseSw.Restart();
-        var bindingDiagnostics = new DiagnosticBag();
-        bindingDiagnostics.SetFilePath(filePath);
-        var binder = new Binder(bindingDiagnostics, filePath);
-        binder.Bind(ast);
         BindingDiagnosticPolicy.PropagateCompilationErrors(bindingDiagnostics, diagnostics);
-        phaseSw.Stop();
-        telemetry?.TrackPhase("SemanticBinding", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
+        telemetry?.TrackPhase("SemanticBinding", semanticBindingMilliseconds, !diagnostics.HasErrors);
 
         if (options.Verbose)
         {

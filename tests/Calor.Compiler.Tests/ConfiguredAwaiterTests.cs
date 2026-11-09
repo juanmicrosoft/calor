@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json;
 using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
@@ -8,6 +9,7 @@ using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Parsing;
+using Calor.Compiler.TypeChecking;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
@@ -30,10 +32,117 @@ public sealed class ConfiguredAwaiterTests
     {
         var result = Program.Compile(Original);
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
-        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code.StartsWith("Calor04", StringComparison.Ordinal));
+        Assert.Empty(result.Diagnostics);
         var method = Compile(result.GeneratedCode).GetTypes().SelectMany(type => type.GetMethods())
             .Single(method => method.Name == "Read");
         Assert.Equal(42, await Assert.IsType<Task<int>>(method.Invoke(null, null)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OriginalOrdinaryCli_HasNoDeferredAwaiterDiagnostic(bool configure)
+    {
+        var source = configure ? Original.Replace("(false)", "(true)", StringComparison.Ordinal) : Original;
+        var result = OrdinaryCli(source);
+        Assert.Equal(0, result.ExitCode);
+        using var json = JsonDocument.Parse(result.StdOut);
+        Assert.Empty(json.RootElement.GetProperty("diagnostics").EnumerateArray());
+        var method = Compile(Assert.IsType<string>(result.GeneratedCode)).GetTypes().SelectMany(type => type.GetMethods())
+            .Single(method => method.Name == "Read");
+        Assert.Equal(42, await Assert.IsType<Task<int>>(method.Invoke(null, null)));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void OrdinaryCli_RejectsNullableAndMismatchedResultsWithoutDeferral(bool nullable, bool configure)
+    {
+        var source = nullable
+            ? """
+                module ConfigureAwaitLimit
+                  using System.Threading.Tasks
+                  func Read async (Task<string?>:pending) → string
+                    !
+                    return await pending.ConfigureAwait(false)
+                """
+            : Original.Replace("→ int", "→ string", StringComparison.Ordinal);
+        if (configure)
+            source = source.Replace("(false)", "(true)", StringComparison.Ordinal);
+        var result = OrdinaryCli(source);
+        Assert.NotEqual(0, result.ExitCode);
+        using var json = JsonDocument.Parse(result.StdOut);
+        var diagnostics = json.RootElement.GetProperty("diagnostics").EnumerateArray().ToArray();
+        Assert.Contains(diagnostics, diagnostic => diagnostic.GetProperty("code").GetString()
+            == (nullable ? DiagnosticCode.NullableReturnFromNonNullable : DiagnosticCode.TypeMismatch));
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.GetProperty("code").GetString() == DiagnosticCode.UndefinedReference);
+        Assert.Null(result.GeneratedCode);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ActualAwaitResult_RejectsAMismatchedReturnWithoutDeferral(bool configure)
+    {
+        var source = Original.Replace("→ int", "→ string", StringComparison.Ordinal)
+            .Replace("(false)", configure ? "(true)" : "(false)", StringComparison.Ordinal);
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var binder = new Calor.Compiler.Binding.Binder(diagnostics);
+        binder.Bind(ast);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        new TypeChecker(diagnostics, binder.BoundAwaits).Check(ast);
+        var mismatch = Assert.Single(diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.TypeMismatch, mismatch.Code);
+        Assert.StartsWith("await Task.FromResult(42)", Slice(source, mismatch.Span));
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference);
+        var compiled = Program.Compile(source);
+        Assert.True(compiled.HasErrors);
+        Assert.Contains(compiled.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference);
+    }
+
+    [Fact]
+    public void AwaitFacts_AreScopedToTheActualAstNotAnotherTreeWithTheSameSpans()
+    {
+        var diagnostics = new DiagnosticBag();
+        ModuleNode Parse() => new Parser(new Lexer(Original, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var selectedAst = Parse();
+        var otherAst = Parse();
+        var binder = new Calor.Compiler.Binding.Binder(diagnostics);
+        binder.Bind(selectedAst);
+        new TypeChecker(diagnostics, binder.BoundAwaits).Check(otherAst);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference
+            && diagnostic.Message.Contains("requires .NET awaiter resolution", StringComparison.Ordinal));
+        binder.Bind(otherAst);
+        Assert.DoesNotContain(binder.BoundAwaits.Keys, awaited =>
+            ReferenceEquals(awaited, Assert.IsType<AwaitExpressionNode>(
+                Assert.IsType<ReturnStatementNode>(selectedAst.Functions.Single().Body.Single()).Expression)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OpenGenericAwait_StillReportsTheUnresolvedContract(bool configure)
+    {
+        var source = $$"""
+            module OpenConfiguredAwait
+              using System.Threading.Tasks
+              func Read<T> async (Task<T>:pending) → Task<T>
+                !
+                return await pending.ConfigureAwait({{configure.ToString().ToLowerInvariant()}})
+            """;
+        var (bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var awaited = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundStructuralExpression>());
+        Assert.True(awaited.HasUnknownInferredType);
+        Assert.Null(awaited.Metadata["GetResult"]);
+        var result = Program.Compile(source);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference
+            && diagnostic.Message.Contains("requires .NET awaiter resolution", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -366,7 +475,10 @@ public sealed class ConfiguredAwaiterTests
         Assert.Null(awaited.Metadata["GetAwaiter"]);
         Assert.Null(awaited.Metadata["GetResult"]);
         Assert.True(awaited.HasUnknownInferredType);
-        Assert.True(Program.Compile(source).HasErrors);
+        var rejected = Program.Compile(source);
+        Assert.True(rejected.HasErrors);
+        Assert.Contains(rejected.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch
+            && diagnostic.Message.Contains("not a supported awaitable", StringComparison.Ordinal));
 
         using var context = MetadataContext.Create();
         var foreign = CSharpCompilation.Create("NotInMetadataContext",
@@ -420,9 +532,28 @@ public sealed class ConfiguredAwaiterTests
         var compiled = Program.Compile(source);
         Assert.True(compiled.HasErrors);
         Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NullableReturnFromNonNullable);
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference);
     }
 
     private static string Slice(string source, TextSpan span) => source.Substring(span.Start, span.Length);
+
+    private static (int ExitCode, string StdOut, string? GeneratedCode) OrdinaryCli(string source)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "CalorConfiguredAwait_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var input = Path.Combine(directory, "ConfigureAwaitLimit.calr");
+            var output = Path.Combine(directory, "ConfigureAwaitLimit.g.cs");
+            File.WriteAllText(input, source);
+            var result = CliTestHarness.RunCli(directory, "-i", input, "--format", "json", "-o", output);
+            return (result.ExitCode, result.StdOut, File.Exists(output) ? File.ReadAllText(output) : null);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
 
     private static (BoundModule Bound, DiagnosticBag Diagnostics) Bind(string source)
     {
