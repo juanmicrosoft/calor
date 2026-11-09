@@ -30,6 +30,81 @@ public class LexerTests
     }
 
     [Theory]
+    [InlineData("this", TokenKind.This)]
+    [InlineData("base", TokenKind.Base)]
+    public void NativeInstanceReceiver_PreservesTheKeywordBeforeMemberAccess(string receiver, TokenKind kind)
+    {
+        var tokens = Tokenize(receiver + ".shared", out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(kind, tokens[0].Kind);
+        Assert.Equal(receiver, tokens[0].Text);
+        Assert.Equal(0, tokens[0].Span.Start);
+        Assert.Equal(receiver.Length, tokens[0].Span.Length);
+        Assert.Equal(TokenKind.Dot, tokens[1].Kind);
+        Assert.Equal(receiver.Length, tokens[1].Span.Start);
+        Assert.Equal(TokenKind.Identifier, tokens[2].Kind);
+        Assert.Equal("shared", tokens[2].Text);
+    }
+
+    [Theory]
+    [InlineData("This.shared")]
+    [InlineData("Base.shared")]
+    [InlineData("thisValue.shared")]
+    [InlineData("baseline.shared")]
+    [InlineData("System.Console.WriteLine")]
+    public void NativeInstanceReceiverBoundary_DoesNotSplitOrdinaryQualifiedNames(string source)
+    {
+        var tokens = Tokenize(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(TokenKind.Identifier, tokens[0].Kind);
+        Assert.Equal(source, tokens[0].Text);
+        Assert.Equal(TokenKind.Eof, tokens[1].Kind);
+    }
+
+    [Theory]
+    [InlineData("this")]
+    [InlineData("base")]
+    public void NativeInstanceReceiverBoundary_PreservesEscapedIdentifierIdentity(string receiver)
+    {
+        var tokens = Tokenize("@" + receiver + ".shared", out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(TokenKind.Identifier, tokens[0].Kind);
+        Assert.Equal("@" + receiver, tokens[0].Text);
+        Assert.Equal(receiver, tokens[0].Value);
+        Assert.Equal(TokenKind.Dot, tokens[1].Kind);
+        Assert.Equal("shared", tokens[2].Text);
+    }
+
+    [Fact]
+    public void NativeInstanceReceivers_ParseAsDistinctThisAndBaseMemberAccess()
+    {
+        var diagnostics = new DiagnosticBag();
+        var expression = new Parser(
+            new Lexer("this.shared + base.shared", diagnostics).TokenizeAllForParser(), diagnostics)
+            .ParseStandaloneExpression();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+        var sum = Assert.IsType<Calor.Compiler.Ast.BinaryOperationNode>(expression);
+        var current = Assert.IsType<Calor.Compiler.Ast.FieldAccessNode>(sum.Left);
+        var inherited = Assert.IsType<Calor.Compiler.Ast.FieldAccessNode>(sum.Right);
+        Assert.IsType<Calor.Compiler.Ast.ThisExpressionNode>(current.Target);
+        Assert.IsType<Calor.Compiler.Ast.BaseExpressionNode>(inherited.Target);
+        Assert.Equal("shared", current.FieldName);
+        Assert.Equal("shared", inherited.FieldName);
+
+        const string source = """
+            module NativeInstanceAccess
+              class Parent
+                field int:shared protected
+              class Derived extends Parent
+                field int:shared private
+                func Sum () → int
+                  return this.shared + base.shared
+            """;
+        var compilation = Program.Compile(source);
+        Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
+    }
+
+    [Theory]
     [InlineData("and")]
     [InlineData("or")]
     [InlineData("not")]

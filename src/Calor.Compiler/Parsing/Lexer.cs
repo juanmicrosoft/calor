@@ -798,6 +798,7 @@ public sealed class Lexer
     // single tokens. This produces ReferenceNode("Math.PI") rather than a
     // FieldAccessNode chain. The CSharpEmitter (Visit(ReferenceNode)) handles dots
     // by splitting on '.' and sanitizing each part, so the round-trip is lossless.
+    // Exact this/base receivers stop before the dot and use native member access.
     // See DottedNameRoundTripTests for verification.
     private bool IsLineHead(int start)
     {
@@ -880,6 +881,8 @@ public sealed class Lexer
     {
         while (char.IsLetterOrDigit(Current) || Current == '_' || Current == '.' && Lookahead != '.')
         {
+            if (Current == '.' && _source.AsSpan(_tokenStart, _position - _tokenStart) is "this" or "base")
+                break;
             Advance();
         }
 
