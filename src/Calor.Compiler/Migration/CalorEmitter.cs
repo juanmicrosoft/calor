@@ -2819,14 +2819,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     public string Visit(DictionaryPutNode node)
-    {
-        // AcceptInInlineSibling: nested zero-arg calls in key/value must keep §/C
-        // or the parser would absorb the value as the call's inline arg.
-        var key = AcceptInInlineSibling(node.Key);
-        var value = AcceptInInlineSibling(node.Value);
-        AppendLine($"§PUT{{{node.DictionaryName}}} {key} {value}");
-        return "";
-    }
+        => Visit(new AssignmentStatementNode(node.Span,
+            new ArrayAccessNode(node.Span, new ReferenceNode(node.Span, node.DictionaryName), node.Key),
+            node.Value));
 
     public string Visit(CollectionRemoveNode node)
     {
@@ -2836,13 +2831,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     public string Visit(CollectionSetIndexNode node)
-    {
-        // AcceptInInlineSibling: see DictionaryPutNode.
-        var index = AcceptInInlineSibling(node.Index);
-        var value = AcceptInInlineSibling(node.Value);
-        AppendLine($"§SETIDX{{{node.CollectionName}}} {index} {value}");
-        return "";
-    }
+        => Visit(new AssignmentStatementNode(node.Span,
+            new ArrayAccessNode(node.Span, new ReferenceNode(node.Span, node.CollectionName), node.Index),
+            node.Value));
 
     public string Visit(CollectionClearNode node)
     {
