@@ -2,12 +2,15 @@
 """Four original async prompts; real entrypoints and disposable native controls."""
 
 import importlib.util
+from concurrent.futures import ThreadPoolExecutor
 import os
 from pathlib import Path
+import re
 import shutil
 import sys
 import tempfile
 import time
+from threading import Lock
 import unittest
 
 
@@ -223,27 +226,45 @@ def coupling_cases(profile):
     return [(source(profile).replace("-> i32", "-> Task<int>"), True, None)]
 
 
+INFRASTRUCTURE = re.compile(
+    r"\b(?:EOF|cleanup|OSError|FileNotFoundError|PermissionError|TimeoutError|Traceback|errno)\b"
+    r"|inherited (?:pipe|stdout)|broken pipe|cannot terminate|process group"
+    r"|permission denied|no such file|(?:failed|unable) to (?:launch|start)|could not (?:launch|start)"
+    r"|launch failure|OS error|operating.system error"
+    r"|\b(?-i:UNKNOWN)\b|solver[^\n]*(?:unknown|timeout|timed out)|(?:unknown|timeout)[^\n]*solver",
+    re.IGNORECASE,
+)
+TIMEOUT = re.compile(r"timeout|timed out|deadline", re.IGNORECASE)
+
+
 def control_failure(error, *, allow_timeout=False):
     output = str(error)
-    timeout = "Verifier timeout:" in output or "Verifier timeout after " in output
-    cleanup = "Verifier cleanup timeout:" in output or "Cannot terminate verifier process group" in output
-    if cleanup or timeout and not allow_timeout:
+    infrastructure = INFRASTRUCTURE.search(output)
+    statuses = re.findall(r"Verifier command exited ([^\s:]+)", output)
+    timeout = TIMEOUT.search(output)
+    explicit_timeout = re.search(r"Verifier timeout(?::| after )", output)
+    if infrastructure or any(status != "1" for status in statuses) or "Verification passed:" in output:
         raise error
-    if not output.startswith("Verifier command exited ") and not (allow_timeout and timeout):
+    if timeout and not (allow_timeout and explicit_timeout):
+        raise error
+    if not re.match(r"Verifier command exited 1:\n", output) and not (allow_timeout and explicit_timeout):
         raise error
     return output
 
 
 def assert_selected_compiler(test, output, environment):
+    if INFRASTRUCTURE.search(output) or TIMEOUT.search(output) or "Verifier command exited " in output:
+        raise AssertionError(f"Infrastructure-shaped positive output:\n{output}")
     root = Path(environment["CALOR_COMPILER_ROOT"]).resolve()
     configuration = environment.get("CALOR_COMPILER_CONFIGURATION", "Debug")
     expected = f"Selected compiler: {root / 'src/Calor.Compiler/bin' / configuration / 'net10.0/calor.dll'}"
-    test.assertEqual([line for line in output.splitlines() if line.startswith("Selected compiler:")],
+    test.assertEqual([line for line in output.splitlines() if line.lstrip().startswith("Selected compiler:")],
                      [expected], output)
 
 
 class AsyncVerifierTests(unittest.TestCase):
     entry_points_executed = 0
+    counter_lock = Lock()
 
     @classmethod
     def tearDownClass(cls):
@@ -277,7 +298,8 @@ class AsyncVerifierTests(unittest.TestCase):
             except RuntimeError as error:
                 output = control_failure(error, allow_timeout=allow_timeout)
                 passed = False
-            type(self).entry_points_executed += 1
+            with type(self).counter_lock:
+                type(self).entry_points_executed += 1
             self.assertEqual(passed, expected, output)
             if expected:
                 assert_selected_compiler(self, output, environment)
@@ -312,7 +334,21 @@ class AsyncVerifierTests(unittest.TestCase):
             shutil.copytree(COMPILER_ROOT / relative, arm / relative)
             native = {"darwin": "libz3.dylib", "linux": "libz3.so", "win32": "libz3.dll"}[sys.platform]
             (arm / relative / native).write_bytes(b"invalid native asset")
-            self.verify("async001", source("async001"), False, env={"CALOR_COMPILER_ROOT": str(arm)})
+            before = type(self).entry_points_executed
+            with self.assertRaises(RuntimeError) as refused:
+                self.verify("async001", source("async001"), False, env={"CALOR_COMPILER_ROOT": str(arm)})
+            output = str(refused.exception)
+            self.assertEqual(re.findall(r"Verifier command exited ([^\s:]+)", output), ["1", "1"], output)
+            self.assertIn("System.DllNotFoundException", output)
+            self.assertIn("Microsoft.Z3", output)
+            self.assertRegex(output, r"slice is not valid mach-o|invalid ELF header|file too short|not a valid Win32")
+            self.assertNotRegex(output, r"(?i)timeout|timed out|deadline|EOF|cleanup|Verification passed:")
+            self.assertEqual((arm / relative / native).read_bytes(), b"invalid native asset")
+            # This deliberate prerequisite failure is an infrastructure refusal,
+            # not a finite behavior rejection; count its one actual invocation.
+            with type(self).counter_lock:
+                self.assertEqual(type(self).entry_points_executed, before)
+                type(self).entry_points_executed += 1
 
     def test_native_call_identity_and_counterfactuals(self):
         for profile in TASKS:
@@ -337,11 +373,28 @@ class AsyncVerifierTests(unittest.TestCase):
                         "Verifier cleanup timeout: child did not exit by the deadline.",
                         "Cannot terminate verifier process group 123: denied",
                         "unexpected process/EOF failure",
-                        "Verifier command exited 1:\nVerification failed: Verifier timeout after 118s: dotnet"):
+                        "Verifier command exited 1:\nVerification failed: Verifier timeout after 118s: dotnet",
+                        "Verifier command exited 0:\nVerification passed: unexpected",
+                        "Verifier command exited -9:\nWrong result",
+                        "Verifier command exited 137:\nWrong result",
+                        "Verifier command exited 1:\nVerifier command exited 139:\nWrong result",
+                        "Verifier command exited 1:\nSolver returned UNKNOWN",
+                        "Verifier command exited 1:\nsolver timed out",
+                        "Verifier command exited 1:\nUNKNOWN",
+                        "Verifier command exited 1:\nEOF failure",
+                        "Verifier command exited 1:\nOSError: cannot launch",
+                        "Verifier command exited 1:\nlaunch failure",
+                        "Verifier command exited 1:\nOS error: denied",
+                        "Verifier command exited 1:\nprocess deadline exceeded",
+                        "Verifier command exited 1:\nVerification passed: success-shaped stdout"):
             with self.subTest(message=message), self.assertRaises(RuntimeError):
                 control_failure(RuntimeError(message))
         for message in ("Verifier cleanup timeout: child did not exit by the deadline.",
-                        "unexpected process/EOF failure"):
+                        "unexpected process/EOF failure",
+                        "Verifier command exited 1:\nEOF after Verifier timeout: expired",
+                        "Verifier command exited 1:\nsolver UNKNOWN after Verifier timeout: expired",
+                        "Verifier command exited 1:\nOSError after Verifier timeout: expired",
+                        "Verifier command exited 137:\nVerifier timeout: expired"):
             with self.subTest(message=message), self.assertRaises(RuntimeError):
                 control_failure(RuntimeError(message), allow_timeout=True)
         self.assertIn("Verifier timeout", control_failure(
@@ -352,7 +405,10 @@ class AsyncVerifierTests(unittest.TestCase):
         identity = f"Selected compiler: {COMPILER_ROOT / 'src/Calor.Compiler/bin/Debug/net10.0/calor.dll'}"
         assert_selected_compiler(self, identity, environment)
         for output in ("", identity.replace("/Debug/", "/Release/"), identity.replace("calor.dll", "other.dll"),
-                       identity + "\n" + identity):
+                       identity + "\n" + identity, identity + "\n  " + identity,
+                       identity + "\n\tSelected compiler: wrong",
+                       identity + "\nSolver UNKNOWN", identity + "\nEOF failure",
+                       identity + "\nlaunch failure", identity + "\nVerifier timed out"):
             with self.subTest(output=output), self.assertRaises(AssertionError):
                 assert_selected_compiler(self, output, environment)
 
@@ -377,23 +433,34 @@ def compatibility_cases(profile):
 def run_compatibility(old, current, deadline):
     test = AsyncVerifierTests()
     count = 0
+
+    def execute(item):
+        arm, root, historical, profile, text, expected, detail = item
+        remaining = min(120, deadline - time.monotonic())
+        if remaining <= 0:
+            raise RuntimeError("Async compatibility exceeded its 600-second deadline.")
+        old_result_blocker = historical and detail == "blocking Result"
+        output = test.verify(profile, historical_syntax(text) if historical else text, expected,
+                             env={"CALOR_COMPILER_ROOT": str(root), "CALOR_LOGIC_TIMEOUT_SECONDS": str(remaining)},
+                             detail="Calor0410" if old_result_blocker else detail, deadline=deadline)
+        if old_result_blocker:
+            test.assertIn("?.get_Result", output)
+            test.assertIn("effect 'unknown'", output)
+            print("v0.29 native/API blocker: inferred task.Result has unknown getter effect (Calor0410); "
+                  "this negative is not CLR behavioral evidence.")
+        return f"{arm} {profile}: {'accepted' if expected else 'rejected'}"
+
     for arm, root, historical in (("v0.29", old, True), ("current", current, False)):
-        for profile in TASKS:
-            for text, expected, detail in compatibility_cases(profile):
-                remaining = min(120, deadline - time.monotonic())
-                if remaining <= 0:
-                    raise RuntimeError("Async compatibility exceeded its 600-second deadline.")
-                old_result_blocker = historical and detail == "blocking Result"
-                output = test.verify(profile, historical_syntax(text) if historical else text, expected,
-                                     env={"CALOR_COMPILER_ROOT": str(root), "CALOR_LOGIC_TIMEOUT_SECONDS": str(remaining)},
-                                     detail="Calor0410" if old_result_blocker else detail, deadline=deadline)
-                if old_result_blocker:
-                    test.assertIn("?.get_Result", output)
-                    test.assertIn("effect 'unknown'", output)
-                    print("v0.29 native/API blocker: inferred task.Result has unknown getter effect (Calor0410); "
-                          "this negative is not CLR behavioral evidence.")
+        batch = [(arm, root, historical, profile, text, expected, detail)
+                 for profile in TASKS for text, expected, detail in compatibility_cases(profile)]
+        if len(batch) != 69:
+            raise RuntimeError("Expected exactly 69 independent controls per genuine async arm.")
+        # Arms stay sequential. Each of the two workers runs an independent
+        # real entrypoint/temp/helper build under the same absolute deadline.
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            for verdict in workers.map(execute, batch):
                 count += 1
-                print(f"{arm} {profile}: {'accepted' if expected else 'rejected'}")
+                print(verdict)
     test.verify("async001", historical_syntax(source("async001")), False,
                 env={"CALOR_COMPILER_ROOT": str(current),
                      "CALOR_LOGIC_TIMEOUT_SECONDS": str(min(120, deadline - time.monotonic()))},

@@ -1501,12 +1501,25 @@ disposable old inputs receive old IDs and explicit native input/output syntax.
 Missing APIs/assets/history, failed positive controls and skipped/empty runs
 fail; no reflection fallback or current-binary stand-in is allowed.
 Finite negative controls admit only an explicit `Verifier command exited`
-failure. Unexpected process/EOF, global/entry deadline and cleanup failures
+status 1 failure, including nested exits. Abnormal statuses, success-shaped
+failure output, solver UNKNOWN/timeout, OS/launch errors, unexpected process/EOF,
+global/entry deadline and cleanup failures
 re-raise, including nested supervisor timeouts inside command-exit output.
 Only the two explicit bounded-timeout controls opt into timeout admission;
 cleanup errors still fail. Every positive control asserts exactly one selected
-`calor.dll` identity with the resolved requested root and configuration. A
+`calor.dll` identity with the resolved requested root and configuration, rejecting
+indented extra identities as well as ordinary duplicates. A
 separate in-process admission/identity test adds no real entrypoint controls.
+Strict compatibility keeps the genuine old/current arms sequential and executes
+two isolated entrypoint workers within each arm under the same absolute
+600-second deadline. Each entry retains its own disposable workspace, helper
+source build and 120-second process/EOF bound; counters are synchronized. There
+is no helper/compiler caching, arm substitution, dropped control or relaxed bound.
+The deliberate corrupt-native control expects the classifier to re-raise its
+loader failure. It checks the selected disposable asset bytes, native loader
+exception and corruption diagnostic, rejects timeout/EOF/cleanup contamination,
+and counts that actual invocation separately as a prerequisite refusal, never a
+finite behavioral rejection.
 
 Known native/API limits are explicit, not repaired by this test-only unit.
 The current binder rejects an explicitly typed Task<int> local initialized
