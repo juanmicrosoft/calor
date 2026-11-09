@@ -132,6 +132,8 @@ def control_failure(error, *, allow_timeout=False):
         raise error
     if TIMEOUT.search(output) and not (allow_timeout and explicit_timeout):
         raise error
+    if allow_timeout and not explicit_timeout:
+        raise error
     if not re.match(r"Verifier command exited 1:\n", output) and not (allow_timeout and explicit_timeout):
         raise error
     return output
@@ -144,6 +146,10 @@ def assert_selected_compiler(test, output, environment):
     if (INFRASTRUCTURE.search(diagnostics) or TIMEOUT.search(diagnostics)
         or "Verifier command exited" in output or "Verification failed:" in output):
         raise AssertionError(f"Infrastructure-shaped positive output:\n{output}")
+    assert_compiler_identity(test, output, environment)
+
+
+def assert_compiler_identity(test, output, environment):
     root = Path(environment["CALOR_COMPILER_ROOT"]).resolve()
     configuration = environment.get("CALOR_COMPILER_CONFIGURATION", "Debug")
     expected = f"Selected compiler: {root / 'src/Calor.Compiler/bin' / configuration / 'net10.0/calor.dll'}"
@@ -276,14 +282,21 @@ def cases(profile):
 
 class EffectsVerifierTests(unittest.TestCase):
     count_lock = Lock()
+    entry_points_attempted = 0
     entry_points_executed = 0
     positives = 0
     negatives = 0
+    bounded_timeouts = 0
+    bootstrap_refusals = 0
+    native_refusals = 0
 
     @classmethod
     def tearDownClass(cls):
-        print(f"Executed {cls.entry_points_executed} real effects verify.sh controls: "
-              f"{cls.positives} positive, {cls.negatives} rejected.")
+        print(f"Validated {cls.entry_points_executed} of {cls.entry_points_attempted} attempted real effects verify.sh controls: "
+              f"{cls.positives} positive, {cls.negatives} rejected, {cls.bootstrap_refusals} bootstrap refusals.")
+        print(f"Rejection categories: {cls.negatives - cls.bounded_timeouts - cls.native_refusals} finite, "
+              f"{cls.bounded_timeouts} selected-runtime timeouts, {cls.native_refusals} native-image refusals; "
+              f"{cls.bootstrap_refusals} bootstrap refusals have zero behavioral credit.")
 
     def verify(self, profile, text, expected=True, *, env=None, detail=None, deadline=None,
                allow_timeout=False):
@@ -305,27 +318,35 @@ class EffectsVerifierTests(unittest.TestCase):
                 if remaining <= 0:
                     raise RuntimeError("Effects entrypoint supervision deadline expired.")
                 environment["CALOR_LOGIC_TIMEOUT_SECONDS"] = str(min(budget, remaining))
+            with type(self).count_lock:
+                type(self).entry_points_attempted += 1
             try:
                 output = ENGINE.run(command, HERE, deadline, env=environment)
                 passed = True
             except RuntimeError as error:
                 output = control_failure(error, allow_timeout=allow_timeout)
+                if allow_timeout:
+                    # The helper prints this only after its selected-arm build.
+                    # A bootstrap timeout has no identity and cannot prove that
+                    # the infinite candidate's runtime process was supervised.
+                    assert_compiler_identity(self, output, environment)
                 passed = False
-            with type(self).count_lock:
-                type(self).entry_points_executed += 1
             self.assertEqual(passed, expected, output)
             if expected:
                 assert_selected_compiler(self, output, environment)
                 self.assertIn(f"Verification passed: {TASKS[profile][1]}; original declared effects, native/CLR signatures, "
                               f"{COUNTS[profile]} runtime cases and BCL output/state coupling.", output)
                 self.assertIn("process supervision, not a sandbox", output)
-                with type(self).count_lock:
-                    type(self).positives += 1
-            else:
-                with type(self).count_lock:
-                    type(self).negatives += 1
             if detail:
                 self.assertIn(detail, output)
+            with type(self).count_lock:
+                type(self).entry_points_executed += 1
+                if expected:
+                    type(self).positives += 1
+                else:
+                    type(self).negatives += 1
+                    if allow_timeout:
+                        type(self).bounded_timeouts += 1
             return output
 
     def test_original_prompt_controls(self):
@@ -340,8 +361,12 @@ class EffectsVerifierTests(unittest.TestCase):
                 self.verify("eff005", text, expected, detail=detail)
 
     def test_supervision_failures_are_not_finite_rejections(self):
-        before = (type(self).entry_points_executed, type(self).positives, type(self).negatives)
+        before = (type(self).entry_points_attempted, type(self).entry_points_executed, type(self).positives, type(self).negatives,
+                  type(self).bounded_timeouts, type(self).bootstrap_refusals, type(self).native_refusals)
         outer = "Verifier command exited 1:\n"
+        configuration = os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug")
+        selected = COMPILER_ROOT / "src/Calor.Compiler/bin" / configuration / "net10.0/calor.dll"
+        identity = f"Selected compiler: {selected}\n"
         infrastructure = [
             "Verifier cleanup timeout: child did not exit by the deadline.",
             "EOF supervision failure", "inherited stdout pipe", "broken pipe",
@@ -382,18 +407,21 @@ class EffectsVerifierTests(unittest.TestCase):
                            outer + "Verification failed: " + outer + "Verification failed: Wrong output"):
                 with patch.object(ENGINE, "run", side_effect=RuntimeError(output)):
                     self.verify("eff005", source("eff005"), False, detail="Wrong output")
+            for output in (identity + "Verifier timeout after 2s: dotnet",
+                           outer + "Verification failed: Verifier timeout after 2s: dotnet\n" + identity):
+                with patch.object(ENGINE, "run", side_effect=RuntimeError(output)):
+                    self.verify("eff005", source("eff005"), False, detail="timeout", allow_timeout=True)
             for output in ("Verifier timeout after 2s: dotnet",
                            outer + "Verification failed: Verifier timeout after 2s: dotnet"):
                 with patch.object(ENGINE, "run", side_effect=RuntimeError(output)):
-                    self.verify("eff005", source("eff005"), False, detail="timeout", allow_timeout=True)
+                    with self.assertRaises(AssertionError):
+                        self.verify("eff005", source("eff005"), False, detail="timeout", allow_timeout=True)
             with self.assertRaises(ValueError):
                 self.verify("eff005", source("eff005"), False, allow_timeout=True)
             with patch.object(ENGINE, "run", side_effect=OSError("launch failed")):
                 with self.assertRaises(OSError):
                     self.verify("eff005", source("eff005"), False)
 
-            configuration = os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug")
-            selected = COMPILER_ROOT / "src/Calor.Compiler/bin" / configuration / "net10.0/calor.dll"
             success = (f"Selected compiler: {selected}\nVerification passed: FetchUrl; original declared effects, "
                        "native/CLR signatures, 16 runtime cases and BCL output/state coupling.\n"
                        f"{EFFECT_LIMITS}\n")
@@ -420,10 +448,27 @@ class EffectsVerifierTests(unittest.TestCase):
                         self.verify("eff005", source("eff005"))
             with patch.object(ENGINE, "run", return_value=success):
                 self.verify("eff005", source("eff005"))
+            for output in (
+                outer + "Verification failed: Verifier timeout: overall deadline expired.\n",
+                outer + "Verification failed: Verifier timeout after 0.0005s: dotnet\n",
+            ):
+                with patch.object(ENGINE, "run", side_effect=RuntimeError(output)):
+                    self.assert_bootstrap_deadline_refusal()
+            for output in (
+                outer + "Verification failed: Verifier timeout after 5s: dotnet\n",
+                outer + "Verification failed: Verifier timeout: overall deadline expired.\n" + identity,
+                outer + "Verification failed: Verifier timeout: overall deadline expired.\nsolver UNKNOWN",
+                outer + "Verification failed: Verifier timeout: overall deadline expired.\nEOF failure",
+                outer + "Verification failed: Verifier timeout: overall deadline expired.\nOSError: launch failure",
+            ):
+                with patch.object(ENGINE, "run", side_effect=RuntimeError(output)):
+                    with self.assertRaises(AssertionError):
+                        self.assert_bootstrap_deadline_refusal()
         finally:
             # Synthetic calls exercise actual verify(), but are not entrypoints.
             with type(self).count_lock:
-                type(self).entry_points_executed, type(self).positives, type(self).negatives = before
+                (type(self).entry_points_attempted, type(self).entry_points_executed, type(self).positives, type(self).negatives,
+                 type(self).bounded_timeouts, type(self).bootstrap_refusals, type(self).native_refusals) = before
 
     def test_independent_provenance_and_coupling(self):
         self.verify("eff001", source("eff001", body="§C{WriteLine} §A name §/C") +
@@ -507,10 +552,11 @@ class EffectsVerifierTests(unittest.TestCase):
         for profile in TASKS:
             self.verify(profile, None, False, detail="Input missing")
         self.verify("eff001", "invalid source", False, detail="Calor compilation failed")
-        self.verify("eff005", source("eff005"), False, env={"CALOR_LOGIC_TIMEOUT_SECONDS": "0.001"},
-                    detail="timeout", allow_timeout=True)
-        self.verify("eff005", source("eff005", body='§WH true\n  §CN\n§R ""'), False,
-                    env={"CALOR_LOGIC_TIMEOUT_SECONDS": "5"}, detail="timeout", allow_timeout=True)
+        with self.subTest(probe="0.001s bootstrap refusal"):
+            self.assert_bootstrap_deadline_refusal()
+        with self.subTest(probe="5s infinite candidate"):
+            self.verify("eff005", source("eff005", body='§WH true\n  §CN\n§R ""'), False,
+                        env={"CALOR_LOGIC_TIMEOUT_SECONDS": "5"}, detail="timeout", allow_timeout=True)
         self.verify("eff005", source("eff005"), False, env={"CALOR_COMPILER_CONFIGURATION": "../Debug"},
                     detail="CALOR_COMPILER_CONFIGURATION")
         self.verify("eff002", source("eff002", body="§R §C{System.Console.ReadLine} §/C"), False,
@@ -520,6 +566,26 @@ class EffectsVerifierTests(unittest.TestCase):
             self.verify("eff005", source("eff005"), False, env={"CALOR_COMPILER_ROOT": str(arm)},
                         detail="Selected compiler dependency missing")
         self.assert_corrupted_native_refusals()
+
+    def assert_bootstrap_deadline_refusal(self):
+        before = (type(self).entry_points_executed, type(self).positives, type(self).negatives,
+                  type(self).bounded_timeouts)
+        with self.assertRaises(RuntimeError) as refused:
+            self.verify("eff005", source("eff005"), False, env={"CALOR_LOGIC_TIMEOUT_SECONDS": "0.001"})
+        output = str(refused.exception)
+        matched = re.fullmatch(
+            r"Verifier command exited 1:\nVerification failed: Verifier timeout"
+            r"(?:: overall deadline expired\.| after (?P<seconds>(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)s: dotnet)\n?",
+            output)
+        self.assertIsNotNone(matched, output)
+        if matched.group("seconds") is not None:
+            self.assertGreater(float(matched.group("seconds")), 0)
+            self.assertLessEqual(float(matched.group("seconds")), 0.001)
+        with type(self).count_lock:
+            self.assertEqual((type(self).entry_points_executed, type(self).positives, type(self).negatives,
+                              type(self).bounded_timeouts), before)
+            type(self).entry_points_executed += 1
+            type(self).bootstrap_refusals += 1
 
     def assert_corrupted_native_refusals(self):
         with tempfile.TemporaryDirectory(prefix="calor-effects-native-arm-") as temporary:
@@ -554,6 +620,7 @@ class EffectsVerifierTests(unittest.TestCase):
                     self.assertEqual(type(self).entry_points_executed, before)
                     type(self).entry_points_executed += 1
                     type(self).negatives += 1
+                    type(self).native_refusals += 1
         print("Validated 6 real corrupted-native prerequisite refusals, not behavioral negatives.")
 
 

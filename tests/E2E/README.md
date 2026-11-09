@@ -1859,7 +1859,8 @@ python3 tests/E2E/agent-tasks/test-effects-verifiers.py
 python3 tests/E2E/agent-tasks/test-logic-old-release.py --effects-system
 ```
 
-The current suite executes 131 real effects entries (34 positive, 97 rejected)
+The current suite attempts 131 real effects entries (34 positive, 96 rejected,
+one separately validated bootstrap refusal with zero behavioral credit)
 and 35 preserved entries: one positive for every prior profile plus the
 selected native-only prerequisite. It checks aliases, extra effects,
 helper/Encoding equivalents, original declarations, private/wrong signatures,
@@ -1911,9 +1912,16 @@ Finite negatives require exact outer and nested `Verifier command exited 1:`
 wrappers. Abnormal statuses, malformed wrappers, solver UNKNOWN/timeouts,
 OS launch errors, process/EOF/cleanup/global-deadline failures and success
 markers in failure output propagate rather than satisfy a finite negative.
-Only the two explicitly opted-in bounded-timeout probes accept an ordinary
-`Verifier timeout after ...s:` refusal; never solver, OS, cleanup, EOF or
-global-deadline contamination. Positive output must be infrastructure-free
+Only the explicitly opted-in five-second infinite-candidate probe accepts an
+ordinary `Verifier timeout after ...s:` refusal, and only with exact selected
+compiler identity proving that the selected-arm helper build completed.
+A helper-build timeout without that identity fails; never solver, OS, cleanup,
+EOF or global-deadline contamination. The unchanged 0.001-second probe instead
+requires an exact bootstrap/global prerequisite refusal before admission
+counters change. It accepts only the complete exit-1 overall-deadline message
+or a complete numeric dotnet bootstrap timeout no greater than 0.001 seconds,
+without runtime identity or additional diagnostics. It has zero behavioral
+credit. Positive output must be infrastructure-free
 and contain exactly one complete resolved-root/configuration compiler identity
 line. Indented, mixed-prefix, missing, duplicate and alternate identity lines
 fail. Synthetic controls exercise the actual `verify()` admission path and
@@ -1928,8 +1936,10 @@ raise before admission counters change, carry exactly two exit-1 wrappers,
 identify Microsoft.Z3's DllNotFoundException and a platform-specific invalid
 image error, and leave the owned corrupted file byte-unchanged. Timeout, UNKNOWN,
 cleanup, EOF and success contamination cannot establish that refusal.
-The current 131-entry total remains 34 positives and 97 rejections: 89 finite
-negatives, two explicit bounded-timeout probes and six native-image refusals.
+The current 131-entry total retains 34 positives, 89 finite negatives, one
+selected-runtime bounded-timeout probe, six native-image refusals and one
+separate bootstrap refusal. Attempted entrypoints are counted separately from
+validated controls; failed admission or oracle assertions receive no credit.
 
 The earlier local-helper follow-up passed the full strict 139-entry old/current run and the
 focused eight-entry current local-helper run (one positive, seven rejections),
@@ -1947,6 +1957,26 @@ confirming that the unchanged limits disclaimer and exact compiler identity
 are admitted. No new full heavy run was started in the child.
 The body/IO matrix, engine, task inputs, strict
 categories and 120/600-second limits are unchanged.
+
+The parent's later frozen `9e1160ad2` run passed six of seven tests in
+972.585 seconds but failed the old 0.001-second expectation on a global
+bootstrap deadline. It completed only 120 effects controls (34 positive,
+86 rejected), plus 34 preserved and one native-only; neither the complete
+131-entry matrix nor the archived chain completed. That run gives no
+six-task acceptance.
+
+The bootstrap-accounting repair's focused actual failure-guards run took
+59.233 seconds: 18 entrypoints were attempted and 17 controls validated
+(10 finite negatives, six native-image prerequisite refusals and one
+zero-credit bootstrap refusal). The five-second infinite-candidate probe
+failed admission: it timed out during bootstrap without selected-runtime
+identity. Remaining configuration, nullable API, missing-root and native
+corruption guards completed. This is not candidate nontermination evidence
+or a passing failure-guards test. Lightweight synthetic admission controls
+and a separate actual 0.001-second bootstrap refusal passed after the
+accounting change. No repeated heavy rerun was started under shared-host
+saturation. Full current and genuine-old/current parent matrices remain
+required after integration; the expected counts are not new passing results.
 
 **Limits:** this is finite process supervision, not a sandbox or universal
 proof. The interposer refuses non-owned supplied paths and unmodeled external
