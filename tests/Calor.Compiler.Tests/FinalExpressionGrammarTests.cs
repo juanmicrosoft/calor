@@ -325,7 +325,7 @@ public sealed class FinalExpressionGrammarTests
     }
 
     [Fact]
-    public void UnmeasuredQuantifierSpelling_IsNotEmittedAsRetiredPrefixOrOpaqueClr()
+    public void QuantifierBodies_EmitThroughTheSelectedGeneralGuardForm()
     {
         var variable = new QuantifierVariableNode(default, "i", "int");
         var body = new BoolLiteralNode(default, true);
@@ -336,9 +336,229 @@ public sealed class FinalExpressionGrammarTests
         ];
         foreach (var quantifier in quantifiers)
         {
-            var error = Assert.Throws<NotSupportedException>(() => quantifier.Accept(new CalorEmitter()));
-            Assert.Contains("supplemental syntax decision", error.Message);
+            var emitted = quantifier.Accept(new CalorEmitter());
+            Assert.DoesNotContain('§', emitted);
+            Assert.Contains("int:i where true", emitted);
+            Assert.Equal(quantifier.GetType(), Parse(emitted).GetType());
         }
+    }
+
+    [Theory]
+    [InlineData("forall int:i in 0..xs.Length : xs[i] >= 0", true)]
+    [InlineData("exists int:i in 0..xs.Length : xs[i] < 0", false)]
+    [InlineData("forall int:i in 0..n, int:j in i..n : i <= j", true)]
+    [InlineData("exists int:i in 0..n, int:j in i..n : i == j", false)]
+    [InlineData("forall int:i where i >= 0 && i < n : i < n", true)]
+    [InlineData("exists int:i where i >= 0 && i < n : i == 1", false)]
+    public void Quantifiers_PreserveNativeAstBindingsAndAuthoredSpans(string source, bool universal)
+    {
+        var node = Parse(source);
+        Assert.Equal(source.Length, node.Span.Length);
+        foreach (var expression in new[] { node, Parse(node.Accept(new CalorEmitter())) })
+        {
+            var variables = universal ? Assert.IsType<ForallExpressionNode>(expression).BoundVariables
+                : Assert.IsType<ExistsExpressionNode>(expression).BoundVariables;
+            Assert.Equal(source.Contains("int:j") ? 2 : 1, variables.Count);
+            Assert.All(variables, variable => Assert.Equal("int", variable.TypeName));
+            Assert.Equal("i", variables[0].Name);
+        }
+        var authored = universal ? ((ForallExpressionNode)node).BoundVariables
+            : ((ExistsExpressionNode)node).BoundVariables;
+        foreach (var variable in authored)
+        {
+            Assert.Equal(variable.Name, source.Substring(variable.IdentifierSpan.Start, variable.IdentifierSpan.Length));
+            Assert.Equal("int", source.Substring(variable.TypeNameSpan.Start, variable.TypeNameSpan.Length));
+        }
+    }
+
+    [Theory]
+    [InlineData("forall")]
+    [InlineData("exists")]
+    public void QuantifierNames_RemainOrdinaryWhenCalledOrEscaped(string name)
+    {
+        Assert.IsType<CallExpressionNode>(Parse($"{name}(x)"));
+        Assert.IsType<CallExpressionNode>(Parse($"@{name}(x)"));
+        Assert.IsType<CallExpressionNode>(Parse($"{name}(x: 1)"));
+        Assert.IsType<ReferenceNode>(Parse($"@{name}"));
+    }
+
+    [Theory]
+    [InlineData("(int:x) ! cw => Log(x)", true)]
+    [InlineData("(int:x) ! => x + 1", true)]
+    [InlineData("(int:x) => x + 1", false)]
+    [InlineData("(Func<int,int>:f) ! => f(1)", true)]
+    [InlineData("() ! cw =>\n  Log(1)", true)]
+    public void LambdaEffectRows_PreserveExplicitEmptyVersusAbsentAndNativePosition(string source, bool hasRow)
+    {
+        var lambda = Assert.IsType<LambdaExpressionNode>(Parse(source));
+        Assert.Equal(hasRow, lambda.Effects is not null);
+        var emitted = lambda.Accept(new CalorEmitter());
+        Assert.DoesNotContain('§', emitted);
+        var reparsed = Assert.IsType<LambdaExpressionNode>(Parse(emitted));
+        Assert.Equal(hasRow, reparsed.Effects is not null);
+        Assert.Equal(lambda.Parameters.Select(parameter => parameter.TypeName),
+            reparsed.Parameters.Select(parameter => parameter.TypeName));
+        if (hasRow)
+            Assert.Equal(lambda.Effects!.Effects, reparsed.Effects!.Effects);
+    }
+
+    [Theory]
+    [InlineData("(int:x) ! notAnEffect => x")]
+    [InlineData("(int:x) ! cw,\n  => x")]
+    [InlineData("(int:x)\n! cw => x")]
+    public void LambdaEffectRows_RejectUnknownCodesAndCrossLineHeaders(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        Parse(source, diagnostics);
+        Assert.True(diagnostics.HasErrors);
+    }
+
+    [Theory]
+    [InlineData("forall int:i in 0..n :")]
+    [InlineData("exists int:i where i >= 0 :")]
+    [InlineData("forall int:i in 0..")]
+    [InlineData("forall int:i in 0..n,")]
+    public void QuantifierRecovery_DoesNotConsumeTheFollowingReturn(string expression)
+    {
+        var source = $"module Q\n  func Run (int:n) → bool\n    requires {expression}\n    return true";
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.True(diagnostics.HasErrors);
+        Assert.IsType<ReturnStatementNode>(Assert.Single(Assert.Single(module.Functions).Body));
+    }
+
+    [Fact]
+    public void NativeQuantifiers_ExecuteHalfOpenEmptyDependentAndArrayRanges()
+    {
+        const string authored = """
+            module NativeQuantifiers
+              func All (int:lo, int:hi) → bool
+                return forall int:i in lo..hi : i != 2
+              func Any (int:lo, int:hi) → bool
+                return exists int:i in lo..hi : i == 2
+              func Dependent (int:n) → bool
+                return forall int:i in 0..n, int:j in i..n : i <= j
+              func Array (int[]:xs) → bool
+                return forall int:i in 0..xs.Length : xs[i] >= 0
+              func Lazy (int:lo, int:hi) → bool
+                return forall int:i in lo..hi : 10 / i > 0
+              func Scoped (int:i) → bool
+                return (exists int:i in 0..3 : i == 2) && i == 42
+            """;
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(authored, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(module) })
+        {
+            var checkedResult = Program.Compile(source, "native-quantifiers.calr",
+                new CompilationOptions { EnableTypeChecking = true, EnforceEffects = true, StatusWriter = TextWriter.Null });
+            Assert.False(checkedResult.HasErrors, string.Join(Environment.NewLine, checkedResult.Diagnostics.Errors));
+            diagnostics = new DiagnosticBag();
+            module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+            Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
+            var generated = new CSharpEmitter().Emit(module);
+            var compilation = CSharpCompilation.Create("NativeQuantifiers_" + Guid.NewGuid().ToString("N"),
+                [CSharpSyntaxTree.ParseText(generated)], GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var result = compilation.Emit(stream);
+            Assert.True(result.Success, generated + Environment.NewLine + string.Join(Environment.NewLine, result.Diagnostics));
+            var methods = Assembly.Load(stream.ToArray()).GetTypes().SelectMany(type => type.GetMethods())
+                .Where(method => method.IsStatic)
+                .ToDictionary(method => method.Name);
+            foreach (var (lo, hi) in new[] { (0, 0), (3, 1), (-2, 2), (0, 3), (2, 3) })
+            {
+                var containsTwo = lo <= 2 && 2 < hi;
+                Assert.Equal(!containsTwo, methods["All"].Invoke(null, [lo, hi]));
+                Assert.Equal(containsTwo, methods["Any"].Invoke(null, [lo, hi]));
+            }
+            Assert.Equal(true, methods["Dependent"].Invoke(null, [4]));
+            Assert.Equal(true, methods["Array"].Invoke(null, [System.Array.Empty<int>()]));
+            Assert.Equal(true, methods["Array"].Invoke(null, [new[] { 0, 1, 2 }]));
+            Assert.Equal(false, methods["Array"].Invoke(null, [new[] { 0, -1, 2 }]));
+            Assert.Equal(true, methods["Lazy"].Invoke(null, [0, 0]));
+            Assert.IsType<DivideByZeroException>(
+                Assert.Throws<TargetInvocationException>(() => methods["Lazy"].Invoke(null, [0, 1])).InnerException);
+            Assert.Equal(true, methods["Scoped"].Invoke(null, [42]));
+            Assert.Equal(false, methods["Scoped"].Invoke(null, [43]));
+        }
+    }
+
+    [Fact]
+    public void NativeQuantifierArrayLength_UsesTheExistingModeledSolverOperation()
+    {
+        var expression = Parse("forall int:i in 0..xs.Length : xs[i] == xs[i]");
+        foreach (var node in new[] { expression, Parse(expression.Accept(new CalorEmitter())) })
+        {
+            using var context = Calor.Compiler.Verification.Z3.Z3ContextFactory.Create();
+            var translator = new Calor.Compiler.Verification.Z3.ContractTranslator(context);
+            Assert.True(translator.DeclareVariable("xs", "int[]"));
+            var normalized = Assert.IsType<ForallExpressionNode>(translator.NormalizeBclExpression(node));
+            var guard = Assert.IsType<BinaryOperationNode>(
+                Assert.IsType<ImplicationExpressionNode>(normalized.Body).Antecedent);
+            Assert.IsType<ArrayLengthNode>(Assert.IsType<BinaryOperationNode>(guard.Right).Right);
+            var formula = Assert.IsAssignableFrom<Microsoft.Z3.BoolExpr>(translator.Translate(normalized));
+            using var solver = context.MkSolver();
+            solver.Assert(context.MkNot(formula));
+            Assert.Equal(Microsoft.Z3.Status.UNSATISFIABLE, solver.Check());
+        }
+    }
+
+    [Fact]
+    public void EffectfulLambda_NativeRoundtripKeepsInvocationDelayed()
+    {
+        const string authored = """
+            module NativeEffectfulLambda
+              func Build (Action<int>:log ! cw) → Action<int>
+                ! cw
+                return (int:x) ! cw =>
+                  log(x)
+            """;
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(authored, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(module) })
+        {
+            var checkedResult = Program.Compile(source, "native-effectful-lambda.calr",
+                new CompilationOptions { EnableTypeChecking = true, EnforceEffects = true, StatusWriter = TextWriter.Null });
+            Assert.False(checkedResult.HasErrors, string.Join(Environment.NewLine, checkedResult.Diagnostics.Errors));
+            diagnostics = new DiagnosticBag();
+            module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+            Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
+            var generated = new CSharpEmitter().Emit(module);
+            var compilation = CSharpCompilation.Create("NativeEffectfulLambda_" + Guid.NewGuid().ToString("N"),
+                [CSharpSyntaxTree.ParseText(generated)], GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var result = compilation.Emit(stream);
+            Assert.True(result.Success, generated + Environment.NewLine + string.Join(Environment.NewLine, result.Diagnostics));
+            var method = Assembly.Load(stream.ToArray()).GetTypes().SelectMany(type => type.GetMethods())
+                .Single(method => method.Name == "Build");
+            var observations = new List<int>();
+            Action<int> log = observations.Add;
+            var action = Assert.IsType<Action<int>>(method.Invoke(null, [log]));
+            Assert.Empty(observations);
+            action(42);
+            Assert.Equal([42], observations);
+        }
+    }
+
+    [Theory]
+    [InlineData("cw", false)]
+    [InlineData("", true)]
+    public void NativeLambdaRows_RetainDeclaredBodyEffectChecks(string row, bool forbidden)
+    {
+        var source = $"""
+            module NativeLambdaRows
+              func Build (Action<int>:log ! cw) → Action<int>
+                ! cw
+                return (int:x) ! {row} => log(x)
+            """;
+        var result = Program.Compile(source, "native-lambda-rows.calr",
+            new CompilationOptions { EnableTypeChecking = true, EnforceEffects = true, StatusWriter = TextWriter.Null });
+        Assert.Equal(forbidden, result.HasErrors);
+        Assert.Equal(forbidden, result.Diagnostics.Any(diagnostic =>
+            diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.StartsWith("Lambda", StringComparison.Ordinal)));
     }
 
     [Fact]

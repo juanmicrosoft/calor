@@ -3596,12 +3596,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(LambdaExpressionNode node)
     {
-        if (node.Effects is not null)
-            throw new NotSupportedException("Native lambda effect-row spelling awaits the supplemental syntax decision.");
         var parameters = string.Join(", ", node.Parameters.Select(parameter =>
             (parameter.TypeName is null ? "" : $"{TypeMapper.ToSurfaceType(parameter.TypeName)}:")
             + EscapeCalorIdentifier(parameter.Name)));
-        var head = (node.IsStatic ? "static " : "") + (node.IsAsync ? "async " : "") + $"({parameters}) =>";
+        var head = (node.IsStatic ? "static " : "") + (node.IsAsync ? "async " : "")
+            + $"({parameters}){FormatEffectRow(node.Effects)} =>";
         if (node.ExpressionBody is not null)
             return head + " " + AcceptInConditionalRegion(node.ExpressionBody);
         var statements = CaptureLambdaStatements(node, inlineSibling: false);
@@ -4647,14 +4646,61 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(QuantifierVariableNode node)
     {
-        return $"({node.Name} {TypeMapper.ToSurfaceType(node.TypeName)})";
+        return $"{TypeMapper.ToSurfaceType(node.TypeName)}:{EscapeCalorIdentifier(node.Name)}";
     }
 
     public string Visit(ForallExpressionNode node)
-        => throw new NotSupportedException("Native quantified-contract spelling awaits the supplemental syntax decision.");
+        => node.Body is ImplicationExpressionNode implication
+            ? EmitNativeQuantifier("forall", node.BoundVariables, implication.Antecedent, implication.Consequent)
+            : EmitNativeQuantifier("forall", node.BoundVariables, new BoolLiteralNode(node.Span, true), node.Body);
 
     public string Visit(ExistsExpressionNode node)
-        => throw new NotSupportedException("Native quantified-contract spelling awaits the supplemental syntax decision.");
+        => node.Body is BinaryOperationNode { Operator: BinaryOperator.And } conjunction
+            ? EmitNativeQuantifier("exists", node.BoundVariables, conjunction.Left, conjunction.Right)
+            : EmitNativeQuantifier("exists", node.BoundVariables, new BoolLiteralNode(node.Span, true), node.Body);
+
+    private string EmitNativeQuantifier(string kind, IReadOnlyList<QuantifierVariableNode> variables,
+        ExpressionNode guard, ExpressionNode predicate)
+    {
+        var bounds = new List<ExpressionNode>();
+        void Collect(ExpressionNode expression)
+        {
+            if (expression is BinaryOperationNode { Operator: BinaryOperator.And } conjunction)
+            {
+                Collect(conjunction.Left);
+                Collect(conjunction.Right);
+            }
+            else
+                bounds.Add(expression);
+        }
+        Collect(guard);
+        var ranges = new List<(QuantifierVariableNode Variable, ExpressionNode Lower, ExpressionNode Upper)>();
+        for (var index = 0; index < variables.Count && bounds.Count == variables.Count * 2; index++)
+        {
+            var variable = variables[index];
+            if (bounds[index * 2] is not BinaryOperationNode
+                {
+                    Operator: BinaryOperator.GreaterOrEqual,
+                    Left: ReferenceNode lowerVariable
+                } lower
+                || lowerVariable.IsNullLiteral || lowerVariable.Name != variable.Name
+                || bounds[index * 2 + 1] is not BinaryOperationNode
+                {
+                    Operator: BinaryOperator.LessThan,
+                    Left: ReferenceNode upperVariable
+                } upper
+                || upperVariable.IsNullLiteral || upperVariable.Name != variable.Name)
+                break;
+            ranges.Add((variable, lower.Right, upper.Right));
+        }
+        var bindings = ranges.Count == variables.Count
+            ? string.Join(", ", ranges.Select(range =>
+                $"{range.Variable.Accept(this)} in {AcceptInConditionalRegion(range.Lower)}"
+                + $"..{AcceptInConditionalRegion(range.Upper)}"))
+            : string.Join(", ", variables.Select(variable => variable.Accept(this)))
+                + $" where {AcceptInConditionalRegion(guard)}";
+        return $"({kind} {bindings} : {AcceptInConditionalRegion(predicate)})";
+    }
 
     public string Visit(ImplicationExpressionNode node)
     {

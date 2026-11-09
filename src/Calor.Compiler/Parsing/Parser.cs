@@ -3658,15 +3658,18 @@ public sealed class Parser
             _position = savedPosition;
         }
 
-        // Check for tuple literal: (expr, expr, ...)
-        // Tuples contain commas at depth 0; Lisp expressions do not.
-        if (LookaheadIsTupleLiteral())
-        {
-            return ParseTupleLiteral();
-        }
-
         var open = Expect(TokenKind.OpenParen);
         var grouped = ParseExpression(allowSpacedCall: true);
+        if (Match(TokenKind.Comma))
+        {
+            var elements = new List<ExpressionNode> { grouped };
+            do
+            {
+                elements.Add(ParseExpression());
+            } while (Match(TokenKind.Comma));
+            var tupleClose = Expect(TokenKind.CloseParen);
+            return new TupleLiteralNode(open.Span.Union(tupleClose.Span), elements);
+        }
         var close = Expect(TokenKind.CloseParen);
         if (grouped is ReferenceNode reference)
             _groupedReferenceSpans.TryAdd(reference, reference.Span);
@@ -3686,24 +3689,43 @@ public sealed class Parser
             else if (_tokens[close].Kind == TokenKind.CloseParen && --depth == 0)
                 break;
         }
-        if (close + 1 >= _tokens.Count || _tokens[close + 1].Kind != TokenKind.FatArrow
-            || _tokens[close + 1].Span.Line != TokenEndLine(_tokens[close]))
+        if (close + 1 >= _tokens.Count)
+            return false;
+        var arrow = close + 1;
+        if (_tokens[arrow].Kind == TokenKind.Exclamation)
+        {
+            while (arrow < _tokens.Count
+                   && _tokens[arrow].Span.Line == TokenEndLine(_tokens[close])
+                   && (_tokens[arrow].Kind is TokenKind.Exclamation or TokenKind.Identifier
+                       or TokenKind.Star or TokenKind.Colon or TokenKind.Comma
+                       || _tokens[arrow].IsKeyword))
+                arrow++;
+        }
+        if (arrow >= _tokens.Count || _tokens[arrow].Kind != TokenKind.FatArrow
+            || _tokens[arrow].Span.Line != TokenEndLine(_tokens[close]))
             return false;
         var open = Advance();
         var parameters = new List<LambdaParameterNode>();
         while (!IsAtEnd && !Check(TokenKind.CloseParen))
         {
             var start = Current.Span;
-            var nameToken = Expect(TokenKind.Identifier);
+            var first = ReadInlineTypeToken();
+            var firstSpan = start.Union(PreviousToken.Span);
+            var nameToken = PreviousToken;
             var name = TokenIdentifier(nameToken);
             string? type = null;
             TextSpan? typeSpan = null;
             if (Match(TokenKind.Colon))
             {
-                type = name;
-                typeSpan = nameToken.Span;
+                type = first;
+                typeSpan = firstSpan;
                 nameToken = Expect(TokenKind.Identifier);
                 name = TokenIdentifier(nameToken);
+            }
+            else if (nameToken.Kind != TokenKind.Identifier || firstSpan != nameToken.Span)
+            {
+                _diagnostics.ReportError(firstSpan, DiagnosticCode.UnexpectedToken,
+                    "A typed lambda parameter requires 'type:name'.");
             }
             parameters.Add(new LambdaParameterNode(start.Union(nameToken.Span),
                 name, type, nameToken.Span, typeSpan));
@@ -3711,10 +3733,11 @@ public sealed class Parser
                 break;
         }
         Expect(TokenKind.CloseParen);
+        var effects = Check(TokenKind.Exclamation) ? ParseEffects(EffectRowPosition.Lambda) : null;
         Expect(TokenKind.FatArrow);
         var (body, statements, end) = ParseLambdaBody();
         expression = new LambdaExpressionNode(open.Span.Union(end), "inline", parameters,
-            null, false, body, statements, new AttributeCollection());
+            effects, false, body, statements, new AttributeCollection());
         return true;
     }
 
@@ -5651,8 +5674,95 @@ public sealed class Parser
         return RecoverFromUnexpectedToken();
     }
 
+    private bool IsNativeQuantifierHead()
+    {
+        if (Current.Text is not ("forall" or "exists"))
+            return false;
+        for (var colon = _position + 2; colon + 1 < _tokens.Count
+             && _tokens[colon].Span.Line == Current.Span.Line; colon++)
+        {
+            if (_tokens[colon].Kind != TokenKind.Colon
+                || _tokens[colon + 1].Kind != TokenKind.Identifier
+                || _tokens[colon + 1].Span.Line != Current.Span.Line)
+                continue;
+            var type = string.Concat(_tokens.Skip(_position + 1).Take(colon - _position - 1)
+                .Select(token => token.Text));
+            if (!SyntaxFactory.ParseTypeName(type).ContainsDiagnostics)
+                return true;
+        }
+        return false;
+    }
+
+    private ExpressionNode ParseNativeQuantifier()
+    {
+        var head = Advance();
+        var variables = new List<QuantifierVariableNode>();
+        ExpressionNode? guard = null;
+        bool? ranged = null;
+        Token ExpectOnHeadLine(TokenKind kind)
+        {
+            if (Current.Span.Line == head.Span.Line)
+                return Expect(kind);
+            _diagnostics.ReportUnexpectedToken(Current.Span, kind, Current.Kind);
+            return new Token(kind, "", head.Span);
+        }
+        do
+        {
+            if (Current.Span.Line != head.Span.Line)
+            {
+                _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                    "A quantified binding must stay on the quantifier's physical line.");
+                break;
+            }
+            var typeStart = Current.Span;
+            var type = ReadInlineTypeToken();
+            var typeSpan = typeStart.Union(PreviousToken.Span);
+            ExpectOnHeadLine(TokenKind.Colon);
+            var name = ExpectOnHeadLine(TokenKind.Identifier);
+            variables.Add(new QuantifierVariableNode(typeSpan.Union(name.Span),
+                TokenIdentifier(name), type, name.Span, typeSpan));
+            ranged ??= Check(TokenKind.In);
+            if (ranged.Value)
+            {
+                var inToken = ExpectOnHeadLine(TokenKind.In);
+                var lower = ParseInfixOperand(inToken, 0);
+                var range = ExpectOnHeadLine(TokenKind.RangeOp);
+                var upper = ParseInfixOperand(range, 0);
+                var reference = new ReferenceNode(name.Span, TokenIdentifier(name), isVerbatim: true);
+                var lowerTest = new BinaryOperationNode(name.Span.Union(lower.Span),
+                    BinaryOperator.GreaterOrEqual, reference, lower);
+                var upperTest = new BinaryOperationNode(name.Span.Union(upper.Span),
+                    BinaryOperator.LessThan, reference, upper);
+                var bounds = new BinaryOperationNode(lowerTest.Span.Union(upperTest.Span),
+                    BinaryOperator.And, lowerTest, upperTest);
+                guard = guard is null ? bounds
+                    : new BinaryOperationNode(guard.Span.Union(bounds.Span), BinaryOperator.And, guard, bounds);
+            }
+        } while (Current.Span.Line == head.Span.Line && Match(TokenKind.Comma));
+        if (ranged == false)
+        {
+            var where = head;
+            if (Current.Text == "where" && Current.Span.Line == head.Span.Line)
+                where = Advance();
+            else
+                _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                    "A quantified binding requires 'in lower..upper' or 'where guard'.");
+            guard = ParseInfixOperand(where, 0);
+        }
+        var colon = ExpectOnHeadLine(TokenKind.Colon);
+        var predicate = ParseInfixOperand(colon, 0);
+        var span = head.Span.Union(predicate.Span);
+        return head.Text == "forall"
+            ? new ForallExpressionNode(span, variables,
+                new ImplicationExpressionNode(guard!.Span.Union(predicate.Span), guard, predicate))
+            : new ExistsExpressionNode(span, variables,
+                new BinaryOperationNode(guard!.Span.Union(predicate.Span), BinaryOperator.And, guard, predicate));
+    }
+
     private ExpressionNode ParseReference(bool verbatim = false)
     {
+        if (!verbatim && IsNativeQuantifierHead())
+            return ParseNativeQuantifier();
         var token = Expect(TokenKind.Identifier);
         var name = TokenIdentifier(token);
         verbatim |= token.Text.StartsWith('@');
