@@ -2975,7 +2975,7 @@ public sealed class Parser
         ExpressionNode? expression = null;
 
         // Check if there's an expression following RETURN
-        if (IsExpressionStart())
+        if (Current.Span.Line == TokenEndLine(startToken) && IsExpressionStart())
         {
             expression = ParseExpression();
         }
