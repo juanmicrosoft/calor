@@ -3770,7 +3770,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ReferenceNode node)
     {
-        if (_postconditionResultIdentifier != null
+        if (!node.IsVerbatim && _postconditionResultIdentifier != null
             && _postconditionResultShadowDepth == 0
             && (node.Name.Equals("result", StringComparison.Ordinal)
                 || node.Name.StartsWith("result.", StringComparison.Ordinal)))
@@ -3780,19 +3780,18 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     : "." + SanitizeIdentifier(node.Name["result.".Length..]));
         }
 
-        // Handle C# keywords that are used as literals (not identifiers)
-        if (node.Name is "null" or "true" or "false")
+        if (node.IsNullLiteral)
         {
             return node.Name;
         }
-        if (node.Name == "this" && _currentClassName != null
+        if (!node.IsVerbatim && node.Name == "this" && _currentClassName != null
             && !IsVarDeclaredInScope(node.Name)
             && !_currentClassMemberNames.Contains(node.Name)
             && !_classMemberScopes.Any(scope => scope.Members.Contains(node.Name)))
         {
             return node.Name;
         }
-        if (node.Name == "default")
+        if (!node.IsVerbatim && node.Name == "default")
         {
             return IsVarDeclaredInScope(node.Name) ||
                 _currentClassMemberNames.Contains(node.Name) ||
@@ -4416,7 +4415,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         if (GetLiteralTypeName(expression) is { } literalType)
             return GetPrimitiveExpressionKind(literalType);
-        if (expression is ReferenceNode { Name: "null" })
+        if (expression is ReferenceNode { IsNullLiteral: true })
             return PrimitiveExpressionKind.Null;
         if (IsStableLengthAccess(expression, types, out _))
             return PrimitiveExpressionKind.Numeric;
@@ -8169,7 +8168,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             BoolLiteralNode => "bool",
             StringLiteralNode => "string",
             CharOperationNode { Operation: CharOp.CharLiteral } => "char",
-            ReferenceNode { Name: "null" } => "object",
+            ReferenceNode { IsNullLiteral: true } => "object",
             _ => null
         };
     }
@@ -9917,7 +9916,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (IsStableLengthAccess(expression, types, out var receiver))
             return !total && !unstable.Contains(receiver);
         if (expression is ReferenceNode reference)
-            return !unstable.Contains(reference.Name) && (reference.Name == "null" && !integral
+            return !unstable.Contains(reference.Name) && (reference.IsNullLiteral && !integral
                 || types.TryGetValue(reference.Name, out var type)
                     && (integral ? IsIntegralType(type) : GetPrimitiveExpressionKind(type) != PrimitiveExpressionKind.Unknown));
         if (expression is UnaryOperationNode unary)

@@ -2368,7 +2368,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
             var literal = node is IntLiteralNode or StringLiteralNode or BoolLiteralNode
                 or FloatLiteralNode or DecimalLiteralNode
                 // `null`/`default` take their type from the target; a temp would lose it.
-                or ReferenceNode { Name: "null" or "default" };
+                or ReferenceNode { IsNullLiteral: true }
+                or ReferenceNode { Name: "default", IsVerbatim: false };
             values.Add(hoistAll && !literal ? HoistToTempVar(value) : value);
         }
         return values;
@@ -3271,7 +3272,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ReferenceNode node)
     {
         var name = node.Name.Replace("@", "");
-        if (node.Name == "null")
+        if (node.IsNullLiteral)
             return name;
         return EscapeCalorIdentifier(name.Contains('<') ? AttributeHelper.ToSurfaceSpelling(name) : name);
     }

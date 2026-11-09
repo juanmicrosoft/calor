@@ -13,6 +13,56 @@ namespace Calor.Compiler.Tests;
 public sealed class FinalExpressionGrammarTests
 {
     [Theory]
+    [InlineData("@true")]
+    [InlineData("@false")]
+    [InlineData("@null")]
+    [InlineData("@this")]
+    [InlineData("@base")]
+    public void EscapedLiteralNames_RemainReferencesAcrossNativeEmissionAndClr(string name)
+    {
+        var reference = Assert.IsType<ReferenceNode>(Parse(name));
+        Assert.True(reference.IsVerbatim);
+        Assert.False(reference.IsNullLiteral);
+        Assert.Equal(name[1..], reference.Name);
+        var authored = $"module NativeIdentity\n  func Run (string:{name}) → string\n    return {name}";
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(authored, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(module) })
+        {
+            diagnostics = new DiagnosticBag();
+            module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+            Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
+            var generated = new CSharpEmitter().Emit(module);
+            var compilation = CSharpCompilation.Create("NativeIdentity_" + Guid.NewGuid().ToString("N"),
+                [CSharpSyntaxTree.ParseText(generated)], GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var result = compilation.Emit(stream);
+            Assert.True(result.Success, generated + Environment.NewLine + string.Join(Environment.NewLine, result.Diagnostics));
+            var method = Assembly.Load(stream.ToArray()).GetTypes().SelectMany(type => type.GetMethods())
+                .Single(method => method.Name == "Run");
+            Assert.Equal("value", method.Invoke(null, ["value"]));
+        }
+    }
+
+    [Fact]
+    public void UnescapedLiterals_RetainTheirNativeMeaning()
+    {
+        Assert.True(Assert.IsType<ReferenceNode>(Parse("null")).IsNullLiteral);
+        Assert.Equal("null", Parse("null").Accept(new CSharpEmitter()));
+        Assert.True(Assert.IsType<BoolLiteralNode>(Parse("true")).Value);
+        Assert.False(Assert.IsType<BoolLiteralNode>(Parse("false")).Value);
+        var context = new ConversionContext();
+        var source = CSharpSyntaxTree.ParseText("class C { string M(string @null) => @null; }");
+        var converted = new RoslynSyntaxVisitor(context).Convert(source.GetCompilationUnitRoot(), "Identity");
+        var reference = Assert.IsType<ReferenceNode>(Assert.IsType<ReturnStatementNode>(
+            Assert.Single(Assert.Single(Assert.Single(converted.Classes).Methods).Body)).Expression);
+        Assert.True(reference.IsVerbatim);
+        Assert.False(reference.IsNullLiteral);
+    }
+
+    [Theory]
     [InlineData("upper(x)")]
     [InlineData("trim(lower(x))")]
     [InlineData("cast(x)")]

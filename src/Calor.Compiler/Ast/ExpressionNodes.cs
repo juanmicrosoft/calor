@@ -209,10 +209,13 @@ public sealed class DecimalLiteralNode : ExpressionNode
 public sealed class ReferenceNode : ExpressionNode
 {
     public string Name { get; }
+    public bool IsVerbatim { get; }
+    public bool IsNullLiteral => Name == "null" && !IsVerbatim;
 
-    public ReferenceNode(TextSpan span, string name) : base(span)
+    public ReferenceNode(TextSpan span, string name, bool isVerbatim = false) : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IsVerbatim = isVerbatim;
     }
 
 

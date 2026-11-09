@@ -78,7 +78,6 @@ public sealed class Parser
     private bool _insideArgContext;
     private bool _insideRefinementPredicate;
     private readonly Dictionary<ReferenceNode, TextSpan> _groupedReferenceSpans = new();
-    private readonly HashSet<ReferenceNode> _verbatimReferences = new();
 
     /// <summary>
     /// Stack of <c>eff</c> binder scopes, innermost last. A scope is pushed when a
@@ -3266,12 +3265,12 @@ public sealed class Parser
         var offset = 0;
         ExpressionNode result = parts[0] switch
         {
-            "this" when !_verbatimReferences.Contains(reference) => new ThisExpressionNode(new TextSpan(identifierSpan.Start, parts[0].Length,
+            "this" when !reference.IsVerbatim => new ThisExpressionNode(new TextSpan(identifierSpan.Start, parts[0].Length,
                 identifierSpan.Line, identifierSpan.Column)),
-            "base" when !_verbatimReferences.Contains(reference) => new BaseExpressionNode(new TextSpan(identifierSpan.Start, parts[0].Length,
+            "base" when !reference.IsVerbatim => new BaseExpressionNode(new TextSpan(identifierSpan.Start, parts[0].Length,
                 identifierSpan.Line, identifierSpan.Column)),
             _ => new ReferenceNode(new TextSpan(identifierSpan.Start, parts[0].Length,
-                identifierSpan.Line, identifierSpan.Column), parts[0])
+                identifierSpan.Line, identifierSpan.Column), parts[0], reference.IsVerbatim)
         };
         for (var index = 1; index < parts.Length; index++)
         {
@@ -5558,9 +5557,7 @@ public sealed class Parser
             var member = Expect(TokenKind.Identifier);
             var receiverSpan = new TextSpan(token.Span.Start, token.Span.Length - 1,
                 token.Span.Line, token.Span.Column);
-            var reference = new ReferenceNode(receiverSpan, name[..^1]);
-            if (verbatim || token.Value is string)
-                _verbatimReferences.Add(reference);
+            var reference = new ReferenceNode(receiverSpan, name[..^1], verbatim || token.Value is string);
             var receiver = name[..^1] switch
             {
                 "this" when !verbatim => new ThisExpressionNode(receiverSpan),
@@ -5590,9 +5587,7 @@ public sealed class Parser
             name = sb.ToString();
         }
 
-        ExpressionNode expr = new ReferenceNode(token.Span, name);
-        if (verbatim || token.Value is string)
-            _verbatimReferences.Add((ReferenceNode)expr);
+        ExpressionNode expr = new ReferenceNode(token.Span, name, verbatim || token.Value is string);
 
         // Handle trailing member access (e.g., _startOptions?.Agenda or obj.Property)
         while (Check(TokenKind.Dot) || Check(TokenKind.NullConditional))

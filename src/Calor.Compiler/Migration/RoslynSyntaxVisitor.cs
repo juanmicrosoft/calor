@@ -10926,7 +10926,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return expression switch
             {
                 LiteralExpressionSyntax literal => ConvertLiteral(literal),
-                IdentifierNameSyntax identifier => new ReferenceNode(GetTextSpan(identifier), identifier.Identifier.ValueText),
+                IdentifierNameSyntax identifier => new ReferenceNode(GetTextSpan(identifier), identifier.Identifier.ValueText,
+                    identifier.Identifier.Text.StartsWith('@')),
                 BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.LogicalAndExpression) ||
                     binary.IsKind(SyntaxKind.LogicalOrExpression) || binary.IsKind(SyntaxKind.CoalesceExpression) =>
                     ConvertConditionalRegion(binary, () => ConvertBinaryExpression(binary)),
