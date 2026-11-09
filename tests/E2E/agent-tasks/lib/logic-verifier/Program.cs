@@ -4514,9 +4514,9 @@ static void VerifyEffects(string profile, string path)
     var function = functions[0];
     if (function.Visibility != Visibility.Public || function.IsAsync || function.TypeParameters.Count != 0
         || function.Output == null
-        || AttributeHelper.ExpandType(function.Output.TypeName) != AttributeHelper.ExpandType(output == typeof(void) ? "void" : "str")
+        || AttributeHelper.ExpandType(function.Output.TypeName) != AttributeHelper.ExpandType(output == typeof(void) ? "void" : "string")
         || !function.Parameters.Select(parameter => parameter.Name).SequenceEqual(names)
-        || function.Parameters.Any(parameter => AttributeHelper.ExpandType(parameter.TypeName) != AttributeHelper.ExpandType("str")
+        || function.Parameters.Any(parameter => AttributeHelper.ExpandType(parameter.TypeName) != AttributeHelper.ExpandType("string")
             || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None))
         throw new InvalidOperationException($"Wrong public effects signature for {name}.");
     var declared = function.Effects?.Effects.TryGetValue("io", out var effects) == true
@@ -4549,9 +4549,12 @@ static void VerifyEffects(string profile, string path)
     if (compilation.HasErrors || compilation.Ast == null)
         throw new InvalidOperationException($"Calor compilation failed:\n{string.Join("\n", compilation.Diagnostics)}");
     var (assembly, trees) = CompileRuntime(compilation.GeneratedCode);
+    var namespaceName = function.NamespaceIdentity ?? parsed.NamespaceIdentity ?? parsed.Name;
+    var moduleClassName = namespaceName.Length == 0 ? "GlobalModule" : namespaceName.Split('.').Last() + "Module";
+    var moduleTypeName = namespaceName.Length == 0 ? moduleClassName : namespaceName + "." + moduleClassName;
     MethodInfo Method(Assembly candidate)
     {
-        var type = candidate.GetType($"{parsed.Name}.{parsed.Name}Module")
+        var type = candidate.GetType(moduleTypeName)
             ?? throw new InvalidOperationException("Effects CLR module missing.");
         var matches = type.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
             .Where(method => method.Name == name).ToArray();
@@ -4624,8 +4627,10 @@ static void VerifyEffects(string profile, string path)
                 || constructor.ContainingType.ToDisplayString().StartsWith("Calor.Runtime.", StringComparison.Ordinal)))
         || root.DescendantNodes().OfType<ImplicitObjectCreationExpressionSyntax>().Any())
         throw new InvalidOperationException("Unsupported effects object construction; finite supervision is not a sandbox.");
+    var probeTypeName = root.Members.OfType<FileScopedNamespaceDeclarationSyntax>().Any()
+        ? namespaceName + ".EffectsTaskProbe" : "EffectsTaskProbe";
     var instrumented = root.ReplaceNodes(witnesses.Select(witness => witness.Call), (before, rewritten) =>
-        rewritten.WithExpression(SyntaxFactory.ParseExpression("global::EffectsTaskProbe." +
+        rewritten.WithExpression(SyntaxFactory.ParseExpression("global::" + probeTypeName + "." +
             witnesses.Single(witness => witness.Call == before).Operation)));
     instrumented = instrumented.AddMembers(SyntaxFactory.ParseMemberDeclaration(EffectsTaskProbe.Source)
         ?? throw new InvalidOperationException("Cannot parse effects instrumentation."));
@@ -4633,11 +4638,11 @@ static void VerifyEffects(string profile, string path)
     {
         var target = instrumented.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method =>
             method.Identifier.ValueText == name && method.Parent is ClassDeclarationSyntax owner
-            && owner.Identifier.ValueText == $"{parsed.Name}Module");
+            && owner.Identifier.ValueText == moduleClassName);
         if (target.Body == null)
             throw new InvalidOperationException("Effects execution-phase body missing.");
         instrumented = instrumented.ReplaceNode(target, target.WithBody(target.Body.WithStatements(
-            target.Body.Statements.Insert(0, SyntaxFactory.ParseStatement("global::EffectsTaskProbe.EnterExecution();\n")))));
+            target.Body.Statements.Insert(0, SyntaxFactory.ParseStatement($"global::{probeTypeName}.EnterExecution();\n")))));
         var instrumentation = instrumented.Members.OfType<ClassDeclarationSyntax>()
             .Single(type => type.Identifier.ValueText == "EffectsTaskProbe");
         instrumented = instrumented.ReplaceNode(instrumentation, instrumentation.AddMembers(
@@ -4646,7 +4651,7 @@ static void VerifyEffects(string profile, string path)
     }
     var instrumentedAssembly = CompileRuntime(instrumented.ToFullString()).Assembly;
     var instrumentedMethod = Method(instrumentedAssembly);
-    var probe = instrumentedAssembly.GetType("EffectsTaskProbe")
+    var probe = instrumentedAssembly.GetType(probeTypeName)
         ?? throw new InvalidOperationException("Effects probe missing.");
     var reset = probe.GetMethod("Reset") ?? throw new InvalidOperationException("Effects reset missing.");
     var events = probe.GetField("Events") ?? throw new InvalidOperationException("Effects events missing.");

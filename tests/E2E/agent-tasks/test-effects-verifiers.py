@@ -188,6 +188,139 @@ def historical_syntax(text):
             .replace("§/LAM\n", "§/LAM{effects_local}\n"))
 
 
+def canonical_source(text):
+    """Author current controls from the bounded legacy control notation, not candidate input."""
+    def type_name(value):
+        if value.startswith("?"):
+            return type_name(value[1:]) + "?"
+        return re.sub(r"\b(str|i32|i64)\b", lambda match: {
+            "str": "string", "i32": "int", "i64": "long",
+        }[match[0]], value)
+
+    def expression(value):
+        tokens = re.findall(r'"(?:\\.|[^"\\])*"|§C\{[^}]+\}|§CS\{[^}]+\}|§/C|§A|§IDX|[()]|[^\s()]+', value)
+        position = 0
+
+        def take(expected=None):
+            nonlocal position
+            if position == len(tokens):
+                raise ValueError(f"Incomplete effects control expression: {value}")
+            token = tokens[position]
+            position += 1
+            if expected is not None and token != expected:
+                raise ValueError(f"Expected {expected}, found {token} in effects control: {value}")
+            return token
+
+        def parse():
+            token = take()
+            if token.startswith("§C{"):
+                target = token[3:-1]
+                arguments = []
+                while position < len(tokens) and tokens[position] == "§A":
+                    take("§A")
+                    arguments.append(parse())
+                take("§/C")
+                return target + "(" + ", ".join(arguments) + ")"
+            if token == "§IDX":
+                array, index = parse(), parse()
+                return f"{array}[{index}]"
+            if token != "(":
+                if token.startswith("§") and not token.startswith("§CS{"):
+                    raise ValueError(f"Unsupported effects control token: {token}")
+                return token
+            head = take()
+            if head == "cast":
+                cast_type, argument = type_name(take()), parse()
+                result = f"({cast_type})({argument})"
+            elif head in ("+", "-", "*", "/", "%", "==", "!=", ">=", "<=", ">", "<", "&&", "||"):
+                left, right = parse(), parse()
+                result = f"({left} {head} {right})"
+            elif head == "len":
+                result = f"({parse()}).Length"
+            elif head == "char-at":
+                target, index = parse(), parse()
+                result = f"{target}[{index}]"
+            elif head == "sb-new":
+                result = "new System.Text.StringBuilder()"
+            elif head == "sb-append":
+                target, argument = parse(), parse()
+                result = f"{target}.Append({argument})"
+            elif head == "sb-tostring":
+                result = f"{parse()}.ToString()"
+            else:
+                raise ValueError(f"Unsupported effects control expression head: {head}")
+            take(")")
+            return result
+
+        result = parse()
+        if position != len(tokens):
+            raise ValueError(f"Unconsumed effects control expression: {value}")
+        return result
+
+    output = []
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        indent = line[:len(line) - len(stripped)]
+        if not stripped or stripped.startswith("//"):
+            output.append(line)
+            continue
+        header = re.fullmatch(r"§F\{([^}:]+)(?::([^}]+))?\} \((.*)\) -> (.+)", stripped)
+        if header:
+            name, visibility, parameters, result = header.groups()
+            visibility = "" if visibility in (None, "pub") else " " + visibility
+            current = f"func {name}{visibility} ({type_name(parameters)}) → {type_name(result)}"
+        elif stripped.startswith("§M{"):
+            name = stripped[3:-1]
+            current = f"module {name} {name}"
+        elif stripped.startswith("§E{"):
+            current = "! " + stripped[3:-1]
+        elif stripped.startswith("§B{"):
+            binding, value = stripped[3:].split("}", 1)
+            name, declared_type = binding.split(":", 1)
+            mutable = name.startswith("~")
+            value = value.strip()
+            if value.startswith("§LAM{"):
+                signature = value[5:-1].removeprefix("static:")
+                parameter, parameter_type = signature.split(":", 1)
+                initializer = f"static ({type_name(parameter_type)}:{parameter}) ! =>"
+            else:
+                initializer = expression(value)
+            current = f"{'var' if mutable else 'let'} {type_name(declared_type)}:{name.lstrip('~')} = {initializer}"
+        elif stripped.startswith("§ASSIGN "):
+            target, value = stripped[8:].split(" ", 1)
+            current = f"set {target} {expression(value)}"
+        elif stripped.startswith("§LIST{"):
+            name, element = stripped[6:-1].split(":")
+            current = f"let List<{type_name(element)}>:{name} = new List<{type_name(element)}>()"
+        elif stripped.startswith("§PUSH{"):
+            name, value = stripped[6:].split("}", 1)
+            current = f"{name}.Add({expression(value.strip())})"
+        elif stripped.startswith(("§/LAM", "§/LIST")):
+            continue
+        elif stripped.startswith("§RAW ") and stripped.endswith(" §/RAW"):
+            payload = stripped[5:-6].strip()
+            output.extend([indent + f"raw statement {len(payload.encode('utf-8'))}", payload])
+            continue
+        else:
+            statements = {"§R ": "return ", "§IF ": "if ", "§EI ": "else if ", "§WH ": "while ",
+                          "§Q ": "requires ", "§S ": "=> ", "§TH ": "throw "}
+            prefix = next((prefix for prefix in statements if stripped.startswith(prefix)), None)
+            if prefix:
+                current = statements[prefix] + expression(stripped[len(prefix):])
+            elif stripped == "§CN":
+                current = "continue"
+            elif stripped == "§EL":
+                current = "else"
+            elif stripped.startswith("§C{"):
+                current = expression(stripped)
+            elif stripped.startswith("§"):
+                raise ValueError(f"Unsupported effects control statement: {stripped}")
+            else:
+                current = stripped
+        output.append(indent + current)
+    return "\n".join(output) + "\n"
+
+
 def local_cases(historical=False):
     raw = "Raw interop cannot establish native effects behavior."
     retired = "Local §F declarations are removed. Use a §B binding with §LAM instead."
@@ -208,7 +341,8 @@ def local_cases(historical=False):
            True, None)
     for body in ('§RAW return "raw"; §/RAW', '§R §CS{"raw"}'):
         yield (source("eff005", body="§B{Local:Func<str,str>} §LAM{static:value:str}\n  "
-                      + body + '\n§/LAM\n§R (+ "Response from: " url)'), False, raw)
+                      + body + '\n§/LAM\n§R (+ "Response from: " url)'), False,
+               raw if historical or "§CS{" not in body else "Legacy section marker")
 
 
 def source(profile, *, body=None, effects=None, signature=None):
@@ -315,13 +449,13 @@ class EffectsVerifierTests(unittest.TestCase):
               f"{cls.bootstrap_refusals} bootstrap refusals have zero behavioral credit.")
 
     def verify(self, profile, text, expected=True, *, env=None, detail=None, deadline=None,
-               allow_timeout=False):
+               allow_timeout=False, canonical=True):
         if allow_timeout and (expected or detail != "timeout"):
             raise ValueError("Only explicit negative bounded-timeout controls may opt in.")
         with tempfile.TemporaryDirectory(prefix="calor-effects-control-") as temporary:
             workspace = Path(temporary)
             if text is not None:
-                (workspace / "Effects.calr").write_text(text, encoding="utf-8")
+                (workspace / "Effects.calr").write_text(canonical_source(text) if canonical else text, encoding="utf-8")
             environment = dict(os.environ, CALOR_COMPILER_ROOT=str(COMPILER_ROOT))
             environment.pop("CALOR_LOGIC_TIMEOUT_SECONDS", None)
             environment.pop("CALOR_EFFECTS_EXECUTION_TIMEOUT_SECONDS", None)
@@ -377,6 +511,45 @@ class EffectsVerifierTests(unittest.TestCase):
             for text, expected, detail in cases(profile):
                 with self.subTest(profile=profile, expected=expected, detail=detail):
                     self.verify(profile, text, expected, detail=detail)
+
+    def test_canonical_control_authoring(self):
+        self.assertEqual(canonical_source(source("eff005")),
+                         'module Effects Effects\n  func FetchUrl (string:url) → string\n'
+                         '    ! net:r\n    return ("Response from: " + url)\n')
+        read = canonical_source(source("eff002"))
+        self.assertIn("let string?:line = System.Console.ReadLine()", read)
+        self.assertIn("if (line != null)\n      return line", read)
+        self.assertIn("→ string\n", read)
+        self.assertIn('return "str i32 §C{Literal}"',
+                      canonical_source(source("eff005", body='§R "str i32 §C{Literal}"')))
+        for profile in TASKS:
+            for text, _, _ in cases(profile):
+                canonical_source(text)
+        for text, _, _ in local_cases():
+            canonical_source(text)
+        with self.assertRaisesRegex(ValueError, "Unsupported effects control"):
+            canonical_source(source("eff005", body="§R (unknown url)"))
+        self.assertIn("§M{", historical_syntax(source("eff005")))
+
+    def test_canonical_namespaces_and_retired_source(self):
+        native = canonical_source(source("eff005"))
+        for header in ("module Effects", "module Label Effects.Nested"):
+            with self.subTest(header=header):
+                self.verify("eff005", native.replace("module Effects Effects", header), canonical=False)
+        for profile in TASKS:
+            with self.subTest(retired="section markers", profile=profile):
+                self.verify(profile, source(profile), False, canonical=False, detail="Legacy section marker")
+        retired = [
+            native.replace("string:url", "str:url"),
+            native.replace('    return', '    let i32:unused = 0\n    return'),
+            canonical_source(source("eff002")).replace("string?:line", "?string:line"),
+            native.replace('("Response from: " + url)', '(+ "Response from: " url)'),
+            native.replace('("Response from: " + url)', '§C{System.String.Concat} §A "Response from: " §A url §/C'),
+        ]
+        for index, text in enumerate(retired):
+            with self.subTest(retired=index):
+                self.verify("eff002" if index == 2 else "eff005", text, False, canonical=False,
+                            detail="Calor compilation failed")
 
     def test_native_local_helpers_and_nested_raw(self):
         for text, expected, detail in local_cases():
@@ -547,7 +720,7 @@ class EffectsVerifierTests(unittest.TestCase):
         for profile in TASKS:
             self.verify(profile, source(profile, body="§Q true\n§S true\n" + TASKS[profile][5]))
         self.verify("eff005", source("eff005", body='§R (sb-tostring (sb-append '
-                    '(sb-append (sb-new) "Response from: ") url))', effects="net:rw,mut"))
+                    '(sb-append (sb-new) "Response from: ") url))', effects="net:rw,mut,alloc"))
         for profile in ("eff003", "eff004", "eff006"):
             self.verify(profile, source(profile, effects="cw,fs:rw"))
 
@@ -679,7 +852,7 @@ def run_compatibility(old, current, deadline):
             raise RuntimeError("Effects compatibility exceeded its 600-second deadline.")
         test.verify(profile, historical_syntax(text) if historical else text, expected,
                     env={"CALOR_COMPILER_ROOT": str(root), "CALOR_LOGIC_TIMEOUT_SECONDS": str(remaining)},
-                    detail=detail, deadline=min(deadline, time.monotonic() + 120))
+                    detail=detail, deadline=min(deadline, time.monotonic() + 120), canonical=not historical)
         verdict = "passed" if expected else detail if local else "rejected"
         return f"{arm} {profile}{' local' if local else ''}: {verdict}"
 
@@ -695,7 +868,7 @@ def run_compatibility(old, current, deadline):
                 print(verdict)
     test.verify("eff005", historical_syntax(source("eff005")), False,
                 env={"CALOR_COMPILER_ROOT": str(current)},
-                detail="Calor compilation failed", deadline=min(deadline, time.monotonic() + 120))
+                detail="Calor compilation failed", deadline=min(deadline, time.monotonic() + 120), canonical=False)
     # Both genuine native APIs reject the nullable BCL return without a guard.
     for arm, root, historical in (("v0.29", old, True), ("current", current, False)):
         text = source("eff002", body="§R §C{System.Console.ReadLine} §/C")
@@ -704,7 +877,7 @@ def run_compatibility(old, current, deadline):
             raise RuntimeError("Effects compatibility exceeded its 600-second deadline.")
         test.verify("eff002", historical_syntax(text) if historical else text, False,
                     env={"CALOR_COMPILER_ROOT": str(root), "CALOR_LOGIC_TIMEOUT_SECONDS": str(remaining)},
-                    detail="Calor0273", deadline=min(deadline, time.monotonic() + 120))
+                    detail="Calor0273", deadline=min(deadline, time.monotonic() + 120), canonical=not historical)
         print(f"{arm} eff002 direct nullable BCL return: Calor0273 rejection")
     expected_count = 139
     if EffectsVerifierTests.entry_points_executed != expected_count:

@@ -1946,7 +1946,7 @@ python3 tests/E2E/agent-tasks/test-effects-verifiers.py
 python3 tests/E2E/agent-tasks/test-logic-old-release.py --effects-system
 ```
 
-The current suite attempts 131 real effects entries (34 positive, 96 rejected,
+The pre-cutover suite attempted 131 real effects entries (34 positive, 96 rejected,
 one separately validated bootstrap refusal with zero behavioral credit)
 and 35 preserved entries: one positive for every prior profile plus the
 selected native-only prerequisite. It checks aliases, extra effects,
@@ -1956,7 +1956,7 @@ overwrite, correct-baseline independent-output decoys, counterfactual runtime
 errors, selected-root/configuration/native failures and bounded nontermination.
 
 The additive historical mode runs a bounded 60-case original-prompt subset against
-both selected arms, plus current rejection of an old-ID input and the two
+both selected arms, plus current rejection of archived ID-bearing source and the two
 direct-ReadLine compatibility cases and eight local-helper controls per arm:
 exactly 139 real entries (39 positive, 100 rejected).
 The subset retains all 18 positive/equivalent/alias inputs,
@@ -2022,7 +2022,7 @@ credit. Positive output must be infrastructure-free
 and contain exactly one complete resolved-root/configuration compiler identity
 line. Indented, mixed-prefix, missing, duplicate and alternate identity lines
 fail. Synthetic controls exercise the actual `verify()` admission path and
-are excluded from all real-entrypoint totals. The current suite has seven tests.
+are excluded from all real-entrypoint totals. The pre-cutover suite has seven tests.
 Only the unchanged engine's verbatim successful limits disclaimer is exempt
 from diagnostic scanning because it names EOF/null as untested. Arbitrary
 Limits-prefixed errors or contamination appended to that disclaimer still fail.
@@ -2033,7 +2033,7 @@ raise before admission counters change, carry exactly two exit-1 wrappers,
 identify Microsoft.Z3's DllNotFoundException and a platform-specific invalid
 image error, and leave the owned corrupted file byte-unchanged. Timeout, UNKNOWN,
 cleanup, EOF and success contamination cannot establish that refusal.
-The current 131-entry total retains 34 positives, 89 finite negatives, one
+The pre-cutover 131-entry total retains 34 positives, 89 finite negatives, one
 selected-runtime bounded-timeout probe, six native-image refusals and one
 separate bootstrap refusal. Attempted entrypoints are counted separately from
 validated controls; failed admission or oracle assertions receive no credit.
@@ -2054,6 +2054,60 @@ confirming that the unchanged limits disclaimer and exact compiler identity
 are admitted. No new full heavy run was started in the child.
 The body/IO matrix, engine, task inputs, strict
 categories and 120/600-second limits are unchanged.
+
+#### Selected native current surface
+
+The parent subsequently passed the full seven-test pre-cutover suite (131 effects,
+34 preserved and one native-only) and genuine-old/current strict 139-entry replay.
+It accepted only six provisional pre-cutover credits, not native cutover acceptance.
+
+Current controls now write actual canonical programs before invoking `verify.sh`:
+lowercase declarations, C# type names, suffix nullability, infix expressions,
+postfix calls/indexing, and byte-counted raw statements. The bounded Python
+authoring adapter covers only the control notation in this file and fails on
+unsupported forms. It is not in the task entrypoints and never translates
+arbitrary candidate input. The selected native compiler parses and compiles
+the resulting source itself. Original task prompts and fixtures stay unchanged.
+String literals, parameter types/nullability, operation order, declared required
+effects and all behavioral/provenance/counterfactual oracles remain intact.
+The native StringBuilder equivalent explicitly declares the independent `alloc`
+effect charged by its real `new` expression; it retains the network declaration.
+
+The helper derives the exact CLR module owner from the parsed function/module
+namespace, including the explicit global namespace, rather than treating a file
+label as a namespace. Interposition and watchdog callbacks use the probe's actual
+file-scoped namespace. These changes are confined to `VerifyEffects`.
+The original archived source arm bypasses current authoring explicitly and still
+uses the original scoped ID translator and genuine archived compiler. The strict
+139-entry matrix and 120/600-second bounds are unchanged. Archived-source rejection
+on the native arm is a retired-spelling blocker, not proof about ID reconciliation.
+Likewise, a retired `§CS` lambda expression is a syntax rejection; native raw
+statements still exercise whole-module interoperability rejection.
+
+Two namespace positives and 11 explicit retired-source negatives are additive.
+The native current suite therefore declares nine tests and 144 effects entries:
+36 positives, 100 finite negatives (including explicit syntax blockers), one
+entered-body timeout, six native-image refusals and one zero-credit bootstrap
+refusal. It retains the separate 34 preserved and one native-only checks.
+These are expected complete-run counts, not a new acceptance result.
+
+Focused checks used a fresh locked source build of parent
+`5aa3c1d6b76153e9c4269389e86b7e86aaedce44`, with its own verified pinned
+native assets, not a compatibility binary. All six canonical prompt positives
+passed. The two namespace/retired-source/local-helper tests passed all 21 entries
+(three positive, 18 rejected) in 81.533 seconds. Authoring/admission synthetic
+tests passed separately with zero real entries. Three Encoding positives,
+the counterfactual-exception negative, the actual entered-body watchdog and the
+separate bootstrap refusal also passed. The explicitly allocating StringBuilder
+positive and unchanged direct-nullable-return `Calor0273` negative passed.
+
+Native acceptance remains blocked on that selected product commit: each of the
+three retained codec coupling controls fails before its required oracle.
+The faithful `bytes.Length` and `text.Length` loop conditions receive
+`Calor0202 Cannot access field on non-record type u8[]` or `str`. They have not
+been replaced with aliases, different types, weakened controls or compile-error
+credit. Full native current and genuine-old/current matrices await the product
+repair and parent integration/replay schedule; no whole heavy matrix ran here.
 
 **Limits:** this is finite process supervision, not a sandbox or universal
 proof. The interposer refuses non-owned supplied paths and unmodeled external
