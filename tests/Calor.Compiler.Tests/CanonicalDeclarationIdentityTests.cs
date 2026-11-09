@@ -39,6 +39,43 @@ public sealed class CanonicalDeclarationIdentityTests : IDisposable
         };
 
     [Fact]
+    public void OperatorsIndexersAndConditionalMembersKeepIdentityAcrossEmissionAndMove()
+    {
+        const string source = """
+            module Native
+              class Counter
+                op + (Counter:a, Counter:b) → Counter
+                  return a
+                this[int:i] → int
+                  get
+                    return i
+                pp DEBUG
+                  func Probe () → int
+                    return 1
+                pp else
+                  func Probe () → int
+                    return 2
+            """;
+        var file = Write("src/Counter.calr", source);
+        var initial = Store.Sync([file]);
+        Assert.Single(initial.Declarations.Where(declaration => declaration.Kind == IdKind.OperatorOverload));
+        Assert.Single(initial.Declarations.Where(declaration => declaration.Kind == IdKind.Indexer));
+        var methods = initial.Declarations.Where(declaration => declaration.Name == "Probe").ToArray();
+        Assert.Equal(2, methods.Length);
+        Assert.NotEqual(methods[0].Id, methods[1].Id);
+        var parsed = CalorSourceHelper.Parse(source, file).Ast!;
+        File.WriteAllText(file, new Calor.Compiler.Migration.CalorEmitter().Emit(parsed));
+        Assert.Equal(initial.Declarations.Select(declaration => declaration.Id).Order(StringComparer.Ordinal),
+            Store.Sync().Declarations.Select(declaration => declaration.Id).Order(StringComparer.Ordinal));
+        var moved = Path.Combine(_root, "src", "Moved.calr");
+        File.Move(file, moved);
+        var reconciled = Store.Sync([moved]);
+        Assert.Equal(initial.Declarations.Select(declaration => declaration.Id).Order(StringComparer.Ordinal),
+            reconciled.Declarations.Select(declaration => declaration.Id).Order(StringComparer.Ordinal));
+        Assert.All(reconciled.Declarations, declaration => Assert.Equal("src/Moved.calr", declaration.File));
+    }
+
+    [Fact]
     public void NativeSyncAndAttachmentPreserveLiteralTestIdentitiesInTestInputs()
     {
         var file = Write("tests/Contract.calr", Source);

@@ -1331,60 +1331,25 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(IndexerNode node)
     {
         EmitDocComment(node);
-        var visibility = GetVisibilityShorthand(node.Visibility);
+        var visibility = node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
         var typeName = TypeMapper.ToSurfaceType(node.TypeName);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
         var modifiers = new List<string>();
-        if (node.IsVirtual) modifiers.Add("virt");
-        if (node.IsOverride) modifiers.Add("over");
-        if (node.IsAbstract) modifiers.Add("abs");
-        if (node.IsSealed) modifiers.Add("seal");
-        var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
-
-        // Compact auto-indexer shorthand
-        if (node.IsAutoIndexer && (node.Getter != null || node.Setter != null || node.Initer != null))
-        {
-            var accessors = new List<string>();
-            if (node.Getter != null)
-                accessors.Add(node.Getter.Visibility == Visibility.PrivateProtected ? "privprotget" :
-                              node.Getter.Visibility == Visibility.Private ? "priget" :
-                              node.Getter.Visibility == Visibility.Internal ? "intget" :
-                              node.Getter.Visibility == Visibility.Protected ? "proget" : "get");
-            if (node.Setter != null)
-                accessors.Add(node.Setter.Visibility == Visibility.PrivateProtected ? "privprotset" :
-                              node.Setter.Visibility == Visibility.Private ? "priset" :
-                              node.Setter.Visibility == Visibility.Internal ? "intset" :
-                              node.Setter.Visibility == Visibility.Protected ? "proset" : "set");
-            if (node.Initer != null)
-                accessors.Add("init");
-            var accessorStr = string.Join(",", accessors);
-            var paramParts = node.Parameters.Select(p =>
-            {
-                var pType = TypeMapper.ToSurfaceType(p.TypeName);
-                return $"{pType}:{p.Name}";
-            });
-            var paramStr = string.Join(", ", paramParts);
-            AppendLine($"§IXER{{{typeName}:{visibility}{modStr}:{accessorStr}}}{attrs} ({paramStr})");
-            return "";
-        }
-
-        // Full indexer syntax with body and closing tag
-        AppendLine($"§IXER{{{typeName}:{visibility}{modStr}}}{attrs}");
+        if (node.IsVirtual) modifiers.Add("virtual");
+        if (node.IsOverride) modifiers.Add("override");
+        if (node.IsAbstract) modifiers.Add("abstract");
+        if (node.IsSealed) modifiers.Add("sealed");
+        var modStr = modifiers.Count > 0 ? $" {string.Join(" ", modifiers)}" : "";
+        var parameters = TryFormatInlineParams(node.Parameters)
+            ?? throw new InvalidOperationException("Canonical indexer parameters require an inline signature.");
+        AppendLine($"this[{parameters}] → {typeName}{visibility}{modStr}{attrs}");
         Indent();
-
-        foreach (var param in node.Parameters)
-        {
-            AppendLine(Visit(param));
-        }
-
         if (node.Getter != null) Visit(node.Getter);
         if (node.Setter != null) Visit(node.Setter);
         if (node.Initer != null) Visit(node.Initer);
 
         Dedent();
-        EmitBlockEnd($"§/IXER");
-
         return "";
     }
 
@@ -1483,24 +1448,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(OperatorOverloadNode node)
     {
         EmitDocComment(node);
-        var visibility = GetVisibilityShorthand(node.Visibility);
+        if (node.Visibility != Visibility.Public)
+            throw new InvalidOperationException("Native operators require public visibility.");
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
-        var inlineFmt = TryFormatInlineParams(node.Parameters);
-        if (inlineFmt != null)
-        {
-            var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
-            var inlineReturn = node.Output != null ? $" -> {TypeMapper.ToSurfaceType(node.Output.TypeName)}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendLine($"§OP{{{node.OperatorToken}:{visibility}}}{attrs}{inlineParams}{inlineReturn}");
-        }
-        else
-        {
-            AppendLine($"§OP{{{node.OperatorToken}:{visibility}}}{attrs}");
-            Indent();
-            EmitParameterLines(node.Parameters);
-            EmitOutputLine(node.Output);
-            Dedent();
-        }
+        var inlineFmt = TryFormatInlineParams(node.Parameters)
+            ?? throw new InvalidOperationException("Canonical operator parameters require an inline signature.");
+        var output = node.Output
+            ?? throw new InvalidOperationException("Canonical operators require a return type.");
+        AppendLine($"op {node.OperatorToken}{attrs} ({inlineFmt}) → {TypeMapper.ToSurfaceType(output.TypeName)}{FormatEffectRow(output.Row)}");
         Indent();
 
         // Emit preconditions
@@ -4963,23 +4919,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(MemberPreprocessorBlockNode node)
     {
-        AppendLine($"§PP{{{node.Condition}}}");
-        EmitMemberPreprocessorMembers(node);
-        if (node.ElseBranch != null)
+        var first = true;
+        for (var branch = node; branch != null; branch = branch.ElseBranch)
         {
-            AppendLine("§PPE");
-            if (!string.IsNullOrEmpty(node.ElseBranch.Condition))
-            {
-                // #elif chain — emit as nested §PP{cond} inside the else
-                Visit(node.ElseBranch);
-            }
-            else
-            {
-                // #else — emit members directly
-                EmitMemberPreprocessorMembers(node.ElseBranch);
-            }
+            AppendLine(first ? $"pp {branch.Condition}"
+                : branch.Condition.Length == 0 ? "pp else" : $"pp elif {branch.Condition}");
+            Indent();
+            EmitMemberPreprocessorMembers(branch);
+            Dedent();
+            first = false;
         }
-        AppendLine($"§/PP{{{node.Condition}}}");
         return "";
     }
 
@@ -5045,25 +4994,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(TypePreprocessorBlockNode node)
     {
-        AppendLine($"§PP{{{node.Condition}}}");
-        Indent();
-        EmitTypePreprocessorTypes(node);
-        Dedent();
-        if (node.ElseBranch != null)
+        var first = true;
+        for (var branch = node; branch != null; branch = branch.ElseBranch)
         {
-            AppendLine("§PPE");
+            AppendLine(first ? $"pp {branch.Condition}"
+                : branch.Condition.Length == 0 ? "pp else" : $"pp elif {branch.Condition}");
             Indent();
-            if (!string.IsNullOrEmpty(node.ElseBranch.Condition))
-            {
-                Visit(node.ElseBranch);
-            }
-            else
-            {
-                EmitTypePreprocessorTypes(node.ElseBranch);
-            }
+            EmitTypePreprocessorTypes(branch);
             Dedent();
+            first = false;
         }
-        AppendLine($"§/PP{{{node.Condition}}}");
         return "";
     }
 

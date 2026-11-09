@@ -1023,11 +1023,25 @@ public sealed class Parser
             || Check(TokenKind.Module)
             || Check(TokenKind.Property) || Check(TokenKind.FieldDef)
             || Check(TokenKind.Constructor) || Check(TokenKind.OperatorOverload)
-            || Check(TokenKind.Indexer) || Check(TokenKind.Event)
+            || Check(TokenKind.Indexer) || IsNativeIndexerHeader() || Check(TokenKind.Event)
             || Check(TokenKind.Class) || Check(TokenKind.Record) || Check(TokenKind.Interface)
             || Check(TokenKind.Enum) || Check(TokenKind.Delegate)
             || Check(TokenKind.EnumExtension)
             || Check(TokenKind.Extends) || Check(TokenKind.Implements);
+
+    private bool IsNativeIndexerHeader()
+    {
+        if (!Check(TokenKind.This) || Peek(1).Kind != TokenKind.OpenBracket)
+            return false;
+        var depth = 0;
+        for (var offset = 1; Peek(offset).Kind != TokenKind.Eof; offset++)
+        {
+            if (Peek(offset).Kind == TokenKind.OpenBracket) depth++;
+            else if (Peek(offset).Kind == TokenKind.CloseBracket && --depth == 0)
+                return Peek(offset + 1).Kind == TokenKind.Arrow;
+        }
+        return false;
+    }
 
     /// <summary>
     /// Phase 3 -- block-end check for class/interface members. Returns true
@@ -9535,7 +9549,7 @@ public sealed class Parser
                 properties.Add(node);
                 interfaceItems.Add(node);
             }
-            else if (Check(TokenKind.Indexer))
+            else if (Check(TokenKind.Indexer) || Check(TokenKind.This))
             {
                 var node = ParseIndexer();
                 indexers.Add(node);
@@ -9553,7 +9567,7 @@ public sealed class Parser
             }
             else if (Check(TokenKind.Preprocessor))
             {
-                var node = ParseMemberPreprocessorBlock();
+                var node = ParseMemberPreprocessorBlock(interfaceMembers: true);
                 preprocessorBlocks.Add(node);
                 interfaceItems.Add(node);
             }
@@ -10012,7 +10026,7 @@ public sealed class Parser
                 properties.Add(node);
                 classItems.Add(node);
             }
-            else if (Check(TokenKind.Indexer))
+            else if (Check(TokenKind.Indexer) || Check(TokenKind.This))
             {
                 var node = ParseIndexer();
                 indexers.Add(node);
@@ -11716,6 +11730,8 @@ public sealed class Parser
     /// </summary>
     private IndexerNode ParseIndexer()
     {
+        if (Check(TokenKind.This))
+            return ParseCanonicalIndexer();
         var startToken = Expect(TokenKind.Indexer);
         var attrs = ParseAttributes();
         ValidateIdentityFreeHeader(startToken, attrs, 4);
@@ -11874,6 +11890,65 @@ public sealed class Parser
         var span = startToken.Span.Union(endToken.Span);
         return WithDocumentation(new IndexerNode(span, id, typeName, visibility, modifiers, parameters2,
             getter2, setter2, initer2, attrs, csharpAttrs), startToken);
+    }
+
+    private IndexerNode ParseCanonicalIndexer()
+    {
+        var startToken = Expect(TokenKind.This);
+        var parameters = new List<ParameterNode>();
+        OutputNode? output = null;
+        TryParseInlineSignature(startToken.Span, parameters, ref output, brackets: true);
+        if (parameters.Count == 0)
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnexpectedToken,
+                "An indexer requires at least one parameter.");
+        if (output == null)
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnexpectedToken,
+                "An indexer requires a return type after '→'.");
+        if (output?.Row != null)
+            _diagnostics.ReportError(output.Span, DiagnosticCode.UnexpectedToken,
+                "Indexer return effect rows are not supported.");
+        var attrs = new AttributeCollection();
+        ConsumeCanonicalDeclarationModifiers(startToken, attrs);
+        var visibility = ParseVisibility(attrs["_pos1"] ?? "pub", startToken.Span);
+        var modifiers = ParseMethodModifiers(attrs["_pos2"] ?? "", startToken.Span);
+        var csharpAttrs = ParseCSharpAttributes();
+        PropertyAccessorNode? getter = null;
+        PropertyAccessorNode? setter = null;
+        PropertyAccessorNode? initer = null;
+        var bodyHadContent = false;
+        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndIndexer))
+        {
+            if (Check(TokenKind.Get))
+            {
+                if (getter != null)
+                    _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken, "Duplicate indexer getter.");
+                getter = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Get);
+            }
+            else if (Check(TokenKind.Set) || Check(TokenKind.Assign))
+            {
+                if (setter != null)
+                    _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken, "Duplicate indexer setter.");
+                setter = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Set);
+            }
+            else if (Check(TokenKind.Init))
+            {
+                if (initer != null)
+                    _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken, "Duplicate indexer initializer.");
+                initer = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Init);
+            }
+            else break;
+            bodyHadContent = true;
+        }
+        TryExpectMemberBlockEnd(TokenKind.EndIndexer, startToken, bodyHadContent, out var endToken);
+        if (!bodyHadContent)
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnexpectedToken,
+                "An indexer requires an accessor.");
+        if (setter != null && initer != null)
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnexpectedToken,
+                "An indexer cannot declare both set and init accessors.");
+        return WithDocumentation(new IndexerNode(startToken.Span.Union(endToken.Span),
+            GenerateParserAutoId("ix"), output?.TypeName ?? "object", visibility, modifiers,
+            parameters, getter, setter, initer, attrs, csharpAttrs), startToken);
     }
 
     /// <summary>
@@ -12068,19 +12143,19 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.OperatorOverload);
 
-        // Parse {id:operator:visibility}
-        Expect(TokenKind.OpenBrace);
+        var canonical = IsCanonicalDeclaration(startToken);
+        if (!canonical) Expect(TokenKind.OpenBrace);
         var id = GenerateParserAutoId("op");
         var operatorToken = ParseOperatorToken();
 
         var visStr = "pub";
-        if (Check(TokenKind.Colon))
+        if (!canonical && Check(TokenKind.Colon))
         {
             Advance();
             visStr = ParseValue();
         }
 
-        Expect(TokenKind.CloseBrace);
+        if (!canonical) Expect(TokenKind.CloseBrace);
 
         var csharpAttrs = ParseCSharpAttributes();
         var visibility = ParseVisibility(visStr, startToken.Span);
@@ -12091,6 +12166,9 @@ public sealed class Parser
         var postconditions = new List<EnsuresNode>();
         OutputNode? output = null;
         TryParseInlineSignature(startToken.Span, parameters, ref output);
+        if (canonical && output == null)
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnexpectedToken,
+                "An operator requires a return type after '→'.");
         var body = new List<StatementNode>();
 
         var bodyHadContent = false;
@@ -12671,13 +12749,17 @@ public sealed class Parser
     /// Parses a member-level preprocessor block inside a class body.
     /// §PP{CONDITION} ... members ... §PPE ... §/PP{CONDITION}
     /// </summary>
-    private MemberPreprocessorBlockNode ParseMemberPreprocessorBlock()
+    private MemberPreprocessorBlockNode ParseMemberPreprocessorBlock(bool continuation = false,
+        bool interfaceMembers = false)
     {
         var startToken = Expect(TokenKind.Preprocessor);
-        var condition = startToken.Value as string ?? "";
+        var canonical = IsCanonicalDeclaration(startToken);
+        var condition = canonical ? ParseNativePreprocessorCondition(startToken, continuation)
+            : startToken.Value as string ?? "";
 
         var fields = new List<ClassFieldNode>();
         var properties = new List<PropertyNode>();
+        var indexers = new List<IndexerNode>();
         var constructors = new List<ConstructorNode>();
         var methods = new List<MethodNode>();
         var events = new List<EventDefinitionNode>();
@@ -12693,14 +12775,26 @@ public sealed class Parser
         {
             ParseMemberInPreprocessorBlock(
                 fields, properties, constructors, methods, events,
-                operatorOverloads, interopBlocks: interopBlocks, items: items);
+                operatorOverloads, indexers: indexers, interopBlocks: interopBlocks, items: items,
+                interfaceMembers: interfaceMembers);
         }
         ConsumeOwnedDedentBeforeChain(
             ppOwner,
+            TokenKind.Preprocessor,
             TokenKind.PreprocessorElse,
             TokenKind.EndPreprocessor);
 
         MemberPreprocessorBlockNode? elseBranch = null;
+        if (canonical)
+        {
+            if (condition.Length != 0 && IsNativePreprocessorContinuation(startToken))
+                elseBranch = ParseMemberPreprocessorBlock(continuation: true, interfaceMembers: interfaceMembers);
+            else
+                ExpectOwnedBlockEnd(TokenKind.EndPreprocessor, ppOwner);
+            return new MemberPreprocessorBlockNode(startToken.Span, condition,
+                fields, properties, constructors, methods, events, operatorOverloads,
+                elseBranch, indexers: indexers, interopBlocks: interopBlocks, items: items);
+        }
         if (Check(TokenKind.PreprocessorElse) && ContinuesChain(ppOwner))
         {
             var ppeToken = Advance();
@@ -12761,10 +12855,12 @@ public sealed class Parser
     /// Parses a type-level preprocessor block at module level.
     /// §PP{CONDITION} ... type declarations ... §PPE ... §/PP{CONDITION}
     /// </summary>
-    private TypePreprocessorBlockNode ParseTypePreprocessorBlock()
+    private TypePreprocessorBlockNode ParseTypePreprocessorBlock(bool continuation = false)
     {
         var startToken = Expect(TokenKind.Preprocessor);
-        var condition = startToken.Value as string ?? "";
+        var canonical = IsCanonicalDeclaration(startToken);
+        var condition = canonical ? ParseNativePreprocessorCondition(startToken, continuation)
+            : startToken.Value as string ?? "";
 
         var usings = new List<UsingDirectiveNode>();
         var classes = new List<ClassDefinitionNode>();
@@ -12793,10 +12889,21 @@ public sealed class Parser
         }
         ConsumeOwnedDedentBeforeChain(
             ppOwner,
+            TokenKind.Preprocessor,
             TokenKind.PreprocessorElse,
             TokenKind.EndPreprocessor);
 
         TypePreprocessorBlockNode? elseBranch = null;
+        if (canonical)
+        {
+            if (condition.Length != 0 && IsNativePreprocessorContinuation(startToken))
+                elseBranch = ParseTypePreprocessorBlock(continuation: true);
+            else
+                ExpectOwnedBlockEnd(TokenKind.EndPreprocessor, ppOwner);
+            return new TypePreprocessorBlockNode(startToken.Span, condition,
+                classes, interfaces, enums, delegates, elseBranch, usings,
+                nestedBlocks, items, interopBlocks);
+        }
         if (Check(TokenKind.PreprocessorElse) && ContinuesChain(ppOwner))
         {
             var ppeToken = Advance();
@@ -12855,6 +12962,43 @@ public sealed class Parser
         return new TypePreprocessorBlockNode(startToken.Span, condition,
             classes, interfaces, enums, delegates, elseBranch, usings,
             nestedBlocks, items, interopBlocks);
+    }
+
+    private bool IsNativePreprocessorContinuation(Token opener) =>
+        Check(TokenKind.Preprocessor) && Current.Span.Column == opener.Span.Column
+        && Peek(1).Span.Line == Current.Span.Line && Peek(1).Text is "elif" or "else";
+
+    private string ParseNativePreprocessorCondition(Token start, bool continuation)
+    {
+        var first = Current;
+        var branch = first.Span.Line == start.Span.Line && first.Text is "elif" or "else"
+            ? first.Text : null;
+        if (branch != null && !continuation)
+            _diagnostics.ReportError(start.Span, DiagnosticCode.UnexpectedToken,
+                $"'pp {branch}' requires a preceding branch at the same indentation.");
+        while (!IsAtEnd && !Check(TokenKind.Dedent) && Current.Span.Line == start.Span.Line)
+            Advance();
+        if (start.Value is not string source)
+        {
+            _diagnostics.ReportError(start.Span, DiagnosticCode.UnexpectedToken,
+                "A native 'pp' header requires its source-backed physical-line condition.");
+            return "";
+        }
+        var condition = source.Trim();
+        if (branch != null)
+            condition = condition[branch.Length..].TrimStart();
+        if (branch == "else")
+        {
+            if (condition.Length != 0)
+                _diagnostics.ReportError(start.Span, DiagnosticCode.UnexpectedToken,
+                    "'pp else' cannot carry a condition.");
+            return "";
+        }
+        if (condition.Length == 0 || SyntaxFactory.ParseLeadingTrivia($"#if {condition}\n#endif\n")
+            .Any(trivia => trivia.ContainsDiagnostics))
+            _diagnostics.ReportError(start.Span, DiagnosticCode.UnexpectedToken,
+                "'pp' requires a valid same-line C# preprocessor condition.");
+        return condition;
     }
 
     private void ParseTypeInPreprocessorBlock(
@@ -12949,7 +13093,8 @@ public sealed class Parser
         List<OperatorOverloadNode> operatorOverloads,
         List<IndexerNode>? indexers = null,
         List<CSharpInteropBlockNode>? interopBlocks = null,
-        List<AstNode>? items = null)
+        List<AstNode>? items = null,
+        bool interfaceMembers = false)
     {
         if (Check(TokenKind.FieldDef))
         {
@@ -12963,7 +13108,7 @@ public sealed class Parser
             properties.Add(node);
             items?.Add(node);
         }
-        else if (Check(TokenKind.Indexer))
+        else if (Check(TokenKind.Indexer) || Check(TokenKind.This))
         {
             var node = ParseIndexer();
             indexers?.Add(node);
@@ -12984,13 +13129,17 @@ public sealed class Parser
                 items?.Add(node);
             }
         }
-        else if (Check(TokenKind.Method) || (_parsingModuleMembers && Check(TokenKind.Func)))
+        else if (interfaceMembers && (Check(TokenKind.Method) || Check(TokenKind.Func)))
+        {
+            items?.Add(ParseMethodSignature());
+        }
+        else if (Check(TokenKind.Method) || Check(TokenKind.Func))
         {
             var node = ParseMethodDefinition();
             methods.Add(node);
             items?.Add(node);
         }
-        else if (Check(TokenKind.AsyncMethod) || (_parsingModuleMembers && Check(TokenKind.AsyncFunc)))
+        else if (Check(TokenKind.AsyncMethod) || Check(TokenKind.AsyncFunc))
         {
             var node = ParseAsyncMethodDefinition();
             methods.Add(node);
@@ -13014,7 +13163,7 @@ public sealed class Parser
         }
         else if (Check(TokenKind.Preprocessor))
         {
-            items?.Add(ParseMemberPreprocessorBlock());
+            items?.Add(ParseMemberPreprocessorBlock(interfaceMembers: interfaceMembers));
         }
         else if (Check(TokenKind.Class) || Check(TokenKind.Record) || Check(TokenKind.Module))
         {
@@ -14650,19 +14799,23 @@ public sealed class Parser
     /// Both colon-separated (type:name) and space-separated (type name) formats are supported.
     /// If no opening paren is found, this method does nothing.
     /// </summary>
-    private void TryParseInlineSignature(TextSpan span, List<ParameterNode> parameters, ref OutputNode? output)
+    private void TryParseInlineSignature(TextSpan span, List<ParameterNode> parameters, ref OutputNode? output,
+        bool brackets = false)
     {
-        if (!Check(TokenKind.OpenParen))
+        var open = brackets ? TokenKind.OpenBracket : TokenKind.OpenParen;
+        var close = brackets ? TokenKind.CloseBracket : TokenKind.CloseParen;
+        if (!Check(open))
         {
             _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
-                "A canonical callable requires an inline parameter list, including '()' for no parameters.");
+                brackets ? "An indexer requires a bracketed type:name parameter list."
+                    : "A canonical callable requires an inline parameter list, including '()' for no parameters.");
             return;
         }
 
         Advance(); // consume (
 
         // Parse comma-separated parameters: type:name, type:name, ...
-        if (!Check(TokenKind.CloseParen))
+        if (!Check(close))
         {
             do
             {
@@ -14762,7 +14915,7 @@ public sealed class Parser
             while (Match(TokenKind.Comma));
         }
 
-        Expect(TokenKind.CloseParen);
+        Expect(close);
 
         // Parse optional return type: -> type or → type
         if (Check(TokenKind.Arrow))
