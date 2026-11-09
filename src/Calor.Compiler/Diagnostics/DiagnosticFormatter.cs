@@ -71,9 +71,9 @@ internal static class DiagnosticText
             "Unknown effects for call '$1'; declare its effect contract",
             "The effect pass cannot resolve this call's effects. It charges worst-case effects rather than assuming purity. Supply a .calor-effects.json manifest for an external member, or make a function-valued declaration and its effect row visible to the module. Selecting effects is a policy decision, not a safe automatic fix."),
         [DiagnosticCode.UndeclaredPublicFunction] = new(
-            "^Public function '([^']+)' in module '([^']+)' has no effect declaration\\. Cross-module callers cannot verify effect safety\\. Add §E\\{\\.\\.\\.\\} to declare effects\\.$",
+            "^Public (?:function|method) '([^']+)' in module '([^']+)' has no effect declaration\\. Cross-module callers cannot verify effect safety\\. Add an indented ! row to declare effects\\.$",
             "Public function '$2.$1' has no effect declaration",
-            "Public functions need an explicit §E effect declaration so cross-module callers can verify their effects. §E{} declares purity; nonempty declarations must include the effects the function can perform. The compiler does not choose this API contract automatically."),
+            "Public functions need an indented ! effect row so cross-module callers can verify their effects. A bare ! declares purity; nonempty rows must include the effects the function can perform. The compiler does not choose this API contract automatically."),
         [DiagnosticCode.AmbiguousCallContinuation] = new(
             "^Closer-less call '([^']+)' already took one inline argument; a second positional argument is ambiguous\\. Use the explicit form '([^']+)' instead\\.$",
             "Ambiguous second argument to '$1'; use '$2'",

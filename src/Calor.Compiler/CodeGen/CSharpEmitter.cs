@@ -2325,7 +2325,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var moduleClassName = string.IsNullOrEmpty(namespaceIdentity)
             ? "GlobalModule"
             : SanitizeIdentifier(namespaceIdentity.Split('.').Last()) + "Module";
-        AppendLine($"public static class {moduleClassName}");
+        AppendLine($"public static partial class {moduleClassName}");
         AppendLine("{");
         Indent();
         foreach (var function in functions)
