@@ -13,6 +13,7 @@ namespace Calor.Compiler.Tests;
 /// (Phase 1 item 6: spec single-sourcing). Each test injects a fake drifted
 /// doc string and asserts the drift is detected — or that clean docs pass.
 /// </summary>
+[Collection("ProductionPipelineConsole")]
 public class DocDriftCheckerTests
 {
     private const string ValidTeachingProgram = "module Good\n  func Value () → int\n    return 1\n";
