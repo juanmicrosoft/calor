@@ -1648,19 +1648,46 @@ native lambda helper passes in both arms. The verifier admits only a resolved
 delegate invocation bound directly to a local lambda initializer. Raw
 statements/expressions inside lambda helpers are rejected in both arms.
 
-Finite negatives accept only command-exit failures; process/EOF/cleanup/global
-deadline errors propagate and cannot satisfy a negative with no diagnostic
-selector. Only the two explicitly opted-in bounded-timeout controls accept
-timeout rejection; cleanup/EOF errors still propagate. Synthetic supervisor
-tests cover wrapped and direct infrastructure errors and missing, duplicate,
-wrong-root and wrong-configuration compiler identity output. These synthetic
-checks are not counted as real entrypoints. The current suite has seven tests.
-Follow-up validation passed the full strict 139-entry old/current run and the
+Finite negatives require exact outer and nested `Verifier command exited 1:`
+wrappers. Abnormal statuses, malformed wrappers, solver UNKNOWN/timeouts,
+OS launch errors, process/EOF/cleanup/global-deadline failures and success
+markers in failure output propagate rather than satisfy a finite negative.
+Only the two explicitly opted-in bounded-timeout probes accept an ordinary
+`Verifier timeout after ...s:` refusal; never solver, OS, cleanup, EOF or
+global-deadline contamination. Positive output must be infrastructure-free
+and contain exactly one complete resolved-root/configuration compiler identity
+line. Indented, mixed-prefix, missing, duplicate and alternate identity lines
+fail. Synthetic controls exercise the actual `verify()` admission path and
+are excluded from all real-entrypoint totals. The current suite has seven tests.
+Only the unchanged engine's verbatim successful limits disclaimer is exempt
+from diagnostic scanning because it names EOF/null as untested. Arbitrary
+Limits-prefixed errors or contamination appended to that disclaimer still fail.
+
+The six deliberately corrupted-native invocations are explicit validated
+prerequisite refusals, not generic finite behavioral negatives. Each must
+raise before admission counters change, carry exactly two exit-1 wrappers,
+identify Microsoft.Z3's DllNotFoundException and a platform-specific invalid
+image error, and leave the owned corrupted file byte-unchanged. Timeout, UNKNOWN,
+cleanup, EOF and success contamination cannot establish that refusal.
+The current 131-entry total remains 34 positives and 97 rejections: 89 finite
+negatives, two explicit bounded-timeout probes and six native-image refusals.
+
+The earlier local-helper follow-up passed the full strict 139-entry old/current run and the
 focused eight-entry current local-helper run (one positive, seven rejections),
 plus the lightweight synthetic supervisor/identity test. The expanded full
 131-effects-plus-35-preserved current suite was not rerun during shared-host
 saturation. Its predecessor's 123-effects-plus-35-preserved run passed before
 the follow-up; that is not a result for the expanded current suite.
+After parent integration, the complete 131-effects-plus-35-preserved suite
+passed seven tests in 891.107 seconds and strict genuine-old/current replay
+passed all 139 entries (39 positive, 100 rejected) within 600 seconds.
+Those results precede the final finite-admission classifier hardening.
+The hardening itself was validated with lightweight actual-verify synthetic
+controls, all six real corrupted-native refusals, and one real FetchUrl positive
+confirming that the unchanged limits disclaimer and exact compiler identity
+are admitted. No new full heavy run was started in the child.
+The body/IO matrix, engine, task inputs, strict
+categories and 120/600-second limits are unchanged.
 
 **Limits:** this is finite process supervision, not a sandbox or universal
 proof. The interposer refuses non-owned supplied paths and unmodeled external

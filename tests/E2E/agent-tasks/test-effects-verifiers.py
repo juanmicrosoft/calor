@@ -5,6 +5,7 @@ import importlib.util
 from concurrent.futures import ThreadPoolExecutor
 import os
 from pathlib import Path
+import re
 import shutil
 import sys
 import tempfile
@@ -103,6 +104,51 @@ def load(name, filename):
 
 
 ENGINE = load("effects_shared_engine", "lib/verify-logic.py")
+
+# Same finite-admission boundaries as test-async-verifiers.py (8cc800185).
+INFRASTRUCTURE = re.compile(
+    r"\b(?:EOF|cleanup|OSError|FileNotFoundError|PermissionError|TimeoutError|Traceback|errno"
+    r"|DllNotFoundException|BadImageFormatException|Win32Exception|Z3Exception)\b"
+    r"|inherited (?:pipe|stdout)|broken pipe|cannot terminate|process group"
+    r"|permission denied|no such file|(?:failed|unable) to (?:launch|start)|could not (?:launch|start)"
+    r"|launch failure|OS error|operating.system error"
+    r"|\b(?-i:UNKNOWN)\b|solver[^\n]*(?:unknown|timeout|timed out)|(?:unknown|timeout)[^\n]*solver",
+    re.IGNORECASE,
+)
+TIMEOUT = re.compile(r"timeout|timed out|deadline", re.IGNORECASE)
+EFFECT_LIMITS = ("Limits: finite non-null strings and owned IO, deterministic restored console; "
+                 "process supervision, not a sandbox or universal body proof. "
+                 "No real network, EOF/null, missing-file or encoding policy.")
+
+
+def control_failure(error, *, allow_timeout=False):
+    output = str(error)
+    wrappers = list(re.finditer(r"Verifier command exited\b", output))
+    explicit_timeout = re.search(r"Verifier timeout after (?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?s: \S+", output)
+    if (INFRASTRUCTURE.search(output)
+        or re.search(r"\bdeadline\b", output, re.IGNORECASE)
+        or any(not re.match(r"Verifier command exited 1:\n", output[wrapper.start():]) for wrapper in wrappers)
+        or "Verification passed:" in output):
+        raise error
+    if TIMEOUT.search(output) and not (allow_timeout and explicit_timeout):
+        raise error
+    if not re.match(r"Verifier command exited 1:\n", output) and not (allow_timeout and explicit_timeout):
+        raise error
+    return output
+
+
+def assert_selected_compiler(test, output, environment):
+    # The unchanged engine's exact success disclaimer names EOF as untested.
+    # Do not exempt arbitrary Limits-prefixed diagnostics or appended failures.
+    diagnostics = "\n".join(line for line in output.splitlines() if line != EFFECT_LIMITS)
+    if (INFRASTRUCTURE.search(diagnostics) or TIMEOUT.search(diagnostics)
+        or "Verifier command exited" in output or "Verification failed:" in output):
+        raise AssertionError(f"Infrastructure-shaped positive output:\n{output}")
+    root = Path(environment["CALOR_COMPILER_ROOT"]).resolve()
+    configuration = environment.get("CALOR_COMPILER_CONFIGURATION", "Debug")
+    expected = f"Selected compiler: {root / 'src/Calor.Compiler/bin' / configuration / 'net10.0/calor.dll'}"
+    test.assertEqual([line for line in output.splitlines() if re.search(r"selected\s+compiler\s*:", line, re.IGNORECASE)],
+                     [expected], output)
 
 
 def historical_syntax(text):
@@ -241,8 +287,8 @@ class EffectsVerifierTests(unittest.TestCase):
 
     def verify(self, profile, text, expected=True, *, env=None, detail=None, deadline=None,
                allow_timeout=False):
-        if allow_timeout and expected:
-            raise ValueError("Timeout rejection must be an explicitly negative bounded-timeout control.")
+        if allow_timeout and (expected or detail != "timeout"):
+            raise ValueError("Only explicit negative bounded-timeout controls may opt in.")
         with tempfile.TemporaryDirectory(prefix="calor-effects-control-") as temporary:
             workspace = Path(temporary)
             if text is not None:
@@ -263,26 +309,13 @@ class EffectsVerifierTests(unittest.TestCase):
                 output = ENGINE.run(command, HERE, deadline, env=environment)
                 passed = True
             except RuntimeError as error:
-                output = str(error)
-                if ("Verifier cleanup" in output or "Cannot terminate verifier process group" in output
-                    or "EOF" in output):
-                    raise
-                timeout = "Verifier timeout" in output
-                if timeout:
-                    if not allow_timeout:
-                        raise
-                elif not output.startswith("Verifier command exited"):
-                    raise
+                output = control_failure(error, allow_timeout=allow_timeout)
                 passed = False
             with type(self).count_lock:
                 type(self).entry_points_executed += 1
             self.assertEqual(passed, expected, output)
             if expected:
-                selected = Path(environment["CALOR_COMPILER_ROOT"]).resolve()
-                configuration = environment.get("CALOR_COMPILER_CONFIGURATION", "Debug")
-                identity = f"Selected compiler: {selected / 'src/Calor.Compiler/bin' / configuration / 'net10.0/calor.dll'}"
-                self.assertEqual([line for line in output.splitlines() if line.startswith("Selected compiler: ")],
-                                 [identity], output)
+                assert_selected_compiler(self, output, environment)
                 self.assertIn(f"Verification passed: {TASKS[profile][1]}; original declared effects, native/CLR signatures, "
                               f"{COUNTS[profile]} runtime cases and BCL output/state coupling.", output)
                 self.assertIn("process supervision, not a sandbox", output)
@@ -307,36 +340,90 @@ class EffectsVerifierTests(unittest.TestCase):
                 self.verify("eff005", text, expected, detail=detail)
 
     def test_supervision_failures_are_not_finite_rejections(self):
-        before = type(self).entry_points_executed
-        errors = [
-            "Verifier timeout: overall deadline expired.",
+        before = (type(self).entry_points_executed, type(self).positives, type(self).negatives)
+        outer = "Verifier command exited 1:\n"
+        infrastructure = [
             "Verifier cleanup timeout: child did not exit by the deadline.",
-            "EOF supervision failure",
-            "Verifier command exited 1:\nVerification failed: Verifier timeout after 2s: dotnet",
-            "Verifier command exited 1:\nVerifier cleanup timeout: inherited pipe did not close.",
-            "Verifier command exited 1:\nCannot terminate verifier process group 123",
+            "EOF supervision failure", "inherited stdout pipe", "broken pipe",
+            "Cannot terminate verifier process group 123",
+            "UNKNOWN", "solver returned unknown", "solver timed out", "solver timeout",
+            "OSError: launch failure", "FileNotFoundError: missing executable",
+            "PermissionError: permission denied", "TimeoutError: process start",
+            "errno 8: OS error", "no such file or directory", "unable to launch dotnet",
+            "could not start subprocess", "operating-system error", "Traceback (most recent call last):",
+            "System.DllNotFoundException: Microsoft.Z3", "System.BadImageFormatException",
         ]
-        for error in errors:
-            with self.subTest(error=error), patch.object(ENGINE, "run", side_effect=RuntimeError(error)):
-                with self.assertRaisesRegex(RuntimeError, "timeout|EOF|Cannot terminate"):
+        errors = infrastructure + [outer + "Verification failed: " + error for error in infrastructure]
+        errors += [
+            "unclassified supervision failure",
+            "Verifier command exited 1\nmissing colon",
+            outer + "Verification failed: Verifier command exited 1\nmissing nested colon",
+            outer + "Verification failed: Verification passed: FetchUrl",
+            outer + "global deadline expired", "Verifier timeout: overall deadline expired.",
+            outer + "Verification failed: Verifier timeout after 2s: dotnet",
+        ]
+        for status in ("0", "2", "-6", "137", "139", "1garbage"):
+            errors += [f"Verifier command exited {status}:\nwrong result",
+                       outer + f"Verification failed: Verifier command exited {status}:\nwrong result"]
+        try:
+            for error in errors:
+                for opted_in in (False, True):
+                    # The explicit ordinary verifier timeout is the only allowed
+                    # opt-in; UNKNOWN, solver/OS and cleanup/EOF still raise.
+                    if opted_in and error == outer + "Verification failed: Verifier timeout after 2s: dotnet":
+                        continue
+                    with self.subTest(error=error, opted_in=opted_in), patch.object(
+                        ENGINE, "run", side_effect=RuntimeError(error)
+                    ):
+                        with self.assertRaises(RuntimeError):
+                            self.verify("eff005", source("eff005"), False,
+                                        detail="timeout" if opted_in else None, allow_timeout=opted_in)
+            for output in (outer + "Verification failed: Wrong output",
+                           outer + "Verification failed: " + outer + "Verification failed: Wrong output"):
+                with patch.object(ENGINE, "run", side_effect=RuntimeError(output)):
+                    self.verify("eff005", source("eff005"), False, detail="Wrong output")
+            for output in ("Verifier timeout after 2s: dotnet",
+                           outer + "Verification failed: Verifier timeout after 2s: dotnet"):
+                with patch.object(ENGINE, "run", side_effect=RuntimeError(output)):
+                    self.verify("eff005", source("eff005"), False, detail="timeout", allow_timeout=True)
+            with self.assertRaises(ValueError):
+                self.verify("eff005", source("eff005"), False, allow_timeout=True)
+            with patch.object(ENGINE, "run", side_effect=OSError("launch failed")):
+                with self.assertRaises(OSError):
                     self.verify("eff005", source("eff005"), False)
-        configuration = os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug")
-        selected = COMPILER_ROOT / "src/Calor.Compiler/bin" / configuration / "net10.0/calor.dll"
-        success = (f"Selected compiler: {selected}\nVerification passed: FetchUrl; original declared effects, "
-                   "native/CLR signatures, 16 runtime cases and BCL output/state coupling.\n"
-                   "Limits: process supervision, not a sandbox\n")
-        invalid = [
-            success.replace(str(selected), str(selected) + ".other"),
-            success.replace(str(selected), str(selected.parent.parent.parent / "wrong-configuration/net10.0/calor.dll")),
-            success.replace(f"Selected compiler: {selected}\n", ""),
-            f"Selected compiler: {selected}\n" + success,
-        ]
-        for output in invalid:
-            with patch.object(ENGINE, "run", return_value=output):
-                with self.assertRaises(AssertionError):
-                    self.verify("eff005", source("eff005"))
-        # Synthetic supervisor checks are not real entrypoint controls.
-        type(self).entry_points_executed = before
+
+            configuration = os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug")
+            selected = COMPILER_ROOT / "src/Calor.Compiler/bin" / configuration / "net10.0/calor.dll"
+            success = (f"Selected compiler: {selected}\nVerification passed: FetchUrl; original declared effects, "
+                       "native/CLR signatures, 16 runtime cases and BCL output/state coupling.\n"
+                       f"{EFFECT_LIMITS}\n")
+            invalid = [
+                success.replace(str(selected), str(selected) + ".other"),
+                success.replace(str(selected), str(selected.parent.parent.parent / "wrong-configuration/net10.0/calor.dll")),
+                success.replace(f"Selected compiler: {selected}\n", ""),
+                f"Selected compiler: {selected}\n" + success,
+                f"  Selected compiler: {selected}\n" + success,
+                success + "  Selected compiler: wrong-root\n",
+                success + "warning: Selected compiler: mixed-extra\n",
+                success.replace("Selected compiler:", "  Selected compiler:"),
+                success.replace(EFFECT_LIMITS, EFFECT_LIMITS + " EOF supervision failure"),
+                success + "Limits: solver UNKNOWN\n",
+            ]
+            invalid += [success + error + "\n" for error in infrastructure]
+            invalid += [success + error + "\n" for error in (
+                "Verification failed: Wrong output", "Verifier command exited 1:\n",
+                "Verifier timeout after 2s: dotnet", "global deadline expired",
+            )]
+            for output in invalid:
+                with self.subTest(output=output), patch.object(ENGINE, "run", return_value=output):
+                    with self.assertRaises(AssertionError):
+                        self.verify("eff005", source("eff005"))
+            with patch.object(ENGINE, "run", return_value=success):
+                self.verify("eff005", source("eff005"))
+        finally:
+            # Synthetic calls exercise actual verify(), but are not entrypoints.
+            with type(self).count_lock:
+                type(self).entry_points_executed, type(self).positives, type(self).negatives = before
 
     def test_independent_provenance_and_coupling(self):
         self.verify("eff001", source("eff001", body="§C{WriteLine} §A name §/C") +
@@ -413,9 +500,7 @@ class EffectsVerifierTests(unittest.TestCase):
                             env=dict(os.environ, CALOR_COMPILER_ROOT=str(COMPILER_ROOT),
                                      CALOR_LOGIC_TIMEOUT_SECONDS="119"))
         self.assertIn("Selected native Z3 prerequisite passed: SATISFIABLE.", output)
-        configuration = os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug")
-        self.assertEqual([line for line in output.splitlines() if line.startswith("Selected compiler: ")],
-                         [f"Selected compiler: {COMPILER_ROOT / 'src/Calor.Compiler/bin' / configuration / 'net10.0/calor.dll'}"])
+        assert_selected_compiler(self, output, dict(os.environ, CALOR_COMPILER_ROOT=str(COMPILER_ROOT)))
         print("Executed 34 preserved profile entrypoints and 1 selected native-only entrypoint.")
 
     def test_failure_guards(self):
@@ -430,16 +515,46 @@ class EffectsVerifierTests(unittest.TestCase):
                     detail="CALOR_COMPILER_CONFIGURATION")
         self.verify("eff002", source("eff002", body="§R §C{System.Console.ReadLine} §/C"), False,
                     detail="Calor0273")
-        with tempfile.TemporaryDirectory(prefix="calor-effects-native-arm-") as temporary:
+        with tempfile.TemporaryDirectory(prefix="calor-effects-missing-arm-") as temporary:
             arm = Path(temporary)
             self.verify("eff005", source("eff005"), False, env={"CALOR_COMPILER_ROOT": str(arm)},
                         detail="Selected compiler dependency missing")
+        self.assert_corrupted_native_refusals()
+
+    def assert_corrupted_native_refusals(self):
+        with tempfile.TemporaryDirectory(prefix="calor-effects-native-arm-") as temporary:
+            arm = Path(temporary)
             relative = Path("src/Calor.Compiler/bin") / os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug") / "net10.0"
             shutil.copytree(COMPILER_ROOT / relative, arm / relative)
             native = {"darwin": "libz3.dylib", "linux": "libz3.so", "win32": "libz3.dll"}[sys.platform]
             (arm / relative / native).write_bytes(b"invalid native asset")
             for profile in TASKS:
-                self.verify(profile, source(profile), False, env={"CALOR_COMPILER_ROOT": str(arm)})
+                before = type(self).entry_points_executed
+                with self.assertRaises(RuntimeError) as refused:
+                    self.verify(profile, source(profile), False, env={"CALOR_COMPILER_ROOT": str(arm)})
+                output = str(refused.exception)
+                self.assertEqual(re.findall(r"Verifier command exited ([^\s:]+)", output), ["1", "1"], output)
+                self.assertTrue(output.startswith("Verifier command exited 1:\n"), output)
+                for wrapper in re.finditer(r"Verifier command exited\b", output):
+                    self.assertRegex(output[wrapper.start():], r"\AVerifier command exited 1:\n")
+                self.assertIn("System.DllNotFoundException", output)
+                self.assertIn("Microsoft.Z3", output)
+                self.assertRegex(output, r"slice is not valid mach-o|invalid ELF header|file too short|not a valid Win32")
+                self.assertNotRegex(output,
+                    r"(?i)timeout|timed out|deadline|EOF|cleanup|Verification passed:|\bUNKNOWN\b"
+                    r"|solver[^\n]*unknown|OSError|FileNotFoundError|PermissionError|Win32Exception|Z3Exception|Traceback"
+                    r"|permission denied|cannot terminate|process group|inherited (?:pipe|stdout)|broken pipe"
+                    r"|(?:failed|unable) to (?:launch|start)|could not (?:launch|start)|launch failure|OS error|operating.system error")
+                self.assertEqual([line for line in output.splitlines() if re.search(r"selected\s+compiler\s*:", line, re.IGNORECASE)],
+                                 [f"Selected compiler: {arm.resolve() / relative / 'calor.dll'}"], output)
+                self.assertEqual((arm / relative / native).read_bytes(), b"invalid native asset")
+                # Count the one real, validated prerequisite refusal separately
+                # from finite behavior admission; preserve the existing totals.
+                with type(self).count_lock:
+                    self.assertEqual(type(self).entry_points_executed, before)
+                    type(self).entry_points_executed += 1
+                    type(self).negatives += 1
+        print("Validated 6 real corrupted-native prerequisite refusals, not behavioral negatives.")
 
 
 def run_compatibility(old, current, deadline):
