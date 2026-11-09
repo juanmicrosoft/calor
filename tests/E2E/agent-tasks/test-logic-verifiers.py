@@ -131,6 +131,67 @@ def prerequisite_refusal(error, compiler, detail):
     return str(error)
 
 
+def parse_guard_diagnostics(name, text):
+    if text == "invalid source":
+        return ["1:1 Calor0100 Expected Module but found Identifier"]
+    if text != "// " + " ".join(DECLARATIONS[name]) + "\nmodule Calculator\n":
+        raise RuntimeError("Not an original native parse-invalid control.")
+    position, token, spelling, recovery, end = {
+        "Factorial": ("2:1", "Requires", "requires",
+                      "2:1=Requires 2:10=Identifier 2:12=LessEqual 2:15=IntLiteral "
+                      "3:1=FatArrow 3:4=Identifier 3:11=GreaterEqual 3:14=IntLiteral "
+                      "3:16=If 3:19=Identifier 3:21=LessEqual 3:24=IntLiteral "
+                      "4:3=Return 4:10=IntLiteral", "5:1=Else"),
+        "Clamp": ("2:1", "FatArrow", "=>",
+                  "2:1=FatArrow 2:4=Identifier 2:11=GreaterEqual 2:14=Identifier "
+                  "3:1=FatArrow 3:4=Identifier 3:11=LessEqual 3:14=Identifier "
+                  "3:18=If 3:21=Identifier 3:27=Less 3:29=Identifier "
+                  "4:3=Return 4:10=Identifier", "5:1=If"),
+        "IsPositive": ("2:3", "Return", "return",
+                       "2:3=Return 2:10=BoolLiteral", "3:1=Return"),
+        "Max": ("2:1", "FatArrow", "=>",
+                "2:1=FatArrow 2:4=Identifier 2:11=GreaterEqual 2:14=Identifier "
+                "3:1=FatArrow 3:4=Identifier 3:11=EqualEqual 3:14=Identifier "
+                "3:16=PipePipe 3:19=Identifier 3:26=EqualEqual 3:29=Identifier "
+                "3:31=If 3:34=Identifier 3:36=GreaterEqual 3:39=Identifier "
+                "4:3=Return 4:10=Identifier", "5:1=Return"),
+    }[name]
+    diagnostics = [
+        f"{position} Calor0100 Expected Module but found {token}",
+        f"{position} Calor0100 Expected Identifier but found {token}",
+        f"{position} Calor0100 Invalid header field '{spelling}'; "
+        "expected 'module name [namespace] [block] [overflow checked|unchecked]'.",
+        f"{position} Calor0102 Missing required attribute 'name' on MODULE",
+    ]
+    for location, found in (item.split("=") for item in recovery.split()):
+        diagnostics.append(f"{location} Calor0100 Expected SEMVER, USING, NS, IFACE, CLASS, "
+                           f"DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found {found}")
+    location, found = end.split("=")
+    return diagnostics + [f"{location} Calor0100 Expected Eof but found {found}"]
+
+
+def compile_guard(name, text, output, source_path):
+    payload = finite_payload(output)
+    expected = parse_guard_diagnostics(name, text)
+    prefix = "System.InvalidOperationException: Calor compilation failed:\n"
+    if not payload.startswith(prefix + f"{source_path}:{expected[0]}\n"):
+        raise RuntimeError("Native parse-invalid guard did not match its observed diagnostic.")
+    diagnostics = [line.removeprefix(f"{source_path}:") for line in payload.splitlines()
+                   if re.search(r"\bCalor\d{4}\b", line)]
+    if diagnostics != expected:
+        raise RuntimeError("Unexpected diagnostic in native parse-invalid guard.")
+    for diagnostic in expected:
+        if "Expected Eof" not in diagnostic:
+            continue
+        line = f"{source_path}:{diagnostic}\n"
+        if output.count(line) != 1:
+            raise RuntimeError("Native parser recovery did not match the observed end-of-source diagnostic.")
+        output = output.replace(line, "", 1)
+    # A pinned parser token named Eof is not a process/pipe EOF failure.
+    # Every other infrastructure marker remains subject to the shared classifier.
+    SHARED.classify(RuntimeError(output))
+
+
 class LogicVerifierTests(unittest.TestCase):
     entry_points_executed = 0
     counts = None
@@ -142,7 +203,7 @@ class LogicVerifierTests(unittest.TestCase):
         print("Logic accepted/finite/compile/input/prerequisite/timeout census:", cls.counts)
         if cls.require_full_totals:
             if cls.entry_points_executed != 103 or cls.counts != {
-                "accepted": 33, "finite": 64, "compile": 1,
+                "accepted": 33, "finite": 60, "compile": 5,
                 "input": 1, "prerequisite": 2, "timeout": 2,
             }:
                 raise AssertionError("Original nonempty 103-control logic census did not complete.")
@@ -180,6 +241,9 @@ class LogicVerifierTests(unittest.TestCase):
                     kind = "timeout"
                 elif kind == "prerequisite":
                     output = prerequisite_refusal(error, compiler, detail)
+                elif kind == "compile":
+                    output = str(error)
+                    compile_guard(name, text, output, workspace.resolve() / "Calculator.calr")
                 else:
                     output = SHARED.classify(error, timeout_seconds=declared, commands=("dotnet",))
                     kind = "timeout" if declared is not None else kind
@@ -188,13 +252,6 @@ class LogicVerifierTests(unittest.TestCase):
                         if kind == "input":
                             if text is not None or payload != f"Input missing: {workspace.resolve() / 'Calculator.calr'}\n":
                                 raise RuntimeError("Not the original missing-input guard.") from error
-                        elif kind == "compile":
-                            if text != "invalid source" or not re.match(
-                                r"System\.InvalidOperationException: Calor compilation failed:\n"
-                                + re.escape(str(workspace.resolve() / "Calculator.calr"))
-                                + r":1:1 Calor0100 Expected Module but found Identifier\n", payload
-                            ):
-                                raise RuntimeError("Not the original native compile-invalid guard.") from error
                         elif rejection is None or not re.match(rejection, payload):
                             raise RuntimeError("Logic rejection did not match its specific native oracle:\n" + output) from error
             identities = [line for line in output.splitlines()
@@ -202,8 +259,11 @@ class LogicVerifierTests(unittest.TestCase):
                           and not (kind == "prerequisite" and line ==
                                    f"Verification failed: Selected compiler dependency missing: {compiler}; build the selected root first.")]
             identity = f"Selected compiler: {compiler}"
-            if identities and identities != [identity]:
+            if identities != [identity] and (passed or kind in ("finite", "compile") or identities):
                 raise RuntimeError("Noncanonical or duplicated logic compiler identity.")
+            if kind == "timeout":
+                print(f"Declared logic total-budget timeout ({declared}s); "
+                      f"selected helper identity present: {bool(identities)}; entered-body claim: false.", flush=True)
             self.assertEqual(passed, expected, output)
             if expected:
                 ENGINE.check_advanced_success(output, identity)
@@ -257,7 +317,7 @@ class LogicVerifierTests(unittest.TestCase):
                 self.verify(name, source(name).replace(f"func {name} ", "func Other "), False,
                             detail="Expected exactly one", rejection=native_rejection(name, "function"))
                 self.verify(name, "// " + " ".join(DECLARATIONS[name]) + "\nmodule Calculator\n", False,
-                            rejection=native_rejection(name, "function"))
+                            kind="compile")
                 self.verify(name, source(name, signature=DECLARATIONS[name][0].replace(f"func {name} ", f"func {name} private ")),
                             False, detail="Wrong public signature", rejection=native_rejection(name, "signature"))
                 self.verify(name, source(name, body="return false" if name == "IsPositive" else "return 1"), False,

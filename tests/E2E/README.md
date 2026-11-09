@@ -364,9 +364,9 @@ errors, timeouts, and missing/corrupt/alternate selected compiler roots. They
 do not establish agent nonregression or complete the paired release experiment.
 
 The original 103 candidate byte strings, expectations and 13 test methods remain
-the admission census: 33 accepted controls and 64 specific finite rejections,
-plus one compile-invalid guard, one missing-input guard, two selected-image
-prerequisite refusals and two declared timeouts. The latter six are not finite
+the admission census: 33 accepted controls and 60 specific finite rejections,
+plus five parse-invalid guards, one missing-input guard, two selected-image
+prerequisite refusals and two declared timeouts. The latter ten are not finite
 behavioral rejection credit. Each entry retains its 120-second inner deadline,
 135-second outer deadline and five-second solver bounds. Native ABI and empty-body
 guards inspect the actual parsed declaration; surviving candidates still undergo
@@ -377,6 +377,12 @@ required input, not by defining a new overflow policy.
 All four scalar profiles verify their own committed native manifest and compare
 selected/copied compiler and native hashes before and after execution. Each
 positive requires one exact canonical compiler identity and one exact verdict.
+Helper-launched semantic and parse-invalid negatives also require that single
+identity. Scalar helper failures still undergo post-execution selected/copied-image
+checks; a mutation is fatal even if the helper returned the expected exit-1 oracle.
+The failure-path hash check preserves the primary timeout/cancellation and reports
+image-validation failures separately, rather than replacing an elapsed timeout
+with another deadline error. The outer 135-second supervision bound still applies.
 Helper restoration is locked and local-cache-only; the build uses `--no-restore`.
 The selected-copy positive includes its matching manifest and source assets.
 Unexpected build, UNKNOWN, identity, abnormal-exit, process, EOF and cleanup failures
@@ -384,6 +390,8 @@ cannot satisfy an expected semantic negative. Only the deliberately corrupted
 selected compiler's observed missing-reference diagnostics qualify for that
 separately counted prerequisite guard. The original 0.001-second budget may expire
 before helper launch; it remains a separately declared deadline refusal.
+Both original shortened-budget controls are reported as total-budget timeouts,
+with no entered-body claim, whether or not a selected-helper identity was observed.
 
 Focused admission regressions are supplemental, not entries in the 103 census:
 
@@ -395,6 +403,18 @@ The original `basic-calor-project/Calculator.calr` fixture remains byte-for-byte
 legacy source. The control driver authors its existing canonical programs; it
 does not translate that fixture. Passing these controls does not establish native
 acceptance of the untouched real-task setup.
+Four original comment-labelled inputs also contain uncommented statements before
+their module header. Their bytes and expected rejection remain unchanged. They
+are counted only as parse-invalid guards, with the selected compiler's observed
+exact ordered `Calor0100`/`Calor0102` diagnostic sequence, not
+as evidence that a valid comment-only program fails the missing-function oracle.
+That intended-oracle gap remains in the original census. Four separately named
+supplemental controls line-comment every native program line, print independent
+input SHA256 hashes, and test the actual missing-function policy. They contribute
+zero original-103 entries and never replace the malformed originals. Only each
+guard's exact observed parser `Eof` diagnostic is excluded from infrastructure
+marker matching; genuine process/pipe EOF, cleanup, UNKNOWN and build failures
+remain fatal.
 
 Actual old-release API compatibility is a separate executable control:
 

@@ -177,14 +177,14 @@ def main():
             if image.is_file() and (image.suffix == ".dll" or image.name.startswith("libz3."))
         }
 
-    def check_images(output):
+    def check_images(output, *, check_deadline=True):
         if hashlib.sha256(manifest.read_bytes()).digest() != manifest_digest:
             raise RuntimeError(f"Selected native manifest changed: {manifest}")
         for relative, expected in images.items():
             for image in (compiler / relative, output / relative):
                 if not image.is_file() or hashlib.sha256(image.read_bytes()).digest() != expected:
                     raise RuntimeError(f"Selected compiler/native image changed or was substituted: {image}")
-        if time.monotonic() >= deadline:
+        if check_deadline and time.monotonic() >= deadline:
             raise RuntimeError("Verifier timeout: selected image validation exceeded the overall deadline.")
 
     with tempfile.TemporaryDirectory(prefix="calor-logic-verifier-") as temporary:
@@ -209,10 +209,20 @@ def main():
         if carrier:
             check_images(project / "bin/Debug/net10.0")
         print(f"Selected compiler: {compiler / 'calor.dll'}")
-        output = run([
-            "dotnet", str(project / "bin/Debug/net10.0/LogicVerifier.dll"),
-            *([sys.argv[1]] if direct_check else [sys.argv[1], str(source)]),
-        ], project, deadline)
+        try:
+            output = run([
+                "dotnet", str(project / "bin/Debug/net10.0/LogicVerifier.dll"),
+                *([sys.argv[1]] if direct_check else [sys.argv[1], str(source)]),
+            ], project, deadline)
+        except BaseException as failure:
+            if scalar_logic:
+                try:
+                    check_images(project / "bin/Debug/net10.0", check_deadline=False)
+                except (OSError, RuntimeError) as image_error:
+                    message = f"Verifier post-failure image validation failure: {image_error}"
+                    failure.add_note(message)
+                    print(message, file=sys.stderr)
+            raise
         if carrier:
             check_images(project / "bin/Debug/net10.0")
         if advanced:
