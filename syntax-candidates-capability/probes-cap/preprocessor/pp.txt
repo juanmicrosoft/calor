@@ -2,11 +2,11 @@ class Logger
   pp DEBUG
     func Log (string:m) → void
       ! cw
-      Console.WriteLine(m)
+      System.Console.WriteLine(m)
   pp elif TRACE
     func Log (string:m) → void
       ! cw
-      Trace.WriteLine(m)
+      System.Diagnostics.Trace.WriteLine(m)
   pp else
     func Log (string:m) → void
       return

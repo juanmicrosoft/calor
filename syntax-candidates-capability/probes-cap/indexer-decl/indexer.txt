@@ -1,5 +1,5 @@
 class Bag
-  field int[]:_items priv
+  field int[]:_items private
   indexer int (int:i)
     get
       return _items[i]

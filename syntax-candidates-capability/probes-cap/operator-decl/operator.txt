@@ -1,5 +1,8 @@
 class Money
-  property long:Cents get
+  property long:Cents
+    get
+  ctor (long:cents)
+    set Cents cents
   operator + (Money:a, Money:b) → Money
     return new Money(a.Cents + b.Cents)
   operator implicit (long:cents) → Money

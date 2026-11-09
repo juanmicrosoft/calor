@@ -671,7 +671,7 @@
       "id": "probe-cap-operator-decl",
       "population": "retained-capability",
       "source": "hand-authored/retained-capability/operator-decl",
-      "note": "Tool baseline label: current = operator. SPECULATIVE spelling payload, NOT accepted syntax and not compiled; token measurement only. Arms use accepted rows (infix, no sigil, spaces, public default, C# types, func, →, var/let, `! e` effects, `=> e` postcondition) and differ only in the probed construct. Native user-defined binary and implicit conversion operators (C# requires public static; implied in every arm, emitted as C# operator). Owner 9a89b133 declaration lane. ",
+      "note": "Tool baseline label: current = operator. SPECULATIVE spelling payload, NOT accepted syntax and not compiled; token measurement only. Arms use accepted rows (infix, no sigil, spaces, public default, C# types, func, →, var/let, `! e` effects, `=> e` postcondition) and differ only in the probed construct. Native user-defined binary and implicit conversion operators (C# requires public static; implied in every arm, emitted as C# operator). Common scaffolding (block get-only property, `ctor (long:cents)` assigning Cents) is identical in every arm per owner 9a89b133 review. ",
       "variants": {
         "current": "probes-cap/operator-decl/operator.txt",
         "func-operator": "probes-cap/operator-decl/func-operator.txt",
