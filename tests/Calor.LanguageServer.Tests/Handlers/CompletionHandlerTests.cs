@@ -10,6 +10,47 @@ namespace Calor.LanguageServer.Tests.Handlers;
 public class CompletionHandlerTests
 {
     [Theory]
+    [InlineData("", "func")]
+    [InlineData("mod", "module")]
+    [InlineData("let ", "string")]
+    [InlineData("var ", "float")]
+    public async Task CanonicalCompletion_UsesNativeWordsAndCSharpTypeWidthsAsync(string source, string expected)
+    {
+        var workspace = new WorkspaceState();
+        var uri = new Uri("file:///canonical-completion.calr");
+        workspace.GetOrCreate(uri, source).Reanalyze();
+        var items = await new CompletionHandler(workspace).Handle(new CompletionParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            Position = new Position(0, source.Length)
+        }, CancellationToken.None);
+        Assert.Contains(items.Items, item => item.Label == expected && item.InsertText == expected);
+        Assert.DoesNotContain(items.Items, item => item.Label.StartsWith('§'));
+        Assert.DoesNotContain(items.Items, item => item.Label is "i32" or "str" or "f64" or "FLOAT");
+        if (source.Length == 0)
+        {
+            Assert.Equal(1, items.Items.Count(item => item.Label == "raw"));
+            Assert.Contains(items.Items, item => item.Label == "float" && item.Detail?.Contains("32-bit") == true);
+            Assert.Contains(items.Items, item => item.Label == "double" && item.Detail?.Contains("64-bit") == true);
+        }
+    }
+
+    [Fact]
+    public async Task CanonicalCompletion_DoesNotTreatTypeColonAsTypePositionAsync()
+    {
+        const string source = "let int:";
+        var workspace = new WorkspaceState();
+        var uri = new Uri("file:///canonical-name-completion.calr");
+        workspace.GetOrCreate(uri, source).Reanalyze();
+        var items = await new CompletionHandler(workspace).Handle(new CompletionParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            Position = new Position(0, source.Length)
+        }, CancellationToken.None);
+        Assert.DoesNotContain(items.Items, item => item.Label == "int");
+    }
+
+    [Theory]
     [InlineData("i32", "Task<i32>")]
     [InlineData("ValueTask<i32>", "ValueTask<i32>")]
     public void AsyncMemberCompletion_ReportsCallableCarrier(string output, string carrier)

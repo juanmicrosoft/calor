@@ -1,7 +1,7 @@
 namespace Calor.Compiler.Parsing;
 
 /// <summary>
-/// Provides suggestions for unknown section markers (§-prefixed keywords).
+/// Provides diagnostic suggestions for canonical syntax words.
 /// Includes typo correction using Levenshtein distance.
 /// </summary>
 public static class SectionMarkerSuggestions
@@ -9,9 +9,7 @@ public static class SectionMarkerSuggestions
     /// <summary>
     /// Registered section markers eligible for canonical-syntax suggestions.
     /// </summary>
-    public static readonly IReadOnlyList<string> AllMarkers = Lexer.KeywordNames
-        .Where(marker => !marker.StartsWith('/') || marker is "/C" or "/LAM" or "/RAW" or "/CSHARP")
-        .ToArray();
+    public static readonly IReadOnlyList<string> AllMarkers = Lexer.KeywordNames.ToArray();
 
     /// <summary>
     /// Common expansions/descriptions for section markers.
@@ -19,112 +17,34 @@ public static class SectionMarkerSuggestions
     /// </summary>
     public static readonly IReadOnlyDictionary<string, string> MarkerDescriptions = new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        // Core
-        ["M"] = "Module",
-        ["F"] = "Function",
-        ["C"] = "Call",
-        ["B"] = "Bind (let)",
-        ["R"] = "Return",
-        ["I"] = "Input parameter",
-        ["O"] = "Output",
-        ["A"] = "Argument",
-        ["E"] = "Effects",
-        ["L"] = "Loop (for)",
-        ["W"] = "Match (switch)",
-        ["K"] = "Case",
-        ["Q"] = "Requires (precondition)",
-        ["S"] = "Ensures (postcondition)",
-        ["U"] = "Using",
-
-        // Control flow
-        ["IF"] = "If",
-        ["EI"] = "ElseIf",
-        ["EL"] = "Else",
-        ["WH"] = "While",
-        ["DO"] = "Do-while",
-        ["BK"] = "Break",
-        ["CN"] = "Continue",
-
-        // Types
-        ["FLD"] = "Field",
-        ["IV"] = "Invariant",
-
-        // Collections
-        ["ARR"] = "Array",
-        ["LIST"] = "List",
-        ["DICT"] = "Dictionary",
-        ["NEW"] = "New object",
-
-        // Classes
-        ["CL"] = "Class",
-        ["IFACE"] = "Interface",
-        ["MT"] = "Method",
-        ["CTOR"] = "Constructor",
-        ["OP"] = "Operator overload",
-        ["PROP"] = "Property",
-
-        // Try/Catch
-        ["TR"] = "Try",
-        ["CA"] = "Catch",
-        ["FI"] = "Finally",
-        ["TH"] = "Throw",
-
-        // Misc
-        ["LAM"] = "Lambda",
-        ["EN"] = "Enum",
-        ["P"] = "Print (Console.WriteLine)",
-    };
-
-    /// <summary>
-    /// Common expanded forms that should map to their short equivalents.
-    /// </summary>
-    private static readonly IReadOnlyDictionary<string, string> ExpandedForms = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-    {
-        ["FUNC"] = "F",
-        ["FUNCTION"] = "F",
-        ["MOD"] = "M",
-        ["MODULE"] = "M",
-        ["CALL"] = "C",
-        ["BIND"] = "B",
-        ["LET"] = "B",
-        ["RETURN"] = "R",
-        ["RET"] = "R",
-        ["INPUT"] = "I",
-        ["OUTPUT"] = "O",
-        ["ARG"] = "A",
-        ["ARGUMENT"] = "A",
-        ["EFFECTS"] = "E",
-        ["LOOP"] = "L",
-        ["FOREACH"] = "L",
-        ["FOR"] = "L",
-        ["SWITCH"] = "W",
-        ["SW"] = "W",
-        ["ENUM"] = "EN",
-        ["FL"] = "FLD",
-        ["WR"] = "WHERE",
-        ["ADD"] = "PUSH",
-        ["CASE"] = "K",
-        ["REQUIRES"] = "Q",
-        ["PRECONDITION"] = "Q",
-        ["PRE"] = "Q",
-        ["ENSURES"] = "S",
-        ["POSTCONDITION"] = "S",
-        ["POST"] = "S",
-        ["TYPE"] = "T",
-        ["RECORD"] = "D",
-        ["DATA"] = "D",
-        ["VARIANT"] = "V",
-        ["USING"] = "U",
-        // Closing tags
-        ["/IF"] = "/I",
-        ["/FUNC"] = "/F",
-        ["/FUNCTION"] = "/F",
-        ["/MOD"] = "/M",
-        ["/MODULE"] = "/M",
-        ["/CALL"] = "/C",
-        ["/LOOP"] = "/L",
-        ["OPERATOR"] = "OP",
-        ["OVERLOAD"] = "OP",
+        ["module"] = "Module",
+        ["func"] = "Function",
+        ["let"] = "Immutable binding",
+        ["var"] = "Mutable binding",
+        ["return"] = "Return",
+        ["set"] = "Assignment statement",
+        ["if"] = "Conditional branch",
+        ["else"] = "Alternative branch",
+        ["for"] = "For loop",
+        ["each"] = "Iteration",
+        ["while"] = "While condition",
+        ["do"] = "Do-while loop",
+        ["match"] = "Pattern match",
+        ["case"] = "Match case",
+        ["requires"] = "Precondition",
+        ["invariant"] = "Invariant",
+        ["class"] = "Class",
+        ["record"] = "Record",
+        ["interface"] = "Interface",
+        ["ctor"] = "Constructor",
+        ["property"] = "Property",
+        ["try"] = "Try",
+        ["catch"] = "Catch",
+        ["finally"] = "Finally",
+        ["throw"] = "Throw",
+        ["enum"] = "Enum",
+        ["new"] = "Object construction",
+        ["raw"] = "Exact UTF-8 byte-counted C# payload",
     };
 
     /// <summary>
@@ -136,14 +56,8 @@ public static class SectionMarkerSuggestions
     /// <returns>The most similar marker, or null if none found within distance threshold.</returns>
     public static string? FindSimilarMarker(string unknown, int maxDistance = 2)
     {
-        if (string.IsNullOrEmpty(unknown))
+        if (string.IsNullOrEmpty(unknown) || unknown.StartsWith('/') || unknown.StartsWith('§'))
             return null;
-
-        var upperUnknown = unknown.ToUpperInvariant();
-
-        // First, check for common expanded forms
-        if (ExpandedForms.TryGetValue(upperUnknown, out var expandedMatch))
-            return AllMarkers.Contains(expandedMatch, StringComparer.Ordinal) ? expandedMatch : null;
 
         string? bestMatch = null;
         var bestDistance = int.MaxValue;
@@ -151,7 +65,7 @@ public static class SectionMarkerSuggestions
 
         foreach (var marker in AllMarkers)
         {
-            var distance = LevenshteinDistance(upperUnknown, marker.ToUpperInvariant());
+            var distance = LevenshteinDistance(unknown, marker);
             if (distance <= maxDistance)
             {
                 // Prefer matches with lower distance
@@ -174,7 +88,7 @@ public static class SectionMarkerSuggestions
     /// </summary>
     public static string GetCommonMarkers()
     {
-        return "§M (Module), §F (Function), §B (Bind), §C (Call), §IF, §L (Loop), §W (Match)";
+        return "module, func, let, var, if, for, each, match";
     }
 
     /// <summary>
@@ -204,7 +118,7 @@ public static class SectionMarkerSuggestions
 
             for (var j = 1; j <= n; j++)
             {
-                var cost = char.ToUpperInvariant(s1[i - 1]) == char.ToUpperInvariant(s2[j - 1]) ? 0 : 1;
+                var cost = s1[i - 1] == s2[j - 1] ? 0 : 1;
                 curr[j] = Math.Min(
                     Math.Min(curr[j - 1] + 1, prev[j] + 1),
                     prev[j - 1] + cost);

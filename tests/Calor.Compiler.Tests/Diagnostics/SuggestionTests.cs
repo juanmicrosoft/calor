@@ -87,23 +87,16 @@ public class SuggestionTests
     #region SectionMarkerSuggestions Tests
 
     [Theory]
-    [InlineData("FU", "F")] // Short typo - one character difference
-    [InlineData("MOD", "M")] // Prefix typo
-    [InlineData("CLL", "CL")] // Typo - one character off from CL (class)
-    [InlineData("IFF", "IF")] // Typo - one character off
-    [InlineData("ELL", "EL")] // Typo of EL (else) - one character off
-    [InlineData("WR", "WHERE")]
-    [InlineData("SW", "W")]
-    [InlineData("ENUM", "EN")]
-    [InlineData("ADD", "PUSH")]
-    [InlineData("when", "WHEN")]
-    [InlineData("LAM", "LAM")] // Exact match (lambda)
-    [InlineData("FL", "FLD")]
-    [InlineData("HSETT", "HSET")]
-    [InlineData("PUTT", "PUT")]
-    [InlineData("ASSIG", "ASSIGN")]
-    [InlineData("FF", "F")] // One character off from F
-    public void FindSimilarMarker_WithTypoOrLongForm_ReturnsSuggestion(string input, string expected)
+    [InlineData("modul", "module")]
+    [InlineData("clas", "class")]
+    [InlineData("funcc", "func")]
+    [InlineData("iff", "if")]
+    [InlineData("elsee", "else")]
+    [InlineData("whenn", "when")]
+    [InlineData("recordd", "record")]
+    [InlineData("whille", "while")]
+    [InlineData("requires", "requires")]
+    public void CanonicalKeywordSuggestion_WithTypo_ReturnsExactWord(string input, string expected)
     {
         var suggestion = SectionMarkerSuggestions.FindSimilarMarker(input);
 
@@ -112,16 +105,15 @@ public class SuggestionTests
     }
 
     [Theory]
-    [InlineData("/CALL", "/C")]
-    [InlineData("/LMA", "/LAM")]
-    [InlineData("/RAWW", "/RAW")]
-    [InlineData("/CSHAR", "/CSHARP")]
-    public void FindSimilarMarker_WithClosingTag_ReturnsSuggestion(string input, string expected)
+    [InlineData("/CALL")]
+    [InlineData("/LMA")]
+    [InlineData("/RAWW")]
+    [InlineData("/CSHAR")]
+    [InlineData("/var")]
+    [InlineData("§func")]
+    public void CanonicalKeywordSuggestion_DoesNotHealRetiredTags(string input)
     {
-        var suggestion = SectionMarkerSuggestions.FindSimilarMarker(input);
-
-        Assert.NotNull(suggestion);
-        Assert.Equal(expected, suggestion);
+        Assert.Null(SectionMarkerSuggestions.FindSimilarMarker(input));
     }
 
     [Theory]
@@ -138,12 +130,12 @@ public class SuggestionTests
     }
 
     [Fact]
-    public void SectionMarkerCatalog_UsesRegisteredKeywordsAndRequiredDelimiters()
+    public void CanonicalKeywordSuggestion_CatalogMatchesTheLexerExactly()
     {
         var expected = Lexer.KeywordNames
-            .Where(marker => !marker.StartsWith('/') || marker is "/C" or "/LAM" or "/RAW" or "/CSHARP")
             .Order(StringComparer.Ordinal);
         Assert.Equal(expected, SectionMarkerSuggestions.AllMarkers.Order(StringComparer.Ordinal));
+        Assert.DoesNotContain(SectionMarkerSuggestions.AllMarkers, word => word.Any(char.IsUpper) || word.StartsWith('/'));
         Assert.All(SectionMarkerSuggestions.MarkerDescriptions.Keys,
             marker => Assert.Contains(marker, SectionMarkerSuggestions.AllMarkers));
     }
@@ -174,15 +166,14 @@ public class SuggestionTests
     }
 
     [Fact]
-    public void GetCommonMarkers_ReturnsCommonMarkers()
+    public void CanonicalKeywordSuggestion_CommonWordsNeverTeachSigils()
     {
         var markers = SectionMarkerSuggestions.GetCommonMarkers();
 
-        Assert.Contains("§M", markers);
-        Assert.Contains("§F", markers);
-        Assert.Contains("§B", markers);
-        Assert.Contains("Module", markers);
-        Assert.Contains("Function", markers);
+        Assert.Contains("module", markers);
+        Assert.Contains("func", markers);
+        Assert.Contains("let", markers);
+        Assert.DoesNotContain("§", markers);
     }
 
     #endregion

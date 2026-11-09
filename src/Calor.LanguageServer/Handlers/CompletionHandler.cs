@@ -18,96 +18,21 @@ public sealed class CompletionHandler : CompletionHandlerBase
 {
     private readonly WorkspaceState _workspace;
 
-    // Common Calor tags for completion
-    private static readonly (string Tag, string Description, CompletionItemKind Kind)[] CommonTags =
-    {
-        ("M", "Module definition", CompletionItemKind.Module),
-        ("F", "Function definition", CompletionItemKind.Function),
-        ("AF", "Async function definition", CompletionItemKind.Function),
-        ("I", "Input parameter", CompletionItemKind.Variable),
-        ("O", "Output (return type)", CompletionItemKind.TypeParameter),
-        ("E", "Effects declaration", CompletionItemKind.Event),
-        ("B", "Variable binding", CompletionItemKind.Variable),
-        ("C", "Function call", CompletionItemKind.Method),
-        ("R", "Return statement", CompletionItemKind.Keyword),
-        ("P", "Print (Console.WriteLine)", CompletionItemKind.Function),
-        ("Pf", "PrintF (Console.Write)", CompletionItemKind.Function),
-        ("L", "For loop", CompletionItemKind.Keyword),
-        ("WH", "While loop", CompletionItemKind.Keyword),
-        ("DO", "Do-while loop", CompletionItemKind.Keyword),
-        ("EACH", "Foreach loop", CompletionItemKind.Keyword),
-        ("IF", "If conditional", CompletionItemKind.Keyword),
-        ("EI", "Else-if", CompletionItemKind.Keyword),
-        ("EL", "Else", CompletionItemKind.Keyword),
-        ("W", "Match/switch expression", CompletionItemKind.Keyword),
-        ("K", "Case in match", CompletionItemKind.Keyword),
-        ("BK", "Break", CompletionItemKind.Keyword),
-        ("CN", "Continue", CompletionItemKind.Keyword),
-        ("Q", "Requires (precondition)", CompletionItemKind.Property),
-        ("S", "Ensures (postcondition)", CompletionItemKind.Property),
-        ("CL", "Class definition", CompletionItemKind.Class),
-        ("IFACE", "Interface definition", CompletionItemKind.Interface),
-        ("EN", "Enum definition", CompletionItemKind.Enum),
-        ("EXT", "Enum extension methods", CompletionItemKind.Method),
-        ("MT", "Method definition", CompletionItemKind.Method),
-        ("AMT", "Async method definition", CompletionItemKind.Method),
-        ("PROP", "Property definition", CompletionItemKind.Property),
-        ("CTOR", "Constructor definition", CompletionItemKind.Constructor),
-        ("FLD", "Field definition", CompletionItemKind.Field),
-        ("GET", "Property getter", CompletionItemKind.Property),
-        ("SET", "Property setter", CompletionItemKind.Property),
-        ("IMPL", "Implements interface", CompletionItemKind.Interface),
-        ("VR", "Virtual modifier", CompletionItemKind.Keyword),
-        ("OV", "Override modifier", CompletionItemKind.Keyword),
-        ("AB", "Abstract modifier", CompletionItemKind.Keyword),
-        ("SD", "Sealed modifier", CompletionItemKind.Keyword),
-        ("THIS", "This reference", CompletionItemKind.Keyword),
-        ("BASE", "Base class reference", CompletionItemKind.Keyword),
-        ("NEW", "New instance", CompletionItemKind.Keyword),
-        ("TR", "Try block", CompletionItemKind.Keyword),
-        ("CA", "Catch block", CompletionItemKind.Keyword),
-        ("FI", "Finally block", CompletionItemKind.Keyword),
-        ("TH", "Throw exception", CompletionItemKind.Keyword),
-        ("LAM", "Lambda expression", CompletionItemKind.Function),
-        ("DEL", "Delegate definition", CompletionItemKind.Function),
-        ("EVT", "Event declaration", CompletionItemKind.Event),
-        ("SUB", "Subscribe to event", CompletionItemKind.Method),
-        ("UNSUB", "Unsubscribe from event", CompletionItemKind.Method),
-        ("ASYNC", "Async modifier", CompletionItemKind.Keyword),
-        ("AWAIT", "Await expression", CompletionItemKind.Keyword),
-        ("ARR", "Array declaration", CompletionItemKind.Struct),
-        ("LIST", "List declaration", CompletionItemKind.Struct),
-        ("DICT", "Dictionary declaration", CompletionItemKind.Struct),
-        ("HSET", "HashSet declaration", CompletionItemKind.Struct),
-        ("PUSH", "Add to collection", CompletionItemKind.Method),
-        ("PUT", "Put in dictionary", CompletionItemKind.Method),
-        ("REM", "Remove from collection", CompletionItemKind.Method),
-        ("INS", "Insert at index", CompletionItemKind.Method),
-        ("HAS", "Contains check", CompletionItemKind.Method),
-        ("CLR", "Clear collection", CompletionItemKind.Method),
-        ("CNT", "Count property", CompletionItemKind.Property),
-        ("IDX", "Index access", CompletionItemKind.Method),
-        ("LEN", "Length property", CompletionItemKind.Property),
-        ("D", "Record definition", CompletionItemKind.Struct),
-        ("V", "Variant definition", CompletionItemKind.EnumMember),
-        ("T", "Type definition", CompletionItemKind.TypeParameter),
-        ("U", "Using directive", CompletionItemKind.Reference),
-    };
-
     // Type keywords for completion
     private static readonly (string Type, string Description)[] TypeKeywords =
     {
-        ("i32", "32-bit signed integer"),
-        ("i64", "64-bit signed integer"),
-        ("i8", "8-bit signed integer"),
-        ("i16", "16-bit signed integer"),
-        ("u8", "8-bit unsigned integer"),
-        ("u16", "16-bit unsigned integer"),
-        ("u32", "32-bit unsigned integer"),
-        ("u64", "64-bit unsigned integer"),
-        ("f32", "32-bit float"),
-        ("f64", "64-bit float"),
-        ("str", "String type"),
+        ("int", "32-bit signed integer"),
+        ("long", "64-bit signed integer"),
+        ("sbyte", "8-bit signed integer"),
+        ("short", "16-bit signed integer"),
+        ("ushort", "16-bit unsigned integer"),
+        ("uint", "32-bit unsigned integer"),
+        ("ulong", "64-bit unsigned integer"),
+        ("nint", "Native-width signed integer"),
+        ("nuint", "Native-width unsigned integer"),
+        ("float", "32-bit float"),
+        ("double", "64-bit float"),
+        ("string", "String type"),
         ("bool", "Boolean type"),
         ("void", "Void type"),
         ("char", "Character type"),
@@ -148,11 +73,6 @@ public sealed class CompletionHandler : CompletionHandlerBase
 
         switch (context)
         {
-            case CompletionContext.AfterSectionMarker:
-                // After § - suggest tags
-                items.AddRange(GetTagCompletions());
-                break;
-
             case CompletionContext.InType:
                 // In type position - suggest types
                 items.AddRange(GetTypeCompletions(snapshot.Ast));
@@ -175,13 +95,6 @@ public sealed class CompletionHandler : CompletionHandlerBase
 
             default:
                 // General context - provide all completions
-                items.Add(new CompletionItem
-                {
-                    Label = "raw",
-                    Kind = CompletionItemKind.Keyword,
-                    Detail = "Exact UTF-8 byte-length C# payload: raw reason N",
-                    InsertText = "raw "
-                });
                 items.AddRange(GetTagCompletions());
                 items.AddRange(GetTypeCompletions(snapshot.Ast));
                 items.AddRange(GetExpressionCompletionsFromSnapshot(snapshot, offset));
@@ -296,21 +209,13 @@ public sealed class CompletionHandler : CompletionHandlerBase
         if (offset <= 0 || offset > source.Length)
             return CompletionContext.General;
 
-        // Look back for § marker
-        var lookback = Math.Min(offset, 10);
-        var before = source.Substring(offset - lookback, lookback);
+        var lineStart = source.LastIndexOf('\n', offset - 1) + 1;
+        var before = source[lineStart..offset].TrimStart();
+        if (before.Length == 0 || before.All(c => char.IsLetterOrDigit(c) || c == '_'))
+            return CompletionContext.General;
 
-        // After § character
-        if (before.EndsWith("§"))
-            return CompletionContext.AfterSectionMarker;
-
-        // After § followed by partial tag
-        var lastSection = before.LastIndexOf('§');
-        if (lastSection >= 0 && !before.Substring(lastSection).Contains('{'))
-            return CompletionContext.AfterSectionMarker;
-
-        // After type indicators (like in §I{, §O{, etc.)
-        if (before.Contains("§I{") || before.Contains("§O{") || before.EndsWith(":"))
+        // A colon ends a type:name annotation; completion after it suggests names, not types.
+        if (before is "let " or "var " || before.EndsWith('(') || before.EndsWith("→ ", StringComparison.Ordinal))
             return CompletionContext.InType;
 
         // After a dot - member access
@@ -322,14 +227,25 @@ public sealed class CompletionHandler : CompletionHandlerBase
 
     private static IEnumerable<CompletionItem> GetTagCompletions()
     {
-        return CommonTags.Select((t, i) => new CompletionItem
+        return Lexer.KeywordNames.Select((word, i) => new CompletionItem
         {
-            Label = $"§{t.Tag}",
-            Kind = t.Kind,
-            Detail = t.Description,
-            InsertText = $"§{t.Tag}",
+            Label = word,
+            Kind = word switch
+            {
+                "module" or "namespace" => CompletionItemKind.Module,
+                "class" or "record" => CompletionItemKind.Class,
+                "interface" => CompletionItemKind.Interface,
+                "func" => CompletionItemKind.Function,
+                "ctor" => CompletionItemKind.Constructor,
+                "property" => CompletionItemKind.Property,
+                "enum" => CompletionItemKind.Enum,
+                "let" or "var" => CompletionItemKind.Variable,
+                _ => CompletionItemKind.Keyword
+            },
+            Detail = SectionMarkerSuggestions.MarkerDescriptions.GetValueOrDefault(word, $"Calor keyword '{word}'"),
+            InsertText = word,
             SortText = i.ToString("D3"),
-            FilterText = t.Tag
+            FilterText = word
         });
     }
 
@@ -2030,7 +1946,6 @@ public sealed class CompletionHandler : CompletionHandlerBase
     private enum CompletionContext
     {
         General,
-        AfterSectionMarker,
         InType,
         InExpression,
         AfterDot
