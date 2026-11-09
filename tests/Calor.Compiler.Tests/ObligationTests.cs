@@ -1520,6 +1520,40 @@ public sealed class ObligationTests
         Assert.IsType<InvalidOperationException>(exception);
     }
 
+    [Theory]
+    [InlineData("i32", "INT:42", "INT:-1", false)]
+    [InlineData("i32", "INT:42", "INT:-1", true)]
+    [InlineData("str", "STR:\"ok\"", "STR:\"\"", false)]
+    [InlineData("str", "STR:\"ok\"", "STR:\"\"", true)]
+    public async Task CSharpEmit_AsyncRefinedReturn_ErasesBeforeWrappingCarrier(
+        string baseType, string validValue, string invalidValue, bool chained)
+    {
+        var predicate = baseType == "str" ? "(> (len #) INT:0)" : "(> # INT:0)";
+        var csharp = Emit($$"""
+            §M{Test}
+              §RTYPE{Valid:{{baseType}}} {{predicate}}
+              {{(chained ? $"§RTYPE{{Refined:Valid}} {predicate}" : "")}}
+              §AF{GoodReturn:pub} () -> {{(chained ? "Refined" : "Valid")}}
+                §R {{validValue}}
+              §AF{BadReturn:pub} () -> {{(chained ? "Refined" : "Valid")}}
+                §R {{invalidValue}}
+            """);
+        var assembly = CompileGenerated(csharp);
+        var method = Assert.Single(assembly.GetTypes(), type => type.GetMethod("GoodReturn") != null)
+            .GetMethod("GoodReturn")!;
+        if (baseType == "str")
+        {
+            Assert.Equal(typeof(Task<string>), method.ReturnType);
+            Assert.Equal("ok", await (Task<string>)method.Invoke(null, null)!);
+        }
+        else
+        {
+            Assert.Equal(typeof(Task<int>), method.ReturnType);
+            Assert.Equal(42, await (Task<int>)method.Invoke(null, null)!);
+        }
+        Assert.IsType<InvalidOperationException>(InvokeGenerated(csharp, "BadReturn"));
+    }
+
     [Fact]
     public void CSharpEmit_RefinedOutParameter_GuardsAfterAssignment()
     {

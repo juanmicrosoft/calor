@@ -1282,7 +1282,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 shape.BodyType == "void" ? null : MapTypeName(shape.BodyType));
         }
 
-        var callableType = MapTypeName(shape.CallableType);
+        var callableType = mappedType.Equals("void", StringComparison.OrdinalIgnoreCase)
+            ? "global::System.Threading.Tasks.Task"
+            : $"global::System.Threading.Tasks.Task<{mappedType}>";
         // Keep the conventional spelling unless a source declaration/alias would capture it.
         if (Parsing.AttributeHelper.ResolveAsyncCarrierName("Task", _asyncTypeModule)
             == "System.Threading.Tasks.Task" && !parameterNames.Contains("Task"))
