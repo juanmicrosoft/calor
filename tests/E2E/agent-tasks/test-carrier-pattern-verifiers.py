@@ -4,6 +4,7 @@
 import importlib.util
 import os
 from pathlib import Path
+import re
 import shutil
 import sys
 import tempfile
@@ -155,6 +156,79 @@ def controls(profile):
     yield "comment-only", "// " + text.replace("\n", " ") + "\n§M{Calculator}\n", False
 
 
+INFRASTRUCTURE = re.compile(
+    r"\b(?:EOF|cleanup|OSError|EOFError|FileNotFoundError|PermissionError|TimeoutError|Traceback|errno"
+    r"|DllNotFoundException|TypeInitializationException|FileNotFoundException|BadImageFormatException"
+    r"|OutOfMemoryException|Win32Exception|Z3Exception|unknown|unmodeled|unclassified|supervision|infrastructure)\b"
+    r"|inherited (?:pipe|stdout|stderr)|broken pipe|cannot terminate|process group"
+    r"|permission denied|no such file|(?:failed|unable) to (?:launch|start)|could not (?:launch|start)"
+    r"|launch failure|OS error|operating.system error"
+    r"|selected compiler dependency|selected native manifest|selected compiler/native image"
+    r"|image changed or was substituted|build failed",
+    re.IGNORECASE,
+)
+TIMEOUT = re.compile(r"timeout|timed out|deadline", re.IGNORECASE)
+SUCCESS = re.compile(r"verification\s+passed\s*:", re.IGNORECASE)
+FAILURE = re.compile(
+    r"verification\s+failed\s*:|compilation failed|\b(?:[\w.]*Exception|[\w.]*Error|failure|failed)\s*:",
+    re.IGNORECASE,
+)
+WRAPPER = re.compile(r"Verifi(?:er|cation)\s+command\s+exited", re.IGNORECASE)
+EXPLICIT_TIMEOUT = re.compile(
+    r"Verification failed: Verifier timeout after (?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?s: \S+"
+)
+
+
+def failure_structure(error):
+    output = str(error)
+    if (not output.startswith("Verifier command exited 1:\n") or SUCCESS.search(output)
+        or any(not re.match(r"Verifier command exited 1:\n", output[wrapper.start():])
+               for wrapper in WRAPPER.finditer(output))):
+        raise error
+    return output
+
+
+def control_failure(error):
+    output = failure_structure(error)
+    if INFRASTRUCTURE.search(output) or TIMEOUT.search(output):
+        raise error
+    return output
+
+
+def reject_prerequisite(command, environment, refusal=None, *, explicit_timeout=False):
+    if (refusal is None) != explicit_timeout:
+        raise ValueError("Declare exactly one prerequisite refusal or ordinary timeout.")
+    try:
+        PROCESS.run(command, HERE, time.monotonic() + 120, environment)
+    except RuntimeError as error:
+        output = failure_structure(error)
+        lines = output.splitlines()
+        refusals = [line for line in lines if (
+            EXPLICIT_TIMEOUT.fullmatch(line) if explicit_timeout else line == refusal)]
+        if len(refusals) != 1:
+            raise
+        diagnostics = "\n".join(line for line in lines if line != refusals[0])
+        if INFRASTRUCTURE.search(diagnostics) or TIMEOUT.search(diagnostics):
+            raise
+        if any(not re.fullmatch(r"(?:Verification failed: )?Verifier command exited 1:", line)
+               for line in lines if line != refusals[0]):
+            raise
+        return output
+    raise AssertionError("Prerequisite control unexpectedly succeeded.")
+
+
+def assert_selected_compiler(output, environment):
+    if (INFRASTRUCTURE.search(output) or TIMEOUT.search(output) or WRAPPER.search(output)
+        or FAILURE.search(output)):
+        raise AssertionError(f"Infrastructure/failure-shaped positive output:\n{output}")
+    selected = Path(environment["CALOR_COMPILER_ROOT"]).resolve() / "src/Calor.Compiler/bin" \
+        / environment.get("CALOR_COMPILER_CONFIGURATION", "Debug") / "net10.0/calor.dll"
+    identities = [line for line in output.splitlines()
+                  if re.search(r"selected\s+compiler\s*:", line, re.IGNORECASE)]
+    if identities != [f"Selected compiler: {selected}"]:
+        raise AssertionError(f"Wrong selected compiler identity:\n{output}")
+
+
 def execute(profile, text, expected, root=ROOT, deadline=None, environment=None, category=None):
     with tempfile.TemporaryDirectory(prefix="calor-carrier-pattern-control-") as temporary:
         workspace = Path(temporary)
@@ -170,12 +244,9 @@ def execute(profile, text, expected, root=ROOT, deadline=None, environment=None,
                 ["bash", str(HERE / "tasks/pattern-matching" / TASKS[profile][0] / "verify.sh"), str(workspace)],
                 HERE, deadline, env)
         except RuntimeError as error:
-            output = str(error)
-            supervision = ("Verifier timeout", "Verifier cleanup timeout", "Cannot terminate verifier process group")
-            if expected or any(marker in output for marker in supervision):
+            if expected:
                 raise
-            if not output.startswith("Verifier command exited 1:\n"):
-                raise
+            output = control_failure(error)
             # Only a real helper's exited, explicit behavioral failure is finite
             # rejection evidence; build/native/selection failures never count.
             behavioral = ("Input missing:", "Calor compilation failed:", "Verification failed: System.",
@@ -191,11 +262,7 @@ def execute(profile, text, expected, root=ROOT, deadline=None, environment=None,
             return output
         if not expected:
             raise AssertionError(f"{profile}: unexpected acceptance:\n{output}")
-        selected = Path(env["CALOR_COMPILER_ROOT"]).resolve() / "src/Calor.Compiler/bin" \
-            / env.get("CALOR_COMPILER_CONFIGURATION", "Debug") / "net10.0/calor.dll"
-        if [line for line in output.splitlines() if line.startswith("Selected compiler:")] != [
-                f"Selected compiler: {selected}"]:
-            raise AssertionError(f"{profile}: wrong selected compiler identity:\n{output}")
+        assert_selected_compiler(output, env)
         cases, counterfactuals = COUNTS[profile]
         required = (f"Verification passed: {TASKS[profile][1]}; native/reflected exact closed CLR input carrier; "
                     f"{cases} independent runtime cases; {counterfactuals} successful complete-case")
@@ -273,30 +340,25 @@ class CarrierPatternVerifierTests(unittest.TestCase):
 
     def test_actual_selected_guards_and_declared_timeout(self):
         with tempfile.TemporaryDirectory(prefix="calor-carrier-pattern-selection-") as temporary:
-            arm = Path(temporary)
+            arm = Path(temporary).resolve()
             workspace = arm / "input"
             workspace.mkdir()
             (workspace / "Calculator.calr").write_text(source("pm004"), encoding="utf-8")
             command = ["bash", str(HERE / "tasks/pattern-matching" / TASKS["pm004"][0] / "verify.sh"), str(workspace)]
 
-            def reject(changes, detail):
+            def reject(changes, refusal=None, *, explicit_timeout=False):
                 environment = dict(os.environ, CALOR_COMPILER_ROOT=str(ROOT))
                 environment.update(changes)
-                with self.assertRaises(RuntimeError) as raised:
-                    PROCESS.run(command, HERE, time.monotonic() + 120, environment)
-                output = str(raised.exception)
-                if any(marker in output for marker in (
-                    "Verifier cleanup timeout", "Cannot terminate verifier process group")):
-                    raise raised.exception
-                if "Verifier timeout" in output and detail != "Verifier timeout":
-                    raise raised.exception
-                self.assertIn(detail, output)
+                reject_prerequisite(command, environment, refusal, explicit_timeout=explicit_timeout)
 
-            reject({"CALOR_COMPILER_ROOT": ""}, "CALOR_COMPILER_ROOT must name")
-            reject({"CALOR_COMPILER_CONFIGURATION": "../Release"}, "CALOR_COMPILER_CONFIGURATION must be")
-            reject({"CALOR_COMPILER_ROOT": str(arm)}, "Selected compiler dependency missing")
+            reject({"CALOR_COMPILER_ROOT": ""},
+                   "Verification failed: CALOR_COMPILER_ROOT must name a compiler checkout, not an empty path.")
+            reject({"CALOR_COMPILER_CONFIGURATION": "../Release"},
+                   "Verification failed: CALOR_COMPILER_CONFIGURATION must be a nonempty directory name within the selected compiler root.")
             configuration = os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug")
             relative = Path("src/Calor.Compiler/bin") / configuration / "net10.0"
+            reject({"CALOR_COMPILER_ROOT": str(arm)},
+                   f"Verification failed: Selected compiler dependency missing: {arm / relative / 'calor.dll'}; build the selected root first.")
             shutil.copytree(ROOT / relative, arm / relative)
             (arm / ".github").mkdir()
             manifest = ".github/z3-binaries-4.15.7.sha256"
@@ -306,11 +368,13 @@ class CarrierPatternVerifierTests(unittest.TestCase):
                 image = arm / relative / filename
                 original = image.read_bytes()
                 image.write_bytes(b"corrupt native prerequisite")
-                reject({"CALOR_COMPILER_ROOT": str(arm)}, "Selected native manifest mismatch")
+                reject({"CALOR_COMPILER_ROOT": str(arm)},
+                       f"Verification failed: Selected native manifest mismatch: {image}")
                 image.write_bytes(original)
             (arm / manifest).unlink()
-            reject({"CALOR_COMPILER_ROOT": str(arm)}, "z3-binaries-4.15.7.sha256")
-            reject({"CALOR_LOGIC_TIMEOUT_SECONDS": "0.001"}, "Verifier timeout")
+            reject({"CALOR_COMPILER_ROOT": str(arm)},
+                   f"Verification failed: [Errno 2] No such file or directory: {str(arm / manifest)!r}")
+            reject({"CALOR_LOGIC_TIMEOUT_SECONDS": "0.001"}, explicit_timeout=True)
         print("Executed 6 actual selected-root/configuration/native infrastructure guards and 1 declared timeout.")
 
     def test_actual_helper_image_substitution(self):
@@ -337,6 +401,144 @@ class CarrierPatternVerifierTests(unittest.TestCase):
                         self.assertRaisesRegex(RuntimeError, "image changed or was substituted"):
                     PROCESS.main()
         print("Executed 2 actual carrier-pattern helper-build image substitution controls.")
+
+
+class CarrierPatternAdmissionTests(unittest.TestCase):
+    infrastructure = (
+        "UNKNOWN", "solver returned unknown", "solver timed out", "solver timeout",
+        "EOF supervision failure", "inherited stdout pipe", "broken pipe",
+        "Verifier cleanup timeout", "Cannot terminate verifier process group 123",
+        "OSError: launch failure", "EOFError: missing EOF", "TimeoutError: process start",
+        "FileNotFoundError: missing executable", "PermissionError: permission denied",
+        "errno 8: OS error", "no such file or directory", "unable to launch dotnet",
+        "could not start subprocess", "operating-system error", "Traceback (most recent call last):",
+        "System.DllNotFoundException", "System.TypeInitializationException",
+        "System.FileNotFoundException", "System.BadImageFormatException",
+        "System.OutOfMemoryException", "System.Win32Exception", "Microsoft.Z3.Z3Exception",
+        "Selected compiler dependency missing", "Selected native manifest mismatch",
+        "Selected compiler/native image changed", "Build FAILED",
+        "global deadline expired", "Verifier timeout after 2s: dotnet",
+        "unclassified supervision failure",
+    )
+
+    def test_execute_finite_declared_diagnostics_never_mask_failures(self):
+        outer = "Verifier command exited 1:\n"
+        declared = "Verification failed: Calor compilation failed:\ninvalid source diagnostic\n"
+        failures = [outer + declared + failure + "\n" for failure in self.infrastructure]
+        failures += [outer + "Verification failed: " + outer + declared + failure + "\n"
+                     for failure in self.infrastructure]
+        for status in ("0", "2", "-6", "137", "139", "1garbage", "+1"):
+            failures += [f"Verifier command exited {status}:\n" + declared,
+                         outer + f"Verification failed: Verifier command exited {status}:\n" + declared]
+        failures += [
+            declared, "Verifier command exited 1\n" + declared,
+            outer + "Verification failed: Verifier command exited 1\n" + declared,
+            outer + "Verifier command exited1:\n" + declared,
+            outer + "Verifier command exited 1: suffixed\n" + declared,
+            outer + "verification command exited 1:\n" + declared,
+            outer + "Verification passed: UnwrapOrDefault\n" + declared,
+        ]
+        with patch.dict(EXECUTED, {"accepted": 0, "rejected": 0}, clear=True):
+            for output in failures:
+                error = RuntimeError(output)
+                with self.subTest(output=output), patch.object(PROCESS, "run", side_effect=error):
+                    with self.assertRaises(RuntimeError) as raised:
+                        execute("pm004", "invalid", False, category="invalid-source")
+                    self.assertIs(raised.exception, error)
+            for output in (outer + declared, outer + "Verification failed: " + outer + declared):
+                with patch.object(PROCESS, "run", side_effect=RuntimeError(output)):
+                    execute("pm004", "invalid", False, category="invalid-source")
+            self.assertEqual(EXECUTED, {"accepted": 0, "rejected": 2})
+        print(f"Checked {len(failures)} contaminated finite failures and 2 exact exited-1 controls; synthetic counters isolated.")
+
+    def test_execute_propagates_actual_os_eof_timeout_exceptions(self):
+        with patch.dict(EXECUTED, {"accepted": 0, "rejected": 0}, clear=True):
+            for kind in (OSError, EOFError, TimeoutError):
+                for expected in (False, True):
+                    error = kind("Calor compilation failed: declared diagnostic with infrastructure failure")
+                    with self.subTest(kind=kind, expected=expected), patch.object(PROCESS, "run", side_effect=error):
+                        with self.assertRaises(kind) as raised:
+                            execute("pm004", "invalid", expected, category="invalid-source")
+                        self.assertIs(raised.exception, error)
+            self.assertEqual(EXECUTED, {"accepted": 0, "rejected": 0})
+        print("Checked 6 actual OSError/EOFError/TimeoutError propagation paths; synthetic counters isolated.")
+
+    def test_execute_positive_unique_complete_identity_and_clean_evidence(self):
+        environment = {"CALOR_COMPILER_ROOT": str(ROOT) + "/../" + ROOT.name,
+                       "CALOR_COMPILER_CONFIGURATION": "Release"}
+        selected = ROOT / "src/Calor.Compiler/bin/Release/net10.0/calor.dll"
+        identity = f"Selected compiler: {selected}\n"
+        rejected = 0
+        with patch.dict(EXECUTED, {"accepted": 0, "rejected": 0}, clear=True):
+            for profile in TASKS:
+                cases, counterfactuals = COUNTS[profile]
+                evidence = (f"Verification passed: {TASKS[profile][1]}; native/reflected exact closed CLR input carrier; "
+                            f"{cases} independent runtime cases; {counterfactuals} successful complete-case "
+                            "arm/case/payload/default/input-output counterfactuals.\n"
+                            "Limits: finite evidence; optional contracts execute.\n")
+                success = identity + evidence
+                failures = [
+                    evidence, success.replace(str(selected), str(selected) + ".other"),
+                    success.replace("/Release/net10.0/", "/Other/net10.0/"),
+                    success.replace(str(ROOT), str(ROOT.parent / "other-root")),
+                    identity + success, "  " + success,
+                    success + "  Selected compiler: wrong-root\n",
+                    success + "warning: Selected compiler: mixed-extra\n",
+                    success + "  sElEcTeD CoMpIlEr : alternate\n",
+                    success + identity.rstrip() + " suffixed\n",
+                ]
+                failures += [success + failure + "\n" for failure in self.infrastructure]
+                failures += [success + failure + "\n" for failure in (
+                    "Verification failed: Wrong output", "Calor compilation failed:",
+                    "Verifier command exited 0:", "Verifier command exited 1:",
+                    "System.InvalidOperationException: wrong output",
+                    "System.NullReferenceException: unexpected failure", "error: wrong output",
+                )]
+                for output in failures:
+                    with self.subTest(profile=profile, output=output), patch.object(PROCESS, "run", return_value=output):
+                        with self.assertRaises(AssertionError):
+                            execute(profile, source(profile), True, environment=environment)
+                    rejected += 1
+                with patch.object(PROCESS, "run", return_value=success):
+                    execute(profile, source(profile), True, environment=environment)
+            self.assertEqual(EXECUTED, {"accepted": 2, "rejected": 0})
+        print(f"Checked {rejected} positive identity/failure adversaries and 2 clean controls; synthetic counters isolated.")
+
+    def test_explicit_prerequisite_and_timeout_guards_do_not_mask_contamination(self):
+        outer = "Verifier command exited 1:\n"
+        refusal = "Verification failed: Selected native manifest mismatch: /selected/libz3.dylib"
+        ordinary_timeout = "Verification failed: Verifier timeout after 0.001s: dotnet"
+        missing_manifest = "Verification failed: [Errno 2] No such file or directory: '/selected/.github/z3-binaries-4.15.7.sha256'"
+        rejected = 0
+        for declared, options in ((refusal, {"refusal": refusal}),
+                                  (missing_manifest, {"refusal": missing_manifest}),
+                                  (ordinary_timeout, {"explicit_timeout": True})):
+            valid = outer + declared + "\n"
+            failures = [valid + failure + "\n" for failure in self.infrastructure]
+            failures += [outer + f"Verification failed: Verifier command exited {status}:\n" + declared + "\n"
+                         for status in ("0", "2", "-6", "137", "139", "1garbage")]
+            failures += [valid + "Verification passed: UnwrapOrDefault\n", valid + declared + "\n",
+                         valid + "unexpected unmodeled diagnostic\n"]
+            for output in failures:
+                error = RuntimeError(output)
+                with self.subTest(options=options, output=output), patch.object(PROCESS, "run", side_effect=error):
+                    with self.assertRaises(RuntimeError) as raised:
+                        reject_prerequisite(["unused"], {}, **options)
+                    self.assertIs(raised.exception, error)
+                rejected += 1
+            with patch.object(PROCESS, "run", side_effect=RuntimeError(valid)):
+                self.assertEqual(reject_prerequisite(["unused"], {}, **options), valid)
+        for kind in (OSError, EOFError, TimeoutError):
+            error = kind(ordinary_timeout)
+            with patch.object(PROCESS, "run", side_effect=error):
+                with self.assertRaises(kind) as raised:
+                    reject_prerequisite(["unused"], {}, explicit_timeout=True)
+                self.assertIs(raised.exception, error)
+        with patch.object(PROCESS, "run", return_value=refusal):
+            with self.assertRaises(AssertionError):
+                reject_prerequisite(["unused"], {}, refusal)
+        print(f"Checked {rejected} contaminated prerequisite/timeout refusals, 3 exact refusals, "
+              "3 direct exception paths and 1 success-shaped refusal.")
 
 
 if __name__ == "__main__":
