@@ -5045,7 +5045,8 @@ public sealed class Binder
             case OrPatternNode orPattern:
                 return Pattern(orPattern, patterns: [BindPattern(orPattern.Left, allowBindings: false), BindPattern(orPattern.Right, allowBindings: false)]);
             case AndPatternNode andPattern:
-                return Pattern(andPattern, patterns: [BindPattern(andPattern.Left, allowBindings), BindPattern(andPattern.Right, allowBindings)]);
+                return Pattern(andPattern, patterns: [BindPattern(andPattern.Left, allowBindings, matchedValue),
+                    BindPattern(andPattern.Right, allowBindings, matchedValue)]);
             default:
                 return Pattern(
                     pattern,

@@ -2155,7 +2155,7 @@ beside a genuinely supplying match, and namespace-qualified factory return
 annotations with inferred allocations. Bare nested property payload capture
 (`§PPROP §PMATCH{Value} §VAR{v}` with arm result `v`) currently fails with
 `Calor0200 Undefined variable 'v'`. These prerequisites use the supported native
-forms; no parser, binder or retired carrier runtime is restored.
+forms; no retired carrier grammar or built-in carrier runtime is restored.
 
 The canonical-current bridge renders only these disposable controls into
 word/infix syntax, using the explicitly selected checkout's lexer declaration.
@@ -2164,8 +2164,14 @@ sigils and historical IDs; the mandatory final historical input is also unchange
 Current rejection must report source-ID removal or the exact `Calor0006` retired
 module-marker diagnostic, never merely a compilation failure. Canonical controls
 retain all 71 categories and expectations, including distinct property and typed
-patterns. Missing current pattern support remains a failing positive requirement;
-it is not replaced by a guarded-var control or credited as a finite rejection.
+patterns. Native `Type binding` and `Type { Member: pattern } binding` now
+retain their tested types, captures and member predicates in the AST and emitted
+C#. Both required pattern forms pass the actual selected-root Option and Result
+profiles, including their complete independent case and counterfactual sets.
+They are not replaced by guarded-var controls or credited as finite rejections.
+Malformed properties and retired type spellings remain errors. This bounded
+support does not implement nested property-variable capture typing or repair
+the existing escaped generic-capture field-access checker limitation.
 The other categories use a real guarded carrier-input match as their canonical
 baseline. Their independent API, contract, output and coupling checks therefore
 do not depend on support for the separately required typed/property syntax.
@@ -2173,7 +2179,9 @@ do not depend on support for the separately required typed/property syntax.
 Carrier reflection follows native declaration namespaces, not the compilation-unit
 label. The trace helper honors emitted file-scoped namespaces. Global-namespace
 functions and qualified `System.Int32`/`System.String` signatures retain exact CLR
-checks. These changes do not modify any other verifier profile or product grammar.
+checks. The verifier bridge does not modify any other profile; the separate native
+pattern prerequisite changes only parsing, type-pattern source emission and
+matched-input propagation through conjunction patterns.
 
 Each Option positive checks **210** independent runtime cases and **1,050**
 successful counterfactuals. Each Result positive checks **90** runtime cases and

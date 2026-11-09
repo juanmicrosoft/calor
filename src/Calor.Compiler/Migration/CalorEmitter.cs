@@ -3822,8 +3822,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(WildcardPatternNode node) => "_";
     public string Visit(TypePatternNode node) => node.BindingName is { } name
-        ? $"§PTYPE{{{TypeMapper.ToSurfaceType(node.TypeName)}:{name}}}"
-        : $"§PTYPE{{{TypeMapper.ToSurfaceType(node.TypeName)}}}";
+        ? $"{TypeMapper.ToSurfaceType(node.TypeName)} {EscapeCalorIdentifier(name)}"
+        : $"{TypeMapper.ToSurfaceType(node.TypeName)} _";
     public string Visit(VariablePatternNode node) => $"var {EscapeCalorIdentifier(node.Name)}";
     public string Visit(LiteralPatternNode node) => node.Literal.Accept(this);
     public string Visit(VarPatternNode node) => $"var {EscapeCalorIdentifier(node.Name)}";

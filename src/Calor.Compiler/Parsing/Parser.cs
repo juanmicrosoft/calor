@@ -6074,27 +6074,8 @@ public sealed class Parser
             return ParseTypePattern();
         }
 
-        // Handle raw { } property pattern from converter output
         if (Check(TokenKind.OpenBrace))
-        {
-            var braceStart = Advance(); // consume {
-            // Consume any content until matching closing brace (track nesting)
-            int braceDepth = 1;
-            while (!IsAtEnd && braceDepth > 0)
-            {
-                if (Check(TokenKind.OpenBrace))
-                    braceDepth++;
-                else if (Check(TokenKind.CloseBrace))
-                    braceDepth--;
-                if (braceDepth > 0)
-                    Advance();
-            }
-            if (Check(TokenKind.CloseBrace))
-            {
-                Advance(); // consume }
-            }
-            return new WildcardPatternNode(braceStart.Span);
-        }
+            return ParseNativePropertyPattern();
 
         if (Check(TokenKind.Var))
         {
@@ -6143,6 +6124,33 @@ public sealed class Parser
             {
                 Advance();
                 return new ConstantPatternNode(token.Span, new ReferenceNode(token.Span, "null"));
+            }
+
+            if (token.Text != "_")
+            {
+                var saved = _position;
+                var typeName = ReadInlineTypeToken(validateCanonicalSpelling: false);
+                var typeSpan = GetConsumedSpan(saved);
+                if (Current.Span.Line == token.Span.Line && Check(TokenKind.OpenBrace))
+                {
+                    ValidateCanonicalTypeSpelling(typeName, typeSpan);
+                    return ParseNativePropertyPattern(typeName, typeSpan);
+                }
+                if (Current.Span.Line == token.Span.Line && Check(TokenKind.Identifier)
+                    && Current.Text is not ("and" or "or" or "not"))
+                {
+                    ValidateCanonicalTypeSpelling(typeName, typeSpan);
+                    var binding = Advance();
+                    return new TypePatternNode(typeSpan.Union(binding.Span), typeName,
+                        TokenIdentifier(binding) is "_" ? null : TokenIdentifier(binding), binding.Span, typeSpan);
+                }
+                if ((SyntaxFactory.ParseTypeName(typeName) is PredefinedTypeSyntax or ArrayTypeSyntax
+                    or GenericNameSyntax) && !Check(TokenKind.OpenParen))
+                {
+                    ValidateCanonicalTypeSpelling(typeName, typeSpan);
+                    return new TypePatternNode(typeSpan, typeName, null, typeNameSpan: typeSpan);
+                }
+                _position = saved;
             }
 
             Advance();
@@ -6198,36 +6206,6 @@ public sealed class Parser
             if (patName != token.Text)
             {
                 return new ConstantPatternNode(token.Span, new ReferenceNode(token.Span, patName));
-            }
-
-            // Handle type pattern with property sub-pattern: TypeName { Prop: value }
-            if (Check(TokenKind.OpenBrace))
-            {
-                // Consume { ... } property pattern (treat as type pattern with property check)
-                var braceStart = Advance(); // consume {
-                var depth = 1;
-                while (!IsAtEnd && depth > 0)
-                {
-                    if (Check(TokenKind.OpenBrace)) depth++;
-                    else if (Check(TokenKind.CloseBrace)) { depth--; if (depth == 0) break; }
-                    Advance();
-                }
-                if (Check(TokenKind.CloseBrace)) Advance(); // consume }
-                // Check for optional variable binding after property pattern: Type { ... } varName
-                string? varName = null;
-                TextSpan? varSpan = null;
-                if (Check(TokenKind.Identifier) && Current.Text != "_"
-                    && Peek(1).Kind != TokenKind.Arrow && Peek(1).Kind != TokenKind.Case
-                    && Peek(1).Kind != TokenKind.EndMatch && Peek(1).Kind != TokenKind.EndCase)
-                {
-                    var nameToken = Advance();
-                    varName = nameToken.Text;
-                    varSpan = nameToken.Span;
-                }
-                // Return as a variable pattern with the type name (property patterns are opaque to Calor)
-                return varName != null
-                    ? new VarPatternNode(token.Span, varName, varSpan)
-                    : new VariablePatternNode(token.Span, token.Text, token.Span);
             }
 
             return new VariablePatternNode(token.Span, token.Text, token.Span);
@@ -6349,6 +6327,47 @@ public sealed class Parser
 
         // Default: wildcard
         return new WildcardPatternNode(Current.Span);
+    }
+
+    private PatternNode ParseNativePropertyPattern(string? typeName = null, TextSpan? typeSpan = null)
+    {
+        var open = Expect(TokenKind.OpenBrace);
+        var matches = new List<PropertyMatchNode>();
+        while (!IsAtEnd && !Check(TokenKind.CloseBrace))
+        {
+            var name = Expect(TokenKind.Identifier);
+            Expect(TokenKind.Colon);
+            var start = _position;
+            var pattern = ParsePattern();
+            if (_position == start)
+            {
+                _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                    "Expected a native property subpattern.");
+                if (!IsAtEnd)
+                    Advance();
+            }
+            matches.Add(new PropertyMatchNode(name.Span.Union(pattern.Span), TokenIdentifier(name), pattern));
+            if (!Check(TokenKind.Comma))
+                break;
+            Advance();
+        }
+        var close = Expect(TokenKind.CloseBrace);
+        var span = (typeSpan ?? open.Span).Union(close.Span);
+        var property = new PropertyPatternNode(span, typeName, matches, typeSpan);
+        if (Check(TokenKind.Identifier) && Current.Span.Line == close.Span.Line
+            && Current.Text is not ("and" or "or" or "not"))
+        {
+            var binding = Advance();
+            if (TokenIdentifier(binding) == "_")
+                return new PropertyPatternNode(span.Union(binding.Span), typeName, matches, typeSpan);
+            PatternNode capture = typeName == null
+                ? new VarPatternNode(binding.Span, TokenIdentifier(binding), binding.Span)
+                : new TypePatternNode(span.Union(binding.Span), typeName,
+                    TokenIdentifier(binding), binding.Span, typeSpan);
+            return new AndPatternNode(span.Union(binding.Span), capture,
+                new PropertyPatternNode(open.Span.Union(close.Span), null, matches));
+        }
+        return property;
     }
 
     private ForStatementNode ParseForStatement()

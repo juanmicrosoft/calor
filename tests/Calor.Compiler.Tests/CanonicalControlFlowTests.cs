@@ -661,6 +661,146 @@ public sealed class CanonicalControlFlowTests
         => AssertObservation($"return match {value}\n  case var @return when @return > 100 → @return\n  case _ → 0",
             expected);
 
+    [Theory]
+    [InlineData("Calculator.Box<int> v when v.Active", "v")]
+    [InlineData("Calculator.Box<int> { Active: true } v", "v")]
+    [InlineData("Calculator.Box<int> { Active: true, } v", "v")]
+    public void NativeCarrierPatterns_PreserveTypePropertyBindingAndRuntimeCases(string pattern, string binding)
+    {
+        var source = $$"""
+            module PatternTests Calculator
+              class Box<T>
+                field bool:Active
+                field T?:Value
+              func Probe (object:value) → int
+                return match value
+                  case {{pattern}} → {{binding}}.Value
+                  case _ → -1
+            """;
+        var parsed = Parse(source);
+        var match = Assert.IsType<MatchExpressionNode>(
+            Assert.IsType<ReturnStatementNode>(parsed.Functions.Single().Body.Single()).Expression);
+        var typed = match.Cases[0].Pattern is AndPatternNode combined
+            ? Assert.IsType<TypePatternNode>(combined.Left)
+            : Assert.IsType<TypePatternNode>(match.Cases[0].Pattern);
+        Assert.Equal("Calculator.Box<int>", typed.TypeName);
+        Assert.Equal(binding.TrimStart('@'), typed.BindingName);
+        Assert.Equal(typed.TypeName, source.Substring(typed.TypeNameSpan.Start, typed.TypeNameSpan.Length));
+        Assert.Equal(binding, source.Substring(typed.BindingSpan!.Value.Start, typed.BindingSpan.Value.Length));
+        var emitted = new CalorEmitter().Emit(parsed);
+        Assert.DoesNotContain('§', emitted);
+        foreach (var program in new[] { source, emitted })
+        {
+            var owner = Load(Compile(program).GeneratedCode);
+            var probe = owner.GetMethod("Probe")!;
+            var definition = owner.Assembly.GetType("Calculator.Box`1")!;
+            var integers = definition.MakeGenericType(typeof(int));
+            foreach (var active in new[] { true, false })
+                foreach (var value in new[] { int.MinValue, -1, 0, 7, int.MaxValue })
+                {
+                    var input = Activator.CreateInstance(integers)!;
+                    integers.GetField("Active")!.SetValue(input, active);
+                    integers.GetField("Value")!.SetValue(input, value);
+                    Assert.Equal(active ? value : -1, probe.Invoke(null, [input]));
+                }
+            var strings = definition.MakeGenericType(typeof(string));
+            var wrongType = Activator.CreateInstance(strings)!;
+            strings.GetField("Active")!.SetValue(wrongType, true);
+            strings.GetField("Value")!.SetValue(wrongType, "not an integer");
+            foreach (var input in new[] { wrongType, new object(), null })
+                Assert.Equal(-1, probe.Invoke(null, [input]));
+        }
+    }
+
+    [Fact]
+    public void NativePropertyPatterns_RetainEveryMemberPredicate()
+    {
+        const string source = """
+            module PropertyTests Calculator
+              class Box<T>
+                field bool:Active
+                field T?:Value
+              func Probe (Calculator.Box<int>:value) → int
+                return match value
+                  case { Active: true, Value: 7 } → 1
+                  case _ → 0
+            """;
+        var parsed = Parse(source);
+        var match = Assert.IsType<MatchExpressionNode>(
+            Assert.IsType<ReturnStatementNode>(parsed.Functions.Single().Body.Single()).Expression);
+        var property = Assert.IsType<PropertyPatternNode>(match.Cases[0].Pattern);
+        Assert.Equal(new[] { "Active", "Value" }, property.Matches.Select(member => member.PropertyName));
+        foreach (var program in new[] { source, new CalorEmitter().Emit(parsed) })
+        {
+            var owner = Load(Compile(program).GeneratedCode);
+            var carrier = owner.Assembly.GetType("Calculator.Box`1")!.MakeGenericType(typeof(int));
+            foreach (var active in new[] { true, false })
+                foreach (var value in new[] { 0, 7, 8 })
+                {
+                    var input = Activator.CreateInstance(carrier)!;
+                    carrier.GetField("Active")!.SetValue(input, active);
+                    carrier.GetField("Value")!.SetValue(input, value);
+                    Assert.Equal(active && value == 7 ? 1 : 0, owner.GetMethod("Probe")!.Invoke(null, [input]));
+                }
+        }
+    }
+
+    [Theory]
+    [InlineData("int", 1)]
+    [InlineData("string", 0)]
+    [InlineData("System.Int32 _", 1)]
+    [InlineData("System.String _", 0)]
+    [InlineData("int[]", 0)]
+    public void NativeTypeOnlyPatterns_DoNotBecomeCatchAllBindings(string pattern, int expected)
+        => AssertObservation($"let object:value = 7\nreturn match value\n  case {pattern} → 1\n  case _ → 0",
+            expected.ToString());
+
+    [Fact]
+    public void NativeQualifiedGenericTypeDiscard_RoundTripsAsATypeTest()
+    {
+        const string source = """
+            module PatternTests Calculator
+              class Box<T>
+                field T?:Value
+              func Probe (object:value) → int
+                return match value
+                  case Calculator.Box<int> _ → 1
+                  case _ → 0
+            """;
+        foreach (var program in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var owner = Load(Compile(program).GeneratedCode);
+            var definition = owner.Assembly.GetType("Calculator.Box`1")!;
+            var probe = owner.GetMethod("Probe")!;
+            Assert.Equal(1, probe.Invoke(null, [Activator.CreateInstance(definition.MakeGenericType(typeof(int)))]));
+            Assert.Equal(0, probe.Invoke(null, [Activator.CreateInstance(definition.MakeGenericType(typeof(string)))]));
+            Assert.Equal(0, probe.Invoke(null, [null]));
+        }
+    }
+
+    [Fact]
+    public void NativeTypePattern_PreservesEscapedScalarBinding()
+        => AssertObservation("""
+            let object:value = 7
+            return match value
+              case int @return when @return > 0 → @return
+              case _ → -1
+            """, "7");
+
+    [Theory]
+    [InlineData("{ Active true }")]
+    [InlineData("{ Active: }")]
+    [InlineData("{ Active: true")]
+    [InlineData("Calculator.Box<i32> v")]
+    public void NativeCarrierPatterns_RejectMalformedPropertiesAndRetiredTypeAliases(string pattern)
+    {
+        var source = $"module Bad\n  func Probe (object:value) → int\n    return match value\n" +
+            $"      case {pattern} → 1\n      case _ → 0";
+        var diagnostics = new DiagnosticBag();
+        _ = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.True(diagnostics.HasErrors);
+    }
+
     [Fact]
     public void GotoCaseAndDefault_PreserveSwitchControlFlow()
         => AssertObservation("""
