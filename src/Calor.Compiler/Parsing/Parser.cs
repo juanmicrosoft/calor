@@ -384,6 +384,7 @@ public sealed class Parser
                 case TokenKind.AsyncMethod:
                 case TokenKind.Constructor:
                 case TokenKind.Class:
+                case TokenKind.Record:
                 case TokenKind.Interface:
                 case TokenKind.Enum:
                     return false;
@@ -527,7 +528,7 @@ public sealed class Parser
 
     private bool IsSiblingDeclarationOpener(bool interopIsSibling)
         => Check(TokenKind.Func) || Check(TokenKind.AsyncFunc)
-           || Check(TokenKind.Class) || Check(TokenKind.Interface)
+           || Check(TokenKind.Class) || Check(TokenKind.Record) || Check(TokenKind.Interface)
            || Check(TokenKind.Enum)
            || Check(TokenKind.Delegate) || Check(TokenKind.Namespace)
            || interopIsSibling && Check(TokenKind.CSharpInterop);
@@ -672,7 +673,7 @@ public sealed class Parser
     /// </summary>
     private bool IsSiblingTypeOpenerAt(int ownerColumn)
         => Current.Span.Column == ownerColumn
-           && (Check(TokenKind.Class)
+           && (Check(TokenKind.Class) || Check(TokenKind.Record)
                || Check(TokenKind.Interface)
                || Check(TokenKind.Enum)
                || Check(TokenKind.Delegate)
@@ -1024,7 +1025,7 @@ public sealed class Parser
             || Check(TokenKind.Property) || Check(TokenKind.FieldDef)
             || Check(TokenKind.Constructor) || Check(TokenKind.OperatorOverload)
             || Check(TokenKind.Indexer) || Check(TokenKind.Event)
-            || Check(TokenKind.Class) || Check(TokenKind.Interface)
+            || Check(TokenKind.Class) || Check(TokenKind.Record) || Check(TokenKind.Interface)
             || Check(TokenKind.Enum) || Check(TokenKind.Delegate)
             || Check(TokenKind.EnumExtension)
             || Check(TokenKind.Extends) || Check(TokenKind.Implements);
@@ -1195,7 +1196,7 @@ public sealed class Parser
                 interfaces.Add(node);
                 moduleItems.Add(node);
             }
-            else if (Check(TokenKind.Class) || Check(TokenKind.Module))
+            else if (Check(TokenKind.Class) || Check(TokenKind.Record) || Check(TokenKind.Module))
             {
                 var node = ParseClassDefinition();
                 classes.Add(node);
@@ -1424,7 +1425,7 @@ public sealed class Parser
                 parsed = ParseInterfaceDefinition();
                 interfaces.Add((InterfaceDefinitionNode)parsed);
             }
-            else if (Check(TokenKind.Class) || Check(TokenKind.Module))
+            else if (Check(TokenKind.Class) || Check(TokenKind.Record) || Check(TokenKind.Module))
             {
                 parsed = ParseClassDefinition();
                 classes.Add((ClassDefinitionNode)parsed);
@@ -1515,6 +1516,7 @@ public sealed class Parser
             or TokenKind.Namespace
             or TokenKind.Interface
             or TokenKind.Class
+            or TokenKind.Record
             or TokenKind.Module
             or TokenKind.Func
             or TokenKind.AsyncFunc
@@ -9461,9 +9463,27 @@ public sealed class Parser
     private ClassDefinitionNode ParseTypeMemberDeclaration()
     {
         var isModule = _parsingModuleMembers;
-        var startToken = Expect(isModule ? TokenKind.Module : TokenKind.Class);
+        var isRecord = Check(TokenKind.Record);
+        var startToken = Expect(isModule ? TokenKind.Module : isRecord ? TokenKind.Record : TokenKind.Class);
         var closer = isModule ? TokenKind.EndModule : TokenKind.EndClass;
-        var attrs = ParseAttributes();
+        var attrs = new AttributeCollection();
+        List<TypeParameterNode>? recordTypeParameters = null;
+        if (isRecord)
+        {
+            var recordName = Expect(TokenKind.Identifier);
+            attrs.Add("_pos0", recordName.Text, recordName.Span);
+            recordTypeParameters = ParseOptionalTypeParameterList(startToken.Span, effectOwner: "a record");
+            for (var position = 1; position <= 2 && Match(TokenKind.Colon); position++)
+            {
+                var value = Expect(TokenKind.Identifier);
+                var text = value.Text;
+                while (Match(TokenKind.Comma))
+                    text += "," + Expect(TokenKind.Identifier).Text;
+                attrs.Add($"_pos{position}", text, value.Span);
+            }
+        }
+        else
+            attrs = ParseAttributes();
         ValidateIdentityFreeHeader(startToken, attrs, 3);
         var csharpAttrs = ParseCSharpAttributes();
 
@@ -9558,6 +9578,14 @@ public sealed class Parser
         var isPartial = modifierTokens.Any(t => t.Equals("partial", StringComparison.Ordinal));
         var isStruct = modifierTokens.Any(t => t.Equals("struct", StringComparison.Ordinal));
         var isReadOnly = modifierTokens.Any(t => t.Equals("readonly", StringComparison.Ordinal));
+        if (isRecord && (isStruct || isStatic || isReadOnly))
+        {
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
+                "A record declaration represents a C# record class, not a struct or static container.");
+            isStruct = false;
+            isStatic = false;
+            isReadOnly = false;
+        }
 
         // Structs cannot be abstract
         if (isStruct && isAbstract)
@@ -9570,9 +9598,37 @@ public sealed class Parser
         var implementedInterfaceSpans = new List<TextSpan>();
 
         // NEW: Parse optional type parameters §CL{...}<T, U>
-        var typeParameters = ParseOptionalTypeParameterList(
+        var typeParameters = recordTypeParameters ?? ParseOptionalTypeParameterList(
             startToken.Span,
             effectOwner: "a class");
+
+        List<ParameterNode>? recordParameters = null;
+        List<ExpressionNode>? recordBaseArguments = null;
+        if (isRecord && Check(TokenKind.OpenParen))
+        {
+            recordParameters = [];
+            OutputNode? recordOutput = null;
+            TryParseInlineSignature(startToken.Span, recordParameters, ref recordOutput);
+            if (recordOutput != null || recordParameters.Any(parameter => parameter.Modifier != ParameterModifier.None))
+                _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
+                    "Record positional parameters have no return type or parameter modifiers.");
+        }
+        if (isRecord && Match(TokenKind.Colon))
+        {
+            var baseStart = _position;
+            baseClass = ReadInlineTypeToken();
+            baseClassSpan = GetConsumedSpan(baseStart);
+            if (Match(TokenKind.OpenParen))
+            {
+                recordBaseArguments = [];
+                if (!Check(TokenKind.CloseParen))
+                {
+                    do { recordBaseArguments.Add(ParseExpression()); }
+                    while (Match(TokenKind.Comma));
+                }
+                Expect(TokenKind.CloseParen);
+            }
+        }
 
         // Also support legacy: Extract type parameters from class name if present (e.g., Repository<T>)
         if (typeParameters.Count == 0)
@@ -9729,7 +9785,7 @@ public sealed class Parser
                 preprocessorBlocks.Add(node);
                 classItems.Add(node);
             }
-            else if (Check(TokenKind.Class) || Check(TokenKind.Module))
+            else if (Check(TokenKind.Class) || Check(TokenKind.Record) || Check(TokenKind.Module))
             {
                 var node = ParseClassDefinition();
                 nestedClasses.Add(node);
@@ -9810,7 +9866,10 @@ public sealed class Parser
             baseClassSpan: baseClassSpan,
             implementedInterfaceSpans: implementedInterfaceSpans,
             items: classItems,
-            isModule: isModule), startToken);
+            isModule: isModule,
+            isRecord: isRecord,
+            recordParameters: recordParameters,
+            recordBaseArguments: recordBaseArguments), startToken);
     }
 
     /// <summary>
@@ -12368,7 +12427,7 @@ public sealed class Parser
             usings.Add(node);
             items?.Add(node);
         }
-        else if (Check(TokenKind.Class) || Check(TokenKind.Module))
+        else if (Check(TokenKind.Class) || Check(TokenKind.Record) || Check(TokenKind.Module))
         {
             var node = ParseClassDefinition();
             classes.Add(node);
@@ -12412,7 +12471,7 @@ public sealed class Parser
         {
             items?.Add(ParseMemberPreprocessorBlock());
         }
-        else if (Check(TokenKind.Class))
+        else if (Check(TokenKind.Class) || Check(TokenKind.Record))
         {
             items?.Add(ParseClassDefinition());
         }
@@ -12511,7 +12570,7 @@ public sealed class Parser
         {
             items?.Add(ParseMemberPreprocessorBlock());
         }
-        else if (Check(TokenKind.Class) || Check(TokenKind.Module))
+        else if (Check(TokenKind.Class) || Check(TokenKind.Record) || Check(TokenKind.Module))
         {
             items?.Add(ParseClassDefinition());
         }

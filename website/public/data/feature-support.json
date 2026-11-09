@@ -17,6 +17,10 @@
           "description": "Instance classes become class definitions; static classes become named modules with static functions and members, preserving their C# type names and lexical namespace scopes"
         },
         {
+          "name": "record",
+          "description": "Record classes preserve positional constructors, init properties, record identity, copying, equality and member bodies through native record declarations. Record structs, partial or nested declarations, positional parameter attributes/modifiers, conditional and unrepresented members preserve exact C# with an explicit reason."
+        },
+        {
           "name": "struct",
           "description": "Structs are converted to Calor struct definitions"
         },
@@ -536,11 +540,6 @@
         }
       ],
       "notsupported": [
-        {
-          "name": "record",
-          "description": "Records are not natively supported; record declarations are preserved verbatim as \u00A7CSHARP interop blocks (counted as a conversion loss)",
-          "workaround": "Rewrite the record as an explicit class before migration, or keep it as a \u00A7CSHARP interop block"
-        },
         {
           "name": "string-interpolation-handler",
           "description": "An interpolated string (or a \u002B chain of them) passed to an [InterpolatedStringHandler] parameter cannot be represented in Calor; the enclosing statement or member is preserved as C# interop, or the conversion fails when preservation is off",

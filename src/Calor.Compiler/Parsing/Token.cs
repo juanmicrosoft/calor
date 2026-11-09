@@ -131,6 +131,7 @@ public enum TokenKind
     Count,          // §CNT - Collection .Count property
 
     // Phase 7: Generics
+    Record,
     Where,
 
     // Phase 8: Classes, Interfaces, Inheritance

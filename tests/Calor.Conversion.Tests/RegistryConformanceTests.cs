@@ -55,19 +55,17 @@ public class RegistryConformanceTests
     }
 
     // ------------------------------------------------------------------
-    // Records (#773): registry says NotSupported → the converter must
-    // preserve records verbatim as §CSHARP, never emit the broken
-    // class-without-constructor shape.
+    // Record classes retain native identity; unsupported variants remain exact C#.
     // ------------------------------------------------------------------
 
     [Fact]
-    public void Registry_Record_IsNotClaimedFull()
+    public void Registry_RecordClasses_AreNative()
     {
-        Assert.NotEqual(SupportLevel.Full, FeatureSupport.GetSupportLevel("record"));
+        Assert.Equal(SupportLevel.Full, FeatureSupport.GetSupportLevel("record"));
     }
 
     [Fact]
-    public void Record_IsPreservedAsInterop_NotBrokenClass()
+    public void Record_IsNative_NotBrokenOrdinaryClass()
     {
         var csharp = """
             public record Person(string Name, int Age);
@@ -79,16 +77,11 @@ public class RegistryConformanceTests
         Assert.NotNull(result.CalorSource);
         _output.WriteLine(result.CalorSource);
 
-        // Preserved verbatim as interop — original record text survives.
-        Assert.Contains("§CSHARP", result.CalorSource);
-        Assert.Contains("record Person(string Name, int Age)", result.CalorSource);
-        // The broken shape (a Calor class definition for the record) must be gone.
+        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        Assert.Contains("record Person:pub (string:Name, int:Age)", result.CalorSource);
         Assert.DoesNotContain("§CL{", result.CalorSource);
-
-        // Counted as a structured loss with a location (#770).
-        var loss = Assert.Single(result.Context.Losses.Where(l => l.Feature == "record"));
-        Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
-        Assert.NotNull(loss.Line);
+        Assert.True(Assert.Single(result.Ast!.Classes).IsRecord);
+        Assert.Empty(result.Losses);
     }
 
     [Fact]
@@ -112,7 +105,7 @@ public class RegistryConformanceTests
     [InlineData(
         "[System.Obsolete] public record Base(int X); public record Derived(int X, int Y) : Base(X);",
         "record Derived(int X, int Y) : Base(X)",
-        2)]
+        0)]
     [InlineData(
         "public partial record Person(string Name); public partial record Person { public void Deconstruct(out string name) => name = Name; }",
         "partial record Person",
@@ -120,8 +113,8 @@ public class RegistryConformanceTests
     [InlineData(
         "public record Nominal { public int Value { get; init; } protected Nominal(Nominal other) { Value = other.Value; } }",
         "protected Nominal(Nominal other)",
-        1)]
-    public void RecordVariants_ArePreservedVerbatimAndCompile(
+        0)]
+    public void RecordVariants_PreserveKindAndCompile(
         string csharp,
         string expectedText,
         int expectedLossCount)
@@ -135,7 +128,7 @@ public class RegistryConformanceTests
             "Round-tripped record variant does not compile: "
             + string.Join("; ", result.RoslynErrors));
         var recordLosses = conversion.Losses
-            .Where(loss => loss.Feature == "record")
+            .Where(loss => loss.Feature.StartsWith("record", StringComparison.Ordinal))
             .ToList();
         Assert.Equal(expectedLossCount, recordLosses.Count);
         Assert.All(
@@ -160,7 +153,7 @@ public class RegistryConformanceTests
         var result = RoundTrip(csharp);
 
         var loss = Assert.Single(conversion.Losses.Where(item =>
-            item.Feature == "record"));
+            item.Feature == "record-nested-declaration"));
         Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
         Assert.DoesNotContain(
             conversion.Losses,
@@ -194,7 +187,7 @@ public class RegistryConformanceTests
         var result = RoundTrip(csharp);
 
         var recordLoss = Assert.Single(conversion.Losses.Where(item =>
-            item.Feature == "record"));
+            item.Feature == "record-nested-declaration"));
         Assert.Equal(
             ConversionLossKind.InteropPreserved,
             recordLoss.Kind);

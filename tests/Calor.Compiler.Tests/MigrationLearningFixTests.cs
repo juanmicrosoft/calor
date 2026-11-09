@@ -951,14 +951,12 @@ public class MigrationLearningFixTests
         var result = _converter.Convert(csharp);
         Assert.True(result.Success, GetErrorMessage(result));
 
-        // W1 Slice 3 (#773): records are preserved verbatim as §CSHARP interop
-        // while the registry marks them NotSupported (the native conversion
-        // emitted a class with no constructor). The property-dedup logic in
-        // ConvertRecord stays dormant until records go native again.
-        Assert.Empty(result.Ast!.Classes);
-        var interop = Assert.Single(result.Ast.InteropBlocks);
-        Assert.Contains("record Person(string Name, int Age)", interop.CSharpCode);
-        Assert.Contains("public string Name { get; init; } = Name;", interop.CSharpCode);
+        var record = Assert.Single(result.Ast!.Classes);
+        Assert.True(record.IsRecord);
+        Assert.Equal(2, record.Properties.Count);
+        Assert.Single(record.Properties.Where(property => property.Name == "Name"));
+        Assert.Equal("Age", Assert.Single(record.RecordPositionalProperties).Name);
+        Assert.Empty(result.Ast.InteropBlocks);
     }
 
     [Fact]
@@ -978,14 +976,11 @@ public class MigrationLearningFixTests
         var result = _converter.Convert(csharp);
         Assert.True(result.Success, GetErrorMessage(result));
 
-        // W1 Slice 3 (#773): records are preserved verbatim as §CSHARP interop
-        // while the registry marks them NotSupported — nothing is dropped and
-        // no broken class shape is emitted.
-        Assert.Empty(result.Ast!.Classes);
-        var interop = Assert.Single(result.Ast.InteropBlocks);
-        Assert.Contains("record Config(string Key, string Value)", interop.CSharpCode);
-        Assert.Contains("public string Key { get; init; } = Key;", interop.CSharpCode);
-        Assert.Contains("public string Value { get; init; } = Value;", interop.CSharpCode);
+        var record = Assert.Single(result.Ast!.Classes);
+        Assert.True(record.IsRecord);
+        Assert.Equal(2, record.Properties.Count);
+        Assert.Empty(record.RecordPositionalProperties);
+        Assert.Empty(result.Ast.InteropBlocks);
     }
 
     #endregion

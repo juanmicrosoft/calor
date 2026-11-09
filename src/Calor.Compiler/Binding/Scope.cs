@@ -1438,6 +1438,7 @@ public sealed class TypeSymbol : Symbol
     public string QualifiedName { get; }
     public Visibility Visibility { get; }
     public bool IsReferenceType { get; init; }
+    public bool IsRecord { get; init; }
 
     /// <summary>
     /// v0.15 E1 slice 2b — true for a type declared with <c>§DEL</c>. This is

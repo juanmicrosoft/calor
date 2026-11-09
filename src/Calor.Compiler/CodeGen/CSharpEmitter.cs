@@ -5846,7 +5846,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (node.IsReadOnly) modifiers += " readonly";
         if (node.IsPartial) modifiers += " partial";
 
-        var keyword = node.IsStruct ? "struct" : "class";
+        var keyword = node.IsRecord ? "record" : node.IsStruct ? "struct" : "class";
 
         // Build type parameters
         var typeParams = "";
@@ -5876,12 +5876,16 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var baseList = new List<string>();
         if (!string.IsNullOrEmpty(node.BaseClass))
         {
-            baseList.Add(MapTypeName(node.BaseClass));
+            var recordBaseCall = node.RecordBaseArguments == null ? ""
+                : "(" + string.Join(", ", node.RecordBaseArguments.Select(argument => argument.Accept(this))) + ")";
+            baseList.Add(MapTypeName(node.BaseClass) + recordBaseCall);
         }
         baseList.AddRange(node.ImplementedInterfaces.Select(MapTypeName));
         var inheritance = baseList.Count > 0 ? " : " + string.Join(", ", baseList) : "";
 
-        AppendLine($"{modifiers} {keyword} {name}{typeParams}{inheritance}{whereClause}");
+        var positional = node.RecordParameters == null ? ""
+            : "(" + string.Join(", ", node.RecordParameters.Select(parameter => parameter.Accept(this))) + ")";
+        AppendLine($"{modifiers} {keyword} {name}{typeParams}{positional}{inheritance}{whereClause}");
         AppendLine("{");
         Indent();
 
@@ -5935,7 +5939,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (node.Items.Count > 0)
         {
             foreach (var item in node.Items)
-                EmitSourceOrderedClassItem(item);
+            {
+                if (!ReferenceEquals(item, node.RecordPrimaryConstructor)
+                    && !ReferenceEquals(item, node.RecordCopyConstructor)
+                    && !node.RecordPositionalProperties.Contains(item))
+                    EmitSourceOrderedClassItem(item);
+            }
         }
         else
         {
@@ -5943,6 +5952,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 Visit(field);
             foreach (var prop in node.Properties)
             {
+                if (node.RecordPositionalProperties.Contains(prop))
+                    continue;
                 Visit(prop);
                 AppendLine();
             }
@@ -5953,6 +5964,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             }
             foreach (var ctor in node.Constructors)
             {
+                if (ReferenceEquals(ctor, node.RecordPrimaryConstructor) || ReferenceEquals(ctor, node.RecordCopyConstructor))
+                    continue;
                 Visit(ctor);
                 AppendLine();
             }

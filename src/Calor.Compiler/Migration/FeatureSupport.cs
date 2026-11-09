@@ -57,16 +57,12 @@ public static class FeatureSupport
             Description = "Public abstract signature-only methods, properties, and indexers are native; interfaces with non-representable contract members are preserved whole as counted C# interop",
             Workaround = "Keep default, static abstract/virtual, private, event, and nested-type interface contracts as exact C# interop"
         },
-        // #773: honest downgrade — the native conversion emitted a positional
-        // record as a class with getter-only properties and NO constructor
-        // (broken output). The converter consults this level and preserves
-        // records verbatim as §CSHARP interop while it is not Full.
         ["record"] = new FeatureInfo
         {
             Name = "record",
-            Support = SupportLevel.NotSupported,
-            Description = "Records are not natively supported; record declarations are preserved verbatim as §CSHARP interop blocks (counted as a conversion loss)",
-            Workaround = "Rewrite the record as an explicit class before migration, or keep it as a §CSHARP interop block"
+            Support = SupportLevel.Full,
+            Description = "Record classes preserve positional constructors, init properties, record identity, copying, equality and member bodies through native record declarations. Record structs, partial or nested declarations, positional parameter attributes/modifiers, conditional and unrepresented members preserve exact C# with an explicit reason.",
+            Workaround = null
         },
         ["struct"] = new FeatureInfo
         {
@@ -1443,7 +1439,7 @@ public static class FeatureSupport
                     => "interface-indexer-semantics",
                 MethodDeclarationSyntax or PropertyDeclarationSyntax
                     or IndexerDeclarationSyntax => null,
-                RecordDeclarationSyntax => "record",
+                RecordDeclarationSyntax => "record-nested-declaration",
                 _ => "interface-member"
             };
 

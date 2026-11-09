@@ -605,6 +605,8 @@ public sealed class DeclarationIdentityStore
         static string? Scope(DeclarationIdentity declaration) => declaration.Kind switch
         {
             IdKind.Module when declaration.Signature.Length == 0 => declaration.Name,
+            IdKind.Record when declaration.Signature.Length > 0 =>
+                declaration.Container + "." + declaration.Name + "`" + declaration.Signature,
             IdKind.Module or IdKind.Class or IdKind.Interface => declaration.Container + "." + declaration.Name + "`" + declaration.Signature,
             IdKind.EnumExtension => declaration.Container + "." + declaration.Name + "Extensions",
             IdKind.Function or IdKind.Method or IdKind.OperatorOverload => declaration.Container + "." + declaration.Name + "#" + declaration.Signature,
@@ -872,9 +874,10 @@ public sealed class DeclarationIdentityStore
                         Members(f.Body, scope + "." + f.Name + "#" + Signature(f.Parameters, f.Output, f.TypeParameters.Count));
                         break;
                     case ClassDefinitionNode c:
-                        Add(c, scope, c.IsModule ? IdKind.Module : IdKind.Class, c.Name,
+                        Add(c, scope, c.IsModule ? IdKind.Module : c.IsRecord ? IdKind.Record : IdKind.Class, c.Name,
                             c.TypeParameters.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                        Members(c.Methods.Cast<AstNode>().Concat(c.Properties).Concat(c.Indexers).Concat(c.Constructors)
+                        Members(c.Methods.Cast<AstNode>().Concat(c.Properties).Concat(c.Indexers)
+                            .Concat(c.Constructors.Where(constructor => !ReferenceEquals(constructor, c.RecordCopyConstructor)))
                             .Concat(c.OperatorOverloads).Concat(c.NestedClasses).Concat(c.NestedInterfaces).Concat(c.NestedEnums)
                             .Concat(c.NestedDelegates).Concat(c.Events).Concat(c.Fields),
                             scope + "." + c.Name + "`" + c.TypeParameters.Count);

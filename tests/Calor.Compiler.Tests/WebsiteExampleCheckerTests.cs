@@ -701,7 +701,8 @@ public sealed class WebsiteExampleCheckerTests
     // #1617: NullableFallback and Division add two compile-checked complete programs.
     // #1619: named static-container example and the corrected native W1-F6 Counter output.
     // #1600: current-language.mdx adds one page and 82 actually compiled complete examples.
-    private const string Pinned = "pages=98 complete=151 negative=7 grouped=3 checkedOutputs=2 illustrative=34";
+    // Native records add one complete constructor/default/copy example.
+    private const string Pinned = "pages=98 complete=152 negative=7 grouped=3 checkedOutputs=2 illustrative=34";
 
     [Theory]
     [InlineData("guides/nullability-and-dotnet-interop.mdx", "```calor expect=Calor0272\n", "```calor\n")]

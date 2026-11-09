@@ -1,0 +1,53 @@
+§M{Fixture:overflow=unchecked}
+  §PP{FEATURE}
+    §CL{ConditionalClass:pub}
+      §MT{Value:pub:stat} () -> int
+        §R 1
+
+
+    record ConditionalRecord:pub (int:Value)
+
+
+    §DEL{ConditionalDelegate}
+      §I{int:value}
+      §O{int}
+
+    §CL{ConditionalPartial:pub:partial}
+      §MT{PartialValue:pub:stat} () -> int
+        §R 10
+
+
+  §PPE
+    §CL{ConditionalClass:pub}
+      §MT{Value:pub:stat} () -> int
+        §R 2
+
+
+    §CL{ConditionalRecord:pub:seal}
+      §PROP{Value:int:pub:get}
+
+      §CTOR{pub} (int:value)
+        §ASSIGN Value value
+
+
+    §DEL{ConditionalDelegate}
+      §I{int:value}
+      §O{int}
+
+    §CL{ConditionalPartial:pub:partial}
+      §MT{PartialValue:pub:stat} () -> int
+        §R 20
+
+
+  §/PP{FEATURE}
+
+  §CL{ConditionalPartial:pub:partial}
+    §MT{Shared:pub:stat} () -> int
+      §R 100
+
+
+  §M{ConditionalHarness:pub}
+    §F{Get:pub} () -> int
+      §E{alloc}
+      §B{ConditionalDelegate:d} §LAM{value:int} (+ value 1) §/LAM
+      §R (+ (+ (+ (+ §C{ConditionalClass.Value} §/C §NEW{ConditionalRecord} §A 3 §/NEW.Value) §C{d} §A 4 §/C) §C{ConditionalPartial.PartialValue} §/C) §C{ConditionalPartial.Shared} §/C)

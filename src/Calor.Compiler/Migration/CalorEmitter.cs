@@ -958,14 +958,25 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
         var declarationTag = node.IsModule ? "M" : "CL";
-        AppendLine($"§{declarationTag}{{{node.Name}{typeParams}:{vis}{modStr}}}{attrs}");
+        if (node.IsRecord)
+        {
+            var positional = node.RecordParameters == null ? "" :
+                " (" + string.Join(", ", node.RecordParameters.Select(parameter =>
+                    $"{TypeMapper.ToSurfaceType(parameter.TypeName)}:{EscapeCalorIdentifier(parameter.Name)}{FormatEffectRow(parameter.Row)}"
+                    + (parameter.DefaultValue == null ? "" : $" = {parameter.DefaultValue.Accept(this)}"))) + ")";
+            var baseCall = node.RecordBaseArguments == null ? "" :
+                $" : {TypeMapper.ToSurfaceType(node.BaseClass!)}({string.Join(", ", node.RecordBaseArguments.Select(argument => argument.Accept(this)))})";
+            AppendLine($"record {node.Name}{typeParams}:{vis}{modStr}{attrs}{positional}{baseCall}");
+        }
+        else
+            AppendLine($"§{declarationTag}{{{node.Name}{typeParams}:{vis}{modStr}}}{attrs}");
         Indent();
 
         // Emit type parameter constraints
         EmitTypeParameterConstraints(node.TypeParameters);
 
         // Emit base class as §EXT tag (not positional)
-        if (node.BaseClass != null)
+        if (node.BaseClass != null && node.RecordBaseArguments == null)
         {
             AppendLine($"§EXT{{{TypeMapper.ToSurfaceType(node.BaseClass)}}}");
         }
@@ -981,7 +992,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Items.Count > 0)
         {
             foreach (var item in node.Items)
-                EmitClassItem(item);
+            {
+                if (!ReferenceEquals(item, node.RecordPrimaryConstructor)
+                    && !ReferenceEquals(item, node.RecordCopyConstructor)
+                    && !node.RecordPositionalProperties.Contains(item))
+                    EmitClassItem(item);
+            }
         }
         else
         {
@@ -994,7 +1010,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
             if (node.Events.Count > 0)
                 AppendLine();
             foreach (var prop in node.Properties)
+            {
+                if (node.RecordPositionalProperties.Contains(prop))
+                    continue;
                 Visit(prop);
+            }
             if (node.Properties.Count > 0)
                 AppendLine();
             foreach (var indexer in node.Indexers)
@@ -1003,6 +1023,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 AppendLine();
             foreach (var ctor in node.Constructors)
             {
+                if (ReferenceEquals(ctor, node.RecordPrimaryConstructor) || ReferenceEquals(ctor, node.RecordCopyConstructor))
+                    continue;
                 Visit(ctor);
                 AppendLine();
             }
@@ -1049,7 +1071,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/{declarationTag}");
+        if (!node.IsRecord)
+            EmitBlockEnd($"§/{declarationTag}");
 
         return "";
     }

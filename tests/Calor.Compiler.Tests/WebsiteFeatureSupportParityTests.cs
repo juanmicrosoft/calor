@@ -63,6 +63,8 @@ public sealed class WebsiteFeatureSupportParityTests
     /// only to headings. Every entry must be used.</summary>
     internal static readonly (string Page, string Passage, string Why)[] NotClaims =
     [
+        ("syntax-reference/current-language.mdx", "partial or nested declarations",
+            "the C# partial modifier and declaration location, not a converter support level"),
         ("cli/convert.mdx", "claiming a fully successful\nconversion", "a successful conversion, not a level"),
         ("cli/convert.mdx", "Calor has no partial members either", "C#'s `partial` modifier, not a level"),
         ("cli/convert.mdx", "C# 13 `partial`\nproperty", "C#'s `partial` modifier, not a level"),

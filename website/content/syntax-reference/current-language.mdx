@@ -590,9 +590,17 @@ Complete example: [break continue](#example-complete_break_continue).
 
 ## record type
 
-Query calor_help action=features for record conversion support. Do not handwrite passthrough.
+Declares a C# record class. Positional parameters retain their constructor defaults and public init properties. Indent properties and methods beneath the header. C# supplies value equality, hashing, ToString, deconstruction and with/copy behavior. Derived positional records use `record D:pub (int:X, int:Y) : B(X)`. Record structs, partial or nested declarations and unrepresented member variants remain exact converter-owned C# fallback, not native records.
 
-Syntax: `No authored native record declaration`
+Syntax: `record Point:pub (int:X, int:Y)`
+
+C# equivalents (fragments):
+
+```csharp
+public record Point(int X, int Y);
+```
+
+Complete example: [Native record construction and copying](#example-complete_records).
 
 ## Array Creation/Initialization
 
@@ -1257,6 +1265,21 @@ C# equivalents (fragments):
 
 ```csharp
 System.Linq.Enumerable.ToArray<int>(filtered)
+```
+
+## Example complete_records
+
+Native record construction and copying
+
+```calor
+§M{Records}
+  record Point:pub (int:X, int:Y = 2)
+  §F{Create:pub} () -> Point
+    §E{alloc,mut}
+    §R §NEW{Point} §A 1 §/NEW
+  §F{Shift:pub} (Point:point) -> Point
+    §E{alloc,mut}
+    §R §WITH point §SET{X} 3 §/WITH
 ```
 
 ## Example copilot_smoke

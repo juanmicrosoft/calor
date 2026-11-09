@@ -288,6 +288,13 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     /// </summary>
     public bool IsModule { get; }
 
+    public bool IsRecord { get; }
+    public IReadOnlyList<ParameterNode>? RecordParameters { get; }
+    public IReadOnlyList<ExpressionNode>? RecordBaseArguments { get; }
+    public ConstructorNode? RecordPrimaryConstructor { get; }
+    public ConstructorNode? RecordCopyConstructor { get; }
+    public IReadOnlyList<PropertyNode> RecordPositionalProperties { get; }
+
     /// <summary>
     /// True if this is a struct (value type).
     /// </summary>
@@ -537,13 +544,23 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         TextSpan? baseClassSpan = null,
         IReadOnlyList<TextSpan>? implementedInterfaceSpans = null,
         IReadOnlyList<AstNode>? items = null,
-        bool isModule = false)
+        bool isModule = false,
+        bool isRecord = false,
+        IReadOnlyList<ParameterNode>? recordParameters = null,
+        IReadOnlyList<ExpressionNode>? recordBaseArguments = null)
         : base(span, id, name, attributes, identifierSpan)
     {
         IsAbstract = isAbstract;
         IsSealed = isSealed;
         IsPartial = isPartial;
         IsModule = isModule;
+        IsRecord = isRecord;
+        RecordParameters = recordParameters;
+        RecordBaseArguments = recordBaseArguments;
+        if (isRecord && (isStruct || isStatic || isModule || isReadOnly))
+            throw new ArgumentException("A native record declaration represents a C# record class.");
+        if (!isRecord && (recordParameters != null || recordBaseArguments != null))
+            throw new ArgumentException("Positional record metadata requires a record declaration.");
         IsStatic = isStatic || isModule;
         IsStruct = isStruct;
         IsReadOnly = isReadOnly;
@@ -568,6 +585,55 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         NestedEnums = nestedEnums ?? Array.Empty<EnumDefinitionNode>();
         NestedDelegates = nestedDelegates ?? Array.Empty<DelegateDefinitionNode>();
         Items = items ?? Array.Empty<AstNode>();
+        RecordPositionalProperties = Array.Empty<PropertyNode>();
+        var recordSelfType = typeParameters.Count == 0 ? name
+            : $"{name}<{string.Join(",", typeParameters.Select(parameter => parameter.Name))}>";
+        bool IsCopyConstructor(ConstructorNode constructor) => !constructor.IsStatic
+            && constructor.Parameters.Count == 1 && constructor.Parameters[0].TypeName == recordSelfType;
+        if (recordParameters != null || isRecord && constructors.All(constructor => constructor.IsStatic || IsCopyConstructor(constructor)))
+        {
+            var primaryParameters = recordParameters ?? [];
+            // Synthesized declarations participate in binding and effect inference,
+            // but emission leaves their implementation to the C# record compiler.
+            RecordPositionalProperties = primaryParameters
+                .Where(parameter => !properties.Any(property => property.Name == parameter.Name)
+                    && !fields.Any(field => field.Name == parameter.Name))
+                .Select(parameter => new PropertyNode(
+                    parameter.Span, $"{id}:positional:{parameter.Name}", parameter.Name,
+                    parameter.TypeName, Visibility.Public, MethodModifiers.None,
+                    new PropertyAccessorNode(parameter.Span, PropertyAccessorNode.AccessorKind.Get,
+                        null, [], [], new AttributeCollection()),
+                    null,
+                    new PropertyAccessorNode(parameter.Span, PropertyAccessorNode.AccessorKind.Init,
+                        null, [], [], new AttributeCollection()),
+                    null, new AttributeCollection(), [],
+                    identifierSpan: parameter.IdentifierSpan,
+                    typeNameSpan: parameter.TypeNameSpan, row: parameter.Row))
+                .ToArray();
+            Properties = properties.Concat(RecordPositionalProperties).ToArray();
+            RecordPrimaryConstructor = new ConstructorNode(
+                new TextSpan(span.Start, 0, span.Line, span.Column),
+                $"{id}:primary", isAbstract ? Visibility.Protected : Visibility.Public,
+                primaryParameters, [],
+                recordBaseArguments == null ? null : new ConstructorInitializerNode(span, true, recordBaseArguments),
+                RecordPositionalProperties.Select(property => (StatementNode)new AssignmentStatementNode(
+                    property.Span,
+                    new FieldAccessNode(property.Span, new ThisExpressionNode(property.Span), property.Name),
+                    new ReferenceNode(property.Span, property.Name))).ToArray(),
+                new AttributeCollection());
+            Constructors = constructors.Append(RecordPrimaryConstructor).ToArray();
+        }
+        if (isRecord && !constructors.Any(IsCopyConstructor))
+        {
+            var copySpan = IdentifierSpan;
+            var original = new ParameterNode(copySpan, "original", recordSelfType, new AttributeCollection());
+            RecordCopyConstructor = new ConstructorNode(copySpan, $"{id}:copy",
+                isSealed ? Visibility.Private : Visibility.Protected, [original], [],
+                baseClass == null ? null : new ConstructorInitializerNode(copySpan, true,
+                    [new ReferenceNode(copySpan, original.Name)]),
+                [], new AttributeCollection());
+            Constructors = Constructors.Append(RecordCopyConstructor).ToArray();
+        }
     }
 
 

@@ -27,7 +27,8 @@ public class ConversionScorecardTests
     // 0.30: full indexer parameters and generic sized arrays survive reparse.
     // Built-in unary plus retains numeric promotion through a native cast.
     // Generic ref T uses native parameter/argument modifiers without copying storage.
-    private const int BASELINE_FULLY_CONVERTED = 98;
+    // Native record classes close unchanged original cases 044 and 100.
+    private const int BASELINE_FULLY_CONVERTED = 100;
     private const int BASELINE_ROUNDTRIP = 100;
 
     private static readonly Lazy<ConversionScorecard> _scorecard = new(() =>
@@ -115,14 +116,22 @@ public class ConversionScorecardTests
     }
 
     [Fact]
-    public void RecordInterop_IsNotReportedAsNativeFeatureConversion()
+    public void RecordClasses_AreNativeWithoutPreservation()
     {
         Assert.Contains("record", Scorecard.ByFeature);
         var records = Scorecard.ByFeature["record"];
 
         Assert.Equal(2, records.Total);
-        Assert.Equal(0, records.Passed);
-        Assert.Equal(0, records.Rate);
+        Assert.Equal(2, records.Passed);
+        Assert.Equal(1, records.Rate);
+        foreach (var id in new[] { "044", "100" })
+        {
+            var result = Assert.Single(Scorecard.Results.Where(result => result.Id == id));
+            Assert.Equal(SnippetStatus.FullyConverted, result.Status);
+            Assert.Equal(0, result.InteropPreservationCount);
+            Assert.Equal(0, result.SemanticLossCount);
+            Assert.True(result.RoundTripSuccess);
+        }
     }
 
     [Fact]

@@ -83,7 +83,7 @@ public sealed class IdScanner : IAstVisitor
 
     public void Visit(ClassDefinitionNode node)
     {
-        AddEntry(node.Id, node.IsModule ? IdKind.Module : IdKind.Class, node.Name, node.Span);
+        AddEntry(node.Id, node.IsModule ? IdKind.Module : node.IsRecord ? IdKind.Record : IdKind.Class, node.Name, node.Span);
 
         foreach (var property in node.Properties)
             property.Accept(this);
@@ -92,7 +92,8 @@ public sealed class IdScanner : IAstVisitor
             indexer.Accept(this);
 
         foreach (var constructor in node.Constructors)
-            constructor.Accept(this);
+            if (!ReferenceEquals(constructor, node.RecordCopyConstructor))
+                constructor.Accept(this);
 
         foreach (var method in node.Methods)
             method.Accept(this);

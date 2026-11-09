@@ -2345,10 +2345,8 @@ public class Test
         Assert.DoesNotContain(
             "__CALOR_OPAQUE_BOUNDARY__",
             conversion.CalorSource);
-        Assert.Contains(
-            conversion.Losses,
-            loss => loss.Kind
-                == ConversionLossKind.InteropPreserved);
+        Assert.Empty(conversion.Losses);
+        Assert.True(Assert.Single(Assert.Single(conversion.Ast!.TypePreprocessorBlocks).Classes).IsRecord);
         Assert.Equal(
             SupportLevel.Partial,
             FeatureSupport.GetSupportLevel(
@@ -2364,6 +2362,13 @@ public class Test
         Assert.False(
             compilation.HasErrors,
             string.Join("\n", compilation.Diagnostics));
+        foreach (var symbols in new[] { Array.Empty<string>(), new[] { "FEATURE" } })
+        {
+            var validation = GeneratedCSharpCompiler.Validate(
+                [new GeneratedCSharpSource(compilation.GeneratedCode, "conditional-record.g.cs")],
+                new GeneratedCSharpCompilationContext { PreprocessorSymbols = symbols });
+            Assert.True(validation.CompilationSuccess, string.Join("\n", validation.FormattedCompilationErrors));
+        }
     }
 
     [Fact]

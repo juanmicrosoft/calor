@@ -82,6 +82,8 @@ public sealed class CallGraphAnalysis
     {
         internal Dictionary<(string CallerId, int Start, int End), BoundCallExpression>
             ComputedMemberCalls { get; } = new();
+        internal Dictionary<(string CallerId, int Start, int End), IReadOnlyList<string>>
+            ConstructorCalls { get; } = new();
         internal HashSet<(string CallerId, int Start, int End)> UnresolvedArgumentCalls { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), Microsoft.CodeAnalysis.IArrayTypeSymbol>
             MetadataArrayTypes { get; } = new();
@@ -107,6 +109,9 @@ public sealed class CallGraphAnalysis
 
     internal BoundCallExpression? ComputedMemberCall(string callerId, TextSpan span) =>
         _boundValues.ComputedMemberCalls.GetValueOrDefault((callerId, span.Start, span.End));
+
+    internal IReadOnlyList<string> ResolvedConstructorCalls(string callerId, TextSpan span) =>
+        _boundValues.ConstructorCalls.GetValueOrDefault((callerId, span.Start, span.End)) ?? [];
 
     internal bool HasUnresolvedCallArguments(string callerId, TextSpan span) =>
         _boundValues.UnresolvedArgumentCalls.Contains((callerId, span.Start, span.End));
@@ -912,6 +917,8 @@ public sealed class CallGraphAnalysis
                         ?? Array.Empty<string>();
                     if (calleeLegacyIds.Length > 0)
                     {
+                        if (node is BoundNewExpression || target.EndsWith("..ctor", StringComparison.Ordinal))
+                            boundValues.ConstructorCalls[(callerId, node.Span.Start, node.Span.End)] = calleeLegacyIds;
                         boundCallSites.Add(key);
                         resolved[key] = calleeLegacyIds;
                     }
@@ -992,7 +999,7 @@ public sealed class CallGraphAnalysis
         IReadOnlyDictionary<string, FunctionNode> functions)
     {
         var candidates = functions.Values
-            .Where(candidate => candidate.Span == boundFunction.Symbol.DefinitionSpan)
+            .Where(candidate => candidate.Span == boundFunction.Span)
             .ToArray();
         var exactName = candidates.FirstOrDefault(candidate =>
             candidate.Name.Equals(boundFunction.Symbol.Name, StringComparison.Ordinal));

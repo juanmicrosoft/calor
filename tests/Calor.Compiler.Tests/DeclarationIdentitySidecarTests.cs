@@ -395,6 +395,34 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     }
 
     [Fact]
+    public void NativeRecordRenameAndMoveRetainRecordPropertyAndConstructorIdentity()
+    {
+        const string source = """
+            §M{Records}
+              record P:pub (int:X, int:Y)
+                §MT{Sum:pub} () -> int
+                  §R X + Y
+            """;
+        var file = Write("before.calr", source);
+        var before = Store.Sync([file]);
+        var recordId = before.Declarations.Single(declaration => declaration.Kind == IdKind.Record).Id;
+        var propertyIds = before.Declarations.Where(declaration => declaration.Kind == IdKind.Property)
+            .Select(declaration => declaration.Id).Order().ToArray();
+        Assert.Equal(2, propertyIds.Length);
+        var ctorId = before.Declarations.Single(declaration => declaration.Kind == IdKind.Constructor).Id;
+        var destination = Write("after.calr", source.Replace("record P:", "record Q:"));
+        File.Delete(file);
+        var after = Store.Sync([destination]);
+        Assert.Equal(recordId, after.Declarations.Single(declaration => declaration.Kind == IdKind.Record).Id);
+        Assert.Equal(propertyIds, after.Declarations.Where(declaration => declaration.Kind == IdKind.Property)
+            .Select(declaration => declaration.Id).Order().ToArray());
+        Assert.Equal(ctorId, after.Declarations.Single(declaration => declaration.Kind == IdKind.Constructor).Id);
+        var ast = CalorSourceHelper.Parse(File.ReadAllText(destination), destination).Ast!;
+        Assert.Equal(recordId, Assert.Single(ast.Classes).Id);
+        Assert.True(ast.Classes[0].IsRecord);
+    }
+
+    [Fact]
     public void AmbiguousTextRenamesWriteNothing()
     {
         var before = Original + "\n  §F{Other:pub} (i32:x) -> i32\n    §R x";

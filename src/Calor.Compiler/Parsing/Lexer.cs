@@ -2224,6 +2224,18 @@ public sealed class Lexer
 
         var text = CurrentText();
 
+        if (text == "record")
+        {
+            var lineStart = _tokenStart == 0 ? 0 : _source.LastIndexOf('\n', _tokenStart - 1) + 1;
+            var nameStart = _position;
+            while (nameStart < _source.Length && _source[nameStart] is ' ' or '\t')
+                nameStart++;
+            if (nameStart > _position && nameStart < _source.Length
+                && (char.IsLetter(_source[nameStart]) || _source[nameStart] is '_' or '@')
+                && _source.AsSpan(lineStart, _tokenStart - lineStart).Trim().IsEmpty)
+                return MakeToken(TokenKind.Record);
+        }
+
         // Check for typed literals (INT:42, STR:"hello", BOOL:true, FLOAT:3.14)
         // Only treat as typed literal if the following value looks like a valid literal
         // Skip typed literal detection inside attribute blocks ({...}) where colon is a separator

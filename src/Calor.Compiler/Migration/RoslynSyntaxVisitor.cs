@@ -2181,7 +2181,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         activeItems.Add(CreateInteropBlock(
                             member,
                             member is RecordDeclarationSyntax
-                                ? "record"
+                                ? "record-nested-declaration"
                                 : "conditional-interface-member",
                             GetInteropMemberKind(member)));
                     }
@@ -2320,7 +2320,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 case RecordDeclarationSyntax recordSyntax:
                     return CreateInteropBlock(
                         recordSyntax,
-                        "record",
+                        "record-nested-declaration",
                         InteropMemberKind.Class);
                 default:
                     if (_context.ShouldPreserveCSharp)
@@ -2546,14 +2546,25 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        // #775: the former native lowering silently replaced records with
-        // classes and lost synthesized and user-defined record semantics.
-        // Keep this fail-safe independent of registry drift until a dedicated
-        // record AST and behavioral equivalence suite exist.
-        AddModuleInteropBlock(CreateInteropBlock(
-            node,
-            "record",
-            InteropMemberKind.Class));
+        _context.RecordFeatureUsage("record");
+        _context.EnterType(node.Identifier.Text);
+        try
+        {
+            var record = ConvertRecord(node);
+            AssociateTypeNamespace(record);
+            AttachDocComment(record, node);
+            _classes.Add(record);
+            _context.Stats.ClassesConverted++;
+            _context.IncrementConverted();
+        }
+        catch (MemberInteropEscalationException ex)
+        {
+            AddModuleInteropBlock(CreateInteropBlock(node, ex.FeatureName, InteropMemberKind.Class));
+        }
+        finally
+        {
+            _context.ExitType();
+        }
     }
 
     public override void VisitStructDeclaration(StructDeclarationSyntax node)
@@ -3060,7 +3071,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 interopBlocks.Add(CreateInteropBlock(
                     nestedRecord,
-                    "record",
+                    "record-nested-declaration",
                     InteropMemberKind.Class));
                 continue;
             }
@@ -3318,6 +3329,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ClassDefinitionNode ConvertRecord(RecordDeclarationSyntax node)
     {
+        if (node.ClassOrStructKeyword.IsKind(SyntaxKind.StructKeyword))
+            throw EscalateExpression(node, "record-struct");
+        if (node.Modifiers.Any(SyntaxKind.FileKeyword))
+            throw EscalateExpression(node, "file-scoped-type");
+        if (node.Modifiers.Any(SyntaxKind.PartialKeyword))
+            throw EscalateExpression(node, "record-partial");
+        if (node.Modifiers.Any(SyntaxKind.UnsafeKeyword))
+            throw EscalateExpression(node, "unsafe");
+        if (node.ParameterList?.Parameters.Any(parameter =>
+            parameter.AttributeLists.Count > 0 || parameter.Modifiers.Count > 0) == true)
+            throw EscalateExpression(node, "record-positional-parameter-metadata");
+        if (ExtractMemberPreprocessorRegions(node).Count > 0)
+            throw EscalateExpression(node, "record-conditional-members");
+
         var id = _context.GenerateId("r");
         var name = node.Identifier.Text;
         var defaultVis = node.Parent is TypeDeclarationSyntax ? Visibility.Private : Visibility.Internal;
@@ -3329,29 +3354,31 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var constructors = new List<ConstructorNode>();
         var methods = new List<MethodNode>();
 
-        // Convert primary constructor parameters to properties
-        if (node.ParameterList != null)
+        string? baseClass = null;
+        IReadOnlyList<ExpressionNode>? baseArguments = null;
+        var interfaces = new List<string>();
+        if (node.BaseList != null)
         {
-            var explicitNames = CollectExplicitMemberNames(node.Members);
-            foreach (var param in node.ParameterList.Parameters)
+            foreach (var baseType in node.BaseList.Types)
             {
-                var propName = param.Identifier.Text;
-                if (explicitNames.Contains(propName))
-                    continue;
-                var propId = _context.GenerateId("p");
-                var typeName = TypeMapper.CSharpToCalor(param.Type?.ToString() ?? "any");
-
-                properties.Add(new PropertyNode(
-                    GetTextSpan(param),
-                    propId,
-                    propName,
-                    typeName,
-                    Visibility.Public,
-                    getter: null,
-                    setter: null,
-                    initer: null,
-                    defaultValue: param.Default != null ? ConvertExpression(param.Default.Value) : null,
-                    new AttributeCollection()));
+                var symbol = _semanticModel?.GetTypeInfo(baseType.Type).Type;
+                if (symbol?.TypeKind == TypeKind.Interface)
+                    interfaces.Add(TypeMapper.CSharpToCalor(baseType.Type.ToString()));
+                else if (symbol is INamedTypeSymbol { IsRecord: true, IsValueType: false }
+                    || baseType is PrimaryConstructorBaseTypeSyntax)
+                {
+                    baseClass = TypeMapper.CSharpToCalor(baseType.Type.ToString());
+                    if (baseType is PrimaryConstructorBaseTypeSyntax primaryBase)
+                    {
+                        if (primaryBase.ArgumentList.Arguments.Any(argument =>
+                            argument.NameColon != null || !argument.RefKindKeyword.IsKind(SyntaxKind.None)))
+                            throw EscalateExpression(node, "record-base-argument-metadata");
+                        baseArguments = primaryBase.ArgumentList.Arguments
+                            .Select(argument => ConvertExpression(argument.Expression)).ToArray();
+                    }
+                }
+                else
+                    throw EscalateExpression(node, "record-unresolved-base-kind");
             }
         }
 
@@ -3389,6 +3416,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 case ConversionOperatorDeclarationSyntax convSyntax:
                     operatorOverloads.Add(ConvertConversionOperatorOverload(convSyntax));
                     break;
+                default:
+                    throw EscalateExpression(node, "record-member-" + member.Kind());
             }
         }
 
@@ -3396,12 +3425,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             GetTextSpan(node),
             id,
             name,
-            isAbstract: false,
-            isSealed: true,
-            isPartial: false,
+            isAbstract: node.Modifiers.Any(SyntaxKind.AbstractKeyword),
+            isSealed: node.Modifiers.Any(SyntaxKind.SealedKeyword),
+            isPartial: node.Modifiers.Any(SyntaxKind.PartialKeyword),
             isStatic: false,
-            baseClass: null,
-            implementedInterfaces: new List<string>(),
+            baseClass: baseClass,
+            implementedInterfaces: interfaces,
             typeParameters,
             fields,
             properties,
@@ -3410,9 +3439,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             Array.Empty<EventDefinitionNode>(),
             operatorOverloads,
             new AttributeCollection(),
-            Array.Empty<CalorAttributeNode>(),
+            ConvertAttributes(node.AttributeLists),
             visibility: visibility,
             indexers: indexers.Count > 0 ? indexers : null,
+            identifierSpan: GetTextSpan(node.Identifier),
             // #1524: initializers run in source order (see HasOrderSensitiveMemberInitializers).
             items: HasOrderSensitiveMemberInitializers(node)
                 ? BuildSourceOrderedClassItems(fields, properties, indexers, constructors, methods,
@@ -3420,7 +3450,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     Array.Empty<MemberPreprocessorBlockNode>(), Array.Empty<ClassDefinitionNode>(),
                     Array.Empty<InterfaceDefinitionNode>(), Array.Empty<EnumDefinitionNode>(),
                     Array.Empty<DelegateDefinitionNode>())
-                : null);
+                : null,
+            isRecord: true,
+            recordParameters: node.ParameterList == null ? null : ConvertParameters(node.ParameterList),
+            recordBaseArguments: baseArguments);
         return PreserveTypeCompilerDirectives(node, convertedRecord);
     }
 
@@ -3634,7 +3667,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 interopBlocks.Add(CreateInteropBlock(
                     nestedRecord,
-                    "record",
+                    "record-nested-declaration",
                     InteropMemberKind.Class));
                 continue;
             }
@@ -3814,9 +3847,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return converted;
 
         var items = converted.Fields.Cast<AstNode>()
-            .Concat(converted.Properties)
+            .Concat(converted.Properties.Except(converted.RecordPositionalProperties))
             .Concat(converted.Indexers)
-            .Concat(converted.Constructors)
+            .Concat(converted.Constructors.Where(constructor => !ReferenceEquals(constructor, converted.RecordPrimaryConstructor)
+                && !ReferenceEquals(constructor, converted.RecordCopyConstructor)))
             .Concat(converted.Methods)
             .Concat(converted.Events)
             .Concat(converted.OperatorOverloads)
@@ -3843,8 +3877,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             converted.ImplementedInterfaces,
             converted.TypeParameters,
             converted.Fields,
-            converted.Properties,
-            converted.Constructors,
+            converted.Properties.Except(converted.RecordPositionalProperties).ToArray(),
+            converted.Constructors.Where(constructor => !ReferenceEquals(constructor, converted.RecordPrimaryConstructor)
+                && !ReferenceEquals(constructor, converted.RecordCopyConstructor)).ToArray(),
             converted.Methods,
             converted.Events,
             converted.OperatorOverloads,
@@ -3864,7 +3899,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             baseClassSpan: converted.BaseClassSpan,
             implementedInterfaceSpans: converted.ImplementedInterfaceSpans,
             items: items,
-            isModule: converted.IsModule);
+            isModule: converted.IsModule,
+            isRecord: converted.IsRecord,
+            recordParameters: converted.RecordParameters,
+            recordBaseArguments: converted.RecordBaseArguments);
     }
 
     private MethodSignatureNode ConvertMethodSignature(MethodDeclarationSyntax node)
@@ -6060,7 +6098,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             var recordInterop = CreateInteropBlock(
                 record,
-                "record",
+                "record-nested-declaration",
                 InteropMemberKind.Class);
             interopBlocks.Add(recordInterop);
             items.Add(recordInterop);
@@ -16953,6 +16991,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             node.Span.Length,
             lineSpan.StartLinePosition.Line + 1,
             lineSpan.StartLinePosition.Character + 1);
+    }
+
+    private static TextSpan GetTextSpan(SyntaxToken token)
+    {
+        var lineSpan = token.GetLocation().GetLineSpan();
+        return new TextSpan(token.SpanStart, token.Span.Length,
+            lineSpan.StartLinePosition.Line + 1, lineSpan.StartLinePosition.Character + 1);
     }
 
     private static TextSpan GetTextSpanAt(SyntaxTree tree, int position)

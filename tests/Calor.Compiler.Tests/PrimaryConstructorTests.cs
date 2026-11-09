@@ -192,12 +192,11 @@ public class PrimaryConstructorTests
         var result = _converter.Convert(csharp);
         Assert.True(result.Success, FormatIssues(result));
 
-        // W1 Slice 3 (#773): records are preserved verbatim as §CSHARP interop
-        // while the registry marks them NotSupported — the old native path
-        // produced properties but NO constructor (non-compiling C#).
-        Assert.Empty(result.Ast!.Classes);
-        var interop = Assert.Single(result.Ast.InteropBlocks);
-        Assert.Contains("record Person(string Name, int Age)", interop.CSharpCode);
+        var record = Assert.Single(result.Ast!.Classes);
+        Assert.True(record.IsRecord);
+        Assert.Equal(2, record.RecordPositionalProperties.Count);
+        Assert.Equal(2, record.RecordPrimaryConstructor!.Parameters.Count);
+        Assert.Empty(result.Ast.InteropBlocks);
     }
 
     [Fact]

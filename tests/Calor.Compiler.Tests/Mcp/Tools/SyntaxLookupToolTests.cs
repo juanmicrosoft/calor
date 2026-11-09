@@ -98,6 +98,7 @@ public class SyntaxLookupToolTests
     [InlineData("dictionary", "task_16")]
     [InlineData("indexof", "primer_strings")]
     [InlineData("postfix", "complete_postfix")]
+    [InlineData("record", "complete_records")]
     public async Task PreciseExampleMatches_DoNotPadResponseWithUnrelatedSecondProgram(string query, string program)
     {
         var result = await LookupAsync(query);
@@ -106,7 +107,6 @@ public class SyntaxLookupToolTests
     }
 
     [Theory]
-    [InlineData("record")]
     [InlineData("pragma warning")]
     [InlineData("Staged section call")]
     public async Task TopicsWithoutCanonicalPrograms_PreserveCaveatsWithoutSubstitutingExamples(string query)

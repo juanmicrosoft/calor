@@ -1019,7 +1019,7 @@ public sealed class Binder
         SymbolId parentIdentity,
         string? containingTypeName)
     {
-        var classIdentity = CreateDeclarationId(parentIdentity, cls.IsModule ? "module" : "class", cls.Id, GetQualifiedTypeName(cls));
+        var classIdentity = CreateDeclarationId(parentIdentity, cls.IsModule ? "module" : cls.IsRecord ? "record" : "class", cls.Id, GetQualifiedTypeName(cls));
         var qualifiedClassName = containingTypeName == null
             ? GetQualifiedTypeName(cls)
             : $"{containingTypeName}.{GetTypeNameWithArity(cls.Name, cls.TypeParameters.Count)}";
@@ -1032,7 +1032,8 @@ public sealed class Binder
             cls.IdentifierSpan,
             cls.Span)
         {
-            IsReferenceType = !cls.IsStruct
+            IsReferenceType = !cls.IsStruct,
+            IsRecord = cls.IsRecord
         };
         TrackSymbol(classSymbol);
 
@@ -8455,7 +8456,7 @@ public sealed class Binder
             // Constructors
             foreach (var ctor in EnumerateConstructors(cls))
             {
-                if (ctor.Body.Count == 0 && ctor.Initializer == null)
+                if (ctor.Body.Count == 0 && ctor.Initializer == null && !cls.IsRecord)
                     continue;
                 var memberName = ctor.IsStatic ? ".cctor" : ".ctor";
                 var bound = TryBindMember(

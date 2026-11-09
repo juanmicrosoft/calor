@@ -415,11 +415,11 @@ public class ConvertFormatEnvelopeTests : IDisposable
     [Fact]
     public void Convert_TextMode_WithLosses_PrintsLossSummary_NotSuccessLine()
     {
-        // A record is preserved as §CSHARP interop → a counted loss (#773).
+        // Record structs remain exact, counted interop rather than record classes.
         var csFile = WriteFile("Rec.cs", """
             namespace N
             {
-                public record Person(string Name, int Age);
+                public record struct Person(string Name, int Age);
             }
             """);
 
@@ -431,7 +431,7 @@ public class ConvertFormatEnvelopeTests : IDisposable
         Assert.Contains("InteropPreserved", stdOut);
         // The loss line carries a file:line location.
         Assert.Contains("Rec.cs:", stdOut);
-        Assert.Contains("[record]", stdOut);
+        Assert.Contains("[record-struct]", stdOut);
     }
 
     [Fact]
@@ -440,7 +440,7 @@ public class ConvertFormatEnvelopeTests : IDisposable
         var csFile = WriteFile("Rec2.cs", """
             namespace N
             {
-                public record Point(int X, int Y);
+                public record struct Point(int X, int Y);
             }
             """);
 
@@ -455,7 +455,7 @@ public class ConvertFormatEnvelopeTests : IDisposable
         Assert.Equal(0, data.GetProperty("dropCount").GetInt32());
 
         var loss = data.GetProperty("losses").EnumerateArray()
-            .Single(l => l.GetProperty("feature").GetString() == "record");
+            .Single(l => l.GetProperty("feature").GetString() == "record-struct");
         Assert.Equal("InteropPreserved", loss.GetProperty("kind").GetString());
         Assert.True(loss.GetProperty("line").GetInt32() >= 1);
 

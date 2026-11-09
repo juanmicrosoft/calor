@@ -214,17 +214,14 @@ public class WedgeW4SliceAStructuralTests
     // ==================================================================
 
     [Fact]
-    public void D3_Registry_Record_IsNotClaimedFull()
+    public void D3_Registry_RecordClasses_AreNative()
     {
-        Assert.NotEqual(SupportLevel.Full, FeatureSupport.GetSupportLevel("record"));
+        Assert.Equal(SupportLevel.Full, FeatureSupport.GetSupportLevel("record"));
     }
 
     [Fact]
-    public void D3_RecordWithValueSemantics_IsPreservedAsInterop()
+    public void D3_RecordWithValueSemantics_IsNativeAndEquivalent()
     {
-        // A record whose behaviour is exercised through the synthesized value
-        // semantics (with-expression, value equality) must not silently degrade
-        // to a sealed class with reference semantics — it is preserved verbatim.
         var csharp = """
             public record Money(decimal Amount, string Currency);
 
@@ -239,11 +236,47 @@ public class WedgeW4SliceAStructuralTests
         Assert.True(result.Success);
         _output.WriteLine(result.CalorSource);
 
-        var recordLoss = Assert.Single(
-            result.Context.Losses.Where(l => l.Feature == "record"));
-        Assert.Equal(ConversionLossKind.InteropPreserved, recordLoss.Kind);
-        Assert.Contains("§CSHARP", result.CalorSource);
+        Assert.Empty(result.Context.Losses);
+        Assert.True(Assert.Single(result.Ast!.Classes.Where(type => type.Name == "Money")).IsRecord);
+        Assert.DoesNotContain("§CSHARP", result.CalorSource);
         Assert.Contains("record Money", result.CalorSource);
+        var compiled = Calor.Compiler.Program.Compile(result.CalorSource!, "money.calr",
+            new Calor.Compiler.CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Select(d => d.Message)));
+        AssertMoney(csharp);
+        AssertMoney(compiled.GeneratedCode!);
+
+        void AssertMoney(string source)
+        {
+            var compilation = CSharpCompilation.Create(Guid.NewGuid().ToString(),
+                [CSharpSyntaxTree.ParseText(source)], Calor.Compiler.CodeGen.GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var emitted = compilation.Emit(stream);
+            Assert.True(emitted.Success, string.Join("; ", emitted.Diagnostics));
+            stream.Position = 0;
+            var context = new AssemblyLoadContext(Guid.NewGuid().ToString(), isCollectible: true);
+            try
+            {
+                var assembly = context.LoadFromStream(stream);
+                var money = Assert.Single(assembly.GetTypes().Where(type => type.Name == "Money"));
+                var bank = Assert.Single(assembly.GetTypes().Where(type => type.Name == "Bank"));
+                Assert.NotNull(money.GetMethod("<Clone>$"));
+                var original = Activator.CreateInstance(money, [2m, "USD"])!;
+                var equal = Activator.CreateInstance(money, [2m, "USD"])!;
+                Assert.Equal(true, bank.GetMethod("Same")!.Invoke(null, [original, equal]));
+                var bumped = bank.GetMethod("Bump")!.Invoke(null, [original])!;
+                Assert.Equal(2m, money.GetProperty("Amount")!.GetValue(original));
+                Assert.Equal(3m, money.GetProperty("Amount")!.GetValue(bumped));
+                Assert.Equal("USD", money.GetProperty("Currency")!.GetValue(bumped));
+                Assert.Equal(false, bank.GetMethod("Same")!.Invoke(null, [original, bumped]));
+                Assert.Equal(original.GetHashCode(), equal.GetHashCode());
+            }
+            finally
+            {
+                context.Unload();
+            }
+        }
     }
 
     // ==================================================================

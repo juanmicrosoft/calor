@@ -240,6 +240,42 @@ public class LspMcpToolsTests
 
     #region FindSymbolTool Tests
 
+    [Theory]
+    [InlineData("record", "PointRecord")]
+    [InlineData("class", "PointClass")]
+    public async Task NativeRecord_SearchKindDoesNotLaunderOrdinaryClasses(string kind, string expected)
+    {
+        const string source = """
+            §M{Records}
+              record PointRecord:pub (int:X)
+              §CL{PointClass:pub}
+            """;
+        var result = await new NavigateTool().ExecuteAsync(CreateFindSymbolArgsWithKind(source, "Point", kind));
+        Assert.False(result.IsError);
+        var match = Assert.Single(ParseOutput(result.Content).GetProperty("matches").EnumerateArray());
+        Assert.Equal(expected, match.GetProperty("name").GetString());
+        Assert.Equal(kind, match.GetProperty("kind").GetString());
+    }
+
+    [Fact]
+    public async Task NativeRecord_InfoAndOutlineRetainRecordIdentity()
+    {
+        const string source = """
+            §M{Records}
+              record PointRecord:pub (int:X)
+            """;
+        var info = await new NavigateTool().ExecuteAsync(CreateArgs(source, 2, 11, "info"));
+        Assert.False(info.IsError);
+        Assert.Equal("record", ParseOutput(info.Content).GetProperty("kind").GetString());
+        Assert.Contains("int X", ParseOutput(info.Content).GetProperty("signature").GetString());
+        var outline = await new StructureTool().ExecuteAsync(CreateOutlineArgs(source));
+        Assert.False(outline.IsError);
+        var record = Assert.Single(ParseOutput(outline.Content).GetProperty("symbols").EnumerateArray());
+        Assert.Equal("record", record.GetProperty("kind").GetString());
+        Assert.Single(record.GetProperty("children").EnumerateArray()
+            .Where(child => child.GetProperty("kind").GetString() == "constructor"));
+    }
+
     [Fact]
     public async Task FindSymbol_FindsByName()
     {

@@ -591,12 +591,12 @@ public class StructAndOperatorTests
         var result = _converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
-        // W1 Slice 3 (#773): records (including their operators) are preserved
-        // verbatim as §CSHARP interop while the registry marks them
-        // NotSupported — nothing is dropped.
-        Assert.Empty(result.Ast!.Classes);
-        var interop = Assert.Single(result.Ast.InteropBlocks);
-        Assert.Contains("operator +(Money a, Money b)", interop.CSharpCode);
+        Assert.Empty(result.Losses);
+        Assert.Empty(result.Ast!.InteropBlocks);
+        var record = Assert.Single(result.Ast.Classes);
+        Assert.True(record.IsRecord);
+        Assert.Single(record.OperatorOverloads);
+        Assert.Contains("operator +(Money a, Money b)", new CSharpEmitter().Emit(result.Ast));
     }
 
     [Fact]
@@ -615,12 +615,12 @@ public class StructAndOperatorTests
         var result = _converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
-        // W1 Slice 3 (#773): records (including conversion operators) are
-        // preserved verbatim as §CSHARP interop while the registry marks them
-        // NotSupported — nothing is dropped.
-        Assert.Empty(result.Ast!.Classes);
-        var interop = Assert.Single(result.Ast.InteropBlocks);
-        Assert.Contains("implicit operator double(Celsius c)", interop.CSharpCode);
+        Assert.Empty(result.Losses);
+        Assert.Empty(result.Ast!.InteropBlocks);
+        var record = Assert.Single(result.Ast.Classes);
+        Assert.True(record.IsRecord);
+        Assert.Single(record.OperatorOverloads);
+        Assert.Contains("implicit operator double(Celsius c)", new CSharpEmitter().Emit(result.Ast));
     }
 
     #endregion

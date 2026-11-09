@@ -423,7 +423,7 @@ public class Issue766DeclarationModuleSemanticsTests
     }
 
     [Fact]
-    public void ConditionalUnsupportedRecord_RemainsGuardedAndRunsPerSymbol()
+    public void ConditionalNativeRecord_RemainsGuardedAndRunsPerSymbol()
     {
         var conversion = ConvertWithoutPreprocessorStripping(
             """
@@ -451,11 +451,10 @@ public class Issue766DeclarationModuleSemanticsTests
             conversion.Ast!.InteropBlocks,
             interop => interop.CSharpCode.Contains("record Selected", StringComparison.Ordinal));
         var typeBlock = Assert.Single(conversion.Ast.TypePreprocessorBlocks);
-        Assert.Equal(2, typeBlock.InteropBlocks.Count);
-        var recordInterop = Assert.Single(
-            typeBlock.InteropBlocks.Where(interop =>
-                interop.CSharpCode.Contains("record Selected", StringComparison.Ordinal)));
-        Assert.Contains("record Selected", recordInterop.CSharpCode);
+        Assert.Single(typeBlock.InteropBlocks);
+        Assert.True(Assert.Single(typeBlock.Classes).IsRecord);
+        Assert.DoesNotContain(typeBlock.InteropBlocks, interop =>
+            interop.CSharpCode.Contains("record Selected", StringComparison.Ordinal));
         Assert.Contains(
             typeBlock.InteropBlocks,
             interop => interop.CSharpCode.Contains(
@@ -470,6 +469,7 @@ public class Issue766DeclarationModuleSemanticsTests
             present: ["Selected", "Factory`1", "RecordHarness"],
             absent: ["Fallback"]);
         Assert.Equal(7, InvokeStaticInt(featureAssembly, "RecordHarness", "Run"));
+        Assert.NotNull(featureAssembly.GetTypes().Single(type => type.Name == "Selected").GetMethod("<Clone>$"));
 
         var fallbackAssembly = CompileAssembly(generated);
         AssertTypePresence(

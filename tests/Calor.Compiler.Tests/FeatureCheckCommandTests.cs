@@ -33,6 +33,7 @@ public class FeatureCheckCommandTests
     [InlineData("nested-generic-type", SupportLevel.Full)]
     [InlineData("binary pattern (and/or)", SupportLevel.Full)]
     [InlineData("unary pattern (not)", SupportLevel.Full)]
+    [InlineData("record", SupportLevel.Full)]
     public void FeatureCheck_FullySupported_ReturnsFullLevel(string feature, SupportLevel expected)
     {
         var info = FeatureSupport.GetFeatureInfo(feature);
@@ -62,7 +63,6 @@ public class FeatureCheckCommandTests
     [Theory]
     [InlineData("await-foreach", SupportLevel.NotSupported)]
     [InlineData("file-scoped-type", SupportLevel.NotSupported)]
-    [InlineData("record", SupportLevel.NotSupported)]
     [InlineData("scoped-parameter", SupportLevel.NotSupported)]
     [InlineData("using-declaration", SupportLevel.NotSupported)]
     [InlineData("standalone-block", SupportLevel.NotSupported)]

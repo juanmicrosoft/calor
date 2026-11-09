@@ -5464,6 +5464,9 @@ public sealed class EffectEnforcementPass
                 MultiDimArrayCreationNode array => $"{array.ElementType}[{new string(',', array.Rank - 1)}]",
                 ThisExpressionNode => EffectResolver.NormalizeParameterType(
                     _context.OwnerClass?.Name ?? "?"),
+                WithExpressionNode with => InferExpressionType(with.Target),
+                TypeOperationNode { Operation: TypeOp.Cast or TypeOp.As } operation =>
+                    EffectResolver.NormalizeParameterType(operation.TargetType),
                 BaseExpressionNode => EffectResolver.NormalizeParameterType(
                     _context.OwnerClass?.BaseClass ?? "?"),
                 LambdaExpressionNode => "Func",
@@ -5936,9 +5939,7 @@ public sealed class EffectEnforcementPass
                 IndexFromEndNode indexFromEnd => InferFromExpression(indexFromEnd.Offset),
                 TypeOperationNode typeOp => InferFromExpression(typeOp.Operand),
                 IsPatternNode isPattern => InferFromExpression(isPattern.Operand),
-                WithExpressionNode with => with.Assignments.Aggregate(
-                    InferFromExpression(with.Target),
-                    (acc, a) => acc.Union(InferFromExpression(a.Value))),
+                WithExpressionNode with => InferFromWithExpression(with),
                 ArrayCreationNode arrayCreation => EffectSet.From("alloc")
                     .Union(arrayCreation.Size != null
                         ? InferFromExpression(arrayCreation.Size)
@@ -6160,7 +6161,10 @@ public sealed class EffectEnforcementPass
         {
             var effects = EffectSet.From("alloc").Union(InferFromMany(newExpr.Arguments));
             var constructorTarget = $"{newExpr.TypeName}..ctor";
-            var resolvedInternalIds = _context.CallGraph.ResolveCallSites(
+            var resolvedInternalIds = _context.CallGraph.ResolvedConstructorCalls(
+                _context.CurrentFunctionId, newExpr.Span);
+            if (resolvedInternalIds.Count == 0)
+                resolvedInternalIds = _context.CallGraph.ResolveCallSites(
                 _context.CurrentFunctionId,
                 constructorTarget,
                 newExpr.Span);
@@ -6189,10 +6193,50 @@ public sealed class EffectEnforcementPass
             return effects;
         }
 
+        private EffectSet InferFromWithExpression(WithExpressionNode expression)
+        {
+            var effects = InferFromExpression(expression.Target);
+            var type = InferExpressionType(expression.Target);
+            if (TryResolveClass(type, out var owner) && owner.IsRecord)
+            {
+                effects = effects.Union(EffectSet.From("alloc"));
+                foreach (var runtimeType in _context.ClassesByName.Values.Distinct()
+                    .Where(candidate => candidate.IsRecord && IsSameOrDerived(candidate, owner)))
+                {
+                    var copies = CallGraphAnalysis.EnumerateConstructors(runtimeType)
+                        .Where(constructor => !constructor.IsStatic && constructor.Parameters.Count == 1
+                            && StripGenericArguments(constructor.Parameters[0].TypeName) == runtimeType.Name).ToArray();
+                    effects = effects.Union(copies.Length == 1
+                        ? InferFromInternalFunctions([$"{runtimeType.Name}.{copies[0].Id}"])
+                        : UnknownResolvedOperation($"{runtimeType.Name}.<Clone>$", expression.Span));
+                }
+                foreach (var assignment in expression.Assignments)
+                {
+                    effects = effects.Union(EffectSet.From("mut"));
+                    effects = effects.Union(ResolveInitializerSetterEffects(type,
+                        new ObjectInitializerAssignment(assignment.PropertyName, assignment.Value)));
+                }
+            }
+            return expression.Assignments.Aggregate(effects,
+                (acc, assignment) => acc.Union(InferFromExpression(assignment.Value)));
+        }
+
+        private bool IsSameOrDerived(ClassDefinitionNode candidate, ClassDefinitionNode ancestor)
+        {
+            var visited = new HashSet<ClassDefinitionNode>();
+            for (var current = candidate; current != null && visited.Add(current); current = ResolveBaseClass(current))
+                if (ReferenceEquals(current, ancestor))
+                    return true;
+            return false;
+        }
+
         public EffectSet InferFromConstructorInitializer(ConstructorDeclaration declaration)
         {
             var initializer = declaration.Constructor.Initializer!;
             var effects = InferFromMany(initializer.Arguments);
+            var resolved = _context.CallGraph.ResolvedConstructorCalls(_context.CurrentFunctionId, initializer.Span);
+            if (resolved.Count > 0)
+                return effects.Union(InferFromInternalFunctions(resolved));
             var targetType = initializer.IsBaseCall
                 ? declaration.Owner.BaseClass
                 : declaration.OwnerName;
@@ -6292,7 +6336,8 @@ public sealed class EffectEnforcementPass
             ConstructorNode constructor,
             IReadOnlyList<string> argumentTypes)
         {
-            if (constructor.Parameters.Count != argumentTypes.Count)
+            if (argumentTypes.Count > constructor.Parameters.Count
+                || constructor.Parameters.Skip(argumentTypes.Count).Any(parameter => parameter.DefaultValue == null))
                 return false;
 
             for (var i = 0; i < argumentTypes.Count; i++)

@@ -6,6 +6,28 @@ namespace Calor.LanguageServer.Tests.Handlers;
 public class DocumentSymbolHandlerTests
 {
     [Fact]
+    public void DocumentSymbols_NativeRecordHasRecordDetailAndNoSyntheticCopyDeclaration()
+    {
+        const string source = """
+            §M{Records}
+              record P:pub (int:X, int:Y)
+            """;
+        var ast = LspTestHarness.GetAst(source);
+        Assert.NotNull(ast);
+        var method = typeof(Calor.LanguageServer.Handlers.DocumentSymbolHandler).GetMethod(
+            "GetModuleChildren", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        var symbols = Assert.IsAssignableFrom<IEnumerable<OmniSharp.Extensions.LanguageServer.Protocol.Models.DocumentSymbol>>(
+            method.Invoke(null, [ast, source]));
+        var record = Assert.Single(symbols);
+        Assert.Equal("record", record.Detail);
+        Assert.Equal(OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Class, record.Kind);
+        Assert.Equal(2, record.Children!.Count(child =>
+            child.Kind == OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Property));
+        Assert.Single(record.Children!.Where(child =>
+            child.Kind == OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Constructor));
+    }
+
+    [Fact]
     public void DocumentSymbols_FunctionsListed()
     {
         var source = """

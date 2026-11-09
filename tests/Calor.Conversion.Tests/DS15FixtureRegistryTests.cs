@@ -21,7 +21,13 @@ namespace Calor.Conversion.Tests;
 public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper output)
 {
     private static readonly HashSet<string> CurrentExpectationFixtures =
-        ["local-function", "conditional-expression-hoisting"];
+        ["local-function", "conditional-expression-hoisting", "conditional-declaration"];
+
+    private static string CurrentManifestPath(string repoRoot, string name, string original) =>
+        name == "conditional-declaration"
+            ? Path.Combine(repoRoot, "tests/TestData/Records/conditional-declaration-current.json")
+            : Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentTypedInput(repoRoot, original,
+                Calor.Compiler.Tests.ActiveSyntaxInputs.InputKind.Structured);
 
     private static string RegistryPath()
     {
@@ -46,12 +52,12 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
     [Theory]
     [InlineData("local-function")]
     [InlineData("conditional-expression-hoisting")]
+    [InlineData("conditional-declaration")]
     public void CurrentExpectation_ChangesOnlyApprovedClassificationFields(string name)
     {
         var repoRoot = Path.GetFullPath(Path.Combine(RegistryPath(), "../../../.."));
         var original = $"bench/phase0-agent-native/fixtures/d-s1.5/{name}/fixture.json";
-        var resolved = Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentTypedInput(repoRoot, original,
-            Calor.Compiler.Tests.ActiveSyntaxInputs.InputKind.Structured);
+        var resolved = CurrentManifestPath(repoRoot, name, original);
         var historical = JsonNode.Parse(File.ReadAllText(Path.Combine(repoRoot, original)))!.AsObject();
         var current = JsonNode.Parse(File.ReadAllText(resolved))!.AsObject();
         Assert.False(historical.ContainsKey("currentObservation"));
@@ -138,14 +144,15 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
         Assert.True(File.Exists(originalTestPath), $"{name}: test.calr missing");
         var repoRoot = Path.GetFullPath(Path.Combine(RegistryPath(), "../../../.."));
         var expectedPath = Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentCompiler(repoRoot, originalExpectedPath);
+        if (name == "conditional-declaration")
+            expectedPath = Path.Combine(repoRoot, "tests/TestData/Records/conditional-declaration-current.calr.txt");
         var testPath = Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentCompiler(repoRoot, originalTestPath);
 
         // 2. Manifest: featureKey named; the DIRECTORY is the sanitized form of the key
         // (keys may contain spaces/parens/slashes — see README) and must match it.
         var relativeManifest = Path.GetRelativePath(repoRoot, manifestPath).Replace('\\', '/');
         var resolvedManifest = CurrentExpectationFixtures.Contains(name)
-            ? Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentTypedInput(repoRoot, relativeManifest,
-                Calor.Compiler.Tests.ActiveSyntaxInputs.InputKind.Structured)
+            ? CurrentManifestPath(repoRoot, name, relativeManifest)
             : manifestPath;
         using var doc = JsonDocument.Parse(File.ReadAllText(resolvedManifest));
         output.WriteLine(JsonSerializer.Serialize(new
@@ -229,7 +236,17 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
             Assert.Equal(observation.GetProperty("requiredIssueFeatures").EnumerateArray()
                 .Select(feature => feature.GetString()).Order(),
                 converted.Issues.Select(issue => issue.Feature).Distinct().Order());
-            AssertValueTestPasses(name, File.ReadAllText(inputPath), runtimeEntryPoint!, runtimeExpectedInt);
+            if (name == "conditional-declaration")
+            {
+                AssertValueTestPasses(name, File.ReadAllText(inputPath), runtimeEntryPoint!,
+                    doc.RootElement.GetProperty("convertedExpectedUndefinedInt").GetInt32(), []);
+                AssertValueTestPasses(name, File.ReadAllText(inputPath), runtimeEntryPoint!,
+                    doc.RootElement.GetProperty("convertedExpectedDefinedInt").GetInt32(), ["FEATURE"]);
+            }
+            else
+            {
+                AssertValueTestPasses(name, File.ReadAllText(inputPath), runtimeEntryPoint!, runtimeExpectedInt);
+            }
         }
         if (certifiedAbsent.ValueKind != JsonValueKind.Null)
         {

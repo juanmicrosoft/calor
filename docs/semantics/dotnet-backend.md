@@ -451,17 +451,24 @@ public sealed class Circle : Shape, IDrawable
 
 ### 11.1 Record Declaration and Construction
 
-Calor preserves C# record declarations with interop; it has no native
-record-declaration marker. Construct an existing record with named constructor
-arguments, not property initializers.
+The bare `record` declaration represents a C# record class, not an ordinary
+class or a record struct. C# synthesizes positional properties, value equality,
+hashing, `ToString`, deconstruction and copy behavior. Constructor defaults and
+record visibility survive emission. Properties, methods and static members use
+the existing indented member syntax. Derived positional records pass their base
+arguments in the header: `record D:pub (int:X, int:Y) : B(X)`.
+
+Record structs, partial or nested declarations, positional parameter attributes/modifiers, conditional members
+and unrepresented member kinds preserve unchanged C# with a specific converter
+fallback reason. They do not count as native record support.
 
 **Calor:**
 ```calor
 §M{Records}
-  §CSHARP{public record Person(string Name, int Age);}§/CSHARP
+  record Person:pub (string:Name, int:Age)
   §F{Create:pub} () -> Person
-    §E{alloc}
-    §R §NEW{Person} §A[Age] 30 §A[Name] "Alice"
+    §E{alloc,mut}
+    §R §NEW{Person} §A[Age] 30 §A[Name] "Alice" §/NEW
 ```
 
 **C#:**
@@ -477,14 +484,21 @@ public static class Records
 
 **Calor:**
 ```calor
-§WITH person
-  §SET{Age} 30
+§M{RecordCopy}
+  record Person:pub (string:Name, int:Age)
+  §F{WithAge:pub} (Person:person) -> Person
+    §E{alloc,mut}
+    §R §WITH person §SET{Age} 30 §/WITH
 ```
 
 **C#:**
 ```csharp
 person with { Age = 30 }
 ```
+
+Constructors and custom init accessors retain the existing effect rules.
+Construction and copying charge their actual constructor and accessor bodies;
+record names do not bypass `Calor0410` or unknown-call diagnostic `Calor0411`.
 
 ---
 
