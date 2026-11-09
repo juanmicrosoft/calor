@@ -4,290 +4,214 @@ section: "syntax-reference"
 order: 3
 ---
 
+Calor expressions use infix operators with C# precedence, ordinary postfix calls
+and indexing. Write `a + b`, `items[index]` and `value.Method(argument)`.
+Parentheses group an expression; they do not introduce a prefix operation.
 
-Calor uses Lisp-style prefix notation for all operations. This eliminates operator precedence ambiguity.
+## Precedence and grouping
 
----
+The table runs from strongest to weakest binding.
 
-## Prefix Notation
+| Category | Operators or forms |
+|:---------|:-------------------|
+| Postfix | Calls, member access, indexing |
+| Unary | `!`, `~`, unary `+` and `-` |
+| Multiplicative | `*`, `/`, `%` |
+| Additive | `+`, `-` |
+| Shift | `<<`, `>>` |
+| Relational | `<`, `<=`, `>`, `>=` |
+| Equality | `==`, `!=` |
+| Bitwise AND | `&` |
+| Bitwise XOR | `^` |
+| Bitwise OR | `\|` |
+| Logical AND | `&&` |
+| Logical OR | `\|\|` |
+| Null coalescing | `??` |
+| Conditional | `condition ? whenTrue : whenFalse` |
 
-Instead of infix `a + b`, Calor uses prefix `(+ a b)`:
-
-| Infix | Calor Prefix |
-|:------|:------------|
-| `a + b` | `(+ a b)` |
-| `a * b + c` | `(+ (* a b) c)` |
-| `a + b * c` | `(+ a (* b c))` |
-| `(a + b) * c` | `(* (+ a b) c)` |
-
----
-
-## Arithmetic Operators
-
-| Operator | Meaning | Example |
-|:---------|:--------|:--------|
-| `+` | Addition | `(+ a b)` |
-| `-` | Subtraction | `(- a b)` |
-| `*` | Multiplication | `(* a b)` |
-| `/` | Division | `(/ a b)` |
-| `%` | Modulo | `(% a b)` |
-
-### Examples
-
-```calor
-(+ 1 2)           // 3
-(- 10 3)          // 7
-(* 4 5)           // 20
-(/ 15 3)          // 5
-(% 17 5)          // 2
-```
-
-### Nested Expressions
+Binary operators associate to the left, except `??`, which associates to the
+right. Conditional expressions also associate to the right.
+Use parentheses when grouping would otherwise be hard to read.
 
 ```calor
-// (1 + 2) * 3 = 9
-(* (+ 1 2) 3)
-
-// 1 + (2 * 3) = 7
-(+ 1 (* 2 3))
-
-// ((a + b) * c) - d
-(- (* (+ a b) c) d)
+module ExpressionPrecedence
+  func Main () → string
+    !
+    let int?:missing = null
+    let int:coalesced = missing ?? 3 + 4 * 2
+    let int:conditional = false ? 1 : true ? 2 : 3
+    return "${2 + 3 * 4}:${(2 + 3) * 4}:${12 - 5 - 2}:${32 / 4 / 2}:${1 << 2 + 1}:${6 & 3}:${6 ^ 3}:${4 | 1}:${!false && true || false}:${coalesced}:${conditional}"
 ```
 
----
+`Main()` returns `14:20:5:4:8:2:5:5:True:11:2`. For example, `1 << 2 + 1`
+means `1 << (2 + 1)`, and `32 / 4 / 2` means `(32 / 4) / 2`.
 
-## Comparison Operators
+## Arithmetic operators
 
-| Operator | Meaning | Example |
-|:---------|:--------|:--------|
-| `==` | Equal | `(== a b)` |
-| `!=` | Not equal | `(!= a b)` |
-| `<` | Less than | `(< a b)` |
-| `<=` | Less or equal | `(<= a b)` |
-| `>` | Greater than | `(> a b)` |
-| `>=` | Greater or equal | `(>= a b)` |
+| Operator | Meaning |
+|:---------|:--------|
+| `+`, `-` | Addition and subtraction |
+| `*` | Multiplication |
+| `/` | Division |
+| `%` | Remainder |
 
-### Examples
+Integer division truncates toward zero. A nonzero integer remainder has the
+dividend's sign; it is not always a positive mathematical modulo.
+Integer arithmetic is checked by default. Overflow and integer division by zero
+throw exceptions rather than produce a successful result.
 
 ```calor
-(== x 0)          // x equals 0
-(!= y "")         // y is not empty string
-(< age 18)        // age less than 18
-(>= score 70)     // score at least 70
+module ArithmeticBehavior
+  func Increment (int:value) → int
+    !
+    return value + 1
+
+  func Divide (int:numerator, int:denominator) → int
+    !
+    return numerator / denominator
+
+  func Remainder (int:numerator, int:denominator) → int
+    !
+    return numerator % denominator
+
+  func Main () → string
+    !
+    return "${Increment(41)}:${Divide(-7, 3)}:${Remainder(-7, 3)}"
 ```
 
-Each comparison takes exactly two operands. `(== x)` and `(!= x)` are
-`Calor0110`: they used to compare `x` with `null` silently. Write the null
-explicitly, `(== x null)`. The same rule holds for the other two short forms
-the parser used to accept: `(?? x)` is `Calor0110` (it was read as `x`, dropping
-the fallback), and so is `(? c a)` (it was read as `c ? a : null`). The
-conditional `(? c a b)` takes exactly three operands and `(?? a b)` exactly two.
+`Main()` returns `42:-2:-1`. `Increment(2147483647)` throws
+`OverflowException`, `Divide(1, 0)` throws `DivideByZeroException`, and
+`Divide(-2147483648, -1)` throws `OverflowException`.
+These are body exceptions, not failed runtime contract checks.
 
----
+## Comparison and logical operators
 
-## Logical Operators
+Comparisons use two operands: `a == b`, `a != b`, `a < b`, `a <= b`,
+`a > b` and `a >= b`. Write null explicitly: `value != null`.
+Logical operators are `&&`, `||` and unary `!`.
 
-| Operator | Meaning | Example |
-|:---------|:--------|:--------|
-| `&&` | Logical AND | `(&& a b)` |
-| `\|\|` | Logical OR | `(\|\| a b)` |
-| `!` | Logical NOT | `(! a)` |
-
-### Examples
+Combine two comparisons for a range check. `minimum <= value <= maximum`
+is not a chained comparison.
 
 ```calor
-(&& (> x 0) (< x 100))      // x > 0 AND x < 100
-(|| (== a 1) (== a 2))      // a == 1 OR a == 2
-(! (== x 0))                // NOT (x == 0)
+module ComparisonExpressions
+  func InRange (int:value, int:minimum, int:maximum) → bool
+    !
+    return value >= minimum && value <= maximum
+
+  func Recognized (int:value) → bool
+    !
+    return value == 1 || value == 2 || value == 3
+
+  func HasValue (string?:value) → bool
+    !
+    return value != null
+
+  func Main () → string
+    !
+    return "${InRange(5, 0, 10)}:${InRange(11, 0, 10)}:${Recognized(2)}:${Recognized(4)}:${HasValue(null)}:${HasValue("")}"
 ```
 
-### Complex Conditions
+`Main()` returns `True:False:True:False:False:True`. An empty string is not null.
+
+## Evaluation order and short circuiting
+
+Operands and call arguments evaluate left to right. `&&` evaluates its right
+operand only when the left is true; `||` evaluates it only when the left is false.
+`??` evaluates its fallback only when the left value is null. A conditional
+expression evaluates only its selected branch.
+
+This program records the expressions that actually run. Its helper's `mut` row
+declares the list mutation; the caller also declares the list allocation.
 
 ```calor
-// (x > 0 && x < 100) || y == 0
-(|| (&& (> x 0) (< x 100)) (== y 0))
+module ExpressionEvaluation
+  func Record (List<int>:trace, int:value) → int
+    ! mut
+    trace.Add(value)
+    return value
 
-// !(a == b && c == d)
-(! (&& (== a b) (== c d)))
+  func Pair (int:left, int:right) → int
+    !
+    return left * 10 + right
+
+  func Main () → string
+    ! alloc, mut
+    let List<int>:trace = new List<int>()
+    let bool:andSkipped = false && Record(trace, 1) > 0
+    let bool:orSkipped = true || Record(trace, 2) > 0
+    let bool:andTaken = true && Record(trace, 3) > 0
+    let bool:orTaken = false || Record(trace, 4) > 0
+    let int:chosen = true ? Record(trace, 5) : Record(trace, 6)
+    let int?:present = 7
+    let int?:missing = null
+    let int:a = present ?? Record(trace, 7)
+    let int:b = missing ?? Record(trace, 8)
+    let int:pair = Pair(Record(trace, 9), Record(trace, 10))
+    return "${andSkipped}:${orSkipped}:${andTaken}:${orTaken}:${chosen}:${a}:${b}:${pair}:${trace.Count}:${trace[0]}:${trace[1]}:${trace[2]}:${trace[3]}:${trace[4]}:${trace[5]}"
 ```
 
----
+`Main()` returns `False:True:True:True:5:7:8:100:6:3:4:5:8:9:10`.
+The trace is exactly `3, 4, 5, 8, 9, 10`: skipped branches contribute nothing,
+and each selected expression runs once.
 
-## Using Expressions
+## Using expressions
 
-### In Return Statements
+Expressions can appear in bindings, returns, call arguments, conditions,
+contracts and loop bounds.
+
+| Position | Example fragment |
+|:---------|:-----------------|
+| Binding | `let int:sum = a + b` |
+| Return | `return (x - 1) * 2` |
+| Call argument | `Console.WriteLine(x * x)` |
+| Condition | `if value > 0` |
+| Precondition | `requires divisor != 0` |
+| Postcondition | `=> result >= 0` |
+| Range bound | `for i from 0 to count - 1 step 1` |
+
+A console call needs `cw` in its caller's effect row. Snapshot range bounds
+evaluate once; the semicolon loop form reevaluates its condition.
+See [control flow](/docs/syntax-reference/control-flow/) and
+[contracts](/docs/syntax-reference/contracts/).
+
+## Collection expressions
+
+Collections use ordinary .NET members, not dedicated query tags.
+
+| Expression | Meaning |
+|:-----------|:--------|
+| `items.Contains(value)` | Membership in a list or set |
+| `mapping.ContainsKey(key)` | Dictionary key lookup |
+| `mapping.ContainsValue(value)` | Dictionary value lookup |
+| `items.Count` | Collection count |
+| `array.Length` | Array length |
+| `items[index]` | Indexed element |
 
 ```calor
-§R (+ a b)
-§R (* (- x 1) 2)
-§R (>= score 70)
+module CollectionExpressions
+  func NonEmptyCount (List<int>:items) → int
+    !
+    requires items.Count > 0
+    => result > 0
+    return items.Count
+
+  func Main () → string
+    ! alloc, mut
+    let List<int>:items = new List<int>()
+    items.Add(5)
+    let Dictionary<string,int>:ages = new Dictionary<string,int>()
+    ages.Add("alice", 30)
+    return "${items.Contains(5)}:${ages.ContainsKey("alice")}:${ages.ContainsValue(30)}:${NonEmptyCount(items)}:${items[0]}"
 ```
 
-### In Bindings
-
-```calor
-§B{sum} (+ a b)
-§B{product} (* x y)
-§B{isValid} (&& (> x 0) (< x 100))
-```
-
-### In Print Statements
-
-```calor
-§P (+ 1 2)          // prints 3
-§P (* x x)          // prints x squared
-```
-
-### In Conditions
-
-```calor
-§IF (> x 0)
-  §P "positive"
-§EI (< x 0)
-  §P "negative"
-§EL
-  §P "zero"
-```
-
-### In Contracts
-
-```calor
-§Q (>= x 0)                      // Requires: x >= 0
-§Q (!= divisor 0)                // Requires: divisor not zero
-§S (>= result 0)                 // Ensures: result >= 0
-§S (<= result (* x x))           // Ensures: result <= x^2
-```
-
-### In Loop Bounds
-
-Loop bounds can be expressions:
-
-```calor
-§L{i:0:(- n 1):1}    // i from 0 to n-1
-§L{j:1:(* 2 n):2}    // j from 1 to 2n, step 2
-```
-
----
-
-## Collection Expressions
-
-Calor provides expressions for querying collections.
-
-### Contains Check (`§HAS`)
-
-Check if a collection contains an element.
-
-| Syntax | Description | C# Equivalent |
-|:-------|:------------|:--------------|
-| `§HAS{coll} value` | Element in list/set | `coll.Contains(value)` |
-| `§HAS{dict} §KEY key` | Key in dictionary | `dict.ContainsKey(key)` |
-| `§HAS{dict} §VAL value` | Value in dictionary | `dict.ContainsValue(value)` |
-
-**Examples:**
-```calor
-// Check if list contains element
-§IF §HAS{numbers} 5
-  §P "Found 5"
-
-// Check if key exists in dictionary
-§IF §HAS{ages} §KEY "alice"
-  §P "Alice found"
-
-// Use in binding
-§B{hasItem} §HAS{inventory} "sword"
-```
-
-### Collection Count (`§CNT`)
-
-Get the number of elements in a collection.
-
-| Syntax | Returns | C# Equivalent |
-|:-------|:--------|:--------------|
-| `§CNT{coll}` | `i32` | `coll.Count` |
-
-**Examples:**
-```calor
-// Get count
-§B{size} §CNT{items}
-
-// Use in condition
-§IF (> §CNT{queue} 0)
-  §P "Queue not empty"
-
-// Use in loop bound
-§L{for1:i:0:(- §CNT{list} 1):1}
-  §P list[i]
-```
-
-### Using Collection Expressions in Contracts
-
-```calor
-§F{ProcessItems:pub}
-  §I{List<i32>:items}
-  §O{i32}
-  §Q (> §CNT{items} 0)           // Requires: items not empty
-  §S (>= result 0)
-  // ...
-```
-
----
-
-## Why Prefix Notation?
-
-### 1. No Precedence Ambiguity
-
-Infix:
-```javascript
-a + b * c    // Is this (a+b)*c or a+(b*c)?
-```
-
-Calor:
-```calor
-(+ a (* b c))    // Clearly a + (b * c)
-(* (+ a b) c)    // Clearly (a + b) * c
-```
-
-### 2. Easy AST Manipulation
-
-The structure `(op arg1 arg2)` directly represents the AST node.
-
-### 3. Uniform Syntax
-
-Every operation follows the same pattern: `(operator arguments...)`
-
----
-
-## Common Patterns
-
-### FizzBuzz Check
-
-```calor
-(== (% i 15) 0)    // i divisible by 15
-(== (% i 3) 0)     // i divisible by 3
-(== (% i 5) 0)     // i divisible by 5
-```
-
-### Range Check
-
-```calor
-(&& (>= x min) (<= x max))    // min <= x <= max
-```
-
-### Null Check
-
-```calor
-(!= value null)    // value is not null
-```
-
-### Equality with Multiple Values
-
-```calor
-(|| (== x 1) (|| (== x 2) (== x 3)))    // x is 1, 2, or 3
-```
-
----
+`Main()` returns `True:True:True:1:5`.
+Use an ordinary property read for `Count` or `Length`, not a zero-argument call.
+See [types](/docs/syntax-reference/types/) for collection construction and
+[calls](/docs/syntax-reference/calls/) for metadata overload resolution.
 
 ## Next
 
-- [Control Flow](/docs/syntax-reference/control-flow/) - Loops and conditionals
+- [Current language](/docs/syntax-reference/current-language/) — generated syntax catalog
+- [String operations](/docs/syntax-reference/string-operations/) — interpolation and string members
+- [Control flow](/docs/syntax-reference/control-flow/) — loops, conditionals and matching

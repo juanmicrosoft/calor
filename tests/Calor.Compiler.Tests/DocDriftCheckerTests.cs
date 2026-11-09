@@ -76,6 +76,13 @@ public class DocDriftCheckerTests
     [InlineData("index.mdx", 2, 0,
         new[] { "LabelExample", "FizzBuzz" }, new[] { "42", "FizzBuzz:Fizz:Buzz:7" },
         new[] { "Demo.DemoModule.Main()", "GlobalModule.Main()" })]
+    [InlineData("expressions.mdx", 5, 0,
+        new[] { "ExpressionPrecedence", "ArithmeticBehavior", "ComparisonExpressions", "ExpressionEvaluation",
+            "CollectionExpressions" },
+        new[] { "14:20:5:4:8:2:5:5:True:11:2", "42:-2:-1", "True:False:True:False:False:True",
+            "False:True:True:True:5:7:8:100:6:3:4:5:8:9:10", "True:True:True:1:5" },
+        new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()",
+            "GlobalModule.Main()" })]
     public void PublicNativeReference_CompilesPositiveAndExactNegativeExamples(
         string page, int completeCount, int negativeCount, string[] moduleNames, string[] expectedResults,
         string[] expressions)
@@ -176,6 +183,30 @@ public class DocDriftCheckerTests
                 """);
             Assert.Equal(expected, observed);
         }
+    }
+
+    [Theory]
+    [InlineData("GlobalModule.Increment(int.MaxValue)", "!OverflowException")]
+    [InlineData("GlobalModule.Divide(1, 0)", "!DivideByZeroException")]
+    [InlineData("GlobalModule.Divide(int.MinValue, -1)", "!OverflowException")]
+    [InlineData("GlobalModule.Divide(-7, 3)", "-2")]
+    [InlineData("GlobalModule.Remainder(-7, 3)", "-1")]
+    public void PublicExpressions_PreserveCheckedArithmeticAndSignedDivision(string expression, string expected)
+    {
+        var path = "website/content/syntax-reference/expressions.mdx";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path));
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(content)
+            .Single(program => program.Source.StartsWith("module ArithmeticBehavior\n", StringComparison.Ordinal)).Source;
+        var compiled = Program.Compile(source, path);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+            public static class Probe
+            {
+                public static object? Run() => {{expression}};
+            }
+            """);
+        Assert.Equal(expected, observed);
     }
 
     [Fact]
