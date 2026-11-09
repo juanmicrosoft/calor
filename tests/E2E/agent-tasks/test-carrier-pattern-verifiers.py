@@ -122,9 +122,15 @@ def canonical_source(text, category=None):
     text = re.sub(r"§B\{(\w+):([^}]+)\}", r"let \2:\1 =", text)
     text = re.sub(r"§B\{(\w+)\}", r"let \1 =", text)
     text = re.sub(r"§NEW\{([^}]+)\}", r"new \1()", text)
-    text = re.sub(
-        r"\(and §PTYPE\{([^:}]+):(\w+)\} §PPROP §PMATCH\{(\w+)\} (true|false)\)",
-        r"\1 { \3: \4 } \2", text)
+    property_capture = r"\(and §PTYPE\{([^:}]+):(\w+)\} §PPROP §PMATCH\{(\w+)\} (true|false)\)"
+    if category is not None and category not in ("property", "type-guard"):
+        # Other categories test APIs, outputs and coupling, not property syntax.
+        # Keep their current carrier match executable without weakening either
+        # separately required typed/property positive.
+        text = re.sub(property_capture, lambda match:
+                      f"var {match[2]} when {'' if match[4] == 'true' else '!'}{match[2]}.{match[3]}", text)
+    else:
+        text = re.sub(property_capture, r"\1 { \3: \4 } \2", text)
     text = re.sub(r"§PTYPE\{([^:}]+):(\w+)\}", r"\1 \2", text)
     text = re.sub(r"§VAR\{(\w+)\}", r"var \1", text)
     text = re.sub(r"§E\{([^}]+)\}", r"! \1", text)
@@ -673,6 +679,10 @@ class CarrierPatternCanonicalBridgeTests(unittest.TestCase):
                 if category in ("property", "type-guard"):
                     self.assertIn("case Calculator.", text)
                     self.assertNotIn("case var ", text)
+                if expected and category not in ("property", "type-guard", "guard"):
+                    self.assertRegex(text, r"case var v when !?v\.")
+                    self.assertNotIn("{ IsSome:", text)
+                    self.assertNotIn("{ IsOk:", text)
                 if category == "scalar-aliases":
                     self.assertIn("System.Int32", text)
                 if category == "raw-interop":

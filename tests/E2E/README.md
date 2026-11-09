@@ -2166,6 +2166,9 @@ module-marker diagnostic, never merely a compilation failure. Canonical controls
 retain all 71 categories and expectations, including distinct property and typed
 patterns. Missing current pattern support remains a failing positive requirement;
 it is not replaced by a guarded-var control or credited as a finite rejection.
+The other categories use a real guarded carrier-input match as their canonical
+baseline. Their independent API, contract, output and coupling checks therefore
+do not depend on support for the separately required typed/property syntax.
 
 Carrier reflection follows native declaration namespaces, not the compilation-unit
 label. The trace helper honors emitted file-scoped namespaces. Global-namespace
