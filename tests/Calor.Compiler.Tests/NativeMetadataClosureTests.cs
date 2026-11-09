@@ -185,6 +185,62 @@ public sealed class NativeMetadataClosureTests
     }
 
     [Fact]
+    public void EscapedDefaultBinding_RemainsAVariableRatherThanADefaultInitializer()
+    {
+        const string authored = """
+            module DefaultIdentifier
+              func Run (int:@default) → int
+                let int:value = @default
+                return value
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var result = Compile(source);
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+            var method = CompileAssembly(result.GeneratedCode).GetTypes()
+                .SelectMany(type => type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                .Single(method => method.Name == "Run");
+            Assert.Equal(31, method.Invoke(null, [31]));
+        }
+    }
+
+    [Theory]
+    [InlineData("W1-F1-refout", false)]
+    [InlineData("W1-F1-refout", true)]
+    [InlineData("W1-F1-outvar-statement", false)]
+    [InlineData("W1-F1-outvar-statement", true)]
+    public void OriginalByReferenceFixtures_RetainNativeConverterCapability(string fixture, bool passthrough)
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
+        var source = File.ReadAllText(Path.Combine(root, "tests", "TestData", "InteropScope", "W1",
+            "fixtures", fixture + ".cs.txt"));
+        var conversion = new CSharpToCalorConverter(new ConversionOptions
+        {
+            RescueUnusableMembers = true,
+            PassthroughOnError = passthrough
+        }).Convert(source);
+        Assert.True(conversion.Success, string.Join(Environment.NewLine, conversion.Issues)
+            + Environment.NewLine + conversion.CalorSource);
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.Equal(0, conversion.LossySubstitutionCount);
+        Assert.Equal(0, conversion.DropCount);
+        Assert.DoesNotContain("@default", conversion.CalorSource);
+        var compiled = Compile(conversion.CalorSource!);
+        Assert.False(compiled.HasErrors, conversion.CalorSource + Environment.NewLine
+            + string.Join(Environment.NewLine, compiled.Diagnostics.Errors));
+        var methods = CompileAssembly(compiled.GeneratedCode).GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic));
+        if (fixture == "W1-F1-refout")
+            Assert.Equal(44, methods.Single(method => method.Name == "Run").Invoke(null, null));
+        else
+        {
+            var parse = methods.Single(method => method.Name == "ParseOrZero");
+            Assert.Equal(42, parse.Invoke(null, ["42"]));
+            Assert.Equal(0, parse.Invoke(null, ["bad"]));
+        }
+    }
+
+    [Fact]
     public void NativeReferenceDefaults_RetainSourceAndMetadataOverloadIdentityAfterReemission()
     {
         const string authored = """

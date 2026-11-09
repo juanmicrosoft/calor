@@ -2035,7 +2035,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
             return "";
         }
 
-        var initPart = node.Initializer != null ? $" = {node.Initializer.Accept(this)}" : "";
+        var initializer = node.Initializer is ReferenceNode { Name: "default", IsVerbatim: false }
+            && mappedType is not null and not "var"
+                ? $"default({mappedType})" : node.Initializer?.Accept(this);
+        var initPart = initializer is not null ? $" = {initializer}" : "";
         AppendLine($"{bindHeader}{initPart}");
         return "";
     }
