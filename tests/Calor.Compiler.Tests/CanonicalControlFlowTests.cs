@@ -63,6 +63,22 @@ public sealed class CanonicalControlFlowTests
             """);
 
     [Theory]
+    [InlineData("checked", "9223372036854775806", "9223372036854775807", "2")]
+    [InlineData("unchecked", "9223372036854775806", "9223372036854775807", "2")]
+    [InlineData("checked", "-9223372036854775807", "-9223372036854775807", "-2")]
+    [InlineData("unchecked", "-9223372036854775807", "-9223372036854775807", "-2")]
+    public void SnapshotRange_TypedLongBinderTerminatesAtOverflowInEitherModulePolicy(
+        string overflow, string start, string end, string step)
+        => AssertObservation($$"""
+            var int:n = 0
+            for long:item from {{start}} to {{end}} step {{step}}
+              set n n + 1
+              if n == 3
+                break
+            return n
+            """, "1", overflow: overflow);
+
+    [Theory]
     [InlineData("for @step from 1 to 3 step 1")]
     [InlineData("for @step = 1; @step <= 3; @step = @step + 1")]
     public void For_KeywordBinderRetainsSemanticNameAndRoundTrips(string header)
