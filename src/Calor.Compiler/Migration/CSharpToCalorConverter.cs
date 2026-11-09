@@ -327,8 +327,16 @@ public sealed class CSharpToCalorConverter
         string csharpSource,
         string? sourceFile,
         CancellationToken cancellationToken)
+        => ConvertWithContext(csharpSource, sourceFile, cancellationToken, capturePreservationContext: false);
+
+    internal ConversionResult ConvertWithPreservationContext(
+        string csharpSource, string? sourceFile = null, CancellationToken cancellationToken = default)
+        => ConvertWithContext(csharpSource, sourceFile, cancellationToken, capturePreservationContext: true);
+
+    private ConversionResult ConvertWithContext(
+        string csharpSource, string? sourceFile, CancellationToken cancellationToken, bool capturePreservationContext)
     {
-        var result = ConvertCore(csharpSource, sourceFile, cancellationToken);
+        var result = ConvertCore(csharpSource, sourceFile, cancellationToken, capturePreservationContext);
         if (_options.Fidelity != ConversionFidelity.Lossless
             || (result.Success && !result.Losses.Any(loss => loss.IsSemanticLoss)))
             return result;
@@ -369,8 +377,11 @@ public sealed class CSharpToCalorConverter
         }
 
         var context = CreateContext(sourceFile);
+        context.CapturePreservationContext = attempted.Context.CapturePreservationContext;
         context.Metadata = attempted.Metadata;
         context.OriginalSource = source;
+        if (context.CapturePreservationContext)
+            context.OriginalSyntaxTree = tree;
         context.UserManifestRoot = ResolveUserManifestRoot();
         context.Stats.TotalNodes = attempted.Context.Stats.TotalNodes;
         context.Stats.InteropBlocksEmitted = 1;
@@ -394,7 +405,7 @@ public sealed class CSharpToCalorConverter
             ConversionEnabledBy.LosslessFidelity);
 
         var module = PreserveCompilationUnit(source, "whole-file-preservation",
-            "Native/member/type conversion or validation failed; preserve the original compilation unit.");
+            "Native/member/type conversion or validation failed; preserve the original compilation unit.", context);
         var calorSource = new CalorEmitter(context).Emit(module);
         var compiled = Program.Compile(calorSource, sourceFile ?? "preserved.calr",
             new CompilationOptions
@@ -489,10 +500,12 @@ public sealed class CSharpToCalorConverter
     private ConversionResult ConvertCore(
         string csharpSource,
         string? sourceFile,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool capturePreservationContext)
     {
         var startTime = DateTime.UtcNow;
         var context = CreateContext(sourceFile);
+        context.CapturePreservationContext = capturePreservationContext;
         context.UserManifestRoot = ResolveUserManifestRoot();
         context.OriginalSource = csharpSource;
         context.ReserveNamesFrom(_options.AdditionalSemanticSyntaxTrees);
@@ -614,6 +627,9 @@ public sealed class CSharpToCalorConverter
                 parseOptions,
                 cancellationToken: cancellationToken);
             var root = syntaxTree.GetCompilationUnitRoot();
+            if (context.CapturePreservationContext
+                && string.Equals(csharpSource, context.OriginalSource, StringComparison.Ordinal))
+                context.OriginalSyntaxTree = syntaxTree;
             // #1132: the tree actually converted (its preprocessor symbols) also reserves names.
             context.ReserveNamesFrom([syntaxTree]);
             effectiveOutputKind = parseOptions.Kind == SourceCodeKind.Script
@@ -984,22 +1000,57 @@ public sealed class CSharpToCalorConverter
     /// <summary>
     /// Converts a C# file and writes the output to an Calor file.
     /// </summary>
+    /// <remarks>
+    /// Persists original conversion context beside the output. Existing output
+    /// must match its saved generation exactly; edited or unassociated output
+    /// is retained and the refresh fails with an actionable I/O error.
+    /// </remarks>
     public async Task<ConversionResult> ConvertFileAndSaveAsync(
         string csharpFilePath,
         string? outputPath = null,
         CancellationToken cancellationToken = default)
     {
-        var result = await ConvertFileAsync(csharpFilePath, cancellationToken);
+        if (!File.Exists(csharpFilePath))
+            return await ConvertFileAsync(csharpFilePath, cancellationToken);
+        var calorPath = Path.GetFullPath(outputPath ?? Path.ChangeExtension(csharpFilePath, ".calr"));
+        var receiptPath = calorPath + ".conversion.json";
+        var sourceIdentity = CanonicalPath.Resolve(csharpFilePath);
+        if (new[] { calorPath, receiptPath, calorPath + ".conversion.lock" }
+            .Any(path => Incremental.BuildStateCache.GetPathComparer().Equals(CanonicalPath.Resolve(path), sourceIdentity)))
+            throw new IOException("Conversion artifacts must not overwrite the original C# source.");
+        Directory.CreateDirectory(Path.GetDirectoryName(calorPath)!);
+        using var generationLock = new FileStream(
+            calorPath + ".conversion.lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        var before = File.Exists(calorPath)
+            ? await ReadSourceFileAsync(calorPath, cancellationToken) : null;
+        var beforeReceipt = File.Exists(receiptPath)
+            ? await ReadSourceFileAsync(receiptPath, cancellationToken) : null;
+        if (before != null || beforeReceipt != null)
+        {
+            if (before == null || beforeReceipt == null)
+                throw new IOException("Existing output has no matching conversion generation context. Keep it and convert the original C# to a new destination.");
+            var previous = ConversionReceipt.Deserialize(beforeReceipt);
+            if (!string.Equals(before, previous.GeneratedCalor, StringComparison.Ordinal)
+                || !string.Equals(previous.Original.Path, Path.GetFullPath(csharpFilePath), StringComparison.Ordinal))
+                throw new IOException("Generated Calor was edited or belongs to another original source. Keep those edits; automatic refresh is refused.");
+        }
+        var inputs = ConversionReceipt.CaptureInputs(
+            csharpFilePath, GetSemanticMetadataReferences(), _options);
+        if (inputs.Any(input => new[] { calorPath, receiptPath, calorPath + ".conversion.lock" }
+                .Any(path => Incremental.BuildStateCache.GetPathComparer()
+                    .Equals(CanonicalPath.Resolve(path), CanonicalPath.Resolve(input.Path)))))
+            throw new IOException("Conversion artifacts must not overwrite original source or reference inputs.");
+        var original = await ReadSourceFileAsync(csharpFilePath, cancellationToken);
+        var result = ConvertWithPreservationContext(original, Path.GetFullPath(csharpFilePath), cancellationToken);
 
         if (result.Success && result.CalorSource != null)
         {
-            var calorPath = outputPath ?? Path.ChangeExtension(csharpFilePath, ".calr");
-            var writeEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
-            await ConversionFileWriter.WriteAtomicAsync(
-                calorPath,
-                result.CalorSource,
-                writeEncoding,
-                cancellationToken);
+            if (!string.Equals(result.Context.OriginalSource,
+                    await ReadSourceFileAsync(csharpFilePath, cancellationToken), StringComparison.Ordinal))
+                throw new IOException("Original C# changed during conversion; output was not refreshed.");
+            var receipt = ConversionReceipt.Capture(result, _options, inputs);
+            await ConversionFileWriter.WriteGenerationAsync(
+                calorPath, before, beforeReceipt, receipt, cancellationToken);
         }
 
         return result;
@@ -1344,7 +1395,7 @@ public sealed class CSharpToCalorConverter
             var module = PreserveCompilationUnit(
                 csharpSource,
                 "namespace-topology",
-                "Multiple lexical namespace scopes are preserved as one whole-file interop boundary.");
+                "Multiple lexical namespace scopes are preserved as one whole-file interop boundary.", context);
             var calorSource = new CalorEmitter(context).Emit(module);
             if (!ParsesCleanly(calorSource))
             {
@@ -1376,7 +1427,8 @@ public sealed class CSharpToCalorConverter
     internal static ModuleNode PreserveCompilationUnit(
         string source,
         string feature,
-        string reason)
+        string reason,
+        ConversionContext? context = null)
     {
         var span = new Parsing.TextSpan(0, source.Length, 1, 1);
         var interop = new CSharpInteropBlockNode(
@@ -1387,6 +1439,7 @@ public sealed class CSharpToCalorConverter
             NamespaceScopeId = "",
             FullyQualifiedSymbolIdentity = "global::<compilation-unit>"
         };
+        context?.AssociatePreservation(interop, context.OriginalSyntaxTree?.GetRoot());
         return new ModuleNode(
             span, "m001", "_global",
             [], [], [], [], [], [], [],
@@ -2193,6 +2246,37 @@ public enum ConversionDirection
 
 internal static class ConversionFileWriter
 {
+    internal static async Task WriteGenerationAsync(
+        string path, string? before, string? beforeReceipt, ConversionReceipt receipt,
+        CancellationToken cancellationToken = default)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var receiptPath = fullPath + ".conversion.json";
+        ConversionReceipt.VerifyInputs(receipt.Inputs);
+        if ((File.Exists(fullPath) ? await CSharpToCalorConverter.ReadSourceFileAsync(fullPath, cancellationToken) : null) != before
+            || (File.Exists(receiptPath) ? await CSharpToCalorConverter.ReadSourceFileAsync(receiptPath, cancellationToken) : null) != beforeReceipt)
+            throw new IOException("Conversion output or generation context changed concurrently; refresh refused.");
+        cancellationToken.ThrowIfCancellationRequested();
+        var directory = Path.GetDirectoryName(fullPath)!;
+        if (fullPath.EndsWith(".calr", StringComparison.OrdinalIgnoreCase)
+            && !Ids.DeclarationIdentityStore.IsAmbientRoot(directory))
+        {
+            var store = Ids.DeclarationIdentityStore.FindForActiveInput(fullPath)
+                ?? new Ids.DeclarationIdentityStore(directory);
+            store.Sync(before == null ? [] : [fullPath]);
+            store.Apply([new(fullPath, before, receipt.GeneratedCalor)]);
+        }
+        else
+        {
+            await WriteAtomicAsync(fullPath, receipt.GeneratedCalor, cancellationToken: cancellationToken);
+        }
+        // Output and receipt are separate artifacts. An interrupted final receipt
+        // write leaves a detectable mismatch, never a trusted new generation.
+        if ((File.Exists(receiptPath) ? await CSharpToCalorConverter.ReadSourceFileAsync(receiptPath) : null) != beforeReceipt)
+            throw new IOException("Output was written but its generation context changed concurrently. Keep both files; automatic refresh is blocked.");
+        await WriteAtomicAsync(receiptPath, receipt.Serialize());
+    }
+
     public static void WriteAtomic(
         string path,
         string content,
@@ -2298,15 +2382,7 @@ public static class Converter
     public static async Task<ConversionResult> ConvertCSharpToCalorAsync(string csharpPath, string? outputPath, ConversionOptions? options)
     {
         var converter = options != null ? new CSharpToCalorConverter(options) : new CSharpToCalorConverter();
-        var result = await converter.ConvertFileAsync(csharpPath);
-
-        if (result.Success && result.CalorSource != null)
-        {
-            var calorPath = outputPath ?? Path.ChangeExtension(csharpPath, ".calr");
-            await ConversionFileWriter.WriteAtomicAsync(calorPath, result.CalorSource);
-        }
-
-        return result;
+        return await converter.ConvertFileAndSaveAsync(csharpPath, outputPath);
     }
 
     /// <summary>

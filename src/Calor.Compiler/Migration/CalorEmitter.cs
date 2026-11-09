@@ -62,6 +62,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Emit(ModuleNode module)
     {
+        _context.EmittedPreservations.Clear();
         _builder.Clear();
         _indentLevel = 0;
         _pendingHoistedLines.Clear();
@@ -4877,6 +4878,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(RawCSharpNode node)
     {
+        if (_context.CapturePreservationContext
+            && RawCSharpFrame.TryParseReason(node.FramingReason ?? "statement", out var frame))
+            _context.RecordPreservationEmission(node, frame with { Code = node.CSharpCode });
         EmitRawFrame(node.FramingReason ?? "statement", node.CSharpCode);
         return "";
     }
@@ -5076,6 +5080,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var frame = new RawCSharpFrame(node.CSharpCode, node.FeatureName,
             node.Reason, node.MemberKind, node.IsCompilationUnitPassthrough);
+        _context.RecordPreservationEmission(node, frame);
         EmitRawFrame(frame.ReasonMarker, frame.Code);
         return "";
     }
