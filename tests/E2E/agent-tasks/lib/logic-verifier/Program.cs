@@ -43,6 +43,11 @@ static void Verify(string profile, string path)
     // Every profile validates the selected native prerequisite, even when it
     // needs no contract proof. A corrupt/mismatched asset must not go unused.
     using var nativePrerequisite = new Context();
+    if (profile is "advanced001" or "advanced002" or "advanced003" or "advanced004")
+    {
+        VerifyAdvancedMath(profile, path);
+        return;
+    }
     if (profile is "ref001" or "ref003" or "ref004" or "ref005" or "ref006" or "ref007" or "ref008")
     {
         VerifyRefactoring(profile, path);
@@ -376,6 +381,418 @@ static void Verify(string profile, string path)
         return;
     }
     Console.WriteLine($"Verification passed: {name}; {(basic ? "basic signature/behavior" : controlFlow ? "native control flow" : "semantic contracts")} and {count} runtime cases.");
+}
+
+static void VerifyAdvancedMath(string profile, string path)
+{
+    var source = File.ReadAllText(path);
+    var diagnostics = new DiagnosticBag();
+    var parsed = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+    if (diagnostics.HasErrors)
+        throw new InvalidOperationException($"Calor compilation failed (native parse):\n{string.Join("\n", diagnostics)}");
+    RejectRawInterop(parsed, "advanced MathUtils");
+    var compilation = Calor.Compiler.Program.Compile(source, path,
+        new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
+    if (compilation.HasErrors || compilation.Ast == null)
+        throw new InvalidOperationException($"Calor compilation failed:\n{string.Join("\n", compilation.Diagnostics)}");
+    var module = compilation.Ast;
+    if (module.Name != "MathUtils")
+        throw new InvalidOperationException("Wrong native MathUtils module owner.");
+    string[] targets = profile switch
+    {
+        "advanced001" => ["Sign"], "advanced002" => ["InRange"],
+        "advanced003" => ["Min"], _ => ["SafeDiv", "SafeMod"]
+    };
+    var options = new CSharpParseOptions(LanguageVersion.Preview);
+    SyntaxTree[] trees =
+    [
+        CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble, options),
+        CSharpSyntaxTree.ParseText(compilation.GeneratedCode, options)
+    ];
+    var mapped = new CSharpEmitter(ContractMode.Debug) { LineDirectiveFilePath = path }.Emit(module);
+    if (!SyntaxFactory.AreEquivalent(CSharpSyntaxTree.ParseText(mapped).GetRoot(), trees[1].GetRoot()))
+        throw new InvalidOperationException("Math mapped selected emission differs from original C#.");
+    var off = CSharpSyntaxTree.ParseText(
+        new CSharpEmitter(ContractMode.Off) { LineDirectiveFilePath = path }.Emit(module),
+        (CSharpParseOptions)trees[0].Options);
+    var mapping = CSharpCompilation.Create("MathMapping", [trees[0], off],
+        GeneratedCSharpCompiler.References, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    var semantic = mapping.GetSemanticModel(off);
+    foreach (var call in off.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>())
+    {
+        if (semantic.GetConstantValue(call) is { HasValue: true, Value: string }
+            && call.Expression is IdentifierNameSyntax { Identifier.ValueText: "nameof" })
+            continue;
+        if (semantic.GetSymbolInfo(call).Symbol is not IMethodSymbol symbol
+            || !SymbolEqualityComparer.Default.Equals(symbol.ContainingAssembly, mapping.Assembly)
+                && symbol.ContainingType.ToDisplayString() != "System.Math"
+            || SymbolEqualityComparer.Default.Equals(symbol.ContainingAssembly, mapping.Assembly)
+                && (symbol.IsExtern || symbol.GetDllImportData() != null))
+            throw new InvalidOperationException($"Unsupported Math executable call surface: {call} ({semantic.GetSymbolInfo(call).Symbol}); external IO/state is not supervised.");
+    }
+    foreach (var access in off.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>())
+        if (semantic.GetSymbolInfo(access).Symbol is IPropertySymbol
+            || semantic.GetSymbolInfo(access).Symbol is IFieldSymbol { HasConstantValue: false })
+            throw new InvalidOperationException("Unsupported Math executable property or external state.");
+    if (off.GetRoot().DescendantNodes().Any(node => node is ImplicitObjectCreationExpressionSyntax
+        or FieldDeclarationSyntax or PropertyDeclarationSyntax or ArrayCreationExpressionSyntax
+        or ImplicitArrayCreationExpressionSyntax or AnonymousObjectCreationExpressionSyntax or AnonymousFunctionExpressionSyntax
+        || node is ObjectCreationExpressionSyntax creation
+            && !(creation.Ancestors().OfType<ThrowStatementSyntax>().Any()
+                && semantic.GetSymbolInfo(creation).Symbol is IMethodSymbol constructor
+                && constructor.ContainingType.ToDisplayString() == "System.ArgumentOutOfRangeException")))
+        throw new InvalidOperationException("Unsupported Math executable construction or static state.");
+    var original = CompileRuntime(compilation.GeneratedCode).Assembly;
+    var offAssembly = CompileRuntime(off.GetRoot().ToFullString()).Assembly;
+    var runtimeCases = 0;
+    var entryRejections = 0;
+    var pathClasses = 0;
+    var outputClasses = 0;
+    var contractClasses = 0;
+    foreach (var name in targets)
+    {
+        string[] names = name == "Sign" ? ["x"] : name == "InRange" ? ["value", "min", "max"] : ["a", "b"];
+        var functions = parsed.Functions.Where(function => function.Name == name).ToArray();
+        if (functions.Length != 1)
+            throw new InvalidOperationException($"Expected exactly one native Math module function named {name}.");
+        var function = functions[0];
+        if (function.Visibility != Visibility.Public || function.IsAsync || function.TypeParameters.Count != 0
+            || function.Output == null || AttributeHelper.ExpandType(function.Output.TypeName) !=
+                AttributeHelper.ExpandType(name == "InRange" ? "bool" : "i32")
+            || !function.Parameters.Select(parameter => parameter.Name).SequenceEqual(names)
+            || function.Parameters.Any(parameter => AttributeHelper.ExpandType(parameter.TypeName) != "INT"
+                || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None))
+            throw new InvalidOperationException($"Wrong public signature for Math {name}.");
+        CheckMathPredicates(function);
+        MethodInfo Target(Assembly image)
+        {
+            var owner = image.GetType("MathUtils.MathUtilsModule")
+                ?? throw new InvalidOperationException("Math reflected module owner missing.");
+            var methods = owner.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+                | BindingFlags.Static | BindingFlags.DeclaredOnly).Where(method => method.Name == name).ToArray();
+            if (!owner.IsPublic || methods.Length != 1 || !methods[0].IsPublic || !methods[0].IsStatic
+                || methods[0].IsGenericMethod || methods[0].DeclaringType != owner
+                || methods[0].ReturnType != (name == "InRange" ? typeof(bool) : typeof(int))
+                || !methods[0].GetParameters().Select(parameter => parameter.ParameterType)
+                    .SequenceEqual(names.Select(_ => typeof(int)))
+                || !methods[0].GetParameters().Select(parameter => parameter.Name).SequenceEqual(names))
+                throw new InvalidOperationException($"Wrong Math reflected owner/signature/width for {name}.");
+            return methods[0];
+        }
+        object Expected(int[] input) => name switch
+        {
+            "Sign" => Math.Sign(input[0]),
+            "InRange" => input[0] >= input[1] && input[0] <= input[2],
+            "Min" => Math.Min(input[0], input[1]),
+            "SafeDiv" => input[0] / input[1],
+            _ => input[0] % input[1]
+        };
+        object? Execute(MethodInfo method, int[] input)
+        {
+            var previous = Console.Out;
+            var previousError = Console.Error;
+            using var output = new BoundedOutput();
+            using var errors = new BoundedOutput();
+            try
+            {
+                Console.SetOut(output);
+                Console.SetError(errors);
+                var result = method.Invoke(null, input.Cast<object>().ToArray());
+                if (output.ToString() != "" || errors.ToString() != "")
+                    throw new InvalidOperationException("Math unexpected stdout/stderr; output is not supplying-path evidence.");
+                return result;
+            }
+            finally
+            {
+                Console.SetOut(previous);
+                Console.SetError(previousError);
+            }
+        }
+        var cases = MathCases(name).ToArray();
+        foreach (var input in cases)
+        {
+            try
+            {
+                if (!Equals(Execute(Target(original), input), Expected(input))
+                    || !Equals(Execute(Target(offAssembly), input), Expected(input)))
+                    throw new InvalidOperationException($"Wrong Math independent original/contract-off output for {name}({string.Join(",", input)}).");
+            }
+            catch (TargetInvocationException error) when (error.InnerException is Calor.Runtime.ContractViolationException violation
+                && violation.Kind == Calor.Runtime.ContractKind.Ensures
+                && function.Postconditions.Any(contract => contract.Span.Start == violation.StartOffset))
+            {
+                throw new InvalidOperationException($"Math baseline native postcondition rejected for {name}({string.Join(",", input)}).", error);
+            }
+        }
+        runtimeCases += cases.Length;
+        var invalid = name == "InRange" ? new[] { new[] { 0, 1, 0 }, [int.MinValue, int.MaxValue, int.MinValue] }
+            : name is "SafeDiv" or "SafeMod" ? new[] { new[] { int.MinValue, 0 }, [0, 0], [int.MaxValue, 0] } : [];
+        foreach (var input in invalid)
+        {
+            try
+            {
+                Execute(Target(original), input);
+                throw new InvalidOperationException("Math missing required native entry rejection.");
+            }
+            catch (TargetInvocationException error) when (error.InnerException is Calor.Runtime.ContractViolationException violation
+                && violation.Kind == Calor.Runtime.ContractKind.Requires
+                && function.Preconditions.Any(contract => contract.Span.Start == violation.StartOffset))
+            {
+                entryRejections++;
+            }
+        }
+        var nativeNodes = LambdaNodes(parsed).ToArray();
+        var nestedLines = nativeNodes.OfType<ConditionalExpressionNode>()
+            .Where(node => LambdaNodes(node).OfType<ConditionalExpressionNode>().Skip(1).Any())
+            .SelectMany(node => LambdaNodes(node).OfType<ConditionalExpressionNode>())
+            .Select(node => node.Span.Line).ToHashSet();
+        var arithmeticLines = nativeNodes.OfType<BinaryOperationNode>()
+            .Where(node => node.Operator == (name == "SafeDiv" ? BinaryOperator.Divide : BinaryOperator.Modulo))
+            .Select(node => node.Span.Line).ToHashSet();
+        var probe = "__Math_" + Guid.NewGuid().ToString("N");
+        var rewriter = new MathAdmissionRewriter(semantic, name, nestedLines, arithmeticLines, path, probe);
+        var tracedRoot = (CompilationUnitSyntax)rewriter.Visit(off.GetRoot())!;
+        tracedRoot = tracedRoot.AddMembers(SyntaxFactory.ParseMemberDeclaration(MathAdmissionRewriter.Probe(probe))!);
+        var tracedImage = CompileRuntime(tracedRoot.NormalizeWhitespace().ToFullString()).Assembly;
+        var traced = Target(tracedImage);
+        var probeType = tracedImage.GetType(probe)!;
+        var reset = probeType.GetMethod("Reset")!;
+        var records = (List<(string Kind, int Site, object Value)>)probeType.GetField("Records")!.GetValue(null)!;
+        var innerSupplying = new Dictionary<int, HashSet<bool>>();
+        foreach (var input in cases)
+        {
+            reset.Invoke(null, ["", -1, 0]);
+            if (!Equals(Execute(traced, input), Expected(input)))
+                throw new InvalidOperationException("Math instrumented baseline changed behavior.");
+        }
+        var groups = cases.GroupBy(input => name switch
+        {
+            "Sign" => Math.Sign(input[0]).ToString(),
+            "Min" => Math.Sign((long)input[0] - input[1]).ToString(),
+            "InRange" => input[0] < input[1] ? "below" : input[0] > input[2] ? "above"
+                : input[0] == input[1] ? "lower" : input[0] == input[2] ? "upper" : "inside",
+            _ => $"{Math.Sign(input[0])}/{Math.Sign(input[1])}/{(input[0] % input[1] == 0 ? "exact" : "remainder")}"
+        }).ToArray();
+        if (groups.Length != (name == "Sign" || name == "Min" ? 3 : name == "InRange" ? 5 : 10))
+            throw new InvalidOperationException("Math incomplete signed/boundary full-class runtime census.");
+        foreach (var group in groups)
+        {
+            var supplied = false;
+            var selected = name != "Sign";
+            var outputChanged = false;
+            var contractRejected = false;
+            foreach (var input in group)
+            {
+                reset.Invoke(null, ["", -1, 0]);
+                Execute(traced, input);
+                var observations = records.ToArray();
+                var kind = name == "Sign" ? "nested" : name == "Min" ? (input[0] <= input[1] ? "a" : "b")
+                    : name == "InRange" ? "return" : "arithmetic";
+                foreach (var record in observations.Where(record => record.Kind == kind))
+                {
+                    var replacement = record.Value is bool boolean ? boolean ? 0 : 1 : ~(int)record.Value;
+                    reset.Invoke(null, [kind, record.Site, replacement]);
+                    object? changed;
+                    try { changed = Execute(traced, input); }
+                    catch (TargetInvocationException error)
+                    {
+                        throw new InvalidOperationException("Math counterfactual runtime failed; exceptions are not coupling evidence.", error);
+                    }
+                    if (!Equals(changed, Expected(input)))
+                        supplied = true;
+                }
+                foreach (var record in observations.Where(record => record.Kind == "return"))
+                {
+                    reset.Invoke(null, ["return", record.Site, record.Value is bool boolean ? boolean ? 0 : 1 : ~(int)record.Value]);
+                    if (!Equals(Execute(traced, input), Expected(input)))
+                        outputChanged = true;
+                }
+                if (name == "Sign")
+                    foreach (var record in observations.Where(record => record.Kind is "condition" or "inner-condition"))
+                    {
+                        reset.Invoke(null, [record.Kind, record.Site, (bool)record.Value ? 0 : 1]);
+                        try
+                        {
+                            if (!Equals(Execute(traced, input), Expected(input)))
+                            {
+                                selected = true;
+                                if (record.Kind == "inner-condition")
+                                {
+                                    if (!innerSupplying.TryGetValue(record.Site, out var choices))
+                                        innerSupplying[record.Site] = choices = [];
+                                    choices.Add((bool)record.Value);
+                                }
+                            }
+                        }
+                        catch (TargetInvocationException error)
+                        {
+                            throw new InvalidOperationException("Math nested-condition counterfactual runtime failed; exceptions are not coupling evidence.", error);
+                        }
+                    }
+                if (supplied && selected && outputChanged)
+                {
+                    var bad = name == "Sign" ? "2" : name == "InRange" ? (!(bool)Expected(input) ? "true" : "false")
+                        : (~(int)Expected(input)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    var changedSource = source;
+                    var returns = LambdaNodes(function).OfType<ReturnStatementNode>()
+                        .Where(statement => statement.Expression != null).Select(statement => statement.Expression!.Span)
+                        .Distinct().OrderByDescending(span => span.Start).ToArray();
+                    if (returns.Length == 0 || returns.Any(span => span.Length <= 0))
+                        throw new InvalidOperationException("Math native return-expression mapping missing.");
+                    foreach (var span in returns)
+                        changedSource = changedSource.Remove(span.Start, span.Length).Insert(span.Start, bad);
+                    var changed = Calor.Compiler.Program.Compile(changedSource, path,
+                        new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
+                    if (changed.HasErrors || changed.Ast == null)
+                        throw new InvalidOperationException($"Math native contract counterfactual compilation failed:\n{string.Join("\n", changed.Diagnostics)}");
+                    var changedFunction = changed.Ast.Functions.Single(candidate => candidate.Name == name);
+                    try
+                    {
+                        Execute(Target(CompileRuntime(changed.GeneratedCode).Assembly), input);
+                    }
+                    catch (TargetInvocationException error) when (error.InnerException is Calor.Runtime.ContractViolationException violation
+                        && violation.Kind == Calor.Runtime.ContractKind.Ensures
+                        && changedFunction.Postconditions.Any(contract => contract.Span.Start == violation.StartOffset))
+                    {
+                        contractRejected = true;
+                    }
+                    break;
+                }
+            }
+            if (!supplied || !selected || !outputChanged || !contractRejected)
+                throw new InvalidOperationException($"Math successful supplying-path/output/contract coupling failed for {name} class {group.Key}.");
+            pathClasses++;
+            outputClasses++;
+            contractClasses++;
+        }
+        if (name == "Sign" && !innerSupplying.Values.Any(choices => choices.SetEquals([true, false])))
+            throw new InvalidOperationException("Math nested inner branches lack successful supplying counterfactuals for both choices.");
+    }
+    Console.WriteLine($"Verification passed: {string.Join("+", targets)}; Math native/CLR predicates; {runtimeCases} runtime cases; "
+        + $"{entryRejections} entry rejections; {pathClasses} supplying classes; {outputClasses} output classes; {contractClasses} contract classes.");
+    Console.WriteLine("Limits: full signed Int32 entry-domain and required-output contract proofs, finite independent original/contract-off body controls; "
+        + "SafeDiv and SafeMod omit only Int32.MinValue/-1 from representable CLR execution/proof (the original b!=0 requirement includes this unrepresentable pair; no overflow semantics invented); "
+        + "native scalar contracts and mapped supplying expressions only; external IO/state, raw interop and unsupported translations refused; no universal body proof.");
+}
+
+static IEnumerable<int[]> MathCases(string name)
+{
+    var values = AdvancedIntegers();
+    if (name == "Sign")
+    {
+        foreach (var value in values) yield return [value];
+        yield break;
+    }
+    foreach (var a in values)
+        foreach (var b in values)
+            if (name == "Min")
+                yield return [a, b];
+            else if (name == "InRange")
+            {
+                if (a <= b)
+                    foreach (var value in values) yield return [value, a, b];
+            }
+            else if (b != 0 && !(a == int.MinValue && b == -1))
+                yield return [a, b];
+}
+
+static void CheckMathPredicates(FunctionNode function)
+{
+    using var context = new Context();
+    var translator = new ContractTranslator(context);
+    foreach (var parameter in function.Parameters) translator.DeclareVariable(parameter.Name, "i32");
+    translator.DeclareVariable("result", function.Name == "InRange" ? "bool" : "i32");
+    BitVecExpr Integer(string name) => context.MkBVConst(name, 32);
+    BitVecNum Number(int value) => context.MkBV(value, 32);
+    BoolExpr Translate(ExpressionNode expression) => translator.TranslateBoolExpr(expression) is { } translated
+        && translator.Warnings.Count == 0 ? translated
+        : throw new InvalidOperationException("Math native contract translation unsupported.");
+    BitVecExpr Value(ExpressionNode expression) => translator.TranslateBitVecExpr(expression) is { SortSize: 32 } translated
+        && translator.Warnings.Count == 0 ? translated
+        : throw new InvalidOperationException("Math native arithmetic translation unsupported.");
+    BoolExpr Safe(ExpressionNode expression, bool entry)
+    {
+        switch (expression)
+        {
+            case BoolLiteralNode:
+            case IntLiteralNode { IsLong: false, IsUnsigned: false } literal
+                when literal.Value >= int.MinValue && literal.Value <= int.MaxValue:
+                return context.MkTrue();
+            case ReferenceNode reference when function.Parameters.Any(parameter => parameter.Name == reference.Name)
+                || !entry && reference.Name == "result":
+            case SelfRefNode when entry:
+                return context.MkTrue();
+            case BinaryOperationNode binary when binary.Operator is BinaryOperator.Divide or BinaryOperator.Modulo:
+                return context.MkAnd(Safe(binary.Left, entry), Safe(binary.Right, entry),
+                    context.MkNot(context.MkEq(Value(binary.Right), Number(0))),
+                    context.MkNot(context.MkAnd(context.MkEq(Value(binary.Left), Number(int.MinValue)),
+                        context.MkEq(Value(binary.Right), Number(-1)))));
+            case BinaryOperationNode binary when binary.Operator is BinaryOperator.Equal or BinaryOperator.NotEqual
+                or BinaryOperator.LessThan or BinaryOperator.LessOrEqual or BinaryOperator.GreaterThan or BinaryOperator.GreaterOrEqual:
+                return context.MkAnd(Safe(binary.Left, entry), Safe(binary.Right, entry));
+            case BinaryOperationNode binary when binary.Operator is BinaryOperator.And or BinaryOperator.Or:
+                return context.MkAnd(Safe(binary.Left, entry), context.MkImplies(
+                    binary.Operator == BinaryOperator.And ? Translate(binary.Left) : context.MkNot(Translate(binary.Left)),
+                    Safe(binary.Right, entry)));
+            case UnaryOperationNode { Operator: UnaryOperator.Not } unary:
+                return Safe(unary.Operand, entry);
+            case ConditionalExpressionNode conditional:
+                return context.MkAnd(Safe(conditional.Condition, entry),
+                    (BoolExpr)context.MkITE(Translate(conditional.Condition),
+                        Safe(conditional.WhenTrue, entry), Safe(conditional.WhenFalse, entry)));
+            case ImplicationExpressionNode implication:
+                return context.MkAnd(Safe(implication.Antecedent, entry),
+                    context.MkImplies(Translate(implication.Antecedent), Safe(implication.Consequent, entry)));
+            default:
+                throw new InvalidOperationException("Math foreign/scoped/unsafe contract operand.");
+        }
+    }
+    var requiredPre = function.Name == "InRange" ? context.MkBVSLE(Integer("min"), Integer("max"))
+        : function.Name is "SafeDiv" or "SafeMod" ? context.MkNot(context.MkEq(Integer("b"), Number(0))) : context.MkTrue();
+    var limit = function.Name is "SafeDiv" or "SafeMod"
+        ? context.MkNot(context.MkAnd(context.MkEq(Integer("a"), Number(int.MinValue)), context.MkEq(Integer("b"), Number(-1))))
+        : context.MkTrue();
+    var entrySafety = new List<BoolExpr>();
+    var actualPre = context.MkAnd(TranslateEntryConditions(function, translator, expression =>
+    {
+        entrySafety.Add(Safe(expression, true));
+        return Translate(expression);
+    }));
+    var actualPost = context.MkAnd(function.Postconditions.Select(contract => Translate(contract.Condition)).ToArray());
+    var postSafety = context.MkAnd(function.Postconditions.Select(contract => Safe(contract.Condition, false)).ToArray());
+    Expr expected = function.Name switch
+    {
+        "Sign" => context.MkITE(context.MkBVSLT(Integer("x"), Number(0)), Number(-1),
+            context.MkITE(context.MkEq(Integer("x"), Number(0)), Number(0), Number(1))),
+        "InRange" => context.MkAnd(context.MkBVSGE(Integer("value"), Integer("min")), context.MkBVSLE(Integer("value"), Integer("max"))),
+        "Min" => context.MkITE(context.MkBVSLE(Integer("a"), Integer("b")), Integer("a"), Integer("b")),
+        "SafeDiv" => context.MkBVSDiv(Integer("a"), Integer("b")),
+        _ => context.MkBVSRem(Integer("a"), Integer("b"))
+    };
+    Expr result = function.Name == "InRange" ? context.MkBoolConst("result") : Integer("result");
+    var correct = context.MkEq(result, expected);
+    var requiredPost = function.Name == "Sign" ? context.MkOr(new[] { -1, 0, 1 }.Select(value => context.MkEq(result, Number(value))).ToArray())
+        : function.Name == "Min" ? context.MkAnd(context.MkBVSLE(Integer("result"), Integer("a")),
+            context.MkBVSLE(Integer("result"), Integer("b")),
+            context.MkOr(context.MkEq(result, Integer("a")), context.MkEq(result, Integer("b")))) : correct;
+    void Prove(BoolExpr counterexample, string message)
+    {
+        using var solver = context.MkSolver();
+        using var settings = context.MkParams();
+        settings.Add("timeout", 5000u);
+        solver.Parameters = settings;
+        solver.Assert(counterexample);
+        var status = solver.Check();
+        if (status == Status.UNKNOWN)
+            throw new InvalidOperationException($"Math solver infrastructure failure: UNKNOWN: {solver.ReasonUnknown}");
+        if (status != Status.UNSATISFIABLE)
+            throw new InvalidOperationException($"{message}: SATISFIABLE: {solver.Model}");
+    }
+    Prove(context.MkNot(context.MkEq(actualPre, requiredPre)), "Math missing/wrong entry predicates or narrowed domain");
+    Prove(context.MkAnd(requiredPre, context.MkNot(context.MkAnd(entrySafety.ToArray()))), "Math undefined entry predicate");
+    Prove(context.MkAnd(limit, requiredPre, actualPost, context.MkNot(requiredPost)), "Math missing/weakened postconditions");
+    Prove(context.MkAnd(limit, requiredPre, correct, context.MkNot(actualPost)), "Math output predicates exclude required output");
+    Prove(context.MkAnd(limit, requiredPre, correct, context.MkNot(postSafety)), "Math undefined postcondition for required output");
 }
 
 static void VerifyAdvancedContracts(string profile, string path)
@@ -5831,6 +6248,106 @@ static void CheckDictionaryOutput(Dictionary<string, int> input, string output)
             throw new InvalidOperationException("Wrong dictionary output: key/value pairing or signed value mismatch.");
     }
 }
+sealed class MathAdmissionRewriter(
+    SemanticModel semantic, string target, HashSet<int> nestedLines, HashSet<int> arithmeticLines,
+    string path, string probe) : CSharpSyntaxRewriter
+{
+    private int serial;
+    private bool Native(SyntaxNode node, HashSet<int> lines)
+    {
+        var mapped = node.GetLocation().GetMappedLineSpan();
+        return mapped.Path == path && lines.Contains(mapped.StartLinePosition.Line + 1);
+    }
+    private ExpressionSyntax Observe(string kind, ExpressionSyntax expression) =>
+        SyntaxFactory.ParseExpression($"{probe}.Observe(\"{kind}\", {serial++}, ({expression}))").WithTriviaFrom(expression);
+
+    public override SyntaxNode? VisitConditionalExpression(ConditionalExpressionSyntax node)
+    {
+        var changed = (ConditionalExpressionSyntax)base.VisitConditionalExpression(node)!;
+        if (!Native(node, nestedLines) || semantic.GetTypeInfo(node).Type?.SpecialType != SpecialType.System_Int32)
+            return changed;
+        changed = changed.WithCondition(Observe(node.Ancestors().OfType<ConditionalExpressionSyntax>().Any()
+            ? "inner-condition" : "condition", changed.Condition));
+        return node.DescendantNodes().OfType<ConditionalExpressionSyntax>().Any() ? Observe("nested", changed) : changed;
+    }
+    public override SyntaxNode? VisitBinaryExpression(BinaryExpressionSyntax node)
+    {
+        var changed = (BinaryExpressionSyntax)base.VisitBinaryExpression(node)!;
+        return Native(node, arithmeticLines) && node.IsKind(target == "SafeDiv"
+                ? SyntaxKind.DivideExpression : SyntaxKind.ModuloExpression)
+            && semantic.GetTypeInfo(node).Type?.SpecialType == SpecialType.System_Int32
+            ? Observe("arithmetic", changed) : changed;
+    }
+    public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node)
+    {
+        if (target != "Min" || !node.Ancestors().OfType<ReturnStatementSyntax>().Any())
+            return base.VisitIdentifierName(node);
+        // Intervene on supplying values, not selection predicates or metadata.
+        if (node.Ancestors().TakeWhile(ancestor => ancestor is not StatementSyntax).Any(ancestor =>
+            ancestor is InvocationExpressionSyntax
+            || ancestor is BinaryExpressionSyntax binary && binary.Kind() is SyntaxKind.LessThanExpression
+                or SyntaxKind.LessThanOrEqualExpression or SyntaxKind.GreaterThanExpression
+                or SyntaxKind.GreaterThanOrEqualExpression or SyntaxKind.EqualsExpression or SyntaxKind.NotEqualsExpression))
+            return node;
+        var origin = Origin(node, new HashSet<ISymbol>(SymbolEqualityComparer.Default));
+        return origin == null ? node : Observe(origin, node);
+    }
+    private string? Origin(IdentifierNameSyntax node, HashSet<ISymbol> seen)
+    {
+        var symbol = semantic.GetSymbolInfo(node).Symbol;
+        if (symbol == null || !seen.Add(symbol)) return null;
+        if (symbol is IParameterSymbol parameter && parameter.ContainingSymbol is IMethodSymbol
+                { Name: "Min", MethodKind: Microsoft.CodeAnalysis.MethodKind.Ordinary, ContainingType: { } owner }
+            && owner.ToDisplayString() == "MathUtils.MathUtilsModule"
+            && parameter.Name is "a" or "b")
+            return parameter.Name;
+        if (symbol is ILocalSymbol local && local.DeclaringSyntaxReferences.Length == 1
+            && local.DeclaringSyntaxReferences[0].GetSyntax() is VariableDeclaratorSyntax
+                { Initializer.Value: IdentifierNameSyntax initializer })
+        {
+            if (node.SyntaxTree.GetRoot().DescendantNodes().OfType<AssignmentExpressionSyntax>()
+                .Any(assignment => SymbolEqualityComparer.Default.Equals(semantic.GetSymbolInfo(assignment.Left).Symbol, local))
+                || node.SyntaxTree.GetRoot().DescendantNodes().Any(candidate =>
+                    candidate is PostfixUnaryExpressionSyntax postfix
+                        && SymbolEqualityComparer.Default.Equals(semantic.GetSymbolInfo(postfix.Operand).Symbol, local)
+                    || candidate is PrefixUnaryExpressionSyntax prefix
+                        && prefix.Kind() is SyntaxKind.PreIncrementExpression or SyntaxKind.PreDecrementExpression
+                        && SymbolEqualityComparer.Default.Equals(semantic.GetSymbolInfo(prefix.Operand).Symbol, local)))
+                return null;
+            return Origin(initializer, seen);
+        }
+        return null;
+    }
+    public override SyntaxNode? VisitReturnStatement(ReturnStatementSyntax node)
+    {
+        var changed = (ReturnStatementSyntax)base.VisitReturnStatement(node)!;
+        return node.Ancestors().OfType<MethodDeclarationSyntax>().FirstOrDefault()?.Identifier.ValueText == target
+            && changed.Expression != null ? changed.WithExpression(Observe("return", changed.Expression)) : changed;
+    }
+    public static string Probe(string name) => $$"""
+        public static class {{name}}
+        {
+            public static readonly System.Collections.Generic.List<(string Kind, int Site, object Value)> Records = new();
+            private static string Kind = "";
+            private static int Site, Replacement;
+            public static void Reset(string kind, int site, int replacement)
+            { Records.Clear(); Kind = kind; Site = site; Replacement = replacement; }
+            public static int Observe(string kind, int site, int value)
+            {
+                var changed = Kind == kind && Site == site ? Replacement : value;
+                Records.Add((kind, site, changed));
+                return changed;
+            }
+            public static bool Observe(string kind, int site, bool value)
+            {
+                var changed = Kind == kind && Site == site ? Replacement != 0 : value;
+                Records.Add((kind, site, changed));
+                return changed;
+            }
+        }
+        """;
+}
+
 sealed class AdvancedArrayRewriter(
     SemanticModel semantic, HashSet<int> nativeLoops, HashSet<int> nativeReads, string path, string probe)
     : CSharpSyntaxRewriter

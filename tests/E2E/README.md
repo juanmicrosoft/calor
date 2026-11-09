@@ -480,6 +480,93 @@ success evidence fail the controls. Positive output must contain exactly the
 resolved root/configuration/`net10.0/calor.dll` identity and complete case verdict.
 Neither command runs agents, providers, paid experiments, or release actions.
 
+## Advanced MathUtils task admission
+
+The four `advanced-001`..`advanced-004` tasks live under
+`agent-tasks/tasks/github-projects/`, but their unchanged prompts ask for
+`MathUtils.calr` functions, not GitHub integrations. Their shell entrypoints
+select `advanced001`..`advanced004` in the shared native/CLR verifier.
+The task JSON and `advanced-calor-project` fixture are not rewritten.
+
+```bash
+python3 tests/E2E/agent-tasks/test-advanced-math-verifiers.py
+python3 tests/E2E/agent-tasks/test-advanced-math-verifiers.py --archived
+```
+
+Both commands verify the selected checkout's complete Z3 assets against its
+own committed manifest, restore locked compiler dependencies from the local
+NuGet cache, and source-build without persistent build servers. The archived
+command builds unchanged commit `d82f3ae95175ecd09581c6922701706be72b0ca9` in a
+disposable directory. Only verified source prerequisites are copied there;
+compiler images are not copied. Historical IDs are confined to disposable
+old-parser inputs. Each shell entry retains 120 seconds for helper build,
+execution, process exit, EOF, and cleanup; the complete archived comparison
+retains 600 seconds. Archived arms are sequential, with at most two independent,
+freshly built helper processes per batch. No helper/result cache, agent,
+provider, network package source, paid experiment, or release action is used.
+
+Admission uses actual `Program.Compile` with Debug contracts and ordinary
+compiler effect checking. The parsed module function and reflected public,
+static CLR method must have the exact requested owner, parameter order,
+Int32 widths, and result type. `int` aliases, equivalent predicates, optional
+total refinements, harmless declared effects, and extra total contracts remain
+valid. Raw/opaque C# cannot establish a feature. Executable external state, IO,
+allocations, and unsupported contract translations are bounded refusals, not
+guessed behavior. In particular, this finite runner is not an IO sandbox.
+
+Selected-translator proofs require full signed Int32 entry domains and
+postcondition entailment, and forbid guards or postconditions that exclude
+required inputs or outputs. A five-second Z3 limit returning `UNKNOWN` is an
+infrastructure failure, never a finite task rejection. The required predicates
+are the Sign result set `{-1,0,1}`, InRange's inclusive iff and `min <= max`,
+all three symmetric Min properties, and exact input/result division and
+remainder relations with `b != 0` on **both** SafeDiv and SafeMod.
+This proof surface supports total scalar comparisons, boolean operations,
+conditionals, implications, and defined Int32 division/remainder. Other
+arithmetic or foreign references in contracts are explicitly unsupported.
+
+Independent Debug and contract-off execution covers 13 Sign inputs, 1,183
+InRange triples, 169 Min pairs, and 155 pairs for each division/remainder
+function. The 13 signed boundary values include both Int32 extremes, adjacent
+extremes, zero, both signs, and large magnitudes. Invalid interval bounds and
+zero divisors must raise the original native entry contract. Counterfactuals
+must execute successfully with changed output before earning supplying-path
+credit. They cover all three Sign classes, five interval boundary/membership
+classes, three Min order classes, and ten signed/exactness classes for **each**
+division/remainder function. Separate native-source return mutations must
+trigger the target's original postcondition. Contract exceptions, dead helpers,
+tautological nested expressions, and unused arithmetic do not establish output
+coupling. Sign also needs a native nested inner condition whose true and false
+choices both change successful output when intervened on. Min's equal-input
+case must supply `a`, not `b`; supplying references and immutable direct
+parameter aliases are modeled, while ambiguous or reassigned alias provenance
+is refused. Changing an argument to `Math.Min` or a helper call is not evidence
+that the original equal-input path selected `a`: call-argument reads cannot
+satisfy the chosen-value witness.
+
+`Int32.MinValue / -1` and the corresponding CLR remainder operation cannot be
+executed as ordinary Int32 division. The original `b != 0` prompt still includes
+this pair: entry-domain proofs must **not** admit an added overflow guard.
+Only this unrepresentable pair is omitted from division/remainder output
+proofs and CLR sampling, and every verdict reports that original-requirement
+limit. No saturating, wrapping, widened-result, or other overflow policy is
+invented. These controls are finite body admissions, not universal body proofs.
+
+The exact current matrix is 108 real shell entrypoints: 16 accepted positive
+variants and 92 finite rejections. Four invalid selected-image prerequisite
+refusals and one deliberately bounded entry timeout are counted separately.
+Synthetic classifier/identity/process/EOF/cleanup controls contribute zero real
+entries. The archived comparison requires 126 real entrypoints: 32 accepted
+and 94 finite rejected, with every positive variant and distinct adversarial
+category retained. It omits only repeated per-profile permutations of shared
+signature/scoping and absent/vacuous-contract categories. A missing prerequisite, unexpected diagnostic,
+timeout, or contaminated identity prevents that census from passing.
+Success requires one canonical selected compiler identity and one exact,
+nonempty case/class verdict. Finite failures require a contiguous chain of
+outer and nested **exit 1** wrappers and a recognized native/behavioral failure.
+Abnormal exits, native image changes, solver failures, launch errors, inherited
+pipes, cleanup failures, and success-shaped output remain fail-closed.
+
 ## Basic-syntax task behavioral verification
 
 The four `basic-001` through `basic-004` `verify.sh` entry points use the same

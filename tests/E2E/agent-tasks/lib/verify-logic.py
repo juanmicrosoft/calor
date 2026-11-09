@@ -112,6 +112,7 @@ def main():
                 "Enums.calr" if sys.argv[1] in ("enum001", "enum002", "enum003") else
                 "Impure.calr" if sys.argv[1] in ("ref001", "ref003", "ref007") else
                 "BuggyContracts.calr" if sys.argv[1] in ("contract003", "ref006") else
+                "MathUtils.calr" if sys.argv[1] in ("advanced001", "advanced002", "advanced003", "advanced004") else
                 "Contracts.calr" if sys.argv[1] in ("ac001", "ac002", "ac003", "ac004", "ac005") else
                 "Collections.calr" if sys.argv[1] in ("PrintDictionary", "coll001", "coll002", "coll003", "coll004", "coll005", "coll006") else "Effects.calr"
                 if sys.argv[1] in ("PrintNumbers", "Countdown", "DoWhileDemo", "PrintEvenNumbers",
@@ -123,7 +124,8 @@ def main():
     if not 0 < timeout <= 120:
         raise RuntimeError("CALOR_LOGIC_TIMEOUT_SECONDS must be in (0, 120].")
     deadline = time.monotonic() + timeout
-    advanced = not native_only and sys.argv[1] in ("ac001", "ac002", "ac003", "ac004", "ac005")
+    advanced = not native_only and sys.argv[1] in ("ac001", "ac002", "ac003", "ac004", "ac005",
+                                                "advanced001", "advanced002", "advanced003", "advanced004")
     carrier = advanced or not native_only and sys.argv[1] in (
         "type001", "type002", "type003", "type004", "pm004", "pm005",
         "ref001", "ref002", "ref003", "ref004", "ref005", "ref006", "ref007", "ref008",
@@ -172,6 +174,8 @@ def main():
         run([
             "dotnet", "build", "LogicVerifier.csproj", "--nologo", "-v", "quiet",
             f"-p:CompilerDirectory={compiler}", "-p:UseSharedCompilation=false",
+            *([f"-p:RestoreSources={Path.home() / '.nuget/packages'}"]
+              if not native_only and sys.argv[1] in ("advanced001", "advanced002", "advanced003", "advanced004") else []),
             "-nodeReuse:false", "--disable-build-servers",
         ], project, deadline)
         if carrier:
