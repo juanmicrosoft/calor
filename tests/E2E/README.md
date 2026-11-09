@@ -1009,6 +1009,12 @@ worker tests contribute no real controls. Before this scheduling change, the
 parent current 79-entry suite passed on `8e970b45f` in 476.297 seconds, but the
 sequential strict replay exhausted its total deadline after the archived arm.
 That failed replay is not acceptance evidence.
+The bounded-worker replay subsequently passed all 97 actual old/current
+controls on `5f7062671`, under the unchanged deadline. The archived compiler's
+own manifest was verified and its source build completed with zero warnings or
+errors. Follow-up `926c24c76` only moves a synthetic accounting assertion before
+mock-global restoration; real execution and admission paths are unchanged.
+The four scalar prerequisites are restored, not whole-milestone acceptance.
 
 Exact public native and reflected CLR scalar signatures are required. DayName
 and IsSingleDigit require their literal cases and wildcard default in a native
@@ -1142,7 +1148,10 @@ exceptions; it contributes no real entries.
 Before this scheduling change, the parent current suite passed all 160 entries
 on `4fcd72d60` in 983.922 seconds. Its sequential 107-entry replay exhausted the
 600-second total budget during the current Counter controls; that failed run is
-not acceptance evidence. The bounded-worker replay must pass in full separately.
+not acceptance evidence. The bounded-worker replay passed all 107 actual entries
+on `8e970b45f` under the unchanged total deadline. The archived compiler's own
+manifest was verified and its source build completed with zero warnings or errors.
+This restores the six OOP prerequisites, not whole-milestone acceptance.
 
 ### Original arithmetic binding prerequisites: type-005 and type-006
 
