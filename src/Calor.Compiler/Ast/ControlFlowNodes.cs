@@ -14,6 +14,10 @@ public sealed class ForStatementNode : StatementNode
     public ExpressionNode From { get; }
     public ExpressionNode To { get; }
     public ExpressionNode? Step { get; }
+    public ExpressionNode? Condition { get; }
+    public AssignmentStatementNode? Update { get; }
+    public string VariableType { get; }
+    public bool ReevaluatesCondition => Condition != null;
     public IReadOnlyList<StatementNode> Body { get; }
     public AttributeCollection Attributes { get; }
 
@@ -26,7 +30,10 @@ public sealed class ForStatementNode : StatementNode
         ExpressionNode? step,
         IReadOnlyList<StatementNode> body,
         AttributeCollection attributes,
-        TextSpan? variableSpan = null)
+        TextSpan? variableSpan = null,
+        ExpressionNode? condition = null,
+        AssignmentStatementNode? update = null,
+        string variableType = "int")
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -35,6 +42,11 @@ public sealed class ForStatementNode : StatementNode
         From = from ?? throw new ArgumentNullException(nameof(from));
         To = to ?? throw new ArgumentNullException(nameof(to));
         Step = step;
+        if ((condition == null) != (update == null))
+            throw new ArgumentException("A re-evaluated for loop requires both condition and update.");
+        Condition = condition;
+        Update = update;
+        VariableType = variableType;
         Body = body ?? throw new ArgumentNullException(nameof(body));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }

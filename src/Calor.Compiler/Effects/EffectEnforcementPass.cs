@@ -5818,6 +5818,10 @@ public sealed class EffectEnforcementPass
         private EffectSet InferFromFor(ForStatementNode forStmt)
         {
             var effects = InferFromExpression(forStmt.From);
+            if (forStmt.Condition != null && forStmt.Update != null)
+                return effects.Union(InferFromExpression(forStmt.Condition))
+                    .Union(InferFromAssignment(forStmt.Update))
+                    .Union(InferFromStatements(forStmt.Body));
             effects = effects.Union(InferFromExpression(forStmt.To));
             if (forStmt.Step != null)
             {

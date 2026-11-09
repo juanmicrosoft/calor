@@ -3823,6 +3823,25 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(ForStatementNode node)
     {
         var varName = SanitizeIdentifier(node.VariableName);
+        if (node.Condition != null && node.Update != null)
+        {
+            var initializer = node.From.Accept(this);
+            PushDeclScope();
+            DeclareVarInScope(varName);
+            var condition = node.Condition.Accept(this);
+            var updateTarget = node.Update.Target.Accept(this);
+            var updateValue = node.Update.Value.Accept(this);
+            var type = TypeMapper.CalorToCSharp(node.VariableType);
+            AppendLine($"for ({type} {varName} = {initializer}; {condition}; {updateTarget} = {updateValue})");
+            AppendLine("{");
+            Indent();
+            foreach (var stmt in node.Body)
+                EmitStatement(stmt, _emissionContext);
+            Dedent();
+            AppendLine("}");
+            PopDeclScope();
+            return "";
+        }
         var from = node.From.Accept(this);
         var to = node.To.Accept(this);
         var hasExplicitStep = node.Step != null;

@@ -52,6 +52,9 @@ public sealed class LoopInvariantSynthesizer : IDisposable
     /// </summary>
     public LoopInvariantResult SynthesizeForLoop(BoundForStatement loop, BoundFunction function)
     {
+        if (loop.Condition != null)
+            return LoopInvariantResult.Unsupported(
+                "Snapshot-range invariant templates do not model re-evaluated for conditions and updates.");
         // Extract loop context
         var context = ExtractLoopContext(loop);
 

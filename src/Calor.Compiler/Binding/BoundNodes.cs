@@ -434,15 +434,26 @@ public sealed class BoundForStatement : BoundStatement
     public BoundExpression From { get; }
     public BoundExpression To { get; }
     public BoundExpression? Step { get; }
+    public BoundExpression? Condition { get; }
+    public BoundStatement? Update { get; }
     public IReadOnlyList<BoundStatement> Body { get; }
     public override IEnumerable<BoundNode> ChildNodes
     {
         get
         {
             yield return From;
-            yield return To;
-            if (Step != null)
-                yield return Step;
+            if (Condition != null)
+            {
+                yield return Condition;
+                if (Update != null)
+                    yield return Update;
+            }
+            else
+            {
+                yield return To;
+                if (Step != null)
+                    yield return Step;
+            }
             foreach (var statement in Body)
                 yield return statement;
         }
@@ -454,7 +465,9 @@ public sealed class BoundForStatement : BoundStatement
         BoundExpression from,
         BoundExpression to,
         BoundExpression? step,
-        IReadOnlyList<BoundStatement> body)
+        IReadOnlyList<BoundStatement> body,
+        BoundExpression? condition = null,
+        BoundStatement? update = null)
         : base(span)
     {
         LoopVariable = loopVariable;
@@ -462,6 +475,8 @@ public sealed class BoundForStatement : BoundStatement
         To = to;
         Step = step;
         Body = body;
+        Condition = condition;
+        Update = update;
     }
 }
 
@@ -1613,14 +1628,17 @@ public sealed class BoundCompoundAssignment : BoundStatement
 public sealed class BoundForeachStatement : BoundStatement
 {
     public VariableSymbol LoopVariable { get; }
+    public VariableSymbol? DeconstructionVariable { get; }
     public BoundExpression Collection { get; }
     public IReadOnlyList<BoundStatement> Body { get; }
     public override IEnumerable<BoundNode> ChildNodes => [Collection, .. Body];
 
-    public BoundForeachStatement(TextSpan span, VariableSymbol loopVariable, BoundExpression collection, IReadOnlyList<BoundStatement> body)
+    public BoundForeachStatement(TextSpan span, VariableSymbol loopVariable, BoundExpression collection,
+        IReadOnlyList<BoundStatement> body, VariableSymbol? deconstructionVariable = null)
         : base(span)
     {
         LoopVariable = loopVariable ?? throw new ArgumentNullException(nameof(loopVariable));
+        DeconstructionVariable = deconstructionVariable;
         Collection = collection ?? throw new ArgumentNullException(nameof(collection));
         Body = body ?? throw new ArgumentNullException(nameof(body));
     }

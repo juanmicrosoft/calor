@@ -998,8 +998,21 @@ public sealed class TypeChecker
     {
         _env.EnterScope();
 
-        // Loop variable is INT
-        _env.DefineVariable(forStmt.VariableName, PrimitiveType.Int);
+        _env.DefineVariable(forStmt.VariableName, ResolveTypeName(forStmt.VariableType, forStmt.VariableSpan));
+
+        if (forStmt.Condition != null && forStmt.Update != null)
+        {
+            InferExpressionType(forStmt.From);
+            var conditionType = InferExpressionType(forStmt.Condition);
+            if (IsDefinitelyNotBool(conditionType))
+                _diagnostics.ReportError(forStmt.Condition.Span, DiagnosticCode.TypeMismatch,
+                    $"For condition must be bool, got {conditionType.SurfaceName}");
+            CheckStatement(forStmt.Update);
+            foreach (var statement in forStmt.Body)
+                CheckStatement(statement);
+            _env.ExitScope();
+            return;
+        }
 
         var fromType = InferExpressionType(forStmt.From);
         var toType = InferExpressionType(forStmt.To);
@@ -1686,11 +1699,18 @@ public sealed class TypeChecker
         else if (IsKnownNonCollection(dictType))
         {
             _diagnostics.ReportError(dictForeach.Dictionary.Span, DiagnosticCode.TypeMismatch,
-                $"EACHKV requires a Dictionary, got {dictType.SurfaceName}");
+                $"Two-name each requires a deconstructable enumerable, got {dictType.SurfaceName}");
 
             // Define variables with error type to allow body checking to continue
             _env.DefineVariable(dictForeach.KeyName, ErrorType.Instance);
             _env.DefineVariable(dictForeach.ValueName, ErrorType.Instance);
+        }
+        else
+        {
+            // Tuple/custom Deconstruct signatures belong to the generated-C#
+            // validation boundary, just like other external type members.
+            _env.DefineVariable(dictForeach.KeyName, new ExternalType("foreach-deconstruction"));
+            _env.DefineVariable(dictForeach.ValueName, new ExternalType("foreach-deconstruction"));
         }
 
         // Check body statements

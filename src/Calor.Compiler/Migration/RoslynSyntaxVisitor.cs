@@ -7281,6 +7281,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 IfStatementSyntax ifStmt => ConvertIfStatement(ifStmt),
                 ForStatementSyntax forStmt => ConvertForStatement(forStmt),
                 ForEachStatementSyntax forEachStmt => ConvertForEachStatement(forEachStmt),
+                ForEachVariableStatementSyntax forEachVariable => ConvertForEachDeconstruction(forEachVariable),
                 WhileStatementSyntax whileStmt => ConvertWhileStatement(whileStmt),
                 DoStatementSyntax doStmt => ConvertDoWhileStatement(doStmt),
                 TryStatementSyntax tryStmt => ConvertTryStatement(tryStmt),
@@ -9950,6 +9951,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return [new RawCSharpNode(GetTextSpan(node), node.ToString())];
         }
 
+        if (TryConvertCountedFor(node) is { } counted)
+            return [counted];
+
         if (!CanUseNativeForRange(node, out var stepValue))
         {
             return [ConvertReevaluatedFor(node)];
@@ -10070,6 +10074,75 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             body,
             new AttributeCollection()));
         return result;
+    }
+
+    private ForStatementNode? TryConvertCountedFor(ForStatementSyntax node)
+    {
+        if (_semanticModel == null
+            || node.Declaration is not { Variables.Count: 1 } declaration
+            || declaration.Type is RefTypeSyntax
+            || declaration.Variables[0] is not { Initializer: { } initializer } declarator
+            || _semanticModel.GetDeclaredSymbol(declarator) is not ILocalSymbol variable
+            || variable.Type.SpecialType is not (SpecialType.System_Int32 or SpecialType.System_Int64
+                or SpecialType.System_UInt32 or SpecialType.System_UInt64
+                or SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_Decimal)
+            || node.Condition is not BinaryExpressionSyntax condition
+            || condition.Kind() is not (SyntaxKind.LessThanExpression or SyntaxKind.LessThanOrEqualExpression
+                or SyntaxKind.GreaterThanExpression or SyntaxKind.GreaterThanOrEqualExpression)
+            || !SymbolEqualityComparer.Default.Equals(_semanticModel.GetSymbolInfo(condition.Left).Symbol, variable)
+            || node.Incrementors.Count != 1)
+            return null;
+
+        var incrementor = node.Incrementors[0];
+        ExpressionSyntax? target;
+        ExpressionSyntax amount;
+        Ast.BinaryOperator operation;
+        switch (incrementor)
+        {
+            case PostfixUnaryExpressionSyntax postfix when postfix.Kind() is
+                SyntaxKind.PostIncrementExpression or SyntaxKind.PostDecrementExpression:
+                target = postfix.Operand;
+                amount = SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(1));
+                operation = postfix.IsKind(SyntaxKind.PostIncrementExpression)
+                    ? Ast.BinaryOperator.Add : Ast.BinaryOperator.Subtract;
+                break;
+            case PrefixUnaryExpressionSyntax prefix when prefix.Kind() is
+                SyntaxKind.PreIncrementExpression or SyntaxKind.PreDecrementExpression:
+                target = prefix.Operand;
+                amount = SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(1));
+                operation = prefix.IsKind(SyntaxKind.PreIncrementExpression)
+                    ? Ast.BinaryOperator.Add : Ast.BinaryOperator.Subtract;
+                break;
+            case AssignmentExpressionSyntax assignment when assignment.Kind() is
+                SyntaxKind.AddAssignmentExpression or SyntaxKind.SubtractAssignmentExpression
+                && _semanticModel.GetConstantValue(assignment.Right).HasValue:
+                target = assignment.Left;
+                amount = assignment.Right;
+                operation = assignment.IsKind(SyntaxKind.AddAssignmentExpression)
+                    ? Ast.BinaryOperator.Add : Ast.BinaryOperator.Subtract;
+                break;
+            default:
+                return null;
+        }
+        if (!SymbolEqualityComparer.Default.Equals(_semanticModel.GetSymbolInfo(target).Symbol, variable))
+            return null;
+
+        // Headers stay inline. If conversion still requires statements, retain
+        // the exact existing fallback rather than executing a hoist only once.
+        var (from, initialHoists) = ConvertLoopCondition(initializer.Value);
+        var (test, conditionHoists) = ConvertLoopCondition(condition);
+        if (initialHoists.Count != 0 || conditionHoists.Count != 0)
+            return null;
+        var span = GetTextSpan(node);
+        var variableReference = new ReferenceNode(GetTextSpan(target), variable.Name);
+        var delta = amount.SyntaxTree == _semanticModel.SyntaxTree
+            ? ConvertExpression(amount) : new IntLiteralNode(span, 1);
+        var next = new BinaryOperationNode(GetTextSpan(incrementor), operation, variableReference, delta);
+        var update = new AssignmentStatementNode(GetTextSpan(incrementor), variableReference, next);
+        var bound = test is BinaryOperationNode comparison ? comparison.Right : from;
+        return new ForStatementNode(span, _context.GenerateId("for"), variable.Name, from, bound, null,
+            ConvertEmbeddedStatement(node.Statement), new AttributeCollection(),
+            GetTextSpan(declarator.Identifier), test, update, variable.Type.ToDisplayString());
     }
 
     private StatementNode ConvertReevaluatedFor(ForStatementSyntax node)
@@ -10242,6 +10315,34 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             collection,
             body,
             new AttributeCollection());
+    }
+
+    private StatementNode ConvertForEachDeconstruction(ForEachVariableStatementSyntax node)
+    {
+        if (node.AwaitKeyword != default
+            || node.Variable is not DeclarationExpressionSyntax
+            {
+                Type: IdentifierNameSyntax { Identifier.ValueText: "var" },
+                Designation: ParenthesizedVariableDesignationSyntax { Variables.Count: 2 } names
+            }
+            || names.Variables[0] is not SingleVariableDesignationSyntax key
+            || names.Variables[1] is not SingleVariableDesignationSyntax value)
+        {
+            _context.RecordLoss(ConversionLossKind.InteropPreserved, "tuple-deconstruction",
+                "Only synchronous two-name var foreach deconstruction has a native each header.",
+                node.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+            return new RawCSharpNode(GetTextSpan(node), node.ToFullString());
+        }
+        _context.RecordFeatureUsage("foreach");
+        _context.RecordFeatureUsage("tuple-deconstruction");
+        _context.IncrementConverted();
+        var (collection, hoisted) = ConvertLoopCondition(node.Expression);
+        if (hoisted.Count > 0)
+            throw EscalateExpression(node.Expression, "foreach-collection-order");
+        return new DictionaryForeachNode(GetTextSpan(node), _context.GenerateId("each"),
+            key.Identifier.ValueText, value.Identifier.ValueText, collection,
+            ConvertEmbeddedStatement(node.Statement), new AttributeCollection(),
+            GetTextSpan(key.Identifier), GetTextSpan(value.Identifier));
     }
 
     private WhileStatementNode ConvertWhileStatement(WhileStatementSyntax node)

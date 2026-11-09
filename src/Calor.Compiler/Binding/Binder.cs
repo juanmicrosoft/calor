@@ -2211,6 +2211,7 @@ public sealed class Binder
             AssignmentStatementNode assign => BindAssignmentStatement(assign),
             CompoundAssignmentStatementNode compound => BindCompoundAssignment(compound),
             ForeachStatementNode forEach => BindForeachStatement(forEach),
+            DictionaryForeachNode deconstruction => BindDeconstructionForeach(deconstruction),
             UsingStatementNode usingStmt => BindUsingStatement(usingStmt),
             ThrowStatementNode throwStmt => new BoundThrowStatement(throwStmt.Span,
                 throwStmt.Exception != null ? BindExpression(throwStmt.Exception) : null),
@@ -2354,7 +2355,7 @@ public sealed class Binder
         // Declare loop variable
         var loopVar = CreateLocalVariable(
             forStmt.VariableName,
-            "INT",
+            forStmt.VariableType,
             isMutable: true,
             isParameter: false,
             ParameterModifier.None,
@@ -2368,14 +2369,16 @@ public sealed class Binder
         }
 
         var from = BindExpression(forStmt.From);
-        var to = BindExpression(forStmt.To);
-        var step = forStmt.Step != null ? BindExpression(forStmt.Step) : null;
+        var condition = forStmt.Condition != null ? BindExpression(forStmt.Condition) : null;
+        var to = condition ?? BindExpression(forStmt.To);
+        var step = !forStmt.ReevaluatesCondition && forStmt.Step != null ? BindExpression(forStmt.Step) : null;
+        var update = forStmt.Update != null ? BindStatement(forStmt.Update) : null;
         PrepareLoopCallableState(forStmt.Body);
         var headerCallables = CaptureCallableState();
         var body = BindStatements(forStmt.Body);
         JoinCallableState(headerCallables);
 
-        return new BoundForStatement(forStmt.Span, loopVar, from, to, step, body);
+        return new BoundForStatement(forStmt.Span, loopVar, from, to, step, body, condition, update);
     }
 
     private BoundWhileStatement BindWhileStatement(WhileStatementNode whileStmt)
@@ -8028,6 +8031,38 @@ public sealed class Binder
         var body = BindStatements(forEach.Body);
         JoinCallableState(headerCallables);
         return new BoundForeachStatement(forEach.Span, loopVar, collection, body);
+    }
+
+    private BoundForeachStatement BindDeconstructionForeach(DictionaryForeachNode each)
+    {
+        using var _ = PushScope(_scope.CreateChild());
+        var collection = BindExpression(each.Dictionary);
+        string? keyType = null;
+        string? valueType = null;
+        if (TypeIdentity.TrySplitGeneric(collection.Type.DisplayString, out var typeName, out var arguments)
+            && typeName is "Dictionary" or "System.Collections.Generic.Dictionary"
+            && arguments.Count == 2)
+        {
+            keyType = arguments[0];
+            valueType = arguments[1];
+        }
+        VariableSymbol Declare(string name, string? type, TextSpan span)
+        {
+            var symbol = CreateLocalVariable(name, type ?? "OBJECT", false, false,
+                ParameterModifier.None, span, "foreach-deconstruction",
+                isTypeInferred: true, hasUnknownInferredType: type == null);
+            if (!_scope.TryDeclare(symbol))
+                _diagnostics.ReportError(span, DiagnosticCode.DuplicateDefinition,
+                    $"Variable '{name}' is already defined");
+            return symbol;
+        }
+        var key = Declare(each.KeyName, keyType, each.KeySpan);
+        var value = Declare(each.ValueName, valueType, each.ValueSpan);
+        PrepareLoopCallableState(each.Body);
+        var headerCallables = CaptureCallableState();
+        var body = BindStatements(each.Body);
+        JoinCallableState(headerCallables);
+        return new BoundForeachStatement(each.Span, key, collection, body, value);
     }
 
     private BoundUsingStatement BindUsingStatement(UsingStatementNode usingStmt)

@@ -457,6 +457,8 @@ public sealed class DictionaryForeachNode : StatementNode
     /// The value variable name.
     /// </summary>
     public string ValueName { get; }
+    public TextSpan KeySpan { get; }
+    public TextSpan ValueSpan { get; }
 
     /// <summary>
     /// The dictionary being iterated.
@@ -477,12 +479,16 @@ public sealed class DictionaryForeachNode : StatementNode
         string valueName,
         ExpressionNode dictionary,
         IReadOnlyList<StatementNode> body,
-        AttributeCollection attributes)
+        AttributeCollection attributes,
+        TextSpan? keySpan = null,
+        TextSpan? valueSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         KeyName = keyName ?? throw new ArgumentNullException(nameof(keyName));
         ValueName = valueName ?? throw new ArgumentNullException(nameof(valueName));
+        KeySpan = keySpan ?? span;
+        ValueSpan = valueSpan ?? span;
         Dictionary = dictionary ?? throw new ArgumentNullException(nameof(dictionary));
         Body = body ?? throw new ArgumentNullException(nameof(body));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));

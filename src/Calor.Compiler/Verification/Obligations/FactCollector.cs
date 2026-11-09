@@ -248,6 +248,12 @@ public sealed class FactCollector
             switch (stmt)
             {
                 case ForStatementNode forStmt:
+                    if (forStmt.Condition != null)
+                    {
+                        var tested = AddGuardFact(forStmt.Condition, forStmt.Body);
+                        Walk(forStmt.Body, reachedExactly && tested && !MayThrow(forStmt.Condition));
+                        break;
+                    }
                     var bounded = CollectFromForLoop(forStmt) && !MayThrow(forStmt.From) && !MayThrow(forStmt.To);
                     Walk(forStmt.Body, reachedExactly && bounded);
                     break;

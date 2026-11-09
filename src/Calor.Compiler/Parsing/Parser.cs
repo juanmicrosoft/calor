@@ -6150,63 +6150,72 @@ public sealed class Parser
     private ForStatementNode ParseForStatement()
     {
         var startToken = Expect(TokenKind.For);
-        var attrs = ParseAttributes();
-        ValidateIdentityFreeHeader(startToken, attrs, 4);
-
-        // Interpret loop attributes
-        var id = GenerateParserAutoId("l");
-        var varName = attrs["_pos0"] ?? "";
-        var fromStr = attrs["_pos1"] ?? "";
-        var toStr = attrs["_pos2"] ?? "";
-        var stepStr = attrs["_pos3"] ?? "";
-        var variableKey = "_pos0";
-
-        if (string.IsNullOrEmpty(varName))
+        RejectLegacyLoopHeader(startToken, "for i from start to end step increment or for i = start; condition; i = next");
+        var variable = Expect(TokenKind.Identifier);
+        var variableType = "int";
+        if (Match(TokenKind.Colon))
         {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "FOR", "var");
+            variableType = variable.Text;
+            variable = Expect(TokenKind.Identifier);
         }
-
-        // Parse from/to/step - these can be expressions or literal values in attributes
+        var attrs = new AttributeCollection();
+        var id = GenerateParserAutoId("l");
         ExpressionNode from;
         ExpressionNode to;
         ExpressionNode? step = null;
-
-        // FROM bound - can be int literal, variable reference, or S-expression like (- n 1)
-        if (!string.IsNullOrEmpty(fromStr))
-            from = ParseExpressionFromAttributeString(fromStr, startToken.Span);
+        ExpressionNode? condition = null;
+        AssignmentStatementNode? update = null;
+        if (Match(TokenKind.From))
+        {
+            from = ParseExpression(allowSpacedCall: false);
+            Expect(TokenKind.To);
+            to = ParseExpression(allowSpacedCall: false);
+            if (Match(TokenKind.Step))
+                step = ParseExpression(allowSpacedCall: false);
+        }
         else
-            from = ParsePositionalExpression();
-
-        // TO bound - can be int literal, variable reference, or S-expression like (- n 1)
-        if (!string.IsNullOrEmpty(toStr))
-            to = ParseExpressionFromAttributeString(toStr, startToken.Span);
-        else
-            to = ParseExpression();
-
-        // STEP bound - can be int literal, variable reference, or S-expression
-        if (!string.IsNullOrEmpty(stepStr))
-            step = ParseExpressionFromAttributeString(stepStr, startToken.Span);
-
-        // Parse body statements
+        {
+            Expect(TokenKind.Equals);
+            from = ParseExpression(allowSpacedCall: false);
+            Expect(TokenKind.Semicolon);
+            condition = ParseExpression(allowSpacedCall: false);
+            Expect(TokenKind.Semicolon);
+            var target = Expect(TokenKind.Identifier);
+            Expect(TokenKind.Equals);
+            var value = ParseExpression(allowSpacedCall: false);
+            update = new AssignmentStatementNode(target.Span.Union(value.Span),
+                new ReferenceNode(target.Span, target.Text), value);
+            // The bound is descriptive only in this mode; condition/update carry
+            // executable semantics and verification must not use snapshot facts.
+            to = condition is BinaryOperationNode comparison ? comparison.Right : from;
+        }
         var bodyOwner = BeginBlockBody(startToken, TokenKind.EndFor, id);
         var body = ParseOwnedStatementBlock(bodyOwner, TokenKind.EndFor);
-
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndFor, bodyOwner);
-        var endAttrs = ParseAttributes();
-        // Positional: [id]
-
-
-        var span = startToken.Span.Union(endToken.Span);
         return new ForStatementNode(
-            span,
+            startToken.Span.Union(endToken.Span),
             id,
-            varName,
+            variable.Text,
             from,
             to,
             step,
             body,
             attrs,
-            GetIdentifierSpan(attrs, variableKey, varName));
+            variable.Span,
+            condition,
+            update,
+            variableType);
+    }
+
+    private void RejectLegacyLoopHeader(Token token, string replacement)
+    {
+        if (token.Text.StartsWith('§') || Check(TokenKind.OpenBrace))
+        {
+            _diagnostics.ReportError(token.Span, DiagnosticCode.UnexpectedToken,
+                $"Legacy loop headers and statement IDs are removed; use '{replacement}'.");
+            if (Check(TokenKind.OpenBrace))
+                ParseAttributes();
+        }
     }
 
     /// <summary>
@@ -6231,10 +6240,8 @@ public sealed class Parser
     private WhileStatementNode ParseWhileStatement()
     {
         var startToken = Expect(TokenKind.While);
-        var attrs = ParseAttributes();
-        ValidateIdentityFreeHeader(startToken, attrs, 0);
-
-        // Positional: [id]
+        RejectLegacyLoopHeader(startToken, "while condition");
+        var attrs = new AttributeCollection();
         var id = GenerateParserAutoId("wh");
 
         // Parse condition expression
@@ -6245,10 +6252,6 @@ public sealed class Parser
         var body = ParseOwnedStatementBlock(bodyOwner, TokenKind.EndWhile);
 
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndWhile, bodyOwner);
-        var endAttrs = ParseAttributes();
-        // Positional: [id]
-
-
         var span = startToken.Span.Union(endToken.Span);
         return new WhileStatementNode(span, id, condition, body, attrs);
     }
@@ -6256,10 +6259,8 @@ public sealed class Parser
     private DoWhileStatementNode ParseDoWhileStatement()
     {
         var startToken = Expect(TokenKind.Do);
-        var attrs = ParseAttributes();
-        ValidateIdentityFreeHeader(startToken, attrs, 0);
-
-        // Positional: [id]
+        RejectLegacyLoopHeader(startToken, "do followed by an indented body and a trailing while condition");
+        var attrs = new AttributeCollection();
         var id = GenerateParserAutoId("do");
 
         // Parse body statements
@@ -6267,12 +6268,11 @@ public sealed class Parser
         var body = ParseOwnedStatementBlock(bodyOwner, TokenKind.EndDo);
 
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndDo, bodyOwner);
-        var endAttrs = ParseAttributes();
-        // Positional: [id]
-
-
-        // Parse condition expression (comes after §/DO[id])
-        var condition = ParseExpression();
+        var clause = Expect(TokenKind.While);
+        if (clause.Span.Column != startToken.Span.Column || clause.Span.Line <= startToken.Span.Line)
+            _diagnostics.ReportError(clause.Span, DiagnosticCode.UnexpectedToken,
+                "A do loop requires a trailing 'while condition' at the do header's indentation.");
+        var condition = ParseExpression(allowSpacedCall: false);
 
         var span = startToken.Span.Union(Current.Span);
         return new DoWhileStatementNode(span, id, body, condition, attrs);
@@ -8271,45 +8271,43 @@ public sealed class Parser
     ///   ...
     /// §/EACH[each1]
     /// </summary>
-    private ForeachStatementNode ParseForeachStatement()
+    private StatementNode ParseForeachStatement()
     {
         var startToken = Expect(TokenKind.Foreach);
-        var attrs = ParseAttributes();
-        ValidateIdentityFreeHeader(startToken, attrs, 3);
-
-        // Positional: [id:variable:type] or [id:variable:type:index]
+        RejectLegacyLoopHeader(startToken, "each item in collection or each key, value in collection");
+        var attrs = new AttributeCollection();
         var id = GenerateParserAutoId("each");
-        var variableName = attrs["_pos0"] ?? "item";
-        var variableType = attrs["_pos1"] ?? "var";
-        var indexVariableName = attrs["_pos2"]; // null if not provided
-
-
-        // Parse collection expression
-        var collection = ParseExpression();
+        var variable = Expect(TokenKind.Identifier);
+        var variableType = "var";
+        if (Match(TokenKind.Colon))
+        {
+            variableType = variable.Text;
+            variable = Expect(TokenKind.Identifier);
+        }
+        Token? secondVariable = null;
+        if (Match(TokenKind.Comma))
+            secondVariable = Expect(TokenKind.Identifier);
+        Expect(TokenKind.In);
+        var collection = ParseExpression(allowSpacedCall: false);
 
         // Parse body statements
         var bodyOwner = BeginBlockBody(startToken, TokenKind.EndForeach, id);
         var body = ParseOwnedStatementBlock(bodyOwner, TokenKind.EndForeach);
 
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndForeach, bodyOwner);
-        var endAttrs = ParseAttributes();
-
-
         var span = startToken.Span.Union(endToken.Span);
+        if (secondVariable is { } value)
+            return new DictionaryForeachNode(span, id, variable.Text, value.Text, collection, body, attrs,
+                variable.Span, value.Span);
         return new ForeachStatementNode(
             span,
             id,
-            variableName,
+            variable.Text,
             variableType,
             collection,
             body,
             attrs,
-            indexVariableName,
-            GetIdentifierSpan(attrs, "_pos0", variableName),
-            indexVariableName == null
-                ? null
-                : GetIdentifierSpan(attrs, "_pos2", indexVariableName),
-            attrs.GetSpan("_pos1"));
+            variableSpan: variable.Span);
     }
 
     // Phase 6 Extended: Collections (List, Dictionary, HashSet)

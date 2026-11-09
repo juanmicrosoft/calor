@@ -545,6 +545,8 @@ internal sealed class TypedBugPatternAnalysis
         bool assumeTrue,
         FlowState state)
     {
+        if (loop.Condition != null)
+            return state;
         if (!LoopStepSemantics.TryEvaluate(loop.Step, out var step)
             || step.IsZero)
             return state;

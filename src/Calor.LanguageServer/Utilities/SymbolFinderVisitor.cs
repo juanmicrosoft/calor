@@ -740,14 +740,22 @@ public sealed class SymbolFinderVisitor
         PushScope(ScopeKind.Loop, forStmt.Span);
 
         // For loop variable
-        AddToScope(forStmt.VariableName, "loop variable", "i32", forStmt.Span, forStmt);
+        AddToScope(forStmt.VariableName, "loop variable", forStmt.VariableType, forStmt.VariableSpan, forStmt);
 
         // Check expressions
         if (SpanContainsOffset(forStmt.From.Span))
         {
             VisitExpression(forStmt.From);
         }
-        else if (SpanContainsOffset(forStmt.To.Span))
+        else if (forStmt.Condition != null && SpanContainsOffset(forStmt.Condition.Span))
+        {
+            VisitExpression(forStmt.Condition);
+        }
+        else if (forStmt.Update != null && SpanContainsOffset(forStmt.Update.Span))
+        {
+            VisitStatement(forStmt.Update);
+        }
+        else if (!forStmt.ReevaluatesCondition && SpanContainsOffset(forStmt.To.Span))
         {
             VisitExpression(forStmt.To);
         }
@@ -1018,10 +1026,13 @@ public sealed class SymbolFinderVisitor
     {
         PushScope(ScopeKind.Loop, dictForeach.Span);
 
-        AddToScope(dictForeach.KeyName, "key variable", null, dictForeach.Span, dictForeach);
-        AddToScope(dictForeach.ValueName, "value variable", null, dictForeach.Span, dictForeach);
+        AddToScope(dictForeach.KeyName, "key variable", null, dictForeach.KeySpan, dictForeach);
+        AddToScope(dictForeach.ValueName, "value variable", null, dictForeach.ValueSpan, dictForeach);
 
-        VisitStatements(dictForeach.Body);
+        if (SpanContainsOffset(dictForeach.Dictionary.Span))
+            VisitExpression(dictForeach.Dictionary);
+        else
+            VisitStatements(dictForeach.Body);
 
         PopScope();
     }

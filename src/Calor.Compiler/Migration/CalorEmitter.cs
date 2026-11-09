@@ -2631,19 +2631,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ForStatementNode node)
     {
         var from = node.From.Accept(this);
-        var to = node.To.Accept(this);
-        var step = node.Step?.Accept(this) ?? "1";
-
-        // Hoist loop bounds that contain section markers or hex literals out of the braces
-        // (hex literals like 0x100 break the ParseValue fallback inside attribute blocks)
-        if (ContainsSectionMarker(from) || from.Contains("0x") || from.Contains(':'))
-            from = HoistToTempVar(from);
-        if (ContainsSectionMarker(to) || to.Contains("0x") || to.Contains(':'))
-            to = HoistToTempVar(to);
-        if (ContainsSectionMarker(step) || step.Contains("0x") || step.Contains(':'))
-            step = HoistToTempVar(step);
-
-        AppendLine($"§L{{{node.VariableName}:{from}:{to}:{step}}}");
+        var binder = node.VariableType == "int" ? node.VariableName
+            : $"{TypeMapper.ToSurfaceType(node.VariableType)}:{node.VariableName}";
+        if (node.Condition != null && node.Update != null)
+            AppendLine($"for {binder} = {from}; {node.Condition.Accept(this)}; " +
+                $"{node.Update.Target.Accept(this)} = {node.Update.Value.Accept(this)}");
+        else
+            AppendLine($"for {binder} from {from} to {node.To.Accept(this)} step {node.Step?.Accept(this) ?? "1"}");
         Indent();
 
         foreach (var stmt in node.Body)
@@ -2652,7 +2646,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/L");
         return "";
     }
 
@@ -2660,7 +2653,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var condition = node.Condition.Accept(this);
 
-        AppendLine($"§WH {condition}");
+        AppendLine($"while {condition}");
         Indent();
 
         foreach (var stmt in node.Body)
@@ -2669,7 +2662,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/WH");
         return "";
     }
 
@@ -2677,7 +2669,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var condition = node.Condition.Accept(this);
 
-        AppendLine($"§DO");
+        AppendLine("do");
         Indent();
 
         foreach (var stmt in node.Body)
@@ -2686,7 +2678,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/DO {condition}");
+        AppendLine($"while {condition}");
         return "";
     }
 
@@ -2695,9 +2687,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var collection = node.Collection.Accept(this);
         var varType = TypeMapper.ToSurfaceType(node.VariableType);
 
-        // Emit as §EACH{variable:type} or §EACH{variable:type:index}
-        var indexPart = node.IndexVariableName != null ? $":{node.IndexVariableName}" : "";
-        AppendLine($"§EACH{{{node.VariableName}:{varType}{indexPart}}} {collection}");
+        if (node.IndexVariableName != null)
+            throw new InvalidOperationException("Indexed foreach is removed; use an explicit counter with each.");
+        var binder = varType == "var" ? node.VariableName : $"{varType}:{node.VariableName}";
+        AppendLine($"each {binder} in {collection}");
         Indent();
 
         foreach (var stmt in node.Body)
@@ -2706,7 +2699,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/EACH");
         return "";
     }
 
@@ -2936,7 +2928,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var dictionary = node.Dictionary.Accept(this);
 
-        AppendLine($"§EACHKV{{{node.KeyName}:{node.ValueName}}} {dictionary}");
+        AppendLine($"each {node.KeyName}, {node.ValueName} in {dictionary}");
         Indent();
 
         foreach (var stmt in node.Body)
@@ -2945,7 +2937,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/EACHKV");
         return "";
     }
 

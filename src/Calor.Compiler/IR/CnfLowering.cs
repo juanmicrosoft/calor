@@ -266,6 +266,9 @@ public sealed class CnfLowering
 
     private void LowerFor(ForStatementNode forStmt)
     {
+        if (forStmt.ReevaluatesCondition)
+            throw new NotSupportedException(
+                "CNF snapshot-range lowering does not model re-evaluated for conditions, updates and continue.");
         var type = CnfType.Int;
 
         // Initialize loop variable
