@@ -4,10 +4,13 @@
 import importlib.util
 import os
 from pathlib import Path
+import re
 import sys
 import tempfile
 import time
+from types import SimpleNamespace
 import unittest
+from unittest.mock import Mock, patch
 
 
 HERE = Path(__file__).resolve().parent
@@ -204,6 +207,16 @@ def compatibility_cases(name):
     return [(category, *full[index]) for index, category in selected]
 
 
+def require_finite_process_result(output):
+    if (re.search(r"timeout|timed\s*out|deadline|\beof\b|cleanup|"
+                  r"cannot terminate verifier process group|"
+                  r"\b(?:OSError|FileNotFoundError|PermissionError|BrokenPipeError|ChildProcessError)\b|"
+                  r"failed to (?:start|launch)|process infrastructure|"
+                  r"segmentation fault|access violation|killed by signal", output, re.IGNORECASE)
+            or any(int(code) != 1 for code in re.findall(r"Verifier command exited (-?\d+)", output))):
+        raise RuntimeError(f"Arithmetic control infrastructure failure; no finite verdict:\n{output}")
+
+
 class TypeArithmeticVerifierTests(unittest.TestCase):
     entry_points_executed = 0
 
@@ -224,15 +237,18 @@ class TypeArithmeticVerifierTests(unittest.TestCase):
                 output = process.run(command, HERE, deadline, env=environment)
                 passed = True
             except RuntimeError as error:
-                if "Verifier command exited" not in str(error):
+                require_finite_process_result(str(error))
+                if not re.match(r"Verifier command exited 1:\n", str(error)):
                     raise
                 output, passed = str(error), False
+            require_finite_process_result(output)
             type(self).entry_points_executed += 1
             self.assertEqual(passed, expected, output)
             if passed:
                 selected = Path(environment["CALOR_COMPILER_ROOT"]).resolve() / "src/Calor.Compiler/bin"
                 selected /= environment.get("CALOR_COMPILER_CONFIGURATION", "Debug")
-                self.assertIn(f"Selected compiler: {selected / 'net10.0/calor.dll'}", output)
+                identities = [line for line in output.splitlines() if line.strip().startswith("Selected compiler:")]
+                self.assertEqual(identities, [f"Selected compiler: {selected / 'net10.0/calor.dll'}"], output)
                 count = len(independent_cases(name)[0])
                 coupling = count * (2 if name == "ComputeWithTemp" else 3)
                 self.assertIn(f"{count} representable runtime/state cases; {coupling} complete-case binding counterfactuals;", output)
@@ -267,6 +283,85 @@ class TypeArithmeticVerifierTests(unittest.TestCase):
         self.assertEqual(len(independent_cases("Accumulate")[0]), 17)
         self.assertEqual(independent_cases("Accumulate")[1][0], -2147483646)
         self.assertEqual(independent_cases("ComputeWithTemp")[1][121], 2147483647)
+
+
+class TypeArithmeticGuardTests(unittest.TestCase):
+    def setUp(self):
+        class MockedArithmeticVerifier(TypeArithmeticVerifierTests):
+            entry_points_executed = 0
+        self.verifier = MockedArithmeticVerifier()
+        self.environment = {"CALOR_COMPILER_ROOT": str(ROOT / "mock selected root"),
+                            "CALOR_COMPILER_CONFIGURATION": "Release"}
+        selected = Path(self.environment["CALOR_COMPILER_ROOT"]).resolve()
+        self.identity = f"Selected compiler: {selected / 'src/Calor.Compiler/bin/Release/net10.0/calor.dll'}"
+        self.success = (self.identity + "\nVerification passed: Accumulate; native/CLR signature; "
+                        "17 representable runtime/state cases; 51 complete-case binding counterfactuals; "
+                        "0 wider-intermediate cases.\nLimits: not a universal body proof; no unknown-proof fallback.\n")
+
+    def execute(self, *, output=None, error=None, expected=True):
+        run = Mock(return_value=output, side_effect=error)
+        try:
+            with patch(__name__ + ".load", return_value=SimpleNamespace(run=run)):
+                return self.verifier.verify("Accumulate", source("Accumulate"), expected, env=self.environment)
+        finally:
+            run.assert_called_once()
+            command = run.call_args.args[0]
+            self.assertEqual(Path(command[0]), HERE / "tasks/type-system/06_variable_assignment/verify.sh")
+            self.assertEqual(run.call_args.kwargs["env"]["CALOR_COMPILER_CONFIGURATION"], "Release")
+
+    def test_infrastructure_errors_never_supply_finite_verdicts(self):
+        failures = [
+            "Verifier timeout after 120s: dotnet",
+            "Verifier cleanup timeout: child did not exit by the deadline.",
+            "Cannot terminate verifier process group 123: permission denied",
+            "Unexpected EOF while capturing process output",
+            "OSError: cannot launch dotnet",
+            "Verifier command exited -9:\nprocess terminated",
+            "Verifier command exited 137:\nprocess terminated",
+            "Verifier command exited 1:\nprocess infrastructure failure",
+            "Missing/wrong writing preconditions: UNKNOWN; timeout",
+        ]
+        for failure in failures:
+            for wrapped in (failure, "Verifier command exited 1:\nVerification failed: " + failure):
+                for expected in (True, False):
+                    with self.subTest(failure=wrapped, expected=expected):
+                        with self.assertRaises(RuntimeError):
+                            self.execute(error=RuntimeError(wrapped), expected=expected)
+                        self.assertEqual(self.verifier.entry_points_executed, 0)
+            for error in (OSError("cannot launch dotnet"), EOFError("captured pipe closed"),
+                                  TimeoutError("capture timed out")):
+                        with self.subTest(error=type(error).__name__, expected=expected):
+                            with self.assertRaises(type(error)):
+                                self.execute(error=error, expected=expected)
+                            self.assertEqual(self.verifier.entry_points_executed, 0)
+        for expected in (True, False):
+            with self.subTest(success_shaped=expected):
+                with self.assertRaises(RuntimeError):
+                    self.execute(output=self.success + "Verification failed: Verifier timeout after 120s\n",
+                                 expected=expected)
+                self.assertEqual(self.verifier.entry_points_executed, 0)
+
+    def test_positive_requires_one_exact_selected_identity(self):
+        body = self.success.split("\n", 1)[1]
+        invalid = [
+            body,
+            "Selected compiler: /wrong/root/calor.dll\n" + body,
+            self.identity + ".other\n" + body,
+            self.identity + "\n" + self.identity + "\n" + body,
+            self.identity + "\nSelected compiler: /wrong/root/calor.dll\n" + body,
+            " " + self.identity + "\n" + body,
+        ]
+        for output in invalid:
+            with self.subTest(output=output):
+                with self.assertRaises(AssertionError):
+                    self.execute(output=output)
+        self.assertEqual(self.execute(output=self.success), self.success)
+
+    def test_finite_candidate_failure_remains_a_negative(self):
+        error = RuntimeError("Verifier command exited 1:\nVerification failed: Verifier command exited 1:\n"
+                             "Calor compilation failed: foreign contract reference")
+        self.assertEqual(self.execute(error=error, expected=False), str(error))
+        self.assertEqual(self.verifier.entry_points_executed, 1)
 
 
 def run_compatibility(old, current, deadline):

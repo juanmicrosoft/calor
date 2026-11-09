@@ -1243,6 +1243,28 @@ This avoids repeating cross-profile categories inside the historical budget:
 the **600-second total and 120-second entry/process/EOF deadlines are unchanged**.
 Exhausting either deadline remains a mandatory failure, not accepted evidence.
 
+Arithmetic controls accept only finite candidate failures. Direct or nested
+timeout, deadline, EOF, cleanup, launch/OS and abnormal process-exit failures
+are re-raised before recording a verdict, even when enclosed in
+`Verifier command exited 1` output. No arithmetic control intentionally expects
+a timeout. Every positive requires exactly one complete `Selected compiler:`
+line matching the resolved requested root, configuration and `net10.0/calor.dll`;
+missing, wrong, duplicate and suffix-only identities reject.
+
+Three lightweight mocked guard tests exercise the actual arithmetic `verify`
+method without launching a compiler or contributing to either real-entrypoint
+count. They check positive/negative infrastructure propagation, direct/nested
+process errors, success-shaped timeout output, invalid/multiple compiler
+identities, a valid requested Release identity and ordinary nested finite
+candidate rejection. The full suite still requires 59 real current controls,
+and strict replay still requires 71 actual old/current controls.
+These guards also make solver `UNKNOWN; timeout` failures fatal rather than
+finite expected negatives. Validation of this guard follow-up exposed those
+failures in ComputeWithTemp's narrowed precondition and narrowed inline
+refinement controls; the archived replay stopped at the same inline guard.
+Those runs are not passing full-suite evidence. The engine and solver deadlines
+were not changed to hide or work around the failures.
+
 This is only the two arithmetic prerequisites, not acceptance of all 129 tasks,
 an agent, the milestone or a release. Product code, other task wrappers,
 task definitions, original fixtures, TestData, active Calor subjects/corpus,
