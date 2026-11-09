@@ -8273,7 +8273,12 @@ public sealed class Parser
         }
         if (Check(TokenKind.StrLiteral))
         {
-            return Advance().Value as string ?? "";
+            var token = Advance();
+            if (token.Value is string value && !token.Text.EndsWith("u8", StringComparison.Ordinal))
+                return value;
+            _diagnostics.ReportError(token.Span, DiagnosticCode.UnexpectedToken,
+                "C# attribute string arguments must be constant ordinary strings; escape '${' as '\\${' for literal text.");
+            return "";
         }
         if (Check(TokenKind.IntLiteral))
         {

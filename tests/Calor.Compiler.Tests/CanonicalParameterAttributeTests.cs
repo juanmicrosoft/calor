@@ -8,6 +8,7 @@ using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -76,7 +77,7 @@ public sealed class CanonicalParameterAttributeTests
     {
         var source = """
             module Attributes
-              func Read (int:@event [@System.ComponentModel.Description("quote \" slash \\ newline \n ${value}")][@System.Runtime.CompilerServices.CallerLineNumber] = 2) → int
+              func Read (int:@event [@System.ComponentModel.Description("quote \" slash \\ newline \n \${value}")][@System.Runtime.CompilerServices.CallerLineNumber] = 2) → int
                 return @event
             """;
         foreach (var input in new[] { source, new CalorEmitter().Emit(Parse(source)) })
@@ -92,6 +93,20 @@ public sealed class CanonicalParameterAttributeTests
             Assert.Empty(parameter.CSharpAttributes[1].Arguments);
             Compile(new CSharpEmitter().Emit(module));
         }
+    }
+
+    [Theory]
+    [InlineData("\"${value}\"")]
+    [InlineData("\"value\"u8")]
+    public void NonconstantAttributeStringArgumentsAreRejectedExplicitly(string argument)
+    {
+        var source = $"module Attributes\n  func Read (int:value [@System.ComponentModel.Description({argument})]) → int\n    return value";
+        var diagnostics = new DiagnosticBag();
+        _ = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var error = Assert.Single(diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.UnexpectedToken, error.Code);
+        Assert.Contains("constant ordinary strings", error.Message);
+        Assert.Contains("\\${", error.Message);
     }
 
     [Theory]
@@ -154,6 +169,8 @@ public sealed class CanonicalParameterAttributeTests
             root = Directory.GetParent(root)!.FullName;
         var original = File.ReadAllText(Path.Combine(root,
             "tests/TestData/InteropScope/W1/fixtures/W1-F1-notnullwhen.cs.txt"));
+        var originalDirective = CSharpSyntaxTree.ParseText(original).GetRoot()
+            .DescendantNodes(descendIntoTrivia: true).OfType<NullableDirectiveTriviaSyntax>().Single();
         var conversion = new CSharpToCalorConverter().Convert(original);
         Assert.True(conversion.Success, string.Join("\n", conversion.Context.Issues));
         Assert.NotNull(conversion.CalorSource);
@@ -167,6 +184,12 @@ public sealed class CanonicalParameterAttributeTests
         {
             var module = Parse(input);
             Assert.Empty(Descendants(module).OfType<CSharpInteropBlockNode>());
+            var directive = Assert.Single(Descendants(module).OfType<CompilerDirectiveNode>());
+            Assert.Equal("nullable-directive", directive.Feature);
+            Assert.Equal(System.Text.Encoding.UTF8.GetBytes(originalDirective.ToString()),
+                System.Text.Encoding.UTF8.GetBytes(directive.Code));
+            Assert.Same(directive, module.Items[0]);
+            Assert.IsType<UsingDirectiveNode>(module.Items[1]);
             var parameter = Assert.Single(Descendants(module).OfType<ParameterNode>()
                 .Where(parameter => parameter.Name == "name"));
             Assert.Equal(Calor.Compiler.Ast.ParameterModifier.Out, parameter.Modifier);
