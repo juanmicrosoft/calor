@@ -2055,3 +2055,120 @@ deadline and **4,096-character** per-invocation/observation output bounds remain
 All 56 previously integrated profiles, all 65,536 SumToN probes and their output-only/
 successful-counterfactual checks are unchanged. These two prerequisites are not
 full milestone, agent-task-set, publication or release acceptance.
+
+### Original advanced-contract verifier prerequisites
+
+The five unchanged `advanced-contracts` prompts now dispatch through the shared
+selected-compiler helper, rather than grepping `Contracts.calr`. Run:
+
+```bash
+CALOR_COMPILER_CONFIGURATION=Release \
+  python3 tests/E2E/agent-tasks/test-advanced-contract-verifiers.py
+CALOR_COMPILER_CONFIGURATION=Release \
+  python3 tests/E2E/agent-tasks/test-logic-old-release.py --advanced-contracts
+```
+
+The selected root must already contain a source-built compiler and verified Z3
+assets. Each entry independently builds its disposable helper against that
+root/configuration. Advanced entries verify the selected root's native manifest,
+top-level DLL/libz3 images and `runtimes/` copies before and after execution.
+Unrelated `publish/` subtrees are not selected images. Every positive requires
+exactly one complete, resolved `root/src/Calor.Compiler/bin/CONFIG/net10.0/calor.dll`
+identity; missing, duplicate, indented, mixed-format and wrong identities fail.
+
+Acceptance requires the public native module AST declaration, selected public
+Debug emission, an independently compiled/reflected CLR owner/signature
+(including parameter names, aliases and widths), and real runtime results.
+Whole-module raw rejection traverses nested callable boundaries. Native contract
+translation must succeed without warnings. SMT counterexample queries must return
+UNSAT; UNKNOWN and solver timeout are infrastructure failures, never positive
+fallbacks or finite candidate rejections.
+
+| Prompt | Required contract proof | Runtime cases per positive |
+|---|---|---|
+| `AllPositive(int[])` | Native result implication with a universal quantifier: every valid index has a positive signed element | 225, plus 13 successful read counterfactuals |
+| `HasNegative(int[])` | Native result implication with an existential quantifier: a valid index has a negative signed element | 225, plus 13 successful read counterfactuals |
+| `SafeIncrement(int x)` | Actual conditional postcondition `x > 0 => result > x` | 12 |
+| `Divide(int a, int b)` | Exact nonzero-divisor entry domain; the native nonzero predicate owns the exact message `Divisor must not be zero` | 155 valid divisions and 5 real Requires/message rejections |
+| `ClampValue(int min, int max, int value)` | Multiple substantive native entry predicates, both bounds and in-range identity; no valid clamp output excluded | 1,183 valid clamps and 3 real Requires rejections |
+
+Array proofs model arbitrary signed Int32 elements and non-null arrays of
+length 0..Int32.MaxValue. A quantifier-free lemma compares the actual bound body
+with the required valid-index predicate for arbitrary index, length and element.
+It proves sign, bounds, scope, nonvacuity and short-circuit access safety before
+comparing the actual publicly translated quantified predicate. Result implication
+and required-output admission are substantive SMT proofs, not diagnostic counts.
+Wrong quantifiers, missing bounds, foreign variables, vacuous conditions and
+stronger contracts excluding valid outputs fail.
+
+Array runtime checks include empty arrays, all 13 signed/boundary singleton
+values, ordered pairs, three-element position permutations and 257-element tails.
+Source-mapped native indexed loops and foreach loops must read the actual
+unchanged input. An exhaustive answer requires coverage of every index; a
+non-exhaustive answer requires an observed deciding element. Successful singleton
+counterfactuals replace only the observed payload without changing the input:
+every signed singleton must complete and return the independently expected
+opposite predicate. Debug baseline contracts run normally; Off body
+counterfactuals do not treat deliberately invalid postcondition outputs as
+coupling. Exceptions, foreign copies, dormant reads, BCL-result decoys and
+tautological payload uses are not dependence evidence.
+
+Scalar proofs use signed Int32 bit-vectors and the exact mathematical-output
+relation. `SafeIncrement` excludes only Int32.MaxValue, whose successor is
+unrepresentable. `Divide` excludes only Int32.MinValue/-1 among nonzero divisors;
+division truncates toward zero, not floor division. No divisibility restriction
+or optional positive-input guard is admitted. `ClampValue` has no overflow or
+output exclusions: all signed inputs satisfying min<=max are in scope. Optional
+entry refinements must preserve these domains, and output predicates must admit
+every required valid output. These are contract proofs plus finite body/runtime
+checks, **not universal implementation proofs** or a sandbox. Null-array policy,
+unrepresentable scalar overflow behavior and arbitrary hostile-code confinement
+are not specified or proved. Unmodeled contract operands fail explicitly.
+
+The dedicated matrix contains 136 genuine entries (22 positives, 114 finite
+rejections), plus a selected-image positive and two separately declared bounded
+timeout controls. Synthetic supervision/identity mocks and corrupt-image
+infrastructure probes cannot increment real counters. The full current command
+also executes one positive for every existing integrated profile, separately
+from advanced counters. Finite failures must be real exited verifier failures;
+direct/wrapped process, deadline, EOF, cleanup, OS/launch, abnormal-exit and
+success-shaped failure output propagate before counting. Even declared timeout
+controls cannot admit EOF/cleanup failure.
+
+The named **representative strict matrix** retains all 46 distinct categories:
+every profile's native body and alias/equivalent variant, substantive proof
+negatives, original empty/sign cases, scalar preservation/message cases,
+array payload/state/provenance/coupling and mutant-only exceptions. It omits
+only duplicate per-profile permutations of shared missing/comment/raw/duplicate/
+owner/signature/domain/scoping categories. It contains exactly 78 entries per
+arm (16 positives, 62 finite rejections). The archived arm comes from unchanged
+Git commit `d82f3ae95175ecd09581c6922701706be72b0ca9`, uses its own native manifest,
+locked restore and a source-built original compiler. Old declaration IDs are
+added only to disposable old-parser strings; predicates are unchanged. Two
+isolated helper workers run within each genuine arm; arms run sequentially with
+the unchanged 600-second total and 120-second entry/process/EOF bounds. There is
+no cache, prebuilt compiler substitution, skip, timeout admission or deadline
+extension in compatibility mode.
+
+Current validation passed all seven tests: **139 real advanced controls**
+(23 positives, 114 finite rejections, two separately declared bounded timeouts)
+and **66 preserved-profile positives**, counted separately. The additional
+SumToN widening/factoring and strong-contract coupling regressions passed
+23 genuine contract-writing controls, retaining all 65,536 representable inputs.
+
+**Archived replay remains blocked, not accepted.** The genuine archived arm
+verified its own native size/hash manifest, locked-restored and source-built
+the original compiler. Both original array positives then exited with
+`Calor0200`: parameter-only postcondition validation rejects `arr.Length` as an
+unknown identifier. Spacing the member access does not avoid that native
+validation; the alternative native array-length node is not a certified
+quantifier bound. Neither original array task is admitted. The runner stops
+after these two blocked probes, before the remaining archived matrix or its
+current arm; the intended 156-entry compatibility matrix has **not passed**.
+Disabling contracts/effects, retyping the task or restoring retired syntax is
+not a compatibility solution.
+
+This unit changes no product source, authoritative task/fixture, TestData,
+active `.calr`/corpus subject, historical ledger/floor, version or workflow.
+The current five-task controls do not resolve the archived blocker or establish
+all 129 prerequisites, agent evaluation, milestone acceptance or release readiness.

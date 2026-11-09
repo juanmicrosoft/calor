@@ -58,6 +58,11 @@ static void Verify(string profile, string path)
         VerifyCarrierPatterns(profile, path);
         return;
     }
+    if (profile is "ac001" or "ac002" or "ac003" or "ac004" or "ac005")
+    {
+        VerifyAdvancedContracts(profile, path);
+        return;
+    }
     if (profile is "pm001" or "pm002" or "pm003" or "pm006")
     {
         VerifyScalarPatterns(profile, path);
@@ -371,6 +376,415 @@ static void Verify(string profile, string path)
         return;
     }
     Console.WriteLine($"Verification passed: {name}; {(basic ? "basic signature/behavior" : controlFlow ? "native control flow" : "semantic contracts")} and {count} runtime cases.");
+}
+
+static void VerifyAdvancedContracts(string profile, string path)
+{
+    var source = File.ReadAllText(path);
+    var compilation = Calor.Compiler.Program.Compile(
+        source, path, new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
+    if (compilation.HasErrors || compilation.Ast == null)
+        throw new InvalidOperationException($"Calor compilation failed:\n{string.Join("\n", compilation.Diagnostics)}");
+    var module = compilation.Ast;
+    RejectRawInterop(module, "advanced-contract acceptance");
+    var name = profile switch
+    {
+        "ac001" => "AllPositive", "ac002" => "HasNegative", "ac003" => "SafeIncrement",
+        "ac004" => "Divide", _ => "ClampValue"
+    };
+    var arrays = profile is "ac001" or "ac002";
+    var functions = module.Functions.Where(candidate => candidate.Name == name).ToArray();
+    if (functions.Length != 1)
+        throw new InvalidOperationException($"Expected exactly one module function named {name}.");
+    var function = functions[0];
+    var names = arrays ? function.Parameters.Select(parameter => parameter.Name).ToArray()
+        : profile == "ac003" ? new[] { "x" } : profile == "ac004" ? new[] { "a", "b" }
+        : new[] { "min", "max", "value" };
+    var outputType = arrays ? "bool" : "i32";
+    if (function.Visibility != Visibility.Public || function.IsAsync || function.TypeParameters.Count != 0
+        || function.Output == null
+        || AttributeHelper.ExpandType(function.Output.TypeName) != AttributeHelper.ExpandType(outputType)
+        || !function.Parameters.Select(parameter => parameter.Name).SequenceEqual(names)
+        || function.Parameters.Count != (arrays ? 1 : names.Length)
+        || function.Parameters.Any(parameter => parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None
+            || AttributeHelper.ExpandType(parameter.TypeName) != AttributeHelper.ExpandType(arrays ? "i32[]" : "i32")))
+        throw new InvalidOperationException($"Wrong public signature for {name}.");
+    CheckAdvancedPredicates(function, arrays);
+    var (assembly, _) = CompileRuntime(compilation.GeneratedCode);
+    MethodInfo Target(Assembly image)
+    {
+        var owner = image.GetType($"{module.Name}.{module.Name}Module")
+            ?? throw new InvalidOperationException("Advanced CLR module owner missing.");
+        var types = arrays ? new[] { typeof(int[]) } : names.Select(_ => typeof(int)).ToArray();
+        var methods = owner.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
+            | BindingFlags.Instance | BindingFlags.DeclaredOnly).Where(method => method.Name == name).ToArray();
+        if (!owner.IsPublic || methods.Length != 1 || !methods[0].IsPublic || !methods[0].IsStatic
+            || methods[0].IsGenericMethod || methods[0].DeclaringType != owner
+            || methods[0].ReturnType != (arrays ? typeof(bool) : typeof(int))
+            || !methods[0].GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(types)
+            || !methods[0].GetParameters().Select(parameter => parameter.Name).SequenceEqual(names))
+            throw new InvalidOperationException("Wrong advanced reflected owner/signature/width.");
+        return methods[0];
+    }
+    var target = Target(assembly);
+    object Expected(int[] input) => name switch
+    {
+        "AllPositive" => input.All(value => value > 0),
+        "HasNegative" => input.Any(value => value < 0),
+        "SafeIncrement" => checked(input[0] + 1),
+        "Divide" => input[0] / input[1],
+        _ => Math.Clamp(input[2], input[0], input[1])
+    };
+    var cases = AdvancedCases(name).ToArray();
+    object[] Arguments(int[] input) => arrays ? [input] : input.Cast<object>().ToArray();
+    object? Execute(MethodInfo method, int[] input, string purpose)
+    {
+        var before = input.ToArray();
+        var actual = method.Invoke(null, Arguments(input));
+        if (!input.SequenceEqual(before))
+            throw new InvalidOperationException($"Advanced {purpose} changed the input array.");
+        return actual;
+    }
+    foreach (var input in cases)
+        if (!Equals(Execute(target, input, "baseline"), Expected(input)))
+            throw new InvalidOperationException($"Wrong advanced baseline output: {name}({string.Join(",", input)}).");
+    var rejected = 0;
+    if (name is "Divide" or "ClampValue")
+    {
+        var invalid = name == "Divide"
+            ? new[] { new[] { int.MinValue, 0 }, [-1, 0], [0, 0], [1, 0], [int.MaxValue, 0] }
+            : new[] { new[] { 1, 0, 0 }, [int.MaxValue, int.MinValue, 0], [0, -1, int.MaxValue] };
+        foreach (var input in invalid)
+        {
+            try
+            {
+                target.Invoke(null, Arguments(input));
+                throw new InvalidOperationException("Advanced required entry rejection did not occur.");
+            }
+            catch (TargetInvocationException error) when (error.InnerException is Calor.Runtime.ContractViolationException violation
+                && violation.Kind == Calor.Runtime.ContractKind.Requires
+                && function.Preconditions.Any(contract => contract.Span.Start == violation.StartOffset)
+                && (name != "Divide" || violation.Message == "Divisor must not be zero"))
+            {
+                rejected++;
+            }
+        }
+    }
+    var coupling = 0;
+    if (arrays)
+    {
+        // Debug contracts must execute above. Counterfactual bodies use Off so an
+        // intentionally changed result is not mistaken for a contract exception.
+        var options = new CSharpParseOptions(LanguageVersion.Preview);
+        var mapped = CSharpSyntaxTree.ParseText(
+            new CSharpEmitter(ContractMode.Off) { LineDirectiveFilePath = path }.Emit(module), options);
+        var nativeLoops = new HashSet<int>();
+        var nativeReads = new HashSet<int>();
+        var pending = new Stack<AstNode>();
+        pending.Push(module);
+        while (pending.TryPop(out var node))
+        {
+            if (node is ForStatementNode or WhileStatementNode or DoWhileStatementNode or ForeachStatementNode)
+                nativeLoops.Add(node.Span.Line);
+            if (node is ArrayAccessNode or ForeachStatementNode)
+                nativeReads.Add(node.Span.Line);
+            foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+                pending.Push(child);
+            if (node is LocalFunctionStatementNode local)
+                pending.Push(local.Function);
+        }
+        if (nativeLoops.Count == 0 || nativeReads.Count == 0)
+            throw new InvalidOperationException("Advanced native array loop/read missing.");
+        var mappedCompilation = CSharpCompilation.Create("AdvancedMapping", [
+            CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble, options), mapped],
+            GeneratedCSharpCompiler.References, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var probe = "__Advanced_" + Guid.NewGuid().ToString("N");
+        var rewriter = new AdvancedArrayRewriter(mappedCompilation.GetSemanticModel(mapped), nativeLoops, nativeReads, path, probe);
+        var rewritten = rewriter.Visit(mapped.GetRoot()) as CompilationUnitSyntax
+            ?? throw new InvalidOperationException("Advanced native instrumentation failed.");
+        if (rewriter.Loops == 0 || rewriter.Reads == 0)
+            throw new InvalidOperationException("Advanced selected emission has no native array loop/read.");
+        rewritten = rewritten.AddMembers(SyntaxFactory.ParseMemberDeclaration(AdvancedArrayRewriter.Probe(probe))
+            ?? throw new InvalidOperationException("Advanced probe declaration failed."));
+        var (tracedAssembly, _) = CompileRuntime(rewritten.NormalizeWhitespace().ToFullString());
+        var traced = Target(tracedAssembly);
+        var probeType = tracedAssembly.GetType(probe)!;
+        var reset = probeType.GetMethod("Reset")!;
+        var records = (List<(int Index, int Value, int Depth)>)probeType.GetField("Records")!.GetValue(null)!;
+        foreach (var input in cases)
+        {
+            reset.Invoke(null, [input, -1, 0]);
+            if (!Equals(Execute(traced, input, "instrumented baseline"), Expected(input)))
+                throw new InvalidOperationException("Wrong advanced instrumented baseline output.");
+            var observations = records.ToArray();
+            if (observations.Any(record => record.Depth <= 0 || record.Index < 0 || record.Index >= input.Length
+                || record.Value != input[record.Index]))
+                throw new InvalidOperationException("Advanced array provenance failed: native loop must read the actual unchanged input.");
+            var exhaustive = name == "AllPositive" ? (bool)Expected(input) : !(bool)Expected(input);
+            if (exhaustive && observations.Select(record => record.Index).Distinct().Count() != input.Length
+                || !exhaustive && !observations.Any(record => name == "AllPositive" ? record.Value <= 0 : record.Value < 0))
+                throw new InvalidOperationException("Advanced array provenance failed: native loop reads do not establish the returned predicate.");
+            // A singleton makes the expected changed result independent of early
+            // exit/loop strategy. A decoy read, tautology or exception cannot pass.
+            if (input.Length != 1)
+                continue;
+            if (observations.Length == 0)
+                throw new InvalidOperationException("Advanced array provenance failed: singleton input was not read in a native loop.");
+            var changedValue = name == "AllPositive" ? input[0] > 0 ? 0 : 1 : input[0] < 0 ? 0 : -1;
+            reset.Invoke(null, [input, 0, changedValue]);
+            object? changed;
+            try
+            {
+                changed = Execute(traced, input, "counterfactual");
+            }
+            catch (TargetInvocationException error)
+            {
+                throw new InvalidOperationException("Advanced counterfactual runtime failed; exceptions are not coupling evidence.", error);
+            }
+            var expectedChanged = name == "AllPositive" ? changedValue > 0 : changedValue < 0;
+            if (!Equals(changed, expectedChanged) || Equals(changed, Expected(input))
+                || !records.Any(record => record.Index == 0 && record.Value == changedValue && record.Depth > 0))
+                throw new InvalidOperationException("Advanced successful array output coupling failed.");
+            coupling++;
+        }
+        if (coupling != AdvancedIntegers().Length)
+            throw new InvalidOperationException("Advanced incomplete array counterfactual matrix.");
+    }
+    Console.WriteLine($"Verification passed: {name}; advanced native/CLR predicates; {cases.Length} runtime cases; "
+        + $"{rejected} entry rejections; {coupling} successful array output counterfactuals.");
+    Console.WriteLine("Limits: translated contract entailment and required-output admission, not a universal body proof; "
+        + (arrays ? "non-null signed Int32 arrays, 0..Int32.MaxValue length; finite empty/signed/permutation/boundary runtime and state checks."
+            : name == "SafeIncrement" ? "all signed Int32 inputs except Int32.MaxValue (x+1 unrepresentable); finite runtime sampling."
+            : name == "Divide" ? "b!=0; only Int32.MinValue/-1 excluded (unrepresentable); signed truncation toward zero; finite runtime sampling."
+            : "full signed Int32 min<=max domain, no optional guard or valid output excluded; finite runtime sampling."));
+}
+
+static int[] AdvancedIntegers() => [int.MinValue, int.MinValue + 1, -1073741824, -100, -2, -1,
+    0, 1, 2, 100, 1073741823, int.MaxValue - 1, int.MaxValue];
+
+static IEnumerable<int[]> AdvancedCases(string name)
+{
+    var values = AdvancedIntegers();
+    if (name is "AllPositive" or "HasNegative")
+    {
+        yield return [];
+        foreach (var value in values)
+        {
+            yield return [value];
+            yield return [1, value, 2];
+            yield return [value, 1, 2];
+            yield return [1, 2, value];
+        }
+        foreach (var a in values)
+            foreach (var b in values)
+                yield return [a, b];
+        yield return Enumerable.Repeat(1, 257).ToArray();
+        yield return Enumerable.Repeat(1, 256).Append(-1).ToArray();
+        yield return Enumerable.Repeat(1, 256).Append(0).ToArray();
+        yield break;
+    }
+    if (name == "SafeIncrement")
+    {
+        foreach (var value in values.Where(value => value != int.MaxValue))
+            yield return [value];
+        yield break;
+    }
+    foreach (var a in values)
+        foreach (var b in values)
+            if (name == "Divide")
+            {
+                if (b != 0 && !(a == int.MinValue && b == -1))
+                    yield return [a, b];
+            }
+            else if (a <= b)
+                foreach (var value in values)
+                    yield return [a, b, value];
+}
+
+static void CheckAdvancedPredicates(FunctionNode function, bool arrays)
+{
+    using var context = new Context();
+    var translator = new ContractTranslator(context);
+    foreach (var parameter in function.Parameters)
+        if (!(arrays ? translator.DeclareArrayVariable(parameter.Name, "i32") : translator.DeclareVariable(parameter.Name, "i32")))
+            throw new InvalidOperationException("Advanced native parameter translation unsupported.");
+    if (!translator.DeclareVariable("result", arrays ? "bool" : "i32"))
+        throw new InvalidOperationException("Advanced native result translation unsupported.");
+    BitVecExpr Integer(string name) => context.MkBVConst(name, 32);
+    BitVecNum Number(int value) => context.MkBV(value, 32);
+    void Prove(BoolExpr counterexample, string message)
+    {
+        using var solver = context.MkSolver();
+        using var settings = context.MkParams();
+        settings.Add("timeout", 5000u);
+        solver.Parameters = settings;
+        solver.Assert(counterexample);
+        var status = solver.Check();
+        if (status == Status.UNKNOWN)
+            throw new InvalidOperationException($"Advanced solver infrastructure failure: UNKNOWN: {solver.ReasonUnknown}");
+        if (status != Status.UNSATISFIABLE)
+            throw new InvalidOperationException($"{message}: SATISFIABLE: {solver.Model}");
+    }
+    BoolExpr Translate(ExpressionNode expression)
+    {
+        var translated = translator.TranslateBoolExpr(expression);
+        if (translated == null || translator.Warnings.Count != 0)
+            throw new InvalidOperationException($"Advanced native contract translation unsupported: {string.Join("; ", translator.Warnings)}");
+        return translated;
+    }
+    var array = arrays ? function.Parameters[0].Name : "";
+    var length = arrays ? translator.TranslateBitVecExpr(new ArrayLengthNode(function.Span, new ReferenceNode(function.Span, array))) : null;
+    var domain = arrays ? context.MkBVULE(length!, Number(int.MaxValue)) : context.MkTrue();
+    var limit = function.Name == "SafeIncrement" ? context.MkNot(context.MkEq(Integer("x"), Number(int.MaxValue)))
+        : function.Name == "Divide" ? context.MkNot(context.MkAnd(context.MkEq(Integer("a"), Number(int.MinValue)),
+            context.MkEq(Integer("b"), Number(-1)))) : context.MkTrue();
+    var requiredPre = function.Name == "Divide" ? context.MkNot(context.MkEq(Integer("b"), Number(0)))
+        : function.Name == "ClampValue" ? context.MkBVSLE(Integer("min"), Integer("max")) : context.MkTrue();
+    BoolExpr Bounds(BitVecExpr index) => context.MkAnd(context.MkBVSGE(index, Number(0)),
+        context.MkBVULT(index, length!));
+    BoolExpr Safe(ExpressionNode expression, string? bound = null)
+    {
+        switch (expression)
+        {
+            case BoolLiteralNode:
+            case IntLiteralNode { IsLong: false, IsUnsigned: false } literal
+                when literal.Value >= int.MinValue && literal.Value <= int.MaxValue:
+                return context.MkTrue();
+            case ReferenceNode reference when function.Parameters.Any(parameter => parameter.Name == reference.Name)
+                || reference.Name == "result" || bound != null && reference.Name == bound:
+            case SelfRefNode:
+                return context.MkTrue();
+            case ArrayLengthNode { Array: ReferenceNode reference } when arrays && reference.Name == array:
+            case FieldAccessNode { Target: ReferenceNode target, FieldName: "Length" } when arrays && target.Name == array:
+            case ReferenceNode lengthReference when arrays && lengthReference.Name == array + ".Length":
+                return context.MkTrue();
+            case ArrayAccessNode { Array: ReferenceNode reference, Index: ReferenceNode index }
+                when arrays && reference.Name == array && index.Name == bound:
+                return Bounds(Integer(bound!));
+            case BinaryOperationNode binary when binary.Operator is BinaryOperator.And or BinaryOperator.Or:
+                return context.MkAnd(Safe(binary.Left, bound), context.MkImplies(
+                    binary.Operator == BinaryOperator.And ? Translate(binary.Left) : context.MkNot(Translate(binary.Left)),
+                    Safe(binary.Right, bound)));
+            case BinaryOperationNode binary when binary.Operator is BinaryOperator.Equal or BinaryOperator.NotEqual
+                or BinaryOperator.LessThan or BinaryOperator.LessOrEqual or BinaryOperator.GreaterThan or BinaryOperator.GreaterOrEqual:
+                return context.MkAnd(Safe(binary.Left, bound), Safe(binary.Right, bound));
+            case UnaryOperationNode { Operator: UnaryOperator.Not } unary:
+                return Safe(unary.Operand, bound);
+            case ImplicationExpressionNode implication:
+                return context.MkAnd(Safe(implication.Antecedent, bound),
+                    context.MkImplies(Translate(implication.Antecedent), Safe(implication.Consequent, bound)));
+            case ConditionalExpressionNode conditional:
+                return context.MkAnd(Safe(conditional.Condition, bound),
+                    (BoolExpr)context.MkITE(Translate(conditional.Condition),
+                        Safe(conditional.WhenTrue, bound), Safe(conditional.WhenFalse, bound)));
+            default:
+                throw new InvalidOperationException($"Advanced foreign/scoped/unsafe contract operand: {expression.GetType().Name}.");
+        }
+    }
+    var entrySafety = new List<BoolExpr>();
+    var actualPre = context.MkAnd(TranslateEntryConditions(function, translator, expression =>
+    {
+        entrySafety.Add(Safe(expression));
+        return Translate(expression);
+    }));
+    Prove(context.MkAnd(domain, limit, context.MkNot(context.MkEq(actualPre, requiredPre))),
+        "Advanced missing/wrong entry predicates or narrowed prompt domain");
+    Prove(context.MkAnd(domain, limit, requiredPre, context.MkNot(context.MkAnd(entrySafety.ToArray()))),
+        "Advanced undefined entry predicates");
+    BoolExpr requiredPost;
+    BoolExpr mathematicalOutput;
+    if (arrays)
+    {
+        var witnesses = function.Postconditions.Select(contract => contract.Condition)
+            .OfType<ImplicationExpressionNode>().ToArray();
+        if (witnesses.Length != 1 || witnesses[0].Antecedent is not ReferenceNode { Name: "result" })
+            throw new InvalidOperationException("Advanced required native result implication missing.");
+        var quantifier = witnesses[0].Consequent;
+        IReadOnlyList<QuantifierVariableNode> variables;
+        ExpressionNode body;
+        if (function.Name == "AllPositive" && quantifier is ForallExpressionNode forall)
+            (variables, body) = (forall.BoundVariables, forall.Body);
+        else if (function.Name == "HasNegative" && quantifier is ExistsExpressionNode exists)
+            (variables, body) = (exists.BoundVariables, exists.Body);
+        else
+            throw new InvalidOperationException("Advanced missing/wrong native quantifier.");
+        if (variables.Count != 1 || AttributeHelper.ExpandType(variables[0].TypeName) != "INT"
+            || function.Parameters.Any(parameter => parameter.Name == variables[0].Name) || variables[0].Name == "result")
+            throw new InvalidOperationException("Advanced wrong quantified binding/scope/width.");
+        var variable = variables[0];
+        translator.DeclareVariable(variable.Name, "i32");
+        var index = Integer(variable.Name);
+        var element = translator.TranslateBitVecExpr(new ArrayAccessNode(function.Span,
+            new ReferenceNode(function.Span, array), new ReferenceNode(function.Span, variable.Name)))
+            ?? throw new InvalidOperationException("Advanced array element translation unsupported.");
+        var predicate = function.Name == "AllPositive" ? context.MkBVSGT(element, Number(0)) : context.MkBVSLT(element, Number(0));
+        var expectedBody = function.Name == "AllPositive" ? context.MkImplies(Bounds(index), predicate)
+            : context.MkAnd(Bounds(index), predicate);
+        // Quantifier-free body equivalence proves bounds, sign, and nonvacuity
+        // without asking a SAT quantified-array problem to supply finite rejection.
+        Prove(context.MkAnd(domain, context.MkNot(context.MkEq(Translate(body), expectedBody))),
+            "Advanced invalid bounds/vacuous/foreign/wrong quantified predicate");
+        Prove(context.MkAnd(domain, context.MkNot(Safe(body, variable.Name))), "Advanced unsafe quantified access");
+        var requiredQuantifier = function.Name == "AllPositive" ? context.MkForall([index], expectedBody)
+            : context.MkExists([index], expectedBody);
+        requiredPost = context.MkImplies(context.MkBoolConst("result"), requiredQuantifier);
+        mathematicalOutput = context.MkEq(context.MkBoolConst("result"), requiredQuantifier);
+        // This is the actual native, publicly translated quantified expression.
+        Prove(context.MkAnd(domain, context.MkNot(context.MkEq(Translate(quantifier), requiredQuantifier))),
+            "Advanced translated quantifier differs from the required predicate");
+    }
+    else
+    {
+        var result = Integer("result");
+        requiredPost = function.Name switch
+        {
+            "SafeIncrement" => context.MkImplies(context.MkBVSGT(Integer("x"), Number(0)),
+                context.MkBVSGT(result, Integer("x"))),
+            "ClampValue" => context.MkAnd(context.MkBVSGE(result, Integer("min")),
+                context.MkBVSLE(result, Integer("max")), context.MkImplies(context.MkAnd(
+                    context.MkBVSGE(Integer("value"), Integer("min")), context.MkBVSLE(Integer("value"), Integer("max"))),
+                    context.MkEq(result, Integer("value")))),
+            _ => context.MkTrue()
+        };
+        mathematicalOutput = context.MkEq(result, function.Name switch
+        {
+            "SafeIncrement" => context.MkBVAdd(Integer("x"), Number(1)),
+            "Divide" => context.MkBVSDiv(Integer("a"), Integer("b")),
+            _ => context.MkITE(context.MkBVSLT(Integer("value"), Integer("min")), Integer("min"),
+                context.MkITE(context.MkBVSGT(Integer("value"), Integer("max")), Integer("max"), Integer("value")))
+        });
+        if (function.Name == "SafeIncrement")
+        {
+            var implications = function.Postconditions.Select(contract => contract.Condition).OfType<ImplicationExpressionNode>().ToArray();
+            if (implications.Length == 0)
+                throw new InvalidOperationException("Advanced required native conditional postcondition missing.");
+            Prove(context.MkAnd(limit, context.MkNot(context.MkEq(context.MkAnd(
+                implications.Select(Translate).ToArray()), requiredPost))), "Advanced wrong/vacuous conditional postcondition");
+        }
+        if (function.Name == "Divide")
+        {
+            var messages = function.Preconditions.Where(contract => contract.Message == "Divisor must not be zero").ToArray();
+            if (messages.Length != 1)
+                throw new InvalidOperationException("Advanced exact native custom error message missing.");
+            Prove(context.MkNot(context.MkEq(Translate(messages[0].Condition), requiredPre)),
+                "Advanced message belongs to a foreign/vacuous predicate");
+        }
+        if (function.Name == "ClampValue" && (function.Preconditions.Count(contract =>
+                !Translate(contract.Condition).Simplify().IsTrue) < 2 || function.Postconditions.Count < 3))
+            throw new InvalidOperationException("Advanced multiple native entry/output predicates missing.");
+        foreach (var contract in function.Postconditions)
+            Prove(context.MkAnd(limit, requiredPre, context.MkNot(Safe(contract.Condition))), "Advanced undefined output predicate");
+    }
+    var actualPost = context.MkAnd(function.Postconditions.Select(contract =>
+    {
+        if (arrays && contract.Condition is not ImplicationExpressionNode)
+            Prove(context.MkAnd(domain, context.MkNot(Safe(contract.Condition))), "Advanced unsafe extra output predicate");
+        return Translate(contract.Condition);
+    }).ToArray());
+    Prove(context.MkAnd(domain, limit, requiredPre, actualPost, context.MkNot(requiredPost)),
+        "Advanced missing/weakened output predicates");
+    Prove(context.MkAnd(domain, limit, requiredPre, mathematicalOutput, context.MkNot(actualPost)),
+        "Advanced output predicates exclude required valid outputs");
 }
 
 static void CheckWritingContracts(FunctionNode function, string[] names, string outputType)
@@ -5354,6 +5768,118 @@ static void CheckDictionaryOutput(Dictionary<string, int> input, string output)
             throw new InvalidOperationException("Wrong dictionary output: key/value pairing or signed value mismatch.");
     }
 }
+sealed class AdvancedArrayRewriter(
+    SemanticModel semantic, HashSet<int> nativeLoops, HashSet<int> nativeReads, string path, string probe)
+    : CSharpSyntaxRewriter
+{
+    public int Loops { get; private set; }
+    public int Reads { get; private set; }
+
+    private bool Native(SyntaxNode node, HashSet<int> lines)
+    {
+        foreach (var ancestor in node.AncestorsAndSelf().OfType<StatementSyntax>())
+        {
+            var directives = ancestor.GetFirstToken().LeadingTrivia.Select(trivia => trivia.GetStructure())
+                .OfType<LineDirectiveTriviaSyntax>().Where(directive => directive.IsActive).ToArray();
+            if (directives.Length == 0)
+                continue;
+            return directives.Any(directive => directive.File.ValueText == path
+                && int.TryParse(directive.Line.ValueText, out var line) && lines.Contains(line));
+        }
+        return false;
+    }
+
+    private StatementSyntax Body(StatementSyntax visited, SyntaxNode loop)
+    {
+        if (!Native(loop, nativeLoops))
+            return visited;
+        Loops++;
+        var block = visited as BlockSyntax ?? SyntaxFactory.Block(visited);
+        return SyntaxFactory.Block(
+            SyntaxFactory.ParseStatement($"{probe}.Enter();"),
+            SyntaxFactory.TryStatement(block, default, SyntaxFactory.FinallyClause(
+                SyntaxFactory.Block(SyntaxFactory.ParseStatement($"{probe}.Exit();")))));
+    }
+
+    public override SyntaxNode? VisitWhileStatement(WhileStatementSyntax node)
+    {
+        var visited = (WhileStatementSyntax)base.VisitWhileStatement(node)!;
+        return visited.WithStatement(Body(visited.Statement, node));
+    }
+
+    public override SyntaxNode? VisitForStatement(ForStatementSyntax node)
+    {
+        var visited = (ForStatementSyntax)base.VisitForStatement(node)!;
+        return visited.WithStatement(Body(visited.Statement, node));
+    }
+
+    public override SyntaxNode? VisitDoStatement(DoStatementSyntax node)
+    {
+        var visited = (DoStatementSyntax)base.VisitDoStatement(node)!;
+        return visited.WithStatement(Body(visited.Statement, node));
+    }
+
+    public override SyntaxNode? VisitForEachStatement(ForEachStatementSyntax node)
+    {
+        var visited = (ForEachStatementSyntax)base.VisitForEachStatement(node)!;
+        if (!Native(node, nativeLoops)
+            || semantic.GetTypeInfo(node.Expression).Type is not IArrayTypeSymbol { Rank: 1 } array
+            || array.ElementType.SpecialType != SpecialType.System_Int32)
+            return visited;
+        Reads++;
+        return visited.WithExpression(SyntaxFactory.ParseExpression($"{probe}.Enumerate(({visited.Expression}))"))
+            .WithStatement(Body(visited.Statement, node));
+    }
+
+    public override SyntaxNode? VisitElementAccessExpression(ElementAccessExpressionSyntax node)
+    {
+        var visited = (ElementAccessExpressionSyntax)base.VisitElementAccessExpression(node)!;
+        if (!Native(node, nativeReads) || node.ArgumentList.Arguments.Count != 1
+            || semantic.GetTypeInfo(node.Expression).Type is not IArrayTypeSymbol { Rank: 1 } array
+            || array.ElementType.SpecialType != SpecialType.System_Int32)
+            return visited;
+        if (node.Parent is AssignmentExpressionSyntax assignment && assignment.Left == node)
+            throw new InvalidOperationException("Advanced native array mutation is not an input read.");
+        Reads++;
+        return SyntaxFactory.ParseExpression($"{probe}.Read(({visited.Expression}), ({visited.ArgumentList.Arguments[0].Expression}))")
+            .WithTriviaFrom(visited);
+    }
+
+    public static string Probe(string name) => $$"""
+        public static class {{name}}
+        {
+            public static readonly System.Collections.Generic.List<(int Index, int Value, int Depth)> Records = new();
+            private static int[] Input = System.Array.Empty<int>();
+            private static int Depth, ChangedIndex, ChangedValue;
+            public static void Reset(int[] input, int index, int value)
+            {
+                Input = input; ChangedIndex = index; ChangedValue = value; Depth = 0; Records.Clear();
+            }
+            public static void Enter() { Depth++; }
+            public static void Exit() { Depth--; }
+            public static System.Collections.Generic.IEnumerable<int> Enumerate(int[] input)
+            {
+                Depth++;
+                try
+                {
+                    for (var index = 0; index < input.Length; index++)
+                        yield return Read(input, index);
+                }
+                finally { Depth--; }
+            }
+            public static int Read(int[] input, int index)
+            {
+                if (!object.ReferenceEquals(Input, input))
+                    throw new System.InvalidOperationException("Advanced foreign array provenance.");
+                var value = input[index];
+                if (index == ChangedIndex) value = ChangedValue;
+                Records.Add((index, value, Depth));
+                return value;
+            }
+        }
+        """;
+}
+
 sealed class BoundedOutput(Func<bool>? isWitnessActive = null, Action<char>? observe = null) : TextWriter
 {
     private readonly StringBuilder output = new();

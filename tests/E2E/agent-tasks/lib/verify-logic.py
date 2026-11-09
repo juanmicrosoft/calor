@@ -4,6 +4,7 @@
 import os
 import hashlib
 import platform
+import re
 from pathlib import Path
 import shutil
 import signal
@@ -34,6 +35,7 @@ def stop(process, deadline):
             process.wait(timeout=max(0, deadline - time.monotonic()))
         except subprocess.TimeoutExpired:
             raise RuntimeError("Verifier cleanup timeout: child did not exit by the deadline.") from None
+        raise RuntimeError("Verifier cleanup EOF timeout: inherited output pipe did not close by the deadline.") from None
     if termination_error is not None:
         raise RuntimeError(f"Cannot terminate verifier process group {process.pid}: {termination_error}") from termination_error
 
@@ -85,6 +87,7 @@ def main():
                 "Enums.calr" if sys.argv[1] in ("enum001", "enum002", "enum003") else
                 "Impure.calr" if sys.argv[1] in ("ref001", "ref003", "ref007") else
                 "BuggyContracts.calr" if sys.argv[1] in ("contract003", "ref006") else
+                "Contracts.calr" if sys.argv[1] in ("ac001", "ac002", "ac003", "ac004", "ac005") else
                 "Collections.calr" if sys.argv[1] in ("PrintDictionary", "coll001", "coll002", "coll003", "coll004", "coll005", "coll006") else "Effects.calr"
                 if sys.argv[1] in ("PrintNumbers", "Countdown", "DoWhileDemo", "PrintEvenNumbers",
                                     "eff001", "eff002", "eff003", "eff004", "eff005", "eff006", "ref002") else "Calculator.calr")
@@ -95,7 +98,8 @@ def main():
     if not 0 < timeout <= 120:
         raise RuntimeError("CALOR_LOGIC_TIMEOUT_SECONDS must be in (0, 120].")
     deadline = time.monotonic() + timeout
-    carrier = not native_only and sys.argv[1] in (
+    advanced = not native_only and sys.argv[1] in ("ac001", "ac002", "ac003", "ac004", "ac005")
+    carrier = advanced or not native_only and sys.argv[1] in (
         "type001", "type002", "type003", "type004", "pm004", "pm005",
         "ref001", "ref002", "ref003", "ref004", "ref005", "ref006", "ref007", "ref008",
         "lam001", "lam002", "lam003", "lam004")
@@ -154,6 +158,9 @@ def main():
         ], project, deadline)
         if carrier:
             check_images(project / "bin/Debug/net10.0")
+        if advanced and (re.search(r"Selected\s+compiler:|Verification failed:", output, re.IGNORECASE)
+                         or len(re.findall(r"^\s*Verification passed:", output, re.MULTILINE)) != 1):
+            raise RuntimeError("Advanced verifier returned success-shaped failure or extra identity/verdict output.")
         print(output, end="")
 
 
