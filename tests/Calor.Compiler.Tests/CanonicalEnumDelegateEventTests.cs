@@ -19,6 +19,392 @@ namespace Calor.Compiler.Tests;
 public sealed class CanonicalEnumDelegateEventTests
 {
     [Theory]
+    [InlineData("", "Color.Red")]
+    [InlineData("", "color")]
+    [InlineData("", "Shade.Red")]
+    [InlineData(" Demo", "Demo.Color.Red")]
+    [InlineData(" Demo", "color")]
+    public void NativeEnumReceiverSelectsSourceSymbolsAndExecutes(string ns, string receiver)
+    {
+        var source = $$"""
+            module EnumReceivers{{ns}}
+              using Shade = {{(ns.Length == 0 ? "" : "Demo.")}}Color
+              enum Color
+                Red
+              enum Other
+                Red
+              module Extensions
+                func Pick (this Color:value, int:amount) → int
+                  !
+                  return value == Color.Red ? amount : 0
+                func Pick (this Other:value, int:amount) → int
+                  ! cw
+                  return 0
+                func Pick (int:value, int:amount) → int
+                  ! alloc
+                  return 0
+              func Main (Color:color) → int
+                !
+                return {{receiver}}.Pick(amount: 7)
+            """;
+        var ast = Parse(source);
+        var bound = BindNativeEnums(ast);
+        var main = bound.Functions.Single(function => function.Symbol.Name == "Main");
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(main).OfType<BoundCallExpression>());
+        Assert.True(call.IsSourceExtensionCall);
+        Assert.Equal(2, call.Arguments.Count);
+        Assert.Same(call.EvaluatedReceiver, call.Arguments[0]);
+        Assert.Equal(1, call.Children.Count(child => ReferenceEquals(child, call.EvaluatedReceiver)));
+        var enumType = Assert.IsType<NominalBoundType>(call.Arguments[0].Type).Declaration!;
+        Assert.True(enumType.IsEnum);
+        Assert.Same(bound.SymbolsById[enumType.Id], enumType);
+        Assert.Equal((ns.Length == 0 ? "" : "Demo.") + "Color", enumType.QualifiedName);
+        var match = Assert.Single(call.SelectedOverloadMatches);
+        Assert.Same(call.ResolvedSymbol, match.Function);
+        Assert.Same(bound.SymbolsById[match.Function.Id], match.Function);
+        Assert.Equal("Color", match.Function.Parameters[0].TypeName);
+        Assert.True(match.Function.Parameters[0].Modifier.HasFlag(Calor.Compiler.Ast.ParameterModifier.This));
+        Assert.Equal(new[] { 0, 1 }, match.Arguments.Select(argument => argument.ArgumentIndex));
+        Assert.Equal(new[] { 0, 1 }, match.Arguments.Select(argument => argument.ParameterIndex));
+        Assert.Equal("global::" + enumType.QualifiedName, match.Arguments[0].ParameterType);
+        Assert.Same(bound.SymbolsById[match.Function.Parameters[0].Id], match.Function.Parameters[0]);
+        Assert.Contains(bound.SymbolsById.Values.OfType<TypeSymbol>(),
+            type => type.QualifiedName == match.Function.ContainingTypeName);
+        Assert.Equal(new string?[] { null, "amount" }, call.ArgumentNames);
+        Assert.Equal("Pick", Slice(source, call.CalleeSpan));
+        Assert.Equal("Pick", Slice(source, match.Function.DeclarationSpan));
+        Assert.Null(call.ResolvedMetadataMethod);
+        Assert.False(call.HasOpaqueOverloads);
+        var selected = bound.Functions.Single(function => function.Symbol == match.Function);
+        Assert.Empty(selected.DeclaredEffects);
+        var graph = CallGraphAnalysis.Build(ast);
+        Assert.True(graph.IsBoundResolutionComplete);
+        if (call.Arguments[0] is BoundFieldAccessExpression constant)
+        {
+            Assert.Same(enumType, Assert.IsType<BoundTypeReferenceExpression>(constant.Target).ResolvedType);
+            Assert.True(constant.ResolvedField!.IsEnumMember);
+            Assert.Same(bound.SymbolsById[constant.ResolvedField.Id], constant.ResolvedField);
+            Assert.Equal(constant.ResolvedField.Id,
+                graph.SourceEnumConstant(ast.Functions.Single().Id, constant.Span)!.Id);
+            Assert.Null(graph.MetadataEnumConstant(ast.Functions.Single().Id, constant.Span));
+        }
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code is
+            DiagnosticCode.UnknownExternalCall or DiagnosticCode.AssumedEffects);
+        Assert.Contains("global::" + (ns.Length == 0 ? "" : "Demo.") + "Extensions.Pick(", compiled.GeneratedCode);
+        Execute(compiled.GeneratedCode, assembly =>
+        {
+            var prefix = ns.Length == 0 ? "" : "Demo.";
+            var value = Enum.Parse(assembly.GetType(prefix + "Color")!, "Red");
+            Assert.Equal(7, assembly.GetType(ns.Length == 0 ? "GlobalModule" : "Demo.DemoModule")!
+                .GetMethod("Main")!.Invoke(null, [value]));
+        });
+    }
+
+    [Fact]
+    public void NativeEnumReceiverExactReportedProgramExecutes()
+    {
+        const string source = """
+            module EnumStatic
+              enum Color
+                Red
+              module ColorExtensions
+                func ToHex (this Color:value) → string
+                  !
+                  return "#FF0000"
+              func Main () → string
+                !
+                return Color.Red.ToHex()
+            """;
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code is
+            DiagnosticCode.UnknownExternalCall or DiagnosticCode.AssumedEffects);
+        Assert.Contains("return global::ColorExtensions.ToHex(Color.Red);", compiled.GeneratedCode);
+        Execute(compiled.GeneratedCode, assembly => Assert.Equal("#FF0000",
+            assembly.GetType("GlobalModule")!.GetMethod("Main")!.Invoke(null, null)));
+    }
+
+    [Fact]
+    public void NativeEnumReceiverChargesSelectedEffectsAndEvaluatesReceiverAndArgumentsOnceInOrder()
+    {
+        const string source = """
+            module ReceiverOrder
+              enum Quiet
+                Value
+              enum Loud
+                Value
+              module Extensions
+                func Pick (this Quiet:value, int:amount) → int
+                  !
+                  return 0
+                func Pick (this Loud:value, int:amount) → int
+                  ! cw
+                  System.Console.WriteLine("selected")
+                  return amount
+              func Receiver () → Loud
+                ! cw
+                System.Console.WriteLine("receiver")
+                return Loud.Value
+              func Argument () → int
+                ! cw
+                System.Console.WriteLine("argument")
+                return 7
+              func Main () → int
+                ! cw
+                return Receiver().Pick(Argument())
+            """;
+        var bound = BindNativeEnums(Parse(source));
+        var main = bound.Functions.Single(function => function.Symbol.Name == "Main");
+        var calls = BoundNodeHelpers.DescendantsAndSelf(main).OfType<BoundCallExpression>().ToArray();
+        Assert.Equal(3, calls.Length);
+        var extension = Assert.Single(calls.Where(call => call.IsSourceExtensionCall));
+        Assert.Equal("Loud", extension.ResolvedSymbol!.Parameters[0].TypeName);
+        Assert.Equal(new[] { "io:console_write" }, bound.Functions.Single(function =>
+            function.Symbol == extension.ResolvedSymbol).DeclaredEffects);
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var previous = Console.Out;
+        using var output = new StringWriter();
+        try
+        {
+            Console.SetOut(output);
+            Execute(compiled.GeneratedCode, assembly => Assert.Equal(7,
+                assembly.GetType("GlobalModule")!.GetMethod("Main")!.Invoke(null, null)));
+        }
+        finally
+        {
+            Console.SetOut(previous);
+        }
+        Assert.Equal(new[] { "receiver", "argument", "selected" },
+            output.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
+        var pureCaller = source.Replace("func Main () → int\n    ! cw", "func Main () → int\n    !",
+            StringComparison.Ordinal);
+        Assert.Contains(Program.Compile(pureCaller).Diagnostics,
+            diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+        var selectedOnly = source.Replace("Receiver().Pick(Argument())", "Loud.Value.Pick(7)", StringComparison.Ordinal)
+            .Replace("func Main () → int\n    ! cw", "func Main () → int\n    !", StringComparison.Ordinal);
+        Assert.Contains(Program.Compile(selectedOnly).Diagnostics,
+            diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
+    [Theory]
+    [InlineData("Other.Red")]
+    [InlineData("(1)")]
+    [InlineData("Color.Missing")]
+    [InlineData("System.ConsoleColor.Red")]
+    public void NativeEnumReceiverWrongEnumIntegerUnknownAndMetadataNeverBorrowSourceRow(string receiver)
+    {
+        var source = $$"""
+            module WrongReceivers
+              enum Color
+                Red
+              enum Other
+                Red
+              module Extensions
+                func Pick (this Color:value) → int
+                  !
+                  return 7
+              func Main () → int
+                !
+                return {{receiver}}.Pick()
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound.Functions.Single(function =>
+            function.Symbol.Name == "Main")).OfType<BoundCallExpression>());
+        Assert.Null(call.ResolvedSymbol);
+        Assert.Empty(call.SelectedOverloadMatches);
+        Assert.Null(call.ResolvedMetadataMethod);
+        var compiled = Program.Compile(source);
+        Assert.True(compiled.HasErrors);
+    }
+
+    [Theory]
+    [InlineData("private", "")]
+    [InlineData("", "  module OtherExtensions\n    func Pick (this Color:value) → int\n      !\n      return 8\n")]
+    [InlineData("", "  module OpaqueExtensions\n    raw member 54\npublic static int Pick(this Color value) { return 9; }\n")]
+    public void NativeEnumReceiverInaccessibleAmbiguousAndOpaqueCompetitionNeverBorrowPureRow(
+        string visibility, string extra)
+    {
+        var source = $$"""
+            module ReceiverCompetition
+              enum Color
+                Red
+              module Extensions
+                func Pick {{visibility}} (this Color:value) → int
+                  !
+                  return 7
+            {{extra}}  func Main () → int
+                !
+                return Color.Red.Pick()
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound.Functions.Single(function =>
+            function.Symbol.Name == "Main")).OfType<BoundCallExpression>());
+        Assert.Null(call.ResolvedSymbol);
+        Assert.Empty(call.SelectedOverloadMatches);
+        Assert.Null(call.ResolvedMetadataMethod);
+        Assert.True(extra.Contains("raw member", StringComparison.Ordinal) == call.HasOpaqueOverloads,
+            $"extension={call.IsSourceExtensionCall}; receiver={call.Receiver?.Type}; unknown={call.HasUnresolvedArguments}; {string.Join("\n", diagnostics)}");
+        if (extra.Contains("OtherExtensions", StringComparison.Ordinal))
+            Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.AmbiguousOverload);
+        Assert.True(Program.Compile(source).HasErrors);
+    }
+
+    [Theory]
+    [InlineData("object:Color", "Color.Red")]
+    [InlineData("Color:value", "Color.Red", "<Color>")]
+    [InlineData("object:value", "value")]
+    public void NativeEnumReceiverShadowedAndUntypedValuesHaveNoSourceAuthority(
+        string parameter, string receiver, string generic = "")
+    {
+        var source = $$"""
+            module ShadowedReceivers
+              enum Color
+                Red
+              module Extensions
+                func Pick (this Color:value) → int
+                  !
+                  return 7
+              func Main{{generic}} ({{parameter}}) → int
+                !
+                return {{receiver}}.Pick()
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound.Functions.Single(function =>
+            function.Symbol.Name == "Main")).OfType<BoundCallExpression>());
+        Assert.Null(call.ResolvedSymbol);
+        Assert.Empty(call.SelectedOverloadMatches);
+        Assert.True(Program.Compile(source).HasErrors);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NativeEnumReceiverDoesNotTurnANonExtensionOrInheritedMetadataMemberIntoASourceCall(bool inherited)
+    {
+        var method = inherited ? "ToString" : "Pick";
+        var source = $$"""
+            module NonExtensionReceivers
+              enum Color
+                Red
+              module Extensions
+                func {{method}} ({{(inherited ? "this " : "")}}Color:value) → string
+                  !
+                  return "not selected"
+              func Main () → string
+                !
+                return Color.Red.{{method}}()
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound.Functions.Single(function =>
+            function.Symbol.Name == "Main")).OfType<BoundCallExpression>());
+        Assert.Null(call.ResolvedSymbol);
+        Assert.Empty(call.SelectedOverloadMatches);
+        Assert.Equal(inherited, call.HasOpaqueOverloads);
+        Assert.True(Program.Compile(source).HasErrors);
+    }
+
+    [Theory]
+    [InlineData("", "object")]
+    [InlineData("<T>", "T")]
+    public void NativeEnumReceiverDoesNotBroadenAuthorityToNonEnumExtensionParameters(
+        string generic, string parameterType)
+    {
+        var source = $$"""
+            module NonEnumExtensionReceivers
+              enum Color
+                Red
+              module Extensions
+                func Pick{{generic}} (this {{parameterType}}:value) → int
+                  !
+                  return 7
+              func Main () → int
+                !
+                return Color.Red.Pick()
+            """;
+        var bound = BindNativeEnums(Parse(source));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound.Functions.Single(function =>
+            function.Symbol.Name == "Main")).OfType<BoundCallExpression>());
+        Assert.Null(call.ResolvedSymbol);
+        Assert.Empty(call.SelectedOverloadMatches);
+        Assert.Contains(Program.Compile(source).Diagnostics,
+            diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
+    [Theory]
+    [InlineData("ConsoleColor.Red", true)]
+    [InlineData("System.ConsoleColor.Red", false)]
+    public void NativeEnumReceiverSameNamedMetadataEnumKeepsItsOrigin(string receiver, bool native)
+    {
+        var source = $$"""
+            module EnumReceiverOrigins
+              enum ConsoleColor
+                Red
+              module Extensions
+                func Pick (this ConsoleColor:value) → int
+                  !
+                  return 7
+              func Main () → int
+                !
+                return {{receiver}}.Pick()
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound.Functions.Single(function =>
+            function.Symbol.Name == "Main")).OfType<BoundCallExpression>());
+        var receiverType = Assert.IsType<NominalBoundType>(call.Receiver!.Type);
+        Assert.Equal(native, receiverType.Declaration is not null);
+        Assert.Equal(native, call.ResolvedSymbol is not null);
+        if (!native)
+        {
+            Assert.Equal(TypeKind.Enum, receiverType.RoslynSymbol!.TypeKind);
+            Assert.Empty(call.SelectedOverloadMatches);
+        }
+        Assert.Equal(!native, Program.Compile(source).HasErrors);
+    }
+
+    [Fact]
+    public void NativeEnumReceiverRetainsGenericNamedOptionalAndStatementCalls()
+    {
+        const string source = """
+            module ReceiverArguments
+              enum Color
+                Red
+              module Extensions
+                func Pick<T> (this Color:value, T:item, int:amount = 7) → int
+                  !
+                  return amount
+              func Main () → int
+                !
+                let color = Color.Red
+                color.Pick<int>(item: 3)
+                color.Pick<Color>(item: Color.Red)
+                return color.Pick<int>(amount: 9, item: 4)
+            """;
+        var bound = BindNativeEnums(Parse(source));
+        var calls = BoundNodeHelpers.DescendantsAndSelf(bound.Functions.Single(function =>
+            function.Symbol.Name == "Main")).OfType<BoundCallExpression>().ToArray();
+        Assert.Equal(3, calls.Length);
+        Assert.All(calls, call =>
+        {
+            Assert.True(call.IsSourceExtensionCall);
+            Assert.Equal(1, call.ResolvedSymbol!.GenericArity);
+        });
+        Assert.Equal(new[] { 0, 2, 1 },
+            Assert.Single(calls[2].SelectedOverloadMatches).Arguments.Select(argument => argument.ParameterIndex));
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Execute(compiled.GeneratedCode, assembly => Assert.Equal(9,
+            assembly.GetType("GlobalModule")!.GetMethod("Main")!.Invoke(null, null)));
+    }
+
+    [Theory]
     [InlineData("", "Color.Red", "red")]
     [InlineData("", "Color.Blue", "blue")]
     [InlineData("", "Shade.Red", "red")]
@@ -267,10 +653,18 @@ public sealed class CanonicalEnumDelegateEventTests
         var bound = BindNativeEnums(Parse(source));
         var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound.Functions.Single(function =>
             function.Symbol.Name == "Main")).OfType<BoundCallExpression>());
-        Assert.Null(call.ResolvedSymbol);
-        Assert.Empty(call.SelectedOverloadMatches);
+        Assert.True(call.IsSourceExtensionCall);
+        Assert.Equal("Extensions.Pick", call.ResolvedSymbol!.Name);
+        Assert.Same(call.ResolvedSymbol, Assert.Single(call.SelectedOverloadMatches).Function);
+        Assert.Equal("Color", call.ResolvedSymbol.Parameters.Single().TypeName);
         Assert.Null(call.ResolvedMetadataMethod);
-        Assert.Contains(Program.Compile(source).Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code is
+            DiagnosticCode.UnknownExternalCall or DiagnosticCode.AssumedEffects);
+        Execute(compiled.GeneratedCode, assembly => Assert.Equal(7,
+            assembly.GetType("GlobalModule")!.GetMethod("Main")!.Invoke(null,
+                [Enum.Parse(assembly.GetType("Color")!, "Red")])));
     }
 
     [Theory]

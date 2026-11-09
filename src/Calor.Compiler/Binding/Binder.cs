@@ -15,6 +15,7 @@ public sealed class Binder
 {
     internal IReadOnlyDictionary<string, CrossModuleFunctionTarget>? CrossModuleFunctionModules { get; init; }
     internal Dictionary<TextSpan, string> CrossModuleCallTargets { get; } = new();
+    internal Dictionary<TextSpan, FunctionSymbol> SourceExtensionCallTargets { get; } = new();
     internal delegate BoundExpression ExpressionBinder(Binder binder, ExpressionNode expression);
 
     private static readonly IReadOnlyDictionary<Type, ExpressionBinder> ExpressionBinders =
@@ -961,6 +962,7 @@ public sealed class Binder
         _functionSymbols.Clear();
         _boundAwaits.Clear();
         CrossModuleCallTargets.Clear();
+        SourceExtensionCallTargets.Clear();
         _staticMethodSymbols.Clear();
         _functionNamespaces.Clear();
         _classScopes.Clear();
@@ -6466,6 +6468,8 @@ public sealed class Binder
         BoundExpression? computedReceiver = null, string? computedMethodName = null)
     {
         var args = BindCallArguments(callExpr.Arguments, callExpr.ArgumentModifiers);
+        var argumentNames = callExpr.ArgumentNames;
+        var argumentModifiers = callExpr.ArgumentModifiers;
         var receiverSymbol = computedReceiver is null ? ResolveCallReceiver(
             callExpr.Target,
             callExpr.ReceiverSpan ?? callExpr.CalleeSpan) : (computedReceiver as BoundVariableExpression)?.Variable;
@@ -6484,6 +6488,27 @@ public sealed class Binder
             allowNullableStringCompatibility: true,
             computedReceiver: computedReceiver,
             computedMethodName: computedMethodName);
+        var isSourceExtensionCall = false;
+        if (resolution.Kind == OverloadResolutionKind.NotFound && !resolution.HasOpaqueOverloads
+            && computedReceiver is not null and not BoundTypeReferenceExpression
+            && computedReceiver.Type is BoundTypes.NominalBoundType { Declaration.IsEnum: true })
+        {
+            IReadOnlyList<BoundExpression> extensionArguments = [computedReceiver, .. args];
+            IReadOnlyList<string?>? extensionNames = argumentNames is null ? null : [null, .. argumentNames];
+            IReadOnlyList<string?>? extensionModifiers = argumentModifiers is null ? null : [null, .. argumentModifiers];
+            var extensionResolution = ResolveSourceEnumExtension(
+                callExpr, computedMethodName!, extensionArguments, extensionNames, extensionModifiers);
+            if (extensionResolution.Kind != OverloadResolutionKind.NotFound || extensionResolution.HasOpaqueOverloads)
+            {
+                resolution = extensionResolution;
+                args = extensionArguments;
+                argumentNames = extensionNames;
+                argumentModifiers = extensionModifiers;
+                isSourceExtensionCall = true;
+                if (resolution.Function is { } selected)
+                    SourceExtensionCallTargets[callExpr.Span] = selected;
+            }
+        }
         var returnType = resolution.ResolvedReturnType ?? "OBJECT";
 
         var (resolvedTypeName, resolvedMethodName) = GetResolvedCallIdentity(
@@ -6593,7 +6618,7 @@ public sealed class Binder
         }
         ValidateCallArguments(args, resolution, bclResolution);
         ValidateDirectFunctionArguments(callExpr.Target, receiverSymbol, args, resolution, bclResolution);
-        InvalidateMutatingCallArguments(args, callExpr.ArgumentModifiers, resolution, bclResolution);
+        InvalidateMutatingCallArguments(args, argumentModifiers, resolution, bclResolution);
         var callable = ResolveCallableStorage(callExpr.Target, receiverSymbol);
         var callableEffects = InvalidateDeferredCallTarget(callable);
 
@@ -6609,8 +6634,8 @@ public sealed class Binder
                 .Select(parameter => parameter.TypeName)
                 ?? args.Select(argument => argument.Type.DisplayString))
                 .ToArray(),
-            argumentNames: callExpr.ArgumentNames,
-            argumentModifiers: callExpr.ArgumentModifiers,
+            argumentNames: argumentNames,
+            argumentModifiers: argumentModifiers,
             typeArguments: callExpr.TypeArguments,
             resolvedSymbol: resolution.Function,
             receiverSymbol: receiverSymbol,
@@ -6624,6 +6649,7 @@ public sealed class Binder
             receiver: receiver)
         {
             EvaluatedReceiver = computedReceiver,
+            IsSourceExtensionCall = isSourceExtensionCall,
             ResolvedMetadataMethod = instanceArrayResolution?.Symbol
                 ?? (metadataReceiver is not null || metadataScalarReturn ? bclResolution?.Symbol : null),
             MetadataArrayResultType = (instanceArrayResolution?.Symbol
@@ -6644,6 +6670,66 @@ public sealed class Binder
                     ? genericReturn : null)
         };
         return boundCall;
+    }
+
+    private OverloadResolutionResult ResolveSourceEnumExtension(
+        CallExpressionNode call, string methodName, IReadOnlyList<BoundExpression> arguments,
+        IReadOnlyList<string?>? argumentNames, IReadOnlyList<string?>? argumentModifiers)
+    {
+        var metadata = GetOrCreateMetadataBinder();
+        if (metadata?.Context.TryResolveType("System.Enum") is not { } enumBase)
+            return OverloadResolutionResult.Opaque();
+        // Instance members precede extension lookup. Until their applicability
+        // is established for source enums, do not replace them with a pure row.
+        if (Metadata.MetadataMemberLookup.MethodGroup(
+                metadata.Context.HostCompilationForBinder, enumBase, methodName)
+            .Any(method => !method.IsStatic))
+            return OverloadResolutionResult.Opaque();
+        var visibleScopes = new HashSet<string>(StringComparer.Ordinal);
+        for (var id = _currentNamespaceScopeId; id is not null
+            && visibleScopes.Add(id) && _metadataNamespaceScopes.TryGetValue(id, out var scope);)
+            id = scope.ParentScopeId;
+        var namespaces = _metadataUsings.Where(import => import.Alias is null && !import.IsStatic
+                && (import.NamespaceScopeId is null || visibleScopes.Contains(import.NamespaceScopeId)))
+            .Select(import => import.Namespace).ToHashSet(StringComparer.Ordinal);
+        for (var ns = _currentNamespaceIdentity ?? ""; ; )
+        {
+            namespaces.Add(ns);
+            var dot = ns.LastIndexOf('.');
+            if (ns.Length == 0) break;
+            ns = dot < 0 ? "" : ns[..dot];
+        }
+        var providers = _classesByQualifiedName.Where(pair => pair.Value.IsStatic
+                && pair.Value.TypeParameters.Count == 0
+                && pair.Key == GetQualifiedTypeName(pair.Value)
+                && namespaces.Contains(pair.Value.NamespaceIdentity ?? ""))
+            .ToArray();
+        // Preserved declarations may compete with a native winner. Their bodies
+        // and signatures cannot authorize a source effect row.
+        if (providers.Any(provider => HasOpaqueMethodDeclaration(
+                provider.Value, methodName, call.TypeArguments?.Count)))
+            return OverloadResolutionResult.Opaque();
+        var owners = providers.Select(provider => provider.Key).ToHashSet(StringComparer.Ordinal);
+        var candidates = _functionSymbols.Where(pair => pair.Key is MethodNode method
+                && method.Name == methodName && method.IsStatic
+                && method.Parameters.Count > 0
+                && method.Parameters[0].Modifier.HasFlag(ParameterModifier.This)
+                && method.Parameters.Skip(1).All(parameter => !parameter.Modifier.HasFlag(ParameterModifier.This))
+                && ResolveCallableEnumType(pair.Value, pair.Value.Parameters[0].TypeName) is not null
+                && pair.Value.ContainingTypeName is { } owner && owners.Contains(owner))
+            .Select(pair => pair.Value).ToArray();
+        var argumentTypes = arguments.Select((argument, index) =>
+            GetOverloadArgumentType(argument, argumentModifiers?.ElementAtOrDefault(index))).ToArray();
+        var resolution = ResolveAccessibleOverload(methodName, argumentTypes,
+            argumentNames, argumentModifiers, GetOverloadTypeArguments(call.TypeArguments),
+            allowNullableStringCompatibility: true, requireStatic: true, candidateOverrides: candidates);
+        if (resolution.Kind == OverloadResolutionKind.NoMatch)
+            _diagnostics.ReportError(call.Span, DiagnosticCode.NoMatchingOverload,
+                $"No source extension overload '{methodName}' matches {FormatCallSignature(argumentTypes, argumentModifiers, call.TypeArguments)}.");
+        else if (resolution.Kind == OverloadResolutionKind.Ambiguous)
+            _diagnostics.ReportError(call.Span, DiagnosticCode.AmbiguousOverload,
+                $"Source extension call '{methodName}' is ambiguous between: {FormatCandidates(resolution.Candidates)}");
+        return resolution;
     }
 
     private BoundTypes.BoundType? GetCallableReturnNullabilityShape(BoundTypes.BoundType returnType)
@@ -7005,11 +7091,7 @@ public sealed class Binder
         var lookupNames = interfaceCandidates is not null ? ["<interface-call>"]
             : computedReceiver is null ? GetCallLookupNames(target)
             : EnumerateHierarchyLookupNames(ResolveClass(computedReceiver.Type.DisplayString), computedMethodName!);
-        var overloadTypeArguments = typeArguments?.Select(typeArgument =>
-            GetTypeParameterConstraints(typeArgument) is null
-                && ResolveSourceType(typeArgument, _currentClassName, _currentNamespaceIdentity,
-                    _currentNamespaceScopeId).Type is { IsEnum: true } enumType
-                    ? "global::" + enumType.QualifiedName : typeArgument).ToArray();
+        var overloadTypeArguments = GetOverloadTypeArguments(typeArguments);
         var opaqueOwner = computedReceiver is null ? _currentClass : ResolveClass(computedReceiver.Type.FullyQualifiedName);
         var opaqueTarget = computedReceiver is null ? target : computedMethodName;
         foreach (var lookupName in lookupNames.Distinct(StringComparer.Ordinal))
@@ -7095,6 +7177,13 @@ public sealed class Binder
 
         return OverloadResolutionResult.NotFound();
     }
+
+    private string[]? GetOverloadTypeArguments(IReadOnlyList<string>? typeArguments) =>
+        typeArguments?.Select(typeArgument =>
+            GetTypeParameterConstraints(typeArgument) is null
+                && ResolveSourceType(typeArgument, _currentClassName, _currentNamespaceIdentity,
+                    _currentNamespaceScopeId).Type is { IsEnum: true } enumType
+                    ? "global::" + enumType.QualifiedName : typeArgument).ToArray();
 
     private bool HasOpaqueMethodDeclaration(ClassDefinitionNode? owner, string target, int? typeArgumentCount)
     {

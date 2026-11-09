@@ -809,8 +809,11 @@ public class BoundCallExpression : BoundExpression
     internal bool HasUnresolvedArguments { get; init; }
     public override BoundType Type { get; }
     public BoundExpression? EvaluatedReceiver { get; init; }
+    // A reduced source extension is represented as its selected static call:
+    // Arguments[0] is the receiver, already included in the child enumeration.
+    internal bool IsSourceExtensionCall { get; init; }
     public override IReadOnlyList<BoundExpression> Children =>
-        EvaluatedReceiver is { } receiver ? [receiver, .. Arguments] : Arguments;
+        !IsSourceExtensionCall && EvaluatedReceiver is { } receiver ? [receiver, .. Arguments] : Arguments;
 
     /// <summary>
     /// Named argument labels, argument modifiers, and explicit generic arguments
