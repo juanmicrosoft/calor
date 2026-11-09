@@ -1,4 +1,5 @@
 using Calor.Compiler.Binding;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
 using Calor.LanguageServer.Tests.Helpers;
 using Calor.LanguageServer.Utilities;
@@ -29,25 +30,32 @@ public class SymbolFinderTests
     }
 
     [Theory]
-    [InlineData("§L{item:0:1:1}", "§L{item:2:3:1}")]
-    [InlineData("§EACH{same:item:i32} items", "§EACH{same:item:i32} items")]
-    [InlineData("§WH BOOL:false", "§WH BOOL:false")]
-    public void Visitor_LoopScopesDoNotDependOnStatementIds(string firstHeader, string secondHeader)
+    [InlineData("for item from 0 to 1 step 1", "for item from 2 to 3 step 1", "")]
+    [InlineData("for item = 0; item < 2; item = item + 1", "for item = 2; item < 4; item = item + 1", "")]
+    [InlineData("each int:item in items", "each int:item in items", "")]
+    [InlineData("each key, value in pairs", "each key, value in pairs", "")]
+    [InlineData("while false", "while false", "")]
+    [InlineData("do", "do", "while false")]
+    public void Visitor_LoopScopesDoNotDependOnStatementIds(
+        string firstHeader, string secondHeader, string trailingCondition)
     {
         var source = $$"""
-            §M{Test}
-              §F{Probe:pub} ([i32]:items) -> void
+            module Test
+              func Probe (int[]:items, System.Collections.Generic.Dictionary<string,int>:pairs) → void
                 {{firstHeader}}
-                  §B{local:i32} 1
-                  §P local
+                  let int:local = 1
+                  System.Console.WriteLine(local)
+                {{trailingCondition}}
                 {{secondHeader}}
-                  §B{local:i32} 2
-                  §P local
+                  let int:local = 2
+                  System.Console.WriteLine(local)
+                {{trailingCondition}}
             """;
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-        var firstOffset = source.IndexOf("§P local", StringComparison.Ordinal) + "§P ".Length;
-        var secondOffset = source.LastIndexOf("§P local", StringComparison.Ordinal) + "§P ".Length;
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+        var firstOffset = source.IndexOf("WriteLine(local)", StringComparison.Ordinal) + "WriteLine(".Length;
+        var secondOffset = source.LastIndexOf("WriteLine(local)", StringComparison.Ordinal) + "WriteLine(".Length;
         var first = new SymbolFinderVisitor(firstOffset, source).FindSymbol(ast);
         var second = new SymbolFinderVisitor(secondOffset, source).FindSymbol(ast);
 
@@ -55,6 +63,27 @@ public class SymbolFinderTests
         Assert.Equal("local", second?.Name);
         Assert.NotEqual(first!.Span, second!.Span);
         Assert.NotSame(first.Node, second.Node);
+    }
+
+    [Fact]
+    public void Visitor_TypedLoopCompletionUsesTheBinderTypeAndDeclarationSpan()
+    {
+        const string source = """
+            module Test
+              func Probe () → void
+                for long:item = 0; item < 2; item = item + 1
+                  System.Console.WriteLine(item)
+            """;
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+        var offset = source.IndexOf("WriteLine(item)", StringComparison.Ordinal) + "WriteLine(".Length;
+        var visitor = new SymbolFinderVisitor(offset, source);
+        var symbol = Assert.Single(visitor.GetVisibleSymbols(ast), symbol => symbol.Name == "item");
+
+        Assert.Equal("long", symbol.Type);
+        Assert.Equal("item", source.Substring(symbol.Span.Start, symbol.Span.Length));
+        Assert.Equal("long", visitor.FindSymbol(ast)?.Type);
     }
 
     [Fact]

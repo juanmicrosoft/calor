@@ -177,7 +177,8 @@ public sealed class SymbolFinderVisitor
                     // For loop variable is visible inside the loop
                     if (SpanContainsOffset(forStmt.Span))
                     {
-                        symbols.Add(new VisibleSymbol(forStmt.VariableName, "loop variable", "i32", forStmt.Span, forStmt));
+                        symbols.Add(new VisibleSymbol(forStmt.VariableName, "loop variable",
+                            forStmt.VariableType, forStmt.VariableSpan, forStmt));
                         CollectBindingsFromStatements(forStmt.Body, symbols);
                     }
                     break;
