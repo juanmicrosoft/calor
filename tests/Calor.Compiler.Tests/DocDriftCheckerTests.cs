@@ -20,6 +20,7 @@ public class DocDriftCheckerTests
     [Theory]
     [InlineData("CLAUDE.md")]
     [InlineData("AGENTS.md")]
+    [InlineData(".github/copilot-instructions.md")]
     public void RepositoryAgentManual_UsesNativeSyntaxAndCompilablePrograms(string relativePath)
     {
         var root = CliTestHarness.FindRepoRoot();

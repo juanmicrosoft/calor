@@ -51,7 +51,7 @@ C# Source → Roslyn Parse → SyntaxTree → RoslynSyntaxVisitor → AST → Ca
 
 | File | Lines | Role |
 |------|-------|------|
-| `Parsing/Lexer.cs` | 1,400 | Tokenizer — section markers, typed literals, keywords |
+| `Parsing/Lexer.cs` | 1,400 | Tokenizer — native keywords, literals and punctuation |
 | `Parsing/Parser.cs` | 8,900 | Recursive descent parser → AST |
 | `Ast/AstNode.cs` | 480 | IAstVisitor / IAstVisitor\<T\> interfaces (~236 methods each) |
 | `Ast/*.cs` | 29 files | AST node classes organized by feature |
@@ -70,46 +70,50 @@ All paths relative to `src/Calor.Compiler/`.
 
 ## Calor Syntax Quick Reference
 
-Block structure is **indentation-only** (2 spaces per level, Python-style). **Never
-write structural closer tags** — the main block closers (`§/M`, `§/F`, `§/L`, `§/I`,
-`§/W`, `§/WH`, `§/CL`, `§/MT`, `§/IFACE`, and others) raise a hard error (`Calor0830`);
-a few remaining closer forms are still tolerated by the parser but always optional.
-The only closers you should ever write are `§/C` (call argument lists) and `§/LAM`
-(block lambdas).
+Block structure is **indentation-only** (2 spaces per level, Python-style).
+Use lowercase keywords, infix expressions with C# precedence, and ordinary calls.
+Section tags, typed-literal prefixes and block/call/lambda closer tags are retired.
 
-```
-§M{Name}                   Module
-§F{name:vis} (T:x) -> R     Function with inline signature
-§B{name:type}              Immutable binding
-§B{~name:type}             Mutable binding
-§L{var:from:to:step}        For loop
-§IF (cond)                 If (body indented)
-§EI (cond)                  ElseIf (at parent column)
-§EL                         Else (at parent column)
-§C{object.method} §A arg §/C  Method call with argument
-§E{codes}                  Effects (§E{} = pure)
-§Q (expr)                  Precondition
-§S (expr)                  Postcondition
-§IV (expr)                 Invariant
+```calor-fragment
+module Name Namespace                 File label and optional CLR namespace
+func name public (int:x) → int         Function with inline signature
+let int:name = value                  Immutable binding
+var int:name = value                  Mutable binding
+set name value                        Assignment
+for i from 1 to 100 step 1             Counted loop
+if condition                          If (body indented)
+else if condition                     Else-if (at parent column)
+else                                  Else (at parent column)
+object.Method(argument)               Method call
+! cw                                  Declaration effect row (standalone ! = pure)
+requires expression                   Precondition
+=> expression                         Postcondition
+invariant expression                  Invariant
 ```
 
-Example (current syntax — see `samples/FizzBuzz/fizzbuzz.calr`; fenced
-` ```calor ` blocks starting with `§M` are parse-checked by `calor self-check docs`):
+The file label is not a CLR namespace or static container. Omit the namespace for
+the global namespace; use a nested `module Name` for a named static container.
+Effect rows and contract headers precede the first body statement.
+
+Example (complete fenced `calor` programs starting with `module` are parse-checked
+by `calor self-check docs`):
 
 ```calor
-§M{FizzBuzz}
-  §F{Main:pub} () -> void
-    §E{cw}
-    §L{i:1:100:1}
-      §IF (== (% i 15) 0)
-        §P "FizzBuzz"
-      §EI (== (% i 3) 0)
-        §P "Fizz"
-      §EL
-        §P i
+module FizzBuzz
+  func Main public () → void
+    ! cw
+    for i from 1 to 100 step 1
+      if i % 15 == 0
+        System.Console.WriteLine("FizzBuzz")
+      else if i % 3 == 0
+        System.Console.WriteLine("Fizz")
+      else
+        System.Console.WriteLine(i)
 ```
 
-**Typed literals:** `INT:42`, `STR:"hello"`, `BOOL:true`, `FLOAT:3.14`
+**Types and literals:** use C# type spellings (`int`, `string`, `int[]`, `string?`)
+and bare literals (`42`, `"hello"`, `true`, `3.14`). Runtime string holes use
+`${expression}`; escape a literal hole as `\${text}`.
 
 Declaration IDs never appear in active source. Tools maintain them in the
 per-project `.calor/ids.json` sidecar; commit it alongside source. Build and
@@ -134,17 +138,17 @@ rename and move tools; plain-text reconciliation rejects ambiguous matches.
 
 - **`ParseAttributes()`** already splits on `:` into `_pos0`, `_pos1`, etc. — **never re-split** `attrs["_pos0"]` on `:`
 - **`IsExpressionStart()`** must include all new expression token kinds — otherwise binding initializers silently fail to parse
-- **Closing tags with IDs** (e.g. `§/UNSAFE{u1}`) need `ParseAttributes()` after `Advance()` to consume the ID block
+- **Native declarations** use the existing indentation and signature readers; do not introduce section tags or structural closers
 - **`ParseValue()`** handles `*` for pointer types and `[,]` for multi-dimensional array types
 
 ## Key Conventions
 
 - **Visitor pattern everywhere** — every AST node has `Accept` methods; all tree operations implement `IAstVisitor` or `IAstVisitor<T>`
-- **CSharpInteropBlockNode** — when `RoslynSyntaxVisitor` encounters unsupported C# features, it wraps the raw C# in this node (preserves code verbatim with metadata about the unsupported feature)
-- **MemberPreprocessorBlockNode** — wraps class members in conditional `#if` blocks; supports `§PP{CONDITION}` ... `§/PP{CONDITION}` syntax with chained else branches
+- **CSharpInteropBlockNode** — converter-only preservation of unsupported C#, with a reason marker and exact payload bytes; do not teach or handwrite passthrough. Preservation is not native support or effect enforcement
+- **MemberPreprocessorBlockNode** — wraps class members in conditional `#if` blocks; native `pp condition`, `pp elif condition` and `pp else` branches have indented bodies
 - **VariableSymbol.IsParameter** — distinguishes function parameters from locals; used by analysis passes
-- **BoundCallExpression.Target** is a `string` — `NullDereferenceChecker` checks for `.unwrap` suffix
-- **Option\<T\> and Result\<T,E\>** are valid generic types in Calor's type system
+- **BoundCallExpression.Target** is a `string` — call-target names alone are not nullability proof facts
+- **Absence and failure** use existing .NET nullable types (`string?`, `int?`, `null`) and exceptions (`throw`, `try`, `catch`); third-party generic types use ordinary generic type references
 - **Diagnostic codes** — Calor0001–0099 (lexer), 0100–0199 (parser), 0200–0299 (semantic), 0300–0399 (contracts), 0400–0499 (effects), 0500–0599 (patterns), 0600–0699 (API strictness), 0700–0799 (semantics version + contract verification results), 0800–0899 (ID validation), 0900–0999 (dataflow/bug patterns/taint), 1000–1099 (codegen/interop), 1100–1199 (refinements/obligations), 1200–1299 (experimental), 1300–1399 (CLI: lint findings and command-level errors)
 
 ## Project Layout
