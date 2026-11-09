@@ -12373,12 +12373,14 @@ public sealed class Parser
                 preconditions.Add(ParseRequires());
                 bodyHadContent = true;
             }
-            else if (Check(TokenKind.Base))
+            else if (Check(TokenKind.Base)
+                && (!IsCanonicalDeclaration(Current) || Lookahead.Kind == TokenKind.OpenParen))
             {
                 initializer = ParseConstructorInitializer(isBase: true);
                 bodyHadContent = true;
             }
-            else if (Check(TokenKind.This))
+            else if (Check(TokenKind.This)
+                && (!IsCanonicalDeclaration(Current) || Lookahead.Kind == TokenKind.OpenParen))
             {
                 initializer = ParseConstructorInitializer(isBase: false);
                 bodyHadContent = true;

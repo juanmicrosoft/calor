@@ -1,7 +1,10 @@
+using System.Reflection;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -11,7 +14,7 @@ namespace Calor.Compiler.Tests;
 /// end-to-end: parsing, code generation, conversion, and round-trip.
 ///
 /// Closes Challenge 8 from the conversion campaign: "Constructor overloading not supported."
-/// This was a documentation gap — the compiler has always supported multiple §CTOR blocks.
+/// Native classes retain multiple constructor declarations.
 /// </summary>
 public class ConstructorOverloadingTests
 {
@@ -23,23 +26,18 @@ public class ConstructorOverloadingTests
     public void Compile_TwoConstructors_EmitsBoth()
     {
         var source = """
-            §M{MultiCtor}
-              §CL{Person:pub}
-                  §FLD{str:name:priv}
-                  §FLD{i32:age:priv}
+            module MultiCtor
+              class Person public
+                field string:name private
+                field int:age private
 
-                  §CTOR{pub}
-                    §I{str:name}
-                    §I{i32:age}
-                    §ASSIGN §THIS.name name
-                    §ASSIGN §THIS.age age
-                  §/CTOR
+                ctor (string:name, int:age)
+                  set this.name name
+                  set this.age age
 
-                  §CTOR{pub}
-                    §I{str:name}
-                    §ASSIGN §THIS.name name
-                    §ASSIGN §THIS.age 0
-                  §/CTOR
+                ctor (string:name)
+                  set this.name name
+                  set this.age 0
             """;
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions
@@ -53,34 +51,35 @@ public class ConstructorOverloadingTests
         // Both constructors should appear
         Assert.Contains("public Person(string name, int age)", code);
         Assert.Contains("public Person(string name)", code);
+        var type = Emit(code).GetTypes().Single(type => type.Name == "Person");
+        var full = Activator.CreateInstance(type, "Ada", 37)!;
+        var shorter = Activator.CreateInstance(type, "Grace")!;
+        Assert.Equal("Ada", type.GetField("name", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(full));
+        Assert.Equal(37, type.GetField("age", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(full));
+        Assert.Equal("Grace", type.GetField("name", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(shorter));
+        Assert.Equal(0, type.GetField("age", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(shorter));
     }
 
     [Fact]
     public void Compile_ThreeConstructors_EmitsAll()
     {
         var source = """
-            §M{TripleCtor}
-              §CL{Config:pub}
-                  §FLD{str:host:priv}
-                  §FLD{i32:port:priv}
+            module TripleCtor
+              class Config public
+                field string:host private
+                field int:port private
 
-                  §CTOR{pub}
-                    §I{str:host}
-                    §I{i32:port}
-                    §ASSIGN §THIS.host host
-                    §ASSIGN §THIS.port port
-                  §/CTOR
+                ctor (string:host, int:port)
+                  set this.host host
+                  set this.port port
 
-                  §CTOR{pub}
-                    §I{str:host}
-                    §ASSIGN §THIS.host host
-                    §ASSIGN §THIS.port 8080
-                  §/CTOR
+                ctor (string:host)
+                  set this.host host
+                  set this.port 8080
 
-                  §CTOR{pub}
-                    §ASSIGN §THIS.host "localhost"
-                    §ASSIGN §THIS.port 8080
-                  §/CTOR
+                ctor ()
+                  set this.host "localhost"
+                  set this.port 8080
             """;
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions
@@ -100,24 +99,15 @@ public class ConstructorOverloadingTests
     public void Compile_ConstructorWithBaseCall_EmitsBaseInitializer()
     {
         var source = """
-            §M{BaseCall}
-              §CL{AppException:pub}
-                  §EXT{Exception}
+            module BaseCall
+              class AppException public
+                extends Exception
 
-                  §CTOR{pub}
-                    §I{str:message}
-                    §I{i32:code}
-                    §BASE
-                      §A message
-                    §/BASE
-                  §/CTOR
+                ctor (string:message, int:code)
+                  base(message)
 
-                  §CTOR{pub}
-                    §I{str:message}
-                    §BASE
-                      §A message
-                    §/BASE
-                  §/CTOR
+                ctor (string:message)
+                  base(message)
             """;
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions
@@ -137,25 +127,17 @@ public class ConstructorOverloadingTests
     public void Compile_ConstructorWithThisChaining_EmitsThisInitializer()
     {
         var source = """
-            §M{ThisChain}
-              §CL{Point:pub}
-                  §FLD{i32:x:priv}
-                  §FLD{i32:y:priv}
+            module ThisChain
+              class Point public
+                field int:x private
+                field int:y private
 
-                  §CTOR{pub}
-                    §I{i32:x}
-                    §I{i32:y}
-                    §ASSIGN §THIS.x x
-                    §ASSIGN §THIS.y y
-                  §/CTOR
+                ctor (int:x, int:y)
+                  set this.x x
+                  set this.y y
 
-                  §CTOR{pub}
-                    §I{i32:val}
-                    §THIS
-                      §A val
-                      §A val
-                    §/THIS
-                  §/CTOR
+                ctor (int:val)
+                  this(val, val)
             """;
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions
@@ -168,25 +150,57 @@ public class ConstructorOverloadingTests
 
         Assert.Contains("Point(int x, int y)", code);
         Assert.Contains("Point(int val) : this(val, val)", code);
+        var type = Emit(code).GetTypes().Single(type => type.Name == "Point");
+        var point = Activator.CreateInstance(type, 12)!;
+        Assert.Equal(12, type.GetField("x", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(point));
+        Assert.Equal(12, type.GetField("y", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(point));
+    }
+
+    [Fact]
+    public void Compile_ThisAndBaseMembers_AreNotConstructorInitializers()
+    {
+        var source = """
+            module ConstructorMembers
+              class Base public
+                field int:Value public
+                func Bump () → void
+                  set this.Value this.Value + 1
+              class Derived public
+                extends Base
+                ctor (int:value)
+                  base()
+                  set this.Value value
+                  set base.Value base.Value + 1
+                  this.Bump()
+                  base.Bump()
+            """;
+        var result = Program.Compile(source, "constructors.calr.txt", new CompilationOptions
+        {
+            EnforceEffects = false
+        });
+        Assert.False(result.HasErrors, FormatDiagnostics(result));
+        var constructor = Assert.Single(result.Ast!.Classes.Single(type => type.Name == "Derived").Constructors);
+        Assert.True(constructor.Initializer!.IsBaseCall);
+        Assert.Equal(4, constructor.Body.Count);
+        var type = Emit(result.GeneratedCode).GetTypes().Single(type => type.Name == "Derived");
+        var value = Activator.CreateInstance(type, 9)!;
+        Assert.Equal(12, type.GetField("Value")!.GetValue(value));
     }
 
     [Fact]
     public void Compile_ConstructorWithPrecondition_EmitsContractCheck()
     {
         var source = """
-            §M{PrecondCtor}
-              §CL{PositiveValue:pub}
-                  §FLD{i32:value:priv}
+            module PrecondCtor
+              class PositiveValue public
+                field int:value private
 
-                  §CTOR{pub}
-                    §I{i32:value}
-                    §Q (> value 0)
-                    §ASSIGN §THIS.value value
-                  §/CTOR
+                ctor (int:value)
+                  requires value > 0
+                  set this.value value
 
-                  §CTOR{pub}
-                    §ASSIGN §THIS.value 1
-                  §/CTOR
+                ctor ()
+                  set this.value 1
             """;
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions
@@ -208,14 +222,11 @@ public class ConstructorOverloadingTests
     public void Compile_MixedVisibilityConstructors_EmitsCorrectAccess()
     {
         var source = """
-            §M{MixedVis}
-              §CL{Singleton:pub}
-                  §CTOR{priv}
-                  §/CTOR
+            module MixedVis
+              class Singleton public
+                ctor private ()
 
-                  §CTOR{int}
-                    §I{i32:seed}
-                  §/CTOR
+                ctor internal (int:seed)
             """;
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions
@@ -514,13 +525,16 @@ public class ConstructorOverloadingTests
         var calrEmitter = new CalorEmitter();
         var calrText = calrEmitter.Emit(convertResult.Ast!);
 
-        // Should have two §CTOR blocks
-        var ctorCount = calrText.Split("§CTOR{").Length - 1;
+        var ctorCount = calrText.Split("ctor (").Length - 1;
         Assert.Equal(2, ctorCount);
 
-        // Should have two §/CTOR blocks
-        var endCtorCount = calrText.Split("§/CTOR{").Length - 1;
-        Assert.Equal(0, endCtorCount);
+        Assert.DoesNotContain("§", calrText);
+        var reparsed = Program.Compile(calrText, "constructors.calr.txt", new CompilationOptions
+        {
+            EnforceEffects = false
+        });
+        Assert.False(reparsed.HasErrors, FormatDiagnostics(reparsed));
+        Assert.Equal(2, Assert.Single(reparsed.Ast!.Classes).Constructors.Count);
     }
 
     #endregion
@@ -531,19 +545,13 @@ public class ConstructorOverloadingTests
     public void Parse_ConstructorWithUniqueIds_NoIdConflict()
     {
         var source = """
-            §M{IdTest}
-              §CL{Widget:pub}
-                  §CTOR{pub}
-                    §I{str:name}
-                  §/CTOR
+            module IdTest
+              class Widget public
+                ctor (string:name)
 
-                  §CTOR{pub}
-                    §I{str:name}
-                    §I{i32:size}
-                  §/CTOR
+                ctor (string:name, int:size)
 
-                  §CTOR{priv}
-                  §/CTOR
+                ctor private ()
             """;
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions
@@ -555,16 +563,30 @@ public class ConstructorOverloadingTests
         Assert.NotNull(result.Ast);
         var classNode = Assert.Single(result.Ast.Classes);
         Assert.Equal(3, classNode.Constructors.Count);
+        Assert.All(classNode.Constructors, ctor => Assert.False(string.IsNullOrEmpty(ctor.Id)));
+        Assert.Equal(3, classNode.Constructors.Select(ctor => ctor.Id).Distinct().Count());
     }
 
     #endregion
 
     #region Helpers
 
+    private static Assembly Emit(string source)
+    {
+        var compilation = CSharpCompilation.Create("Constructors_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble + source)],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        return Assembly.Load(stream.ToArray());
+    }
+
     private static string FormatDiagnostics(CompilationResult result)
     {
         var errors = result.Diagnostics
-            .Where(d => d.Severity == DiagnosticSeverity.Error)
+            .Where(d => d.Severity == Calor.Compiler.Diagnostics.DiagnosticSeverity.Error)
             .Select(d => $"[{d.Code}] {d.Message}");
         return string.Join("\n", errors);
     }
