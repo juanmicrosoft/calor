@@ -1586,6 +1586,11 @@ Task<int> local initialized directly from a scalar-output native async function.
 The original current control retains its exact input and now requires native/CLR
 behavioral success instead of the former Calor0202 refusal. The 100/139 control
 counts and strict representatives are unchanged.
+On integrated parent `ea4dedcee`, all 100 current controls passed in 416.292
+seconds, followed by all 139 genuine archived old/current controls under the
+unchanged 600-second deadline. The archived source build used its own verified
+manifest and completed with zero warnings or errors. These results restore the
+four async prerequisites; they do not establish whole-milestone acceptance.
 The archived compiler rejects the inferred task.Result negative before CLR
 execution because its getter has unknown effect (Calor0410). The old mode
 asserts that exact blocker and does not label it CLR behavioral evidence.
