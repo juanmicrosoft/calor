@@ -10123,16 +10123,7 @@ public sealed class Parser
             var baseStart = _position;
             baseClass = ReadInlineTypeToken();
             baseClassSpan = GetConsumedSpan(baseStart);
-            if (Match(TokenKind.OpenParen))
-            {
-                recordBaseArguments = [];
-                if (!Check(TokenKind.CloseParen))
-                {
-                    do { recordBaseArguments.Add(ParseExpression()); }
-                    while (Match(TokenKind.Comma));
-                }
-                Expect(TokenKind.CloseParen);
-            }
+            recordBaseArguments = ParseRecordBaseArguments();
         }
 
         // Also support legacy: Extract type parameters from class name if present (e.g., Repository<T>)
@@ -10212,6 +10203,8 @@ public sealed class Parser
                     var typeStart = _position;
                     baseClass = ReadInlineTypeToken();
                     baseClassSpan = GetConsumedSpan(typeStart);
+                    if (isRecord)
+                        recordBaseArguments = ParseRecordBaseArguments();
                 }
                 else
                 {
@@ -10389,6 +10382,21 @@ public sealed class Parser
             isRecord: isRecord,
             recordParameters: recordParameters,
             recordBaseArguments: recordBaseArguments), startToken);
+    }
+
+    private List<ExpressionNode>? ParseRecordBaseArguments()
+    {
+        if (!Match(TokenKind.OpenParen))
+            return null;
+
+        var arguments = new List<ExpressionNode>();
+        if (!Check(TokenKind.CloseParen))
+        {
+            do { arguments.Add(ParseExpression()); }
+            while (Match(TokenKind.Comma));
+        }
+        Expect(TokenKind.CloseParen);
+        return arguments;
     }
 
     /// <summary>

@@ -198,6 +198,15 @@ public sealed class NativeRecordTests
         Assert.False(result.HasErrors, conversion.CalorSource + "\n" + string.Join("\n", result.Diagnostics));
         Assert.Equal(Emit(declarations + probe).GetType("Records.Probe")!.GetMethod("Run")!.Invoke(null, null),
             Emit(result.GeneratedCode + probe).GetType("Records.Probe")!.GetMethod("Run")!.Invoke(null, null));
+        var authored = Compile("""
+            module Records Records block
+              record IBase (int:X)
+              record Derived sealed (int:X, string:Label)
+                extends IBase(X)
+            """);
+        Assert.False(authored.HasErrors, string.Join("\n", authored.Diagnostics));
+        Assert.Equal(Emit(declarations + probe).GetType("Records.Probe")!.GetMethod("Run")!.Invoke(null, null),
+            Emit(authored.GeneratedCode + probe).GetType("Records.Probe")!.GetMethod("Run")!.Invoke(null, null));
     }
 
     [Fact]
@@ -211,7 +220,8 @@ public sealed class NativeRecordTests
                     return 0
                   init
                     Console.WriteLine("base init")
-              record Derived (int:X) : Base(X)
+              record Derived (int:X)
+                extends Base(X)
               func Copy (Derived:value) → Derived
                 ! alloc,mut
                 return value with { X = 1 }
@@ -222,6 +232,32 @@ public sealed class NativeRecordTests
         var declared = Compile(source.Replace("! alloc,mut", "! alloc,mut,cw", StringComparison.Ordinal));
         Assert.Contains(declared.Diagnostics.Errors, error => error.Code == "Calor0423"
             && error.Message.Contains("Base.X", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("()", "()", 0)]
+    [InlineData("(int:X)", "(3)", 1)]
+    [InlineData("(int:X, int:Y)", "(3, 7)", 2)]
+    public void IndentedRecordExtends_PreservesEmptyAndMultipleBaseArguments(
+        string parameters, string arguments, int count)
+    {
+        var result = Compile($$"""
+            module Records Records block
+              record Base {{parameters}}
+              record Derived ()
+                extends Base{{arguments}}
+            """);
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        var derived = Assert.Single(result.Ast!.Classes.Where(record => record.Name == "Derived"));
+        Assert.NotNull(derived.RecordBaseArguments);
+        Assert.Equal(count, derived.RecordBaseArguments.Count);
+        var type = Emit(result.GeneratedCode).GetType("Records.Derived")!;
+        var value = Activator.CreateInstance(type);
+        Assert.NotNull(value);
+        if (count > 0)
+            Assert.Equal(3, type.GetProperty("X")!.GetValue(value));
+        if (count > 1)
+            Assert.Equal(7, type.GetProperty("Y")!.GetValue(value));
     }
 
     [Fact]
