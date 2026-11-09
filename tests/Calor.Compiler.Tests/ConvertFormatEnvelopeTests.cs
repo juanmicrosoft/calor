@@ -343,11 +343,11 @@ public class ConvertFormatEnvelopeTests : IDisposable
     [Fact]
     public void Convert_Json_CalorToCSharp_CompileErrors_UseRealDiagnosticCodes()
     {
-        // §B{x} with no type and no initializer → deterministic Calor0250 at line 3.
+        // Native inferred bindings require an initializer during parsing, before binding.
         var calrFile = WriteFile("bad.calr",
-            "§M{Bad}\n" +
-            "  §F{Main:pub} () -> void\n" +
-            "    §B{x}\n");
+            "module Bad\n" +
+            "  func Main public () → void\n" +
+            "    let x\n");
 
         var (exitCode, stdOut, _) = RunCli("convert", calrFile, "--format", "json");
 
@@ -357,8 +357,9 @@ public class ConvertFormatEnvelopeTests : IDisposable
         Assert.Equal("calor-to-csharp", data.GetProperty("direction").GetString());
         Assert.False(data.GetProperty("success").GetBoolean());
 
-        var diag = root.GetProperty("diagnostics").EnumerateArray()
-            .Single(d => d.GetProperty("code").GetString() == "Calor0250");
+        var diag = Assert.Single(root.GetProperty("diagnostics").EnumerateArray());
+        Assert.Equal(DiagnosticCode.UnexpectedToken, diag.GetProperty("code").GetString());
+        Assert.Equal("An inferred binding requires '= expression'.", diag.GetProperty("message").GetString());
         Assert.Equal("error", diag.GetProperty("severity").GetString());
         Assert.Equal(3, diag.GetProperty("location").GetProperty("line").GetInt32());
     }
