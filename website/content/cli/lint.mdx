@@ -5,7 +5,9 @@ order: 7
 ---
 
 
-The `lint` command checks Calor source files for compliance with the agent-optimized format and can automatically fix issues.
+The `lint` command reports source-format issues and lexer/parser diagnostics.
+Its write mode uses the lossless formatter. It is not a substitute for
+compilation, effect checking or contract verification.
 
 ## Usage
 
@@ -13,8 +15,8 @@ The `lint` command checks Calor source files for compliance with the agent-optim
 # Check files and report issues
 calor lint <files...>
 
-# Auto-fix all fixable issues (explicitly acknowledge the experimental writer)
-calor lint <files...> --fix --experimental
+# Fix supported whitespace issues
+calor lint <files...> --fix
 
 # Check without modifying (exit code indicates issues)
 calor lint <files...> --check
@@ -23,55 +25,54 @@ calor lint <files...> --check
 calor lint <files...> --verbose
 
 # Combine options
-calor lint src/*.calr --fix --experimental --verbose
+calor lint src/*.calr --fix --verbose
 ```
 
 ## Options
 
 | Option | Description |
 |--------|-------------|
-| `--fix`, `-f` | Automatically fix issues through the formatter write path; requires `--experimental` |
+| `--fix`, `-f` | Fix supported issues through the validated formatter write path |
 | `--check` | Check mode - exit with error if issues found (CI-friendly) |
 | `--verbose` | Show detailed information about each issue |
 | `--format` | `text`, schema 2.0 `json`, or `sarif`; no short alias |
-| `--experimental` | Acknowledge known formatter write defects |
+| `--experimental` | Deprecated compatibility flag; validated fixes are enabled by default |
 
-> **Release policy:** `lint --fix` is refused with `Calor1346` unless
-> you pass `--experimental` or set `CALOR_EXPERIMENTAL_FORMAT_WRITE=1`. The
-> shared writer can rewrite identifiers and drop comments. Read-only linting
-> remains available without acknowledgment.
+The writer preserves non-trivia tokens, comments, strings and declaration
+names. It checks generated C# and idempotence before writing. If semantic
+errors prevent those checks, it leaves the source unchanged and reports a
+conservative fallback. Review the result; formatting is not a semantic repair.
 
 ## Exit Codes
 
 | Code | Meaning |
 |------|---------|
 | `0` | No issues found (or all issues fixed with `--fix`) |
-| `1` | Issues found and not fixed |
+| `1` | Issues found and not fixed, or fixes conservatively suppressed |
 | `2` | Parse error or invalid file |
 
 ## Design Principles
 
-The Calor linter is designed specifically for **agent-optimized code**, not human-readable code. This fundamentally changes the linting philosophy compared to traditional linters.
+Calor uses meaningful indentation. Removing indentation, comments or names to
+save characters can change semantics or discard useful context. Formatting
+must preserve the program, not minimize its text at any cost.
 
 ### Traditional Linters vs Agent-Optimized Linters
 
 | Aspect | Traditional Linters | Calor Linter |
 |--------|---------------------|--------------|
 | **Indentation** | Enforce style indentation | Preserve meaningful block indentation |
-| **Whitespace** | Format for readability | Eliminate unnecessary whitespace |
+| **Whitespace** | Format for readability | Trim eligible trailing whitespace without changing tokens |
 | **Identifiers** | Descriptive names encouraged | Source names remain names; persistent IDs live outside source |
-| **Blank lines** | Separate logical sections | Remove all blank lines |
-| **Comments** | Encouraged for clarity | Stripped (contracts replace comments) |
-| **Line length** | 80-120 character limits | No limit (single-line preferred) |
+| **Blank lines** | Separate logical sections | Preserve existing line structure |
+| **Comments** | Encouraged for clarity | Preserve comments; contracts do not replace explanations |
+| **Line length** | May impose a limit | No lint line-length rule |
 
 ### Why Agent-Optimized?
 
-AI coding agents process code as tokens. Every character costs tokens and processing time. The Calor linter optimizes for:
-
-1. **Minimal token count** - Fewer tokens = faster processing, lower cost
-2. **Unambiguous structure** - Indentation defines blocks; tags introduce language constructs
-3. **Consistent format** - No style variations that add noise to agent context
-4. **Semantic density** - Maximum information per token
+Consistent source can make reviews easier for people and agents. That is not
+a measured model-accuracy or latency result. Character count is not token
+count; see [token economics](/docs/benchmarking/metrics/token-economics/).
 
 ### Key Principle: Structure Through Indentation
 
@@ -88,17 +89,20 @@ public void Main() {
 }
 ```
 
-Calor uses indent-only blocks with explicit tags and IDs:
+The equivalent native Calor program uses keywords and indented bodies:
 
 ```calor
-§F{Main:pub}
-  §O{void}
-  §L{i:0:10:1}
-    §IF (== (% i 2) 0)
-      §P i
+module LintLoops
+  func Main public () → void
+    ! cw
+    for i from 0 to 9 step 1
+      if i % 2 == 0
+        System.Console.WriteLine(i)
 ```
 
-The structure is explicit in indentation. Identity fields are not part of block headers.
+Both loops print `0`, `2`, `4`, `6`, and `8`, each on its own line. The native
+range includes its upper bound, so `9` preserves the C# condition `i < 10`.
+Declaration identities live in the sidecar, not block headers.
 
 ## Lint Rules
 
@@ -107,55 +111,47 @@ The structure is explicit in indentation. Identity fields are not part of block 
 There is no source-ID abbreviation rule. Declaration IDs belong in the
 tooling-maintained `.calor/ids.json` sidecar, not in source headers.
 Use [`ids check`](/docs/cli/ids/) to validate persisted identity state.
-The formatter must not treat a program name such as `f001` as an ID to shorten.
+The formatter must not treat a program name such as `f001` as an ID to shorten:
+
+```calor
+module LintNames
+  func f001 public (int:value) → int
+    !
+    // Keep this explanation.
+    return value * 2
+```
+
+`f001(21)` returns `42`. Formatting preserves both its name and comment.
 
 ### Whitespace
 
-Use two spaces per block level. Avoid trailing whitespace and unnecessary blank lines.
-
-| Issue | Example |
-|-------|---------|
-| Wrong indent width | `    §P "text"` (4 spaces where 2 expected) |
-| Leading tabs | `\t§P "text"` (leading tab) |
-| Trailing whitespace | `§M{Name}  ` (trailing spaces) |
-| Blank lines | Empty lines between statements |
-| Multiple blank lines | Consecutive empty lines |
+Use two spaces per block level. Read-only lint reports trimmable trailing
+whitespace plus lexer/parser diagnostics. It does not report every possible
+formatting difference. Comments, strings and converter-preserved C# payloads
+have protected whitespace; the writer does not trim them indiscriminately.
 
 ### Tag Formats
 
-Tags should use the canonical format.
-
-| Issue | Input | Fixed |
-|-------|-------|-------|
-| External visibility | `§F{Main} pub` | `§F{Main:pub}` |
+Declarations use native headers such as `func Main public () → void`.
+The linter does not migrate retired declaration syntax or invent modifiers.
 
 ### Expression Format
 
-Expressions should use prefix (Polish) notation.
-
-| Issue | Input | Fixed |
-|-------|-------|-------|
-| Infix binary | `(a + b)` | `(+ a b)` |
-| Nested infix | `(a + (b * c))` | `(+ a (* b c))` |
+Use infix expressions with C# precedence: `a + b * c`. Parentheses such as
+`(a + b) * c` change grouping. Formatting preserves those expression tokens;
+it does not convert expressions to prefix notation.
 
 ### Type Names
 
-Type names should be lowercase.
-
-| Issue | Input | Fixed |
-|-------|-------|-------|
-| Uppercase void | `§O{VOID}` | `§O{void}` |
-| Uppercase int | `§I{x:INT}` | `§I{x:int}` |
-| Uppercase string | `§I{s:STRING}` | `§I{s:string}` |
+Use C# type spellings such as `int`, `string`, `int[]` and `string?`.
+User-defined names such as `Customer` retain their case. Formatting does not
+repair an unknown type by lowercasing it.
 
 ### Effect Codes
 
-Effects should use abbreviated codes.
-
-| Issue | Input | Fixed |
-|-------|-------|-------|
-| Verbose effect | `§E{io/console_write}` | `§E{cw}` |
-| Multiple verbose | `§E{io/console_read,io/console_write}` | `§E{cr,cw}` |
+Use `! cw` for console output or `! cr, cw` for console input and output.
+A standalone `!` declares purity. Compilation, not linting, checks whether
+the body's effects fit that row.
 
 ## Examples
 
@@ -172,14 +168,11 @@ calor lint src/hello.calr --format json
 ### Auto-Fix
 
 ```bash
-# Fix all issues automatically
-calor lint src/hello.calr --fix --experimental
+# Fix supported whitespace issues
+calor lint src/hello.calr --fix
 
-# Output:
-# src/hello.calr
-#   Fixed 3 issues
-#
-# All issues fixed
+# A file that was changed is reported as:
+# Fixed: hello.calr
 ```
 
 ### CI Integration
@@ -196,32 +189,24 @@ calor lint src/**/*.calr --check
 ```bash
 calor lint src/hello.calr --verbose
 
-# Output:
-# src/hello.calr
-#   line 1, col 4: padded_id
-#     Found: m001
-#     Expected: m1
-#     Rule: IDs should use minimal padding
-#
-#   line 3, col 1: leading_whitespace
-#     Found: 2 leading spaces
-#     Expected: no indentation
-#     Rule: Agent-optimized format uses no indentation
+# For a file with trailing spaces on line 5, the text includes:
+# hello.calr: 1 issue(s)
+#   Line 5: Line has trailing whitespace
 ```
 
 ### Agent Output
 
 ```bash
-calor lint src/hello.calr --agent
-
-# Compact output for agent consumption:
-# §LINT{3}src/hello.calr:1:padded_id:m001→m1|:3:leading_whitespace:2sp
+calor lint src/hello.calr --format json
 ```
+
+There is no `--agent` option. JSON contains the shared diagnostic envelope,
+including located lint warnings; human status messages go to stderr.
 
 ## Best Practices
 
 1. **Run lint before commit** - Use pre-commit hooks to ensure all code is properly formatted
-2. **Review write-mode changes** - Use `--fix --experimental` only after reading the release-policy warning
+2. **Review write-mode changes** - Confirm that comments, names and behavior remain intact
 3. **Use `--check` in CI** - Fail builds on lint issues to maintain consistency
 4. **Format after code generation** - If generating Calor from other sources, always lint the output
 
@@ -234,13 +219,14 @@ The `lint` command checks for issues while `format` rewrites the entire file. Us
 calor lint src/module.calr
 
 # If issues found, format to fix
-calor format src/module.calr
+calor format src/module.calr --write
 ```
 
-Or use lint with `--fix` for targeted fixes without full reformatting:
+Both commands use the same validated writer. Lint fixes files with reported
+issues; format also handles supported indentation changes:
 
 ```bash
-calor lint src/module.calr --fix --experimental
+calor lint src/module.calr --fix
 ```
 
 ## Related Commands

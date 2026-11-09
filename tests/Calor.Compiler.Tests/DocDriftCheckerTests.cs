@@ -143,6 +143,9 @@ public class DocDriftCheckerTests
         new[] { "CompileExample" }, new[] { "42" }, new[] { "GlobalModule.Increment(41)" })]
     [InlineData("cli/ids.mdx", 1, 0,
         new[] { "Calculator" }, new[] { "42" }, new[] { "GlobalModule.Double(21)" })]
+    [InlineData("cli/lint.mdx", 2, 0,
+        new[] { "LintLoops", "LintNames" }, new[] { "0", "42" },
+        new[] { "((System.Func<int>)(() => { GlobalModule.Main(); return 0; }))()", "GlobalModule.f001(21)" })]
     [InlineData("guides/dependent-types-tutorial.mdx", 4, 0,
         new[] { "ServerContracts", "BankingContracts", "MissingFundsContract", "DivisionContracts" },
         new[] { "10", "70", "70", "-2" },
@@ -761,12 +764,126 @@ public class DocDriftCheckerTests
     [Theory]
     [InlineData("cli/query.mdx")]
     [InlineData("cli/self-check.mdx")]
+    [InlineData("cli/format.mdx")]
     public void PublicNativeCliProse_DoesNotTeachRetiredSectionHeaders(string page)
     {
         var path = "website/content/" + page;
         var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path));
         Assert.DoesNotContain("§", content);
         Assert.Empty(WebsiteExampleChecker.Check([new DocFile(path, content)]));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PublicLintGuide_PreservesTheOriginalExclusiveLoopBound(bool native)
+    {
+        var path = "website/content/cli/lint.mdx";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path));
+        string generated;
+        if (native)
+        {
+            var source = ExemplarCompileChecker.ExtractCompletePrograms(content)
+                .Single(program => program.Source.StartsWith("module LintLoops\n", StringComparison.Ordinal)).Source;
+            var compiled = Program.Compile(source, path);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            generated = compiled.GeneratedCode;
+        }
+        else
+        {
+            var original = System.Text.RegularExpressions.Regex.Match(content,
+                @"```csharp\r?\n(?<body>.*?)\r?\n```",
+                System.Text.RegularExpressions.RegexOptions.Singleline);
+            Assert.True(original.Success);
+            generated = "using System;\npublic class Original {\n" + original.Groups["body"].Value + "\n}\n";
+        }
+        var observed = InteropScope.RefOutImplementationTests.Run(generated + $$"""
+
+            public static class Probe
+            {
+                public static object? Run()
+                {
+                    var previous = System.Console.Out;
+                    using var output = new System.IO.StringWriter();
+                    try
+                    {
+                        System.Console.SetOut(output);
+                        {{(native ? "GlobalModule.Main()" : "new Original().Main()")}};
+                        return output.ToString().Replace("\r\n", "\n");
+                    }
+                    finally { System.Console.SetOut(previous); }
+                }
+            }
+            """);
+        Assert.Equal("0\n2\n4\n6\n8\n", observed);
+    }
+
+    [Theory]
+    [InlineData("lint", "--fix")]
+    [InlineData("format", "--write")]
+    public void PublicFormattingGuides_ActualWritesNeedNoExperimentalFlagAndPreserveNamesAndComments(
+        string command, string writeOption)
+    {
+        var path = "website/content/cli/lint.mdx";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith("module LintNames\n", StringComparison.Ordinal)).Source;
+        var dirty = source.Replace("return value * 2", "return value * 2  ", StringComparison.Ordinal);
+        Assert.NotEqual(source, dirty);
+        var directory = Path.Combine(Path.GetTempPath(), "calor-published-format-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var input = Path.Combine(directory, "hello.calr");
+            File.WriteAllText(input, dirty);
+            var check = CliTestHarness.RunCli(directory, command, input, "--check", "--format", "json");
+            Assert.Equal(1, check.ExitCode);
+            Assert.Equal(dirty, File.ReadAllText(input));
+            var fixedFile = CliTestHarness.RunCli(directory,
+                new Dictionary<string, string> { ["CALOR_EXPERIMENTAL_FORMAT_WRITE"] = "0" },
+                command, input, writeOption);
+            Assert.True(fixedFile.ExitCode == 0, fixedFile.StdOut + fixedFile.StdErr);
+            Assert.Equal(source, File.ReadAllText(input));
+            var clean = CliTestHarness.RunCli(directory, command, input, "--check", "--format", "json");
+            Assert.True(clean.ExitCode == 0, clean.StdOut + clean.StdErr);
+            using var diagnostics = JsonDocument.Parse(clean.StdOut);
+            Assert.Empty(diagnostics.RootElement.GetProperty("diagnostics").EnumerateArray());
+            var compiled = Program.Compile(File.ReadAllText(input), path);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Assert.Equal("42", InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + """
+
+                public static class Probe
+                {
+                    public static object? Run() => GlobalModule.f001(21);
+                }
+                """));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Fact]
+    public void PublicLintGuide_ReportsSuppressedSemanticFailureWithoutRewritingSource()
+    {
+        var path = "website/content/cli/lint.mdx";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith("module LintNames\n", StringComparison.Ordinal)).Source
+            .Replace("return value * 2", "return missing  ", StringComparison.Ordinal);
+        var directory = Path.Combine(Path.GetTempPath(), "calor-published-lint-refusal-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var input = Path.Combine(directory, "hello.calr");
+            File.WriteAllText(input, source);
+            var refused = CliTestHarness.RunCli(directory, "lint", input, "--fix", "--format", "json");
+            Assert.Equal(1, refused.ExitCode);
+            Assert.Equal(source, File.ReadAllText(input));
+            using var diagnostics = JsonDocument.Parse(refused.StdOut);
+            Assert.Contains(diagnostics.RootElement.GetProperty("diagnostics").EnumerateArray(),
+                diagnostic => diagnostic.GetProperty("code").GetString() == DiagnosticCode.FormatConservativeFallback);
+            Assert.Contains("fix suppressed", refused.StdErr);
+        }
+        finally { Directory.Delete(directory, recursive: true); }
     }
 
     [Fact]
