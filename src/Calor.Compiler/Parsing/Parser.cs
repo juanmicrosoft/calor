@@ -6748,7 +6748,8 @@ public sealed class Parser
         var modifiers = new List<string>();
         if (attributes["_pos2"] is { } existing)
             modifiers.AddRange(existing.Split(','));
-        while (Current.Span.Line == start.Span.Line && Check(TokenKind.Identifier))
+        while (Current.Span.Line == start.Span.Line
+            && (Check(TokenKind.Identifier) || Check(TokenKind.Unsafe)))
         {
             var token = Advance();
             var word = token.Text;

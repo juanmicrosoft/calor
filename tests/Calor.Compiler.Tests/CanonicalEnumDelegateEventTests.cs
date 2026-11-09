@@ -99,6 +99,33 @@ public sealed class CanonicalEnumDelegateEventTests
 
     private static void Observe(int value) { }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UnsafeCallableModifierDoesNotTerminateTheNativeHeader(bool roundtrip)
+    {
+        const string input = """
+            module UnsafeHeaders
+              class Native
+                func Change private unsafe (in int:value) → int
+                  return value + 1
+            """;
+        var source = roundtrip ? new CalorEmitter().Emit(Parse(input)) : input;
+        var method = Parse(source).Classes.Single().Methods.Single();
+        Assert.True(method.IsUnsafe);
+        Assert.Equal(Visibility.Private, method.Visibility);
+        Assert.Equal(Calor.Compiler.Ast.ParameterModifier.In, method.Parameters.Single().Modifier);
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Execute(compiled.GeneratedCode, assembly =>
+        {
+            var type = assembly.GetType("Native", throwOnError: true)!;
+            var change = type.GetMethod("Change", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            Assert.True(change.GetParameters().Single().IsIn);
+            Assert.Equal(42, change.Invoke(Activator.CreateInstance(type), [41]));
+        }, allowUnsafe: true);
+    }
+
     [Fact]
     public void StaticEventConversionStillPreservesUnsupportedCSharpVerbatim()
     {
@@ -155,13 +182,13 @@ public sealed class CanonicalEnumDelegateEventTests
         return module;
     }
 
-    private static void Execute(string source, Action<Assembly> observe)
+    private static void Execute(string source, Action<Assembly> observe, bool allowUnsafe = false)
     {
         var compilation = CSharpCompilation.Create("NativeEnumDelegateEvents",
             [CSharpSyntaxTree.ParseText(source)],
             ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
                 .Select(path => MetadataReference.CreateFromFile(path)),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: allowUnsafe));
         using var stream = new MemoryStream();
         var emitted = compilation.Emit(stream);
         Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
