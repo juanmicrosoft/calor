@@ -233,9 +233,9 @@ class ScalarAdmissionTests(unittest.TestCase):
             with patch.dict(globals(), {"execute": admitted, "ThreadPoolExecutor": workers}), \
                     patch("builtins.print"):
                 run_compatibility(old, current, time.monotonic() + 600)
+                self.assertEqual(COUNT, 97)
             self.assertEqual([call.kwargs for call in workers.call_args_list], [{"max_workers": 2}] * 2)
             self.assertEqual(calls, [old] * 48 + [current] * 49)
-            self.assertEqual(COUNT, 97)
             for failure in (RuntimeError("Verifier command exited 139:\n"), RuntimeError("UNKNOWN"),
                             OSError("launch failed"), EOFError("inherited pipe"), TimeoutError("deadline")):
                 COUNT = 0
