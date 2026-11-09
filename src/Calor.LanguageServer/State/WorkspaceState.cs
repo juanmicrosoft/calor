@@ -102,6 +102,9 @@ public sealed class WorkspaceState
         public string DisplayName => Arity == 0
             ? QualifiedName
             : $"{QualifiedName}`{Arity}";
+        public string MetadataIdentity => string.IsNullOrEmpty(NamespaceIdentity)
+            ? DisplayName
+            : $"{NamespaceIdentity}.{DisplayName}";
     }
     private readonly record struct WorkspaceTypeLookupKey(
         string Name,
@@ -109,7 +112,8 @@ public sealed class WorkspaceState
     private readonly record struct WorkspaceTypeReference(
         string Name,
         string SimpleName,
-        int Arity);
+        int Arity,
+        bool IsGlobal);
     private enum WorkspaceTypeResolutionKind
     {
         NotFound,
@@ -130,6 +134,25 @@ public sealed class WorkspaceState
         bool IsAmbiguous,
         ImmutableArray<string> Imports,
         ImmutableArray<WorkspaceTypeDeclarationPart> Parts);
+    private sealed record WorkspaceTypeLookup(
+        IReadOnlyList<WorkspaceTypeGraphNode> Nodes,
+        Func<WorkspaceTypeGraphNode, WorkspaceTypeReference, WorkspaceTypeResolution> Resolve)
+    {
+        public WorkspaceTypeGraphNode? FindExact(string qualifiedName)
+        {
+            var identity = TypeIdentity.ToLookupName(qualifiedName);
+            var matches = Nodes.Where(node => node.Key.MetadataIdentity == identity).Take(2).ToArray();
+            return matches.Length == 1 && !matches[0].IsAmbiguous ? matches[0] : null;
+        }
+
+        public WorkspaceTypeGraphNode? FindBase(WorkspaceTypeGraphNode source)
+        {
+            if (source.BaseClass is not { } reference)
+                return null;
+            var resolution = Resolve(source, reference);
+            return resolution.Kind == WorkspaceTypeResolutionKind.Found ? resolution.Node : null;
+        }
+    }
     internal sealed record DocumentSymbolIndex(
         ImmutableDictionary<SymbolId, ImmutableArray<ProjectSymbolOccurrence>> BySymbol,
         ImmutableArray<ProjectSymbolOccurrence> Occurrences);
@@ -1093,12 +1116,12 @@ public sealed class WorkspaceState
         if (callerContainingType != null
             && target.StartsWith("base.", StringComparison.Ordinal))
         {
-            var callerClass = FindClass(documents, callerContainingType);
-            if (callerClass?.BaseClass is { Length: > 0 } baseClass)
-            {
-                lookupTarget =
-                    $"{GetNominalTypeName(baseClass)}.{target["base.".Length..]}";
-            }
+            var types = BuildWorkspaceTypeLookup(documents);
+            var callerType = types.FindExact(callerContainingType);
+            var baseType = callerType == null ? null : types.FindBase(callerType);
+            if (baseType == null)
+                return new ProjectFunctionLocation(null, null, null);
+            lookupTarget = $"{baseType.Key.MetadataIdentity}.{target["base.".Length..]}";
         }
         var candidates = documents
             .Where(document => document.Analysis.BoundModule != null)
@@ -1360,7 +1383,8 @@ public sealed class WorkspaceState
         switch (call)
         {
             case BoundCallStatement statement:
-                target = statement.Target;
+                target = statement.Receiver is BoundBaseExpression && statement.ResolvedMethodName is { } statementMember
+                    ? $"base.{statementMember}" : statement.Target;
                 arguments = statement.Arguments;
                 argumentNames = statement.ArgumentNames;
                 argumentModifiers = statement.ArgumentModifiers;
@@ -1368,7 +1392,8 @@ public sealed class WorkspaceState
                 receiver = statement.ReceiverSymbol;
                 return true;
             case BoundCallExpression expression:
-                target = expression.Target;
+                target = expression.Receiver is BoundBaseExpression && expression.ResolvedMethodName is { } expressionMember
+                    ? $"base.{expressionMember}" : expression.Target;
                 arguments = expression.Arguments;
                 argumentNames = expression.ArgumentNames;
                 argumentModifiers = expression.ArgumentModifiers;
@@ -1511,42 +1536,20 @@ public sealed class WorkspaceState
         string expectedBaseType,
         IReadOnlyList<WorkspaceDocumentSnapshot> documents)
     {
-        var current = typeName;
-        var visited = new HashSet<string>(StringComparer.Ordinal);
-        while (visited.Add(current))
+        var expected = TypeIdentity.ToLookupName(expectedBaseType);
+        if (TypeIdentity.ToLookupName(typeName) == expected)
+            return true;
+        var types = BuildWorkspaceTypeLookup(documents);
+        var current = types.FindExact(typeName);
+        var visited = new HashSet<WorkspaceTypeGraphKey>();
+        while (current != null && visited.Add(current.Key))
         {
-            if (string.Equals(current, expectedBaseType, StringComparison.Ordinal))
+            if (current.Key.MetadataIdentity == expected)
                 return true;
-
-            var declaration = FindClass(documents, current);
-            if (declaration?.BaseClass is not { Length: > 0 } baseClass)
-                return false;
-            current = GetNominalTypeName(baseClass);
+            current = types.FindBase(current);
         }
 
         return false;
-    }
-
-    private static Calor.Compiler.Ast.ClassDefinitionNode? FindClass(
-        IReadOnlyList<WorkspaceDocumentSnapshot> documents,
-        string qualifiedName)
-    {
-        foreach (var document in documents)
-        {
-            if (document.Analysis.Ast == null)
-                continue;
-
-            foreach (var cls in EnumerateClasses(document.Analysis.Ast.Classes, containingType: null))
-            {
-                if (string.Equals(cls.QualifiedName, qualifiedName, StringComparison.Ordinal)
-                    || string.Equals(cls.Node.Name, qualifiedName, StringComparison.Ordinal))
-                {
-                    return cls.Node;
-                }
-            }
-        }
-
-        return null;
     }
 
     private static IEnumerable<(
@@ -1979,6 +1982,84 @@ public sealed class WorkspaceState
         ImmutableArray<Calor.Compiler.Diagnostics.Diagnostic>> BuildInheritanceDiagnostics(
         IReadOnlyList<WorkspaceDocumentSnapshot> documents)
     {
+        var lookup = BuildWorkspaceTypeLookup(documents);
+        var byKey = lookup.Nodes.ToDictionary(node => node.Key);
+        var edges = new Dictionary<WorkspaceTypeGraphKey, WorkspaceTypeGraphKey>();
+        foreach (var node in lookup.Nodes.Where(item => !item.IsAmbiguous))
+        {
+            if (lookup.FindBase(node) is { } baseType)
+                edges[node.Key] = baseType.Key;
+        }
+
+        var state = new Dictionary<WorkspaceTypeGraphKey, int>();
+        var stack = new List<WorkspaceTypeGraphKey>();
+        var diagnostics = new Dictionary<DocumentUri, List<Calor.Compiler.Diagnostics.Diagnostic>>();
+        foreach (var node in lookup.Nodes.Where(item => !item.IsAmbiguous))
+            Visit(node.Key);
+        return diagnostics.ToImmutableDictionary(
+            pair => pair.Key,
+            pair => pair.Value.OrderBy(diagnostic => diagnostic.Span.Start)
+                .ThenBy(diagnostic => diagnostic.Message, StringComparer.Ordinal).ToImmutableArray());
+
+        void Visit(WorkspaceTypeGraphKey key)
+        {
+            if (state.GetValueOrDefault(key) != 0)
+                return;
+            state[key] = 1;
+            stack.Add(key);
+            if (edges.TryGetValue(key, out var next))
+            {
+                if (state.GetValueOrDefault(next) == 0)
+                    Visit(next);
+                else if (state.GetValueOrDefault(next) == 1)
+                {
+                    var start = stack.FindIndex(item => item == next);
+                    if (start >= 0)
+                        ReportCycle(stack.Skip(start).ToArray());
+                }
+            }
+            stack.RemoveAt(stack.Count - 1);
+            state[key] = 2;
+        }
+
+        void ReportCycle(IReadOnlyList<WorkspaceTypeGraphKey> cycleKeys)
+        {
+            if (cycleKeys.Count == 0)
+                return;
+            var cycle = cycleKeys.Select(key => byKey[key]).ToArray();
+            var start = Enumerable.Range(0, cycle.Length)
+                .OrderBy(index => cycle[index].Key.DisplayName, StringComparer.Ordinal)
+                .ThenBy(index => cycle[index].Key.NamespaceIdentity, StringComparer.Ordinal).First();
+            var ordered = Enumerable.Range(0, cycle.Length)
+                .Select(offset => cycle[(start + offset) % cycle.Length]).ToArray();
+            var description = string.Join(" -> ", ordered.Select(item => item.Key.DisplayName)
+                .Append(ordered[0].Key.DisplayName));
+            var message = $"Inheritance cycle detected: {description}.";
+            foreach (var node in ordered)
+            {
+                foreach (var part in node.Parts.OrderBy(item => item.Document.Document.Uri.ToString(), StringComparer.Ordinal)
+                             .ThenBy(item => item.Node.Span.Start))
+                {
+                    var uri = DocumentUri.From(part.Document.Document.Uri);
+                    if (!diagnostics.TryGetValue(uri, out var documentDiagnostics))
+                    {
+                        documentDiagnostics = [];
+                        diagnostics.Add(uri, documentDiagnostics);
+                    }
+                    documentDiagnostics.Add(new Calor.Compiler.Diagnostics.Diagnostic(
+                        Calor.Compiler.Diagnostics.DiagnosticCode.InheritanceCycle,
+                        message,
+                        part.Node.BaseClassSpan ?? part.Node.IdentifierSpan,
+                        Calor.Compiler.Diagnostics.DiagnosticSeverity.Error,
+                        part.Document.Document.Uri.IsFile ? part.Document.Document.Uri.LocalPath : part.Document.Document.Uri.ToString()));
+                }
+            }
+        }
+    }
+
+    private static WorkspaceTypeLookup BuildWorkspaceTypeLookup(
+        IReadOnlyList<WorkspaceDocumentSnapshot> documents)
+    {
         var declarationParts = documents
             .SelectMany(GetTypeDeclarations)
             .OrderBy(item => item.Identity.Value, StringComparer.Ordinal)
@@ -2016,38 +2097,17 @@ public sealed class WorkspaceState
             .ToDictionary(
                 group => group.Key,
                 CreateResolution);
-        var edges = new Dictionary<
-            WorkspaceTypeGraphKey,
-            WorkspaceTypeGraphKey>();
-        foreach (var node in nodes.Where(item => !item.IsAmbiguous))
-        {
-            if (node.BaseClass is not { } reference)
-                continue;
-
-            var resolution = ResolveBaseType(node, reference);
-            if (resolution.Kind == WorkspaceTypeResolutionKind.Found)
-                edges[node.Key] = resolution.Node!.Key;
-        }
-
-        var state = new Dictionary<WorkspaceTypeGraphKey, int>();
-        var stack = new List<WorkspaceTypeGraphKey>();
-        var diagnostics = new Dictionary<
-            DocumentUri,
-            List<Calor.Compiler.Diagnostics.Diagnostic>>();
-        foreach (var node in nodes.Where(item => !item.IsAmbiguous))
-            Visit(node.Key);
-
-        return diagnostics.ToImmutableDictionary(
-            pair => pair.Key,
-            pair => pair.Value
-                .OrderBy(diagnostic => diagnostic.Span.Start)
-                .ThenBy(diagnostic => diagnostic.Message, StringComparer.Ordinal)
-                .ToImmutableArray());
+        return new WorkspaceTypeLookup(nodes, ResolveBaseType);
 
         WorkspaceTypeResolution ResolveBaseType(
             WorkspaceTypeGraphNode source,
             WorkspaceTypeReference reference)
         {
+            if (reference.IsGlobal)
+            {
+                return ResolveLookup(byNamespaceQualifiedName,
+                    new WorkspaceTypeLookupKey(reference.Name, reference.Arity));
+            }
             var containingPath = source.Key.ContainingTypePath;
             while (true)
             {
@@ -2081,19 +2141,18 @@ public sealed class WorkspaceState
             if (namespaceQualified.Kind != WorkspaceTypeResolutionKind.NotFound)
                 return namespaceQualified;
 
+            if (reference.Name.Contains('.', StringComparison.Ordinal))
+                return new WorkspaceTypeResolution(WorkspaceTypeResolutionKind.NotFound, null);
+
             var qualified = ResolveLookup(byUnqualifiedName, lookup);
             if (qualified.Kind != WorkspaceTypeResolutionKind.NotFound)
                 return qualified;
 
-            return reference.Name.Contains('.', StringComparison.Ordinal)
-                ? new WorkspaceTypeResolution(
-                    WorkspaceTypeResolutionKind.NotFound,
-                    null)
-                : ResolveLookup(
-                    bySimpleName,
-                    new WorkspaceTypeLookupKey(
-                        reference.SimpleName,
-                        reference.Arity));
+            return ResolveLookup(
+                bySimpleName,
+                new WorkspaceTypeLookupKey(
+                    reference.SimpleName,
+                    reference.Arity));
         }
 
         WorkspaceTypeResolution ResolveImports(
@@ -2169,85 +2228,6 @@ public sealed class WorkspaceState
                 : new WorkspaceTypeResolution(
                     WorkspaceTypeResolutionKind.Ambiguous,
                     null);
-        }
-
-        void Visit(WorkspaceTypeGraphKey key)
-        {
-            if (state.GetValueOrDefault(key) == 2)
-                return;
-            if (state.GetValueOrDefault(key) == 1)
-                return;
-
-            state[key] = 1;
-            stack.Add(key);
-            if (edges.TryGetValue(key, out var next))
-            {
-                if (state.GetValueOrDefault(next) == 0)
-                {
-                    Visit(next);
-                }
-                else if (state.GetValueOrDefault(next) == 1)
-                {
-                    var start = stack.FindIndex(item =>
-                        item == next);
-                    if (start >= 0)
-                        ReportCycle(stack.Skip(start).ToArray());
-                }
-            }
-            stack.RemoveAt(stack.Count - 1);
-            state[key] = 2;
-        }
-
-        void ReportCycle(IReadOnlyList<WorkspaceTypeGraphKey> cycleKeys)
-        {
-            if (cycleKeys.Count == 0)
-                return;
-
-            var cycle = cycleKeys
-                .Select(key => byKey[key])
-                .ToArray();
-            var start = Enumerable.Range(0, cycle.Length)
-                .OrderBy(
-                    index => cycle[index].Key.DisplayName,
-                    StringComparer.Ordinal)
-                .ThenBy(
-                    index => cycle[index].Key.NamespaceIdentity,
-                    StringComparer.Ordinal)
-                .First();
-            var ordered = Enumerable.Range(0, cycle.Length)
-                .Select(offset => cycle[(start + offset) % cycle.Length])
-                .ToArray();
-            var description = string.Join(
-                " -> ",
-                ordered.Select(item => item.Key.DisplayName)
-                    .Append(ordered[0].Key.DisplayName));
-
-            var message = $"Inheritance cycle detected: {description}.";
-            foreach (var node in ordered)
-            {
-                foreach (var part in node.Parts
-                             .OrderBy(
-                                 item => item.Document.Document.Uri.ToString(),
-                                 StringComparer.Ordinal)
-                             .ThenBy(item => item.Node.Span.Start))
-                {
-                    var uri = DocumentUri.From(part.Document.Document.Uri);
-                    if (!diagnostics.TryGetValue(uri, out var documentDiagnostics))
-                    {
-                        documentDiagnostics = [];
-                        diagnostics.Add(uri, documentDiagnostics);
-                    }
-
-                    documentDiagnostics.Add(new Calor.Compiler.Diagnostics.Diagnostic(
-                        Calor.Compiler.Diagnostics.DiagnosticCode.InheritanceCycle,
-                        message,
-                        part.Node.BaseClassSpan ?? part.Node.IdentifierSpan,
-                        Calor.Compiler.Diagnostics.DiagnosticSeverity.Error,
-                        part.Document.Document.Uri.IsFile
-                            ? part.Document.Document.Uri.LocalPath
-                            : part.Document.Document.Uri.ToString()));
-                }
-            }
         }
 
         static WorkspaceTypeGraphNode CreateGraphNode(
@@ -2410,75 +2390,22 @@ public sealed class WorkspaceState
 
         static WorkspaceTypeReference ParseTypeReference(string typeName)
         {
-            var type = typeName.Trim().TrimStart('?');
-            var genericStart = type.IndexOf('<');
-            if (genericStart < 0)
+            var name = TypeIdentity.ToLookupName(typeName);
+            var arity = 0;
+            var tick = name.LastIndexOf('`');
+            if (tick > name.LastIndexOf('.') && tick >= 0
+                && int.TryParse(name.AsSpan(tick + 1), System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out var representedArity))
             {
-                var nominal = GetNominalTypeName(type);
-                var separator = nominal.LastIndexOf('.');
-                return new WorkspaceTypeReference(
-                    nominal,
-                    separator < 0 ? nominal : nominal[(separator + 1)..],
-                    Arity: 0);
-            }
-
-            var name = type[..genericStart].Trim();
-            var genericEnd = type.LastIndexOf('>');
-            if (genericEnd <= genericStart)
-            {
-                var separator = name.LastIndexOf('.');
-                return new WorkspaceTypeReference(
-                    name,
-                    separator < 0 ? name : name[(separator + 1)..],
-                    Arity: 0);
-            }
-
-            var arity = 1;
-            var angleDepth = 0;
-            var parenthesisDepth = 0;
-            var bracketDepth = 0;
-            var braceDepth = 0;
-            for (var index = genericStart + 1; index < genericEnd; index++)
-            {
-                switch (type[index])
-                {
-                    case '<':
-                        angleDepth++;
-                        break;
-                    case '>':
-                        angleDepth--;
-                        break;
-                    case '(':
-                        parenthesisDepth++;
-                        break;
-                    case ')':
-                        parenthesisDepth--;
-                        break;
-                    case '[':
-                        bracketDepth++;
-                        break;
-                    case ']':
-                        bracketDepth--;
-                        break;
-                    case '{':
-                        braceDepth++;
-                        break;
-                    case '}':
-                        braceDepth--;
-                        break;
-                    case ',' when angleDepth == 0
-                        && parenthesisDepth == 0
-                        && bracketDepth == 0
-                        && braceDepth == 0:
-                        arity++;
-                        break;
-                }
+                arity = representedArity;
+                name = name[..tick];
             }
             var lastSeparator = name.LastIndexOf('.');
             return new WorkspaceTypeReference(
                 name,
                 lastSeparator < 0 ? name : name[(lastSeparator + 1)..],
-                arity);
+                arity,
+                typeName.TrimStart().StartsWith("global::", StringComparison.Ordinal));
         }
     }
 
@@ -2515,7 +2442,8 @@ public sealed class WorkspaceState
             return resolved;
 
         var callerContainingType = FindCallerContainingType(caller.Analysis, field);
-        var currentType = GetNominalTypeName(field.Target.Type.DisplayString);
+        var currentType = TypeIdentity.ToLookupName(field.Target.Type.DisplayString);
+        WorkspaceTypeLookup? types = null;
         var visited = new HashSet<string>(StringComparer.Ordinal);
         while (currentType.Length > 0 && visited.Add(currentType))
         {
@@ -2547,10 +2475,10 @@ public sealed class WorkspaceState
             if (candidates.Length > 0)
                 return candidates.Length == 1 ? candidates : Array.Empty<VariableSymbol>();
 
-            var declaration = FindClass(documents, currentType);
-            currentType = declaration?.BaseClass is { Length: > 0 } baseClass
-                ? GetNominalTypeName(baseClass)
-                : string.Empty;
+            types ??= BuildWorkspaceTypeLookup(documents);
+            var declaration = types.FindExact(currentType);
+            currentType = declaration == null ? string.Empty
+                : types.FindBase(declaration)?.Key.MetadataIdentity ?? string.Empty;
         }
 
         return Array.Empty<VariableSymbol>();
