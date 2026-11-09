@@ -1052,6 +1052,39 @@ public class VerificationCacheTests : IDisposable
         Assert.False(entry.IsValidFor("4.12.0"));
     }
 
+    [Theory]
+    [InlineData("null")]
+    [InlineData("true")]
+    [InlineData("false")]
+    public void Cache_PreEscapeIdentityFormatCannotServeMatchingReferenceKeys(string name)
+    {
+        var options = new VerificationCacheOptions { Enabled = true, CacheDirectory = _testCacheDir };
+        var parameters = new[] { (name, "int") };
+        var condition = new RequiresNode(EmptySpan,
+            new BinaryOperationNode(EmptySpan, BinaryOperator.Equal,
+                new ReferenceNode(EmptySpan, name, isVerbatim: true), new IntLiteralNode(EmptySpan, 0)),
+            null, new AttributeCollection());
+        var proven = new ContractVerificationResult(ContractVerificationStatus.Proven);
+        using (var writer = new VerificationCache(options))
+            writer.CachePreconditionResult(parameters, condition, proven);
+
+        var path = Assert.Single(Directory.GetFiles(_testCacheDir, "*.json", SearchOption.AllDirectories));
+        var persisted = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        Assert.Equal(VerificationCacheEntry.CurrentFormatVersion, persisted["version"]!.GetValue<string>());
+        persisted["version"] = "1.22";
+        File.WriteAllText(path, persisted.ToJsonString());
+
+        using (var reader = new VerificationCache(options))
+        {
+            Assert.False(reader.TryGetPreconditionResult(parameters, condition, out var stale));
+            Assert.Null(stale);
+            reader.CachePreconditionResult(parameters, condition, proven);
+        }
+        using var currentReader = new VerificationCache(options);
+        Assert.True(currentReader.TryGetPreconditionResult(parameters, condition, out var current));
+        Assert.Equal(ContractVerificationStatus.Proven, current!.Status);
+    }
+
     [Fact]
     public void Cache_EvictsOldEntriesWhenSizeLimitExceeded()
     {

@@ -95,7 +95,9 @@ public sealed class VerificationCacheEntry
     // int32 range (D2) are refused, and checked arithmetic that can overflow on some input is
     // Assumed even when the preconditions rule it out. Older entries may hold Proven for them.
     // (1.21 is taken by the S2 text-encoding repair, #1497.)
-    public const string CurrentFormatVersion = "1.22";
+    // 1.23: escaped null/true/false names retain symbol identity throughout binding and proof
+    // translation. Their REF keys can match older entries produced with literal-name semantics.
+    public const string CurrentFormatVersion = "1.23";
 
     /// <summary>#778: the compiler-semantics ledger version that produced this entry.
     /// A verdict computed under different compile semantics must not be served, even
