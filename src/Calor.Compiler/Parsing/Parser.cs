@@ -3788,7 +3788,7 @@ public sealed class Parser
         _position = close;
         var typeSpan = typeStart.Union(_tokens[close - 1].Span);
         Advance();
-        var operand = ParseExpression(13);
+        var operand = ParseExpression(15);
         expression = new TypeOperationNode(open.Span.Union(operand.Span),
             TypeOp.Cast, operand, type.ToString(), typeSpan);
         return true;

@@ -6,6 +6,7 @@ using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -68,6 +69,11 @@ public sealed class FinalExpressionGrammarTests
         Assert.IsType<WithExpressionNode>(multiply.Right);
         var clone = Assert.IsType<WithExpressionNode>(Parse("-a with { X = 1 }"));
         Assert.IsType<UnaryOperationNode>(clone.Target);
+        var castClone = Assert.IsType<WithExpressionNode>(Parse("(Item)value with { X = 1 }"));
+        Assert.IsType<TypeOperationNode>(castClone.Target);
+        var reparsedCastClone = Assert.IsType<WithExpressionNode>(Parse(castClone.Accept(new CalorEmitter())));
+        Assert.IsType<TypeOperationNode>(reparsedCastClone.Target);
+        Assert.IsType<WithExpressionSyntax>(SyntaxFactory.ParseExpression(castClone.Accept(new CSharpEmitter())));
         var conditional = Assert.IsType<ConditionalExpressionNode>(Parse("flag ? a with { X = 1 } : b"));
         Assert.IsType<WithExpressionNode>(conditional.WhenTrue);
     }
