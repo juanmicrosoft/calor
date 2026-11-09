@@ -12,6 +12,54 @@ from unittest.mock import patch
 import registered_ledger_historical_replay as replay
 
 
+class ArchivedCloserReplayTests(unittest.TestCase):
+    def test_requires_all_original_names_and_exact_passing_counters(self):
+        expected = {f"Calor.Compiler.Tests.Archive.T_case_{i}" for i in range(23)}
+        for fault in (None, "empty-run", "skipped", "failed", "wrong-test", "duplicate",
+                      "missing-summary", "bad-counters", "bad-outcome"):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temporary:
+                path = Path(temporary) / "result.trx"
+                names = sorted(expected)
+                if fault == "empty-run":
+                    names = []
+                elif fault == "wrong-test":
+                    names[0] = "Unrelated.Test"
+                elif fault == "duplicate":
+                    names[0] = names[1]
+                outcome = "NotExecuted" if fault == "skipped" else "Failed" if fault == "failed" else "Passed"
+                rows = "".join(f'<UnitTestResult testName="{name}" outcome="{outcome}" />' for name in names)
+                summary = "" if fault == "missing-summary" else (
+                    f'<ResultSummary outcome="{"Failed" if fault == "bad-outcome" else "Completed"}">'
+                    f'<Counters total="{"24" if fault == "bad-counters" else "23"}" executed="23" passed="23" '
+                    'failed="0" error="0" timeout="0" notExecuted="0" /></ResultSummary>')
+                path.write_text(
+                    '<TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">'
+                    f'<Results>{rows}</Results>{summary}</TestRun>', encoding="utf-8",
+                )
+                if fault is None:
+                    replay.verify_archived_closer_results(path, expected)
+                    with self.assertRaisesRegex(ValueError, "all 23 original"):
+                        replay.verify_archived_closer_results(path, set())
+                else:
+                    with self.assertRaises(ValueError):
+                        replay.verify_archived_closer_results(path, expected)
+
+    def test_regeneration_and_missing_history_fail_before_build(self):
+        self.assertEqual("d82f3ae95175ecd09581c6922701706be72b0ca9", replay.ARCHIVED_CLOSER_COMPILER)
+        for flag in ("CALOR_UPDATE_ANYTHING", "CALOR_REGENERATE_ANYTHING"):
+            with patch.dict(os.environ, {flag: "1"}, clear=True):
+                with patch.object(replay, "require_commit") as require:
+                    with self.assertRaisesRegex(ValueError, "forbids regeneration"):
+                        replay.replay_archived_closers()
+                    require.assert_not_called()
+        with patch.dict(os.environ, {}, clear=True):
+            with patch.object(replay, "git", side_effect=subprocess.CalledProcessError(128, "git")):
+                with patch.object(replay, "run_dotnet") as run:
+                    with self.assertRaisesRegex(ValueError, "fetch full history"):
+                        replay.replay_archived_closers()
+                    run.assert_not_called()
+
+
 class TranslatorReplayTests(unittest.TestCase):
     def test_requires_exact_summary_as_well_as_one_passing_result(self):
         with tempfile.TemporaryDirectory() as temporary:

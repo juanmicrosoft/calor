@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replay registered regression artifacts with their original producer trees."""
+"""Replay regression artifacts and archived migrations with their original compilers."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import runpy
 import shutil
 import subprocess
@@ -69,6 +70,80 @@ TRANSLATOR_PRODUCER = "452afeb29e7bfbd5aff892336de722e79ca3c157"
 TRANSLATOR_TEST = "Calor.Verification.Tests.ContractTranslatorSemanticsVersionGuardTests.TranslatorOutputMatchesCommittedBaseline"
 TRANSLATOR_GUARD = "tests/Calor.Verification.Tests/ContractTranslatorSemanticsVersionGuardTests.cs"
 DETERMINISM_CASES = "tests/TestData/DeterminismProtocol/cases.json"
+ARCHIVED_CLOSER_COMPILER = "d82f3ae95175ecd09581c6922701706be72b0ca9"
+ARCHIVED_CLOSER_CLASSES = ("CallCloserEliderTests", "CloserHealMigratorTests")
+
+
+def verify_archived_closer_results(path: Path, expected: set[str]) -> None:
+    document = ET.parse(path)
+    results = document.findall(".//{*}UnitTestResult")
+    if len(expected) != 23 or len(results) != len(expected) \
+            or {row.get("testName") for row in results} != expected \
+            or any(row.get("outcome") != "Passed" for row in results):
+        raise ValueError("archived closer replay requires all 23 original named tests to pass; no skips/empty runs")
+    summary = document.find("./{*}ResultSummary")
+    counters = document.find("./{*}ResultSummary/{*}Counters")
+    if summary is None or summary.get("outcome") != "Completed" or counters is None \
+            or any(counters.get(key) != "23" for key in ("total", "executed", "passed")) \
+            or any(counters.get(key) != "0" for key in ("failed", "error", "timeout", "notExecuted")) \
+            or any(value != "0" for key, value in counters.attrib.items()
+                   if key not in ("total", "executed", "passed")):
+        raise ValueError("archived closer replay requires exact 23 pass / 0 skips / 0 failures counters")
+
+
+def replay_archived_closers() -> None:
+    if any(key.upper().startswith(("CALOR_UPDATE_", "CALOR_REGENERATE_")) and value
+           for key, value in os.environ.items()):
+        raise ValueError("archived closer replay forbids regeneration flags")
+    require_commit(ARCHIVED_CLOSER_COMPILER)
+    verifier = ROOT / "scripts/verify-z3-assets.py"
+    subprocess.run([sys.executable, str(verifier)], check=True, timeout=60)
+    with tempfile.TemporaryDirectory(prefix="calor-archived-closers-") as temporary:
+        scratch = Path(temporary)
+        archive = scratch / "source.tar"
+        git("archive", "--format=tar", f"--output={archive}", ARCHIVED_CLOSER_COMPILER)
+        source = scratch / "source"
+        extract_archive(archive, source)
+        expected = set()
+        original_tests = {}
+        for name in ARCHIVED_CLOSER_CLASSES:
+            relative = f"tests/Calor.Compiler.Tests/Migration/{name}.cs"
+            original = git("show", f"{ARCHIVED_CLOSER_COMPILER}:{relative}")
+            if (source / relative).read_bytes() != original:
+                raise ValueError(f"{relative}: archived tests differ from their original compiler")
+            original_tests[relative] = original
+            expected.update(f"Calor.Compiler.Tests.{name}.{method}"
+                            for method in re.findall(r"public void (T_\w+)\(\)", original.decode("utf-8")))
+        for manifest in (
+            ".github/z3-binaries-4.15.7.sha256",
+            "src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256",
+        ):
+            if (ROOT / manifest).read_bytes() != (source / manifest).read_bytes():
+                raise ValueError(f"{manifest}: assets differ from the archived closer compiler")
+        for relative in runpy.run_path(str(verifier))["ASSET_PATHS"].values():
+            destination = source / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / relative, destination)
+        subprocess.run(
+            [sys.executable, str(source / "scripts/verify-z3-assets.py")], check=True, timeout=60,
+        )
+        environment = os.environ.copy()
+        environment["LC_ALL"] = "C"
+        environment["CALOR_HOME"] = str(scratch / "empty-calor-home")
+        Path(environment["CALOR_HOME"]).mkdir()
+        project = "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj"
+        print(f"archived closer replay: compiler {ARCHIVED_CLOSER_COMPILER}", flush=True)
+        run_dotnet(["restore", project, "--locked-mode"], source, environment, timeout=300)
+        run_dotnet(
+            ["test", project, "--no-restore", "--filter",
+             "|".join(f"FullyQualifiedName~Calor.Compiler.Tests.{name}" for name in ARCHIVED_CLOSER_CLASSES),
+             "--logger", "trx;LogFileName=historical.trx", "--results-directory", str(scratch / "results")],
+            source, environment, timeout=600,
+        )
+        verify_archived_closer_results(scratch / "results/historical.trx", expected)
+        for relative, original in original_tests.items():
+            if (source / relative).read_bytes() != original:
+                raise ValueError(f"{relative}: historical replay changed its original tests")
 
 
 def verify_result(path: Path, test: str, *, strict: bool = False) -> None:
@@ -308,7 +383,7 @@ def replay(name: str) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("ledger", choices=[*REPLAYS, "translator"])
+    parser.add_argument("ledger", choices=[*REPLAYS, "translator", "archived-closers"])
     parser.add_argument("--record-dir", type=Path)
     args = parser.parse_args()
     try:
@@ -316,6 +391,10 @@ if __name__ == "__main__":
             if args.record_dir is None:
                 raise ValueError("translator replay requires --record-dir")
             replay_translator(args.record_dir)
+        elif args.ledger == "archived-closers":
+            if args.record_dir is not None:
+                raise ValueError("--record-dir is only valid for translator replay")
+            replay_archived_closers()
         else:
             if args.record_dir is not None:
                 raise ValueError("--record-dir is only valid for translator replay")

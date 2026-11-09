@@ -35,6 +35,25 @@ Select exactly one operation; they cannot be combined with `--apply`:
 | `--heal-closers` | Remove legacy structural closers so blocks end by dedenting. |
 | `--elide-call-closers` | Elide optional `§/C` on supported same-line calls. |
 
+These modes describe archived section-tag syntax, not native-source conversion.
+`--heal-closers` removes only structural closing tags; the remaining archived
+headers and expressions still fail today's lexer. Call elision needs a compiler
+that accepts the archive: today's `--elide-call-closers` rejects retired syntax,
+returns a nonzero exit code, and leaves the source and any existing recovery log
+unchanged.
+
+The original 23 elision/healing tests run unchanged with their recorded compiler:
+
+```bash
+python3 scripts/registered_ledger_historical_replay.py archived-closers
+```
+
+This replay builds compiler `d82f3ae95175ecd09581c6922701706be72b0ca9` from Git
+history, requires .NET 10 and verified Z3 assets, and fails on missing history,
+failed tests, or skipped/empty results. It does not enable legacy syntax in the
+current compiler. The compiler test suite marks this replay `HistoricalReplay`;
+current byte-preservation and retired-syntax rejection tests run separately.
+
 `--drop-structural-ids` and `--compact-ids` have been removed. They are not
 compatibility options.
 

@@ -22,7 +22,7 @@ namespace Calor.Compiler.Tests;
 ///   T-heal-g  round-trip (heal → revert via byte log) is byte-equal
 ///   T-heal-h  round-trip is byte-equal with Unicode-before + CRLF
 ///   T-heal-i  no closers → no edits, no log entries
-///   T-heal-j  healed source re-parses with no Calor0830 and no errors
+///   T-heal-j  healed archives still require their original compiler
 ///   T-heal-k  idempotent: healing twice = healing once
 /// </summary>
 public class CloserHealMigratorTests
@@ -30,14 +30,14 @@ public class CloserHealMigratorTests
     private static readonly CloserHealMigrator Sut = new();
 
     private const string CloserModule =
-        "§M{Calc}\n" +
-        "  §F{Add:pub}\n" +
+        "§M{m1:Calc}\n" +
+        "  §F{f1:Add:pub}\n" +
         "    §I{i32:a}\n" +
         "    §I{i32:b}\n" +
         "    §O{i32}\n" +
         "    §R (+ a b)\n" +
-        "  §/F\n" +
-        "§/M\n";
+        "  §/F{f1}\n" +
+        "§/M{m1}\n";
 
     [Fact]
     public void T_heal_a_RemovesBareStructuralClosers()
@@ -59,8 +59,9 @@ public class CloserHealMigratorTests
         Assert.Equal(2, removals.Count);
         Assert.DoesNotContain("§/F", migrated);
         Assert.DoesNotContain("§/M", migrated);
-        // Payload braces went with the closer.
-        Assert.DoesNotContain("{f1}\n", migrated.Replace("§F{f1", ""));
+        Assert.Contains("§F{f1:Add:pub}", migrated);
+        Assert.DoesNotContain("§/F{f1}", migrated);
+        Assert.DoesNotContain("§/M{m1}", migrated);
     }
 
     [Fact]
@@ -157,13 +158,14 @@ public class CloserHealMigratorTests
     }
 
     [Fact]
-    public void T_heal_j_HealedSourceReparsesCleanly()
+    public void T_heal_j_HealedArchiveStillRequiresItsOriginalCompiler()
     {
         var (migrated, _) = Sut.Process(CloserModule, "j.calr");
         var (diags, hasErrors) = Parse(migrated);
 
         Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.LegacyCloserForm);
-        Assert.False(hasErrors, "Healed source must parse without errors");
+        Assert.True(hasErrors, "Removing structural closers must not enable retired source syntax");
+        Assert.Contains(diags, d => d.Code == DiagnosticCode.UnknownSectionMarker);
     }
 
     [Fact]
