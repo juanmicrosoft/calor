@@ -68,6 +68,11 @@ public class DocDriftCheckerTests
         new[] { "StringBasics", "StringComparisons", "TextTools", "Receipt" },
         new[] { "11:HELLO WORLD:ell:hello Calor", "True:True:6:True", "True:True:Cat", "coffee  |      3.50|7.0:${x}" },
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()" })]
+    [InlineData("contracts.mdx", 4, 0,
+        new[] { "ContractDivide", "AbsoluteValue", "ContractClamp", "NonEmptyCollection" },
+        new[] { "4", "5", "15", "42" },
+        new[] { "GlobalModule.Divide(9, 2)", "GlobalModule.Abs(-5)", "GlobalModule.Main()",
+            "GlobalModule.First(new int[] { 42 })" })]
     public void PublicNativeReference_CompilesPositiveAndExactNegativeExamples(
         string page, int completeCount, int negativeCount, string[] moduleNames, string[] expectedResults,
         string[] expressions)
@@ -139,6 +144,35 @@ public class DocDriftCheckerTests
             }
             """);
         Assert.Equal(expected, observed);
+    }
+
+    [Theory]
+    [InlineData("ContractDivide", "GlobalModule.Divide(9, 0)", "!ContractViolationException", "!DivideByZeroException")]
+    [InlineData("ContractDivide", "GlobalModule.Divide(-1, 1)", "!ContractViolationException", "-1")]
+    [InlineData("ContractClamp", "GlobalModule.Clamp(4, 10, 0)", "!ContractViolationException", "10")]
+    [InlineData("NonEmptyCollection", "GlobalModule.First(System.Array.Empty<int>())",
+        "!ContractViolationException", "!IndexOutOfRangeException")]
+    [InlineData("AbsoluteValue", "GlobalModule.Abs(int.MinValue)", "!OverflowException", "!OverflowException")]
+    public void PublicContracts_SeparateEnabledGuardsFromBodyBehavior(
+        string module, string expression, string enabled, string disabled)
+    {
+        var path = "website/content/syntax-reference/contracts.mdx";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path));
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(content)
+            .Single(program => program.Source.StartsWith("module " + module + "\n", StringComparison.Ordinal)).Source;
+        foreach (var (mode, expected) in new[] { (ContractMode.Debug, enabled), (ContractMode.Off, disabled) })
+        {
+            var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = mode });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run() => {{expression}};
+                }
+                """);
+            Assert.Equal(expected, observed);
+        }
     }
 
     [Fact]

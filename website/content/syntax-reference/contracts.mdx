@@ -4,253 +4,126 @@ section: "syntax-reference"
 order: 5
 ---
 
-
-Contracts are first-class citizens in Calor. They define what a function requires (preconditions) and guarantees (postconditions).
-
-Contract verification has seven explicit outcomes: `proven`, `refuted`,
-`assumed`, `unknown`, `timeout`, `unsupported`, and `unavailable`. Since
-0.15, `--verify` removes the runtime guard by default — but only for a clean,
-non-vacuous, assumption-free `proven` postcondition. `assumed` and every
-inconclusive status never authorize proof-based removal. Pass
-`--keep-proven-guards` to retain otherwise-emitted guards and use verification
-as a diagnostic only. `--contract-mode off` emits no contract checks; enabled
-checks still require supported runtime lowering. See
-[verification modes and limits](/docs/guides/verification-guarantees/).
-
-Runtime quantifiers preserve their full predicate and require certified typed
-bounds and evaluation order. Unsupported requested lowering is a fatal
-`Calor0326`, even when proof-based guard removal would otherwise be possible.
-See [runtime quantifier limits](/docs/guides/verification-guarantees/#runtime-quantifier-limits).
-
----
-
-## Preconditions (`§Q`)
-
-Preconditions specify what must be true when calling a function.
-
-### Syntax
+Contracts state what a function requires from its caller and what it guarantees
+on a normal return. Write preconditions with `requires` and postconditions with
+`=>`, before the first body statement.
 
 ```calor
-§Q condition
-§Q{message="error text"} condition
+module ContractDivide
+  func Divide (int:dividend, int:divisor) → int
+    !
+    requires divisor > 0
+    requires dividend >= 0
+    => result >= 0
+    => result <= dividend
+    return dividend / divisor
 ```
 
-### Examples
+`Divide(9, 2)` returns `4`. Both input conditions are needed: allowing a negative
+divisor would contradict the promised non-negative result.
+
+## Preconditions
+
+Each `requires` line is an ordinary Boolean expression over the function's
+inputs. Multiple lines must all hold. With runtime checks enabled, a failed
+precondition throws `Calor.Runtime.ContractViolationException` before the body
+runs. For example, `Divide(9, 0)` fails its precondition rather than reaching
+integer division.
+
+Contracts do not replace the implementation or automatically prove every call
+safe. A runtime test that exercises a guard is not a verifier proof.
+
+## Postconditions and `result`
+
+In a postcondition, `result` denotes the value the body returns, not a local
+variable to declare or assign. A postcondition is checked on a normal return
+when its runtime guard is enabled. It does not promise that the body cannot
+throw.
 
 ```calor
-§Q (>= x 0)                              // x must be non-negative
-§Q (!= divisor 0)                        // divisor must not be zero
-§Q{message="Age must be positive"} (> age 0)
+module AbsoluteValue
+  func Abs (int:x) → int
+    !
+    => result >= 0
+    if x >= 0
+      return x
+    return 0 - x
 ```
 
-### Multiple Preconditions
+`Abs(-5)` returns `5`. The default checked integer arithmetic throws
+`OverflowException` for `Abs(int.MinValue)`; that execution does not reach a
+normal return or establish the postcondition.
 
-Functions can have multiple preconditions:
+## Range validation
+
+Separate a valid input range from the promised result range.
 
 ```calor
-§F{CreateUser:pub}
-  §I{str:name}
-  §I{i32:age}
-  §O{User}
-  §Q (!= name "")                        // name not empty
-  §Q (> (len name) 2)                    // name at least 3 chars
-  §Q (>= age 0)                          // age non-negative
-  §Q (<= age 150)                        // age reasonable
-  // ...
+module ContractClamp
+  func Clamp (int:value, int:min, int:max) → int
+    !
+    requires min <= max
+    => result >= min
+    => result <= max
+    if value < min
+      return min
+    if value > max
+      return max
+    return value
+
+  func Main () → int
+    !
+    return Clamp(-3, 0, 10) + Clamp(15, 0, 10) + Clamp(5, 0, 10)
 ```
 
----
+`Main()` returns `15`. An inverted range violates the precondition; it is not
+silently repaired.
 
-## Postconditions (`§S`)
+## Non-empty collections
 
-Postconditions specify what the function guarantees when it returns.
-
-### Syntax
+Use the actual collection type and its members in the contract.
 
 ```calor
-§S condition
-§S{message="error text"} condition
+module NonEmptyCollection
+  func First (int[]:items) → int
+    !
+    requires items.Length > 0
+    => result == items[0]
+    return items[0]
 ```
 
-### The `result` Variable
+`First(new int[] { 42 })` returns `42`. With checks enabled, an empty array
+fails the precondition before indexing. The declared input is non-null; a
+nullable input would need its own null guard before reading `Length`.
 
-In postconditions, `result` refers to the return value:
+## Runtime modes and verification
 
-```calor
-§S (>= result 0)                         // result is non-negative
-§S (!= result null)                      // result is not null
-§S (== result (* x x))                   // result equals x squared
-```
+`--contract-mode debug` emits detailed runtime checks. `release` emits leaner
+checks; `off` emits none. Turning checks off does not make invalid inputs valid,
+prove a contract or prevent exceptions from the body.
 
-### Examples
+The verifier reports `proven`, `refuted`, `assumed`, `unknown`, `timeout`,
+`unsupported` or `unavailable`. Only a clean, non-vacuous, assumption-free
+`proven` postcondition is eligible for proof-based runtime-guard removal with
+`--verify`. Pass `--keep-proven-guards` to retain otherwise-emitted guards.
+An inconclusive result does not authorize removal.
 
-```calor
-§F{Abs:pub}
-  §I{i32:x}
-  §O{i32}
-  §S (>= result 0)                       // absolute value is non-negative
-  §IF (>= x 0)
-    §R x
-  §EL
-    §R (- 0 x)
-```
+Runtime lowering has its own support boundary. Requested unsupported lowering,
+including uncertified quantified checks, fails rather than silently dropping a
+guard. See [verification guarantees and limits](/docs/guides/verification-guarantees/).
 
----
+## Declaration order and failure messages
 
-## Complete Contract Example
+Put the signature first, followed by effect and contract lines, then the body.
+Keep contracts above the first statement; they are declaration clauses, not
+statements to execute in the middle of a function.
 
-```calor
-§F{Divide:pub}
-  §I{i32:dividend}
-  §I{i32:divisor}
-  §O{i32}
+The native `requires` form does not have a custom-message clause. When an API
+needs a particular exception type and message, use an explicit condition and
+exception in the body rather than inventing a contract attribute.
 
-  // Preconditions
-  §Q (!= divisor 0)                      // can't divide by zero
-  §Q{message="Dividend must be non-negative"} (>= dividend 0)
+## Related references
 
-  // Postconditions
-  §S (>= result 0)                       // result is non-negative
-  §S (<= result dividend)                // result doesn't exceed dividend
-
-  §R (/ dividend divisor)
-```
-
----
-
-## Contract Patterns
-
-### Range Validation
-
-```calor
-§F{Clamp:pub}
-  §I{i32:value}
-  §I{i32:min}
-  §I{i32:max}
-  §O{i32}
-  §Q (<= min max)                        // valid range
-  §S (>= result min)                     // result at least min
-  §S (<= result max)                     // result at most max
-  // ...
-```
-
-### Non-Empty Collection
-
-```calor
-§F{First:pub}
-  §I{List:items}
-  §O{?Item}
-  §Q (> (count items) 0)                 // list not empty
-  §S (!= result null)                    // result exists
-  // ...
-```
-
-### State Preservation
-
-```calor
-§F{Increment:pub}
-  §I{i32:x}
-  §O{i32}
-  §S (== result (+ x 1))                 // result is exactly x + 1
-  §R (+ x 1)
-```
-
-### Balance Transfers
-
-```calor
-§F{Transfer:pub}
-  §I{Account:from}
-  §I{Account:to}
-  §I{i32:amount}
-  §O{void}
-  §E{db:rw}
-  §Q (> amount 0)                        // positive amount
-  §Q (>= from.balance amount)            // sufficient funds
-  // Balance conservation would be expressed if Calor supported old_ values
-  // ...
-```
-
----
-
-## Why First-Class Contracts?
-
-### 1. For Agent Comprehension
-
-An agent can understand function behavior without reading implementation:
-
-```calor
-§F{SquareRoot:pub}
-  §I{f64:x}
-  §O{f64}
-  §Q (>= x 0)                            // Only works for non-negative
-  §S (>= result 0)                       // Result is non-negative
-  §S (<= (- (* result result) x) 0.0001) // result^2 ≈ x
-  // ...
-```
-
-### 2. For Bug Detection
-
-Contracts surface violations at call sites:
-
-```calor
-// If an agent sees this call:
-§C{SquareRoot} §A -5 §/C
-
-// It can immediately flag: violates §Q (>= x 0)
-```
-
-### 3. For Test Generation
-
-Contracts provide test oracle:
-
-- Generate inputs satisfying preconditions
-- Verify outputs satisfy postconditions
-
----
-
-## Custom Error Messages
-
-Add context to failures:
-
-```calor
-§Q{message="User ID must be positive"} (> userId 0)
-§Q{message="Email cannot be empty"} (!= email "")
-§S{message="Password hash must be 64 chars"} (== (len hash) 64)
-```
-
----
-
-## Contract Ordering
-
-Recommended order in function definition:
-
-```calor
-§F{name:vis}
-  §I{...}           // 1. Inputs
-  §O{...}           // 2. Output
-  §E{...}           // 3. Effects (optional)
-  §Q ...            // 4. Preconditions (0 or more)
-  §S ...            // 5. Postconditions (0 or more)
-  // body           // 6. Implementation
-```
-
----
-
-## See Also: Refinement Types
-
-Contracts define what a function requires and guarantees. **Refinement types**
-extend this idea to the type level — instead of writing `§Q (>= x 0)` at the
-function, you declare `§I{i32:x} | (>= # INT:0)` on the parameter itself. The
-constraint becomes part of the type and the obligation engine analyzes it.
-Refinement obligations are compile-time analysis only; they do not emit runtime
-guards.
-
-- [Verification guarantees and limits](/docs/guides/verification-guarantees/) — The proof boundary and runtime-check rules
-- [Refinement Types](/docs/syntax-reference/refinement-types/) — Type-level constraints with `§RTYPE`, inline `|`, and `§PROOF`
-- [Dependent Types Tutorial](/docs/guides/dependent-types-tutorial/) — Progressive walkthrough
-
----
-
-## Next
-
-- [Effects](/docs/syntax-reference/effects/) - Declaring side effects
+- [Types](/docs/syntax-reference/types/) — arrays, nullable inputs and exceptions
+- [Effects](/docs/syntax-reference/effects/) — declarations for side effects
+- [Verification guarantees](/docs/guides/verification-guarantees/) — proof outcomes and guard removal
