@@ -24,8 +24,8 @@ def load(name, path):
 
 
 def main():
-    if sys.argv[1:] not in ([], ["--control-flow"], ["--remaining-control-flow"], ["--basic-syntax"], ["--contract-writing"], ["--native-prerequisite"], ["--enums"], ["--idioms"], ["--generics"], ["--strings"], ["--collections"], ["--scalar-patterns"], ["--oop"], ["--type-arithmetic"], ["--carriers"], ["--async-functions"], ["--effects-system"], ["--carrier-patterns"], ["--refactoring"]):
-        raise RuntimeError("Usage: test-logic-old-release.py [--control-flow|--remaining-control-flow|--basic-syntax|--contract-writing|--native-prerequisite|--enums|--idioms|--generics|--strings|--collections|--scalar-patterns|--oop|--type-arithmetic|--carriers|--async-functions|--effects-system|--carrier-patterns|--refactoring]")
+    if sys.argv[1:] not in ([], ["--control-flow"], ["--remaining-control-flow"], ["--basic-syntax"], ["--contract-writing"], ["--native-prerequisite"], ["--enums"], ["--idioms"], ["--generics"], ["--strings"], ["--collections"], ["--scalar-patterns"], ["--oop"], ["--type-arithmetic"], ["--carriers"], ["--async-functions"], ["--effects-system"], ["--carrier-patterns"], ["--refactoring"], ["--lambdas-delegates"]):
+        raise RuntimeError("Usage: test-logic-old-release.py [--control-flow|--remaining-control-flow|--basic-syntax|--contract-writing|--native-prerequisite|--enums|--idioms|--generics|--strings|--collections|--scalar-patterns|--oop|--type-arithmetic|--carriers|--async-functions|--effects-system|--carrier-patterns|--refactoring|--lambdas-delegates]")
     verifier = load("verify_logic", HERE / "lib/verify-logic.py")
     controls = load("logic_controls", HERE / "test-logic-verifiers.py")
     current = controls.COMPILER_ROOT
@@ -34,7 +34,7 @@ def main():
         raise RuntimeError(f"Build the selected current compiler first: {current}")
     deadline = time.monotonic() + 600
     def bootstrap_deadline():
-        return min(deadline, time.monotonic() + 120) if sys.argv[1:] in (["--carriers"], ["--carrier-patterns"]) else deadline
+        return min(deadline, time.monotonic() + 120) if sys.argv[1:] in (["--carriers"], ["--carrier-patterns"], ["--lambdas-delegates"]) else deadline
 
     with tempfile.TemporaryDirectory(prefix="calor-v029-compatibility-") as temporary:
         directory = Path(temporary)
@@ -55,7 +55,7 @@ def main():
         print(verifier.run([sys.executable, "scripts/verify-z3-assets.py"], old, bootstrap_deadline()), end="")
         print(verifier.run([
             "dotnet", "restore", "src/Calor.Compiler/Calor.Compiler.csproj", "--locked-mode",
-            *(["--source", str(Path.home() / ".nuget/packages")] if sys.argv[1:] in (["--carrier-patterns"], ["--refactoring"]) else []),
+            *(["--source", str(Path.home() / ".nuget/packages")] if sys.argv[1:] in (["--carrier-patterns"], ["--refactoring"], ["--lambdas-delegates"]) else []),
             "--disable-build-servers", "-p:UseSharedCompilation=false", "-nodeReuse:false", "-v", "quiet",
         ], old, bootstrap_deadline()), end="")
         print(verifier.run([
@@ -126,6 +126,10 @@ def main():
         if sys.argv[1:] == ["--carrier-patterns"]:
             patterns = load("carrier_pattern_controls", HERE / "test-carrier-pattern-verifiers.py")
             patterns.run_compatibility(old, current, deadline)
+            return
+        if sys.argv[1:] == ["--lambdas-delegates"]:
+            lambdas = load("lambda_controls", HERE / "test-lambda-verifiers.py")
+            lambdas.run_compatibility(old, current, deadline)
             return
         if sys.argv[1:] == ["--enums"]:
             enums = load("enum_controls", HERE / "test-enum-verifiers.py")

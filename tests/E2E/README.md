@@ -381,6 +381,91 @@ not skips. No historical files or ledgers are changed. This is a v0.29
 compatibility control, not a selection of the final experimental baseline,
 an agent run, or agent nonregression evidence.
 
+## Lambda, delegate, and event task admission
+
+The original `lam-001` through `lam-004` wrappers now use the shared selected-native
+compiler/AST/CLR helper instead of grep. Prompts, fixture projects, and verification
+flags are unchanged: `lam-001`, `lam-002`, and `lam-004` use permissive unknown-call
+effects; `lam-003` uses ordinary compilation. All four disable contract proofs.
+Optional runtime contracts still execute on the original generated program.
+
+```bash
+python3 tests/E2E/agent-tasks/test-lambda-verifiers.py
+python3 tests/E2E/agent-tasks/test-logic-old-release.py --lambdas-delegates
+```
+
+`ApplyDouble` runs 13 independent signed/boundary inputs whose doubled results
+fit `Int32`. `ApplyComplex` runs 14, including `Int32.MinValue`, nonpositive
+inputs, and positive doubling boundaries. Native bound lambdas must actually
+receive `x` and supply the output. Each candidate runs the full independent
+original-input/replacement-argument cross product and complemented-output
+interventions (182 and 210 respectively). Captured integers also receive their
+observed value, zero, and one independently across every original input. Block
+lambdas need multiple native statements, not a particular conditional spelling.
+Interventions use independently emitted contract-off code so accurate optional
+postconditions cannot obstruct a counterfactual. Original runtime guards remain
+an independent admission check. Contextually typed implicit parameters, static
+lambdas, scalar aliases, qualified `Func`, captures, and intermediate result
+bindings are exercised.
+
+`MathOperation` must be a native public nongeneric CLR multicast delegate with
+`Int32 (a, b) -> Int32` `Invoke`. Independently bound delegates run 432 signed/
+boundary invocation cases, including duplicate multicast entries, argument
+identity, invocation order, and last-result semantics. Native delegates are
+public by default; no invented visibility/header syntax is required.
+`EventPublisher` must expose the actual public CLR `EventHandler` event and
+subscribe the supplied handler. Sixteen state/invocation checks exercise
+preexisting subscribers, duplicates, order, null handlers, removal, independent
+instances, and sender/argument identity. Thirty-two further complete-case checks
+replace the native subscription's handler or neutralize the subscription. No
+public raising method is required: backing storage is identified by the actual
+event add accessor before any `Subscribe` call and that same storage is observed
+throughout. Nullable/qualified handler types, different parameter names, and an
+extra method return value are permitted.
+
+These are finite behavioral admissions, not universal proofs. Raw C# interop
+cannot establish a required feature. Nondelegate calls, arbitrary allocations,
+property/external static-state access in executed declarations, nested lambdas,
+noninteger captures, captured-variable mutations, constructor initializers,
+initialized event storage, or ambiguous backing storage are explicitly bounded
+unsupported scope, not guessed signatures. Generic/static publisher APIs and
+publishers without usable parameterless construction are also explicitly
+unsupported, as are overloaded target identities; no public constructor is
+required. Null-handler cases apply to
+nullable handler parameters, not an invented nonnullable entry domain.
+Qualified primitive lambda arithmetic has a separate selected-current compiler
+limitation: changing only the new `ApplyDouble` declaration's `i32` spellings to
+`System.Int32` makes `Program.Compile` report `Calor0202` for `(* n 2)`
+(`System.Int32` and `i32` operands). A dedicated refusal control reports this
+without changing product code or crediting it as a finite task rejection.
+Additional unexecuted APIs are not
+required or credited. The full current matrix contains 80 real entrypoints
+(27 accepted, 53 rejected); native/selection refusals, a deliberate timeout, and
+synthetic accounting mocks are separate from those counters.
+The same test also preserves 34 existing task profiles, one selected native
+prerequisite, and two arithmetic/carrier entrypoints, with separate counters.
+
+The old mode archives exact commit
+`d82f3ae95175ecd09581c6922701706be72b0ca9`, verifies copied assets against its own
+manifest, restores locked packages from the local cache, and builds that source.
+Old and current arms execute sequentially with the same representative matrix:
+every original positive, each distinct positive form, and each adversarial
+category. Four compound positives cover interacting aliases, captures, result
+bindings, contracts, static/implicit lambdas, block bindings, and nullable/
+qualified/renamed event handlers with extra return values. No category is omitted:
+the matrix asserts complete form coverage and retains every distinct negative.
+The full current matrix also isolates each positive form separately. The paired
+matrix has 77 actual entrypoints (16 accepted, 61 rejected), including the final
+current-parser historical-ID refusal. Historical IDs appear only in disposable
+old-parser inputs.
+Entrypoints retain their 120-second build/execution/process/EOF budget; the
+complete old/current run retains 600 seconds. Every finite rejection requires
+outer and nested exit 1 plus a known behavioral diagnostic. Infrastructure,
+native/solver failures, abnormal exits, unknown diagnostics, and contaminated
+success evidence fail the controls. Positive output must contain exactly the
+resolved root/configuration/`net10.0/calor.dll` identity and complete case verdict.
+Neither command runs agents, providers, paid experiments, or release actions.
+
 ## Basic-syntax task behavioral verification
 
 The four `basic-001` through `basic-004` `verify.sh` entry points use the same

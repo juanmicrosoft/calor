@@ -79,7 +79,7 @@ def main():
     for dependency in ("calor.dll", "Calor.Runtime.dll", "Microsoft.Z3.dll", native):
         if not (compiler / dependency).is_file():
             raise RuntimeError(f"Selected compiler dependency missing: {compiler / dependency}; build the selected root first.")
-    filename = ("Domain.calr" if sys.argv[1] in ("oop001", "oop002", "oop003", "oop004", "oop005", "oop006", "async004") else
+    filename = ("Domain.calr" if sys.argv[1] in ("oop001", "oop002", "oop003", "oop004", "oop005", "oop006", "async004", "lam003", "lam004") else
                 "AsyncOps.calr" if sys.argv[1] in ("async001", "async002", "async003") else
                 "Generic.calr" if sys.argv[1] in ("gen001", "gen002", "gen003") else
                 "Enums.calr" if sys.argv[1] in ("enum001", "enum002", "enum003") else
@@ -97,7 +97,8 @@ def main():
     deadline = time.monotonic() + timeout
     carrier = not native_only and sys.argv[1] in (
         "type001", "type002", "type003", "type004", "pm004", "pm005",
-        "ref001", "ref002", "ref003", "ref004", "ref005", "ref006", "ref007", "ref008")
+        "ref001", "ref002", "ref003", "ref004", "ref005", "ref006", "ref007", "ref008",
+        "lam001", "lam002", "lam003", "lam004")
     images = {}
     manifest_digest = None
     if carrier:

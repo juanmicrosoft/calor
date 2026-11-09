@@ -6,6 +6,7 @@ using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification.Z3;
@@ -45,6 +46,11 @@ static void Verify(string profile, string path)
     if (profile is "ref001" or "ref003" or "ref004" or "ref005" or "ref006" or "ref007" or "ref008")
     {
         VerifyRefactoring(profile, path);
+        return;
+    }
+    if (profile is "lam001" or "lam002" or "lam003" or "lam004")
+    {
+        VerifyLambdaDelegate(profile, path);
         return;
     }
     if (profile is "pm004" or "pm005")
@@ -1258,6 +1264,478 @@ static void VerifyScalarPatterns(string profile, string path)
     if (accepted == 0)
         throw new InvalidOperationException("Required native scalar pattern constructs missing or do not supply the output.");
     Console.WriteLine($"Verification passed: {name}; {inputs.Length} independent runtime cases, actual native arms and successful input/output coupling.");
+}
+
+static IEnumerable<AstNode> LambdaNodes(AstNode node)
+{
+    yield return node;
+    foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+        foreach (var descendant in LambdaNodes(child))
+            yield return descendant;
+}
+
+static void VerifyLambdaDelegate(string profile, string path)
+{
+    var source = File.ReadAllText(path);
+    var compiled = Calor.Compiler.Program.Compile(source, path, new Calor.Compiler.CompilationOptions
+    {
+        ContractMode = ContractMode.Debug,
+        UnknownCallPolicy = profile == "lam003" ? UnknownCallPolicy.Strict : UnknownCallPolicy.Permissive,
+        VerifyContracts = false
+    });
+    if (compiled.HasErrors || compiled.Ast == null)
+        throw new InvalidOperationException($"Calor compilation failed:\n{string.Join("\n", compiled.Diagnostics)}");
+    var module = compiled.Ast;
+    RejectRawInterop(module, "lambda/delegate/event admission");
+    var previous = Console.Out;
+    using var output = new BoundedOutput();
+    try
+    {
+        Console.SetOut(output);
+        var (assembly, trees) = CompileRuntime(compiled.GeneratedCode);
+        var options = new CSharpParseOptions(LanguageVersion.Preview);
+        var mapped = CSharpSyntaxTree.ParseText(
+            new CSharpEmitter(ContractMode.Debug) { LineDirectiveFilePath = path }.Emit(module), options);
+        if (!SyntaxFactory.AreEquivalent(trees[1].GetRoot(), mapped.GetRoot()))
+            throw new InvalidOperationException("Native lambda/delegate/event mapping differs from compiled emission.");
+        var debugMapping = CSharpCompilation.Create("LambdaDebugMapping",
+            [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble, options), mapped],
+            GeneratedCSharpCompiler.References, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var debugSemantic = debugMapping.GetSemanticModel(mapped);
+        var debugRoot = mapped.GetCompilationUnitRoot();
+        var name = profile switch { "lam001" => "ApplyDouble", "lam002" => "ApplyComplex", _ => "Subscribe" };
+        if (profile != "lam003")
+        {
+            foreach (var method in debugRoot.DescendantNodes().OfType<MethodDeclarationSyntax>().Where(method =>
+                method.Identifier.ValueText == name && method.Parent is ClassDeclarationSyntax container
+                && container.Identifier.ValueText == (profile == "lam004" ? "EventPublisher" : module.Name + "Module")))
+                RefuseLambdaExternalExecution(method, debugSemantic);
+            if (profile == "lam004")
+                foreach (var member in debugRoot.DescendantNodes().OfType<ClassDeclarationSyntax>()
+                    .Where(type => type.Identifier.ValueText == "EventPublisher").SelectMany(type => type.Members)
+                    .Where(member => member is ConstructorDeclarationSyntax or EventDeclarationSyntax))
+                    RefuseLambdaExternalExecution(member, debugSemantic);
+        }
+        // Execute original runtime guards above; interventions must not be
+        // obstructed by contracts that correctly describe the unmodified task.
+        mapped = CSharpSyntaxTree.ParseText(
+            new CSharpEmitter(ContractMode.Off) { LineDirectiveFilePath = path }.Emit(module), options);
+        var mapping = CSharpCompilation.Create("LambdaMapping",
+            [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble, options), mapped],
+            GeneratedCSharpCompiler.References, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var semantic = mapping.GetSemanticModel(mapped);
+        var root = mapped.GetCompilationUnitRoot();
+        if (profile == "lam003")
+            VerifyNativeDelegate(module, assembly, root, semantic, path);
+        else if (profile == "lam004")
+            VerifyNativeEvent(module, assembly, root, semantic, path);
+        else
+            VerifyNativeLambda(profile, module, assembly, root, semantic, path);
+    }
+    finally
+    {
+        Console.SetOut(previous);
+    }
+}
+
+static int[] LambdaInputs(bool block) => block
+    ? [int.MinValue, int.MinValue + 1, -1073741825, -1073741824, -65536, -2, -1, 0, 1, 2, 3, 65536, 1073741822, 1073741823]
+    : [-1073741824, -1073741823, -65536, -2, -1, 0, 1, 2, 3, 65535, 65536, 1073741822, 1073741823];
+
+static bool LambdaIntegerType(string name) =>
+    AttributeHelper.ExpandType(name) == AttributeHelper.ExpandType("i32") || name == "System.Int32";
+
+static void VerifyNativeLambda(string profile, ModuleNode module, Assembly original,
+    CompilationUnitSyntax root, SemanticModel semantic, string path)
+{
+    var block = profile == "lam002";
+    var name = block ? "ApplyComplex" : "ApplyDouble";
+    var functions = module.Functions.Where(function => function.Name == name).ToArray();
+    if (functions.Length > 1)
+        throw new InvalidOperationException("Bounded unsupported lambda scope: overloaded target identity requires disambiguation.");
+    if (functions.Length != 1)
+        throw new InvalidOperationException($"Expected exactly one native function named {name}.");
+    var function = functions[0];
+    if (function.TypeParameters.Count != 0)
+        throw new InvalidOperationException("Bounded unsupported lambda scope: generic function requires type arguments.");
+    if (function.Visibility != Visibility.Public || function.IsAsync
+        || function.Parameters is not [var parameter] || parameter.Name != "x"
+        || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None
+        || !LambdaIntegerType(parameter.TypeName)
+        || function.Output == null || !LambdaIntegerType(function.Output.TypeName))
+        throw new InvalidOperationException($"Wrong native public lambda function signature for {name}.");
+    MethodInfo Target(Assembly assembly)
+    {
+        var type = assembly.GetType($"{module.Name}.{module.Name}Module")
+            ?? throw new InvalidOperationException("Missing native lambda module CLR type.");
+        var method = type.GetMethod(name, BindingFlags.Public | BindingFlags.Static, [typeof(int)])
+            ?? throw new InvalidOperationException("Wrong CLR lambda function signature.");
+        if (!type.IsPublic || method.IsGenericMethod || method.ReturnType != typeof(int)
+            || method.GetParameters()[0].Name != "x")
+            throw new InvalidOperationException("Wrong CLR lambda function signature.");
+        return method;
+    }
+    var inputs = LambdaInputs(block);
+    int Expected(int x) => block && x <= 0 ? 0 : checked(x * 2);
+    int Invoke(MethodInfo method, int x) => (int)(method.Invoke(null, [x])
+        ?? throw new InvalidOperationException("Null native lambda output."));
+    var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method =>
+        method.Identifier.ValueText == name && method.Parent is ClassDeclarationSyntax container
+        && container.Identifier.ValueText == module.Name + "Module");
+    RefuseLambdaExternalExecution(declaration, semantic);
+    foreach (var x in inputs)
+        if (Invoke(Target(original), x) != Expected(x))
+            throw new InvalidOperationException($"Wrong native lambda output for {name}({x}).");
+    var candidates = LambdaNodes(function).OfType<BindStatementNode>()
+        .Where(binding => binding.Initializer is LambdaExpressionNode lambda && !lambda.IsAsync
+            && lambda.Parameters.Count == 1 && (block
+                ? lambda.StatementBody is { Count: >= 2 }
+                : lambda.ExpressionBody != null)).ToArray();
+    var admitted = 0;
+    var counterfactuals = 0;
+    var capturesChecked = 0;
+    foreach (var binding in candidates)
+    {
+        var native = (LambdaExpressionNode)binding.Initializer!;
+        var emitted = declaration.DescendantNodes().OfType<VariableDeclaratorSyntax>()
+            .Where(variable => variable.Identifier.ValueText == binding.Name
+                && variable.Initializer?.Value is LambdaExpressionSyntax lambda
+                && lambda.GetLocation().GetMappedLineSpan().Path == path
+                && lambda.GetLocation().GetMappedLineSpan().StartLinePosition.Line + 1 == native.Span.Line).ToArray();
+        if (emitted.Length != 1 || emitted[0].Initializer?.Value is not LambdaExpressionSyntax selected
+            || semantic.GetDeclaredSymbol(emitted[0]) is not ILocalSymbol local
+            || local.Type is not INamedTypeSymbol { TypeKind: TypeKind.Delegate, DelegateInvokeMethod: var invoke }
+            || invoke == null || invoke.Parameters is not [var argument]
+            || argument.Type.SpecialType != SpecialType.System_Int32 || invoke.ReturnType.SpecialType != SpecialType.System_Int32)
+            throw new InvalidOperationException("Ambiguous native/bound/emitted lambda symbol or non-Int32 delegate.");
+        var lambdaParameter = selected switch
+        {
+            SimpleLambdaExpressionSyntax simple => simple.Parameter,
+            ParenthesizedLambdaExpressionSyntax parenthesized when parenthesized.ParameterList.Parameters.Count == 1
+                => parenthesized.ParameterList.Parameters[0],
+            _ => throw new InvalidOperationException("Wrong emitted native lambda parameter count.")
+        };
+        if (lambdaParameter.Identifier.ValueText != native.Parameters[0].Name
+            || block != (selected.Body is BlockSyntax))
+            throw new InvalidOperationException("Native/emitted lambda body or parameter mapping differs.");
+        var captureSymbols = selected.DescendantNodes().OfType<IdentifierNameSyntax>()
+            .Select(identifier => semantic.GetSymbolInfo(identifier).Symbol)
+            .Where(symbol => symbol is ILocalSymbol or IParameterSymbol
+                && symbol.DeclaringSyntaxReferences.All(reference => !selected.Span.Contains(reference.Span)))
+            .Distinct(SymbolEqualityComparer.Default).ToArray();
+        if (captureSymbols.Any(symbol => symbol switch
+            {
+                ILocalSymbol captured => captured.Type.SpecialType != SpecialType.System_Int32,
+                IParameterSymbol captured => captured.Type.SpecialType != SpecialType.System_Int32,
+                _ => true
+            }))
+            throw new InvalidOperationException("Bounded unsupported lambda scope: non-Int32 capture.");
+        if (selected.DescendantNodes().OfType<LambdaExpressionSyntax>().Any())
+            throw new InvalidOperationException("Bounded unsupported lambda scope: nested lambda.");
+        var probe = "LambdaTrace_" + Guid.NewGuid().ToString("N");
+        var rewriter = new LambdaAdmissionRewriter(semantic, captureSymbols, probe);
+        var body = (CSharpSyntaxNode)(rewriter.Visit(selected.Body)
+            ?? throw new InvalidOperationException("Missing rewritten native lambda body."));
+        var prefix = SyntaxFactory.ParseStatement(
+            $"{{ {probe}.Start({lambdaParameter.Identifier.Text}); {lambdaParameter.Identifier.Text} = {probe}.Argument({lambdaParameter.Identifier.Text}); }}") as BlockSyntax
+            ?? throw new InvalidOperationException("Missing lambda entry intervention.");
+        BlockSyntax tracedBody;
+        if (body is BlockSyntax statements)
+            tracedBody = statements.WithStatements(statements.Statements.InsertRange(0, prefix.Statements));
+        else
+            tracedBody = prefix.AddStatements(SyntaxFactory.ParseStatement($"return {probe}.Output(({body.ToFullString()}));"));
+        var traced = selected switch
+        {
+            SimpleLambdaExpressionSyntax simple => (LambdaExpressionSyntax)simple.WithBody(tracedBody),
+            ParenthesizedLambdaExpressionSyntax parenthesized => parenthesized.WithBody(tracedBody),
+            _ => throw new InvalidOperationException("Missing lambda intervention form.")
+        };
+        var traceClass = SyntaxFactory.ParseMemberDeclaration(
+            $"public static class {probe} {{ public static int Mode, Replacement, Calls, Arg, Result, CaptureIndex;"
+            + $" public static int[] Captures = new int[{captureSymbols.Length}];"
+            + " public static void Start(int arg) { Calls++; Arg=arg; }"
+            + " public static int Argument(int arg) => Mode==1 ? Replacement : arg;"
+            + " public static int Capture(int index,int value) { Captures[index]=value; return Mode==3 && index==CaptureIndex ? Replacement : value; }"
+            + " public static int Output(int value) { Result=Mode==2 ? Replacement : value; return Result; } }")
+            ?? throw new InvalidOperationException("Missing lambda intervention type.");
+        var instrumented = CompileRuntime(root.ReplaceNode(selected, traced).AddMembers(traceClass)
+            .NormalizeWhitespace().ToFullString()).Assembly;
+        var target = Target(instrumented);
+        var trace = instrumented.GetType(probe) ?? throw new InvalidOperationException("Missing lambda trace CLR identity.");
+        FieldInfo Field(string field) => trace.GetField(field) ?? throw new InvalidOperationException("Missing lambda trace field.");
+        var validArgument = true;
+        int Run(int x, int mode, int replacement, int capture = -1)
+        {
+            Field("Mode").SetValue(null, mode);
+            Field("Replacement").SetValue(null, replacement);
+            Field("CaptureIndex").SetValue(null, capture);
+            Field("Calls").SetValue(null, 0);
+            var result = Invoke(target, x);
+            if ((int)Field("Calls").GetValue(null)! == 0 || (int)Field("Arg").GetValue(null)! != x)
+                validArgument = false;
+            return result;
+        }
+        var supplying = true;
+        var candidateCounterfactuals = 0;
+        var candidateCaptures = 0;
+        foreach (var x in inputs)
+        {
+            if (Run(x, 0, 0) != Expected(x) || (int)Field("Result").GetValue(null)! != Expected(x))
+                supplying = false;
+            foreach (var y in inputs)
+            {
+                if (Run(x, 1, y) != Expected(y) || (int)Field("Result").GetValue(null)! != Expected(y))
+                    supplying = false;
+                candidateCounterfactuals++;
+            }
+            if (Run(x, 2, ~Expected(x)) != ~Expected(x))
+                supplying = false;
+            candidateCounterfactuals++;
+            Run(x, 0, 0);
+            var observed = ((int[])Field("Captures").GetValue(null)!).ToArray();
+            for (var index = 0; index < observed.Length; index++)
+            {
+                foreach (var replacement in new[] { observed[index], 0, 1 })
+                {
+                    if (Run(x, 3, replacement, index) != (int)Field("Result").GetValue(null)!)
+                        supplying = false;
+                    candidateCaptures++;
+                }
+            }
+        }
+        if (supplying && validArgument)
+        {
+            admitted++;
+            counterfactuals += candidateCounterfactuals;
+            capturesChecked += candidateCaptures;
+        }
+    }
+    if (admitted == 0)
+        throw new InvalidOperationException("Required native bound/called supplying lambda missing or complete argument/output/capture counterfactual failed.");
+    Console.Error.WriteLine($"Verification passed: {name}; {inputs.Length} independent representable signed/boundary cases; "
+        + $"{counterfactuals} successful complete-case argument/output interventions; {capturesChecked} capture interventions; native/CLR mapping.");
+}
+
+static void RefuseLambdaExternalExecution(SyntaxNode declaration, SemanticModel semantic)
+{
+    foreach (var expression in declaration.DescendantNodes().OfType<ExpressionSyntax>())
+        if (semantic.GetSymbolInfo(expression).Symbol is IPropertySymbol
+            || semantic.GetSymbolInfo(expression).Symbol is IFieldSymbol { IsStatic: true } field
+                && !(field.ContainingType.ToDisplayString() == "System.EventArgs" && field.Name == "Empty")
+                && field.ContainingType.ToDisplayString() != "Calor.Runtime.ContractKind")
+            throw new InvalidOperationException("Bounded unsupported lambda/event scope: property or external static state.");
+    foreach (var call in declaration.DescendantNodes().OfType<InvocationExpressionSyntax>())
+        if (semantic.GetSymbolInfo(call).Symbol is not IMethodSymbol { MethodKind: MethodKind.DelegateInvoke })
+            throw new InvalidOperationException("Bounded unsupported lambda/event scope: non-delegate call in executed declaration.");
+    foreach (var allocation in declaration.DescendantNodes().Where(node =>
+        node is ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax))
+        if (semantic.GetTypeInfo(allocation).Type?.ToDisplayString() != "Calor.Runtime.ContractViolationException")
+            throw new InvalidOperationException("Bounded unsupported lambda/event scope: allocation in executed declaration.");
+}
+
+static void VerifyNativeDelegate(ModuleNode module, Assembly assembly, CompilationUnitSyntax root,
+    SemanticModel semantic, string path)
+{
+    var declarations = module.Delegates.Where(declaration => declaration.Name == "MathOperation").ToArray();
+    if (declarations.Length != 1)
+        throw new InvalidOperationException("Expected exactly one native MathOperation delegate.");
+    var native = declarations[0];
+    if (!native.Parameters.Select(parameter => parameter.Name).SequenceEqual(new[] { "a", "b" })
+        || native.Parameters.Any(parameter => parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None
+            || !LambdaIntegerType(parameter.TypeName))
+        || native.Output == null || !LambdaIntegerType(native.Output.TypeName))
+        throw new InvalidOperationException("Wrong native MathOperation delegate signature.");
+    var syntax = root.DescendantNodes().OfType<DelegateDeclarationSyntax>()
+        .Where(declaration => declaration.Identifier.ValueText == native.Name).ToArray();
+    var type = assembly.GetType($"{module.Name}.MathOperation");
+    if (syntax.Length != 1
+        || semantic.GetDeclaredSymbol(syntax[0]) is not INamedTypeSymbol { TypeKind: TypeKind.Delegate } symbol
+        || symbol.DelegateInvokeMethod == null
+        || !symbol.DelegateInvokeMethod.Parameters.Select(parameter => parameter.Name)
+            .SequenceEqual(native.Parameters.Select(parameter => parameter.Name))
+        || type == null || !type.IsPublic || type.IsGenericType || type.BaseType != typeof(MulticastDelegate))
+        throw new InvalidOperationException("Wrong native/mapped/public nongeneric CLR multicast delegate.");
+    var invoke = type.GetMethod("Invoke") ?? throw new InvalidOperationException("Missing delegate Invoke.");
+    if (invoke.ReturnType != typeof(int) || !invoke.GetParameters().Select(parameter => parameter.ParameterType)
+            .SequenceEqual(new[] { typeof(int), typeof(int) })
+        || !invoke.GetParameters().Select(parameter => parameter.Name).SequenceEqual(new[] { "a", "b" }))
+        throw new InvalidOperationException("Wrong CLR MathOperation Invoke signature/declared parameters.");
+    int[] inputs = [int.MinValue, int.MinValue + 1, -65536, -2, -1, 0, 1, 2, 3, 65536, int.MaxValue - 1, int.MaxValue];
+    var cases = 0;
+    var observations = new List<(string, int, int)>();
+    Func<int, int, int> first = (a, b) => { observations.Add(("first", a, b)); return a; };
+    Func<int, int, int> second = (a, b) => { observations.Add(("second", a, b)); return b; };
+    var left = Delegate.CreateDelegate(type, first.Target, first.Method);
+    var right = Delegate.CreateDelegate(type, second.Target, second.Method);
+    foreach (var a in inputs)
+        foreach (var b in inputs)
+            foreach (var (candidate, labels, expected) in new[]
+                { (left, new[] { "first" }, a), (right, new[] { "second" }, b),
+                  (Delegate.Combine(left, right, left)!, new[] { "first", "second", "first" }, a) })
+            {
+                observations.Clear();
+                if ((int)candidate.DynamicInvoke(a, b)! != expected
+                    || !observations.SequenceEqual(labels.Select(label => (label, a, b)))
+                    || candidate.GetInvocationList().Length != labels.Length)
+                    throw new InvalidOperationException("Wrong independently bound native CLR delegate invocation/order/arguments.");
+                cases++;
+            }
+    Console.Error.WriteLine($"Verification passed: MathOperation; {cases} independent CLR delegate binding/invocation cases; native/CLR mapping.");
+}
+
+static void VerifyNativeEvent(ModuleNode module, Assembly original, CompilationUnitSyntax root,
+    SemanticModel semantic, string path)
+{
+    var classes = module.Classes.Where(type => type.Name == "EventPublisher").ToArray();
+    if (classes.Length != 1 || classes[0].Visibility != Visibility.Public)
+        throw new InvalidOperationException("Expected exactly one native public EventPublisher class.");
+    var native = classes[0];
+    if (native.TypeParameters.Count != 0)
+        throw new InvalidOperationException("Bounded unsupported event scope: generic publisher requires type arguments.");
+    var events = native.Events.Where(member => member.Name == "OnDataReceived").ToArray();
+    var methods = native.Methods.Where(member => member.Name == "Subscribe").ToArray();
+    if (methods.Length > 1)
+        throw new InvalidOperationException("Bounded unsupported event scope: overloaded Subscribe identity requires disambiguation.");
+    if (events.Length != 1 || events[0].Visibility != Visibility.Public || methods.Length != 1
+        || methods[0].Visibility != Visibility.Public || methods[0].IsAsync
+        || methods[0].Parameters.Count != 1 || methods[0].Parameters[0].Modifier != Calor.Compiler.Ast.ParameterModifier.None)
+        throw new InvalidOperationException("Wrong native public EventPublisher event/Subscribe signature.");
+    if (methods[0].TypeParameters.Count != 0)
+        throw new InvalidOperationException("Bounded unsupported event scope: generic Subscribe requires type arguments.");
+    var declaration = root.DescendantNodes().OfType<ClassDeclarationSyntax>()
+        .Single(type => type.Identifier.ValueText == native.Name);
+    var methodSyntax = declaration.Members.OfType<MethodDeclarationSyntax>()
+        .Single(method => method.Identifier.ValueText == "Subscribe");
+    var eventSyntax = declaration.Members.Where(member => member is EventDeclarationSyntax evt
+        && evt.Identifier.ValueText == "OnDataReceived" || member is EventFieldDeclarationSyntax field
+        && field.Declaration.Variables.Any(variable => variable.Identifier.ValueText == "OnDataReceived")).Single();
+    ISymbol? eventSymbol = eventSyntax is EventDeclarationSyntax custom ? semantic.GetDeclaredSymbol(custom)
+        : semantic.GetDeclaredSymbol(((EventFieldDeclarationSyntax)eventSyntax).Declaration.Variables.Single());
+    if (eventSymbol is IEventSymbol { IsStatic: true }
+        || semantic.GetDeclaredSymbol(methodSyntax) is IMethodSymbol { IsStatic: true })
+        throw new InvalidOperationException("Bounded unsupported event scope: static event or Subscribe.");
+    if (eventSymbol is not IEventSymbol { Type: var eventType, IsStatic: false }
+        || eventType.ToDisplayString().TrimEnd('?') != "System.EventHandler"
+        || semantic.GetDeclaredSymbol(methodSyntax) is not IMethodSymbol { Parameters: [var handler] } subscribeSymbol
+        || !SymbolEqualityComparer.Default.Equals(handler.Type, eventType))
+        throw new InvalidOperationException($"Wrong native/mapped CLR EventHandler event/Subscribe signature: {eventSymbol?.ToDisplayString()} / {semantic.GetDeclaredSymbol(methodSyntax)?.ToDisplayString()}.");
+    var nullableHandler = handler.NullableAnnotation == NullableAnnotation.Annotated;
+    RefuseLambdaExternalExecution(methodSyntax, semantic);
+    foreach (var accessor in eventSyntax.DescendantNodes().OfType<AccessorDeclarationSyntax>())
+        RefuseLambdaExternalExecution(accessor, semantic);
+    foreach (var constructor in declaration.Members.OfType<ConstructorDeclarationSyntax>())
+    {
+        RefuseLambdaExternalExecution(constructor, semantic);
+        if (constructor.Initializer != null)
+            throw new InvalidOperationException("Bounded unsupported event scope: constructor initializer.");
+    }
+    if (declaration.Members.OfType<FieldDeclarationSyntax>().Any(field =>
+        field.Declaration.Variables.Any(variable => variable.Initializer != null)))
+        throw new InvalidOperationException("Bounded unsupported event scope: field initializer.");
+    (Type Type, EventInfo Event, MethodInfo Subscribe) Target(Assembly assembly)
+    {
+        var type = assembly.GetType($"{module.Name}.EventPublisher")
+            ?? throw new InvalidOperationException("Missing EventPublisher CLR type.");
+        var evt = type.GetEvent("OnDataReceived", BindingFlags.Public | BindingFlags.Instance);
+        var subscribe = type.GetMethod("Subscribe", BindingFlags.Public | BindingFlags.Instance, [typeof(EventHandler)]);
+        if (!type.IsPublic || type.IsGenericType || evt?.EventHandlerType != typeof(EventHandler)
+            || evt.AddMethod is not { IsPublic: true, IsStatic: false }
+            || evt.RemoveMethod is not { IsPublic: true, IsStatic: false }
+            || subscribe == null || subscribe.IsGenericMethod)
+            throw new InvalidOperationException("Wrong actual CLR EventHandler event/Subscribe shape.");
+        if (type.IsAbstract || type.GetConstructor(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
+            null, Type.EmptyTypes, null) == null)
+            throw new InvalidOperationException("Bounded unsupported event scope: no usable parameterless instance construction.");
+        return (type, evt, subscribe);
+    }
+    int Behavior(Assembly assembly, string? probe = null, int mode = 0)
+    {
+        var target = Target(assembly);
+        var trace = probe == null ? null : assembly.GetType(probe)
+            ?? throw new InvalidOperationException("Missing event intervention identity.");
+        trace?.GetField("Mode")!.SetValue(null, mode);
+        var observed = new List<(int, object?, EventArgs)>();
+        EventHandler a = (sender, args) => observed.Add((1, sender, args));
+        EventHandler b = (sender, args) => observed.Add((2, sender, args));
+        trace?.GetField("Replacement")!.SetValue(null, b);
+        var checks = 0;
+        foreach (var sequence in new EventHandler?[][] { [a], [a, b, a], [b, a, b, b],
+            nullableHandler ? [null, a, null, b] : [a, b, a, b] })
+        {
+            var instance = Activator.CreateInstance(target.Type, nonPublic: true)
+                ?? throw new InvalidOperationException("EventPublisher has no usable parameterless construction.");
+            var independent = Activator.CreateInstance(target.Type, nonPublic: true)!;
+            var expected = new List<EventHandler> { b };
+            target.Event.AddEventHandler(instance, b);
+            var fields = target.Type.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+                .Where(field => field.FieldType == typeof(EventHandler)).ToArray();
+            var backing = fields.Where(field =>
+                ((Delegate?)field.GetValue(instance))?.GetInvocationList().SequenceEqual(expected) == true).ToArray();
+            if (backing.Length != 1)
+                throw new InvalidOperationException("Bounded unsupported event scope: ambiguous authoritative event backing storage.");
+            var storage = backing[0];
+            foreach (var supplied in sequence)
+            {
+                observed.Clear();
+                target.Subscribe.Invoke(instance, [supplied]);
+                if (observed.Count != 0)
+                    throw new InvalidOperationException("Event Subscribe immediately invoked a handler.");
+                if (mode != 2 && (mode == 1 || supplied != null))
+                    expected.Add(mode == 1 ? b : supplied!);
+                if (!(((Delegate?)storage.GetValue(instance))?.GetInvocationList() ?? []).SequenceEqual(expected))
+                    throw new InvalidOperationException("Wrong actual event subscriber state/order/duplicates/replacement (or bounded ambiguous backing storage).");
+                if (target.Type.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+                    .Where(field => field.FieldType == typeof(EventHandler)).Any(field => field.GetValue(independent) != null))
+                    throw new InvalidOperationException("Event subscriber state leaked between instances.");
+                var sender = new object();
+                var args = new EventArgs();
+                ((Delegate)storage.GetValue(instance)!).DynamicInvoke(sender, args);
+                var wanted = expected.Select(handler => (handler == a ? 1 : 2, (object?)sender, args));
+                if (!observed.SequenceEqual(wanted))
+                    throw new InvalidOperationException("Wrong actual event invocation arguments/order/duplicates.");
+                checks++;
+            }
+            target.Event.RemoveEventHandler(instance, b);
+            expected.RemoveAt(expected.FindLastIndex(handler => handler == b));
+            if (!(((Delegate?)storage.GetValue(instance))?.GetInvocationList() ?? []).SequenceEqual(expected))
+                throw new InvalidOperationException("Wrong actual event removal/subscriber preservation.");
+            checks++;
+        }
+        return checks;
+    }
+    var cases = Behavior(original);
+    var subscriptions = LambdaNodes(methods[0]).OfType<EventSubscribeNode>().ToArray();
+    var admitted = 0;
+    foreach (var subscription in subscriptions)
+    {
+        var nativeStatement = SyntaxFactory.ParseStatement(new CSharpEmitter(ContractMode.Debug).Visit(subscription));
+        var assignments = methodSyntax.DescendantNodes().OfType<AssignmentExpressionSyntax>().Where(assignment =>
+            assignment.IsKind(SyntaxKind.AddAssignmentExpression)
+            && SyntaxFactory.AreEquivalent(nativeStatement, assignment.Parent)
+            && SymbolEqualityComparer.Default.Equals(semantic.GetSymbolInfo(assignment.Left).Symbol, eventSymbol)).ToArray();
+        if (assignments.Length != 1)
+            throw new InvalidOperationException("Ambiguous native EventSubscribe/emitted event symbol mapping.");
+        var selected = assignments[0];
+        var probe = "EventTrace_" + Guid.NewGuid().ToString("N");
+        var replacement = SyntaxFactory.ParseExpression(
+            $"{probe}.Mode==2 ? 0 : {probe}.Apply(() => {{ {selected.Left.WithoutTrivia().ToFullString()} += {probe}.Mode==1 ? {probe}.Replacement : ({selected.Right.WithoutTrivia().ToFullString()}); }})");
+        var traceClass = SyntaxFactory.ParseMemberDeclaration(
+            $"public static class {probe} {{ public static int Mode; public static EventHandler Replacement=null!;"
+            + " public static int Apply(Action action) { action(); return 0; } }")!;
+        var statement = selected.Parent as ExpressionStatementSyntax
+            ?? throw new InvalidOperationException("Bounded unsupported event scope: non-statement subscription.");
+        var rewritten = SyntaxFactory.ParseStatement($"_ = ({replacement.ToFullString()});").WithTriviaFrom(statement);
+        var assembly = CompileRuntime(root.ReplaceNode(statement, rewritten).AddMembers(traceClass)
+            .NormalizeWhitespace().ToFullString()).Assembly;
+        Behavior(assembly, probe);
+        Behavior(assembly, probe, 1);
+        Behavior(assembly, probe, 2);
+        admitted++;
+    }
+    if (admitted == 0)
+        throw new InvalidOperationException("Required native supplying EventSubscribe missing.");
+    Console.Error.WriteLine($"Verification passed: EventPublisher; {cases} actual event state/invocation cases; "
+        + $"{cases * 2 * admitted} successful complete-case handler/neutralization interventions; native/CLR mapping.");
 }
 
 static void VerifyAsync(string profile, string path)
@@ -5032,6 +5510,31 @@ sealed class ArithmeticPolynomial : IDisposable
     {
         normalization.Dispose();
         context.Dispose();
+    }
+}
+
+sealed class LambdaAdmissionRewriter(SemanticModel semantic, ISymbol?[] captures, string probe) : CSharpSyntaxRewriter
+{
+    public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node)
+    {
+        var symbol = semantic.GetSymbolInfo(node).Symbol;
+        var index = Array.FindIndex(captures, captured => SymbolEqualityComparer.Default.Equals(captured, symbol));
+        if (index < 0)
+            return base.VisitIdentifierName(node);
+        if (node.Parent is AssignmentExpressionSyntax assignment && assignment.Left == node
+            || node.Parent is PrefixUnaryExpressionSyntax prefix && prefix.IsKind(SyntaxKind.PreIncrementExpression)
+            || node.Parent is PostfixUnaryExpressionSyntax)
+            throw new InvalidOperationException("Bounded unsupported lambda scope: captured variable mutation.");
+        return SyntaxFactory.ParseExpression($"{probe}.Capture({index}, {node.ToFullString()})");
+    }
+
+    public override SyntaxNode? VisitReturnStatement(ReturnStatementSyntax node)
+    {
+        if (node.Expression == null)
+            throw new InvalidOperationException("Wrong native lambda void return.");
+        var expression = Visit(node.Expression)
+            ?? throw new InvalidOperationException("Missing native lambda return expression.");
+        return node.WithExpression(SyntaxFactory.ParseExpression($"{probe}.Output(({expression.ToFullString()}))"));
     }
 }
 
