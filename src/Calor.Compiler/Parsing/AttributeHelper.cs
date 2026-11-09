@@ -271,7 +271,8 @@ public static class AttributeHelper
         AttributeCollection attrs,
         Action<string>? reportUnknownCode = null,
         Func<string, bool>? isEffectVariable = null,
-        ICollection<string>? effectVariableSink = null)
+        ICollection<string>? effectVariableSink = null,
+        bool codesAreComplete = false)
     {
         var effects = new Dictionary<string, string>();
 
@@ -287,6 +288,12 @@ public static class AttributeHelper
         {
             var code = attrs[$"_pos{i}"];
             if (string.IsNullOrEmpty(code)) break;
+
+            if (codesAreComplete)
+            {
+                effectCodes.Add(code);
+                continue;
+            }
 
             // Check if this contains comma-separated effects (e.g., "cw,fs" from §E{cw,fs:w})
             if (code.Contains(','))

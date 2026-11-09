@@ -2157,12 +2157,13 @@ public sealed class Parser
         {
             var index = 0;
             while (!IsAtEnd && Current.Span.Line == startToken.Span.Line
-                   && (Check(TokenKind.Identifier) || Check(TokenKind.Star)))
+                   && (Check(TokenKind.Identifier) || Current.IsKeyword || Check(TokenKind.Star)))
             {
                 var effect = Advance();
                 var code = effect.Text;
                 while (Match(TokenKind.Colon))
-                    code += ":" + Expect(TokenKind.Identifier).Text;
+                    code += ":" + (Check(TokenKind.Identifier) || Current.IsKeyword
+                        ? Advance().Text : Expect(TokenKind.Identifier).Text);
                 attrs.Add($"_pos{index++}", code, effect.Span);
                 if (!Match(TokenKind.Comma)) break;
             }
@@ -2178,7 +2179,8 @@ public sealed class Parser
                 DiagnosticCode.UnknownEffectCode,
                 $"Unknown effect code '{code}'. Use a code from the authoritative effect taxonomy."),
             IsEffectVariableInScope,
-            variables);
+            variables,
+            codesAreComplete: canonical);
 
         if (variables.Count > 0 && !PermitsEffectVariables(position))
         {
