@@ -1,13 +1,221 @@
+using System.Reflection;
+using System.Runtime.Loader;
 using Calor.Compiler.Ast;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
 
 public class NullCoalescingTests
 {
+    [Theory]
+    [InlineData("null", "null")]
+    [InlineData("\"\"", "0")]
+    [InlineData("\"abc\"", "3")]
+    public void Original095_NativeRoundTrip_PreservesBranchesAndRefStores(string receiver, string expected)
+    {
+        var root = AppContext.BaseDirectory;
+        while (!File.Exists(Path.Combine(root, "Directory.Build.props")))
+            root = Path.GetDirectoryName(root)!;
+        var path = Path.Combine(root, "tests", "TestData", "CSharpImport", "Level5_Advanced", "095_NullCoalescing.cs");
+        var bytes = File.ReadAllBytes(path);
+        var source = File.ReadAllText(path);
+        var witness = $$"""
+            public static class Witness
+            {
+                public static string Run()
+                {
+                    if (NullCoalescing.NullHandling.GetOrDefault(null, "fallback") != "fallback"
+                        || NullCoalescing.NullHandling.GetOrDefault("kept", "fallback") != "kept"
+                        || NullCoalescing.NullHandling.GetOrZero(null) != 0
+                        || NullCoalescing.NullHandling.GetOrZero(7) != 7
+                        || NullCoalescing.NullHandling.GetSafe(null) != ""
+                        || NullCoalescing.NullHandling.GetSafe("kept") != "kept"
+                        || NullCoalescing.NullHandling.GetChained(1, 2, 3) != 1
+                        || NullCoalescing.NullHandling.GetChained(null, 2, 3) != 2
+                        || NullCoalescing.NullHandling.GetChained(null, null, 3) != 3
+                        || NullCoalescing.NullHandling.GetChained(null, null, null) != null)
+                        throw new System.Exception("coalescing branch changed");
+                    string absent = null;
+                    string present = "kept";
+                    string empty = "";
+                    string stillNull = null;
+                    NullCoalescing.NullHandling.SetIfNull(ref absent, "assigned");
+                    NullCoalescing.NullHandling.SetIfNull(ref present, "ignored");
+                    NullCoalescing.NullHandling.SetIfNull(ref empty, "ignored");
+                    NullCoalescing.NullHandling.SetIfNull(ref stillNull, null);
+                    if (absent != "assigned" || present != "kept" || empty != "" || stillNull != null)
+                        throw new System.Exception("ref store changed");
+                    return NullCoalescing.NullHandling.GetLength({{receiver}});
+                }
+            }
+            """;
+        AssertNativeRuntimeAndReemission(source, witness, expected, Path.GetFileName(path));
+        Assert.Equal(bytes, File.ReadAllBytes(path));
+    }
+
+    [Theory]
+    [InlineData(false, "fallback|1|0|1")]
+    [InlineData(true, "3|1|0|0")]
+    public void NativeConditionalCallChain_EvaluatesReceiverOnceAndFallbackLazily(bool present, string expected)
+    {
+        var source = """
+            public static class Probe
+            {
+                private static int Reads;
+                private static int Arguments;
+                private static int Fallbacks;
+                private static string? Target(bool present) { Reads++; return present ? "abc" : null; }
+                private static string Fallback() { Fallbacks++; return "fallback"; }
+                public static string Run(bool present)
+                {
+                    Reads = 0;
+                    Arguments = 0;
+                    Fallbacks = 0;
+                    var value = Target(present)?.Length.ToString() ?? Fallback();
+                    return value + "|" + Reads + "|" + Arguments + "|" + Fallbacks;
+                }
+            }
+            """;
+        AssertNativeRuntimeAndReemission(source,
+            $"public static class Witness {{ public static string Run() => Probe.Run({present.ToString().ToLowerInvariant()}); }}",
+            expected);
+    }
+
+    [Theory]
+    [InlineData(false, "fallback|1|0|1")]
+    [InlineData(true, "bc|1|1|0")]
+    public void NativeConditionalCallArguments_StayInsideTheConditionalRegion(bool present, string expected)
+    {
+        var source = """
+            public static class Probe
+            {
+                private static int Reads;
+                private static int Arguments;
+                private static int Fallbacks;
+                private static string? Target(bool present) { Reads++; return present ? "abc" : null; }
+                private static int Argument() { Arguments++; return 1; }
+                private static string Fallback() { Fallbacks++; return "fallback"; }
+                public static string Run(bool present)
+                {
+                    Reads = 0;
+                    Arguments = 0;
+                    Fallbacks = 0;
+                    var value = Target(present)?.Substring(Argument()).ToString() ?? Fallback();
+                    return value + "|" + Reads + "|" + Arguments + "|" + Fallbacks;
+                }
+            }
+            """;
+        AssertNativeRuntimeAndReemission(source,
+            $"public static class Witness {{ public static string Run() => Probe.Run({present.ToString().ToLowerInvariant()}); }}",
+            expected);
+    }
+
+    [Theory]
+    [InlineData(false, "fallback")]
+    [InlineData(true, "System.InvalidOperationException:argument")]
+    public void NativeConditionalArguments_PreserveExceptionLaziness(bool present, string expected)
+    {
+        const string source = """
+            public static class Probe
+            {
+                private static int Argument() { throw new System.InvalidOperationException("argument"); }
+                public static string Run(bool present)
+                {
+                    string? value = present ? "abc" : null;
+                    return value?.Substring(Argument()) ?? "fallback";
+                }
+            }
+            """;
+        var witness = $$"""
+            public static class Witness
+            {
+                public static string Run()
+                {
+                    try { return Probe.Run({{present.ToString().ToLowerInvariant()}}); }
+                    catch (System.Exception exception) { return exception.GetType().FullName + ":" + exception.Message; }
+                }
+            }
+            """;
+        AssertNativeRuntimeAndReemission(source, witness, expected);
+    }
+
+    [Theory]
+    [InlineData("null", "assigned|1")]
+    [InlineData("\"kept\"", "kept|0")]
+    public void NativeCoalescingStore_EvaluatesRightOnlyWhenNull(string initial, string expected)
+    {
+        var source = $$"""
+            public static class Probe
+            {
+                private static int Calls;
+                private static string Right() { Calls++; return "assigned"; }
+                public static string Run()
+                {
+                    Calls = 0;
+                    string value = {{initial}};
+                    value ??= Right();
+                    return value + "|" + Calls;
+                }
+            }
+            """;
+        AssertNativeRuntimeAndReemission(source,
+            "public static class Witness { public static string Run() => Probe.Run(); }", expected);
+    }
+
+    private static void AssertNativeRuntimeAndReemission(
+        string source, string witness, string expected, string sourceFile = "NullCoalescingNative.cs")
+    {
+        Assert.Equal(expected, ExecuteNativeWitness(source, witness));
+        var conversion = new CSharpToCalorConverter().Convert(source, sourceFile);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.True(conversion.Losses.Count == 0,
+            string.Join("\n", conversion.Losses) + "\n" + string.Join("\n", conversion.Issues));
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.NotNull(conversion.CalorSource);
+        Assert.DoesNotContain("§", conversion.CalorSource);
+        Assert.DoesNotContain("raw ", conversion.CalorSource);
+        Assert.DoesNotContain("TODO", conversion.CalorSource);
+        var parsed = Parse(conversion.CalorSource, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var reemitted = new CalorEmitter().Emit(parsed);
+        Assert.DoesNotContain("§", reemitted);
+        foreach (var text in new[] { conversion.CalorSource, reemitted })
+        {
+            var compiled = Program.Compile(text, "null-coalescing-native.calr",
+                new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Assert.Equal(expected, ExecuteNativeWitness(compiled.GeneratedCode, witness));
+        }
+    }
+
+    private static string ExecuteNativeWitness(string source, string witness)
+    {
+        var compilation = CSharpCompilation.Create("NullCoalescingNative_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(source), CSharpSyntaxTree.ParseText(witness)],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var emitted = compilation.Emit(stream);
+        Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+        stream.Position = 0;
+        var context = new AssemblyLoadContext(compilation.AssemblyName!, isCollectible: true);
+        try
+        {
+            var run = context.LoadFromStream(stream).GetType("Witness")!.GetMethod("Run")!;
+            return Assert.IsType<string>(run.Invoke(null, null));
+        }
+        finally
+        {
+            context.Unload();
+        }
+    }
+
     private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)
     {
         diagnostics = new DiagnosticBag();

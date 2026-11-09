@@ -3322,7 +3322,9 @@ public sealed class Parser
                             "A call argument is required after ','.");
                 }
                 var close = Expect(TokenKind.CloseParen);
-                ReportUnsupportedConditionalPostfix(expr, open.Span);
+                if (typeArguments is { Count: > 0 }
+                    || names.Any(name => name is not null) || modifiers.Any(modifier => modifier is not null))
+                    ReportUnsupportedConditionalPostfix(expr, open.Span);
                 expr = SplitNativeMemberReference(expr);
                 var span = expr.Span.Union(close.Span);
                 expr = expr is ReferenceNode reference
@@ -3439,7 +3441,7 @@ public sealed class Parser
     {
         if (HasConditionalPostfixTarget(expr))
             _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
-                "Native null-conditional invocation and indexing are not yet supported.");
+                "This native null-conditional postfix form is not yet supported.");
     }
 
     private static bool HasConditionalPostfixTarget(ExpressionNode expr) => expr switch
@@ -3701,6 +3703,10 @@ public sealed class Parser
             return new TupleLiteralNode(open.Span.Union(tupleClose.Span), elements);
         }
         var close = Expect(TokenKind.CloseParen);
+        if (HasConditionalPostfixTarget(grouped) && Current.Span.Line == TokenEndLine(close)
+            && Current.Kind is TokenKind.Dot or TokenKind.NullConditional or TokenKind.OpenParen or TokenKind.OpenBracket)
+            _diagnostics.ReportError(close.Span, DiagnosticCode.UnexpectedToken,
+                "A parenthesized null-conditional chain followed by another postfix operation is not yet supported.");
         if (grouped is ReferenceNode reference)
             _groupedReferenceSpans.TryAdd(reference, reference.Span);
         grouped.IncludeSpan(open.Span.Union(close.Span));

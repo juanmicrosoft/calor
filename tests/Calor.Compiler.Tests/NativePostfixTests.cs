@@ -256,6 +256,86 @@ public sealed class NativePostfixTests
     }
 
     [Theory]
+    [InlineData("x?.M(1)")]
+    [InlineData("factory()?.M(1)")]
+    [InlineData("x?.Factory().M()")]
+    public void NativeConditionalInvocation_PreservesThePostfixChain(string expression)
+    {
+        var source = $"module Native\n  func Probe () → object\n    return {expression}\n";
+        var diagnostics = new DiagnosticBag();
+        var ast = Parse(source, diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.IsType<ExpressionCallNode>(
+            Assert.IsType<ReturnStatementNode>(Assert.Single(Assert.Single(ast.Functions).Body)).Expression);
+        Assert.Contains("?.", new CalorEmitter().Emit(ast));
+        Assert.DoesNotContain("§", new CalorEmitter().Emit(ast));
+        Assert.Equal(expression, call.Accept(new CSharpEmitter()));
+    }
+
+    [Theory]
+    [InlineData("x?.Items[0]")]
+    [InlineData("x?[0]")]
+    [InlineData("x?.M<int>(1)")]
+    [InlineData("x?.M(value: 1)")]
+    [InlineData("x?.M(ref value)")]
+    [InlineData("(x?.Length).ToString()")]
+    [InlineData("((x?.M())).N()")]
+    [InlineData("(x?.Factory())()")]
+    public void NativeUnsupportedConditionalForms_RemainGated(string expression)
+    {
+        var diagnostics = new DiagnosticBag();
+        Parse($"module Native\n  func Probe () → object\n    return {expression}\n", diagnostics);
+        Assert.True(diagnostics.HasErrors, expression);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Message.Contains("not yet supported"));
+    }
+
+    [Fact]
+    public void NativeConditionalInvocation_BindsItsChildrenAndDoesNotLaunderEffects()
+    {
+        const string source = """
+            module Native
+              func Step () → int
+                ! cw
+                System.Console.WriteLine(1)
+                return 0
+              func Probe (string?:x) → string?
+                return x?.Substring(Step())
+            """;
+        var (ast, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.IsType<BoundExpressionCall>(Assert.IsType<BoundReturnStatement>(
+            Assert.Single(bound.Functions.Single(function => function.Symbol.Name == "Probe").Body)).Expression);
+        var conditional = Assert.IsType<BoundStructuralExpression>(call.Target);
+        Assert.Equal(nameof(NullConditionalNode), conditional.NodeTypeName);
+        Assert.Equal("Substring", conditional.Metadata["MemberName"]);
+        Assert.Equal("x", Assert.IsType<BoundVariableExpression>(Assert.Single(conditional.Children)).Variable.Name);
+        Assert.IsType<BoundCallExpression>(Assert.Single(call.Arguments));
+        Assert.True(call.HasUnknownInferredType);
+        var result = Program.Compile(new CalorEmitter().Emit(ast));
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0419");
+    }
+
+    [Theory]
+    [InlineData("Produce()?.ToString()")]
+    [InlineData("x?.ToString() ?? Produce()")]
+    public void NativeConditionalInvocation_ChargesReceiverAndCoalescingRhsEffects(string expression)
+    {
+        var source = $$"""
+            module Native
+              func Produce () → string?
+                ! cw
+                System.Console.WriteLine(1)
+                return null
+              func Probe (string?:x) → string?
+                return {{expression}}
+            """;
+        var result = Program.Compile(source);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0419");
+    }
+
+    [Theory]
     [InlineData("f(1,)")]
     [InlineData("f(ref)")]
     [InlineData("f(first:)")]
@@ -266,11 +346,11 @@ public sealed class NativePostfixTests
     [InlineData("items[0,]")]
     [InlineData("items[0")]
     [InlineData("factory().")]
-    [InlineData("x?.M(1)")]
+    [InlineData("x?.M<int>(1)")]
+    [InlineData("x?.M(value: 1)")]
+    [InlineData("x?.M(ref value)")]
     [InlineData("x?.Items[0]")]
     [InlineData("x?[0]")]
-    [InlineData("factory()?.M(1)")]
-    [InlineData("x?.Factory().M()")]
     public void MalformedAndUnsupportedConditionalForms_ReportErrors(string expression)
     {
         var diagnostics = new DiagnosticBag();

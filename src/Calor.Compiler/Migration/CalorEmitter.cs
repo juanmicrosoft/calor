@@ -2403,6 +2403,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(CompoundAssignmentStatementNode node)
     {
+        if (node.Operator == CompoundAssignmentOperator.NullCoalesce)
+            return Visit(new AssignmentStatementNode(node.Span, node.Target,
+                new NullCoalesceNode(node.Span, node.Target, node.Value)));
+
         var target = node.Target.Accept(this);
         var value = node.Value.Accept(this);
         var opSymbol = node.Operator switch
@@ -2422,11 +2426,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             _ => throw new ArgumentOutOfRangeException(nameof(node),
                 $"Unhandled compound assignment operator: {node.Operator}")
         };
-        // Parser expects: §ASSIGN <target> <value>
-        if (node.Operator == CompoundAssignmentOperator.NullCoalesce)
-            AppendLine($"§ASSIGN {target} (?? {target} {value})");
-        else
-            AppendLine($"§ASSIGN {target} ({opSymbol} {target} {value})");
+        AppendLine($"§ASSIGN {target} ({opSymbol} {target} {value})");
         return "";
     }
 
@@ -3760,8 +3760,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(NullCoalesceNode node)
     {
-        // AcceptInInlineSibling: operands in Lisp (?? a b) form are space-separated,
-        // so a nested zero-arg call without explicit §/C would absorb b as its inline arg.
         var left = AcceptInConditionalRegion(node.Left);
         var right = AcceptInConditionalRegion(node.Right);
         return $"({left} ?? {right})";
@@ -3769,24 +3767,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(NullConditionalNode node)
     {
-        // AcceptInInlineSibling: in Lisp (?. target "member") form, target is space-separated
-        // from the member string literal. A naked zero-arg §C{Get} target would absorb the
-        // string literal as its inline argument on re-parse (Parser.IsExpressionStart accepts
-        // StrLiteral). Defect: v0.6.1 loop-5 devil's-advocate finding.
-        var target = AcceptInConditionalRegion(node.Target);
         // Sanitize member name: collapse whitespace/newlines to single space
         // (multi-line C# chains from converter can produce newlines in member names)
         var memberName = System.Text.RegularExpressions.Regex.Replace(node.MemberName, @"\s+", " ").Trim();
 
-        // Inside interpolation, use C# syntax to avoid nested quote conflicts
-        if (_inInterpolation)
-        {
-            return $"{target}?.{memberName}";
-        }
-
-        // Escape quotes and backslashes in member name for safe embedding in string literal
-        var escaped = memberName.Replace("\\", "\\\\").Replace("\"", "\\\"");
-        return $"(?. {target} \"{escaped}\")";
+        return $"{EmitPostfixOperand(node.Target)}?.{EscapeCalorIdentifier(memberName)}";
     }
 
     // Pattern-related methods
@@ -4873,36 +4858,21 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ExpressionCallNode node)
     {
-        if (!IsConditionalCallTarget(node.TargetExpression))
-        {
-            var callee = EmitPostfixOperand(node.TargetExpression);
-            var types = node.TypeArguments is { Count: > 0 }
-                ? $"<{string.Join(", ", node.TypeArguments.Select(TypeMapper.ToSurfaceType))}>"
-                : "";
-            var arguments = node.Arguments.Select((argument, index) =>
-            {
-                var name = node.ArgumentNames?.ElementAtOrDefault(index);
-                var modifier = node.ArgumentModifiers?.ElementAtOrDefault(index);
-                return (name is null ? "" : $"{EscapeCalorIdentifier(name.TrimStart('@'))}: ")
-                    + (modifier is null ? "" : $"{modifier} ") + AcceptInConditionalRegion(argument);
-            });
-            return $"{callee}{types}({string.Join(", ", arguments)})";
-        }
-
-        // Null-conditional call binding remains on the existing compatibility route.
-        if (node.TypeArguments is { Count: > 0 })
+        if (IsConditionalCallTarget(node.TargetExpression) && node.TypeArguments is { Count: > 0 })
             throw new NotSupportedException("Null-conditional computed generic calls remain staged.");
-        var target = AcceptInConditionalRegion(node.TargetExpression);
-        var args = node.Arguments.Select((argument, index) =>
+
+        var callee = EmitPostfixOperand(node.TargetExpression);
+        var types = node.TypeArguments is { Count: > 0 }
+            ? $"<{string.Join(", ", node.TypeArguments.Select(TypeMapper.ToSurfaceType))}>"
+            : "";
+        var arguments = node.Arguments.Select((argument, index) =>
         {
-            var modifier = node.ArgumentModifiers?.ElementAtOrDefault(index);
             var name = node.ArgumentNames?.ElementAtOrDefault(index);
-            var marker = modifier is null ? "§A" : $"§A{{{modifier}}}";
-            if (name is not null)
-                marker += $"[{name.TrimStart('@')}]";
-            return $" {marker} {AcceptInConditionalRegion(argument)}";
-        }).ToList();
-        return $"§C {target}{string.Join("", args)} §/C";
+            var modifier = node.ArgumentModifiers?.ElementAtOrDefault(index);
+            return (name is null ? "" : $"{EscapeCalorIdentifier(name.TrimStart('@'))}: ")
+                + (modifier is null ? "" : $"{modifier} ") + AcceptInConditionalRegion(argument);
+        });
+        return $"{callee}{types}({string.Join(", ", arguments)})";
     }
 
     private string EmitPostfixOperand(ExpressionNode node) => node switch
@@ -4913,7 +4883,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             $"{EmitPostfixOperand(array.Array)}[{AcceptInConditionalRegion(array.Index)}]",
         MultiDimArrayAccessNode array =>
             $"{EmitPostfixOperand(array.Array)}[{string.Join(", ", array.Indices.Select(AcceptInConditionalRegion))}]",
-        ReferenceNode or ExpressionCallNode => AcceptInConditionalRegion(node),
+        ReferenceNode or ExpressionCallNode or NullConditionalNode => AcceptInConditionalRegion(node),
         _ => $"({AcceptInConditionalRegion(node)})"
     };
 
