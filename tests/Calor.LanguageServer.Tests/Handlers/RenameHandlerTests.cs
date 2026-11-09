@@ -1849,46 +1849,46 @@ public sealed class ExactSpanRefactoringGateTests
             var sources = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["definitions.calr"] = """
-                    §M{Collision}
-                      §CL{Worker:pub:partial}
-                        §FLD{i32:value:pub}
-                        §MT{Pick:pub} (i32:value) -> i32
-                          §IF (== value INT:0)
-                            §B{result:i32} INT:10
-                            §R result
-                          §EL
-                            §B{result:i32} value
-                            §R result
-                        §MT{Pick:pub} (str:value) -> i32
-                          §R INT:2
-                        §MT{Run:pub} () -> i32
-                          §B{value:i32} INT:3
-                          §R (+ value §THIS.value)
-                        §CL{Nested:pub}
-                          §MT{Run:pub} () -> i32
-                            §B{result:i32} INT:4
-                            §R result
+                    module Collision
+                      class Worker partial
+                        field int:value
+                        func Pick (int:value) → int
+                          if value == 0
+                            let int:result = 10
+                            return result
+                          else
+                            let int:result = value
+                            return result
+                        func Pick (string:value) → int
+                          return 2
+                        func Run () → int
+                          let int:value = 3
+                          return value + this.value
+                        class Nested
+                          func Run () → int
+                            let int:result = 4
+                            return result
                     """,
                 ["open-use.calr"] = """
-                    §M{Collision}
-                      §CL{Worker:pub:partial}
-                        §MT{UseOne:pub} () -> i32
-                          §R §C{Pick} §A INT:1 §/C
+                    module Collision
+                      class Worker partial
+                        func UseOne () → int
+                          return Pick(1)
                     """,
                 ["closed-use.calr"] = """
-                    §M{Collision}
-                      §CL{Worker:pub:partial}
-                        §MT{UseTwo:pub} () -> i32
-                          §R §C{Pick} §A INT:2 §/C
+                    module Collision
+                      class Worker partial
+                        func UseTwo () → int
+                          return Pick(2)
                     """,
                 ["collisions.calr"] = """
-                    §M{Collision}
-                      §CL{OtherType:pub}
-                        §FLD{i32:value:pub}
-                        §MT{Pick:pub} (str:value) -> i32
-                          §R INT:3
-                        §MT{Run:pub} (i32:value) -> i32
-                          §R value
+                    module Collision
+                      class OtherType
+                        field int:value
+                        func Pick (string:value) → int
+                          return 3
+                        func Run (int:value) → int
+                          return value
                     """,
             };
             foreach (var (fileName, source) in sources)
@@ -1947,12 +1947,12 @@ public sealed class ExactSpanRefactoringGateTests
             Assert.Equal(3, updated.Values.Sum(source => Count(source, "Choose")));
             Assert.Equal(
                 1,
-                Count(updated[Path.Combine(root, "definitions.calr")], "§MT{Pick:pub"));
+                Count(updated[Path.Combine(root, "definitions.calr")], "func Pick ("));
             Assert.Equal(
                 1,
-                Count(updated[Path.Combine(root, "collisions.calr")], "§MT{Pick:pub"));
-            Assert.Contains("§MT{Run:pub}", updated[Path.Combine(root, "definitions.calr")]);
-            Assert.Contains("§MT{Run:pub}", updated[Path.Combine(root, "collisions.calr")]);
+                Count(updated[Path.Combine(root, "collisions.calr")], "func Pick ("));
+            Assert.Contains("func Run (", updated[Path.Combine(root, "definitions.calr")]);
+            Assert.Contains("func Run (", updated[Path.Combine(root, "collisions.calr")]);
 
             var syntaxTrees = new List<SyntaxTree>();
             foreach (var (path, source) in updated.OrderBy(pair => pair.Key, StringComparer.Ordinal))
@@ -2116,6 +2116,7 @@ public sealed class ExactSpanRefactoringGateTests
         string newName)
     {
         var offset = source.IndexOf(cursorText, StringComparison.Ordinal);
+        Assert.True(offset >= 0, $"Rename cursor marker '{cursorText}' was not found in the source.");
         var (line, column) = LspTestHarness.GetLineColumn(source, offset);
         return await new RenameHandler(workspace).Handle(
             new RenameParams
