@@ -27,9 +27,9 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     }
 
     private const string Original = """
-        §M{Demo}
-          §F{Add:pub} (i32:x) -> i32
-            §R x
+        module Demo
+          func Add (int:x) → int
+            return x
         """;
 
     public void Dispose()
@@ -252,10 +252,10 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     [Fact]
     public void TextClassRenamePreservesSelfTypedMemberIdentity()
     {
-        var source = "§M{Demo}\n  §CL{A:pub}\n    §MT{Echo:pub} (A:value) -> A\n      §R value\n";
+        var source = "module Demo\n  class A\n    func Echo (A:value) → A\n      return value\n";
         var file = Write("active.calr", source);
         var before = Store.Sync([file]);
-        var after = source.Replace("§CL{A:", "§CL{B:").Replace("(A:value)", "(B:value)").Replace("-> A", "-> B");
+        var after = source.Replace("class A", "class B").Replace("(A:value)", "(B:value)").Replace("→ A", "→ B");
         var result = Store.Apply([new(file, source, after)]);
         Assert.Equal(before.Declarations.Single(d => d.Name == "Echo").Id,
             result.Declarations.Single(d => d.Name == "Echo").Id);
@@ -266,8 +266,8 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     [Fact]
     public async Task McpClassRenameReportsExistingTypeIndexLimitationWithoutEdits()
     {
-        var source = "§M{Demo}\n  §CL{A:pub}\n    §MT{Echo:pub} (A:value) -> A\n      §R value\n"
-            + "    §MT{Echo:pub} (i32:value) -> i32\n      §R value\n";
+        var source = "module Demo\n  class A\n    func Echo (A:value) → A\n      return value\n"
+            + "    func Echo (int:value) → int\n      return value\n";
         var file = Write("active.calr", source);
         Store.Sync([file]);
         var sidecar = File.ReadAllText(Store.SidecarPath);
@@ -275,7 +275,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
             JsonSerializer.SerializeToElement(new
             {
                 action = "rename", projectDirectory = _root, filePath = file,
-                line = 2, column = 7, newName = "B"
+                line = 2, column = 9, newName = "B"
             }));
         Assert.True(result.IsError);
         Assert.Contains("TypeReferencesNotIndexed", result.Content.Single().Text);
@@ -289,16 +289,16 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     public void ClassRenamePreservesSelfTypedOverloadsWithOrWithoutExplicitRelocation(bool explicitRelocation)
     {
         const string source = """
-            §M{Demo}
-              §CL{A:pub}
-                §MT{Echo:pub} (A:value) -> A
-                  §R value
-                §MT{Echo:pub} (i32:value) -> i32
-                  §R value
+            module Demo
+              class A
+                func Echo (A:value) → A
+                  return value
+                func Echo (int:value) → int
+                  return value
             """;
         var file = Write("active.calr", source);
         var before = Store.Sync([file]);
-        var renamed = source.Replace("§CL{A:", "§CL{B:").Replace("(A:value)", "(B:value)").Replace("-> A", "-> B");
+        var renamed = source.Replace("class A", "class B").Replace("(A:value)", "(B:value)").Replace("→ A", "→ B");
         var relocation = new DeclarationRelocation(before.Declarations.Single(d => d.Name == "A").Id,
             DeclarationIdentityStore.Describe("active.calr", renamed).Single(d => d.Name == "B").Key);
         Store.Apply([new(file, source, renamed)], explicitRelocation ? [relocation] : []);
@@ -312,17 +312,17 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     public void AmbiguousSelfTypedOverloadEditsAfterClassRenameWriteNothing()
     {
         const string source = """
-            §M{Demo}
-              §CL{A:pub}
-                §MT{Echo:pub} (A:value) -> A
-                  §R value
-                §MT{Echo:pub} (A:value, i32:count) -> A
-                  §R value
+            module Demo
+              class A
+                func Echo (A:value) → A
+                  return value
+                func Echo (A:value, int:count) → A
+                  return value
             """;
         var file = Write("active.calr", source);
         Store.Sync([file]);
         var sidecar = File.ReadAllText(Store.SidecarPath);
-        var renamed = source.Replace("§CL{A:", "§CL{B:").Replace("(A:value", "(B:value").Replace("-> A", "-> B");
+        var renamed = source.Replace("class A", "class B").Replace("(A:value", "(B:value").Replace("→ A", "→ B");
         Assert.Contains("Ambiguous", Assert.Throws<InvalidOperationException>(() =>
             Store.Apply([new(file, source, renamed)])).Message);
         Assert.Equal(source, File.ReadAllText(file));
@@ -339,24 +339,24 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     {
         var member = memberKind switch
         {
-            "property" => "§PROP{P:i32:pub}",
-            "init" => "§PROP{P:i32:pub}",
-            "indexer" => "§IXER{i32:pub}\n      §I{i32:index}",
-            _ => "§EVT{Changed:pub:EventHandler}"
+            "property" => "property int:P",
+            "init" => "property int:P",
+            "indexer" => "this[int:index] → int",
+            _ => "event EventHandler:Changed"
         };
-        var firstAccessor = memberKind == "event" ? "§EADD" : "§GET";
-        var secondAccessor = memberKind == "event" ? "§EREM" : memberKind == "init" ? "§INIT" : "§SET";
-        var source = "§M{Demo}\n  §CL{A:pub}\n    " + member + "\n"
-            + "      " + firstAccessor + "\n        §PROOF{\"Helper\"} (> 1 0)\n        §R 1\n"
-            + "      " + secondAccessor + "\n        §PROOF{\"Helper\"} (> 1 0)\n        §R 2\n";
+        var firstAccessor = memberKind == "event" ? "add" : "get";
+        var secondAccessor = memberKind == "event" ? "remove" : memberKind == "init" ? "init" : "set";
+        var source = "module Demo\n  class A\n    " + member + "\n"
+            + "      " + firstAccessor + "\n        proof{\"Helper\"} 1 > 0\n        return 1\n"
+            + "      " + secondAccessor + "\n        proof{\"Helper\"} 1 > 0\n        return 2\n";
         var file = Write("active.calr", source);
         var before = Store.Sync([file]).Declarations.Where(d => d.Name == "Helper").ToArray();
         Assert.Equal(2, before.Length);
         Assert.NotEqual(before[0].Container, before[1].Container);
         Assert.NotEqual(before[0].Id, before[1].Id);
-        File.WriteAllText(file, source.Replace("§R 1", "§R 3").Replace("§R 2", "§R 4"));
+        File.WriteAllText(file, source.Replace("return 1", "return 3").Replace("return 2", "return 4"));
         Assert.Equal(before, Store.Sync().Declarations.Where(d => d.Name == "Helper"));
-        var renamed = File.ReadAllText(file).Replace("§CL{A:", "§CL{B:");
+        var renamed = File.ReadAllText(file).Replace("class A", "class B");
         Store.Apply([new(file, File.ReadAllText(file), renamed)]);
         Assert.Equal(before.Select(d => d.Id).Order(), Store.Sync().Declarations.Where(d => d.Name == "Helper").Select(d => d.Id).Order());
     }
@@ -398,10 +398,10 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     public void NativeRecordRenameAndMoveRetainRecordPropertyAndConstructorIdentity()
     {
         const string source = """
-            §M{Records}
-              record P:pub (int:X, int:Y)
-                §MT{Sum:pub} () -> int
-                  §R X + Y
+            module Records
+              record P (int:X, int:Y)
+                func Sum () → int
+                  return X + Y
             """;
         var file = Write("before.calr", source);
         var before = Store.Sync([file]);
@@ -410,7 +410,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
             .Select(declaration => declaration.Id).Order().ToArray();
         Assert.Equal(2, propertyIds.Length);
         var ctorId = before.Declarations.Single(declaration => declaration.Kind == IdKind.Constructor).Id;
-        var destination = Write("after.calr", source.Replace("record P:", "record Q:"));
+        var destination = Write("after.calr", source.Replace("record P", "record Q"));
         File.Delete(file);
         var after = Store.Sync([destination]);
         Assert.Equal(recordId, after.Declarations.Single(declaration => declaration.Kind == IdKind.Record).Id);
@@ -425,7 +425,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     [Fact]
     public void AmbiguousTextRenamesWriteNothing()
     {
-        var before = Original + "\n  §F{Other:pub} (i32:x) -> i32\n    §R x";
+        var before = Original + "\n  func Other (int:x) → int\n    return x";
         var file = Write("active.calr", before);
         Store.Sync([file]);
         var bytes = File.ReadAllBytes(Store.SidecarPath);
@@ -438,7 +438,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     [Fact]
     public void ExplicitRelocationsDisambiguateTwoRenamesAtomically()
     {
-        var before = Original + "\n  §F{Other:pub} (i32:x) -> i32\n    §R x";
+        var before = Original + "\n  func Other (int:x) → int\n    return x";
         var file = Write("active.calr", before);
         var state = Store.Sync([file]);
         var after = before.Replace("Add", "Sum").Replace("Other", "Again");
@@ -473,7 +473,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     [Fact]
     public void RemovedSourceIdentityFieldCannotLeaveAnInvalidJournal()
     {
-        var source = Original.Replace("§F{Add", "§F{" + CompactIdGenerator.Generate(IdKind.Module) + ":Add");
+        var source = Original.Replace("func Add", "func " + CompactIdGenerator.Generate(IdKind.Module) + ":Add");
         var file = Write("active.calr", source);
         Assert.Throws<DeclarationIdentityParseException>(() => Store.Sync([file]));
         Assert.False(File.Exists(Store.SidecarPath));
@@ -498,13 +498,13 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     public void SameFilePartialTypeFragmentsShareIdentityWithoutSelectingALegacyFragmentId()
     {
         const string source = """
-            §M{Demo}
-              §CL{Parts:pub:partial}
-                §MT{First:pub} () -> i32
-                  §R 1
-              §CL{Parts:pub:partial}
-                §MT{Second:pub} () -> i32
-                  §R 2
+            module Demo
+              class Parts partial
+                func First () → int
+                  return 1
+              class Parts partial
+                func Second () → int
+                  return 2
             """;
         var file = Write("active.calr", source);
         var before = Store.Sync([file]);
@@ -522,13 +522,13 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     public void IndexEnrollsItsActiveInputsAndProjectsNonBinderDeclarations()
     {
         const string source = """
-            §M{Demo}
-              §CL{Container:pub}
-                §FLD{i32:count:pub}
-                §EVT{Changed:pub:EventHandler}
-              §F{Main:pub} () -> i32
-                §PROOF{positive} (> 1 0)
-                §R 1
+            module Demo
+              class Container
+                field int:count public
+                event EventHandler:Changed
+              func Main () → int
+                proof{"positive"} 1 > 0
+                return 1
             """;
         var file = Write("active.calr", source);
         Write("historical.calr", "frozen invalid syntax");
@@ -588,14 +588,14 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     [Fact]
     public void OverloadsUseTypesAndRefModifiersRatherThanParameterNames()
     {
-        var before = Original + "\n  §F{Add:pub} (str:value) -> str\n    §R value";
+        var before = Original + "\n  func Add (string:value) → string\n    return value";
         var file = Write("active.calr", before);
         var initial = Store.Sync([file]);
-        File.WriteAllText(file, before.Replace("Add", "Sum").Replace("i32:x", "i32:input").Replace("§R x", "§R input"));
+        File.WriteAllText(file, before.Replace("Add", "Sum").Replace("int:x", "int:input").Replace("return x", "return input"));
         var result = Store.Sync();
         Assert.Equal(initial.Declarations.Where(d => d.Kind == IdKind.Function).Select(d => d.Id).Order(),
             result.Declarations.Where(d => d.Kind == IdKind.Function).Select(d => d.Id).Order());
-        var refVersion = DeclarationIdentityStore.Describe("ref.calr", Original.Replace("i32:x", "i32:x:ref"));
+        var refVersion = DeclarationIdentityStore.Describe("ref.calr", Original.Replace("int:x", "ref int:x"));
         Assert.NotEqual(initial.Declarations.Single(d => d.Name == "Add" && d.Signature.Contains("i32")).Signature,
             refVersion.Single(d => d.Name == "Add").Signature);
     }
@@ -604,18 +604,18 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     public void MoveBetweenClassesAndFilesKeepsBoundSymbolIdentity()
     {
         const string before = """
-            §M{Demo}
-              §CL{A:pub}
-                §MT{Work:pub} (i32:x) -> i32
-                  §R x
-              §CL{B:pub}
+            module Demo
+              class A
+                func Work (int:x) → int
+                  return x
+              class B
             """;
         const string after = """
-            §M{Demo}
-              §CL{A:pub}
-              §CL{B:pub}
-                §MT{Work:pub} (i32:x) -> i32
-                  §R x
+            module Demo
+              class A
+              class B
+                func Work (int:x) → int
+                  return x
             """;
         var file = Write("before.calr", before);
         var initial = Store.Sync([file]);
@@ -664,13 +664,13 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     public void NamedModulesUseExactModuleKindAndRetainNestedIdentityAcrossRename()
     {
         const string source = """
-            §M{Demo}
-              §M{Tools:pub}
-                §F{Work:pub} () -> i32
-                  §R 1
-                §M{Nested:pub}
-                  §F{Inner:pub} () -> i32
-                    §R 2
+            module Demo
+              module Tools
+                func Work () → int
+                  return 1
+                module Nested
+                  func Inner () → int
+                    return 2
             """;
         var file = Write("active.calr", source);
         var before = Store.Sync([file]);
@@ -687,7 +687,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
         Assert.Contains(bound.SymbolsById.Keys,
             id => id == SymbolId.Create("declaration", after.Declarations.Single(d => d.Name == "Helpers").Id));
         var emitted = new CalorEmitter().Emit(ast);
-        Assert.Contains("§M{", emitted);
+        Assert.Contains("module Helpers", emitted);
         foreach (var declaration in after.Declarations)
             Assert.DoesNotContain(declaration.Id, emitted);
     }
@@ -699,7 +699,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
             isAbstract: false, isSealed: false, isPartial: false, isStatic: true, baseClass: null,
             implementedInterfaces: [], typeParameters: [], fields: [], properties: [], constructors: [],
             methods: [], attributes: new AttributeCollection(), csharpAttributes: []);
-        var module = CalorSourceHelper.Parse("§M{Demo}").Ast!.With(update => update.Items = [legacy]);
+        var module = CalorSourceHelper.Parse(Original).Ast!.With(update => update.Items = [legacy]);
         Assert.True(legacy.IsStatic);
         Assert.False(legacy.IsModule);
         var identity = Assert.Single(new IdScanner().Scan(module, "legacy-ast.calr").Where(d => d.Name == "Legacy"));
@@ -722,7 +722,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     [Fact]
     public void ContractReconstructionPreservesBothSourceAndToolingIdentity()
     {
-        var source = Original.Replace("§R x", "§Q (== INT:1 INT:1)\n    §R x");
+        var source = Original.Replace("return x", "=> 1 == 1\n    return x");
         var file = Write("active.calr", source);
         var state = Store.Sync([file]);
         var ast = CalorSourceHelper.Parse(source, file).Ast!;
@@ -893,7 +893,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     public void CanonicalLookingSemanticNameNeverSelectsSidecarIdentity()
     {
         var functionId = CompactIdGenerator.Generate(IdKind.Function);
-        var source = Original.Replace("§F{Add", "§F{" + functionId);
+        var source = Original.Replace("func Add", "func " + functionId);
         var file = Write("active.calr", source);
         var state = Store.Sync([file]);
         Assert.NotEqual(functionId, state.Declarations.Single(d => d.Name == functionId).Id);
@@ -926,7 +926,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     [Fact]
     public async Task McpRenameUsesPositionsAndKeepsNavigationIdentity()
     {
-        var source = Original + "\n  §F{Use:pub} () -> i32\n    §R §C{Add} §A 1 §/C";
+        var source = Original + "\n  func Use () → int\n    return Add(1)";
         var file = Write("active.calr", source);
         var initial = Store.Sync([file]);
         var sessions = new ProjectSessionManager();
@@ -934,12 +934,12 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
         var result = await tool.ExecuteAsync(JsonSerializer.SerializeToElement(new
         {
             action = "rename", projectDirectory = _root, filePath = file,
-            line = 2, column = 7, newName = "Sum"
+            line = 2, column = 8, newName = "Sum"
         }));
         Assert.False(result.IsError, result.Content.Single().Text);
         var updated = File.ReadAllText(file);
-        Assert.Contains("§F{Sum:pub}", updated);
-        Assert.Contains("§C{Sum}", updated);
+        Assert.Contains("func Sum", updated);
+        Assert.Contains("Sum(1)", updated);
         var parsed = CalorSourceHelper.Parse(updated, file);
         Assert.Equal(initial.Declarations.Single(d => d.Name == "Add").Id, parsed.Ast!.Functions.Single(f => f.Name == "Sum").Id);
     }
@@ -948,18 +948,18 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     public async Task McpMoveAcrossClassesAndFilesRetainsExactIdentity()
     {
         const string before = """
-            §M{Demo}
-              §CL{A:pub}
-                §MT{Work:pub} (i32:x) -> i32
-                  §R x
-              §CL{B:pub}
+            module Demo
+              class A
+                func Work (int:x) → int
+                  return x
+              class B
             """;
         const string after = """
-            §M{Demo}
-              §CL{A:pub}
-              §CL{B:pub}
-                §MT{Work:pub} (i32:x) -> i32
-                  §R x
+            module Demo
+              class A
+              class B
+                func Work (int:x) → int
+                  return x
             """;
         var file = Write("before.calr", before);
         var initial = Store.Sync([file]);
@@ -968,8 +968,8 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
         var tool = new FileWriteTool(sessions, _root);
         var result = await tool.ExecuteAsync(JsonSerializer.SerializeToElement(new
         {
-            action = "move", projectDirectory = _root, filePath = file, line = 3, column = 9,
-            destinationFile = destination, destinationLine = 4, destinationColumn = 9,
+            action = "move", projectDirectory = _root, filePath = file, line = 3, column = 10,
+            destinationFile = destination, destinationLine = 4, destinationColumn = 10,
             changes = new[]
             {
                 new { path = file, originalSource = (string?)before, modifiedSource = (string?)null },
@@ -994,7 +994,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
         var result = await tool.ExecuteAsync(JsonSerializer.SerializeToElement(new
         {
             action = "rename", projectDirectory = _root, filePath = file,
-            line = 2, column = 7, newName = "Sum", preview = true
+            line = 2, column = 8, newName = "Sum", preview = true
         }));
         Assert.False(result.IsError, result.Content.Single().Text);
         Assert.Equal(Original, File.ReadAllText(file));
@@ -1007,15 +1007,15 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     {
         var file = Write("active.calr", Original);
         var before = Store.Sync([file]);
-        var after = Store.Apply([new(file, Original, Original.Replace("(i32:x)", "(i64:x)"))]);
+        var after = Store.Apply([new(file, Original, Original.Replace("(int:x)", "(long:x)"))]);
         Assert.Equal(before.Declarations.Single(d => d.Name == "Add").Id,
             after.Declarations.Single(d => d.Name == "Add").Id);
-        Store.Apply([new(file, Original.Replace("(i32:x)", "(i64:x)"), Original)]);
-        var overloaded = Original + "\n  §F{Add:pub} (str:x) -> str\n    §R x";
+        Store.Apply([new(file, Original.Replace("(int:x)", "(long:x)"), Original)]);
+        var overloaded = Original + "\n  func Add (string:x) → string\n    return x";
         File.WriteAllText(file, overloaded);
         Store.Sync();
         var sidecar = File.ReadAllBytes(Store.SidecarPath);
-        var changed = overloaded.Replace("(i32:x)", "(i64:x)").Replace("(str:x)", "(bool:x)");
+        var changed = overloaded.Replace("(int:x)", "(long:x)").Replace("(string:x)", "(bool:x)");
         Assert.Throws<InvalidOperationException>(() => Store.Preview([new(file, overloaded, changed)]));
         Assert.Equal(sidecar, File.ReadAllBytes(Store.SidecarPath));
     }
@@ -1024,16 +1024,16 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     public void RenamingAClassPreservesItsOverloadedMembers()
     {
         const string source = """
-            §M{Demo}
-              §CL{A:pub}
-                §MT{One:pub} () -> i32
-                  §R 1
-                §MT{Two:pub} () -> i32
-                  §R 2
+            module Demo
+              class A
+                func One () → int
+                  return 1
+                func Two () → int
+                  return 2
             """;
         var file = Write("active.calr", source);
         var before = Store.Sync([file]);
-        var after = Store.Apply([new(file, source, source.Replace("§CL{A:pub}", "§CL{B:pub}"))]);
+        var after = Store.Apply([new(file, source, source.Replace("class A", "class B"))]);
         Assert.Equal(before.Declarations.Select(d => d.Id).Order(), after.Declarations.Select(d => d.Id).Order());
     }
 
@@ -1043,7 +1043,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
         var file = Write("active.calr", Original);
         Store.Sync([file]);
         var sidecar = File.ReadAllBytes(Store.SidecarPath);
-        File.WriteAllText(file, "§M{Demo}\n  §F{Broken:pub} () -> i32\n    §R (");
+        File.WriteAllText(file, "module Demo\n  func Broken () → int\n    return (");
         var failure = Assert.Throws<DeclarationIdentityParseException>(() => Store.Sync());
         Assert.All(failure.Diagnostics.Errors, diagnostic => Assert.Equal(file, diagnostic.FilePath));
         Assert.Equal(sidecar, File.ReadAllBytes(Store.SidecarPath));
@@ -1060,7 +1060,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
         var file = Write("active.calr", Original);
         if (registered) Store.Sync([file]);
         var before = File.Exists(Store.SidecarPath) ? File.ReadAllText(Store.SidecarPath) : null;
-        var duplicate = Original + "\n  §F{Add:pub} (i32:x) -> i32\n    §R x\n";
+        var duplicate = Original + "\n  func Add (int:x) → int\n    return x\n";
         File.WriteAllText(file, duplicate);
         var failure = Assert.Throws<DeclarationIdentityParseException>(() => Store.Sync([file]));
         var diagnostic = Assert.Single(failure.Diagnostics.Errors);
@@ -1075,21 +1075,21 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     public void ConditionalDeclarationsHaveDistinctStableIdentities()
     {
         const string source = """
-            §M{Demo}
-              §CL{A:pub}
-                §PP{DEBUG}
-                  §MT{Work:pub} () -> i32
-                    §R 1
-                §PPE
-                  §MT{Work:pub} () -> i32
-                    §R 2
+            module Demo
+              class A
+                pp DEBUG
+                  func Work () → int
+                    return 1
+                pp else
+                  func Work () → int
+                    return 2
             """;
         var file = Write("active.calr", source);
         var before = Store.Sync([file]);
         var methods = before.Declarations.Where(d => d.Kind == IdKind.Method).ToArray();
         Assert.Equal(2, methods.Length);
         Assert.NotEqual(methods[0].Id, methods[1].Id);
-        var updated = source.Replace("§MT{Work:pub}", "§MT{Run:pub}");
+        var updated = source.Replace("func Work", "func Run");
         var after = Store.Apply([new(file, source, updated)]);
         Assert.Equal(methods.Select(d => d.Id).Order(), after.Declarations.Where(d => d.Kind == IdKind.Method).Select(d => d.Id).Order());
         var parse = CalorSourceHelper.Parse(updated, file);
@@ -1116,20 +1116,17 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     public void DelegateEventFieldLambdaAndProofIdentitiesSurviveEdits()
     {
         const string source = """
-            §M{Demo}
-              §DEL{Transform}
-                §I{i32:value}
-                §O{i32}
-              §CL{A:pub}
-                §EVT{Changed:pub:EventHandler}
-                §FLD{i32:value:pub}
-              §F{Main:pub} () -> i32
-                §B{Local:System.Func<i32>} §LAM{}
-                  §IF true
-                    §PROOF{"positive"} (> 1 0)
-                  §R 1
-                §/LAM
-                §R 0
+            module Demo
+              delegate Transform (int:value) → int
+              class A
+                event EventHandler:Changed
+                field int:value public
+              func Main () → int
+                let System.Func<int>:Local = () =>
+                  if true
+                    proof{"positive"} 1 > 0
+                  return 1
+                return 0
             """;
         var initialParse = CalorSourceHelper.Parse(source);
         Assert.True(initialParse.IsSuccess, string.Join("; ", initialParse.Errors));
