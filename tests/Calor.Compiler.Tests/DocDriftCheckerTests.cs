@@ -140,7 +140,7 @@ public class DocDriftCheckerTests
         new[] { "True", "200", "42", "42", "42" },
         new[] { "GlobalModule.ProcessOrder()", "GlobalModule.Calculate()", "GlobalModule.GetUser(42)",
             "GlobalModule.Calculate()", "GlobalModule.GetUser(42)" })]
-    [InlineData("structure-tags.mdx", 20, 2,
+    [InlineData("structure-tags.mdx", 22, 4,
         new[] { "StructureModules", "BlockNamespace", "FunctionHeaders", "AsyncFunctions", "AsyncMethods",
             "AwaitExpressions", "LambdaExamples", "AsyncLambdas", "LocalCallables", "DelegateDefinitions",
             "EnumDefinitions", "EnumExtensions", "EventDefinitions", "ParameterArrays", "ArrayDeclarations",
@@ -151,7 +151,7 @@ public class DocDriftCheckerTests
             "GlobalModule.Read().GetAwaiter().GetResult() + \":\" + GlobalModule.ExplicitTask().GetAwaiter().GetResult() + \":\" + GlobalModule.ExplicitValueTask().GetAwaiter().GetResult()",
             "GlobalModule.Main().GetAwaiter().GetResult()", "GlobalModule.Main().GetAwaiter().GetResult()",
             "GlobalModule.Main()", "GlobalModule.Main().GetAwaiter().GetResult()", "GlobalModule.Use(2)",
-            "GlobalModule.Main()", "GlobalModule.Main()", "Color.Red.ToHex() + \":\" + Color.Blue.IsPrimary()",
+            "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()",
             "new SubscriptionCounter().Count", "GlobalModule.Main()",
             "new DataProcessor().ProcessData(new string[] { \"a\", \"b\" }) + \":\" + GlobalModule.First(new int[][] { new int[] { 7 } })",
             "GlobalModule.Main()", "GlobalModule.Main()", "new Data().Read()" })]

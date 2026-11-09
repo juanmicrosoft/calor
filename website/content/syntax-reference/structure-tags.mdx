@@ -395,14 +395,19 @@ module EnumExtensions
       !
       return self == Color.Red || self == Color.Green || self == Color.Blue
 
+  func Main () → string
+    !
+    return ColorExtensions.ToHex(Color.Red) + ":" + ColorExtensions.IsPrimary(Color.Blue)
 ```
 
-The methods are CLR static extension methods on `ColorExtensions`; the
-receiver remains `Color`. A CLR caller evaluating
-`Color.Red.ToHex() + ":" + Color.Blue.IsPrimary()` gets `"#FF0000:True"`.
-This is a CLR observation of native declarations, not native invocation
-coverage. Both receiver-style and explicit static native calls currently
-fail effect resolution instead of inheriting the extension's pure row.
+`Main()` returns `"#FF0000:True"` through normally enforced **native explicit
+static calls**. The binder retains the actual source enum owner and member
+identity when selecting the overload; it does not substitute an integer or a
+same-named metadata enum.
+
+The methods also carry CLR extension-method metadata. A C# caller evaluating
+`Color.Red.ToHex() + ":" + Color.Blue.IsPrimary()` gets the same string, but
+that receiver-style C# observation is separate from native invocation support.
 
 The following complete negative example reports `Calor0410` and `Calor0411`.
 It does not establish native receiver-style invocation support.
@@ -418,9 +423,40 @@ module EnumReceiverLimit
   func Receiver () → string
     !
     return Color.Red.ToHex()
-  func Static () → string
+```
+
+Two other forms remain explicit limits. An escaped enum member can bind to
+the correct source symbol while the separate AST type checker still rejects
+the program with `Calor0200`:
+
+```calor expect=Calor0200
+module EscapedEnumLimit
+  enum Color
+    @event = 7
+  module Extensions
+    func Pick (Color:value) → int
+      !
+      return 7
+  func Main () → int
     !
-    return ColorExtensions.ToHex(Color.Red)
+    return Extensions.Pick(Color.@event)
+```
+
+An explicit `global::` qualifier in this argument position is not current
+native grammar. This complete negative reports `Calor0100`, not a successful
+escape from the shadowing parameter:
+
+```calor expect=Calor0100
+module GlobalEnumLimit
+  enum Color
+    Red
+  module Extensions
+    func Pick (Color:value) → int
+      !
+      return 7
+  func Main (int:Color) → int
+    !
+    return Extensions.Pick(global::Color.Red)
 ```
 
 ## Event Definitions
