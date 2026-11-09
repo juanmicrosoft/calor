@@ -189,7 +189,7 @@ public class GenericCallTests
         var result = node.Accept(emitter);
 
         Assert.Contains("items.Cast<int>", result);
-        Assert.Contains("§C{", result);
+        Assert.Equal("items.Cast<int>()", result);
     }
 
     #endregion
@@ -296,6 +296,7 @@ public class GenericCallTests
         });
 
         Assert.False(compileResult.HasErrors, FormatDiagnostics(compileResult));
+        Assert.True(GeneratedCSharpCompiler.Validate(compileResult.GeneratedCode!).CompilationSuccess);
         return compileResult.GeneratedCode;
     }
 
