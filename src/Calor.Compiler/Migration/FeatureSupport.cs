@@ -779,6 +779,13 @@ public static class FeatureSupport
             Description = "Compilation units with extern aliases preserve the complete source verbatim",
             Workaround = "Preserve the compilation unit and aliased references as C# interop"
         },
+        ["alias-qualified-value"] = new FeatureInfo
+        {
+            Name = "alias-qualified-value",
+            Support = SupportLevel.NotSupported,
+            Description = "Value references with global:: or a namespace alias qualifier preserve their containing C# member and qualifier. Qualified types, imports, constraints and nameof keep their existing conversion paths.",
+            Workaround = "Keep the original C# member as counted interop; native value expressions do not admit :: qualifiers"
+        },
 
         ["namespace"] = new FeatureInfo
         {

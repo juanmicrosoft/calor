@@ -6228,6 +6228,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private static string? GetRequiredCapabilityFeature(Exception exception)
         => exception is MemberInteropEscalationException escalation
             && (escalation.FeatureName is "tuple-deconstruction" or "iterator-accessor" or "partial-property"
+                or "alias-qualified-value"
                 || SyntaxCapabilityClassifier.RequiredUnsupportedFeatures.Contains(
                     escalation.FeatureName))
                 ? escalation.FeatureName
@@ -11002,7 +11003,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 AnonymousMethodExpressionSyntax anonMethod => ConvertAnonymousMethodExpression(anonMethod),
                 // #943 (D1 RO-UNS-1): `=> ref a[0]` is preserved as block-bodied ref returns are.
                 RefExpressionSyntax refExpr => throw EscalateExpression(refExpr, "ref-parameter"),
-                AliasQualifiedNameSyntax aliasName => new ReferenceNode(GetTextSpan(aliasName), aliasName.Name.ToString()),
+                AliasQualifiedNameSyntax aliasName =>
+                    throw EscalateExpression(aliasName, "alias-qualified-value", preserveMember: true),
                 QualifiedNameSyntax qualifiedName => new ReferenceNode(GetTextSpan(qualifiedName), qualifiedName.ToString()),
                 ImplicitElementAccessSyntax implicitElement =>
                     new ArrayAccessNode(GetTextSpan(implicitElement),
@@ -13610,6 +13612,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     : null);
         }
         var target = ConvertInvocationTarget(invocation);
+        // nameof's operand is a name, not a value expression.
+        if (target == "nameof" && invocation.ArgumentList.Arguments.Count == 1)
+        {
+            _context.RecordFeatureUsage("nameof");
+            _context.IncrementConverted();
+            var argText = invocation.ArgumentList.Arguments[0].Expression.ToString();
+            if (argText.StartsWith("@"))
+                argText = argText[1..];
+            return new NameOfExpressionNode(GetTextSpan(invocation), argText);
+        }
         // #1677 (Codex round 1): C# evaluates the receiver before the arguments, so it is
         // converted first and its hoists (`_chainNext = c.Next()`) come before the arguments'.
         // The safety net below reuses it instead of converting it again (a second conversion
@@ -13847,18 +13859,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             || target.EndsWith(".WithDegreeOfParallelism") || target.EndsWith(".WithCancellation"))
         {
             _context.RecordFeatureUsage("plinq");
-        }
-
-        // Convert nameof(x) to NameOfExpressionNode
-        if (target == "nameof" && invocation.ArgumentList.Arguments.Count == 1)
-        {
-            _context.RecordFeatureUsage("nameof");
-            _context.IncrementConverted();
-            var argText = invocation.ArgumentList.Arguments[0].Expression.ToString();
-            // Strip C# verbatim identifier prefix @ (e.g., @event → event)
-            if (argText.StartsWith("@"))
-                argText = argText[1..];
-            return new NameOfExpressionNode(GetTextSpan(invocation), argText);
         }
 
         // Safety net: if the target still contains characters that ParseValue() can't handle,

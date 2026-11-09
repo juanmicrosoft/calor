@@ -9,7 +9,7 @@
     "info": 0
   },
   "data": {
-    "totalFeatures": 177,
+    "totalFeatures": 178,
     "features": {
       "full": [
         {
@@ -669,6 +669,11 @@
           "name": "extern-alias",
           "description": "Compilation units with extern aliases preserve the complete source verbatim",
           "workaround": "Preserve the compilation unit and aliased references as C# interop"
+        },
+        {
+          "name": "alias-qualified-value",
+          "description": "Value references with global:: or a namespace alias qualifier preserve their containing C# member and qualifier. Qualified types, imports, constraints and nameof keep their existing conversion paths.",
+          "workaround": "Keep the original C# member as counted interop; native value expressions do not admit :: qualifiers"
         },
         {
           "name": "iterator-accessor",
