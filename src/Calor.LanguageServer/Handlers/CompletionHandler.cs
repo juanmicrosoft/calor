@@ -102,8 +102,16 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 break;
         }
 
-        return Task.FromResult(new CompletionList(items));
+        return Task.FromResult(new CompletionList(items.Select(item =>
+            item.InsertText?.StartsWith('@') == true
+                ? item with { FilterText = item.InsertText }
+                : item)));
     }
+
+    private static string EscapeIdentifier(string name)
+        => Lexer.KeywordNames.Contains(name) || name is "true" or "false" or "null"
+            ? "@" + name
+            : name;
 
     private static IEnumerable<CompletionItem> GetCrossFileTypeCompletions(
         WorkspaceIndexSnapshot workspace,
@@ -130,7 +138,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                         _ => CompletionItemKind.TypeParameter
                     },
                     Detail = $"[{GetFileName(doc.Document.Uri)}] {kind} {name}",
-                    InsertText = name,
+                    InsertText = EscapeIdentifier(name),
                     SortText = "z" + name // Sort after local completions
                 });
             }
@@ -163,7 +171,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                     _ => CompletionItemKind.Reference
                 },
                 Detail = $"[{GetFileName(doc.Document.Uri)}] {kind}{(type != null ? ": " + type : "")}",
-                InsertText = name,
+                InsertText = EscapeIdentifier(name),
                 SortText = "z" + name // Sort after local completions
             });
         }
@@ -273,7 +281,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = c.Name,
                 Kind = CompletionItemKind.Class,
                 Detail = $"class {c.Name}",
-                InsertText = c.Name
+                InsertText = EscapeIdentifier(c.Name)
             }));
 
             // Interfaces
@@ -282,7 +290,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = i.Name,
                 Kind = CompletionItemKind.Interface,
                 Detail = $"interface {i.Name}",
-                InsertText = i.Name
+                InsertText = EscapeIdentifier(i.Name)
             }));
 
             // Enums
@@ -291,7 +299,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = e.Name,
                 Kind = CompletionItemKind.Enum,
                 Detail = $"enum {e.Name}",
-                InsertText = e.Name
+                InsertText = EscapeIdentifier(e.Name)
             }));
         }
 
@@ -317,7 +325,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
             Label = f.Name,
             Kind = CompletionItemKind.Function,
             Detail = $"({string.Join(", ", f.Parameters.Select(p => p.TypeName))}) → {CallableReturnType(f, ast)}",
-            InsertText = f.Name
+            InsertText = EscapeIdentifier(f.Name)
         }));
 
         // Add variables in scope at the current position
@@ -412,7 +420,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
             }
 
             // Extract identifier characters
-            if (char.IsLetterOrDigit(source[start]) || source[start] == '_')
+            if (char.IsLetterOrDigit(source[start]) || source[start] is '_' or '@')
             {
                 start--;
                 continue;
@@ -471,15 +479,19 @@ public sealed class CompletionHandler : CompletionHandlerBase
         int offset,
         WorkspaceIndexSnapshot workspace)
     {
-        // Handle 'this' keyword
-        if (expression == "this")
+        var escaped = expression.StartsWith('@');
+        if (escaped)
+            expression = expression[1..];
+
+        // Escaped instance words refer to declared symbols, not the current instance.
+        if (!escaped && expression == "this")
         {
             var containingClass = FindContainingClass(ast, offset);
             return containingClass?.Name;
         }
 
         // Handle 'base' keyword
-        if (expression == "base")
+        if (!escaped && expression == "base")
         {
             var containingClass = FindContainingClass(ast, offset);
             return containingClass?.BaseClass;
@@ -581,7 +593,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 return null;
 
             var part = parts[i];
-            var nextType = ResolveMemberType(currentType, part.Name, part.IsMethodCall, ast, workspace);
+            var nextType = ResolveMemberType(currentType, part.Name.TrimStart('@'), part.IsMethodCall, ast, workspace);
 
             if (nextType == null)
                 return currentType; // Return what we have so far
@@ -695,7 +707,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
     {
         var parenIndex = expression.LastIndexOf('(');
         if (parenIndex > 0)
-            return expression.Substring(0, parenIndex);
+            return expression.Substring(0, parenIndex).TrimStart('@');
         return null;
     }
 
@@ -1000,6 +1012,8 @@ public sealed class CompletionHandler : CompletionHandlerBase
         WorkspaceIndexSnapshot workspace,
         string? containingType)
     {
+        methodName = methodName.TrimStart('@');
+
         // If we have a containing type, search for methods on that type
         if (containingType != null)
         {
@@ -1164,7 +1178,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = field.Name,
                 Kind = CompletionItemKind.Field,
                 Detail = $"{inheritedPrefix}(field) {field.Name}: {field.TypeName}",
-                InsertText = field.Name
+                InsertText = EscapeIdentifier(field.Name)
             });
         }
 
@@ -1179,7 +1193,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = prop.Name,
                 Kind = CompletionItemKind.Property,
                 Detail = $"{inheritedPrefix}(property) {prop.Name}: {prop.TypeName}",
-                InsertText = prop.Name
+                InsertText = EscapeIdentifier(prop.Name)
             });
         }
 
@@ -1195,7 +1209,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = method.Name,
                 Kind = CompletionItemKind.Method,
                 Detail = $"{inheritedPrefix}(method) {method.Name}({paramList}): {CallableReturnType(method, ast, cls)}",
-                InsertText = method.Name
+                InsertText = EscapeIdentifier(method.Name)
             });
         }
 
@@ -1226,7 +1240,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                         Label = method.Name,
                         Kind = CompletionItemKind.Method,
                         Detail = $"(interface {ifaceName}) {method.Name}({paramList}): {method.Output?.TypeName ?? "void"}",
-                        InsertText = method.Name
+                        InsertText = EscapeIdentifier(method.Name)
                     });
                 }
             }
@@ -1237,9 +1251,9 @@ public sealed class CompletionHandler : CompletionHandlerBase
     {
         return new[]
         {
-            new CompletionItem { Label = "Length", Kind = CompletionItemKind.Property, Detail = "(property) Length: INT", InsertText = "Length" },
+            new CompletionItem { Label = "Length", Kind = CompletionItemKind.Property, Detail = "(property) Length: int", InsertText = "Length" },
             new CompletionItem { Label = "Clone", Kind = CompletionItemKind.Method, Detail = "(method) Clone(): Array", InsertText = "Clone" },
-            new CompletionItem { Label = "CopyTo", Kind = CompletionItemKind.Method, Detail = "(method) CopyTo(dest: Array, index: INT): void", InsertText = "CopyTo" },
+            new CompletionItem { Label = "CopyTo", Kind = CompletionItemKind.Method, Detail = "(method) CopyTo(dest: Array, index: int): void", InsertText = "CopyTo" },
         };
     }
 
@@ -1255,7 +1269,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = method.Name,
                 Kind = CompletionItemKind.Method,
                 Detail = $"(method) {method.Name}({paramList}): {method.Output?.TypeName ?? "void"}",
-                InsertText = method.Name
+                InsertText = EscapeIdentifier(method.Name)
             });
         }
 
@@ -1273,7 +1287,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = member.Name,
                 Kind = CompletionItemKind.EnumMember,
                 Detail = $"(enum member) {en.Name}.{member.Name}" + (member.Value != null ? $" = {member.Value}" : ""),
-                InsertText = member.Name
+                InsertText = EscapeIdentifier(member.Name)
             });
         }
 
@@ -1292,7 +1306,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = method.Name,
                 Kind = CompletionItemKind.Method,
                 Detail = $"(extension) {method.Name}({paramList}): {CallableReturnType(method, ast)}",
-                InsertText = method.Name
+                InsertText = EscapeIdentifier(method.Name)
             });
         }
 
@@ -1310,7 +1324,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = field.Name,
                 Kind = CompletionItemKind.Field,
                 Detail = $"(field) {field.Name}: {field.TypeName}",
-                InsertText = field.Name
+                InsertText = EscapeIdentifier(field.Name)
             });
         }
 
@@ -1321,17 +1335,17 @@ public sealed class CompletionHandler : CompletionHandlerBase
     {
         return new[]
         {
-            new CompletionItem { Label = "Length", Kind = CompletionItemKind.Property, Detail = "(property) Length: INT", InsertText = "Length" },
-            new CompletionItem { Label = "ToUpper", Kind = CompletionItemKind.Method, Detail = "(method) ToUpper(): STRING", InsertText = "ToUpper" },
-            new CompletionItem { Label = "ToLower", Kind = CompletionItemKind.Method, Detail = "(method) ToLower(): STRING", InsertText = "ToLower" },
-            new CompletionItem { Label = "Trim", Kind = CompletionItemKind.Method, Detail = "(method) Trim(): STRING", InsertText = "Trim" },
-            new CompletionItem { Label = "Substring", Kind = CompletionItemKind.Method, Detail = "(method) Substring(start: INT, length: INT): STRING", InsertText = "Substring" },
-            new CompletionItem { Label = "Contains", Kind = CompletionItemKind.Method, Detail = "(method) Contains(value: STRING): BOOL", InsertText = "Contains" },
-            new CompletionItem { Label = "StartsWith", Kind = CompletionItemKind.Method, Detail = "(method) StartsWith(value: STRING): BOOL", InsertText = "StartsWith" },
-            new CompletionItem { Label = "EndsWith", Kind = CompletionItemKind.Method, Detail = "(method) EndsWith(value: STRING): BOOL", InsertText = "EndsWith" },
-            new CompletionItem { Label = "Replace", Kind = CompletionItemKind.Method, Detail = "(method) Replace(old: STRING, new: STRING): STRING", InsertText = "Replace" },
-            new CompletionItem { Label = "Split", Kind = CompletionItemKind.Method, Detail = "(method) Split(separator: STRING): LIST<STRING>", InsertText = "Split" },
-            new CompletionItem { Label = "IndexOf", Kind = CompletionItemKind.Method, Detail = "(method) IndexOf(value: STRING): INT", InsertText = "IndexOf" },
+            new CompletionItem { Label = "Length", Kind = CompletionItemKind.Property, Detail = "(property) Length: int", InsertText = "Length" },
+            new CompletionItem { Label = "ToUpper", Kind = CompletionItemKind.Method, Detail = "(method) ToUpper(): string", InsertText = "ToUpper" },
+            new CompletionItem { Label = "ToLower", Kind = CompletionItemKind.Method, Detail = "(method) ToLower(): string", InsertText = "ToLower" },
+            new CompletionItem { Label = "Trim", Kind = CompletionItemKind.Method, Detail = "(method) Trim(): string", InsertText = "Trim" },
+            new CompletionItem { Label = "Substring", Kind = CompletionItemKind.Method, Detail = "(method) Substring(start: int, length: int): string", InsertText = "Substring" },
+            new CompletionItem { Label = "Contains", Kind = CompletionItemKind.Method, Detail = "(method) Contains(value: string): bool", InsertText = "Contains" },
+            new CompletionItem { Label = "StartsWith", Kind = CompletionItemKind.Method, Detail = "(method) StartsWith(value: string): bool", InsertText = "StartsWith" },
+            new CompletionItem { Label = "EndsWith", Kind = CompletionItemKind.Method, Detail = "(method) EndsWith(value: string): bool", InsertText = "EndsWith" },
+            new CompletionItem { Label = "Replace", Kind = CompletionItemKind.Method, Detail = "(method) Replace(old: string, new: string): string", InsertText = "Replace" },
+            new CompletionItem { Label = "Split", Kind = CompletionItemKind.Method, Detail = "(method) Split(separator: string): string[]", InsertText = "Split" },
+            new CompletionItem { Label = "IndexOf", Kind = CompletionItemKind.Method, Detail = "(method) IndexOf(value: string): int", InsertText = "IndexOf" },
         };
     }
 
@@ -1339,14 +1353,14 @@ public sealed class CompletionHandler : CompletionHandlerBase
     {
         return new[]
         {
-            new CompletionItem { Label = "Count", Kind = CompletionItemKind.Property, Detail = "(property) Count: INT", InsertText = "Count" },
+            new CompletionItem { Label = "Count", Kind = CompletionItemKind.Property, Detail = "(property) Count: int", InsertText = "Count" },
             new CompletionItem { Label = "Add", Kind = CompletionItemKind.Method, Detail = "(method) Add(item: T): void", InsertText = "Add" },
-            new CompletionItem { Label = "Remove", Kind = CompletionItemKind.Method, Detail = "(method) Remove(item: T): BOOL", InsertText = "Remove" },
-            new CompletionItem { Label = "RemoveAt", Kind = CompletionItemKind.Method, Detail = "(method) RemoveAt(index: INT): void", InsertText = "RemoveAt" },
-            new CompletionItem { Label = "Insert", Kind = CompletionItemKind.Method, Detail = "(method) Insert(index: INT, item: T): void", InsertText = "Insert" },
+            new CompletionItem { Label = "Remove", Kind = CompletionItemKind.Method, Detail = "(method) Remove(item: T): bool", InsertText = "Remove" },
+            new CompletionItem { Label = "RemoveAt", Kind = CompletionItemKind.Method, Detail = "(method) RemoveAt(index: int): void", InsertText = "RemoveAt" },
+            new CompletionItem { Label = "Insert", Kind = CompletionItemKind.Method, Detail = "(method) Insert(index: int, item: T): void", InsertText = "Insert" },
             new CompletionItem { Label = "Clear", Kind = CompletionItemKind.Method, Detail = "(method) Clear(): void", InsertText = "Clear" },
-            new CompletionItem { Label = "Contains", Kind = CompletionItemKind.Method, Detail = "(method) Contains(item: T): BOOL", InsertText = "Contains" },
-            new CompletionItem { Label = "IndexOf", Kind = CompletionItemKind.Method, Detail = "(method) IndexOf(item: T): INT", InsertText = "IndexOf" },
+            new CompletionItem { Label = "Contains", Kind = CompletionItemKind.Method, Detail = "(method) Contains(item: T): bool", InsertText = "Contains" },
+            new CompletionItem { Label = "IndexOf", Kind = CompletionItemKind.Method, Detail = "(method) IndexOf(item: T): int", InsertText = "IndexOf" },
         };
     }
 
@@ -1354,15 +1368,15 @@ public sealed class CompletionHandler : CompletionHandlerBase
     {
         return new[]
         {
-            new CompletionItem { Label = "Count", Kind = CompletionItemKind.Property, Detail = "(property) Count: INT", InsertText = "Count" },
+            new CompletionItem { Label = "Count", Kind = CompletionItemKind.Property, Detail = "(property) Count: int", InsertText = "Count" },
             new CompletionItem { Label = "Keys", Kind = CompletionItemKind.Property, Detail = "(property) Keys: ICollection<K>", InsertText = "Keys" },
             new CompletionItem { Label = "Values", Kind = CompletionItemKind.Property, Detail = "(property) Values: ICollection<V>", InsertText = "Values" },
             new CompletionItem { Label = "Add", Kind = CompletionItemKind.Method, Detail = "(method) Add(key: K, value: V): void", InsertText = "Add" },
-            new CompletionItem { Label = "Remove", Kind = CompletionItemKind.Method, Detail = "(method) Remove(key: K): BOOL", InsertText = "Remove" },
+            new CompletionItem { Label = "Remove", Kind = CompletionItemKind.Method, Detail = "(method) Remove(key: K): bool", InsertText = "Remove" },
             new CompletionItem { Label = "Clear", Kind = CompletionItemKind.Method, Detail = "(method) Clear(): void", InsertText = "Clear" },
-            new CompletionItem { Label = "ContainsKey", Kind = CompletionItemKind.Method, Detail = "(method) ContainsKey(key: K): BOOL", InsertText = "ContainsKey" },
-            new CompletionItem { Label = "ContainsValue", Kind = CompletionItemKind.Method, Detail = "(method) ContainsValue(value: V): BOOL", InsertText = "ContainsValue" },
-            new CompletionItem { Label = "TryGetValue", Kind = CompletionItemKind.Method, Detail = "(method) TryGetValue(key: K, out value: V): BOOL", InsertText = "TryGetValue" },
+            new CompletionItem { Label = "ContainsKey", Kind = CompletionItemKind.Method, Detail = "(method) ContainsKey(key: K): bool", InsertText = "ContainsKey" },
+            new CompletionItem { Label = "ContainsValue", Kind = CompletionItemKind.Method, Detail = "(method) ContainsValue(value: V): bool", InsertText = "ContainsValue" },
+            new CompletionItem { Label = "TryGetValue", Kind = CompletionItemKind.Method, Detail = "(method) TryGetValue(key: K, out value: V): bool", InsertText = "TryGetValue" },
         };
     }
 
@@ -1425,7 +1439,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = param.Name,
                 Kind = CompletionItemKind.Variable,
                 Detail = $"(parameter) {param.Name}: {param.TypeName}",
-                InsertText = param.Name,
+                InsertText = EscapeIdentifier(param.Name),
                 SortText = "0" + param.Name // Sort parameters first
             });
         }
@@ -1447,7 +1461,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = variable.Name,
                 Kind = variable.IsMutable ? CompletionItemKind.Variable : CompletionItemKind.Constant,
                 Detail = $"({kindLabel}) {variable.Name}: {variable.TypeName ?? "inferred"}",
-                InsertText = variable.Name,
+                InsertText = EscapeIdentifier(variable.Name),
                 SortText = "1" + variable.Name // Sort local variables after parameters
             });
         }
@@ -1566,7 +1580,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = field.Name,
                 Kind = CompletionItemKind.Field,
                 Detail = $"(field) {field.Name}: {field.TypeName}",
-                InsertText = field.Name,
+                InsertText = EscapeIdentifier(field.Name),
                 SortText = "0" + field.Name
             });
         }
@@ -1579,7 +1593,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = prop.Name,
                 Kind = CompletionItemKind.Property,
                 Detail = $"(property) {prop.Name}: {prop.TypeName}",
-                InsertText = prop.Name,
+                InsertText = EscapeIdentifier(prop.Name),
                 SortText = "0" + prop.Name
             });
         }
@@ -1592,7 +1606,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = param.Name,
                 Kind = CompletionItemKind.Variable,
                 Detail = $"(parameter) {param.Name}: {param.TypeName}",
-                InsertText = param.Name,
+                InsertText = EscapeIdentifier(param.Name),
                 SortText = "1" + param.Name
             });
         }
@@ -1614,7 +1628,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = variable.Name,
                 Kind = variable.IsMutable ? CompletionItemKind.Variable : CompletionItemKind.Constant,
                 Detail = $"({kindLabel}) {variable.Name}: {variable.TypeName ?? "inferred"}",
-                InsertText = variable.Name,
+                InsertText = EscapeIdentifier(variable.Name),
                 SortText = "2" + variable.Name
             });
         }
@@ -1644,7 +1658,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = field.Name,
                 Kind = CompletionItemKind.Field,
                 Detail = $"(field) {field.Name}: {field.TypeName}",
-                InsertText = field.Name,
+                InsertText = EscapeIdentifier(field.Name),
                 SortText = "0" + field.Name
             });
         }
@@ -1657,7 +1671,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = prop.Name,
                 Kind = CompletionItemKind.Property,
                 Detail = $"(property) {prop.Name}: {prop.TypeName}",
-                InsertText = prop.Name,
+                InsertText = EscapeIdentifier(prop.Name),
                 SortText = "0" + prop.Name
             });
         }
@@ -1670,7 +1684,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = param.Name,
                 Kind = CompletionItemKind.Variable,
                 Detail = $"(parameter) {param.Name}: {param.TypeName}",
-                InsertText = param.Name,
+                InsertText = EscapeIdentifier(param.Name),
                 SortText = "1" + param.Name
             });
         }
@@ -1692,7 +1706,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = variable.Name,
                 Kind = variable.IsMutable ? CompletionItemKind.Variable : CompletionItemKind.Constant,
                 Detail = $"({kindLabel}) {variable.Name}: {variable.TypeName ?? "inferred"}",
-                InsertText = variable.Name,
+                InsertText = EscapeIdentifier(variable.Name),
                 SortText = "2" + variable.Name
             });
         }
@@ -1722,7 +1736,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = field.Name,
                 Kind = CompletionItemKind.Field,
                 Detail = $"(field) {field.Name}: {field.TypeName}",
-                InsertText = field.Name,
+                InsertText = EscapeIdentifier(field.Name),
                 SortText = "0" + field.Name
             });
         }
@@ -1735,7 +1749,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = otherProp.Name,
                 Kind = CompletionItemKind.Property,
                 Detail = $"(property) {otherProp.Name}: {otherProp.TypeName}",
-                InsertText = otherProp.Name,
+                InsertText = EscapeIdentifier(otherProp.Name),
                 SortText = "0" + otherProp.Name
             });
         }
@@ -1770,7 +1784,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 Label = variable.Name,
                 Kind = variable.IsMutable ? CompletionItemKind.Variable : CompletionItemKind.Constant,
                 Detail = $"({kindLabel}) {variable.Name}: {variable.TypeName ?? "inferred"}",
-                InsertText = variable.Name,
+                InsertText = EscapeIdentifier(variable.Name),
                 SortText = "2" + variable.Name
             });
         }

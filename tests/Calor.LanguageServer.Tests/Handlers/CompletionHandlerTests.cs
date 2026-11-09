@@ -70,6 +70,98 @@ public class CompletionHandlerTests
     }
 
     [Theory]
+    [InlineData("func", "let")]
+    [InlineData("requires", "true")]
+    [InlineData("requires", "false")]
+    [InlineData("invariant", "null")]
+    public async Task CanonicalCompletion_EscapesCollisionSymbolsAsync(string function, string parameter)
+    {
+        var source = $"module M\n  func @{function} (string:@{parameter}) → string\n    return @{parameter}\n";
+        var compilation = Compiler.Program.Compile(source);
+        Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
+        var workspace = new WorkspaceState();
+        var uri = new Uri("file:///collision-completion.calr");
+        workspace.GetOrCreate(uri, source).Reanalyze();
+        var offset = source.IndexOf("return ", StringComparison.Ordinal) + "return ".Length;
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+        var items = await new CompletionHandler(workspace).Handle(new CompletionParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            Position = new Position(line - 1, column - 1)
+        }, CancellationToken.None);
+
+        foreach (var name in new[] { function, parameter })
+        {
+            var kind = name == function ? CompletionItemKind.Function : CompletionItemKind.Variable;
+            var item = Assert.Single(items.Items, item => item.Label == name && item.Kind == kind);
+            Assert.Equal($"@{name}", item.InsertText);
+            Assert.Equal($"@{name}", item.FilterText);
+        }
+        Assert.Contains(items.Items, item => item.Kind == CompletionItemKind.Constant
+            && item.Label == "true" && item.InsertText == "true");
+        var parameterCompletion = items.Items.Single(item =>
+            item.Label == parameter && item.Kind == CompletionItemKind.Variable);
+        Assert.False(Compiler.Program.Compile(
+            source.Replace($"return @{parameter}", $"return {parameterCompletion.InsertText}", StringComparison.Ordinal)).HasErrors);
+    }
+
+    [Theory]
+    [InlineData("this")]
+    [InlineData("base")]
+    public void CanonicalCompletion_EscapedInstanceWordsResolveTheDeclaredParameter(string parameter)
+    {
+        var source = $"module M\n  func Echo (string:@{parameter}) → string\n    return @{parameter}.Trim()\n";
+        var compilation = Compiler.Program.Compile(source);
+        Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
+
+        var items = LspTestHarness.GetCompletions(source, $"@{parameter}.");
+
+        Assert.Contains(items, item => item.Label == "Length");
+        Assert.Contains(items, item => item.Label == "Trim");
+    }
+
+    [Theory]
+    [InlineData("@let.@Trim().")]
+    [InlineData("@func().")]
+    public void CanonicalCompletion_EscapedChainsPreserveTheReceiver(string expression)
+    {
+        var source = $"module M\n  func @func () → string\n    return \"text\"\n"
+            + $"  func Echo (string:@let) → string\n    return {expression}Trim()\n";
+        var compilation = Compiler.Program.Compile(source);
+        Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
+
+        var items = LspTestHarness.GetCompletions(source, expression);
+
+        Assert.Contains(items, item => item.Label == "Length");
+        Assert.Contains(items, item => item.Label == "Split" && item.Detail?.EndsWith("string[]", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public async Task CanonicalCompletion_CrossFileCollisionsStayEscapedAsync()
+    {
+        const string exported = "module Exported\n  func @func () → string\n    return \"text\"\n";
+        const string source = "module Local\n  func Echo (string:value) → string\n    return value\n";
+        Assert.False(Compiler.Program.Compile(exported).HasErrors);
+        Assert.False(Compiler.Program.Compile(source).HasErrors);
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(new Uri("file:///exported.calr"), exported).Reanalyze();
+        var uri = new Uri("file:///local.calr");
+        workspace.GetOrCreate(uri, source).Reanalyze();
+        var offset = source.IndexOf("return ", StringComparison.Ordinal) + "return ".Length;
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+
+        var items = await new CompletionHandler(workspace).Handle(new CompletionParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            Position = new Position(line - 1, column - 1)
+        }, CancellationToken.None);
+
+        var item = Assert.Single(items.Items, item => item.Label == "func");
+        Assert.Equal("@func", item.InsertText);
+        Assert.Equal("@func", item.FilterText);
+    }
+
+    [Theory]
     [InlineData("Length", false, "int", typeof(int))]
     [InlineData("ToUpper", true, "string", typeof(string))]
     [InlineData("IndexOf", true, "int", typeof(int))]
