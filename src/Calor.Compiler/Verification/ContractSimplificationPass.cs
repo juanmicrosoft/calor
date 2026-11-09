@@ -234,7 +234,8 @@ public sealed class ContractSimplificationPass
             items: RemapItems(
                 iface.Items,
                 iface.Methods,
-                simplifiedMethods)));
+                simplifiedMethods),
+            visibility: iface.Visibility));
     }
 
     private static IReadOnlyList<AstNode> RemapItems(

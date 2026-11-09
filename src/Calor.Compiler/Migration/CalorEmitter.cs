@@ -798,15 +798,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var typeParams = node.TypeParameters.Count > 0
             ? $"<{string.Join(",", node.TypeParameters.Select(tp => Visit(tp)))}>"
             : "";
-        var baseList = node.BaseInterfaces.Count > 0
-            ? $":{string.Join(",", node.BaseInterfaces.Select(TypeMapper.ToSurfaceType))}"
-            : "";
+        var visibility = node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
-        AppendLine($"§IFACE{{{node.Name}{typeParams}{baseList}}}{attrs}");
+        AppendLine($"interface {EscapeCalorIdentifier(node.Name)}{typeParams}{visibility}{attrs}");
         Indent();
 
         EmitTypeParameterConstraints(node.TypeParameters);
+        foreach (var baseInterface in node.BaseInterfaces)
+            AppendLine($"extends {TypeMapper.ToSurfaceType(baseInterface)}");
 
         if (node.Items.Count > 0)
         {
@@ -909,17 +909,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var inlineFmt = TryFormatInlineParams(node.Parameters);
         if (inlineFmt != null)
         {
-            var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
-            var inlineReturn = node.Output != null ? $" -> {TypeMapper.ToSurfaceType(node.Output.TypeName)}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendEffectRowDeclaration(node, $"§MT{{{node.Name}}}{attrs}{typeParams}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
+            var inlineParams = $" ({inlineFmt})";
+            var inlineReturn = node.Output != null ? $" → {TypeMapper.ToSurfaceType(node.Output.TypeName)}{FormatEffectRow(node.Output.Row)}" : "";
+            AppendEffectRowDeclaration(node, $"func {EscapeCalorIdentifier(node.Name)}{typeParams}{typeParamsAfterGroup}{attrs}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendEffectRowDeclaration(node, $"§MT{{{node.Name}}}{attrs}{typeParams}{typeParamsAfterGroup}");
-            Indent();
-            EmitParameterLines(node.Parameters);
-            EmitOutputLine(node.Output);
-            Dedent();
+            throw new InvalidOperationException("Canonical interface method parameters require an inline signature.");
         }
         if (node.TypeParameters.Any(typeParameter =>
                 typeParameter.Constraints.Count > 0))
@@ -938,6 +934,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Calor0410 for Calor0421.
         Indent();
         EmitEffects(node.Effects);
+        foreach (var precondition in node.Preconditions) Visit(precondition);
+        foreach (var postcondition in node.Postconditions) Visit(postcondition);
         Dedent();
 
         EmitBlockEnd($"§/MT");
@@ -1164,7 +1162,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ClassFieldNode node)
     {
         EmitDocComment(node);
-        var visibility = GetVisibilityShorthand(node.Visibility);
+        var visibility = node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
         var typeName = TypeMapper.ToSurfaceType(node.TypeName);
         // #1595: a collection default (§LIST/§HSET/§DICT) is written inline with its closer. It
         // used to become "= default" (null), silently dropping the collection and its elements.
@@ -1176,14 +1174,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
         var modifiers = new List<string>();
-        if (node.IsRequired) modifiers.Add("req");
-        if (node.Modifiers.HasFlag(MethodModifiers.Static)) modifiers.Add("stat");
+        if (node.IsRequired) modifiers.Add("required");
+        if (node.Modifiers.HasFlag(MethodModifiers.Static)) modifiers.Add("static");
         if (node.Modifiers.HasFlag(MethodModifiers.Const)) modifiers.Add("const");
         if (node.Modifiers.HasFlag(MethodModifiers.Readonly)) modifiers.Add("readonly");
         if (node.IsVolatile) modifiers.Add("volatile");
-        var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
+        var modStr = modifiers.Count > 0 ? $" {string.Join(" ", modifiers)}" : "";
 
-        AppendLine($"§FLD{{{typeName}:{EscapeCalorIdentifier(node.Name)}:{visibility}{modStr}}}{attrs}{FormatEffectRow(node.Row)}{defaultVal}");
+        AppendLine($"field {typeName}:{EscapeCalorIdentifier(node.Name)}{visibility}{modStr}{attrs}{FormatEffectRow(node.Row)}{defaultVal}");
 
         return "";
     }
@@ -1268,49 +1266,40 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(PropertyNode node)
     {
         EmitDocComment(node);
-        var visibility = GetVisibilityShorthand(node.Visibility);
+        var visibility = node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
         var typeName = TypeMapper.ToSurfaceType(node.TypeName);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
         var modifiers = new List<string>();
-        if (node.IsRequired) modifiers.Add("req");
-        if (node.IsVirtual) modifiers.Add("virt");
-        if (node.IsOverride) modifiers.Add("over");
-        if (node.IsAbstract) modifiers.Add("abs");
-        if (node.IsSealed) modifiers.Add("seal");
-        if (node.IsStatic) modifiers.Add("stat");
-        var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
+        if (node.IsRequired) modifiers.Add("required");
+        if (node.IsVirtual) modifiers.Add("virtual");
+        if (node.IsOverride) modifiers.Add("override");
+        if (node.IsAbstract) modifiers.Add("abstract");
+        if (node.IsSealed) modifiers.Add("sealed");
+        if (node.IsStatic) modifiers.Add("static");
+        var modStr = modifiers.Count > 0 ? $" {string.Join(" ", modifiers)}" : "";
 
         // Compact auto-property shorthand. #1524: a default with an object initializer stays on
         // the header line too (see AcceptMemberDefault).
         if (node.IsAutoProperty && (node.Getter != null || node.Setter != null || node.Initer != null))
         {
-            var accessors = new List<string>();
-            if (node.Getter != null)
-                accessors.Add(node.Getter.Visibility == Visibility.PrivateProtected ? "privprotget" :
-                              node.Getter.Visibility == Visibility.Private ? "priget" :
-                              node.Getter.Visibility == Visibility.Internal ? "intget" :
-                              node.Getter.Visibility == Visibility.Protected ? "proget" : "get");
-            if (node.Setter != null)
-                accessors.Add(node.Setter.Visibility == Visibility.PrivateProtected ? "privprotset" :
-                              node.Setter.Visibility == Visibility.Private ? "priset" :
-                              node.Setter.Visibility == Visibility.Internal ? "intset" :
-                              node.Setter.Visibility == Visibility.Protected ? "proset" : "set");
-            if (node.Initer != null)
-                accessors.Add("init");
-            var accessorStr = string.Join(",", accessors);
             var defaultVal = node.DefaultValue != null ? $" = {AcceptMemberDefault(node.DefaultValue)}" : "";
             // v0.17 S1, round-4 finding — the row goes here, before the
             // default value, because that is where the parser reads it
             // (Parser.cs TryParseSameLineRow(EffectRowPosition.Property)).
             // Omitting it let a Calor -> Calor re-emit silently strip a
             // hand-written `§PROP{...} §E{cw}` and reopen the escape S1 closed.
-            AppendLine($"§PROP{{{EscapeCalorIdentifier(node.Name)}:{typeName}:{visibility}{modStr}:{accessorStr}}}{attrs}{FormatEffectRow(node.Row)}{defaultVal}");
+            AppendLine($"property {typeName}:{EscapeCalorIdentifier(node.Name)}{visibility}{modStr}{attrs}{FormatEffectRow(node.Row)}{defaultVal}");
+            Indent();
+            if (node.Getter != null) Visit(node.Getter);
+            if (node.Setter != null) Visit(node.Setter);
+            if (node.Initer != null) Visit(node.Initer);
+            Dedent();
             return "";
         }
 
         // Full property syntax with body and closing tag
-        AppendLine($"§PROP{{{EscapeCalorIdentifier(node.Name)}:{typeName}:{visibility}{modStr}}}{attrs}{FormatEffectRow(node.Row)}");
+        AppendLine($"property {typeName}:{EscapeCalorIdentifier(node.Name)}{visibility}{modStr}{attrs}{FormatEffectRow(node.Row)}");
         Indent();
 
         if (node.Getter != null) Visit(node.Getter);
@@ -1392,24 +1381,24 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var keyword = node.Kind switch
         {
-            PropertyAccessorNode.AccessorKind.Get => "GET",
-            PropertyAccessorNode.AccessorKind.Set => "SET",
-            PropertyAccessorNode.AccessorKind.Init => "INIT",
-            _ => "GET"
+            PropertyAccessorNode.AccessorKind.Get => "get",
+            PropertyAccessorNode.AccessorKind.Set => "set",
+            PropertyAccessorNode.AccessorKind.Init => "init",
+            _ => throw new InvalidOperationException($"Unsupported accessor kind: {node.Kind}.")
         };
 
         // Add visibility if different from property visibility
-        var visStr = node.Visibility.HasValue ? $"{{{GetVisibilityShorthand(node.Visibility.Value)}}}" : "";
+        var visStr = node.Visibility.HasValue ? $" {GetVisibilityShorthand(node.Visibility.Value)}" : "";
 
         if (node.IsAutoImplemented)
         {
             // Auto-implemented: just §GET or §GET{{pri}} for restricted visibility
-            AppendLine($"§{keyword}{visStr}");
+            AppendLine($"{keyword}{visStr}");
         }
         else
         {
             // Full body: §GET ... §/GET
-            AppendLine($"§{keyword}{visStr}");
+            AppendLine($"{keyword}{visStr}");
             Indent();
             _memberBodyDepth++;
             foreach (var stmt in node.Body)
@@ -1427,15 +1416,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ConstructorNode node)
     {
         EmitDocComment(node);
-        var visibility = node.IsStatic ? "stat" : GetVisibilityShorthand(node.Visibility);
+        var visibility = node.IsStatic ? " static"
+            : node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
         // Inline params: §CTOR{vis} (type:name, type:name)
         var inlineFmt = TryFormatInlineParams(node.Parameters);
-        if (inlineFmt != null && (node.Parameters.Count > 0 || NeedsEmptyPostfixSignature(node.Body)))
-            AppendLine($"§CTOR{{{visibility}}}{attrs} ({inlineFmt})");
-        else
-            AppendLine($"§CTOR{{{visibility}}}{attrs}");
+        if (inlineFmt == null)
+            throw new InvalidOperationException("Canonical constructor parameters require an inline signature.");
+        AppendLine($"ctor{visibility}{attrs} ({inlineFmt})");
         Indent();
 
         if (inlineFmt == null)
@@ -1463,15 +1452,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 FlushHoistedLines();
                 evalArgs.Add(argExpr);
             }
-            var initKeyword = node.Initializer.IsBaseCall ? "§BASE" : "§THIS";
-            AppendLine(initKeyword);
-            Indent();
-            foreach (var argExpr in evalArgs)
-            {
-                AppendLine($"§A {argExpr}");
-            }
-            Dedent();
-            AppendLine(node.Initializer.IsBaseCall ? "§/BASE" : "§/THIS");
+            AppendLine($"{(node.Initializer.IsBaseCall ? "base" : "this")}({string.Join(", ", evalArgs)})");
         }
 
         // Emit body statements
@@ -1575,8 +1556,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var inlineFmt = TryFormatInlineParams(node.Parameters);
         if (inlineFmt != null)
         {
-            var inlineParams = node.Parameters.Count > 0 || node.Output != null || NeedsEmptyPostfixSignature(node.Body)
-                ? $" ({inlineFmt})" : "";
+            var inlineParams = $" ({inlineFmt})";
             var inlineReturn = node.Output != null ? $" → {output}{FormatEffectRow(node.Output.Row)}" : "";
             AppendEffectRowDeclaration(node, $"func {EscapeCalorIdentifier(node.Name)}{typeParams}{typeParamsAfterGroup}{visibility}{modStr}{attrs}{inlineParams}{inlineReturn}");
         }
@@ -1638,10 +1618,21 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(FunctionNode node)
     {
-        EmitDocComment(node);
-        if (node.Since != null && !(node.DocComment ?? "").Split('\n')
-            .Any(line => line.TrimStart().StartsWith("since ", StringComparison.Ordinal)))
-            AppendLine($"/// since {node.Since.Version}");
+        if (node.DocComment != null)
+        {
+            foreach (var line in node.DocComment.Split('\n'))
+            {
+                var text = line.TrimStart();
+                if (node.Since != null && text.StartsWith("since ", StringComparison.Ordinal)
+                    || node.Deprecated != null && text.StartsWith("deprecated ", StringComparison.Ordinal)
+                    || node.BreakingChanges.Count > 0 && text.StartsWith("breaking ", StringComparison.Ordinal))
+                    continue;
+                EmitDocumentationText(line);
+            }
+        }
+        if (node.Since != null) Visit(node.Since);
+        if (node.Deprecated != null) Visit(node.Deprecated);
+        foreach (var breaking in node.BreakingChanges) Visit(breaking);
         foreach (var issue in node.Issues) Visit(issue);
         if (node.Uses != null) Visit(node.Uses);
         if (node.UsedBy != null) Visit(node.UsedBy);
@@ -1669,8 +1660,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var inlineFmt = TryFormatInlineParams(node.Parameters);
         if (inlineFmt != null)
         {
-            var inlineParams = node.Parameters.Count > 0 || node.Output != null || NeedsEmptyPostfixSignature(node.Body)
-                ? $" ({inlineFmt})" : "";
+            var inlineParams = $" ({inlineFmt})";
             var inlineReturn = node.Output != null ? $" → {output}{FormatEffectRow(node.Output.Row)}" : "";
             AppendEffectRowDeclaration(node, $"func {EscapeCalorIdentifier(functionName)}{typeParams}{typeParamsAfterGroup}{visibilitySegment}{(node.IsAsync ? " async" : "")}{inlineParams}{inlineReturn}");
         }
@@ -1706,8 +1696,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         foreach (var example in node.Examples) Visit(example);
         foreach (var assumption in node.Assumptions) Visit(assumption);
-        if (node.Deprecated != null) Visit(node.Deprecated);
-        foreach (var breaking in node.BreakingChanges) Visit(breaking);
         foreach (var property in node.Properties) Visit(property);
 
         // Body
@@ -1766,8 +1754,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(RequiresNode node)
     {
         var condition = node.Condition.Accept(this);
-        var head = node.Message != null ? $"§Q{{\"{node.Message}\"}}" : "§Q";
-        AppendLine($"{head} {condition}");
+        if (node.Message != null)
+            throw new InvalidOperationException("Canonical precondition message syntax has not been selected.");
+        AppendLine($"requires {condition}");
         return "";
     }
 
@@ -4114,7 +4103,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             if (tp.Constraints.Count > 0)
             {
                 var constraints = string.Join(", ", tp.Constraints.Select(c => Visit(c)));
-                AppendLine($"§WHERE {tp.Name} : {constraints}");
+                AppendLine($"where {EscapeCalorIdentifier(tp.Name)} : {constraints}");
             }
         }
     }
@@ -4331,7 +4320,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(SinceNode node)
     {
-        AppendLine($"§SN{{{Visit(new StringLiteralNode(node.Span, node.Version))}}}");
+        AppendLine($"/// since {node.Version}");
         return "";
     }
 
@@ -4339,17 +4328,19 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         if (node.Reason != null || node.RemovedInVersion != null)
             throw new InvalidOperationException(
-                "The current §DP syntax cannot preserve deprecation reason/removal fields. " +
+                "The selected documentation syntax cannot preserve deprecation reason/removal fields. " +
                 "A measured structured-documentation replacement is required before formatting these fields.");
         var replacement = node.Replacement != null
-            ? $":{Visit(new StringLiteralNode(node.Span, node.Replacement))}" : "";
-        AppendLine($"§DP{{{Visit(new StringLiteralNode(node.Span, node.SinceVersion))}{replacement}}}");
+            ? $" {node.Replacement}" : "";
+        if (node.Replacement?.Any(char.IsWhiteSpace) == true)
+            throw new InvalidOperationException("The selected deprecation replacement must be one word.");
+        AppendLine($"/// deprecated {node.SinceVersion}{replacement}");
         return "";
     }
 
     public string Visit(BreakingChangeNode node)
     {
-        AppendLine($"§BR{{{Visit(new StringLiteralNode(node.Span, node.Version))}}} "
+        AppendLine($"/// breaking {node.Version} "
             + Visit(new StringLiteralNode(node.Span, node.Description)));
         return "";
     }

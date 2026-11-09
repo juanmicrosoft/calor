@@ -139,6 +139,35 @@ public sealed class CanonicalDeclarationIdentityTests : IDisposable
     }
 
     [Fact]
+    public void NamedStaticModuleKindsAndNestedLineageSurviveCanonicalRename()
+    {
+        const string source = """
+            module Unit
+              module Tools
+                class Nested
+                  field int:Value
+                func Read () → int
+                  !
+                  return 1
+            """;
+        var file = Write("tests/Modules.calr", source);
+        var before = Store.Sync([file]);
+        var ast = CalorSourceHelper.Parse(source, file).Ast!;
+        var namedModule = ast.Classes.Single();
+        Assert.True(namedModule.IsModule);
+        Assert.True(namedModule.IsStatic);
+        Assert.False(namedModule.NestedClasses.Single().IsModule);
+        Assert.True(namedModule.Methods.Single().IsStatic);
+        Assert.Equal(2, before.Declarations.Count(declaration => declaration.Kind == IdKind.Module));
+        File.WriteAllText(file, source.Replace("Tools", "Utilities", StringComparison.Ordinal));
+        var after = Store.Sync();
+        Assert.Equal(before.Declarations.Select(declaration => declaration.Id).Order(),
+            after.Declarations.Select(declaration => declaration.Id).Order());
+        Assert.Equal(before.Declarations.Single(declaration => declaration.Name == "Tools").Id,
+            after.Declarations.Single(declaration => declaration.Name == "Utilities").Id);
+    }
+
+    [Fact]
     public void FreshNativeDeclarationsStillReceiveCanonicalIds()
     {
         var path = Write("tests/Contract.calr", Source);

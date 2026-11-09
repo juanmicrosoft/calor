@@ -1040,8 +1040,7 @@ public sealed class Parser
         => IsBlockEnd(explicitCloser) || IsClassMemberOpener();
 
     private bool IsModuleFunctionSibling(Token owner)
-        => _parsingModuleMembers
-           && (Check(TokenKind.Func) || Check(TokenKind.AsyncFunc))
+        => (Check(TokenKind.Func) || Check(TokenKind.AsyncFunc))
            && Current.Span.Column <= owner.Span.Column;
 
     /// <summary>
@@ -1090,6 +1089,9 @@ public sealed class Parser
         _moduleIndentColumn = LineIndentColumnAt(_position - 1);
         var attrs = ParseDeclarationAttributes(startToken);
         ValidateIdentityFreeHeader(startToken, attrs, 2);
+        if (IsCanonicalDeclaration(startToken) && (attrs["_pos1"] != null || attrs["_pos2"] != null))
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
+                "The compilation-unit module header accepts only its name and overflow policy.");
         var overflowModifier = attrs["_pos1"];
         if (overflowModifier?.StartsWith("overflow=", StringComparison.Ordinal) == true)
             attrs.Add("overflow", overflowModifier["overflow=".Length..].Trim());
@@ -1709,6 +1711,13 @@ public sealed class Parser
             startToken.Span,
             effectParameters: effectParameters);
         ConsumeCanonicalDeclarationModifiers(startToken, attrs);
+        if (IsCanonicalDeclaration(startToken) && attrs["_pos2"] is { } functionModifiers)
+        {
+            foreach (var modifier in functionModifiers.Split(','))
+                if (modifier is not ("async" or "static"))
+                    _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
+                        $"Unsupported module-level function modifier '{modifier}'.");
+        }
         var visibility = IsCanonicalDeclaration(startToken)
             ? ParseVisibility(attrs["_pos1"], startToken.Span)
             : ParseVisibility(visibilityStr, startToken.Span);
@@ -1732,9 +1741,7 @@ public sealed class Parser
         UsedByNode? usedBy = null;
         var assumptions = new List<AssumeNode>();
         ComplexityNode? complexity = null;
-        SinceNode? since = ParseDocumentationSince(startToken);
-        DeprecatedNode? deprecated = null;
-        var breakingChanges = new List<BreakingChangeNode>();
+        var (since, deprecated, breakingChanges) = ParseDocumentationMetadata(startToken);
         var properties = new List<PropertyTestNode>();
         LockNode? lockNode = null;
         AuthorNode? author = null;
@@ -4751,7 +4758,7 @@ public sealed class Parser
     {
         var startPosition = _position;
         var startSpan = Current.Span;
-        var typeName = ParseLispTypeNameCore();
+        var typeName = ReadInlineTypeToken();
         typeSpan = _position > startPosition
             ? startSpan.Union(Peek(-1).Span)
             : TextSpan.Empty;
@@ -6584,7 +6591,7 @@ public sealed class Parser
         var start = Advance();
         var typeStart = _position;
         var firstToken = Current;
-        var first = ReadInlineTypeToken();
+        var first = ReadInlineTypeToken(validateCanonicalSpelling: false);
         string? type = null;
         var name = firstToken.Value as string ?? first;
         var identifierSpan = GetConsumedSpan(typeStart);
@@ -6592,6 +6599,7 @@ public sealed class Parser
         if (Match(TokenKind.Colon))
         {
             type = first;
+            ValidateCanonicalTypeSpelling(type, GetConsumedSpan(typeStart));
             typeSpan = identifierSpan;
             var identifier = Expect(TokenKind.Identifier);
             name = identifier.Value as string ?? identifier.Text;
@@ -6662,21 +6670,72 @@ public sealed class Parser
         if (modifiers.Count != 0) attributes.Add("_pos2", string.Join(",", modifiers));
     }
 
-    private SinceNode? ParseDocumentationSince(Token start)
+    private (SinceNode? Since, DeprecatedNode? Deprecated, List<BreakingChangeNode> BreakingChanges)
+        ParseDocumentationMetadata(Token start)
     {
-        SinceNode? result = null;
+        SinceNode? since = null;
+        DeprecatedNode? deprecated = null;
+        var breakingChanges = new List<BreakingChangeNode>();
         foreach (var line in (start.DocComment ?? "").Split('\n'))
         {
             var text = line.Trim();
-            if (!text.StartsWith("since ", StringComparison.Ordinal)) continue;
-            var version = text["since ".Length..].Trim();
-            if (result != null || !Version.TryParse(version, out _))
-                _diagnostics.ReportError(start.Span, DiagnosticCode.UnexpectedToken,
-                    "A declaration accepts one '/// since version' with a valid version.");
-            else
-                result = new SinceNode(start.Span, version, new AttributeCollection());
+            var fields = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            if (fields.Length == 0) continue;
+            if (fields[0] == "since")
+            {
+                if (since != null || fields.Length != 2 || !Version.TryParse(fields[1], out _))
+                    _diagnostics.ReportError(start.Span, DiagnosticCode.UnexpectedToken,
+                        "A declaration accepts one '/// since version' with a valid version.");
+                else
+                    since = new SinceNode(start.Span, fields[1], new AttributeCollection());
+            }
+            else if (fields[0] == "deprecated")
+            {
+                if (deprecated != null || fields.Length is < 2 or > 3 || !Version.TryParse(fields[1], out _))
+                    _diagnostics.ReportError(start.Span, DiagnosticCode.UnexpectedToken,
+                        "A declaration accepts one '/// deprecated version [replacement]'.");
+                else
+                    deprecated = new DeprecatedNode(start.Span, fields[1],
+                        fields.Length == 3 ? fields[2] : null, null, null, new AttributeCollection());
+            }
+            else if (fields[0] == "breaking")
+            {
+                var description = fields.Length >= 3
+                    ? text[(text.IndexOf(fields[1], StringComparison.Ordinal) + fields[1].Length)..].Trim()
+                    : "";
+                var expression = Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression(description);
+                if (fields.Length < 3 || !Version.TryParse(fields[1], out _)
+                    || expression.ContainsDiagnostics || expression.Span.Length != description.Length
+                    || expression is not Microsoft.CodeAnalysis.CSharp.Syntax.LiteralExpressionSyntax literal
+                    || literal.RawKind != (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind.StringLiteralExpression)
+                    _diagnostics.ReportError(start.Span, DiagnosticCode.UnexpectedToken,
+                        "'/// breaking version description' requires a valid version and one C# string literal.");
+                else
+                    breakingChanges.Add(new BreakingChangeNode(start.Span, fields[1],
+                        literal.Token.ValueText, new AttributeCollection()));
+            }
         }
-        return result;
+        return (since, deprecated, breakingChanges);
+    }
+
+    private AttributeCollection ParseTypedDeclarationAttributes(Token start, bool typeFirst)
+    {
+        if (!IsCanonicalDeclaration(start)) return ParseAttributes();
+        var typeStart = _position;
+        var type = ReadInlineTypeToken();
+        var typeSpan = GetConsumedSpan(typeStart);
+        Expect(TokenKind.Colon);
+        var name = Expect(TokenKind.Identifier);
+        var temporary = new AttributeCollection();
+        ConsumeCanonicalDeclarationModifiers(start, temporary);
+        var attributes = new AttributeCollection();
+        attributes.Add(typeFirst ? "_pos0" : "_pos1", type, typeSpan);
+        attributes.Add(typeFirst ? "_pos1" : "_pos0", name.Value as string ?? name.Text, name.Span);
+        if (temporary["_pos1"] is { } visibility)
+            attributes.Add("_pos2", visibility, temporary.GetSpan("_pos1") ?? start.Span);
+        if (temporary["_pos2"] is { } modifiers)
+            attributes.Add("_pos3", modifiers, temporary.GetSpan("_pos2") ?? start.Span);
+        return attributes;
     }
 
     /// <summary>
@@ -8832,7 +8891,7 @@ public sealed class Parser
 
             // Check for variance modifiers: in/out before the type parameter name
             var variance = Ast.VarianceKind.None;
-            if (Check(TokenKind.Identifier) && Current.Text is "in" or "out")
+            if (Current.Text is "in" or "out")
             {
                 variance = Current.Text == "out" ? Ast.VarianceKind.Out : Ast.VarianceKind.In;
                 if (!allowVariance)
@@ -8848,7 +8907,7 @@ public sealed class Parser
             if (Check(TokenKind.Identifier))
             {
                 var nameToken = Advance();
-                typeParams.Add(new TypeParameterNode(nameToken.Span, nameToken.Text, Array.Empty<TypeConstraintNode>(), variance));
+                typeParams.Add(new TypeParameterNode(nameToken.Span, nameToken.Value as string ?? nameToken.Text, Array.Empty<TypeConstraintNode>(), variance));
             }
             else
             {
@@ -9045,7 +9104,7 @@ public sealed class Parser
     private string ParseConstraintTypeName()
     {
         // Handle special keywords
-        if (Check(TokenKind.Identifier))
+        if (Check(TokenKind.Identifier) || Current.IsKeyword)
         {
             var text = Current.Text;
             if (text == "class")
@@ -9250,7 +9309,7 @@ public sealed class Parser
     private InterfaceDefinitionNode ParseInterfaceDefinition()
     {
         var startToken = Expect(TokenKind.Interface);
-        var attrs = ParseAttributes();
+        var attrs = ParseDeclarationAttributes(startToken);
         ValidateIdentityFreeHeader(startToken, attrs, 2);
         var csharpAttrs = ParseCSharpAttributes();
 
@@ -9258,7 +9317,7 @@ public sealed class Parser
         var id = GenerateParserAutoId("i");
         var name = attrs["_pos0"] ?? "";
         var interfaceNameKey = "_pos0";
-        var pos2 = attrs["_pos1"] ?? "";
+        var pos2 = IsCanonicalDeclaration(startToken) ? "" : attrs["_pos1"] ?? "";
 
         if (string.IsNullOrEmpty(name))
         {
@@ -9270,6 +9329,12 @@ public sealed class Parser
             startToken.Span,
             allowVariance: true,
             owner: "an interface");
+        ConsumeCanonicalDeclarationModifiers(startToken, attrs);
+        var visibility = IsCanonicalDeclaration(startToken)
+            ? ParseVisibility(attrs["_pos1"], startToken.Span) : Visibility.Public;
+        if (IsCanonicalDeclaration(startToken) && attrs["_pos2"] != null)
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
+                "Unsupported interface header modifier.");
 
         // Legacy: Extract type parameters from name if present (e.g., IProducer<out T>)
         if (typeParameters.Count == 0)
@@ -9346,7 +9411,14 @@ public sealed class Parser
             }
             else if (Check(TokenKind.Extends))
             {
-                Expect(TokenKind.Extends);
+                var extends = Expect(TokenKind.Extends);
+                if (IsCanonicalDeclaration(extends))
+                {
+                    var typeStart = _position;
+                    baseInterfaces.Add(ReadInlineTypeToken());
+                    baseInterfaceSpans.Add(GetConsumedSpan(typeStart));
+                    continue;
+                }
                 var extAttrs = ParseAttributes();
                 var baseIface = extAttrs["_pos0"] ?? "";
                 if (!string.IsNullOrEmpty(baseIface))
@@ -9356,7 +9428,7 @@ public sealed class Parser
                         baseInterfaceSpans.Add(baseInterfaceSpan);
                 }
             }
-            else if (Check(TokenKind.Method))
+            else if (Check(TokenKind.Method) || Check(TokenKind.Func))
             {
                 var node = ParseMethodSignature();
                 methods.Add(node);
@@ -9420,7 +9492,8 @@ public sealed class Parser
                 || interopBlocks.Any(block =>
                     block.CSharpCode.TrimStart().StartsWith("#", StringComparison.Ordinal))
                     ? interfaceItems
-                    : null), startToken);
+                    : null,
+            visibility: visibility), startToken);
     }
 
     /// <summary>
@@ -9429,8 +9502,8 @@ public sealed class Parser
     /// </summary>
     private MethodSignatureNode ParseMethodSignature()
     {
-        var startToken = Expect(TokenKind.Method);
-        var attrs = ParseAttributes();
+        var startToken = Check(TokenKind.Func) ? Advance() : Expect(TokenKind.Method);
+        var attrs = ParseDeclarationAttributes(startToken);
         ValidateIdentityFreeHeader(startToken, attrs, 2);
         var csharpAttrs = ParseCSharpAttributes();
 
@@ -9438,24 +9511,23 @@ public sealed class Parser
         var id = GenerateParserAutoId("mt");
         var name = attrs["_pos0"] ?? "";
 
-        var visStr = attrs["_pos1"];
-
-        // An interface member is public. The field used to be dropped, so `§MT{m1:Run:bogus}`
-        // compiled silently; an unknown word is Calor0122 and any other level is refused too.
-        if (!string.IsNullOrEmpty(visStr)
-            && ParseVisibility(visStr, startToken.Span) is not Visibility.Public
-            && TryParseVisibilityWord(visStr, out _))
-        {
-            _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnknownVisibility,
-                $"Interface method '{name}' cannot be '{visStr}': interface methods are public. Remove the field or write ':pub'.");
-        }
-
-
         // NEW: Parse optional type parameters §MT{...}<T, U>
         var effectParameters = new List<EffectParameterInfo>();
         var typeParameters = ParseOptionalTypeParameterList(
             startToken.Span,
             effectParameters: effectParameters);
+        ConsumeCanonicalDeclarationModifiers(startToken, attrs);
+        var visStr = attrs["_pos1"];
+        if (!string.IsNullOrEmpty(visStr)
+            && ParseVisibility(visStr, startToken.Span) is not Visibility.Public
+            && TryParseVisibilityWord(visStr, out _))
+        {
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnknownVisibility,
+                $"Interface method '{name}' must be public.");
+        }
+        if (IsCanonicalDeclaration(startToken) && attrs["_pos2"] != null)
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
+                "Unsupported interface method header modifier.");
         // §7.3 position 1: this declaration binds its own effect variables, and they
         // stay in scope for its own row and its parameters' rows until it is parsed out.
         using var effectScope = PushEffectVariableScope(effectParameters);
@@ -9487,7 +9559,7 @@ public sealed class Parser
                 output = ParseOutput();
                 bodyHadContent = true;
             }
-            else if (Check(TokenKind.Effects))
+            else if (Check(TokenKind.Effects) || Check(TokenKind.Exclamation))
             {
                 effects = ParseEffects();
                 bodyHadContent = true;
@@ -9497,7 +9569,7 @@ public sealed class Parser
                 preconditions.Add(ParseRequires());
                 bodyHadContent = true;
             }
-            else if (Check(TokenKind.Ensures))
+            else if (Check(TokenKind.Ensures) || Check(TokenKind.FatArrow))
             {
                 postconditions.Add(ParseEnsures());
                 bodyHadContent = true;
@@ -10024,13 +10096,13 @@ public sealed class Parser
     private ClassFieldNode ParseClassField()
     {
         var startToken = Expect(TokenKind.FieldDef);
-        var attrs = ParseAttributes();
+        var attrs = ParseTypedDeclarationAttributes(startToken, typeFirst: true);
         var csharpAttrs = ParseCSharpAttributes();
 
         // Positional: [type:name:visibility?:modifiers?]
         var typeName = attrs["_pos0"] ?? "object";
         var name = attrs["_pos1"] ?? "";
-        var visStr = attrs["_pos2"] ?? "priv";
+        var visStr = attrs["_pos2"] ?? (IsCanonicalDeclaration(startToken) ? "public" : "priv");
         var modStr = attrs["_pos3"] ?? "";
 
         if (string.IsNullOrEmpty(name))
@@ -10055,7 +10127,7 @@ public sealed class Parser
             Advance(); // consume =
             defaultValue = ParseExpression();
         }
-        else if (IsExpressionStart())
+        else if (!IsCanonicalDeclaration(startToken) && IsExpressionStart())
         {
             defaultValue = ParseExpression();
         }
@@ -11395,7 +11467,7 @@ public sealed class Parser
     private PropertyNode ParseProperty()
     {
         var startToken = Expect(TokenKind.Property);
-        var attrs = ParseAttributes();
+        var attrs = ParseTypedDeclarationAttributes(startToken, typeFirst: false);
         ValidateIdentityFreeHeader(startToken, attrs, 5);
         var csharpAttrs = ParseCSharpAttributes();
 
@@ -11482,7 +11554,7 @@ public sealed class Parser
                 getter2 = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Get);
                 bodyHadContent = true;
             }
-            else if (Check(TokenKind.Set))
+            else if (Check(TokenKind.Set) || Check(TokenKind.Assign))
             {
                 setter2 = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Set);
                 bodyHadContent = true;
@@ -11723,14 +11795,23 @@ public sealed class Parser
         }
         else if (kind == PropertyAccessorNode.AccessorKind.Set)
         {
-            startToken = Expect(TokenKind.Set);
+            startToken = Check(TokenKind.Assign) ? Advance() : Expect(TokenKind.Set);
         }
         else
         {
             startToken = Expect(TokenKind.Init);
         }
 
-        var attrs = ParseAttributes();
+        var attrs = new AttributeCollection();
+        if (IsCanonicalDeclaration(startToken))
+        {
+            if (Current.Span.Line == startToken.Span.Line && Check(TokenKind.Identifier))
+            {
+                var visibilityToken = Advance();
+                attrs.Add("_pos0", visibilityToken.Text, visibilityToken.Span);
+            }
+        }
+        else attrs = ParseAttributes();
         var visStr = attrs["_pos0"];
         var visibility = visStr != null ? ParseVisibility(visStr, startToken.Span) : (Visibility?)null;
 
@@ -11750,8 +11831,9 @@ public sealed class Parser
         // Also stop at Equals for property default values, next accessor, or end tokens.
         // #1485: the accessor owns only the lines indented under it.
         var accessorOwner = BeginBlockBody(startToken, endTokenKind, null,
-            TokenKind.Get, TokenKind.Set, TokenKind.Init);
+            TokenKind.Get, TokenKind.Set, TokenKind.Assign, TokenKind.Init);
         while (!IsAtEnd && !Check(TokenKind.Get) && !Check(TokenKind.Set) &&
+               !(Check(TokenKind.Assign) && Current.Span.Column <= startToken.Span.Column) &&
                !Check(TokenKind.Init) && !IsBlockEnd(TokenKind.EndProperty) && !IsBlockEnd(TokenKind.EndIndexer) &&
                !Check(TokenKind.Equals) && !IsBlockEnd(TokenKind.EndGet) && !IsBlockEnd(TokenKind.EndSet) &&
                !IsBlockEnd(TokenKind.EndInit) && IsInBlockBody(accessorOwner))
@@ -11793,7 +11875,17 @@ public sealed class Parser
     private ConstructorNode ParseConstructor()
     {
         var startToken = Expect(TokenKind.Constructor);
-        var attrs = ParseAttributes();
+        var attrs = new AttributeCollection();
+        if (IsCanonicalDeclaration(startToken))
+        {
+            var temporary = new AttributeCollection();
+            ConsumeCanonicalDeclarationModifiers(startToken, temporary);
+            if (temporary["_pos2"] is { } modifiers && modifiers != "static")
+                _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
+                    "A constructor accepts a visibility or the static modifier.");
+            attrs.Add("_pos0", temporary["_pos2"] == "static" ? "static" : temporary["_pos1"] ?? "public");
+        }
+        else attrs = ParseAttributes();
         ValidateIdentityFreeHeader(startToken, attrs, 1);
         var csharpAttrs = ParseCSharpAttributes();
 
@@ -11802,13 +11894,16 @@ public sealed class Parser
         var visStr = attrs["_pos0"] ?? "pub";
 
 
-        var isStatic = visStr.Equals("stat", StringComparison.Ordinal);
+        var isStatic = visStr is "stat" or "static";
         var visibility = isStatic ? Visibility.Private : ParseVisibility(visStr, startToken.Span);
 
         // --- Compact syntax: inline signature (consume but parameters already parsed via §I) ---
         var _inlineParams = new List<ParameterNode>();
         OutputNode? _inlineOutput = null;
         TryParseInlineSignature(startToken.Span, _inlineParams, ref _inlineOutput);
+        if (_inlineOutput != null)
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnexpectedToken,
+                "A constructor has no return-type arrow.");
 
         var parameters = new List<ParameterNode>();
         // If inline signature produced parameters, use them
@@ -12042,6 +12137,16 @@ public sealed class Parser
         var startToken = isBase ? Expect(TokenKind.Base) : Expect(TokenKind.This);
 
         var arguments = new List<ExpressionNode>();
+        if (IsCanonicalDeclaration(startToken))
+        {
+            Expect(TokenKind.OpenParen);
+            if (!Check(TokenKind.CloseParen))
+            {
+                do arguments.Add(ParseExpression()); while (Match(TokenKind.Comma));
+            }
+            Expect(TokenKind.CloseParen);
+            return new ConstructorInitializerNode(startToken.Span.Union(PreviousToken.Span), isBase, arguments);
+        }
 
         // Parse arguments until we encounter something that's not an ARG
         while (Check(TokenKind.Arg))
@@ -14453,7 +14558,11 @@ public sealed class Parser
     private void TryParseInlineSignature(TextSpan span, List<ParameterNode> parameters, ref OutputNode? output)
     {
         if (!Check(TokenKind.OpenParen))
+        {
+            _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                "A canonical callable requires an inline parameter list, including '()' for no parameters.");
             return;
+        }
 
         Advance(); // consume (
 
@@ -14600,10 +14709,48 @@ public sealed class Parser
     /// Reads a type token for inline signatures. Handles simple types (i32, str, bool),
     /// nullable types (i32?), array types ([i32]), and generic types (List&lt;i32&gt;).
     /// </summary>
-    private string ReadInlineTypeToken()
+    private string ReadInlineTypeToken(bool validateCanonicalSpelling = true)
     {
+        var startPosition = _position;
         int pendingGreaters = 0;
-        return ReadInlineTypeToken(ref pendingGreaters);
+        var type = ReadInlineTypeToken(ref pendingGreaters);
+        if (validateCanonicalSpelling)
+            ValidateCanonicalTypeSpelling(type, GetConsumedSpan(startPosition));
+        return type;
+    }
+
+    private void ValidateCanonicalTypeSpelling(string type, TextSpan span)
+    {
+        if (type == "void") return;
+        if (type.Length > 0 && type.AsSpan().IndexOfAny("<[?(* ".AsSpan()) < 0)
+        {
+            if (!type.StartsWith('@') && !type.Contains('.') && !type.Contains("::", StringComparison.Ordinal))
+            {
+                var canonical = Migration.TypeMapper.CalorToCSharp(type);
+                if (canonical != type)
+                    _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                        $"Type alias '{type}' is retired. Use the C# type '{canonical}'.");
+            }
+            return;
+        }
+        var syntax = SyntaxFactory.ParseTypeName(type);
+        if (syntax.ContainsDiagnostics)
+        {
+            _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                "Use a C# type spelling with suffix arrays and nullability, such as 'int[]' or 'string?'.");
+            return;
+        }
+        foreach (var name in syntax.DescendantNodesAndSelf().OfType<SimpleNameSyntax>())
+        {
+            if (name.Identifier.Text.StartsWith('@')
+                || name.Parent is QualifiedNameSyntax or AliasQualifiedNameSyntax)
+                continue;
+            var spelling = name.Identifier.Text;
+            var canonical = Migration.TypeMapper.CalorToCSharp(spelling);
+            if (canonical != spelling)
+                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                    $"Type alias '{spelling}' is retired. Use the C# type '{canonical}'.");
+        }
     }
 
     /// <summary>

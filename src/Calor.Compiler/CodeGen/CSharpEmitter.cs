@@ -5716,7 +5716,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             ? " : " + string.Join(", ", node.BaseInterfaces.Select(MapTypeName))
             : "";
 
-        AppendLine($"public interface {name}{typeParams}{baseList}{whereClause}");
+        var visibility = node.Visibility switch
+        {
+            Visibility.Public => "public",
+            Visibility.Internal => "internal",
+            Visibility.Private => "private",
+            Visibility.Protected => "protected",
+            Visibility.ProtectedInternal => "protected internal",
+            Visibility.PrivateProtected => "private protected",
+            _ => throw new InvalidOperationException($"Unsupported interface visibility: {node.Visibility}.")
+        };
+        AppendLine($"{visibility} interface {name}{typeParams}{baseList}{whereClause}");
         AppendLine("{");
         Indent();
 

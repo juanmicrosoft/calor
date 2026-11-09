@@ -31,6 +31,8 @@ public enum MethodModifiers
 /// </summary>
 public sealed class InterfaceDefinitionNode : TypeDefinitionNode
 {
+    public Visibility Visibility { get; }
+
     /// <summary>
     /// Interface methods (signatures only).
     /// </summary>
@@ -130,7 +132,8 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
         TextSpan? identifierSpan = null,
         IReadOnlyList<CSharpInteropBlockNode>? interopBlocks = null,
         IReadOnlyList<MemberPreprocessorBlockNode>? preprocessorBlocks = null,
-        IReadOnlyList<AstNode>? items = null)
+        IReadOnlyList<AstNode>? items = null,
+        Visibility visibility = Visibility.Public)
         : base(span, id, name, attributes, identifierSpan)
     {
         BaseInterfaces = baseInterfaces ?? throw new ArgumentNullException(nameof(baseInterfaces));
@@ -143,6 +146,7 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
         InteropBlocks = interopBlocks ?? Array.Empty<CSharpInteropBlockNode>();
         PreprocessorBlocks = preprocessorBlocks ?? Array.Empty<MemberPreprocessorBlockNode>();
         Items = items ?? Array.Empty<AstNode>();
+        Visibility = visibility;
     }
 
 

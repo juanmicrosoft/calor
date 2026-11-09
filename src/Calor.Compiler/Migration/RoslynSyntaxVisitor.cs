@@ -2261,7 +2261,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             preprocessorBlocks: preprocessorBlocks,
             items: preprocessorBlocks.Count > 0 || compilerDirectives.Count > 0
                 ? items
-                : null);
+                : null,
+            visibility: GetVisibility(node.Modifiers,
+                node.Parent is InterfaceDeclarationSyntax ? Visibility.Public
+                    : node.Parent is TypeDeclarationSyntax ? Visibility.Private : Visibility.Internal));
     }
 
     private AstNode? ConvertInterfaceMember(

@@ -61,6 +61,105 @@ public sealed class CanonicalDeclarationTests
     }
 
     [Fact]
+    public void GenericConstraintsRemainNativeAndKeepConstructorAndReferenceTypeRequirements()
+    {
+        var module = Parse("""
+            module Generics
+              class Holder<T>
+                where T : class, new()
+                field T:Value
+              func Copy<T> (T:value) → T
+                where T : class, new()
+                !
+                return value
+            """);
+        var expected = new[] { TypeConstraintKind.Class, TypeConstraintKind.New };
+        Assert.Equal(expected, module.Classes.Single().TypeParameters.Single().Constraints.Select(constraint => constraint.Kind));
+        Assert.Equal(expected, module.Functions.Single().TypeParameters.Single().Constraints.Select(constraint => constraint.Kind));
+        var emitted = new CalorEmitter().Emit(module);
+        Assert.DoesNotContain('§', emitted);
+        var reparse = Parse(emitted);
+        Assert.Equal(expected, reparse.Functions.Single().TypeParameters.Single().Constraints.Select(constraint => constraint.Kind));
+    }
+
+    [Fact]
+    public void CanonicalProgramUsesTheDefaultBindingAndValidationPipeline()
+    {
+        var result = Program.Compile("""
+            module BoundApi
+              func Copy (int:value) → int
+                !
+                let int:copy = value
+                var next = copy + 1
+                return next
+            """);
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        Assert.Equal("int", result.Ast!.Functions.Single().Parameters.Single().TypeName);
+        Assert.Contains("int Copy(int value)", result.GeneratedCode);
+    }
+
+    [Fact]
+    public void ConstructorSignaturesAndBaseCallsRetainNativeMetadata()
+    {
+        var module = Parse("""
+            module Constructors
+              class Parent
+                field int:Value protected
+                ctor (int:value)
+                  set Value value
+              class Child
+                extends Parent
+                ctor internal (int:value)
+                  base(value)
+                  set Value value + 1
+            """);
+        var parent = module.Classes[0];
+        var child = module.Classes[1];
+        Assert.Equal(Visibility.Public, parent.Constructors.Single().Visibility);
+        Assert.Equal(Visibility.Internal, child.Constructors.Single().Visibility);
+        Assert.Equal("Parent", child.BaseClass);
+        Assert.True(child.Constructors.Single().Initializer!.IsBaseCall);
+        Assert.Single(child.Constructors.Single().Initializer!.Arguments);
+        var emitted = new CalorEmitter().Emit(module);
+        Assert.DoesNotContain('§', emitted);
+        var reparsed = Parse(emitted).Classes[1].Constructors.Single();
+        Assert.Equal(Visibility.Internal, reparsed.Visibility);
+        Assert.True(reparsed.Initializer!.IsBaseCall);
+        Assert.Single(reparsed.Body);
+    }
+
+    [Fact]
+    public void CanonicalTypedMembersRetainVisibilityDefaultsAndRestrictedAccessors()
+    {
+        var module = Parse("""
+            module Members
+              class Box
+                field int:_value private readonly = 7
+                field int:PublicValue = 1
+                property string?:Name
+                  get
+                  set private
+                property int:Value
+                  get
+                    return _value
+            """);
+        var type = module.Classes.Single();
+        Assert.Equal(Visibility.Private, type.Fields[0].Visibility);
+        Assert.True(type.Fields[0].Modifiers.HasFlag(MethodModifiers.Readonly));
+        Assert.Equal(Visibility.Public, type.Fields[1].Visibility);
+        Assert.Equal("string?", type.Properties[0].TypeName);
+        Assert.Equal(Visibility.Private, type.Properties[0].Setter!.Visibility);
+        Assert.Single(type.Properties[1].Getter!.Body);
+        var emitted = new CalorEmitter().Emit(module);
+        Assert.DoesNotContain('§', emitted);
+        var reparse = Parse(emitted).Classes.Single();
+        Assert.Equal(type.Fields.Select(field => field.Visibility), reparse.Fields.Select(field => field.Visibility));
+        Assert.Equal(Visibility.Private, reparse.Properties[0].Setter!.Visibility);
+        Assert.NotNull(reparse.Fields[0].DefaultValue);
+        Assert.Single(reparse.Properties[1].Getter!.Body);
+    }
+
+    [Fact]
     public void DocumentationAndPureHeaderClausesRetainTheirSemantics()
     {
         var module = Parse("""
@@ -144,6 +243,20 @@ public sealed class CanonicalDeclarationTests
         var methods = symbols.SelectMany(symbol => symbol.GetMembers().OfType<IMethodSymbol>()).ToArray();
         Assert.Equal(Accessibility.Public, Assert.Single(methods.Where(method => method.Name == "Pick")).DeclaredAccessibility);
         Assert.Equal(Accessibility.Private, Assert.Single(methods.Where(method => method.Name == "Hidden")).DeclaredAccessibility);
+    }
+
+    [Theory]
+    [InlineData("i32")]
+    [InlineData("?string")]
+    [InlineData("[int]")]
+    [InlineData("Dictionary<string,i32>")]
+    [InlineData("Func<str>")]
+    public void RetiredTypeAliasesAndPrefixFormsAreExplicitErrors(string type)
+    {
+        var diagnostics = new DiagnosticBag();
+        _ = new Parser(new Lexer($"module Bad\n  func F ({type}:value) → int\n    return 1", diagnostics)
+            .TokenizeAllForParser(), diagnostics).Parse();
+        Assert.True(diagnostics.HasErrors);
     }
 
     [Theory]

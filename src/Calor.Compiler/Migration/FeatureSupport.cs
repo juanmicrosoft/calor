@@ -1486,8 +1486,10 @@ public static class FeatureSupport
         /// </summary>
         public static bool IsRepresentableInterfaceDeclaration(
             InterfaceDeclarationSyntax node)
-            => node.Modifiers.Count == 1
-                && node.Modifiers[0].IsKind(SyntaxKind.PublicKeyword);
+            => node.Modifiers.All(modifier => modifier.IsKind(SyntaxKind.PublicKeyword)
+                || modifier.IsKind(SyntaxKind.InternalKeyword)
+                || modifier.IsKind(SyntaxKind.PrivateKeyword)
+                || modifier.IsKind(SyntaxKind.ProtectedKeyword));
 
         /// <summary>
         /// Returns whether the delegate surface can be represented exactly by the
