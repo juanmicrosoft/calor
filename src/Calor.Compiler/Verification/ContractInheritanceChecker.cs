@@ -73,7 +73,9 @@ public sealed class ContractInheritanceChecker : IDisposable
         _qualifiedNames.Clear();
         _displayNames.Clear();
         _enclosingDeclarations.Clear();
-        _moduleNamespace = module.Name == "_global" ? "" : module.Name;
+        _moduleNamespace = module.NamespaceScopes.Count == 1
+            ? module.NamespaceScopes[0].FullName
+            : module.Name == "_global" ? "" : module.Name;
         if (_z3Prover != null)
             _z3Prover.CheckIntegerOverflow = module.ShouldCheckIntegerOverflow();
         var interfaces = new List<InterfaceDefinitionNode>();
