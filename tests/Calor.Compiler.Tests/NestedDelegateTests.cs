@@ -11,7 +11,7 @@ public class NestedDelegateTests
     [Fact]
     public void NestedDelegate_InClass_ParsesSuccessfully()
     {
-        var source = "§M{Test}\n§CL{Foo:pub}\n  §DEL{MyHandler}\n    §I{str:input}\n    §O{bool}\n  §/DEL\n\n";
+        var source = "module Test\n  class Foo public\n    delegate MyHandler (string:input) → bool\n";
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
@@ -33,7 +33,7 @@ public class NestedDelegateTests
     [Fact]
     public void NestedDelegate_EmitsCSharp()
     {
-        var source = "§M{Test}\n§CL{Foo:pub}\n  §DEL{MyHandler}\n    §I{str:input}\n    §O{bool}\n  §/DEL\n\n";
+        var source = "module Test\n  class Foo public\n    delegate MyHandler (string:input) → bool\n";
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
@@ -52,7 +52,7 @@ public class NestedDelegateTests
     [Fact]
     public void NestedDelegate_EmitsCalor()
     {
-        var source = "§M{Test}\n§CL{Foo:pub}\n  §DEL{MyHandler}\n    §I{str:input}\n    §O{bool}\n  §/DEL\n\n";
+        var source = "module Test\n  class Foo public\n    delegate MyHandler (string:input) → bool\n";
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
@@ -64,8 +64,13 @@ public class NestedDelegateTests
         var emitter = new CalorEmitter();
         var result = emitter.Emit(module);
 
-        Assert.Contains("§DEL{MyHandler}", result);
-        Assert.DoesNotContain("§/DEL", result);
+        Assert.Contains("delegate MyHandler (string:input) → bool", result);
+        Assert.DoesNotContain("§", result);
+        var reparsedDiagnostics = new DiagnosticBag();
+        var reparsed = new Parser(new Lexer(result, reparsedDiagnostics).TokenizeAllForParser(),
+            reparsedDiagnostics).Parse();
+        Assert.Empty(reparsedDiagnostics);
+        Assert.Equal("MyHandler", Assert.Single(Assert.Single(reparsed.Classes).NestedDelegates).Name);
     }
 
     [Fact]

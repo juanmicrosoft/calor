@@ -29,14 +29,14 @@ public class EmptyInterfaceSiblingParsingTests
             string.Join("\n", diagnostics.Errors.Select(d => $"{d.Code}: {d.Message}")));
 
     [Theory]
-    [InlineData("§CL{Impl:pub}\n    §IMPL{IMarker}")]
-    [InlineData("§IFACE{IOther}\n    §MT{Run} () -> void")]
-    [InlineData("§EN{Mode:pub}\n    Fast\n    Slow")]
-    [InlineData("§DEL{Handler}\n    §I{i32:x}\n    §O{bool}")]
-    [InlineData("§CSHARP{public class Sibling { }}§/CSHARP")]
+    [InlineData("class Impl public\n    implements IMarker")]
+    [InlineData("interface IOther\n    func Run () → void")]
+    [InlineData("enum Mode public\n    Fast\n    Slow")]
+    [InlineData("delegate Handler (int:x) → bool")]
+    [InlineData("raw member 24\npublic class Sibling { }\n")]
     public void EmptyInterface_FollowedBySameColumnSibling_Parses(string sibling)
     {
-        var source = "§M{Markers}\n  §IFACE{IMarker}\n  " + sibling + "\n";
+        var source = "module Markers\n  interface IMarker\n  " + sibling + "\n";
 
         var (module, diagnostics) = Parse(source);
 
@@ -44,18 +44,20 @@ public class EmptyInterfaceSiblingParsingTests
         var marker = Assert.Single(module.Interfaces, i => i.Name == "IMarker");
         Assert.Empty(marker.Methods);
         Assert.Empty(marker.Properties);
+        if (sibling.StartsWith("raw ", StringComparison.Ordinal))
+            Assert.Equal("public class Sibling { }", Assert.Single(module.InteropBlocks).CSharpCode);
     }
 
     [Fact]
     public void EmptyInterface_FollowedBySiblingClass_SiblingIsNotNested()
     {
         const string source = """
-            §M{Markers}
-              §IFACE{IMarker}
-              §CL{Impl:pub}
-                §IMPL{IMarker}
-                §MT{Run:pub} () -> void
-                  §R
+            module Markers
+              interface IMarker
+              class Impl public
+                implements IMarker
+                func Run public () → void
+                  return
             """;
 
         var (module, diagnostics) = Parse(source);
@@ -71,12 +73,14 @@ public class EmptyInterfaceSiblingParsingTests
     public void ConsecutiveEmptyInterfaces_EachParsesAsASibling()
     {
         const string source = """
-            §M{Markers}
-              §IFACE{IA}
-              §IFACE{IB:IA}
-              §IFACE{IC}
-                §PROP{Name:str:pub:get}
-              §IFACE{ID}
+            module Markers
+              interface IA
+              interface IB
+                extends IA
+              interface IC
+                property string:Name public
+                  get
+              interface ID
             """;
 
         var (module, diagnostics) = Parse(source);
@@ -92,11 +96,11 @@ public class EmptyInterfaceSiblingParsingTests
     public void EmptyInterface_InsideClass_FollowedByNestedSiblingType_Parses()
     {
         const string source = """
-            §M{Markers}
-              §CL{Outer:pub}
-                §IFACE{IInner}
-                §CL{Inner:pub}
-                  §IMPL{IInner}
+            module Markers
+              class Outer public
+                interface IInner
+                class Inner public
+                  implements IInner
             """;
 
         var (module, diagnostics) = Parse(source);
@@ -114,18 +118,19 @@ public class EmptyInterfaceSiblingParsingTests
     /// It must still report Calor0100, exactly as before #903 cluster 2.
     /// </summary>
     [Theory]
-    [InlineData("    §CL{Nested:pub}")]
-    [InlineData("    §IFACE{INested}")]
-    [InlineData("    §EN{Nested:pub}\n      Fast")]
+    [InlineData("    class Nested public")]
+    [InlineData("    interface INested")]
+    [InlineData("    enum Nested public\n      Fast")]
     public void EmptyInterface_WithIndentedTypeOpener_IsStillAnError(string indentedOpener)
     {
-        var source = "§M{Markers}\n  §IFACE{IMarker}\n" + indentedOpener + "\n";
+        var source = "module Markers\n  interface IMarker\n" + indentedOpener + "\n";
 
         var (_, diagnostics) = Parse(source);
 
         Assert.True(diagnostics.HasErrors,
             "An indented type opener inside an interface body must not be silently reparented.");
         Assert.Contains(diagnostics.Errors, d => d.Code == "Calor0100");
+        Assert.DoesNotContain(diagnostics.Errors, d => d.Code is "Calor0003" or "Calor0006" or "Calor0007");
     }
 
     /// <summary>
@@ -136,22 +141,23 @@ public class EmptyInterfaceSiblingParsingTests
     public void EmptyInterface_InsideClass_IndentedOpener_IsStillAnError()
     {
         const string source = """
-            §M{Markers}
-              §CL{Outer:pub}
-                §IFACE{IInner}
-                  §CL{TooDeep:pub}
+            module Markers
+              class Outer public
+                interface IInner
+                  class TooDeep public
             """;
 
         var (_, diagnostics) = Parse(source);
 
         Assert.True(diagnostics.HasErrors);
         Assert.Contains(diagnostics.Errors, d => d.Code == "Calor0100");
+        Assert.DoesNotContain(diagnostics.Errors, d => d.Code is "Calor0003" or "Calor0006" or "Calor0007");
     }
 
     [Fact]
     public void EmptyInterface_AtEndOfModule_StillParses()
     {
-        var (module, diagnostics) = Parse("§M{Markers}\n  §IFACE{IMarker}\n");
+        var (module, diagnostics) = Parse("module Markers\n  interface IMarker\n");
 
         AssertNoErrors(diagnostics);
         Assert.Single(module.Interfaces);
@@ -161,11 +167,11 @@ public class EmptyInterfaceSiblingParsingTests
     public void Interface_WithMembers_ThenSibling_MembersStayOnTheInterface()
     {
         const string source = """
-            §M{Markers}
-              §IFACE{IShape}
-                §MT{Area} () -> f64
-              §CL{Square:pub}
-                §IMPL{IShape}
+            module Markers
+              interface IShape
+                func Area () → double
+              class Square public
+                implements IShape
             """;
 
         var (module, diagnostics) = Parse(source);
