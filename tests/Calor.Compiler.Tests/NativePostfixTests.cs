@@ -16,6 +16,118 @@ namespace Calor.Compiler.Tests;
 public sealed class NativePostfixTests
 {
     [Theory]
+    [InlineData("", "", false)]
+    [InlineData("cw", "", true)]
+    [InlineData("cw", "cw", false)]
+    public void AbstractReceiver_ChargesTheSelectedDeclarationContract(
+        string declared, string caller, bool forbidden)
+    {
+        var source = $$"""
+            module Native Native
+              class Base abstract
+                func Read abstract () → int
+                  ! {{declared}}
+              class Derived
+                extends Base
+                func Read override () → int
+                  !
+                  return 9
+              func Probe (Base:value) → int
+                ! {{caller}}
+                return value.Read()
+            """;
+        var (ast, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        var signature = Assert.Single(ast.Classes[0].Methods);
+        Assert.Equal(signature.Span, Assert.IsType<FunctionSymbol>(call.ResolvedSymbol).DefinitionSpan);
+        Assert.Equal("Native.Base.Read", call.ResolvedSymbol.Name);
+        var result = Program.Compile(source);
+        Assert.Equal(forbidden, result.HasErrors);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.AssumedEffects);
+        if (forbidden)
+            Assert.All(result.Diagnostics.Errors, diagnostic => Assert.Equal(DiagnosticCode.ForbiddenEffect, diagnostic.Code));
+        else
+        {
+            var type = Compile(source);
+            Assert.Equal(9, Invoke(type, "Probe", Activator.CreateInstance(type.Assembly.GetType("Native.Derived")!)));
+        }
+    }
+
+    [Theory]
+    [InlineData("\"text\"", "", false, "string")]
+    [InlineData("1", "", true, "int")]
+    [InlineData("1", "cw", false, "int")]
+    public void AbstractReceiver_OverloadsKeepTheirOwnDeclaredRows(
+        string argument, string caller, bool forbidden, string selectedType)
+    {
+        var source = $$"""
+            module Native Native
+              class Base abstract
+                func Read abstract (int:x) → int
+                  ! cw
+                func Read abstract (string:x) → int
+                  !
+              func Probe (Base:value) → int
+                ! {{caller}}
+                return value.Read({{argument}})
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Equal(selectedType, Assert.Single(Assert.IsType<FunctionSymbol>(call.ResolvedSymbol).Parameters).TypeName);
+        var result = Program.Compile(source);
+        Assert.Equal(forbidden, result.HasErrors);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        if (forbidden)
+            Assert.All(result.Diagnostics.Errors, diagnostic => Assert.Equal(DiagnosticCode.ForbiddenEffect, diagnostic.Code));
+    }
+
+    [Theory]
+    [InlineData("true", DiagnosticCode.NoMatchingOverload)]
+    [InlineData("missing", DiagnosticCode.UndefinedReference)]
+    public void AbstractReceiver_InvalidArgumentsDoNotAcquireAContract(string argument, string code)
+    {
+        var source = $$"""
+            module Native Native
+              class Base abstract
+                func Read abstract (int:x) → int
+                  !
+              func Probe (Base:value) → int
+                !
+                return value.Read({{argument}})
+            """;
+        var result = Program.Compile(source);
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == code);
+    }
+
+    [Fact]
+    public void AbstractReceiver_OverrideCannotWidenTheContract()
+    {
+        const string source = """
+            module Native Native
+              class Base abstract
+                func Read abstract () → int
+                  !
+              class Derived
+                extends Base
+                func Read override () → int
+                  ! cw
+                  System.Console.Write("called")
+                  return 9
+              func Probe (Base:value) → int
+                !
+                return value.Read()
+            """;
+        var result = Program.Compile(source);
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.OverrideEffectVariance);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
+    [Theory]
     [InlineData(4, 5)]
     [InlineData(1, 2)]
     public void LegacyLoopHeader_NestedSiblingOperandsRetainCheckedRuntimeSemantics(int a, int b)

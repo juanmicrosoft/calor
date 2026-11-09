@@ -256,17 +256,13 @@ public Dog(string name, string breed)
 `Circle` supplies the area calculation and passes `"Circle"` to the protected
 base constructor. `Demo` calls `Describe` through a `Shape` reference.
 
-**Current limitation:** the effect checker also reports `Calor0410` and a
-`Calor0411` warning for the call to the abstract `Area` method below. This
-complete source demonstrates the type hierarchy, but normal compilation
-currently rejects it. It is not a successful native example.
+The abstract `Area` declaration has a pure effect row (`!`). Calls through
+that declaration charge its contract, and an override cannot add effects.
+For radius `5.0`, `Demo` returns `"Circle with area 78.53975"`. The explicit
+invariant culture makes the decimal separator independent of the machine's
+locale.
 
-The generated C# can execute this hierarchy: for radius `5.0`, `Demo` returns
-`"Circle with area 78.53975"`. The explicit invariant culture makes the decimal
-separator independent of the machine's locale. That CLR observation does not
-establish native effect acceptance.
-
-```calor expect=Calor0410,Calor0411
+```calor
 module ShapeHierarchy
   class Shape abstract
     field string:_name protected

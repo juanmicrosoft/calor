@@ -57,14 +57,14 @@ public class DocDriftCheckerTests
             "GlobalModule.Main()",
             "GlobalModule.Classify(15) + \":\" + GlobalModule.Classify(3) + \":\" + GlobalModule.Classify(5) + \":\" + GlobalModule.Classify(7)",
             "GlobalModule.CountEvens(6)", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Word(2)" })]
-    [InlineData("inheritance.mdx", 8, 2,
+    [InlineData("inheritance.mdx", 8, 1,
         new[] { "ClassModifiers", "VirtualDispatch", "InterfaceInheritance", "SealedOverride", "BaseMethods",
-            "BaseConstructors" },
-        new[] { "59", "Woof!", "...:Rex:7", "42", "15", "Rex:Collie" },
+            "BaseConstructors", "ShapeHierarchy" },
+        new[] { "59", "Woof!", "...:Rex:7", "42", "15", "Rex:Collie", "Circle with area 78.53975" },
         new[] { "GlobalModule.Main()", "GlobalModule.Main()",
             "((IPet)new Dog()).Name() == \"Rex\" && ((ITrainable)new Dog()).Train() == 7 ? GlobalModule.Main() : \"incorrect interface dispatch\"",
             "GlobalModule.Main()",
-            "GlobalModule.Main()", "GlobalModule.Main()" })]
+            "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Demo()" })]
     public void PublicNativeReference_CompilesPositiveAndExactNegativeExamples(
         string page, int completeCount, int negativeCount, string[] moduleNames, string[] expectedResults,
         string[] expressions)
@@ -100,7 +100,6 @@ public class DocDriftCheckerTests
 
     [Theory]
     [InlineData("InterfaceDispatchLimit", 1, "GlobalModule.ReadThroughInterface(new Quiet())", "9")]
-    [InlineData("ShapeHierarchy", 2, "GlobalModule.Demo()", "Circle with area 78.53975")]
     public void PublicInheritanceLimitations_RejectNativeEffectsSeparatelyFromClrBehavior(
         string moduleName, int errorCount, string expression, string expected)
     {

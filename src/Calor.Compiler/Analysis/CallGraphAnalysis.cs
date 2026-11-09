@@ -791,6 +791,25 @@ public sealed class CallGraphAnalysis
                     LegacyId: ResolveLegacyFunctionId(function, functions)))
                 .Where(item => item.LegacyId != null)
                 .ToDictionary(item => item.SymbolId, item => item.LegacyId!);
+            var typeDeclarations = boundModule.SymbolsById.Values.OfType<TypeSymbol>()
+                .ToLookup(symbol => (symbol.DefinitionSpan, symbol.DeclarationSpan));
+            var callableDeclarations = boundModule.SymbolsById.Values.OfType<FunctionSymbol>()
+                .ToLookup(symbol => (symbol.ContainingTypeName, symbol.DefinitionSpan, symbol.DeclarationSpan));
+            // Abstract members have declaration symbols but no BoundFunction body.
+            foreach (var cls in EnumerateClasses(ast))
+            {
+                var owners = typeDeclarations[(cls.Span, cls.IdentifierSpan)]
+                    .Where(symbol => symbol.Name == cls.Name).Take(2).ToArray();
+                if (owners is not [var owner])
+                    continue;
+                foreach (var method in EnumerateMethods(cls).Where(method => method.IsAbstract))
+                {
+                    var declarations = callableDeclarations[(owner.QualifiedName, method.Span, method.IdentifierSpan)]
+                        .Take(2).ToArray();
+                    if (declarations is [var declaration])
+                        legacyIds.TryAdd(declaration.Id, $"{cls.Name}.{method.Id}");
+                }
+            }
             // 0.25 F3 (#847): a local body is indexed under its enclosing callable's id.
             var callerIds = new Dictionary<SymbolId, string>(legacyIds);
             var localFunctionIds = new HashSet<SymbolId>();

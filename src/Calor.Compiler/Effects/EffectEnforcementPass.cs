@@ -206,6 +206,7 @@ public sealed class EffectEnforcementPass
     // call-site charging and declaration-local effect variance (D-W2.2).
     private Dictionary<string, ClassDefinitionNode> _classesByName = new(StringComparer.Ordinal);
     private Dictionary<string, InterfaceDefinitionNode> _interfacesByName = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, MethodNode> _abstractMethods = new(StringComparer.Ordinal);
     private HashSet<string> _delegateTypeNames = new(StringComparer.Ordinal);
     private Dictionary<string, ClassDefinitionNode> _ownerClassByFunctionId = new(StringComparer.Ordinal);
     private Dictionary<string, ConstructorDeclaration> _constructorsByFunctionId = new(StringComparer.Ordinal);
@@ -270,12 +271,17 @@ public sealed class EffectEnforcementPass
         _delegateTypeNames = new HashSet<string>(
             CallGraphAnalysis.EnumerateDelegates(module).Select(d => d.Name), StringComparer.Ordinal);
         _ownerClassByFunctionId = new Dictionary<string, ClassDefinitionNode>(StringComparer.Ordinal);
+        _abstractMethods.Clear();
         _constructorsByFunctionId = new Dictionary<string, ConstructorDeclaration>(StringComparer.Ordinal);
         _implicitAccessorsByFunctionId = new Dictionary<string, ImplicitAccessorDeclaration>(StringComparer.Ordinal);
         foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
         {
             foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))
+            {
                 _ownerClassByFunctionId[$"{cls.Name}.{method.Id}"] = cls;
+                if (method.IsAbstract)
+                    _abstractMethods[$"{cls.Name}.{method.Id}"] = method;
+            }
             foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(cls))
             {
                 _ownerClassByFunctionId[$"{cls.Name}.{ctor.Id}"] = cls;
@@ -621,6 +627,8 @@ public sealed class EffectEnforcementPass
 
     private EffectSet InferEffects(FunctionNode function, HashSet<string> sccMembers)
     {
+        if (_abstractMethods.TryGetValue(function.Id, out var signature))
+            return GetDeclaredEffects(signature.Effects);
         var assumptions = new List<string>();
         var context = new InferenceContext(
             _resolver, _computedEffects,
