@@ -48,16 +48,19 @@ Each file is scored across eight dimensions that correspond to Calor language fe
 
 | Dimension | Weight | What It Detects | Calor Feature |
 |:----------|:------:|:----------------|:-------------|
-| **ContractPotential** | 18% | Argument validation, `ArgumentException` throws, range checks | `§Q`/`§S` contracts |
+| **ContractPotential** | 18% | Argument validation, `ArgumentException` throws, range checks | `requires` preconditions and `=>` postconditions |
 | **NullSafetyPotential** | 18% | Nullable types, `?.`, `??`, null checks | Nullable-boundary checks |
 | **ErrorHandlingPotential** | 18% | Try/catch blocks, throw statements | Native exceptions with declared effects |
-| **EffectPotential** | 13% | File I/O, network calls, database access, console | `§E` effect declarations |
+| **EffectPotential** | 13% | File I/O, network calls, database access, console | `!` effect rows |
 | **ApiComplexityPotential** | 13% | Undocumented public APIs | Calor metadata requirements |
 | **PatternMatchPotential** | 8% | Switch statements/expressions | Exhaustiveness checking |
 | **AsyncPotential** | 6% | `async`, `await`, `Task<T>`, and cancellation | Calor async model |
 | **LinqPotential** | 6% | LINQ methods and query syntax | Calor collection patterns |
 
 The total score (0-100) is the weighted sum of individual dimension scores.
+It ranks detected patterns, not measured safety improvements, successful native
+conversion or agent accuracy. Inspect the conversion report and run tests before
+deciding to migrate a file.
 
 ---
 
@@ -232,7 +235,7 @@ calor assess ./src --threshold 50 --top 10
 calor assess . --format json --output migration-report.json
 
 # Parse with jq to find critical files
-cat migration-report.json | jq '.files[] | select(.priority == "critical") | .path'
+cat migration-report.json | jq '.data.files[] | select(.priority == "critical") | .path'
 ```
 
 ### Verbose Analysis of Specific Area
@@ -262,5 +265,5 @@ Skipped files are reported in the summary but don't affect scoring.
 
 - [Getting Started](/docs/getting-started/) - Install Calor and write your first program
 - [Syntax Reference](/docs/syntax-reference/) - Complete language reference
-- [Contracts](/docs/syntax-reference/contracts/) - Learn about `§Q`/`§S` contracts
-- [Effects](/docs/syntax-reference/effects/) - Learn about `§E` effect declarations
+- [Contracts](/docs/syntax-reference/contracts/) - Learn about `requires` and `=>`
+- [Effects](/docs/syntax-reference/effects/) - Learn about `!` effect rows

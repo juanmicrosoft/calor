@@ -767,6 +767,7 @@ public class DocDriftCheckerTests
     [InlineData("cli/format.mdx")]
     [InlineData("cli/feature-check.mdx")]
     [InlineData("cli/static-analysis.mdx")]
+    [InlineData("cli/analyze.mdx")]
     public void PublicNativeCliProse_DoesNotTeachRetiredSectionHeaders(string page)
     {
         var path = "website/content/" + page;
