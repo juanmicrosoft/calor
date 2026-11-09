@@ -546,7 +546,10 @@ public sealed class CallGraphAnalysis
     /// <summary>
     /// Builds a call graph analysis from a module AST.
     /// </summary>
-    public static CallGraphAnalysis Build(ModuleNode ast)
+    public static CallGraphAnalysis Build(ModuleNode ast) => Build(ast, null);
+
+    internal static CallGraphAnalysis Build(ModuleNode ast,
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions)
     {
         var functions = new Dictionary<string, FunctionNode>(StringComparer.Ordinal);
         var functionNameToId = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -628,7 +631,7 @@ public sealed class CallGraphAnalysis
 
         var (resolvedCallIds, boundCallSites, boundResolutionComplete, boundValueTypes,
              declaredFunctionTypes, declaredReturnTypes, declaredFieldTypes, boundValues) =
-            ResolveBoundCallSites(ast, functions);
+            ResolveBoundCallSites(ast, functions, crossModuleFunctions);
 
         // Build call edges
         var unresolvedCalls = new List<AstUnresolvedCallSite>();
@@ -704,7 +707,8 @@ public sealed class CallGraphAnalysis
         BoundValueIndex BoundValues)
         ResolveBoundCallSites(
             ModuleNode ast,
-            IReadOnlyDictionary<string, FunctionNode> functions)
+            IReadOnlyDictionary<string, FunctionNode> functions,
+            IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions)
     {
         var resolved = new Dictionary<AstCallKey, IReadOnlyList<string>>();
         var boundCallSites = new HashSet<AstCallKey>();
@@ -770,7 +774,10 @@ public sealed class CallGraphAnalysis
         try
         {
             var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
-            var boundModule = new Binder(diagnostics).Bind(ast);
+            var boundModule = new Binder(diagnostics)
+            {
+                CrossModuleFunctionModules = crossModuleFunctions
+            }.Bind(ast);
             boundValues.Complete = true;
             var incompatibleCallSpans = diagnostics
                 .Where(diagnostic =>

@@ -14,6 +14,7 @@ namespace Calor.Compiler.Effects;
 /// </summary>
 public sealed class EffectEnforcementPass
 {
+    internal IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? CrossModuleFunctionModules { get; init; }
     private readonly DiagnosticBag _diagnostics;
     private readonly EffectResolver _resolver;
     private readonly UnknownCallPolicy _policy;
@@ -255,7 +256,7 @@ public sealed class EffectEnforcementPass
         _chargedVariables.Clear();
 
         // Phase 1: Build function map and call graph (includes functions and methods)
-        _callGraphAnalysis = CallGraphAnalysis.Build(module);
+        _callGraphAnalysis = CallGraphAnalysis.Build(module, CrossModuleFunctionModules);
 
         // Phase 1b: index module shape for delegate detection, static-receiver
         // resolution and variance checks. All enumerations include §PP-wrapped
@@ -6059,6 +6060,9 @@ public sealed class EffectEnforcementPass
             if (call.TargetExpression is FieldAccessNode member)
             {
                 var bound = _context.CallGraph.ComputedMemberCall(_context.CurrentFunctionId, call.Span);
+                if (bound is not null && _context.CrossModuleFunctionNames.Contains(bound.Target))
+                    return InferFromCallTarget(bound.Target, call.Span, call.Arguments)
+                        .Union(InferFromCallArguments(bound.Target, call.Arguments, call.ArgumentModifiers));
                 var receiverEffects = bound?.Receiver is Binding.BoundTypeReferenceExpression
                     ? EffectSet.Empty
                     : InferFromExpression(member.Target);
@@ -6075,8 +6079,11 @@ public sealed class EffectEnforcementPass
                     if (resolution.Status != EffectResolutionStatus.Unknown)
                         return evaluated.Union(resolution.Effects);
                 }
+                var receiverName = bound?.Receiver?.Type is Binding.BoundTypes.UnresolvedBoundType
+                    ? Binding.Binder.DottedReferenceName(member.Target) ?? "<expression>"
+                    : bound?.Receiver?.Type.DisplayString ?? "<expression>";
                 return evaluated.Union(UnknownResolvedOperation(
-                    $"{bound?.Receiver?.Type.DisplayString ?? "<expression>"}.{member.FieldName}", call.Span));
+                    $"{receiverName}.{member.FieldName}", call.Span));
             }
             var argEffects = InferFromCallArguments("<expression-call>", call.Arguments, call.ArgumentModifiers);
 

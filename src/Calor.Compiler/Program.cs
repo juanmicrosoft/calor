@@ -934,7 +934,8 @@ public class Program
                 projectDirectory: options.ProjectDirectory,
                 crossModuleFunctionNames: options.CrossModuleFunctionModules?.Keys)
             {
-                CrossModuleTypes = options.CrossModuleTypes
+                CrossModuleTypes = options.CrossModuleTypes,
+                CrossModuleFunctionModules = options.CrossModuleFunctionModules
             };
             enforcementPass.Enforce(ast);
             phaseSw.Stop();

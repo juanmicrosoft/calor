@@ -1,5 +1,6 @@
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis.CSharp;
@@ -12,6 +13,8 @@ namespace Calor.Compiler.Binding;
 /// </summary>
 public sealed class Binder
 {
+    internal IReadOnlyDictionary<string, CrossModuleFunctionTarget>? CrossModuleFunctionModules { get; init; }
+    internal Dictionary<TextSpan, string> CrossModuleCallTargets { get; } = new();
     internal delegate BoundExpression ExpressionBinder(Binder binder, ExpressionNode expression);
 
     private static readonly IReadOnlyDictionary<Type, ExpressionBinder> ExpressionBinders =
@@ -942,6 +945,7 @@ public sealed class Binder
         _asyncTypeModule = module;
         _scope = new Scope();
         _functionSymbols.Clear();
+        CrossModuleCallTargets.Clear();
         _staticMethodSymbols.Clear();
         _functionNamespaces.Clear();
         _classScopes.Clear();
@@ -4144,7 +4148,7 @@ public sealed class Binder
             .Any(symbol => !allowDeclaredTypes || symbol is not TypeSymbol)
         || GetTypeParameterConstraints(head) is not null;
 
-    private static string? DottedReferenceName(ExpressionNode expression) => expression switch
+    internal static string? DottedReferenceName(ExpressionNode expression) => expression switch
     {
         ReferenceNode reference => reference.Name,
         FieldAccessNode field when DottedReferenceName(field.Target) is { } prefix =>
@@ -5628,6 +5632,8 @@ public sealed class Binder
     {
         if (call.TargetExpression is FieldAccessNode member)
         {
+            var sourceReceiver = DottedReferenceName(member.Target);
+            var sourceTarget = sourceReceiver is null ? null : $"{sourceReceiver}.{member.FieldName}";
             BoundExpression? receiver = TryBindPredefinedTypeReceiver(member.Target);
             if (receiver is null && DottedReferenceName(member.Target) is { } receiverName
                 && !IsTypeReceiverHeadShadowed(receiverName.Split('.')[0], allowDeclaredTypes: true)
@@ -5636,7 +5642,23 @@ public sealed class Binder
                 receiver = new BoundTypeReferenceExpression(member.Target.Span,
                     receiverName,
                     new BoundTypes.NominalBoundType(typeSymbol.QualifiedName, declaration: typeSymbol), typeSymbol);
-            receiver ??= TryBindMetadataTypeReceiver(member.Target) ?? BindExpression(member.Target);
+            receiver ??= TryBindMetadataTypeReceiver(member.Target);
+            if (receiver is null && sourceReceiver is not null && sourceTarget is not null
+                && !IsTypeReceiverHeadShadowed(sourceReceiver.Split('.')[0], allowDeclaredTypes: false)
+                && CrossModuleFunctionModules?.TryGetValue(sourceTarget, out var moduleTarget) == true)
+            {
+                receiver = new BoundTypeReferenceExpression(member.Target.Span, sourceReceiver,
+                    new BoundTypes.NominalBoundType(moduleTarget.QualifiedClassName));
+                CrossModuleCallTargets[call.Span] = sourceTarget;
+                return BindCallExpression(new CallExpressionNode(call.Span,
+                    sourceTarget, call.Arguments, call.ArgumentNames, call.ArgumentModifiers,
+                    call.TypeArguments, member.FieldNameSpan, member.Target.Span), receiver, member.FieldName);
+            }
+            receiver ??= BindExpression(member.Target);
+            if (receiver is BoundVariableExpression { Variable.Id.IsNone: true } unresolved)
+                receiver = new BoundVariableExpression(unresolved.Span, unresolved.Variable,
+                    typeOverride: new BoundTypes.UnresolvedBoundType(
+                        $"Undefined receiver '{sourceReceiver}'", reported: true));
             return BindCallExpression(new CallExpressionNode(call.Span,
                 "<expression-call>", call.Arguments, call.ArgumentNames, call.ArgumentModifiers,
                 call.TypeArguments, member.FieldNameSpan, member.Target.Span), receiver, member.FieldName);

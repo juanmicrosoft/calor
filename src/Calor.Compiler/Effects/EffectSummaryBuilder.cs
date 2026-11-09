@@ -11,7 +11,10 @@ namespace Calor.Compiler.Effects;
 /// </summary>
 public static class EffectSummaryBuilder
 {
-    public static EffectSummary Build(ModuleNode module)
+    public static EffectSummary Build(ModuleNode module) => Build(module, null);
+
+    internal static EffectSummary Build(ModuleNode module,
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions)
     {
         var summary = new EffectSummary
         {
@@ -54,7 +57,7 @@ public static class EffectSummaryBuilder
         // are gone; `NoNameKeyedEffectStoreRemains` pins it), then attach them
         // with the caller's declared effects + a diagnostic span for any
         // cross-module errors.
-        var rawCalls = ExternalCallCollector.CollectPerFunctionWithBareNames(module);
+        var rawCalls = ExternalCallCollector.CollectPerFunctionWithBareNames(module, crossModuleFunctions);
         var callsByCaller = new Dictionary<string, List<RawCall>>(StringComparer.Ordinal);
         foreach (var call in rawCalls)
         {

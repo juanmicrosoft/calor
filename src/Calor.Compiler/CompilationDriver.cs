@@ -525,7 +525,7 @@ internal static class CompilationDriver
             EffectSummary? summary = null;
             if (result.Ast != null && (crossModuleEnforcement || newState != null))
             {
-                summary = EffectSummaryBuilder.Build(result.Ast);
+                summary = EffectSummaryBuilder.Build(result.Ast, crossModuleMap);
                 moduleSummaries.Add((summary, file.FullName));
             }
 

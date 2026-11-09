@@ -11,6 +11,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 // Import ContractMode from Program.cs
 using ContractMode = Calor.Compiler.ContractMode;
+using Binder = Calor.Compiler.Binding.Binder;
 
 namespace Calor.Compiler.CodeGen;
 
@@ -40,6 +41,8 @@ public sealed record CrossModuleFunctionTarget(
     string NamespaceIdentity,
     string ModuleClassName)
 {
+    internal string QualifiedClassName => string.IsNullOrEmpty(NamespaceIdentity)
+        ? ModuleClassName : $"{NamespaceIdentity}.{ModuleClassName}";
     internal static CrossModuleFunctionTarget? Create(
         ModuleNode module,
         FunctionNode function)
@@ -123,6 +126,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     /// #823's original assumption.</summary>
     private IReadOnlyList<ClassDefinitionNode> _moduleClasses = Array.Empty<ClassDefinitionNode>();
     private ModuleNode? _asyncTypeModule;
+    private IReadOnlyDictionary<TextSpan, string>? _boundCrossModuleCallTargets;
     private Stack<(string? ClassName, string? ClassIdentity, HashSet<string> Members, bool Suppress)> _classMemberScopes = new();
     private bool _suppressCrossModuleQualification;
     private readonly HashSet<int> _preambleDirectiveStarts = new();
@@ -782,6 +786,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _currentClassMemberNames = new HashSet<string>(StringComparer.Ordinal);
         _moduleClasses = module.Classes;
         _asyncTypeModule = module;
+        _boundCrossModuleCallTargets = null;
         _classMemberScopes =
             new Stack<(string? ClassName, string? ClassIdentity, HashSet<string> Members, bool Suppress)>();
         _suppressCrossModuleQualification = false;
@@ -9070,6 +9075,22 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(ExpressionCallNode node)
     {
         var target = EmitGroupedOperand(node.TargetExpression);
+        if (_asyncTypeModule is not null
+            && Binder.DottedReferenceName(node.TargetExpression) is { } sourceTarget
+            && CrossModuleFunctionModules?.ContainsKey(sourceTarget) == true)
+        {
+            if (_boundCrossModuleCallTargets is null)
+            {
+                var binder = new Binder(new Diagnostics.DiagnosticBag())
+                {
+                    CrossModuleFunctionModules = CrossModuleFunctionModules
+                };
+                binder.Bind(_asyncTypeModule);
+                _boundCrossModuleCallTargets = binder.CrossModuleCallTargets;
+            }
+            if (_boundCrossModuleCallTargets.TryGetValue(node.Span, out var boundTarget))
+                target = QualifyCrossModuleTarget(boundTarget);
+        }
         if (node.TypeArguments is { Count: > 0 })
             target += $"<{string.Join(", ", node.TypeArguments.Select(MapTypeName))}>";
         var args = EmitCallArguments(node.Arguments, node.ArgumentNames, node.ArgumentModifiers);

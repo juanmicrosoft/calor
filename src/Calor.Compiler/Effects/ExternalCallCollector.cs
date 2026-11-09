@@ -125,6 +125,7 @@ public sealed record RawCall(string CallerId, string CallerName, string Target, 
 /// </summary>
 public sealed class ExternalCallCollector
 {
+    private IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? _crossModuleFunctions;
     private readonly List<CollectedCall> _calls = new();
     private readonly List<RawCall> _rawCalls = new();
     private readonly Dictionary<(int Start, int End, string Target), BoundReceiver> _boundReceiverTypes = new();
@@ -177,8 +178,16 @@ public sealed class ExternalCallCollector
     /// cross-module resolution can match against the <see cref="CrossModuleEffectRegistry"/>.
     /// </summary>
     public static List<RawCall> CollectPerFunctionWithBareNames(ModuleNode module)
+        => CollectPerFunctionWithBareNames(module, null);
+
+    internal static List<RawCall> CollectPerFunctionWithBareNames(ModuleNode module,
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions)
     {
-        var collector = new ExternalCallCollector { _rawMode = true };
+        var collector = new ExternalCallCollector
+        {
+            _rawMode = true,
+            _crossModuleFunctions = crossModuleFunctions
+        };
         collector.IndexBoundCallReceivers(module);
 
         foreach (var function in module.Functions)
@@ -237,7 +246,9 @@ public sealed class ExternalCallCollector
                 if (_computedMemberCalls.TryGetValue((node.Span.Start, node.Span.End), out var bound)
                     && expressionCall.TargetExpression is FieldAccessNode member)
                 {
-                    var target = $"<expression>.{member.FieldName}";
+                    var target = _crossModuleFunctions?.TryGetValue(bound.Target, out var moduleTarget) == true
+                        ? $"{moduleTarget.ModuleName}.{member.FieldName}"
+                        : $"<expression>.{member.FieldName}";
                     _boundReceiverTypes[(node.Span.Start, node.Span.End, target)] = ResolveBoundReceiver(bound.Receiver);
                     TryAddCall(target, CallKind.Method, node.Span);
                 }
@@ -330,7 +341,10 @@ public sealed class ExternalCallCollector
     {
         try
         {
-            var bound = new Binder(new Calor.Compiler.Diagnostics.DiagnosticBag()).Bind(module);
+            var bound = new Binder(new Calor.Compiler.Diagnostics.DiagnosticBag())
+            {
+                CrossModuleFunctionModules = _crossModuleFunctions
+            }.Bind(module);
             foreach (var node in Descendants(bound))
             {
                 switch (node)
