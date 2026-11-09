@@ -2949,8 +2949,11 @@ public sealed class Binder
             && TypeIdentity.Canonicalize(nullableElement) == "STRING")
             element = new BoundTypes.NominalBoundType(
                 "STRING", BoundTypes.NullableAnnotation.Annotated);
-        else if (IsBuiltInValueTypeName(TypeIdentity.Canonicalize(elementName)))
-            element = new BoundTypes.PrimitiveBoundType(TypeIdentity.Canonicalize(elementName));
+        else if (IsBuiltInValueTypeName(TypeIdentity.Canonicalize(elementName))
+            || IsBuiltInValueTypeName(elementName))
+            element = new BoundTypes.PrimitiveBoundType(
+                IsBuiltInValueTypeName(TypeIdentity.Canonicalize(elementName))
+                    ? TypeIdentity.Canonicalize(elementName) : elementName);
         else if (TryBuildStringTarget(elementName, out var reference, declaringFunction)
             && reference is BoundTypes.NominalBoundType)
             element = reference;

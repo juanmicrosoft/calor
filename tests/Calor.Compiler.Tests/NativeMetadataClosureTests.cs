@@ -266,13 +266,37 @@ public sealed class NativeMetadataClosureTests
                 ! mut, fs:w
                 bytes.Add(item)
                 File.WriteAllBytes(path, bytes.ToArray())
+              func WriteEncoded (List<byte>:bytes, byte:item, string:path) → void
+                ! mut, fs:w
+                File.WriteAllBytes(path, Encode(bytes, item))
             """;
+        var metadataDiagnostics = new DiagnosticBag();
+        var metadataBound = new Binder(metadataDiagnostics).Bind(Parse(source));
+        var write = metadataBound.Functions.Single(function => function.Symbol.Name == "WriteEncoded");
+        var writeCall = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundExpressionStatement>(write.Body[0]).Expression);
+        Assert.True(writeCall.ResolvedMetadataMethod is not null,
+            $"Array argument: {writeCall.Arguments[1].Type.DisplayString}; "
+            + $"input element: {writeCall.Arguments[1].MethodInputArrayType?.ElementType.DisplayString}");
+        Assert.Equal("System.IO.File", writeCall.ResolvedMetadataMethod.ContainingType.ToDisplayString());
+        Assert.Equal(SpecialType.System_Byte, Assert.IsAssignableFrom<IArrayTypeSymbol>(
+            writeCall.ResolvedMetadataMethod.Parameters[1].Type).ElementType.SpecialType);
         var result = Compile(source);
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
         var method = CompileAssembly(result.GeneratedCode).GetTypes().SelectMany(type => type.GetMethods())
             .Single(method => method.Name == "Encode");
         var values = new List<byte> { 7 };
         Assert.Equal(new byte[] { 7, 255 }, Assert.IsType<byte[]>(method.Invoke(null, [values, (byte)255])));
+        var path = Path.Combine(Path.GetTempPath(), $"calor-byte-codec-{Guid.NewGuid():N}.bin");
+        try
+        {
+            method.DeclaringType!.GetMethod("WriteEncoded")!.Invoke(null, [new List<byte> { 2 }, (byte)254, path]);
+            Assert.Equal(new byte[] { 2, 254 }, File.ReadAllBytes(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
         var diagnostics = new DiagnosticBag();
         var bound = new Binder(diagnostics).Bind(Parse(source));
         var encode = bound.Functions.Single(function => function.Symbol.Name == "Encode");
