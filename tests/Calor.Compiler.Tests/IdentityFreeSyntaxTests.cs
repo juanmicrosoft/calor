@@ -1,11 +1,267 @@
+using System.Reflection;
+using Calor.Compiler.Ast;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
 
 public sealed class IdentityFreeSyntaxTests
 {
+    [Theory]
+    [InlineData("public static object Run() { string? text = default; return text == null ? 7 : 0; }", null, 7)]
+    [InlineData("public static object Run() { string? text = null; return text!.Length; }", "null-forgiving-expression", "throws:NullReferenceException")]
+    [InlineData("public static object Run() { int value; value = 9; return value; }", null, 9)]
+    [InlineData("public static object Run() { System.Text.StringBuilder value; value = new System.Text.StringBuilder(); return value.Length; }", "default-expression", 0)]
+    [InlineData("public enum Level { Low, High } public static object Run() { Level value; value = Level.High; return (int)value; }", "default-expression", 1)]
+    [InlineData("public static object Run() { var values = new System.Collections.Generic.Dictionary<int,int> { [1] = 2, [1] = 3 }; return values[1]; }", "dictionary-initializer", 3)]
+    [InlineData("public static bool Enabled { get; } = !System.AppContext.TryGetSwitch(\"Calor.Shape.Absent\", out var enabled) || enabled; public static object Run() => Enabled ? 8 : 0;", "conditional-expression-hoisting", 8)]
+    [InlineData("public static object Run() { int[] values = {1, 2}; var query = from value in values let next = value + 1 select next; return System.Linq.Enumerable.Sum(query); }", "linq-query", 5)]
+    public void CorpusOutputShapesPreserveOriginalClrObservations(
+        string members, string? feature, object expected)
+    {
+        var source = "using System.Linq;\npublic class Probe { " + members + " }";
+        var result = ConvertCorpusShape(source);
+        var module = ParseCorpusShape(result.CalorSource!);
+        if (feature is null)
+            Assert.Empty(result.Losses);
+        else
+        {
+            Assert.Contains(result.Losses, loss =>
+                loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == feature);
+            Assert.True(result.InteropPreservationCount > 0);
+            var raw = Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(module)
+                .SelectMany(CorpusInteropBlocks).ToArray();
+            Assert.NotEmpty(raw);
+            Assert.All(raw, block => Assert.Contains(block.CSharpCode.Trim(), source));
+        }
+        Assert.Equal(expected, RunCorpusShape(source));
+        Assert.Equal(expected, RunCorpusShape(new CSharpEmitter().Emit(module)));
+        var emitted = new CalorEmitter().Emit(module);
+        var reparsed = ParseCorpusShape(emitted);
+        Assert.Equal(expected, RunCorpusShape(new CSharpEmitter().Emit(reparsed)));
+        Assert.DoesNotContain("§CS", emitted);
+        Assert.DoesNotContain("§LIST", emitted);
+    }
+
+    [Fact]
+    public void ExplicitGenericInterfaceImplementationPreservesDispatchAndExactMember()
+    {
+        const string member = "int IValue<int>.Get(int value) => value + 1;";
+        const string source = """
+            public interface IValue<T> { int Get(T value); }
+            public class Probe : IValue<int>
+            {
+                int IValue<int>.Get(int value) => value + 1;
+                public static object Run() => ((IValue<int>)new Probe()).Get(8);
+            }
+            """;
+        var conversion = ConvertCorpusShape(source);
+        Assert.Contains(conversion.Losses, loss =>
+            loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "explicit-interface");
+        var module = ParseCorpusShape(conversion.CalorSource!);
+        var interop = Assert.Single(Assert.Single(module.Classes).InteropBlocks);
+        Assert.Contains(member, interop.CSharpCode);
+        Assert.Equal(9, RunCorpusShape(source));
+        Assert.Equal(9, RunCorpusShape(new CSharpEmitter().Emit(module)));
+        var reparsed = ParseCorpusShape(new CalorEmitter().Emit(module));
+        Assert.Equal(9, RunCorpusShape(new CSharpEmitter().Emit(reparsed)));
+    }
+
+    [Fact]
+    public void GenericMethodAttributesPrecedeTypeParametersAndRetainReflectionMetadata()
+    {
+        const string source = """
+            using System;
+            public interface IValue
+            {
+                [Obsolete("interface")] T Get<T>(T value);
+            }
+            public class Probe
+            {
+                [Obsolete("implementation")] public static T Get<T>(T value) => value;
+                public static object Run() => typeof(Probe).GetMethod("Get").GetCustomAttributes(false).Length;
+            }
+            """;
+        var result = ConvertCorpusShape(source);
+        Assert.Empty(result.Losses);
+        Assert.Contains("Get[@Obsolete(\"interface\")]<T>", result.CalorSource);
+        Assert.Contains("Get[@Obsolete(\"implementation\")]<T>", result.CalorSource);
+        var module = ParseCorpusShape(result.CalorSource!);
+        Assert.Single(Assert.Single(module.Interfaces).Methods.Single().CSharpAttributes);
+        Assert.Single(Assert.Single(module.Classes).Methods.Single(method => method.Name == "Get").CSharpAttributes);
+        Assert.Equal(1, RunCorpusShape(source));
+        Assert.Equal(1, RunCorpusShape(new CSharpEmitter().Emit(module)));
+        var reparsed = ParseCorpusShape(new CalorEmitter().Emit(module));
+        Assert.Equal(1, RunCorpusShape(new CSharpEmitter().Emit(reparsed)));
+    }
+
+    [Fact]
+    public void ConsecutiveMultilineLambdaArgumentsRetainScopeOrderAndDelayedExecution()
+    {
+        const string source = """
+            using System;
+            public class Probe
+            {
+                private static int value;
+                public Probe(Action<int> first, Action<int> second, Action<int> third)
+                {
+                    if (value != 0) throw new Exception("eager body");
+                    second(2); first(1); third(3);
+                }
+                public static object Run()
+                {
+                    var probe = new Probe(x => { value = value * 10 + x; },
+                        y => { value = value * 10 + y; },
+                        z => { value = value * 10 + z; });
+                    return value;
+                }
+            }
+            """;
+        var conversion = ConvertCorpusShape(source);
+        Assert.Empty(conversion.Losses);
+        var module = ParseCorpusShape(conversion.CalorSource!);
+        var run = Assert.Single(module.Classes).Methods.Single(method => method.Name == "Run");
+        var call = Assert.IsType<NewExpressionNode>(run.Body.OfType<BindStatementNode>()
+            .Single(binding => binding.Name == "probe").Initializer);
+        Assert.Equal(3, call.Arguments.Count);
+        var lambdas = call.Arguments.Select(argument =>
+        {
+            var reference = Assert.IsType<ReferenceNode>(argument);
+            return Assert.IsType<LambdaExpressionNode>(run.Body.OfType<BindStatementNode>()
+                .Single(binding => binding.Name == reference.Name).Initializer);
+        }).ToArray();
+        Assert.All(lambdas, lambda => Assert.Single(lambda.StatementBody!));
+        var inlineCreation = new NewExpressionNode(call.Span, call.TypeName, call.TypeArguments, lambdas);
+        var inline = inlineCreation.Accept(new CalorEmitter());
+        var inlineModule = ParseCorpusShape("module Inline\n  func Build ()\n    let value = "
+            + inline.Replace("\n", "\n    ", StringComparison.Ordinal));
+        var inlineCall = Assert.IsType<NewExpressionNode>(
+            Assert.IsType<BindStatementNode>(Assert.Single(inlineModule.Functions).Body[0]).Initializer);
+        Assert.Equal(3, inlineCall.Arguments.Count);
+        Assert.All(inlineCall.Arguments, argument =>
+            Assert.Single(Assert.IsType<LambdaExpressionNode>(argument).StatementBody!));
+        Assert.Equal(213, RunCorpusShape(source));
+        Assert.Equal(213, RunCorpusShape(new CSharpEmitter().Emit(module)));
+        var reparsed = ParseCorpusShape(new CalorEmitter().Emit(module));
+        Assert.Equal(213, RunCorpusShape(new CSharpEmitter().Emit(reparsed)));
+    }
+
+    [Fact]
+    public void NativeListInitializerRetainsBindingElementOrderAndOneEvaluation()
+    {
+        const string source = """
+            using System.Collections.Generic;
+            public class Probe
+            {
+                private static int trace;
+                private static int Next(int value) { trace = trace * 10 + value; return value; }
+                public static object Run()
+                {
+                    var values = new List<int> { Next(1), Next(2) };
+                    return trace * 100 + values[0] * 10 + values[1];
+                }
+            }
+            """;
+        var conversion = ConvertCorpusShape(source);
+        Assert.Empty(conversion.Losses);
+        Assert.DoesNotContain("§LIST", conversion.CalorSource);
+        var module = ParseCorpusShape(conversion.CalorSource!);
+        var run = Assert.Single(module.Classes).Methods.Single(method => method.Name == "Run");
+        var creation = Assert.IsType<NewExpressionNode>(
+            Assert.IsType<BindStatementNode>(run.Body[0]).Initializer);
+        Assert.Equal(2, creation.CollectionInitializers.Count);
+        Assert.Equal(1212, RunCorpusShape(source));
+        Assert.Equal(1212, RunCorpusShape(new CSharpEmitter().Emit(module)));
+        Assert.Equal(1212, RunCorpusShape(new CSharpEmitter().Emit(
+            ParseCorpusShape(new CalorEmitter().Emit(module)))));
+    }
+
+    [Fact]
+    public void NamelessAndEmptyCatchesRetainFollowingSiblingAndThrowBehavior()
+    {
+        const string source = """
+            using System;
+            public class Probe
+            {
+                public static object Run()
+                {
+                    int count = 0;
+                    try { throw new Exception(); } catch (Exception) { }
+                    count = count + 1;
+                    try { throw new Exception(); } catch (Exception) { count = count + 2; }
+                    return count;
+                }
+            }
+            """;
+        var conversion = ConvertCorpusShape(source);
+        Assert.Empty(conversion.Losses);
+        Assert.Contains("catch Exception\n", conversion.CalorSource!.Replace("\r\n", "\n"));
+        Assert.DoesNotContain("catch Exception:", conversion.CalorSource);
+        var module = ParseCorpusShape(conversion.CalorSource!);
+        Assert.Equal(3, RunCorpusShape(source));
+        Assert.Equal(3, RunCorpusShape(new CSharpEmitter().Emit(module)));
+        Assert.Equal(3, RunCorpusShape(new CSharpEmitter().Emit(
+            ParseCorpusShape(new CalorEmitter().Emit(module)))));
+    }
+
+    private static ConversionResult ConvertCorpusShape(string source)
+    {
+        var conversion = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            PreprocessorMode = PreprocessorConversionMode.SelectActiveBranchLossy,
+            ParseOptions = new CSharpParseOptions(LanguageVersion.Preview,
+                DocumentationMode.Parse, SourceCodeKind.Regular),
+            DefinedSymbols = Array.Empty<string>(),
+            ModuleName = "Calor0425Leg",
+            GracefulFallback = true,
+            AutoGenerateIds = true
+        }).Convert(source, "original.cs");
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        return conversion;
+    }
+
+    private static IEnumerable<CSharpInteropBlockNode> CorpusInteropBlocks(AstNode node)
+    {
+        if (node is CSharpInteropBlockNode block)
+            yield return block;
+        foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node))
+            foreach (var nested in CorpusInteropBlocks(child))
+                yield return nested;
+    }
+
+    private static ModuleNode ParseCorpusShape(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, source + "\n" + string.Join("\n", diagnostics));
+        return module;
+    }
+
+    private static object? RunCorpusShape(string source)
+    {
+        var compilation = CSharpCompilation.Create("CorpusShape_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(source)], GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        Assert.True(result.Success, source + "\n" + string.Join("\n", result.Diagnostics));
+        var type = Assembly.Load(stream.ToArray()).GetTypes().Single(candidate => candidate.Name == "Probe");
+        try
+        {
+            return type.GetMethod("Run")!.Invoke(null, null);
+        }
+        catch (TargetInvocationException exception) when (exception.InnerException != null)
+        {
+            return "throws:" + exception.InnerException.GetType().Name;
+        }
+    }
+
     [Fact]
     public void ConversionAndReemissionNeverSerializeDeclarationOrBlockIdentity()
     {

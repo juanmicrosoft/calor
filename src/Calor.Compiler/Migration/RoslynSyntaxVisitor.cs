@@ -3886,6 +3886,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private MethodNode ConvertMethod(MethodDeclarationSyntax node)
     {
+        if (node.ExplicitInterfaceSpecifier != null)
+            throw EscalateExpression(node, "explicit-interface", preserveMember: true);
         _context.RecordFeatureUsage("method");
         _context.EnterMethod(node.Identifier.Text);
         _reassignedVariables = CollectReassignedVariables(node);
@@ -6192,6 +6194,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         => exception is MemberInteropEscalationException escalation
             && (escalation.FeatureName is "tuple-deconstruction" or "iterator-accessor" or "partial-property"
                 or "alias-qualified-value"
+                or "explicit-interface" or "null-forgiving-expression"
+                or "conditional-expression-hoisting" or "initializer-interop" or "linq-query"
+                or "dictionary-initializer" or "default-expression"
                 || SyntaxCapabilityClassifier.RequiredUnsupportedFeatures.Contains(
                     escalation.FeatureName))
                 ? escalation.FeatureName
@@ -11063,53 +11068,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode PreserveConditionalOperand(
         ExpressionSyntax expression, string feature = "conditional-expression-hoisting")
-    {
-        var line = expression.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
-        _context.RecordLoss(ConversionLossKind.InteropPreserved, feature,
-            $"Conditional operand preserved in place as C#: {TruncateForMessage(expression.ToString())}", line);
-        _context.AddWarning("Conditional operand preserved in place to retain evaluation order",
-            feature: feature, line: line, suggestion: FeatureSupport.GetWorkaround(feature));
-        var code = expression is ThrowExpressionSyntax or DeclarationExpressionSyntax
-            ? expression.ToString()
-            : $"({expression})";
-        return TypedRawCSharp(expression, code);
-    }
-
-    /// <summary>
-    /// Raw C# in expression position, cast to its own type when Roslyn knows a nameable one so the
-    /// Calor binder can type it (an identity cast; it runs no conversion).
-    /// </summary>
-    private ExpressionNode TypedRawCSharp(ExpressionSyntax expression, string code, bool minimalTypeName = false)
-    {
-        var span = GetTextSpan(expression);
-        var raw = new RawCSharpExpressionNode(span, code);
-        if (expression is not DeclarationExpressionSyntax &&
-            _semanticModel != null && expression.SyntaxTree == _semanticModel.SyntaxTree)
-        {
-            var info = _semanticModel.GetTypeInfo(expression);
-            // A tuple literal or collection expression takes its type from the target: cast to the
-            // converted type so each element converts in place, as in the original (#1541 review r2).
-            var type = expression is TupleExpressionSyntax or CollectionExpressionSyntax
-                ? info.ConvertedType ?? info.Type
-                : info.Type;
-            if (type is { IsAnonymousType: false, IsRefLikeType: false } &&
-                (type.CanBeReferencedByName || type is IArrayTypeSymbol) &&
-                type.TypeKind is not (TypeKind.Error or TypeKind.Dynamic) &&
-                type.SpecialType != SpecialType.System_Void)
-            {
-                // The minimal name is the one the preserved C# itself spells, so it resolves
-                // wherever that code does (the converter may move types into a namespace).
-                return new TypeOperationNode(span, TypeOp.Cast, raw,
-                    TypeMapper.CSharpToCalor(minimalTypeName
-                        ? type.ToMinimalDisplayString(_semanticModel, expression.SpanStart)
-                        : type.ToDisplayString(
-                            SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
-                                SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions |
-                                SymbolDisplayMiscellaneousOptions.ExpandNullable))));
-            }
-        }
-        return raw;
-    }
+        => throw EscalateExpression(expression, feature, preserveMember: true);
 
     private ExpressionNode ConvertLiteral(LiteralExpressionSyntax literal)
     {
@@ -12904,6 +12863,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         if (DefaultNameCollides(at))
             throw EscalateExpression(at, "default-member-collision");
+        if (at is LocalDeclarationStatementSyntax local)
+        {
+            var type = TypeMapper.ToSurfaceType(MapDeclarationType(local.Declaration.Type));
+            if (type is not ("bool" or "string" or "object" or "string?" or "object?"
+                or "sbyte" or "byte" or "short" or "ushort" or "int" or "uint"
+                or "long" or "ulong" or "nint" or "nuint" or "char" or "float" or "double" or "decimal"))
+                throw EscalateExpression(local, "default-expression", preserveMember: true);
+        }
         return new ReferenceNode(span, "default");
     }
 
@@ -13054,12 +13021,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // dropping the C# compiler's explicit flow-state override.
         if (postfix.OperatorToken.IsKind(SyntaxKind.ExclamationToken))
         {
-            _context.RecordLoss(
-                ConversionLossKind.InteropPreserved,
-                "null-forgiving-expression",
-                "Null-forgiving expression preserved verbatim because Calor has no equivalent flow assertion",
-                postfix.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-            return new RawCSharpExpressionNode(GetTextSpan(postfix), postfix.ToString());
+            throw EscalateExpression(postfix, "null-forgiving-expression", preserveMember: true);
         }
 
         if (postfix.OperatorToken.IsKind(SyntaxKind.PlusPlusToken)
@@ -14320,10 +14282,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                             { Expression: IdentifierNameSyntax selected }
                         || selected.Identifier.ValueText != continuation.Identifier.ValueText)))
         {
-            _context.RecordLoss(ConversionLossKind.InteropPreserved, "linq-query",
-                "Query range-variable scope and deferred execution preserved verbatim",
-                query.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-            return new RawCSharpExpressionNode(span, query.ToString());
+            throw EscalateExpression(query, "linq-query", preserveMember: true);
         }
 
         // Start with the from clause's collection
@@ -14719,10 +14678,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private ExpressionNode PreserveDictionaryInitializer(BaseObjectCreationExpressionSyntax creation)
     {
         _context.RecordFeatureUsage("dictionary-initializer");
-        _context.RecordLoss(ConversionLossKind.InteropPreserved, "dictionary-initializer",
-            "Dictionary construction and initializer operations preserved verbatim",
-            creation.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-        return new RawCSharpExpressionNode(GetTextSpan(creation), creation.ToString());
+        throw EscalateExpression(creation, "dictionary-initializer", preserveMember: true);
     }
 
     /// <summary>
@@ -15126,10 +15082,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private ExpressionNode PreserveInitializerContainer(ExpressionSyntax container, string reason)
     {
         _context.RecordFeatureUsage("initializer-interop");
-        _context.RecordLoss(ConversionLossKind.InteropPreserved, "initializer-interop",
-            $"Expression holding an initializer preserved verbatim ({reason})",
-            container.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-        return TypedRawCSharp(container, "(" + container + ")", minimalTypeName: true);
+        throw EscalateExpression(container, "initializer-interop", preserveMember: true);
     }
 
     /// <summary>
@@ -15244,29 +15197,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             && argument.NameColon == null && IsMarkerFreeValue(argument.Expression)) ?? true;
 
     /// <summary>
-    /// #1524, #1541, #1595: keeps a creation whose initializer has no faithful native form as an
-    /// inline C# expression, and records the loss. A target-typed <c>new(…) { … }</c> is spelled
-    /// with its type, so a later hoist into a <c>var</c> temporary cannot lose the target type.
+    /// Keeps the complete containing boundary when an initializer has no native form.
     /// </summary>
     private ExpressionNode PreserveInitializer(BaseObjectCreationExpressionSyntax creation, string reason)
     {
         _context.RecordFeatureUsage("initializer-interop");
-        _context.RecordLoss(ConversionLossKind.InteropPreserved, "initializer-interop",
-            $"Object creation with an initializer preserved verbatim ({reason})",
-            creation.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-        var code = creation.ToString();
-        if (creation is ImplicitObjectCreationExpressionSyntax implicitCreation
-            && _semanticModel != null && creation.SyntaxTree == _semanticModel.SyntaxTree
-            && _semanticModel.GetTypeInfo(creation).Type is { TypeKind: not TypeKind.Error } createdType
-            && !createdType.IsAnonymousType)
-        {
-            // The minimal name resolves wherever the surrounding preserved C# does, including after
-            // the converter moves the declarations into a module namespace (#1524 review).
-            code = "new " + createdType.ToMinimalDisplayString(_semanticModel, creation.SpanStart)
-                + implicitCreation.ArgumentList.ToString()
-                + (implicitCreation.Initializer == null ? "" : " " + implicitCreation.Initializer);
-        }
-        return TypedRawCSharp(creation, "(" + code + ")", minimalTypeName: true);
+        throw EscalateExpression(creation, "initializer-interop", preserveMember: true);
     }
 
     private DictionaryCreationNode ConvertDictionaryCreation(ObjectCreationExpressionSyntax objCreation, string keyType, string valueType)

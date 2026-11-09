@@ -919,7 +919,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var inlineParams = $" ({inlineFmt})";
             var inlineReturn = node.Output != null ? $" → {TypeMapper.ToSurfaceType(node.Output.TypeName)}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendEffectRowDeclaration(node, $"func {EscapeCalorIdentifier(node.Name)}{typeParams}{typeParamsAfterGroup}{attrs}{inlineParams}{inlineReturn}");
+            AppendEffectRowDeclaration(node, $"func {EscapeCalorIdentifier(node.Name)}{attrs}{typeParams}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
         }
         else
         {
@@ -1520,7 +1520,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var inlineParams = $" ({inlineFmt})";
             var inlineReturn = node.Output != null ? $" → {output}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendEffectRowDeclaration(node, $"func {EscapeCalorIdentifier(node.Name)}{typeParams}{typeParamsAfterGroup}{visibility}{modStr}{attrs}{inlineParams}{inlineReturn}");
+            AppendEffectRowDeclaration(node, $"func {EscapeCalorIdentifier(node.Name)}{attrs}{typeParams}{typeParamsAfterGroup}{visibility}{modStr}{inlineParams}{inlineReturn}");
         }
         else
         {
@@ -2032,7 +2032,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         var initializer = node.Initializer is ReferenceNode { Name: "default", IsVerbatim: false }
             && mappedType is not null and not "var"
-                ? $"default({mappedType})" : node.Initializer?.Accept(this);
+                ? mappedType is "string?" or "object?"
+                    ? $"(({mappedType})null)"
+                    : $"default({mappedType})"
+                : node.Initializer?.Accept(this);
         var initPart = initializer is not null ? $" = {initializer}" : "";
         AppendLine($"{bindHeader}{initPart}");
         return "";
@@ -2615,50 +2618,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ListCreationNode node)
     {
-        var elementType = TypeMapper.ToSurfaceType(node.ElementType);
-        if (_inlineCollections > 0 || node.RenderInline)
-            return RenderInlineCollection($"§LIST{{{elementType}}}", $"§/LIST",
-                RenderInlineCollectionItems(node.Elements));
-
-        // Evaluate all elements first, collecting any hoisted bindings before the list.
-        // AcceptInInlineSibling: each element line is parsed as a sibling expression
-        // and a one-arg closer-less §C would absorb the next sibling (v0.6.3 RFC §3.2 B).
-        var evaluatedElements = new List<string>();
-        var allHoisted = new List<string>();
-        foreach (var element in node.Elements)
-        {
-            // #1595: a nested collection element is written inline, on its element line.
-            var val = AcceptCollectionElement(element);
-            // #903: a multi-line element (an object initializer) cannot sit on an
-            // element line; hoist it so the block lands at the enclosing indent.
-            if (val.Contains('\n'))
-                val = HoistToTempVar(val);
-            // Collect any hoisted lines generated during element evaluation
-            if (_pendingHoistedLines.Count > 0)
-            {
-                allHoisted.AddRange(_pendingHoistedLines);
-                _pendingHoistedLines.Clear();
-            }
-            evaluatedElements.Add(val);
-        }
-
-        // Emit hoisted bindings before the list
-        foreach (var hoisted in allHoisted)
-        {
-            AppendLine(hoisted);
-        }
-
-        AppendLine($"§LIST{{{node.Name}:{elementType}}}");
-        Indent();
-
-        foreach (var val in evaluatedElements)
-        {
-            AppendLine(val);
-        }
-
-        Dedent();
-        EmitBlockEnd($"§/LIST");
-        return "";
+        return Visit(new NewExpressionNode(node.Span, "System.Collections.Generic.List",
+            [node.ElementType], [], [],
+            collectionInitializers: node.Elements.Select(element =>
+                new CallExpressionNode(element.Span, "Add", [element])).ToArray()));
     }
 
     public string Visit(DictionaryCreationNode node)
@@ -2882,7 +2845,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(CatchClauseNode node)
     {
         var exType = node.ExceptionType;
-        var varPart = node.VariableName != null ? $":{node.VariableName}" : "";
+        var varPart = !string.IsNullOrEmpty(node.VariableName)
+            ? $":{EscapeCalorIdentifier(node.VariableName)}" : "";
         var filterPart = node.Filter != null ? $" when {node.Filter.Accept(this)}" : "";
 
         AppendLine($"catch{(exType == null ? "" : $" {exType}{varPart}")}{filterPart}");
@@ -3143,6 +3107,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
     }
 
+    private string AcceptArgument(ExpressionNode expression)
+    {
+        var rendered = AcceptInConditionalRegion(expression);
+        // Dedent before the next argument's lambda head, without hoisting its closure.
+        return expression is LambdaExpressionNode { ExpressionBody: null }
+            ? $"({rendered}\n)" : rendered;
+    }
+
     /// <summary>
     /// Hoists an expression containing section markers to a temp variable.
     /// Adds a §B{~tempVar} expr line to _pendingHoistedLines and returns the temp var name.
@@ -3298,7 +3270,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var arguments = node.Arguments.Select((argument, index) =>
             (node.ArgumentNames?.ElementAtOrDefault(index) is { } name
                 ? $"{EscapeCalorIdentifier(name)}: " : "")
-            + AcceptInConditionalRegion(argument));
+            + AcceptArgument(argument));
         var initializers = node.Initializers.Count == 0 ? ""
             : " { " + string.Join(", ", node.Initializers.Select(initializer =>
                 $"{EscapeCalorIdentifier(initializer.PropertyName)} = {AcceptInConditionalRegion(initializer.Value)}")) + " }";
@@ -3427,7 +3399,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             var modifier = node.ArgumentModifiers?.ElementAtOrDefault(index);
             return (name is null ? "" : $"{EscapeCalorIdentifier(name)}: ")
                 + (modifier is null ? "" : $"{modifier} ")
-                + AcceptInConditionalRegion(argument);
+                + AcceptArgument(argument);
         });
         return $"{target}{types}({string.Join(", ", arguments)})";
     }
@@ -4876,7 +4848,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             var name = node.ArgumentNames?.ElementAtOrDefault(index);
             var modifier = node.ArgumentModifiers?.ElementAtOrDefault(index);
             return (name is null ? "" : $"{EscapeCalorIdentifier(name.TrimStart('@'))}: ")
-                + (modifier is null ? "" : $"{modifier} ") + AcceptInConditionalRegion(argument);
+                + (modifier is null ? "" : $"{modifier} ") + AcceptArgument(argument);
         });
         return $"{callee}{types}({string.Join(", ", arguments)})";
     }
