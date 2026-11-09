@@ -291,12 +291,13 @@ workspace containing `Calculator.calr`. They do not call agents or provider APIs
 Their unchanged `task.json` prompts define the required signatures, contracts,
 and behavior.
 
-Build the compiler first, then run the executable verifier controls:
+The control driver verifies the selected source assets, restores locked
+dependencies only from the local NuGet cache, and freshly rebuilds the selected
+compiler before running the controls:
 
 ```bash
-# On a fresh clone, bootstrap the verified Z3 assets if the build requests them.
-src/Calor.Compiler/scripts/download-z3.sh
-dotnet build src/Calor.Compiler/
+# Bootstrap source prerequisites explicitly if they are missing.
+# A cold NuGet cache must also be populated separately; this driver cannot fetch.
 python3 tests/E2E/agent-tasks/test-logic-verifiers.py
 ```
 
@@ -361,6 +362,39 @@ and stub declarations, misleading comments and unrelated contracts, wrong
 signatures and boundary outputs, missing/weakened/vacuous contracts, runtime
 errors, timeouts, and missing/corrupt/alternate selected compiler roots. They
 do not establish agent nonregression or complete the paired release experiment.
+
+The original 103 candidate byte strings, expectations and 13 test methods remain
+the admission census: 33 accepted controls and 64 specific finite rejections,
+plus one compile-invalid guard, one missing-input guard, two selected-image
+prerequisite refusals and two declared timeouts. The latter six are not finite
+behavioral rejection credit. Each entry retains its 120-second inner deadline,
+135-second outer deadline and five-second solver bounds. Native ABI and empty-body
+guards inspect the actual parsed declaration; surviving candidates still undergo
+the selected compiler's ordinary Debug compilation, contract proofs and CLR execution.
+The wrong `Max` sum control is rejected for its observed checked overflow on a
+required input, not by defining a new overflow policy.
+
+All four scalar profiles verify their own committed native manifest and compare
+selected/copied compiler and native hashes before and after execution. Each
+positive requires one exact canonical compiler identity and one exact verdict.
+Helper restoration is locked and local-cache-only; the build uses `--no-restore`.
+The selected-copy positive includes its matching manifest and source assets.
+Unexpected build, UNKNOWN, identity, abnormal-exit, process, EOF and cleanup failures
+cannot satisfy an expected semantic negative. Only the deliberately corrupted
+selected compiler's observed missing-reference diagnostics qualify for that
+separately counted prerequisite guard. The original 0.001-second budget may expire
+before helper launch; it remains a separately declared deadline refusal.
+
+Focused admission regressions are supplemental, not entries in the 103 census:
+
+```bash
+python3 tests/E2E/agent-tasks/test-logic-admission-policy.py
+```
+
+The original `basic-calor-project/Calculator.calr` fixture remains byte-for-byte
+legacy source. The control driver authors its existing canonical programs; it
+does not translate that fixture. Passing these controls does not establish native
+acceptance of the untouched real-task setup.
 
 Actual old-release API compatibility is a separate executable control:
 

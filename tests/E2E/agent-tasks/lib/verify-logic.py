@@ -143,7 +143,8 @@ def main():
     if not 0 < timeout <= maximum_timeout:
         raise RuntimeError(f"CALOR_LOGIC_TIMEOUT_SECONDS must be in (0, {maximum_timeout}].")
     deadline = time.monotonic() + timeout
-    advanced = not direct_check and sys.argv[1] in ("ac001", "ac002", "ac003", "ac004", "ac005",
+    scalar_logic = not direct_check and sys.argv[1] in ("Factorial", "Clamp", "IsPositive", "Max")
+    advanced = scalar_logic or not direct_check and sys.argv[1] in ("ac001", "ac002", "ac003", "ac004", "ac005",
                                                 "advanced001", "advanced002", "advanced003", "advanced004")
     carrier = topology_only or benchmark or advanced or not direct_check and sys.argv[1] in (
         "type001", "type002", "type003", "type004", "pm004", "pm005",
@@ -190,8 +191,16 @@ def main():
         project = Path(temporary)
         shutil.copytree(helper / "logic-verifier", project, dirs_exist_ok=True,
                         ignore=shutil.ignore_patterns("bin", "obj"))
+        if scalar_logic:
+            run([
+                "dotnet", "restore", "LogicVerifier.csproj", "--locked-mode",
+                "--source", str(Path.home() / ".nuget/packages"),
+                f"-p:CompilerDirectory={compiler}", "-p:UseSharedCompilation=false",
+                "-nodeReuse:false", "--disable-build-servers", "-v", "quiet",
+            ], project, deadline)
         run([
             "dotnet", "build", "LogicVerifier.csproj", "--nologo", "-v", "quiet",
+            *(["--no-restore"] if scalar_logic else []),
             f"-p:CompilerDirectory={compiler}", "-p:UseSharedCompilation=false",
             *([f"-p:RestoreSources={Path.home() / '.nuget/packages'}"]
               if not native_only and sys.argv[1] in ("advanced001", "advanced002", "advanced003", "advanced004") else []),

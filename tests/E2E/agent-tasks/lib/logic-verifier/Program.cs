@@ -190,24 +190,41 @@ static void Verify(string profile, string path)
     var outputType = name == "GetZero" ? "i32"
         : name == "PrintNumber" || names.Length == 0 || dictionary ? "void" : name is "IsPositive" or "IsEven" ? "bool" : "i32";
     var source = File.ReadAllText(path);
+    var scalarLogic = profile is "Factorial" or "Clamp" or "IsPositive" or "Max";
+    FunctionNode ScalarFunction(ModuleNode module)
+    {
+        var candidates = module.Functions.Where(candidate => candidate.Name == name).ToArray();
+        if (candidates.Length != 1)
+            throw new InvalidOperationException($"Expected exactly one module function named {name}.");
+        var candidate = candidates[0];
+        if (candidate.Visibility != Visibility.Public || candidate.IsAsync || candidate.TypeParameters.Count != 0
+            || candidate.Output == null
+            || ScalarType(candidate.Output.TypeName) != ScalarType(outputType)
+            || (!dictionary && !candidate.Parameters.Select(parameter => parameter.Name).SequenceEqual(names))
+            || candidate.Parameters.Count != names.Length
+            || candidate.Parameters.Any(parameter => (dictionary
+                    ? !IsDictionaryType(parameter.TypeName) : ScalarType(parameter.TypeName) != "INT")
+                || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None
+                || !basic && !contractWriting && !idiom && name != "GradeToLetter" && parameter.InlineRefinement != null))
+            throw new InvalidOperationException($"Wrong public signature for {name}.");
+        return candidate;
+    }
+    if (scalarLogic)
+    {
+        var diagnostics = new DiagnosticBag();
+        var parsed = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        if (!diagnostics.HasErrors)
+        {
+            var declared = ScalarFunction(parsed);
+            if (declared.Body.Count == 0)
+                throw new InvalidOperationException($"Logic native return body missing for {name}.");
+        }
+    }
     var compilation = Calor.Compiler.Program.Compile(
         source, path, new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
     if (compilation.HasErrors || compilation.Ast == null)
         throw new InvalidOperationException($"Calor compilation failed:\n{string.Join("\n", compilation.Diagnostics)}");
-    var functions = compilation.Ast.Functions.Where(function => function.Name == name).ToArray();
-    if (functions.Length != 1)
-        throw new InvalidOperationException($"Expected exactly one module function named {name}.");
-    var function = functions[0];
-    if (function.Visibility != Visibility.Public || function.IsAsync || function.TypeParameters.Count != 0
-        || function.Output == null
-        || ScalarType(function.Output.TypeName) != ScalarType(outputType)
-        || (!dictionary && !function.Parameters.Select(parameter => parameter.Name).SequenceEqual(names))
-        || function.Parameters.Count != names.Length
-        || function.Parameters.Any(parameter => (dictionary
-                ? !IsDictionaryType(parameter.TypeName) : ScalarType(parameter.TypeName) != "INT")
-            || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None
-            || !basic && !contractWriting && !idiom && name != "GradeToLetter" && parameter.InlineRefinement != null))
-        throw new InvalidOperationException($"Wrong public signature for {name}.");
+    var function = ScalarFunction(compilation.Ast);
 
     StatementNode[] witnesses = [];
     if (controlFlow || basic && name == "PrintNumber")
@@ -312,7 +329,22 @@ static void Verify(string profile, string path)
     var count = 0;
     foreach (var (inputs, expected) in idiom ? IdiomCases(name) : contractWriting ? WritingCases(name) : Cases(name))
     {
-        var actual = method.Invoke(null, inputs.Select(value => (object)value).ToArray());
+        object? actual;
+        try
+        {
+            actual = method.Invoke(null, inputs.Select(value => (object)value).ToArray());
+        }
+        catch (TargetInvocationException error) when (scalarLogic
+            && error.InnerException is Calor.Runtime.ContractViolationException violation
+            && violation.Kind == Calor.Runtime.ContractKind.Ensures
+            && function.Postconditions.Any(contract => contract.Span.Start == violation.StartOffset))
+        {
+            throw new InvalidOperationException($"Logic native Ensures rejected for {name}.", error);
+        }
+        catch (TargetInvocationException error) when (scalarLogic && error.InnerException is OverflowException)
+        {
+            throw new InvalidOperationException($"Logic executable overflow for {name}({string.Join(", ", inputs)}).", error);
+        }
         if (!Equals(actual, expected))
             throw new InvalidOperationException($"{name}({string.Join(", ", inputs)}) returned {actual}; expected {expected}.");
         count++;
