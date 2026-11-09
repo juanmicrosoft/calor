@@ -163,6 +163,7 @@ public sealed class ContractVerifier
     /// </summary>
     public void Verify(ModuleNode module)
     {
+        _asyncTypeModule = module;
         VerifyNamedRefinementPredicates(module, _diagnostics);
         // Collect indexed type size parameter names
         foreach (var itype in module.IndexedTypes)
@@ -201,10 +202,14 @@ public sealed class ContractVerifier
     /// <summary>
     /// Verifies contracts in a single function.
     /// </summary>
+    private ModuleNode? _asyncTypeModule;
+
     public void VerifyFunction(FunctionNode function)
     {
+        var bodyType = ReturnShape.GetAsyncReturnTypes(function.Output?.TypeName ?? "void", function.IsAsync,
+            _asyncTypeModule, function.TypeParameters.Select(parameter => parameter.Name)).BodyType;
         _contractVariables = function.Parameters.Select(parameter => (parameter.Name, parameter.TypeName))
-            .Concat(function.Output == null ? [] : new[] { ("result", function.Output.TypeName) }).ToArray();
+            .Concat(ReturnShape.IsVoidType(bodyType) ? [] : new[] { ("result", bodyType) }).ToArray();
         // Verify preconditions
         foreach (var requires in EffectivePreconditions(function.Parameters, function.Preconditions))
         {
@@ -269,7 +274,9 @@ public sealed class ContractVerifier
         var validNames = function.Parameters.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
         validNames.Add("result"); // Special identifier for return value
 
-        var hasReturnValue = ReturnShape.DeclaresValueOutput(function.Output);
+        var hasReturnValue = !ReturnShape.IsVoidType(ReturnShape.GetAsyncReturnTypes(
+            function.Output?.TypeName ?? "void", function.IsAsync, _asyncTypeModule,
+            function.TypeParameters.Select(parameter => parameter.Name)).BodyType);
 
         foreach (var name in referencedNames)
         {

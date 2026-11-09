@@ -70,7 +70,7 @@ public sealed class ContractVerificationPass
             if (preconditions.Count == 0 && function.Postconditions.Count == 0)
                 continue;
 
-            var result = VerifyFunction(verifier, cache, function, preconditions);
+            var result = VerifyFunction(verifier, cache, function, preconditions, module);
             results.Add(result);
             ReportDiagnostics(function, result, preconditions);
         }
@@ -102,14 +102,19 @@ public sealed class ContractVerificationPass
         Z3Verifier verifier,
         VerificationCache cache,
         FunctionNode function,
-        IReadOnlyList<RequiresNode> preconditions)
+        IReadOnlyList<RequiresNode> preconditions,
+        ModuleNode module)
     {
         // Extract parameter information
         var parameters = function.Parameters
             .Select(p => (p.Name, p.TypeName))
             .ToList();
 
-        var outputType = function.Output?.TypeName;
+        var outputType = Analysis.ReturnShape.GetAsyncReturnTypes(
+            function.Output?.TypeName ?? "void", function.IsAsync, module,
+            function.TypeParameters.Select(parameter => parameter.Name)).BodyType;
+        if (Analysis.ReturnShape.IsVoidType(outputType))
+            outputType = null;
 
         // Verify preconditions with cache
         var preconditionResults = new List<ContractVerificationResult>();

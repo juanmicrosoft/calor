@@ -602,6 +602,7 @@ public sealed class GenericInstanceType : CalorType
     {
         get
         {
+            if (TypeArguments.Count == 0) return BaseName;
             var argsStr = string.Join(", ", TypeArguments.Select(a => a.Name));
             return $"{BaseName}<{argsStr}>";
         }
@@ -610,6 +611,7 @@ public sealed class GenericInstanceType : CalorType
     {
         get
         {
+            if (TypeArguments.Count == 0) return BaseName;
             var argsStr = string.Join(", ", TypeArguments.Select(a => a.SurfaceName));
             return $"{BaseName}<{argsStr}>";
         }

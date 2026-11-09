@@ -289,6 +289,13 @@ Complete example: [Class with Fields, Constructor + Operators](#example-complex_
 
 Defines an async function. Use §AF for standalone async functions, §AMT for async class methods.
 
+An async declaration with scalar output `T` is callable as `Task<T>`, but its body
+returns `T`. A `void` output produces `Task`. Explicit .NET `Task<T>` and
+`ValueTask<T>` outputs preserve that carrier and return `T` in the body; their
+non-generic forms have a void body result. Postconditions describe the body
+result, not the task object. Ordinary synchronous task-returning declarations
+keep their declared return type.
+
 Syntax: `§AF{name:vis} (type:param, ...) -> returnType or §AMT{name:vis} (type:param, ...) -> returnType`
 
 C# equivalents (fragments):
@@ -303,6 +310,13 @@ Complete example: [Async Method with Try/Catch](#example-complex_async).
 ## await expression
 
 Awaits an asynchronous operation.
+
+Awaiting a .NET `Task<T>` or `ValueTask<T>` produces `T`. Awaiting a non-generic
+carrier produces no value and cannot initialize a binding. `§AWAIT` can also be
+used as a statement. A custom type named `MyTask<T>` or a source declaration
+named `Task<T>` is not automatically a .NET async carrier. Unsupported custom
+awaitables are diagnosed or checked by generated C# validation, never inferred
+from a name suffix.
 
 Syntax: `§AWAIT expression`
 

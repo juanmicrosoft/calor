@@ -2629,6 +2629,11 @@ public sealed class Parser
         {
             return ParseProofObligation();
         }
+        else if (Check(TokenKind.Await))
+        {
+            var expr = ParseAwaitExpression();
+            return new ExpressionStatementNode(expr.Span, expr);
+        }
         // Expression statement: bare lisp expression like (inc x), (post-dec y)
         else if (Check(TokenKind.OpenParen))
         {

@@ -152,6 +152,7 @@ public sealed class Binder
     /// </summary>
     private Metadata.MetadataBinder? _metadataBinder;
     private IReadOnlyList<UsingDirectiveNode> _metadataUsings = [];
+    private ModuleNode? _asyncTypeModule;
 
     /// <summary>
     /// v0.14 §S4 (nullability workstream / issue #875) — declared return
@@ -811,6 +812,7 @@ public sealed class Binder
         using var diagnosticContext = _diagnostics.EnterBindingContext();
         _declaredReferenceTypes = Parsing.AttributeHelper.GetDeclaredReferenceTypeNames(module);
         _metadataUsings = module.Usings;
+        _asyncTypeModule = module;
         _scope = new Scope();
         _functionSymbols.Clear();
         _staticMethodSymbols.Clear();
@@ -899,7 +901,8 @@ public sealed class Binder
                 definitionSpan: function.Span,
                 output: function.Output,
                 effectParameters: function.EffectParameters,
-                lexicalTypeContext: function.NamespaceIdentity);
+                lexicalTypeContext: function.NamespaceIdentity,
+                isAsync: function.IsAsync);
             _functionSymbols.Add(function, symbol);
             _functionNamespaces.Add(symbol.Id, function.NamespaceIdentity);
 
@@ -1172,7 +1175,8 @@ public sealed class Binder
                 method.Span,
                 conditionalAlternative,
                 output: method.Output,
-                effectParameters: method.EffectParameters);
+                effectParameters: method.EffectParameters,
+                isAsync: method.IsAsync);
             _functionSymbols.Add(method, symbol);
             if (method.IsStatic)
                 _staticMethodSymbols.Add(symbol);
@@ -1390,8 +1394,15 @@ public sealed class Binder
         // parameter row may mention (§7.2).
         OutputNode? output = null,
         IReadOnlyList<EffectParameterInfo>? effectParameters = null,
-        string? lexicalTypeContext = null)
+        string? lexicalTypeContext = null,
+        bool isAsync = false)
     {
+        var classTypeParameters = containingTypeName is not null
+            && _classesByQualifiedName.TryGetValue(containingTypeName, out var declaringClass)
+                ? declaringClass.TypeParameters.Select(parameter => parameter.Name)
+                : [];
+        var returnShape = ReturnShape.GetAsyncReturnTypes(returnType, isAsync, _asyncTypeModule,
+            typeParameters.Concat(classTypeParameters));
         var parameterSymbols = parameters
             .Select((parameter, index) => CreateVariable(
                 CreateDeclarationId(id, "parameter", stableAstId: null, parameter.Name),
@@ -1421,7 +1432,7 @@ public sealed class Binder
         var symbol = new FunctionSymbol(
             id,
             name,
-            returnType,
+            returnShape.CallableType,
             parameterSymbols,
             typeParameters,
             declarationSpan,
@@ -1431,7 +1442,8 @@ public sealed class Binder
             conditionalAlternative)
         {
             // v0.15 E2 slice b — position 6's row (§3.3).
-            ReturnFunctionType = TryBuildFunctionType(
+            BodyReturnType = returnShape.BodyType,
+            ReturnFunctionType = isAsync ? null : TryBuildFunctionType(
                 output?.TypeName, output?.Row, effectParameters,
                 containingTypeName ?? lexicalTypeContext),
         };
@@ -1979,7 +1991,8 @@ public sealed class Binder
                 Visibility.Private,
                 containingTypeName: null,
                 definitionSpan: function.Span,
-                output: function.Output);
+                output: function.Output,
+                isAsync: function.IsAsync);
             _localFunctionSymbols.Add(symbol);
             if (!scope.TryDeclareOverload(function.Name, symbol, out var duplicate))
                 ReportDuplicateSignature(function.Span, function.Name, symbol, duplicate);
@@ -2007,7 +2020,7 @@ public sealed class Binder
                 using var _s = PushScope(bodyScope);
                 using var _c = PushStaticContext(true);
                 using var _identity = PushDeclarationContext(symbol.Id);
-                using var _returnCtx = PushReturnTypeContext(symbol.ReturnType);
+                using var _returnCtx = PushReturnTypeContext(symbol.BodyReturnType);
                 DeclareParameters(symbol.Parameters, function.Parameters);
                 var body = BindStatements(function.Body);
                 _boundLocalFunctions.Add(new BoundFunction(function.Span, symbol, body, bodyScope,
@@ -2054,7 +2067,7 @@ public sealed class Binder
         var functionSymbol = _functionSymbols[func];
         using var _identity = PushDeclarationContext(functionSymbol.Id);
         // v0.14 §S4 — expose the declared return type to BindReturnStatement.
-        using var _returnCtx = PushReturnTypeContext(functionSymbol.ReturnType);
+        using var _returnCtx = PushReturnTypeContext(functionSymbol.BodyReturnType);
         var previousNamespaceIdentity = _currentNamespaceIdentity;
         _currentNamespaceIdentity = func.NamespaceIdentity;
 
@@ -2299,7 +2312,9 @@ public sealed class Binder
 
     private BoundReturnStatement BindReturnStatement(ReturnStatementNode ret)
     {
-        var expr = ret.Expression != null ? BindExpression(ret.Expression) : null;
+        var expr = ret.Expression is LambdaExpressionNode { IsAsync: true } asyncLambda
+            ? BindLambdaExpression(asyncLambda, TryBuildFunctionType(_currentFunctionReturnType, null, null))
+            : ret.Expression != null ? BindExpression(ret.Expression) : null;
 
         // v0.14 §S4 nullability check (issue #875, D2 predicate). Return-site
         // sibling of the §S3b BindBindStatement check. Fires when the current
@@ -2599,7 +2614,9 @@ public sealed class Binder
 
         if (bind.Initializer != null)
         {
-            initializer = BindExpression(bind.Initializer);
+            initializer = bind.Initializer is LambdaExpressionNode { IsAsync: true } asyncLambda
+                ? BindLambdaExpression(asyncLambda, TryBuildFunctionType(bind.TypeName, null, null))
+                : BindExpression(bind.Initializer);
             // Infer type from initializer if not specified
             typeName = bind.TypeName ?? initializer.Type.DisplayString;
         }
@@ -4514,20 +4531,33 @@ public sealed class Binder
         };
     }
 
-    private static BoundTypes.BoundType? GetAwaitedResultType(BoundTypes.BoundType awaitedType)
+    private BoundTypes.BoundType? GetAwaitedResultType(BoundTypes.BoundType awaitedType)
     {
+        if (awaitedType is BoundTypes.NominalBoundType { RoslynSymbol: Microsoft.CodeAnalysis.INamedTypeSymbol metadataType })
+        {
+            var awaiter = metadataType.GetMembers("GetAwaiter")
+                .OfType<Microsoft.CodeAnalysis.IMethodSymbol>()
+                .FirstOrDefault(method => !method.IsStatic && method.Parameters.Length == 0)?.ReturnType;
+            var resultMethod = awaiter?.GetMembers("GetResult")
+                .OfType<Microsoft.CodeAnalysis.IMethodSymbol>()
+                .FirstOrDefault(method => !method.IsStatic && method.Parameters.Length == 0);
+            if (resultMethod is not null)
+                return Metadata.MetadataBinderResult.ToBoundType(resultMethod.ReturnType);
+        }
         if (awaitedType is BoundTypes.GenericInstantiationBoundType
             {
                 Definition.QualifiedName: var definition,
                 TypeArguments.Length: 1
             } generic
-            && ShortGenericName(definition) is "Task" or "ValueTask")
+            && Parsing.AttributeHelper.ResolveAsyncCarrierName(definition, _asyncTypeModule)
+                is "System.Threading.Tasks.Task" or "System.Threading.Tasks.ValueTask")
         {
             return generic.TypeArguments[0];
         }
 
-        var typeName = UnwrapAwaitedType(awaitedType.DisplayString);
-        return typeName is null ? null : BuildDeclaredBoundType(typeName);
+        return Parsing.AttributeHelper.TryGetAsyncResultType(awaitedType.DisplayString, _asyncTypeModule, out var result)
+            ? BuildDeclaredBoundType(result)
+            : null;
     }
 
     private BoundExpression BindNullCoalesce(NullCoalesceNode coalesce)
@@ -4655,7 +4685,8 @@ public sealed class Binder
         return new BoundInterpolatedStringExpression(interpolated.Span, parts);
     }
 
-    private BoundExpression BindLambdaExpression(LambdaExpressionNode lambda)
+    private BoundExpression BindLambdaExpression(
+        LambdaExpressionNode lambda, BoundTypes.FunctionBoundType? targetType = null)
     {
         var outerBindings = _scope.CaptureVisibleVariableBindings();
         var mutableArrayResults = outerBindings.Select(binding => binding.Symbol.StorageIdentity)
@@ -4681,11 +4712,12 @@ public sealed class Binder
         using var _returnGuard = PushReturnTypeContext(null);
 
         var parameters = new List<VariableSymbol>(lambda.Parameters.Count);
-        foreach (var parameter in lambda.Parameters)
+        foreach (var (parameter, index) in lambda.Parameters.Select((parameter, index) => (parameter, index)))
         {
             var symbol = CreateLocalVariable(
                 parameter.Name,
-                parameter.TypeName ?? "OBJECT",
+                parameter.TypeName ?? (targetType is not null && index < targetType.ParameterTypes.Length
+                    ? targetType.ParameterTypes[index].DisplayString : "OBJECT"),
                 isMutable: false,
                 isParameter: true,
                 ParameterModifier.None,
@@ -4714,6 +4746,11 @@ public sealed class Binder
         var returnType = expressionBody?.Type.DisplayString
             ?? GetCommonType(CollectReturnTypes(statementBody))
             ?? "VOID";
+        if (lambda.IsAsync)
+            returnType = targetType?.ReturnType.DisplayString
+                ?? (ReturnShape.IsVoidType(returnType)
+                    ? "global::System.Threading.Tasks.Task"
+                    : $"global::System.Threading.Tasks.Task<{returnType}>");
         var effects = lambda.Effects?.Effects
             .Select(effect => $"{effect.Key}:{effect.Value}")
             .ToArray()
@@ -4774,7 +4811,7 @@ public sealed class Binder
             // E1 slice 2b: hand the expression body's real BoundType to the
             // lambda's FunctionBoundType. A statement body has no single bound
             // expression, so the node falls back to the string it just computed.
-            expressionBody?.Type,
+            lambda.IsAsync ? BuildDeclaredBoundType(returnType) : expressionBody?.Type,
             declaredRow,
             deferredMutations)
         {
@@ -7561,21 +7598,6 @@ public sealed class Binder
     private static string MakeArrayType(string elementType, int rank) =>
         $"{elementType}[{new string(',', Math.Max(0, rank - 1))}]";
 
-    private static string? UnwrapAwaitedType(string typeName)
-    {
-        foreach (var prefix in new[] { "Task<", "ValueTask<", "TASK<", "VALUETASK<" })
-        {
-            if (typeName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
-                && typeName.EndsWith('>'))
-                return typeName[prefix.Length..^1];
-        }
-
-        return typeName.Equals("Task", StringComparison.OrdinalIgnoreCase)
-            || typeName.Equals("ValueTask", StringComparison.OrdinalIgnoreCase)
-            ? "VOID"
-            : null;
-    }
-
     private static string? GetIndexedElementType(string typeName)
     {
         const string arrayPrefix = "ARRAY[element=";
@@ -8639,7 +8661,7 @@ public sealed class Binder
         var functionSymbol = _functionSymbols[method];
         using var _identity = PushDeclarationContext(functionSymbol.Id);
         // v0.14 §S4 — expose the declared return type to BindReturnStatement.
-        using var _returnCtx = PushReturnTypeContext(functionSymbol.ReturnType);
+        using var _returnCtx = PushReturnTypeContext(functionSymbol.BodyReturnType);
 
         DeclareParameters(functionSymbol.Parameters, method.Parameters);
         var boundBody = BindStatements(method.Body);

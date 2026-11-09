@@ -249,7 +249,9 @@ public sealed class HoverHandler : HoverHandlerBase
                 if (targetFunc != null)
                 {
                     var paramList = string.Join(", ", targetFunc.Parameters.Select(p => $"{p.Name}: {p.TypeName}"));
-                    var returnType = targetFunc.Output?.TypeName ?? "void";
+                    var returnType = Compiler.Analysis.ReturnShape.GetAsyncReturnTypes(
+                        targetFunc.Output?.TypeName ?? "void", targetFunc.IsAsync, ast,
+                        targetFunc.TypeParameters.Select(parameter => parameter.Name)).CallableType;
                     sb.AppendLine("```calor");
                     sb.AppendLine($"(function) {result.Name}({paramList}) -> {returnType}");
                     sb.AppendLine("```");

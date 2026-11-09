@@ -936,6 +936,8 @@ public static class TypeIdentity
                     "System.Collections.Generic.HashSet`1",
                 "Task" or "System.Threading.Tasks.Task" =>
                     "System.Threading.Tasks.Task`1",
+                "ValueTask" or "System.Threading.Tasks.ValueTask" =>
+                    "System.Threading.Tasks.ValueTask`1",
                 _ => null
             };
             if (mapped != null)
@@ -1017,6 +1019,7 @@ public static class TypeIdentity
         "Trace" => "System.Diagnostics.Trace",
         "Thread" => "System.Threading.Thread",
         "Task" => "System.Threading.Tasks.Task",
+        "ValueTask" => "System.Threading.Tasks.ValueTask",
         "JsonSerializer" => "System.Text.Json.JsonSerializer",
         "JsonDocument" => "System.Text.Json.JsonDocument",
         "Regex" => "System.Text.RegularExpressions.Regex",
@@ -1339,6 +1342,8 @@ public sealed class VariableSymbol : Symbol
 public sealed class FunctionSymbol : Symbol
 {
     public string ReturnType { get; }
+    /// <summary>The type a return statement produces, before an async carrier is applied.</summary>
+    public string BodyReturnType { get; init; }
 
     /// <summary>
     /// v0.15 E2 slice b, design-doc §8.2 — the RETURN's function type when the
@@ -1390,6 +1395,7 @@ public sealed class FunctionSymbol : Symbol
         : base(id, name, declarationSpan, definitionSpan, conditionalAlternative)
     {
         ReturnType = returnType ?? throw new ArgumentNullException(nameof(returnType));
+        BodyReturnType = returnType;
         Parameters = parameters?.ToArray() ?? throw new ArgumentNullException(nameof(parameters));
         TypeParameters = typeParameters?.ToArray() ?? Array.Empty<string>();
         Visibility = visibility;

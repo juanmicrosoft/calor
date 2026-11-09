@@ -699,6 +699,65 @@ public static class AttributeHelper
         }
     }
 
+    /// <summary>
+    /// Resolves only the two built-in async carriers. Short names must not override source
+    /// declarations or aliases; synthesized carriers are always globally qualified.
+    /// </summary>
+    public static string ResolveAsyncCarrierName(string typeName, ModuleNode? module)
+    {
+        var name = typeName.Trim();
+        if (name.StartsWith("global::", StringComparison.Ordinal))
+            return name[8..];
+        if (module is not null)
+        {
+            var headEnd = name.IndexOf('.');
+            var head = headEnd < 0 ? name : name[..headEnd];
+            var alias = module.Usings.FirstOrDefault(import => import.Alias == head);
+            if (alias is not null)
+                return alias.Namespace.Replace("global::", "", StringComparison.Ordinal)
+                    + (headEnd < 0 ? "" : name[headEnd..]);
+            if (GetDeclaredReferenceTypeNames(module).Contains(name)
+                || module.Enums.Any(declaration => declaration.Name == name)
+                || module.RefinementTypes.Any(declaration => declaration.Name == name)
+                || HasClass(module.Classes))
+                return name;
+        }
+        return name is "Task" or "ValueTask" ? $"System.Threading.Tasks.{name}" : name;
+
+        bool HasClass(IReadOnlyList<ClassDefinitionNode> classes)
+            => classes.Any(declaration => declaration.Name == name || HasClass(declaration.NestedClasses));
+    }
+
+    public static bool TryGetAsyncResultType(string typeName, ModuleNode? module, out string resultType)
+    {
+        var surface = ToSurfaceSpelling(typeName);
+        if (TryUnwrapNullableAnnotation(surface, out var nonNullable))
+            surface = ToSurfaceSpelling(nonNullable);
+        var open = surface.IndexOf('<');
+        var carrier = ResolveAsyncCarrierName(open < 0 ? surface : surface[..open], module);
+        if (open < 0 && carrier != surface && carrier.Contains('<'))
+            return TryGetAsyncResultType(carrier, null, out resultType);
+        if (carrier is "System.Threading.Tasks.Task" or "System.Threading.Tasks.ValueTask")
+        {
+            if (open < 0)
+            {
+                resultType = "void";
+                return true;
+            }
+            if (surface.EndsWith('>'))
+            {
+                var arguments = SplitGenericArgs(surface[(open + 1)..^1]);
+                if (arguments.Count == 1 && arguments[0].Length > 0)
+                {
+                    resultType = arguments[0];
+                    return true;
+                }
+            }
+        }
+        resultType = "";
+        return false;
+    }
+
     private static List<string> SplitGenericArgs(string argsStr)
     {
         var args = new List<string>();

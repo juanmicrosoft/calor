@@ -9,6 +9,27 @@ namespace Calor.LanguageServer.Tests.Handlers;
 
 public class CompletionHandlerTests
 {
+    [Theory]
+    [InlineData("i32", "Task<i32>")]
+    [InlineData("ValueTask<i32>", "ValueTask<i32>")]
+    public void AsyncMemberCompletion_ReportsCallableCarrier(string output, string carrier)
+    {
+        var source = $$"""
+            §M{AsyncCompletion}
+              §CL{Probe:pub}
+                §AMT{Produce:pub} () -> {{output}}
+                  §R 42
+              §F{Use:pub} (Probe:probe) -> void
+                §C{probe.Produce} §/C
+            """;
+        var compilation = Compiler.Program.Compile(source, "async-completion.calr",
+            new Compiler.CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
+        var completion = Assert.Single(LspTestHarness.GetCompletions(source, "probe."),
+            item => item.Label == "Produce");
+        Assert.Contains(carrier, completion.Detail);
+    }
+
     [Fact]
     public void GetAst_ValidModule_ReturnsAst()
     {

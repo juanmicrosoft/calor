@@ -65,6 +65,7 @@ public sealed class ReturnValidationPass
     }
 
     private readonly DiagnosticBag _diagnostics;
+    private ModuleNode? _module;
 
     public ReturnValidationPass(DiagnosticBag diagnostics)
     {
@@ -78,6 +79,7 @@ public sealed class ReturnValidationPass
             return;
         }
 
+        _module = module;
         _typeNamesWithFacts = module.RefinementTypes.Select(type => type.Name)
             .Concat(module.IndexedTypes.Select(type => type.Name))
             .ToHashSet(StringComparer.Ordinal);
@@ -163,7 +165,7 @@ public sealed class ReturnValidationPass
         {
             case FunctionNode or MethodNode or OperatorOverloadNode
                 or ConstructorNode or PropertyAccessorNode or EventDefinitionNode:
-                childContext = ReturnShape.Classify(node);
+                childContext = ReturnShape.Classify(node, _module);
                 var body = node switch
                 {
                     FunctionNode function when !_localFunctionNodes.Contains(function) => function.Body,

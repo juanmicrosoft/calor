@@ -122,6 +122,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     /// its whole base chain is local. Empty means every base is opaque, which is
     /// #823's original assumption.</summary>
     private IReadOnlyList<ClassDefinitionNode> _moduleClasses = Array.Empty<ClassDefinitionNode>();
+    private ModuleNode? _asyncTypeModule;
     private Stack<(string? ClassName, string? ClassIdentity, HashSet<string> Members, bool Suppress)> _classMemberScopes = new();
     private bool _suppressCrossModuleQualification;
     private readonly HashSet<int> _preambleDirectiveStarts = new();
@@ -780,6 +781,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 _intraModuleFunctionModules);
         _currentClassMemberNames = new HashSet<string>(StringComparer.Ordinal);
         _moduleClasses = module.Classes;
+        _asyncTypeModule = module;
         _classMemberScopes =
             new Stack<(string? ClassName, string? ClassIdentity, HashSet<string> Members, bool Suppress)>();
         _suppressCrossModuleQualification = false;
@@ -1244,7 +1246,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private CallableReturnShape GetCallableReturnShape(
         string returnType,
         bool isAsync,
-        bool isIterator)
+        bool isIterator,
+        IEnumerable<string>? typeParameterNames = null)
     {
         var mappedType = MapTypeName(returnType);
         if (isIterator)
@@ -1267,41 +1270,24 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         RequireNamespace("System.Threading.Tasks");
-        if (TryUnwrapAsyncValueType(mappedType, out var asyncValueType))
+        var classParameters = _moduleClasses.SelectMany(DescendantsAndSelf).OfType<ClassDefinitionNode>()
+            .Where(cls => cls.Name == _currentClassName)
+            .SelectMany(cls => cls.TypeParameters.Select(parameter => parameter.Name));
+        var parameterNames = (typeParameterNames ?? []).Concat(classParameters).ToHashSet(StringComparer.Ordinal);
+        var shape = Analysis.ReturnShape.GetAsyncReturnTypes(returnType, isAsync, _asyncTypeModule, parameterNames);
+        if (shape.CallableType == returnType)
         {
-            return new CallableReturnShape(mappedType, asyncValueType);
+            return new CallableReturnShape(mappedType,
+                shape.BodyType == "void" ? null : MapTypeName(shape.BodyType));
         }
 
-        if (mappedType is "Task" or "ValueTask")
-        {
-            return new CallableReturnShape(mappedType, null);
-        }
-
-        return mappedType.Equals("void", StringComparison.OrdinalIgnoreCase)
-            ? new CallableReturnShape("Task", null)
-            : new CallableReturnShape(WrapInTask(mappedType), mappedType);
-    }
-
-    private static bool TryUnwrapAsyncValueType(
-        string mappedType,
-        out string valueType)
-    {
-        var genericStart = mappedType.IndexOf('<');
-        if (genericStart > 0
-            && mappedType.EndsWith('>')
-            && (mappedType[..genericStart].EndsWith(
-                    "Task",
-                    StringComparison.Ordinal)
-                || mappedType[..genericStart].EndsWith(
-                    "ValueTask",
-                    StringComparison.Ordinal)))
-        {
-            valueType = mappedType[(genericStart + 1)..^1];
-            return true;
-        }
-
-        valueType = "";
-        return false;
+        var callableType = MapTypeName(shape.CallableType);
+        // Keep the conventional spelling unless a source declaration/alias would capture it.
+        if (Parsing.AttributeHelper.ResolveAsyncCarrierName("Task", _asyncTypeModule)
+            == "System.Threading.Tasks.Task" && !parameterNames.Contains("Task"))
+            callableType = callableType.Replace("global::System.Threading.Tasks.Task", "Task", StringComparison.Ordinal);
+        return new CallableReturnShape(callableType,
+            mappedType.Equals("void", StringComparison.OrdinalIgnoreCase) ? null : mappedType);
     }
 
     private void EmitCallableBody(
@@ -3029,7 +3015,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var returnShape = GetCallableReturnShape(
             returnType,
             node.IsAsync,
-            isIterator);
+            isIterator,
+            node.TypeParameters.Select(parameter => parameter.Name));
         var hasReturnRefinement = _refinementTypes.ContainsKey(returnType);
         var previousYieldRefinement = _currentYieldRefinement;
         _currentYieldRefinement = hasReturnRefinement && isIterator
@@ -3145,12 +3132,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             ResetDeclScopes(function.Parameters, function);
 
             var returnType = function.Output?.TypeName ?? "void";
-            var returnShape = GetCallableReturnShape(returnType, isAsync: false, isIterator: false);
+            var returnShape = GetCallableReturnShape(returnType, function.IsAsync, isIterator: false);
             _currentYieldRefinement = null;
             _inlineReturnGuardCounter = 0;
             var parameters = string.Join(", ", function.Parameters.Select(p => Visit(p)));
             _localFunctionEnclosingNames = _bareCallNames.Concat(_enclosingCallableNames).ToArray();
-            AppendLine($"static {returnShape.DeclarationType} {SanitizeIdentifier(function.Name)}({parameters})");
+            var asyncKeyword = function.IsAsync ? "async " : "";
+            AppendLine($"static {asyncKeyword}{returnShape.DeclarationType} {SanitizeIdentifier(function.Name)}({parameters})");
             AppendLine("{");
             Indent();
             EmitRefinementParameterGuards(function.Parameters);
@@ -4805,7 +4793,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var returnShape = GetCallableReturnShape(
             returnType,
             method.IsAsync,
-            isIterator);
+            isIterator,
+            method.TypeParameters.Select(parameter => parameter.Name));
         var hasReturnRefinement = _refinementTypes.ContainsKey(returnType);
         var previousYieldRefinement = _currentYieldRefinement;
         _currentYieldRefinement = hasReturnRefinement && isIterator
@@ -6172,7 +6161,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var returnShape = GetCallableReturnShape(
             returnType,
             node.IsAsync,
-            isIterator);
+            isIterator,
+            node.TypeParameters.Select(parameter => parameter.Name));
         var hasReturnRefinement = _refinementTypes.ContainsKey(returnType);
         var methodName = SanitizeIdentifier(node.Name);
         EnsureDefaultConstraintsLegal(
@@ -8335,24 +8325,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 predicates.Pop());
         }
         return effective;
-    }
-
-    /// <summary>
-    /// Wraps a return type in Task for async methods.
-    /// </summary>
-    private static string WrapInTask(string returnType)
-    {
-        // Don't double-wrap types that are already Task/ValueTask
-        if (returnType.StartsWith("Task<", StringComparison.Ordinal) ||
-            returnType == "Task" ||
-            returnType.StartsWith("ValueTask<", StringComparison.Ordinal) ||
-            returnType == "ValueTask")
-        {
-            return returnType;
-        }
-
-        // void -> Task, T -> Task<T>
-        return returnType == "void" ? "Task" : $"Task<{returnType}>";
     }
 
     /// <summary>

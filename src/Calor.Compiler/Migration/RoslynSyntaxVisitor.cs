@@ -3908,6 +3908,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Check for async modifier
         var isAsync = node.Modifiers.Any(SyntaxKind.AsyncKeyword);
         var returnTypeStr = node.ReturnType.ToString();
+        if (isAsync && (node.ReturnType is PredefinedTypeSyntax predefined
+                && predefined.Keyword.IsKind(SyntaxKind.VoidKeyword)
+            || _semanticModel?.GetDeclaredSymbol(node, _cancellationToken) is IMethodSymbol
+                { ReturnType: INamedTypeSymbol { TypeKind: not TypeKind.Error } nativeReturn }
+                && (nativeReturn.Name is not ("Task" or "ValueTask")
+                    || nativeReturn.ContainingNamespace.ToDisplayString() != "System.Threading.Tasks")))
+            throw EscalateExpression(node, "async-return-signature");
 
         // For async methods, unwrap Task<T> -> T
         if (isAsync)
@@ -9069,6 +9076,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         MethodDeclarationSyntax method,
         string unwrappedReturnType)
     {
+        // Only an ordinary Task spelling can be losslessly abbreviated to its body result.
+        // Preserve ValueTask, aliases and qualified carriers in the public CLR signature.
+        if (method.ReturnType is not GenericNameSyntax { Identifier.ValueText: "Task" }
+            and not IdentifierNameSyntax { Identifier.ValueText: "Task" })
+            return MapDeclarationType(method.ReturnType);
         var mapped = TypeMapper.CSharpToCalor(unwrappedReturnType);
         if (_semanticModel?.GetDeclaredSymbol(
                 method,

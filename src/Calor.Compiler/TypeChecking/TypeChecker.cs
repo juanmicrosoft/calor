@@ -11,6 +11,7 @@ public sealed class TypeChecker
 {
     private readonly DiagnosticBag _diagnostics;
     private readonly TypeEnvironment _env;
+    private ModuleNode? _module;
     private readonly Dictionary<IsPatternNode, CalorType> _patternBindingTypes = new();
     private readonly Dictionary<MatchStatementNode, CalorType> _matchTargetTypes = new();
     private readonly HashSet<string> _moduleDeclaredValueTypes = new(StringComparer.OrdinalIgnoreCase);
@@ -95,6 +96,7 @@ public sealed class TypeChecker
 
     public void Check(ModuleNode module)
     {
+        _module = module;
         Verification.ContractVerifier.VerifyNamedRefinementPredicates(module, _diagnostics);
         _hasNamedRefinements = module.RefinementTypes.Count > 0;
         _patternBindingTypes.Clear();
@@ -367,13 +369,14 @@ public sealed class TypeChecker
         => _env.DefineFunction(GetCallableLookupName(func.Name), CreateCandidate(func));
 
     private FunctionCandidate CreateCandidate(FunctionNode func)
-        => CreateCandidate(func.TypeParameters, func.Name, func.Parameters, func.Output);
+        => CreateCandidate(func.TypeParameters, func.Name, func.Parameters, func.Output, func.IsAsync);
 
     private FunctionCandidate CreateCandidate(
         IReadOnlyList<TypeParameterNode> typeParameters,
         string callableName,
         IReadOnlyList<ParameterNode> parameters,
-        OutputNode? output)
+        OutputNode? output,
+        bool isAsync = false)
     {
         _env.EnterScope();
 
@@ -392,9 +395,8 @@ public sealed class TypeChecker
             paramTypes.Add(paramType);
         }
 
-        var returnType = output != null
-            ? ResolveTypeName(output.TypeName, output.Span)
-            : PrimitiveType.Void;
+        var shape = Analysis.ReturnShape.GetAsyncReturnTypes(output?.TypeName ?? "void", isAsync, _module, AsyncCarrierTypeParameters());
+        var returnType = ResolveTypeName(shape.CallableType, output?.Span ?? default);
 
         _suppressDiagnostics = previousSuppressDiagnostics;
         _env.ExitScope();
@@ -453,11 +455,13 @@ public sealed class TypeChecker
         RegisterTypeParameters(func);
         var previousSuppressDiagnostics = _suppressDiagnostics;
         _suppressDiagnostics = true;
-        var returnType = func.Output != null
-            ? ResolveTypeName(func.Output.TypeName, func.Output.Span)
-            : PrimitiveType.Void;
+        var shape = Analysis.ReturnShape.GetAsyncReturnTypes(func.Output?.TypeName ?? "void", func.IsAsync, _module, AsyncCarrierTypeParameters());
+        var returnType = ResolveTypeName(shape.BodyType, func.Output?.Span ?? func.Span);
         _suppressDiagnostics = previousSuppressDiagnostics;
+        var previousValidateReturnAssignments = _validateReturnAssignments;
+        _validateReturnAssignments = func.IsAsync;
         CheckCallableBody(func.Parameters, returnType, func.Body);
+        _validateReturnAssignments = previousValidateReturnAssignments;
         _env.ExitScope();
     }
 
@@ -560,7 +564,7 @@ public sealed class TypeChecker
         {
             _env.DefineLocalFunction(
                 GetCallableLookupName(method.Name),
-                CreateCandidate(method.TypeParameters, method.Name, method.Parameters, method.Output));
+                CreateCandidate(method.TypeParameters, method.Name, method.Parameters, method.Output, method.IsAsync));
         }
 
         foreach (var constructor in cls.Constructors)
@@ -569,7 +573,7 @@ public sealed class TypeChecker
         {
             _env.EnterScope();
             RegisterTypeParameters(method.TypeParameters, method.Name);
-            CheckMemberBody(method.Parameters, method.Output, method.Body);
+            CheckMemberBody(method.Parameters, method.Output, method.Body, method.IsAsync);
             _env.ExitScope();
         }
         foreach (var property in cls.Properties)
@@ -623,15 +627,18 @@ public sealed class TypeChecker
     private void CheckMemberBody(
         IReadOnlyList<ParameterNode> parameters,
         OutputNode? output,
-        IReadOnlyList<StatementNode> body)
+        IReadOnlyList<StatementNode> body,
+        bool isAsync = false)
     {
         var previousSuppressDiagnostics = _suppressDiagnostics;
         _suppressDiagnostics = true;
-        var returnType = output != null
-            ? ResolveTypeName(output.TypeName, output.Span)
-            : PrimitiveType.Void;
+        var shape = Analysis.ReturnShape.GetAsyncReturnTypes(output?.TypeName ?? "void", isAsync, _module, AsyncCarrierTypeParameters());
+        var returnType = ResolveTypeName(shape.BodyType, output?.Span ?? default);
         _suppressDiagnostics = previousSuppressDiagnostics;
+        var previousValidateReturnAssignments = _validateReturnAssignments;
+        _validateReturnAssignments = isAsync;
         CheckCallableBody(parameters, returnType, body);
+        _validateReturnAssignments = previousValidateReturnAssignments;
     }
 
     private void CheckAccessors(
@@ -1802,6 +1809,7 @@ public sealed class TypeChecker
             NewExpressionNode newExpression => InferNewExpressionType(newExpression),
             CallExpressionNode call => InferCallExpressionType(call),
             ExpressionCallNode call => InferExpressionCallType(call),
+            AwaitExpressionNode awaited => InferAwaitType(awaited),
             InterpolatedStringNode interpolated => InferInterpolatedStringType(interpolated),
             LambdaExpressionNode lambda => InferLambdaType(lambda, expectedType),
             ForallExpressionNode forall => InferQuantifierType(forall.BoundVariables, forall.Body),
@@ -1817,6 +1825,26 @@ public sealed class TypeChecker
             IsPatternNode isPattern => InferIsPatternType(isPattern),
             _ => InferUnknownExpressionType(expr)
         };
+    }
+
+    private IEnumerable<string> AsyncCarrierTypeParameters()
+        => new[] { "Task", "ValueTask" }.Where(name => _env.LookupType(name) is TypeParameterType);
+
+    private CalorType InferAwaitType(AwaitExpressionNode awaited)
+    {
+        var carrier = InferExpressionType(awaited.Awaited);
+        if (AttributeHelper.TryGetAsyncResultType(carrier.SurfaceName, _module, out var result))
+            return ResolveTypeName(result, awaited.Span);
+        if (carrier is ErrorType or ExternalType)
+        {
+            if (!_suppressDiagnostics && !_suppressContextualDiagnostics)
+                _diagnostics.ReportWarning(awaited.Span, DiagnosticCode.UndefinedReference,
+                    "The awaited result requires .NET awaiter resolution; generated C# validation checks this expression.");
+            return carrier;
+        }
+        _diagnostics.ReportError(awaited.Span, DiagnosticCode.TypeMismatch,
+            $"Type {carrier.SurfaceName} is not a supported awaitable.");
+        return ErrorType.Instance;
     }
 
     private CalorType InferNullCoalesceType(NullCoalesceNode coalesce)
@@ -2255,6 +2283,20 @@ public sealed class TypeChecker
             return declaredType;
         }).ToArray();
 
+        var callableTarget = expectedFunction;
+        if (lambda.IsAsync && expectedFunction is not null
+            && !expectedFunction.ReturnType.Equals(PrimitiveType.Void))
+        {
+            if (AttributeHelper.TryGetAsyncResultType(expectedFunction.ReturnType.SurfaceName, _module, out var bodyResult))
+                expectedFunction = new FunctionType(expectedFunction.ParameterTypes, ResolveTypeName(bodyResult, lambda.Span));
+            else
+            {
+                if (!_suppressContextualDiagnostics)
+                    _diagnostics.ReportError(lambda.Span, DiagnosticCode.TypeMismatch,
+                        $"Async lambda requires an async carrier return type, not {expectedFunction.ReturnType.SurfaceName}.");
+                signatureValid = false;
+            }
+        }
         var previousReturnType = _currentReturnType;
         var previousValidateReturnAssignments = _validateReturnAssignments;
         var previousSuppressContextualDiagnostics = _suppressContextualDiagnostics;
@@ -2344,7 +2386,7 @@ public sealed class TypeChecker
         }
         _ = parameterTypes;
         _ = returnType;
-        return expectedFunction is not null && signatureValid ? expectedFunction : ErrorType.Instance;
+        return callableTarget is not null && signatureValid ? callableTarget : ErrorType.Instance;
     }
 
     private static bool IsVoidCompatibleLambdaExpression(
@@ -3817,7 +3859,12 @@ public sealed class TypeChecker
         _env.ExitScope();
         _inlineRefinedParameters = previousInlineRefinedParameters;
         foreach (var returnType in _inferredLambdaReturnTypes)
-            InferTypeArguments(targetTemplate.ReturnType, returnType, substitutions);
+        {
+            var callableResult = lambda.IsAsync
+                ? new GenericInstanceType("System.Threading.Tasks.Task", [returnType])
+                : returnType;
+            InferTypeArguments(targetTemplate.ReturnType, callableResult, substitutions);
+        }
         _inferredLambdaReturnTypes = previousInferredLambdaReturnTypes;
         _currentReturnType = previousReturnType;
         _validateReturnAssignments = previousValidateReturnAssignments;
@@ -4969,6 +5016,8 @@ public sealed class TypeChecker
 
     private CalorType ResolveTypeName(string typeName, Parsing.TextSpan span)
     {
+        if (typeName.StartsWith("global::", StringComparison.Ordinal))
+            typeName = typeName[8..];
         if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(typeName, out var referentName))
         {
             var referentSurface = Parsing.AttributeHelper.ToSurfaceSpelling(referentName);
@@ -5029,7 +5078,8 @@ public sealed class TypeChecker
             var argsStr = typeName[(bracketIndex + 1)..^1];
             var args = SplitGenericArgs(argsStr);
 
-            return new GenericInstanceType(baseName, args.Select(arg => ResolveTypeName(arg, span)).ToList());
+            return new GenericInstanceType(AttributeHelper.ResolveAsyncCarrierName(baseName, _module),
+                args.Select(arg => ResolveTypeName(arg, span)).ToList());
         }
 
         // Handle generic types with angle bracket syntax: List<T>, Dictionary<K, V>
@@ -5047,7 +5097,7 @@ public sealed class TypeChecker
             {
                 resolvedArgs.Add(ResolveTypeName(arg, span));
             }
-            return new GenericInstanceType(baseName, resolvedArgs);
+            return new GenericInstanceType(AttributeHelper.ResolveAsyncCarrierName(baseName, _module), resolvedArgs);
         }
 
         // Try primitive type
@@ -5075,6 +5125,11 @@ public sealed class TypeChecker
         var userType = _env.LookupType(typeName);
         if (userType != null)
             return userType;
+        var carrierName = AttributeHelper.ResolveAsyncCarrierName(typeName, _module);
+        if (carrierName is "System.Threading.Tasks.Task" or "System.Threading.Tasks.ValueTask")
+            return new GenericInstanceType(carrierName, Array.Empty<CalorType>());
+        if (carrierName != typeName && AttributeHelper.TryGetAsyncResultType(carrierName, null, out _))
+            return ResolveTypeName(carrierName, span);
 
         // #741: surface-spell the echoed name. A sized numeric type reaches here as its
         // expanded internal form (e.g. `INT[bits=64][signed=true]`, `FLOAT[bits=32]`),
@@ -5276,6 +5331,9 @@ public sealed class TypeChecker
         }
         if (TryGetDelegateFunctionType(target, out var targetFunction) && source is FunctionType sourceFunction)
             return targetFunction.Equals(sourceFunction);
+        if (target is GenericInstanceType { BaseName: "System.Threading.Tasks.Task", TypeArguments.Count: 0 }
+            && source is GenericInstanceType { BaseName: "System.Threading.Tasks.Task", TypeArguments.Count: 1 })
+            return true;
         // Nothing is known about an unmodeled external type, in either direction.
         if (target is ExternalType || source is ExternalType) return true;
         if (target.Equals(PrimitiveType.Float) && source.Equals(PrimitiveType.Int)) return true;

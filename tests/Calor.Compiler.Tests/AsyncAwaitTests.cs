@@ -3,6 +3,9 @@ using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using System.Reflection;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -110,7 +113,7 @@ public class AsyncAwaitTests
     }
 
     [Fact]
-    public void Convert_AsyncValueTaskMethod_UnwrapsReturnType()
+    public void Convert_AsyncValueTaskMethod_PreservesCarrier()
     {
         var csharpSource = """
             public class Service
@@ -130,7 +133,7 @@ public class AsyncAwaitTests
         var method = Assert.Single(classNode.Methods);
         Assert.True(method.IsAsync);
         Assert.NotNull(method.Output);
-        Assert.Equal("i32", method.Output.TypeName);
+        Assert.Equal("ValueTask<i32>", method.Output.TypeName);
     }
 
     #endregion
@@ -1166,6 +1169,406 @@ public class AsyncAwaitTests
     }
 
     #endregion
+
+    [Theory]
+    [InlineData("i32", "Task<i32>", true)]
+    [InlineData("i32", "Task<i32>", false)]
+    [InlineData("Task<i32>", "Task<i32>", true)]
+    [InlineData("ValueTask<i32>", "ValueTask<i32>", true)]
+    [InlineData("System.Threading.Tasks.Task<i32>", "Task<i32>", true)]
+    [InlineData("System.Threading.Tasks.ValueTask<i32>", "ValueTask<i32>", false)]
+    public async Task Compile_AsyncCallableAndAwait_UseDifferentResultTypes(
+        string output, string bindingType, bool typed)
+    {
+        var binding = typed ? $"pending:{bindingType}" : "pending";
+        var assembly = CompileAndLoad($$"""
+            §M{AsyncNative}
+              §AF{Produce:pub} () -> {{output}}
+                §R 42
+              §AF{Consume:pub} () -> i32
+                §B{ {{binding}} } §C{Produce} §/C
+                §B{value:i32} §AWAIT pending
+                §R value
+            """);
+        var module = assembly.GetType("AsyncNative.AsyncNativeModule", throwOnError: true)!;
+        Assert.Equal(bindingType.StartsWith("ValueTask", StringComparison.Ordinal)
+            ? typeof(ValueTask<int>) : typeof(Task<int>), module.GetMethod("Produce")!.ReturnType);
+        Assert.Equal(42, await (Task<int>)module.GetMethod("Consume")!.Invoke(null, null)!);
+    }
+
+    [Theory]
+    [InlineData("Task")]
+    [InlineData("ValueTask")]
+    [InlineData("void")]
+    public async Task Compile_AsyncVoidBody_UsesVoidAwaitResult(string output)
+    {
+        var assembly = CompileAndLoad($$"""
+            §M{AsyncVoidNative}
+              §AF{Produce:pub} () -> {{output}}
+                §R
+              §AF{Consume:pub} () -> void
+                §AWAIT §C{Produce} §/C
+            """);
+        var module = assembly.GetType("AsyncVoidNative.AsyncVoidNativeModule", throwOnError: true)!;
+        Assert.Equal(output == "ValueTask" ? typeof(ValueTask) : typeof(Task),
+            module.GetMethod("Produce")!.ReturnType);
+        await (Task)module.GetMethod("Consume")!.Invoke(null, null)!;
+    }
+
+    [Theory]
+    [InlineData("§B{pending:Task<i32>} 42")]
+    [InlineData("§B{value:str} §AWAIT §C{Produce} §/C")]
+    [InlineData("§B{value:i32} §AWAIT 42")]
+    [InlineData("§B{value:i32} §C{Produce} §/C")]
+    [InlineData("§R \"wrong\"")]
+    public void Compile_AsyncWrongResult_IsRejected(string statement)
+    {
+        var result = Program.Compile($$"""
+            §M{AsyncRejected}
+              §AF{Produce:pub} () -> i32
+                §R 42
+              §AF{Consume:pub} () -> i32
+                {{statement}}
+                §R 42
+            """, "async-rejected.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public async Task Compile_GenericAsyncMethodGroup_PreservesTaskResult()
+    {
+        var assembly = CompileAndLoad("""
+            §M{AsyncGeneric}
+              §AF{Identity:pub}<T> (T:value) -> T
+                §R value
+              §AF{Consume:pub} () -> i32
+                §B{factory:Func<i32,Task<i32>>} Identity
+                §B{pending:Task<i32>} §C{factory} §A 42 §/C
+                §R §AWAIT pending
+            """);
+        var module = assembly.GetType("AsyncGeneric.AsyncGenericModule", throwOnError: true)!;
+        Assert.Equal(typeof(Task<int>), module.GetMethod("Identity")!.MakeGenericMethod(typeof(int)).ReturnType);
+        Assert.Equal(42, await (Task<int>)module.GetMethod("Consume")!.Invoke(null, null)!);
+    }
+
+    [Fact]
+    public async Task Compile_ClassAndInheritedAsyncCalls_PreserveTaskResult()
+    {
+        var assembly = CompileAndLoad("""
+            §M{AsyncClasses}
+              §CL{Base:pub}
+                §AMT{Produce:pub} () -> i32
+                  §R 42
+              §CL{Derived:pub}
+                §EXT{Base}
+                §AMT{Consume:pub} () -> i32
+                  §B{pending:Task<i32>} §C{Produce} §/C
+                  §R §AWAIT pending
+            """);
+        var derived = assembly.GetType("AsyncClasses.Derived", throwOnError: true)!;
+        Assert.Equal(42, await (Task<int>)derived.GetMethod("Consume")!.Invoke(Activator.CreateInstance(derived), null)!);
+    }
+
+    [Theory]
+    [InlineData("Task<int>")]
+    [InlineData("ValueTask<int>")]
+    [InlineData("Task")]
+    [InlineData("ValueTask")]
+    public async Task Convert_AsyncPublicSignature_IsPreserved(string returnType)
+    {
+        var returnsValue = returnType.EndsWith('>');
+        var source = $$"""
+            using System.Threading.Tasks;
+            public class AsyncMigration
+            {
+                public async {{returnType}} Produce()
+                {
+                    await Task.Yield();
+                    {{(returnsValue ? "return 42;" : "")}}
+                }
+            }
+            """;
+        var conversion = _converter.Convert(source);
+        Assert.True(conversion.Success, GetErrorMessage(conversion));
+        var assembly = CompileAndLoad(conversion.CalorSource!);
+        var type = Assert.Single(assembly.GetTypes(), candidate => candidate.Name == "AsyncMigration");
+        var expected = returnType switch
+        {
+            "Task<int>" => typeof(Task<int>),
+            "ValueTask<int>" => typeof(ValueTask<int>),
+            "Task" => typeof(Task),
+            _ => typeof(ValueTask)
+        };
+        Assert.Equal(expected, type.GetMethod("Produce")!.ReturnType);
+        var pending = type.GetMethod("Produce")!.Invoke(Activator.CreateInstance(type), null);
+        switch (pending)
+        {
+            case Task<int> task:
+                Assert.Equal(42, await task);
+                break;
+            case ValueTask<int> valueTask:
+                Assert.Equal(42, await valueTask);
+                break;
+            case Task task:
+                await task;
+                break;
+            case ValueTask valueTask:
+                await valueTask;
+                break;
+            default:
+                Assert.Fail("Converted async method did not return its declared carrier.");
+                break;
+        }
+    }
+
+    private static Assembly CompileAndLoad(string source)
+    {
+        var result = Program.Compile(source, "async-native.calr", new CompilationOptions
+        {
+            EnableTypeChecking = true,
+            ContractMode = ContractMode.Debug,
+            StatusWriter = TextWriter.Null
+        });
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        var compilation = CSharpCompilation.Create("Async_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble + result.GeneratedCode)],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var emitted = compilation.Emit(stream);
+        Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+        return Assembly.Load(stream.ToArray());
+    }
+
+    [Theory]
+    [InlineData("MyTask")]
+    [InlineData("Task")]
+    public async Task Compile_CustomTaskNames_AreBodyValuesNotBclCarriers(string name)
+    {
+        var assembly = CompileAndLoad($$"""
+            §M{AsyncCustom}
+              §CL{ {{name}}:pub}<T>
+              §AF{Produce:pub} ({{name}}<i32>:value) -> {{name}}<i32>
+                §S (== result value)
+                §R value
+              §AF{Consume:pub} ({{name}}<i32>:value) -> {{name}}<i32>
+                §B{pending:global::System.Threading.Tasks.Task<{{name}}<i32>>} §C{Produce} §A value §/C
+                §R §AWAIT pending
+            """);
+        var module = assembly.GetType("AsyncCustom.AsyncCustomModule", throwOnError: true)!;
+        var custom = assembly.GetType($"AsyncCustom.{name}`1", throwOnError: true)!.MakeGenericType(typeof(int));
+        var value = Activator.CreateInstance(custom);
+        Assert.Equal(typeof(Task<>).MakeGenericType(custom), module.GetMethod("Produce")!.ReturnType);
+        var pending = (Task)module.GetMethod("Consume")!.Invoke(null, [value])!;
+        await pending;
+        Assert.Same(value, pending.GetType().GetProperty("Result")!.GetValue(pending));
+    }
+
+    [Fact]
+    public async Task Compile_SynchronousTaskReturn_IsNotUnwrapped()
+    {
+        var assembly = CompileAndLoad("""
+            §M{AsyncSyncCarrier}
+              §F{Pass:pub} (Task<i32>:pending) -> Task<i32>
+                §R pending
+              §AF{Consume:pub} (Task<i32>:pending) -> i32
+                §B{copy:Task<i32>} §C{Pass} §A pending §/C
+                §R §AWAIT copy
+            """);
+        var module = assembly.GetType("AsyncSyncCarrier.AsyncSyncCarrierModule", throwOnError: true)!;
+        var value = Task.FromResult(42);
+        Assert.Same(value, module.GetMethod("Pass")!.Invoke(null, [value]));
+        Assert.Equal(42, await (Task<int>)module.GetMethod("Consume")!.Invoke(null, [value])!);
+    }
+
+    [Theory]
+    [InlineData("§U{Pending:System.Threading.Tasks.Task<i32>}", "Pending")]
+    [InlineData("§U{Tasks:System.Threading.Tasks}", "Tasks.Task<i32>")]
+    public async Task Compile_AsyncAlias_PreservesCarrier(string import, string output)
+    {
+        var assembly = CompileAndLoad($$"""
+            §M{AsyncAlias}
+              {{import}}
+              §AF{Produce:pub} () -> {{output}}
+                §R 42
+              §AF{Consume:pub} () -> i32
+                §B{pending:Task<i32>} §C{Produce} §/C
+                §R §AWAIT pending
+            """);
+        var module = assembly.GetType("AsyncAlias.AsyncAliasModule", throwOnError: true)!;
+        Assert.Equal(typeof(Task<int>), module.GetMethod("Produce")!.ReturnType);
+        Assert.Equal(42, await (Task<int>)module.GetMethod("Consume")!.Invoke(null, null)!);
+    }
+
+    [Theory]
+    [InlineData("Task<i32>")]
+    [InlineData("ValueTask<i32>")]
+    public async Task Compile_AsyncLambda_UsesDelegateBodyResult(string carrier)
+    {
+        var assembly = CompileAndLoad($$"""
+            §M{AsyncLambda}
+              §AF{Consume:pub} () -> i32
+                §B{factory:Func<{{carrier}}>} §LAM{async} 42 §/LAM
+                §R §AWAIT §C{factory} §/C
+            """);
+        var module = assembly.GetType("AsyncLambda.AsyncLambdaModule", throwOnError: true)!;
+        Assert.Equal(42, await (Task<int>)module.GetMethod("Consume")!.Invoke(null, null)!);
+    }
+
+    [Theory]
+    [InlineData("Task")]
+    [InlineData("ValueTask")]
+    public void Compile_VoidAwaitCannotInitializeValue(string carrier)
+    {
+        var result = Program.Compile($$"""
+            §M{AsyncVoidRejected}
+              §AF{Consume:pub} ({{carrier}}:pending) -> i32
+                §B{value:i32} §AWAIT pending
+                §R value
+            """, "async-void-rejected.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Theory]
+    [InlineData("Task")]
+    [InlineData("MyTask")]
+    public void Compile_CustomTaskCannotBeAwaitedAsBclCarrier(string name)
+    {
+        var result = Program.Compile($$"""
+            §M{AsyncCustomRejected}
+              §CL{ {{name}}:pub}<T>
+              §AF{Consume:pub} ({{name}}<i32>:pending) -> i32
+                §R §AWAIT pending
+            """, "async-custom-rejected.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Theory]
+    [InlineData("i32")]
+    [InlineData("Task<i32>")]
+    [InlineData("ValueTask<i32>")]
+    public async Task Compile_AsyncPostcondition_DescribesBodyResult(string output)
+    {
+        var assembly = CompileAndLoad($$"""
+            §M{AsyncContracts}
+              §AF{Produce:pub} () -> {{output}}
+                §S (> result 0)
+                §R 42
+              §AF{Consume:pub} () -> i32
+                §R §AWAIT §C{Produce} §/C
+            """);
+        var module = assembly.GetType("AsyncContracts.AsyncContractsModule", throwOnError: true)!;
+        Assert.Equal(42, await (Task<int>)module.GetMethod("Consume")!.Invoke(null, null)!);
+    }
+
+    [Fact]
+    public async Task Compile_TypeParameterNamedTask_IsNotBclTask()
+    {
+        var assembly = CompileAndLoad("""
+            §M{AsyncParameter}
+              §AF{Identity:pub}<Task> (Task:value) -> Task
+                §R value
+            """);
+        var method = assembly.GetType("AsyncParameter.AsyncParameterModule", throwOnError: true)!
+            .GetMethod("Identity")!.MakeGenericMethod(typeof(int));
+        Assert.Equal(typeof(Task<int>), method.ReturnType);
+        Assert.Equal(42, await (Task<int>)method.Invoke(null, [42])!);
+    }
+
+    [Theory]
+    [InlineData("Func<i32>")]
+    [InlineData("Func<Task<str>>")]
+    public void Compile_AsyncLambdaWrongTargetOrBody_IsRejected(string target)
+    {
+        var result = Program.Compile($$"""
+            §M{AsyncLambdaRejected}
+              §F{Probe:pub} () -> void
+                §B{factory:{{target}}} §LAM{async} 42 §/LAM
+            """, "async-lambda-rejected.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void Compile_BoundNativeAsyncResult_AgreesWithCallableAndBodyTypes()
+    {
+        var result = Program.Compile("""
+            §M{AsyncBound}
+              §AF{Produce:pub} () -> i32
+                §R 42
+              §AF{Consume:pub} () -> i32
+                §B{pending} §C{Produce} §/C
+                §R §AWAIT pending
+            """, "async-bound.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binding.Binder(diagnostics).Bind(result.Ast!);
+        Assert.Empty(diagnostics.Errors);
+        var producer = bound.Functions.Single(function => function.Symbol.Name == "Produce");
+        Assert.Equal("global::System.Threading.Tasks.Task<i32>", producer.Symbol.ReturnType);
+        Assert.Equal("i32", producer.Symbol.BodyReturnType);
+        var consumer = bound.Functions.Single(function => function.Symbol.Name == "Consume");
+        var pending = Assert.IsType<Binding.BoundBindStatement>(consumer.Body[0]);
+        Assert.Contains("Task<", pending.Initializer!.Type.DisplayString);
+        var returned = Assert.IsType<Binding.BoundReturnStatement>(consumer.Body[1]);
+        Assert.Equal("INT", Binding.TypeIdentity.Canonicalize(returned.Expression!.Type.DisplayString));
+        Assert.False(returned.Expression.HasUnknownInferredType);
+    }
+
+    [Fact]
+    public async Task Compile_TaskOfValueCanInitializeNonGenericTask()
+    {
+        var assembly = CompileAndLoad("""
+            §M{AsyncBaseCarrier}
+              §AF{Produce:pub} () -> i32
+                §R 42
+              §AF{Consume:pub} () -> void
+                §B{pending:Task} §C{Produce} §/C
+                §AWAIT pending
+            """);
+        var module = assembly.GetType("AsyncBaseCarrier.AsyncBaseCarrierModule", throwOnError: true)!;
+        await (Task)module.GetMethod("Consume")!.Invoke(null, null)!;
+    }
+
+    [Fact]
+    public void Convert_AsyncVoid_IsPreservedRatherThanChangedToTask()
+    {
+        var conversion = new CSharpToCalorConverter().Convert("""
+            using System.Threading.Tasks;
+            public class AsyncVoidMigration
+            {
+                public async void Produce() { await Task.Yield(); }
+            }
+            """);
+        Assert.True(conversion.Success, GetErrorMessage(conversion));
+        var assembly = CompileAndLoad(conversion.CalorSource!);
+        var type = Assert.Single(assembly.GetTypes(), candidate => candidate.Name == "AsyncVoidMigration");
+        Assert.Equal(typeof(void), type.GetMethod("Produce")!.ReturnType);
+        Assert.Contains(conversion.Issues, issue => issue.Message.Contains("async-return-signature", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("Task")]
+    [InlineData("ValueTask")]
+    public void Compile_BoundAsyncLambda_PreservesContextualCarrier(string carrier)
+    {
+        var result = Program.Compile($$"""
+            §M{AsyncLambdaBound}
+              §F{Probe:pub} () -> void
+                §B{factory:Func<{{carrier}}<i32>>} §LAM{async} 42 §/LAM
+            """, "async-lambda-bound.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binding.Binder(diagnostics).Bind(result.Ast!);
+        Assert.Empty(diagnostics.Errors);
+        var initializer = Assert.IsType<Binding.BoundLambdaExpression>(
+            Assert.IsType<Binding.BoundBindStatement>(Assert.Single(bound.Functions).Body[0]).Initializer);
+        Assert.Equal(Binding.TypeIdentity.Canonicalize($"{carrier}<i32>"),
+            Binding.TypeIdentity.Canonicalize(initializer.ReturnTypeName));
+    }
 
     #region Helpers
 

@@ -138,14 +138,19 @@ public sealed class BindValidationPass
         _source = source;
     }
 
+    private ModuleNode? _asyncTypeModule;
+
     public void Check(ModuleNode module)
     {
+        _asyncTypeModule = module;
         BuildUserSignatures(module);
 
         foreach (var func in module.Functions)
         {
             _localFunctionNames = LocalFunctionNames(func.Body);
-            CheckBody(func.Body, func.Output?.TypeName, func.Parameters, fields: null, className: null);
+            CheckBody(func.Body, ReturnShape.GetAsyncReturnTypes(
+                func.Output?.TypeName ?? "void", func.IsAsync, module,
+                func.TypeParameters.Select(parameter => parameter.Name)).BodyType, func.Parameters, fields: null, className: null);
             CheckLocalFunctions(func.Body, fields: null, className: null);
             _localFunctionNames = [];
         }
@@ -162,7 +167,10 @@ public sealed class BindValidationPass
             foreach (var method in cls.Methods)
             {
                 _localFunctionNames = LocalFunctionNames(method.Body);
-                CheckBody(method.Body, method.Output?.TypeName, method.Parameters, fields, cls.Name);
+                CheckBody(method.Body, ReturnShape.GetAsyncReturnTypes(
+                    method.Output?.TypeName ?? "void", method.IsAsync, module,
+                    method.TypeParameters.Concat(cls.TypeParameters).Select(parameter => parameter.Name)).BodyType,
+                    method.Parameters, fields, cls.Name);
                 CheckLocalFunctions(method.Body, fields, cls.Name);
                 _localFunctionNames = [];
             }
@@ -528,7 +536,9 @@ public sealed class BindValidationPass
         foreach (var local in body.OfType<LocalFunctionStatementNode>())
         {
             var function = local.Function;
-            CheckBody(function.Body, function.Output?.TypeName, function.Parameters, fields, className);
+            CheckBody(function.Body, ReturnShape.GetAsyncReturnTypes(
+                function.Output?.TypeName ?? "void", function.IsAsync, _asyncTypeModule,
+                function.TypeParameters.Select(parameter => parameter.Name)).BodyType, function.Parameters, fields, className);
         }
     }
 
@@ -1092,10 +1102,12 @@ public sealed class BindValidationPass
 
         foreach (var func in module.Functions)
         {
-            RegisterSignature(func.Name, func.Parameters, func.Output?.TypeName);
-            if (func.Output?.TypeName is { } rt)
+            var returnType = ReturnShape.GetAsyncReturnTypes(func.Output?.TypeName ?? "void", func.IsAsync, module,
+                func.TypeParameters.Select(parameter => parameter.Name)).CallableType;
+            RegisterSignature(func.Name, func.Parameters, returnType);
+            if (!ReturnShape.IsVoidType(returnType))
             {
-                RegisterReturnType(func.Name, func.Parameters, rt);
+                RegisterReturnType(func.Name, func.Parameters, returnType);
             }
 
             RegisterParams(func.Name, func.Parameters);
@@ -1106,10 +1118,12 @@ public sealed class BindValidationPass
             foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))
             {
                 var key = $"{cls.Name}.{method.Name}";
-                RegisterSignature(key, method.Parameters, method.Output?.TypeName);
-                if (method.Output?.TypeName is { } rt)
+                var returnType = ReturnShape.GetAsyncReturnTypes(method.Output?.TypeName ?? "void", method.IsAsync, module,
+                    method.TypeParameters.Concat(cls.TypeParameters).Select(parameter => parameter.Name)).CallableType;
+                RegisterSignature(key, method.Parameters, returnType);
+                if (!ReturnShape.IsVoidType(returnType))
                 {
-                    RegisterReturnType(key, method.Parameters, rt);
+                    RegisterReturnType(key, method.Parameters, returnType);
                 }
 
                 RegisterParams(key, method.Parameters);

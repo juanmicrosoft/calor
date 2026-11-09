@@ -59,11 +59,11 @@ public static class ReturnShape
     /// <summary>
     /// Classify an owner node. Non-owner nodes classify as <see cref="Kind.None"/>.
     /// </summary>
-    public static Kind Classify(AstNode owner) => owner switch
+    public static Kind Classify(AstNode owner, ModuleNode? module = null) => owner switch
     {
-        FunctionNode f => ClassifyCallable(f.Output, f.IsAsync, f),
-        MethodNode m => ClassifyCallable(m.Output, m.IsAsync, m),
-        OperatorOverloadNode op => ClassifyCallable(op.Output, isAsync: false, op),
+        FunctionNode f => ClassifyCallable(f.Output, f.IsAsync, f, module),
+        MethodNode m => ClassifyCallable(m.Output, m.IsAsync, m, module),
+        OperatorOverloadNode op => ClassifyCallable(op.Output, isAsync: false, op, module),
         ConstructorNode => Kind.Constructor,
         PropertyAccessorNode accessor => ClassifyAccessor(accessor),
         EventDefinitionNode => Kind.EventAccessor,
@@ -99,14 +99,37 @@ public static class ReturnShape
     public static bool IsVoidType(string typeName)
         => typeName.Trim().Equals("void", StringComparison.OrdinalIgnoreCase);
 
-    private static Kind ClassifyCallable(OutputNode? output, bool isAsync, AstNode owner)
+    public static (string CallableType, string BodyType) GetAsyncReturnTypes(
+        string declaredType, bool isAsync, ModuleNode? module,
+        IEnumerable<string>? typeParameterNames = null)
+    {
+        if (!isAsync)
+            return (declaredType, declaredType);
+        var surface = Parsing.AttributeHelper.ToSurfaceSpelling(declaredType);
+        var open = surface.IndexOf('<');
+        var carrierName = open < 0 ? surface : surface[..open];
+        if (typeParameterNames?.Contains(carrierName, StringComparer.Ordinal) != true
+            && Parsing.AttributeHelper.TryGetAsyncResultType(declaredType, module, out var result))
+            return (declaredType, result);
+        return IsVoidType(Parsing.AttributeHelper.ToSurfaceSpelling(declaredType))
+            ? ("global::System.Threading.Tasks.Task", "void")
+            : ($"global::System.Threading.Tasks.Task<{declaredType}>", declaredType);
+    }
+
+    private static Kind ClassifyCallable(OutputNode? output, bool isAsync, AstNode owner, ModuleNode? module)
     {
         if (IsIterator(owner))
         {
             return Kind.Iterator;
         }
 
-        if (!DeclaresValueOutput(output))
+        var typeParameters = owner switch
+        {
+            FunctionNode function => function.TypeParameters.Select(parameter => parameter.Name),
+            MethodNode method => method.TypeParameters.Select(parameter => parameter.Name),
+            _ => []
+        };
+        if (IsVoidType(GetAsyncReturnTypes(output?.TypeName ?? "void", isAsync, module, typeParameters).BodyType))
         {
             return isAsync ? Kind.AsyncVoid : Kind.Void;
         }

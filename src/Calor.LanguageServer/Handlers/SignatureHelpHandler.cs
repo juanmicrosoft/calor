@@ -77,15 +77,15 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
             var method = FindMethodInClasses(snapshot.Ast, callContext.FunctionName);
             if (method != null)
             {
-                return Task.FromResult<SignatureHelp?>(BuildSignatureHelp(method, callContext.ArgumentIndex));
+                return Task.FromResult<SignatureHelp?>(BuildSignatureHelp(method, callContext.ArgumentIndex, snapshot.Ast));
             }
             return Task.FromResult<SignatureHelp?>(null);
         }
 
-        return Task.FromResult<SignatureHelp?>(BuildSignatureHelp(func, callContext.ArgumentIndex));
+        return Task.FromResult<SignatureHelp?>(BuildSignatureHelp(func, callContext.ArgumentIndex, snapshot.Ast));
     }
 
-    private static SignatureHelp BuildSignatureHelp(FunctionNode func, int activeParameter)
+    private static SignatureHelp BuildSignatureHelp(FunctionNode func, int activeParameter, ModuleNode module)
     {
         var parameters = func.Parameters.Select(p => new ParameterInformation
         {
@@ -99,7 +99,7 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
 
         var signature = new SignatureInformation
         {
-            Label = BuildSignatureLabel(func),
+            Label = BuildSignatureLabel(func, module),
             Documentation = new StringOrMarkupContent(new MarkupContent
             {
                 Kind = MarkupKind.Markdown,
@@ -148,7 +148,7 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
         };
     }
 
-    private static SignatureHelp BuildSignatureHelp(MethodNode method, int activeParameter)
+    private static SignatureHelp BuildSignatureHelp(MethodNode method, int activeParameter, ModuleNode module)
     {
         var parameters = method.Parameters.Select(p => new ParameterInformation
         {
@@ -162,7 +162,7 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
 
         var signature = new SignatureInformation
         {
-            Label = BuildSignatureLabel(method),
+            Label = BuildSignatureLabel(method, module),
             Documentation = new StringOrMarkupContent(new MarkupContent
             {
                 Kind = MarkupKind.Markdown,
@@ -180,17 +180,21 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
         };
     }
 
-    private static string BuildSignatureLabel(FunctionNode func)
+    private static string BuildSignatureLabel(FunctionNode func, ModuleNode module)
     {
         var parameters = string.Join(", ", func.Parameters.Select(p => $"{p.Name}: {p.TypeName}"));
-        var returnType = func.Output?.TypeName ?? "void";
+        var returnType = Compiler.Analysis.ReturnShape.GetAsyncReturnTypes(
+            func.Output?.TypeName ?? "void", func.IsAsync, module,
+            func.TypeParameters.Select(parameter => parameter.Name)).CallableType;
         return $"{func.Name}({parameters}) -> {returnType}";
     }
 
-    private static string BuildSignatureLabel(MethodNode method)
+    private static string BuildSignatureLabel(MethodNode method, ModuleNode module)
     {
         var parameters = string.Join(", ", method.Parameters.Select(p => $"{p.Name}: {p.TypeName}"));
-        var returnType = method.Output?.TypeName ?? "void";
+        var returnType = Compiler.Analysis.ReturnShape.GetAsyncReturnTypes(
+            method.Output?.TypeName ?? "void", method.IsAsync, module,
+            method.TypeParameters.Select(parameter => parameter.Name)).CallableType;
         return $"{method.Name}({parameters}) -> {returnType}";
     }
 

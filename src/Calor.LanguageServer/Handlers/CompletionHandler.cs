@@ -268,7 +268,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
             foreach (var func in ast.Functions)
             {
                 if (func.Visibility != Visibility.Private)
-                    yield return (doc, func.Name, "function", func.Output?.TypeName ?? "void");
+                    yield return (doc, func.Name, "function", CallableReturnType(func, ast));
             }
             foreach (var cls in ast.Classes)
                 yield return (doc, cls.Name, "class", null);
@@ -388,7 +388,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
         {
             Label = f.Name,
             Kind = CompletionItemKind.Function,
-            Detail = $"({string.Join(", ", f.Parameters.Select(p => p.TypeName))}) -> {f.Output?.TypeName ?? "void"}",
+            Detail = $"({string.Join(", ", f.Parameters.Select(p => p.TypeName))}) -> {CallableReturnType(f, ast)}",
             InsertText = f.Name
         }));
 
@@ -842,7 +842,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                 var method = current.Methods.FirstOrDefault(
                     candidate => candidate.Name == memberName);
                 if (method != null)
-                    return method.Output?.TypeName;
+                    return CallableReturnType(method, ast, current);
             }
             else
             {
@@ -1081,7 +1081,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
         // Search for standalone functions
         var func = ast.Functions.FirstOrDefault(f => f.Name == methodName);
         if (func != null)
-            return func.Output?.TypeName;
+            return CallableReturnType(func, ast);
 
         // Search for methods in the containing class
         var containingMethod = FindContainingMethod(ast, offset);
@@ -1090,11 +1090,22 @@ public sealed class CompletionHandler : CompletionHandlerBase
             var (cls, _) = containingMethod.Value;
             var method = cls.Methods.FirstOrDefault(m => m.Name == methodName);
             if (method != null)
-                return method.Output?.TypeName;
+                return CallableReturnType(method, ast, cls);
         }
 
         return null;
     }
+
+    private static string CallableReturnType(FunctionNode function, ModuleNode module)
+        => Compiler.Analysis.ReturnShape.GetAsyncReturnTypes(
+            function.Output?.TypeName ?? "void", function.IsAsync, module,
+            function.TypeParameters.Select(parameter => parameter.Name)).CallableType;
+
+    private static string CallableReturnType(MethodNode method, ModuleNode module, ClassDefinitionNode? declaringClass = null)
+        => Compiler.Analysis.ReturnShape.GetAsyncReturnTypes(
+            method.Output?.TypeName ?? "void", method.IsAsync, module,
+            method.TypeParameters.Concat(declaringClass?.TypeParameters ?? [])
+                .Select(parameter => parameter.Name)).CallableType;
 
     private static IEnumerable<CompletionItem> GetMembersForType(
         string typeName,
@@ -1133,7 +1144,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
             var ext = ast.EnumExtensions.FirstOrDefault(e => e.EnumName == baseTypeName);
             if (ext != null)
             {
-                items.AddRange(GetExtensionMethods(ext));
+                items.AddRange(GetExtensionMethods(ext, ast));
             }
             return items;
         }
@@ -1253,7 +1264,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
             {
                 Label = method.Name,
                 Kind = CompletionItemKind.Method,
-                Detail = $"{inheritedPrefix}(method) {method.Name}({paramList}): {method.Output?.TypeName ?? "void"}",
+                Detail = $"{inheritedPrefix}(method) {method.Name}({paramList}): {CallableReturnType(method, ast, cls)}",
                 InsertText = method.Name
             });
         }
@@ -1339,7 +1350,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
         return items;
     }
 
-    private static IEnumerable<CompletionItem> GetExtensionMethods(EnumExtensionNode ext)
+    private static IEnumerable<CompletionItem> GetExtensionMethods(EnumExtensionNode ext, ModuleNode ast)
     {
         var items = new List<CompletionItem>();
 
@@ -1350,7 +1361,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
             {
                 Label = method.Name,
                 Kind = CompletionItemKind.Method,
-                Detail = $"(extension) {method.Name}({paramList}): {method.Output?.TypeName ?? "void"}",
+                Detail = $"(extension) {method.Name}({paramList}): {CallableReturnType(method, ast)}",
                 InsertText = method.Name
             });
         }
