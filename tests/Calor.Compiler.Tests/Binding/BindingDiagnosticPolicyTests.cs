@@ -8,14 +8,23 @@ namespace Calor.Compiler.Tests;
 
 public class BindingDiagnosticPolicyTests
 {
-    public static IEnumerable<object[]> NullableBoundaries() => BindingReceivingCases.NullableBoundaries();
+    public static IEnumerable<object[]> NullableBoundaries()
+    {
+        // Keep native copies of the shared cases while other legacy consumers migrate separately.
+        yield return [DiagnosticCode.NullableToNonNullableBinding, BindingReceivingBoundary.Initializer,
+            "let string:x = System.Environment.GetEnvironmentVariable(\"CALOR_ROUTING_UNSET\")", "void"];
+        yield return [DiagnosticCode.NullableReturnFromNonNullable, BindingReceivingBoundary.NativeReturn,
+            "return System.Environment.GetEnvironmentVariable(\"CALOR_ROUTING_UNSET\")", "string"];
+        yield return [DiagnosticCode.NullableArgumentToNonNullableParameter, BindingReceivingBoundary.MethodArgument,
+            "return System.Int32.Parse(System.Environment.GetEnvironmentVariable(\"CALOR_ROUTING_UNSET\"))", "int"];
+    }
 
     [Theory]
     [MemberData(nameof(NullableBoundaries))]
     public void ScalarNullableErrors_ActivateAcrossCompilerModes(
         string code, BindingReceivingBoundary boundary, string body, string returnType)
     {
-        var source = $"§M{{Routing}}\n  §F{{Probe:pub}} () -> {returnType}\n    §E{{env}}\n    {body}\n";
+        var source = $"module Routing\n  func Probe () → {returnType}\n    ! env\n    {body}\n";
         var bag = Bind(source);
         var diagnostic = Assert.Single(bag.Errors);
         Assert.Equal(code, diagnostic.Code);
@@ -89,8 +98,8 @@ public class BindingDiagnosticPolicyTests
     public void SharedApiContext_DoesNotReuseSuccessOrTurnEarlyTypingIntoBinderOwnership()
     {
         using var context = new CompilationContext { SharedEffectResolver = new Effects.EffectResolver() };
-        const string safe = "§M{Routing}\n  §F{Probe:pub} () -> str\n    §R \"safe\"\n";
-        var duplicate = safe + "  §F{Probe:pub} () -> str\n    §R \"safe\"\n";
+        const string safe = "module Routing\n  func Probe () → string\n    return \"safe\"\n";
+        var duplicate = safe + "  func Probe () → string\n    return \"safe\"\n";
         foreach (var source in new[] { safe, duplicate, safe })
         {
             var ordinary = Program.Compile(source, "routing.calr");
@@ -101,7 +110,7 @@ public class BindingDiagnosticPolicyTests
         }
         // Scalar nullable-to-nonnullable assignment is owned by the binder
         // even when the optional type checker is enabled.
-        const string early = "§M{Routing}\n  §F{Probe:pub} () -> void\n    §B{x:?str} null\n    §B{y:str} x\n";
+        const string early = "module Routing\n  func Probe () → void\n    let string?:x = null\n    let string:y = x\n";
         var rejected = Program.Compile(early, "routing.calr", new CompilationOptions { Context = context });
         var active = Assert.Single(rejected.Diagnostics);
         Assert.Equal(DiagnosticCode.NullableToNonNullableBinding, active.Code);
@@ -122,14 +131,14 @@ public class BindingDiagnosticPolicyTests
         var bag = new DiagnosticBag();
         var span = new TextSpan(0, 1, 1, 1);
         bag.ReportError(span, DiagnosticCode.UndefinedReference, "before binding");
-        Bind("§M{Routing}\n  §F{Probe:pub} () -> i32\n    §R absent\n", bag);
+        Bind("module Routing\n  func Probe () → int\n    return absent\n", bag);
         bag.ReportError(span, DiagnosticCode.UndefinedReference, "after binding");
         Assert.Null(bag.First().BindingContext);
         Assert.Null(bag.Last().BindingContext);
         Assert.NotNull(bag.ElementAt(1).BindingContext);
         Assert.True(bag.HasErrors);
 
-        var duplicates = Bind("§M{Routing}\n  §F{Probe:pub} (i32:x,i32:x) -> i32\n    §R x\n");
+        var duplicates = Bind("module Routing\n  func Probe (int:x,int:x) → int\n    return x\n");
         Assert.Contains(duplicates.DiagnosticsWithFixes, d => d.BindingContext is not null);
         Assert.All(duplicates.Errors, d => Assert.True(BindingDiagnosticPolicy.IsCompilationError(d)));
     }
@@ -137,7 +146,7 @@ public class BindingDiagnosticPolicyTests
     [Fact]
     public void ActiveErrors_PropagateOnce_WithoutChangingTheirSpanSeverityOrMessage()
     {
-        var bag = Bind("§M{Routing}\n  §F{Probe:pub} () -> i32\n    §R 1\n  §F{Probe:pub} () -> i32\n    §R 2\n");
+        var bag = Bind("module Routing\n  func Probe () → int\n    return 1\n  func Probe () → int\n    return 2\n");
         var original = Assert.Single(bag.Errors);
         Assert.Equal(DiagnosticCode.DuplicateFunctionSignature, original.Code);
         foreach (var rule in BindingDiagnosticPolicy.Catalog.Values.Where(rule =>
@@ -152,6 +161,7 @@ public class BindingDiagnosticPolicyTests
 
     private static DiagnosticBag Bind(string source, DiagnosticBag? diagnostics = null)
     {
+        Assert.StartsWith("module ", source);
         diagnostics ??= new DiagnosticBag();
         var parse = new DiagnosticBag();
         var module = new Parser(new Lexer(source, parse).TokenizeAllForParser(), parse).Parse();
