@@ -13,6 +13,7 @@ import time
 from threading import Lock
 import unittest
 from unittest.mock import patch
+import uuid
 
 
 HERE = Path(__file__).resolve().parent
@@ -124,7 +125,7 @@ EFFECT_LIMITS = ("Limits: finite non-null strings and owned IO, deterministic re
 def control_failure(error, *, allow_timeout=False):
     output = str(error)
     wrappers = list(re.finditer(r"Verifier command exited\b", output))
-    explicit_timeout = re.search(r"Verifier timeout after (?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?s: \S+", output)
+    explicit_timeout = re.search(r"^Effects candidate execution timeout after 5s\.$", output, re.MULTILINE)
     if (INFRASTRUCTURE.search(output)
         or re.search(r"\bdeadline\b", output, re.IGNORECASE)
         or any(not re.match(r"Verifier command exited 1:\n", output[wrapper.start():]) for wrapper in wrappers)
@@ -134,7 +135,7 @@ def control_failure(error, *, allow_timeout=False):
         raise error
     if allow_timeout and not explicit_timeout:
         raise error
-    if not re.match(r"Verifier command exited 1:\n", output) and not (allow_timeout and explicit_timeout):
+    if not re.match(r"Verifier command exited 1:\n", output):
         raise error
     return output
 
@@ -155,6 +156,21 @@ def assert_compiler_identity(test, output, environment):
     expected = f"Selected compiler: {root / 'src/Calor.Compiler/bin' / configuration / 'net10.0/calor.dll'}"
     test.assertEqual([line for line in output.splitlines() if re.search(r"selected\s+compiler\s*:", line, re.IGNORECASE)],
                      [expected], output)
+    return expected
+
+
+def assert_execution_phase(test, output, environment, *, timed_out=False):
+    selected = assert_compiler_identity(test, output, environment)
+    entered = ("Effects candidate execution entered: eff005 FetchUrl; "
+               f"compiler={selected.removeprefix('Selected compiler: ')}; "
+               f"token={environment['CALOR_EFFECTS_EXECUTION_TOKEN']}")
+    test.assertEqual([line for line in output.splitlines() if "Effects candidate execution entered:" in line],
+                     [entered], output)
+    if timed_out:
+        test.assertEqual(sorted(line for line in output.splitlines() if line), sorted([
+            "Verifier command exited 1:", "Verification failed: Verifier command exited 1:",
+            selected, entered, "Effects candidate execution timeout after 5s.",
+        ]), output)
 
 
 def historical_syntax(text):
@@ -308,7 +324,15 @@ class EffectsVerifierTests(unittest.TestCase):
                 (workspace / "Effects.calr").write_text(text, encoding="utf-8")
             environment = dict(os.environ, CALOR_COMPILER_ROOT=str(COMPILER_ROOT))
             environment.pop("CALOR_LOGIC_TIMEOUT_SECONDS", None)
+            environment.pop("CALOR_EFFECTS_EXECUTION_TIMEOUT_SECONDS", None)
+            environment.pop("CALOR_EFFECTS_EXECUTION_TOKEN", None)
             environment.update(env or {})
+            if allow_timeout:
+                environment.setdefault("CALOR_EFFECTS_EXECUTION_TIMEOUT_SECONDS", "5")
+            if "CALOR_EFFECTS_EXECUTION_TIMEOUT_SECONDS" in environment:
+                if profile != "eff005" or environment["CALOR_EFFECTS_EXECUTION_TIMEOUT_SECONDS"] != "5":
+                    raise ValueError("Only the five-second FetchUrl execution-phase control is supported.")
+                environment["CALOR_EFFECTS_EXECUTION_TOKEN"] = uuid.uuid4().hex
             command = [str(HERE / "tasks/effects-system" / TASKS[profile][0] / "verify.sh"), str(workspace)]
             deadline = min(deadline or time.monotonic() + 120, time.monotonic() + 120)
             budget = float(environment.get("CALOR_LOGIC_TIMEOUT_SECONDS", "120"))
@@ -326,10 +350,7 @@ class EffectsVerifierTests(unittest.TestCase):
             except RuntimeError as error:
                 output = control_failure(error, allow_timeout=allow_timeout)
                 if allow_timeout:
-                    # The helper prints this only after its selected-arm build.
-                    # A bootstrap timeout has no identity and cannot prove that
-                    # the infinite candidate's runtime process was supervised.
-                    assert_compiler_identity(self, output, environment)
+                    assert_execution_phase(self, output, environment, timed_out=True)
                 passed = False
             self.assertEqual(passed, expected, output)
             if expected:
@@ -337,6 +358,8 @@ class EffectsVerifierTests(unittest.TestCase):
                 self.assertIn(f"Verification passed: {TASKS[profile][1]}; original declared effects, native/CLR signatures, "
                               f"{COUNTS[profile]} runtime cases and BCL output/state coupling.", output)
                 self.assertIn("process supervision, not a sandbox", output)
+                if "CALOR_EFFECTS_EXECUTION_TIMEOUT_SECONDS" in environment:
+                    assert_execution_phase(self, output, environment)
             if detail:
                 self.assertIn(detail, output)
             with type(self).count_lock:
@@ -393,10 +416,6 @@ class EffectsVerifierTests(unittest.TestCase):
         try:
             for error in errors:
                 for opted_in in (False, True):
-                    # The explicit ordinary verifier timeout is the only allowed
-                    # opt-in; UNKNOWN, solver/OS and cleanup/EOF still raise.
-                    if opted_in and error == outer + "Verification failed: Verifier timeout after 2s: dotnet":
-                        continue
                     with self.subTest(error=error, opted_in=opted_in), patch.object(
                         ENGINE, "run", side_effect=RuntimeError(error)
                     ):
@@ -407,15 +426,27 @@ class EffectsVerifierTests(unittest.TestCase):
                            outer + "Verification failed: " + outer + "Verification failed: Wrong output"):
                 with patch.object(ENGINE, "run", side_effect=RuntimeError(output)):
                     self.verify("eff005", source("eff005"), False, detail="Wrong output")
-            for output in (identity + "Verifier timeout after 2s: dotnet",
-                           outer + "Verification failed: Verifier timeout after 2s: dotnet\n" + identity):
-                with patch.object(ENGINE, "run", side_effect=RuntimeError(output)):
-                    self.verify("eff005", source("eff005"), False, detail="timeout", allow_timeout=True)
-            for output in ("Verifier timeout after 2s: dotnet",
-                           outer + "Verification failed: Verifier timeout after 2s: dotnet"):
-                with patch.object(ENGINE, "run", side_effect=RuntimeError(output)):
-                    with self.assertRaises(AssertionError):
+            for mode in ("valid", "missing entry", "wrong token", "duplicate entry", "extra diagnostic"):
+                def runtime_timeout(command, cwd, deadline, env):
+                    entered = (f"Effects candidate execution entered: eff005 FetchUrl; compiler={selected}; "
+                               f"token={env['CALOR_EFFECTS_EXECUTION_TOKEN']}\n")
+                    if mode == "missing entry":
+                        entered = ""
+                    elif mode == "wrong token":
+                        entered = entered.replace(env["CALOR_EFFECTS_EXECUTION_TOKEN"], "wrong")
+                    elif mode == "duplicate entry":
+                        entered += entered
+                    output = (outer + identity + "\nVerification failed: " + outer + entered
+                              + "Effects candidate execution timeout after 5s.\n")
+                    if mode == "extra diagnostic":
+                        output += "unclassified failure\n"
+                    raise RuntimeError(output)
+                with patch.object(ENGINE, "run", side_effect=runtime_timeout):
+                    if mode == "valid":
                         self.verify("eff005", source("eff005"), False, detail="timeout", allow_timeout=True)
+                    else:
+                        with self.assertRaises(AssertionError):
+                            self.verify("eff005", source("eff005"), False, detail="timeout", allow_timeout=True)
             with self.assertRaises(ValueError):
                 self.verify("eff005", source("eff005"), False, allow_timeout=True)
             with patch.object(ENGINE, "run", side_effect=OSError("launch failed")):
@@ -556,7 +587,7 @@ class EffectsVerifierTests(unittest.TestCase):
             self.assert_bootstrap_deadline_refusal()
         with self.subTest(probe="5s infinite candidate"):
             self.verify("eff005", source("eff005", body='§WH true\n  §CN\n§R ""'), False,
-                        env={"CALOR_LOGIC_TIMEOUT_SECONDS": "5"}, detail="timeout", allow_timeout=True)
+                        env={"CALOR_EFFECTS_EXECUTION_TIMEOUT_SECONDS": "5"}, detail="timeout", allow_timeout=True)
         self.verify("eff005", source("eff005"), False, env={"CALOR_COMPILER_CONFIGURATION": "../Debug"},
                     detail="CALOR_COMPILER_CONFIGURATION")
         self.verify("eff002", source("eff002", body="§R §C{System.Console.ReadLine} §/C"), False,

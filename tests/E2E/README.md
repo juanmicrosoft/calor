@@ -1913,10 +1913,20 @@ wrappers. Abnormal statuses, malformed wrappers, solver UNKNOWN/timeouts,
 OS launch errors, process/EOF/cleanup/global-deadline failures and success
 markers in failure output propagate rather than satisfy a finite negative.
 Only the explicitly opted-in five-second infinite-candidate probe accepts an
-ordinary `Verifier timeout after ...s:` refusal, and only with exact selected
-compiler identity proving that the selected-arm helper build completed.
-A helper-build timeout without that identity fails; never solver, OS, cleanup,
-EOF or global-deadline contamination. The unchanged 0.001-second probe instead
+`Effects candidate execution timeout after 5s.` refusal. Its fresh helper build
+and native/generated compilation retain the original 120-second outer budget.
+`CALOR_EFFECTS_EXECUTION_TIMEOUT_SECONDS=5` starts a monotonic watchdog from an
+interposed callback at the instrumented candidate body's first statement, not
+from bootstrap or compilation. Each invocation disarms it before output/state
+oracles and cleanup. An unpredictable per-entry token and exact selected
+compiler identity must accompany the entry marker; the loaded compiler image
+must byte-match that selected image. The watchdog exits only its own helper
+with status 1. Its owned IO directory lives inside the disposable helper project
+so the existing outer supervisor removes it even when the watchdog exits.
+Only the two exact exit-1 wrappers, one complete selected identity, the matching
+entry marker and the five-second refusal are admitted (empty separators are
+allowed). Generic verifier/solver/OS/cleanup/EOF/global-deadline failures are not
+execution evidence. The unchanged 0.001-second probe instead
 requires an exact bootstrap/global prerequisite refusal before admission
 counters change. It accepts only the complete exit-1 overall-deadline message
 or a complete numeric dotnet bootstrap timeout no greater than 0.001 seconds,
@@ -1977,6 +1987,17 @@ and a separate actual 0.001-second bootstrap refusal passed after the
 accounting change. No repeated heavy rerun was started under shared-host
 saturation. Full current and genuine-old/current parent matrices remain
 required after integration; the expected counts are not new passing results.
+
+The subsequent phase-budget correction adds only this opt-in test-helper
+watchdog; ordinary profiles and the shared Python supervisor are unchanged.
+The final focused run passed three tests in 43.600 seconds, with 19 actual controls:
+one phase-enabled positive, 10 finite negatives, one entered-body runtime
+timeout, six native-image refusals and one zero-credit bootstrap refusal.
+Synthetic admission mocks are separate and excluded from those real counts.
+The watchdog is opt-in and limited to active body invocations; ordinary
+profiles allocate no timer. Owned helper/IO cleanup was checked after the actual timeout.
+These supersede the earlier bootstrap-only timeout evidence, not the pending
+full parent current/strict matrices.
 
 **Limits:** this is finite process supervision, not a sandbox or universal
 proof. The interposer refuses non-owned supplied paths and unmodeled external

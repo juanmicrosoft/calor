@@ -4060,6 +4060,11 @@ static void VerifyDigitConversion(ModuleNode parsed, ModuleNode module, string g
 
 static void VerifyEffects(string profile, string path)
 {
+    var executionBudget = Environment.GetEnvironmentVariable("CALOR_EFFECTS_EXECUTION_TIMEOUT_SECONDS");
+    var executionToken = Environment.GetEnvironmentVariable("CALOR_EFFECTS_EXECUTION_TOKEN");
+    if (executionBudget != null && (executionBudget != "5" || profile != "eff005"
+        || !Guid.TryParseExact(executionToken, "N", out _)))
+        throw new InvalidOperationException("Invalid effects execution-phase control.");
     var name = profile switch
     {
         "eff001" => "SayHello", "eff002" => "ReadInput", "eff003" => "ReadFile",
@@ -4207,15 +4212,68 @@ static void VerifyEffects(string profile, string path)
             witnesses.Single(witness => witness.Call == before).Operation)));
     instrumented = instrumented.AddMembers(SyntaxFactory.ParseMemberDeclaration(EffectsTaskProbe.Source)
         ?? throw new InvalidOperationException("Cannot parse effects instrumentation."));
+    if (executionBudget != null)
+    {
+        var target = instrumented.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method =>
+            method.Identifier.ValueText == name && method.Parent is ClassDeclarationSyntax owner
+            && owner.Identifier.ValueText == $"{parsed.Name}Module");
+        if (target.Body == null)
+            throw new InvalidOperationException("Effects execution-phase body missing.");
+        instrumented = instrumented.ReplaceNode(target, target.WithBody(target.Body.WithStatements(
+            target.Body.Statements.Insert(0, SyntaxFactory.ParseStatement("global::EffectsTaskProbe.EnterExecution();\n")))));
+        var instrumentation = instrumented.Members.OfType<ClassDeclarationSyntax>()
+            .Single(type => type.Identifier.ValueText == "EffectsTaskProbe");
+        instrumented = instrumented.ReplaceNode(instrumentation, instrumentation.AddMembers(
+            SyntaxFactory.ParseMemberDeclaration("public static global::System.Action EnterExecution = () => { };")
+                ?? throw new InvalidOperationException("Effects execution-phase callback missing.")));
+    }
     var instrumentedAssembly = CompileRuntime(instrumented.ToFullString()).Assembly;
     var instrumentedMethod = Method(instrumentedAssembly);
     var probe = instrumentedAssembly.GetType("EffectsTaskProbe")
         ?? throw new InvalidOperationException("Effects probe missing.");
     var reset = probe.GetMethod("Reset") ?? throw new InvalidOperationException("Effects reset missing.");
     var events = probe.GetField("Events") ?? throw new InvalidOperationException("Effects events missing.");
+    var phaseOutput = Console.Error;
+    var activeExecution = 0;
+    long executionStarted = 0;
+    using var executionTimer = executionBudget == null ? null : new System.Threading.Timer(_ =>
+    {
+        if (Volatile.Read(ref activeExecution) == 0
+            || System.Diagnostics.Stopwatch.GetElapsedTime(Volatile.Read(ref executionStarted)) < TimeSpan.FromSeconds(5))
+            return;
+        phaseOutput.WriteLine("Effects candidate execution timeout after 5s.");
+        phaseOutput.Flush();
+        Environment.Exit(1);
+    }, null, System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+    var entered = 0;
+    if (executionTimer != null)
+    {
+        var selectedCompiler = Path.Combine(Path.GetFullPath(Environment.GetEnvironmentVariable("CALOR_COMPILER_ROOT")
+            ?? throw new InvalidOperationException("Effects execution-phase compiler root missing.")),
+            "src", "Calor.Compiler", "bin", Environment.GetEnvironmentVariable("CALOR_COMPILER_CONFIGURATION") ?? "Debug",
+            "net10.0", "calor.dll");
+        if (!File.ReadAllBytes(selectedCompiler).SequenceEqual(File.ReadAllBytes(typeof(Calor.Compiler.Program).Assembly.Location)))
+            throw new InvalidOperationException("Effects execution-phase loaded compiler differs from selected image.");
+        var callback = probe.GetField("EnterExecution")
+            ?? throw new InvalidOperationException("Effects execution-phase callback missing.");
+        callback.SetValue(null, (Action)(() =>
+        {
+            if (Interlocked.Exchange(ref entered, 1) == 0)
+            {
+                phaseOutput.WriteLine($"Effects candidate execution entered: {profile} {name}; compiler={selectedCompiler}; token={executionToken}");
+                phaseOutput.Flush();
+            }
+            Volatile.Write(ref executionStarted, System.Diagnostics.Stopwatch.GetTimestamp());
+            Volatile.Write(ref activeExecution, 1);
+            executionTimer.Change(TimeSpan.FromSeconds(5), System.Threading.Timeout.InfiniteTimeSpan);
+        }));
+    }
     string[] values = ["", "alpha", "BETA", " \t ", "line\nbreak", "\r\n", "caf\u00e9", "\u4e2d\ud83d\ude00"];
     string[] lines = ["", "alpha", "BETA", " \t ", "caf\u00e9", "\u4e2d\ud83d\ude00"];
-    var directory = Directory.CreateTempSubdirectory("calor-effects-owned-");
+    // The watchdog may end this process before finally; its supervisor owns
+    // and removes the entire disposable helper project in phase-control mode.
+    var directory = executionBudget == null ? Directory.CreateTempSubdirectory("calor-effects-owned-")
+        : Directory.CreateDirectory(Path.Combine(Environment.CurrentDirectory, $"effects-owned-{Guid.NewGuid():N}"));
     try
     {
         var paths = new[] { Path.Combine(directory.FullName, "first \u00e9.txt"), Path.Combine(directory.FullName, "second \u4e2d.txt") };
@@ -4257,6 +4315,11 @@ static void VerifyEffects(string profile, string path)
             }
             finally
             {
+                if (executionTimer != null)
+                {
+                    Volatile.Write(ref activeExecution, 0);
+                    executionTimer.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+                }
                 Console.SetIn(previousIn);
                 Console.SetOut(previousOut);
                 Console.SetError(previousError);
