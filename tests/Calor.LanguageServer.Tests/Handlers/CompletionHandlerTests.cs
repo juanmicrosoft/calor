@@ -817,6 +817,89 @@ public class CompletionHandlerTests
         Assert.Equal(recognized, completions.Any(item => item.Label == member));
     }
 
+    [Theory]
+    [InlineData("string", true)]
+    [InlineData("String", false)]
+    [InlineData("System.String", true)]
+    [InlineData("System.Array", true)]
+    [InlineData("Array", true)]
+    [InlineData("str", false)]
+    [InlineData("STRING", false)]
+    [InlineData("ARRAY", false)]
+    [InlineData("array", false)]
+    public void CanonicalCompletion_StringAndArrayNamesAreExact(string type, bool recognized)
+    {
+        var header = $$"""
+            module NativeMemberNames
+              func Test private ({{type}}:items) → int
+            """;
+        if (recognized)
+            AssertNativeSource(header + "\n    return 0");
+
+        var completions = LspTestHarness.GetCompletions(header + "\n    return items.", "items.");
+        Assert.Equal(recognized, completions.Any(item => item.Label == "Length"));
+    }
+
+    [Theory]
+    [InlineData("System.Collections.Generic.Dictionary<string,Payload>", "items[\"key\"].", true)]
+    [InlineData("System.Collections.Generic.List<Payload>", "items[0].", true)]
+    [InlineData("Payload[]", "items[0].", true)]
+    [InlineData("Dict<string,Payload>", "items[\"key\"].", false)]
+    [InlineData("DICT<string,Payload>", "items[\"key\"].", false)]
+    [InlineData("dict<string,Payload>", "items[\"key\"].", false)]
+    [InlineData("System.Collections.Generic.List<Payload,string>", "items[0].", false)]
+    [InlineData("System.Collections.Generic.Dictionary<string,Payload,string>", "items[\"key\"].", false)]
+    [InlineData("System.Array<Payload>", "items[0].", false)]
+    public void CanonicalCompletion_IndexChainsUseActualCSharpCollectionNames(
+        string type, string expression, bool recognized)
+    {
+        var header = $$"""
+            module IndexedMembers
+              class Payload
+                field int:Marker private
+              func Test private ({{type}}:items) → int
+            """;
+        if (recognized)
+            AssertNativeSource(header + "\n    return 0");
+
+        var completions = LspTestHarness.GetCompletions(header + "\n    return " + expression, expression);
+        Assert.Equal(recognized, completions.Any(item => item.Label == "Marker"));
+    }
+
+    [Theory]
+    [InlineData("Array", "Array", "items.Clone().")]
+    [InlineData("List<T>", "List<string>", "items[0].")]
+    [InlineData("Dictionary<K,V>", "Dictionary<string,string>", "items[\"key\"].")]
+    public void CanonicalCompletion_UserTypesDoNotBorrowBclMembers(
+        string declaration, string type, string expression)
+    {
+        var header = $$"""
+            module ShadowedMembers
+              class {{declaration}}
+                field int:Marker private
+              func Test private ({{type}}:items) → int
+            """;
+        AssertNativeSource(header + "\n    return 0");
+        var declared = LspTestHarness.GetCompletions(header + "\n    return items.", "items.");
+        Assert.Contains(declared, item => item.Label == "Marker");
+
+        var unresolved = LspTestHarness.GetCompletions(header + "\n    return " + expression, expression);
+        Assert.Empty(unresolved);
+    }
+
+    [Fact]
+    public void CanonicalCompletion_UnresolvedChainDoesNotReuseItsReceiverType()
+    {
+        const string header = """
+            module UnresolvedMembers
+              func Test private (string:items) → int
+            """;
+        AssertNativeSource(header + "\n    return 0");
+        var completions = LspTestHarness.GetCompletions(
+            header + "\n    return items.DoesNotExist().", "items.DoesNotExist().");
+        Assert.Empty(completions);
+    }
+
     // NOTE: Index access completion (e.g., list[0].) requires proper extraction
     // of the expression before the dot and type resolution of generic parameters.
     // These tests verify the implementation works correctly.

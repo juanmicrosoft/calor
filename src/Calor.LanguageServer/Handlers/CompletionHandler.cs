@@ -454,8 +454,8 @@ public sealed class CompletionHandler : CompletionHandlerBase
         int offset,
         WorkspaceIndexSnapshot workspace)
     {
-        // Handle chained expressions like "a.b.c"
-        if (expression.Contains('.'))
+        // Index access also needs receiver/element resolution without a preceding dot.
+        if (expression.Contains('.') || expression.Contains('['))
         {
             return ResolveChainedExpressionType(expression, ast, offset, workspace);
         }
@@ -583,7 +583,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
         // Handle index access on first part
         if (parts[0].IsIndexAccess && currentType != null)
         {
-            currentType = ResolveIndexAccessType(currentType);
+            currentType = ResolveIndexAccessType(currentType, ast, workspace);
         }
 
         // Resolve each subsequent part
@@ -596,14 +596,14 @@ public sealed class CompletionHandler : CompletionHandlerBase
             var nextType = ResolveMemberType(currentType, part.Name.TrimStart('@'), part.IsMethodCall, ast, workspace);
 
             if (nextType == null)
-                return currentType; // Return what we have so far
+                return null;
 
             currentType = nextType;
 
             // Handle index access on this part
             if (part.IsIndexAccess && currentType != null)
             {
-                currentType = ResolveIndexAccessType(currentType);
+                currentType = ResolveIndexAccessType(currentType, ast, workspace);
             }
         }
 
@@ -614,14 +614,19 @@ public sealed class CompletionHandler : CompletionHandlerBase
     /// Resolves the element type when accessing a collection by index.
     /// For List&lt;Person&gt;[0], returns Person.
     /// </summary>
-    private static string? ResolveIndexAccessType(string collectionType)
+    private static string? ResolveIndexAccessType(
+        string collectionType, ModuleNode ast, WorkspaceIndexSnapshot workspace)
     {
         var (baseType, typeArgs) = ParseGenericType(collectionType);
+        // A source declaration with a BCL name does not prove a BCL indexer.
+        if (FindClassByName(baseType, ast, workspace) != null
+            || FindInterfaceByName(baseType, ast, workspace) != null)
+            return null;
 
         // Handle generic collections
-        if (baseType is "List" or "System.Collections.Generic.List" or "Array" or "System.Array")
+        if (baseType is "List" or "System.Collections.Generic.List")
         {
-            return typeArgs.Count > 0 ? typeArgs[0] : "object";
+            return typeArgs.Count == 1 ? typeArgs[0] : null;
         }
 
         // Handle array syntax: Person[]
@@ -631,13 +636,13 @@ public sealed class CompletionHandler : CompletionHandlerBase
         }
 
         // Handle dictionaries - index access returns value type
-        if (baseType is "Dict" or "DICT" or "dict")
+        if (baseType is "Dictionary" or "System.Collections.Generic.Dictionary")
         {
-            return typeArgs.Count > 1 ? typeArgs[1] : "object";
+            return typeArgs.Count == 2 ? typeArgs[1] : null;
         }
 
         // Handle strings - index access returns char
-        if (baseType is "str" or "STRING" or "string")
+        if (baseType is "string" or "System.String")
         {
             return "char";
         }
@@ -725,22 +730,20 @@ public sealed class CompletionHandler : CompletionHandlerBase
         var cls = FindClassByName(baseTypeName, ast, workspace);
         if (cls != null)
         {
-            var result = ResolveMemberTypeInClassHierarchy(cls, memberName, isMethodCall, ast, workspace);
-            if (result != null)
-                return result;
+            return ResolveMemberTypeInClassHierarchy(cls, memberName, isMethodCall, ast, workspace);
         }
 
         // Check interfaces
         var iface = FindInterfaceByName(baseTypeName, ast, workspace);
-        if (iface != null && isMethodCall)
+        if (iface != null)
         {
-            var method = iface.Methods.FirstOrDefault(m => m.Name == memberName);
-            if (method != null)
-                return method.Output?.TypeName;
+            return isMethodCall
+                ? iface.Methods.FirstOrDefault(m => m.Name == memberName)?.Output?.TypeName
+                : null;
         }
 
         // Handle built-in types
-        if (baseTypeName is "str" or "STRING" or "string")
+        if (baseTypeName is "string" or "System.String")
         {
             return ResolveBuiltInStringMember(memberName, isMethodCall);
         }
@@ -755,7 +758,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
             return ResolveBuiltInDictMember(typeName, memberName, isMethodCall, typeArgs);
         }
 
-        if (baseTypeName is "Array" or "ARRAY" or "array" ||
+        if (baseTypeName is "Array" or "System.Array" ||
             typeName.EndsWith("[]"))
         {
             return ResolveBuiltInArrayMember(typeName, memberName, isMethodCall, typeArgs);
@@ -1116,7 +1119,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
         }
 
         // Built-in string methods
-        if (baseTypeName is "str" or "STRING" or "string")
+        if (baseTypeName is "string" or "System.String")
         {
             items.AddRange(GetStringMembers());
         }
@@ -1132,7 +1135,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
             items.AddRange(GetDictMembers());
         }
 
-        if (baseTypeName is "Array" or "ARRAY" || typeName.EndsWith("[]"))
+        if (baseTypeName is "Array" or "System.Array" || typeName.EndsWith("[]"))
         {
             items.AddRange(GetArrayMembers());
         }
