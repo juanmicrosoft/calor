@@ -84,6 +84,10 @@ public sealed class CallGraphAnalysis
             ComputedMemberCalls { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), IReadOnlyList<string>>
             ConstructorCalls { get; } = new();
+        internal Dictionary<(string CallerId, int Start, int End), Microsoft.CodeAnalysis.ITypeSymbol>
+            MetadataValueTypes { get; } = new();
+        internal Dictionary<(string CallerId, int Start, int End), Binding.BoundTypes.NominalBoundType>
+            MetadataMemberReceiverTypes { get; } = new();
         internal HashSet<(string CallerId, int Start, int End)> UnresolvedArgumentCalls { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), Microsoft.CodeAnalysis.IArrayTypeSymbol>
             MetadataArrayTypes { get; } = new();
@@ -112,6 +116,15 @@ public sealed class CallGraphAnalysis
 
     internal IReadOnlyList<string> ResolvedConstructorCalls(string callerId, TextSpan span) =>
         _boundValues.ConstructorCalls.GetValueOrDefault((callerId, span.Start, span.End)) ?? [];
+
+    internal Microsoft.CodeAnalysis.INamedTypeSymbol? MetadataCreationType(string callerId, TextSpan span) =>
+        MetadataValueType(callerId, span) as Microsoft.CodeAnalysis.INamedTypeSymbol;
+
+    internal Microsoft.CodeAnalysis.ITypeSymbol? MetadataValueType(string callerId, TextSpan span) =>
+        _boundValues.MetadataValueTypes.GetValueOrDefault((callerId, span.Start, span.End));
+
+    internal Binding.BoundTypes.NominalBoundType? MetadataMemberReceiverType(string callerId, TextSpan span) =>
+        _boundValues.MetadataMemberReceiverTypes.GetValueOrDefault((callerId, span.Start, span.End));
 
     internal bool HasUnresolvedCallArguments(string callerId, TextSpan span) =>
         _boundValues.UnresolvedArgumentCalls.Contains((callerId, span.Start, span.End));
@@ -819,6 +832,14 @@ public sealed class CallGraphAnalysis
 
                 foreach (var node in DescendantsAndSelf(function))
                 {
+                    if (node is BoundFieldAccessExpression
+                        { Target.Type: Binding.BoundTypes.NominalBoundType { RoslynSymbol: not null } memberReceiver })
+                        boundValues.MetadataMemberReceiverTypes.TryAdd(
+                            (callerId, node.Span.Start, node.Span.End), memberReceiver);
+                    if (node is BoundExpression
+                        { Type: Binding.BoundTypes.NominalBoundType { RoslynSymbol: { } metadataValueType } })
+                        boundValues.MetadataValueTypes.TryAdd(
+                            (callerId, node.Span.Start, node.Span.End), metadataValueType);
                     if (node is BoundExpression expressionWithMetadata
                         && expressionWithMetadata.MetadataArrayResultType is { } metadataArray)
                         boundValues.MetadataArrayTypes.TryAdd(

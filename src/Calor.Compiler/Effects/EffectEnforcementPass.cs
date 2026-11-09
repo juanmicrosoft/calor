@@ -5444,6 +5444,9 @@ public sealed class EffectEnforcementPass
 
         private string InferExpressionType(ExpressionNode expression)
         {
+            if (expression is ReferenceNode or FieldAccessNode or NewExpressionNode
+                && _context.CallGraph.MetadataValueType(_context.CurrentFunctionId, expression.Span) is { } metadataType)
+                return EffectResolver.NormalizeParameterType(metadataType.ToDisplayString());
             return expression switch
             {
                 StringLiteralNode => "String",
@@ -5617,6 +5620,15 @@ public sealed class EffectEnforcementPass
                 return (topLevel.Length > 0 ? topLevel : candidates)
                     .Aggregate(EffectSet.Empty, (effects, function) =>
                         effects.Union(MethodGroupEffects(function.Effects, function.EffectParameters.Count)));
+            }
+
+            if (_context.CallGraph.MetadataMemberReceiverType(_context.CurrentFunctionId, reference.Span) is { } metadata)
+            {
+                var resolution = _context.Resolver.Resolve(EffectResolverKey.FromBoundReceiver(
+                    metadata, member, null, EffectMemberKind.Getter));
+                return resolution.Status == EffectResolutionStatus.Unknown
+                    ? UnknownResolvedOperation($"{metadata.DisplayString}.get_{member}", reference.Span)
+                    : resolution.Effects;
             }
 
             // #1176: `this.` and `self.` resolve to the enclosing class, the same way the
@@ -6174,8 +6186,9 @@ public sealed class EffectEnforcementPass
             }
             else
             {
+                var metadataType = _context.CallGraph.MetadataCreationType(_context.CurrentFunctionId, newExpr.Span);
                 effects = effects.Union(ResolveConstructorEffects(
-                    newExpr.TypeName,
+                    metadataType?.OriginalDefinition.ToDisplayString() ?? newExpr.TypeName,
                     newExpr.Arguments,
                     newExpr.TypeNameSpan));
             }

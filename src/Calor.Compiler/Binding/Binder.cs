@@ -132,6 +132,7 @@ public sealed class Binder
     private Scope? _currentClassScope;
     private SymbolId _currentClassIdentity;
     private string? _currentNamespaceIdentity;
+    private string? _currentNamespaceScopeId;
     private bool _isStaticContext;
 
     /// <summary>#943 (D1 RO-NULL-2): the current callable's ref/out/in parameters, which may alias.</summary>
@@ -154,6 +155,10 @@ public sealed class Binder
     private readonly Dictionary<SymbolId, IReadOnlyDictionary<string, Microsoft.CodeAnalysis.ITypeParameterSymbol>>
         _metadataTypeParameterScopes = new();
     private IReadOnlyList<UsingDirectiveNode> _metadataUsings = [];
+    private IReadOnlyDictionary<string, NamespaceScopeInfo> _metadataNamespaceScopes =
+        new Dictionary<string, NamespaceScopeInfo>();
+    private readonly Dictionary<(string? Scope, string? Namespace, string Name, int Arity),
+        (bool Handled, Microsoft.CodeAnalysis.INamedTypeSymbol? Type)> _scopedMetadataTypes = new();
     private ModuleNode? _asyncTypeModule;
 
     /// <summary>
@@ -353,13 +358,87 @@ public sealed class Binder
             var metadataName = TypeIdentity.MapShortTypeNameToFullName(typeName);
             if (!metadataName.Contains('`'))
                 metadataName = (name is "Func" or "Action" ? $"System.{name}" : name) + $"`{arguments.Count}";
-            var definition = context.TryResolveType(metadataName);
+            var scoped = ResolveScopedMetadataType(context, name, arguments.Count,
+                _currentNamespaceScopeId, _currentNamespaceIdentity);
+            var definition = scoped.Handled ? scoped.Type : context.TryResolveType(metadataName);
             var types = arguments.Select(argument => ResolveComputedMetadataType(context, argument)).ToArray();
             return definition is not null && definition.Arity == types.Length && types.All(type => type is not null)
                 ? definition.Construct(types.OfType<Microsoft.CodeAnalysis.ITypeSymbol>().ToArray())
                 : null;
         }
-        return ResolveBclArgumentType(context, typeName);
+        var resolved = ResolveScopedMetadataType(context, typeName, 0,
+            _currentNamespaceScopeId, _currentNamespaceIdentity);
+        return resolved.Handled ? resolved.Type : ResolveBclArgumentType(context, typeName);
+    }
+
+    private (bool Handled, Microsoft.CodeAnalysis.INamedTypeSymbol? Type) ResolveScopedMetadataType(
+        Metadata.MetadataContext context, string name, int arity, string? scopeId, string? namespaceIdentity)
+    {
+        var key = (scopeId, namespaceIdentity, name, arity);
+        if (_scopedMetadataTypes.TryGetValue(key, out var cached))
+            return cached;
+
+        var scopes = new List<NamespaceScopeInfo>();
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        for (var id = scopeId; id is not null;)
+        {
+            if (!visited.Add(id) || !_metadataNamespaceScopes.TryGetValue(id, out var scope))
+            {
+                _diagnostics.ReportInfo(TextSpan.Empty, DiagnosticCode.SignatureUnresolved,
+                    "Metadata lookup requires a valid lexical namespace scope ancestry.");
+                return _scopedMetadataTypes[key] = (true, null);
+            }
+            scopes.Add(scope);
+            id = scope.ParentScopeId;
+        }
+        scopes.Reverse();
+        var visibleScopes = scopes.Select(scope => scope.Id).ToHashSet(StringComparer.Ordinal);
+        var imports = _metadataUsings.Where(import =>
+            import.NamespaceScopeId is null || visibleScopes.Contains(import.NamespaceScopeId)).ToArray();
+        if (imports.Length == 0 && string.IsNullOrEmpty(namespaceIdentity))
+            return _scopedMetadataTypes[key] = (false, null);
+
+        var emitter = new CodeGen.CSharpEmitter();
+        var source = new System.Text.StringBuilder();
+        foreach (var import in imports.Where(import => import.NamespaceScopeId is null))
+            source.AppendLine(import.Accept(emitter));
+        var namespaceCount = 0;
+        string NamespaceSpelling(string value) =>
+            string.Join(".", value.Split('.').Select(segment => "@" + segment.TrimStart('@')));
+        foreach (var scope in scopes)
+        {
+            if (!scope.IsGlobal && scope.Name.Length > 0)
+            {
+                source.Append("namespace ").Append(NamespaceSpelling(scope.Name)).AppendLine(" {");
+                namespaceCount++;
+            }
+            foreach (var import in imports.Where(import => import.NamespaceScopeId == scope.Id))
+                source.AppendLine(import.Accept(emitter));
+        }
+        if (scopes.Count == 0 && !string.IsNullOrEmpty(namespaceIdentity))
+        {
+            source.Append("namespace ").Append(NamespaceSpelling(namespaceIdentity)).AppendLine(" {");
+            namespaceCount++;
+        }
+        var spelling = arity == 0 ? name : name + "<" + new string(',', arity - 1) + ">";
+        source.Append("class __CalorMetadataTypeLookup_").Append(Guid.NewGuid().ToString("N"))
+            .Append(" { static global::System.Type Resolve() => typeof(").Append(spelling).AppendLine("); }");
+        source.Append('}', namespaceCount);
+        var tree = CSharpSyntaxTree.ParseText(source.ToString());
+        var compilation = context.HostCompilationForBinder.AddSyntaxTrees(tree);
+        var model = compilation.GetSemanticModel(tree);
+        var syntax = tree.GetRoot().DescendantNodes().OfType<TypeOfExpressionSyntax>().Single().Type;
+        var diagnostics = model.GetDiagnostics();
+        var symbol = model.GetTypeInfo(syntax).Type;
+        if (!diagnostics.Any(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+            && symbol is Microsoft.CodeAnalysis.INamedTypeSymbol { TypeKind: not Microsoft.CodeAnalysis.TypeKind.Error } named)
+            return _scopedMetadataTypes[key] = (true, named.IsUnboundGenericType ? named.OriginalDefinition : named);
+
+        var head = name.Split('.')[0].TrimStart('@');
+        var alias = !name.StartsWith("global::", StringComparison.Ordinal)
+            && imports.Any(import => import.Alias == head);
+        var ambiguous = diagnostics.Any(diagnostic => diagnostic.Id is "CS0104" or "CS0576" or "CS1537");
+        return _scopedMetadataTypes[key] = (alias || ambiguous, null);
     }
 
     private Microsoft.CodeAnalysis.ITypeParameterSymbol? ResolveMetadataTypeParameter(
@@ -438,24 +517,14 @@ public sealed class Binder
             || receiver.Type is not BoundTypes.NominalBoundType { Declaration: null }
             || _currentMemberTypeParameters?.Any(parameter => parameter.Name == variable.TypeName) == true
             || _currentClass?.TypeParameters.Any(parameter => parameter.Name == variable.TypeName) == true
-            || _symbolsById.Values.OfType<TypeSymbol>().Any(type => type.Name == variable.TypeName)
-            || _metadataUsings.Any(import => import.NamespaceScopeId != null))
+            || _symbolsById.Values.OfType<TypeSymbol>().Any(type => type.Name == variable.TypeName))
             return null;
 
         var metadata = GetOrCreateMetadataBinder();
         if (metadata is null)
             return null;
-        var aliases = _metadataUsings.Where(import => import.Alias == variable.TypeName).ToArray();
-        var names = aliases.Length == 0
-            ? new[] { variable.TypeName }.Concat(_metadataUsings
-                .Where(import => !import.IsStatic && import.Alias is null)
-                .Select(import => $"{import.Namespace}.{variable.TypeName}"))
-            : aliases.Select(import => import.Namespace);
-        var candidates = names.Select(metadata.Context.TryResolveType)
-            .OfType<Microsoft.CodeAnalysis.INamedTypeSymbol>()
-            .Distinct<Microsoft.CodeAnalysis.INamedTypeSymbol>(Microsoft.CodeAnalysis.SymbolEqualityComparer.Default)
-            .ToArray();
-        return candidates is [{ IsReferenceType: true, IsGenericType: false } resolved] ? resolved : null;
+        return ResolveComputedMetadataType(metadata.Context, variable.TypeName)
+            is Microsoft.CodeAnalysis.INamedTypeSymbol { IsReferenceType: true } resolved ? resolved : null;
     }
 
     private Microsoft.CodeAnalysis.IPropertySymbol? ResolveMetadataArrayProperty(
@@ -868,6 +937,8 @@ public sealed class Binder
         using var diagnosticContext = _diagnostics.EnterBindingContext();
         _declaredReferenceTypes = Parsing.AttributeHelper.GetDeclaredReferenceTypeNames(module);
         _metadataUsings = module.Usings;
+        _metadataNamespaceScopes = module.NamespaceScopes.ToDictionary(scope => scope.Id, StringComparer.Ordinal);
+        _scopedMetadataTypes.Clear();
         _asyncTypeModule = module;
         _scope = new Scope();
         _functionSymbols.Clear();
@@ -893,6 +964,7 @@ public sealed class Binder
         _delegateTypeNames.Clear();
         _misplacedRowsReported.Clear();
         _currentNamespaceIdentity = null;
+        _currentNamespaceScopeId = null;
         _transientBindingId = CreateSnapshotIdentityKey(module, out var hasToolingIdentity);
         _toolingIds = hasToolingIdentity
             ? Ids.DeclarationIdentityStore.ToolingIds(module).ToHashSet(StringComparer.Ordinal)
@@ -2128,7 +2200,9 @@ public sealed class Binder
         // v0.14 §S4 — expose the declared return type to BindReturnStatement.
         using var _returnCtx = PushReturnTypeContext(functionSymbol.BodyReturnType);
         var previousNamespaceIdentity = _currentNamespaceIdentity;
+        var previousNamespaceScopeId = _currentNamespaceScopeId;
         _currentNamespaceIdentity = func.NamespaceIdentity;
+        _currentNamespaceScopeId = func.NamespaceScopeId;
 
         try
         {
@@ -2146,6 +2220,7 @@ public sealed class Binder
         finally
         {
             _currentNamespaceIdentity = previousNamespaceIdentity;
+            _currentNamespaceScopeId = previousNamespaceScopeId;
         }
     }
 
@@ -3129,10 +3204,17 @@ public sealed class Binder
         }
 
         var metadataName = TypeIdentity.MapShortTypeNameToFullName(lookupNames[^1]);
-        if (!metadataName.Contains('.', StringComparison.Ordinal))
-            return null;
-        var symbol = GetOrCreateMetadataBinder()?.Context.TryResolveType(metadataName);
-        return symbol is { IsReferenceType: true, IsGenericType: false }
+        var metadata = GetOrCreateMetadataBinder();
+        var lexicalScope = containingTypeName is not null
+            && _classesByQualifiedName.TryGetValue(containingTypeName, out var declaringClass)
+                ? declaringClass.NamespaceScopeId : _currentNamespaceScopeId;
+        var scoped = metadata is not null
+            ? ResolveScopedMetadataType(metadata.Context, referent, 0, lexicalScope, namespaceIdentity)
+            : default;
+        var symbol = scoped.Handled ? scoped.Type
+            : metadataName.Contains('.', StringComparison.Ordinal) ? metadata?.Context.TryResolveType(metadataName) : null;
+        return symbol is { IsReferenceType: true }
+            && (!symbol.IsGenericType || !symbol.IsDefinition)
             ? new BoundTypes.NominalBoundType(referent, annotation, roslynSymbol: symbol)
             : null;
     }
@@ -8660,11 +8742,13 @@ public sealed class Binder
         var previousClassScope = _currentClassScope;
         var previousClassIdentity = _currentClassIdentity;
         var previousNamespaceIdentity = _currentNamespaceIdentity;
+        var previousNamespaceScopeId = _currentNamespaceScopeId;
         _currentClassName = className;
         _currentClass = cls;
         _currentClassScope = classScope;
         _currentClassIdentity = _classSymbolIds[cls];
         _currentNamespaceIdentity = cls.NamespaceIdentity;
+        _currentNamespaceScopeId = cls.NamespaceScopeId;
 
         try
         {
@@ -8842,6 +8926,7 @@ public sealed class Binder
             _currentClassScope = previousClassScope;
             _currentClassIdentity = previousClassIdentity;
             _currentNamespaceIdentity = previousNamespaceIdentity;
+            _currentNamespaceScopeId = previousNamespaceScopeId;
         }
     }
 

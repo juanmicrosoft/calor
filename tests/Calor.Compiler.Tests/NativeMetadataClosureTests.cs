@@ -185,6 +185,161 @@ public sealed class NativeMetadataClosureTests
     }
 
     [Fact]
+    public void MetadataAliases_FollowLexicalAncestryRatherThanEqualNamespaceNames()
+    {
+        var parsed = Parse("""
+            module ScopedAliases
+              class Left
+                func Make () → object
+                  return new Builder()
+              class Right
+                func Make () → object
+                  return new Builder()
+              class Outside
+                func Make () → object
+                  return new Builder()
+            """);
+        var scopes = new[]
+        {
+            new NamespaceScopeInfo("outer", "Shared", "Shared", null, false, TextSpan.Empty),
+            new NamespaceScopeInfo("left", "Repeated", "Shared.Repeated", "outer", false, TextSpan.Empty),
+            new NamespaceScopeInfo("right", "Repeated", "Shared.Repeated", "outer", false, TextSpan.Empty)
+        };
+        var ids = new[] { "left", "right", "outer" };
+        for (var index = 0; index < parsed.Classes.Count; index++)
+        {
+            parsed.Classes[index].NamespaceScopeId = ids[index];
+            parsed.Classes[index].NamespaceIdentity = scopes.Single(scope => scope.Id == ids[index]).FullName;
+        }
+        var module = parsed.With(update =>
+        {
+            update.NamespaceScopes = scopes;
+            update.Usings =
+            [
+                new UsingDirectiveNode(TextSpan.Empty, "System.Version", "Builder",
+                    namespaceScopeId: "outer"),
+                new UsingDirectiveNode(TextSpan.Empty, "System.Text.StringBuilder", "Builder",
+                    namespaceScopeId: "left"),
+                new UsingDirectiveNode(TextSpan.Empty, "System.IO.StringWriter", "Builder",
+                    namespaceScopeId: "right")
+            ];
+        });
+        var bound = new Binder(new DiagnosticBag()).Bind(module);
+        var names = bound.Functions.Select(function =>
+            Assert.IsType<Calor.Compiler.Binding.BoundTypes.NominalBoundType>(
+                Assert.IsType<BoundNewExpression>(
+                    Assert.IsType<BoundReturnStatement>(Assert.Single(function.Body)).Expression).Type)
+            .RoslynSymbol!.ToDisplayString()).ToArray();
+        Assert.Equal(new[] { "System.Text.StringBuilder", "System.IO.StringWriter", "System.Version" }, names);
+    }
+
+    [Theory]
+    [InlineData("using StringBuilder = Missing.StringBuilder")]
+    [InlineData("using StringBuilder = Other\n  using Other = System.Text.StringBuilder")]
+    public void MetadataAliases_DoNotGuessMissingTargetsOrChainSiblingAliases(string imports)
+    {
+        var module = Parse($$"""
+            module InvalidAlias
+              {{imports}}
+              func Make () → object
+                return new StringBuilder()
+            """);
+        var bound = new Binder(new DiagnosticBag()).Bind(module);
+        var creation = Assert.IsType<BoundNewExpression>(
+            Assert.IsType<BoundReturnStatement>(Assert.Single(Assert.Single(bound.Functions).Body)).Expression);
+        Assert.Null(Assert.IsType<Calor.Compiler.Binding.BoundTypes.NominalBoundType>(creation.Type).RoslynSymbol);
+    }
+
+    [Fact]
+    public void MetadataAliases_RetainConstructedGenericTypeAndGetterIdentity()
+    {
+        const string authored = """
+            module GenericAlias
+              using Items = System.Collections.Generic.List<int>
+              func Read () → int
+                ! alloc
+                let Items:items = new Items()
+                return items.Count
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var result = Compile(source);
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+            var method = CompileAssembly(result.GeneratedCode).GetTypes()
+                .SelectMany(type => type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                .Single(method => method.Name == "Read");
+            Assert.Equal(0, method.Invoke(null, null));
+            var bound = new Binder(new DiagnosticBag()).Bind(Parse(source));
+            var created = Assert.IsType<BoundNewExpression>(
+                Assert.IsType<BoundBindStatement>(Assert.Single(bound.Functions).Body[0]).Initializer);
+            Assert.Equal("System.Collections.Generic.List<int>",
+                Assert.IsType<Calor.Compiler.Binding.BoundTypes.NominalBoundType>(created.Type).RoslynSymbol!.ToDisplayString());
+        }
+    }
+
+    [Fact]
+    public void MetadataImports_DoNotReplaceAShadowingSourceTypeWithABclType()
+    {
+        const string source = """
+            module SourceShadow
+              using System.Text
+              class StringBuilder
+                field int:Length public = 17
+              func Read () → int
+                ! alloc
+                let StringBuilder:item = new StringBuilder()
+                return item.Length
+            """;
+        var bound = new Binder(new DiagnosticBag()).Bind(Parse(source));
+        var created = Assert.IsType<BoundNewExpression>(
+            Assert.IsType<BoundBindStatement>(bound.Functions.Single(function => function.Symbol.Name == "Read").Body[0]).Initializer);
+        Assert.NotNull(created.ResolvedType);
+        Assert.Null(Assert.IsType<Calor.Compiler.Binding.BoundTypes.NominalBoundType>(created.Type).RoslynSymbol);
+        var result = Compile(source);
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+        var method = CompileAssembly(result.GeneratedCode).GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+            .Single(method => method.Name == "Read");
+        Assert.Equal(17, method.Invoke(null, null));
+    }
+
+    [Theory]
+    [InlineData("Text = System.Text", "Text.StringBuilder")]
+    [InlineData("Builder = System.Text.StringBuilder", "Builder")]
+    [InlineData("System.Text", "StringBuilder")]
+    public void NativeNamespaceImports_RetainActualMetadataConstructorAndPropertyIdentity(string import, string typeName)
+    {
+        var source = $$"""
+            module NamespaceFile Contoso.Tools
+              using {{import}}
+              class Box
+                func Read () → int
+                  ! alloc
+                  let {{typeName}}:builder = new {{typeName}}("example")
+                  return builder.Length
+            """;
+        var bound = new Binder(new DiagnosticBag()).Bind(Parse(source));
+        var binding = Assert.IsType<BoundBindStatement>(Assert.Single(bound.Functions).Body[0]);
+        var created = Assert.IsType<BoundNewExpression>(binding.Initializer);
+        Assert.Equal("System.Text.StringBuilder",
+            Assert.IsType<Calor.Compiler.Binding.BoundTypes.NominalBoundType>(created.Type).RoslynSymbol!.ToDisplayString());
+        var graph = Calor.Compiler.Analysis.CallGraphAnalysis.Build(Parse(source));
+        var callerId = Assert.Single(graph.Functions).Key;
+        Assert.NotNull(graph.MetadataCreationType(callerId, created.Span));
+        var returned = Assert.IsType<BoundReturnStatement>(Assert.Single(bound.Functions).Body[1]);
+        var member = Assert.IsType<BoundFieldAccessExpression>(returned.Expression);
+        Assert.NotNull(graph.MetadataValueType(callerId, member.Target.Span));
+        var effects = new DiagnosticBag();
+        new Calor.Compiler.Effects.EffectEnforcementPass(effects).Enforce(Parse(source));
+        Assert.False(effects.HasErrors, string.Join(Environment.NewLine, effects));
+        var result = Compile(source);
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+        var type = CompileAssembly(result.GeneratedCode).GetType("Contoso.Tools.Box")!;
+        var method = type.GetMethod("Read", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
+        Assert.Equal(7, method.Invoke(Activator.CreateInstance(type), null));
+    }
+
+    [Fact]
     public void EscapedDefaultBinding_RemainsAVariableRatherThanADefaultInitializer()
     {
         const string authored = """

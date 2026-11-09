@@ -969,6 +969,9 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
     /// </summary>
     private static string DeclaringTypeOf(Binding.BoundTypes.BoundType type)
     {
+        if (type is Binding.BoundTypes.NominalBoundType
+            { RoslynSymbol: Microsoft.CodeAnalysis.INamedTypeSymbol metadata })
+            return MetadataName(metadata.OriginalDefinition);
         if (type is Binding.BoundTypes.GenericInstantiationBoundType generic)
         {
             var mappedDisplay = Binding.TypeIdentity.MapShortTypeNameToFullName(generic.DisplayString);
@@ -981,6 +984,11 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
 
         return Binding.TypeIdentity.MapShortTypeNameToFullName(type.DisplayString);
     }
+
+    private static string MetadataName(Microsoft.CodeAnalysis.INamedTypeSymbol type) =>
+        type.ContainingType is { } parent ? MetadataName(parent) + "+" + type.MetadataName
+        : type.ContainingNamespace.IsGlobalNamespace ? type.MetadataName
+        : type.ContainingNamespace.ToDisplayString() + "." + type.MetadataName;
 
     private static string WithArity(string qualifiedName, int arity) =>
         string.IsNullOrEmpty(qualifiedName) || qualifiedName.Contains('`') || arity == 0
