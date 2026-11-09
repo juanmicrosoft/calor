@@ -24,18 +24,16 @@ public class NullableCastTests
     private static string WrapInFunction(string body)
     {
         return $$"""
-            §M{Test}
-              §F{Main:pub}
-                  §I{object:value}
-                  §O{object}
-                  {{body}}
+            module Test
+              func Main public (object:value) → object
+                {{body}}
             """;
     }
 
     [Fact]
-    public void ParseLispTypeName_NullablePrefix_ParsesCorrectly()
+    public void ParseNativeCast_NullableValueType_ParsesCorrectly()
     {
-        var source = WrapInFunction("§R (cast ?i32 value)");
+        var source = WrapInFunction("return (int?)value");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -45,13 +43,13 @@ public class NullableCastTests
         var typeOp = returnStmt!.Expression as TypeOperationNode;
         Assert.NotNull(typeOp);
         Assert.Equal(TypeOp.Cast, typeOp!.Operation);
-        Assert.Equal("i32?", typeOp.TargetType);
+        Assert.Equal("int?", typeOp.TargetType);
     }
 
     [Fact]
-    public void ParseLispTypeName_NullableGeneric_ParsesCorrectly()
+    public void ParseNativeCast_NullableGeneric_ParsesCorrectly()
     {
-        var source = WrapInFunction("§R (cast ?List<int> value)");
+        var source = WrapInFunction("return (List<int>?)value");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -65,9 +63,9 @@ public class NullableCastTests
     }
 
     [Fact]
-    public void ParseLispTypeName_PostfixNullable_StillWorks()
+    public void ParseNativeCast_GroupedNullableValueType_ParsesCorrectly()
     {
-        var source = WrapInFunction("§R (cast i32? value)");
+        var source = WrapInFunction("return ((int?)value)");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -77,7 +75,17 @@ public class NullableCastTests
         var typeOp = returnStmt!.Expression as TypeOperationNode;
         Assert.NotNull(typeOp);
         Assert.Equal(TypeOp.Cast, typeOp!.Operation);
-        Assert.Equal("i32?", typeOp.TargetType);
+        Assert.Equal("int?", typeOp.TargetType);
+    }
+
+    [Theory]
+    [InlineData("(cast ?i32 value)")]
+    [InlineData("(cast ?List<int> value)")]
+    [InlineData("(cast i32? value)")]
+    public void ParseLegacyCast_IsRejectedInsideNativeFunction(string expression)
+    {
+        Parse(WrapInFunction("return " + expression), out var diagnostics);
+        Assert.True(diagnostics.HasErrors);
     }
 
     [Fact]
@@ -96,7 +104,7 @@ public class Foo
         Assert.True(result.Success, "Conversion should succeed");
         Assert.NotNull(result.CalorSource);
         Assert.True(result.CalorSource!.Length > 0);
-        Assert.Contains("(cast int? value)", result.CalorSource);
+        Assert.Contains("(int?)value", result.CalorSource);
         var compiled = Program.Compile(result.CalorSource, "nullable-cast.calr");
         Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
         Assert.Contains("(int?)value", compiled.GeneratedCode);
@@ -114,5 +122,7 @@ public class Foo
         var instance = Activator.CreateInstance(type);
         Assert.Null(method.Invoke(instance, [null]));
         Assert.Equal(42, method.Invoke(instance, [42]));
+        var invalid = Assert.Throws<TargetInvocationException>(() => method.Invoke(instance, [42d]));
+        Assert.IsType<InvalidCastException>(invalid.InnerException);
     }
 }
