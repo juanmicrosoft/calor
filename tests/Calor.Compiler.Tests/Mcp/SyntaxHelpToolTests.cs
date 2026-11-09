@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Calor.Compiler.Mcp.Tools;
+using Calor.Compiler.Migration;
 using Calor.Compiler.Telemetry;
 using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.Channel;
@@ -35,6 +36,47 @@ public class SyntaxHelpToolTests
         Assert.Equal(JsonValueKind.Object, schema.ValueKind);
         Assert.True(schema.TryGetProperty("properties", out var props));
         Assert.True(props.TryGetProperty("feature", out _));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FeatureCatalog_PreservesCapabilitiesWithoutTeachingRetiredSpellings()
+    {
+        foreach (var feature in FeatureSupport.GetAllFeatures())
+        {
+            var result = await _tool.ExecuteAsync(JsonSerializer.SerializeToElement(
+                new { action = "features", feature = feature.Name }));
+            Assert.False(result.IsError);
+            using var json = JsonDocument.Parse(result.Content[0].Text!);
+            var report = json.RootElement;
+            Assert.Equal(feature.Name, report.GetProperty("feature").GetString());
+            Assert.Equal(feature.Support.ToString(), report.GetProperty("support").GetString());
+            Assert.Equal(feature.Description, report.TryGetProperty("description", out var description)
+                ? description.GetString() : null);
+            Assert.Equal(feature.Workaround, report.TryGetProperty("workaround", out var workaround)
+                ? workaround.GetString() : null);
+            Assert.Contains("converter-owned", report.GetProperty("guidance").GetString());
+            Assert.DoesNotContain('§', result.Content[0].Text!);
+        }
+
+        foreach (var level in Enum.GetValues<SupportLevel>())
+        {
+            var result = await _tool.ExecuteAsync(JsonSerializer.SerializeToElement(
+                new { action = "features", supportLevel = level.ToString() }));
+            Assert.False(result.IsError);
+            using var json = JsonDocument.Parse(result.Content[0].Text!);
+            Assert.Contains("not an authoring grammar", json.RootElement.GetProperty("guidance").GetString());
+            var actual = json.RootElement.GetProperty("features").EnumerateArray()
+                .Select(feature => feature.GetProperty("feature").GetString()).OrderBy(name => name);
+            Assert.Equal(FeatureSupport.GetFeaturesBySupport(level).Select(feature => feature.Name).OrderBy(name => name),
+                actual);
+            Assert.DoesNotContain('§', result.Content[0].Text!);
+        }
+
+        var summary = await _tool.ExecuteAsync(JsonSerializer.SerializeToElement(new { action = "features" }));
+        Assert.False(summary.IsError);
+        using var summaryJson = JsonDocument.Parse(summary.Content[0].Text!);
+        Assert.Equal(FeatureSupport.GetAllFeatures().Count(), summaryJson.RootElement.GetProperty("totalFeatures").GetInt32());
+        Assert.Contains("action=syntax", summaryJson.RootElement.GetProperty("guidance").GetString());
     }
 
     [Fact]

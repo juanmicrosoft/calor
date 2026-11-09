@@ -106,23 +106,23 @@
         },
         {
           "name": "object-initializer",
-          "description": "Object initializers of plain Name = value assignments are converted to Calor \u00A7NEW with property assignments; other shapes are preserved (initializer-interop)"
+          "description": "Object initializers of plain Name = value assignments are represented by object-creation nodes with property assignments; other shapes are preserved (initializer-interop)"
         },
         {
           "name": "list-initializer",
-          "description": "List initializers are converted to Calor \u00A7LIST nodes"
+          "description": "List initializers are represented by list-literal nodes"
         },
         {
           "name": "hashset-initializer",
-          "description": "HashSet initializers are converted to Calor \u00A7SET nodes"
+          "description": "HashSet initializers are represented by set-literal nodes"
         },
         {
           "name": "anonymous-type",
-          "description": "Anonymous types are converted to Calor \u00A7ANON blocks"
+          "description": "Anonymous types are represented by anonymous-object nodes"
         },
         {
           "name": "foreach-index",
-          "description": "Indexed foreach via \u00A7EACH with optional index variable"
+          "description": "Foreach nodes can carry an optional index variable"
         },
         {
           "name": "attributes",
@@ -138,31 +138,31 @@
         },
         {
           "name": "generic-type-constraint",
-          "description": "Generic type constraints are supported via \u00A7WHERE syntax"
+          "description": "Generic type constraints are represented by constraint clauses"
         },
         {
           "name": "goto",
-          "description": "Goto statements are converted to \u00A7GOTO{label} nodes"
+          "description": "Goto statements are represented by goto nodes"
         },
         {
           "name": "labeled-statement",
-          "description": "Labeled statements are converted to \u00A7LABEL{name} nodes"
+          "description": "Labeled statements are represented by label nodes"
         },
         {
           "name": "unsafe",
-          "description": "Unsafe code blocks are converted to \u00A7UNSAFE blocks"
+          "description": "Unsafe code blocks are represented by unsafe block nodes"
         },
         {
           "name": "pointer",
-          "description": "Pointer types (int*) are supported with \u00A7ADDR and \u00A7DEREF"
+          "description": "Pointer types (int*) have address-of and dereference expression nodes"
         },
         {
           "name": "stackalloc",
-          "description": "Stackalloc expressions are converted to \u00A7SALLOC nodes"
+          "description": "Stackalloc expressions are represented by stack-allocation nodes"
         },
         {
           "name": "fixed",
-          "description": "Fixed statements are converted to \u00A7FIXED blocks"
+          "description": "Fixed statements are represented by fixed statement nodes"
         },
         {
           "name": "volatile",
@@ -174,15 +174,15 @@
         },
         {
           "name": "operator-overload",
-          "description": "Operator overloads are fully supported via \u00A7OP tags and converted to op_ CIL-convention methods"
+          "description": "Operator overload declarations generate op_ CIL-convention methods"
         },
         {
           "name": "implicit-conversion",
-          "description": "Implicit conversions are fully supported via \u00A7OP tags and converted to op_Implicit methods"
+          "description": "Implicit conversion declarations generate op_Implicit methods"
         },
         {
           "name": "explicit-conversion",
-          "description": "Explicit conversions are fully supported via \u00A7OP tags and converted to op_Explicit methods"
+          "description": "Explicit conversion declarations generate op_Explicit methods"
         },
         {
           "name": "yield-return",
@@ -194,7 +194,7 @@
         },
         {
           "name": "equals-operator",
-          "description": "Custom == and != operators are fully supported via \u00A7OP tags and converted to op_Equality/op_Inequality methods"
+          "description": "Custom == and != operator declarations generate op_Equality/op_Inequality methods"
         },
         {
           "name": "primary-constructor",
@@ -202,11 +202,11 @@
         },
         {
           "name": "range-expression",
-          "description": "Range expressions (0..5, ..5, 5..) are converted to \u00A7RANGE nodes"
+          "description": "Range expressions (0..5, ..5, 5..) are represented by range-expression nodes"
         },
         {
           "name": "index-from-end",
-          "description": "Index from end expressions (^1) are converted to \u00A7^ nodes"
+          "description": "Index from end expressions (^1) are represented by index-from-end nodes"
         },
         {
           "name": "named-argument",
@@ -218,7 +218,7 @@
         },
         {
           "name": "throw-expression",
-          "description": "Throw expressions are preserved as \u00A7TH expressions"
+          "description": "Throw expressions retain their expression evaluation region"
         },
         {
           "name": "nameof",
@@ -234,7 +234,7 @@
         },
         {
           "name": "in-parameter",
-          "description": "in parameters and \u00A7A{in} arguments convert natively (a C# ref argument to an in parameter becomes \u00A7A{in}). A call statement that omits in, or whose by-reference operand contains a call, creation, assignment or \u002B\u002B/-- or indexes a non-array, stays C# (\u00A7RAW); in indexer parameters preserve the member"
+          "description": "in parameters and in arguments convert natively (a C# ref argument to an in parameter becomes an in argument). A call statement that omits in, or whose by-reference operand contains a call, creation, assignment or \u002B\u002B/-- or indexes a non-array, stays converter-owned C# interop; in indexer parameters preserve the member"
         },
         {
           "name": "checked-block",
@@ -242,7 +242,7 @@
         },
         {
           "name": "with-expression",
-          "description": "with expressions (record copying) are converted to \u00A7WITH blocks"
+          "description": "with expressions (record copying) are represented by record-copy nodes"
         },
         {
           "name": "init-accessor",
@@ -258,7 +258,7 @@
         },
         {
           "name": "lock-statement",
-          "description": "Lock statements are converted to \u00A7SYNC blocks with full semantics"
+          "description": "Lock statements are represented by lock nodes with full semantics"
         },
         {
           "name": "readonly-struct",
@@ -302,7 +302,7 @@
         },
         {
           "name": "default-parameter",
-          "description": "Default parameter values are converted to \u00A7I{type:name} = value syntax"
+          "description": "Default parameter values are retained on parameter declarations"
         },
         {
           "name": "parallel",
@@ -342,19 +342,19 @@
         },
         {
           "name": "multidim-array",
-          "description": "Rectangular arrays (int[,], int[,,]) convert natively: sized creation, nested initializers (\u00A7ROW), element access, and new[,] of a known type. new[,] of an unknown type, and an element that cannot be written in place (a collection initializer or a multi-line element, array-element-block), are preserved as C#"
+          "description": "Rectangular arrays (int[,], int[,,]) convert natively: sized creation, nested initializer rows, element access, and new[,] of a known type. new[,] of an unknown type, and an element that cannot be written in place (a collection initializer or a multi-line element, array-element-block), are preserved as C#"
         },
         {
           "name": "refinement-type",
-          "description": "Refinement types (\u00A7RTYPE) define base types constrained by predicates; erased to base types in C#"
+          "description": "Refinement-type nodes define base types constrained by predicates; erased to base types in C#"
         },
         {
           "name": "proof-obligation",
-          "description": "Proof obligations (\u00A7PROOF) declare conditions to be verified; emitted as comments or runtime checks"
+          "description": "Proof-obligation nodes declare conditions to be verified; emitted as comments or runtime checks"
         },
         {
           "name": "indexed-type",
-          "description": "Indexed types (\u00A7ITYPE) define size-parameterized types for bounds checking; erased to base types in C#"
+          "description": "Indexed-type nodes define size-parameterized types for bounds checking; erased to base types in C#"
         },
         {
           "name": "index-bounds",
@@ -370,11 +370,11 @@
         },
         {
           "name": "verbatim-identifier",
-          "description": "C# @keyword identifiers mapped to backtick syntax in Calor"
+          "description": "C# @keyword identifiers retain @ escaping in Calor"
         },
         {
           "name": "conditional-using",
-          "description": "Using directives inside #if blocks supported via \u00A7PP wrapping \u00A7U"
+          "description": "Using directives inside #if blocks are represented inside conditional-compilation nodes"
         },
         {
           "name": "anonymous-method",
@@ -419,7 +419,7 @@
         },
         {
           "name": "string-interpolation-hole",
-          "description": "Holes made of names, string/char/bool/int literals, doubles with a fractional part, dotted member access, operators, nameof, typeof, and calls with a dotted target and positional arguments convert natively. Other holes (object creation, indexing, ?., ?:, lambdas, named or ref arguments, generic calls) keep their original C# text as \u00A7CS{...} inside the hole, with assumed effects",
+          "description": "Holes made of names, string/char/bool/int literals, doubles with a fractional part, dotted member access, operators, nameof, typeof, and calls with a dotted target and positional arguments convert natively. Other holes (object creation, indexing, ?., ?:, lambdas, named or ref arguments, generic calls) keep their original C# text as converter-owned inline interop inside the hole, with assumed effects",
           "workaround": "Move the expression into a local before the interpolated string to convert it natively"
         },
         {
@@ -429,7 +429,7 @@
         },
         {
           "name": "conditional-expression-hoisting",
-          "description": "Conditional calls and throw expressions remain in their native evaluation region. Update/assignment operands and conversions requiring unsafe eager preludes preserve the original expression as counted C# interop; updates use only \u00A7ASSIGN when lowered to statements",
+          "description": "Conditional calls and throw expressions remain in their native evaluation region. Update/assignment operands and conversions requiring unsafe eager preludes preserve the original expression as counted C# interop; updates use assignment nodes when lowered to statements",
           "workaround": "Keep the counted interop, or express conditional side effects as explicit statements before converting"
         },
         {
@@ -442,16 +442,16 @@
         },
         {
           "name": "dictionary-initializer",
-          "description": "Literal Add-style Dictionary initializers in direct local bindings and returns use \u00A7DICT. Other contexts, index setters, constructor/comparer arguments, nonliteral entries, target-typed initializers and other concrete dictionary types are explicitly preserved as inline C# interop to retain their operations, type initialization order and evaluation timing."
+          "description": "Literal Add-style Dictionary initializers in direct local bindings and returns use dictionary-literal nodes. Other contexts, index setters, constructor/comparer arguments, nonliteral entries, target-typed initializers and other concrete dictionary types are explicitly preserved as converter-owned inline C# interop to retain their operations, type initialization order and evaluation timing."
         },
         {
           "name": "ref-parameter",
-          "description": "ref parameters and ref arguments convert natively (\u00A7A{ref}) and pass the caller\u0027s storage, never a copy. Ref locals and returns, conditional refs, scoped and ref readonly parameters, this-ref extensions, by-reference delegates, constructor and indexer arguments, and method-generic out/in or nullable-type-parameter ref declarations are preserved as C#. Plain ref T method parameters use the same native storage-preserving form",
+          "description": "ref parameters and ref arguments convert natively and pass the caller\u0027s storage, never a copy. Ref locals and returns, conditional refs, scoped and ref readonly parameters, this-ref extensions, by-reference delegates, constructor and indexer arguments, and method-generic out/in or nullable-type-parameter ref declarations are preserved as C#. Plain ref T method parameters use the same native storage-preserving form",
           "workaround": "Keep the preserved member as C# interop; no tuple or wrapper form is equivalent"
         },
         {
           "name": "out-parameter",
-          "description": "out parameters and out arguments convert natively (\u00A7A{out}, out _ discards). Flow attributes such as [NotNullWhen] are copied but inert. Method-generic out parameters are preserved as C#",
+          "description": "out parameters and out arguments convert natively, including out _ discards. Flow attributes such as [NotNullWhen] are copied but inert. Method-generic out parameters are preserved as C#",
           "workaround": "Keep the preserved member as C# interop; no return-value-only form is equivalent"
         },
         {
@@ -490,7 +490,7 @@
         },
         {
           "name": "preprocessor-directive",
-          "description": "Default conversion preserves all #if/#elif/#else branches as explicit \u00A7PP AST across module declarations/usings, class and struct members, statements, nesting, and partial declarations",
+          "description": "Default conversion preserves all #if/#elif/#else branches as explicit conditional-compilation AST across module declarations/usings, class and struct members, statements, nesting, and partial declarations",
           "workaround": "Interface and enum member-level directives may use verbatim interop; review those counted preservation boundaries"
         },
         {
@@ -501,17 +501,17 @@
         {
           "name": "namespace",
           "description": "Single namespace scopes convert natively; lossless conversion preserves multiple, nested, or mixed global/namespace topologies as whole-file C# interop",
-          "workaround": "Use lossy mode for native \u00A7NS topology, or keep the lossless whole-file interop boundary"
+          "workaround": "Explicitly choose lossy mode to convert namespace topology, or retain the converter\u0027s lossless whole-file interop boundary"
         },
         {
           "name": "namespace-topology",
           "description": "Multiple, nested, or mixed global/namespace scopes convert natively only in explicit lossy mode; default lossless mode uses whole-file interop",
-          "workaround": "Review the recorded namespace-topology interop loss or explicitly choose lossy native \u00A7NS conversion"
+          "workaround": "Review the recorded namespace-topology interop loss or explicitly choose lossy namespace-topology conversion"
         },
         {
           "name": "local-function",
-          "description": "A non-capturing, non-generic local function with direct calls after its declaration converts at the same point to a typed \u00A7B lambda binding. Direct self-recursion additionally requires a pure body proved over resolved built-in scalar operations; its lambda captures only an initialized internal self binding. Forward/mutual calls, method-group uses, captures, explicit checked/unchecked regions in recursive bodies, named local-call arguments, unused locals, attributes, async/unsafe/extern, yield, nested locals, ref-like signatures and ref/out/in/params/default parameters preserve the containing member as \u00A7CSHARP interop",
-          "workaround": "Use an existing lambda binding with calls after its declaration, or keep the original member as \u00A7CSHARP interop"
+          "description": "A non-capturing, non-generic local function with direct calls after its declaration converts at the same point to a typed lambda binding. Direct self-recursion additionally requires a pure body proved over resolved built-in scalar operations; its lambda captures only an initialized internal self binding. Forward/mutual calls, method-group uses, captures, explicit checked/unchecked regions in recursive bodies, named local-call arguments, unused locals, attributes, async/unsafe/extern, yield, nested locals, ref-like signatures and ref/out/in/params/default parameters preserve the containing member as converter-owned C# interop",
+          "workaround": "Use an existing lambda binding with calls after its declaration, or let the converter preserve the original C# member"
         },
         {
           "name": "complex-is-pattern",
@@ -592,12 +592,12 @@
         },
         {
           "name": "conditional-member",
-          "description": "Class and struct member branches are native \u00A7PP AST; interface and enum member branches may require verbatim interop",
+          "description": "Class and struct member branches use conditional-compilation AST; interface and enum member branches may require verbatim interop",
           "workaround": "Review interface and enum member-level conditional blocks"
         },
         {
           "name": "conditional-statement",
-          "description": "Method block statement branches preserve #if/#elif/#else nesting as \u00A7PP AST; unsupported statement shapes remain explicit interop",
+          "description": "Method block statement branches preserve #if/#elif/#else nesting as conditional-compilation AST; unsupported statement shapes remain explicit interop",
           "workaround": "Review counted interop inside complex switch/accessor/lambda directive placements"
         },
         {
@@ -672,13 +672,13 @@
         },
         {
           "name": "iterator-accessor",
-          "description": "A property or indexer whose accessor uses yield return/yield break is preserved verbatim as a \u00A7CSHARP interop block; Calor has no iterator accessors (Calor0209)",
-          "workaround": "Move the iterator body into a method (\u00A7MT with \u00A7YIELD) and have the accessor return its result, or keep the member as a \u00A7CSHARP interop block"
+          "description": "A property or indexer whose accessor uses yield return/yield break is preserved verbatim as converter-owned C# interop; Calor has no iterator accessors (Calor0209)",
+          "workaround": "Move the iterator body into a method and have the accessor return its result, or let the converter preserve the original C# member"
         },
         {
           "name": "partial-property",
-          "description": "Each declaration of a partial property or indexer (C# 13) is preserved verbatim as a \u00A7CSHARP interop block; Calor has no partial members",
-          "workaround": "Merge the defining and implementing declarations into one ordinary property before migration, or keep both as \u00A7CSHARP interop blocks"
+          "description": "Each declaration of a partial property or indexer (C# 13) is preserved verbatim as converter-owned C# interop; Calor has no partial members",
+          "workaround": "Merge the defining and implementing declarations into one ordinary property before migration, or let the converter preserve both original C# declarations"
         },
         {
           "name": "default-lambda-parameter",
@@ -702,13 +702,13 @@
         },
         {
           "name": "unsupported-binary-operator",
-          "description": "Binary operator has no Calor mapping; the containing member is preserved as \u00A7CSHARP interop (never substituted with \u002B)",
-          "workaround": "Rewrite using a supported operator or keep the member as \u00A7CSHARP interop"
+          "description": "Binary operator has no Calor mapping; the containing member is preserved as converter-owned C# interop (never substituted with \u002B)",
+          "workaround": "Rewrite using a supported operator or let the converter preserve the original C# member"
         },
         {
           "name": "unsupported-compound-assignment",
-          "description": "Compound assignment operator (e.g. \u003E\u003E\u003E=) has no Calor mapping; the containing member is preserved as \u00A7CSHARP interop (never emitted as a plain assignment)",
-          "workaround": "Rewrite as x = x OP y with a supported operator, or keep the member as \u00A7CSHARP interop"
+          "description": "Compound assignment operator (e.g. \u003E\u003E\u003E=) has no Calor mapping; the containing member is preserved as converter-owned C# interop (never emitted as a plain assignment)",
+          "workaround": "Rewrite as x = x OP y with a supported operator, or let the converter preserve the original C# member"
         },
         {
           "name": "embedded-assignment",
@@ -732,33 +732,33 @@
         },
         {
           "name": "unsupported-switch-label",
-          "description": "Switch label kind (e.g. pattern case label) is not convertible; the containing member is preserved as \u00A7CSHARP interop (never broadened to a wildcard)",
-          "workaround": "Rewrite as a constant case label or if/else chain, or keep the member as \u00A7CSHARP interop"
+          "description": "Switch label kind (e.g. pattern case label) is not convertible; the containing member is preserved as converter-owned C# interop (never broadened to a wildcard)",
+          "workaround": "Rewrite as a constant case label or if/else chain, or let the converter preserve the original C# member"
         },
         {
           "name": "unsupported-pattern-operator",
-          "description": "Relational/binary pattern operator has no Calor mapping; the containing member is preserved as \u00A7CSHARP interop (never defaulted to ==/\u0026\u0026)",
-          "workaround": "Rewrite the pattern with supported operators, or keep the member as \u00A7CSHARP interop"
+          "description": "Relational/binary pattern operator has no Calor mapping; the containing member is preserved as converter-owned C# interop (never defaulted to ==/\u0026\u0026)",
+          "workaround": "Rewrite the pattern with supported operators, or let the converter preserve the original C# member"
         },
         {
           "name": "unsupported-prefix-operator",
-          "description": "Built-in numeric unary \u002B converts through a native cast preserving numeric promotion and nullable lifting. User-defined, dynamic or unresolved unary \u002B is preserved as \u00A7CSHARP interop (never dropped or substituted with negation)",
+          "description": "Built-in numeric unary \u002B converts through a native cast preserving numeric promotion and nullable lifting. User-defined, dynamic or unresolved unary \u002B is preserved as converter-owned C# interop (never dropped or substituted with negation)",
           "workaround": "Keep user-defined or unresolved unary \u002B as C# interop"
         },
         {
           "name": "unsupported-slice-subpattern",
-          "description": "A list-pattern slice carrying an inner sub-pattern (e.g. ..[1,2]) constrains the remaining elements; it is preserved as \u00A7CSHARP interop (never broadened by dropping the sub-pattern)",
-          "workaround": "Match the remaining elements explicitly, or keep the member as \u00A7CSHARP interop"
+          "description": "A list-pattern slice carrying an inner sub-pattern (e.g. ..[1,2]) constrains the remaining elements; it is preserved as converter-owned C# interop (never broadened by dropping the sub-pattern)",
+          "workaround": "Match the remaining elements explicitly, or let the converter preserve the original C# member"
         },
         {
           "name": "generic-delegate",
-          "description": "Generic delegate declarations are preserved verbatim as counted \u00A7CSHARP interop so type parameters and constraints remain exact",
-          "workaround": "Use Func\u003C\u003E/Action\u003C\u003E or keep the delegate as \u00A7CSHARP interop"
+          "description": "Generic delegate declarations are preserved verbatim as counted converter-owned C# interop so type parameters and constraints remain exact",
+          "workaround": "Use Func\u003C\u003E/Action\u003C\u003E or let the converter preserve the original C# delegate"
         },
         {
           "name": "conversion-error",
-          "description": "The converter crashed on this construct; the containing statement/member is preserved as \u00A7CSHARP interop",
-          "workaround": "Simplify the construct or keep it as \u00A7CSHARP interop"
+          "description": "The converter crashed on this construct; the containing statement/member is preserved as converter-owned C# interop",
+          "workaround": "Simplify the construct or let the converter preserve the original C# statement/member"
         },
         {
           "name": "unknown-expression",

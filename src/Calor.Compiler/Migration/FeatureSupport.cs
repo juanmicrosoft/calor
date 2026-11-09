@@ -207,7 +207,7 @@ public static class FeatureSupport
         {
             Name = "string-interpolation-hole",
             Support = SupportLevel.Partial,
-            Description = "Holes made of names, string/char/bool/int literals, doubles with a fractional part, dotted member access, operators, nameof, typeof, and calls with a dotted target and positional arguments convert natively. Other holes (object creation, indexing, ?., ?:, lambdas, named or ref arguments, generic calls) keep their original C# text as §CS{...} inside the hole, with assumed effects",
+            Description = "Holes made of names, string/char/bool/int literals, doubles with a fractional part, dotted member access, operators, nameof, typeof, and calls with a dotted target and positional arguments convert natively. Other holes (object creation, indexing, ?., ?:, lambdas, named or ref arguments, generic calls) keep their original C# text as converter-owned inline interop inside the hole, with assumed effects",
             Workaround = "Move the expression into a local before the interpolated string to convert it natively"
         },
         ["null-coalescing"] = new FeatureInfo
@@ -235,7 +235,7 @@ public static class FeatureSupport
         {
             Name = "conditional-expression-hoisting",
             Support = SupportLevel.Partial,
-            Description = "Conditional calls and throw expressions remain in their native evaluation region. Update/assignment operands and conversions requiring unsafe eager preludes preserve the original expression as counted C# interop; updates use only §ASSIGN when lowered to statements",
+            Description = "Conditional calls and throw expressions remain in their native evaluation region. Update/assignment operands and conversions requiring unsafe eager preludes preserve the original expression as counted C# interop; updates use assignment nodes when lowered to statements",
             Workaround = "Keep the counted interop, or express conditional side effects as explicit statements before converting"
         },
         ["array-element-block"] = new FeatureInfo
@@ -267,7 +267,7 @@ public static class FeatureSupport
         {
             Name = "object-initializer",
             Support = SupportLevel.Full,
-            Description = "Object initializers of plain Name = value assignments are converted to Calor §NEW with property assignments; other shapes are preserved (initializer-interop)"
+            Description = "Object initializers of plain Name = value assignments are represented by object-creation nodes with property assignments; other shapes are preserved (initializer-interop)"
         },
         ["initializer-interop"] = new FeatureInfo
         {
@@ -279,38 +279,38 @@ public static class FeatureSupport
         {
             Name = "dictionary-initializer",
             Support = SupportLevel.Partial,
-            Description = "Literal Add-style Dictionary initializers in direct local bindings and returns use §DICT. Other contexts, index setters, constructor/comparer arguments, nonliteral entries, target-typed initializers and other concrete dictionary types are explicitly preserved as inline C# interop to retain their operations, type initialization order and evaluation timing."
+            Description = "Literal Add-style Dictionary initializers in direct local bindings and returns use dictionary-literal nodes. Other contexts, index setters, constructor/comparer arguments, nonliteral entries, target-typed initializers and other concrete dictionary types are explicitly preserved as converter-owned inline C# interop to retain their operations, type initialization order and evaluation timing."
         },
         ["list-initializer"] = new FeatureInfo
         {
             Name = "list-initializer",
             Support = SupportLevel.Full,
-            Description = "List initializers are converted to Calor §LIST nodes"
+            Description = "List initializers are represented by list-literal nodes"
         },
         ["hashset-initializer"] = new FeatureInfo
         {
             Name = "hashset-initializer",
             Support = SupportLevel.Full,
-            Description = "HashSet initializers are converted to Calor §SET nodes"
+            Description = "HashSet initializers are represented by set-literal nodes"
         },
         ["anonymous-type"] = new FeatureInfo
         {
             Name = "anonymous-type",
             Support = SupportLevel.Full,
-            Description = "Anonymous types are converted to Calor §ANON blocks"
+            Description = "Anonymous types are represented by anonymous-object nodes"
         },
         ["foreach-index"] = new FeatureInfo
         {
             Name = "foreach-index",
             Support = SupportLevel.Full,
-            Description = "Indexed foreach via §EACH with optional index variable"
+            Description = "Foreach nodes can carry an optional index variable"
         },
         ["ref-parameter"] = new FeatureInfo
         {
             Name = "ref-parameter",
             Support = SupportLevel.Partial,
             // #943 (D1 RO-REP-1, RO-UNS-1): native ref parameters and §A{ref} arguments; no tuple form.
-            Description = "ref parameters and ref arguments convert natively (§A{ref}) and pass the caller's storage, never a copy. " +
+            Description = "ref parameters and ref arguments convert natively and pass the caller's storage, never a copy. " +
                 "Ref locals and returns, conditional refs, scoped and ref readonly parameters, this-ref extensions, " +
                 "by-reference delegates, constructor and indexer arguments, and method-generic out/in or nullable-type-parameter ref declarations are preserved as C#. " +
                 "Plain ref T method parameters use the same native storage-preserving form",
@@ -321,7 +321,7 @@ public static class FeatureSupport
             Name = "out-parameter",
             Support = SupportLevel.Partial,
             // #943 (D1 RO-REP-1, RO-NULL-3/4): native out parameters and §A{out} arguments.
-            Description = "out parameters and out arguments convert natively (§A{out}, out _ discards). Flow attributes such as " +
+            Description = "out parameters and out arguments convert natively, including out _ discards. Flow attributes such as " +
                 "[NotNullWhen] are copied but inert. Method-generic out parameters are preserved as C#",
             Workaround = "Keep the preserved member as C# interop; no return-value-only form is equivalent"
         },
@@ -363,43 +363,43 @@ public static class FeatureSupport
         {
             Name = "generic-type-constraint",
             Support = SupportLevel.Full,
-            Description = "Generic type constraints are supported via §WHERE syntax"
+            Description = "Generic type constraints are represented by constraint clauses"
         },
         ["goto"] = new FeatureInfo
         {
             Name = "goto",
             Support = SupportLevel.Full,
-            Description = "Goto statements are converted to §GOTO{label} nodes"
+            Description = "Goto statements are represented by goto nodes"
         },
         ["labeled-statement"] = new FeatureInfo
         {
             Name = "labeled-statement",
             Support = SupportLevel.Full,
-            Description = "Labeled statements are converted to §LABEL{name} nodes"
+            Description = "Labeled statements are represented by label nodes"
         },
         ["unsafe"] = new FeatureInfo
         {
             Name = "unsafe",
             Support = SupportLevel.Full,
-            Description = "Unsafe code blocks are converted to §UNSAFE blocks"
+            Description = "Unsafe code blocks are represented by unsafe block nodes"
         },
         ["pointer"] = new FeatureInfo
         {
             Name = "pointer",
             Support = SupportLevel.Full,
-            Description = "Pointer types (int*) are supported with §ADDR and §DEREF"
+            Description = "Pointer types (int*) have address-of and dereference expression nodes"
         },
         ["stackalloc"] = new FeatureInfo
         {
             Name = "stackalloc",
             Support = SupportLevel.Full,
-            Description = "Stackalloc expressions are converted to §SALLOC nodes"
+            Description = "Stackalloc expressions are represented by stack-allocation nodes"
         },
         ["fixed"] = new FeatureInfo
         {
             Name = "fixed",
             Support = SupportLevel.Full,
-            Description = "Fixed statements are converted to §FIXED blocks"
+            Description = "Fixed statements are represented by fixed statement nodes"
         },
         ["volatile"] = new FeatureInfo
         {
@@ -419,19 +419,19 @@ public static class FeatureSupport
         {
             Name = "operator-overload",
             Support = SupportLevel.Full,
-            Description = "Operator overloads are fully supported via §OP tags and converted to op_ CIL-convention methods"
+            Description = "Operator overload declarations generate op_ CIL-convention methods"
         },
         ["implicit-conversion"] = new FeatureInfo
         {
             Name = "implicit-conversion",
             Support = SupportLevel.Full,
-            Description = "Implicit conversions are fully supported via §OP tags and converted to op_Implicit methods"
+            Description = "Implicit conversion declarations generate op_Implicit methods"
         },
         ["explicit-conversion"] = new FeatureInfo
         {
             Name = "explicit-conversion",
             Support = SupportLevel.Full,
-            Description = "Explicit conversions are fully supported via §OP tags and converted to op_Explicit methods"
+            Description = "Explicit conversion declarations generate op_Explicit methods"
         },
 
         // Additional features based on agent feedback
@@ -458,7 +458,7 @@ public static class FeatureSupport
         {
             Name = "equals-operator",
             Support = SupportLevel.Full,
-            Description = "Custom == and != operators are fully supported via §OP tags and converted to op_Equality/op_Inequality methods"
+            Description = "Custom == and != operator declarations generate op_Equality/op_Inequality methods"
         },
         ["primary-constructor"] = new FeatureInfo
         {
@@ -471,13 +471,13 @@ public static class FeatureSupport
         {
             Name = "range-expression",
             Support = SupportLevel.Full,
-            Description = "Range expressions (0..5, ..5, 5..) are converted to §RANGE nodes"
+            Description = "Range expressions (0..5, ..5, 5..) are represented by range-expression nodes"
         },
         ["index-from-end"] = new FeatureInfo
         {
             Name = "index-from-end",
             Support = SupportLevel.Full,
-            Description = "Index from end expressions (^1) are converted to §^ nodes"
+            Description = "Index from end expressions (^1) are represented by index-from-end nodes"
         },
         ["target-typed-new"] = new FeatureInfo
         {
@@ -509,7 +509,7 @@ public static class FeatureSupport
         {
             Name = "throw-expression",
             Support = SupportLevel.Full,
-            Description = "Throw expressions are preserved as §TH expressions"
+            Description = "Throw expressions retain their expression evaluation region"
         },
         ["nameof"] = new FeatureInfo
         {
@@ -547,9 +547,9 @@ public static class FeatureSupport
             Name = "in-parameter",
             Support = SupportLevel.Full,
             // #943 (D1 RO-LV-3, RO-CALL-3): the parameter form is native; some call sites are preserved.
-            Description = "in parameters and §A{in} arguments convert natively (a C# ref argument to an in parameter becomes §A{in}). " +
+            Description = "in parameters and in arguments convert natively (a C# ref argument to an in parameter becomes an in argument). " +
                 "A call statement that omits in, or whose by-reference operand contains a call, creation, assignment or ++/-- or " +
-                "indexes a non-array, stays C# (§RAW); in indexer parameters preserve the member"
+                "indexes a non-array, stays converter-owned C# interop; in indexer parameters preserve the member"
         },
         ["checked-block"] = new FeatureInfo
         {
@@ -561,7 +561,7 @@ public static class FeatureSupport
         {
             Name = "with-expression",
             Support = SupportLevel.Full,
-            Description = "with expressions (record copying) are converted to §WITH blocks"
+            Description = "with expressions (record copying) are represented by record-copy nodes"
         },
         ["init-accessor"] = new FeatureInfo
         {
@@ -601,7 +601,7 @@ public static class FeatureSupport
         {
             Name = "lock-statement",
             Support = SupportLevel.Full,
-            Description = "Lock statements are converted to §SYNC blocks with full semantics"
+            Description = "Lock statements are represented by lock nodes with full semantics"
         },
         ["await-foreach"] = new FeatureInfo
         {
@@ -657,7 +657,7 @@ public static class FeatureSupport
         {
             Name = "preprocessor-directive",
             Support = SupportLevel.Partial,
-            Description = "Default conversion preserves all #if/#elif/#else branches as explicit §PP AST across module declarations/usings, class and struct members, statements, nesting, and partial declarations",
+            Description = "Default conversion preserves all #if/#elif/#else branches as explicit conditional-compilation AST across module declarations/usings, class and struct members, statements, nesting, and partial declarations",
             Workaround = "Interface and enum member-level directives may use verbatim interop; review those counted preservation boundaries"
         },
         ["conditional-declaration"] = new FeatureInfo
@@ -671,14 +671,14 @@ public static class FeatureSupport
         {
             Name = "conditional-member",
             Support = SupportLevel.NotSupported,
-            Description = "Class and struct member branches are native §PP AST; interface and enum member branches may require verbatim interop",
+            Description = "Class and struct member branches use conditional-compilation AST; interface and enum member branches may require verbatim interop",
             Workaround = "Review interface and enum member-level conditional blocks"
         },
         ["conditional-statement"] = new FeatureInfo
         {
             Name = "conditional-statement",
             Support = SupportLevel.NotSupported,
-            Description = "Method block statement branches preserve #if/#elif/#else nesting as §PP AST; unsupported statement shapes remain explicit interop",
+            Description = "Method block statement branches preserve #if/#elif/#else nesting as conditional-compilation AST; unsupported statement shapes remain explicit interop",
             Workaround = "Review counted interop inside complex switch/accessor/lambda directive placements"
         },
         ["conditional-unmodeled-placement"] = new FeatureInfo
@@ -785,7 +785,7 @@ public static class FeatureSupport
             Name = "namespace",
             Support = SupportLevel.Partial,
             Description = "Single namespace scopes convert natively; lossless conversion preserves multiple, nested, or mixed global/namespace topologies as whole-file C# interop",
-            Workaround = "Use lossy mode for native §NS topology, or keep the lossless whole-file interop boundary"
+            Workaround = "Explicitly choose lossy mode to convert namespace topology, or retain the converter's lossless whole-file interop boundary"
         },
 
         ["namespace-single-scope"] = new FeatureInfo
@@ -800,7 +800,7 @@ public static class FeatureSupport
             Name = "namespace-topology",
             Support = SupportLevel.Partial,
             Description = "Multiple, nested, or mixed global/namespace scopes convert natively only in explicit lossy mode; default lossless mode uses whole-file interop",
-            Workaround = "Review the recorded namespace-topology interop loss or explicitly choose lossy native §NS conversion"
+            Workaround = "Review the recorded namespace-topology interop loss or explicitly choose lossy namespace-topology conversion"
         },
 
         // #777 (WS-W4 D4): local functions are never hoisted to module level — the
@@ -810,8 +810,8 @@ public static class FeatureSupport
         {
             Name = "local-function",
             Support = SupportLevel.Partial,
-            Description = "A non-capturing, non-generic local function with direct calls after its declaration converts at the same point to a typed §B lambda binding. Direct self-recursion additionally requires a pure body proved over resolved built-in scalar operations; its lambda captures only an initialized internal self binding. Forward/mutual calls, method-group uses, captures, explicit checked/unchecked regions in recursive bodies, named local-call arguments, unused locals, attributes, async/unsafe/extern, yield, nested locals, ref-like signatures and ref/out/in/params/default parameters preserve the containing member as §CSHARP interop",
-            Workaround = "Use an existing lambda binding with calls after its declaration, or keep the original member as §CSHARP interop"
+            Description = "A non-capturing, non-generic local function with direct calls after its declaration converts at the same point to a typed lambda binding. Direct self-recursion additionally requires a pure body proved over resolved built-in scalar operations; its lambda captures only an initialized internal self binding. Forward/mutual calls, method-group uses, captures, explicit checked/unchecked regions in recursive bodies, named local-call arguments, unused locals, attributes, async/unsafe/extern, yield, nested locals, ref-like signatures and ref/out/in/params/default parameters preserve the containing member as converter-owned C# interop",
+            Workaround = "Use an existing lambda binding with calls after its declaration, or let the converter preserve the original C# member"
         },
 
         // #1139: a property or indexer accessor that yields is a C# iterator.
@@ -821,8 +821,8 @@ public static class FeatureSupport
         {
             Name = "iterator-accessor",
             Support = SupportLevel.NotSupported,
-            Description = "A property or indexer whose accessor uses yield return/yield break is preserved verbatim as a §CSHARP interop block; Calor has no iterator accessors (Calor0209)",
-            Workaround = "Move the iterator body into a method (§MT with §YIELD) and have the accessor return its result, or keep the member as a §CSHARP interop block"
+            Description = "A property or indexer whose accessor uses yield return/yield break is preserved verbatim as converter-owned C# interop; Calor has no iterator accessors (Calor0209)",
+            Workaround = "Move the iterator body into a method and have the accessor return its result, or let the converter preserve the original C# member"
         },
 
         // #1139: Calor has no partial property or indexer. A native defining
@@ -831,8 +831,8 @@ public static class FeatureSupport
         {
             Name = "partial-property",
             Support = SupportLevel.NotSupported,
-            Description = "Each declaration of a partial property or indexer (C# 13) is preserved verbatim as a §CSHARP interop block; Calor has no partial members",
-            Workaround = "Merge the defining and implementing declarations into one ordinary property before migration, or keep both as §CSHARP interop blocks"
+            Description = "Each declaration of a partial property or indexer (C# 13) is preserved verbatim as converter-owned C# interop; Calor has no partial members",
+            Workaround = "Merge the defining and implementing declarations into one ordinary property before migration, or let the converter preserve both original C# declarations"
         },
 
         // Phase 4 features (C# 11-13)
@@ -887,15 +887,15 @@ public static class FeatureSupport
         {
             Name = "unsupported-binary-operator",
             Support = SupportLevel.NotSupported,
-            Description = "Binary operator has no Calor mapping; the containing member is preserved as §CSHARP interop (never substituted with +)",
-            Workaround = "Rewrite using a supported operator or keep the member as §CSHARP interop"
+            Description = "Binary operator has no Calor mapping; the containing member is preserved as converter-owned C# interop (never substituted with +)",
+            Workaround = "Rewrite using a supported operator or let the converter preserve the original C# member"
         },
         ["unsupported-compound-assignment"] = new FeatureInfo
         {
             Name = "unsupported-compound-assignment",
             Support = SupportLevel.NotSupported,
-            Description = "Compound assignment operator (e.g. >>>=) has no Calor mapping; the containing member is preserved as §CSHARP interop (never emitted as a plain assignment)",
-            Workaround = "Rewrite as x = x OP y with a supported operator, or keep the member as §CSHARP interop"
+            Description = "Compound assignment operator (e.g. >>>=) has no Calor mapping; the containing member is preserved as converter-owned C# interop (never emitted as a plain assignment)",
+            Workaround = "Rewrite as x = x OP y with a supported operator, or let the converter preserve the original C# member"
         },
         // #1574: an assignment used as a value is hoisted before its statement only where the
         // hoist runs it once and in C#'s order; every other position keeps the statement as C#.
@@ -942,29 +942,29 @@ public static class FeatureSupport
         {
             Name = "unsupported-switch-label",
             Support = SupportLevel.NotSupported,
-            Description = "Switch label kind (e.g. pattern case label) is not convertible; the containing member is preserved as §CSHARP interop (never broadened to a wildcard)",
-            Workaround = "Rewrite as a constant case label or if/else chain, or keep the member as §CSHARP interop"
+            Description = "Switch label kind (e.g. pattern case label) is not convertible; the containing member is preserved as converter-owned C# interop (never broadened to a wildcard)",
+            Workaround = "Rewrite as a constant case label or if/else chain, or let the converter preserve the original C# member"
         },
         ["unsupported-pattern-operator"] = new FeatureInfo
         {
             Name = "unsupported-pattern-operator",
             Support = SupportLevel.NotSupported,
-            Description = "Relational/binary pattern operator has no Calor mapping; the containing member is preserved as §CSHARP interop (never defaulted to ==/&&)",
-            Workaround = "Rewrite the pattern with supported operators, or keep the member as §CSHARP interop"
+            Description = "Relational/binary pattern operator has no Calor mapping; the containing member is preserved as converter-owned C# interop (never defaulted to ==/&&)",
+            Workaround = "Rewrite the pattern with supported operators, or let the converter preserve the original C# member"
         },
         ["unsupported-prefix-operator"] = new FeatureInfo
         {
             Name = "unsupported-prefix-operator",
             Support = SupportLevel.NotSupported,
-            Description = "Built-in numeric unary + converts through a native cast preserving numeric promotion and nullable lifting. User-defined, dynamic or unresolved unary + is preserved as §CSHARP interop (never dropped or substituted with negation)",
+            Description = "Built-in numeric unary + converts through a native cast preserving numeric promotion and nullable lifting. User-defined, dynamic or unresolved unary + is preserved as converter-owned C# interop (never dropped or substituted with negation)",
             Workaround = "Keep user-defined or unresolved unary + as C# interop"
         },
         ["unsupported-slice-subpattern"] = new FeatureInfo
         {
             Name = "unsupported-slice-subpattern",
             Support = SupportLevel.NotSupported,
-            Description = "A list-pattern slice carrying an inner sub-pattern (e.g. ..[1,2]) constrains the remaining elements; it is preserved as §CSHARP interop (never broadened by dropping the sub-pattern)",
-            Workaround = "Match the remaining elements explicitly, or keep the member as §CSHARP interop"
+            Description = "A list-pattern slice carrying an inner sub-pattern (e.g. ..[1,2]) constrains the remaining elements; it is preserved as converter-owned C# interop (never broadened by dropping the sub-pattern)",
+            Workaround = "Match the remaining elements explicitly, or let the converter preserve the original C# member"
         },
         ["type-pattern"] = new FeatureInfo
         {
@@ -982,15 +982,15 @@ public static class FeatureSupport
         {
             Name = "generic-delegate",
             Support = SupportLevel.NotSupported,
-            Description = "Generic delegate declarations are preserved verbatim as counted §CSHARP interop so type parameters and constraints remain exact",
-            Workaround = "Use Func<>/Action<> or keep the delegate as §CSHARP interop"
+            Description = "Generic delegate declarations are preserved verbatim as counted converter-owned C# interop so type parameters and constraints remain exact",
+            Workaround = "Use Func<>/Action<> or let the converter preserve the original C# delegate"
         },
         ["conversion-error"] = new FeatureInfo
         {
             Name = "conversion-error",
             Support = SupportLevel.NotSupported,
-            Description = "The converter crashed on this construct; the containing statement/member is preserved as §CSHARP interop",
-            Workaround = "Simplify the construct or keep it as §CSHARP interop"
+            Description = "The converter crashed on this construct; the containing statement/member is preserved as converter-owned C# interop",
+            Workaround = "Simplify the construct or let the converter preserve the original C# statement/member"
         },
 
         // Fallback features (for explain mode)
@@ -1067,7 +1067,7 @@ public static class FeatureSupport
         {
             Name = "default-parameter",
             Support = SupportLevel.Full,
-            Description = "Default parameter values are converted to §I{type:name} = value syntax"
+            Description = "Default parameter values are retained on parameter declarations"
         },
 
         // Issue #325: Language gap features
@@ -1135,7 +1135,7 @@ public static class FeatureSupport
         {
             Name = "multidim-array",
             Support = SupportLevel.Full,
-            Description = "Rectangular arrays (int[,], int[,,]) convert natively: sized creation, nested initializers (§ROW), element " +
+            Description = "Rectangular arrays (int[,], int[,,]) convert natively: sized creation, nested initializer rows, element " +
                 "access, and new[,] of a known type. new[,] of an unknown type, and an element that cannot be written in place " +
                 "(a collection initializer or a multi-line element, array-element-block), are preserved as C#"
         },
@@ -1145,19 +1145,19 @@ public static class FeatureSupport
         {
             Name = "refinement-type",
             Support = SupportLevel.Full,
-            Description = "Refinement types (§RTYPE) define base types constrained by predicates; erased to base types in C#"
+            Description = "Refinement-type nodes define base types constrained by predicates; erased to base types in C#"
         },
         ["proof-obligation"] = new FeatureInfo
         {
             Name = "proof-obligation",
             Support = SupportLevel.Full,
-            Description = "Proof obligations (§PROOF) declare conditions to be verified; emitted as comments or runtime checks"
+            Description = "Proof-obligation nodes declare conditions to be verified; emitted as comments or runtime checks"
         },
         ["indexed-type"] = new FeatureInfo
         {
             Name = "indexed-type",
             Support = SupportLevel.Full,
-            Description = "Indexed types (§ITYPE) define size-parameterized types for bounds checking; erased to base types in C#"
+            Description = "Indexed-type nodes define size-parameterized types for bounds checking; erased to base types in C#"
         },
         ["index-bounds"] = new FeatureInfo
         {
@@ -1183,7 +1183,7 @@ public static class FeatureSupport
         {
             Name = "verbatim-identifier",
             Support = SupportLevel.Full,
-            Description = "C# @keyword identifiers mapped to backtick syntax in Calor"
+            Description = "C# @keyword identifiers retain @ escaping in Calor"
         },
         ["pragma"] = new FeatureInfo
         {
@@ -1196,7 +1196,7 @@ public static class FeatureSupport
         {
             Name = "conditional-using",
             Support = SupportLevel.Full,
-            Description = "Using directives inside #if blocks supported via §PP wrapping §U"
+            Description = "Using directives inside #if blocks are represented inside conditional-compilation nodes"
         },
         ["nullable-directive"] = new FeatureInfo
         {

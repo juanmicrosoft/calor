@@ -894,8 +894,15 @@ public sealed class HelpTool : McpToolBase
 
     #region FeatureSupport Models
 
+    private const string FeatureSupportGuidance =
+        "C# conversion capabilities and preservation boundaries, not an authoring grammar. "
+        + "Use action=syntax for current forms. Raw interop is converter-owned; do not handwrite passthrough frames.";
+
     private sealed class FeatureQueryResult
     {
+        [JsonPropertyName("guidance")]
+        public string Guidance => FeatureSupportGuidance;
+
         [JsonPropertyName("feature")]
         public required string Feature { get; init; }
 
@@ -913,6 +920,9 @@ public sealed class HelpTool : McpToolBase
 
     private sealed class FeatureListResult
     {
+        [JsonPropertyName("guidance")]
+        public string Guidance => FeatureSupportGuidance;
+
         [JsonPropertyName("supportLevel")]
         public required string SupportLevel { get; init; }
 
@@ -939,6 +949,9 @@ public sealed class HelpTool : McpToolBase
 
     private sealed class FeatureSummaryResult
     {
+        [JsonPropertyName("guidance")]
+        public string Guidance => FeatureSupportGuidance;
+
         [JsonPropertyName("totalFeatures")]
         public int TotalFeatures { get; init; }
 
