@@ -1317,7 +1317,7 @@ public static class FeatureSupport
             "conditional-expression-hoisting", "conditional-interface-member",
             "conditional-interface-placement", "conditional-top-level-statement",
             "conditional-type-placement", "conditional-unmodeled-placement",
-            "conversion-error", "csharp-script", "default-member-collision",
+            "conversion-error", "csharp-script", "default-expression", "default-member-collision",
             "delegate", "dictionary-initializer", "embedded-assignment", "enum", "event-definition",
             "explicit-interface", "extern-alias", "foreach-collection-order", "in-parameter",
             "initializer-interop", "interface", "iterator-accessor",

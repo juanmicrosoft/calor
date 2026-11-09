@@ -434,6 +434,7 @@ public class FeatureCheckCommandTests
     [InlineData("record-struct")]
     [InlineData("preprocessor-disabled")]
     [InlineData("conversion-error")]
+    [InlineData("default-expression")]
     [InlineData("whole-file-preservation")]
     public void PreservationAuthority_MissingOriginalContextIsExplicit(string feature)
     {
@@ -458,6 +459,7 @@ public class FeatureCheckCommandTests
     [InlineData("whole-file-preservation")]
     [InlineData("async-return-signature")]
     [InlineData("alias-qualified-value")]
+    [InlineData("default-expression")]
     [InlineData("null-forgiving-expression")]
     [InlineData("dictionary-initializer")]
     [InlineData("explicit-interface")]
