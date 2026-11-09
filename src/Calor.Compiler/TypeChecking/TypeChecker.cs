@@ -1829,7 +1829,7 @@ public sealed class TypeChecker
             IntLiteralNode => PrimitiveType.Int,
             FloatLiteralNode => PrimitiveType.Float,
             BoolLiteralNode => PrimitiveType.Bool,
-            StringLiteralNode => PrimitiveType.String,
+            StringLiteralNode or NameOfExpressionNode => PrimitiveType.String,
             NullCoalesceNode coalesce => InferNullCoalesceType(coalesce),
             ConditionalExpressionNode conditional => InferConditionalExpressionType(conditional),
             ThrowExpressionNode throwExpression => InferThrowExpressionType(throwExpression),
@@ -4905,6 +4905,8 @@ public sealed class TypeChecker
         if (field.Target is ThisExpressionNode or ReferenceNode { Name: "this" } && LookupThisMember(field.FieldName) is { } memberType)
             return memberType;
         var targetType = InferExpressionType(field.Target);
+        if (targetType == PrimitiveType.String && field.FieldName == "Length")
+            return PrimitiveType.Int;
 
         if (targetType is RecordType recordType)
         {

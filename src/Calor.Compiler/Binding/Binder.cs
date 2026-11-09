@@ -3976,6 +3976,14 @@ public sealed class Binder
             ?? BindExpression(fieldAccess.Target);
         if (fieldAccess.FieldName == "Length" && IsArrayReceiver(target))
             return new BoundArrayLength(fieldAccess.Span, target);
+        if (fieldAccess.FieldName == "Length" && target is BoundStringLiteral
+            && GetOrCreateMetadataBinder() is { } stringMetadata
+            && stringMetadata.Context.TryResolveType("System.String") is { } stringType
+            && stringMetadata.ResolveMemberRead(stringType, "Length", false, out _)
+                is Microsoft.CodeAnalysis.IPropertySymbol
+                    { IsStatic: false, Type.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_Int32 } length)
+            return new BoundFieldAccessExpression(fieldAccess.Span, target, "Length", "INT",
+                fieldNameSpan: fieldAccess.FieldNameSpan) { ResolvedMetadataMember = length };
         var resolvedFields = fieldAccess.Target switch
         {
             ThisExpressionNode => ResolveAccessibleMembers(_currentClass, fieldAccess.FieldName),
@@ -4146,7 +4154,18 @@ public sealed class Binder
 
     private BoundExpression BindTypeOperation(TypeOperationNode typeOp)
     {
-        var operand = BindExpression(typeOp.Operand);
+        BoundTypes.FunctionBoundType? callable = null;
+        if (typeOp is { Operation: TypeOp.Cast, Operand: LambdaExpressionNode }
+            && GetOrCreateMetadataBinder() is { } metadata
+            && ResolveComputedMetadataType(metadata.Context, typeOp.TargetType)
+                is Microsoft.CodeAnalysis.INamedTypeSymbol
+                    { TypeKind: Microsoft.CodeAnalysis.TypeKind.Delegate, DelegateInvokeMethod: { } invoke })
+            callable = new BoundTypes.FunctionBoundType(
+                System.Collections.Immutable.ImmutableArray.CreateRange(
+                    invoke.Parameters.Select(parameter => Metadata.MetadataBinderResult.ToBoundType(parameter.Type))),
+                Metadata.MetadataBinderResult.ToBoundType(invoke.ReturnType),
+                displayOverride: typeOp.TargetType, row: BoundTypes.EffectRow.Unknown);
+        var operand = BindExpression(typeOp.Operand, callable);
         var annotation = typeOp.Operation switch
         {
             TypeOp.Cast when operand is BoundNullLiteral =>
@@ -4166,7 +4185,8 @@ public sealed class Binder
             typeOp.Operation,
             operand,
             typeOp.TargetType,
-            annotation);
+            annotation,
+            resolvedType: callable);
     }
 
     private BoundExpression BindIsPattern(IsPatternNode isPattern)

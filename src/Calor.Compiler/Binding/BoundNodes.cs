@@ -2136,13 +2136,14 @@ public sealed class BoundTypeOperationExpression : BoundExpression
         TypeOp operation,
         BoundExpression operand,
         string targetType,
-        NullableAnnotation nullableAnnotation = NullableAnnotation.Oblivious)
+        NullableAnnotation nullableAnnotation = NullableAnnotation.Oblivious,
+        BoundType? resolvedType = null)
         : base(span)
     {
         Operation = operation;
         Operand = operand ?? throw new ArgumentNullException(nameof(operand));
         TargetType = targetType ?? throw new ArgumentNullException(nameof(targetType));
-        Type = new NominalBoundType(
+        Type = resolvedType ?? new NominalBoundType(
             operation == TypeOp.Is ? "BOOL" : targetType,
             operation == TypeOp.Is ? NullableAnnotation.NotAnnotated : nullableAnnotation);
         Children = [operand];

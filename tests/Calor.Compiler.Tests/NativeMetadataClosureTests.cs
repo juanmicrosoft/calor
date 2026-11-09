@@ -15,6 +15,159 @@ namespace Calor.Compiler.Tests;
 public sealed class NativeMetadataClosureTests
 {
     [Theory]
+    [InlineData("(Func<int>)(() => 9)")]
+    [InlineData("(f)(1)")]
+    [InlineData("(T)-n")]
+    [InlineData("(T)!flag")]
+    [InlineData("(T)~n")]
+    [InlineData("(T)+n")]
+    [InlineData("(Func<int>)-n")]
+    [InlineData("(N.T)(value)")]
+    [InlineData("(N.T)!flag")]
+    [InlineData("(N.F<int>)(() => 9)")]
+    [InlineData("(f)(1, 2)")]
+    public void NativeCastDisambiguation_MatchesCSharpSyntax(string expression)
+    {
+        var expected = SyntaxFactory.ParseExpression(expression);
+        Assert.False(expected.ContainsDiagnostics, expected.ToFullString());
+        var module = Parse($"module CastSyntax\n  func Probe () → object\n    return {expression}");
+        var actual = Assert.IsType<ReturnStatementNode>(
+            Assert.Single(Assert.Single(module.Functions).Body)).Expression;
+        Assert.True((expected is Microsoft.CodeAnalysis.CSharp.Syntax.CastExpressionSyntax)
+            == (actual is TypeOperationNode { Operation: TypeOp.Cast }),
+            $"{expression}: C# {expected.Kind()}, native {actual!.GetType().Name}");
+    }
+
+    [Theory]
+    [InlineData("nameof(n).Length", "1")]
+    [InlineData("(nameof(n)).Length", "1")]
+    [InlineData("\"abc\".Length", "3")]
+    public void NativeNameofAndLiteralLength_RetainStringMetadataAndPureInterpolation(string expression, string expected)
+    {
+        var authored = "module Native Native\n  func Probe (int:n) → string\n    return \"${" + expression + "}\"";
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var diagnostics = new DiagnosticBag();
+            var bound = new Binder(diagnostics).Bind(Parse(source));
+            Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+            var interpolation = Assert.IsType<BoundInterpolatedStringExpression>(
+                Assert.IsType<BoundReturnStatement>(Assert.Single(Assert.Single(bound.Functions).Body)).Expression);
+            var member = Assert.IsType<BoundFieldAccessExpression>(Assert.Single(interpolation.Children));
+            Assert.False(member.HasUnknownInferredType);
+            Assert.Equal("INT", member.Type.DisplayString);
+            var property = Assert.IsAssignableFrom<IPropertySymbol>(member.ResolvedMetadataMember);
+            Assert.Equal(SpecialType.System_String, property.ContainingType.SpecialType);
+            Assert.Equal(SpecialType.System_Int32, property.Type.SpecialType);
+            var result = Compile(source);
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+            Assert.Equal(expected, CompileAssembly(result.GeneratedCode).GetType("Native.NativeModule")!
+                .GetMethod("Probe")!.Invoke(null, [12]));
+        }
+    }
+
+    [Fact]
+    public void NativeNameofLength_DoesNotMakeUnknownStringMembersPure()
+    {
+        var result = Compile("""
+            module UnknownNameofMember
+              func Probe (int:n) → int
+                return nameof(n).Missing
+            """);
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void NativeCastLambdaInvocation_RetainsTheOriginalNineWithoutAnOpaqueAssumption()
+    {
+        const string authored = """
+            module Native Native
+              func Probe () → string
+                return "${((Func<int>)(() => 9))()}"
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var diagnostics = new DiagnosticBag();
+            var bound = new Binder(diagnostics).Bind(Parse(source));
+            Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+            var interpolation = Assert.IsType<BoundInterpolatedStringExpression>(
+                Assert.IsType<BoundReturnStatement>(Assert.Single(Assert.Single(bound.Functions).Body)).Expression);
+            var call = Assert.IsType<BoundExpressionCall>(Assert.Single(interpolation.Children));
+            var cast = Assert.IsType<BoundTypeOperationExpression>(call.Target);
+            var lambda = Assert.IsType<BoundLambdaExpression>(cast.Operand);
+            Assert.Equal(9, Assert.IsType<BoundIntLiteral>(lambda.ExpressionBody).Value);
+            var signature = Assert.IsType<Calor.Compiler.Binding.BoundTypes.FunctionBoundType>(cast.Type);
+            Assert.Empty(signature.ParameterTypes);
+            Assert.Equal(signature.ReturnType, call.Type);
+            Assert.False(call.HasUnknownInferredType);
+            var result = Compile(source);
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+            Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code.StartsWith("Calor04", StringComparison.Ordinal));
+            Assert.Equal("9", CompileAssembly(result.GeneratedCode).GetType("Native.NativeModule")!
+                .GetMethod("Probe")!.Invoke(null, null));
+        }
+    }
+
+    [Theory]
+    [InlineData("Func<int>", "int")]
+    [InlineData("System.Func<int>", "int")]
+    [InlineData("Func<object>", "object")]
+    public void NativeCastLambdaInvocation_RetainsTheAuthoredDelegateReturnOverload(string type, string expected)
+    {
+        var authored = $$"""
+            module DelegateReturnIdentity
+              func Pick (int:value) → string
+                return "int"
+              func Pick (object:value) → string
+                return "object"
+              func Probe () → string
+                return Pick((({{type}})(() => 9))())
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var result = Compile(source);
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+            var method = CompileAssembly(result.GeneratedCode).GetTypes()
+                .SelectMany(type => type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                .Single(method => method.Name == "Probe");
+            Assert.Equal(expected, method.Invoke(null, null));
+        }
+    }
+
+    [Theory]
+    [InlineData("((Func<int>)(() => Next()))()")]
+    [InlineData("((Func<int,int>)((x) => x))(Next())")]
+    public void NativeCastLambdaInvocation_ChargesBodyAndArgumentEffects(string expression)
+    {
+        var authored = $$"""
+            module DelegateEffects
+              func Next () → int
+                ! cw
+                System.Console.WriteLine("next")
+                return 9
+              func Probe () → int
+                return {{expression}}
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var result = Compile(source);
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'cw'"));
+        }
+    }
+
+    [Fact]
+    public void NativeCastUnknownDelegate_DoesNotAcquireALiteralBodyProof()
+    {
+        var result = Compile("""
+            module UnknownDelegate
+              func Probe (Func<int>:value) → int
+                return ((Func<int>)value)()
+            """);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0419");
+    }
+
+    [Theory]
     [InlineData("module Demo\n  func Run () → void\n    let items = new System.Collections.Generic.List<int> {1, 2}")]
     [InlineData("module Demo\n  func Run () → void\n    let items = new System.Collections.Generic.Dictionary<string,int> {{\"a\", 1}}")]
     [InlineData("module Demo\n  func Run () → void\n    let items = new System.Collections.Generic.HashSet<string> {\"a\"}")]

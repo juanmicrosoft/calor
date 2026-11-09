@@ -4784,6 +4784,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(TypeOperationNode node)
     {
         var operand = AcceptInInlineSibling(node.Operand);
+        if (node.Operation == TypeOp.Cast && node.Operand is LambdaExpressionNode)
+            operand = $"({operand})";
         return node.Operation switch
         {
             TypeOp.Cast => $"(({TypeMapper.ToSurfaceType(node.TargetType)}){operand})",

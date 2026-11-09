@@ -3804,8 +3804,10 @@ public sealed class Parser
             return false;
         var unambiguousType = type is PredefinedTypeSyntax or NullableTypeSyntax or ArrayTypeSyntax
             or PointerTypeSyntax or TupleTypeSyntax;
-        if (!unambiguousType && following.Kind is TokenKind.Minus or TokenKind.Exclamation
-            or TokenKind.Tilde or TokenKind.OpenParen)
+        if (!unambiguousType && following.Kind is TokenKind.Minus or TokenKind.Plus)
+            return false;
+        if (following.Kind == TokenKind.OpenParen && close + 2 < _tokens.Count
+            && _tokens[close + 2].Kind == TokenKind.CloseParen)
             return false;
         var saved = _position;
         _position = close + 1;

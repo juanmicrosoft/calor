@@ -5449,7 +5449,7 @@ public sealed class EffectEnforcementPass
                 return EffectResolver.NormalizeParameterType(metadataType.ToDisplayString());
             return expression switch
             {
-                StringLiteralNode => "String",
+                StringLiteralNode or NameOfExpressionNode => "String",
                 IntLiteralNode => "Int32",
                 BoolLiteralNode => "Boolean",
                 FloatLiteralNode => "Double",
@@ -6095,6 +6095,9 @@ public sealed class EffectEnforcementPass
                 case LambdaExpressionNode lambda:
                     // Immediately-invoked lambda literal: the body IS the callee,
                     // so its effects are fully charged — no delegate opacity.
+                    return InferFromLambda(lambda).Union(argEffects);
+
+                case TypeOperationNode { Operation: TypeOp.Cast, Operand: LambdaExpressionNode lambda }:
                     return InferFromLambda(lambda).Union(argEffects);
 
                 case CallExpressionNode inner:
