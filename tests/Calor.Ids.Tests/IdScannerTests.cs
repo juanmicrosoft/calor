@@ -11,16 +11,16 @@ public class IdScannerTests
 {
     [Theory]
     [InlineData("", IdKind.Module, "TestModule")]
-    [InlineData("  §F{TestFunction:pub} () -> void", IdKind.Function, "TestFunction")]
-    [InlineData("  §CL{TestClass:pub}", IdKind.Class, "TestClass")]
-    [InlineData("  §CL{TestClass:pub}\n    §MT{TestMethod:pub} () -> void", IdKind.Method, "TestMethod")]
-    [InlineData("  §CL{TestClass:pub}\n    §PROP{TestProperty:i32:pub:get,set}", IdKind.Property, "TestProperty")]
-    [InlineData("  §CL{TestClass:pub}\n    §CTOR{pub} ()", IdKind.Constructor, ".ctor")]
-    [InlineData("  §IFACE{ITestInterface}", IdKind.Interface, "ITestInterface")]
-    [InlineData("  §EN{Status:pub}\n    Active", IdKind.Enum, "Status")]
+    [InlineData("  func TestFunction () → void", IdKind.Function, "TestFunction")]
+    [InlineData("  class TestClass", IdKind.Class, "TestClass")]
+    [InlineData("  class TestClass\n    func TestMethod () → void", IdKind.Method, "TestMethod")]
+    [InlineData("  class TestClass\n    property int:TestProperty\n      get\n      set", IdKind.Property, "TestProperty")]
+    [InlineData("  class TestClass\n    ctor ()", IdKind.Constructor, ".ctor")]
+    [InlineData("  interface ITestInterface", IdKind.Interface, "ITestInterface")]
+    [InlineData("  enum Status\n    Active", IdKind.Enum, "Status")]
     public void ScanFindsEffectiveSidecarIdentity(string members, IdKind kind, string name)
     {
-        var source = "§M{TestModule}\n" + members + "\n";
+        var source = "module TestModule\n" + members + "\n";
         WithIdentity(source, (module, state) =>
         {
             var entries = new IdScanner().Scan(module, "test.calr");
@@ -35,7 +35,7 @@ public class IdScannerTests
     [Fact]
     public void ScanRecordsRequestedFilePath()
     {
-        WithIdentity("§M{TestModule}", (module, _) =>
+        WithIdentity("module TestModule", (module, _) =>
         {
             var entries = new IdScanner().Scan(module, "/path/to/test.calr");
             Assert.Single(entries);
@@ -47,14 +47,15 @@ public class IdScannerTests
     public void ScanFindsEveryDeclarationExactlyOnceInComplexFile()
     {
         const string source = """
-            §M{TestModule}
-              §F{Func1:pub} () -> void
-              §CL{Class1:pub}
-                §MT{Method1:pub} () -> void
-                §PROP{Prop1:i32:pub:get}
-                §CTOR{pub} ()
-              §IFACE{ITest}
-              §EN{Status:pub}
+            module TestModule
+              func Func1 () → void
+              class Class1
+                func Method1 () → void
+                property int:Prop1
+                  get
+                ctor ()
+              interface ITest
+              enum Status
                 Active
             """;
         WithIdentity(source, (module, state) =>

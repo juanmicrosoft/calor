@@ -16,7 +16,7 @@ public class HookIdValidationTests : IDisposable
     [Fact]
     public void ValidateIds_AllowsValidCurrentContentWithoutChangingSidecar()
     {
-        const string content = "§M{TestModule}\n  §F{TestFunc:pub} () -> void\n";
+        const string content = "module TestModule\n  func TestFunc () → void\n";
         var (file, store) = Register(content);
         var before = File.ReadAllText(store.SidecarPath);
 
@@ -39,7 +39,7 @@ public class HookIdValidationTests : IDisposable
     [Fact]
     public void ValidateIds_AllowsIdShapedSemanticNames()
     {
-        const string content = "§M{m001}\n  §F{f001:pub} () -> void\n";
+        const string content = "module m001\n  func f001 () → void\n";
         var (file, _) = Register(content);
         var (exitCode, reason) = HookCommand.ValidateIds(CreateToolInput(file, content));
         Assert.Equal(0, exitCode);
@@ -49,7 +49,7 @@ public class HookIdValidationTests : IDisposable
     [Fact]
     public void ValidateIds_BlocksDuplicatePersistedIdsWithoutWritingAnything()
     {
-        const string content = "§M{TestModule}\n  §F{First:pub} () -> void\n  §F{Second:pub} () -> void\n";
+        const string content = "module TestModule\n  func First () → void\n  func Second () → void\n";
         var (file, store) = Register(content);
         var functions = store.Sync().Declarations.Where(d => d.Kind == IdKind.Function).ToArray();
         var corrupt = File.ReadAllText(store.SidecarPath).Replace(functions[1].Id, functions[0].Id);
@@ -69,7 +69,7 @@ public class HookIdValidationTests : IDisposable
     [Fact]
     public void ValidateIds_BlocksMalformedIdentityStorage()
     {
-        const string content = "§M{TestModule}\n";
+        const string content = "module TestModule\n";
         var (file, store) = Register(content);
         File.WriteAllText(store.SidecarPath, "{ malformed");
 
@@ -83,7 +83,7 @@ public class HookIdValidationTests : IDisposable
     [Fact]
     public void ValidateIds_BlocksAmbiguousContinuityWithoutWritingAnything()
     {
-        const string content = "§M{TestModule}\n  §F{First:pub} () -> void\n  §F{Second:pub} () -> void\n";
+        const string content = "module TestModule\n  func First () → void\n  func Second () → void\n";
         var (file, store) = Register(content);
         var before = File.ReadAllText(store.SidecarPath);
         var proposed = content.Replace("First", "RenamedFirst").Replace("Second", "RenamedSecond");
@@ -99,11 +99,11 @@ public class HookIdValidationTests : IDisposable
     [Fact]
     public void ValidateIds_AllowsNewFunctionsWithoutMintingPersistedIds()
     {
-        const string content = "§M{TestModule}\n  §F{TestFunc:pub} () -> void\n";
+        const string content = "module TestModule\n  func TestFunc () → void\n";
         var (file, store) = Register(content);
         var before = File.ReadAllText(store.SidecarPath);
         var (exitCode, _) = HookCommand.ValidateIds(CreateToolInput(file,
-            content + "  §F{NewFunc:pub} () -> void\n"));
+            content + "  func NewFunc () → void\n"));
         Assert.Equal(0, exitCode);
         Assert.Equal(before, File.ReadAllText(store.SidecarPath));
         Assert.Equal(content, File.ReadAllText(file));
