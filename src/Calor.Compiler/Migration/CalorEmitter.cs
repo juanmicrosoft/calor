@@ -2404,8 +2404,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(CompoundAssignmentStatementNode node)
     {
         if (node.Operator == CompoundAssignmentOperator.NullCoalesce)
-            return Visit(new AssignmentStatementNode(node.Span, node.Target,
-                new NullCoalesceNode(node.Span, node.Target, node.Value)));
+            throw new NotSupportedException(
+                "Null-coalescing stores require declaration-proven lowering before Calor emission.");
 
         var target = node.Target.Accept(this);
         var value = node.Value.Accept(this);

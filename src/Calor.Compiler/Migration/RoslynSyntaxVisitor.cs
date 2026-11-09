@@ -8020,7 +8020,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     /// <summary>
     /// #1633 audit: <c>t ??= v</c>. C# reads <c>t</c> once and, only when it is null, runs
-    /// <c>v</c> and stores it. <c>t = t ?? v</c> is exact for a variable or field target when
+    /// <c>v</c> and stores it. <c>t = t ?? v</c> is exact for a local or parameter target when
     /// <c>v</c> hoists nothing (the store of an unchanged value is unobservable); otherwise the
     /// assignment becomes <c>if (!(t is object)) { hoisted; t = v; }</c>.
     /// </summary>
@@ -8044,9 +8044,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _pendingStatements.AddRange(enclosing);
         }
 
-        var storage = _semanticModel!.GetSymbolInfo(Unparen(left)).Symbol is ILocalSymbol or IParameterSymbol or IFieldSymbol;
+        var storage = _semanticModel!.GetSymbolInfo(Unparen(left)).Symbol is ILocalSymbol or IParameterSymbol;
         if (parts is { HasParts: false } && storage && hoisted.Count == 0)
-            return new CompoundAssignmentStatementNode(span, targetNode!, CompoundAssignmentOperator.NullCoalesce, value);
+            return new AssignmentStatementNode(span, targetNode!, new NullCoalesceNode(span, targetNode!, value));
         if (parts == null)
             throw EscalateExpression(site, "compound-assignment-order");
 

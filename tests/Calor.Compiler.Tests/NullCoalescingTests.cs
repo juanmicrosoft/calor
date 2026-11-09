@@ -168,6 +168,88 @@ public class NullCoalescingTests
             "public static class Witness { public static string Run() => Probe.Run(); }", expected);
     }
 
+    [Theory]
+    [InlineData("property", false, "assigned|1|0|1|1|1")]
+    [InlineData("property", true, "kept|1|0|1|0|0")]
+    [InlineData("indexer", false, "assigned|1|1|1|1|1")]
+    [InlineData("indexer", true, "kept|1|1|1|0|0")]
+    [InlineData("implicit", false, "assigned|0|0|1|1|1")]
+    [InlineData("implicit", true, "kept|0|0|1|0|0")]
+    [InlineData("field", false, "assigned|0|0|0|0|1")]
+    [InlineData("field", true, "kept|0|0|0|0|0")]
+    public void NativeCoalescingAccessors_PreserveReceiverGetterSetterAndRhsCounts(
+        string target, bool populated, string expected)
+    {
+        var assignment = target switch
+        {
+            "property" => "Get(box).Value ??= Right();",
+            "indexer" => "Get(box)[Index()] ??= Right();",
+            "implicit" => "box.Assign();",
+            "field" => "box.AssignField();",
+            _ => throw new ArgumentOutOfRangeException(nameof(target))
+        };
+        var source = $$"""
+            public sealed class Box
+            {
+                public string? Field;
+                public int Gets;
+                public int Sets;
+                public string? Value
+                {
+                    get { Gets++; return Field; }
+                    set { Sets++; Field = value; }
+                }
+                public string? this[int index]
+                {
+                    get { Gets++; return Field; }
+                    set { Sets++; Field = value; }
+                }
+                public void Assign() { Value ??= Probe.Right(); }
+                public void AssignField() { Field ??= Probe.Right(); }
+            }
+            public static class Probe
+            {
+                private static int Receivers;
+                private static int Indices;
+                private static int Rights;
+                private static Box Get(Box box) { Receivers++; return box; }
+                private static int Index() { Indices++; return 0; }
+                public static string Right() { Rights++; return "assigned"; }
+                public static string Run()
+                {
+                    Receivers = 0;
+                    Indices = 0;
+                    Rights = 0;
+                    var box = new Box();
+                    box.Field = {{(populated ? "\"kept\"" : "null")}};
+                    {{assignment}}
+                    return box.Field + "|" + Receivers + "|" + Indices + "|" + box.Gets + "|" + box.Sets + "|" + Rights;
+                }
+            }
+            """;
+        AssertNativeRuntimeAndReemission(source,
+            "public static class Witness { public static string Run() => Probe.Run(); }", expected);
+    }
+
+    [Fact]
+    public void UnprovedCoalescingStoreNodes_AreNotRewrittenAsUnconditionalStores()
+    {
+        var receiver = new CallExpressionNode(default, "Receiver", []);
+        ExpressionNode[] targets =
+        [
+            new ReferenceNode(default, "Value"),
+            new FieldAccessNode(default, receiver, "Value"),
+            new ArrayAccessNode(default, receiver, new CallExpressionNode(default, "Index", []))
+        ];
+        foreach (var target in targets)
+        {
+            var store = new CompoundAssignmentStatementNode(default, target,
+                CompoundAssignmentOperator.NullCoalesce, new StringLiteralNode(default, "assigned"));
+            var error = Assert.Throws<NotSupportedException>(() => store.Accept(new CalorEmitter()));
+            Assert.Contains("declaration-proven lowering", error.Message);
+        }
+    }
+
     private static void AssertNativeRuntimeAndReemission(
         string source, string witness, string expected, string sourceFile = "NullCoalescingNative.cs")
     {
