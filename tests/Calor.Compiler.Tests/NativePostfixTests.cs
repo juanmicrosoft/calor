@@ -99,7 +99,10 @@ public sealed class NativePostfixTests
                 Assert.Equal("Capacity", initializer.PropertyName);
                 Assert.Equal(8, Assert.IsType<IntLiteralNode>(initializer.Value).Value);
                 var boundFactory = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundLambdaExpression>());
+                Assert.Equal(factory.Id, boundFactory.Id);
+                Assert.Empty(boundFactory.Parameters);
                 var boundBuilder = Assert.IsType<BoundNewExpression>(boundFactory.ExpressionBody);
+                Assert.Empty(boundBuilder.Arguments);
                 var boundInitializer = Assert.Single(boundBuilder.Initializers);
                 Assert.Equal("Capacity", boundInitializer.MemberName);
                 Assert.Equal(8, Assert.IsType<BoundIntLiteral>(boundInitializer.Value).Value);
@@ -125,7 +128,11 @@ public sealed class NativePostfixTests
                 Assert.Equal("System.Array", selected.ResolvedMetadataMethod!.ContainingType.ToDisplayString());
                 Assert.Equal("IndexOf", selected.ResolvedMetadataMethod.Name);
                 Assert.Equal(SpecialType.System_Int32, Assert.Single(selected.ResolvedMetadataMethod.TypeArguments).SpecialType);
-                Assert.IsType<BoundArrayCreation>(selected.Arguments[0]);
+                Assert.Equal(2, selected.Arguments.Count);
+                var boundArray = Assert.IsType<BoundArrayCreation>(selected.Arguments[0]);
+                Assert.Equal(array.Id, boundArray.Id);
+                Assert.Equal([1L, 2L], boundArray.Initializer.Select(element => Assert.IsType<BoundIntLiteral>(element).Value));
+                Assert.Equal(2, Assert.IsType<BoundIntLiteral>(selected.Arguments[1]).Value);
                 Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
                 Assert.Contains(result.Diagnostics.Errors, diagnostic =>
                     diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'alloc'", StringComparison.Ordinal));
