@@ -50,7 +50,7 @@
       "type": "System.Char",
       "methods": {
         "IsDigit": [],
-        "ToString": []
+        "ToString()": []
       }
     },
     {

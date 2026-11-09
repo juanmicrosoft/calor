@@ -4357,6 +4357,20 @@ public sealed class Binder
     private BoundTypes.BoundType? GetArrayAccessElementType(BoundExpression array)
     {
         var typeName = array.Type.DisplayString;
+        if (!array.HasUnknownInferredType
+            && GetOrCreateMetadataBinder() is { } metadata
+            && ResolveComputedMetadataType(metadata.Context, typeName)
+                is Microsoft.CodeAnalysis.INamedTypeSymbol { SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String } text)
+        {
+            var stringIndexer = text.GetMembers().OfType<Microsoft.CodeAnalysis.IPropertySymbol>()
+                .FirstOrDefault(property => property.IsIndexer && property.GetMethod is not null
+                    && property.Parameters.Length == 1
+                    && property.Parameters[0].Type.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_Int32
+                    && property.Type.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_Char);
+            if (stringIndexer?.Type is Microsoft.CodeAnalysis.INamedTypeSymbol character)
+                // Preserve CLR identity instead of the C# display alias for effect resolution.
+                return new BoundTypes.NominalBoundType("System.Char", roslynSymbol: character);
+        }
         if (!TypeIdentity.TrySplitGeneric(typeName, out var name, out var arguments))
             return GetIndexedElementType(typeName) is { } elementName
                 ? new BoundTypes.NominalBoundType(elementName) : null;

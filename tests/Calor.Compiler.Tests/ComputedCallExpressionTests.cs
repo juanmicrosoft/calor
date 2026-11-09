@@ -18,6 +18,67 @@ namespace Calor.Compiler.Tests;
 public sealed class ComputedCallExpressionTests
 {
     [Theory]
+    [InlineData("text")]
+    [InlineData("\"Q\"")]
+    public void NativeStringIndex_BindsTheActualCharMethodAndPreservesRuntimeValue(string receiver)
+    {
+        var source = $$"""
+            module NativeCharIndex
+              func Test private (string:text) → string
+                return {{receiver}}[0].ToString()
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        var method = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+        Assert.Equal(SpecialType.System_Char, method.ContainingType.SpecialType);
+        Assert.Equal("ToString", method.Name);
+        Assert.Empty(method.Parameters);
+        Assert.Equal(SpecialType.System_String, method.ReturnType.SpecialType);
+        var resolver = new EffectResolver();
+        var receiverType = Assert.IsAssignableFrom<BoundExpression>(call.Receiver).Type;
+        var exactKey = EffectResolverKey.FromBoundReceiver(receiverType, "ToString", []);
+        Assert.Equal("System.Char", exactKey.DeclaringType);
+        var exact = resolver.Resolve(exactKey);
+        Assert.Equal(EffectResolutionStatus.PureExplicit, exact.Status);
+        Assert.True(exact.Effects.IsEmpty);
+        Assert.Equal(EffectResolutionStatus.Unknown,
+            resolver.Resolve(EffectResolverKey.FromBoundReceiver(receiverType, "ToString", ["Int32"])).Status);
+
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var compilation = CSharpCompilation.Create("CharIndex_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble + compiled.GeneratedCode)],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var emitted = compilation.Emit(stream);
+        Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+        var assembly = System.Reflection.Assembly.Load(stream.ToArray());
+        var test = Assert.Single(assembly.GetTypes().SelectMany(type => type.GetMethods(
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)),
+            method => method.Name == "Test");
+        Assert.Equal("Q", test.Invoke(null, ["Q"]));
+    }
+
+    [Fact]
+    public void NativeStringNamedTypeParameter_DoesNotBorrowStringIndexerMetadata()
+    {
+        var (_, bound, _) = Bind("""
+            module GenericCharIndex
+              func Test<String> (String:text) → string
+                return text[0].ToString()
+            """);
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Null(call.ResolvedMetadataMethod);
+        Assert.True(Program.Compile("""
+            module GenericCharIndex
+              func Test<String> (String:text) → string
+                return text[0].ToString()
+            """).HasErrors);
+    }
+
+    [Theory]
     [InlineData(BoundTypes.NullableAnnotation.NotAnnotated)]
     [InlineData(BoundTypes.NullableAnnotation.Annotated)]
     [InlineData(BoundTypes.NullableAnnotation.Oblivious)]
