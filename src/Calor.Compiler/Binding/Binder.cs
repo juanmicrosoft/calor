@@ -218,7 +218,8 @@ public sealed class Binder
         IReadOnlyList<string>? typeArguments = null)
     {
         if (args.Any(argument => argument.HasUnknownInferredType)
-            || computedReceiver?.HasUnknownInferredType == true)
+            || computedReceiver?.HasUnknownInferredType == true
+            || computedReceiver is BoundVariableExpression { Variable.Id.IsNone: true })
             return null;
         // BCL-shape heuristic: receiver contains at least one dot AND starts
         // with System./Microsoft. or a capitalized identifier followed by a dot.
@@ -344,6 +345,8 @@ public sealed class Binder
             return context.TryResolveType("System.Object");
         if (TypeIdentity.TrySplitGeneric(typeName, out var name, out var arguments))
         {
+            if (ResolveTypeSymbol(name, arguments.Count) is not null)
+                return null;
             var metadataName = TypeIdentity.MapShortTypeNameToFullName(typeName);
             if (!metadataName.Contains('`'))
                 metadataName = (name is "Func" or "Action" ? $"System.{name}" : name) + $"`{arguments.Count}";
@@ -2318,6 +2321,8 @@ public sealed class Binder
         var expr = ret.Expression is LambdaExpressionNode { IsAsync: true } asyncLambda
             ? BindExpression(asyncLambda, TryBuildFunctionType(_currentFunctionReturnType, null, null))
             : ret.Expression != null ? BindExpression(ret.Expression) : null;
+        if (expr is not null && _currentFunctionReturnType is not null)
+            CheckMetadataArrayToCollection(expr, _currentFunctionReturnType, ret.Span, "Return");
 
         // v0.14 §S4 nullability check (issue #875, D2 predicate). Return-site
         // sibling of the §S3b BindBindStatement check. Fires when the current
@@ -2627,6 +2632,8 @@ public sealed class Binder
                 : BindExpression(bind.Initializer);
             // Infer type from initializer if not specified
             typeName = bind.TypeName ?? initializer.Type.DisplayString;
+            if (bind.TypeName is not null)
+                CheckMetadataArrayToCollection(initializer, bind.TypeName, bind.Span, $"Binding '{bind.Name}'");
         }
         else if (bind.TypeName != null)
         {
@@ -3683,6 +3690,8 @@ public sealed class Binder
         ExpressionNode receiver, IEnumerable<(string Name, string Type)> variables)
     {
         using var scope = PushVerificationScope(variables, receiver.Span);
+        if (TryBindPredefinedTypeReceiver(receiver) is { } predefined)
+            return predefined;
         if (receiver is ReferenceNode reference && GetOrCreateMetadataBinder() is { } metadata)
         {
             if (_scope.Lookup(reference.Name) is VariableSymbol variable
@@ -3690,11 +3699,19 @@ public sealed class Binder
                 return new BoundVariableExpression(receiver.Span, variable,
                     typeOverride: Metadata.MetadataBinderResult.ToBoundType(variableType));
             if (_scope.Lookup(reference.Name) is null
+                && !(reference.IsVerbatim && SyntaxFactory.ParseTypeName(reference.Name) is PredefinedTypeSyntax)
                 && ResolveVerificationType(metadata.Context, reference.Name) is { } staticType)
                 return new BoundTypeReferenceExpression(receiver.Span, reference.Name,
                     Metadata.MetadataBinderResult.ToNominalBoundType(staticType));
         }
         return TryBindMetadataTypeReceiver(receiver) ?? BindExpression(receiver);
+    }
+
+    internal BoundExpression BindVerificationExpression(
+        ExpressionNode expression, IEnumerable<(string Name, string Type)> variables)
+    {
+        using var scope = PushVerificationScope(variables, expression.Span);
+        return BindExpression(expression);
     }
 
     private static Microsoft.CodeAnalysis.ITypeSymbol? ResolveVerificationType(
@@ -3933,19 +3950,37 @@ public sealed class Binder
 
     private BoundTypeReferenceExpression? TryBindMetadataTypeReceiver(ExpressionNode expression)
     {
+        if (TryBindPredefinedTypeReceiver(expression) is { } predefined)
+            return predefined;
         var name = DottedReferenceName(expression);
         if (name is null)
             return null;
         var head = name.Split('.')[0];
         if (IsTypeReceiverHeadShadowed(head, allowDeclaredTypes: false))
             return null;
+        if (expression is ReferenceNode { IsVerbatim: true }
+            && SyntaxFactory.ParseTypeName(name) is PredefinedTypeSyntax)
+            return null;
         var type = TryBuildReferenceType(
             name, _currentClassName, _currentNamespaceIdentity,
             _currentMemberTypeParameters?.Select(parameter => parameter.Name));
-        return type?.RoslynSymbol is not null
-            ? new BoundTypeReferenceExpression(expression.Span, name, type)
-            : null;
+        if (type?.RoslynSymbol is not null)
+            return new BoundTypeReferenceExpression(expression.Span, name, type);
+        return GetOrCreateMetadataBinder() is { } metadata
+            && ResolveComputedMetadataType(metadata.Context, name) is Microsoft.CodeAnalysis.INamedTypeSymbol symbol
+                ? new BoundTypeReferenceExpression(expression.Span, name,
+                    Metadata.MetadataBinderResult.ToNominalBoundType(symbol))
+                : null;
     }
+
+    private BoundTypeReferenceExpression? TryBindPredefinedTypeReceiver(ExpressionNode expression)
+        => expression is ReferenceNode { IsVerbatim: false } reference
+            && SyntaxFactory.ParseTypeName(reference.Name) is PredefinedTypeSyntax
+            && GetOrCreateMetadataBinder() is { } metadata
+            && ResolveBclArgumentType(metadata.Context, reference.Name) is Microsoft.CodeAnalysis.INamedTypeSymbol symbol
+                ? new BoundTypeReferenceExpression(expression.Span, reference.Name,
+                    Metadata.MetadataBinderResult.ToNominalBoundType(symbol))
+                : null;
 
     private bool IsTypeReceiverHeadShadowed(string head, bool allowDeclaredTypes) =>
         _scope.LookupAll(head).Concat(ResolveLexicalMembers(head))
@@ -4302,6 +4337,16 @@ public sealed class Binder
                 is Microsoft.CodeAnalysis.IArrayTypeSymbol { ElementType: Microsoft.CodeAnalysis.IArrayTypeSymbol element }
                 ? element : null;
         var elementType = GetArrayAccessElementType(array);
+        if (elementType is null && GetOrCreateMetadataBinder() is { } indexerMetadata
+            && ResolveComputedMetadataType(indexerMetadata.Context, array.Type.DisplayString)
+                is { SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String } receiverType
+            && ResolveComputedMetadataType(indexerMetadata.Context, index.Type.DisplayString) is { } indexType
+            && indexerMetadata.ResolveIndexer(receiverType, [new Metadata.MetadataArgument(indexType)])
+                is { GetMethod: not null } property)
+        {
+            elementType = Metadata.MetadataBinderResult.ToBoundType(property.Type);
+            metadataArray = property.Type as Microsoft.CodeAnalysis.IArrayTypeSymbol;
+        }
         return new BoundArrayAccess(arrayAccess.Span, array, index,
             elementType?.DisplayString, elementType)
         {
@@ -5222,8 +5267,8 @@ public sealed class Binder
     {
         if (call.TargetExpression is FieldAccessNode member)
         {
-            BoundExpression? receiver = null;
-            if (DottedReferenceName(member.Target) is { } receiverName
+            BoundExpression? receiver = TryBindPredefinedTypeReceiver(member.Target);
+            if (receiver is null && DottedReferenceName(member.Target) is { } receiverName
                 && !IsTypeReceiverHeadShadowed(receiverName.Split('.')[0], allowDeclaredTypes: true)
                 && ReferenceLookupNames(receiverName, _currentClassName ?? _currentNamespaceIdentity)
                     .Select(name => ResolveTypeSymbol(name)).FirstOrDefault(type => type is not null) is { } typeSymbol)
@@ -7964,6 +8009,7 @@ public sealed class Binder
     {
         var target = BindExpression(assign.Target);
         var value = BindExpression(assign.Value);
+        CheckMetadataArrayToCollection(value, target.Type.DisplayString, assign.Span, "Assignment");
         ReportWriteToReadOnlyLocal(target, assign.Target.Span, "assign to {0}");
         if (target is BoundVariableExpression variable)
         {
@@ -7973,6 +8019,27 @@ public sealed class Binder
             SetCallableState(restored, value);
         }
         return new BoundAssignmentStatement(assign.Span, target, value);
+    }
+
+    private void CheckMetadataArrayToCollection(
+        BoundExpression value, string targetTypeName, Parsing.TextSpan span, string subject)
+    {
+        if (value.MetadataArrayResultType is not { } array
+            || GetOrCreateMetadataBinder() is not { } metadata
+            || ResolveComputedMetadataType(metadata.Context, targetTypeName)
+                is not Microsoft.CodeAnalysis.INamedTypeSymbol { IsGenericType: true } target)
+            return;
+        var identity = $"{target.ContainingNamespace.ToDisplayString()}.{target.OriginalDefinition.MetadataName}";
+        if (identity is not ("System.Collections.Generic.List`1" or "System.Collections.Generic.HashSet`1"
+            or "System.Collections.Generic.SortedSet`1" or "System.Collections.Generic.Queue`1"
+            or "System.Collections.Generic.Stack`1" or "System.Collections.Generic.LinkedList`1"
+            or "System.Collections.ObjectModel.Collection`1" or "System.Collections.ObjectModel.ObservableCollection`1"
+            or "System.Collections.Generic.SortedList`2"))
+            return;
+        _diagnostics.ReportError(span, DiagnosticCode.BindArrayToConcreteCollection,
+            $"{subject} is a concrete collection ('{target.Name}<…>'), but the selected metadata member returns an array. "
+            + $"An array is not implicitly convertible to '{target.Name}<…>' in C# (CS0029). "
+            + $"Use '{array.ToDisplayString()}', or construct a new {target.Name} from the array.");
     }
 
     private BoundCompoundAssignment BindCompoundAssignment(CompoundAssignmentStatementNode compound)

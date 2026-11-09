@@ -974,7 +974,7 @@ public class Program
 
         // Contract semantic verification (type checking, reference validation for quantifiers, etc.)
         phaseSw.Restart();
-        var contractVerifier = new ContractVerifier(diagnostics);
+        var contractVerifier = new ContractVerifier(diagnostics, binder);
         contractVerifier.Verify(ast);
         phaseSw.Stop();
         telemetry?.TrackPhase("ContractVerifier", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);

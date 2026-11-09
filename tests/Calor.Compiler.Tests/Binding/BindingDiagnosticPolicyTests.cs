@@ -40,7 +40,7 @@ public class BindingDiagnosticPolicyTests
     [Fact]
     public void EveryCatalogEntry_HasAnExplicitDispositionReasonAndOwner()
     {
-        Assert.Equal(21, BindingDiagnosticPolicy.Catalog.Count); // #1617 retires Option mismatch; #1619 adds module/extension validation.
+        Assert.Equal(22, BindingDiagnosticPolicy.Catalog.Count); // Native metadata calls retain the array-to-collection error.
         Assert.DoesNotContain(DiagnosticCode.ReferenceOptionMismatch, BindingDiagnosticPolicy.Catalog.Keys);
         foreach (var (code, rule) in BindingDiagnosticPolicy.Catalog)
         {

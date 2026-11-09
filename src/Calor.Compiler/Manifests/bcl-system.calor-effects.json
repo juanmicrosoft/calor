@@ -47,6 +47,13 @@
       }
     },
     {
+      "type": "System.Char",
+      "methods": {
+        "IsDigit": [],
+        "ToString": []
+      }
+    },
+    {
       "type": "System.Int32",
       "defaultEffects": [],
       "methods": {

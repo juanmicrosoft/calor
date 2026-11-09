@@ -35,12 +35,20 @@ public sealed class ContractVerifier
             .ToArray();
 
     private readonly DiagnosticBag _diagnostics;
-    private readonly Binder _contractBinder = new(new DiagnosticBag());
+    private readonly Binder _contractBinder;
+    private readonly bool _ownsContractBinder;
     private IReadOnlyList<(string Name, string Type)> _contractVariables = [];
 
     public ContractVerifier(DiagnosticBag diagnostics)
+        : this(diagnostics, new Binder(new DiagnosticBag()))
+    {
+        _ownsContractBinder = true;
+    }
+
+    internal ContractVerifier(DiagnosticBag diagnostics, Binder contractBinder)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+        _contractBinder = contractBinder;
     }
 
     /// <summary>
@@ -162,6 +170,8 @@ public sealed class ContractVerifier
     /// </summary>
     public void Verify(ModuleNode module)
     {
+        if (_ownsContractBinder)
+            _contractBinder.Bind(module);
         _asyncTypeModule = module;
         VerifyNamedRefinementPredicates(module, _diagnostics);
         // Collect indexed type size parameter names
@@ -383,6 +393,7 @@ public sealed class ContractVerifier
             BoolLiteralNode => PrimitiveType.Bool,
             StringLiteralNode => PrimitiveType.String,
             CallExpressionNode call => InferBclCallType(call),
+            ExpressionCallNode call => InferBclExpressionCallType(call),
             StringOperationNode operation => operation.Operation switch
             {
                 StringOp.Contains or StringOp.StartsWith or StringOp.EndsWith
@@ -436,6 +447,12 @@ public sealed class ContractVerifier
             _ => null
         };
     }
+
+    private CalorType? InferBclExpressionCallType(ExpressionCallNode call)
+        => _contractBinder.BindVerificationExpression(call, _contractVariables)
+            is BoundCallExpression { ResolvedMetadataMethod: { } method }
+                ? PrimitiveType.FromName(method.ReturnType.ToDisplayString())
+                : null;
 
     private CalorType? InferUnaryOperationType(UnaryOperationNode unaryOp)
     {
@@ -507,6 +524,16 @@ public sealed class ContractVerifier
                 if (receiver is not BoundTypeReferenceExpression)
                     CollectReferencesInternal(new ReferenceNode(call.Span, name, isVerbatim: true), references, boundVariables);
             }
+        }
+
+        if (expr is ExpressionCallNode { TargetExpression: FieldAccessNode member } expressionCall)
+        {
+            var receiver = _contractBinder.BindVerificationReceiver(member.Target, _contractVariables);
+            if (receiver is not BoundTypeReferenceExpression)
+                CollectReferencesInternal(member.Target, references, boundVariables);
+            foreach (var argument in expressionCall.Arguments)
+                CollectReferencesInternal(argument, references, boundVariables);
+            return;
         }
 
         if (expr is ForallExpressionNode forall)

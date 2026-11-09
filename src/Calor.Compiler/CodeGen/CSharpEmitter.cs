@@ -4929,7 +4929,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(FieldAccessNode node)
     {
-        var target = EmitGroupedOperand(node.Target);
+        var target = node.Target is ReferenceNode { IsVerbatim: false } reference
+            && SyntaxFactory.ParseTypeName(reference.Name) is PredefinedTypeSyntax
+                ? reference.Name : EmitGroupedOperand(node.Target);
         var fieldName = SanitizeIdentifier(node.FieldName);
         return $"{target}.{fieldName}";
     }
