@@ -283,6 +283,82 @@ public sealed class NativeMetadataClosureTests
         Assert.Equal("System.Collections.Generic.List<byte>", call.ResolvedMetadataMethod.ContainingType.ToDisplayString());
     }
 
+    [Fact]
+    public void SourceGenericListCalls_RetainTheSourceTypeParameter()
+    {
+        const string source = """
+            module GenericCollection
+              func Append<T> (List<T>:items, T:item) → T[]
+                ! mut
+                items.Add(item)
+                return items.ToArray()
+            """;
+        var result = Compile(source);
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        var method = CompileAssembly(result.GeneratedCode).GetTypes().SelectMany(type => type.GetMethods())
+            .Single(method => method.Name == "Append").MakeGenericMethod(typeof(string));
+        Assert.Equal(new[] { "first", "second" },
+            Assert.IsType<string[]>(method.Invoke(null, [new List<string> { "first" }, "second"])));
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        var add = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundExpressionStatement>(Assert.Single(bound.Functions).Body[0]).Expression);
+        Assert.Equal("Add", add.ResolvedMetadataMethod!.Name);
+        Assert.Equal("T", Assert.IsAssignableFrom<ITypeParameterSymbol>(
+            Assert.Single(add.ResolvedMetadataMethod.Parameters).Type).Name);
+        var call = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundReturnStatement>(Assert.Single(bound.Functions).Body[1]).Expression);
+        var array = Assert.IsAssignableFrom<IArrayTypeSymbol>(call.ResolvedMetadataMethod!.ReturnType);
+        var parameter = Assert.IsAssignableFrom<ITypeParameterSymbol>(array.ElementType);
+        Assert.Equal("T", parameter.Name);
+        Assert.Equal(TypeKind.TypeParameter, parameter.TypeKind);
+    }
+
+    [Fact]
+    public void ClassGenericListCalls_RetainInterfaceConstraints()
+    {
+        const string source = """
+            module GenericClass
+              class Repository<T>
+                where T : IDisposable
+                func Append (List<T>:items, T:item) → T[]
+                  ! mut
+                  items.Add(item)
+                  return items.ToArray()
+            """;
+        var result = Compile(source);
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        var append = Assert.Single(bound.Functions);
+        var call = Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(append.Body[1]).Expression);
+        var array = Assert.IsAssignableFrom<IArrayTypeSymbol>(call.ResolvedMetadataMethod!.ReturnType);
+        var parameter = Assert.IsAssignableFrom<ITypeParameterSymbol>(array.ElementType);
+        Assert.Equal("System.IDisposable", Assert.Single(parameter.ConstraintTypes).ToDisplayString());
+        var type = CompileAssembly(result.GeneratedCode).GetTypes().Single(type => type.Name == "Repository`1")
+            .MakeGenericType(typeof(MemoryStream));
+        using var item = new MemoryStream();
+        Assert.Same(item, Assert.Single(Assert.IsType<MemoryStream[]>(
+            type.GetMethod("Append")!.Invoke(Activator.CreateInstance(type), [new List<MemoryStream>(), item]))));
+    }
+
+    [Fact]
+    public void SourceGenericList_DoesNotSubstituteObjectForAnInvalidArgument()
+    {
+        const string source = """
+            module GenericCollection
+              func Append<T> (List<T>:items) → void
+                ! mut
+                items.Add("not an arbitrary T")
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        var call = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundExpressionStatement>(Assert.Single(bound.Functions).Body[0]).Expression);
+        Assert.Null(call.ResolvedMetadataMethod);
+        Assert.True(Compile(source).HasErrors);
+    }
+
     private static CompilationResult Compile(string source) => Program.Compile(source, "native-metadata.calr",
         new CompilationOptions { EnableTypeChecking = true, EnforceEffects = true, StatusWriter = TextWriter.Null });
 

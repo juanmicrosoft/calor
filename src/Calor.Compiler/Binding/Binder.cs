@@ -151,6 +151,8 @@ public sealed class Binder
     /// that cost unless they need it. Null until first BCL-shaped resolve.
     /// </summary>
     private Metadata.MetadataBinder? _metadataBinder;
+    private readonly Dictionary<SymbolId, IReadOnlyDictionary<string, Microsoft.CodeAnalysis.ITypeParameterSymbol>>
+        _metadataTypeParameterScopes = new();
     private IReadOnlyList<UsingDirectiveNode> _metadataUsings = [];
     private ModuleNode? _asyncTypeModule;
 
@@ -336,8 +338,9 @@ public sealed class Binder
                 ? context.TryResolveType("System.Nullable`1")?.Construct(inner)
                 : inner;
         }
-        if (GetTypeParameterConstraints(typeName) is not null
-            || ResolveClass(typeName) is not null
+        if (GetTypeParameterConstraints(typeName) is not null)
+            return ResolveMetadataTypeParameter(context, typeName);
+        if (ResolveClass(typeName) is not null
             || _symbolsById.Values.OfType<TypeSymbol>().Any(type =>
                 type.Name == typeName || type.QualifiedName == TypeIdentity.ToLookupName(typeName)))
             return null;
@@ -357,6 +360,56 @@ public sealed class Binder
                 : null;
         }
         return ResolveBclArgumentType(context, typeName);
+    }
+
+    private Microsoft.CodeAnalysis.ITypeParameterSymbol? ResolveMetadataTypeParameter(
+        Metadata.MetadataContext context, string name)
+    {
+        if (!_metadataTypeParameterScopes.TryGetValue(_declarationContext, out var symbols))
+        {
+            var parameters = (_currentMemberTypeParameters ?? [])
+                .Concat(_currentClass?.TypeParameters ?? [])
+                .ToArray();
+            if (parameters.DistinctBy(parameter => parameter.Name).Count() != parameters.Length)
+            {
+                _diagnostics.ReportInfo(parameters[0].Span, DiagnosticCode.SignatureUnresolved,
+                    "Metadata binding cannot flatten shadowed class and member type-parameter identities.");
+                _metadataTypeParameterScopes.Add(_declarationContext,
+                    new Dictionary<string, Microsoft.CodeAnalysis.ITypeParameterSymbol>());
+                return null;
+            }
+            if (parameters.SelectMany(parameter => parameter.Constraints)
+                .Where(constraint => constraint.TypeName is not null)
+                .Any(constraint => TypeIdentity.TrySplitGeneric(constraint.TypeName!, out var root, out var arguments)
+                    ? ResolveTypeSymbol(root, arguments.Count) is not null
+                    : ResolveTypeSymbol(constraint.TypeName!) is not null))
+            {
+                _diagnostics.ReportInfo(parameters[0].Span, DiagnosticCode.SignatureUnresolved,
+                    "Metadata binding requires the declared identity of a source-defined generic constraint.");
+                _metadataTypeParameterScopes.Add(_declarationContext,
+                    new Dictionary<string, Microsoft.CodeAnalysis.ITypeParameterSymbol>());
+                return null;
+            }
+            var emitter = new CodeGen.CSharpEmitter();
+            var names = string.Join(", ", parameters.Select(parameter => "@" + parameter.Name));
+            var constraints = string.Join(" ", parameters.Where(parameter => parameter.Constraints.Count > 0)
+                .Select(parameter => $"where @{parameter.Name} : "
+                    + string.Join(", ", parameter.Constraints.Select(constraint => constraint.Accept(emitter)))));
+            var tree = CSharpSyntaxTree.ParseText(
+                "using System; using System.Collections.Generic; using System.Threading.Tasks;\n"
+                + $"class __CalorTypeParameters<{names}> {constraints} {{ }}");
+            var compilation = context.HostCompilationForBinder.AddSyntaxTrees(tree);
+            var model = compilation.GetSemanticModel(tree);
+            symbols = model.GetDiagnostics().Any(diagnostic =>
+                diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+                    ? new Dictionary<string, Microsoft.CodeAnalysis.ITypeParameterSymbol>()
+                    : tree.GetRoot().DescendantNodes().OfType<TypeParameterSyntax>()
+                        .Select(parameter => model.GetDeclaredSymbol(parameter))
+                        .OfType<Microsoft.CodeAnalysis.ITypeParameterSymbol>()
+                        .ToDictionary(parameter => parameter.Name, StringComparer.Ordinal);
+            _metadataTypeParameterScopes.Add(_declarationContext, symbols);
+        }
+        return symbols.GetValueOrDefault(name);
     }
 
     private Metadata.MetadataBinderResult? TryResolveInstanceArrayCall(
@@ -831,6 +884,7 @@ public sealed class Binder
         _flowNarrowingSources.Clear();
         _topLevelFunctionLookupNames.Clear();
         _symbolsById.Clear();
+        _metadataTypeParameterScopes.Clear();
         _symbolOrder.Clear();
         _declarationIdOccurrences.Clear();
         _snapshotLocalContexts.Clear();

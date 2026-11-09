@@ -57,9 +57,29 @@ internal sealed class MetadataBinder
         var method = "@" + methodName.TrimStart('@');
         if (typeArguments.Count > 0)
             method += $"<{string.Join(", ", typeArguments.Select(type => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)))}>";
-        return QueryInvocation(BuildSyntheticSource(receiver, method, arguments, preserveArrayAnnotations), out var reason)
+        var scopes = EnumerateTypeParameters(receiverType)
+            .Concat(arguments.SelectMany(argument => EnumerateTypeParameters(argument.Type)))
+            .Concat(typeArguments.SelectMany(EnumerateTypeParameters))
+            .Select(parameter => parameter.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax()
+                .Ancestors().OfType<ClassDeclarationSyntax>().FirstOrDefault())
+            .OfType<ClassDeclarationSyntax>()
+            .DistinctBy(scope => scope.SyntaxTree).ToArray();
+        if (scopes.Length > 1)
+            return MetadataBinderResult.CreateUnresolved("Call contains type parameters from incompatible lexical scopes.");
+        var scope = scopes.SingleOrDefault();
+        return QueryInvocation(BuildSyntheticSource(receiver, method, arguments, preserveArrayAnnotations, scope),
+                out var reason, requireValidSource: true)
             ?? MetadataBinderResult.CreateUnresolved(reason ?? "Expression call resolution failed.");
     }
+
+    private static IEnumerable<ITypeParameterSymbol> EnumerateTypeParameters(ITypeSymbol type)
+        => type switch
+        {
+            ITypeParameterSymbol parameter => [parameter],
+            IArrayTypeSymbol array => EnumerateTypeParameters(array.ElementType),
+            INamedTypeSymbol named => named.TypeArguments.SelectMany(EnumerateTypeParameters),
+            _ => []
+        };
 
     /// <summary>
     /// Resolves a Calor call site. Returns a resolved
@@ -347,22 +367,34 @@ internal sealed class MetadataBinder
 
     private static string BuildSyntheticSource(
         string receiverExpr, string methodName, IReadOnlyList<MetadataArgument> arguments,
-        bool preserveArrayAnnotations)
+        bool preserveArrayAnnotations, ClassDeclarationSyntax? typeParameterScope = null)
     {
         return "#nullable enable\n" +
+            "using System;\n" +
             "using System.Linq;\n" +
             "using System.Collections.Generic;\n" +
-            "class __CalorS4Synth { static void __Probe() {\n" +
+            "using System.Threading.Tasks;\n" +
+            $"class __CalorS4Synth{typeParameterScope?.TypeParameterList} "
+            + $"{string.Join(" ", typeParameterScope?.ConstraintClauses.Select(clause => clause.ToString()) ?? [])}"
+            + " { static void __Probe() {\n" +
             BuildArgumentLocals(arguments, preserveArrayAnnotations) +
-            $"    _ = {receiverExpr}.{methodName}({string.Join(", ", BuildArgumentExpressions(arguments, preserveArrayAnnotations))});\n" +
+            $"    {receiverExpr}.{methodName}({string.Join(", ", BuildArgumentExpressions(arguments, preserveArrayAnnotations))});\n" +
             "} }\n";
     }
 
-    private MetadataBinderResult? QueryInvocation(string source, out string? unresolvedReason)
+    private MetadataBinderResult? QueryInvocation(
+        string source, out string? unresolvedReason, bool requireValidSource = false)
     {
         var tree = CSharpSyntaxTree.ParseText(source);
         var extended = _context.HostCompilationForBinder.AddSyntaxTrees(tree);
         var model = extended.GetSemanticModel(tree);
+        var errors = model.GetDiagnostics().Where(diagnostic =>
+            diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).ToArray();
+        if (requireValidSource && errors.Length != 0)
+        {
+            unresolvedReason = string.Join("; ", errors.Select(diagnostic => $"{diagnostic.Id}: {diagnostic.GetMessage()}"));
+            return null;
+        }
         var invocation = tree.GetRoot()
             .DescendantNodes()
             .OfType<InvocationExpressionSyntax>()
