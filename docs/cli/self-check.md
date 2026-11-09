@@ -64,7 +64,7 @@ Findings use the `Calor1320`–`Calor1334` band (see
 
 | Check | Finding |
 |:------|:--------|
-| Every documented `§`-keyword (e.g. `§EACH`, `§/C`) exists in the lexer's keyword table | `Calor1320` |
+| Section-marker keyword references in current documentation must exist in the lexer's keyword table; retired or unknown forms fail | `Calor1320` |
 | Every cited `CalorNNNN` diagnostic code is defined in the compiler | `Calor1321` |
 | Every cited diagnostic band (e.g. `Calor0800`–`0899`) contains at least one implemented code | `Calor1322` |
 | Every effect code in `docs/syntax-reference/effects.md`'s "Effect Codes" table is known to the effect registry | `Calor1323` |
@@ -75,7 +75,7 @@ Findings use the `Calor1320`–`Calor1334` band (see
 | Every implemented `Calor13xx` code is listed in `docs/cli/structured-output.md`'s table | `Calor1327` |
 | Every complete-program example still parses (see below) | `Calor1328` |
 | Generated mirrors (agent manual, AST inventory and teaching resources) match their authored sources | `Calor1329` |
-| Every complete `§M` program in the agent syntax exemplar compiles to valid C# (Roslyn-semantic-checked) | `Calor1330` |
+| Every complete `module` program in the agent syntax exemplar compiles to valid C# (Roslyn-semantic-checked) | `Calor1330` |
 | Every complete declaration example in the agent-task reference compiles to valid C# | `Calor1330` |
 | The exemplar never binds an array-returning BCL call to a generic collection type (the E1a trap) | `Calor1331` |
 | Every complete website example compiles with the CLI defaults, or reports exactly the codes its `expect=` annotation declares | `Calor1332` |
@@ -84,11 +84,12 @@ Findings use the `Calor1320`–`Calor1334` band (see
 
 ## Parse-checked examples
 
-Fenced code blocks tagged `calor` whose **first non-blank line starts with
-`§M`** declare a complete program by convention and are lexed and parsed
+Fenced code blocks tagged `calor` whose **first non-comment content line starts with
+`module`** declare a complete program by convention and are lexed and parsed
 with the real compiler on every run — if the syntax rots, the check fails
 with `Calor1328` at the offending doc line. Blocks that do not start with
-`§M` are treated as deliberate fragments and are skipped.
+`module` after leading blank lines and `//` comments are treated as deliberate
+fragments and are skipped.
 
 ## Website examples (#1143)
 
@@ -99,7 +100,7 @@ of the generated C#. The fence info string carries the page's claim:
 
 | Fence | Meaning | Check |
 |:------|:--------|:------|
-| ```` ```calor ```` starting with `§M` | Complete program | No errors (warnings allowed) |
+| ```` ```calor ```` starting with `module` after leading comments | Complete program | No errors (warnings allowed) |
 | ```` ```calor expect=Calor0272 ```` | Intended negative example | The error **and** warning codes equal the listed set exactly; the adjacent prose (nearest heading to the next fence, plus any linked `output` fence) cites every listed code; a "line N, column M" claim before the fence matches a reported location |
 | ```` ```calor group=orders ```` | One file of a multi-file example | All members of the group compile together, as `calor --input a.calr --input b.calr` does, so cross-module effect checks run. A fence may join several groups (`group=a,b`); its expectations must hold in each. When a member fails its own compile (so it produces no C#), the other members are compiled again without it and may not report any new error code, because a failing file can stop generated-C# validation and the cross-module pass for the whole set |
 | ```` ```text output ```` | Real diagnostics of the nearest preceding complete program | Every quoted `[file(line,col): ][error\|warning ]CalorNNNN: message` entry (continuation lines are joined) must match an actual diagnostic, and every actual error or warning must be quoted |
@@ -152,7 +153,7 @@ C# validation. `expectedDiagnostics` must match every error and warning by code,
 severity, message, and multiplicity; positives use an empty array.
 
 There are two complete programs and four fragments. The contract fragment gains
-an `i32` parameter, a pure function, and an identity return; the effect fragment
+an `int` parameter, a pure function, and an identity return; the effect fragment
 gains a function; the stable-ID declaration gains a void, pure body. CatchBugs
 gains an `Order` class and a separate module containing declared-effect stubs for
 `SaveOrder` and `NotifyCustomer`. Those stubs accept `object`, allowing the local
@@ -172,14 +173,15 @@ are mounted; `FeatureGrid` and `CompetitivePositioning` are not mounted by
 
 The agent syntax exemplar
 (`src/Calor.Compiler/Resources/agent-syntax-exemplar.md`, served to agents as
-`calor://primer`) gets a stronger check than parse-only: every complete `§M`
+`calor://primer`) gets a stronger check than parse-only: every complete `module`
 program in it is emitted to C# and the **generated C# is compiled with Roslyn's
-full semantic model** (`Calor1330`). That is the only layer that catches type
-errors — e.g. binding `File.ReadAllLines` (an array) to `List<str>`, which Calor
-emits but the C# compiler rejects (`CS0029`). The copyable fragment reference
+full semantic model** (`Calor1330`). This catches generated-C# type errors such as
+assigning an array to `List<string>` (`CS0029`). Calor also rejects known
+array-returning BCL calls assigned to collections with `Calor0254`.
+The copyable fragment reference
 lines cannot be compiled standalone (they intermix prose and free identifiers),
 so that one recurring trap is additionally caught by a lint (`Calor1331`):
-array-returning BCL calls must bind to the array form `[T]`.
+array-returning BCL calls must bind to the array form `T[]`.
 
 ## Agent-task reference
 
@@ -239,7 +241,7 @@ doc (or the registry it is checked against) instead of suppressing.
 Semantic and prose drift: wrong descriptions of behavior, stale line
 counts or file paths, outdated flag defaults, incorrect *output* examples
 (except website `output` fences),
-rotted `calor` fragments (blocks not starting with `§M`), undocumented
+rotted `calor` fragments (blocks not starting with `module` after leading comments), undocumented
 features (other than effect codes and the `Calor13xx` table, which are
 checked for completeness), and anything in files outside the covered set.
 
