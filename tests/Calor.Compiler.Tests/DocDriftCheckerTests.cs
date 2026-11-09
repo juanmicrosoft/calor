@@ -87,6 +87,21 @@ public class DocDriftCheckerTests
         new[] { "PortConstraint", "TextConstraint", "TransferConstraint", "ConstraintBoundary" },
         new[] { "443", "5", "7", "-1" },
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()" })]
+    [InlineData("structure-tags.mdx", 20, 2,
+        new[] { "StructureModules", "BlockNamespace", "FunctionHeaders", "AsyncFunctions", "AsyncMethods",
+            "AwaitExpressions", "LambdaExamples", "AsyncLambdas", "LocalCallables", "DelegateDefinitions",
+            "EnumDefinitions", "EnumExtensions", "EventDefinitions", "ParameterArrays", "ArrayDeclarations",
+            "IndentedBlocks", "GenericDeclarations", "AttributeDeclarations" },
+        new[] { "42", "42", "10", "21:7:9", "42", "42", "24", "42", "3", "5", "True",
+            "#FF0000:True", "0", "7", "2:7", "15", "42", "7" },
+        new[] { "Demo.DemoModule.Main()", "new Demo.Tools.Box().Read()", "GlobalModule.Main()",
+            "GlobalModule.Read().GetAwaiter().GetResult() + \":\" + GlobalModule.ExplicitTask().GetAwaiter().GetResult() + \":\" + GlobalModule.ExplicitValueTask().GetAwaiter().GetResult()",
+            "GlobalModule.Main().GetAwaiter().GetResult()", "GlobalModule.Main().GetAwaiter().GetResult()",
+            "GlobalModule.Main()", "GlobalModule.Main().GetAwaiter().GetResult()", "GlobalModule.Use(2)",
+            "GlobalModule.Main()", "GlobalModule.Main()", "Color.Red.ToHex() + \":\" + Color.Blue.IsPrimary()",
+            "new SubscriptionCounter().Count", "GlobalModule.Main()",
+            "new DataProcessor().ProcessData(new string[] { \"a\", \"b\" }) + \":\" + GlobalModule.First(new int[][] { new int[] { 7 } })",
+            "GlobalModule.Main()", "GlobalModule.Main()", "new Data().Read()" })]
     public void PublicNativeReference_CompilesPositiveAndExactNegativeExamples(
         string page, int completeCount, int negativeCount, string[] moduleNames, string[] expectedResults,
         string[] expressions)
@@ -127,6 +142,106 @@ public class DocDriftCheckerTests
             Assert.Equal(expectedResults[index], observed);
         }
         Assert.True(diagnostics.Count == 0, string.Join("\n", diagnostics));
+    }
+
+    [Fact]
+    public void PublicStructureReference_PreservesPublishedClrMetadataAndEventAccessors()
+    {
+        const string path = "website/content/syntax-reference/structure-tags.mdx";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path));
+        Assert.Empty(WebsiteExampleChecker.Check([new DocFile(path, content)]));
+        var programs = ExemplarCompileChecker.ExtractCompletePrograms(content);
+        foreach (var (module, observation, expected) in new[]
+        {
+            ("StructureModules", """
+                return typeof(Demo.Arithmetic).IsAbstract && typeof(Demo.Arithmetic).IsSealed
+                    && typeof(Demo.Arithmetic).GetMethod("Twice")!.IsStatic
+                    && typeof(Demo.DemoModule).Assembly.GetType("Demo.StructureModules") == null;
+                """, "True"),
+            ("BlockNamespace", """
+                return typeof(Demo.Tools.Box).GetField("Builder")!.FieldType == typeof(System.Text.StringBuilder);
+                """, "True"),
+            ("FunctionHeaders", """
+                var previous = System.Console.Out;
+                using var output = new System.IO.StringWriter();
+                try
+                {
+                    System.Console.SetOut(output);
+                    GlobalModule.PrintSum(2, 3);
+                    return output.ToString() == "5" + System.Environment.NewLine;
+                }
+                finally { System.Console.SetOut(previous); }
+                """, "True"),
+            ("AsyncFunctions", """
+                GlobalModule.Wait().GetAwaiter().GetResult();
+                return typeof(GlobalModule).GetMethod("Read")!.ReturnType == typeof(System.Threading.Tasks.Task<int>)
+                    && typeof(GlobalModule).GetMethod("ExplicitTask")!.ReturnType == typeof(System.Threading.Tasks.Task<int>)
+                    && typeof(GlobalModule).GetMethod("ExplicitValueTask")!.ReturnType == typeof(System.Threading.Tasks.ValueTask<int>)
+                    && typeof(GlobalModule).GetMethod("Wait")!.ReturnType == typeof(System.Threading.Tasks.Task);
+                """, "True"),
+            ("DelegateDefinitions", """
+                var calculator = typeof(Calculator).GetMethod("Invoke")!;
+                var logger = typeof(Logger).GetMethod("Invoke")!;
+                return calculator.ReturnType == typeof(int) && calculator.GetParameters().Length == 2
+                    && calculator.GetParameters()[0].ParameterType == typeof(int)
+                    && calculator.GetParameters()[1].ParameterType == typeof(int)
+                    && logger.ReturnType == typeof(void) && logger.GetParameters().Length == 1
+                    && logger.GetParameters()[0].ParameterType == typeof(string);
+                """, "True"),
+            ("EnumDefinitions", """
+                return System.Enum.GetUnderlyingType(typeof(Color)) == typeof(int)
+                    && (int)Color.Red == 0 && (int)StatusCode.NotFound == 404
+                    && System.Enum.GetUnderlyingType(typeof(Access)) == typeof(byte);
+                """, "True"),
+            ("EnumExtensions", """
+                var extension = typeof(ColorExtensions).GetMethod("ToHex")!;
+                return extension.IsStatic && extension.GetParameters()[0].ParameterType == typeof(Color)
+                    && extension.IsDefined(typeof(System.Runtime.CompilerServices.ExtensionAttribute), false);
+                """, "True"),
+            ("EventDefinitions", """
+                Handler handler = value => { };
+                var counter = new SubscriptionCounter();
+                var changed = typeof(SubscriptionCounter).GetEvent("Changed")!;
+                changed.AddEventHandler(counter, handler);
+                changed.RemoveEventHandler(counter, handler);
+                return typeof(Publisher).GetEvent("Changed")!.EventHandlerType == typeof(Handler)
+                    && counter.Count == 11;
+                """, "True"),
+            ("GenericDeclarations", """
+                return typeof(Box<>).GetGenericArguments()[0].GenericParameterAttributes
+                        .HasFlag(System.Reflection.GenericParameterAttributes.ReferenceTypeConstraint)
+                    && typeof(IRepository<>).GetGenericArguments()[0].GenericParameterAttributes
+                        .HasFlag(System.Reflection.GenericParameterAttributes.ReferenceTypeConstraint);
+                """, "True"),
+            ("AttributeDeclarations", """
+                var type = typeof(Data);
+                var parameter = type.GetMethod("Read")!.GetParameters()[0];
+                return type.IsDefined(typeof(System.SerializableAttribute), false)
+                    && ((System.ComponentModel.DescriptionAttribute)type.GetCustomAttributes(
+                        typeof(System.ComponentModel.DescriptionAttribute), false)[0]).Description == "payload"
+                    && ((System.ComponentModel.DescriptionAttribute)type.GetProperty("Email")!.GetCustomAttributes(
+                        typeof(System.ComponentModel.DescriptionAttribute), false)[0]).Description == "address"
+                    && ((System.ComponentModel.DescriptionAttribute)parameter.GetCustomAttributes(
+                        typeof(System.ComponentModel.DescriptionAttribute), false)[0]).Description == "input";
+                """, "True"),
+        })
+        {
+            var source = programs.Single(program => program.Source.StartsWith("module " + module,
+                StringComparison.Ordinal)).Source;
+            var compiled = Program.Compile(source, path);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Assert.DoesNotContain("raw ", source);
+            Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run()
+                    {
+                        {{observation}}
+                    }
+                }
+                """));
+        }
     }
 
     [Theory]
