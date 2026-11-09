@@ -12,6 +12,43 @@ namespace Calor.Compiler.Tests;
 
 public sealed class LiteralRawSemanticsTests
 {
+    [Theory]
+    [InlineData("String.Concat(\"\\x41\")", "System.String.Concat(\"\\u0041\")", "A")]
+    [InlineData("String.Concat(\"${x}\")", "System.String.Concat(\"\\${x}\")", "${x}")]
+    [InlineData("String.Concat(\"\\x41\"),4", "System.String.Concat(\"\\u0041\"),4", "   A")]
+    [InlineData("String.Concat(\"${x}\"),8", "System.String.Concat(\"\\${x}\"),8", "    ${x}")]
+    [InlineData("String.Concat(String.Concat(\"\\x41\"))", "System.String.Concat(System.String.Concat(\"\\u0041\"))", "A")]
+    [InlineData("String.Concat(\"${x}\").Length", "System.String.Concat(\"\\${x}\").Length", "4")]
+    public void NativeInterpolation_SourceContextTranslationPreservesOriginalCSharpValue(
+        string csharpHole, string nativeHole, string expected)
+    {
+        var original = CompileCSharp("public static class OriginalLiteralContext { "
+            + "public static string Probe(int x) => $\"{" + csharpHole + "}\"; }");
+        Assert.Equal(expected, InvokeString(original, "OriginalLiteralContext", "Probe", 7));
+
+        var source = "module NativeLiteralContext\n"
+            + "  func Probe public (int:x) \u2192 string\n"
+            + "    return \"${" + nativeHole + "}\"\n";
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var interpolation = Assert.IsType<InterpolatedStringNode>(
+            Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions).Body[0]).Expression);
+        Assert.IsNotType<RawCSharpExpressionNode>(
+            Assert.IsType<InterpolatedStringExpressionNode>(Assert.Single(interpolation.Parts)).Expression);
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(module) })
+        {
+            var compiled = Program.Compile(candidate, "literal-context.calr.txt",
+                new CompilationOptions { EnforceEffects = true });
+            Assert.False(compiled.HasErrors, candidate + "\n" + string.Join("\n", compiled.Diagnostics));
+            var assembly = CompileCSharp(compiled.GeneratedCode);
+            var method = Assert.Single(assembly.GetTypes().SelectMany(type => type.GetMethods(
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)),
+                method => method.Name == "Probe");
+            Assert.Equal(expected, method.Invoke(null, [7]));
+        }
+    }
+
     public static TheoryData<string, string> IntegerBoundaryCorpus => new()
     {
         { "-0x2A", "-0x2A" },
