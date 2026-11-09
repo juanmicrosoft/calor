@@ -177,6 +177,7 @@ WRAPPER = re.compile(r"Verifi(?:er|cation)\s+command\s+exited", re.IGNORECASE)
 EXPLICIT_TIMEOUT = re.compile(
     r"Verification failed: Verifier timeout after (?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?s: \S+"
 )
+BOOTSTRAP_REFUSAL = "Verification failed: Verifier timeout: overall deadline expired."
 
 
 def failure_structure(error):
@@ -338,7 +339,7 @@ class CarrierPatternVerifierTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     execute("pm004", source("pm004"), False)
 
-    def test_actual_selected_guards_and_declared_timeout(self):
+    def test_actual_selected_guards_and_bootstrap_refusal(self):
         with tempfile.TemporaryDirectory(prefix="calor-carrier-pattern-selection-") as temporary:
             arm = Path(temporary).resolve()
             workspace = arm / "input"
@@ -374,8 +375,9 @@ class CarrierPatternVerifierTests(unittest.TestCase):
             (arm / manifest).unlink()
             reject({"CALOR_COMPILER_ROOT": str(arm)},
                    f"Verification failed: [Errno 2] No such file or directory: {str(arm / manifest)!r}")
-            reject({"CALOR_LOGIC_TIMEOUT_SECONDS": "0.001"}, explicit_timeout=True)
-        print("Executed 6 actual selected-root/configuration/native infrastructure guards and 1 declared timeout.")
+            reject({"CALOR_LOGIC_TIMEOUT_SECONDS": "0.001"}, BOOTSTRAP_REFUSAL)
+        print("Executed 6 actual selected-root/configuration/native infrastructure guards and "
+              "1 exact 0.001-second global/bootstrap prerequisite refusal; zero behavioral or entry-timeout credit.")
 
     def test_actual_helper_image_substitution(self):
         native = {"darwin": "libz3.dylib", "linux": "libz3.so", "win32": "libz3.dll"}[sys.platform]
@@ -512,7 +514,8 @@ class CarrierPatternAdmissionTests(unittest.TestCase):
         rejected = 0
         for declared, options in ((refusal, {"refusal": refusal}),
                                   (missing_manifest, {"refusal": missing_manifest}),
-                                  (ordinary_timeout, {"explicit_timeout": True})):
+                                  (ordinary_timeout, {"explicit_timeout": True}),
+                                  (BOOTSTRAP_REFUSAL, {"refusal": BOOTSTRAP_REFUSAL})):
             valid = outer + declared + "\n"
             failures = [valid + failure + "\n" for failure in self.infrastructure]
             failures += [outer + f"Verification failed: Verifier command exited {status}:\n" + declared + "\n"
@@ -528,6 +531,17 @@ class CarrierPatternAdmissionTests(unittest.TestCase):
                 rejected += 1
             with patch.object(PROCESS, "run", side_effect=RuntimeError(valid)):
                 self.assertEqual(reject_prerequisite(["unused"], {}, **options), valid)
+        bootstrap_error = RuntimeError(outer + BOOTSTRAP_REFUSAL + "\n")
+        with patch.object(PROCESS, "run", side_effect=bootstrap_error):
+            with self.assertRaises(RuntimeError) as raised:
+                reject_prerequisite(["unused"], {}, explicit_timeout=True)
+            self.assertIs(raised.exception, bootstrap_error)
+        with patch.dict(EXECUTED, {"accepted": 0, "rejected": 0}, clear=True), \
+                patch.object(PROCESS, "run", side_effect=bootstrap_error):
+            with self.assertRaises(RuntimeError) as raised:
+                execute("pm004", "invalid", False, category="invalid-source")
+            self.assertIs(raised.exception, bootstrap_error)
+            self.assertEqual(EXECUTED, {"accepted": 0, "rejected": 0})
         for kind in (OSError, EOFError, TimeoutError):
             error = kind(ordinary_timeout)
             with patch.object(PROCESS, "run", side_effect=error):
@@ -537,8 +551,8 @@ class CarrierPatternAdmissionTests(unittest.TestCase):
         with patch.object(PROCESS, "run", return_value=refusal):
             with self.assertRaises(AssertionError):
                 reject_prerequisite(["unused"], {}, refusal)
-        print(f"Checked {rejected} contaminated prerequisite/timeout refusals, 3 exact refusals, "
-              "3 direct exception paths and 1 success-shaped refusal.")
+        print(f"Checked {rejected} contaminated prerequisite/timeout refusals, 4 exact refusals, "
+              "2 bootstrap non-admission paths, 3 direct exception paths and 1 success-shaped refusal.")
 
 
 if __name__ == "__main__":

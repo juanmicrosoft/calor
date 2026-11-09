@@ -2020,7 +2020,8 @@ CALOR_COMPILER_CONFIGURATION=Release python3 tests/E2E/agent-tasks/test-logic-ol
 
 The current suite requires **71 actual behavioral entrypoints** (**24 accepted,
 47 rejected**), six actual selected-root/configuration/native infrastructure
-guards, one explicitly declared timeout, and two actual helper-build image
+guards, one exact 0.001-second global/bootstrap prerequisite refusal (zero
+behavioral or entry-timeout credit), and two actual helper-build image
 substitution controls. Finite negatives require exited verifier failures with
 declared behavioral diagnostics and exact outer and nested exit-1 wrappers.
 Direct or wrapped timeout, EOF, cleanup, build, native-loading, OS/launch,
