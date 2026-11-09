@@ -5,6 +5,7 @@ using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Ids;
+using Calor.Compiler.Mcp.Sessions;
 using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
@@ -241,6 +242,60 @@ public sealed class EnumExtensionIdentityMigrationTests : IDisposable
         Assert.Contains("/// Keep receiver order.", source);
         Assert.DoesNotContain('§', source);
         Assert.Contains("Optimize allocation.", Parse(source).Classes.Single().Methods.Single().DocComment);
+    }
+
+    [Fact]
+    public async Task McpPreviewRenameAndFileMoveRetainMigratedAllocationKinds()
+    {
+        var original = Original("");
+        var initial = Seed(original);
+        Store.MigrateEnumExtensions(FilePath, Before, original);
+        var source = File.ReadAllText(FilePath);
+        var offset = source.IndexOf("func Read", StringComparison.Ordinal) + "func ".Length;
+        var line = source[..offset].Count(character => character == '\n') + 1;
+        var column = offset - source.LastIndexOf('\n', offset - 1);
+        var sessions = new ProjectSessionManager();
+        var tool = new FileWriteTool(sessions, _root);
+        var sidecar = File.ReadAllText(Store.SidecarPath);
+        foreach (var preview in new[] { true, false })
+        {
+            var result = await tool.ExecuteAsync(JsonSerializer.SerializeToElement(new
+            {
+                action = "rename", projectDirectory = _root, filePath = FilePath,
+                line, column, newName = "Load", preview
+            }));
+            Assert.False(result.IsError, result.Content.Single().Text);
+            if (preview)
+            {
+                Assert.Equal(source, File.ReadAllText(FilePath));
+                Assert.Equal(sidecar, File.ReadAllText(Store.SidecarPath));
+            }
+        }
+        var renamed = File.ReadAllText(FilePath);
+        Assert.Contains("func Load", renamed);
+        var destination = Path.Combine(_root, "Moved.calr");
+        var moved = await tool.ExecuteAsync(JsonSerializer.SerializeToElement(new
+        {
+            action = "move", projectDirectory = _root, filePath = FilePath, line, column,
+            destinationFile = destination, destinationLine = line, destinationColumn = column,
+            changes = new[]
+            {
+                new { path = FilePath, originalSource = (string?)renamed, modifiedSource = (string?)null },
+                new { path = destination, originalSource = (string?)null, modifiedSource = (string?)renamed }
+            }
+        }));
+        Assert.False(moved.IsError, moved.Content.Single().Text);
+        Assert.False(File.Exists(FilePath));
+        var final = Store.Sync();
+        Assert.Equal(initial.Declarations.Select(declaration => declaration.Id).Order(StringComparer.Ordinal),
+            final.Declarations.Select(declaration => declaration.Id).Order(StringComparer.Ordinal));
+        var method = final.Declarations.Single(declaration => declaration.Name == "Load");
+        Assert.Equal(IdKind.Method, method.Kind);
+        Assert.Equal(IdKind.Function, method.AllocationKind);
+        Assert.Equal(IdKind.EnumExtension, final.Declarations.Single(declaration =>
+            declaration.Name == "ModeExtensions").AllocationKind);
+        var attached = CalorSourceHelper.Parse(File.ReadAllText(destination), destination).Ast!;
+        Assert.True(IdChecker.Check(new IdScanner().Scan(attached, destination)).IsValid);
     }
 
     [Theory]
