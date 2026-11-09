@@ -425,6 +425,25 @@ internal sealed record RawCSharpFrame(
     Ast.InteropMemberKind MemberKind = Ast.InteropMemberKind.Other,
     bool IsCompilationUnitPassthrough = false)
 {
+    internal static string NormalizeLineEndings(string source)
+    {
+        if (!source.Contains("\r\n", StringComparison.Ordinal))
+            return source;
+        var result = new System.Text.StringBuilder(source.Length);
+        var cursor = 0;
+        foreach (var token in ReadTokens(source))
+        {
+            if (token.Value is not RawCSharpFrame frame)
+                continue;
+            var payloadStart = token.Span.End - frame.Code.Length;
+            result.Append(source[cursor..payloadStart].Replace("\r\n", "\n", StringComparison.Ordinal));
+            result.Append(frame.Code);
+            cursor = token.Span.End;
+        }
+        result.Append(source[cursor..].Replace("\r\n", "\n", StringComparison.Ordinal));
+        return result.ToString();
+    }
+
     internal static string MaskForAnalysis(string source)
     {
         var characters = source.ToCharArray();

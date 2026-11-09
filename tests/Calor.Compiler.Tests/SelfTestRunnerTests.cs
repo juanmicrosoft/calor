@@ -15,6 +15,25 @@ public sealed class SelfTestConsoleCollection;
 public class SelfTestRunnerTests
 {
     [Fact]
+    public void SelfTestRunner_Run_PreservesRawCrLfBeforeCompilation()
+    {
+        const string payload = "public delegate int Pick(\r\n    int value);";
+        var input = $"§M{{SelfTestRaw}}\r\n  raw delegate {System.Text.Encoding.UTF8.GetByteCount(payload)}\r\n{payload}\r\n";
+        var compiled = Program.Compile(input, "SelfTestRaw.calr", new CompilationOptions
+        {
+            EnforceEffects = true,
+            ContractMode = ContractMode.Debug,
+            VerifyContracts = false,
+            EmitLineDirectives = false
+        });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Contains(payload, compiled.GeneratedCode);
+        var result = SelfTestRunner.Run(new SelfTestRunner.SelfTestScenario(
+            "SelfTestRaw", input, compiled.GeneratedCode));
+        Assert.True(result.Passed, result.Error ?? result.Diff);
+    }
+
+    [Fact]
     public void SelfTestRunner_LoadScenarios_ReturnsExpectedScenarios()
     {
         var scenarios = SelfTestRunner.LoadScenarios();
@@ -347,7 +366,7 @@ public class SelfTestRunnerTests
             Path.Combine(Path.GetTempPath(), "another-checkout", "04_option_result.calr")
         })
         {
-            var result = Program.Compile(scenario.Input.Replace("\r\n", "\n"), path, new CompilationOptions
+            var result = Program.Compile(Calor.Compiler.Parsing.RawCSharpFrame.NormalizeLineEndings(scenario.Input), path, new CompilationOptions
             {
                 EnforceEffects = true,
                 ContractMode = ContractMode.Debug,

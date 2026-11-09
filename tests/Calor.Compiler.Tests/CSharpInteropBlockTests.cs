@@ -12,6 +12,70 @@ namespace Calor.Compiler.Tests;
 public class CSharpInteropBlockTests
 {
     [Theory]
+    [InlineData("// \u03c0\U0001f600\r\n  // }§/CSHARP\r\n")]
+    [InlineData("#if NEVER\r\n\"\"\" unmatched { }\r\n#endif\r\n// no final newline")]
+    public void RawFraming_LineEndingNormalizationPreservesExactFrames(string payload)
+    {
+        var source = $"§M{{RawTest}}\r\n  raw delegate {System.Text.Encoding.UTF8.GetByteCount(payload)}\r\n{payload}\r\n" +
+            "  §F{Next:pub} () -> i32\r\n    §E{}\r\n    §R 1\r\n";
+        var normalized = RawCSharpFrame.NormalizeLineEndings(source);
+        Assert.Equal($"§M{{RawTest}}\n  raw delegate {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n" +
+            "  §F{Next:pub} () -> i32\n    §E{}\n    §R 1\n", normalized);
+        var parsed = ParseRawModule(normalized);
+        Assert.Equal(payload, Assert.Single(parsed.InteropBlocks).CSharpCode);
+        Assert.Equal("Next", Assert.Single(parsed.Functions).Name);
+        Assert.Equal(normalized, RawCSharpFrame.NormalizeLineEndings(normalized));
+        Assert.Throws<FormatException>(() =>
+            RawCSharpFrame.NormalizeLineEndings("raw statement 4\r\nx"));
+    }
+
+    [Fact]
+    public void RawFraming_ConvertedCrLfCorpusInputRetainsNativeBindingAndEffects()
+    {
+        const string source = "public static class Probe {\r\n" +
+            "    public static int Run() => 1;\r\n" +
+            "    public static System.Collections.Generic.IEnumerable<int> Values {\r\n" +
+            "        get {\r\n            yield return 1;\r\n" +
+            "            yield return 2;\r\n            yield return 3;\r\n" +
+            "        }\r\n    }\r\n}";
+        var conversion = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            PreprocessorMode = PreprocessorConversionMode.SelectActiveBranchLossy,
+            DefinedSymbols = [],
+            GracefulFallback = true
+        }).Convert(source, "Probe.cs");
+        Assert.NotNull(conversion.CalorSource);
+        var original = ParseRawModule(conversion.CalorSource);
+        var originalFrame = Assert.Single(new Lexer(conversion.CalorSource, new DiagnosticBag())
+            .TokenizeAll().Where(token => token.Value is RawCSharpFrame));
+        Assert.Contains("\r\n", Assert.IsType<RawCSharpFrame>(originalFrame.Value).Code);
+        var damaged = new DiagnosticBag();
+        new Lexer(conversion.CalorSource.Replace("\r\n", "\n"), damaged).TokenizeAllForParser();
+        Assert.Contains(damaged, diagnostic => diagnostic.Code == DiagnosticCode.InvalidRawFrame);
+
+        var normalized = RawCSharpFrame.NormalizeLineEndings(conversion.CalorSource);
+        var parsed = ParseRawModule(normalized);
+        var parsedFrame = Assert.Single(new Lexer(normalized, new DiagnosticBag())
+            .TokenizeAll().Where(token => token.Value is RawCSharpFrame));
+        Assert.Equal(originalFrame.Value, parsedFrame.Value);
+        var originalBinder = new Calor.Compiler.Binding.Binder(new DiagnosticBag());
+        var parsedBinder = new Calor.Compiler.Binding.Binder(new DiagnosticBag());
+        originalBinder.Bind(original);
+        parsedBinder.Bind(parsed);
+        Assert.True(originalBinder.ExpressionsBound > 0);
+        Assert.Equal(originalBinder.ExpressionsBound, parsedBinder.ExpressionsBound);
+        var originalEffects = new DiagnosticBag();
+        var parsedEffects = new DiagnosticBag();
+        new Calor.Compiler.Effects.EffectEnforcementPass(originalEffects,
+            resolver: Calor0425CorpusLedgerTests.HermeticResolver()).Enforce(original);
+        new Calor.Compiler.Effects.EffectEnforcementPass(parsedEffects,
+            resolver: Calor0425CorpusLedgerTests.HermeticResolver()).Enforce(parsed);
+        Assert.Equal(originalEffects.Select(diagnostic => (diagnostic.Code, diagnostic.Message)),
+            parsedEffects.Select(diagnostic => (diagnostic.Code, diagnostic.Message)));
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("public delegate void D();")]
     [InlineData("  x\r\n\t y  \r\n")]

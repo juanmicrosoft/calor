@@ -75,8 +75,8 @@ public sealed class SelfTestRunner
                 EmitLineDirectives = false
             };
 
-            // Normalize input line endings so span offsets are consistent across platforms
-            var normalizedInput = scenario.Input.Replace("\r\n", "\n");
+            // Normalize the Calor envelope, never the counted raw payload.
+            var normalizedInput = Parsing.RawCSharpFrame.NormalizeLineEndings(scenario.Input);
             var result = Program.Compile(normalizedInput, scenario.Name + ".calr", options);
 
             if (result.HasErrors)

@@ -583,7 +583,7 @@ public class Calor0270CorpusVolumeTests
             }).Convert(source, Path.GetFileName(file));
         Assert.False(string.IsNullOrEmpty(conversion.CalorSource), $"Empty conversion: {file}");
 
-        var serialized = conversion.CalorSource.Replace("\r\n", "\n");
+        var serialized = RawCSharpFrame.NormalizeLineEndings(conversion.CalorSource);
         var parseDiagnostics = new DiagnosticBag();
         var module = new Parser(
             new Lexer(serialized, parseDiagnostics).TokenizeAllForParser(),

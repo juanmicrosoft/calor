@@ -419,7 +419,7 @@ public class Calor0425CorpusLedgerTests
                 }).Convert(File.ReadAllText(file), Path.GetFileName(file));
             return string.IsNullOrEmpty(conversion.CalorSource)
                 ? null
-                : conversion.CalorSource.Replace("\r\n", "\n");
+                : RawCSharpFrame.NormalizeLineEndings(conversion.CalorSource);
         }
         catch
         {
@@ -1326,7 +1326,7 @@ public class Calor0425CorpusLedgerTests
                 continue;
             }
 
-            var source = conversion.CalorSource.Replace("\r\n", "\n");
+            var source = RawCSharpFrame.NormalizeLineEndings(conversion.CalorSource);
             var parseDiagnostics = new DiagnosticBag();
             var module = new Parser(
                 new Lexer(source, parseDiagnostics).TokenizeAllForParser(),

@@ -969,7 +969,7 @@ public class BinderIncompleteRatchetTests
         }
         var diagnostics = new DiagnosticBag();
         var module = new Parser(
-            new Lexer(conversion.CalorSource.Replace("\r\n", "\n"), diagnostics)
+            new Lexer(RawCSharpFrame.NormalizeLineEndings(conversion.CalorSource), diagnostics)
                 .TokenizeAllForParser(),
             diagnostics).Parse();
         if (diagnostics.HasErrors)
@@ -983,7 +983,7 @@ public class BinderIncompleteRatchetTests
         var binder = new Binder(bindDiagnostics);
         binder.Bind(module);
         coverage.LastBindingSites = CaptureBindingSites(bindDiagnostics,
-            conversion.CalorSource.Replace("\r\n", "\n"));
+            RawCSharpFrame.NormalizeLineEndings(conversion.CalorSource));
         Assert.NotNull(conversion.Ast);
         // Branch selection removes trivia/text and shifts offsets. Conversion AST spans
         // belong to this selected source, not the original file.
