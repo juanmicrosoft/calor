@@ -15,9 +15,11 @@ public sealed class NativeRecordTests
 {
     [Theory]
     [InlineData("record P (int:X)", TokenKind.Record)]
-    [InlineData("record()", TokenKind.Identifier)]
-    [InlineData("record ()", TokenKind.Identifier)]
+    [InlineData("record()", TokenKind.Record)]
+    [InlineData("record ()", TokenKind.Record)]
     [InlineData("record.X()", TokenKind.Identifier)]
+    [InlineData("@record()", TokenKind.Identifier)]
+    [InlineData("@record ()", TokenKind.Identifier)]
     public void RecordKeyword_IsContextualToDeclarationHeaders(string source, TokenKind expected)
     {
         var diagnostics = new DiagnosticBag();
@@ -30,16 +32,18 @@ public sealed class NativeRecordTests
     public void CallableNamedRecord_RemainsAnOrdinaryCallableAtLineStart()
     {
         var result = Compile("""
-            §M{Records}
-              §F{record:pub} () -> int
-                §E{}
-                §R INT:7
-              §F{Invoke:pub} () -> void
-                §E{}
-                record()
+            module Records Records
+              func @record () → int
+                !
+                return 7
+              func Invoke () → void
+                !
+                @record()
             """);
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
-        Emit(result.GeneratedCode);
+        var assembly = Emit(result.GeneratedCode);
+        Assert.Equal(7, assembly.GetType("Records.RecordsModule")!.GetMethod("record")!.Invoke(null, null));
+        Assert.Null(assembly.GetType("Records.RecordsModule")!.GetMethod("Invoke")!.Invoke(null, null));
     }
 
     private static ConversionResult Convert(string source)
@@ -49,8 +53,14 @@ public sealed class NativeRecordTests
         return result;
     }
 
-    private static CompilationResult Compile(string source) => Program.Compile(source, "records.calr.txt",
-        new CompilationOptions { EnableTypeChecking = true, EnforceEffects = true, StatusWriter = TextWriter.Null });
+    private static CompilationResult Compile(string source)
+    {
+        var result = Program.Compile(source, "records.calr.txt",
+            new CompilationOptions { EnableTypeChecking = true, EnforceEffects = true, StatusWriter = TextWriter.Null });
+        Assert.DoesNotContain(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code is "Calor0003" or "Calor0006" or "Calor0007" or DiagnosticCode.UnexpectedToken);
+        return result;
+    }
 
     private static Assembly Emit(string source)
     {
@@ -68,15 +78,15 @@ public sealed class NativeRecordTests
     public void BareRecord_IsPublicNativeAstWithActualPositionalDeclarations()
     {
         var result = Compile("""
-            §M{Records}
-              record P:pub (int:X, int:Y = INT:2)
+            module Records Records
+              record P (int:X, int:Y = 2)
             """);
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
         Assert.Contains("public record P(int X, int Y = 2)", result.GeneratedCode);
         var bag = new DiagnosticBag();
         var module = new Parser(new Lexer("""
-            §M{Records}
-              record P:pub (int:X, int:Y = INT:2)
+            module Records Records
+              record P (int:X, int:Y = 2)
             """, bag).TokenizeAllForParser(), bag).Parse();
         Assert.False(bag.HasErrors, string.Join("\n", bag));
         var record = Assert.Single(module.Classes);
@@ -194,22 +204,22 @@ public sealed class NativeRecordTests
     public void DerivedPositionalRecord_CannotHideForbiddenInheritedInitEffect()
     {
         const string source = """
-            §M{DerivedInit}
-              record Base:pub (int:X)
-                §PROP{X:int:pub}
-                  §GET
-                    §R 0
-                  §INIT
-                    §P "base init"
-              record Derived:pub (int:X) : Base(X)
-              §F{Copy:pub} (Derived:value) -> Derived
-                §E{alloc,mut}
-                §R §WITH value §SET{X} 1
+            module DerivedInit DerivedInit
+              record Base (int:X)
+                property int:X
+                  get
+                    return 0
+                  init
+                    Console.WriteLine("base init")
+              record Derived (int:X) : Base(X)
+              func Copy (Derived:value) → Derived
+                ! alloc,mut
+                return value with { X = 1 }
             """;
         var refused = Compile(source);
         Assert.Contains(refused.Diagnostics.Errors, error => error.Code == "Calor0423"
             && error.Message.Contains("Base.X", StringComparison.Ordinal));
-        var declared = Compile(source.Replace("§E{alloc,mut}", "§E{alloc,mut,cw}", StringComparison.Ordinal));
+        var declared = Compile(source.Replace("! alloc,mut", "! alloc,mut,cw", StringComparison.Ordinal));
         Assert.Contains(declared.Diagnostics.Errors, error => error.Code == "Calor0423"
             && error.Message.Contains("Base.X", StringComparison.Ordinal));
     }
@@ -275,19 +285,20 @@ public sealed class NativeRecordTests
     public void WrongConstructorSignatureAndWrongRecordKind_AreNotSilentlyAccepted()
     {
         var wrongSignature = Compile("""
-            §M{Records}
-              record P:pub (int:X)
-              §F{Make:pub} () -> P
-                §E{alloc}
-                §R §NEW{P} §A "wrong" §/NEW
+            module Records Records
+              record P (int:X)
+              func Make () → P
+                ! alloc
+                return new P("wrong")
             """);
         Assert.True(wrongSignature.HasErrors);
         Assert.NotEmpty(wrongSignature.Diagnostics.Errors);
         var wrongKind = Compile("""
-            §M{Records}
-              record P:pub:struct (int:X)
+            module Records Records
+              record P struct (int:X)
             """);
         Assert.True(wrongKind.HasErrors);
+        Assert.Contains(wrongKind.Diagnostics.Errors, error => error.Code == DiagnosticCode.InvalidModifier);
     }
 
     [Theory]
@@ -296,13 +307,13 @@ public sealed class NativeRecordTests
     public void ConstructorEffects_ChargeActualConstructorAndCaller(string visibility)
     {
         var result = Compile($$"""
-            §M{Records}
-              record P:pub
-                §CTOR{pub} (int:x)
-                  §P "ctor"
-              §F{Make:{{visibility}}} () -> P
-                §E{alloc}
-                §R §NEW{P} §A INT:1 §/NEW
+            module Records Records
+              record P
+                ctor (int:x)
+                  Console.WriteLine("ctor")
+              func Make {{(visibility == "pub" ? "public" : "private")}} () → P
+                ! alloc
+                return new P(1)
             """);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0422");
@@ -314,13 +325,13 @@ public sealed class NativeRecordTests
     public void PublicAndPrivateRecordConstructors_UseTheSameRealEffectContract(string visibility)
     {
         var result = Compile($$"""
-            §M{Records}
-              record P:pub
-                §CTOR{ {{visibility}} } (int:x)
-                  §P "ctor"
-                §MT{Make:pub:stat} () -> P
-                  §E{alloc}
-                  §R §NEW{P} §A INT:1 §/NEW
+            module Records Records
+              record P
+                ctor {{(visibility == "pub" ? "public" : "private")}} (int:x)
+                  Console.WriteLine("ctor")
+                func Make static () → P
+                  ! alloc
+                  return new P(1)
             """);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0422");
@@ -331,18 +342,18 @@ public sealed class NativeRecordTests
     public void CopyAndInitBodies_AreNotLaunderedByWith()
     {
         var result = Compile("""
-            §M{Records}
-              record P:pub (int:X)
-                §CTOR{prot} (P:original)
-                  §P "copy"
-                §PROP{Value:int:pub}
-                  §GET
-                    §R INT:0
-                  §INIT
-                    §P "init"
-                §MT{Copy:pub} () -> P
-                  §E{alloc,mut}
-                  §R §WITH §THIS §SET{Value} INT:2 §/WITH
+            module Records Records
+              record P (int:X)
+                ctor protected (P:original)
+                  Console.WriteLine("copy")
+                property int:Value
+                  get
+                    return 0
+                  init
+                    Console.WriteLine("init")
+                func Copy () → P
+                  ! alloc,mut
+                  return this with { Value = 2 }
             """);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0422");
@@ -354,12 +365,13 @@ public sealed class NativeRecordTests
     {
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer("""
-            §M{Records}
-              record P:pub (int:X)
-              §F{Make:pub} () -> P
-                §E{alloc}
-                §R §NEW{P} §A "wrong" §/NEW
+            module Records Records
+              record P (int:X)
+              func Make () → P
+                ! alloc
+                return new P("wrong")
             """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         new EffectEnforcementPass(diagnostics, policy: UnknownCallPolicy.Strict).Enforce(module);
         Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
     }
