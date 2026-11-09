@@ -957,7 +957,9 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
     /// key it replaces name the SAME type. That equality is what lets this
     /// slice re-key the resolver without moving a diagnostic.</para>
     ///
-    /// <para>The one addition is generic instantiation. When the legacy
+    /// <para>Metadata-backed instantiations use the selected CLR definition,
+    /// including nested declaring types, rather than a constructed display name.
+    /// For source-only generic instantiations, when the legacy
     /// name-shape map already knows the type (it hard-codes <c>List</c>,
     /// <c>Dictionary</c>, <c>HashSet</c>, <c>Task</c>) its answer wins, byte for
     /// byte. Otherwise the key falls back to the generic DEFINITION plus arity
@@ -974,6 +976,8 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
             return MetadataName(metadata.OriginalDefinition);
         if (type is Binding.BoundTypes.GenericInstantiationBoundType generic)
         {
+            if (generic.RoslynSymbol is { } constructed)
+                return MetadataName(constructed.OriginalDefinition);
             var mappedDisplay = Binding.TypeIdentity.MapShortTypeNameToFullName(generic.DisplayString);
             if (mappedDisplay.Contains('`'))
                 return mappedDisplay;

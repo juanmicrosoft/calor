@@ -39,6 +39,10 @@ namespace Calor.Compiler.Binding.Metadata;
 /// </summary>
 internal sealed class MetadataBinder
 {
+    private static readonly SymbolDisplayFormat ReceiverTypeFormat =
+        SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
+            SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions
+            | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
     private readonly MetadataContext _context;
     internal MetadataContext Context => _context;
 
@@ -51,7 +55,7 @@ internal sealed class MetadataBinder
         ITypeSymbol receiverType, string methodName, IReadOnlyList<MetadataArgument> arguments,
         IReadOnlyList<ITypeSymbol> typeArguments, bool isStatic, bool preserveArrayAnnotations = false)
     {
-        var receiver = receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var receiver = receiverType.ToDisplayString(ReceiverTypeFormat);
         if (!isStatic)
             receiver = $"(({receiver})default!)";
         var method = "@" + methodName.TrimStart('@');
@@ -67,9 +71,27 @@ internal sealed class MetadataBinder
         if (scopes.Length > 1)
             return MetadataBinderResult.CreateUnresolved("Call contains type parameters from incompatible lexical scopes.");
         var scope = scopes.SingleOrDefault();
-        return QueryInvocation(BuildSyntheticSource(receiver, method, arguments, preserveArrayAnnotations, scope),
+        return QueryInvocation(BuildSyntheticSource(receiver, method, arguments, preserveArrayAnnotations, scope,
+                useArgumentLocals: true),
                 out var reason, requireValidSource: true)
             ?? MetadataBinderResult.CreateUnresolved(reason ?? "Expression call resolution failed.");
+    }
+
+    internal AwaitExpressionInfo? ResolveAwait(ITypeSymbol awaitedType)
+    {
+        var typeName = awaitedType.ToDisplayString(ReceiverTypeFormat);
+        var tree = CSharpSyntaxTree.ParseText(
+            $"#nullable enable\nclass __CalorAwaitProbe {{ async global::System.Threading.Tasks.Task Probe() {{ await (({typeName})default!); }} }}");
+        var compilation = _context.HostCompilationForBinder.AddSyntaxTrees(tree);
+        var model = compilation.GetSemanticModel(tree);
+        if (model.GetDiagnostics().Any(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+            return null;
+        var expression = tree.GetRoot().DescendantNodes().OfType<AwaitExpressionSyntax>().Single();
+        if (!SymbolEqualityComparer.Default.Equals(model.GetTypeInfo(expression.Expression).Type, awaitedType))
+            return null;
+        var info = model.GetAwaitExpressionInfo(expression);
+        return info.GetAwaiterMethod is not null && info.IsCompletedProperty is not null && info.GetResultMethod is not null
+            ? info : null;
     }
 
     private static IEnumerable<ITypeParameterSymbol> EnumerateTypeParameters(ITypeSymbol type)
@@ -318,7 +340,8 @@ internal sealed class MetadataBinder
     }
 
     internal static string[] BuildArgumentExpressions(
-        IReadOnlyList<MetadataArgument> arguments, bool preserveArrayAnnotations = false)
+        IReadOnlyList<MetadataArgument> arguments, bool preserveArrayAnnotations = false,
+        bool useArgumentLocals = false)
     {
         var exprs = new string[arguments.Count];
         for (int i = 0; i < arguments.Count; i++)
@@ -330,7 +353,7 @@ internal sealed class MetadataBinder
                 RefKind.Out => $"out __arg{i}",
                 RefKind.Ref => $"ref __arg{i}",
                 RefKind.In => $"in __arg{i}",
-                _ => $"(({argFq})default!)",
+                _ => useArgumentLocals ? $"__arg{i}" : $"(({argFq})default!)",
             };
             if (argument.Name is { Length: > 0 } name)
                 exprs[i] = $"@{name}: {exprs[i]}";
@@ -340,9 +363,10 @@ internal sealed class MetadataBinder
     }
 
     internal static string BuildArgumentLocals(
-        IReadOnlyList<MetadataArgument> arguments, bool preserveArrayAnnotations = false) =>
+        IReadOnlyList<MetadataArgument> arguments, bool preserveArrayAnnotations = false,
+        bool useArgumentLocals = false) =>
         string.Concat(arguments.Select((argument, index) =>
-            argument.RefKind == RefKind.None
+            argument.RefKind == RefKind.None && !useArgumentLocals
                 ? ""
                 : InArrayNullableContext(
                     $"{argument.Type.ToDisplayString(ArgumentTypeFormat(argument.Type, preserveArrayAnnotations))} __arg{index} = default!;\n",
@@ -367,7 +391,8 @@ internal sealed class MetadataBinder
 
     private static string BuildSyntheticSource(
         string receiverExpr, string methodName, IReadOnlyList<MetadataArgument> arguments,
-        bool preserveArrayAnnotations, ClassDeclarationSyntax? typeParameterScope = null)
+        bool preserveArrayAnnotations, ClassDeclarationSyntax? typeParameterScope = null,
+        bool useArgumentLocals = false)
     {
         return "#nullable enable\n" +
             "using System;\n" +
@@ -377,8 +402,9 @@ internal sealed class MetadataBinder
             $"class __CalorS4Synth{typeParameterScope?.TypeParameterList} "
             + $"{string.Join(" ", typeParameterScope?.ConstraintClauses.Select(clause => clause.ToString()) ?? [])}"
             + " { static void __Probe() {\n" +
-            BuildArgumentLocals(arguments, preserveArrayAnnotations) +
-            $"    {receiverExpr}.{methodName}({string.Join(", ", BuildArgumentExpressions(arguments, preserveArrayAnnotations))});\n" +
+            // A type-only native probe must not invent the constant-zero enum conversion.
+            BuildArgumentLocals(arguments, preserveArrayAnnotations, useArgumentLocals) +
+            $"    {receiverExpr}.{methodName}({string.Join(", ", BuildArgumentExpressions(arguments, preserveArrayAnnotations, useArgumentLocals))});\n" +
             "} }\n";
     }
 
@@ -655,7 +681,8 @@ internal readonly struct MetadataBinderResult
             && !named.TypeArguments.IsDefaultOrEmpty)
         {
             var definition = new NominalBoundType(
-                qualifiedName: named.ConstructedFrom.ToDisplayString(),
+                qualifiedName: named.ConstructedFrom.ToDisplayString(
+                    SymbolDisplayFormat.CSharpErrorMessageFormat.WithGenericsOptions(SymbolDisplayGenericsOptions.None)),
                 nullableAnnotation: Calor.Compiler.Binding.BoundTypes.NullableAnnotation.Oblivious,
                 declaration: null,
                 roslynSymbol: named.ConstructedFrom);
@@ -665,7 +692,8 @@ internal readonly struct MetadataBinderResult
             return new GenericInstantiationBoundType(
                 definition,
                 args,
-                MapAnnotation(named.NullableAnnotation));
+                MapAnnotation(named.NullableAnnotation),
+                named);
         }
 
         return ToNominalBoundType(typeSymbol);

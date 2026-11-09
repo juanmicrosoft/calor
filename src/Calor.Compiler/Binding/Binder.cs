@@ -348,7 +348,7 @@ public sealed class Binder
             var inner = ResolveComputedMetadataType(context, referent);
             return inner?.IsValueType == true
                 ? context.TryResolveType("System.Nullable`1")?.Construct(inner)
-                : inner;
+                : inner?.WithNullableAnnotation(Microsoft.CodeAnalysis.NullableAnnotation.Annotated);
         }
         if (GetTypeParameterConstraints(typeName) is not null)
             return ResolveMetadataTypeParameter(context, typeName);
@@ -525,6 +525,8 @@ public sealed class Binder
     {
         if (receiver.Type is BoundTypes.NominalBoundType { RoslynSymbol: { } symbol })
             return symbol;
+        if (receiver.Type is BoundTypes.GenericInstantiationBoundType { RoslynSymbol: { } constructed })
+            return constructed;
         if (receiver is not BoundVariableExpression { Variable: { IsTypeInferred: false } variable }
             || receiver.Type is not BoundTypes.NominalBoundType { Declaration: null }
             || _currentMemberTypeParameters?.Any(parameter => parameter.Name == variable.TypeName) == true
@@ -5103,7 +5105,16 @@ public sealed class Binder
     private BoundExpression BindAwaitExpression(AwaitExpressionNode awaitExpression)
     {
         var awaited = BindExpression(awaitExpression.Awaited);
-        var resultType = GetAwaitedResultType(awaited.Type);
+        var metadataType = awaited.Type switch
+        {
+            BoundTypes.NominalBoundType nominal => nominal.RoslynSymbol,
+            BoundTypes.GenericInstantiationBoundType generic => generic.RoslynSymbol,
+            _ => null
+        };
+        var awaiter = metadataType is not null ? GetOrCreateMetadataBinder()?.ResolveAwait(metadataType) : null;
+        var resultType = awaiter?.GetResultMethod is { } getResult
+            ? Metadata.MetadataBinderResult.ToBoundType(getResult.ReturnType)
+            : metadataType is null ? GetAwaitedResultType(awaited.Type) : null;
         return new BoundStructuralExpression(
             awaitExpression.Span,
             nameof(AwaitExpressionNode),
@@ -5112,6 +5123,9 @@ public sealed class Binder
             new Dictionary<string, object?>
             {
                 ["ConfigureAwait"] = awaitExpression.ConfigureAwait,
+                ["GetAwaiter"] = awaiter?.GetAwaiterMethod,
+                ["IsCompleted"] = awaiter?.IsCompletedProperty,
+                ["GetResult"] = awaiter?.GetResultMethod,
             },
             deferredChildren: null,
             typeAnnotation: BoundTypes.NullableAnnotation.Oblivious,
@@ -5123,17 +5137,6 @@ public sealed class Binder
 
     private BoundTypes.BoundType? GetAwaitedResultType(BoundTypes.BoundType awaitedType)
     {
-        if (awaitedType is BoundTypes.NominalBoundType { RoslynSymbol: Microsoft.CodeAnalysis.INamedTypeSymbol metadataType })
-        {
-            var awaiter = metadataType.GetMembers("GetAwaiter")
-                .OfType<Microsoft.CodeAnalysis.IMethodSymbol>()
-                .FirstOrDefault(method => !method.IsStatic && method.Parameters.Length == 0)?.ReturnType;
-            var resultMethod = awaiter?.GetMembers("GetResult")
-                .OfType<Microsoft.CodeAnalysis.IMethodSymbol>()
-                .FirstOrDefault(method => !method.IsStatic && method.Parameters.Length == 0);
-            if (resultMethod is not null)
-                return Metadata.MetadataBinderResult.ToBoundType(resultMethod.ReturnType);
-        }
         if (awaitedType is BoundTypes.GenericInstantiationBoundType
             {
                 Definition.QualifiedName: var definition,

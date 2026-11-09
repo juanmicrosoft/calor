@@ -154,6 +154,8 @@ public sealed class NominalBoundType : BoundType
 public sealed class GenericInstantiationBoundType : BoundType
 {
     public NominalBoundType Definition { get; }
+    /// <summary>The selected constructed CLR type, including containing-type substitutions.</summary>
+    public INamedTypeSymbol? RoslynSymbol { get; }
     public ImmutableArray<BoundType> TypeArguments { get; }
     public NullableAnnotation NullableAnnotation { get; }
     public override string DisplayString { get; }
@@ -161,17 +163,19 @@ public sealed class GenericInstantiationBoundType : BoundType
     public GenericInstantiationBoundType(
         NominalBoundType definition,
         ImmutableArray<BoundType> typeArguments,
-        NullableAnnotation nullableAnnotation = NullableAnnotation.Oblivious)
+        NullableAnnotation nullableAnnotation = NullableAnnotation.Oblivious,
+        INamedTypeSymbol? roslynSymbol = null)
     {
         if (definition is null) throw new ArgumentNullException(nameof(definition));
         // default(ImmutableArray) has IsDefault=true; enumerating throws NRE.
         // Normalize to Empty so downstream code (Select, SequenceEqual) is safe.
         if (typeArguments.IsDefault) typeArguments = ImmutableArray<BoundType>.Empty;
         Definition = definition;
+        RoslynSymbol = roslynSymbol;
         TypeArguments = typeArguments;
         NullableAnnotation = nullableAnnotation;
         var args = string.Join(", ", typeArguments.Select(t => t.DisplayString));
-        DisplayString = $"{definition.QualifiedName}<{args}>";
+        DisplayString = roslynSymbol?.ToDisplayString() ?? $"{definition.QualifiedName}<{args}>";
     }
 
     public override bool Equals(BoundType? other) =>
