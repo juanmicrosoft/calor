@@ -405,6 +405,14 @@ static string ScalarModuleTypeName(ModuleNode module, FunctionNode function)
         : $"{namespaceName}.{namespaceName.Split('.').Last()}Module";
 }
 
+static void CheckMathExecutableProperties(SyntaxNode root, SemanticModel semantic)
+{
+    foreach (var access in root.DescendantNodes().OfType<MemberAccessExpressionSyntax>())
+        if (semantic.GetSymbolInfo(access).Symbol is IPropertySymbol
+            || semantic.GetSymbolInfo(access).Symbol is IFieldSymbol { HasConstantValue: false })
+            throw new InvalidOperationException("Unsupported Math executable property or external state.");
+}
+
 static void VerifyAdvancedMath(string profile, string path)
 {
     var source = File.ReadAllText(path);
@@ -413,6 +421,14 @@ static void VerifyAdvancedMath(string profile, string path)
     if (diagnostics.HasErrors)
         throw new InvalidOperationException($"Calor compilation failed (native parse):\n{string.Join("\n", diagnostics)}");
     RejectRawInterop(parsed, "advanced MathUtils");
+    var options = new CSharpParseOptions(LanguageVersion.Preview);
+    var preamble = CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble, options);
+    var policyTree = CSharpSyntaxTree.ParseText(new CSharpEmitter(ContractMode.Off).Emit(parsed), options);
+    var policyMapping = CSharpCompilation.Create("MathParsedPolicy", [preamble, policyTree],
+        GeneratedCSharpCompiler.References, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    // Resolve the existing property policy before unrelated return-type errors can mask it.
+    // This semantic model emits and executes nothing; accepted candidates still compile below.
+    CheckMathExecutableProperties(policyTree.GetRoot(), policyMapping.GetSemanticModel(policyTree));
     var compilation = Calor.Compiler.Program.Compile(source, path,
         new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
     if (compilation.HasErrors || compilation.Ast == null)
@@ -425,10 +441,9 @@ static void VerifyAdvancedMath(string profile, string path)
         "advanced001" => ["Sign"], "advanced002" => ["InRange"],
         "advanced003" => ["Min"], _ => ["SafeDiv", "SafeMod"]
     };
-    var options = new CSharpParseOptions(LanguageVersion.Preview);
     SyntaxTree[] trees =
     [
-        CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble, options),
+        preamble,
         CSharpSyntaxTree.ParseText(compilation.GeneratedCode, options)
     ];
     var mapped = new CSharpEmitter(ContractMode.Debug) { LineDirectiveFilePath = path }.Emit(module);
@@ -452,10 +467,7 @@ static void VerifyAdvancedMath(string profile, string path)
                 && (symbol.IsExtern || symbol.GetDllImportData() != null))
             throw new InvalidOperationException($"Unsupported Math executable call surface: {call} ({semantic.GetSymbolInfo(call).Symbol}); external IO/state is not supervised.");
     }
-    foreach (var access in off.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>())
-        if (semantic.GetSymbolInfo(access).Symbol is IPropertySymbol
-            || semantic.GetSymbolInfo(access).Symbol is IFieldSymbol { HasConstantValue: false })
-            throw new InvalidOperationException("Unsupported Math executable property or external state.");
+    CheckMathExecutableProperties(off.GetRoot(), semantic);
     if (off.GetRoot().DescendantNodes().Any(node => node is ImplicitObjectCreationExpressionSyntax
         or FieldDeclarationSyntax or PropertyDeclarationSyntax or ArrayCreationExpressionSyntax
         or ImplicitArrayCreationExpressionSyntax or AnonymousObjectCreationExpressionSyntax or AnonymousFunctionExpressionSyntax

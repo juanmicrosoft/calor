@@ -509,8 +509,24 @@ python3 tests/E2E/agent-tasks/test-advanced-math-verifiers.py
 python3 tests/E2E/agent-tasks/test-advanced-math-verifiers.py --archived
 ```
 
-Both commands verify the selected checkout's complete Z3 assets against its
-own committed manifest, restore locked compiler dependencies from the local
+The separate focused property-policy regressions run with:
+
+```bash
+python3 tests/E2E/agent-tasks/test-math-property-policy.py -f
+```
+
+These regressions are not a full math acceptance census. They retain the original
+InRange external-state input, including its integer-valued return in a boolean
+function. The verifier resolves its existing unsupported-property policy from a
+parse-only native AST emission before semantic compilation, so the real property
+read is refused before an unrelated return-type error masks it. This policy
+model neither emits an assembly nor executes candidate code. Unresolved lookalikes
+and property names inside strings are not property-policy evidence. Ordinary
+compilation failures remain compilation failures, with no native admission credit;
+every accepted candidate still requires actual Debug compilation and execution.
+
+The full current and archived matrix commands verify the checkout's complete Z3
+assets against its own committed manifest, restore locked compiler dependencies from the local
 NuGet cache, and source-build without persistent build servers. The archived
 command builds unchanged commit `d82f3ae95175ecd09581c6922701706be72b0ca9` in a
 disposable directory. Only verified source prerequisites are copied there;
