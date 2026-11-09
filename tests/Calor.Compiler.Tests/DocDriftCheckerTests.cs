@@ -83,6 +83,10 @@ public class DocDriftCheckerTests
             "False:True:True:True:5:7:8:100:6:3:4:5:8:9:10", "True:True:True:1:5" },
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()",
             "GlobalModule.Main()" })]
+    [InlineData("refinement-types.mdx", 4, 0,
+        new[] { "PortConstraint", "TextConstraint", "TransferConstraint", "ConstraintBoundary" },
+        new[] { "443", "5", "7", "-1" },
+        new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()" })]
     public void PublicNativeReference_CompilesPositiveAndExactNegativeExamples(
         string page, int completeCount, int negativeCount, string[] moduleNames, string[] expectedResults,
         string[] expressions)
@@ -207,6 +211,35 @@ public class DocDriftCheckerTests
             }
             """);
         Assert.Equal(expected, observed);
+    }
+
+    [Theory]
+    [InlineData("PortConstraint", "GlobalModule.SelectPort(0)", "!ContractViolationException", "0")]
+    [InlineData("PortConstraint", "GlobalModule.SelectPort(65536)", "!ContractViolationException", "65536")]
+    [InlineData("TextConstraint", "GlobalModule.Length(\"\")", "!ContractViolationException", "0")]
+    [InlineData("TextConstraint", "GlobalModule.Length(null!)", "!ContractViolationException", "!NullReferenceException")]
+    [InlineData("TransferConstraint", "GlobalModule.Transfer(3, 5)", "!ContractViolationException", "-2")]
+    [InlineData("ConstraintBoundary", "GlobalModule.Reset(5)", "-1", "-1")]
+    public void PublicValueConstraints_SeparateEntryGuardsFromNominalAndAssignmentInvariants(
+        string module, string expression, string enabled, string disabled)
+    {
+        var path = "website/content/syntax-reference/refinement-types.mdx";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path));
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(content)
+            .Single(program => program.Source.StartsWith("module " + module + "\n", StringComparison.Ordinal)).Source;
+        foreach (var (mode, expected) in new[] { (ContractMode.Debug, enabled), (ContractMode.Off, disabled) })
+        {
+            var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = mode });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run() => {{expression}};
+                }
+                """);
+            Assert.Equal(expected, observed);
+        }
     }
 
     [Fact]
