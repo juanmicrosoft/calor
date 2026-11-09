@@ -270,7 +270,7 @@ public class CharLiteralTests
             """;
         var conversion = new CSharpToCalorConverter().Convert(source);
         Assert.True(conversion.Success, string.Join(Environment.NewLine, conversion.Issues));
-        Assert.DoesNotContain("§CSHARP", conversion.CalorSource);
+        RawFrameAssertions.AssertFramed(conversion.CalorSource, present: false);
         var utf8 = new UTF8Encoding(false, true);
         var calor = utf8.GetString(utf8.GetBytes(conversion.CalorSource!));
         var assembly = Compile(calor, enforceEffects: false);

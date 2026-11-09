@@ -180,7 +180,7 @@ public class ConversionPathReportingTests : IDisposable
         var rescue = Convert(RoundTripFailure, new ConversionOptions { RescueUnusableMembers = true, ModuleName = "Custom" });
         Assert.True(rescue.Success);
         AssertPaths(rescue, ConversionPath.Rescue, ConversionTrigger.RoundTripFailure, ConversionEnabledBy.RescueUnusableMembers, 1);
-        Assert.Contains("§CSHARP", rescue.CalorSource);
+        RawFrameAssertions.AssertFramed(rescue.CalorSource);
     }
 
     [Fact]

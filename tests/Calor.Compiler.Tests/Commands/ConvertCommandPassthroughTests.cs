@@ -142,6 +142,6 @@ public class ConvertCommandPassthroughTests
 
         Assert.False(result.Success);
         Assert.Equal(0, result.Context!.Stats.InteropBlocksEmitted);
-        Assert.DoesNotContain("§CSHARP", result.CalorSource!);
+        RawFrameAssertions.AssertFramed(result.CalorSource!, present: false);
     }
 }

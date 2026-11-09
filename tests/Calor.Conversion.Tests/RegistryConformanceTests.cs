@@ -77,7 +77,7 @@ public class RegistryConformanceTests
         Assert.NotNull(result.CalorSource);
         _output.WriteLine(result.CalorSource);
 
-        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
         Assert.Contains("record Person:pub (string:Name, int:Age)", result.CalorSource);
         Assert.DoesNotContain("§CL{", result.CalorSource);
         Assert.True(Assert.Single(result.Ast!.Classes).IsRecord);
@@ -213,7 +213,7 @@ public class RegistryConformanceTests
         var result = Convert(csharp);
 
         Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Contains("record Inner(int Value)", result.CalorSource);
         // The rest of the class still converts natively.
         Assert.Contains("§MT{", result.CalorSource);
@@ -373,7 +373,7 @@ public class RegistryConformanceTests
         _output.WriteLine(result.CalorSource!);
 
         // The member with >>> is preserved verbatim — original operator intact.
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Contains(">>> 2", result.CalorSource);
         // The unsupported operator must NOT be silently converted to addition.
         Assert.DoesNotContain("(+ x 2)", result.CalorSource);
@@ -404,7 +404,7 @@ public class RegistryConformanceTests
         Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
         _output.WriteLine(result.CalorSource!);
 
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Contains(">>>= 1", result.CalorSource);
         // Must not degrade to a plain assignment x = 1.
         Assert.DoesNotContain("§ASSIGN x 1", result.CalorSource);
@@ -511,7 +511,7 @@ public class RegistryConformanceTests
         _output.WriteLine(result.CalorSource!);
 
         // Preserved verbatim — the unary + survives, never becomes negation.
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Contains("+x", result.CalorSource);
         Assert.DoesNotContain("(- x)", result.CalorSource);
         // Sibling member still converts natively.
@@ -812,7 +812,7 @@ public class RegistryConformanceTests
         _output.WriteLine(result.CalorSource!);
 
         // Preserved verbatim — `case > 100:` semantics intact, never broadened.
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Contains("case > 100:", result.CalorSource);
         Assert.Contains(result.Context.Losses,
             l => l.Kind == ConversionLossKind.InteropPreserved);
@@ -856,7 +856,7 @@ public class RegistryConformanceTests
         _output.WriteLine(result.CalorSource!);
 
         // The raw statement is actually IN the output…
-        Assert.Contains("§RAW", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource, Calor.Compiler.Parsing.TokenKind.RawCSharp);
         Assert.Contains(">>> 2", result.CalorSource);
         // …and the half-converted compound assignment did not leak next to it.
         Assert.DoesNotContain("(+ total x)", result.CalorSource);
@@ -897,7 +897,7 @@ public class RegistryConformanceTests
         _output.WriteLine(result.EmittedCSharp!);
 
         // The escalated member is preserved without directive trivia.
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Contains(">>> 1", result.CalorSource);
 
         // And the round-tripped C# compiles (a dangling #if would be CS1027).
@@ -995,7 +995,7 @@ public class RegistryConformanceTests
         var result = RoundTrip(csharp);
         _output.WriteLine(result.CalorSource!);
 
-        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
         Assert.Contains("'\\ud83d'", result.CalorSource, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("�", result.CalorSource);
         Assert.True(result.RoslynSuccess, string.Join("; ", result.RoslynErrors));
@@ -1028,7 +1028,7 @@ public class RegistryConformanceTests
         _output.WriteLine(result.CalorSource!);
 
         // The member is preserved verbatim — `case > 100:` semantics intact.
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Contains("case > 100:", result.CalorSource);
         Assert.Contains(result.Context.Losses,
             l => l.Kind == ConversionLossKind.InteropPreserved);
@@ -1071,7 +1071,7 @@ public class RegistryConformanceTests
         var conversion = Convert(csharp);
         var roundTrip = RoundTrip(csharp);
 
-        Assert.Contains("§CSHARP", conversion.CalorSource);
+        TestHelpers.AssertRawFraming(conversion.CalorSource);
         Assert.Contains(originalSyntax, conversion.CalorSource);
         Assert.DoesNotContain("§IFACE{", conversion.CalorSource);
         var loss = Assert.Single(conversion.Losses.Where(item =>
@@ -1097,7 +1097,7 @@ public class RegistryConformanceTests
             """);
 
         Assert.Contains("§IFACE{", result.CalorSource);
-        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
         Assert.Empty(result.Losses);
     }
 
@@ -1132,7 +1132,7 @@ public class RegistryConformanceTests
         var roundTrip = RoundTrip(csharp);
 
         Assert.Contains("§CL{", conversion.CalorSource);
-        Assert.Contains("§CSHARP", conversion.CalorSource);
+        TestHelpers.AssertRawFraming(conversion.CalorSource);
         Assert.Contains(originalSyntax, conversion.CalorSource);
         Assert.DoesNotContain("§MT{", conversion.CalorSource);
         var loss = Assert.Single(conversion.Losses.Where(item =>
@@ -1159,7 +1159,7 @@ public class RegistryConformanceTests
         var conversion = Convert(csharp);
         var roundTrip = RoundTrip(csharp);
 
-        Assert.Contains("§CSHARP", conversion.CalorSource);
+        TestHelpers.AssertRawFraming(conversion.CalorSource);
         Assert.Contains(csharp, conversion.CalorSource);
         Assert.DoesNotContain(nativeMarker, conversion.CalorSource);
         var loss = Assert.Single(conversion.Losses.Where(item =>
@@ -1198,7 +1198,7 @@ public class RegistryConformanceTests
             ? "file-scoped-type"
             : "delegate-semantics";
 
-        Assert.Contains("§CSHARP", conversion.CalorSource);
+        TestHelpers.AssertRawFraming(conversion.CalorSource);
         Assert.Contains(originalSyntax, conversion.CalorSource);
         Assert.DoesNotContain("§DEL{", conversion.CalorSource);
         var loss = Assert.Single(conversion.Losses.Where(item =>
@@ -1282,7 +1282,7 @@ public class RegistryConformanceTests
             preserveDocumentationComments: preserve);
 
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Equal(
             preserve,
             result.CalorSource!.Contains(
@@ -1304,7 +1304,7 @@ public class RegistryConformanceTests
         var result = Convert(csharp);
 
         Assert.Contains("§CL{", result.CalorSource);
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Contains("ref struct Buffer", result.CalorSource);
         Assert.Contains("§MT{", result.CalorSource);
         var loss = Assert.Single(result.Losses.Where(item =>
@@ -1324,7 +1324,7 @@ public class RegistryConformanceTests
         var result = Convert(csharp);
 
         Assert.Contains("§CL{", result.CalorSource);
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Contains(nestedDeclaration, result.CalorSource);
         var loss = Assert.Single(result.Losses.Where(item =>
             item.Feature == "file-scoped-type"));
@@ -1352,7 +1352,7 @@ public class RegistryConformanceTests
             symbols: ["FEATURE"],
             preserveDocumentationComments: preserve);
 
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Equal(
             preserve,
             result.CalorSource!.Contains(

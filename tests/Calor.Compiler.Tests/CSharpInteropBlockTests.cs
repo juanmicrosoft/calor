@@ -56,6 +56,35 @@ public class CSharpInteropBlockTests
     }
 
     [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    [InlineData("\r")]
+    public void RawFraming_RecordHeaderAfterPayloadRetainsNativeDeclaration(string newline)
+    {
+        var payload = "// opaque" + newline;
+        var source = $"§M{{RawTest}}{newline}  raw member {System.Text.Encoding.UTF8.GetByteCount(payload)}{newline}" +
+            payload + "  record Next:pub (int:X)" + newline;
+        var module = ParseRawModule(source);
+        Assert.Equal(payload, Assert.Single(module.InteropBlocks).CSharpCode);
+        var record = Assert.Single(module.Classes);
+        Assert.Equal("Next", record.Name);
+        Assert.True(record.IsRecord);
+    }
+
+    [Fact]
+    public void RawFraming_AssertionsRequireActualCanonicalTokens()
+    {
+        RawFrameAssertions.AssertFramed("§M{Test}\n  raw member 3\nx;\n");
+        RawFrameAssertions.AssertFramed("§M{Test}\n", present: false);
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
+            RawFrameAssertions.AssertFramed("§M{Test}\n"));
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
+            RawFrameAssertions.AssertFramed("§M{Test}\n  §CSHARP{public class Keep { }}§/CSHARP\n"));
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
+            RawFrameAssertions.GetFrames("§M{Test}\n  raw member 20\nabc\n"));
+    }
+
+    [Theory]
     [InlineData("raw", "reason")]
     [InlineData("raw delegate\n", "Missing")]
     [InlineData("raw delegate -1\n", "Invalid")]
@@ -570,7 +599,7 @@ public class CSharpInteropBlockTests
         Assert.True(result.Success);
         if (result.CalorSource != null)
         {
-            Assert.DoesNotContain("§CSHARP{", result.CalorSource);
+            RawFrameAssertions.AssertFramed(result.CalorSource, present: false);
         }
     }
 
@@ -670,7 +699,7 @@ public class CSharpInteropBlockTests
         // In standard mode, there should be no §CSHARP blocks
         if (result.CalorSource != null)
         {
-            Assert.DoesNotContain("§CSHARP{", result.CalorSource);
+            RawFrameAssertions.AssertFramed(result.CalorSource, present: false);
         }
     }
 

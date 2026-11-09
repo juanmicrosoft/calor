@@ -1985,7 +1985,7 @@ public class Issue769NamespaceTopologyTests
 
     private static string OutsideInterop(string calor)
     {
-        var result = calor;
+        var result = Parsing.RawCSharpFrame.MaskForAnalysis(calor);
         while (true)
         {
             var start = result.IndexOf("§CSHARP{", StringComparison.Ordinal);

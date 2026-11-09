@@ -413,7 +413,7 @@ public class ArrayExpressionConversionTests
         var expected = Run(source);
         var calor = await ConvertNativeWithRealCliAsync(source, surface);
         Assert.DoesNotContain("§CS", calor);
-        Assert.DoesNotContain("§RAW", calor);
+        RawFrameAssertions.AssertFramed(calor, Calor.Compiler.Parsing.TokenKind.RawCSharp, present: false);
         var compilation = Program.Compile(calor, "array-local-lambdas.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compilation.HasErrors,
@@ -478,7 +478,7 @@ public class ArrayExpressionConversionTests
         Assert.Equal(expected, Run(source));
         var calor = await ConvertNativeWithRealCliAsync(source, surface);
         Assert.DoesNotContain("§CS", calor);
-        Assert.DoesNotContain("§RAW", calor);
+        RawFrameAssertions.AssertFramed(calor, Calor.Compiler.Parsing.TokenKind.RawCSharp, present: false);
         var compilation = Program.Compile(calor, "eager-binary-order.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compilation.HasErrors,
@@ -574,7 +574,7 @@ public class ArrayExpressionConversionTests
         var (calor, losses) = await ConvertWithRealCliAsync(source, surface);
         var feature = rebinds ? modifier + "-parameter" : "compound-assignment-order";
         Assert.Equal(new[] { feature }, losses);
-        Assert.Contains("§RAW", calor);
+        RawFrameAssertions.AssertFramed(calor, Calor.Compiler.Parsing.TokenKind.RawCSharp);
         var compilation = Program.Compile(calor, "eager-array-address.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
@@ -1163,7 +1163,7 @@ public class ArrayExpressionConversionTests
 
         // Native: nothing preserved as C# and nothing rescued after the fact.
         Assert.Empty(losses);
-        Assert.DoesNotContain("§CSHARP", calor);
+        RawFrameAssertions.AssertFramed(calor, present: false);
         Assert.DoesNotContain("§CS{", calor);
 
         var strict = Program.Compile(calor, row + ".calr",

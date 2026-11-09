@@ -265,7 +265,7 @@ public class LocalFunctionConversionTests
         Assert.True(converted.Success, string.Join("\n", converted.Issues) + "\n" + converted.CalorSource);
         Assert.Empty(converted.Losses);
         Assert.DoesNotContain("§CS", converted.CalorSource);
-        Assert.DoesNotContain("§RAW", converted.CalorSource);
+        RawFrameAssertions.AssertFramed(converted.CalorSource, Calor.Compiler.Parsing.TokenKind.RawCSharp, present: false);
         var originalBody = Assert.Single(converted.Ast!.Classes).Methods.Single(method => method.Name == "Run").Body;
         var binding = Assert.IsType<BindStatementNode>(originalBody[0]);
         Assert.True(binding.IsMutable);
@@ -408,7 +408,7 @@ public class LocalFunctionConversionTests
         Assert.Contains(converted.Issues, issue => issue.Feature == "local-function");
         Assert.Contains(converted.Losses, loss => loss.Feature == "method"
             && loss.Kind == ConversionLossKind.InteropPreserved);
-        Assert.Contains("§CSHARP", converted.CalorSource);
+        RawFrameAssertions.AssertFramed(converted.CalorSource);
         var compiled = Program.Compile(converted.CalorSource!, "preserved-checked-recursion.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
@@ -519,7 +519,7 @@ public class LocalFunctionConversionTests
         Assert.Equal(expected, Run(source));
         var (calor, losses) = await ConvertAsync(source, surface);
         Assert.Equal(["initializer-interop"], losses);
-        Assert.DoesNotContain("§CSHARP", calor);
+        RawFrameAssertions.AssertFramed(calor, present: false);
         Assert.Contains("§CS{", calor);
         Assert.Contains("§LAM{", calor);
         var compilation = Program.Compile(calor, "initializer-lambda.calr",
@@ -548,7 +548,7 @@ public class LocalFunctionConversionTests
 
         var (calor, losses) = await ConvertAsync(source, surface);
 
-        Assert.DoesNotContain("§CSHARP", calor);
+        RawFrameAssertions.AssertFramed(calor, present: false);
         Assert.DoesNotContain("§CS{", calor);
         Assert.Empty(losses);
         Assert.Contains("§LAM{", calor);
@@ -598,7 +598,7 @@ public class LocalFunctionConversionTests
         var (calor, losses) = await ConvertAsync(source, surface);
 
         // Honest: each containing member is a counted interop loss, never a native §F.
-        Assert.Equal(preservedMembers, Regex.Matches(calor, @"§CSHARP\{").Count);
+        Assert.Equal(preservedMembers, RawFrameAssertions.GetFrames(calor).Length);
         Assert.Equal(preservedMembers, losses.Count(feature => feature == "method"));
         Assert.DoesNotContain("post-validation-fallback", losses);
 
@@ -671,7 +671,7 @@ public class LocalFunctionConversionTests
         var result = new CSharpToCalorConverter().Convert("public class C\n{\n" + members + "\n}\n");
         Assert.True(result.Success, string.Join("\n", result.Issues));
         Assert.Contains(result.Issues, issue => issue.Feature == "local-function");
-        Assert.Contains("§CSHARP", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource);
         Assert.DoesNotMatch(@"\n {6,}§F\{", result.CalorSource!);
     }
 
@@ -690,7 +690,7 @@ public class LocalFunctionConversionTests
         var result = new CSharpToCalorConverter().Convert(source);
         Assert.True(result.Success, string.Join("\n", result.Issues));
         Assert.DoesNotContain(result.Issues, issue => issue.Feature == "local-function");
-        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource, present: false);
         Assert.Contains("§LAM{", result.CalorSource!);
         Assert.DoesNotMatch(@"\n {6,}§F\{f\d+:L\}", result.CalorSource!);
         if (!compile)

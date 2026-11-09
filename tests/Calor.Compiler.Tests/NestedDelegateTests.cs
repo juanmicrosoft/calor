@@ -80,7 +80,7 @@ public class Foo
         var result = converter.Convert(csharp, "Test.cs");
 
         Assert.True(result.Success, string.Join("; ", result.Issues));
-        Assert.Contains("§CSHARP", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource);
         Assert.Contains(
             "private delegate bool Handler(string input);",
             result.CalorSource);

@@ -235,7 +235,7 @@ public class StaticModuleDeclarationTests
         Assert.Empty(outer.InteropBlocks);
         Assert.Empty(innerDeclaration.InteropBlocks);
         Assert.Empty(deepDeclaration.InteropBlocks);
-        Assert.DoesNotContain("§CSHARP", conversion.CalorSource);
+        RawFrameAssertions.AssertFramed(conversion.CalorSource, present: false);
         var converted = Compile(generated);
         foreach (var assembly in new[] { original, converted })
         {

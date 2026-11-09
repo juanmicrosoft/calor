@@ -226,7 +226,7 @@ public class ForLoopConditionSemanticsTests
         else if (native)
             Assert.Contains("§L{", conversion.CalorSource);
         else if (memberPreserved)
-            Assert.Contains("§CSHARP{", conversion.CalorSource); // #943 (D1 RO-UNS-1): a ref local keeps its member as C#
+            RawFrameAssertions.AssertFramed(conversion.CalorSource); // #943 (D1 RO-UNS-1): a ref local keeps its member as C#
         else
             Assert.True(conversion.CalorSource!.Contains("§WH "),
                 conversion.CalorSource + "\n" + string.Join("; ", conversion.Issues.Select(issue => issue.Message)));

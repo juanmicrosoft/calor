@@ -548,7 +548,7 @@ public class ConvertToolTests
         var text = result.Content[0].Text!;
         var json = JsonDocument.Parse(text);
         var calorSource = json.RootElement.GetProperty("calorSource").GetString()!;
-        Assert.Contains("\u00A7CSHARP", calorSource);
+        RawFrameAssertions.AssertFramed(calorSource);
         Assert.Contains("Multiply", calorSource);
         Assert.Contains("multiplier", calorSource);
         Assert.DoesNotContain("\u00A7F{", calorSource);

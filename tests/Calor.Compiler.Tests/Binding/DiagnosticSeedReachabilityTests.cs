@@ -33,7 +33,7 @@ public class DiagnosticSeedReachabilityTests
         yield return new object[] { "conditional-value", "§R (? (> x 0) (/ 10 0) null)" };
         yield return new object[] { "throw-argument", "§R §TH §NEW{Exception} §A (/ 10 0) §/NEW" };
         yield return new object[] { "conversion-operand", "§R (as (/ 10 0) i64)" };
-        yield return new object[] { "await-operand", "§R §AWAIT (/ 10 0)" };
+        yield return new object[] { "await-operand", "§R §AWAIT §C{System.Threading.Tasks.Task.FromResult} §A (/ 10 0) §/C" };
         yield return new object[] { "lambda-expression-body", "§R §LAM{y:i32} (/ 10 0) §/LAM" };
         yield return new object[] { "bind-initializer", "§B{y:i32} (/ 10 0)\n    §R y" };
         // Unsafe wrappers are structurally bound on the PR branch; their operands must

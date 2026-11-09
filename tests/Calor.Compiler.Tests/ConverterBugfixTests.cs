@@ -628,7 +628,7 @@ public class Test
         var calor = emitter.Emit(result.Ast!);
 
         // Must NOT fall back to interop
-        Assert.DoesNotContain("§CSHARP", calor);
+        RawFrameAssertions.AssertFramed(calor, present: false);
         // Must contain native Calor base call with interpolation
         Assert.Contains("§BASE", calor);
         Assert.Contains("${kind}", calor);
@@ -1208,7 +1208,7 @@ public class Test
 
         Assert.True(calor.IndexOf("§B{", StringComparison.Ordinal) < calor.IndexOf("§WH ", StringComparison.Ordinal));
         Assert.Contains("§WH ", calor);
-        Assert.DoesNotContain("§RAW", calor);
+        RawFrameAssertions.AssertFramed(calor, Calor.Compiler.Parsing.TokenKind.RawCSharp, present: false);
     }
 
     [Fact]
@@ -1231,7 +1231,7 @@ public class Test
 
         Assert.True(calor.IndexOf("§ASSIGN", StringComparison.Ordinal) < calor.IndexOf("§WH ", StringComparison.Ordinal));
         Assert.Contains("§WH ", calor);
-        Assert.DoesNotContain("§RAW", calor);
+        RawFrameAssertions.AssertFramed(calor, Calor.Compiler.Parsing.TokenKind.RawCSharp, present: false);
     }
 
     #endregion

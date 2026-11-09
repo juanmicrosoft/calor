@@ -36,5 +36,6 @@
     <!-- #1564: pins CALOR_HOME to an empty directory so in-process conversion never reads ~/.calor/manifests. -->
     <Compile Include="..\Shared\HermeticCalorHome.cs" Link="Shared\HermeticCalorHome.cs" />
     <Compile Include="..\Calor.Compiler.Tests\ActiveSyntaxInputs.cs" Link="Shared\ActiveSyntaxInputs.cs" />
+    <Compile Include="..\Shared\RawFrameAssertions.cs" Link="Shared\RawFrameAssertions.cs" />
   </ItemGroup>
 </Project>

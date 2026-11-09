@@ -180,7 +180,13 @@ public class SnapshotConversionTests
 
         var snapshotDir = Path.Combine(projectDir, "Snapshots");
         Directory.CreateDirectory(snapshotDir);
-        File.WriteAllText(Path.Combine(snapshotDir, snapshotName), content);
+        var original = $"tests/Calor.Conversion.Tests/Snapshots/{snapshotName}";
+        var activeInputs = Calor.Compiler.Tests.ActiveSyntaxInputs.OriginalPaths;
+        var path = activeInputs.Contains(original)
+            ? Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentCompiler(
+                Calor.Compiler.Tests.ActiveSyntaxInputs.RepositoryRoot, original)
+            : Path.Combine(snapshotDir, snapshotName);
+        File.WriteAllText(path, content);
     }
 
     internal static void VerifySnapshot(

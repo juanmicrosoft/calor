@@ -163,7 +163,7 @@ public class ConverterReachTests
         AssertParsesClean(rt);
         // #943 (D1 RO-DECL-1): an out var inside a lambda is never lowered (main emitted a typeless
         // §B that failed with Calor0250), so the member is kept as C# and still parses clean.
-        Assert.Contains("§CSHARP{", rt.Calor);
+        TestHelpers.AssertRawFraming(rt.Calor);
         // The block lands under a hoisted binding at the statement's own indent —
         // never at column 0 mid-module.
         Assert.DoesNotMatch(new Regex(@"\n§/LAM\{"), rt.Calor);
@@ -733,7 +733,7 @@ public class ConverterReachTests
         Assert.False(diagnostics.HasErrors,
             string.Join("\n", diagnostics.Errors.Select(d => $"{d.Code}: {d.Message}"))
             + "\n\n" + result.CalorSource);
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
     }
 
     /// <summary>
@@ -794,7 +794,7 @@ public class ConverterReachTests
         _output.WriteLine(result.CalorSource);
         // Not merely rescued — the nesting is emitted natively, with no §B hoisted
         // out of the lambdas that declare the captured names.
-        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
         Assert.DoesNotContain("§B{_hoistLam", result.CalorSource);
 
         var diagnostics = new DiagnosticBag();
@@ -919,7 +919,7 @@ public class ConverterReachTests
         var rt = ConvertAndParse(csharp, "N1Arr2D");
 
         AssertParsesClean(rt);
-        Assert.DoesNotContain("§CSHARP", rt.Calor);
+        TestHelpers.AssertRawFraming(rt.Calor, present: false);
         var lines = rt.Calor.Split('\n');
         var opener = Array.FindIndex(lines, l => l.Contains("§ARR2D{", StringComparison.Ordinal));
         Assert.True(opener >= 0, rt.Calor);
@@ -1277,7 +1277,7 @@ public class ConverterReachTests
         var rt = ConvertAndParse(csharp, "StageALogEventPropertyValue");
         AssertParsesClean(rt);
         Assert.Contains("§MT{", rt.Calor);
-        Assert.Contains("§CSHARP{", rt.Calor);
+        TestHelpers.AssertRawFraming(rt.Calor);
         Assert.Contains("using var output", rt.Calor);
 
         var compilation = Compiler.Program.Compile(
@@ -1322,7 +1322,7 @@ public class ConverterReachTests
 
         var rt = ConvertAndParse(csharp, "StageANegativeControl");
         AssertParsesClean(rt);
-        Assert.Contains("§CSHARP{", rt.Calor);
+        TestHelpers.AssertRawFraming(rt.Calor);
         Assert.Contains("string Other()", rt.Calor);
 
         var compilation = Compiler.Program.Compile(

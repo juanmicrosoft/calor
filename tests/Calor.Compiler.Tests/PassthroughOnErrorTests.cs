@@ -42,6 +42,6 @@ public class Foo
 }";
         var result = converter.Convert(csharp, "Test.cs");
         Assert.NotNull(result.CalorSource);
-        Assert.DoesNotContain("§CSHARP{", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource, present: false);
     }
 }

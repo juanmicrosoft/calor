@@ -3,7 +3,8 @@
     §F{Add:pub} (int:x) -> int
       §R (+ x 1000)
 
-    §CSHARP{
+    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20int%20Run%28%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20int%20shadowed%20%3D%20Add%282%29%3B%0A%20%20%20%20%20%20%20%20if%20%28shad... 554
+
     public static int Run()
     {
         int shadowed = Add(2);
@@ -30,4 +31,3 @@
             return n * Fact(n - 1);
         }
     }
-}§/CSHARP

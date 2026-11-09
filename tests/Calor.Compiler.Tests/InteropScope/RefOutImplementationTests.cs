@@ -67,7 +67,7 @@ public class RefOutImplementationTests
         var (calor, losses) = await ConvertAsync(source, surface);
         Assert.Empty(losses);
         Assert.DoesNotContain("§CS", calor);
-        Assert.DoesNotContain("§RAW", calor);
+        RawFrameAssertions.AssertFramed(calor, Calor.Compiler.Parsing.TokenKind.RawCSharp, present: false);
         Assert.Contains("T:a:ref", calor);
         var parseDiagnostics = new Compiler.Diagnostics.DiagnosticBag();
         var module = new Compiler.Parsing.Parser(
@@ -106,7 +106,7 @@ public class RefOutImplementationTests
     {
         var source = $"public static class Probe {{ static void Use<T>({parameterType} value) {constraint} {{ }} }}";
         var conversion = new CSharpToCalorConverter().Convert(source);
-        Assert.Contains("§CSHARP", conversion.CalorSource);
+        RawFrameAssertions.AssertFramed(conversion.CalorSource);
         Assert.Contains(conversion.Issues, issue => issue.Feature == feature);
         Assert.Contains(conversion.Losses, item => item.Feature == loss);
     }
@@ -587,7 +587,7 @@ public class RefOutImplementationTests
     public void ExpressionBodiedRefReturn_IsPreserved_NotStripped()
     {
         var result = new CSharpToCalorConverter().Convert("public static class C { public static ref int First(int[] a) => ref a[0]; }");
-        Assert.Contains("§CSHARP{", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource);
         Assert.DoesNotContain("-> ref", result.CalorSource);
         var block = new CSharpToCalorConverter().Convert("public static class C { public static ref int First(int[] a) { return ref a[0]; } }");
         Assert.Equal(block.Losses.Select(loss => loss.Feature), result.Losses.Select(loss => loss.Feature)); // the same report

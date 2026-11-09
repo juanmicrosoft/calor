@@ -12,6 +12,9 @@ public static class TestHelpers
 {
     private static readonly CSharpToCalorConverter Converter = new();
 
+    public static void AssertRawFraming(string? source, TokenKind kind = TokenKind.CSharpInterop, bool present = true)
+        => Calor.Compiler.Tests.RawFrameAssertions.AssertFramed(source, kind, present);
+
     /// <summary>
     /// Converts C# source to Calor source. Returns the ConversionResult.
     /// </summary>

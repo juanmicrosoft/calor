@@ -111,7 +111,7 @@ public sealed class NativeRecordTests
         var source = File.ReadAllText(Path.Combine(root, "tests/TestData/CSharpImport", path));
         var conversion = Convert(source);
         Assert.Empty(conversion.Losses);
-        Assert.DoesNotContain("§CSHARP", conversion.CalorSource);
+        RawFrameAssertions.AssertFramed(conversion.CalorSource, present: false);
         Assert.DoesNotContain("§CS{", conversion.CalorSource);
         Assert.Equal(records, conversion.Ast!.Classes.Count(node => node.IsRecord));
         var result = Compile(conversion.CalorSource!);
@@ -204,7 +204,7 @@ public sealed class NativeRecordTests
               record Derived:pub (int:X) : Base(X)
               §F{Copy:pub} (Derived:value) -> Derived
                 §E{alloc,mut}
-                §R §WITH value §SET{X} 1 §/WITH
+                §R §WITH value §SET{X} 1
             """;
         var refused = Compile(source);
         Assert.Contains(refused.Diagnostics.Errors, error => error.Code == "Calor0423"

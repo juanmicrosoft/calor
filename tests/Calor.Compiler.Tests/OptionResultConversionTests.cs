@@ -160,7 +160,7 @@ public class OptionResultConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
 
         var calor = result.CalorSource!;
-        Assert.DoesNotContain("§CSHARP", calor);
+        RawFrameAssertions.AssertFramed(calor, present: false);
     }
 
     [Fact]
@@ -170,7 +170,7 @@ public class OptionResultConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
 
         var calor = result.CalorSource!;
-        Assert.DoesNotContain("§CSHARP", calor);
+        RawFrameAssertions.AssertFramed(calor, present: false);
     }
 
     #endregion

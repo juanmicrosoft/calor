@@ -95,29 +95,24 @@ public class MigrateCommandE2ETests : IDisposable
         Assert.True(calrFiles.Length == csFiles.Length,
             $"Expected exactly {csFiles.Length} .calr files (one per .cs), got {calrFiles.Length}. STDOUT:\n{migrateStdOut}");
 
-        // Assert content: aggregate counts of executable-member declarations (§MT class methods
-        // and §F free functions — the migrator emits §MT for methods inside class bodies) and
-        // §CSHARP interop blocks across the whole produced set. A migrator that regressed to
-        // blanket-passthrough (every file wrapped in a single §CSHARP block, zero real
-        // conversion) would produce §CSHARP-count == file-count and §MT+§F count == 0. This
-        // is exactly the "testing the copy loop" failure mode the adversarial review of the
-        // first draft flagged.
+        // Count native declarations outside opaque C# payloads. Blanket
+        // passthrough must not pass by supplying declaration text inside raw.
         int totalMemberDeclarations = 0;
         int totalCSharpBlocks = 0;
         var perFileCsharp = new Dictionary<string, int>();
         foreach (var calr in calrFiles)
         {
             var text = File.ReadAllText(calr);
-            var members = Regex.Matches(text, @"§(MT|F|CTOR|PROP|OP|IXER)\{").Count;
-            var cs = Regex.Matches(text, @"§CSHARP\{").Count;
+            var members = Regex.Matches(Parsing.RawCSharpFrame.MaskForAnalysis(text), @"§(MT|F|CTOR|PROP|OP|IXER)\{").Count;
+            var cs = RawFrameAssertions.GetFrames(text).Length;
             totalMemberDeclarations += members;
             totalCSharpBlocks += cs;
             perFileCsharp[Path.GetFileName(calr)] = cs;
         }
         Assert.True(totalMemberDeclarations >= 5,
-            $"Migrator produced very few executable-member declarations ({totalMemberDeclarations}) across {calrFiles.Length} files. Expected at least 5 — the fixture has 8+ methods/constructors total. Per-file §CSHARP block counts: {string.Join(", ", perFileCsharp.Select(kv => $"{kv.Key}={kv.Value}"))}");
+            $"Migrator produced very few executable-member declarations ({totalMemberDeclarations}) across {calrFiles.Length} files. Expected at least 5 — the fixture has 8+ methods/constructors total. Per-file raw C# block counts: {string.Join(", ", perFileCsharp.Select(kv => $"{kv.Key}={kv.Value}"))}");
         Assert.True(totalCSharpBlocks < calrFiles.Length,
-            $"Migrator produced {totalCSharpBlocks} §CSHARP interop blocks across {calrFiles.Length} .calr files — that's >= one wrapper per file, i.e. blanket passthrough. Per-file: {string.Join(", ", perFileCsharp.Select(kv => $"{kv.Key}={kv.Value}"))}");
+            $"Migrator produced {totalCSharpBlocks} raw C# interop blocks across {calrFiles.Length} .calr files — that's >= one wrapper per file, i.e. blanket passthrough. Per-file: {string.Join(", ", perFileCsharp.Select(kv => $"{kv.Key}={kv.Value}"))}");
 
         // Assert: the .json report is envelope-wrapped per schema 2.0 with populated fileResults.
         Assert.True(File.Exists(reportPath), $"report.json was not written to {reportPath}");

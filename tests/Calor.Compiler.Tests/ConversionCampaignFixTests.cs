@@ -886,7 +886,8 @@ class Test
         var calor = result.CalorSource;
 
         // Should NOT downgrade ValueTask to Task
-        Assert.DoesNotContain("Task<", calor);
+        Assert.Contains("-> ValueTask<int>", calor);
+        Assert.DoesNotContain("-> Task<", calor);
     }
 
     #endregion
@@ -1852,7 +1853,7 @@ public delegate bool Predicate<T>(T item);";
 
         var calor = result.CalorSource!;
         Assert.Contains("§DEL", calor);
-        Assert.Contains("§CSHARP", calor);
+        RawFrameAssertions.AssertFramed(calor);
         Assert.Contains("Predicate<T>(T item)", calor);
 
         // Compile round-trip — both delegates survive with their semantics.

@@ -1928,7 +1928,7 @@ public class ConverterImprovementTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == "LocalAsync");
         Assert.Contains(result.Context.Losses, l => l.Kind == ConversionLossKind.InteropPreserved);
-        Assert.Contains("§CSHARP", result.CalorSource!);
+        RawFrameAssertions.AssertFramed(result.CalorSource!);
     }
 
     [Fact]

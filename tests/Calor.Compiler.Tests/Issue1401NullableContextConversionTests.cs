@@ -297,12 +297,14 @@ public sealed class Issue1401NullableContextConversionTests
                 """,
                 "Fixture.cs");
 
-        Assert.Contains(
-            "() -> IAsyncEnumerable<string>",
-            result.CalorSource);
-        Assert.DoesNotContain(
-            "() -> IAsyncEnumerable<string>?",
-            result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource);
+        var compiled = Program.Compile(result.CalorSource!, "async-stream.calr");
+        Assert.False(compiled.HasErrors, string.Join(Environment.NewLine, compiled.Diagnostics.Errors));
+        var read = CSharpSyntaxTree.ParseText(compiled.GeneratedCode!).GetRoot()
+            .DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
+            .Single(method => method.Identifier.ValueText == "Read");
+        Assert.Equal("IAsyncEnumerable<string>", read.ReturnType.ToString());
+        Assert.Contains(read.Modifiers, modifier => modifier.IsKind(SyntaxKind.AsyncKeyword));
     }
 
     [Fact]

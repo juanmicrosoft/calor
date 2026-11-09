@@ -353,7 +353,7 @@ public sealed class LosslessConversionContractTests
         }).Convert(source, "Example.cs");
 
         Assert.True(result.Success, string.Join(Environment.NewLine, result.Issues));
-        Assert.Contains("§CSHARP", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource);
         Assert.Contains("int Local() => 42 + k;", result.CalorSource);
         Assert.Equal(1, result.InteropPreservationCount);
         Assert.Equal(0, result.LossySubstitutionCount);
@@ -484,7 +484,7 @@ public sealed class LosslessConversionContractTests
                     new[] { FileMigrationStatus.Success, FileMigrationStatus.Partial }));
             var interop = Assert.Single(report.FileResults, result => result.SourcePath == interopPath);
             Assert.Contains(interop.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
-            Assert.Contains("§CSHARP", await File.ReadAllTextAsync(Path.ChangeExtension(interopPath, ".calr")));
+            RawFrameAssertions.AssertFramed(await File.ReadAllTextAsync(Path.ChangeExtension(interopPath, ".calr")));
         }
 
         finally

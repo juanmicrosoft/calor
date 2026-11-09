@@ -431,7 +431,7 @@
         "async method"
       ],
       "calorSyntax": "§AF{name:vis} (type:param, ...) -> returnType or §AMT{name:vis} (type:param, ...) -> returnType",
-      "description": "Defines an async function. Use §AF for standalone async functions, §AMT for async class methods.",
+      "description": "Defines an async function. Use §AF for standalone async functions, §AMT for async class methods.\n\nAn async declaration with scalar output `T` is callable as `Task<T>`, but its body\nreturns `T`. A `void` output produces `Task`. Explicit .NET `Task<T>` and\n`ValueTask<T>` outputs preserve that carrier and return `T` in the body; their\nnon-generic forms have a void body result. Postconditions describe the body\nresult, not the task object. Ordinary synchronous task-returning declarations\nkeep their declared return type.",
       "programs": [
         "complex_async"
       ],
@@ -455,7 +455,7 @@
         "await expression"
       ],
       "calorSyntax": "§AWAIT expression",
-      "description": "Awaits an asynchronous operation.",
+      "description": "Awaits an asynchronous operation.\n\nAwaiting a .NET `Task<T>` or `ValueTask<T>` produces `T`. Awaiting a non-generic\ncarrier produces no value and cannot initialize a binding. `§AWAIT` can also be\nused as a statement. A custom type named `MyTask<T>` or a source declaration\nnamed `Task<T>` is not automatically a .NET async carrier. Unsupported custom\nawaitables are diagnosed or checked by generated C# validation, never inferred\nfrom a name suffix.",
       "programs": [
         "complex_async"
       ],
@@ -2101,7 +2101,7 @@
     "§AF": {
       "name": "Async Function",
       "syntax": "§AF{name:vis} (type:param, ...) -> returnType or §AMT{name:vis} (type:param, ...) -> returnType",
-      "description": "Defines an async function. Use §AF for standalone async functions, §AMT for async class methods.",
+      "description": "Defines an async function. Use §AF for standalone async functions, §AMT for async class methods.\n\nAn async declaration with scalar output `T` is callable as `Task<T>`, but its body\nreturns `T`. A `void` output produces `Task`. Explicit .NET `Task<T>` and\n`ValueTask<T>` outputs preserve that carrier and return `T` in the body; their\nnon-generic forms have a void body result. Postconditions describe the body\nresult, not the task object. Ordinary synchronous task-returning declarations\nkeep their declared return type.",
       "csharpEquivalent": "public async Task<string> FetchDataAsync() { ... }\npublic async Task ProcessAsync() { await DoWork(); }"
     },
     "§M": {
@@ -2231,7 +2231,7 @@
     "§AWAIT": {
       "name": "Await",
       "syntax": "§AWAIT expression",
-      "description": "Awaits an asynchronous operation.",
+      "description": "Awaits an asynchronous operation.\n\nAwaiting a .NET `Task<T>` or `ValueTask<T>` produces `T`. Awaiting a non-generic\ncarrier produces no value and cannot initialize a binding. `§AWAIT` can also be\nused as a statement. A custom type named `MyTask<T>` or a source declaration\nnamed `Task<T>` is not automatically a .NET async carrier. Unsupported custom\nawaitables are diagnosed or checked by generated C# validation, never inferred\nfrom a name suffix.",
       "csharpEquivalent": "var result = await FetchAsync();\nawait Task.Delay(1000);"
     },
     "§TR": {

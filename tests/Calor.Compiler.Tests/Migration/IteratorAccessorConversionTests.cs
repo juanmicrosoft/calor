@@ -220,7 +220,7 @@ public class IteratorAccessorConversionTests
         // and nothing was rescued after the fact.
         Assert.Equal(preserved, losses.Count(loss => loss == "iterator-accessor"));
         Assert.DoesNotContain("post-validation-fallback", losses);
-        Assert.Equal(preserved, Regex.Matches(calor, @"§CSHARP\{").Count);
+        Assert.Equal(preserved, RawFrameAssertions.GetFrames(calor).Length);
 
         // Default compile (effects enforced), then run: same observable behavior.
         var compilation = Program.Compile(calor, row + ".calr",
@@ -283,7 +283,7 @@ public class IteratorAccessorConversionTests
             "using System.Collections.Generic;\npublic class C\n{\n" + members + "\n}\n");
         Assert.True(result.Success, string.Join("\n", result.Issues));
         Assert.Contains(marker, result.CalorSource);
-        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource, present: false);
         Assert.DoesNotContain(result.Issues, issue => issue.Feature == "iterator-accessor");
     }
 
@@ -298,7 +298,7 @@ public class IteratorAccessorConversionTests
             }
             """);
         Assert.True(result.Success);
-        Assert.Contains("§CSHARP", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource);
         Assert.DoesNotMatch(@"§Y(IELD|BRK)", result.CalorSource!);
         Assert.DoesNotContain(result.Issues, issue => issue.Feature == "iterator-accessor");
     }

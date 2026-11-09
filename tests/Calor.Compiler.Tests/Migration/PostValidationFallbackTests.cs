@@ -28,9 +28,9 @@ public class PostValidationFallbackTests
         "namespace N { public class Keepme { public int A() => 1; } " +
         "public class Breakme { public int B() => 2; } }";
 
-    // Everything outside §CSHARP{...}§/CSHARP blocks — what a real parser reads as Calor.
+    // Everything outside opaque C# payloads — what a real parser reads as Calor.
     private static string OutsideCSharp(string calor) =>
-        Regex.Replace(calor, @"§CSHARP\{.*?\}§/CSHARP", "", RegexOptions.Singleline);
+        Regex.Replace(Parsing.RawCSharpFrame.MaskForAnalysis(calor), @"§CSHARP\{.*?\}§/CSHARP", "", RegexOptions.Singleline);
 
     private static Func<string, bool> CondemnOutsideCSharp(string marker) =>
         calor => !OutsideCSharp(calor).Contains(marker);
@@ -60,7 +60,7 @@ public class PostValidationFallbackTests
             "fallback output must be valid Calor:\n" + result.CalorSource);
 
         // The offending member is preserved verbatim inside a §CSHARP interop block.
-        Assert.Contains("§CSHARP", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource);
         Assert.Contains("class Breakme", result.CalorSource);
         Assert.Equal(1, result.Context!.Stats.InteropBlocksEmitted);
 
@@ -133,7 +133,7 @@ public class PostValidationFallbackTests
         Assert.False(result.Success);
         Assert.NotNull(result.CalorSource);
         Assert.Equal(0, result.Context!.Stats.InteropBlocksEmitted);
-        Assert.DoesNotContain("§CSHARP", result.CalorSource!);
+        RawFrameAssertions.AssertFramed(result.CalorSource!, present: false);
     }
 
     [Fact]
@@ -146,6 +146,6 @@ public class PostValidationFallbackTests
         Assert.True(result.Success);
         Assert.True(ParsesForReal(result.CalorSource!));
         Assert.Equal(0, result.Context!.Stats.InteropBlocksEmitted);
-        Assert.DoesNotContain("§CSHARP", result.CalorSource!);
+        RawFrameAssertions.AssertFramed(result.CalorSource!, present: false);
     }
 }

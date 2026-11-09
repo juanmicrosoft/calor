@@ -2,5 +2,6 @@
   §DEL{MyHandler}
     §I{int:x}
 
-  §CSHARP{public delegate bool Predicate<T>(T item);}§/CSHARP
+  raw member:delegate-semantics:Other:Unsupported%20Other%3A%20public%20delegate%20bool%20Predicate%3CT%3E%28T%20item%29%3B 42
+public delegate bool Predicate<T>(T item);
 

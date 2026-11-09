@@ -130,7 +130,7 @@ public class DuplicateBindingTests
         var result = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy }).Convert(csharp);
         Assert.True(result.Success);
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§CSHARP", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource);
         var loss = Assert.Single(result.Losses.Where(item =>
             item.Feature == "standalone-block"));
         Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);

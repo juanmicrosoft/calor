@@ -2,6 +2,5 @@
   §U{System.Collections.Generic}
 
   §CL{Container:pub}
-    §CSHARP{    public List<string> Items { get; set; } = [];
-}§/CSHARP
-
+    raw member:property:Property:Unsupported%20Property%3A%20public%20List%3Cstring%3E%20Items%20%7B%20get%3B%20set%3B%20%7D%20%3D%20%5B%5D%3B 50
+    public List<string> Items { get; set; } = [];

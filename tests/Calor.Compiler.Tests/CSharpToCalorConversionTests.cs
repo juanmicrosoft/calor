@@ -3527,7 +3527,7 @@ public class CSharpToCalorConversionTests
 
         var result = _converter.Convert(csharpSource);
         Assert.True(result.Success, GetErrorMessage(result));
-        Assert.Contains("§CSHARP", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource);
         Assert.Contains("event System.EventHandler Changed;", result.CalorSource);
         Assert.DoesNotContain("§IFACE{", result.CalorSource);
         Assert.Contains(result.Losses, loss =>

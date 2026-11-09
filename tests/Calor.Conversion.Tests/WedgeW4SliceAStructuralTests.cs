@@ -142,7 +142,7 @@ public class WedgeW4SliceAStructuralTests
         Assert.Contains(
             result.Ast.Classes,
             type => type.FullyQualifiedSymbolIdentity == "global::B.Foo");
-        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
         Assert.Contains("§CL{", result.CalorSource);
     }
 
@@ -238,7 +238,7 @@ public class WedgeW4SliceAStructuralTests
 
         Assert.Empty(result.Context.Losses);
         Assert.True(Assert.Single(result.Ast!.Classes.Where(type => type.Name == "Money")).IsRecord);
-        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
         Assert.Contains("record Money", result.CalorSource);
         var compiled = Calor.Compiler.Program.Compile(result.CalorSource!, "money.calr",
             new Calor.Compiler.CompilationOptions { StatusWriter = TextWriter.Null });
@@ -311,7 +311,7 @@ public class WedgeW4SliceAStructuralTests
 
         Assert.Contains(result.Context.Losses,
             l => l.Kind == ConversionLossKind.InteropPreserved);
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Contains("Id<T>", result.CalorSource);
         // Not silently hoisted as a native module function.
         Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == "Id");
@@ -338,7 +338,7 @@ public class WedgeW4SliceAStructuralTests
 
         Assert.Contains(result.Context.Losses,
             l => l.Kind == ConversionLossKind.InteropPreserved);
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == "Get");
     }
 
@@ -358,7 +358,7 @@ public class WedgeW4SliceAStructuralTests
         Assert.DoesNotContain(result.Context.Losses,
             l => l.Kind == ConversionLossKind.InteropPreserved);
         Assert.DoesNotContain(result.Issues, i => i.Feature == "local-function");
-        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
         var binding = Assert.Single(RecursiveAstWalker.DescendantsAndSelf(result.Ast!)
             .OfType<BindStatementNode>().Where(node => node.Name == localName));
         Assert.IsType<LambdaExpressionNode>(binding.Initializer);
@@ -378,7 +378,7 @@ public class WedgeW4SliceAStructuralTests
         Assert.Contains(result.Context.Losses,
             l => l.Kind == ConversionLossKind.InteropPreserved);
         Assert.Contains(result.Issues, i => i.Feature == "local-function");
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         // Never hoisted as a native module function.
         Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == localName);
     }

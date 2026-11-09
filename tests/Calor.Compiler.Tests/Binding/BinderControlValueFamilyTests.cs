@@ -122,19 +122,21 @@ public class BinderControlValueFamilyTests
     }
 
     [Fact]
-    public void Await_UnwrapsTaskTypeString_ConfigureAwaitRetained()
+    public void Await_ResolvesNativeTaskResult_ConfigureAwaitRetained()
     {
         var (expr, diags) = BindReturn(new AwaitExpressionNode(S,
             new ReferenceNode(S, "t"), configureAwait: false), ("t", "Task<i32>"));
         var aw = Assert.IsType<BoundStructuralExpression>(expr);
-        Assert.Equal("i32", aw.Type.DisplayString);
+        Assert.Equal(Compiler.Parsing.AttributeHelper.ExpandType("i32"),
+            Compiler.Parsing.AttributeHelper.ExpandType(aw.Type.DisplayString));
         Assert.Equal(false, aw.Metadata["ConfigureAwait"]);
         AssertComplete(diags);
 
         var (voidAwait, _) = BindReturn(
             new AwaitExpressionNode(S, new ReferenceNode(S, "t")),
             ("t", "Task"));
-        Assert.Equal("VOID", voidAwait.Type.DisplayString);
+        Assert.Equal(Compiler.Parsing.AttributeHelper.ExpandType("void"),
+            Compiler.Parsing.AttributeHelper.ExpandType(voidAwait.Type.DisplayString));
     }
 
     [Fact]
