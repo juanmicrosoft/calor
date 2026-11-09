@@ -1,4 +1,5 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Parsing;
 using Calor.LanguageServer.Documentation;
 using Calor.LanguageServer.State;
 using Calor.LanguageServer.Utilities;
@@ -59,13 +60,17 @@ public sealed class HoverHandler : HoverHandlerBase
             };
         }
 
-        // Try tag documentation hover FIRST - educational docs for Calor syntax tags
-        // This takes priority because users hovering over § tags want syntax help
-        var tagHover = TryGetTagHover(snapshot.Source, position);
+        if (snapshot.GetTokenAtOffset(offset) is not { } syntaxToken || syntaxToken.Kind == TokenKind.Error)
+            return null;
+
+        var tagHover = TryGetTagHover(snapshot.Source, syntaxToken);
         if (tagHover != null)
         {
             return tagHover;
         }
+
+        if (syntaxToken.Kind != TokenKind.Identifier && !syntaxToken.IsLiteral)
+            return null;
 
         // Fall back to symbol-based hover (when we have AST)
         if (snapshot.Ast != null)
@@ -78,7 +83,7 @@ public sealed class HoverHandler : HoverHandlerBase
                 snapshot.BoundModule);
             if (result != null)
             {
-                var content = BuildHoverContent(result, snapshot.Ast);
+                var content = BuildHoverContent(result, snapshot.Ast, snapshot);
                 var range = PositionConverter.ToLspRange(result.Span, snapshot.Source);
 
                 return new Hover
@@ -99,26 +104,14 @@ public sealed class HoverHandler : HoverHandlerBase
     /// <summary>
     /// Attempts to provide hover documentation for a Calor syntax tag.
     /// </summary>
-    private static Hover? TryGetTagHover(string source, Position position)
+    private static Hover? TryGetTagHover(string source, Token token)
     {
-        // Convert LSP position (0-based) to offset
-        var offset = PositionConverter.ToOffset(position, source);
-        if (offset < 0 || offset >= source.Length)
-            return null;
-
-        // Try to extract a tag at this position
-        var tag = TagDocumentationProvider.ExtractTagAtPosition(source, offset);
+        var tag = TagDocumentationProvider.GetSyntaxTag(token, source);
         if (tag == null)
             return null;
-
-        // Get documentation for the tag
         var doc = TagDocumentationProvider.Instance.GetTagDocumentation(tag);
         if (doc == null)
             return null;
-
-        // Build the hover range (find the tag boundaries)
-        var (startOffset, endOffset) = FindTagBoundaries(source, offset, tag);
-        var range = OffsetRangeToLspRange(source, startOffset, endOffset);
 
         return new Hover
         {
@@ -127,73 +120,11 @@ public sealed class HoverHandler : HoverHandlerBase
                 Kind = MarkupKind.Markdown,
                 Value = doc.ToMarkdown()
             }),
-            Range = range
+            Range = PositionConverter.ToLspRange(token.Span, source)
         };
     }
 
-    /// <summary>
-    /// Finds the start and end offsets of a tag in the source.
-    /// </summary>
-    private static (int Start, int End) FindTagBoundaries(string source, int offset, string tag)
-    {
-        // Find the § character
-        var start = offset;
-        while (start > 0 && source[start] != '§')
-            start--;
-
-        // Find the end of the tag name (before { or whitespace)
-        var end = start + 1;
-        if (end < source.Length && source[end] == '/')
-            end++; // Skip closing tag slash
-
-        while (end < source.Length && (char.IsLetter(source[end]) || source[end] == '?' || source[end] == '!'))
-            end++;
-
-        return (start, end);
-    }
-
-    /// <summary>
-    /// Converts offset range to LSP Range.
-    /// </summary>
-    private static OmniSharp.Extensions.LanguageServer.Protocol.Models.Range OffsetRangeToLspRange(string source, int startOffset, int endOffset)
-    {
-        var startLine = 0;
-        var startChar = 0;
-        var endLine = 0;
-        var endChar = 0;
-
-        for (var i = 0; i < source.Length && i <= endOffset; i++)
-        {
-            if (i == startOffset)
-            {
-                startLine = endLine;
-                startChar = endChar;
-            }
-
-            if (i == endOffset)
-            {
-                break;
-            }
-
-            if (source[i] == '\n')
-            {
-                endLine++;
-                endChar = 0;
-            }
-            else
-            {
-                endChar++;
-            }
-        }
-
-        return new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range
-        {
-            Start = new Position(startLine, startChar),
-            End = new Position(endLine, endChar)
-        };
-    }
-
-    private static string BuildHoverContent(SymbolLookupResult result, ModuleNode ast)
+    private static string BuildHoverContent(SymbolLookupResult result, ModuleNode ast, DocumentSnapshot snapshot)
     {
         var sb = new System.Text.StringBuilder();
 
@@ -202,38 +133,13 @@ public sealed class HoverHandler : HoverHandlerBase
             case "function":
                 if (result.Node is FunctionNode func)
                 {
-                    sb.AppendLine("```calor");
-                    sb.Append($"§F{{{func.Id}:{func.Name}");
-                    if (func.Visibility == Visibility.Public) sb.Append(":pub");
-                    sb.AppendLine("}");
-
-                    foreach (var param in func.Parameters)
-                    {
-                        sb.AppendLine($"  §I{{{param.TypeName}:{param.Name}}}");
-                    }
-
-                    if (func.Output != null)
-                    {
-                        sb.AppendLine($"  §O{{{func.Output.TypeName}}}");
-                    }
-
-                    if (func.Effects != null && func.Effects.Effects.Count > 0)
-                    {
-                        var effects = string.Join(",", func.Effects.Effects.Values);
-                        sb.AppendLine($"  §E{{{effects}}}");
-                    }
-
-                    foreach (var pre in func.Preconditions)
-                    {
-                        sb.AppendLine($"  §Q (...)");
-                    }
-
-                    foreach (var post in func.Postconditions)
-                    {
-                        sb.AppendLine($"  §S (...)");
-                    }
-
-                    sb.AppendLine("```");
+                    AppendDeclarationHeader(sb, func, snapshot);
+                    if (func.Effects != null)
+                        sb.AppendLine($"**Effects:** `! {string.Join(",", func.Effects.Effects.Values)}`");
+                    if (func.Preconditions.Count > 0)
+                        sb.AppendLine($"**Preconditions:** {func.Preconditions.Count}");
+                    if (func.Postconditions.Count > 0)
+                        sb.AppendLine($"**Postconditions:** {func.Postconditions.Count}");
 
                     if (func.IsAsync)
                     {
@@ -245,15 +151,15 @@ public sealed class HoverHandler : HoverHandlerBase
 
             case "parameter":
                 sb.AppendLine("```calor");
-                sb.AppendLine($"(parameter) {result.Name}: {result.Type}");
+                sb.AppendLine($"(parameter) {result.Type}:{result.Name}");
                 sb.AppendLine("```");
                 break;
 
             case "variable":
             case "mutable variable":
                 sb.AppendLine("```calor");
-                var mutability = result.Kind == "mutable variable" ? "~" : "";
-                sb.AppendLine($"(variable) §B{{{mutability}{result.Name}}} = ...{(result.Type != null ? $" : {result.Type}" : "")}");
+                var binding = result.Kind == "mutable variable" ? "var" : "let";
+                sb.AppendLine($"{binding} {(result.Type != null ? result.Type + ":" : "")}{result.Name} = ...");
                 sb.AppendLine("```");
                 break;
 
@@ -267,12 +173,12 @@ public sealed class HoverHandler : HoverHandlerBase
                 var targetFunc = SymbolFinder.FindFunction(ast, result.Name);
                 if (targetFunc != null)
                 {
-                    var paramList = string.Join(", ", targetFunc.Parameters.Select(p => $"{p.Name}: {p.TypeName}"));
+                    var paramList = string.Join(", ", targetFunc.Parameters.Select(p => $"{p.TypeName}:{p.Name}"));
                     var returnType = Compiler.Analysis.ReturnShape.GetAsyncReturnTypes(
                         targetFunc.Output?.TypeName ?? "void", targetFunc.IsAsync, ast,
                         targetFunc.TypeParameters.Select(parameter => parameter.Name)).CallableType;
                     sb.AppendLine("```calor");
-                    sb.AppendLine($"(function) {result.Name}({paramList}) -> {returnType}");
+                    sb.AppendLine($"(function) {result.Name}({paramList}) → {returnType}");
                     sb.AppendLine("```");
                 }
                 else
@@ -284,23 +190,11 @@ public sealed class HoverHandler : HoverHandlerBase
             case "class":
                 if (result.Node is ClassDefinitionNode cls)
                 {
-                    sb.AppendLine("```calor");
-                    sb.Append($"§CL{{{cls.Id}:{cls.Name}");
-                    if (cls.IsAbstract) sb.Append(":abs");
-                    if (cls.IsSealed) sb.Append(":sealed");
-                    sb.AppendLine("}");
-
+                    AppendDeclarationHeader(sb, cls, snapshot);
                     if (cls.BaseClass != null)
-                    {
-                        sb.AppendLine($"  §EXT{{{cls.BaseClass}}}");
-                    }
-
+                        sb.AppendLine($"**Extends:** `{cls.BaseClass}`");
                     foreach (var implIface in cls.ImplementedInterfaces)
-                    {
-                        sb.AppendLine($"  §IMPL{{{implIface}}}");
-                    }
-
-                    sb.AppendLine("```");
+                        sb.AppendLine($"**Implements:** `{implIface}`");
 
                     if (cls.Fields.Count > 0 || cls.Methods.Count > 0 || cls.Properties.Count > 0)
                     {
@@ -313,51 +207,28 @@ public sealed class HoverHandler : HoverHandlerBase
             case "field":
                 if (result.Node is ClassFieldNode field)
                 {
-                    sb.AppendLine("```calor");
-                    sb.AppendLine($"(field) §FLD{{{field.TypeName}:{field.Name}:{field.Visibility.ToString().ToLower()}}}");
-                    sb.AppendLine("```");
+                    AppendDeclarationHeader(sb, field, snapshot);
                 }
                 break;
 
             case "method":
                 if (result.Node is MethodNode method)
                 {
-                    sb.AppendLine("```calor");
-                    sb.Append($"§MT{{{method.Id}:{method.Name}");
-                    if (method.IsVirtual) sb.Append(":vr");
-                    if (method.IsOverride) sb.Append(":ov");
-                    if (method.IsAbstract) sb.Append(":ab");
-                    sb.AppendLine("}");
-
-                    foreach (var param in method.Parameters)
-                    {
-                        sb.AppendLine($"  §I{{{param.TypeName}:{param.Name}}}");
-                    }
-
-                    if (method.Output != null)
-                    {
-                        sb.AppendLine($"  §O{{{method.Output.TypeName}}}");
-                    }
-
-                    sb.AppendLine("```");
+                    AppendDeclarationHeader(sb, method, snapshot);
                 }
                 break;
 
             case "property":
                 if (result.Node is PropertyNode prop)
                 {
-                    sb.AppendLine("```calor");
-                    sb.AppendLine($"(property) §PROP{{{prop.Id}:{prop.TypeName}:{prop.Name}}}");
-                    sb.AppendLine("```");
+                    AppendDeclarationHeader(sb, prop, snapshot);
                 }
                 break;
 
             case "interface":
                 if (result.Node is InterfaceDefinitionNode iface)
                 {
-                    sb.AppendLine("```calor");
-                    sb.AppendLine($"§IFACE{{{iface.Id}:{iface.Name}}}");
-                    sb.AppendLine("```");
+                    AppendDeclarationHeader(sb, iface, snapshot);
 
                     if (iface.Methods.Count > 0)
                     {
@@ -370,14 +241,7 @@ public sealed class HoverHandler : HoverHandlerBase
             case "enum":
                 if (result.Node is EnumDefinitionNode enumDef)
                 {
-                    sb.AppendLine("```calor");
-                    sb.Append($"§EN{{{enumDef.Id}:{enumDef.Name}");
-                    if (enumDef.UnderlyingType != null)
-                    {
-                        sb.Append($":{enumDef.UnderlyingType}");
-                    }
-                    sb.AppendLine("}");
-                    sb.AppendLine("```");
+                    AppendDeclarationHeader(sb, enumDef, snapshot);
 
                     if (enumDef.Members.Count > 0)
                     {
@@ -411,6 +275,32 @@ public sealed class HoverHandler : HoverHandlerBase
         }
 
         return sb.ToString();
+    }
+
+    private static void AppendDeclarationHeader(
+        System.Text.StringBuilder builder,
+        AstNode node,
+        DocumentSnapshot snapshot)
+    {
+        var end = node.Span.Start;
+        var line = node.Span.Line;
+        var depth = 0;
+        foreach (var token in snapshot.Tokens)
+        {
+            if (token.Span.Start < node.Span.Start || token.Span.Length == 0 || token.IsTrivia)
+                continue;
+            if (token.Span.Line > line && depth == 0)
+                break;
+            if (token.Kind is TokenKind.OpenParen or TokenKind.OpenBracket or TokenKind.OpenBrace)
+                depth++;
+            else if (token.Kind is TokenKind.CloseParen or TokenKind.CloseBracket or TokenKind.CloseBrace)
+                depth--;
+            end = token.Span.End;
+            line = token.Span.Line;
+        }
+        builder.AppendLine("```calor");
+        builder.AppendLine(snapshot.Source[node.Span.Start..end].Trim());
+        builder.AppendLine("```");
     }
 
     protected override HoverRegistrationOptions CreateRegistrationOptions(

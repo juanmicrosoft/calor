@@ -14,9 +14,9 @@ public class HoverHandlerTests
     public async Task RawFraming_HeaderHoverAndOpaquePayloadDoNotLeakCalorAssistanceAsync()
     {
         const string payload = "// \u03c0\U0001f600 §F{Fake}\r\n// §C{Run} §A value";
-        var source = "§M{Test}\n  §F{Run:pub} (i32:value) -> i32\n    §R value\n" +
+        var source = "module Test\n  func Run (int:value) → int\n    return value\n" +
             $"  raw member {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n" +
-            "  §F{After:pub} () -> void\n";
+            "  func After () → void\n";
         var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///raw-hover.calr");
         var state = _workspace.GetOrCreate(uri, source, version: 1);
         Assert.NotNull(state.Snapshot.Ast);
@@ -88,13 +88,101 @@ public class HoverHandlerTests
         _handler = new HoverHandler(_workspace);
     }
 
+    [Theory]
+    [InlineData("module Demo", "module")]
+    [InlineData("func Add () → int", "func")]
+    [InlineData("class Person", "class")]
+    [InlineData("let int:value = 1", "let")]
+    [InlineData("var int:value = 1", "var")]
+    [InlineData("for i from 0 to 2 step 1", "for")]
+    [InlineData("each item in items", "each")]
+    [InlineData("requires value > 0", "requires")]
+    [InlineData("=> result > 0", "=>")]
+    [InlineData("! cw", "!")]
+    [InlineData("func Add () → int", "→")]
+    [InlineData("new Person()", "new")]
+    [InlineData("items[0..2]", "..")]
+    [InlineData("value ?? fallback", "??")]
+    [InlineData("value?.Name", "?.")]
+    public async Task NativeSyntaxHover_UsesCapturedTokenAndExactUtf16RangeAsync(string statement, string syntax)
+    {
+        var source = "// \u03c0\U0001f600\r\n  " + statement;
+        var start = source.IndexOf(syntax, source.IndexOf('\n') + 1, StringComparison.Ordinal);
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///native-syntax-hover.calr");
+        _workspace.GetOrCreate(uri, source);
+        var (line, column) = LspTestHarness.GetLineColumn(source, start);
+        for (var index = 0; index < syntax.Length; index++)
+        {
+            var hover = await _handler.Handle(new HoverParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1 + index)
+            }, CancellationToken.None);
+            Assert.NotNull(hover);
+            Assert.Equal(TagDocumentationProvider.Instance.GetTagDocumentation(syntax)!.ToMarkdown(),
+                hover.Contents.MarkupContent!.Value);
+            Assert.Equal(new Position(line - 1, column - 1), hover.Range!.Start);
+            Assert.Equal(new Position(line - 1, column - 1 + syntax.Length), hover.Range.End);
+        }
+    }
+
+    [Theory]
+    [InlineData("// func New", "func")]
+    [InlineData("/// func New", "func")]
+    [InlineData("§F{Run:pub}", "§F")]
+    [InlineData("§!{Run}", "!")]
+    public void NativeSyntaxHover_DoesNotTeachCommentOrRetiredTokens(string source, string marker)
+    {
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///not-native-hover.calr");
+        var snapshot = _workspace.GetOrCreate(uri, source).Snapshot;
+        var (line, column) = LspTestHarness.GetLineColumn(source,
+            source.IndexOf(marker, StringComparison.Ordinal));
+        Assert.Null(HoverHandler.BuildHover(snapshot, new Position(line - 1, column - 1)));
+    }
+
+    [Theory]
+    [InlineData("module Demo\n  func Identity<T> (T:value) → T\n    return value",
+        "Identity", "func Identity<T> (T:value) → T")]
+    [InlineData("module Demo\n  class Person\n    field string:name",
+        "Person", "class Person")]
+    [InlineData("module Demo\n  class Person\n    field string:name",
+        "name", "field string:name")]
+    [InlineData("module Demo\n  class Person\n    func Add (int:x) → int\n      return x",
+        "Add", "func Add (int:x) → int")]
+    [InlineData("module Demo\n  class Person\n    property int:Count\n      get\n        return 1",
+        "Count", "property int:Count")]
+    [InlineData("module Demo\n  interface IShape\n    func Area () → double",
+        "IShape", "interface IShape")]
+    [InlineData("module Demo\n  enum Color\n    Red",
+        "Color", "enum Color")]
+    [InlineData("module Demo\n  func Identity (\n    int:value\n  ) → int\n    return value",
+        "Identity", "func Identity (\n    int:value\n  ) → int")]
+    [InlineData("module Demo\n  func Text (\n    string:value = \"(value)\"\n  ) → string\n    return value",
+        "Text", "func Text (\n    string:value = \"(value)\"\n  ) → string")]
+    public void NativeSymbolHover_RetainsExactAuthoredDeclarationWithoutSourceIds(
+        string source, string name, string expectedHeader)
+    {
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///native-symbol-hover.calr");
+        var snapshot = _workspace.GetOrCreate(uri, source).Snapshot;
+        Assert.NotNull(snapshot.Ast);
+        Assert.DoesNotContain(snapshot.Diagnostics, diagnostic => diagnostic.IsError);
+        var (line, column) = LspTestHarness.GetLineColumn(source,
+            source.IndexOf(name, StringComparison.Ordinal));
+        var hover = HoverHandler.BuildHover(snapshot, new Position(line - 1, column - 1));
+        Assert.NotNull(hover);
+        var content = hover.Contents.MarkupContent!.Value;
+        Assert.Contains(expectedHeader, content);
+        Assert.DoesNotContain("§", content);
+        Assert.DoesNotContain("return value", content);
+    }
+
     [Fact]
     public void BuildHover_UsesOneCapturedAnalysisSnapshot()
     {
         const string original = """
-            §M{TestModule}
-              §F{Original:pub} () -> i32
-                §R 1
+            module TestModule
+              func Original () → int
+                return 1
             """;
         var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(
             "file:///snapshot-hover.calr");
@@ -104,7 +192,7 @@ public class HoverHandlerTests
         var (line, column) = LspTestHarness.GetLineColumn(original, offset);
         _workspace.Update(
             uri,
-            "§M{Changed}\n  §F{New:pub} () -> i32\n    §R 2\n",
+            "module Changed\n  func New () → int\n    return 2\n",
             version: 2);
 
         var hover = HoverHandler.BuildHover(
@@ -116,18 +204,54 @@ public class HoverHandlerTests
         Assert.Contains("Original", markup.Value, StringComparison.Ordinal);
         Assert.Equal(1, captured.Version);
         Assert.Equal(2, state.Version);
+        Assert.Contains("func Original () → int", markup.Value);
+        Assert.DoesNotContain("§", markup.Value);
+    }
+
+    [Fact]
+    public void NativeSymbolHover_DoesNotConfuseEscapedIdentifiersOrStringValuesWithKeywords()
+    {
+        const string source = """
+            module Demo
+              func Read (string:@func) → string
+                let string:text = "func"
+                return @func
+            """;
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///escaped-hover.calr");
+        var snapshot = _workspace.GetOrCreate(uri, source).Snapshot;
+        Assert.DoesNotContain(snapshot.Diagnostics, diagnostic => diagnostic.IsError);
+        foreach (var offset in new[] { source.LastIndexOf("@func", StringComparison.Ordinal) + 1,
+            source.IndexOf("\"func\"", StringComparison.Ordinal) + 1 })
+        {
+            var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+            var hover = HoverHandler.BuildHover(snapshot, new Position(line - 1, column - 1));
+            Assert.NotNull(hover);
+            Assert.DoesNotContain("## Function", hover.Contents.MarkupContent!.Value);
+        }
+    }
+
+    [Fact]
+    public void NativeSyntaxHover_DoesNotInspectNativeLookingRawPayload()
+    {
+        const string payload = "new func if";
+        var source = $"module Demo\n  raw stmt {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///raw-native-hover.calr");
+        var snapshot = _workspace.GetOrCreate(uri, source).Snapshot;
+        var payloadStart = source.IndexOf(payload, StringComparison.Ordinal);
+        for (var index = 0; index < payload.Length; index++)
+        {
+            var (line, column) = LspTestHarness.GetLineColumn(source, payloadStart + index);
+            Assert.Null(HoverHandler.BuildHover(snapshot, new Position(line - 1, column - 1)));
+        }
     }
 
     [Fact]
     public void Hover_Function_ReturnsSymbolInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{TestModule}
-              §F{/*cursor*/Add}
-                §I{i32:a}
-                §I{i32:b}
-                §O{i32}
-                §R a + b
+            module TestModule
+              func /*cursor*/Add (int:a, int:b) → int
+                return a + b
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -141,11 +265,9 @@ public class HoverHandlerTests
     public void Hover_Parameter_ReturnsTypeInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{TestModule}
-              §F{Test}
-                §I{i32:/*cursor*/value}
-                §O{i32}
-                §R value
+            module TestModule
+              func Test (int:/*cursor*/value) → int
+                return value
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -153,17 +275,17 @@ public class HoverHandlerTests
         Assert.NotNull(result);
         Assert.Equal("value", result.Name);
         Assert.Equal("parameter", result.Kind);
-        Assert.Equal("INT", result.Type);
+        Assert.Equal("int", result.Type);
     }
 
     [Fact]
     public void Hover_Class_ReturnsClassInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{TestModule}
-              §CL{/*cursor*/Person}
-                §FLD{str:name}
-                §FLD{i32:age}
+            module TestModule
+              class /*cursor*/Person
+                field string:name
+                field int:age
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -177,9 +299,9 @@ public class HoverHandlerTests
     public void Hover_Field_ReturnsFieldInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{TestModule}
-              §CL{Person}
-                §FLD{str:/*cursor*/name}
+            module TestModule
+              class Person
+                field string:/*cursor*/name
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -193,13 +315,10 @@ public class HoverHandlerTests
     public void Hover_Method_ReturnsMethodInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{TestModule}
-              §CL{Calculator}
-                §MT{/*cursor*/Add}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §R a + b
+            module TestModule
+              class Calculator
+                func /*cursor*/Add (int:a, int:b) → int
+                  return a + b
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -213,10 +332,9 @@ public class HoverHandlerTests
     public void Hover_Interface_ReturnsInterfaceInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{TestModule}
-              §IFACE{/*cursor*/IShape}
-                §MT{GetArea}
-                  §O{f64}
+            module TestModule
+              interface /*cursor*/IShape
+                func GetArea () → double
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -230,12 +348,11 @@ public class HoverHandlerTests
     public void Hover_Enum_ReturnsEnumInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{TestModule}
-              §EN{/*cursor*/Color}
-              §EM{Red}
-              §EM{Green}
-              §EM{Blue}
-              §/EN
+            module TestModule
+              enum /*cursor*/Color
+                Red
+                Green
+                Blue
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -249,10 +366,9 @@ public class HoverHandlerTests
     public void Hover_EnumMember_ReturnsMemberInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{TestModule}
-              §EN{Color}
-              §EM{/*cursor*/Red}
-              §/EN
+            module TestModule
+              enum Color
+                /*cursor*/Red
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -266,10 +382,10 @@ public class HoverHandlerTests
     public void Hover_LocalVariable_ReturnsVariableInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{TestModule}
-              §F{Test}
-                §B{/*cursor*/x:i32} 42
-                §R x
+            module TestModule
+              func Test () → int
+                let int:/*cursor*/x = 42
+                return x
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -283,9 +399,9 @@ public class HoverHandlerTests
     public void Hover_Module_ReturnsModuleInfo()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{/*cursor*/TestModule}
-              §F{Test}
-                §R 0
+            module /*cursor*/TestModule
+              func Test () → int
+                return 0
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -302,7 +418,7 @@ public class HoverHandlerTests
     {
         if (!TagDocumentationProvider.Instance.IsLoaded) return;
 
-        var source = "§NEW{User}(name)§/NEW";
+        var source = "new User(name)";
         var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test_new.calr");
         var doc = _workspace.GetOrCreate(uri, source);
         Assert.NotNull(doc); // Verify document was created
@@ -310,7 +426,7 @@ public class HoverHandlerTests
         var request = new HoverParams
         {
             TextDocument = new TextDocumentIdentifier(uri),
-            Position = new Position(0, 1) // On 'N' of §NEW
+            Position = new Position(0, 1)
         };
 
         var result = await _handler.Handle(request, CancellationToken.None);
@@ -325,14 +441,14 @@ public class HoverHandlerTests
     {
         if (!TagDocumentationProvider.Instance.IsLoaded) return;
 
-        var source = "§F{Test}§/F";
+        var source = "func Test () → void";
         var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
         _workspace.GetOrCreate(uri, source);
 
         var request = new HoverParams
         {
             TextDocument = new TextDocumentIdentifier(uri),
-            Position = new Position(0, 1) // On 'F' of §F
+            Position = new Position(0, 1)
         };
 
         var result = await _handler.Handle(request, CancellationToken.None);
@@ -347,7 +463,7 @@ public class HoverHandlerTests
     {
         if (!TagDocumentationProvider.Instance.IsLoaded) return;
 
-        var source = "§L{i:0..10} body §/L";
+        var source = "for i from 0 to 10 step 1";
         var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
         _workspace.GetOrCreate(uri, source);
 
@@ -369,14 +485,14 @@ public class HoverHandlerTests
     {
         if (!TagDocumentationProvider.Instance.IsLoaded) return;
 
-        var source = "§IF true §/IF";
+        var source = "if true";
         var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
         _workspace.GetOrCreate(uri, source);
 
         var request = new HoverParams
         {
             TextDocument = new TextDocumentIdentifier(uri),
-            Position = new Position(0, 2) // On 'I' of §IF
+            Position = new Position(0, 1)
         };
 
         var result = await _handler.Handle(request, CancellationToken.None);
@@ -387,7 +503,7 @@ public class HoverHandlerTests
     }
 
     [Fact]
-    public async Task Handle_TagHover_ClosingTag_ReturnsOpeningTagDocAsync()
+    public async Task Handle_TagHover_RetiredCloser_DoesNotAdvertiseSyntaxAsync()
     {
         if (!TagDocumentationProvider.Instance.IsLoaded) return;
 
@@ -403,9 +519,7 @@ public class HoverHandlerTests
 
         var result = await _handler.Handle(request, CancellationToken.None);
 
-        Assert.NotNull(result);
-        var content = result.Contents.MarkupContent?.Value ?? "";
-        Assert.Contains("New Instance", content);
+        Assert.Null(result);
     }
 
     [Fact]
@@ -413,14 +527,14 @@ public class HoverHandlerTests
     {
         if (!TagDocumentationProvider.Instance.IsLoaded) return;
 
-        var source = "§AWAIT expr §/AWAIT";
+        var source = "await expr";
         var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
         _workspace.GetOrCreate(uri, source);
 
         var request = new HoverParams
         {
             TextDocument = new TextDocumentIdentifier(uri),
-            Position = new Position(0, 3) // On 'A' of §AWAIT
+            Position = new Position(0, 3)
         };
 
         var result = await _handler.Handle(request, CancellationToken.None);
@@ -435,7 +549,7 @@ public class HoverHandlerTests
     {
         if (!TagDocumentationProvider.Instance.IsLoaded) return;
 
-        var source = "§TR body §CA{} handler §/TR";
+        var source = "try\n  Run()\ncatch\n  Recover()";
         var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
         _workspace.GetOrCreate(uri, source);
 
@@ -457,14 +571,14 @@ public class HoverHandlerTests
     {
         if (!TagDocumentationProvider.Instance.IsLoaded) return;
 
-        var source = "§E{cw,fs:r}";
+        var source = "! cw,fs:r";
         var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
         _workspace.GetOrCreate(uri, source);
 
         var request = new HoverParams
         {
             TextDocument = new TextDocumentIdentifier(uri),
-            Position = new Position(0, 1)
+            Position = new Position(0, 0)
         };
 
         var result = await _handler.Handle(request, CancellationToken.None);
@@ -479,7 +593,7 @@ public class HoverHandlerTests
     {
         if (!TagDocumentationProvider.Instance.IsLoaded) return;
 
-        var source = "§Q (x > 0)";
+        var source = "requires x > 0";
         var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
         _workspace.GetOrCreate(uri, source);
 
@@ -501,7 +615,7 @@ public class HoverHandlerTests
     {
         if (!TagDocumentationProvider.Instance.IsLoaded) return;
 
-        var source = "§S ($result > 0)";
+        var source = "=> result > 0";
         var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
         _workspace.GetOrCreate(uri, source);
 
@@ -556,7 +670,7 @@ public class HoverHandlerTests
     {
         if (!TagDocumentationProvider.Instance.IsLoaded) return;
 
-        var source = "§NEW{User}(name)§/NEW";
+        var source = "new User(name)";
         var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
         _workspace.GetOrCreate(uri, source);
 
@@ -579,7 +693,7 @@ public class HoverHandlerTests
     {
         if (!TagDocumentationProvider.Instance.IsLoaded) return;
 
-        var source = "§L{i:0..10}§/L";
+        var source = "for i from 0 to 10 step 1";
         var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
         _workspace.GetOrCreate(uri, source);
 
