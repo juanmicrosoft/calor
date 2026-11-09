@@ -2305,14 +2305,23 @@ public sealed class Parser
         {
             var effect = Advance();
             var code = effect.Text;
-            while (Match(TokenKind.Colon))
-                code += ":" + (Check(TokenKind.Identifier) || Current.IsKeyword
-                    ? Advance().Text : Expect(TokenKind.Identifier).Text);
+            while (Current.Span.Line == startToken.Span.Line && Check(TokenKind.Colon))
+            {
+                var colon = Advance();
+                if (Current.Span.Line != startToken.Span.Line
+                    || !(Check(TokenKind.Identifier) || Current.IsKeyword))
+                {
+                    _diagnostics.ReportUnexpectedToken(colon.Span,
+                        "an effect code after ':' on the same line", Current.Kind);
+                    return;
+                }
+                code += ":" + Advance().Text;
+            }
             attrs.Add($"_pos{index++}", code, effect.Span);
             if (position == EffectRowPosition.Parameter && Check(TokenKind.Comma)
                 && NativeRowCommaStartsParameter())
                 break;
-            if (!Match(TokenKind.Comma)) break;
+            if (Current.Span.Line != startToken.Span.Line || !Match(TokenKind.Comma)) break;
         }
     }
 
@@ -2375,7 +2384,8 @@ public sealed class Parser
         // section loop's §E arm and becomes the DECLARATION's row — two different
         // meanings from one line, with no diagnostic. Inline, the same shape cascades.
         // A row mixing effects is written `§E{cw, net}`, which is what the message says.
-        while (Check(TokenKind.Effects) && Current.Span.Line == PreviousToken.Span.Line)
+        while ((Check(TokenKind.Effects) || Check(TokenKind.Exclamation))
+            && Current.Span.Line == PreviousToken.Span.Line)
         {
             _diagnostics.ReportError(
                 Current.Span,
@@ -2384,8 +2394,11 @@ public sealed class Parser
                 + "row — §E{cw, net} — or, if this is meant to be the function's own effect "
                 + "declaration, move it onto its own line in the §F body.");
 
-            Advance();
-            ParseAttributes();
+            var startToken = Advance();
+            if (startToken.Kind == TokenKind.Exclamation)
+                ReadNativeEffectAttributes(startToken, new AttributeCollection(), position);
+            else
+                ParseAttributes();
         }
 
         return row;

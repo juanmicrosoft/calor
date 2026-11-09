@@ -20,6 +20,198 @@ public sealed class NativeFieldEffectRowTests
         + "Move it onto the end of the 'count' field line, or — if this is meant to be "
         + "the function's own effect declaration — onto its own line in the §F body.";
 
+    private const string DuplicateMessage =
+        "A type can carry only one §E{…} effect row. Combine the codes into a single "
+        + "row — §E{cw, net} — or, if this is meant to be the function's own effect "
+        + "declaration, move it onto its own line in the §F body.";
+
+    [Theory]
+    [InlineData("field")]
+    [InlineData("property")]
+    [InlineData("binding")]
+    [InlineData("parameter")]
+    [InlineData("return")]
+    public void DuplicateNativeTypeRows_RetainOnlyTheFirstRowAndTheSharedDiagnostic(string surface)
+    {
+        var source = DuplicateSource(surface);
+        var (module, diagnostics) = Parse(source);
+        var error = Assert.Single(diagnostics);
+        Assert.Equal(DiagnosticCode.EffectRowMisplaced, error.Code);
+        Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+        Assert.Equal(DuplicateMessage, error.Message);
+        Assert.Equal(source.IndexOf("! fs:r", StringComparison.Ordinal), error.Span.Start);
+        Assert.Equal(1, error.Span.Length);
+        var first = TypeRow(module, surface);
+        Assert.Single(first.Effects);
+        Assert.Contains("io", first.Effects.Keys);
+        if (surface is "field" or "property")
+            Assert.Equal("after", Assert.Single(module.Classes).Fields.Last().Name);
+        Assert.Equal("After", module.Functions.Last().Name);
+        Assert.All(module.Functions, function => Assert.Empty(function.Effects!.Effects));
+        var compiled = Program.Compile(source);
+        Assert.True(compiled.HasErrors);
+        Assert.Equal(DiagnosticCode.EffectRowMisplaced, Assert.Single(compiled.Diagnostics.Errors).Code);
+    }
+
+    [Theory]
+    [InlineData("field")]
+    [InlineData("property")]
+    [InlineData("binding")]
+    [InlineData("parameter")]
+    [InlineData("return")]
+    public void SingleNativeTypeRows_DoNotConsumeDistinctFunctionRows(string surface)
+    {
+        var source = DuplicateSource(surface).Replace(" ! fs:r", "", StringComparison.Ordinal);
+        var (module, diagnostics) = Parse(source);
+        Assert.Empty(diagnostics);
+        Assert.Contains("io", TypeRow(module, surface).Effects.Keys);
+        Assert.All(module.Functions, function => Assert.Empty(function.Effects!.Effects));
+        if (surface == "parameter")
+            Assert.Equal(["next", "value"], module.Functions[0].Parameters.Select(parameter => parameter.Name));
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join(Environment.NewLine, compiled.Diagnostics));
+    }
+
+    [Theory]
+    [InlineData("field int:other private")]
+    [InlineData("func Next () → int\n      !\n      return 7")]
+    public void MalformedMisplacedNativeCode_DoesNotConsumeTheFollowingMember(string member)
+    {
+        var source = $$"""
+            module MalformedRow
+              class Counter
+                field int:count private
+                ! fs:
+                {{member}}
+              func After () → int
+                !
+                return 9
+            """;
+        var (module, diagnostics) = Parse(source);
+        var misplaced = Assert.Single(diagnostics.Where(diagnostic => diagnostic.Code == DiagnosticCode.EffectRowMisplaced));
+        AssertMisplaced(misplaced, source);
+        var malformed = Assert.Single(diagnostics.Where(diagnostic => diagnostic.Code == DiagnosticCode.UnexpectedToken));
+        Assert.Equal(DiagnosticSeverity.Error, malformed.Severity);
+        Assert.Equal(source.IndexOf("fs:", StringComparison.Ordinal) + 2, malformed.Span.Start);
+        Assert.Equal(1, malformed.Span.Length);
+        Assert.Equal(2, diagnostics.Count);
+        var counter = Assert.Single(module.Classes);
+        Assert.Null(counter.Fields[0].Row);
+        if (member.StartsWith("field", StringComparison.Ordinal))
+            Assert.Equal(["count", "other"], counter.Fields.Select(field => field.Name));
+        else
+            Assert.Equal("Next", Assert.Single(counter.Methods).Name);
+        Assert.Equal("After", Assert.Single(module.Functions).Name);
+        Assert.True(Program.Compile(source).HasErrors);
+    }
+
+    [Theory]
+    [InlineData("! cw ! fs:")]
+    [InlineData("! cw, fs:")]
+    public void MalformedNativeTypeCode_RejectsRatherThanAcceptingAPartialCode(string row)
+    {
+        var source = $$"""
+            module MalformedTypeRow
+              class Counter
+                field Func<int>:next private {{row}}
+                field int:after private
+            """;
+        var (module, diagnostics) = Parse(source);
+        var malformed = Assert.Single(diagnostics.Where(diagnostic => diagnostic.Code == DiagnosticCode.UnexpectedToken));
+        Assert.Equal(source.IndexOf("fs:", StringComparison.Ordinal) + 2, malformed.Span.Start);
+        var counter = Assert.Single(module.Classes);
+        Assert.Equal(["next", "after"], counter.Fields.Select(field => field.Name));
+        Assert.Single(counter.Fields[0].Row!.Effects);
+        Assert.Contains("io", counter.Fields[0].Row!.Effects.Keys);
+        Assert.True(Program.Compile(source).HasErrors);
+    }
+
+    [Fact]
+    public void MalformedParameterCode_LeavesTheClosingParenthesisForItsOwner()
+    {
+        const string source = """
+            module MalformedParameter
+              func Probe (Func<int>:next ! fs:) → int
+                !
+                return 7
+              func After () → int
+                !
+                return 9
+            """;
+        var (module, diagnostics) = Parse(source);
+        var error = Assert.Single(diagnostics);
+        Assert.Equal(DiagnosticCode.UnexpectedToken, error.Code);
+        Assert.Equal(source.IndexOf("fs:", StringComparison.Ordinal) + 2, error.Span.Start);
+        Assert.Equal(["Probe", "After"], module.Functions.Select(function => function.Name));
+        Assert.Empty(module.Functions[0].Parameters[0].Row!.Effects);
+        var compiled = Program.Compile(source);
+        Assert.True(compiled.HasErrors);
+        Assert.Equal(DiagnosticCode.UnexpectedToken, Assert.Single(compiled.Diagnostics.Errors).Code);
+    }
+
+    private static string DuplicateSource(string surface) => surface switch
+    {
+        "field" => """
+            module Duplicate
+              class Counter
+                field Func<int>:next private ! cw ! fs:r
+                field int:after private
+              func After () → int
+                !
+                return 9
+            """,
+        "property" => """
+            module Duplicate
+              class Counter
+                property Func<int>:Next ! cw ! fs:r
+                  get
+                  set
+                field int:after private
+              func After () → int
+                !
+                return 9
+            """,
+        "binding" => """
+            module Duplicate
+              func Probe () → int
+                !
+                let Func<int>:next ! cw ! fs:r = () => 1
+                return 7
+              func After () → int
+                !
+                return 9
+            """,
+        "parameter" => """
+            module Duplicate
+              func Probe (Func<int>:next ! cw ! fs:r, int:value) → int
+                !
+                return value
+              func After () → int
+                !
+                return 9
+            """,
+        "return" => """
+            module Duplicate
+              func Probe (Func<int>:next ! cw) → Func<int> ! cw ! fs:r
+                !
+                return next
+              func After () → int
+                !
+                return 9
+            """,
+        _ => throw new ArgumentOutOfRangeException(nameof(surface))
+    };
+
+    private static EffectsNode TypeRow(ModuleNode module, string surface) => surface switch
+    {
+        "field" => module.Classes[0].Fields[0].Row!,
+        "property" => module.Classes[0].Properties[0].Row!,
+        "binding" => Assert.IsType<BindStatementNode>(module.Functions[0].Body[0]).Row!,
+        "parameter" => module.Functions[0].Parameters[0].Row!,
+        "return" => module.Functions[0].Output!.Row!,
+        _ => throw new ArgumentOutOfRangeException(nameof(surface))
+    };
+
     [Theory]
     [InlineData("\n")]
     [InlineData("\r\n")]
@@ -127,8 +319,10 @@ public sealed class NativeFieldEffectRowTests
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.EffectRowMisplaced);
     }
 
-    [Fact]
-    public void SeparateFieldRow_CliJsonRejectsWithTheSameDiagnosticAndNoGeneratedFile()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void InvalidFieldRow_CliJsonRejectsWithTheSameDiagnosticAndNoGeneratedFile(bool duplicate)
     {
         var directory = Path.Combine(Path.GetTempPath(), "calor-native-field-row-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
@@ -136,7 +330,7 @@ public sealed class NativeFieldEffectRowTests
         {
             var input = Path.Combine(directory, "BadRow.calr");
             var output = Path.Combine(directory, "BadRow.g.cs");
-            File.WriteAllText(input, BadRow);
+            File.WriteAllText(input, duplicate ? DuplicateSource("field") : BadRow);
             var result = CliTestHarness.RunCli(directory, "--no-telemetry", "--input", input,
                 "--output", output, "--format", "json");
             Assert.Equal(1, result.ExitCode);
@@ -144,10 +338,10 @@ public sealed class NativeFieldEffectRowTests
             var diagnostic = Assert.Single(json.RootElement.GetProperty("diagnostics").EnumerateArray());
             Assert.Equal(DiagnosticCode.EffectRowMisplaced, diagnostic.GetProperty("code").GetString());
             Assert.Equal("error", diagnostic.GetProperty("severity").GetString());
-            Assert.Equal(MisplacedMessage, diagnostic.GetProperty("message").GetString());
+            Assert.Equal(duplicate ? DuplicateMessage : MisplacedMessage, diagnostic.GetProperty("message").GetString());
             var location = diagnostic.GetProperty("location");
-            Assert.Equal(4, location.GetProperty("line").GetInt32());
-            Assert.Equal(5, location.GetProperty("column").GetInt32());
+            Assert.Equal(duplicate ? 3 : 4, location.GetProperty("line").GetInt32());
+            Assert.Equal(duplicate ? 39 : 5, location.GetProperty("column").GetInt32());
             Assert.Equal(1, location.GetProperty("length").GetInt32());
             Assert.DoesNotContain(DiagnosticCode.UnexpectedToken, result.StdOut + result.StdErr);
             Assert.False(File.Exists(output));
