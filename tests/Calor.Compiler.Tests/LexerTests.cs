@@ -2,6 +2,10 @@
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Ids;
 using Calor.Compiler.Parsing;
+using Calor.Compiler.CodeGen;
+using Calor.Compiler.Migration;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -50,6 +54,107 @@ public class LexerTests
             .ParseStandaloneExpression();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
         Assert.Equal(name, Assert.IsType<Calor.Compiler.Ast.CallExpressionNode>(expression).Target);
+    }
+
+    [Theory]
+    [InlineData("1e309d")]
+    [InlineData("1e309D")]
+    [InlineData("3.5e39f")]
+    [InlineData("3.5e39F")]
+    [InlineData("1e+d")]
+    public void CanonicalFloatingSuffix_InvalidMagnitudeFailsExplicitly(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        Assert.Contains(new Lexer(source, diagnostics).TokenizeAll(), token => token.Kind == TokenKind.Error);
+        Assert.Equal(DiagnosticCode.InvalidTypedLiteral, Assert.Single(diagnostics.Errors).Code);
+    }
+
+    [Theory]
+    [InlineData("1dD")]
+    [InlineData("1fF")]
+    [InlineData("1.0df")]
+    [InlineData("1.0mD")]
+    public void CanonicalFloatingSuffix_ExtraSuffixCannotBecomeAValidExpression(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).ParseStandaloneExpression();
+        Assert.Contains(diagnostics.Errors, error => error.Code == DiagnosticCode.UnexpectedToken);
+    }
+
+    [Theory]
+    [InlineData("2147483647", "System.Int32")]
+    [InlineData("-2147483648", "System.Int32")]
+    [InlineData("2147483648L", "System.Int64")]
+    [InlineData("9223372036854775807L", "System.Int64")]
+    [InlineData("-9223372036854775808L", "System.Int64")]
+    [InlineData("4294967295U", "System.UInt32")]
+    [InlineData("18446744073709551615UL", "System.UInt64")]
+    [InlineData("0xFFFFFFFFU", "System.UInt32")]
+    [InlineData("1.25f", "System.Single")]
+    [InlineData("1F", "System.Single")]
+    [InlineData("1.25F", "System.Single")]
+    [InlineData("1e2F", "System.Single")]
+    [InlineData("1.25", "System.Double")]
+    [InlineData("1d", "System.Double")]
+    [InlineData("1D", "System.Double")]
+    [InlineData("1.25D", "System.Double")]
+    [InlineData("1e2d", "System.Double")]
+    [InlineData("1.25m", "System.Decimal")]
+    [InlineData("-0.0d", "System.Double")]
+    [InlineData("-0.0f", "System.Single")]
+    [InlineData("-0.00m", "System.Decimal")]
+    [InlineData("'π'", "System.Char")]
+    [InlineData("\"a\\n\\\"b\"", "System.String")]
+    public void CanonicalLiteralBoundary_PreservesClrWidthValueAndSignedZero(string source, string expectedType)
+    {
+        var diagnostics = new DiagnosticBag();
+        var expression = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics)
+            .ParseStandaloneExpression();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+        var calor = expression.Accept(new CalorEmitter());
+        Assert.DoesNotContain('§', calor);
+        var roundtripDiagnostics = new DiagnosticBag();
+        var roundtrip = new Parser(new Lexer(calor, roundtripDiagnostics).TokenizeAllForParser(), roundtripDiagnostics)
+            .ParseStandaloneExpression();
+        Assert.False(roundtripDiagnostics.HasErrors, string.Join("\n", roundtripDiagnostics.Errors));
+        var generated = roundtrip.Accept(new CSharpEmitter());
+        var syntax = CSharpSyntaxTree.ParseText($$"""
+            public static class LiteralProbe
+            {
+                public static object Original() => {{source}};
+                public static object Generated() => {{generated}};
+            }
+            """);
+        var compilation = CSharpCompilation.Create("Literal_" + Guid.NewGuid().ToString("N"),
+            [syntax], GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var bytes = new MemoryStream();
+        var result = compilation.Emit(bytes);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var probe = System.Reflection.Assembly.Load(bytes.ToArray()).GetType("LiteralProbe")!;
+        var original = probe.GetMethod("Original")!.Invoke(null, null)!;
+        var actual = probe.GetMethod("Generated")!.Invoke(null, null)!;
+        Assert.Equal(expectedType, original.GetType().FullName);
+        Assert.Equal(expectedType, actual.GetType().FullName);
+        Assert.Equal(original, actual);
+        if (source.StartsWith("-0", StringComparison.Ordinal))
+        {
+            switch (actual)
+            {
+                case double value:
+                    Assert.Equal(BitConverter.DoubleToInt64Bits((double)original), BitConverter.DoubleToInt64Bits(value));
+                    Assert.True(BitConverter.DoubleToInt64Bits(value) < 0);
+                    break;
+                case float value:
+                    Assert.Equal(BitConverter.SingleToInt32Bits((float)original), BitConverter.SingleToInt32Bits(value));
+                    Assert.True(BitConverter.SingleToInt32Bits(value) < 0);
+                    break;
+                case decimal value:
+                    Assert.Equal(decimal.GetBits((decimal)original), decimal.GetBits(value));
+                    Assert.NotEqual(0, decimal.GetBits(value)[3] & int.MinValue);
+                    break;
+            }
+        }
     }
 
     [Theory]

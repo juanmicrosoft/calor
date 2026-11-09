@@ -1394,8 +1394,10 @@ public sealed class Lexer
             {
                 Advance();
             }
-            if (Current == 'f')
-                return ScanSingleSuffix();
+            if (Current is 'f' or 'F')
+                return ScanFloatingSuffix(isSingle: true);
+            if (Current is 'd' or 'D')
+                return ScanFloatingSuffix(isSingle: false);
             if (Current is 'M' or 'm')
                 return ScanDecimalSuffix();
             var sciText = CurrentText().Replace("_", "");
@@ -1429,8 +1431,10 @@ public sealed class Lexer
                 }
             }
 
-            if (Current == 'f')
-                return ScanSingleSuffix();
+            if (Current is 'f' or 'F')
+                return ScanFloatingSuffix(isSingle: true);
+            if (Current is 'd' or 'D')
+                return ScanFloatingSuffix(isSingle: false);
 
             if (Current is 'M' or 'm')
                 return ScanDecimalSuffix();
@@ -1443,8 +1447,10 @@ public sealed class Lexer
             }
         }
 
-        if (Current == 'f')
-            return ScanSingleSuffix();
+        if (Current is 'f' or 'F')
+            return ScanFloatingSuffix(isSingle: true);
+        if (Current is 'd' or 'D')
+            return ScanFloatingSuffix(isSingle: false);
 
         // Check for decimal suffix on integers (42M, 100m)
         if (Current is 'M' or 'm')
@@ -1515,17 +1521,20 @@ public sealed class Lexer
         return MakeToken(TokenKind.Error);
     }
 
-    private Token ScanSingleSuffix()
+    private Token ScanFloatingSuffix(bool isSingle)
     {
         Advance();
         var text = CurrentText()[..^1].Replace("_", "", StringComparison.Ordinal);
-        if (float.TryParse(text, System.Globalization.NumberStyles.Float,
+        if (isSingle && float.TryParse(text, System.Globalization.NumberStyles.Float,
             System.Globalization.CultureInfo.InvariantCulture, out var value) && float.IsFinite(value))
         {
             return MakeToken(TokenKind.FloatLiteral, new FloatLiteralInfo(value, IsSingle: true));
         }
+        if (!isSingle && double.TryParse(text, System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out var doubleValue) && double.IsFinite(doubleValue))
+            return MakeToken(TokenKind.FloatLiteral, doubleValue);
 
-        _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "single-precision number");
+        _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), isSingle ? "single-precision number" : "double-precision number");
         return MakeToken(TokenKind.Error);
     }
 
