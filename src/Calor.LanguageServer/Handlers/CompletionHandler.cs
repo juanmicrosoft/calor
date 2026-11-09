@@ -215,7 +215,9 @@ public sealed class CompletionHandler : CompletionHandlerBase
             return CompletionContext.General;
 
         // A colon ends a type:name annotation; completion after it suggests names, not types.
-        if (before is "let " or "var " || before.EndsWith('(') || before.EndsWith("→ ", StringComparison.Ordinal))
+        if (before is "let " or "var "
+            || before.StartsWith("func ", StringComparison.Ordinal) && before.IndexOf('(') == before.Length - 1
+            || before.EndsWith("→ ", StringComparison.Ordinal))
             return CompletionContext.InType;
 
         // After a dot - member access
@@ -314,7 +316,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
         {
             Label = f.Name,
             Kind = CompletionItemKind.Function,
-            Detail = $"({string.Join(", ", f.Parameters.Select(p => p.TypeName))}) -> {CallableReturnType(f, ast)}",
+            Detail = $"({string.Join(", ", f.Parameters.Select(p => p.TypeName))}) → {CallableReturnType(f, ast)}",
             InsertText = f.Name
         }));
 
@@ -906,16 +908,16 @@ public sealed class CompletionHandler : CompletionHandlerBase
     private static string? ResolveBuiltInStringMember(string memberName, bool isMethodCall)
     {
         if (!isMethodCall && memberName == "Length")
-            return "i32";
+            return "int";
 
         if (isMethodCall)
         {
             return memberName switch
             {
-                "ToUpper" or "ToLower" or "Trim" or "Substring" or "Replace" => "str",
+                "ToUpper" or "ToLower" or "Trim" or "Substring" or "Replace" => "string",
                 "Contains" or "StartsWith" or "EndsWith" => "bool",
-                "IndexOf" => "i32",
-                "Split" => "List<str>",
+                "IndexOf" => "int",
+                "Split" => "string[]",
                 _ => null
             };
         }
@@ -931,7 +933,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
         {
             return memberName switch
             {
-                "Count" => "i32",
+                "Count" => "int",
                 _ => null
             };
         }
@@ -939,7 +941,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
         return memberName switch
         {
             "Contains" => "bool",
-            "IndexOf" => "i32",
+            "IndexOf" => "int",
             "Remove" => "bool",
             "First" or "Last" or "FirstOrDefault" or "LastOrDefault" => elementType,
             "Find" or "FindLast" => elementType,
@@ -956,7 +958,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
         {
             return memberName switch
             {
-                "Count" => "i32",
+                "Count" => "int",
                 "Keys" => $"List<{keyType}>",
                 "Values" => $"List<{valueType}>",
                 _ => null
@@ -979,7 +981,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
         {
             return memberName switch
             {
-                "Length" => "i32",
+                "Length" => "int",
                 _ => null
             };
         }
@@ -1808,7 +1810,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
             else if (stmt is ForStatementNode forStmt && offset >= forStmt.Span.Start && offset < forStmt.Span.End)
             {
                 // Add loop variable
-                variables.Add(new ScopeVariable(forStmt.VariableName, "i32", false, "loop"));
+                variables.Add(new ScopeVariable(forStmt.VariableName, "int", false, "loop"));
                 variables.AddRange(CollectVisibleVariables(forStmt.Body, offset));
             }
             else if (stmt is WhileStatementNode whileStmt && offset >= whileStmt.Span.Start && offset < whileStmt.Span.End)
@@ -1938,7 +1940,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
         return new CompletionRegistrationOptions
         {
             DocumentSelector = TextDocumentSelector.ForLanguage("calor"),
-            TriggerCharacters = new Container<string>("§", ".", ":"),
+            TriggerCharacters = new Container<string>(".", ":", "(", "→"),
             ResolveProvider = false
         };
     }

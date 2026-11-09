@@ -14,6 +14,7 @@ public class CompletionHandlerTests
     [InlineData("mod", "module")]
     [InlineData("let ", "string")]
     [InlineData("var ", "float")]
+    [InlineData("func F (", "int")]
     public async Task CanonicalCompletion_UsesNativeWordsAndCSharpTypeWidthsAsync(string source, string expected)
     {
         var workspace = new WorkspaceState();
@@ -48,6 +49,40 @@ public class CompletionHandlerTests
             Position = new Position(0, source.Length)
         }, CancellationToken.None);
         Assert.DoesNotContain(items.Items, item => item.Label == "int");
+    }
+
+    [Fact]
+    public async Task CanonicalCompletion_CallArgumentRetainsExpressionScopeAsync()
+    {
+        const string source = "module M\n  func Echo (int:value) → int\n    return Echo(value)\n";
+        var workspace = new WorkspaceState();
+        var uri = new Uri("file:///canonical-call-completion.calr");
+        workspace.GetOrCreate(uri, source).Reanalyze();
+        var offset = source.IndexOf("return Echo(", StringComparison.Ordinal) + "return Echo(".Length;
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+        var items = await new CompletionHandler(workspace).Handle(new CompletionParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            Position = new Position(line - 1, column - 1)
+        }, CancellationToken.None);
+        Assert.Contains(items.Items, item => item.Label == "value");
+        Assert.DoesNotContain(items.Items, item => item.Label == "int");
+    }
+
+    [Theory]
+    [InlineData("Length", false, "int", typeof(int))]
+    [InlineData("ToUpper", true, "string", typeof(string))]
+    [InlineData("IndexOf", true, "int", typeof(int))]
+    [InlineData("Split", true, "string[]", typeof(string[]))]
+    public void CanonicalCompletion_StringMemberTypesMatchTheActualBcl(string member, bool isMethod, string expected, Type clrType)
+    {
+        var resolver = typeof(CompletionHandler).GetMethod("ResolveBuiltInStringMember",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        Assert.Equal(expected, resolver.Invoke(null, [member, isMethod]));
+        var actualTypes = isMethod
+            ? typeof(string).GetMethods().Where(method => method.Name == member).Select(method => method.ReturnType)
+            : [typeof(string).GetProperty(member)!.PropertyType];
+        Assert.Equal(clrType, Assert.Single(actualTypes.Distinct()));
     }
 
     [Theory]
