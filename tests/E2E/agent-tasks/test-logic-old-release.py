@@ -24,8 +24,8 @@ def load(name, path):
 
 
 def main():
-    if sys.argv[1:] not in ([], ["--control-flow"], ["--remaining-control-flow"], ["--basic-syntax"], ["--contract-writing"], ["--native-prerequisite"], ["--enums"], ["--idioms"], ["--generics"], ["--strings"], ["--collections"], ["--scalar-patterns"], ["--oop"], ["--type-arithmetic"], ["--carriers"], ["--async-functions"], ["--effects-system"], ["--carrier-patterns"]):
-        raise RuntimeError("Usage: test-logic-old-release.py [--control-flow|--remaining-control-flow|--basic-syntax|--contract-writing|--native-prerequisite|--enums|--idioms|--generics|--strings|--collections|--scalar-patterns|--oop|--type-arithmetic|--carriers|--async-functions|--effects-system|--carrier-patterns]")
+    if sys.argv[1:] not in ([], ["--control-flow"], ["--remaining-control-flow"], ["--basic-syntax"], ["--contract-writing"], ["--native-prerequisite"], ["--enums"], ["--idioms"], ["--generics"], ["--strings"], ["--collections"], ["--scalar-patterns"], ["--oop"], ["--type-arithmetic"], ["--carriers"], ["--async-functions"], ["--effects-system"], ["--carrier-patterns"], ["--refactoring"]):
+        raise RuntimeError("Usage: test-logic-old-release.py [--control-flow|--remaining-control-flow|--basic-syntax|--contract-writing|--native-prerequisite|--enums|--idioms|--generics|--strings|--collections|--scalar-patterns|--oop|--type-arithmetic|--carriers|--async-functions|--effects-system|--carrier-patterns|--refactoring]")
     verifier = load("verify_logic", HERE / "lib/verify-logic.py")
     controls = load("logic_controls", HERE / "test-logic-verifiers.py")
     current = controls.COMPILER_ROOT
@@ -55,7 +55,7 @@ def main():
         print(verifier.run([sys.executable, "scripts/verify-z3-assets.py"], old, bootstrap_deadline()), end="")
         print(verifier.run([
             "dotnet", "restore", "src/Calor.Compiler/Calor.Compiler.csproj", "--locked-mode",
-            *(["--source", str(Path.home() / ".nuget/packages")] if sys.argv[1:] == ["--carrier-patterns"] else []),
+            *(["--source", str(Path.home() / ".nuget/packages")] if sys.argv[1:] in (["--carrier-patterns"], ["--refactoring"]) else []),
             "--disable-build-servers", "-p:UseSharedCompilation=false", "-nodeReuse:false", "-v", "quiet",
         ], old, bootstrap_deadline()), end="")
         print(verifier.run([
@@ -64,6 +64,10 @@ def main():
             "-nodeReuse:false", "--nologo", "-v", "quiet",
         ], old, bootstrap_deadline()), end="")
         print(f"Built actual v0.29.0 source from Git commit {OLD_COMMIT}.")
+        if sys.argv[1:] == ["--refactoring"]:
+            refactoring = load("refactoring_controls", HERE / "test-refactoring-verifiers.py")
+            refactoring.run_compatibility(old, current, deadline)
+            return
         if sys.argv[1:] == ["--native-prerequisite"]:
             for arm, root in (("v0.29", old), ("current", current)):
                 root = root.resolve()

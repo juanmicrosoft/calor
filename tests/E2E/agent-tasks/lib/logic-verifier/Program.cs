@@ -6,6 +6,7 @@ using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification.Z3;
 using Microsoft.CodeAnalysis;
@@ -41,6 +42,11 @@ static void Verify(string profile, string path)
     // Every profile validates the selected native prerequisite, even when it
     // needs no contract proof. A corrupt/mismatched asset must not go unused.
     using var nativePrerequisite = new Context();
+    if (profile is "ref001" or "ref003" or "ref004" or "ref005" or "ref006" or "ref007" or "ref008")
+    {
+        VerifyRefactoring(profile, path);
+        return;
+    }
     if (profile is "pm004" or "pm005")
     {
         VerifyCarrierPatterns(profile, path);
@@ -80,7 +86,7 @@ static void Verify(string profile, string path)
         VerifyAsync(profile, path);
         return;
     }
-    if (profile is "eff001" or "eff002" or "eff003" or "eff004" or "eff005" or "eff006")
+    if (profile is "eff001" or "eff002" or "eff003" or "eff004" or "eff005" or "eff006" or "ref002")
     {
         VerifyEffects(profile, path);
         return;
@@ -449,6 +455,47 @@ static void CheckWritingContracts(FunctionNode function, string[] names, string 
     BoolExpr mathematicalOutput;
     switch (function.Name)
     {
+        case "DoubleValue":
+        case "LogAndDouble":
+            var doubled = context.MkBVMul(Wide(Integer("x")), context.MkBV(2, 64));
+            limit = Fits(doubled);
+            mathematicalOutput = context.MkEq(Wide(result), doubled);
+            break;
+        case "JustCompute":
+        case "NoContractAdd":
+            var addition = context.MkBVAdd(Wide(Integer(names[0])), Wide(Integer(names[1])));
+            limit = Fits(addition);
+            mathematicalOutput = context.MkEq(Wide(result), addition);
+            if (function.Name == "NoContractAdd")
+            {
+                limit = context.MkTrue();
+                requiredPre = context.MkAnd(names.SelectMany(name => new[]
+                {
+                    context.MkBVSGE(Integer(name), Constant(-1000000)),
+                    context.MkBVSLE(Integer(name), Constant(1000000))
+                }).ToArray());
+                requiredPost = mathematicalOutput;
+            }
+            break;
+        case "SafeMultiply":
+            var multiplication = context.MkBVMul(Wide(Integer("a")), Wide(Integer("b")));
+            limit = Fits(multiplication);
+            requiredPost = context.MkAnd(
+                context.MkImplies(context.MkAnd(context.MkBVSGT(Integer("a"), Constant(0)),
+                    context.MkBVSGT(Integer("b"), Constant(0))), context.MkBVSGT(result, Constant(0))),
+                context.MkImplies(context.MkAnd(context.MkBVSLT(Integer("a"), Constant(0)),
+                    context.MkBVSLT(Integer("b"), Constant(0))), context.MkBVSGT(result, Constant(0))));
+            // The required contracts specify signs, not an exact product.
+            // Use the mathematical sign relation as a conservative output
+            // overapproximation; runtime product cases remain independent.
+            mathematicalOutput = context.MkAnd(requiredPost,
+                context.MkImplies(context.MkOr(context.MkEq(Integer("a"), Constant(0)),
+                    context.MkEq(Integer("b"), Constant(0))), context.MkEq(result, Constant(0))),
+                context.MkImplies(context.MkOr(
+                    context.MkAnd(context.MkBVSLT(Integer("a"), Constant(0)), context.MkBVSGT(Integer("b"), Constant(0))),
+                    context.MkAnd(context.MkBVSGT(Integer("a"), Constant(0)), context.MkBVSLT(Integer("b"), Constant(0)))),
+                    context.MkBVSLT(result, Constant(0))));
+            break;
         case "ComputeWithTemp":
             var sum = context.MkBVAdd(Wide(Integer("a")), Wide(Integer("b")));
             var difference = context.MkBVSub(Wide(Integer("a")), Wide(Integer("b")));
@@ -480,11 +527,14 @@ static void CheckWritingContracts(FunctionNode function, string[] names, string 
             requiredPre = context.MkBVSGE(Integer("x"), Constant(0));
             mathematicalOutput = context.MkEq(result, Integer("x"));
             break;
+        case "AbsoluteValue":
         case "Abs":
             var x = Integer("x");
             limit = context.MkNot(context.MkEq(x, Constant(int.MinValue)));
             mathematicalOutput = context.MkEq(result, context.MkITE(context.MkBVSLT(x, Constant(0)), context.MkBVNeg(x), x));
             requiredPost = context.MkBVSGE(result, Constant(0));
+            if (function.Name == "AbsoluteValue")
+                requiredPost = context.MkAnd(requiredPost, mathematicalOutput);
             break;
         case "SafeDivide":
             var a = Integer("a");
@@ -2704,27 +2754,435 @@ static IEnumerable<(int[] Inputs, bool Positive, object? Payload)> CarrierCases(
             yield return ([], false, profile == "type004" ? "Operation not supported" : null);
 }
 
+static void VerifyRefactoring(string profile, string path)
+{
+    var name = profile switch
+    {
+        "ref001" => "DoubleValue", "ref003" => "JustCompute", "ref004" => "AbsoluteValue",
+        "ref005" => "SafeMultiply", "ref006" => "Abs", "ref007" => "NoContractAdd", _ => "TryParseDigit"
+    };
+    var source = File.ReadAllText(path);
+    var diagnostics = new DiagnosticBag();
+    var parsed = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+    if (diagnostics.HasErrors)
+        throw new InvalidOperationException($"Calor compilation failed (original parse):\n{string.Join("\n", diagnostics)}");
+    RejectRawInterop(parsed, "refactoring behavior");
+    if (profile == "ref008")
+    {
+        var targets = parsed.Functions.Where(candidate => candidate.Name == name).ToArray();
+        if (targets.Length != 1)
+            throw new InvalidOperationException($"Expected exactly one native refactoring function named {name}.");
+        if (targets[0].Parameters.Count != 1
+            || AttributeHelper.ExpandType(targets[0].Parameters[0].TypeName) != AttributeHelper.ExpandType("char"))
+            throw new InvalidOperationException("Wrong native Option<int> digit-conversion signature.");
+        var digitCompilation = Calor.Compiler.Program.Compile(source, path,
+            new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
+        if (digitCompilation.HasErrors || digitCompilation.Ast == null)
+            throw new InvalidOperationException($"Calor compilation failed:\n{string.Join("\n", digitCompilation.Diagnostics)}");
+        VerifyDigitConversion(parsed, digitCompilation.Ast, digitCompilation.GeneratedCode, path);
+        return;
+    }
+    string[] names = profile is "ref003" or "ref005" ? ["a", "b"] : profile == "ref007" ? ["x", "y"] : ["x"];
+    FunctionNode Function(string target, string[] parameters, bool pure)
+    {
+        var matches = parsed.Functions.Where(function => function.Name == target).ToArray();
+        if (matches.Length != 1)
+            throw new InvalidOperationException($"Expected exactly one native refactoring function named {target}.");
+        var function = matches[0];
+        if (function.IsAsync || function.TypeParameters.Count != 0 || function.Output == null
+            || AttributeHelper.ExpandType(function.Output.TypeName) != "INT"
+            || !function.Parameters.Select(parameter => parameter.Name).SequenceEqual(parameters)
+            || function.Parameters.Any(parameter => AttributeHelper.ExpandType(parameter.TypeName) != "INT"
+                || parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None))
+            throw new InvalidOperationException($"Wrong native refactoring signature for {target}.");
+        if (pure && function.Effects?.Effects.Values.Any(value => !string.IsNullOrWhiteSpace(value)) == true)
+            throw new InvalidOperationException($"Original refactoring declaration {target} must be pure.");
+        CheckWritingContracts(function, parameters, "i32");
+        return function;
+    }
+    var function = Function(name, names, profile is "ref001" or "ref003");
+    if (profile == "ref004" && function.Postconditions.Count < 2)
+        throw new InvalidOperationException("AbsoluteValue requires multiple native postconditions.");
+    if (profile == "ref005")
+    {
+        if (function.Preconditions.Count != 0 || function.Parameters.Any(parameter => parameter.InlineRefinement != null))
+            throw new InvalidOperationException("SafeMultiply must not declare preconditions.");
+        if (!function.Postconditions.SelectMany(contract => RecursiveAstWalker.GetAllChildren(contract.Condition)
+            .Prepend(contract.Condition)).Any(node => node is ImplicationExpressionNode))
+            throw new InvalidOperationException("SafeMultiply requires native implication postconditions.");
+    }
+    if (profile == "ref001")
+    {
+        var caller = Function("LogAndDouble", ["x"], false);
+        if (!(caller.Effects?.Effects.TryGetValue("io", out var declared) == true
+            && declared.Split(',').Contains("console_write", StringComparer.Ordinal)))
+            throw new InvalidOperationException("Original LogAndDouble console-write declaration missing.");
+    }
+    var compilation = Calor.Compiler.Program.Compile(source, path,
+        new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
+    if (compilation.HasErrors || compilation.Ast == null)
+        throw new InvalidOperationException($"Calor compilation failed:\n{string.Join("\n", compilation.Diagnostics)}");
+    var (original, trees) = CompileRuntime(compilation.GeneratedCode);
+    var mapped = new CSharpEmitter(ContractMode.Debug) { LineDirectiveFilePath = path }.Emit(compilation.Ast);
+    if (!SyntaxFactory.AreEquivalent(CSharpSyntaxTree.ParseText(mapped).GetRoot(), trees[1].GetRoot()))
+        throw new InvalidOperationException("Mapped selected refactoring emission differs from compiled C#.");
+    var off = CSharpSyntaxTree.ParseText(
+        new CSharpEmitter(ContractMode.Off) { LineDirectiveFilePath = path }.Emit(compilation.Ast)).GetCompilationUnitRoot();
+    var semanticCompilation = CSharpCompilation.Create("RefactoringMapping",
+        [trees[0], CSharpSyntaxTree.Create(off, (CSharpParseOptions)trees[0].Options)], GeneratedCSharpCompiler.References,
+        new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    var offTree = semanticCompilation.SyntaxTrees.Last();
+    var semantic = semanticCompilation.GetSemanticModel(offTree);
+    off = offTree.GetCompilationUnitRoot();
+    // Bound the executable external surface before invoking either original or
+    // counterfactual code. This finite supervisor is not an IO sandbox.
+    foreach (var invocation in off.DescendantNodes().OfType<InvocationExpressionSyntax>())
+    {
+        if (semantic.GetSymbolInfo(invocation).Symbol is not IMethodSymbol symbol)
+            throw new InvalidOperationException("Unresolved refactoring call symbol.");
+        if (!symbol.ContainingAssembly.Equals(semanticCompilation.Assembly, SymbolEqualityComparer.Default)
+            && !(symbol.ContainingType.ToDisplayString() == "System.Console" && symbol.Name == "WriteLine")
+            && symbol.ContainingType.ToDisplayString() != "System.Math")
+            throw new InvalidOperationException($"Unsupported finite refactoring call {symbol.ContainingType}.{symbol.Name}.");
+    }
+    if (off.DescendantNodes().Any(node => node is ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax))
+        throw new InvalidOperationException("Unsupported finite scalar refactoring object construction.");
+    MethodInfo Method(Assembly assembly, string target, int count)
+    {
+        var type = assembly.GetType($"{parsed.Name}.{parsed.Name}Module")
+            ?? throw new InvalidOperationException("Refactoring CLR module missing.");
+        var matches = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly)
+            .Where(method => method.Name == target).ToArray();
+        if (matches.Length != 1 || matches[0].IsGenericMethod || matches[0].ReturnType != typeof(int)
+            || !matches[0].GetParameters().Select(parameter => parameter.ParameterType)
+                .SequenceEqual(Enumerable.Repeat(typeof(int), count)))
+            throw new InvalidOperationException($"Wrong reflected refactoring signature for {target}.");
+        return matches[0];
+    }
+    int[] values = [-2147483648, -2147483647, -1073741824, -1000001, -1000000, -999999,
+        -46341, -46340, -101, -17, -2, -1, 0, 1, 2, 17, 101, 46340, 46341,
+        999999, 1000000, 1000001, 1073741823, 2147483646, 2147483647];
+    var cases = (names.Length == 1 ? values.Select(value => new[] { value }) :
+        from first in values from second in values select new[] { first, second })
+        .Where(input => profile != "ref007" || input.All(value => value >= -1000000 && value <= 1000000))
+        .Select(input => (Input: input, Expected: profile switch
+        {
+            "ref001" => (long)input[0] * 2,
+            "ref003" or "ref007" => (long)input[0] + input[1],
+            "ref005" => (long)input[0] * input[1],
+            _ => Math.Abs((long)input[0])
+        })).Where(item => item.Expected >= int.MinValue && item.Expected <= int.MaxValue).ToArray();
+    bool Behavior(MethodInfo method, bool logging = false)
+    {
+        var correct = true;
+        foreach (var (input, expected) in cases)
+        {
+            var previous = Console.Out;
+            var previousError = Console.Error;
+            using var written = new BoundedOutput();
+            using var errors = new BoundedOutput();
+            object? actual;
+            try
+            {
+                Console.SetOut(written);
+                Console.SetError(errors);
+                actual = method.Invoke(null, input.Select(value => (object)value).ToArray());
+            }
+            catch (TargetInvocationException error)
+            {
+                throw new InvalidOperationException("Refactoring runtime failed; exceptions are not dependence evidence.", error);
+            }
+            finally
+            {
+                Console.SetOut(previous);
+                Console.SetError(previousError);
+            }
+            correct &= Equals(actual, (int)expected) && errors.ToString() == ""
+                && written.ToString().Replace("\r\n", "\n", StringComparison.Ordinal)
+                    == (logging ? input[0].ToString(System.Globalization.CultureInfo.InvariantCulture) + "\n" : "");
+        }
+        return correct;
+    }
+    var offAssembly = CompileRuntime(off.ToFullString()).Assembly;
+    if (!Behavior(Method(original, name, names.Length)) || !Behavior(Method(offAssembly, name, names.Length)))
+        throw new InvalidOperationException("Wrong refactoring baseline behavior (original/contract-off output or purity).");
+    var interventions = 0;
+    if (profile == "ref001")
+    {
+        if (!Behavior(Method(original, "LogAndDouble", 1), true)
+            || !Behavior(Method(offAssembly, "LogAndDouble", 1), true))
+            throw new InvalidOperationException("Wrong LogAndDouble original/contract-off logging or doubling behavior.");
+        var calls = off.DescendantNodes().OfType<InvocationExpressionSyntax>().Where(call =>
+            semantic.GetSymbolInfo(call).Symbol is IMethodSymbol symbol && symbol.Name == "DoubleValue"
+            && symbol.ContainingAssembly.Equals(semanticCompilation.Assembly, SymbolEqualityComparer.Default)).ToArray();
+        foreach (var call in calls)
+        {
+            var counter = off.ReplaceNode(call, SyntaxFactory.ParseExpression($"unchecked(({call}) + 1)"));
+            if (!Behavior(Method(CompileRuntime(counter.ToFullString()).Assembly, "LogAndDouble", 1), true))
+                interventions++;
+        }
+        if (interventions == 0)
+            throw new InvalidOperationException("DoubleValue call coupling failed: no supplying call changes successful LogAndDouble output.");
+    }
+    else
+    {
+        var declaration = off.DescendantNodes().OfType<ClassDeclarationSyntax>()
+            .Single(type => type.Identifier.ValueText == parsed.Name + "Module")
+            .Members.OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == name);
+        var returns = declaration.DescendantNodes().OfType<ReturnStatementSyntax>()
+            .Where(statement => statement.Expression != null).ToArray();
+        foreach (var statement in returns)
+        {
+            var counter = off.ReplaceNode(statement, statement.WithExpression(
+                SyntaxFactory.ParseExpression($"unchecked(({statement.Expression}) + 1)")));
+            if (!Behavior(Method(CompileRuntime(counter.ToFullString()).Assembly, name, names.Length)))
+                interventions++;
+        }
+        if (interventions == 0)
+            throw new InvalidOperationException("Refactoring supplying-return coupling failed.");
+    }
+    Console.WriteLine($"Verification passed: {name}; original native contracts/effects; {cases.Length} independent runtime cases; {interventions} successful source counterfactuals; original and contract-off behavior.");
+    Console.WriteLine("Limits: finite Int32 representable-result cases, exact selected predicate proofs, bounded restored console; no overflow policy or universal body proof.");
+}
+
+static void VerifyDigitConversion(ModuleNode parsed, ModuleNode module, string generatedCode, string path)
+{
+    var functions = parsed.Functions.Where(function => function.Name == "TryParseDigit").ToArray();
+    if (functions.Length != 1)
+        throw new InvalidOperationException("Expected exactly one native refactoring function named TryParseDigit.");
+    var function = functions[0];
+    var output = SyntaxFactory.ParseTypeName(function.Output?.TypeName ?? "");
+    var generic = output switch
+    {
+        GenericNameSyntax unqualified => unqualified,
+        QualifiedNameSyntax { Right: GenericNameSyntax qualified } => qualified,
+        _ => null
+    };
+    if (function.IsAsync || function.TypeParameters.Count != 0 || function.Parameters.Count != 1
+        || AttributeHelper.ExpandType(function.Parameters[0].TypeName) != AttributeHelper.ExpandType("char")
+        || function.Parameters[0].Modifier != Calor.Compiler.Ast.ParameterModifier.None
+        || generic?.Identifier.ValueText != "Option" || generic.TypeArgumentList.Arguments.Count != 1
+        || AttributeHelper.ExpandType(generic.TypeArgumentList.Arguments[0].ToString()) != "INT")
+        throw new InvalidOperationException("Wrong native Option<int> digit-conversion signature.");
+    var (original, trees) = CompileRuntime(generatedCode, warningsAsErrors: true);
+    var debug = new CSharpEmitter(ContractMode.Debug) { LineDirectiveFilePath = path }.Emit(module);
+    if (!SyntaxFactory.AreEquivalent(CSharpSyntaxTree.ParseText(debug).GetRoot(), trees[1].GetRoot()))
+        throw new InvalidOperationException("Mapped selected digit emission differs from compiled C#.");
+    var off = CSharpSyntaxTree.ParseText(
+        new CSharpEmitter(ContractMode.Off) { LineDirectiveFilePath = path }.Emit(module)).GetCompilationUnitRoot();
+    var semanticCompilation = CSharpCompilation.Create("DigitMapping",
+        [trees[0], CSharpSyntaxTree.Create(off, (CSharpParseOptions)trees[0].Options)], GeneratedCSharpCompiler.References,
+        new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    var tree = semanticCompilation.SyntaxTrees.Last();
+    var semantic = semanticCompilation.GetSemanticModel(tree);
+    off = tree.GetCompilationUnitRoot();
+    MethodInfo Method(Assembly assembly)
+    {
+        var type = assembly.GetType($"{module.Name}.{module.Name}Module")
+            ?? throw new InvalidOperationException("Digit CLR module missing.");
+        var methods = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly)
+            .Where(method => method.Name == "TryParseDigit").ToArray();
+        if (methods.Length != 1 || methods[0].IsGenericMethod
+            || !methods[0].GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual([typeof(char)]))
+            throw new InvalidOperationException("Wrong reflected digit signature.");
+        var closed = methods[0].ReturnType;
+        if (!closed.IsGenericType || closed.ContainsGenericParameters || closed.Name != "Option`1"
+            || !closed.GetGenericArguments().SequenceEqual([typeof(int)]))
+            throw new InvalidOperationException("Wrong reflected closed Option<int> digit return.");
+        var definition = closed.GetGenericTypeDefinition();
+        if (closed.Assembly == assembly)
+        {
+            var carriers = parsed.Classes.Where(candidate => candidate.Name == "Option").ToArray();
+            if (carriers.Length != 1 || carriers[0].TypeParameters.Count != 1
+                || definition.FullName != $"{module.Name}.Option`1")
+                throw new InvalidOperationException("Missing exact native auxiliary Option<T> declaration.");
+            foreach (var factory in new[] { "Some", "None" })
+                if (carriers[0].Methods.Count(method => method.Name == factory && method.IsStatic)
+                    + parsed.Functions.Count(candidate => candidate.Name == factory) != 1)
+                    throw new InvalidOperationException($"Missing native Option {factory} factory.");
+        }
+        else if (definition.Namespace != "Calor.Runtime"
+            || definition.Assembly != typeof(Calor.Runtime.ContractKind).Assembly)
+            throw new InvalidOperationException("Foreign CLR Option identity.");
+        var some = closed.GetMethod("Some", BindingFlags.Public | BindingFlags.Static, [typeof(int)])
+            ?? type.GetMethod("Some", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static, [typeof(int)]);
+        var none = closed.GetMethod("None", BindingFlags.Public | BindingFlags.Static, Type.EmptyTypes)
+            ?? type.GetMethod("None", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static, Type.EmptyTypes);
+        if (some?.ReturnType != closed || none?.ReturnType != closed || some.IsGenericMethod || none.IsGenericMethod)
+            throw new InvalidOperationException("Wrong typed Option Some/None factory API.");
+        return methods[0];
+    }
+    const string csharpIdiom = """
+        public static class CSharpDigitReference
+        {
+            public static bool TryParseDigit(char c, out int digit)
+            {
+                if (c >= '0' && c <= '9') { digit = c - '0'; return true; }
+                digit = 0; return false;
+            }
+        }
+        """;
+    var reference = CompileRuntime(csharpIdiom).Assembly.GetType("CSharpDigitReference")!.GetMethod("TryParseDigit")!;
+    var conversion = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "DigitConversion" })
+        .Convert(csharpIdiom, "CSharpDigitReference.cs");
+    if (!conversion.Success || conversion.Ast == null || string.IsNullOrWhiteSpace(conversion.CalorSource))
+        throw new InvalidOperationException("Actual C# digit idiom conversion failed.");
+    RejectRawInterop(conversion.Ast, "native C# digit idiom conversion");
+    var converted = Calor.Compiler.Program.Compile(conversion.CalorSource, "ConvertedDigit.calr",
+        new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
+    if (converted.HasErrors || converted.Ast == null)
+        throw new InvalidOperationException($"Actual converted digit compilation failed:\n{string.Join("\n", converted.Diagnostics)}");
+    RejectRawInterop(converted.Ast, "native C# digit idiom conversion");
+    var convertedReference = CompileRuntime(converted.GeneratedCode).Assembly.GetTypes()
+        .Single(type => type.Name == "CSharpDigitReference").GetMethod("TryParseDigit")
+        ?? throw new InvalidOperationException("Actual converted C# digit signature missing.");
+    if (convertedReference.ReturnType != typeof(bool) || !convertedReference.IsStatic
+        || !convertedReference.GetParameters().Select(parameter => parameter.ParameterType)
+            .SequenceEqual([typeof(char), typeof(int).MakeByRefType()])
+        || !convertedReference.GetParameters()[1].IsOut)
+        throw new InvalidOperationException("Actual converted C# digit out-parameter signature changed.");
+    var expected = Enumerable.Range(0, 65536).Select(code =>
+    {
+        object[] arguments = [(char)code, 0];
+        var present = (bool)reference.Invoke(null, arguments)!;
+        object[] convertedArguments = [(char)code, 0];
+        var convertedPresent = convertedReference.Invoke(null, convertedArguments);
+        if (!Equals(convertedPresent, present) || !Equals(convertedArguments[1], arguments[1]))
+            throw new InvalidOperationException($"Actual C# to native Calor conversion changed digit behavior at UTF-16 code {code}.");
+        return (Present: present, Value: (int)arguments[1]);
+    }).ToArray();
+    bool Behavior(MethodInfo method)
+    {
+        var closed = method.ReturnType;
+        const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
+        var tags = new[] { "IsSome", "IsNone" }.SelectMany(name => closed.GetMember(name, flags)).ToArray();
+        var payloads = new[] { "Value", "Unwrap" }.SelectMany(name => closed.GetMember(name, flags)).ToArray();
+        object? Read(MemberInfo member, object value) => member switch
+        {
+            FieldInfo field when !field.IsStatic => field.GetValue(value),
+            PropertyInfo property when property.GetMethod is { IsPublic: true, IsStatic: false }
+                && property.GetIndexParameters().Length == 0 => property.GetValue(value),
+            MethodInfo accessor when !accessor.IsStatic && !accessor.IsGenericMethod && accessor.GetParameters().Length == 0
+                => accessor.Invoke(value, null),
+            _ => throw new InvalidOperationException("Wrong Option observation API.")
+        };
+        if (tags.Length == 0 || payloads.Length == 0)
+            throw new InvalidOperationException("Missing authoritative typed Option case/payload API.");
+        var correct = true;
+        for (var code = 0; code < expected.Length; code++)
+        {
+            var previous = Console.Out;
+            var previousError = Console.Error;
+            using var written = new BoundedOutput();
+            using var errors = new BoundedOutput();
+            try
+            {
+                Console.SetOut(written);
+                Console.SetError(errors);
+                var value = method.Invoke(null, [(char)code])
+                    ?? throw new InvalidOperationException("Null is not an Option None value.");
+                var observations = tags.Select(member => Read(member, value) is bool tag
+                    ? member.Name == "IsSome" ? tag : !tag
+                    : throw new InvalidOperationException("Wrong typed Option case API.")).ToArray();
+                if (observations.Any(tag => tag != observations[0]))
+                    throw new InvalidOperationException("Contradictory Option case observations.");
+                correct &= observations[0] == expected[code].Present;
+                if (observations[0])
+                {
+                    var values = payloads.Select(member => Read(member, value) is int payload ? payload
+                        : throw new InvalidOperationException("Wrong typed Option active payload API.")).ToArray();
+                    if (values.Any(payload => payload != values[0]))
+                        throw new InvalidOperationException("Contradictory Option payload observations.");
+                    correct &= values[0] == expected[code].Value;
+                }
+                correct &= written.ToString() == "" && errors.ToString() == "";
+            }
+            catch (TargetInvocationException error)
+            {
+                throw new InvalidOperationException("Digit runtime failed; exceptions are not dependence evidence.", error);
+            }
+            finally
+            {
+                Console.SetOut(previous);
+                Console.SetError(previousError);
+            }
+        }
+        return correct;
+    }
+    var factories = new List<(InvocationExpressionSyntax Call, string Name)>();
+    foreach (var call in off.DescendantNodes().OfType<InvocationExpressionSyntax>())
+    {
+        if (semantic.GetSymbolInfo(call).Symbol is not IMethodSymbol symbol)
+            throw new InvalidOperationException("Unresolved digit conversion call symbol.");
+        if (symbol.Name is "Some" or "None" && (symbol.ContainingType.Name == "Option"
+            || symbol.ContainingType.Name == module.Name + "Module"
+                && symbol.ContainingAssembly.Equals(semanticCompilation.Assembly, SymbolEqualityComparer.Default)))
+            factories.Add((call, symbol.Name));
+        else if (!symbol.ContainingAssembly.Equals(semanticCompilation.Assembly, SymbolEqualityComparer.Default)
+            && !(symbol.ContainingType.Name == "Option" && symbol.Name == "Unwrap"))
+            throw new InvalidOperationException($"Unsupported finite digit call {symbol.ContainingType}.{symbol.Name}.");
+    }
+    foreach (var creation in off.DescendantNodes().OfType<ObjectCreationExpressionSyntax>())
+        if (semantic.GetSymbolInfo(creation).Symbol is not IMethodSymbol constructor
+            || !constructor.ContainingAssembly.Equals(semanticCompilation.Assembly, SymbolEqualityComparer.Default)
+            || constructor.ContainingType.Name != "Option")
+            throw new InvalidOperationException("Unsupported digit object construction.");
+    if (off.DescendantNodes().OfType<ImplicitObjectCreationExpressionSyntax>().Any())
+        throw new InvalidOperationException("Unsupported implicit digit object construction.");
+    if (!Behavior(Method(original)) || !Behavior(Method(CompileRuntime(off.ToFullString(), warningsAsErrors: true).Assembly)))
+        throw new InvalidOperationException("Wrong digit baseline case/payload behavior against actual C# out-parameter idiom.");
+    var interventions = 0;
+    foreach (var factory in new[] { "Some", "None" })
+    {
+        var supplying = 0;
+        foreach (var (call, name) in factories.Where(candidate => candidate.Name == factory))
+        {
+            var symbol = semantic.GetSymbolInfo(call).Symbol as IMethodSymbol
+                ?? throw new InvalidOperationException("Unresolved Option counterfactual factory.");
+            var receiver = call.Expression switch
+            {
+                MemberAccessExpressionSyntax when symbol.ContainingType.Name == "Option"
+                    && symbol.ContainingType.Arity == 0
+                    => symbol.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + ".",
+                MemberAccessExpressionSyntax member => member.Expression + ".",
+                IdentifierNameSyntax => "",
+                _ => throw new InvalidOperationException("Unsupported Option factory receiver.")
+            };
+            var replacement = SyntaxFactory.ParseExpression(name == "Some"
+                ? $"{receiver}None()" : $"{receiver}Some(7)");
+            var counter = off.ReplaceNode(call, replacement);
+            if (!Behavior(Method(CompileRuntime(counter.ToFullString(), warningsAsErrors: true).Assembly)))
+                supplying++;
+        }
+        if (supplying == 0)
+            throw new InvalidOperationException($"Option {factory} factory coupling failed: no supplying factory changes successful digit case/payload.");
+        interventions += supplying;
+    }
+    Console.WriteLine($"Verification passed: TryParseDigit; native Option<int>/Some/None; 65536 independent C# out-parameter equivalence cases; actual C# to native Calor conversion; {interventions} successful factory counterfactuals; original and contract-off behavior.");
+    Console.WriteLine("Limits: exhaustive UTF-16 chars, actual selected CLR carrier and native factory coupling; source-defined Option is not builtin support. No agent/provider or benchmark claims.");
+}
+
 static void VerifyEffects(string profile, string path)
 {
     var name = profile switch
     {
         "eff001" => "SayHello", "eff002" => "ReadInput", "eff003" => "ReadFile",
-        "eff004" => "WriteFile", "eff005" => "FetchUrl", _ => "LogToFileAndConsole"
+        "eff004" => "WriteFile", "eff005" => "FetchUrl", "ref002" => "ProcessAndLog", _ => "LogToFileAndConsole"
     };
     string[] names = profile switch
     {
         "eff001" => ["name"], "eff002" => [], "eff003" => ["path"],
-        "eff004" => ["path", "content"], "eff005" => ["url"], _ => ["path", "message"]
+        "eff004" => ["path", "content"], "eff005" => ["url"], "ref002" => ["path"], _ => ["path", "message"]
     };
     string[] required = profile switch
     {
         "eff001" => ["console_write"], "eff002" => ["console_read"], "eff003" => ["file_read"],
-        "eff004" => ["file_write"], "eff005" => ["network_read"], _ => ["console_write", "file_write"]
+        "eff004" => ["file_write"], "eff005" => ["network_read"], "ref002" => ["file_read", "console_write"], _ => ["console_write", "file_write"]
     };
     string[] operations = profile switch
     {
         "eff001" => ["WriteLine"], "eff002" => ["ReadLine"], "eff003" => ["ReadAllText"],
-        "eff004" => ["WriteAllText"], "eff005" => [], _ => ["WriteLine", "AppendAllText"]
+        "eff004" => ["WriteAllText"], "eff005" => [], "ref002" => ["ReadAllText", "WriteLine"], _ => ["WriteLine", "AppendAllText"]
     };
     var output = profile is "eff002" or "eff003" or "eff005" ? typeof(string) : typeof(void);
     var source = File.ReadAllText(path);
@@ -2786,6 +3244,17 @@ static void VerifyEffects(string profile, string path)
         return matches[0];
     }
     var original = Method(assembly);
+    MethodInfo? contractOff = null;
+    if (profile == "ref002")
+    {
+        var mapped = new CSharpEmitter(ContractMode.Debug) { LineDirectiveFilePath = path }.Emit(compilation.Ast);
+        if (!SyntaxFactory.AreEquivalent(CSharpSyntaxTree.ParseText(mapped).GetRoot(), trees[1].GetRoot()))
+            throw new InvalidOperationException("Mapped selected effects emission differs from compiled C#.");
+        var disabled = new CSharpEmitter(ContractMode.Off) { LineDirectiveFilePath = path }.Emit(compilation.Ast);
+        var offRuntime = CompileRuntime(disabled);
+        contractOff = Method(offRuntime.Assembly);
+        trees = offRuntime.Trees;
+    }
     var root = trees[1].GetCompilationUnitRoot();
     var semanticCompilation = CSharpCompilation.Create("EffectsMapping", trees,
         GeneratedCSharpCompiler.References, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
@@ -2857,7 +3326,7 @@ static void VerifyEffects(string profile, string path)
         var sentinel = Path.Combine(directory.FullName, "unrelated.txt");
         var cases = (from index in Enumerable.Range(0, 2)
                      from value in profile == "eff002" ? lines : values
-                     from seed in profile is "eff003" or "eff004" or "eff006" ? values : new[] { "seed" }
+                     from seed in profile is "eff003" or "eff004" or "eff006" or "ref002" ? values : new[] { "seed" }
                      select (Index: index, Value: value, Seed: seed)).ToArray();
         bool Execute(MethodInfo method, string mode, int index, string value, string seed, bool traced)
         {
@@ -2880,7 +3349,7 @@ static void VerifyEffects(string profile, string path)
                 Console.SetError(errors);
                 object[] arguments = profile switch
                 {
-                    "eff001" => [value], "eff002" => [], "eff003" => [paths[index]],
+                    "eff001" => [value], "eff002" => [], "eff003" or "ref002" => [paths[index]],
                     "eff004" or "eff006" => [paths[index], value], _ => [value]
                 };
                 result = method.Invoke(null, arguments);
@@ -2904,7 +3373,7 @@ static void VerifyEffects(string profile, string path)
                     var matching = trace.Where(entry => entry[0] == operation).ToArray();
                     if (matching.Length == 0 || matching.Any(entry => operation switch
                     {
-                        "WriteLine" => entry[1] != value,
+                        "WriteLine" => entry[1] != (profile == "ref002" ? before[index] : value),
                         "ReadLine" => entry[1] != value,
                         "ReadAllText" => entry[1] != paths[index] || entry[2] != before[index],
                         _ => entry[1] != paths[index] || entry[2] != value
@@ -2912,7 +3381,8 @@ static void VerifyEffects(string profile, string path)
                         throw new InvalidOperationException("Effects BCL provenance/arguments differ from supplied inputs.");
                 }
             }
-            var expectedConsole = profile is "eff001" or "eff006" ? value + written.NewLine : "";
+            var expectedConsole = profile == "ref002" ? before[index] + written.NewLine
+                : profile is "eff001" or "eff006" ? value + written.NewLine : "";
             var expectedFile = profile == "eff004" ? value : profile == "eff006" ? before[index] + value : before[index];
             var expectedReturn = profile switch
             {
@@ -2931,6 +3401,10 @@ static void VerifyEffects(string profile, string path)
         foreach (var (index, value, seed) in cases)
             if (!Execute(original, "", index, value, seed, false))
                 throw new InvalidOperationException("Wrong original effects baseline behavior/state.");
+        if (contractOff != null)
+            foreach (var (index, value, seed) in cases)
+                if (!Execute(contractOff, "", index, value, seed, false))
+                    throw new InvalidOperationException("Wrong contract-off effects baseline behavior/state.");
         foreach (var operation in operations)
         {
             var changed = false;
@@ -2940,7 +3414,9 @@ static void VerifyEffects(string profile, string path)
                 throw new InvalidOperationException($"Effects coupling failed: {operation} does not contribute to successful output/state.");
         }
         Console.WriteLine($"Verification passed: {name}; original declared effects, native/CLR signatures, {cases.Length} runtime cases and BCL output/state coupling.");
-        Console.WriteLine("Limits: finite non-null strings and owned IO, deterministic restored console; process supervision, not a sandbox or universal body proof. No real network, EOF/null, missing-file or encoding policy.");
+        Console.WriteLine(profile == "ref002"
+            ? "Limits: finite non-null strings and owned IO, deterministic restored console; no universal body proof, real network or encoding policy."
+            : "Limits: finite non-null strings and owned IO, deterministic restored console; process supervision, not a sandbox or universal body proof. No real network, EOF/null, missing-file or encoding policy.");
     }
     finally
     {

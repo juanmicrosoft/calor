@@ -83,10 +83,11 @@ def main():
                 "AsyncOps.calr" if sys.argv[1] in ("async001", "async002", "async003") else
                 "Generic.calr" if sys.argv[1] in ("gen001", "gen002", "gen003") else
                 "Enums.calr" if sys.argv[1] in ("enum001", "enum002", "enum003") else
-                "BuggyContracts.calr" if sys.argv[1] == "contract003" else
+                "Impure.calr" if sys.argv[1] in ("ref001", "ref003", "ref007") else
+                "BuggyContracts.calr" if sys.argv[1] in ("contract003", "ref006") else
                 "Collections.calr" if sys.argv[1] in ("PrintDictionary", "coll001", "coll002", "coll003", "coll004", "coll005", "coll006") else "Effects.calr"
                 if sys.argv[1] in ("PrintNumbers", "Countdown", "DoWhileDemo", "PrintEvenNumbers",
-                                    "eff001", "eff002", "eff003", "eff004", "eff005", "eff006") else "Calculator.calr")
+                                    "eff001", "eff002", "eff003", "eff004", "eff005", "eff006", "ref002") else "Calculator.calr")
     source = None if native_only else Path(sys.argv[2]).resolve() / filename
     if source is not None and not source.is_file():
         raise RuntimeError(f"Input missing: {source}")
@@ -94,7 +95,9 @@ def main():
     if not 0 < timeout <= 120:
         raise RuntimeError("CALOR_LOGIC_TIMEOUT_SECONDS must be in (0, 120].")
     deadline = time.monotonic() + timeout
-    carrier = not native_only and sys.argv[1] in ("type001", "type002", "type003", "type004", "pm004", "pm005")
+    carrier = not native_only and sys.argv[1] in (
+        "type001", "type002", "type003", "type004", "pm004", "pm005",
+        "ref001", "ref002", "ref003", "ref004", "ref005", "ref006", "ref007", "ref008")
     images = {}
     manifest_digest = None
     if carrier:

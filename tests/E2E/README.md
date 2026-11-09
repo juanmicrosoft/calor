@@ -190,6 +190,100 @@ grep -q "Console.WriteLine" "$OUTPUT_FILE" || exit 1
 3. Add `verify.sh` with verification logic
 4. Run `./run-tests.sh` to verify
 
+## Original refactoring prerequisites (ref-001 through ref-008)
+
+The eight original `agent-tasks/tasks/refactoring/*/task.json` prompts and initial
+fixtures remain unchanged. Their executable wrappers now invoke the selected
+compiler-backed helper rather than file-global text searches.
+
+`DoubleValue` must compute `x * 2` without effects. `LogAndDouble` must retain its
+declared console-write effect, original logging and doubling behavior, and an
+actually supplying call to `DoubleValue`. Independently perturbing that resolved
+call must change successfully returned outputs; an unused call beside independent
+doubling cannot pass. `JustCompute` must add both supplied integers with no effects
+or observed console output. `ProcessAndLog` must declare file-read and console-write
+effects and print the supplied file's complete contents. Its 128 cases vary two
+owned paths and independent text/file seeds, including empty text, multiline text
+and Unicode. Instrumented BCL provenance, unchanged files/sentinel, original and
+contract-disabled behavior, read-result replacement and write suppression are
+separate requirements. Reading unused text and independently decoding file bytes
+does not establish `ReadAllText` coupling.
+
+`AbsoluteValue` requires multiple postconditions jointly specifying nonnegativity
+and both signed branches. `SafeMultiply` declares no preconditions and supplies
+both positive-input/negative-input positivity implications. `Abs` must repair the
+zero-exclusive contract without changing absolute-value behavior. `NoContractAdd`
+must bound both parameters inclusively to `[-1000000,1000000]` and specify the
+exact sum. Scoped selected Z3 translation independently proves input-domain
+equivalence, required postcondition entailment, executable arithmetic safety and
+nonexclusion of correct outputs. Missing, weak, foreign, vacuous or narrowed
+contracts cannot pass. For multiplication, the postcondition proof conservatively
+overapproximates mathematical product outputs by their sign relation; this avoids
+a nonlinear bit-vector proof without treating solver UNKNOWN as success. Stronger
+optional predicates outside that abstraction can be refused, not silently ignored.
+Independent runtime products still require exact values.
+
+Scalar runtime cases include zero, both signs, the contract endpoints and their
+neighbors, Int32 boundaries and arithmetic boundaries. Only representable
+mathematical results are specified; no checked/unchecked overflow policy is
+invented. Complete positive counts are 21 for extraction, 541 for pure addition,
+24 each for absolute-value specification/repair, 313 for multiplication, and
+289 for bounded addition. Original and contract-disabled executions must agree
+with independent host arithmetic. Mapped supplying-return perturbations must
+change successfully completed outputs; exceptions never count as coupling.
+These finite samples are not universal body proofs.
+
+`TryParseDigit` retains the original `char -> Option<int>` requirement. It is not
+a nullable-return substitute. The verifier compiles an actual C# out-parameter
+digit idiom as an independent reference, genuinely converts that C# through the
+selected converter into native Calor, recompiles it, and verifies its original
+out-parameter signature and values. It compares candidate case and payload observations
+for **all 65,536 UTF-16 character values**, including non-ASCII digits, NUL,
+surrogates and `'0'`/`'9'` boundaries. Native `Some` and `None` factories must
+actually supply the returned carrier: independently changing each factory's case
+must change successfully completed outputs. Case APIs must agree; all available
+active payload observations must agree. Original and contract-disabled candidates
+must preserve the C# behavior. Source-defined native `Option<T>` plus typed
+module-level `Some`/`None` factories are supported; this is not a claim that
+current Calor restored builtin `§SM`/`§NN`. The archived compiler also exercises
+its genuine builtin constructors. Static generic receiver substitution is not
+used to hide an unsupported current binding path.
+
+```bash
+# Build the selected compiler first, with its own verified ignored Z3 assets.
+python3 tests/E2E/agent-tasks/test-refactoring-verifiers.py --admission
+python3 tests/E2E/agent-tasks/test-refactoring-verifiers.py --prerequisites
+python3 tests/E2E/agent-tasks/test-refactoring-verifiers.py
+python3 tests/E2E/agent-tasks/test-logic-old-release.py --refactoring
+```
+
+The full current matrix requires 97 actual wrappers: 22 accepted and 75 rejected.
+The strict archived/current matrix retains canonical positives and combines
+alternate scalar bodies with integer aliases, keeping separate aliases for file
+IO and digit conversion. It covers all eight requirements and all 25 distinct
+adversarial categories, plus a genuine old builtin positive and current rejection
+of historical source IDs: 84 actual wrappers, 33 accepted and 51 rejected.
+Only disposable historical controls acquire IDs; protected fixture bytes,
+declaration identities and task flags do not change.
+
+The historical command archives unchanged `d82f3ae95175ecd09581c6922701706be72b0ca9`,
+verifies ignored native assets against that archived source's own manifest, then
+locked-restores exclusively from the local NuGet cache and builds its real source.
+No compiler image is copied from the current arm. Every entry recompiles the helper
+against its exactly selected root/configuration/net10.0 compiler. Refactoring
+profiles check selected managed/native image hashes before and after execution.
+The existing 120-second per-entry and 600-second strict total bounds remain.
+Dependency/selection/manifest/deadline refusals are a separate ten-entry matrix,
+not behavioral negatives. Mocked contamination and canonical-identity tests
+contribute zero actual entries. All nested command wrappers must report exactly
+exit 1; UNKNOWN, solver, OS, process, inherited-pipe/EOF, cleanup, timeout and other
+infrastructure diagnostics invalidate finite admission. Each positive requires
+exactly one complete canonical selected `calor.dll` identity.
+
+This closes only these eight prerequisites, not all 129 tasks, paid agent
+acceptance, milestone completion or a release. No product code, historical
+fixtures/ledgers, census, provider, model, network or release action is changed.
+
 ## Logic-task behavioral verification
 
 The four `agent-tasks/tasks/logic-implementation/*/verify.sh` entry points take a
