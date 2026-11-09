@@ -2315,7 +2315,7 @@ public sealed class Binder
     private BoundReturnStatement BindReturnStatement(ReturnStatementNode ret)
     {
         var expr = ret.Expression is LambdaExpressionNode { IsAsync: true } asyncLambda
-            ? BindLambdaExpression(asyncLambda, TryBuildFunctionType(_currentFunctionReturnType, null, null))
+            ? BindExpression(asyncLambda, TryBuildFunctionType(_currentFunctionReturnType, null, null))
             : ret.Expression != null ? BindExpression(ret.Expression) : null;
 
         // v0.14 §S4 nullability check (issue #875, D2 predicate). Return-site
@@ -2617,7 +2617,7 @@ public sealed class Binder
         if (bind.Initializer != null)
         {
             initializer = bind.Initializer is LambdaExpressionNode { IsAsync: true } asyncLambda
-                ? BindLambdaExpression(asyncLambda, TryBuildFunctionType(bind.TypeName, null, null))
+                ? BindExpression(asyncLambda, TryBuildFunctionType(bind.TypeName, null, null))
                 : BindExpression(bind.Initializer);
             // Infer type from initializer if not specified
             typeName = bind.TypeName ?? initializer.Type.DisplayString;
@@ -3656,11 +3656,16 @@ public sealed class Binder
         };
     }
 
-    private BoundExpression BindExpression(ExpressionNode expr)
+    private BoundExpression BindExpression(ExpressionNode expr) => BindExpression(expr, targetType: null);
+
+    private BoundExpression BindExpression(
+        ExpressionNode expr, BoundTypes.FunctionBoundType? targetType)
     {
         ArgumentNullException.ThrowIfNull(expr);
         ExpressionsBound++;
-        var bound = ExpressionBinders.TryGetValue(expr.GetType(), out var binder)
+        var bound = expr is LambdaExpressionNode lambda && targetType != null
+            ? BindLambdaExpression(lambda, targetType)
+            : ExpressionBinders.TryGetValue(expr.GetType(), out var binder)
             ? binder(this, expr)
             : BindUnsupportedExpression(expr);
         if (MayChangeHeap(bound))
