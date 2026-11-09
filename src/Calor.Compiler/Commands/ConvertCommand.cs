@@ -107,7 +107,7 @@ public static class ConvertCommand
 
         var explicitCallClosersOption = new Option<bool>(
             aliases: new[] { "--explicit-call-closers" },
-            description: "Emit explicit §/C for every §C call (v0.6.0-compatible output); disables zero-arg §/C elision");
+            description: "Legacy compatibility option; current native calls use parentheses and never emit closer tags.");
 
         // No -f short alias (consistent with lint, where -f means --fix).
         var formatOption = new Option<string>(

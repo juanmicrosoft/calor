@@ -59,7 +59,7 @@ calor convert MyService.cs --benchmark
 | `--validate` | — | `false` | Parse generated Calor before writing and report errors |
 | `--passthrough` | — | `false` | Widen the set of C# members preserved as `§CSHARP` interop blocks. Since 0.16 `calor convert` already rescues a member it cannot convert this way; see [What Changed in 0.16](#what-changed-in-0-16) |
 | `--timeout` | `-t` | `0` | Conversion timeout in seconds; 0 disables it |
-| `--explicit-call-closers` | — | `false` | Emit explicit `§/C` for every `§C` call (v0.6.0-compatible output). |
+| `--explicit-call-closers` | — | `false` | Legacy compatibility option; current native calls use parentheses and never emit closer tags. |
 | `--format` | — | `text` | `text` or schema 2.0 `json`; there is no `-f` alias |
 
 ---

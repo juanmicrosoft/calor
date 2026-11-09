@@ -59,7 +59,7 @@ calor migrate ./src --direction calor-to-cs
 | `--skip-analyze` | — | `false` | Skip the migration analysis phase |
 | `--skip-verify` | — | `false` | Skip the Z3 contract verification phase |
 | `--verification-timeout` | — | `5000` | Z3 verification timeout per contract, in milliseconds |
-| `--explicit-call-closers` | — | `false` | Emit explicit `§/C` for every `§C` call (v0.6.0-compatible output). |
+| `--explicit-call-closers` | — | `false` | Legacy compatibility option; current native calls use parentheses and never emit closer tags. |
 
 ---
 

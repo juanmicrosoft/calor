@@ -71,6 +71,26 @@ public class ConvertCommandPassthroughTests
     }
 
     [Fact]
+    public void ExplicitClosersCompatibilityFlag_DoesNotReintroduceRetiredNativeSyntax()
+    {
+        const string source = "public static class Calls { public static int Value() => 1; public static int Run() => Value(); }";
+        string Convert(bool explicitClosers)
+        {
+            var options = ConvertCommand.BuildCSharpToCalorOptions(
+                benchmark: false, verbose: false, explain: false, noFallback: false,
+                passthrough: false, explicitCallClosers: explicitClosers);
+            var result = new CSharpToCalorConverter(options).Convert(source);
+            Assert.True(result.Success);
+            Assert.Equal(0, result.Context!.Stats.InteropBlocksEmitted);
+            Assert.NotNull(result.CalorSource);
+            Assert.Contains("return Value()", result.CalorSource);
+            Assert.DoesNotContain('§', result.CalorSource);
+            return result.CalorSource;
+        }
+        Assert.Equal(Convert(false), Convert(true));
+    }
+
+    [Fact]
     public void PassthroughOptions_EnableTheCSharpFallback()
     {
         // The end-to-end acceptance: a member whose emission would not parse is preserved

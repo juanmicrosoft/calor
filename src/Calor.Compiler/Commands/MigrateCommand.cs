@@ -64,7 +64,7 @@ public static class MigrateCommand
 
         var explicitCallClosersOption = new Option<bool>(
             aliases: new[] { "--explicit-call-closers" },
-            description: "Emit explicit §/C for every §C call (v0.6.0-compatible output); disables zero-arg §/C elision",
+            description: "Legacy compatibility option; current native calls use parentheses and never emit closer tags.",
             getDefaultValue: () => false);
 
         var defineOption = new Option<string[]>(
