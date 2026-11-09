@@ -742,17 +742,20 @@ public class RenameHandlerTests
                         func Run () → int
                           return Pick(1)
                     """,
-                ["broken.calr"] = "module Broken\n" + CreateRawMember("""
+                ["broken.calr"] = ConvertInteropSupport("""
                     public static class BrokenProbe
                     {
                         public static int Value => MissingValue;
                     }
-                    """),
+                    """, "broken.cs"),
             };
             foreach (var (fileName, source) in sources)
                 File.WriteAllText(Path.Combine(root, fileName), source);
 
-            Assert.Single(GetRoslynErrors(sources["broken.calr"]));
+            var baselineError = Assert.Single(GetRoslynErrors(sources["broken.calr"]));
+            Assert.Equal("CS0103", baselineError.Id);
+            Assert.Equal("MissingValue", (await baselineError.Location.SourceTree!.GetTextAsync())
+                .ToString(baselineError.Location.SourceSpan));
             AssertWorkspaceRoslynCleanWithProductionMap(
                 sources
                     .Where(pair => pair.Key != "broken.calr")
@@ -760,6 +763,9 @@ public class RenameHandlerTests
                         pair => Path.Combine(root, pair.Key),
                         pair => pair.Value,
                         StringComparer.Ordinal));
+            var combinedBaseline = Assert.Single(GetRoslynErrors(sources.Values.ToArray()));
+            Assert.Equal(baselineError.Id, combinedBaseline.Id);
+            Assert.Equal(baselineError.GetMessage(), combinedBaseline.GetMessage());
             var workspace = new WorkspaceState(root);
             var definitionPath = Path.Combine(root, "definition.calr");
             var definitionUri = DocumentUri.FromFileSystemPath(definitionPath);
@@ -776,6 +782,7 @@ public class RenameHandlerTests
                 "Choose");
 
             Assert.NotNull(edit);
+            Assert.Equal(2, workspace.RenameValidationCompilationCount);
             var documentEdits = Assert.IsType<Container<WorkspaceEditDocumentChange>>(
                     edit.DocumentChanges)
                 .Select(change => Assert.IsType<TextDocumentEdit>(change.TextDocumentEdit))
@@ -785,6 +792,25 @@ public class RenameHandlerTests
                 documentEdits,
                 documentEdit => documentEdit.TextDocument.Uri.ToUri().LocalPath
                     == Path.Combine(root, "broken.calr"));
+            var updated = sources.ToDictionary(
+                pair => Path.Combine(root, pair.Key),
+                pair => pair.Value,
+                StringComparer.Ordinal);
+            foreach (var documentEdit in documentEdits)
+            {
+                var textEdit = Assert.Single(documentEdit.Edits);
+                var original = updated[documentEdit.TextDocument.Uri.ToUri().LocalPath];
+                var start = PositionConverter.ToOffset(textEdit.Range.Start, original);
+                var end = PositionConverter.ToOffset(textEdit.Range.End, original);
+                Assert.Equal("Pick", original[start..end]);
+                Assert.Equal("Choose", textEdit.NewText);
+            }
+            ApplyDocumentEdits(updated, documentEdits);
+            Assert.Equal(sources["broken.calr"], updated[Path.Combine(root, "broken.calr")]);
+            var candidateError = Assert.Single(GetRoslynErrors(updated.Values.ToArray()));
+            Assert.Equal(baselineError.Id, candidateError.Id);
+            Assert.Equal(baselineError.GetMessage(), candidateError.GetMessage());
+            Assert.Equal(baselineError.Location.SourceSpan, candidateError.Location.SourceSpan);
         }
         finally
         {
@@ -800,29 +826,73 @@ public class RenameHandlerTests
             module SwapErrors
               func Old () → int
                 return 1
-            """ + "\n" + CreateRawMember("""
+            """;
+        const string supportingPayload = """
             public static class Probe
             {
                 public static int Existing() => GlobalModule.Old();
                 public static int Missing() => GlobalModule.NewName();
             }
-            """);
+            """;
+        var originalContext = CreateRoslynCompilation(source);
+        Assert.DoesNotContain(originalContext.GetDiagnostics(),
+            diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        // Keep the converter's whole-unit rescue intact, separate from the indexed Old declaration.
+        var support = ConvertInteropSupport(
+            supportingPayload, "probe.cs", originalContext.SyntaxTrees.ToArray());
         var candidate = source.Replace(
             "func Old ",
             "func NewName ",
             StringComparison.Ordinal);
-        var baselineErrors = GetRoslynErrors(source);
-        var candidateErrors = GetRoslynErrors(candidate);
+        var baselineCompilation = CreateRoslynCompilation(source, support);
+        var candidateCompilation = CreateRoslynCompilation(candidate, support);
+        var baselineErrors = GetRoslynErrors(baselineCompilation);
+        var candidateErrors = GetRoslynErrors(candidateCompilation);
         var baselineError = Assert.Single(baselineErrors);
         var candidateError = Assert.Single(candidateErrors);
+        Assert.Equal("CS0117", baselineError.Id);
         Assert.Equal(baselineError.Id, candidateError.Id);
+        Assert.Contains("GlobalModule", baselineError.GetMessage());
+        Assert.Contains("GlobalModule", candidateError.GetMessage());
+        Assert.Equal("NewName", (await baselineError.Location.SourceTree!.GetTextAsync())
+            .ToString(baselineError.Location.SourceSpan));
+        Assert.Equal("Old", (await candidateError.Location.SourceTree!.GetTextAsync())
+            .ToString(candidateError.Location.SourceSpan));
+        Assert.Equal(supportingPayload.IndexOf("NewName", StringComparison.Ordinal),
+            baselineError.Location.SourceSpan.Start);
+        Assert.Equal(supportingPayload.IndexOf("Old", StringComparison.Ordinal),
+            candidateError.Location.SourceSpan.Start);
+        Assert.Equal(supportingPayload, (await baselineError.Location.SourceTree.GetTextAsync()).ToString());
+        Assert.Equal(supportingPayload, (await candidateError.Location.SourceTree.GetTextAsync()).ToString());
+        var originalOwner = baselineCompilation.GetTypeByMetadataName("GlobalModule");
+        var candidateOwner = candidateCompilation.GetTypeByMetadataName("GlobalModule");
+        Assert.NotNull(originalOwner);
+        Assert.NotNull(candidateOwner);
+        Assert.True(originalOwner.ContainingNamespace.IsGlobalNamespace);
+        Assert.True(candidateOwner.ContainingNamespace.IsGlobalNamespace);
+        Assert.True(Assert.Single(originalOwner.GetMembers("Old").OfType<IMethodSymbol>()).IsStatic);
+        Assert.True(Assert.Single(candidateOwner.GetMembers("NewName").OfType<IMethodSymbol>()).IsStatic);
+        Assert.NotNull(baselineCompilation.GetTypeByMetadataName("Probe"));
+        Assert.NotNull(candidateCompilation.GetTypeByMetadataName("Probe"));
         Assert.NotEqual(
             baselineError.Location.GetLineSpan().StartLinePosition.Line,
             candidateError.Location.GetLineSpan().StartLinePosition.Line);
 
         var uri = DocumentUri.From("file:///rename-error-identity.calr");
         var workspace = new WorkspaceState();
-        workspace.GetOrCreate(uri, source);
+        var document = workspace.GetOrCreate(uri, source);
+        var supportUri = DocumentUri.From("file:///rename-error-support.calr");
+        var supportingDocument = workspace.GetOrCreate(supportUri, support);
+        var originalSnapshot = document.Snapshot;
+        var supportSnapshot = supportingDocument.Snapshot;
+        var target = workspace.ResolveOccurrence(uri, source.IndexOf("Old ()", StringComparison.Ordinal));
+        Assert.NotNull(target);
+        var occurrence = Assert.Single(workspace.FindSymbolOccurrences(
+            target.SymbolId, includeDeclaration: true));
+        Assert.Equal(SymbolOccurrenceKind.Definition, occurrence.Kind);
+        Assert.Equal(uri.ToString(), occurrence.Doc.Uri.AbsoluteUri);
+        Assert.Equal("Old", source[occurrence.Span.Start..occurrence.Span.End]);
+        Assert.Equal(candidate, source[..occurrence.Span.Start] + "NewName" + source[occurrence.Span.End..]);
 
         Assert.Null(await RenameAtAsync(
             workspace,
@@ -830,6 +900,11 @@ public class RenameHandlerTests
             source,
             "Old ()",
             "NewName"));
+        Assert.Equal(2, workspace.RenameValidationCompilationCount);
+        Assert.Equal(source, document.Source);
+        Assert.Equal(support, supportingDocument.Source);
+        Assert.Equal(originalSnapshot.Version, document.Version);
+        Assert.Equal(supportSnapshot.Version, supportingDocument.Version);
     }
 
     [Fact]
@@ -1884,24 +1959,61 @@ public class RenameHandlerTests
                 == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
     }
 
-    private static Microsoft.CodeAnalysis.Diagnostic[] GetRoslynErrors(string source)
-    {
-        var state = LspTestHarness.CreateDocument(source);
-        Assert.NotNull(state.Ast);
-        Assert.False(
-            state.Diagnostics.HasErrors,
-            string.Join(Environment.NewLine, state.Diagnostics.Select(diagnostic =>
-                $"{diagnostic.Code}: {diagnostic.Message}")));
-        var tree = CSharpSyntaxTree.ParseText(new CSharpEmitter().Emit(state.Ast!));
-        var compilation = CSharpCompilation.Create(
-            "RenameBaselineErrors",
-            [tree],
-            GetPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        return compilation.GetDiagnostics()
+    private static Microsoft.CodeAnalysis.Diagnostic[] GetRoslynErrors(params string[] sources)
+        => GetRoslynErrors(CreateRoslynCompilation(sources));
+
+    private static Microsoft.CodeAnalysis.Diagnostic[] GetRoslynErrors(CSharpCompilation compilation)
+        => compilation.GetDiagnostics()
             .Where(diagnostic => diagnostic.Severity
                 == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
             .ToArray();
+
+    private static CSharpCompilation CreateRoslynCompilation(params string[] sources)
+    {
+        var modules = sources.Select(source =>
+        {
+            var state = LspTestHarness.CreateDocument(source);
+            Assert.NotNull(state.Ast);
+            Assert.False(
+                state.Diagnostics.HasErrors,
+                string.Join(Environment.NewLine, state.Diagnostics.Select(diagnostic =>
+                    $"{diagnostic.Code}: {diagnostic.Message}")));
+            return state.Ast!;
+        }).ToArray();
+        var crossModuleMap = modules.Length > 1
+            ? Calor.Compiler.CompilationDriver.BuildCrossModuleFunctionMap(modules)
+            : null;
+        var trees = modules.Select(module => CSharpSyntaxTree.ParseText(
+            new CSharpEmitter { CrossModuleFunctionModules = crossModuleMap }.Emit(module)));
+        return CSharpCompilation.Create(
+            "RenameBaselineErrors",
+            trees,
+            GetPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    }
+
+    private static string ConvertInteropSupport(
+        string payload, string sourceFile, params SyntaxTree[] context)
+    {
+        var conversion = new Calor.Compiler.Migration.CSharpToCalorConverter(
+            new Calor.Compiler.Migration.ConversionOptions
+            {
+                AdditionalSemanticSyntaxTrees = context
+            }).Convert(payload, sourceFile);
+        Assert.True(conversion.Success, string.Join(Environment.NewLine, conversion.Issues));
+        // These are intentionally erroneous C# oracles, not native or verified conversion acceptance.
+        Assert.Equal(Calor.Compiler.Migration.ConversionRoundTrip.Failed, conversion.Context.RoundTrip);
+        Assert.NotNull(conversion.CalorSource);
+        var state = LspTestHarness.CreateDocument(conversion.CalorSource);
+        Assert.NotNull(state.Ast);
+        Assert.False(state.Diagnostics.HasErrors, string.Join(Environment.NewLine, state.Diagnostics));
+        var preserved = Assert.Single(state.Ast.InteropBlocks);
+        Assert.True(preserved.IsCompilationUnitPassthrough);
+        Assert.False(string.IsNullOrWhiteSpace(preserved.FeatureName));
+        Assert.False(string.IsNullOrWhiteSpace(preserved.Reason));
+        Assert.Equal(payload, preserved.CSharpCode);
+        Assert.Equal(payload, new CSharpEmitter().Emit(state.Ast));
+        return conversion.CalorSource;
     }
 
     internal static Dictionary<string, string> AssertWorkspaceRoslynCleanWithProductionMap(
