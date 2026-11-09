@@ -9,7 +9,9 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest.mock import patch
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
+from unittest.mock import Mock, patch
 
 HERE = Path(__file__).resolve().parent
 ROOT = Path(os.environ.get("CALOR_COMPILER_ROOT", str(HERE.parents[2]))).resolve()
@@ -23,6 +25,7 @@ TASKS = {
     "pm006": ("06_wildcard_default", "IsSingleDigit", "n", "bool"),
 }
 COUNT = 0
+COUNT_LOCK = Lock()
 
 # Keep the effects/async finite-admission boundary local to this test unit.
 INFRASTRUCTURE = re.compile(
@@ -97,7 +100,7 @@ def execute(profile, text, expected=True, root=ROOT, deadline=None, *, detail=No
             (workspace / "Calculator.calr").write_text(text, encoding="utf-8")
         environment = dict(os.environ, CALOR_COMPILER_ROOT=str(root))
         environment.pop("CALOR_LOGIC_TIMEOUT_SECONDS", None)
-        deadline = deadline if deadline is not None else time.monotonic() + 130
+        deadline = min(deadline, time.monotonic() + 120) if deadline is not None else time.monotonic() + 130
         environment["CALOR_LOGIC_TIMEOUT_SECONDS"] = str(min(120, deadline - time.monotonic()))
         command = ["bash", str(HERE / "tasks/pattern-matching" / TASKS[profile][0] / "verify.sh"), str(workspace)]
         try:
@@ -108,14 +111,16 @@ def execute(profile, text, expected=True, root=ROOT, deadline=None, *, detail=No
                 raise AssertionError(f"{profile}: {error}") from error
             if detail is not None and detail not in output:
                 raise AssertionError(f"{profile}: missing behavioral diagnostic {detail!r}:\n{output}")
-            COUNT += 1
+            with COUNT_LOCK:
+                COUNT += 1
             return output
         assert_positive_output(output, environment)
         if not expected:
             raise AssertionError(f"{profile}: unexpected acceptance:\n{output}")
         if "actual native arms and successful input/output coupling." not in output:
             raise AssertionError(f"{profile}: missing native behavioral evidence:\n{output}")
-        COUNT += 1
+        with COUNT_LOCK:
+            COUNT += 1
         return output
 
 
@@ -178,11 +183,21 @@ def run_compatibility(old, current, deadline):
     }
     by_profile = {profile: [control for control in controls() if control[0] == profile] for profile in TASKS}
     for label, root in (("v0.29", old), ("current", current)):
-        for profile, indices in selected.items():
-            for index in indices:
-                _, text, expected = by_profile[profile][index]
-                execute(profile, historical(text) if label == "v0.29" and text is not None else text,
-                        expected, root, deadline)
+        batch = [by_profile[profile][index] for profile, indices in selected.items() for index in indices]
+        if len(batch) != 48:
+            raise AssertionError("Expected exactly 48 independent scalar controls per genuine arm.")
+
+        def run_entry(control):
+            profile, text, expected = control
+            if time.monotonic() >= deadline:
+                raise RuntimeError("Scalar compatibility exceeded its 600-second deadline.")
+            execute(profile, historical(text) if label == "v0.29" and text is not None else text,
+                    expected, root, deadline)
+
+        # Each entry owns its temporary input and fresh helper; arms remain sequential.
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            for _ in workers.map(run_entry, batch):
+                pass
         print(f"{label}: real scalar pattern controls passed.")
     execute("pm001", historical(source("pm001")), False, current, deadline)
     if COUNT - before != 2 * sum(len(indices) for indices in selected.values()) + 1:
@@ -198,6 +213,40 @@ class ScalarPatternVerifierTests(unittest.TestCase):
 
 
 class ScalarAdmissionTests(unittest.TestCase):
+    def test_compatibility_workers_preserve_counts_and_propagate_failures(self):
+        global COUNT
+        before = COUNT
+        old, current = ROOT / "synthetic-old", ROOT / "synthetic-current"
+        calls = []
+
+        def admitted(profile, text, expected=True, root=ROOT, deadline=None):
+            global COUNT
+            self.assertIsNotNone(deadline)
+            self.assertGreater(deadline, time.monotonic())
+            with COUNT_LOCK:
+                calls.append(root)
+                COUNT += 1
+
+        try:
+            COUNT = 0
+            workers = Mock(wraps=ThreadPoolExecutor)
+            with patch.dict(globals(), {"execute": admitted, "ThreadPoolExecutor": workers}), \
+                    patch("builtins.print"):
+                run_compatibility(old, current, time.monotonic() + 600)
+            self.assertEqual([call.kwargs for call in workers.call_args_list], [{"max_workers": 2}] * 2)
+            self.assertEqual(calls, [old] * 48 + [current] * 49)
+            self.assertEqual(COUNT, 97)
+            for failure in (RuntimeError("Verifier command exited 139:\n"), RuntimeError("UNKNOWN"),
+                            OSError("launch failed"), EOFError("inherited pipe"), TimeoutError("deadline")):
+                COUNT = 0
+                with self.subTest(failure=failure), patch.dict(globals(), {"execute": Mock(side_effect=failure)}):
+                    with self.assertRaises(type(failure)) as refused:
+                        run_compatibility(old, current, time.monotonic() + 600)
+                    self.assertIs(refused.exception, failure)
+                    self.assertEqual(COUNT, 0)
+        finally:
+            COUNT = before
+
     def test_actual_execute_finite_failure_and_identity_guards(self):
         global COUNT
         before = COUNT

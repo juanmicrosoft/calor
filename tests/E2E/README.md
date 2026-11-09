@@ -1000,6 +1000,16 @@ compiler identity for the requested resolved root, configuration and
 `ScalarAdmissionTests` mocks the actual `execute()` path; its synthetic calls
 do not contribute to the 79/97 real controls.
 
+The 97-entry strict replay uses two isolated workers per arm, with locked
+accounting and a fresh disposable helper for each actual entry. Both arms remain
+sequential; all 48 representatives per arm and the final old-syntax rejection
+are retained. The shared 600-second deadline is unchanged, and each outer entry
+is additionally capped at 120 seconds. Worker exceptions propagate. Synthetic
+worker tests contribute no real controls. Before this scheduling change, the
+parent current 79-entry suite passed on `8e970b45f` in 476.297 seconds, but the
+sequential strict replay exhausted its total deadline after the archived arm.
+That failed replay is not acceptance evidence.
+
 Exact public native and reflected CLR scalar signatures are required. DayName
 and IsSingleDigit require their literal cases and wildcard default in a native
 switch expression. ScoreCategory requires supplying relational cases; reversed
