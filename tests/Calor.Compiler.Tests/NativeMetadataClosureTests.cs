@@ -15,27 +15,111 @@ namespace Calor.Compiler.Tests;
 public sealed class NativeMetadataClosureTests
 {
     [Theory]
-    [InlineData("(Func<int>)(() => 9)")]
-    [InlineData("(f)(1)")]
-    [InlineData("(T)-n")]
-    [InlineData("(T)!flag")]
-    [InlineData("(T)~n")]
-    [InlineData("(T)+n")]
-    [InlineData("(Func<int>)-n")]
-    [InlineData("(N.T)(value)")]
-    [InlineData("(N.T)!flag")]
-    [InlineData("(N.F<int>)(() => 9)")]
-    [InlineData("(f)(1, 2)")]
-    public void NativeCastDisambiguation_MatchesCSharpSyntax(string expression)
+    [InlineData("(Func<int>)(() => 9)", true)]
+    [InlineData("(f)(1)", false)]
+    [InlineData("(T)-n", false)]
+    [InlineData("(T)!flag", false)]
+    [InlineData("(T)~n", false)]
+    [InlineData("(T)+n", false)]
+    [InlineData("(Func<int>)-n", false)]
+    [InlineData("(N.T)(value)", false)]
+    [InlineData("(N.T)!flag", false)]
+    [InlineData("(N.F<int>)(() => 9)", true)]
+    [InlineData("(f)(1, 2)", false)]
+    public void NativeCastDisambiguation_RetainsStagedGroupedCallBoundaries(string expression, bool isCast)
     {
         var expected = SyntaxFactory.ParseExpression(expression);
         Assert.False(expected.ContainsDiagnostics, expected.ToFullString());
+        if (expression.Contains('!') || expression.Contains('~'))
+        {
+            var diagnostics = new DiagnosticBag();
+            var source = $"module CastSyntax\n  func Probe () → object\n    return {expression}";
+            new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+            Assert.True(diagnostics.HasErrors);
+            return;
+        }
         var module = Parse($"module CastSyntax\n  func Probe () → object\n    return {expression}");
         var actual = Assert.IsType<ReturnStatementNode>(
             Assert.Single(Assert.Single(module.Functions).Body)).Expression;
-        Assert.True((expected is Microsoft.CodeAnalysis.CSharp.Syntax.CastExpressionSyntax)
-            == (actual is TypeOperationNode { Operation: TypeOp.Cast }),
+        Assert.True(isCast == (actual is TypeOperationNode { Operation: TypeOp.Cast }),
             $"{expression}: C# {expected.Kind()}, native {actual!.GetType().Name}");
+    }
+
+    [Theory]
+    [InlineData("(f) (x)", false)]
+    [InlineData("(obj.Child.Pick)(value)", true)]
+    [InlineData("(f)((x) => x)", false)]
+    public void NativeGroupedCallees_RetainTheirOriginalCallNodesAndSpans(string expression, bool computed)
+    {
+        var source = $"module GroupedCalls\n  func Probe () → object\n    return {expression}";
+        var value = Assert.IsType<ReturnStatementNode>(Assert.Single(Parse(source).Functions).Body[0]).Expression;
+        if (computed)
+        {
+            var call = Assert.IsType<ExpressionCallNode>(value);
+            var member = Assert.IsType<FieldAccessNode>(call.TargetExpression);
+            Assert.Equal("Pick", member.FieldName);
+            Assert.Equal("Pick", source.Substring(member.FieldNameSpan.Start, member.FieldNameSpan.Length));
+        }
+        else
+            Assert.IsType<CallExpressionNode>(value);
+    }
+
+    [Fact]
+    public void NativeGroupedNamedCall_RetainsItsRuntimeAndConsoleEffect()
+    {
+        const string authored = """
+            module GroupedRuntime
+              func Echo (int:value) → int
+                ! cw
+                System.Console.WriteLine(value)
+                return value
+              func Probe () → int
+                ! cw
+                return (Echo)(3)
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var result = Compile(source);
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+            Assert.Equal(3, CompileAssembly(result.GeneratedCode).GetTypes()
+                .SelectMany(type => type.GetMethods()).Single(method => method.Name == "Probe").Invoke(null, null));
+            var forbidden = Compile(source.Replace("func Probe () → int\n    ! cw", "func Probe () → int\n    !",
+                StringComparison.Ordinal));
+            Assert.Contains(forbidden.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'cw'"));
+        }
+    }
+
+    [Fact]
+    public void NativeGroupedDelegateCall_RetainsItsRuntimeAndUnknownEffect()
+    {
+        const string source = """
+            module GroupedDelegate
+              func Probe (Func<int,int>:f) → int
+                return (f)(3)
+            """;
+        Assert.IsType<CallExpressionNode>(Assert.IsType<ReturnStatementNode>(
+            Assert.Single(Parse(source).Functions).Body[0]).Expression);
+        Assert.Contains(Compile(source).Diagnostics, diagnostic => diagnostic.Code == "Calor0425");
+        var method = CompileAssembly(new CSharpEmitter().Emit(Parse(source))).GetTypes()
+            .SelectMany(type => type.GetMethods()).Single(method => method.Name == "Probe");
+        Assert.Equal(4, method.Invoke(null, [new Func<int, int>(value => value + 1)]));
+    }
+
+    [Fact]
+    public void NativeCastLambda_SourceFuncShadowDoesNotAcquireABclDelegateSignature()
+    {
+        const string source = """
+            module ShadowedDelegate
+              class Func<T>
+              func Probe () → object
+                return ((Func<int>)(() => 9))()
+            """;
+        var bound = new Binder(new DiagnosticBag()).Bind(Parse(source));
+        var call = Assert.IsType<BoundExpressionCall>(
+            Assert.IsType<BoundReturnStatement>(Assert.Single(bound.Functions).Body[0]).Expression);
+        Assert.IsNotType<Calor.Compiler.Binding.BoundTypes.FunctionBoundType>(call.Target.Type);
+        Assert.True(Compile(source).HasErrors);
     }
 
     [Theory]

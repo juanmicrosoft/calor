@@ -3716,29 +3716,7 @@ public sealed class Parser
     private bool TryParseNativeLambda(out ExpressionNode expression)
     {
         expression = null!;
-        var depth = 0;
-        var close = _position;
-        for (; close < _tokens.Count; close++)
-        {
-            if (_tokens[close].Kind == TokenKind.OpenParen)
-                depth++;
-            else if (_tokens[close].Kind == TokenKind.CloseParen && --depth == 0)
-                break;
-        }
-        if (close + 1 >= _tokens.Count)
-            return false;
-        var arrow = close + 1;
-        if (_tokens[arrow].Kind == TokenKind.Exclamation)
-        {
-            while (arrow < _tokens.Count
-                   && _tokens[arrow].Span.Line == TokenEndLine(_tokens[close])
-                   && (_tokens[arrow].Kind is TokenKind.Exclamation or TokenKind.Identifier
-                       or TokenKind.Star or TokenKind.Colon or TokenKind.Comma
-                       || _tokens[arrow].IsKeyword))
-                arrow++;
-        }
-        if (arrow >= _tokens.Count || _tokens[arrow].Kind != TokenKind.FatArrow
-            || _tokens[arrow].Span.Line != TokenEndLine(_tokens[close]))
+        if (!IsNativeLambdaAt(_position))
             return false;
         var open = Advance();
         var parameters = new List<LambdaParameterNode>();
@@ -3777,6 +3755,35 @@ public sealed class Parser
         return true;
     }
 
+    private bool IsNativeLambdaAt(int position)
+    {
+        if (position >= _tokens.Count || _tokens[position].Kind != TokenKind.OpenParen)
+            return false;
+        var depth = 0;
+        var close = position;
+        for (; close < _tokens.Count; close++)
+        {
+            if (_tokens[close].Kind == TokenKind.OpenParen)
+                depth++;
+            else if (_tokens[close].Kind == TokenKind.CloseParen && --depth == 0)
+                break;
+        }
+        if (close + 1 >= _tokens.Count)
+            return false;
+        var arrow = close + 1;
+        if (_tokens[arrow].Kind == TokenKind.Exclamation)
+        {
+            while (arrow < _tokens.Count
+                   && _tokens[arrow].Span.Line == TokenEndLine(_tokens[close])
+                   && (_tokens[arrow].Kind is TokenKind.Exclamation or TokenKind.Identifier
+                       or TokenKind.Star or TokenKind.Colon or TokenKind.Comma
+                       || _tokens[arrow].IsKeyword))
+                arrow++;
+        }
+        return arrow < _tokens.Count && _tokens[arrow].Kind == TokenKind.FatArrow
+            && _tokens[arrow].Span.Line == TokenEndLine(_tokens[close]);
+    }
+
     private bool TryParseNativeCast(out ExpressionNode expression)
     {
         expression = null!;
@@ -3804,10 +3811,12 @@ public sealed class Parser
             return false;
         var unambiguousType = type is PredefinedTypeSyntax or NullableTypeSyntax or ArrayTypeSyntax
             or PointerTypeSyntax or TupleTypeSyntax;
-        if (!unambiguousType && following.Kind is TokenKind.Minus or TokenKind.Plus)
-            return false;
-        if (following.Kind == TokenKind.OpenParen && close + 2 < _tokens.Count
-            && _tokens[close + 2].Kind == TokenKind.CloseParen)
+        var typedLambdaCast = (type is GenericNameSyntax
+                or QualifiedNameSyntax { Right: GenericNameSyntax })
+            && following.Kind == TokenKind.OpenParen && IsNativeLambdaAt(close + 2);
+        if (!unambiguousType
+            && (following.Kind is TokenKind.Minus or TokenKind.Plus or TokenKind.Exclamation or TokenKind.Tilde
+                || following.Kind == TokenKind.OpenParen && !typedLambdaCast))
             return false;
         var saved = _position;
         _position = close + 1;
