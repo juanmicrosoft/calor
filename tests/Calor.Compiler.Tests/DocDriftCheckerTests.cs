@@ -125,6 +125,10 @@ public class DocDriftCheckerTests
         new[] { "Counter", "Probe", "Countdown", "Grids" }, new[] { "1", "3", "3,2,1", "13" },
         new[] { "new Counter().Next()", "Probe.UseShadow()", "System.String.Join(\",\", new Countdown().Steps)",
             "Grid.Total(3)" })]
+    [InlineData("getting-started/claude-integration.mdx", 5, 1,
+        new[] { "ContractReview", "LoopReview", "BoundedFactorial", "ExtractedCalculation" },
+        new[] { "42", "15", "120", "25" },
+        new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()" })]
     [InlineData("structure-tags.mdx", 20, 2,
         new[] { "StructureModules", "BlockNamespace", "FunctionHeaders", "AsyncFunctions", "AsyncMethods",
             "AwaitExpressions", "LambdaExamples", "AsyncLambdas", "LocalCallables", "DelegateDefinitions",
@@ -393,6 +397,29 @@ public class DocDriftCheckerTests
                 """);
             Assert.Equal(expected, observed);
         }
+    }
+
+    [Theory]
+    [InlineData(-1, "!ContractViolationException")]
+    [InlineData(0, "1")]
+    [InlineData(12, "479001600")]
+    [InlineData(13, "!ContractViolationException")]
+    public void PublicClaudeGuide_FactorialUsesActualCheckedIntegerBounds(int value, string expected)
+    {
+        var path = "website/content/getting-started/claude-integration.mdx";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith("module BoundedFactorial\n", StringComparison.Ordinal)).Source;
+        var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = ContractMode.Debug });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+            public static class Probe
+            {
+                public static object? Run() => GlobalModule.Factorial({{value}});
+            }
+            """);
+        Assert.Equal(expected, observed);
     }
 
     [Fact]

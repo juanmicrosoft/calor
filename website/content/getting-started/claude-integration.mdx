@@ -4,403 +4,235 @@ section: "getting-started"
 order: 4
 ---
 
+Calor supplies project instructions, compiler tools and file-writing hooks for
+Claude Code. They help an agent use the current language; they do not guarantee
+that every generated program is correct.
 
-Calor is designed specifically for AI coding agents. This guide explains how to use Calor with Claude and other AI assistants.
-
----
-
-## Quick Setup
-
-Initialize your project for Claude Code with a single command:
+## Quick setup
 
 ```bash
 calor init --ai claude
 ```
 
-This creates:
+Initialization configures the repository root when it can identify one.
 
 | File | Purpose |
 |:-----|:--------|
-| `.claude/skills/calor/SKILL.md` | Teaches Claude Calor syntax for writing new code |
-| `.claude/skills/calor-convert/SKILL.md` | Teaches Claude how to convert C# to Calor |
-| `.claude/settings.json` | **Enforces Calor-first** - blocks `.cs` file creation |
-| `CLAUDE.md` | Project documentation with Calor reference and conventions |
-| `~/.claude.json` | **MCP server configuration** for compiler integration |
+| `CLAUDE.md` | Project instructions and the generated native language reference |
+| `.claude/settings.json` | Calor write/edit checks and post-write lint hooks |
+| `~/.claude.json` | The project's `calor` MCP server configuration |
 
-You can run this command again anytime to update the Calor documentation section in CLAUDE.md without losing your custom content.
+Review the command's actual created/updated-file report. Re-running it updates
+the managed Calor instructions; it is not permission to discard custom project
+configuration. Review changes before using `--force`.
 
----
+The command does **not** install `.claude/skills/calor/SKILL.md` or
+`.claude/skills/calor-convert/SKILL.md`.
 
-## MCP Server Integration
+## MCP server integration
 
-The init command also configures an **MCP (Model Context Protocol) server** that gives Claude direct access to the Calor compiler. This enables Claude to:
-
-- **Type check** code and get semantic errors
-- **Verify contracts** using the Z3 SMT solver
-- **Navigate code** with goto-definition and find-references
-- **Analyze** code for bugs and migration potential
-
-### How It Works
-
-When you open the project in Claude Code, the MCP server starts automatically. Claude can then use tools like:
-
-```
-calor_check         - Diagnose, lint, type check, or validate
-calor_verify        - Verify function contracts
-calor_navigate      - Definitions, references, symbols, and scope
-calor_structure     - Outlines, call graphs, and impact
-calor_query         - Project index: callers, callees, impact, effect rows
-```
-
-### Example: Contract Verification
-
-Claude can verify your contracts are correct:
-
-```
-You: Does this function have any contract violations?
-
-§F{Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §E{}
-  §Q (!= b 0)
-  §R (/ a b)
-
-Claude: [Uses calor_verify]
-The precondition is satisfiable and excludes b = 0 for valid callers.
-It is assumed while verifying the body; the runtime precondition check remains.
-```
-
-### Available Tools
+MCP, the Model Context Protocol, exposes compiler operations to a compatible
+client. The initializer records the server configuration; starting and approving
+it remains the client's responsibility.
 
 | Tool | Purpose |
 |:-----|:--------|
-| `calor_check` | Diagnose, lint, type check, or validate a snippet via `action` |
-| `calor_verify` | Seven-status Z3 contract verification |
-| `calor_navigate` | Definition, reference, symbol, type, and scope actions |
-| `calor_structure` | Outline, call graph, and impact actions |
-| `calor_query` | Project index: who calls a declaration, what it calls, what a change could break, its effect row |
-| `calor_analyze` | Advanced bug detection |
+| `calor_check` | Diagnostics, lint, type checking and validation actions |
+| `calor_verify` | Contract verification with explicit result statuses |
+| `calor_navigate` | Definitions, references, symbols, types and scope |
+| `calor_structure` | Outlines, call graphs and impact |
+| `calor_query` | Project-index callers, callees, impact and effect rows |
+| `calor_analyze` | Additional analysis |
 
-See [calor mcp](/docs/cli/mcp/) for the complete 19-tool surface.
+Consult [MCP tools](/docs/cli/mcp/) for the actual tool arguments and available
+actions. A configured server is not evidence that a call succeeded.
 
----
+### Example: contract verification
 
-## Calor-First Enforcement
+```calor
+module ContractReview
+  func Next (int:value) → int
+    !
+    requires value < 2147483647
+    => result == value + 1
+    return value + 1
 
-When you initialize with `--ai claude`, hooks are configured that **automatically block Claude from creating `.cs` files**. This ensures all new code is written in Calor.
+  func Main () → int
+    !
+    return Next(41)
+```
 
-### What Happens
-
-When Claude tries to create a C# file:
+`Main()` returns `42`. The precondition excludes checked overflow at
+`int.MaxValue`. Ask the agent to invoke verification and report its actual
+status and assumptions. Do not turn a successful execution into a proof that
+every caller satisfies the precondition.
 
 ```text illustrative
-BLOCKED: Cannot create C# file 'UserService.cs'
-
-This is an Calor-first project. Create an .calr file instead:
-  UserService.calr
-
-Use /calor skill for Calor syntax help.
+Verify Next in this file. Report the returned status, assumptions and any
+unsupported expressions. Keep runtime precondition checks unless an eligible
+proof from the relevant compilation authorizes their removal.
 ```
 
-Claude will automatically retry with an `.calr` file - no user intervention required.
+## Calor-first enforcement
 
-### Allowed Files
+The configured hooks check Claude Code's supported write/edit operations.
+They direct new product code toward `.calr` files and run content/identity
+checks; post-write lint provides additional feedback.
 
-The hook allows:
-- **`.calr` files** - All Calor source files
-- **`.g.cs` files** - Generated C# output from Calor compilation
-- **`obj/` directory** - Build artifacts
+Generated C# and build artifacts have specific allowances. A hook is not an
+operating-system sandbox and does not prove that every possible file-writing
+mechanism is covered. Read any refusal and correct its cause instead of
+changing the extension to evade it.
 
-### Disabling Enforcement
+If you deliberately change this policy, review only the relevant Calor hook
+entries. Do not delete the whole settings file: it can contain unrelated
+project configuration. Reinitialization is a configuration change to review,
+not a blanket repair for every client problem.
 
-If you need to temporarily allow `.cs` file creation, remove or rename `.claude/settings.json`. Re-run `calor init --ai claude` to restore enforcement.
+## Available skills
 
----
+Slash skills such as `/calor` or `/calor-convert` are usable only if separately
+installed and discovered by the client. `calor init --ai claude` does not install
+them. The generated `CLAUDE.md` and the compiler's
+[current-language catalog](/docs/syntax-reference/current-language/) supply the
+native syntax reference without depending on those slash commands.
 
-## Available Skills
+## How Claude learns Calor
 
-Claude automatically consults the installed skills when needed. You can also invoke them explicitly for specific tasks:
+The project instructions describe lowercase declaration headers, C# type names,
+type-first parameters, infix expressions and two-space indentation. MCP
+operations provide real compiler feedback. Hooks can reject specific writes
+and report lint findings.
 
-### The `/calor` Skill
+These are distinct mechanisms. Instructions are guidance; a hook checks an
+operation; compilation checks a program. None makes an agent's prose a compiler
+or verifier result.
 
-Invoke `/calor` when you want Claude to focus specifically on Calor syntax or see detailed templates:
+## Why Calor works well with agents
 
-```
-/calor
-
-What's the syntax for a while loop with a condition?
-```
-
-### The `/calor-convert` Skill
-
-Invoke `/calor-convert` when converting C# files to Calor:
-
-```
-/calor-convert
-
-Convert src/Services/UserService.cs to Calor
-```
-
-**Note:** For most tasks, you don't need to invoke skills explicitly. Just describe what you want and Claude will write Calor automatically.
-
----
-
-## How Claude Learns Calor
-
-When you run `calor init --ai claude`, three components work together to enable Claude to write Calor code automatically:
-
-### 1. CLAUDE.md - Project Instructions
-
-The `CLAUDE.md` file is read by Claude Code at the start of every conversation. It contains:
-
-- **Mandatory rules** - "All new code MUST be written in Calor"
-- **Workflow guidance** - When to create `.calr` files vs. convert existing `.cs` files
-- **Syntax highlights** - Quick reference for Calor syntax
-- **Type mappings** - How C# types map to Calor types (`int` → `i32`, `string` → `str`)
-
-Claude reads this file automatically - you don't need to reference it in your prompts.
-
-### 2. Skills - Syntax Reference
-
-Two skills are installed in `.claude/skills/`:
-
-| Skill | Purpose |
-|:------|:--------|
-| `calor` | Complete Calor syntax reference with templates |
-| `calor-convert` | Guidelines for converting C# to Calor |
-
-Claude consults these skills when it needs detailed syntax information. You can also invoke them explicitly with `/calor` or `/calor-convert` if you want Claude to focus on a specific task.
-
-### 3. Hooks - Enforcement
-
-The `.claude/settings.json` file configures a `PreToolUse` hook that runs before Claude creates any file. If Claude tries to create a `.cs` file, the hook:
-
-1. **Blocks the operation** - The file is not created
-2. **Returns guidance** - Tells Claude to create a `.calr` file instead
-3. **Claude retries** - Automatically creates the correct file type
-
-This means even if Claude "forgets" the CLAUDE.md instructions, the hook ensures Calor-first compliance.
-
-### The Result
-
-You simply ask Claude to write code:
-
-```
-Write a function that validates email addresses
-```
-
-Claude automatically:
-1. Reads CLAUDE.md and knows to use Calor
-2. Consults the calor skill for syntax details
-3. Creates a `.calr` file (hook prevents `.cs`)
-
-No special prompts or syntax teaching required.
-
----
-
-## Why Calor Works Well with Agents
-
-### 1. Unambiguous Structure
-
-Traditional code:
-```
-// Which brace closes what?
-if (x > 0) {
-    for (int i = 0; i < n; i++) {
-        if (y > 0) {
-            // ...
-        }
-    }
-}
-```
-
-Calor code:
-```calor
-§IF (> x 0)
-  §L{i:0:n:1}
-    §IF (> y 0)
-      // ...
-```
-
-Every scope begins with an explicit, stable ID and ends when indentation returns to the parent level. Structural closer tags are intentionally rejected.
-
-### 2. Precise Edit Targeting
-
-Tell Claude: "Change the loop `for1` to start at 1 instead of 0"
+### Visible structure
 
 ```calor
-// Before
-§L{i:0:n:1}
+module LoopReview
+  func Sum (int:count) → int
+    !
+    requires count >= 0 && count <= 100
+    var int:total = 0
+    for i from 1 to count step 1
+      set total total + i
+    return total
 
-// After
-§L{i:1:n:1}
+  func Main () → int
+    !
+    return Sum(5)
 ```
 
-The ID `for1` uniquely identifies the target. No confusion with other loops.
+`Main()` returns `15`. The range includes its endpoint and snapshots its
+bounds. The final `return` is outside the loop because it is dedented.
+Do not silently replace this with a different loop's evaluation rules.
 
-### 3. Explicit Contracts for Verification
+### Precise edit targeting
+
+Identify a declaration by name and file, or obtain its persistent identity from
+tooling. Declaration IDs belong in `.calor/ids.json`, not source headers.
+Use identity-aware refactoring tools and inspect their actual edit result.
+
+```text illustrative
+In LoopReview.calr, change the loop inside Sum to start at 2.
+Keep the inclusive endpoint and snapshot-bound semantics.
+```
+
+### Explicit effects
+
+`!` declares a pure row; `! cw` admits console output. A pure function cannot
+silently acquire that effect:
+
+```calor expect=Calor0410
+module UndeclaredConsoleEffect
+  func Report (string:message) → void
+    !
+    Console.WriteLine(message)
+```
+
+The compiler rejects this program with `Calor0410`, an effect used but not
+declared. Declare the real effect when the operation is intended; do not disable
+enforcement to call the program native acceptance.
+
+## Example prompts
+
+### Generate a bounded function
+
+```text illustrative
+Write checked integer factorial for inputs 0 through 12, with explicit input
+bounds and a positive-result postcondition. Compile it and report actual
+verification results separately from execution results.
+```
+
+One native implementation is:
 
 ```calor
-§F{CalculateInterest:pub}
-  §I{f64:principal}
-  §I{f64:rate}
-  §I{i32:years}
-  §O{f64}
-  §Q (> principal 0)
-  §Q (>= rate 0)
-  §Q (> years 0)
-  §S (>= result principal)
-  §R (* principal (** (+ 1 rate) years))
+module BoundedFactorial
+  func Factorial (int:n) → int
+    !
+    requires n >= 0 && n <= 12
+    => result >= 1
+    if n <= 1
+      return 1
+    return n * Factorial(n - 1)
+
+  func Main () → int
+    !
+    return Factorial(5)
 ```
 
-Claude can verify:
-- All preconditions are satisfied at call sites
-- The postcondition is mathematically correct
-- No undeclared side effects
+`Main()` returns `120`. The upper bound matters: `13!` does not fit in `int`.
+The postcondition describes normal returns, not permission to ignore overflow.
 
-### 4. Effects for Side Effect Analysis
+### Refactor without changing behavior
+
+```text illustrative
+Extract the square calculation into a private function. Preserve checked
+arithmetic, declaration identities and the public result.
+```
 
 ```calor
-§F{ProcessOrder:pub}
-  §I{Order:order}
-  §O{bool}
-  §E{db,net,cw}
-  // ...
+module ExtractedCalculation
+  func Square private (int:value) → int
+    !
+    return value * value
+
+  func Main () → int
+    !
+    return Square(5)
 ```
 
-Claude knows immediately that this function:
-- Writes to database (`db`)
-- Makes network calls (`net`)
-- Writes to console (`cw`)
+`Main()` returns `25`. This is an executable example, not a transcript claiming
+an agent already performed the refactoring.
 
-No need to analyze the implementation.
+## Best practices
 
----
+Use the [current syntax reference](/docs/syntax-reference/), declare actual
+effects and keep contracts before body statements. Use ordinary .NET nullable
+types and exceptions for absence and failure. Let tooling maintain identities.
 
-## Example Prompts
+Read native diagnostics and generated C# failures separately. A preserved C#
+frame can retain behavior without being native language coverage. Unknown
+effects, unsupported verifier expressions and missing project references need
+explicit handling, not success-shaped summaries.
 
-### Generate a Function
+## Workflow tips
 
-**Prompt:**
-```
-Write a factorial function with a precondition that n >= 0
-and postcondition that result >= 1
-```
+Start with a bounded change and an observable result. Compile the exact source
+you intend to keep, run relevant tests, and inspect verification statuses.
+Do not infer a benchmark improvement from the syntax alone.
 
-**Claude generates:**
-```calor
-§M{Math}
-  §F{Factorial:pub}
-    §I{i32:n}
-    §O{i32}
-    §Q (>= n 0)
-    §S (>= result 1)
-    §IF (<= n 1)
-      §R 1
-    §EL
-      §R (* n §C{Factorial} §A (- n 1) §/C)
-```
+For existing C#, use the converter with the original project context when
+needed. Keep generation receipts and check the reported losses and disposition;
+writing output is not proof of successful compilation or tests.
 
-### Find Bugs
+## Next steps
 
-**Prompt:**
-```
-Is there a bug in this code?
-
-§F{Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (/ a b)
-```
-
-**Claude responds:**
-```
-Yes - missing precondition. Add:
-
-§Q (!= b 0)
-
-Otherwise division by zero is possible.
-```
-
-### Refactor Code
-
-**Prompt:**
-```
-Refactor this to extract the calculation into a separate function:
-
-§F{Main:pub}
-  §O{void}
-  §E{cw}
-  §B{x} (* 5 5)
-  §P x
-```
-
-**Claude generates:**
-```calor
-§F{Square:priv}
-  §I{i32:n}
-  §O{i32}
-  §R (* n n)
-
-§F{Main:pub}
-  §O{void}
-  §E{cw}
-  §B{x} §C{Square} §A 5 §/C
-  §P x
-```
-
----
-
-## Best Practices
-
-1. **Always include IDs** - They enable precise references
-2. **Declare effects** - Even if empty (`§E{}`)
-3. **Write contracts** - They serve as executable documentation
-4. **Indent consistently** - Block boundaries are inferred from indentation; mixing tabs and spaces is rejected
-5. **Use standard syntax** - `(+ a b)` for expressions
-
----
-
-## Workflow Tips
-
-### Starting a New Feature
-
-Just describe what you need - Claude writes Calor automatically:
-
-```
-I need a payment processing service that:
-- Validates the payment amount is positive
-- Connects to the payment gateway
-- Returns success or failure
-```
-
-### Converting Existing Code
-
-Ask Claude to convert specific files:
-
-```
-Convert src/Services/PaymentService.cs to Calor
-```
-
-### Refactoring Calor
-
-Use declaration names for an unambiguous request, or obtain persistent IDs from
-`calor ids index`. Identity-aware tools update source and `.calor/ids.json` together:
-
-```
-In PaymentService.calr:
-- Extract the validation logic from ValidatePayment into a new private function
-- Add a postcondition to CalculateTotal ensuring the result is positive
-```
-
----
-
-## Next Steps
-
-- [Syntax Reference](/docs/syntax-reference/) - Complete language reference
-- [Adding Calor to Existing Projects](/docs/guides/adding-calor-to-existing-projects/) - Migration guide
-- [calor init](/docs/cli/init/) - Full init command documentation
-- [Benchmarking](/docs/benchmarking/) - See how Calor compares to C#
+- [Syntax reference](/docs/syntax-reference/) — current language and executable examples
+- [Convert](/docs/cli/convert/) — preservation, generation receipts and refresh limits
+- [Adding Calor to existing projects](/docs/guides/adding-calor-to-existing-projects/) — migration guide
+- [calor init](/docs/cli/init/) — initialization options

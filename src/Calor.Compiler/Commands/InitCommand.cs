@@ -335,7 +335,7 @@ public static class InitCommand
         if (agentNames.Count == 0)
         {
             Console.WriteLine();
-            Console.WriteLine("Optional: Run 'calor init --ai claude' to add Claude Code skills");
+            Console.WriteLine("Optional: Run 'calor init --ai claude' to add Claude Code instructions, hooks and MCP configuration");
         }
         else
         {
@@ -535,7 +535,7 @@ public static class InitCommand
         if (agentNames.Count == 0)
         {
             Console.WriteLine();
-            Console.WriteLine("Optional: Run 'calor init --ai claude' to add Claude Code skills");
+            Console.WriteLine("Optional: Run 'calor init --ai claude' to add Claude Code instructions, hooks and MCP configuration");
         }
         else
         {
