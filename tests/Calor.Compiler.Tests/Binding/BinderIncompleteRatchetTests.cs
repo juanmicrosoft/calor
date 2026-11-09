@@ -449,6 +449,8 @@ public class BinderIncompleteRatchetTests
             LegacySourceOrderAttempted,
             measuredNative.LegacySourceOrderAttempted);
         var current = ReadCurrentConversionExpectations();
+        // Preserved async-void methods replace former lambda-only boundaries;
+        // native records remove opaque boundaries without proving expression source coverage.
         AssertCurrentConversionTotals(current, measuredNative, measuredPreserve);
         var recordedSources = JsonSerializer.Deserialize<
             SortedDictionary<string, SourceCoverageRecord>>(
