@@ -57,6 +57,14 @@ public class DocDriftCheckerTests
             "GlobalModule.Main()",
             "GlobalModule.Classify(15) + \":\" + GlobalModule.Classify(3) + \":\" + GlobalModule.Classify(5) + \":\" + GlobalModule.Classify(7)",
             "GlobalModule.CountEvens(6)", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Word(2)" })]
+    [InlineData("inheritance.mdx", 8, 2,
+        new[] { "ClassModifiers", "VirtualDispatch", "InterfaceInheritance", "SealedOverride", "BaseMethods",
+            "BaseConstructors" },
+        new[] { "59", "Woof!", "...:Rex:7", "42", "15", "Rex:Collie" },
+        new[] { "GlobalModule.Main()", "GlobalModule.Main()",
+            "((IPet)new Dog()).Name() == \"Rex\" && ((ITrainable)new Dog()).Train() == 7 ? GlobalModule.Main() : \"incorrect interface dispatch\"",
+            "GlobalModule.Main()",
+            "GlobalModule.Main()", "GlobalModule.Main()" })]
     public void PublicNativeReference_CompilesPositiveAndExactNegativeExamples(
         string page, int completeCount, int negativeCount, string[] moduleNames, string[] expectedResults,
         string[] expressions)
@@ -66,7 +74,6 @@ public class DocDriftCheckerTests
         Assert.DoesNotContain("§", content);
         var coverage = new WebsiteExampleChecker.Coverage();
         var diagnostics = WebsiteExampleChecker.Check([new DocFile(relativePath, content)], coverage);
-        Assert.Empty(diagnostics);
         Assert.Equal(completeCount, coverage.CompletePrograms);
         Assert.Equal(negativeCount, coverage.NegativePrograms);
         var programs = ExemplarCompileChecker.ExtractCompletePrograms(content);
@@ -88,6 +95,44 @@ public class DocDriftCheckerTests
                 """);
             Assert.Equal(expectedResults[index], observed);
         }
+        Assert.True(diagnostics.Count == 0, string.Join("\n", diagnostics));
+    }
+
+    [Theory]
+    [InlineData("InterfaceDispatchLimit", 1, "GlobalModule.ReadThroughInterface(new Quiet())", "9")]
+    [InlineData("ShapeHierarchy", 2, "GlobalModule.Demo()", "Circle with area 78.53975")]
+    public void PublicInheritanceLimitations_RejectNativeEffectsSeparatelyFromClrBehavior(
+        string moduleName, int errorCount, string expression, string expected)
+    {
+        const string relativePath = "website/content/syntax-reference/inheritance.mdx";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), relativePath));
+        var programs = ExemplarCompileChecker.ExtractCompletePrograms(
+            content.Replace("```calor expect=Calor0410,Calor0411", "```calor", StringComparison.Ordinal));
+        var program = Assert.Single(programs.Where(program =>
+            program.Source.StartsWith("module " + moduleName + "\n", StringComparison.Ordinal)));
+        var rejected = Program.Compile(program.Source, relativePath);
+        Assert.True(rejected.HasErrors);
+        Assert.Equal(errorCount, rejected.Diagnostics.Errors.Count());
+        Assert.All(rejected.Diagnostics.Errors,
+            diagnostic => Assert.Equal(DiagnosticCode.ForbiddenEffect, diagnostic.Code));
+        Assert.Single(rejected.Diagnostics.Where(diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall));
+        Assert.DoesNotContain(rejected.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.AssumedEffects);
+
+        var clrOnly = Program.Compile(program.Source, relativePath,
+            new CompilationOptions { EnableTypeChecking = true, EnforceEffects = false, StatusWriter = TextWriter.Null });
+        Assert.False(clrOnly.HasErrors, string.Join("\n", clrOnly.Diagnostics));
+        var implementation = moduleName == "InterfaceDispatchLimit"
+            ? "public sealed class Quiet : IQuiet { public int Read() => 9; }"
+            : "";
+        var observed = InteropScope.RefOutImplementationTests.Run(clrOnly.GeneratedCode + $$"""
+
+            {{implementation}}
+            public static class Probe
+            {
+                public static object? Run() => {{expression}};
+            }
+            """);
+        Assert.Equal(expected, observed);
     }
 
     [Theory]
