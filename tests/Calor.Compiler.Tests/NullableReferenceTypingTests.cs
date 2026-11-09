@@ -1,4 +1,5 @@
 using System.Reflection;
+using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Binding.BoundTypes;
 using Calor.Compiler.Binding.Metadata;
@@ -19,20 +20,17 @@ namespace Calor.Compiler.Tests;
 public class NullableReferenceTypingTests
 {
     [Theory]
-    [InlineData("?str")]
-    [InlineData("?string")]
-    [InlineData("str?")]
     [InlineData("string?")]
-    [InlineData("?System.String")]
+    [InlineData("System.String?")]
     public void NullableStringLiteralAndInlineParameter_AgreeWithGeneratedRuntime(string spelling)
     {
         var source = $$"""
-            §M{NullableTyping}
-              §F{Probe:pub} ({{spelling}}:input) -> {{spelling}}
-                §E{}
-                §B{literal:{{spelling}}} "value"
-                §B{copy:{{spelling}}} input
-                §R literal
+            module NullableTyping NullableTyping
+              func Probe public ({{spelling}}:input) → {{spelling}}
+                !
+                let {{spelling}}:literal = "value"
+                let {{spelling}}:copy = input
+                return literal
             """;
         foreach (var text in RoundTrip(source))
         foreach (var checking in new[] { true, false })
@@ -50,6 +48,35 @@ public class NullableReferenceTypingTests
     [Theory]
     [InlineData("?str")]
     [InlineData("?string")]
+    [InlineData("str?")]
+    [InlineData("?System.String")]
+    public void RetiredNullableStringSpellings_AreRejectedInsideNativeSignatures(string spelling)
+    {
+        var source = $$"""
+            module NullableTyping NullableTyping
+              func Probe public ({{spelling}}:input) → {{spelling}}
+                !
+                return input
+            """;
+        foreach (var checking in new[] { true, false })
+        foreach (var transpile in new[] { true, false })
+        {
+            var result = Program.Compile(source, "nullable-typing.calr", new CompilationOptions
+            {
+                EnableTypeChecking = checking,
+                UnsafeTranspileOnly = transpile,
+                StatusWriter = TextWriter.Null
+            });
+            Assert.True(result.HasErrors);
+            Assert.Contains(result.Diagnostics.Errors, error =>
+                error.Code == DiagnosticCode.UnexpectedToken && error.Span.Line == 2);
+            Assert.DoesNotContain(result.Diagnostics.Errors, error => error.Code == DiagnosticCode.UnknownSectionMarker);
+        }
+    }
+
+    [Theory]
+    [InlineData("string?")]
+    [InlineData("System.String?")]
     public void NullableBclReturn_IsAReferenceAndRetainsNullAtRuntime(string spelling)
     {
         // This annotation assertion uses the repository-scoped metadata profile, not its Oblivious fallback.
@@ -57,11 +84,11 @@ public class NullableReferenceTypingTests
         var key = "CALOR_T1_ABSENT_" + Guid.NewGuid().ToString("N");
         Assert.Null(Environment.GetEnvironmentVariable(key));
         var source = $$"""
-            §M{NullableTyping}
-              §F{Probe:pub} () -> {{spelling}}
-                §E{env}
-                §B{value:{{spelling}}} §C{System.Environment.GetEnvironmentVariable} §A "{{key}}" §/C
-                §R value
+            module NullableTyping NullableTyping
+              func Probe public () → {{spelling}}
+                ! env
+                let {{spelling}}:value = System.Environment.GetEnvironmentVariable("{{key}}")
+                return value
             """;
         foreach (var checking in new[] { true, false })
         {
@@ -82,14 +109,14 @@ public class NullableReferenceTypingTests
     public void DeclaredNominalReference_ParametersCopiesAndConstructorsRemainReferences()
     {
         const string source = """
-            §M{NullableTyping}
-              §CL{Foo:pub}
-                §FLD{i32:value:pub}
-              §F{Probe:pub} (?Foo:input) -> ?Foo
-                §E{alloc}
-                §B{copy:?Foo} input
-                §B{created:?Foo} §NEW{Foo}
-                §R created
+            module NullableTyping NullableTyping
+              class Foo public
+                field int:value public
+              func Probe public (Foo?:input) → Foo?
+                ! alloc
+                let Foo?:copy = input
+                let Foo?:created = new Foo()
+                return created
             """;
         foreach (var text in RoundTrip(source))
         foreach (var checking in new[] { true, false })
@@ -99,6 +126,7 @@ public class NullableReferenceTypingTests
             Assert.DoesNotContain("Calor.Runtime.Option", result.GeneratedCode);
             var method = Emit(result.GeneratedCode).GetType("NullableTyping.NullableTypingModule")!.GetMethod("Probe")!;
             Assert.Equal("Foo", method.ReturnType.Name);
+            Assert.Equal("NullableTyping.Foo", method.ReturnType.FullName);
             Assert.Equal(method.ReturnType, Assert.Single(method.GetParameters()).ParameterType);
             Assert.NotNull(method.Invoke(null, [null]));
         }
@@ -108,13 +136,13 @@ public class NullableReferenceTypingTests
     public void NullableConstructionAndConsumption_KeepTheirDeclaredType()
     {
         const string source = """
-            §M{NullableTyping}
-              §F{Probe:pub} (bool:present) -> ?str
-                §E{alloc}
-                §IF present
-                  §R "value"
-                §EL
-                  §R null
+            module NullableTyping NullableTyping
+              func Probe public (bool:present) → string?
+                ! alloc
+                if present
+                  return "value"
+                else
+                  return null
             """;
         foreach (var text in RoundTrip(source))
         foreach (var checking in new[] { true, false })
@@ -129,16 +157,16 @@ public class NullableReferenceTypingTests
     }
 
     [Theory]
-    [InlineData("?str", "§SM \"value\"")]
-    [InlineData("?string", "§NN{str}")]
-    [InlineData("str", "§SM \"value\"")]
+    [InlineData("string?", "§SM \"value\"")]
+    [InlineData("string?", "§NN{str}")]
+    [InlineData("string", "§SM \"value\"")]
     public void RemovedOptionConstructors_AreRejectedInNullableBindings(string target, string expression)
     {
         var source = $$"""
-            §M{NullableTyping}
-              §F{Probe:pub} (?str:input) -> void
-                §E{alloc}
-                §B{value:{{target}}} {{expression}}
+            module NullableTyping NullableTyping
+              func Probe public (string?:input) → void
+                ! alloc
+                let {{target}}:value = {{expression}}
             """;
         foreach (var checking in new[] { true, false })
         foreach (var transpile in new[] { true, false })
@@ -150,7 +178,8 @@ public class NullableReferenceTypingTests
                 StatusWriter = TextWriter.Null
             });
             Assert.True(result.HasErrors, result.GeneratedCode);
-            Assert.Contains(result.Diagnostics.Errors, d => d.Span.Line == 4);
+            Assert.Contains(result.Diagnostics.Errors,
+                d => d.Code == DiagnosticCode.UnknownSectionMarker && d.Span.Line == 4);
         }
     }
 
@@ -158,11 +187,11 @@ public class NullableReferenceTypingTests
     public void ExpandedNullableAssignment_UsesActivatedBinderOwnership()
     {
         const string source = """
-            §M{NullableTyping}
-              §F{Probe:pub} () -> void
-                §E{}
-                §B{x:?str} null
-                §B{y:str} x
+            module NullableTyping NullableTyping
+              func Probe public () → void
+                !
+                let string?:x = null
+                let string:y = x
             """;
         foreach (var checking in new[] { true, false })
         {
@@ -189,10 +218,10 @@ public class NullableReferenceTypingTests
     public void RawInlineNullableFlow_IsActivatedForScalarString()
     {
         const string source = """
-            §M{NullableTyping}
-              §F{Probe:pub} (?str:input) -> void
-                §E{}
-                §B{y:str} input
+            module NullableTyping NullableTyping
+              func Probe public (string?:input) → void
+                !
+                let string:y = input
             """;
         foreach (var checking in new[] { true, false })
         {
@@ -215,15 +244,16 @@ public class NullableReferenceTypingTests
     public void NullableNativeArguments_KeepRejectionWithNullabilityOwnership()
     {
         const string source = """
-            §M{NullableTyping}
-              §F{Take:pub} (str:input) -> void
-                §E{env}
-              §F{Probe:pub} () -> void
-                §E{env}
-                §C{Take} §A §C{System.Environment.GetEnvironmentVariable} §A "PATH" §/C §/C
+            module NullableTyping NullableTyping
+              func Take public (string:input) → void
+                ! env
+              func Probe public () → void
+                ! env
+                Take(System.Environment.GetEnvironmentVariable("PATH"))
             """;
         var (bound, diagnostics) = Bind(source);
-        var call = Assert.IsType<BoundCallStatement>(bound.Functions[1].Body[0]);
+        var call = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundExpressionStatement>(bound.Functions[1].Body[0]).Expression);
         Assert.True(diagnostics.Any(d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
                 && BindingDiagnosticPolicy.IsCompilationError(d)),
             $"Argument: {Assert.Single(call.Arguments).Type.DisplayString}; target: {call.ResolvedSymbol?.Parameters[0].TypeName}; {string.Join("; ", diagnostics)}");
@@ -235,16 +265,16 @@ public class NullableReferenceTypingTests
     public void NullableNativeTarget_PreservesNullAndNonNullRuntimeValues()
     {
         const string source = """
-            §M{NullableTyping}
-              §F{Take:pub} (?str:value) -> ?str
-                §E{}
-                §R value
-              §F{Probe:pub} (?str:value) -> ?str
-                §E{}
-                §R §C{Take} §A value §/C
-              §F{NonNull:pub} (str:value) -> ?str
-                §E{}
-                §R §C{Take} §A value §/C
+            module NullableTyping NullableTyping
+              func Take public (string?:value) → string?
+                !
+                return value
+              func Probe public (string?:value) → string?
+                !
+                return Take(value)
+              func NonNull public (string:value) → string?
+                !
+                return Take(value)
             """;
         var result = Program.Compile(source, "native-string-runtime.calr");
         Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics));
@@ -262,16 +292,16 @@ public class NullableReferenceTypingTests
     public void ObjectAlternative_DoesNotBypassScalarStringActivation()
     {
         const string source = """
-            §M{NullableTyping}
-              §F{Take:pub} (str:value) -> i32
-                §E{}
-                §R 1
-              §F{Take:pub} (object:value) -> i32
-                §E{}
-                §R 2
-              §F{Probe:pub} (?str:value) -> i32
-                §E{}
-                §R §C{Take} §A value §/C
+            module NullableTyping NullableTyping
+              func Take public (string:value) → int
+                !
+                return 1
+              func Take public (object:value) → int
+                !
+                return 2
+              func Probe public (string?:value) → int
+                !
+                return Take(value)
             """;
         var (_, diagnostics) = Bind(source);
         var bindingError = Assert.Single(diagnostics.Errors);
@@ -285,38 +315,75 @@ public class NullableReferenceTypingTests
     }
 
     [Theory]
+    [InlineData("push")]
+    [InlineData("set-index")]
+    [InlineData("insert")]
+    public void ExpandedCompatibilityCollectionNodes_RejectNullableStringPayloads(string operation)
+    {
+        foreach (var nullable in new[] { false, true })
+        {
+            var diagnostics = new DiagnosticBag();
+            var module = new Parser(new Lexer($$"""
+                module NullableTyping NullableTyping
+                  func Probe public ({{(nullable ? "string?" : "string")}}:value) → void
+                    let List<string>:items = new List<string>{"seed"}
+                """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+            Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+            var function = Assert.Single(module.Functions);
+            var span = TextSpan.Empty;
+            var value = new ReferenceNode(span, "value");
+            StatementNode statement = operation switch
+            {
+                "push" => new CollectionPushNode(span, "items", value),
+                "set-index" => new CollectionSetIndexNode(span, "items", new IntLiteralNode(span, 0), value),
+                "insert" => new CollectionInsertNode(span, "items", new IntLiteralNode(span, 0), value),
+                _ => throw new ArgumentOutOfRangeException(nameof(operation))
+            };
+            // These retained nodes use the expanded compatibility contract, not native List<T> call enforcement.
+            var parameter = Assert.Single(function.Parameters);
+            var compatibilityParameter = new ParameterNode(parameter.Span, parameter.Name,
+                AttributeHelper.ExpandType(parameter.TypeName), parameter.Attributes);
+            var compatibilityFunction = new FunctionNode(function.Span, function.Id, function.Name,
+                function.Visibility, [compatibilityParameter], function.Output, function.Effects,
+                [.. function.Body, statement], function.Attributes);
+            var compatibilityModule = new ModuleNode(module.Span, module.Id, module.Name,
+                module.Usings, [compatibilityFunction], module.Attributes);
+
+            new TypeChecker(diagnostics).Check(compatibilityModule);
+
+            if (nullable)
+                Assert.Equal(DiagnosticCode.TypeMismatch, Assert.Single(diagnostics.Errors).Code);
+            else
+                Assert.Empty(diagnostics.Errors);
+        }
+    }
+
+    [Theory]
     [InlineData("§PUSH{items} value")]
     [InlineData("§SETIDX{items} 0 value")]
     [InlineData("§INS{items} 0 value")]
-    public void NullableString_RemainsRejectedByNonBoundaryCollectionConsumers(string operation)
+    public void RetiredCollectionOperations_AreNotAdmittedAsNativeStatements(string operation)
     {
-        var diagnostics = new DiagnosticBag();
-        var module = new Parser(new Lexer($$"""
-            §M{NullableTyping}
-              §F{Probe:pub}
-                §I{?str:value}
-                §O{void}
-                §LIST{items:str}
-                  "seed"
-                §/LIST
+        var result = Program.Compile($$"""
+            module NullableTyping NullableTyping
+              func Probe public (string?:value) → void
+                ! alloc mut
+                let List<string>:items = new List<string>{"seed"}
                 {{operation}}
-            """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
-        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+            """, "nullable-typing.calr");
 
-        new TypeChecker(diagnostics).Check(module);
-
-        Assert.Contains(diagnostics.Errors,
-            d => d.Code == DiagnosticCode.TypeMismatch);
+        Assert.Contains(result.Diagnostics.Errors, error =>
+            error.Code == DiagnosticCode.UnknownSectionMarker && error.Span.Line == 5);
     }
 
     [Fact]
     public void NullableStringReturn_PreservesAnnotatedPayload()
     {
         const string source = """
-            §M{NullableTyping}
-              §F{Probe:pub} (?str:value) -> str
-                §E{throw}
-                §R value
+            module NullableTyping NullableTyping
+              func Probe public (string?:value) → string
+                ! throw
+                return value
             """;
 
         var (bound, diagnostics) = Bind(source);
@@ -344,16 +411,16 @@ public class NullableReferenceTypingTests
     }
 
     [Theory]
-    [InlineData("?str", "42")]
-    [InlineData("i32", "\"value\"")]
+    [InlineData("string?", "42")]
+    [InlineData("int", "\"value\"")]
     public void GenuineMismatches_DoNotBecomeUniversallyAssignable(
         string target, string expression)
     {
         var result = Program.Compile($$"""
-            §M{NullableTyping}
-              §F{Probe:pub} () -> void
-                §E{}
-                §B{value:{{target}}} {{expression}}
+            module NullableTyping NullableTyping
+              func Probe public () → void
+                !
+                let {{target}}:value = {{expression}}
             """, "nullable-typing.calr");
         Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.TypeMismatch && d.Span.Line == 4);
     }
@@ -362,32 +429,32 @@ public class NullableReferenceTypingTests
     public void NullableValueTypes_AcceptImplicitUnderlyingValueConversion()
     {
         var result = Program.Compile("""
-            §M{NullableTyping}
-              §F{Probe:pub} () -> void
-                §E{}
-                §B{value:?i32} 42
+            module NullableTyping NullableTyping
+              func Probe public () → void
+                !
+                let int?:value = 42
             """, "nullable-typing.calr");
 
         Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics));
     }
 
     [Theory]
-    [InlineData("i32[,]", "int[,]")]
-    [InlineData("i32[,,]", "int[,,]")]
-    [InlineData("i32[,,,]", "int[,,,]")]
-    [InlineData("i32[][,]", "int[][,]")]
-    [InlineData("i32[,][,,]", "int[,][,,]")]
-    [InlineData("?i32[,][]", "int[,][]?")]
-    [InlineData("str[,]", "string[,]")]
-    [InlineData("List<i32>[,]", "List<int>[,]")]
+    [InlineData("int[,]", "int[,]")]
+    [InlineData("int[,,]", "int[,,]")]
+    [InlineData("int[,,,]", "int[,,,]")]
+    [InlineData("int[][,]", "int[][,]")]
+    [InlineData("int[,][,,]", "int[,][,,]")]
+    [InlineData("int[,][]?", "int[,][]?")]
+    [InlineData("string[,]", "string[,]")]
+    [InlineData("List<int>[,]", "List<int>[,]")]
     public void ArrayRankSuffixes_AcceptNullWithDefaultChecking(string type, string emittedType)
     {
         var result = Program.Compile($$"""
-            §M{NullableTyping}
-              §U{System.Collections.Generic}
-              §F{Probe:pub} () -> void
-                §E{}
-                §B{grid:{{type}}} null
+            module NullableTyping NullableTyping
+              using System.Collections.Generic
+              func Probe public () → void
+                !
+                let {{type}}:grid = null
             """, "array-rank-typing.calr");
 
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
@@ -396,22 +463,19 @@ public class NullableReferenceTypingTests
     }
 
     [Theory]
-    [InlineData("i32[]")]
-    [InlineData("[i32]")]
-    [InlineData("i32[,][]")]
-    [InlineData("Option<i32>")]
-    [InlineData("Result<i32, str>")]
-    [InlineData("Option<i32[,]>")]
-    [InlineData("Result<i32[,], str>")]
-    [InlineData("Option[i32]")]
-    [InlineData("Result[i32, str]")]
+    [InlineData("int[]")]
+    [InlineData("int[,][]")]
+    [InlineData("Option<int>")]
+    [InlineData("Result<int, string>")]
+    [InlineData("Option<int[,]>")]
+    [InlineData("Result<int[,], string>")]
     public void ArraysAndOrdinaryGenerics_KeepExistingNullRejection(string type)
     {
         var result = Program.Compile($$"""
-            §M{NullableTyping}
-              §F{Probe:pub} () -> void
-                §E{}
-                §B{value:{{type}}} null
+            module NullableTyping NullableTyping
+              func Probe public () → void
+                !
+                let {{type}}:value = null
             """, "array-generic-typing.calr");
 
         Assert.Contains(result.Diagnostics.Errors, diagnostic =>
@@ -420,16 +484,16 @@ public class NullableReferenceTypingTests
     }
 
     [Theory]
-    [InlineData("List<i32[]>", "List<int[]>")]
-    [InlineData("Dictionary<i32, str[]>", "Dictionary<int, string[]>")]
+    [InlineData("List<int[]>", "List<int[]>")]
+    [InlineData("Dictionary<int, string[]>", "Dictionary<int, string[]>")]
     public void GenericsWithArrayArguments_KeepTheirGenericIdentity(string type, string emittedType)
     {
         var result = Program.Compile($$"""
-            §M{NullableTyping}
-              §U{System.Collections.Generic}
-              §F{Probe:pub} ({{type}}:input) -> void
-                §E{}
-                §B{grid:{{type}}} input
+            module NullableTyping NullableTyping
+              using System.Collections.Generic
+              func Probe public ({{type}}:input) → void
+                !
+                let {{type}}:grid = input
             """, "array-generic-typing.calr");
 
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
@@ -438,19 +502,38 @@ public class NullableReferenceTypingTests
     }
 
     [Theory]
-    [InlineData("i32[]", "str[]")]
-    [InlineData("[i32]", "[str]")]
-    [InlineData("Option<i32>", "Option<str>")]
-    [InlineData("List<i32>", "List<str>")]
+    [InlineData("int[]", "string[]")]
+    [InlineData("Option<int>", "Option<string>")]
+    [InlineData("List<int>", "List<string>")]
     public void ArrayAndGenericMismatches_KeepTheirExistingTypeChecks(string sourceType, string target)
     {
         var result = Program.Compile($$"""
-            §M{NullableTyping}
-              §F{Probe:pub} ({{sourceType}}:input) -> void
-                §E{}
-                §B{value:{{target}}} input
+            module NullableTyping NullableTyping
+              func Probe public ({{sourceType}}:input) → void
+                !
+                let {{target}}:value = input
             """, "nullable-typing.calr");
         Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Theory]
+    [InlineData("[i32]", "[i32]", "null")]
+    [InlineData("Option[i32]", "Option[i32]", "null")]
+    [InlineData("Result[i32, str]", "Result[i32, str]", "null")]
+    [InlineData("[i32]", "[str]", "input")]
+    public void RetiredArrayAndGenericSpellings_AreRejectedInsideNativeDeclarations(
+        string sourceType, string target, string expression)
+    {
+        var result = Program.Compile($$"""
+            module NullableTyping NullableTyping
+              func Probe public ({{sourceType}}:input) → void
+                !
+                let {{target}}:value = {{expression}}
+            """, "nullable-typing.calr");
+
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, error => error.Code == DiagnosticCode.UnexpectedToken);
+        Assert.DoesNotContain(result.Diagnostics.Errors, error => error.Code == DiagnosticCode.UnknownSectionMarker);
     }
 
     [Fact]
@@ -476,10 +559,10 @@ public class NullableReferenceTypingTests
     public void NullableStringConcatenation_PreservesExistingNonNullRuntimeResult()
     {
         const string source = """
-            §M{NullableTyping}
-              §F{Probe:pub} (?str:left, ?str:right) -> str
-                §E{}
-                §R (+ left right)
+            module NullableTyping NullableTyping
+              func Probe public (string?:left, string?:right) → string
+                !
+                return left + right
             """;
         foreach (var checking in new[] { true, false })
         {
@@ -492,15 +575,15 @@ public class NullableReferenceTypingTests
     }
 
     [Theory]
-    [InlineData("[?str]", "string?[]")]
+    [InlineData("string?[]", "string?[]")]
     public void NullablePayloads_DoNotCollapseTheirArrayContainer(string type, string emittedType)
     {
         var source = $$"""
-            §M{NullableTyping}
-              §F{Probe:pub} ({{type}}:input) -> {{type}}
-                §E{}
-                §B{copy:{{type}}} input
-                §R copy
+            module NullableTyping NullableTyping
+              func Probe public ({{type}}:input) → {{type}}
+                !
+                let {{type}}:copy = input
+                return copy
             """;
         foreach (var checking in new[] { true, false })
         {
@@ -510,19 +593,21 @@ public class NullableReferenceTypingTests
             Assert.True(GeneratedCSharpCompiler.Validate(result.GeneratedCode).CompilationSuccess);
             var method = Emit(result.GeneratedCode).GetType("NullableTyping.NullableTypingModule")!.GetMethod("Probe")!;
             Assert.Equal(typeof(string[]), method.ReturnType);
+            string?[] values = ["value", null];
+            Assert.Same(values, method.Invoke(null, [values]));
         }
     }
 
     [Theory]
-    [InlineData("?str", "§SM \"value\"")]
-    [InlineData("?str", "§NN{str}")]
+    [InlineData("string?", "§SM \"value\"")]
+    [InlineData("string?", "§NN{str}")]
     public void RemovedOptionReturns_AreRejectedWithoutTypeChecking(string returnType, string expression)
     {
         var source = $$"""
-            §M{NullableTyping}
-              §F{Probe:pub} () -> {{returnType}}
-                §E{alloc}
-                §R {{expression}}
+            module NullableTyping NullableTyping
+              func Probe public () → {{returnType}}
+                ! alloc
+                return {{expression}}
             """;
         foreach (var checking in new[] { true, false })
         foreach (var transpile in new[] { true, false })
@@ -533,7 +618,8 @@ public class NullableReferenceTypingTests
                 UnsafeTranspileOnly = transpile
             });
             Assert.True(result.HasErrors);
-            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Span.Line == 4);
+            Assert.Contains(result.Diagnostics.Errors,
+                diagnostic => diagnostic.Code == DiagnosticCode.UnknownSectionMarker && diagnostic.Span.Line == 4);
         }
     }
 
@@ -541,13 +627,12 @@ public class NullableReferenceTypingTests
     public void LambdaReturn_DoesNotUseEnclosingReferenceReturnContract()
     {
         const string source = """
-            §M{NullableTyping}
-              §F{Probe:pub} () -> str
-                §E{alloc}
-                §B{factory:Func<str?>} §LAM{}
-                  §R null
-                §/LAM
-                §R "outer"
+            module NullableTyping NullableTyping
+              func Probe public () → string
+                ! alloc
+                let Func<string?>:factory = () =>
+                  return null
+                return "outer"
             """;
         foreach (var checking in new[] { true, false })
         {
@@ -571,15 +656,15 @@ public class NullableReferenceTypingTests
     public void DeclarationClassification_DoesNotTreatStructsOrEnumsAsReferences()
     {
         const string source = """
-            §M{NullableTyping}
-              §CL{Foo:pub}
-                §FLD{i32:value:pub}
-              §CL{Value:pub:struct}
-                §FLD{i32:value:pub}
-              §EN{Kind:pub}
+            module NullableTyping NullableTyping
+              class Foo public
+                field int:value public
+              class Value public struct
+                field int:value public
+              enum Kind public
                 First
-              §F{Probe:pub} (?Foo:reference, ?Value:value, ?Kind:kind) -> void
-                §E{}
+              func Probe public (Foo?:reference, Value?:value, Kind?:kind) → void
+                !
             """;
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
@@ -601,11 +686,11 @@ public class NullableReferenceTypingTests
     public void NullableObjectBoxing_PreservesTheValue()
     {
         const string source = """
-            §M{NullableTyping}
-              §F{Probe:pub} () -> ?object
-                §E{alloc}
-                §B{boxed:?object} "value"
-                §R boxed
+            module NullableTyping NullableTyping
+              func Probe public () → object?
+                ! alloc
+                let object?:boxed = "value"
+                return boxed
             """;
         foreach (var checking in new[] { true, false })
         {
@@ -621,28 +706,20 @@ public class NullableReferenceTypingTests
     public void NullableNominalMemberAccess_IsNotMisdiagnosedAsARecordOperation()
     {
         const string source = """
-            §M{NullableTyping}
-              §CL{Foo:pub}
-                §FLD{i32:value:pub}
-              §F{Probe:pub} () -> i32
-                §E{alloc}
-                §B{input:?Foo} §NEW{Foo}
-                §R input.value
+            module NullableTyping NullableTyping
+              class Foo public
+                field int:value public
+              func Probe public () → int
+                ! alloc
+                let Foo?:input = new Foo()
+                return input.value
             """;
         foreach (var checking in new[] { true, false })
         {
-            // This unresolved member-effect path is outside the supported typing assertion.
-            // Keep its current rejection visible; the effect opt-out isolates typing.
-            var ordinary = Program.Compile(source, "nullable-typing.calr",
-                new CompilationOptions { EnableTypeChecking = checking });
-            Assert.Contains(ordinary.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect);
-            var result = Program.Compile(source, "nullable-typing.calr", new CompilationOptions
-            {
-                EnableTypeChecking = checking,
-                EnforceEffects = false
-            });
-            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+            var result = Compile(source, checking);
             AssertNoTypingNoise(result);
+            Assert.DoesNotContain(result.Diagnostics, diagnostic =>
+                diagnostic.Code is DiagnosticCode.UnknownExternalCall or DiagnosticCode.AssumedEffects);
             var method = Emit(result.GeneratedCode).GetType("NullableTyping.NullableTypingModule")!.GetMethod("Probe")!;
             Assert.Equal(0, method.Invoke(null, null));
         }
@@ -650,30 +727,35 @@ public class NullableReferenceTypingTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void PrimaryReceiverGetters_AreChargedInsteadOfBeingTreatedAsOptionMembers(bool conditional)
+    [InlineData(false, "base.Value")]
+    [InlineData(true, "input?.Child .Value")]
+    [InlineData(true, "input?.Child.Value")]
+    [InlineData(true, "(input)?.Child.Value")]
+    [InlineData(true, "input?.@Child.Value")]
+    [InlineData(true, "input?.Child.@Value")]
+    [InlineData(true, "input?.Child?.Value")]
+    public void PrimaryReceiverGetters_AreChargedInsteadOfBeingTreatedAsOptionMembers(
+        bool conditional, string expression)
     {
         var source = $$"""
-            §M{ReceiverTyping}
-              §U{System.Collections.Generic}
-              §CL{Parent:pub}
-                §PROP{Value:i32:pub}
-                  §GET
-                    §B{created:List<i32>} §NEW{List<i32>}
-                    §R INT:3
-              §CL{Node:pub}
-                §FLD{i32:Value:pub}
-                §PROP{Child:Node:pub}
-                  §GET
-                    §B{created:List<i32>} §NEW{List<i32>}
-                    §B{child:Node} §NEW{Node}
-                    §R child
-              §CL{Derived:pub}
-                §EXT{Parent}
-                §MT{Read:pub} (Node:input) -> i32?
-                  §E{}
-                  §R {{(conditional ? "input?.Child .Value" : "§BASE.Value")}}
+            module ReceiverTyping ReceiverTyping
+              using System.Collections.Generic
+              class Parent public
+                property int:Value public
+                  get
+                    let List<int>:created = new List<int>()
+                    return 3
+              class Node public
+                field int:Value public
+                property Node:Child public
+                  get
+                    let List<int>:created = new List<int>()
+                    let Node:child = new Node()
+                    return child
+              class Derived public extends Parent
+                func Read public (Node:input) → int?
+                  !
+                  return {{expression}}
             """;
         var rejected = Program.Compile(source, "receiver-typing.calr",
             new CompilationOptions { EnableTypeChecking = false });
@@ -682,7 +764,7 @@ public class NullableReferenceTypingTests
             && d.Message.Contains("alloc", StringComparison.Ordinal)),
             string.Join(Environment.NewLine, rejected.Diagnostics) + Environment.NewLine + rejected.GeneratedCode);
 
-        var accepted = Compile(source.Replace("§E{}", "§E{alloc}", StringComparison.Ordinal), checking: false);
+        var accepted = Compile(source.Replace("      !\n", "      ! alloc\n", StringComparison.Ordinal), checking: false);
         var assembly = Emit(accepted.GeneratedCode);
         var derived = assembly.GetType("ReceiverTyping.Derived")!;
         var node = assembly.GetType("ReceiverTyping.Node")!;
@@ -693,17 +775,49 @@ public class NullableReferenceTypingTests
             method.Invoke(Activator.CreateInstance(derived), [null]));
     }
 
+    [Theory]
+    [InlineData("input?.Child.Value")]
+    [InlineData("input?.Child .Value")]
+    [InlineData("(input)?.Child.Value")]
+    [InlineData("input?.@Child.Value")]
+    [InlineData("input?.Child.@Value")]
+    public void NativeNullConditionalChain_RetainsIndividualMembersAndTheirSpans(string expression)
+    {
+        var source = $$"""
+            module Chain
+              func Read (Node:input) → int?
+                return {{expression}}
+            """;
+        foreach (var text in RoundTrip(source))
+        {
+            var diagnostics = new DiagnosticBag();
+            var tokens = new Lexer(text, diagnostics).TokenizeAllForParser();
+            var module = new Parser(tokens, diagnostics).Parse();
+            Assert.False(diagnostics.HasErrors,
+                text + "\n" + string.Join("\n", diagnostics) + "\n"
+                + string.Join(" ", tokens.Select(token => $"{token.Kind}:{token.Text}")));
+            var field = Assert.IsType<FieldAccessNode>(
+                Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions).Body.Single()).Expression);
+            Assert.Equal("Value", field.FieldName);
+            Assert.Equal("Value", text.Substring(field.FieldNameSpan.Start, field.FieldNameSpan.Length).TrimStart('@'));
+            var getter = Assert.IsType<NullConditionalNode>(field.Target);
+            Assert.Equal("Child", getter.MemberName);
+            Assert.EndsWith("Child", text.Substring(getter.Span.Start, getter.Span.Length));
+            Assert.Equal("input", Assert.IsType<ReferenceNode>(getter.Target).Name);
+        }
+    }
+
     [Fact]
     public void UnknownReceiverSentinel_DoesNotResolveToPureRuntimeOptionMembers()
     {
         Assert.Equal("?", TypeIdentity.MapShortTypeNameToFullName("?"));
         const string source = """
-            §M{ReceiverTyping}
-              §CL{Node:pub}
-                §FLD{i32:Value:pub}
-              §F{Probe:pub} (Node:input) -> i32
-                §E{}
-                §R (?? input input).Value
+            module ReceiverTyping ReceiverTyping
+              class Node public
+                field int:Value public
+              func Probe public (Node:input) → int
+                !
+                return (input ?? input).Value
             """;
         var result = Program.Compile(source, "receiver-typing.calr",
             new CompilationOptions { EnableTypeChecking = false });
@@ -713,20 +827,20 @@ public class NullableReferenceTypingTests
     }
 
     [Theory]
-    [InlineData("?str", "\"value\"")]
-    [InlineData("?Foo", "§NEW{Foo}")]
-    [InlineData("?Value", "§NEW{Value}")]
+    [InlineData("string?", "\"value\"")]
+    [InlineData("Foo?", "new Foo()")]
+    [InlineData("Value?", "new Value()")]
     public void NullableNormalization_PreservesActiveNonFunctionRowErrors(string type, string expression)
     {
         var source = $$"""
-            §M{NullableTyping}
-              §CL{Foo:pub}
-                §FLD{i32:value:pub}
-              §CL{Value:pub:struct}
-                §FLD{i32:value:pub}
-              §F{Probe:pub} () -> void
-                §E{alloc}
-                §B{item:{{type}}} §E{} {{expression}}
+            module NullableTyping NullableTyping
+              class Foo public
+                field int:value public
+              class Value public struct
+                field int:value public
+              func Probe public () → void
+                ! alloc
+                let {{type}}:item ! = {{expression}}
             """;
         foreach (var checking in new[] { true, false })
         {

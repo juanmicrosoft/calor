@@ -3818,7 +3818,8 @@ public sealed class Parser
         if (close + 1 >= _tokens.Count)
             return false;
         var following = _tokens[close + 1];
-        if (following.Kind == TokenKind.FatArrow || following.Span.Line != TokenEndLine(_tokens[close]))
+        if (following.Kind is TokenKind.FatArrow or TokenKind.NullConditional
+            || following.Span.Line != TokenEndLine(_tokens[close]))
             return false;
         var typeText = string.Concat(_tokens.Skip(_position + 1).Take(close - _position - 1)
             .Select(token => token.Text));
@@ -4917,21 +4918,47 @@ public sealed class Parser
                 Advance(); // consume '.' or '?.'
                 var escapedSpan = Check(TokenKind.At) ? Advance().Span : (TextSpan?)null;
                 var memberToken = Expect(TokenKind.Identifier);
+                var memberPath = TokenIdentifier(memberToken);
                 var memberOffset = 0;
-                foreach (var memberName in TokenIdentifier(memberToken).Split('.'))
+                foreach (var simpleMemberName in memberPath.Split('.'))
                 {
+                    var memberName = simpleMemberName;
                     var memberSpan = new TextSpan(memberToken.Span.Start + memberOffset, memberName.Length,
                         memberToken.Span.Line, memberToken.Span.Column + memberOffset);
-                    if (memberOffset == 0 && escapedSpan is { } escaped)
+                    if (memberName.Length == 0 && memberOffset == memberPath.Length
+                        && (Check(TokenKind.At) || Check(TokenKind.Identifier) && Current.Text.StartsWith('@')))
+                    {
+                        var trailingEscape = Check(TokenKind.At) ? Advance().Span : (TextSpan?)null;
+                        var escapedMember = Expect(TokenKind.Identifier);
+                        memberName = TokenIdentifier(escapedMember);
+                        memberSpan = trailingEscape?.Union(escapedMember.Span) ?? escapedMember.Span;
+                    }
+                    else if (memberOffset == 0 && escapedSpan is { } escaped)
                         memberSpan = escaped.Union(memberSpan);
                     else if (memberOffset == 0 && (memberName.Length == memberToken.Text.Length
                         || memberToken.Text.StartsWith('@')))
                         memberSpan = memberToken.Span;
+                    if (memberOffset + simpleMemberName.Length == memberPath.Length
+                        && Check(TokenKind.Less) && IsGenericTypeBracket() && !IsGenericTypeBracket(requireCall: true))
+                    {
+                        var name = new System.Text.StringBuilder(memberName);
+                        name.Append('<');
+                        Advance();
+                        var depth = 1;
+                        while (!IsAtEnd && depth > 0)
+                        {
+                            if (Check(TokenKind.Less)) { name.Append('<'); depth++; Advance(); }
+                            else if (Check(TokenKind.Greater)) { name.Append('>'); depth--; Advance(); }
+                            else if (Check(TokenKind.GreaterGreater)) { name.Append(">>"); depth -= 2; Advance(); }
+                            else { name.Append(Current.Text); Advance(); }
+                        }
+                        memberName = name.ToString();
+                    }
                     var span = expr.Span.Union(memberSpan);
                     expr = isNullConditional && memberOffset == 0
                         ? new NullConditionalNode(span, expr, memberName)
                         : new FieldAccessNode(span, expr, memberName, memberSpan);
-                    memberOffset += memberName.Length + 1;
+                    memberOffset += simpleMemberName.Length + 1;
                 }
             }
         }
@@ -5919,48 +5946,7 @@ public sealed class Parser
 
         ExpressionNode expr = new ReferenceNode(token.Span, name, verbatim || token.Value is string);
 
-        // Handle trailing member access (e.g., _startOptions?.Agenda or obj.Property)
-        while (Check(TokenKind.Dot) || Check(TokenKind.NullConditional))
-        {
-            var isNullConditional = Check(TokenKind.NullConditional);
-            Advance(); // consume '.' or '?.'
-            var escapedSpan = Check(TokenKind.At) ? Advance().Span : (TextSpan?)null;
-            var memberToken = Expect(TokenKind.Identifier);
-
-            // Handle generic type after member access: Type<T>.Member<U>
-            var memberName = TokenIdentifier(memberToken);
-            if (Check(TokenKind.Less) && IsGenericTypeBracket() && !IsGenericTypeBracket(requireCall: true))
-            {
-                var sb = new System.Text.StringBuilder(memberName);
-                sb.Append('<');
-                Advance();
-                var depth = 1;
-                while (!IsAtEnd && depth > 0)
-                {
-                    if (Check(TokenKind.Less)) { sb.Append('<'); depth++; Advance(); }
-                    else if (Check(TokenKind.Greater)) { sb.Append('>'); depth--; Advance(); }
-                    else if (Check(TokenKind.GreaterGreater)) { sb.Append(">>"); depth -= 2; Advance(); }
-                    else { sb.Append(Current.Text); Advance(); }
-                }
-                memberName = sb.ToString();
-            }
-
-            var span = expr.Span.Union(memberToken.Span);
-            if (isNullConditional)
-            {
-                expr = new NullConditionalNode(span, expr, memberName);
-            }
-            else
-            {
-                expr = new FieldAccessNode(
-                    span,
-                    expr,
-                    memberName,
-                    escapedSpan?.Union(memberToken.Span) ?? memberToken.Span);
-            }
-        }
-
-        return expr;
+        return ParseTrailingMemberAccess(expr);
     }
 
     // Phase 3: Type System Expression Parsing
