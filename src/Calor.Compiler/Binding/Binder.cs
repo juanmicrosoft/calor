@@ -94,6 +94,10 @@ public sealed class Binder
     private readonly Dictionary<AwaitExpressionNode, BoundStructuralExpression> _boundAwaits =
         new(ReferenceEqualityComparer.Instance);
     internal IReadOnlyDictionary<AwaitExpressionNode, BoundStructuralExpression> BoundAwaits => _boundAwaits;
+    private readonly Dictionary<ExpressionNode, BoundFieldAccessExpression> _boundSourceEnumConstants =
+        new(ReferenceEqualityComparer.Instance);
+    internal IReadOnlyDictionary<ExpressionNode, BoundFieldAccessExpression> BoundSourceEnumConstants =>
+        _boundSourceEnumConstants;
     private readonly HashSet<FunctionSymbol> _staticMethodSymbols = new();
     private readonly Dictionary<SymbolId, string?> _functionNamespaces = new();
     private readonly Dictionary<ClassDefinitionNode, Scope> _classScopes = new();
@@ -961,6 +965,7 @@ public sealed class Binder
         _scope = new Scope();
         _functionSymbols.Clear();
         _boundAwaits.Clear();
+        _boundSourceEnumConstants.Clear();
         CrossModuleCallTargets.Clear();
         SourceExtensionCallTargets.Clear();
         _staticMethodSymbols.Clear();
@@ -3854,6 +3859,13 @@ public sealed class Binder
             : BindUnsupportedExpression(expr);
         if (MayChangeHeap(bound))
             InvalidateByReferenceParameterNarrowing();
+        if (bound is BoundFieldAccessExpression
+            {
+                ResolvedField.IsEnumMember: true,
+                Target: BoundTypeReferenceExpression { ResolvedType: { IsEnum: true } owner },
+                Type: BoundTypes.NominalBoundType { Declaration: { } resultOwner }
+            } constant && ReferenceEquals(owner, resultOwner))
+            _boundSourceEnumConstants[expr] = constant;
         return bound;
     }
 

@@ -839,7 +839,8 @@ public class Program
         if (options.EnableTypeChecking && !options.UnsafeTranspileOnly)
         {
             phaseSw.Restart();
-            var typeChecker = new TypeChecking.TypeChecker(diagnostics, binder.BoundAwaits);
+            var typeChecker = new TypeChecking.TypeChecker(
+                diagnostics, binder.BoundAwaits, binder.BoundSourceEnumConstants);
             typeChecker.Check(ast);
             phaseSw.Stop();
             telemetry?.TrackPhase("TypeChecker", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);

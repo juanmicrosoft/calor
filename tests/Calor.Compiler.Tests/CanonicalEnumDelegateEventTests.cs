@@ -943,8 +943,141 @@ public sealed class CanonicalEnumDelegateEventTests
         Assert.Equal("@event", Slice(source, constant.ResolvedField!.DeclarationSpan));
         Assert.Equal("@event", Slice(source, constant.FieldNameSpan));
         var compiled = Program.Compile(source);
-        Assert.Equal(DiagnosticCode.UndefinedReference, Assert.Single(compiled.Diagnostics.Where(diagnostic =>
-            diagnostic.Severity == Calor.Compiler.Diagnostics.DiagnosticSeverity.Error)).Code);
+        Assert.Empty(compiled.Diagnostics);
+        Execute(compiled.GeneratedCode, assembly =>
+            Assert.Equal(7, assembly.GetType("GlobalModule")!.GetMethod("Main")!.Invoke(null, null)));
+    }
+
+    [Theory]
+    [InlineData("", "Color", "Color")]
+    [InlineData("", "Shade", "Color")]
+    [InlineData(" Demo", "Color", "Demo.Color")]
+    [InlineData(" Demo", "Demo.Color", "Demo.Color")]
+    [InlineData(" Demo", "Shade", "Demo.Color")]
+    public void EscapedEnumConstantUsesActualBoundOwnerUnderNormalEnforcement(
+        string ns, string receiver, string owner)
+    {
+        var source = $$"""
+            module EscapedEnumScopes{{ns}}
+              using Shade = {{owner}}
+              enum Color
+                @event = 7
+              module Extensions
+                func Pick (this Color:value) → int
+                  !
+                  return value == Color.@event ? 7 : 0
+              func Main () → int
+                !
+                let color = {{receiver}}.@event
+                return color.Pick()
+            """;
+        var ast = Parse(source);
+        var diagnostics = new DiagnosticBag();
+        var binder = new Binder(diagnostics);
+        var bound = binder.Bind(ast);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var constant = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound.Functions.Single(function =>
+            function.Symbol.Name == "Main")).OfType<BoundFieldAccessExpression>());
+        var enumType = Assert.IsType<NominalBoundType>(constant.Type).Declaration!;
+        Assert.Equal(owner, enumType.QualifiedName);
+        Assert.Same(bound.SymbolsById[enumType.Id], enumType);
+        Assert.Same(bound.SymbolsById[constant.ResolvedField!.Id], constant.ResolvedField);
+        Assert.Contains(binder.BoundSourceEnumConstants.Values, value => ReferenceEquals(value, constant));
+        var compiled = Program.Compile(source);
+        Assert.Empty(compiled.Diagnostics);
+        Execute(compiled.GeneratedCode, assembly => Assert.Equal(7,
+            assembly.GetType(ns.Length == 0 ? "GlobalModule" : "Demo.DemoModule")!
+                .GetMethod("Main")!.Invoke(null, null)));
+    }
+
+    [Theory]
+    [InlineData("Color.Missing")]
+    [InlineData("Unknown.@event")]
+    [InlineData("value.@event")]
+    [InlineData("System.ConsoleColor.@event")]
+    [InlineData("Color.@event", "object:Color")]
+    [InlineData("Color.@event", "Color:Color")]
+    public void UnresolvedEnumMemberCannotBorrowSourceConstantFacts(
+        string expression, string parameter = "object:value")
+    {
+        var source = $$"""
+            module UnknownEnumConstants
+              enum Color
+                @event = 7
+              module Extensions
+                func Pick (Color:value) → int
+                  !
+                  return 7
+              func Main ({{parameter}}) → int
+                !
+                return Extensions.Pick({{expression}})
+            """;
+        var binder = new Binder(new DiagnosticBag());
+        binder.Bind(Parse(source));
+        Assert.Empty(binder.BoundSourceEnumConstants);
+        Assert.True(Program.Compile(source).HasErrors);
+    }
+
+    [Fact]
+    public void SourceEnumConstantFactsRequireTheExactAstAndAreClearedOnRebind()
+    {
+        const string source = """
+            module ScopedEnumConstants
+              enum Color
+                @event = 7
+              func Main () → Color
+                !
+                return Color.@event
+            """;
+        var ast = Parse(source);
+        var other = Parse(source);
+        var binder = new Binder(new DiagnosticBag());
+        binder.Bind(ast);
+        var original = Assert.Single(binder.BoundSourceEnumConstants.Keys);
+        var diagnostics = new DiagnosticBag();
+        new TypeChecking.TypeChecker(diagnostics, binder.BoundAwaits, binder.BoundSourceEnumConstants).Check(ast);
+        Assert.Empty(diagnostics);
+        var unrelated = new DiagnosticBag();
+        new TypeChecking.TypeChecker(unrelated, binder.BoundAwaits, binder.BoundSourceEnumConstants).Check(other);
+        Assert.Contains(unrelated, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference
+            && diagnostic.Message == "Undefined variable 'Color'");
+        binder.Bind(other);
+        Assert.DoesNotContain(binder.BoundSourceEnumConstants.Keys, node => ReferenceEquals(node, original));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void EscapedEnumConstantOrdinaryCliHasNoDiagnosticsAndExecutesActualGeneratedCode(bool receiverCall)
+    {
+        var source = $$"""
+            module EscapedEnumCli
+              enum Color
+                @event = 7
+              module Extensions
+                func Pick (this Color:value) → int
+                  !
+                  return 7
+              func Main () → int
+                !
+                return {{(receiverCall ? "Color.@event.Pick()" : "Extensions.Pick(Color.@event)")}}
+            """;
+        var directory = Path.Combine(Path.GetTempPath(), "calor-escaped-enum-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var input = Path.Combine(directory, "Escaped.calr");
+            var output = Path.Combine(directory, "Escaped.g.cs");
+            File.WriteAllText(input, source);
+            var run = CliTestHarness.RunCli(directory, "--no-telemetry", "-i", input,
+                "--format", "json", "-o", output);
+            Assert.True(run.ExitCode == 0, run.StdOut + run.StdErr);
+            using var json = System.Text.Json.JsonDocument.Parse(run.StdOut);
+            Assert.Empty(json.RootElement.GetProperty("diagnostics").EnumerateArray());
+            Execute(File.ReadAllText(output), assembly => Assert.Equal(7,
+                assembly.GetType("GlobalModule")!.GetMethod("Main")!.Invoke(null, null)));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
     }
 
     [Fact]

@@ -174,19 +174,19 @@ public class DocDriftCheckerTests
         new[] { "GlobalModule.Divide(9, 2)", "GlobalModule.Add(20, 22)" })]
     [InlineData("philosophy/design-principles.mdx", 1, 0,
         new[] { "DesignContracts" }, new[] { "4" }, new[] { "GlobalModule.Divide(9, 2)" })]
-    [InlineData("structure-tags.mdx", 22, 2,
+    [InlineData("structure-tags.mdx", 22, 1,
         new[] { "StructureModules", "BlockNamespace", "FunctionHeaders", "AsyncFunctions", "AsyncMethods",
             "AwaitExpressions", "ConfigureAwaitLimit", "LambdaExamples", "AsyncLambdas", "LocalCallables", "DelegateDefinitions",
-            "EnumDefinitions", "EnumExtensions", "EnumReceiverLimit", "EventDefinitions", "ParameterArrays", "ArrayDeclarations",
+            "EnumDefinitions", "EnumExtensions", "EnumReceiverLimit", "EscapedEnumLimit", "EventDefinitions", "ParameterArrays", "ArrayDeclarations",
             "IndentedBlocks", "GenericDeclarations", "AttributeDeclarations" },
         new[] { "42", "42", "10", "21:7:9", "42", "42", "42", "24", "42", "3", "5", "True",
-            "#FF0000:True", "#FF0000", "0", "7", "2:7", "15", "42", "7" },
+            "#FF0000:True", "#FF0000", "7", "0", "7", "2:7", "15", "42", "7" },
         new[] { "Demo.DemoModule.Main()", "new Demo.Tools.Box().Read()", "GlobalModule.Main()",
             "GlobalModule.Read().GetAwaiter().GetResult() + \":\" + GlobalModule.ExplicitTask().GetAwaiter().GetResult() + \":\" + GlobalModule.ExplicitValueTask().GetAwaiter().GetResult()",
             "GlobalModule.Main().GetAwaiter().GetResult()", "GlobalModule.Main().GetAwaiter().GetResult()",
             "GlobalModule.Read().GetAwaiter().GetResult()",
             "GlobalModule.Main()", "GlobalModule.Main().GetAwaiter().GetResult()", "GlobalModule.Use(2)",
-            "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Receiver()",
+            "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Receiver()", "GlobalModule.Main()",
             "new SubscriptionCounter().Count", "GlobalModule.Main()",
             "new DataProcessor().ProcessData(new string[] { \"a\", \"b\" }) + \":\" + GlobalModule.First(new int[][] { new int[] { 7 } })",
             "GlobalModule.Main()", "GlobalModule.Main()", "new Data().Read()" })]

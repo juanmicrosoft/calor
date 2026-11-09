@@ -12,6 +12,7 @@ public sealed class TypeChecker
     private readonly DiagnosticBag _diagnostics;
     private readonly TypeEnvironment _env;
     private readonly IReadOnlyDictionary<AwaitExpressionNode, Binding.BoundStructuralExpression>? _boundAwaits;
+    private readonly IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? _boundSourceEnumConstants;
     private ModuleNode? _module;
     private readonly Dictionary<IsPatternNode, CalorType> _patternBindingTypes = new();
     private readonly Dictionary<MatchStatementNode, CalorType> _matchTargetTypes = new();
@@ -65,11 +66,13 @@ public sealed class TypeChecker
     }
 
     internal TypeChecker(DiagnosticBag diagnostics,
-        IReadOnlyDictionary<AwaitExpressionNode, Binding.BoundStructuralExpression>? boundAwaits)
+        IReadOnlyDictionary<AwaitExpressionNode, Binding.BoundStructuralExpression>? boundAwaits,
+        IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundSourceEnumConstants = null)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _env = new TypeEnvironment();
         _boundAwaits = boundAwaits;
+        _boundSourceEnumConstants = boundSourceEnumConstants;
     }
 
     /// <summary>
@@ -1832,6 +1835,8 @@ public sealed class TypeChecker
 
     private CalorType InferExpressionType(ExpressionNode expr, CalorType? expectedType = null)
     {
+        if (_boundSourceEnumConstants?.TryGetValue(expr, out var constant) == true)
+            return new ExternalType(constant.Type.DisplayString);
         return expr switch
         {
             IntLiteralNode => PrimitiveType.Int,

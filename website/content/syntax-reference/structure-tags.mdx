@@ -435,11 +435,11 @@ receivers. Ambiguous, inaccessible, or preserved competing declarations cannot
 borrow the source method's effect contract. Inherited enum instance-member
 names remain conservatively unresolved.
 
-Two other forms remain explicit limits. An escaped enum member can bind to
-the correct source symbol while the separate AST type checker still rejects
-the program with `Calor0200`:
+Escaped enum member names also retain their source owner and member identity.
+The `@` escape is part of the source spelling, not a different member.
+This normally enforced program returns `7`:
 
-```calor expect=Calor0200
+```calor
 module EscapedEnumLimit
   enum Color
     @event = 7
