@@ -1763,9 +1763,21 @@ The current suite requires **71 actual behavioral entrypoints** (**24 accepted,
 47 rejected**), six actual selected-root/configuration/native infrastructure
 guards, one explicitly declared timeout, and two actual helper-build image
 substitution controls. Finite negatives require exited verifier failures with
-declared behavioral diagnostics. Direct or wrapped timeout, EOF, cleanup, build,
-native-loading and unknown failures propagate; they never count as behavioral
-rejections.
+declared behavioral diagnostics and exact outer and nested exit-1 wrappers.
+Direct or wrapped timeout, EOF, cleanup, build, native-loading, OS/launch,
+UNKNOWN and abnormal-status failures propagate even when an expected behavioral
+diagnostic is also present. Positive evidence rejects infrastructure and failure
+contamination and requires one complete canonical compiler identity, including
+rejection of indented or mixed-prefix extra identities. Explicit prerequisite
+and timeout guards require their exact single declared refusal, not a matching
+substring amid other failures.
+
+The child's complete 71-current/97-strict results precede this final admission
+hardening. Its guard-only follow-up passed five targeted tests with isolated
+synthetic counters and one real positive per profile. Parent integration passed
+the same five guard tests with zero behavioral entrypoints; complete integrated
+current/strict matrices and preservation remain pending. No acceptance credit
+comes from the earlier weaker guard or these synthetic tests.
 
 The additive `--carrier-patterns` mode executes **97 actual entrypoints**
 (**48 accepted, 49 rejected**). All positive forms run for both signatures;
@@ -1781,6 +1793,6 @@ The shared selected-image checks retain their top-level/`runtimes/` copy scope,
 excluding unrelated publish artifacts. Native `Context` loading, per-process/
 entry/EOF cleanup deadlines of **120 seconds**, the old-run **600-second total**
 deadline and **4,096-character** per-invocation/observation output bounds remain.
-All 56 accepted prior profiles, all 65,536 SumToN probes and their output-only/
+All 56 previously integrated profiles, all 65,536 SumToN probes and their output-only/
 successful-counterfactual checks are unchanged. These two prerequisites are not
 full milestone, agent-task-set, publication or release acceptance.
