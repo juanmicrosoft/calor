@@ -680,7 +680,7 @@ public class Test
 
         // Nested conditional ownership is conservatively retained in one complete
         // type boundary rather than detached nested blocks.
-        Assert.Contains("§CSHARP", calor);
+        Assert.Contains("raw ", calor);
         Assert.Contains("#if NET6_0_OR_GREATER", calor);
         Assert.Contains("#if DEBUG", calor);
 
@@ -2599,7 +2599,7 @@ public class Test
             csharp,
             "SharedSuffix.cs");
         Assert.True(result.Success, GetErrorMessage(result));
-        Assert.Contains("§CSHARP", result.CalorSource);
+        Assert.Contains("raw ", result.CalorSource);
         Assert.Contains("return 1", result.CalorSource);
         Assert.Contains("return 2", result.CalorSource);
         var generated = CompileCalorToCSharp(result.CalorSource!);
@@ -4169,7 +4169,7 @@ public class Test
             csharp,
             "AttributedNullable.cs");
         Assert.True(result.Success, GetErrorMessage(result));
-        Assert.Contains("§CSHARP", result.CalorSource);
+        Assert.Contains("raw ", result.CalorSource);
         Assert.Contains("[System.Obsolete]", result.CalorSource);
         Assert.Contains("#nullable disable", result.CalorSource);
         Assert.Contains(

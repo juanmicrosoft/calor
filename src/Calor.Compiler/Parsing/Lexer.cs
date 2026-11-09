@@ -608,6 +608,16 @@ public sealed class Lexer
                 DocComment = tok.DocComment,
                 IndentationDepth = indentStack.Count - 1
             };
+            // Payload line breaks are opaque tokens, not Calor layout. Resume
+            // layout at the next header when a frame itself ends on a line break.
+            if (tok.Value is RawCSharpFrame && tok.Text[^1] is '\r' or '\n')
+            {
+                yield return new Token(TokenKind.Newline, "",
+                    new TextSpan(tok.Span.End, 0, raw[i + 1].Span.Line, 1));
+                atLineStart = true;
+                currentIndent = 0;
+                currentIndentHasTab = false;
+            }
         }
     }
 
@@ -2215,6 +2225,83 @@ public sealed class Lexer
     // FieldAccessNode chain. The CSharpEmitter (Visit(ReferenceNode)) handles dots
     // by splitting on '.' and sanitizing each part, so the round-trip is lossless.
     // See DottedNameRoundTripTests for verification.
+    private bool IsLineHead(int start)
+    {
+        for (var i = start - 1; i >= 0 && _source[i] is not '\r' and not '\n'; i--)
+            if (_source[i] is not ' ' and not '\t')
+                return false;
+        return true;
+    }
+
+    private Token ScanRawFrame()
+    {
+        Token Fail(string message)
+        {
+            _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.InvalidRawFrame, message);
+            return MakeToken(TokenKind.Error);
+        }
+
+        while (Current is ' ' or '\t')
+            Advance();
+        var reasonStart = _position;
+        while (!IsAtEnd && !char.IsWhiteSpace(Current))
+            Advance();
+        var marker = _source[reasonStart.._position];
+        if (marker.Length == 0 || !RawCSharpFrame.TryParseReason(marker, out var frame))
+            return Fail("raw requires a valid reason marker followed by a UTF-8 byte length.");
+        while (Current is ' ' or '\t')
+            Advance();
+        if (IsAtEnd || Current is '\r' or '\n')
+            return Fail("Missing raw payload length: expected a nonnegative decimal UTF-8 byte count.");
+        var length = 0;
+        var digits = 0;
+        while (Current is >= '0' and <= '9')
+        {
+            var digit = Current - '0';
+            if (length > (int.MaxValue - digit) / 10)
+                return Fail("Raw payload length overflows the supported UTF-8 byte count (2147483647).");
+            length = length * 10 + digit;
+            digits++;
+            Advance();
+        }
+        if (digits == 0)
+            return Fail("Invalid raw payload length: expected a nonnegative decimal UTF-8 byte count.");
+        while (Current is ' ' or '\t')
+            Advance();
+        if (Current is not '\r' and not '\n')
+            return Fail("Invalid raw header: the decimal byte length must be followed by a newline.");
+        if (Current == '\r')
+        {
+            Advance();
+            if (Current == '\n')
+                Advance();
+        }
+        else
+            Advance();
+
+        var payloadStart = _position;
+        var remaining = length;
+        while (remaining > 0)
+        {
+            if (IsAtEnd)
+                return Fail($"Truncated raw payload: missing {remaining} of {length} UTF-8 bytes.");
+            var status = System.Text.Rune.DecodeFromUtf16(
+                _source.AsSpan(_position), out var rune, out var consumed);
+            if (status != System.Buffers.OperationStatus.Done)
+                return Fail("Invalid Unicode in raw payload: an unpaired UTF-16 surrogate has no exact UTF-8 encoding.");
+            if (rune.Utf8SequenceLength > remaining)
+                return Fail("Raw payload length ends inside a UTF-8 code point.");
+            remaining -= rune.Utf8SequenceLength;
+            for (var i = 0; i < consumed; i++)
+                Advance();
+        }
+        if (!IsAtEnd && Current is not '\r' and not '\n'
+            && _source[_position - 1] is not '\r' and not '\n')
+            return Fail("Raw payload must be followed by a newline or end of file, outside its byte count.");
+        frame = frame with { Code = _source[payloadStart.._position] };
+        return MakeToken(marker == "statement" ? TokenKind.RawCSharp : TokenKind.CSharpInterop, frame);
+    }
+
     private Token ScanIdentifierOrTypedLiteral()
     {
         while (char.IsLetterOrDigit(Current) || Current == '_' || Current == '.')
@@ -2226,14 +2313,20 @@ public sealed class Lexer
 
         if (text == "record")
         {
-            var lineStart = _tokenStart == 0 ? 0 : _source.LastIndexOf('\n', _tokenStart - 1) + 1;
             var nameStart = _position;
             while (nameStart < _source.Length && _source[nameStart] is ' ' or '\t')
                 nameStart++;
             if (nameStart > _position && nameStart < _source.Length
                 && (char.IsLetter(_source[nameStart]) || _source[nameStart] is '_' or '@')
-                && _source.AsSpan(lineStart, _tokenStart - lineStart).Trim().IsEmpty)
+                && IsLineHead(_tokenStart))
                 return MakeToken(TokenKind.Record);
+        }
+
+        if (text == "raw"
+            && (IsAtEnd || Current is ' ' or '\t' or '\r' or '\n')
+            && IsLineHead(_tokenStart))
+        {
+            return ScanRawFrame();
         }
 
         // Check for typed literals (INT:42, STR:"hello", BOOL:true, FLOAT:3.14)

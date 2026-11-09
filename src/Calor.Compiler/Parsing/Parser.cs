@@ -2599,7 +2599,8 @@ public sealed class Parser
             return ParseDictionaryForeach();
         }
         // Raw C# passthrough
-        else if (Check(TokenKind.RawCSharp))
+        else if (Check(TokenKind.RawCSharp)
+            || Check(TokenKind.CSharpInterop) && Current.Value is RawCSharpFrame)
         {
             return ParseRawCSharpStatement();
         }
@@ -9879,6 +9880,12 @@ public sealed class Parser
     private CSharpInteropBlockNode ParseCSharpInteropBlock()
     {
         var token = Expect(TokenKind.CSharpInterop);
+        if (token.Value is RawCSharpFrame frame)
+        {
+            return new CSharpInteropBlockNode(
+                token.Span, frame.Code, frame.FeatureName, frame.Reason,
+                frame.MemberKind, frame.IsCompilationUnitPassthrough);
+        }
         var content = token.Value as string ?? "";
         var isCompilationUnitPassthrough = content.StartsWith(
             CSharpInteropBlockNode.CompilationUnitPassthroughMarker,
@@ -12129,9 +12136,13 @@ public sealed class Parser
     /// </summary>
     private RawCSharpNode ParseRawCSharpStatement()
     {
-        var token = Expect(TokenKind.RawCSharp);
-        var content = token.Value as string ?? "";
-        return new RawCSharpNode(token.Span, content);
+        var token = Expect(Check(TokenKind.CSharpInterop)
+            ? TokenKind.CSharpInterop : TokenKind.RawCSharp);
+        var content = token.Value is RawCSharpFrame frame
+            ? frame.Code : token.Value as string ?? "";
+        var reason = token.Kind == TokenKind.CSharpInterop && token.Value is RawCSharpFrame metadata
+            ? metadata.ReasonMarker : null;
+        return new RawCSharpNode(token.Span, content, reason);
     }
 
     private CompilerDirectiveNode ParseCompilerDirective()

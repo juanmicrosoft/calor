@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace Calor.Compiler.Mcp.Tools;
 
 /// <summary>
-/// Analyzes §CSHARP interop block content to detect C# constructs that have
+/// Analyzes raw C# interop payloads to detect C# constructs that have
 /// native Calor equivalents. Produces actionable hints for agents.
 /// </summary>
 internal static class InteropHintAnalyzer
@@ -106,24 +106,15 @@ internal static class InteropHintAnalyzer
     }
 
     /// <summary>
-    /// Extracts and concatenates the content of all §CSHARP{...}§/CSHARP blocks.
-    /// The actual format emitted by CalorEmitter is: §CSHARP{code}§/CSHARP
-    /// where the end marker is }§/CSHARP.
+    /// Extracts interop payloads using the lexer, including legacy frames.
     /// </summary>
     private static string ExtractInteropContent(string source)
     {
-        // Match §CSHARP{ ... }§/CSHARP — the actual emit format from CalorEmitter
-        var pattern = new Regex(@"§CSHARP\{(.*?)\}§/CSHARP", RegexOptions.Singleline);
-        var matches = pattern.Matches(source);
-        if (matches.Count == 0)
-            return "";
-
         var sb = new System.Text.StringBuilder();
-        foreach (Match match in matches)
-        {
-            // Group 1 is the content inside the braces
-            sb.AppendLine(match.Groups[1].Value);
-        }
+        foreach (var token in Parsing.RawCSharpFrame.ReadTokens(source)
+            .Where(t => t.Kind == Parsing.TokenKind.CSharpInterop))
+            sb.AppendLine(token.Value is Parsing.RawCSharpFrame frame
+                ? frame.Code : token.Value as string);
         return sb.ToString();
     }
 }

@@ -574,7 +574,8 @@ public sealed class BatchTool : McpToolBase
         if (outputPath == null || !File.Exists(outputPath))
             return 0;
         var content = File.ReadAllText(outputPath);
-        return Regex.Matches(content, @"§CSHARP\s*\{").Count;
+        return Parsing.RawCSharpFrame.ReadTokens(content)
+            .Count(t => t.Kind == Parsing.TokenKind.CSharpInterop);
     }
 
     private McpToolResult HandleCompile(JsonElement? arguments, bool summaryMode, CancellationToken cancellationToken)

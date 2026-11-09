@@ -64,7 +64,9 @@ public sealed class PostConversionFixer
 
             foreach (var (name, description, apply) in Rules)
             {
-                var (result, changed) = apply(current);
+                var result = Parsing.RawCSharpFrame.RewriteOutsideFrames(
+                    current, text => apply(text).Result);
+                var changed = !string.Equals(result, current, StringComparison.Ordinal);
                 if (changed)
                 {
                     current = result;

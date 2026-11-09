@@ -33,9 +33,12 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
         }
 
         var offset = PositionConverter.ToOffset(request.Position, snapshot.Source);
+        if (Calor.Compiler.Parsing.RawCSharpFrame.FindAtOffset(snapshot.Source, offset) != null)
+            return Task.FromResult<SignatureHelp?>(null);
 
         // Find if we're inside a function call
-        var callContext = FindCallContext(snapshot.Source, offset);
+        var callContext = FindCallContext(
+            Calor.Compiler.Parsing.RawCSharpFrame.MaskForAnalysis(snapshot.Source), offset);
         if (callContext == null)
         {
             return Task.FromResult<SignatureHelp?>(null);

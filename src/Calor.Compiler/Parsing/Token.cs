@@ -418,6 +418,139 @@ internal readonly record struct IntLiteralInfo(
 /// </summary>
 internal readonly record struct FloatLiteralInfo(double Value, bool IsSingle);
 
+internal sealed record RawCSharpFrame(
+    string Code,
+    string? FeatureName = null,
+    string? Reason = null,
+    Ast.InteropMemberKind MemberKind = Ast.InteropMemberKind.Other,
+    bool IsCompilationUnitPassthrough = false)
+{
+    internal static string MaskForAnalysis(string source)
+    {
+        var characters = source.ToCharArray();
+        var tokens = new Lexer(source, new Diagnostics.DiagnosticBag()).TokenizeAll();
+        foreach (var token in tokens)
+            if (token.Value is RawCSharpFrame)
+                for (var i = token.Span.Start; i < token.Span.End; i++)
+                    if (characters[i] is not '\r' and not '\n')
+                        characters[i] = ' ';
+        return new string(characters);
+    }
+
+    internal static Token? FindAtOffset(string source, int offset)
+    {
+        var tokens = new Lexer(source, new Diagnostics.DiagnosticBag()).TokenizeAll();
+        foreach (var token in tokens)
+            if ((token.Value is RawCSharpFrame
+                    || token.Kind == TokenKind.Error
+                        && (token.Text == "raw"
+                            || token.Text.StartsWith("raw ", StringComparison.Ordinal)
+                            || token.Text.StartsWith("raw\t", StringComparison.Ordinal)))
+                && offset >= token.Span.Start
+                && (token.Kind == TokenKind.Error || offset < token.Span.End
+                    || offset == token.Span.End && token.Text[^1] is not '\r' and not '\n'))
+                return token;
+        return null;
+    }
+
+    internal static List<Token> ReadTokens(string source)
+    {
+        var diagnostics = new Diagnostics.DiagnosticBag();
+        var tokens = new Lexer(source, diagnostics).TokenizeAll();
+        var frameErrors = diagnostics.Errors
+            .Where(d => d.Code == Diagnostics.DiagnosticCode.InvalidRawFrame).ToList();
+        if (frameErrors.Count > 0)
+            throw new FormatException(string.Join("\n", frameErrors.Select(d => d.Message)));
+        return tokens;
+    }
+
+    internal static string RewriteOutsideFrames(string source, Func<string, string> rewrite)
+    {
+        var frames = ReadTokens(source).Where(t => t.Value is RawCSharpFrame).ToList();
+        if (frames.Count == 0)
+            return rewrite(source);
+        var prefix = "__CALOR_OPAQUE_FRAME_";
+        while (source.Contains(prefix, StringComparison.Ordinal))
+            prefix += "_";
+        var masked = new System.Text.StringBuilder();
+        var replacements = new List<(string Marker, string Text, bool EndsLine)>();
+        var cursor = 0;
+        foreach (var token in frames)
+        {
+            var marker = prefix + replacements.Count + "__";
+            var endsLine = token.Text[^1] is '\r' or '\n';
+            masked.Append(source, cursor, token.Span.Start - cursor);
+            masked.Append(marker);
+            if (endsLine)
+                masked.Append('\n');
+            replacements.Add((marker, token.Text, endsLine));
+            cursor = token.Span.End;
+        }
+        masked.Append(source, cursor, source.Length - cursor);
+        var result = rewrite(masked.ToString());
+        foreach (var (marker, text, endsLine) in replacements)
+        {
+            if (!result.Contains(marker, StringComparison.Ordinal))
+                throw new InvalidOperationException("Source rewrite removed an opaque raw frame boundary.");
+            result = result.Replace(
+                endsLine && result.Contains(marker + "\n", StringComparison.Ordinal)
+                    ? marker + "\n" : marker, text, StringComparison.Ordinal);
+        }
+        return result;
+    }
+
+    internal string ReasonMarker
+    {
+        get
+        {
+            if (!IsCompilationUnitPassthrough
+                && Reason == null && MemberKind == Ast.InteropMemberKind.Other)
+            {
+                if (FeatureName == null)
+                    return "member";
+                var compact = Uri.EscapeDataString(FeatureName);
+                if (compact.Length > 0 && compact is not ("statement" or "member" or "unit"))
+                    return compact;
+            }
+            return $"{(IsCompilationUnitPassthrough ? "unit" : "member")}:" +
+                $"{Encode(FeatureName)}:{MemberKind}:{Encode(Reason)}";
+        }
+    }
+
+    private static string Encode(string? value) =>
+        value == null ? "~" : Uri.EscapeDataString(value).Replace("~", "%7E", StringComparison.Ordinal);
+
+    internal static bool TryParseReason(string marker, out RawCSharpFrame frame)
+    {
+        frame = new RawCSharpFrame("");
+        var parts = marker.Split(':');
+        if (parts.Length == 1)
+        {
+            if (marker is "statement" or "member")
+                return true;
+            if (marker == "unit")
+            {
+                frame = frame with { IsCompilationUnitPassthrough = true };
+                return true;
+            }
+            frame = frame with { FeatureName = Uri.UnescapeDataString(marker) };
+            return true;
+        }
+        if (parts.Length != 4 || parts[0] is not ("member" or "unit")
+            || !Enum.TryParse<Ast.InteropMemberKind>(parts[2], out var kind)
+            || !Enum.IsDefined(kind))
+            return false;
+        frame = frame with
+        {
+            FeatureName = parts[1] == "~" ? null : Uri.UnescapeDataString(parts[1]),
+            MemberKind = kind,
+            Reason = parts[3] == "~" ? null : Uri.UnescapeDataString(parts[3]),
+            IsCompilationUnitPassthrough = parts[0] == "unit"
+        };
+        return true;
+    }
+}
+
 internal abstract record InterpolatedStringTokenPart;
 
 internal sealed record InterpolatedStringTextTokenPart(string Text)

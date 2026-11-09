@@ -25,7 +25,8 @@ public class ConvertCommandPassthroughTests
         "public class Breakme { public int B() => 2; } }";
 
     private static Func<string, bool> CondemnOutsideCSharp(string marker) =>
-        calor => !Regex.Replace(calor, @"§CSHARP\{.*?\}§/CSHARP", "", RegexOptions.Singleline).Contains(marker);
+        calor => !Regex.Replace(Parsing.RawCSharpFrame.MaskForAnalysis(calor),
+            @"§CSHARP\{.*?\}§/CSHARP", "", RegexOptions.Singleline).Contains(marker);
 
     [Fact]
     public void PassthroughFlag_SetsPassthroughOnError()
@@ -86,7 +87,7 @@ public class ConvertCommandPassthroughTests
         var result = converter.Convert(TwoClasses);
 
         Assert.True(result.Success);
-        Assert.Contains("§CSHARP", result.CalorSource);
+        Assert.Contains("raw ", result.CalorSource);
         Assert.Contains("class Breakme", result.CalorSource);
         Assert.Equal(1, result.Context!.Stats.InteropBlocksEmitted);
         // The rescued block is attributed to the fallback specifically (#745 review

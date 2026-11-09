@@ -26,6 +26,7 @@ namespace Calor.Compiler.Formatting;
 /// Verbatim regions are preserved untouched: <c>§RAW…§/RAW</c> and
 /// <c>§CSHARP…§/CSHARP</c> blocks, plus any line that starts inside an
 /// unclosed bracket/brace (multi-line expressions, <c>§CS{…}</c>).
+/// Length-prefixed raw frames are shielded before line-based healing.
 ///
 /// The transform is idempotent: healed output re-heals to itself, because
 /// every emitted indent is exactly the canonical column its own structure
@@ -38,8 +39,8 @@ namespace Calor.Compiler.Formatting;
 ///
 /// <para><b>Design decision — this is intentionally a second layout engine.</b>
 /// The healer re-implements the lexer's layout heuristics on raw text because
-/// it must work on exactly the files the lexer/parser reject; it cannot call
-/// into them. Known divergences from the lexer
+/// it must work on exactly the files the parser rejects. The lexer is used
+/// only to shield length-prefixed raw frames. Known divergences from the lexer
 /// (<c>Lexer.PostProcessIndent</c>):
 /// (1) bracket continuation is an approximation — <see cref="BracketDelta"/>
 /// counts brackets textually (skipping strings/char literals/<c>//</c>
@@ -81,6 +82,24 @@ public sealed class SourceHealer
     /// <summary>Heal a Calor source text. Returns the healed text (may equal the input).</summary>
     public string Heal(string source)
     {
+        var shifts = new List<(int MaskedLine, int RemovedBreaks)>();
+        var removed = 0;
+        foreach (var token in Parsing.RawCSharpFrame.ReadTokens(source)
+            .Where(t => t.Value is Parsing.RawCSharpFrame))
+        {
+            var breaks = token.Text.Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Count(c => c is '\r' or '\n');
+            var delta = breaks - (token.Text[^1] is '\r' or '\n' ? 1 : 0);
+            shifts.Add((token.Span.Line - removed, delta));
+            removed += delta;
+        }
+        return Parsing.RawCSharpFrame.RewriteOutsideFrames(source, masked =>
+            HealUnprotected(masked, line => line
+                + shifts.Where(shift => line > shift.MaskedLine).Sum(shift => shift.RemovedBreaks)));
+    }
+
+    private string HealUnprotected(string source, Func<int, int> originalLine)
+    {
         _ambiguities.Clear();
         if (string.IsNullOrEmpty(source))
         {
@@ -108,7 +127,7 @@ public sealed class SourceHealer
             {
                 continue; // line emptied by the closer strip
             }
-            lines.Add((strippedLines[i], i + 1));
+            lines.Add((strippedLines[i], originalLine(i + 1)));
         }
 
         // Step 2 — classify lines (verbatim regions, bracket continuations)

@@ -39,6 +39,25 @@ public sealed class HoverHandler : HoverHandlerBase
         Position position)
     {
         var (line, column) = PositionConverter.ToCalorPosition(position);
+        var offset = PositionConverter.ToOffset(position, snapshot.Source);
+        var raw = Calor.Compiler.Parsing.RawCSharpFrame.FindAtOffset(snapshot.Source, offset);
+        if (raw is { } token)
+        {
+            var headerEnd = token.Text.IndexOfAny(['\r', '\n']);
+            if (headerEnd < 0 || offset >= token.Span.Start + headerEnd)
+                return null;
+            return new Hover
+            {
+                Contents = new MarkedStringsOrMarkupContent(new MarkupContent
+                {
+                    Kind = MarkupKind.Markdown,
+                    Value = "**raw reason N** — preserves exactly N UTF-8 payload bytes after the header newline. Payload indentation and line endings are not Calor syntax."
+                }),
+                Range = PositionConverter.ToLspRange(
+                    new Calor.Compiler.Parsing.TextSpan(token.Span.Start, headerEnd,
+                        token.Span.Line, token.Span.Column), snapshot.Source)
+            };
+        }
 
         // Try tag documentation hover FIRST - educational docs for Calor syntax tags
         // This takes priority because users hovering over § tags want syntax help

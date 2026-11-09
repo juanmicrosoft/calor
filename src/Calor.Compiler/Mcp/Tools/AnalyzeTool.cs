@@ -694,25 +694,14 @@ public sealed class AnalyzeTool : McpToolBase
     private static List<CSharpBlock> ExtractCSharpBlocks(string source)
     {
         var blocks = new List<CSharpBlock>();
-        var lines = source.Split('\n');
-
-        for (int i = 0; i < lines.Length; i++)
-        {
-            var line = lines[i].TrimStart();
-            if (line.StartsWith("§CSHARP", StringComparison.Ordinal))
+        foreach (var token in Parsing.RawCSharpFrame.ReadTokens(source)
+            .Where(t => t.Kind == Parsing.TokenKind.CSharpInterop))
+            blocks.Add(new CSharpBlock
             {
-                var codeLines = new List<string>();
-                int j = i + 1;
-                while (j < lines.Length && !lines[j].TrimStart().StartsWith("§/CSHARP", StringComparison.Ordinal))
-                {
-                    codeLines.Add(lines[j]);
-                    j++;
-                }
-                blocks.Add(new CSharpBlock { Code = string.Join('\n', codeLines), Line = i + 1 });
-                i = j;
-            }
-        }
-
+                Code = token.Value is Parsing.RawCSharpFrame frame
+                    ? frame.Code : token.Value as string ?? "",
+                Line = token.Span.Line
+            });
         return blocks;
     }
 

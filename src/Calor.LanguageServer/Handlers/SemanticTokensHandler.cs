@@ -135,6 +135,11 @@ public sealed class SemanticTokensHandler : SemanticTokensHandlerBase
 
         public void Visit(ModuleNode module)
         {
+            var lexer = new Lexer(_source, new Calor.Compiler.Diagnostics.DiagnosticBag());
+            foreach (var token in lexer.TokenizeAll().Where(t => t.Value is RawCSharpFrame))
+                PushToken(new TextSpan(token.Span.Start, 3,
+                    token.Span.Line, token.Span.Column), SemanticTokenType.Keyword);
+
             foreach (var func in module.Functions)
                 VisitFunction(func);
 

@@ -11,6 +11,49 @@ namespace Calor.LanguageServer.Tests.Handlers;
 public class HoverHandlerTests
 {
     [Fact]
+    public async Task RawFraming_HeaderHoverAndOpaquePayloadDoNotLeakCalorAssistanceAsync()
+    {
+        const string payload = "// \u03c0\U0001f600 §F{Fake}\r\n// §C{Run} §A value";
+        var source = "§M{Test}\n  §F{Run:pub} (i32:value) -> i32\n    §R value\n" +
+            $"  raw member {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n" +
+            "  §F{After:pub} () -> void\n";
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///raw-hover.calr");
+        var state = _workspace.GetOrCreate(uri, source, version: 1);
+        Assert.NotNull(state.Snapshot.Ast);
+        var header = source.IndexOf("raw ", StringComparison.Ordinal);
+        var (headerLine, headerColumn) = LspTestHarness.GetLineColumn(source, header);
+        var headerPosition = new Position(headerLine - 1, headerColumn - 1);
+        var hover = HoverHandler.BuildHover(state.Snapshot, headerPosition);
+        Assert.NotNull(hover);
+        Assert.Contains("UTF-8", hover.Contents.MarkupContent!.Value);
+        var completion = new CompletionHandler(_workspace);
+        var signature = new SignatureHelpHandler(_workspace);
+        foreach (var marker in new[] { "§F{Fake}", "§C{Run}" })
+        {
+            var (line, column) = LspTestHarness.GetLineColumn(source, source.IndexOf(marker, StringComparison.Ordinal));
+            var position = new Position(line - 1, column - 1);
+            Assert.Null(HoverHandler.BuildHover(state.Snapshot, position));
+            var items = await completion.Handle(new CompletionParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = position
+            }, CancellationToken.None);
+            Assert.Empty(items.Items);
+            Assert.Null(await signature.Handle(new SignatureHelpParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = position
+            }, CancellationToken.None));
+        }
+        var (endLine, endColumn) = LspTestHarness.GetLineColumn(source, source.Length);
+        Assert.Null(await signature.Handle(new SignatureHelpParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            Position = new Position(endLine - 1, endColumn - 1)
+        }, CancellationToken.None));
+    }
+
+    [Fact]
     public void PackagedTeachingMetadata_MatchesEveryHoverEntry()
     {
         var provider = TagDocumentationProvider.Instance;

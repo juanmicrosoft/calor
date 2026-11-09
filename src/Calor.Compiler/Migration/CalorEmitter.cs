@@ -83,8 +83,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _pendingHoistedLines.Clear();
         foreach (var line in lines)
         {
-            _builder.Append(new string(' ', _indentLevel * 2));
-            _builder.AppendLine(line);
+            AppendIndentedLine(line);
         }
     }
 
@@ -97,7 +96,22 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         else
         {
-            _builder.Append(new string(' ', _indentLevel * 2));
+            AppendIndentedLine(line);
+        }
+    }
+
+    private void AppendIndentedLine(string line)
+    {
+        var indent = new string(' ', _indentLevel * 2);
+        if (line.Contains('\n')
+            && RawCSharpFrame.ReadTokens(line).Any(t => t.Value is RawCSharpFrame))
+        {
+            _builder.AppendLine(RawCSharpFrame.RewriteOutsideFrames(line, text =>
+                indent + text.Replace("\n", "\n" + indent, StringComparison.Ordinal)));
+        }
+        else
+        {
+            _builder.Append(indent);
             _builder.AppendLine(line);
         }
     }
@@ -179,7 +193,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Capture result. Any binding still pending belongs to this statement
         // (the visitor returned without an AppendLine), so it leads the capture.
         var leftover = _pendingHoistedLines.ToList();
-        var result = _builder.ToString().TrimEnd('\r', '\n');
+        var result = RawCSharpFrame.RewriteOutsideFrames(
+            _builder.ToString(), text => text.TrimEnd('\r', '\n'));
         if (leftover.Count > 0)
             result = string.Join("\n", leftover) + "\n" + result;
 
@@ -204,7 +219,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         try
         {
             return node.StatementBody!
-                .Select(s => CaptureStatementOutput(s).Trim())
+                .Select(s => RawCSharpFrame.RewriteOutsideFrames(
+                    CaptureStatementOutput(s), text => text.Trim()))
                 .ToList();
         }
         finally
@@ -257,6 +273,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         foreach (var stmt in capturedStatements)
         {
             if (string.IsNullOrWhiteSpace(stmt)) continue;
+            if (RawCSharpFrame.ReadTokens(stmt).Any(t => t.Value is RawCSharpFrame))
+            {
+                lines.Add(RawCSharpFrame.RewriteOutsideFrames(stmt, text =>
+                    string.Join("\n", text.Split('\n')
+                        .Select(line => line.Length == 0 ? "" : "  " + line.TrimEnd('\r')))));
+                continue;
+            }
             foreach (var line in stmt.Split('\n'))
             {
                 var trimmed = line.TrimEnd('\r');
@@ -278,7 +301,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private static bool CanInlineLambdaStatements(LambdaExpressionNode node, IReadOnlyList<string> captured)
         => node.StatementBody!.Count <= 2
            && !node.StatementBody.Any(s => s is FallbackCommentNode or RawCSharpNode)
-           && captured.All(s => !s.Contains('\n'));
+           && captured.All(s => !s.Contains('\n') && !s.Contains('\r'));
 
     /// <summary>
     /// Captures a statement-bodied lambda's statements once and reports whether the
@@ -5160,18 +5183,17 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(RawCSharpNode node)
     {
-        FlushHoistedLines();
-        _builder.Append(new string(' ', _indentLevel * 2));
-        _builder.AppendLine("§RAW");
-        _builder.Append(node.CSharpCode);
-        if (node.CSharpCode.Length == 0
-            || node.CSharpCode[^1] is not '\r' and not '\n')
-        {
-            _builder.AppendLine();
-        }
-        _builder.Append(new string(' ', _indentLevel * 2));
-        _builder.AppendLine("§/RAW");
+        EmitRawFrame(node.FramingReason ?? "statement", node.CSharpCode);
         return "";
+    }
+
+    private void EmitRawFrame(string reason, string code)
+    {
+        var byteCount = new UTF8Encoding(false, true).GetByteCount(code);
+        AppendLine($"raw {reason} {byteCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+        _builder.Append(code);
+        // This separator belongs to the Calor envelope, never to the payload.
+        _builder.AppendLine();
     }
 
     public string Visit(CompilerDirectiveNode node)
@@ -5363,24 +5385,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(CSharpInteropBlockNode node)
     {
-        FlushHoistedLines();
-        _builder.Append(new string(' ', _indentLevel * 2));
-        _builder.Append("§CSHARP{");
-        if (node.IsCompilationUnitPassthrough)
-            _builder.Append(
-                CSharpInteropBlockNode.CompilationUnitPassthroughMarker);
-        _builder.Append(node.CSharpCode);
-        if (!node.IsCompilationUnitPassthrough
-            && !node.CSharpCode.EndsWith('\n')
-            && !node.CSharpCode.EndsWith('\r')
-            && node.CSharpCode[
-                     (node.CSharpCode.LastIndexOfAny(['\r', '\n']) + 1)..]
-                 .Contains("//", StringComparison.Ordinal))
-        {
-            _builder.AppendLine();
-            _builder.Append(new string(' ', _indentLevel * 2));
-        }
-        _builder.AppendLine("}§/CSHARP");
+        var frame = new RawCSharpFrame(node.CSharpCode, node.FeatureName,
+            node.Reason, node.MemberKind, node.IsCompilationUnitPassthrough);
+        EmitRawFrame(frame.ReasonMarker, frame.Code);
         return "";
     }
 

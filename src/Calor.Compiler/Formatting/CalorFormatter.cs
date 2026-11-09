@@ -33,7 +33,13 @@ public sealed class CalorFormatter
     public string Format(ModuleNode module)
     {
         ArgumentNullException.ThrowIfNull(module);
-        return new CalorEmitter().Emit(module).TrimEnd('\r', '\n');
+        var emitted = new CalorEmitter().Emit(module);
+        var trimmed = emitted.TrimEnd('\r', '\n');
+        var payloadEnd = RawCSharpFrame.ReadTokens(emitted)
+            .Where(t => t.Value is RawCSharpFrame)
+            .Select(t => t.Span.End)
+            .DefaultIfEmpty(0).Max();
+        return emitted[..Math.Max(trimmed.Length, payloadEnd)];
     }
 
     /// <summary>

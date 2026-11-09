@@ -139,9 +139,12 @@ public sealed class CompletionHandler : CompletionHandlerBase
         var snapshot = document.Analysis;
         var items = new List<CompletionItem>();
         var offset = PositionConverter.ToOffset(request.Position, snapshot.Source);
+        if (Calor.Compiler.Parsing.RawCSharpFrame.FindAtOffset(snapshot.Source, offset) != null)
+            return Task.FromResult(new CompletionList());
 
         // Determine context
-        var context = GetCompletionContext(snapshot.Source, offset);
+        var context = GetCompletionContext(
+            Calor.Compiler.Parsing.RawCSharpFrame.MaskForAnalysis(snapshot.Source), offset);
 
         switch (context)
         {
@@ -172,6 +175,13 @@ public sealed class CompletionHandler : CompletionHandlerBase
 
             default:
                 // General context - provide all completions
+                items.Add(new CompletionItem
+                {
+                    Label = "raw",
+                    Kind = CompletionItemKind.Keyword,
+                    Detail = "Exact UTF-8 byte-length C# payload: raw reason N",
+                    InsertText = "raw "
+                });
                 items.AddRange(GetTagCompletions());
                 items.AddRange(GetTypeCompletions(snapshot.Ast));
                 items.AddRange(GetExpressionCompletionsFromSnapshot(snapshot, offset));

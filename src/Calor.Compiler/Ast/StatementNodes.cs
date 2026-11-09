@@ -170,7 +170,7 @@ public sealed class FallbackCommentNode : StatementNode
 
 /// <summary>
 /// Represents a raw C# passthrough block.
-/// §RAW ... §/RAW
+/// raw statement N (legacy §RAW ... §/RAW remains accepted).
 /// Content is emitted verbatim as C# code without any transformation.
 /// </summary>
 public sealed class RawCSharpNode : StatementNode
@@ -179,11 +179,13 @@ public sealed class RawCSharpNode : StatementNode
     /// The raw C# source code to emit verbatim.
     /// </summary>
     public string CSharpCode { get; }
+    public string? FramingReason { get; }
 
-    public RawCSharpNode(TextSpan span, string csharpCode)
+    public RawCSharpNode(TextSpan span, string csharpCode, string? framingReason = null)
         : base(span)
     {
         CSharpCode = csharpCode ?? throw new ArgumentNullException(nameof(csharpCode));
+        FramingReason = framingReason;
     }
 
 
@@ -369,7 +371,7 @@ public enum InteropMemberKind
 
 /// <summary>
 /// Represents a raw C# interop block at module or class scope.
-/// §CSHARP{...}§/CSHARP
+/// raw reason N (legacy §CSHARP{...}§/CSHARP remains accepted).
 /// Used to preserve unsupported C# members verbatim during partial conversion.
 /// Unlike RawCSharpNode (statement-level), this is a member-level construct.
 /// </summary>

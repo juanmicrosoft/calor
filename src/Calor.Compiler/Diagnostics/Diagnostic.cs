@@ -28,6 +28,7 @@ public static class DiagnosticCode
     public const string UnsignedNegativeLiteral = "Calor0010";
     public const string InterpolatedUtf8Literal = "Calor0011";
     public const string SignedIntegerLiteralOverflow = "Calor0012";
+    public const string InvalidRawFrame = "Calor0013";
 
     /// <summary>
     /// Warning: leading whitespace uses tab characters. Calor indentation is
