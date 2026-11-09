@@ -308,15 +308,13 @@ public sealed class Lexer
     };
 
     /// <summary>
-    /// Every §-keyword the lexer accepts, including forms handled outside the
-    /// keyword dictionary: preprocessor conditionals (§PP / §/PP / §PPE),
-    /// inline C# expressions (§CS), raw passthrough blocks (§RAW / §/RAW),
-    /// and C# interop blocks (§CSHARP / §/CSHARP). Single source of truth for
+    /// Every canonical word the lexer accepts, including counted raw frames.
+    /// Single source of truth for
     /// the docs-drift check (<c>calor self-check docs</c>).
     /// </summary>
     public static IReadOnlyCollection<string> KeywordNames { get; } =
-        Keywords.Keys
-            .Concat(["PP", "/PP", "PPE", "CS", "RAW", "/RAW", "CSHARP", "/CSHARP"])
+        CanonicalKeywords.Keys
+            .Append("raw")
             .ToArray();
 
     public Lexer(string source, DiagnosticBag diagnostics)
@@ -716,7 +714,7 @@ public sealed class Lexer
         return Current switch
         {
             '\0' => MakeToken(TokenKind.Eof),
-            '§' => ScanSectionMarker(),
+            '§' => ScanRetiredSectionMarker(),
             '[' => ScanSingle(TokenKind.OpenBracket),
             ']' => ScanSingle(TokenKind.CloseBracket),
             '{' => ScanSingle(TokenKind.OpenBrace),
@@ -752,9 +750,9 @@ public sealed class Lexer
             // Unicode quantifiers
             '∀' => ScanRemovedQuantifier("forall"),
             '∃' => ScanRemovedQuantifier("exists"),
-            '`' => ScanBacktickIdentifier(),
+            '`' => ScanRetiredBacktickIdentifier(),
             '\'' => ScanCharLiteral(),
-            '$' => ScanDollarString(),
+            '$' => ScanRetiredDollarString(),
             ';' => ScanSingle(TokenKind.Semicolon),
             _ when char.IsLetter(Current) || Current == '_' => ScanIdentifierOrTypedLiteral(),
             _ when char.IsDigit(Current) => ScanNumber(),
@@ -907,7 +905,9 @@ public sealed class Lexer
         {
             Advance(); // consume '-'
             Advance(); // consume '>'
-            return MakeToken(TokenKind.Arrow);
+            _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.InvalidSectionOperator,
+                "The ASCII arrow '->' is removed. Use '→' for a function signature; write implication as '!p || q'.");
+            return MakeToken(TokenKind.Error);
         }
         // A sign is an operator, including without whitespace in a-1.
         Advance();
@@ -967,6 +967,52 @@ public sealed class Lexer
         return new Token(TokenKind.Identifier, sb.ToString(), CurrentSpan(), sb.ToString());
     }
 
+    private Token ScanRetiredBacktickIdentifier()
+    {
+        Advance();
+        while (!IsAtEnd && Current is not '`' and not '\r' and not '\n')
+            Advance();
+        if (Current == '`')
+            Advance();
+        _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.InvalidSectionOperator,
+            "Backtick identifiers are removed. Use '@name' for a keyword collision.");
+        return MakeToken(TokenKind.Error);
+    }
+
+    private Token ScanRetiredDollarString()
+    {
+        Advance();
+        _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.InvalidSectionOperator,
+            "Prefixed interpolated strings are removed. Use a plain string with '${expression}' holes.");
+        return MakeToken(TokenKind.Error);
+    }
+
+    private Token ScanRetiredSectionMarker()
+    {
+        Advance();
+        if (Current == '/')
+            Advance();
+        while (char.IsLetterOrDigit(Current) || Current is '_' or '?' or '^')
+            Advance();
+        var marker = CurrentText();
+        var guidance = marker switch
+        {
+            "§M" => "Use 'module Name'.",
+            "§F" or "§MT" or "§AF" or "§AMT" => "Use 'func Name' with a '→' signature.",
+            "§B" => "Use 'let' or 'var' with a type:name binding.",
+            "§E" => "Use an '! effects' header.",
+            "§Q" => "Use a 'requires expression' header.",
+            "§S" => "Use an '=> expression' postcondition header.",
+            "§SN" or "§DP" or "§BR" => "Use constrained '/// since', '/// deprecated' or '/// breaking' documentation.",
+            "§RAW" or "§CS" or "§CSHARP" => "Use 'raw reason N' with the exact UTF-8 payload length.",
+            _ when marker.StartsWith("§/", StringComparison.Ordinal) => "End blocks by dedenting; expressions need no closer tags.",
+            _ => "Use canonical lowercase words and ordinary C# expression punctuation."
+        };
+        _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.UnknownSectionMarker,
+            $"Legacy section marker '{marker}' is removed. {guidance}");
+        return MakeToken(TokenKind.Error);
+    }
+
     private Token ScanSingle(TokenKind kind)
     {
         Advance();
@@ -976,6 +1022,12 @@ public sealed class Lexer
     private Token ScanEscapedIdentifier()
     {
         Advance();
+        if (Current == '"')
+        {
+            _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.InvalidSectionOperator,
+                "Verbatim string prefixes are removed. Use a plain string with escaped literal text.");
+            return MakeToken(TokenKind.Error);
+        }
         if (!char.IsLetter(Current) && Current != '_')
             return MakeToken(TokenKind.At);
         var start = _position;
@@ -2425,68 +2477,15 @@ public sealed class Lexer
                 "FLOAT" or "SINGLE" or "DEC" or "DECIMAL" => char.IsDigit(lookahead) || lookahead is '-' or '.',
                 _ => false
             };
-            if (looksLikeLiteral && text != upperText)
+            if (looksLikeLiteral)
             {
+                Advance(); // consume the retired prefix's colon, not its value
                 _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.InvalidTypedLiteral,
-                    $"Literal prefixes are case-sensitive. Use '{upperText}:' instead of '{text}:'.");
+                    $"Typed literal prefix '{text}:' is removed. Use a bare literal with its C# numeric suffix when needed.");
                 return MakeToken(TokenKind.Error);
             }
 
-            // INT:digits or INT:-digits
-            if (text == "INT" && (char.IsDigit(lookahead) || lookahead == '-'))
-            {
-                return ScanTypedIntLiteral();
-            }
-            // STR:"string"
-            if (text == "STR" && lookahead == '"')
-            {
-                return ScanTypedStringLiteral();
-            }
-            // BOOL:true or BOOL:false
-            if (text == "BOOL" && (lookahead == 't' || lookahead == 'f'))
-            {
-                // Extra check: make sure it's exactly "true" or "false", not an identifier
-                // like "trueTestPermits..." — require word boundary after the literal
-                var remaining = _source[(_position + 1)..];
-                if (remaining.StartsWith("true") && (remaining.Length == 4 || !char.IsLetterOrDigit(remaining[4])))
-                {
-                    return ScanTypedBoolLiteral();
-                }
-                if (remaining.StartsWith("false") && (remaining.Length == 5 || !char.IsLetterOrDigit(remaining[5])))
-                {
-                    return ScanTypedBoolLiteral();
-                }
-            }
-            // FLOAT:digits or FLOAT:-digits or FLOAT:.digits
-            if (text == "FLOAT" && (char.IsDigit(lookahead) || lookahead == '-' || lookahead == '.'))
-            {
-                return ScanTypedFloatLiteral();
-            }
-            // DECIMAL:digits or DEC:digits (decimal literal)
-            if ((text == "DECIMAL" || text == "DEC") && (char.IsDigit(lookahead) || lookahead == '-' || lookahead == '.'))
-            {
-                return ScanTypedDecimalLiteral();
-            }
-            // SINGLE:digits (single-precision float literal, #774 width preservation)
-            if (text == "SINGLE" && (char.IsDigit(lookahead) || lookahead == '-' || lookahead == '.'))
-            {
-                return ScanTypedFloatLiteral(isSingle: true);
-            }
-            // LONG:digits / UINT:digits / ULONG:digits (explicit int width/signedness, #774)
-            if (text == "LONG" && (char.IsDigit(lookahead) || lookahead == '-'))
-            {
-                return ScanTypedIntLiteral(isUnsigned: false, isLong: true);
-            }
-            if (text == "UINT" && (char.IsDigit(lookahead) || lookahead == '-'))
-            {
-                return ScanTypedIntLiteral(isUnsigned: true, isLong: false);
-            }
-            if (text == "ULONG" && (char.IsDigit(lookahead) || lookahead == '-'))
-            {
-                return ScanTypedIntLiteral(isUnsigned: true, isLong: true);
-            }
-
-            // Not a typed literal - return as identifier (colon is a separate token)
+            // A declaration type:name still uses an ordinary colon.
         }
 
         // v2: Support bare boolean literals

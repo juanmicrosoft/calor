@@ -8,6 +8,82 @@ namespace Calor.Compiler.Tests;
 
 public class LexerTests
 {
+    [Theory]
+    [InlineData("§M")]
+    [InlineData("§F")]
+    [InlineData("§CL")]
+    [InlineData("§/M")]
+    [InlineData("§/C")]
+    [InlineData("§/NEW")]
+    [InlineData("§/LAM")]
+    [InlineData("§SN")]
+    [InlineData("§DP")]
+    [InlineData("§BR")]
+    [InlineData("§RAW")]
+    [InlineData("§CSHARP")]
+    [InlineData("§CS")]
+    [InlineData("§IF")]
+    [InlineData("§ARR")]
+    [InlineData("§EACHKV")]
+    public void CanonicalCutover_RejectsEveryLegacyMarkerBoundary(string marker)
+    {
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(marker, diagnostics).TokenizeAll();
+        Assert.Equal(TokenKind.Error, tokens[0].Kind);
+        Assert.Equal(marker, tokens[0].Text);
+        Assert.Equal(DiagnosticCode.UnknownSectionMarker, Assert.Single(diagnostics.Errors).Code);
+    }
+
+    [Theory]
+    [InlineData("INT:42")]
+    [InlineData("LONG:42")]
+    [InlineData("UINT:42")]
+    [InlineData("ULONG:42")]
+    [InlineData("FLOAT:1.5")]
+    [InlineData("SINGLE:1.5")]
+    [InlineData("DEC:1.5")]
+    [InlineData("DECIMAL:1.5")]
+    [InlineData("BOOL:true")]
+    [InlineData("STR:\"text\"")]
+    [InlineData("int:42")]
+    [InlineData("str:\"text\"")]
+    public void CanonicalCutover_RejectsTypedLiteralPrefixes(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(source, diagnostics).TokenizeAll();
+        Assert.Equal(TokenKind.Error, tokens[0].Kind);
+        var error = Assert.Single(diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.InvalidTypedLiteral, error.Code);
+        Assert.Contains("removed", error.Message);
+        Assert.DoesNotContain("Use 'INT:'", error.Message);
+    }
+
+    [Theory]
+    [InlineData("->")]
+    [InlineData("`name`")]
+    [InlineData("$\"text\"")]
+    [InlineData("@\"text\"")]
+    public void CanonicalCutover_RejectsRetiredArrowAndStringIdentifierPrefixes(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        Assert.Equal(TokenKind.Error, new Lexer(source, diagnostics).TokenizeAll()[0].Kind);
+        Assert.NotEmpty(diagnostics.Errors);
+    }
+
+    [Fact]
+    public void CanonicalCutover_RawStringsAndDocumentationKeepLegacyLookingTextOpaque()
+    {
+        const string payload = "§M{not Calor}\r\nINT:42 $\"${0}\" `name` ->\n";
+        var bytes = System.Text.Encoding.UTF8.GetByteCount(payload);
+        var source = $"/// since §SN INT:42\nraw statement {bytes}\n{payload}\n\"§M INT:42 -> \\${{0}}\"";
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(source, diagnostics).TokenizeAll();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+        Assert.Equal(payload, Assert.IsType<RawCSharpFrame>(tokens[0].Value).Code);
+        Assert.Equal("since §SN INT:42", tokens[0].DocComment);
+        Assert.Equal(TokenKind.StrLiteral, tokens[1].Kind);
+    }
+
     [Fact]
     public void CanonicalWords_ExposeTheSharedParserInterface()
     {
