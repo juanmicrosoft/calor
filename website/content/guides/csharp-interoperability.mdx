@@ -244,7 +244,7 @@ public static class Report
 ```calor
       return "${item,-8}|${amount,10:F2}"
       return Kind(((global::System.FormattableString)"k=${x}"))
-      raw statement 29
+      raw member:string-interpolation-handler:Other:Statement%20preserved%20as%20raw%20C%23%3A%20sb.Append%28%24%22x%3D%7Bx%7D%22%29%3B 29
         sb.Append($"x={x}");
 ```
 
@@ -409,7 +409,7 @@ module Grid overflow unchecked
       return Sum(new int[] { v, (v * 2) }, (Pick(true, v))[0, 1])
 
     func Mixed () → int
-      raw statement 53
+      raw member:array-element-block:Other:Statement%20preserved%20as%20raw%20C%23%3A%20object%5B%5D%20items%20%3D%20%7B%20new%20List%3Cint%3E%20%7B%201%20%7D%2C%202%20%7D%3B 53
         object[] items = { new List<int> { 1 }, 2 };
 
       return items.Length
