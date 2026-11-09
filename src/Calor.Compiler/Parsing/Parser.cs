@@ -9773,7 +9773,7 @@ public sealed class Parser
 
         foreach (var word in pos2.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries))
         {
-            if (RemovedVisibilityReplacement(word) is { } replacement)
+            if (!IsCanonicalDeclaration(startToken) && RemovedVisibilityReplacement(word) is { } replacement)
                 _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnknownVisibility,
                     $"Removed visibility '{word}'. Use '{replacement}' instead.");
         }
@@ -9841,7 +9841,7 @@ public sealed class Parser
         if (!isModule && isStatic)
         {
             _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
-                $"Static class declarations are removed. Replace '§CL{{{name}:...}}' with a named module '§M{{{name}:...}}'; use §F for its functions. Static members of non-static classes remain supported.");
+                $"Static class declarations are removed. Use a named 'module {name}' inside the compilation-unit wrapper, with 'func' members. Static members of non-static classes remain supported.");
         }
         var isPartial = modifierTokens.Any(t => t.Equals("partial", StringComparison.Ordinal));
         var isStruct = modifierTokens.Any(t => t.Equals("struct", StringComparison.Ordinal));
