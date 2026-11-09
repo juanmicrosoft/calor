@@ -174,6 +174,10 @@ public class DocDriftCheckerTests
         new[] { "GlobalModule.Divide(9, 2)", "GlobalModule.Add(20, 22)" })]
     [InlineData("philosophy/design-principles.mdx", 1, 0,
         new[] { "DesignContracts" }, new[] { "4" }, new[] { "GlobalModule.Divide(9, 2)" })]
+    [InlineData("philosophy/static-verification.mdx", 3, 0,
+        new[] { "SquareBoundaries", "FunctionCallBoundary", "FloatingProofBoundary" },
+        new[] { "2147395600", "1", "4" },
+        new[] { "GlobalModule.Square(46340)", "GlobalModule.Identity(1)", "GlobalModule.Square(2.0)" })]
     [InlineData("philosophy/stable-identifiers.mdx", 1, 0,
         new[] { "Calculator" }, new[] { "42" }, new[] { "GlobalModule.Calculate(21)" })]
     [InlineData("philosophy/effects-contracts-enforcement.mdx", 4, 1,
@@ -720,6 +724,53 @@ public class DocDriftCheckerTests
                 }
                 """);
             Assert.Equal(mode == ContractMode.Off ? disabled : enabled, observed);
+        }
+    }
+
+    [Theory]
+    [InlineData("FunctionCallBoundary", "Identity")]
+    [InlineData("FloatingProofBoundary", "Square")]
+    public async Task PublicStaticVerification_ReportsUnsupportedForExactPublishedBoundaries(
+        string module, string functionName)
+    {
+        var path = "website/content/philosophy/static-verification.mdx";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith($"module {module}\n", StringComparison.Ordinal)).Source;
+        var response = await new Calor.Compiler.Mcp.Tools.VerifyTool().ExecuteAsync(
+            JsonSerializer.SerializeToElement(new { source, timeout = 5000 }));
+        using var document = JsonDocument.Parse(Assert.IsType<string>(Assert.Single(response.Content).Text));
+        var function = document.RootElement.GetProperty("functions").EnumerateArray()
+            .Single(function => function.GetProperty("functionName").GetString() == functionName);
+        var postcondition = Assert.Single(function.GetProperty("contracts").EnumerateArray()
+            .Where(contract => contract.GetProperty("type").GetString() == "postcondition"));
+        Assert.Equal("unsupported", postcondition.GetProperty("status").GetString());
+    }
+
+    [Theory]
+    [InlineData("SquareBoundaries", "46340", "2147395600", "2147395600")]
+    [InlineData("SquareBoundaries", "46341", "!OverflowException", "!OverflowException")]
+    [InlineData("SquareBoundaries", "-1", "!ContractViolationException", "1")]
+    [InlineData("FloatingProofBoundary", "double.NaN", "!ContractViolationException", "NaN")]
+    public void PublicStaticVerification_SeparatesEnabledContractsFromActualArithmetic(
+        string module, string argument, string enabled, string disabled)
+    {
+        var path = "website/content/philosophy/static-verification.mdx";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith($"module {module}\n", StringComparison.Ordinal)).Source;
+        foreach (var (mode, expected) in new[] { (ContractMode.Debug, enabled), (ContractMode.Off, disabled) })
+        {
+            var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = mode });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run() => GlobalModule.Square({{argument}});
+                }
+                """);
+            Assert.Equal(expected, observed);
         }
     }
 
