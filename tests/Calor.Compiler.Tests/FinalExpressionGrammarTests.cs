@@ -13,6 +13,76 @@ namespace Calor.Compiler.Tests;
 public sealed class FinalExpressionGrammarTests
 {
     [Theory]
+    [InlineData("await next() + 1")]
+    [InlineData("await next() * 2")]
+    [InlineData("await next() ?? 1")]
+    public void Await_UsesUnaryRatherThanWholeExpressionPrecedence(string source)
+    {
+        var expression = Parse(source);
+        var left = expression switch
+        {
+            BinaryOperationNode binary => binary.Left,
+            NullCoalesceNode coalesce => coalesce.Left,
+            _ => throw new InvalidOperationException(expression.GetType().Name)
+        };
+        var awaited = Assert.IsType<AwaitExpressionNode>(left);
+        Assert.IsType<CallExpressionNode>(awaited.Awaited);
+        Assert.Equal("await next()", source[..awaited.Span.Length]);
+        Assert.True(awaited.Span.End < expression.Span.End);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Await_EmitsExplicitConfigurationAsOrdinaryNativeMemberCall(bool configure)
+    {
+        var node = new AwaitExpressionNode(default, Parse("next()"), configure);
+        var emitted = node.Accept(new CalorEmitter());
+        Assert.DoesNotContain('§', emitted);
+        Assert.Contains($".ConfigureAwait({configure.ToString().ToLowerInvariant()})", emitted);
+        var reparsed = Assert.IsType<AwaitExpressionNode>(Parse(emitted));
+        var call = Assert.IsType<ExpressionCallNode>(reparsed.Awaited);
+        Assert.Equal("ConfigureAwait", Assert.IsType<FieldAccessNode>(call.TargetExpression).FieldName);
+        Assert.Equal(configure, Assert.IsType<BoolLiteralNode>(Assert.Single(call.Arguments)).Value);
+    }
+
+    [Fact]
+    public async Task Await_NativeRoundtripPreservesOrderedSingleEvaluation()
+    {
+        const string authored = """
+            module NativeAwait
+              func Run async (Func<Task<int>>:next) → Task<int>
+                return await next() + await next()
+            """;
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(authored, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(module) })
+        {
+            diagnostics = new DiagnosticBag();
+            module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+            Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
+            var generated = new CSharpEmitter().Emit(module);
+            var compilation = CSharpCompilation.Create("NativeAwait_" + Guid.NewGuid().ToString("N"),
+                [CSharpSyntaxTree.ParseText(generated)], GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var result = compilation.Emit(stream);
+            Assert.True(result.Success, generated + Environment.NewLine + string.Join(Environment.NewLine, result.Diagnostics));
+            var method = Assembly.Load(stream.ToArray()).GetTypes().SelectMany(type => type.GetMethods())
+                .Single(method => method.Name == "Run");
+            var observations = new List<int>();
+            Func<Task<int>> next = () =>
+            {
+                observations.Add(observations.Count + 1);
+                return Task.FromResult(observations.Count == 1 ? 20 : 22);
+            };
+            Assert.Equal(42, await Assert.IsAssignableFrom<Task<int>>(method.Invoke(null, [next])));
+            Assert.Equal([1, 2], observations);
+        }
+    }
+
+    [Theory]
     [InlineData("@true")]
     [InlineData("@false")]
     [InlineData("@null")]

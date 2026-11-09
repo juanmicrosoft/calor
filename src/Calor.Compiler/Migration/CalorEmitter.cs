@@ -3700,10 +3700,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(AwaitExpressionNode node)
     {
-        var awaited = node.Awaited.Accept(this);
-        if (_inInterpolation)
-            return $"await {awaited}";
-        return $"§AWAIT {awaited}";
+        var awaited = node.ConfigureAwait is { } configure
+            ? $"{EmitPostfixOperand(node.Awaited)}.ConfigureAwait({(configure ? "true" : "false")})"
+            : AcceptInConditionalRegion(node.Awaited);
+        return $"await {awaited}";
     }
 
     public string Visit(InterpolatedStringNode node)

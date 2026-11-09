@@ -13626,40 +13626,15 @@ public sealed class Parser
     // Phase 12: Async/Await
 
     /// <summary>
-    /// Parses an await expression.
-    /// §AWAIT §C[client.GetStringAsync] §A §REF[name=url] §/C
-    /// §AWAIT[false] §C[reader.ReadAsync] §/C   // ConfigureAwait(false)
+    /// Parses native await with the same operand precedence as other unary operators.
     /// </summary>
     private AwaitExpressionNode ParseAwaitExpression()
     {
         var startToken = Expect(TokenKind.Await);
-        var attrs = ParseAttributes();
-
-        // Check for ConfigureAwait attribute: §AWAIT[false] or §AWAIT[true]
-        bool? configureAwait = null;
-        var configValue = attrs["_pos0"];
-        if (!string.IsNullOrEmpty(configValue))
-        {
-            if (configValue.Equals("false", StringComparison.Ordinal))
-            {
-                configureAwait = false;
-            }
-            else if (configValue.Equals("true", StringComparison.Ordinal))
-            {
-                configureAwait = true;
-            }
-            else
-            {
-                _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidTypedLiteral,
-                    "ConfigureAwait requires exact-case 'true' or 'false'.");
-            }
-        }
-
-        // Parse the awaited expression
-        var awaited = ParseExpression();
+        var awaited = ParseInfixOperand(startToken, 13);
 
         var span = startToken.Span.Union(awaited.Span);
-        return new AwaitExpressionNode(span, awaited, configureAwait);
+        return new AwaitExpressionNode(span, awaited);
     }
 
     // Phase 9: String Interpolation and Modern Operators
