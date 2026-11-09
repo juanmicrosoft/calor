@@ -21,7 +21,7 @@ calor self-check docs --root /path    # explicit repository root
 calor self-check docs --format json   # unified diagnostic schema on stdout
 calor self-check docs --format sarif  # SARIF 2.1.0 on stdout
 calor self-check docs --teaching-only # generated teaching resources only
-calor self-check docs --teaching-only --fix # regenerate, then check those resources
+calor self-check docs --teaching-only --fix # validate, regenerate, then check
 ```
 
 `--teaching-only` verifies all generated teaching mirrors, current keyword
@@ -29,8 +29,12 @@ references, and compilation of the primer and every complete reference program.
 E2E reference loading uses this scoped gate before copying the reference.
 It is not a repository-wide documentation result. Without this option,
 `--fix` also regenerates the agent manual and AST inventory, then runs the full check.
+Before writing any teaching mirror, `--fix` validates that every authored teaching
+program declares a complete module and compiles to valid C#. Invalid examples leave
+all existing teaching mirrors unchanged and create no new ones.
 
-Exit codes: `0` no drift, `1` drift findings, `2` no repository root found.
+Exit codes: `0` no drift, `1` drift findings, `2` no repository root found or
+requested regeneration could not complete.
 Findings use the `Calor1320`–`Calor1334` band (see
 [Structured Output](/calor/cli/structured-output/)).
 

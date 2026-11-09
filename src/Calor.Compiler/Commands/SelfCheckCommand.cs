@@ -36,7 +36,7 @@ public static class SelfCheckCommand
 
         var fixOption = new Option<bool>(
             aliases: ["--fix"],
-            description: "Regenerate teaching mirrors (also AGENTS.md and AST inventory unless --teaching-only), then check");
+            description: "Validate complete teaching examples before regenerating mirrors (also AGENTS.md and AST inventory unless --teaching-only), then check");
 
         var teachingOnlyOption = new Option<bool>(
             "--teaching-only",
@@ -49,8 +49,8 @@ public static class SelfCheckCommand
             "bands are non-empty); (3) effect codes in docs/syntax-reference/effects.md match " +
             "the effect registry in both directions; (4) the Calor13xx table in " +
             "docs/cli/structured-output.md is complete; (5) no doc hardcodes the current version; " +
-            "(6) every fenced ```calor example that declares a complete program (first non-blank " +
-            "line starts with §M) parses with the current compiler; (7) AGENTS.md is in sync with its single source CLAUDE.md (--fix regenerates it); " +
+            "(6) every fenced ```calor example that declares a complete program (first non-comment " +
+            "content line starts with module) parses with the current compiler; (7) AGENTS.md is in sync with its single source CLAUDE.md (--fix regenerates it); " +
             "(8) every complete program in the agent syntax exemplar compiles to valid C# (Roslyn-semantic-checked) and no copyable line binds an array-returning call to a generic collection (the E1a trap). " +
             "(9) normative semantics-version claims match the implemented language version; (10) the AST inventory matches eng/ast-schema.json. " +
             "(11) all complete examples in the generated current teaching reference compile to valid C#, and teaching mirrors are current. " +
@@ -94,8 +94,7 @@ public static class SelfCheckCommand
             if ((!teachingOnly && !DocDriftChecker.RegenerateAstInventory(resolvedRoot, inventoryErrors))
                 || !DocDriftChecker.RegenerateTeachingResources(resolvedRoot, inventoryErrors))
             {
-                foreach (var error in inventoryErrors)
-                    Console.Error.WriteLine(error);
+                WriteDiagnostics(inventoryErrors, format, resolvedRoot, teachingOnly);
                 return 2;
             }
             // Regeneration never bypasses validation in the selected check scope.
@@ -127,6 +126,12 @@ public static class SelfCheckCommand
             : DocDriftChecker.LoadFromRepository(resolvedRoot, diagnostics);
         diagnostics.AddRange(DocDriftChecker.Check(inputs));
 
+        WriteDiagnostics(diagnostics, format, resolvedRoot, teachingOnly);
+        return diagnostics.Count > 0 ? 1 : 0;
+    }
+
+    private static void WriteDiagnostics(List<Diagnostic> diagnostics, string format, string resolvedRoot, bool teachingOnly)
+    {
         if (format.Equals("json", StringComparison.OrdinalIgnoreCase) ||
             format.Equals("sarif", StringComparison.OrdinalIgnoreCase))
         {
@@ -145,8 +150,6 @@ public static class SelfCheckCommand
                 ? $"calor self-check docs{scope} — no drift found (root: {resolvedRoot})"
                 : $"calor self-check docs{scope} — {diagnostics.Count} drift finding(s) (root: {resolvedRoot})");
         }
-
-        return diagnostics.Count > 0 ? 1 : 0;
     }
 
     private static string? FindRepositoryRoot(string startDirectory)

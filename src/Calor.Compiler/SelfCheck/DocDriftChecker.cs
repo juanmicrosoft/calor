@@ -448,6 +448,13 @@ public static class DocDriftChecker
         var mirrors = LoadTeachingMirrors(root, diagnostics);
         if (mirrors.Count == 0)
             return false;
+        var reference = mirrors.Single(mirror =>
+            mirror.MirrorPath == ExemplarCompileChecker.TeachingReferencePath);
+        var findings = ExemplarCompileChecker.CheckAgentTaskReference(
+            new DocFile(reference.MirrorPath, reference.Expected));
+        diagnostics.AddRange(findings);
+        if (findings.Count > 0)
+            return false;
         foreach (var mirror in mirrors)
         {
             var path = Path.Combine(root, mirror.MirrorPath);
@@ -640,10 +647,7 @@ public static class DocDriftChecker
     {
         foreach (var block in FindCalorFences(doc))
         {
-            var firstContent = block.Lines.FirstOrDefault(l => !string.IsNullOrWhiteSpace(l));
-            if (block.Suppressed ||
-                firstContent == null ||
-                !Regex.IsMatch(firstContent.TrimStart(), @"^§M(?:\s|\{|$)"))
+            if (block.Suppressed || !ExemplarCompileChecker.StartsWithModule(block.Lines))
             {
                 continue;
             }

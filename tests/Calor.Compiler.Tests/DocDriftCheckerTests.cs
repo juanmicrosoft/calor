@@ -1,3 +1,5 @@
+using System.Text;
+using System.Text.Json;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Parsing;
@@ -13,6 +15,155 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class DocDriftCheckerTests
 {
+    private const string ValidTeachingProgram = "module Good\n  func Value () → int\n    return 1\n";
+
+    [Theory]
+    [InlineData("module Good\n  func Value () → int\n    return 1\n", false)]
+    [InlineData("// Header\nmodule Good\n  func Value () → int\n    return 1\n", false)]
+    [InlineData("// Header\nfunc Value () → int\n  return 1\n", true)]
+    public void NativeReferenceExtraction_PreservesCommentsContextAndDocumentLine(string source, bool wrapped)
+    {
+        var doc = new DocFile("reference.md", "# Example\n```calor\n" + source + "```\n");
+        var program = Assert.Single(ExemplarCompileChecker.ExtractAgentTaskPrograms(doc.Content));
+        Assert.Equal(wrapped, program.Wrapped);
+        Assert.Equal(3, program.FirstContentLine);
+        if (wrapped)
+            Assert.StartsWith("module AgentReference0\n  // Header\n", program.Source);
+        else
+            Assert.Equal(source.TrimEnd(), program.Source);
+        Assert.Empty(ExemplarCompileChecker.CheckAgentTaskReference(doc));
+    }
+
+    [Theory]
+    [InlineData("module Bad\n  func Value () → int\n    return (\n")]
+    [InlineData("module Bad\n  func Value () → int\n    return \"not an int\"\n")]
+    [InlineData("func Value () → int\n  return 1\n")]
+    [InlineData("This is not a complete module.")]
+    public void TeachingRegeneration_RejectsInvalidProgramsBeforeWritingAnyMirror(string invalid)
+    {
+        var root = NewTempDir();
+        try
+        {
+            var outputs = ExemplarCompileChecker.GenerateTeachingResources(
+                TeachingSource(ValidTeachingProgram, ValidTeachingProgram));
+            var previous = new Dictionary<string, byte[]?>();
+            foreach (var (relative, _) in outputs)
+            {
+                var path = Path.Combine(root, relative);
+                var bytes = previous.Count % 2 == 0 ? Encoding.UTF8.GetBytes("retain " + relative) : null;
+                previous.Add(path, bytes);
+                if (bytes != null)
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                    File.WriteAllBytes(path, bytes);
+                }
+            }
+            WriteTeachingSource(root, TeachingSource(ValidTeachingProgram, invalid));
+            var diagnostics = new List<Diagnostic>();
+
+            Assert.False(DocDriftChecker.RegenerateTeachingResources(root, diagnostics));
+            Assert.NotEmpty(diagnostics);
+            Assert.All(diagnostics, diagnostic => Assert.Contains(diagnostic.Code,
+                new[] { DiagnosticCode.DocDriftExampleCompileError, DiagnosticCode.DocDriftMissingInput }));
+            foreach (var (path, bytes) in previous)
+            {
+                if (bytes == null)
+                    Assert.False(File.Exists(path), path);
+                else
+                    Assert.Equal(bytes, File.ReadAllBytes(path));
+            }
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
+    public void TeachingRegeneration_ValidatesWritesIdempotentlyAndRepairsStaleMirrors()
+    {
+        var root = NewTempDir();
+        try
+        {
+            var source = TeachingSource(ValidTeachingProgram);
+            WriteTeachingSource(root, source);
+            var outputs = ExemplarCompileChecker.GenerateTeachingResources(source);
+            var diagnostics = new List<Diagnostic>();
+            Assert.True(DocDriftChecker.RegenerateTeachingResources(root, diagnostics), string.Join("\n", diagnostics));
+            Assert.Empty(diagnostics);
+            var timestamp = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            foreach (var (relative, expected) in outputs)
+            {
+                var path = Path.Combine(root, relative);
+                Assert.Equal(Encoding.UTF8.GetBytes(expected), File.ReadAllBytes(path));
+                File.SetLastWriteTimeUtc(path, timestamp);
+            }
+
+            Assert.True(DocDriftChecker.RegenerateTeachingResources(root, diagnostics));
+            Assert.Empty(diagnostics);
+            Assert.All(outputs.Keys, relative =>
+                Assert.Equal(timestamp, File.GetLastWriteTimeUtc(Path.Combine(root, relative))));
+
+            var stale = "src/Calor.Compiler/Resources/Teaching/Generated/tags.json";
+            File.WriteAllText(Path.Combine(root, stale), "stale");
+            var inputs = DocDriftChecker.LoadTeachingFromRepository(root, diagnostics);
+            Assert.Contains(DocDriftChecker.Check(inputs), diagnostic =>
+                diagnostic.Code == DiagnosticCode.DocDriftMirrorOutOfSync && diagnostic.FilePath == stale);
+            Assert.True(DocDriftChecker.RegenerateTeachingResources(root, diagnostics));
+            Assert.Empty(diagnostics);
+            Assert.Equal(outputs[stale], File.ReadAllText(Path.Combine(root, stale)));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    private static void WriteTeachingSource(string root, string source)
+    {
+        var path = Path.Combine(root, ExemplarCompileChecker.TeachingSourcePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, source);
+    }
+
+    private static string TeachingSource(params string[] sources)
+    {
+        var ids = sources.Select((_, index) => "example" + index).ToArray();
+        return JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            version = "test",
+            introduction = "",
+            overview = "",
+            agentInstructions = "Use Calor.\n",
+            constructs = new[]
+            {
+                new
+                {
+                    id = "function", csharpConstruct = "Function", calorSyntax = "func Value () → int",
+                    description = "Return a value.", csharpEquivalent = "int Value() => 1;",
+                    keywords = new[] { "func" }, programs = ids
+                }
+            },
+            programs = sources.Select((source, index) => new { id = ids[index], title = ids[index], calor = source }),
+            tags = new Dictionary<string, object>(),
+            primer = new { introduction = "", programs = ids, mistakes = "" },
+            catalogs = new Dictionary<string, object>
+            {
+                ["effects.json"] = new { effects = EffectCodes.DocumentedCompactCodes.Select(code => new { code }) }
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData("// Header\n")]
+    [InlineData("/// Header\n")]
+    [InlineData("\n// Header\n\n")]
+    public void NativeModuleAfterLeadingComments_IsChecked(string prefix)
+    {
+        var source = prefix + "module Good\n  func Value () → int\n    return 1\n";
+        var doc = new DocFile("docs/example.md", $"```calor\n{source}```\n");
+        Assert.Empty(DocDriftChecker.Check(BaseInputs(parseExampleDocs: [doc])));
+
+        var invalid = doc with { Content = doc.Content.Replace("return 1", "return (", StringComparison.Ordinal) };
+        Assert.Contains(DocDriftChecker.Check(BaseInputs(parseExampleDocs: [invalid])),
+            diagnostic => diagnostic.Code == DiagnosticCode.DocDriftExampleParseError);
+    }
+
     private static DocDriftInputs BaseInputs(
         DocFile[]? keywordDocs = null,
         DocFile[]? diagnosticCodeDocs = null,
@@ -582,16 +733,16 @@ public class DocDriftCheckerTests
     // --- Parse-the-examples (the rotted-snippet class) ---
 
     private const string FizzBuzzExample =
-        "§M{FizzBuzz}\n" +
-        "  §F{Main:pub} () -> void\n" +
-        "    §E{cw}\n" +
-        "    §L{i:1:100:1}\n" +
-        "      §IF (== (% i 15) 0)\n" +
-        "        §P \"FizzBuzz\"\n" +
-        "      §EI (== (% i 3) 0)\n" +
-        "        §P \"Fizz\"\n" +
-        "      §EL\n" +
-        "        §P i\n";
+        "module FizzBuzz\n" +
+        "  func Main () → void\n" +
+        "    ! cw\n" +
+        "    for i from 1 to 100 step 1\n" +
+        "      if i % 15 == 0\n" +
+        "        Console.WriteLine(\"FizzBuzz\")\n" +
+        "      else if i % 3 == 0\n" +
+        "        Console.WriteLine(\"Fizz\")\n" +
+        "      else\n" +
+        "        Console.WriteLine(i)\n";
 
     [Fact]
     public void CompleteProgramExampleThatParsesPasses()
@@ -607,7 +758,7 @@ public class DocDriftCheckerTests
     {
         // §FOREACH does not lex; a doc example using it has rotted.
         var doc = new DocFile("fake.md",
-            "Example:\n\n```calor\n§M{Loops}\n  §F{Sum:pub} (i32[]:items) -> void\n    §FOREACH{e1:x} items\n      §P x\n```\n");
+            "Example:\n\n```calor\nmodule Loops\n  func Sum (int[]:items) → void\n    §FOREACH{e1:x} items\n      Console.WriteLine(x)\n```\n");
         var findings = DocDriftChecker.Check(BaseInputs(parseExampleDocs: [doc]));
 
         Assert.NotEmpty(findings);
@@ -675,16 +826,13 @@ public class DocDriftCheckerTests
     [Fact]
     public void LexerExposesKeywordsIncludingSpecialForms()
     {
-        Assert.Contains("EACH", Lexer.KeywordNames);
-        Assert.Contains("IV", Lexer.KeywordNames);
-        Assert.Contains("PP", Lexer.KeywordNames);
-        Assert.Contains("/PP", Lexer.KeywordNames);
-        Assert.Contains("PPE", Lexer.KeywordNames);
-        Assert.Contains("CS", Lexer.KeywordNames);
-        Assert.Contains("RAW", Lexer.KeywordNames);
-        Assert.Contains("/RAW", Lexer.KeywordNames);
-        Assert.Contains("CSHARP", Lexer.KeywordNames);
-        Assert.Contains("/CSHARP", Lexer.KeywordNames);
+        Assert.Contains("module", Lexer.KeywordNames);
+        Assert.Contains("each", Lexer.KeywordNames);
+        Assert.Contains("invariant", Lexer.KeywordNames);
+        Assert.Contains("pp", Lexer.KeywordNames);
+        Assert.Contains("raw", Lexer.KeywordNames);
+        foreach (var retired in new[] { "EACH", "IV", "PP", "/PP", "PPE", "CS", "RAW", "/RAW", "CSHARP", "/CSHARP" })
+            Assert.DoesNotContain(retired, Lexer.KeywordNames);
         Assert.DoesNotContain("FOREACH", Lexer.KeywordNames);
         Assert.DoesNotContain("INV", Lexer.KeywordNames);
     }

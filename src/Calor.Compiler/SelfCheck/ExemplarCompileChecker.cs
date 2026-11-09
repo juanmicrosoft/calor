@@ -17,7 +17,7 @@ namespace Calor.Compiler.SelfCheck;
 /// <c>src/Calor.Compiler/Resources/agent-syntax-exemplar.md</c> — the single-sourced
 /// idiom sheet served to agents as <c>calor://primer</c>.
 ///
-/// <para>The exemplar promises "every complete §M program compiles (the compiler's
+/// <para>The exemplar promises "every complete module compiles (the compiler's
 /// own tests prove it)". <see cref="CheckCompletePrograms"/> makes that literally
 /// true: each complete program is compiled Calor→C# and the <em>generated C#</em>
 /// is then compiled with Roslyn's full semantic model. That last step is the point
@@ -57,6 +57,9 @@ public static class ExemplarCompileChecker
         var programs = root["programs"]!.AsArray().Select(p => p!).ToDictionary(p => Text(p, "id"), StringComparer.Ordinal);
         if (constructs.Count == 0 || programs.Count == 0)
             throw new InvalidDataException("Teaching source must contain constructs and complete examples.");
+        foreach (var (id, program) in programs)
+            if (!StartsWithModule(Text(program, "calor").Split('\n')))
+                throw new InvalidDataException($"Teaching program '{id}' must declare a complete module.");
         var byId = constructs.Select(c => c!).ToDictionary(c => Text(c, "id"), StringComparer.Ordinal);
         var effectCodes = root["catalogs"]!["effects.json"]!["effects"]!.AsArray()
             .Select(effect => Text(effect!, "code")).ToArray();
@@ -192,7 +195,8 @@ public static class ExemplarCompileChecker
     // reference lines that cannot be compiled; the complete programs get the real
     // Roslyn compile, which catches array/collection mismatches for any API.
     private static readonly Regex ArrayReturningBinding = new(
-        @"§B\{\s*~?\s*[A-Za-z_][A-Za-z0-9_]*\s*:\s*(?<type>[^}]+?)\s*\}\s*" +
+        @"(?:\b(?:let|var)\s+(?<type>[^=\r\n]+?)\s*:\s*@?[A-Za-z_][A-Za-z0-9_]*\s*=\s*|" +
+        @"§B\{\s*~?\s*[A-Za-z_][A-Za-z0-9_]*\s*:\s*(?<type>[^}]+?)\s*\}\s*)" +
         @"(?:§C\{\s*)?(?<api>" +
         string.Join("|", Analysis.ArrayReturningBcl.Methods.Keys.Select(Regex.Escape)) +
         @")\s*[}(]",
@@ -317,11 +321,11 @@ public static class ExemplarCompileChecker
     }
 
     /// <summary>
-    /// Lifts every complete §M program out of the markdown: a <c>```calor</c>-tagged
-    /// fenced block whose first non-blank content line starts with §M. The tag is
+    /// Lifts every complete module out of a <c>```calor</c>-tagged
+    /// fenced block. Leading comments do not hide the module header. The fence is
     /// what distinguishes a compilable program from the prose-annotated reference
     /// blocks (which use bare <c>```</c> fences and may open with a shape line like
-    /// <c>§M{Name}   Module</c>) and the "common mistakes" block (deliberately
+    /// <c>module Name   Module</c>) and the "common mistakes" block (deliberately
     /// non-compiling).
     /// </summary>
     public static IReadOnlyList<ExemplarProgram> ExtractCompletePrograms(string markdown)
@@ -343,8 +347,7 @@ public static class ExemplarCompileChecker
                     // Closing fence. Finalize if we were capturing a calor block.
                     if (current != null)
                     {
-                        var first = current.FirstOrDefault(l => !string.IsNullOrWhiteSpace(l));
-                        if (first != null && first.TrimStart().StartsWith("§M", StringComparison.Ordinal))
+                        if (StartsWithModule(current))
                         {
                             programs.Add(new ExemplarProgram(
                                 string.Join("\n", current) + "\n", fenceContentStart, suppressed));
@@ -380,7 +383,16 @@ public static class ExemplarCompileChecker
     public static readonly string AgentTaskReferencePath =
         TeachingReferencePath;
 
-    private static readonly Regex ReferenceDeclaration = new(@"^§(?:M|F|AF|CL|IFACE|DEL)\{");
+    private static readonly Regex ModuleStart = new(@"^(?:module(?:\s|$)|§M(?:\s|\{|$))");
+    private static readonly Regex ReferenceDeclaration = new(
+        @"^(?:(?:module|func|class|record|interface|delegate)\s|§(?:M|F|AF|CL|IFACE|DEL)\{)");
+
+    internal static bool StartsWithModule(IEnumerable<string> lines)
+    {
+        var first = lines.FirstOrDefault(line => !string.IsNullOrWhiteSpace(line)
+            && !line.TrimStart().StartsWith("//", StringComparison.Ordinal));
+        return first != null && ModuleStart.IsMatch(first.TrimStart());
+    }
 
     public sealed record ReferenceProgram(string Source, int FirstContentLine, bool Wrapped);
 
@@ -415,12 +427,12 @@ public static class ExemplarCompileChecker
             }
             if (language is not ("" or "calor"))
                 throw new InvalidDataException($"Complete Calor example at line {first + 1} has unexpected fence language '{language}'.");
-            var body = string.Join("\n", lines[first..index]);
-            var wrapped = !lines[first].TrimStart().StartsWith("§M{", StringComparison.Ordinal);
+            var body = string.Join("\n", lines[contentStart..index]);
+            var wrapped = !ModuleStart.IsMatch(lines[first].TrimStart());
             if (wrapped)
-                body = $"§M{{AgentReference{programs.Count}}}\n"
+                body = $"module AgentReference{programs.Count}\n"
                     + string.Join("\n", body.Split('\n').Select(line => "  " + line));
-            programs.Add(new(body, first + 1, wrapped));
+            programs.Add(new(body, contentStart + 1, wrapped));
             language = null;
         }
         if (language != null)
