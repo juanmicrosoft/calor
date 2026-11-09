@@ -40,17 +40,20 @@ public class DocDriftCheckerTests
         Assert.Empty(ExemplarCompileChecker.CheckAgentTaskReference(new DocFile(relativePath, content)));
     }
 
-    [Fact]
-    public void PublicCallsReference_CompilesPositiveAndExactNegativeExamples()
+    [Theory]
+    [InlineData("calls.mdx", 3, 1, "CallExamples", "9", "44")]
+    [InlineData("binding.mdx", 8, 6, "BindingExamples", "150", "16")]
+    public void PublicNativeReference_CompilesPositiveAndExactNegativeExamples(
+        string page, int completeCount, int negativeCount, string firstModule, string firstResult, string secondResult)
     {
-        const string relativePath = "website/content/syntax-reference/calls.mdx";
+        var relativePath = "website/content/syntax-reference/" + page;
         var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), relativePath));
         Assert.DoesNotContain("§", content);
         var coverage = new WebsiteExampleChecker.Coverage();
         var diagnostics = WebsiteExampleChecker.Check([new DocFile(relativePath, content)], coverage);
         Assert.Empty(diagnostics);
-        Assert.Equal(3, coverage.CompletePrograms);
-        Assert.Equal(1, coverage.NegativePrograms);
+        Assert.Equal(completeCount, coverage.CompletePrograms);
+        Assert.Equal(negativeCount, coverage.NegativePrograms);
         var programs = ExemplarCompileChecker.ExtractCompletePrograms(content);
         Assert.Equal(2, programs.Count);
         foreach (var program in programs)
@@ -64,7 +67,7 @@ public class DocDriftCheckerTests
                     public static int Run() => GlobalModule.Main();
                 }
                 """);
-            Assert.Equal(program.Source.StartsWith("module CallExamples", StringComparison.Ordinal) ? "9" : "44",
+            Assert.Equal(program.Source.StartsWith("module " + firstModule, StringComparison.Ordinal) ? firstResult : secondResult,
                 observed);
         }
     }
