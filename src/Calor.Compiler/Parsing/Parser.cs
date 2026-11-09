@@ -1108,7 +1108,7 @@ public sealed class Parser
         if (overflowModifier?.StartsWith("overflow=", StringComparison.Ordinal) == true)
             attrs.Add("overflow", overflowModifier["overflow=".Length..].Trim());
         if (attrs["overflow"] is { } overflow && overflow is not ("checked" or "unchecked"))
-            _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
+            _diagnostics.ReportError(attrs.GetSpan("overflow") ?? startToken.Span, DiagnosticCode.InvalidModifier,
                 $"Module overflow policy must be 'checked' or 'unchecked', not '{overflow}'.");
 
         var id = GenerateParserAutoId("m");
@@ -1384,11 +1384,12 @@ public sealed class Parser
         if (Current.Span.Line == start.Span.Line && Current.Text == "overflow")
         {
             Advance();
-            attributes.Add("overflow", Expect(TokenKind.Identifier).Text);
+            var policy = Expect(TokenKind.Identifier);
+            attributes.Add("overflow", policy.Text, policy.Span);
         }
-        if (Current.Span.Line == start.Span.Line && !IsAtEnd)
+        if (Current.Span.Line == start.Span.Line && !IsAtEnd && !Check(TokenKind.Dedent))
             _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
-                "A module header is 'module name [namespace] [block] [overflow checked|unchecked]'.");
+                $"Invalid header field '{Current.Text}'; expected 'module name [namespace] [block] [overflow checked|unchecked]'.");
         return attributes;
     }
 
@@ -1801,7 +1802,7 @@ public sealed class Parser
         {
             foreach (var modifier in functionModifiers.Split(','))
                 if (modifier is not ("async" or "static"))
-                    _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
+                    _diagnostics.ReportError(attrs.GetSpan("_pos2") ?? startToken.Span, DiagnosticCode.InvalidModifier,
                         $"Unsupported module-level function modifier '{modifier}'.");
         }
         var visibility = IsCanonicalDeclaration(startToken)
@@ -6879,6 +6880,7 @@ public sealed class Parser
     {
         if (!IsCanonicalDeclaration(start)) return;
         var modifiers = new List<string>();
+        var modifierSpan = attributes.GetSpan("_pos2");
         if (attributes["_pos2"] is { } existing)
             modifiers.AddRange(existing.Split(','));
         while (Current.Span.Line == start.Span.Line
@@ -6895,9 +6897,12 @@ public sealed class Parser
             else if (word == "overflow" && Match(TokenKind.Equals))
                 attributes.Add("overflow", Expect(TokenKind.Identifier).Text);
             else
+            {
                 modifiers.Add(word);
+                modifierSpan = modifierSpan?.Union(token.Span) ?? token.Span;
+            }
         }
-        if (modifiers.Count != 0) attributes.Add("_pos2", string.Join(",", modifiers));
+        if (modifiers.Count != 0) attributes.Add("_pos2", string.Join(",", modifiers), modifierSpan ?? start.Span);
     }
 
     private (SinceNode? Since, DeprecatedNode? Deprecated, List<BreakingChangeNode> BreakingChanges)
@@ -9768,7 +9773,7 @@ public sealed class Parser
 
         // Parse signature elements until END_METHOD
         var bodyHadContent = false;
-        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndMethod))
+        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndMethod) && !IsModuleFunctionSibling(startToken))
         {
             if (Check(TokenKind.Where))
             {
@@ -11777,7 +11782,7 @@ public sealed class Parser
         ExpressionNode? defaultValue2 = null;
 
         var bodyHadContent = false;
-        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndProperty))
+        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndProperty) && !IsModuleFunctionSibling(startToken))
         {
             if (Check(TokenKind.Get))
             {
@@ -11973,7 +11978,7 @@ public sealed class Parser
         PropertyAccessorNode? initer2 = null;
 
         var bodyHadContent = false;
-        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndIndexer))
+        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndIndexer) && !IsModuleFunctionSibling(startToken))
         {
             if (Check(TokenKind.In))
             {
@@ -12037,7 +12042,7 @@ public sealed class Parser
         PropertyAccessorNode? setter = null;
         PropertyAccessorNode? initer = null;
         var bodyHadContent = false;
-        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndIndexer))
+        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndIndexer) && !IsModuleFunctionSibling(startToken))
         {
             if (Check(TokenKind.Get))
             {
@@ -12207,7 +12212,7 @@ public sealed class Parser
         var body = new List<StatementNode>();
 
         var bodyHadContent = false;
-        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndConstructor))
+        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndConstructor) && !IsModuleFunctionSibling(startToken))
         {
             if (Check(TokenKind.In))
             {
@@ -12293,7 +12298,7 @@ public sealed class Parser
         var body = new List<StatementNode>();
 
         var bodyHadContent = false;
-        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndOperatorOverload))
+        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndOperatorOverload) && !IsModuleFunctionSibling(startToken))
         {
             if (Check(TokenKind.In))
             {
@@ -13677,7 +13682,7 @@ public sealed class Parser
         List<StatementNode>? removeBody = null;
 
         var bodyHadContent = false;
-        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndEvent))
+        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndEvent) && !IsModuleFunctionSibling(startToken))
         {
             if (Check(TokenKind.EventAdd))
             {

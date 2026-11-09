@@ -11,6 +11,48 @@ namespace Calor.Compiler.Tests;
 
 public sealed class CanonicalDeclarationTests
 {
+    [Theory]
+    [InlineData("ctor ()")]
+    [InlineData("property int:Count\n      get\n      set")]
+    [InlineData("this[int:index] → int\n      get")]
+    [InlineData("event System.Action:Changed")]
+    public void EmptyMembersDoNotConsumeTheFollowingNativeFunction(string member)
+    {
+        var module = Parse($"module Demo\n  class Value\n    {member}\n    func Next () → int\n      return 42");
+        var type = Assert.Single(module.Classes);
+        Assert.Equal("Next", Assert.Single(type.Methods).Name);
+        Assert.Single(type.Methods[0].Body);
+        Assert.Equal(1, type.Constructors.Count + type.Properties.Count + type.Indexers.Count + type.Events.Count);
+        var reparse = Parse(new CalorEmitter().Emit(module));
+        Assert.Equal("Next", Assert.Single(Assert.Single(reparse.Classes).Methods).Name);
+    }
+
+    [Theory]
+    [InlineData("checked")]
+    [InlineData("unchecked")]
+    public void ModuleOverflowHeadersAcceptEndOfFileWithoutANewline(string policy)
+    {
+        var module = Parse($"module Demo overflow {policy}");
+        Assert.Equal(policy, module.Attributes["overflow"]);
+        Assert.Equal(policy, Parse(new CalorEmitter().Emit(module)).Attributes["overflow"]);
+    }
+
+    [Theory]
+    [InlineData("module Demo overflow bogus", "'checked' or 'unchecked'", 1, 22)]
+    [InlineData("module Demo\n  func Run bogus () → void", "function modifier", 2, 12)]
+    [InlineData("module Demo Outer bogus", "[block]", 1, 19)]
+    public void InvalidNativeHeaderFieldsReportTheActualField(
+        string source, string guidance, int line, int column)
+    {
+        var diagnostics = new DiagnosticBag();
+        new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var diagnostic = Assert.Single(diagnostics.Errors.Where(error => error.Message.Contains(guidance)));
+        Assert.Contains("bogus", diagnostic.Message);
+        Assert.Equal(line, diagnostic.Span.Line);
+        Assert.Equal(column, diagnostic.Span.Column);
+        Assert.Equal("bogus", source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
+    }
+
     [Fact]
     public void CanonicalFunctionsPreserveTypesBindingsVisibilityAndPublicDefault()
     {
