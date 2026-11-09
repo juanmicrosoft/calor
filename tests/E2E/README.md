@@ -2120,6 +2120,15 @@ the counterfactual-exception negative, the actual entered-body watchdog and the
 separate bootstrap refusal also passed. The explicitly allocating StringBuilder
 positive and unchanged direct-nullable-return `Calor0273` negative passed.
 
+A focused archived-arm check then used the existing old-release runner's
+unchanged manifest verification, locked restore and fresh source build of
+`d82f3ae95175ecd09581c6922701706be72b0ca9`. Its 18 real entrypoints all passed
+admission: eight positives and ten finite rejections. These cover the six
+original prompt positives, eight archived local/lambda controls and four
+codec coupling/counterfactual-exception controls. Current authoring was
+explicitly disabled for every archived candidate. This is separate partial
+evidence, not a result for the full 139-entry old/current matrix.
+
 Native acceptance remains blocked on that selected product commit: each of the
 three retained codec coupling controls fails before its required oracle.
 The faithful `bytes.Length` and `text.Length` loop conditions receive
