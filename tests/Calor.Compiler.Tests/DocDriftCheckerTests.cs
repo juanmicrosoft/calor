@@ -151,6 +151,9 @@ public class DocDriftCheckerTests
             "GlobalModule.At(new int[] { 42 }, 0)",
             "((System.Func<string>)(() => { try { GlobalModule.Trigger(9, 5); return \"not rejected\"; } catch (Calor.Runtime.ContractViolationException failure) { return failure.Kind.ToString(); } }))()",
             "GlobalModule.SafeDivide(6, 2)" })]
+    [InlineData("benchmarking/metrics/task-completion.mdx", 2, 0,
+        new[] { "TaskSafeDivide", "TaskNormalizeScore" }, new[] { "3", "75" },
+        new[] { "GlobalModule.SafeDivide(6, 2)", "GlobalModule.NormalizeScore(75, 100)" })]
     [InlineData("structure-tags.mdx", 22, 4,
         new[] { "StructureModules", "BlockNamespace", "FunctionHeaders", "AsyncFunctions", "AsyncMethods",
             "AwaitExpressions", "LambdaExamples", "AsyncLambdas", "LocalCallables", "DelegateDefinitions",
@@ -735,6 +738,117 @@ public class DocDriftCheckerTests
                     public static object? Run() => {{call}};
                 }
                 """));
+    }
+
+    [Theory]
+    [InlineData(0, "GlobalModule.SafeDivide(6, 2)", "Functions.SafeDivide(6, 2)", "3", "3", "3")]
+    [InlineData(0, "GlobalModule.SafeDivide(6, 0)", "Functions.SafeDivide(6, 0)",
+        "!ContractViolationException", "!DivideByZeroException", "!ArgumentException")]
+    [InlineData(0, "GlobalModule.SafeDivide(int.MinValue, -1)", "Functions.SafeDivide(int.MinValue, -1)",
+        "!OverflowException", "!OverflowException", "!OverflowException")]
+    [InlineData(1, "GlobalModule.NormalizeScore(0, 100)", "Original.NormalizeScore(0, 100)", "0", "0", "0")]
+    [InlineData(1, "GlobalModule.NormalizeScore(100, 100)", "Original.NormalizeScore(100, 100)", "100", "100", "100")]
+    [InlineData(1, "GlobalModule.NormalizeScore(75, 100)", "Original.NormalizeScore(75, 100)", "75", "75", "75")]
+    [InlineData(1, "GlobalModule.NormalizeScore(-1, 100)", "Original.NormalizeScore(-1, 100)",
+        "!ContractViolationException", "-1", "!ArgumentException")]
+    [InlineData(1, "GlobalModule.NormalizeScore(1, 0)", "Original.NormalizeScore(1, 0)",
+        "!ContractViolationException", "!DivideByZeroException", "!ArgumentException")]
+    [InlineData(1, "GlobalModule.NormalizeScore(101, 100)", "Original.NormalizeScore(101, 100)",
+        "!ContractViolationException", "101", "!ArgumentException")]
+    [InlineData(1, "GlobalModule.NormalizeScore(30000000, 30000000)", "Original.NormalizeScore(30000000, 30000000)",
+        "!OverflowException", "!OverflowException", "-43")]
+    [InlineData(1, "GlobalModule.NormalizeScore(int.MaxValue, int.MaxValue)", "Original.NormalizeScore(int.MaxValue, int.MaxValue)",
+        "!OverflowException", "!OverflowException", "0")]
+    public void PublicTaskCompletion_ObservesNativeAndOriginalCSharpBoundaries(
+        int index, string nativeCall, string csharpCall, string enabled, string disabled, string original)
+    {
+        const string path = "website/content/benchmarking/metrics/task-completion.mdx";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)).Replace("\r\n", "\n");
+        var programs = ExemplarCompileChecker.ExtractCompletePrograms(content);
+        Assert.Equal(2, programs.Count);
+        var fragments = System.Text.RegularExpressions.Regex.Matches(content,
+            @"```csharp\n(?<body>.*?)\n```", System.Text.RegularExpressions.RegexOptions.Singleline);
+        Assert.Equal(2, fragments.Count);
+        foreach (var mode in new[] { ContractMode.Debug, ContractMode.Off })
+        {
+            var compiled = Program.Compile(programs[index].Source, path, new CompilationOptions { ContractMode = mode });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Assert.Equal(mode == ContractMode.Debug ? enabled : disabled, Observe(compiled.GeneratedCode, nativeCall));
+        }
+        var csharp = fragments[index].Groups["body"].Value;
+        if (index == 1) csharp = "public static class Original {\n" + csharp + "\n}";
+        Assert.Equal(original, Observe("global using System;\n" + csharp, csharpCall));
+
+        static string Observe(string source, string expression) =>
+            InteropScope.RefOutImplementationTests.Run(source + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run() => {{expression}};
+                }
+                """);
+    }
+
+    [Fact]
+    public async Task PublicTaskCompletion_DistinguishesNeutralDefinitionsFromTheFailedPublishedRun()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var manifest = await Calor.Evaluation.LlmTasks.LlmTaskManifest.LoadAsync(
+            Path.Combine(root, "tests/Calor.Evaluation/Tasks/task-manifest-neutral.json"));
+        Assert.Equal(50, manifest.Tasks.Count);
+        Assert.All(manifest.Tasks, task =>
+        {
+            Assert.True(task.UsesNeutralPrompt);
+            Assert.Equal(task.GetPrompt("calor"), task.GetPrompt("csharp"));
+            Assert.Equal(0.4, task.Scoring.Compilation, 10);
+            Assert.Equal(0.6, task.Scoring.TestCases, 10);
+            Assert.Equal(0, task.Scoring.Contracts);
+            Assert.NotEmpty(task.TestCases);
+        });
+        Assert.Equal(new[] { "basic-algorithms:15", "data-structures:10", "logic:15", "safety:10" },
+            manifest.Tasks.GroupBy(task => task.Category).OrderBy(group => group.Key, StringComparer.Ordinal)
+                .Select(group => $"{group.Key}:{group.Count()}"));
+
+        using var published = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(root, "website/public/data/llm-results.json")));
+        var record = published.RootElement;
+        Assert.Equal("claude", record.GetProperty("provider").GetString());
+        Assert.False(record.GetProperty("isDryRun").GetBoolean());
+        Assert.Equal(0, record.GetProperty("totalCost").GetDecimal());
+        var results = record.GetProperty("results").EnumerateArray().ToArray();
+        Assert.Equal(50, results.Length);
+        foreach (var result in results)
+        {
+            var task = result.GetProperty("task");
+            Assert.False(task.GetProperty("usesNeutralPrompt").GetBoolean());
+            Assert.Equal(JsonValueKind.Null, task.GetProperty("prompt").ValueKind);
+            Assert.Equal(0.3, task.GetProperty("scoring").GetProperty("compilation").GetDouble(), 10);
+            var contractTask = task.GetProperty("category").GetString() == "contracts";
+            Assert.Equal(contractTask ? 0.4 : 0.5, task.GetProperty("scoring").GetProperty("testCases").GetDouble(), 10);
+            Assert.Equal(contractTask ? 0.3 : 0.2, task.GetProperty("scoring").GetProperty("contracts").GetDouble(), 10);
+            foreach (var language in new[] { "calorResult", "cSharpResult" })
+            {
+                var response = result.GetProperty(language);
+                Assert.Equal("", response.GetProperty("generatedCode").GetString());
+                Assert.False(response.GetProperty("compilationSuccess").GetBoolean());
+                Assert.Empty(response.GetProperty("testResults").EnumerateArray());
+                Assert.Equal(0, response.GetProperty("score").GetDouble());
+                Assert.Equal(JsonValueKind.Null, response.GetProperty("generationMetadata").GetProperty("model").ValueKind);
+                Assert.Contains(response.GetProperty("compilationErrors").EnumerateArray(),
+                    error => error.GetString()!.Contains("Unauthorized", StringComparison.Ordinal));
+            }
+        }
+        Assert.Equal(new[] { "basic-algorithms:15", "contracts:10", "data-structures:10", "logic:15" },
+            results.GroupBy(result => result.GetProperty("task").GetProperty("category").GetString())
+                .OrderBy(group => group.Key, StringComparer.Ordinal).Select(group => $"{group.Key}:{group.Count()}"));
+        var summary = record.GetProperty("summary");
+        Assert.Equal(50, summary.GetProperty("totalTasks").GetInt32());
+        Assert.Equal(0, summary.GetProperty("averageCalorScore").GetDouble());
+        Assert.Equal(0, summary.GetProperty("averageCSharpScore").GetDouble());
+        Assert.Equal(1, summary.GetProperty("overallAdvantageRatio").GetDouble());
+        Assert.Equal(new[] { "basic-algorithms:15", "contracts:10", "data-structures:10", "logic:15" },
+            summary.GetProperty("byCategory").EnumerateObject().OrderBy(category => category.Name, StringComparer.Ordinal)
+                .Select(category => $"{category.Name}:{category.Value.GetProperty("taskCount").GetInt32()}"));
     }
 
     [Fact]

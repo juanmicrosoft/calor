@@ -22,6 +22,85 @@ public class LlmTaskTests
         Assert.DoesNotContain("§/M", prompt);
         Assert.DoesNotContain("§CSHARP", prompt);
         Assert.Contains("Include a complete module with indented bodies", prompt);
+        Assert.Contains("For boolean logic use a && b, a || b, !a. For numeric negation use -n.", prompt);
+        Assert.DoesNotContain("For boolean logic use (&&", prompt);
+        Assert.DoesNotContain("For numeric negation use (-", prompt);
+    }
+
+    [Theory]
+    [InlineData("""{"compilation":0.4,"testCases":0.6}""", 0.4, 0.6, 0)]
+    [InlineData("""{"compilation":0.4,"testCases":0.6,"contracts":0}""", 0.4, 0.6, 0)]
+    [InlineData("""{"compilation":0.3,"testCases":0.5,"contracts":0.2}""", 0.3, 0.5, 0.2)]
+    public void TaskScoring_JsonDoesNotInventAnUnspecifiedContractBonus(
+        string json, double compilation, double testCases, double contracts)
+    {
+        var scoring = Assert.IsType<TaskScoring>(JsonSerializer.Deserialize<TaskScoring>(json,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }));
+        Assert.Equal(compilation, scoring.Compilation, 10);
+        Assert.Equal(testCases, scoring.TestCases, 10);
+        Assert.Equal(contracts, scoring.Contracts, 10);
+        Assert.True(scoring.IsValid);
+        var roundTrip = JsonSerializer.Deserialize<TaskScoring>(JsonSerializer.Serialize(scoring));
+        Assert.Equal(scoring, roundTrip);
+        Assert.Equal(0.2, new TaskScoring().Contracts, 10);
+    }
+
+    [Theory]
+    [InlineData(0.4, 0.6, 0.2)]
+    [InlineData(-0.1, 0.6, 0.5)]
+    [InlineData(1.1, 0, -0.1)]
+    public async Task TaskScoring_InvalidWeightsAreRejectedBeforeAnyProviderCall(
+        double compilation, double testCases, double contracts)
+    {
+        var provider = new MockProvider();
+        using var runner = new LlmTaskRunner(provider);
+        var task = new LlmTaskDefinition
+        {
+            Id = "invalid-scoring",
+            Name = "Invalid scoring control",
+            Prompt = "ProbeValue",
+            Scoring = new TaskScoring { Compilation = compilation, TestCases = testCases, Contracts = contracts }
+        };
+        Assert.False(task.Scoring.IsValid);
+        var error = await Assert.ThrowsAsync<ArgumentException>(() => runner.RunTaskAsync(task));
+        Assert.Contains(task.Id, error.Message);
+        Assert.Equal(0, provider.CallCount);
+    }
+
+    [Fact]
+    public async Task TaskScoring_NeutralWeightsGiveIdenticalPartiallyCorrectProgramsIdenticalScores()
+    {
+        var task = Assert.IsType<LlmTaskDefinition>(JsonSerializer.Deserialize<LlmTaskDefinition>("""
+            {
+              "id": "offline-scoring",
+              "name": "Offline neutral scoring control",
+              "prompt": "ProbeValue",
+              "scoring": { "compilation": 0.4, "testCases": 0.6 },
+              "testCases": [
+                { "input": [0], "expected": 0 },
+                { "input": [1], "expected": 1 }
+              ],
+              "expectedSignature": {
+                "functionName": "ProbeValue",
+                "parameterTypes": ["int"],
+                "returnType": "int"
+              }
+            }
+            """, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }));
+        var provider = new MockProvider((_, language) => language == "calor"
+            ? "module OfflineScore\n  func ProbeValue public (int:value) → int\n    return 1\n"
+            : "public static class Functions { public static int ProbeValue(int value) => 1; }");
+        using var runner = new LlmTaskRunner(provider);
+        var result = await runner.RunTaskAsync(task, new LlmTaskRunnerOptions { UseCache = false });
+        Assert.Equal(2, provider.CallCount);
+        Assert.Equal(task.GetPrompt("calor"), task.GetPrompt("csharp"));
+        foreach (var language in new[] { result.CalorResult, result.CSharpResult })
+        {
+            Assert.True(language.CompilationSuccess, string.Join("\n", language.CompilationErrors));
+            Assert.Equal(2, language.TotalTests);
+            Assert.Equal(1, language.PassedTests);
+            Assert.Equal(0.7, language.Score, 10);
+        }
     }
 
     [Theory]

@@ -4,17 +4,25 @@ section: "benchmarking"
 order: 7
 ---
 
-> **Syntax and measurement:** Source illustrations use current ID-free headers. The published numerical results and archived output remain historical; these illustrations are not a remeasurement of those results.
+> **Evidence boundary:** The native programs below are executable illustrations,
+> not saved model responses. The published results file records provider failures,
+> not a successful neutral-prompt run. No model evaluation was rerun for this page.
 
 **Category:** Task Completion
-**Status:** Separate historical LLM-runner result; not part of the historical eight-metric dashboard
+**Status:** Separate LLM runner; no successful neutral-prompt result established here
 **What it measures:** AI agent ability to learn and write correct code in both languages
 
 ---
 
 ## Overview
 
-The Task Completion benchmark measures how successfully AI agents can complete programming tasks using Calor vs C#. This benchmark uses **language-neutral prompts** - the same functional requirements given to both languages without syntax hints - to fairly measure whether Calor is as learnable and usable as an established language like C#.
+The Task Completion runner asks a model for programs, compiles its responses and
+executes manifest test cases. The neutral manifest supplies the same functional
+requirements to both languages without language-specific syntax hints.
+
+The runner still supplies language-specific system prompts, including Calor
+teaching material. Neutral task wording does not make the entire model context
+identical or eliminate every source of benchmark bias.
 
 ---
 
@@ -22,9 +30,10 @@ The Task Completion benchmark measures how successfully AI agents can complete p
 
 **Primary Question:** Can an LLM learn Calor and write correct code as easily as C#?
 
-**Historical result:** The example run documented below reported a 1.00x ratio
-with neutral prompts. It is not evidence in the historical eight-metric dashboard
-and does not prove general model parity or the absence of a productivity cost.
+**Available result:** The published file has a 1.00x summary ratio, but both scores
+are zero after provider failures. None of its 50 tasks uses the neutral prompt
+field. That ratio is a zero-denominator fallback, **not evidence of language
+parity**, successful learning or productivity.
 
 ---
 
@@ -46,13 +55,13 @@ The same prompt goes to both Calor and C#. The LLM must apply its knowledge of e
 
 | Approach | Problem |
 |:---------|:--------|
-| Calor-biased prompts | "Add §Q precondition..." teaches syntax, doesn't test learning |
+| Calor-biased prompts | "Add a Calor `requires` precondition..." supplies syntax instead of testing its selection |
 | C#-biased prompts | Unfair to Calor, doesn't reflect real usage |
 | **Neutral prompts** | Tests whether LLM can translate requirements to idiomatic code |
 
 ### Task Corpus
 
-The benchmark includes **50 programming tasks** across 4 categories:
+The neutral manifest defines **50 programming tasks** across 4 categories:
 
 | Category | Tasks | Examples |
 |:---------|:------|:---------|
@@ -63,7 +72,7 @@ The benchmark includes **50 programming tasks** across 4 categories:
 
 ### Scoring Formula
 
-Each task is scored on compilation and test results:
+Each task in the neutral manifest assigns these weights:
 
 | Factor | Weight | Description |
 |:-------|:-------|:------------|
@@ -71,6 +80,13 @@ Each task is scored on compilation and test results:
 | Test Cases | 60% | What percentage of test cases pass? |
 
 **Final score:** `0.4 × compile + 0.6 × tests`
+
+Here `compile` is 0 or 1, and `tests` is the fraction of that task's executed
+cases that pass. The neutral manifest assigns no contract-verification bonus.
+The loader treats an omitted JSON `contracts` weight as zero; the runner rejects
+invalid weights before requesting that task's model responses.
+Changing prompts, weights, cases or teaching context requires a new identified
+run; it does not revise an earlier result.
 
 ---
 
@@ -80,29 +96,43 @@ Each task is scored on compilation and test results:
 
 | Metric | Calor | C# | Advantage |
 |:-------|:------|:---|:----------|
-| Average Score | 1.00 | 1.00 | **1.00x (Tie)** |
-| Compilation Rate | 100% | 100% | Tie |
-| Test Pass Rate | 100% | 100% | Tie |
+| Recorded average score | 0.00 | 0.00 | 1.00x fallback; not parity |
+| Nonempty generated programs | 0 of 50 | 0 of 50 | Not measured |
+| Successful compilations | 0 | 0 | No programs generated |
+| Executed test cases | 0 | 0 | No test-pass comparison |
+
+These are observations of `website/public/data/llm-results.json`. Every language
+result records an authentication failure before code generation. Its stored zero
+compilation and test rates must not be interpreted as measured compiler failures
+or failed runtime cases.
+
+The previous 100% success tables on this page were not supported by that file.
+The artifact is unchanged; the claims are corrected.
 
 ### By Category
 
 | Category | Calor Score | C# Score | Advantage |
 |:---------|:------------|:---------|:----------|
-| basic-algorithms | 1.00 | 1.00 | 1.00x |
-| safety | 1.00 | 1.00 | 1.00x |
-| data-structures | 1.00 | 1.00 | 1.00x |
-| logic | 1.00 | 1.00 | 1.00x |
+| basic-algorithms (15 tasks) | 0.00 | 0.00 | Fallback only |
+| contracts (10 tasks) | 0.00 | 0.00 | Fallback only |
+| data-structures (10 tasks) | 0.00 | 0.00 | Fallback only |
+| logic (15 tasks) | 0.00 | 0.00 | Fallback only |
+
+This failed artifact uses the older `contracts` category and language-specific
+prompts. Its 40 non-contract tasks use weights 0.3 compilation, 0.5 tests and
+0.2 contracts; its 10 contract tasks use 0.3/0.4/0.3. It is not a result for the
+neutral manifest's `safety` category or 0.4/0.6 formula.
 
 ---
 
 ## What This Tells Us
 
-### Calor is Learnable
+### Calor is Learnable?
 
-The 1.00x ratio demonstrates that:
-- LLMs can learn Calor syntax from skills files
-- Calor code compiles at the same rate as C#
-- Calor implementations pass tests at the same rate as C#
+That remains a question for an actual successful run. This file establishes
+neither equal compilation rates nor equal test performance. Provider failures,
+cached responses, dry runs and mock-provider output are not evidence that a
+real model learned the language.
 
 ### Task Completion ≠ Code Value
 
@@ -120,18 +150,15 @@ These are different questions that require different benchmarks.
 ### Task: SafeDivide
 **Prompt:** "Write a public function named SafeDivide that divides integer a by integer b. Division by zero must not be allowed."
 
-**Generated Calor:**
+**Current native illustration, not an archived model response:**
 ```calor
-§M{SafeDivideModule}
-  §F{SafeDivide:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §Q (!= b 0)
-    §R (/ a b)
+module TaskSafeDivide
+  func SafeDivide public (int:a, int:b) → int
+    requires b != 0
+    return a / b
 ```
 
-**Generated C#:**
+**Original C# illustration:**
 ```csharp
 public static class Functions
 {
@@ -144,28 +171,30 @@ public static class Functions
 }
 ```
 
-Both compile and pass tests. But note that Calor uses a **contract** (`§Q (!= b 0)`) while C# uses a **guard clause**. This difference doesn't affect task completion scores, but affects code properties.
+For `(6, 2)` both return `3`. With runtime checks enabled, Calor's zero-divisor
+contract throws `ContractViolationException`; the C# guard throws
+`ArgumentException`. With Calor checks off, division by zero reaches the ordinary
+`DivideByZeroException`. These are explicit boundary observations, not a model
+task-completion score or a claim of exception equivalence.
 
 ---
 
 ### Task: NormalizeScore
 **Prompt:** "Write a public function named NormalizeScore that normalizes a score to the 0-100 range using the formula (score * 100) / maxScore. The maxScore must be positive, score must be non-negative, and score must not exceed maxScore."
 
-**Generated Calor:**
+**Current native illustration, retaining the original formula:**
 ```calor
-§F{NormalizeScore:pub}
-  §I{i32:score}
-  §I{i32:maxScore}
-  §O{i32}
-  §Q (>= score 0)
-  §Q (> maxScore 0)
-  §Q (<= score maxScore)
-  §S (>= result 0)
-  §S (<= result 100)
-  §R (/ (* score 100) maxScore)
+module TaskNormalizeScore
+  func NormalizeScore public (int:score, int:maxScore) → int
+    requires score >= 0
+    requires maxScore > 0
+    requires score <= maxScore
+    => result >= 0
+    => result <= 100
+    return score * 100 / maxScore
 ```
 
-**Generated C#:**
+**Original C# illustration:**
 ```csharp
 public static int NormalizeScore(int score, int maxScore)
 {
@@ -180,23 +209,37 @@ public static int NormalizeScore(int score, int maxScore)
 }
 ```
 
-Key difference: Calor includes **postconditions** (`§S (>= result 0)` and `§S (<= result 100)`) that guarantee output bounds. C# has no equivalent - bugs in the output go undetected.
+For `(75, 100)` both return `75`. Calor adds runtime result obligations, not a
+proof that this formula is correct for every accepted integer.
+
+The multiplication can overflow within the declared valid domain. For
+`(30000000, 30000000)`, Calor's normal checked arithmetic throws
+`OverflowException`, before a postcondition can check the result. Turning off
+contracts does not turn off that arithmetic check. This C# fragment's ordinary
+unchecked arithmetic returns `-43`, not `100`.
+
+The original formula is deliberately not repaired here. Its preconditions do not
+make it total over the accepted integer domain. Output bounds alone would not
+prove the formula correct either: the unchecked C# call with both arguments
+`int.MaxValue` returns `0` instead of `100`.
 
 ---
 
 ## Contract Usage Analysis
 
-When examining generated Calor code, the LLM consistently extracts constraints from requirements into contracts:
+These are possible translations of requirements into current native contracts.
+They are not observed extraction rates from the failed published run.
 
 | Requirement Language | Generated Contract |
 |:---------------------|:-------------------|
-| "must only accept non-negative" | `§Q (>= n 0)` |
-| "must not be zero" | `§Q (!= n 0)` |
-| "result is never negative" | `§S (>= result 0)` |
-| "result is always at least 1" | `§S (>= result 1)` |
-| "must be between X and Y" | `§Q (>= n X)` + `§Q (<= n Y)` |
+| "must only accept non-negative" | `requires n >= 0` |
+| "must not be zero" | `requires n != 0` |
+| "result is never negative" | `=> result >= 0` |
+| "result is always at least 1" | `=> result >= 1` |
+| "must be between X and Y" | `requires n >= X` and `requires n <= Y` |
 
-This demonstrates that the **Contract-First Methodology** in the skills file is working - the LLM translates requirement language into executable contracts.
+Whether a model chooses complete, correct contracts must be measured from its
+actual responses and tested obligations, including invalid-input cases.
 
 ---
 
@@ -205,30 +248,40 @@ This demonstrates that the **Contract-First Methodology** in the skills file is 
 ### Running Locally
 
 ```bash
-# Run the LLM benchmark with neutral prompts
-dotnet run --project tests/Calor.Evaluation -- llm-tasks \
-  --manifest tests/Calor.Evaluation/Tasks/task-manifest-neutral.json \
-  --verbose
+# Inspect options without making model requests
+dotnet run --project tests/Calor.Evaluation -- llm-tasks --help
 
-# Refresh cache (re-run all tasks)
+# Estimate with a configured provider; do not generate model responses
 dotnet run --project tests/Calor.Evaluation -- llm-tasks \
   --manifest tests/Calor.Evaluation/Tasks/task-manifest-neutral.json \
+  --dry-run
+
+# Paid run: requires separate authorization and provider credentials
+dotnet run --project tests/Calor.Evaluation -- llm-tasks \
+  --manifest tests/Calor.Evaluation/Tasks/task-manifest-neutral.json \
+  --budget 5.00 \
   --refresh-cache
 ```
 
 ### Cost Controls
 
 - Results are cached to avoid redundant API calls
-- Budget caps prevent runaway costs
-- Estimated cost: ~$0.76 for 50 tasks
+- The budget option is checked between tasks, not as a hard per-request billing cap
+- A task and its retries can exceed the remaining budget
+- The old ~$0.76 estimate for 50 tasks is not a current price quote
+- Dry-run estimates and cache hits are not newly executed model evaluations
 
 ### Model Information
 
 | Property | Value |
 |:---------|:------|
 | Provider | Anthropic |
-| Model | Claude Sonnet 4 |
-| Model ID | `claude-sonnet-4-20250514` |
+| Recorded provider key | `claude` |
+| Recorded model | Not available in the failed language results |
+
+The previously advertised `claude-sonnet-4-20250514` ID does not establish which
+model handled a failed request. A new accepted run needs its actual model,
+teaching context, prompts, options and case outcomes recorded.
 
 ---
 
@@ -239,13 +292,17 @@ dotnet run --project tests/Calor.Evaluation -- llm-tasks \
 All benchmark data is available:
 - Task definitions: `tests/Calor.Evaluation/Tasks/task-manifest-neutral.json`
 - Current teaching source: `src/Calor.Compiler/Resources/Teaching/reference.json` (rendered into the packaged reference consumed by current evaluation runs; historical runs retain their recorded prompts).
-- Results: `llm-results.json` (includes generated code for every task)
+- Published historical record: `website/public/data/llm-results.json` (50 failed
+  task pairs, empty generated code, no executed cases)
+- New runner output defaults to `llm-results.json`; publishing it is a separate action
 
 ### Limitations
 
 - Results may vary with model updates
 - 50 tasks is a limited sample size
 - Simple tasks may not reveal differences in more complex scenarios
+- A ratio alone cannot distinguish equal successes from equal failures
+- The available file does not establish results for the current neutral manifest
 
 ---
 
@@ -257,7 +314,9 @@ Task completion measures "can correct code be written?" A separate **Safety Benc
 2. Measuring contract enforcement (Calor) vs exception handling (C#)
 3. Comparing error message quality and precision
 
-This would highlight Calor's contract advantages in scenarios where C# code might silently fail or produce incorrect results.
+Such a comparison needs the same input domain and runtime observations in both
+languages. It must not count contract presence, differing exception types or
+compilation alone as proof of superior bug detection.
 
 ---
 

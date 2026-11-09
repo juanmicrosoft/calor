@@ -97,6 +97,9 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
         LlmTaskRunnerOptions? options = null,
         CancellationToken cancellationToken = default)
     {
+        if (task.Scoring is not { IsValid: true })
+            throw new ArgumentException(
+                $"Task '{task.Id}' scoring weights must be between 0 and 1 and sum to 1.", nameof(task));
         options ??= new LlmTaskRunnerOptions();
 
         // Generate code for both languages using language-appropriate prompts
@@ -669,7 +672,7 @@ Create a public static class with a public static method. Output only the code, 
         {GetCalorSkillsContent()}
 
         Output only Calor source, no markdown or explanation. Include a complete module with indented bodies.
-        For boolean logic use (&& a b), (|| a b), (! a). For numeric negation use (- 0 n).
+        For boolean logic use a && b, a || b, !a. For numeric negation use -n.
         """;
 
     private static List<LlmTaskDefinition> FilterTasks(
