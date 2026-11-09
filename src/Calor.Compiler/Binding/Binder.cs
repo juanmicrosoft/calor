@@ -4541,7 +4541,12 @@ public sealed class Binder
                 calleeSpan: TextSpan.Empty)
             {
                 ResolvedMetadataMethod = selected?.Symbol,
-                CollectionMethodDefinition = sourceListEntry ? sourceAddDefinition : null
+                CollectionMethodDefinition = sourceListEntry ? sourceAddDefinition : null,
+                MutatesOnlyFreshCollectionReceiver = source.Functions.Count == 0
+                    && resolution.Functions.Count == 0
+                    && newExpr.Arguments.Count == 0
+                    && IsFreshBclCollectionAdd(metadata, metadataType ?? collectionDefinition,
+                        selected?.Symbol ?? (sourceListEntry ? sourceAddDefinition : null))
             };
             collectionCalls.Add(call);
             InvalidateByReferenceParameterNarrowing();
@@ -4560,6 +4565,39 @@ public sealed class Binder
             newExpr.ArgumentNames,
             metadataType,
             collectionCalls);
+    }
+
+    private static bool IsFreshBclCollectionAdd(
+        Metadata.MetadataBinder? metadata,
+        Microsoft.CodeAnalysis.INamedTypeSymbol? receiver,
+        Microsoft.CodeAnalysis.IMethodSymbol? method)
+    {
+        if (metadata is null || receiver is null || method is null
+            || method.IsStatic || method.IsGenericMethod
+            || !receiver.InstanceConstructors.Any(constructor =>
+                constructor.Parameters.IsEmpty
+                && constructor.DeclaredAccessibility == Microsoft.CodeAnalysis.Accessibility.Public))
+            return false;
+        var symbols = Microsoft.CodeAnalysis.SymbolEqualityComparer.Default;
+        var definition = receiver.OriginalDefinition;
+        var list = metadata.Context.TryResolveType("System.Collections.Generic.List`1");
+        var set = metadata.Context.TryResolveType("System.Collections.Generic.HashSet`1");
+        var dictionary = metadata.Context.TryResolveType("System.Collections.Generic.Dictionary`2");
+        var isList = symbols.Equals(definition, list);
+        if (!isList && !symbols.Equals(definition, set) && !symbols.Equals(definition, dictionary))
+            return false;
+        if (!definition.GetMembers("Add").OfType<Microsoft.CodeAnalysis.IMethodSymbol>()
+            .Any(candidate => symbols.Equals(candidate, method.OriginalDefinition)))
+            return false;
+        // Default equality for these sealed CLR primitives cannot dispatch to user callbacks.
+        return isList || receiver.TypeArguments[0].SpecialType is
+            Microsoft.CodeAnalysis.SpecialType.System_Boolean or Microsoft.CodeAnalysis.SpecialType.System_Char
+            or Microsoft.CodeAnalysis.SpecialType.System_SByte or Microsoft.CodeAnalysis.SpecialType.System_Byte
+            or Microsoft.CodeAnalysis.SpecialType.System_Int16 or Microsoft.CodeAnalysis.SpecialType.System_UInt16
+            or Microsoft.CodeAnalysis.SpecialType.System_Int32 or Microsoft.CodeAnalysis.SpecialType.System_UInt32
+            or Microsoft.CodeAnalysis.SpecialType.System_Int64 or Microsoft.CodeAnalysis.SpecialType.System_UInt64
+            or Microsoft.CodeAnalysis.SpecialType.System_Single or Microsoft.CodeAnalysis.SpecialType.System_Double
+            or Microsoft.CodeAnalysis.SpecialType.System_Decimal or Microsoft.CodeAnalysis.SpecialType.System_String;
     }
 
     private bool IsEnumerableCollectionClass(ClassDefinitionNode cls, HashSet<ClassDefinitionNode> visited)

@@ -6221,8 +6221,11 @@ public sealed class EffectEnforcementPass
                     add = _context.Resolver.Resolve(EffectResolverKey.FromStrings(
                         definition.ContainingNamespace.ToDisplayString() + "." + definition.ContainingType.MetadataName,
                         definition.Name, initializer.Arguments.Select(InferExpressionType).ToArray()));
-                effects = effects.Union(add is { Status: not EffectResolutionStatus.Unknown }
-                    ? add.Effects : UnknownResolvedOperation(initializer.Target, initializer.Span));
+                var addEffects = add is { Status: not EffectResolutionStatus.Unknown }
+                    ? add.Effects : UnknownResolvedOperation(initializer.Target, initializer.Span);
+                if (bound is { MutatesOnlyFreshCollectionReceiver: true } && !addEffects.IsUnknown)
+                    addEffects = EffectSet.FromInternal(addEffects.Except(EffectSet.From("mut")));
+                effects = effects.Union(addEffects);
             }
 
             return effects;

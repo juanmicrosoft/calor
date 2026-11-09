@@ -761,6 +761,7 @@ public class BoundCallExpression : BoundExpression
 {
     internal Microsoft.CodeAnalysis.IMethodSymbol? ResolvedMetadataMethod { get; init; }
     internal Microsoft.CodeAnalysis.IMethodSymbol? CollectionMethodDefinition { get; init; }
+    internal bool MutatesOnlyFreshCollectionReceiver { get; init; }
     internal VariableSymbol? CallableStorageIdentity { get; init; }
     internal CallableMutationSummary ObservedCallableEffects { get; init; } = CallableMutationSummary.Empty;
     public string Target { get; }

@@ -605,9 +605,9 @@ public sealed class NativeMetadataClosureTests
     }
 
     [Theory]
-    [InlineData("alloc", "mut")]
-    [InlineData("mut", "alloc")]
-    public void NativeCollectionInitializer_ChargesAllocationAndAddEffects(string declared, string missing)
+    [InlineData("mut")]
+    [InlineData("")]
+    public void NativeCollectionInitializer_StillChargesAllocation(string declared)
     {
         var result = Compile($$"""
             module CollectionEffects
@@ -616,13 +616,232 @@ public sealed class NativeMetadataClosureTests
                 return new System.Collections.Generic.List<int> {1}
             """);
         Assert.Contains(result.Diagnostics.Errors, diagnostic =>
-            diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains($"'{missing}'"));
+            diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'alloc'"));
+    }
+
+    [Theory]
+    [InlineData("List<int>", "(int)1, (int)2")]
+    [InlineData("HashSet<int>", "(int)1, (int)2")]
+    [InlineData("Dictionary<int,int>", "{(int)1, (int)10}, {(int)2, (int)20}")]
+    [InlineData("List<int>", "Echo(1), Echo(2)")]
+    [InlineData("HashSet<int>", "Echo(1), Echo(2)")]
+    [InlineData("Dictionary<int,int>", "{Echo(1), Echo(10)}, {Echo(2), Echo(20)}")]
+    public void OriginalSixNativeCollectionRows_RetainAllocOnlyAndClrOracles(string type, string entries)
+    {
+        var authored = $$"""
+            module Native Native
+              using System.Collections.Generic
+              func Echo private (int:value) → int
+                !
+                return value
+              func Probe () → object
+                ! alloc
+                let values = new {{type}} { {{entries}} }
+                return values
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var diagnostics = new DiagnosticBag();
+            var bound = new Binder(diagnostics).Bind(Parse(source));
+            Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+            var creation = Assert.IsType<BoundNewExpression>(Assert.IsType<BoundBindStatement>(
+                bound.Functions.Single(function => function.Symbol.Name == "Probe").Body[0]).Initializer);
+            Assert.All(creation.CollectionInitializers, call =>
+            {
+                Assert.True(call.MutatesOnlyFreshCollectionReceiver);
+                Assert.NotNull(call.ResolvedMetadataMethod);
+            });
+            var result = Compile(source);
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+            var value = CompileAssembly(result.GeneratedCode).GetType("Native.NativeModule")!
+                .GetMethod("Probe")!.Invoke(null, null);
+            if (value is IDictionary<int, int> dictionary)
+            {
+                Assert.Equal(2, dictionary.Count);
+                Assert.Equal(10, dictionary[1]);
+                Assert.Equal(20, dictionary[2]);
+            }
+            else if (value is HashSet<int> set)
+                Assert.True(set.SetEquals([1, 2]));
+            else
+                Assert.Equal([1, 2], Assert.IsAssignableFrom<IEnumerable<int>>(value));
+        }
+    }
+
+    [Theory]
+    [InlineData("List<int>", "1", "")]
+    [InlineData("HashSet<string>", "\"a\"", "")]
+    [InlineData("Dictionary<string,int>", "{\"a\", 1}", "")]
+    [InlineData("Items", "1", "using Items = System.Collections.Generic.List<int>")]
+    public void FreshBclCollectionIdentity_RetainsAliasesAndSafeStringKeys(string type, string entries, string import)
+    {
+        var authored = $$"""
+            module FreshIdentity
+              using System.Collections.Generic
+              {{import}}
+              func Make () → {{type}}
+                ! alloc
+                return new {{type}} { {{entries}} }
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var result = Compile(source);
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+            CompileAssembly(result.GeneratedCode);
+        }
+    }
+
+    [Theory]
+    [InlineData("new System.Collections.Generic.HashSet<object> {key}")]
+    [InlineData("new System.Collections.Generic.Dictionary<object,int> {{key, 1}}")]
+    [InlineData("new System.Collections.Generic.List<int>(2) {1}")]
+    public void CollectionInitializers_WithoutTheFreshCallbackFreeProofRetainMutation(string expression)
+    {
+        var authored = $$"""
+            module UnprovedFreshCollection
+              func Probe (object:key) → object
+                ! alloc
+                return {{expression}}
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var bound = new Binder(new DiagnosticBag()).Bind(Parse(source));
+            var creation = Assert.IsType<BoundNewExpression>(
+                Assert.IsType<BoundReturnStatement>(Assert.Single(bound.Functions).Body[0]).Expression);
+            Assert.All(creation.CollectionInitializers, call => Assert.False(call.MutatesOnlyFreshCollectionReceiver));
+            var result = Compile(source);
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'mut'"));
+        }
+    }
+
+    [Theory]
+    [InlineData("Next(external)", "")]
+    [InlineData("1", "values.Add(2)")]
+    public void FreshCollectionDischarge_DoesNotRemoveExternalOrPostConstructionMutation(string entry, string after)
+    {
+        var authored = $$"""
+            module ExternalMutation
+              using System.Collections.Generic
+              func Next (List<int>:external) → int
+                ! mut
+                external.Add(1)
+                return external.Count
+              func Probe (List<int>:external) → List<int>
+                ! alloc
+                let values = new List<int> { {{entry}} }
+                {{after}}
+                return values
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var result = Compile(source);
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'mut'"));
+        }
+    }
+
+    [Theory]
+    [InlineData("Tracked")]
+    [InlineData("List")]
+    [InlineData("HashSet")]
+    public void FreshCollectionDischarge_ExcludesSourceNamesAndConstructors(string name)
+    {
+        var authored = $$"""
+            module CustomCollection
+              class {{name}} extends System.Collections.Generic.List<int>
+                field int:Total public = 0
+                ctor ()
+                  System.Console.WriteLine("construction")
+                func Add (int:value) → void
+                  ! mut
+                  set this.Total (this.Total + value)
+              func Probe () → {{name}}
+                ! alloc
+                return new {{name}} {1}
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var bound = new Binder(new DiagnosticBag()).Bind(Parse(source));
+            var creation = Assert.IsType<BoundNewExpression>(
+                Assert.IsType<BoundReturnStatement>(
+                    bound.Functions.Single(function => function.Symbol.Name == "Probe").Body[0]).Expression);
+            Assert.All(creation.CollectionInitializers, call => Assert.False(call.MutatesOnlyFreshCollectionReceiver));
+            var result = Compile(source);
+            foreach (var effect in new[] { "mut", "cw" })
+                Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains($"'{effect}'"));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FreshSourceElementList_OnlyDischargesTheGenuineBclAdd(bool constructorWrites)
+    {
+        var authored = $$"""
+            module SourceElementEffects
+              using System.Collections.Generic
+              class Item
+                ctor ()
+                  {{(constructorWrites ? "System.Console.WriteLine(\"construction\")" : "")}}
+              func Probe () → List<Item>
+                ! alloc
+                return new List<Item> {new Item()}
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var diagnostics = new DiagnosticBag();
+            var bound = new Binder(diagnostics).Bind(Parse(source));
+            Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+            var creation = Assert.IsType<BoundNewExpression>(Assert.IsType<BoundReturnStatement>(
+                bound.Functions.Single(function => function.Symbol.Name == "Probe").Body[0]).Expression);
+            var call = Assert.Single(creation.CollectionInitializers);
+            Assert.True(call.MutatesOnlyFreshCollectionReceiver);
+            Assert.Null(call.ResolvedMetadataMethod);
+            Assert.Equal("System.Collections.Generic.List<T>",
+                call.CollectionMethodDefinition!.ContainingType.ToDisplayString());
+            var result = Compile(source);
+            if (constructorWrites)
+                Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'cw'"));
+            else
+            {
+                Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+                var method = CompileAssembly(result.GeneratedCode).GetTypes()
+                    .SelectMany(type => type.GetMethods()).Single(method => method.Name == "Probe");
+                Assert.Single(Assert.IsAssignableFrom<System.Collections.IList>(method.Invoke(null, null)).Cast<object>());
+            }
+        }
     }
 
     [Fact]
-    public void NativeCollectionInitializer_DoesNotDropElementCallEffects()
+    public void FreshCollectionDischarge_ExcludesExplicitComparerConstructors()
     {
-        const string source = """
+        const string authored = """
+            module ComparerEffects
+              using System.Collections.Generic
+              func Probe (IEqualityComparer<int>:comparer) → HashSet<int>
+                ! alloc
+                return new HashSet<int>(comparer) {1}
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var bound = new Binder(new DiagnosticBag()).Bind(Parse(source));
+            var creation = Assert.IsType<BoundNewExpression>(
+                Assert.IsType<BoundReturnStatement>(Assert.Single(bound.Functions).Body[0]).Expression);
+            Assert.False(Assert.Single(creation.CollectionInitializers).MutatesOnlyFreshCollectionReceiver);
+            Assert.Contains(Compile(source).Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'mut'"));
+        }
+    }
+
+    [Theory]
+    [InlineData("", "Next()")]
+    [InlineData("(Next())", "1")]
+    public void NativeCollectionInitializer_DoesNotDropConstructorOrElementCallEffects(string arguments, string entry)
+    {
+        var source = $$"""
             module ElementEffects
               func Next () → int
                 ! cw
@@ -630,11 +849,14 @@ public sealed class NativeMetadataClosureTests
                 return 1
               func Make () → System.Collections.Generic.List<int>
                 ! alloc, mut
-                return new System.Collections.Generic.List<int> {Next()}
+                return new System.Collections.Generic.List<int>{{arguments}} { {{entry}} }
             """;
-        var result = Compile(source);
-        Assert.Contains(result.Diagnostics.Errors, diagnostic =>
-            diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'cw'"));
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var result = Compile(candidate);
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'cw'"));
+        }
     }
 
     [Fact]
@@ -650,10 +872,13 @@ public sealed class NativeMetadataClosureTests
                 ! alloc, mut
                 return new Tracked {1}
             """;
-        var result = Compile(source);
-        Assert.Contains(result.Diagnostics.Errors, diagnostic =>
-            diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'cw'"));
-        Assert.DoesNotContain(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var result = Compile(candidate);
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'cw'"));
+            Assert.DoesNotContain(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+        }
     }
 
     [Theory]
