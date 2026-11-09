@@ -15,6 +15,62 @@ namespace Calor.Compiler.Tests;
 public sealed class NativeMetadataClosureTests
 {
     [Theory]
+    [InlineData("System.SByte", "int")]
+    [InlineData("System.Byte", "int")]
+    [InlineData("System.Int16", "int")]
+    [InlineData("System.UInt16", "int")]
+    [InlineData("System.Int32", "int")]
+    [InlineData("System.UInt32", "uint")]
+    [InlineData("System.Int64", "long")]
+    [InlineData("System.UInt64", "ulong")]
+    [InlineData("System.Single", "float")]
+    [InlineData("System.Double", "double")]
+    [InlineData("System.Decimal", "decimal")]
+    public void ClrNumericAliases_RetainArithmeticTypingAndRealParameterIdentity(string alias, string output)
+    {
+        var authored = $$"""
+            module Numbers
+              func Divide ({{alias}}:left, {{alias}}:right) → {{output}}
+                let quotient = left / right
+                return quotient
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var diagnostics = new DiagnosticBag();
+            new TypeChecking.TypeChecker(diagnostics).Check(Parse(source));
+            Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
+            Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference);
+            var result = Compile(source);
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+            var method = CompileAssembly(result.GeneratedCode).GetTypes().SelectMany(owner => owner.GetMethods())
+                .Single(method => method.Name == "Divide");
+            var parameterType = Type.GetType(alias, throwOnError: true)!;
+            Assert.All(method.GetParameters(), parameter => Assert.Equal(parameterType, parameter.ParameterType));
+            var arguments = new[] { Convert.ChangeType(6, parameterType), Convert.ChangeType(3, parameterType) };
+            Assert.Equal(Convert.ChangeType(2, method.ReturnType), method.Invoke(null, arguments));
+        }
+    }
+
+    [Theory]
+    [InlineData("System.Boolean")]
+    [InlineData("System.String")]
+    public void ClrNonNumericAliases_DoNotAcquireArithmeticOperations(string alias)
+    {
+        var source = $"module Numbers\n  func Divide ({alias}:left, {alias}:right) → int\n    let quotient = left / right\n    return quotient";
+        var diagnostics = new DiagnosticBag();
+        new TypeChecking.TypeChecker(diagnostics).Check(Parse(source));
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+        Assert.True(Compile(source).HasErrors);
+    }
+
+    [Theory]
+    [InlineData("Example.Int32")]
+    [InlineData("System.int32")]
+    [InlineData("System.Int32Thing")]
+    public void ClrNumericAliases_DoNotResolveLookalikeTypeNames(string name)
+        => Assert.Null(TypeChecking.PrimitiveType.FromName(name));
+
+    [Theory]
     [InlineData("byte[]", 3)]
     [InlineData("int[]", 3)]
     [InlineData("int[,]", 6)]

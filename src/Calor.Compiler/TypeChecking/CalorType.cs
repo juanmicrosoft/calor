@@ -123,6 +123,23 @@ public sealed class PrimitiveType : CalorType
 
     public static PrimitiveType? FromName(string name)
     {
+        name = name switch
+        {
+            "System.SByte" => "sbyte",
+            "System.Byte" => "byte",
+            "System.Int16" => "short",
+            "System.UInt16" => "ushort",
+            "System.Int32" => "int",
+            "System.UInt32" => "uint",
+            "System.Int64" => "long",
+            "System.UInt64" => "ulong",
+            "System.Single" => "float",
+            "System.Double" => "double",
+            "System.Decimal" => "decimal",
+            "System.Boolean" => "bool",
+            "System.Char" => "char",
+            _ => name
+        };
         // The C# surface spelling is single precision; internal FLOAT stays double.
         if (name == "float")
             return Sized(Float, "f32");
