@@ -1,0 +1,2 @@
+fn Add pub stat (int:a, int:b) -> int
+  return a + b

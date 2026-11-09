@@ -1,0 +1,8 @@
+module Canon
+  fn Label pub stat (int:n) -> string
+    let ~string:label
+    if n > 0
+      set label "positive"
+    else
+      set label "other"
+    return label + "!"

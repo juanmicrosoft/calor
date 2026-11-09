@@ -1,0 +1,2 @@
+set Store()[Key()] Value()
+set Items()[Index()] Next()

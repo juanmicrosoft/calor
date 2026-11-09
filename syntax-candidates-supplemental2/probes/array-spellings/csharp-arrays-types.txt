@@ -1,0 +1,2 @@
+fn F (int[]:a, int[,]:b, int[][]:c) -> int[]
+  return a

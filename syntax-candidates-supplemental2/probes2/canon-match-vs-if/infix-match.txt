@@ -1,0 +1,7 @@
+module Canon
+  fn Classify pub stat (int:code) -> string
+    return code switch
+      1 => "one"
+      2 => "two"
+      3 => "three"
+      _ => "other"

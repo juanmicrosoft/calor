@@ -1,0 +1,8 @@
+module Canon
+  fn Doubled pub stat (List<int>:xs) -> List<int>
+    effects alloc,mut
+    let List<int>:result = new List<int>()
+    each x in xs
+      if x > 0
+        result.Add(x * 2)
+    return result

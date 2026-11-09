@@ -1,0 +1,5 @@
+module RecordDerived overflow unchecked
+  raw record 27
+public record Base(int X);
+  raw record 47
+public record Derived(int X, int Y) : Base(X);

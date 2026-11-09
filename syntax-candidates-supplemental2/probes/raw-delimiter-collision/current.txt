@@ -1,0 +1,6 @@
+raw unsupported <<CALOR_RAW_
+// CALOR_RAW
+CALOR_RAW
+// §/RAW §/CSHARP
+
+CALOR_RAW_

@@ -1,0 +1,9 @@
+§M{Lit}
+  §F{Describe:pub} (i32:n) -> str
+    §B{~count:i32} 0
+    §B{scale:f64} 1.5
+    §B{label:str} "total"
+    §B{active:bool} true
+    §IF (&& active (> n 10))
+      §ASSIGN count (* n 2)
+    §R (+ label (+ "=" (+ count (* scale 2.0))))

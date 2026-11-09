@@ -1,0 +1,5 @@
+raw unsupported <<CALOR_RAW
+var s = """
+  literal
+  """;
+CALOR_RAW

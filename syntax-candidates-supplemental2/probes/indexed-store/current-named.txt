@@ -1,0 +1,4 @@
+§B{d} §C{Store} §/C
+§PUT{d} §C{Key} §/C §C{Value} §/C
+§B{xs} §C{Items} §/C
+§SETIDX{xs} §C{Index} §/C §C{Next} §/C

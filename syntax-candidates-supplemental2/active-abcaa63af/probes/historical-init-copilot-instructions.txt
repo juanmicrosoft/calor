@@ -1,0 +1,106 @@
+<!-- BEGIN CalorC SECTION - DO NOT EDIT -->
+## Calor-First Project
+
+This project uses **Calor**, a DSL that compiles to C# on .NET 10. The Calor MCP server provides all compiler capabilities as tools.
+
+### Rules for AI Agents
+
+1. **All new code must be `.calr` files** — never create `.cs` files directly.
+2. **Convert before modifying** — convert any `.cs` file to `.calr` using `calor_convert` MCP tool before making changes.
+3. **Never edit `.g.cs` files** — they are auto-generated from `.calr` sources.
+4. **Validate after writing** — run `calor_check` MCP tool (action=diagnose) after any `.calr` edit.
+5. **Read the primer once, up front** — read the `calor://primer` MCP resource at the
+   start of a Calor session (a measured syntax exemplar that in one
+   experiment (E1a, n=30) brought green-field Calor to C# iteration parity on one task), then use `calor_help` for specific lookups.
+
+### MCP Tools (available via `calor mcp --stdio`)
+
+| Category | Tools |
+|----------|-------|
+| **Compile & Verify** | `calor_compile` (+ checkCompat), `calor_verify`, `calor_analyze` (action: security/assess/minimize) |
+| **Convert** | `calor_convert` (mode: convert/validate/roundtrip/assess), `calor_batch` (action: convert/analyze) |
+| **Navigate** | `calor_navigate` (action: definition/references/find/info/scope) |
+| **Code Quality** | `calor_check` (action: diagnose/lint/typecheck/validate), `calor_format` (action: format/ids) |
+| **Structure** | `calor_structure` (action: outline/callgraph/impact) |
+| **Project index** | `calor_query` (facet: callers/callees/impact/effects) |
+| **Syntax & Help** | `calor_help` (action: syntax/features/error/example) |
+| **Edit Support** | `calor_edit_preview` |
+| **Refinement** | `calor_refine` (action: obligations/bounds/diagnose/guards/fixes/types) |
+| **Health** | `calor_self_test` |
+
+### C# Feature Support for Conversion
+
+Most C# features convert cleanly to Calor. Key supported features include:
+
+**Fully supported**: classes, structs, interfaces, enums, abstract/sealed/static classes, generics (including nested), inheritance, properties (auto/computed/init), fields, constructors (with base/this chains), methods (virtual/override/abstract/async), operators (including implicit/explicit conversion), indexers, events, delegates, lambdas, LINQ, pattern matching (type/constant/relational/logical and/or/not/var/discard/tuple/positional patterns), switch expressions, nullable types, string interpolation, collection expressions, goto/label, yield return/break, throw expressions, lock, stackalloc, volatile, extension methods, using declarations, with expressions, required members.
+
+**Partial support** (most usage converts): is-pattern with complex recursion, implicit `new()` with arguments, checked/unchecked blocks (wrapper stripped, body preserved).
+
+**Preserved as C# interop**: records and record structs (all synthesized and user-defined record semantics remain verbatim).
+
+**Not yet supported**: list/slice patterns (`[a, ..rest]`), `ref struct`, `static abstract` interface members, `in` parameters, mixed collection spread (`[1, ..other]`).
+
+Use `calor_help` with action=features to check specific features, or `calor_batch` with action=analyze to assess an entire project.
+
+### Quick Syntax Reference
+
+Calor is **indent-only**: a block's body is indented under its opener and ends at
+the next dedent. There are **no closing tags** — never write `§/`-prefixed closers.
+
+| Structure | Calor Syntax |
+|-----------|-------------|
+| Module | `§M{id:Name}` (body indented) |
+| Function | `§F{id:name:vis} (type:name, ...) -> retType` (body indented) |
+| Binding | `§B{name} expr` (immutable), `§B{~name} expr` (mutable) |
+| Loop | `§L{id:var:from:to:step}` (body indented) |
+| Conditional | `§IF{id} (cond)` + `§EI (cond)` / `§EL`; inline `§IF{id} (cond) → §R expr` |
+| Contracts | `§Q (precondition)`, `§S (postcondition)` |
+| Types | `i32`, `i64`, `str`, `bool`, `f64`, `void`, `?i32` (option), `i32!str` (result) |
+| Expressions | Prefix notation: `(+ a b)`, `(== x 0)`, `(% i 15)` |
+| Literals | `INT:42`, `STR:"hello"`, `BOOL:true`, `FLOAT:3.14` |
+
+### Exemplar idioms (E1a-hardened)
+
+The idioms agents most often get wrong. Copy these shapes verbatim.
+
+**Calls** — every argument is prefixed with `§A`; the argument list closes with `§/C`:
+
+```
+§B{lines:[str]} §C{File.ReadAllLines} §A path §/C
+§C{File.AppendAllText} §A path §A (+ key (+ "=" (+ value "\n"))) §/C
+§B{ok:bool} §C{File.Exists} §A path §/C
+§B{n:i32} §C{LocalFunc} §A x §/C
+```
+
+**Strings are prefix ops, not method calls:**
+
+```
+(len s)              s.Length            (substr s start count)   s.Substring
+(contains s sub)     s.Contains          (starts s pre)           s.StartsWith
+(replace s old new)  s.Replace           (trim s)  (upper s)  (lower s)
+§B{c:str} (substr line i 1)      // single char at index i, as a str
+```
+
+**Lists and dictionaries** (empty literals close with `§/LIST` / `§/DICT`):
+
+```
+§LIST{items:str}
+§/LIST{items}
+§PUSH{items} x               items.Add(x)      [needs mut effect]
+§B{n:i32} §CNT{items}        items.Count
+§B{e:str} §IDX items i       items[i]
+§DICT{ages:str:i32}
+§/DICT{ages}
+§PUT{ages} k v               ages[k] = v       [needs mut effect]
+```
+
+**Effects:** a function whose body mutates a collection (`§PUSH`, `§PUT`, `§SETIDX`)
+must declare `mut` in `§E{...}`; file reads/writes need `fs:r` / `fs:w` / `fs:rw`.
+Callers must declare at least the union of their callees' effects.
+
+**Arrays vs lists (measured trap):** `File.ReadAllLines` returns an ARRAY — bind it
+as `[str]`. Do NOT copy `[str]` into a signature that requires `List<str>`; match the
+type the surrounding surface declares.
+
+*Generated by calor v{{VERSION}}*
+<!-- END CalorC SECTION -->

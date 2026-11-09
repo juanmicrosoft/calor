@@ -1,0 +1,4 @@
+/// breaking 2.0.0 "Requires x > 0 & y < 5"
+/// breaking 3.0.0 "Requires options"
+fn Old pub stat () -> void
+  return

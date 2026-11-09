@@ -1,0 +1,16 @@
+§M{FluentValidation.Resources:overflow=unchecked}
+  §NS{FluentValidation.Resources:file}
+    §U{System.Globalization}
+
+    /// Allows the default error message translations to be managed.
+    §IFACE{ILanguageManager}
+      /// Whether localization is enabled.
+      §PROP{Enabled:bool:pub:get,set}
+      /// Default culture to use for all requests to the LanguageManager. If not specified, uses the current UI culture.
+      §PROP{Culture:?CultureInfo:pub:get,set}
+      §MT{GetString}
+        §I{?str:key}
+        §I{?CultureInfo:culture} = null
+        §O{?str}
+
+

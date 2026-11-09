@@ -1,0 +1,4 @@
+module RecordDerived overflow unchecked
+  class Base pub record (int:X)
+  class Derived pub record (int:X, int:Y)
+    extends Base(X)

@@ -1,0 +1,7 @@
+§M{Microsoft.Extensions.DependencyInjection:overflow=unchecked}
+  §NS{Microsoft.Extensions.DependencyInjection:file}
+    §EN{RequestExceptionActionProcessorStrategy:pub}
+      ApplyForUnhandledExceptions
+      ApplyForAllExceptions
+
+

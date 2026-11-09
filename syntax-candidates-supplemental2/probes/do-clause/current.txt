@@ -1,0 +1,3 @@
+do
+  set r Read()
+while r < 0

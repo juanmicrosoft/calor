@@ -1,0 +1,10 @@
+module RecordType overflow unchecked
+  class Geometry pub stat
+    fn Origin pub stat () -> Point
+      effects alloc
+      return new Point(0, 0)
+    fn Create pub stat (int:x, int:y) -> Point
+      effects alloc
+      return new Point(x, y)
+  raw record 35
+public record Point(int X, int Y);

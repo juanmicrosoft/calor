@@ -1,0 +1,3 @@
+let x = §C{f}
+let y = f
+let z = (tuple f x)

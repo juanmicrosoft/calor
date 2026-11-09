@@ -1,0 +1,8 @@
+§M{Canon}
+  §F{Sum:pub} ([i32]:xs) -> i32
+    §B{~total:i32} 0
+    §B{~i:i32} 0
+    §WH (< i xs.Length)
+      §ASSIGN total (+ total (§IDX xs i))
+      §ASSIGN i (+ i 1)
+    §R total

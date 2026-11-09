@@ -1,0 +1,3 @@
+fn Old pub stat () -> void
+  deprecated 1.4.0 NewApi
+  return

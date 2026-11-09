@@ -1,0 +1,7 @@
+§M{RecordDerived:overflow=unchecked}
+  §NS{RecordDerived:file}
+    §CSHARP{public record Base(int X);}§/CSHARP
+
+    §CSHARP{public record Derived(int X, int Y) : Base(X);}§/CSHARP
+
+

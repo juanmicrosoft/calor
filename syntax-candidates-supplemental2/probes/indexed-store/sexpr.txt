@@ -1,0 +1,2 @@
+set (index (Store) (Key)) (Value)
+set (index (Items) (Index)) (Next)

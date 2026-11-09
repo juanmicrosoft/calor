@@ -1,0 +1,5 @@
+let Func<int,int>:f =
+  (int:x) =>
+    let int:y = x + 1
+    return y
+Use(f)

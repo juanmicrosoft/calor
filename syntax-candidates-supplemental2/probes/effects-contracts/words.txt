@@ -1,0 +1,5 @@
+fn F (int:x | # >= 0) -> int
+  effects cw
+  ensures result >= 0
+  Console.WriteLine(x)
+  return x

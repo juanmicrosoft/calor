@@ -1,0 +1,2 @@
+§EACHKV{k:v} §C{Pairs} §/C
+  §C{Use} §A k §A v §/C

@@ -1,0 +1,6 @@
+module MediatR overflow unchecked
+  using System.Collections.Generic
+  using System.Threading.Tasks
+  using System.Threading
+  interface INotificationPublisher
+    fn Publish (Seq<NotificationHandlerExecutor>:handlerExecutors, INotification:notification, CancellationToken:cancellationToken) -> Task

@@ -1,0 +1,15 @@
+§M{RecordType:overflow=unchecked}
+  §NS{RecordType}
+    §M{Geometry:pub}
+      §F{Origin:pub} () -> Point
+        §E{alloc}
+        §R §NEW{Point} §A 0 §A 0 §/NEW
+
+      §F{Create:pub} (i32:x, i32:y) -> Point
+        §E{alloc}
+        §R §NEW{Point} §A x §A y §/NEW
+
+
+    §CSHARP{public record Point(int X, int Y);}§/CSHARP
+
+

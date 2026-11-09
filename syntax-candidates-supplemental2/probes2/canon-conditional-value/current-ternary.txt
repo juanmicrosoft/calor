@@ -1,0 +1,4 @@
+§M{Canon}
+  §F{Label:pub} (i32:n) -> str
+    §B{label:str} (? (> n 0) "positive" "other")
+    §R (+ label "!")

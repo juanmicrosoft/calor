@@ -1,0 +1,45 @@
+module SyntheticLib overflow unchecked
+  class StringUtils pub
+    fn Reverse pub stat (string:input) -> string
+      effects throw,alloc,mut
+      if (== input null)
+        throw (new ArgumentNullException (nameof input))
+      let char[]:chars = §C{input.ToCharArray}
+      §C{Array.Reverse} chars
+      return (new string chars)
+    fn IsPalindrome pub stat (string:input) -> bool
+      effects throw,alloc,mut
+      if (== input null)
+        return false
+      let string:cleaned = §C{input.ToLowerInvariant}
+      let string:reversed = §C{Reverse} cleaned
+      return (== cleaned reversed)
+    fn CountOccurrences pub stat (string:text, char:target) -> int
+      if (== text null)
+        return 0
+      let ~int:count = 0
+      if true
+        let ~int:i = 0
+        let ~bool:_forFirst009 = true
+        while true
+          if _forFirst009
+            set _forFirst009 false
+          else
+            set i (+ i 1)
+          if (< i (member text Length))
+          else
+            break
+          if true
+            if (== (index text i) target)
+              set count (+ count 1)
+      return count
+    fn Truncate pub stat (string:input, int:maxLength) -> string
+      if (== input null)
+        return ""
+      if (<= (member input Length) maxLength)
+        return input
+      return (+ (input.Substring 0 maxLength) "...")
+    fn Capitalize pub stat (string:input) -> string
+      if §C{string.IsNullOrEmpty} input
+        return (?? input "")
+      return (+ (char.ToUpperInvariant (index input 0)) (input.Substring 1))

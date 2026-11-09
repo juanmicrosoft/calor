@@ -1,0 +1,8 @@
+§M{Canon}
+  §F{Doubled:pub} (List<i32>:xs) -> List<i32>
+    §E{alloc,mut}
+    §B{result:List<i32>} §NEW{List<i32>}
+    §EACH{x} xs
+      §IF (> x 0)
+        §PUSH{result} (* x 2)
+    §R result

@@ -1,0 +1,26 @@
+module RecordWithMethods overflow unchecked
+  record Person pub (string:FirstName, string:LastName, int:Age)
+    property string:FullName pub
+      get
+        return FirstName + " " + LastName
+    property bool:IsAdult pub
+      get
+        return Age >= 18
+    fn WithAge pub (int:newAge) -> Person
+      effects alloc
+      return this with { Age = newAge }
+    fn Greet pub () -> string
+      return "Hello, I am " + FullName
+  record Point3D pub (double:X, double:Y, double:Z)
+    property double:Magnitude pub
+      get
+        return System.Math.Sqrt(X * X + Y * Y + Z * Z)
+    property Point3D:Origin pub stat
+      get
+        return new Point3D(0, 0, 0)
+    fn Add pub (Point3D:other) -> Point3D
+      effects alloc
+      return new Point3D(X + other.X, Y + other.Y, Z + other.Z)
+    fn Scale pub (double:factor) -> Point3D
+      effects alloc
+      return new Point3D(X * factor, Y * factor, Z * factor)

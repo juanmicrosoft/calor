@@ -1,0 +1,10 @@
+§M{m001:MediatR:overflow=unchecked}
+  §U{System.Collections.Generic}
+  §U{System.Threading.Tasks}
+  §U{System.Threading}
+
+  §NS{ns001:MediatR:file}
+    §IFACE{i002:INotificationPublisher}
+      §MT{m003:Publish} (Seq<NotificationHandlerExecutor>:handlerExecutors, INotification:notification, CancellationToken:cancellationToken) -> Task
+
+

@@ -1,0 +1,5 @@
+module FluentValidation.Internal overflow unchecked
+  // AbstractValidator implementation for containing child rules.
+  class ChildRulesContainer<T> int
+    extends InlineValidator<T>
+    field string[]:RuleSetsToApplyToChildRules int

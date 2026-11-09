@@ -1,0 +1,35 @@
+module RecordWithMethods overflow unchecked
+  raw record 389
+public record Person(string FirstName, string LastName, int Age)
+    {
+        public string FullName => FirstName + " " + LastName;
+
+        public bool IsAdult => Age >= 18;
+
+        public Person WithAge(int newAge)
+        {
+            return this with { Age = newAge };
+        }
+
+        public string Greet()
+        {
+            return "Hello, I am " + FullName;
+        }
+    }
+  raw record 470
+public record Point3D(double X, double Y, double Z)
+    {
+        public double Magnitude => System.Math.Sqrt(X * X + Y * Y + Z * Z);
+
+        public static Point3D Origin => new Point3D(0, 0, 0);
+
+        public Point3D Add(Point3D other)
+        {
+            return new Point3D(X + other.X, Y + other.Y, Z + other.Z);
+        }
+
+        public Point3D Scale(double factor)
+        {
+            return new Point3D(X * factor, Y * factor, Z * factor);
+        }
+    }

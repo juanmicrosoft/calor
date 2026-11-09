@@ -1,0 +1,3 @@
+fn Old pub stat () -> void
+  §DP{1.4.0}
+  return

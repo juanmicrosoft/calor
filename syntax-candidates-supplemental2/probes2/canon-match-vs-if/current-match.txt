@@ -1,0 +1,7 @@
+§M{Canon}
+  §F{Classify:pub} (i32:code) -> str
+    §R §W code
+      §K 1 → "one"
+      §K 2 → "two"
+      §K 3 → "three"
+      §K _ → "other"

@@ -1,0 +1,10 @@
+§M{Canon}
+  §F{Classify:pub} (i32:code) -> str
+    §IF (== code 1)
+      §R "one"
+    §EI (== code 2)
+      §R "two"
+    §EI (== code 3)
+      §R "three"
+    §EL
+      §R "other"

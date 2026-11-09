@@ -1,0 +1,3 @@
+fn Old pub stat () -> void
+  doc since 1.2.0
+  return

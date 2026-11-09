@@ -1,0 +1,2 @@
+fn F pub stat (int:x) -> int
+  return x

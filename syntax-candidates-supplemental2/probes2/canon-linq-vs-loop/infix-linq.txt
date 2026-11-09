@@ -1,0 +1,7 @@
+module Canon
+  using System.Linq
+  fn Doubled pub stat (List<int>:xs) -> List<int>
+    effects alloc
+    let IEnumerable<int>:kept = xs.Where((int:x) => x > 0)
+    let IEnumerable<int>:doubled = kept.Select((int:x) => x * 2)
+    return doubled.ToList()

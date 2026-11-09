@@ -1,0 +1,34 @@
+module MatchAfter
+  fn MatchOption pub stat <eff e> (bool:hasValue, int:value, Func<int,int>:onSome effects e, Func<int>:onNone effects e) -> int
+    effects e
+    if hasValue
+      return (onSome value)
+    return (onNone)
+  fn Identity pub stat (int:x) -> int
+    effects
+    return x
+  fn Zero pub stat () -> int
+    effects
+    return 0
+  fn Shout pub stat (int:x) -> int
+    effects cw
+    (Console.WriteLine x)
+    return x
+  fn BothPure pub stat (bool:h, int:v) -> int
+    effects
+    return (MatchOption h v Identity Zero)
+  fn OneImpure pub stat (bool:h, int:v) -> int
+    effects cw
+    return (MatchOption h v Shout Zero)
+  fn Fell priv stat () -> int
+    effects cw
+    (Console.WriteLine "fallback")
+    return 0
+  fn Fallback pub stat (bool:h, int:v) -> int
+    effects cw
+    return (MatchOption h v Identity Fell)
+  fn Sum2 pub stat (bool:h1, int:v1, bool:h2, int:v2) -> int
+    effects
+    let int:a = (BothPure h1 v1)
+    let int:b = (BothPure h2 v2)
+    return (+ a b)

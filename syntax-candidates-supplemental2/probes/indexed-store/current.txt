@@ -1,0 +1,2 @@
+§ASSIGN §IDX §C{Store} §/C §C{Key} §/C §C{Value} §/C
+§ASSIGN §IDX §C{Items} §/C §C{Index} §/C §C{Next} §/C

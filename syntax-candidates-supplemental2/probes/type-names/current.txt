@@ -1,0 +1,2 @@
+fn F (i32:x, f64:y, i64:z, u8:b, str:s) -> f64
+  return y

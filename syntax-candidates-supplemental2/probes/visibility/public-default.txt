@@ -1,0 +1,3 @@
+class C
+  fn F (int:x) -> int
+    return x

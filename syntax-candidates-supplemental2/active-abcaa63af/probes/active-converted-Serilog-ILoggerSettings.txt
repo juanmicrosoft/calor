@@ -1,0 +1,7 @@
+§M{Serilog.Configuration:overflow=unchecked}
+  §NS{Serilog.Configuration:file}
+    /// Implemented on types that apply settings to a logger configuration.
+    §IFACE{ILoggerSettings}
+      §MT{Configure} (LoggerConfiguration:loggerConfiguration)
+
+

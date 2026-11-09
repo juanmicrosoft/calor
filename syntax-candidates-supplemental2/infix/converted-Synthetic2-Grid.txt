@@ -1,0 +1,57 @@
+module GeoLib overflow unchecked
+  // Simple integer-grid helpers — deliberately arithmetic/boundary-dense so the round-trip converter produces native regions and standard mutation operators (boundary, off-by-one, arithmetic, swap-return) have well-covered sites. A second corpus subject for Slice C.
+  class Grid pub stat
+    fn SumOfSquares pub stat (int:a, int:b) -> int
+      return a * a + b * b
+    fn Triple pub stat (int:x) -> int
+      return x * 3
+    fn Area pub stat (int:width, int:height) -> int
+      return width * height
+    fn Perimeter pub stat (int:width, int:height) -> int
+      return 2 * (width + height)
+    fn InBounds pub stat (int:x, int:y, int:width, int:height) -> bool
+      if x < 0 || y < 0
+        return false
+      if x >= width || y >= height
+        return false
+      return true
+    fn ClampIndex pub stat (int:index, int:length) -> int
+      if index < 0
+        return 0
+      if index >= length
+        return length - 1
+      return index
+    fn ManhattanDistance pub stat (int:x1, int:y1, int:x2, int:y2) -> int
+      let int:dx = x1 - x2
+      let int:dy = y1 - y2
+      return Math.Abs(dx) + Math.Abs(dy)
+    fn CellCount pub stat (int:rows, int:cols) -> int
+      let ~int:total = 0
+      if true
+        let ~int:r = 0
+        let ~bool:_forFirst015 = true
+        while true
+          if _forFirst015
+            set _forFirst015 false
+          else
+            set r r + 1
+          if r < rows
+          else
+            break
+          if true
+            if true
+              let ~int:c = 0
+              let ~bool:_forFirst018 = true
+              while true
+                if _forFirst018
+                  set _forFirst018 false
+                else
+                  set c c + 1
+                if c < cols
+                else
+                  break
+                if true
+                  set total total + 1
+      return total
+    fn IsSquare pub stat (int:width, int:height) -> bool
+      return width == height

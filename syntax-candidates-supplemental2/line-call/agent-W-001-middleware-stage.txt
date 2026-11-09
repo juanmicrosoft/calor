@@ -1,0 +1,27 @@
+module MiddlewareAfter
+  fn RunTwice pub stat <eff e> (Func<int>:g effects e) -> int
+    effects e
+    let int:first = §C{g}
+    let int:second = §C{g}
+    return (+ first second)
+  fn Beat pub stat () -> int
+    effects cw
+    §C{Console.WriteLine} "beat"
+    return 1
+  interface IPipelineBehavior
+    fn Handle <eff e> (int:request, Func<int>:next effects e) -> int
+      effects e
+  class RetryBehavior pub
+    implements IPipelineBehavior
+    field Func<int>:_step priv effects
+    ctor pub ()
+      set _step (lambda () 1)
+    fn Handle pub <eff e> (int:request, Func<int>:next effects e) -> int
+      effects e
+      return §C{RunTwice} next
+    fn Probe pub () -> int
+      effects cw
+      let Func<int>:step = (lambda () (Beat))
+      return §C{RunTwice} step
+    fn Twice pub () -> int
+      return §C{RunTwice} _step

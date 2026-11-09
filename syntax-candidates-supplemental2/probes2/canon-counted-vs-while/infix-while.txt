@@ -1,0 +1,8 @@
+module Canon
+  fn Sum pub stat (int[]:xs) -> int
+    let ~int:total = 0
+    let ~int:i = 0
+    while i < xs.Length
+      set total total + xs[i]
+      set i i + 1
+    return total

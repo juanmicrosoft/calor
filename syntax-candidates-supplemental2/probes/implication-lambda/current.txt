@@ -1,0 +1,1 @@
+let f = (bool:p, bool:q) => !p || q

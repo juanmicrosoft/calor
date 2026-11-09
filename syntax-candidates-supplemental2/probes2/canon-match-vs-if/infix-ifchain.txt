@@ -1,0 +1,10 @@
+module Canon
+  fn Classify pub stat (int:code) -> string
+    if code == 1
+      return "one"
+    elif code == 2
+      return "two"
+    elif code == 3
+      return "three"
+    else
+      return "other"

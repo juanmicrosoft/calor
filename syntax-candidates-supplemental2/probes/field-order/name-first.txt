@@ -1,0 +1,3 @@
+fn Add (a:int, b:int) -> int
+  let sum:int = a + b
+  return sum

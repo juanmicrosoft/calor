@@ -1,0 +1,3 @@
+repeat
+  set r Read()
+until !(r < 0)

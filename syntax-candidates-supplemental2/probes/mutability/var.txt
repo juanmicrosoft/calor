@@ -1,0 +1,2 @@
+var int:count = 0
+set count count + 1

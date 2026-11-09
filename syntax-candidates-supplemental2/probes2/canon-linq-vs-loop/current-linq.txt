@@ -1,0 +1,7 @@
+§M{Canon}
+  §U{System.Linq}
+  §F{Doubled:pub} (List<i32>:xs) -> List<i32>
+    §E{alloc}
+    §B{kept:IEnumerable<i32>} §C{System.Linq.Enumerable.Where} §A xs §A §LAM{x:i32} (> x 0) §/LAM §/C
+    §B{doubled:IEnumerable<i32>} §C{System.Linq.Enumerable.Select} §A kept §A §LAM{x:i32} (* x 2) §/LAM §/C
+    §R §C{System.Linq.Enumerable.ToList} §A doubled §/C

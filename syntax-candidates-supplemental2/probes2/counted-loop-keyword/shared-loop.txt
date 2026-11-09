@@ -1,0 +1,4 @@
+loop i from Start() to End() step Step()
+  Use(i)
+loop i = Start(); i < End(); i = unchecked(i + Step())
+  Use(i)

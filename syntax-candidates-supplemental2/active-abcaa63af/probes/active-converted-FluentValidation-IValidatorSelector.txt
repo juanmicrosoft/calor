@@ -1,0 +1,7 @@
+§M{FluentValidation.Internal:overflow=unchecked}
+  §NS{FluentValidation.Internal:file}
+    /// Determines whether or not a rule should execute.
+    §IFACE{IValidatorSelector}
+      §MT{CanExecute} (IValidationRule:rule, ?str:propertyPath, IValidationContext:context) -> bool
+
+
