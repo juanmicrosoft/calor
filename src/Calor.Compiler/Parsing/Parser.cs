@@ -3821,6 +3821,10 @@ public sealed class Parser
         if (following.Kind is TokenKind.FatArrow or TokenKind.NullConditional
             || following.Span.Line != TokenEndLine(_tokens[close]))
             return false;
+        // Type operators inside grouping must not fuse into a named cast type.
+        if (_tokens.Skip(_position + 1).Take(close - _position - 1)
+            .Any(token => token.Text is "as" or "is"))
+            return false;
         var typeText = string.Concat(_tokens.Skip(_position + 1).Take(close - _position - 1)
             .Select(token => token.Text));
         var type = SyntaxFactory.ParseTypeName(typeText);
