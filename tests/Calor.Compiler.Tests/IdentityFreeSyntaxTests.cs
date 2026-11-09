@@ -42,10 +42,10 @@ public sealed class IdentityFreeSyntaxTests
         var roundTripDiagnostics = new DiagnosticBag();
         new Parser(new Lexer(emitted, roundTripDiagnostics).TokenizeAllForParser(), roundTripDiagnostics).Parse();
         Assert.False(roundTripDiagnostics.HasErrors, string.Join("\n", roundTripDiagnostics));
-        Assert.Contains("§CTOR{pub}", emitted);
-        Assert.Contains("§PROP{Value:", emitted);
-        Assert.Contains("§LAM{y:", emitted);
-        Assert.DoesNotContain("§/LAM{", emitted);
+        Assert.Contains("ctor ()", emitted);
+        Assert.Contains("property int:Value", emitted);
+        Assert.Contains("y) =>", emitted);
+        Assert.DoesNotContain('§', emitted);
     }
 
     [Fact]
@@ -56,7 +56,7 @@ public sealed class IdentityFreeSyntaxTests
         try
         {
             var name = Ids.CompactIdGenerator.Generate(Ids.IdKind.Function);
-            var source = $"§M{{m001}}\n  §F{{{name}:pub}} () -> void\n    §E{{}}\n";
+            var source = $"module m001\n  func {name} () → void\n    !\n    return";
             var file = Path.Combine(directory, "active.calr");
             File.WriteAllText(file, source);
             var store = new Ids.DeclarationIdentityStore(directory);
@@ -82,11 +82,11 @@ public sealed class IdentityFreeSyntaxTests
     public void IdentityShapedNamesHaveOnlyCurrentSemanticMeaning()
     {
         const string source = """
-            §M{m001}
-              §CL{c001:Value:pub}
-              §F{f001:pub} () -> void
-                §B{handler} §LAM{lam1:x:i32} lam1 §/LAM
-              §IFACE{i001:IValue}
+            module m001
+              class c001 extends Value
+              func f001 () → void
+                let handler = (x:lam1, i32) => lam1
+              interface i001 extends IValue
             """;
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
@@ -109,38 +109,38 @@ public sealed class IdentityFreeSyntaxTests
     }
 
     [Theory]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §E{}")]
-    [InlineData("§M{Demo}\n  §AF{Run:pub} () -> Task\n    §E{}")]
-    [InlineData("§M{Demo}\n  §NS{Outer:named}\n    §CL{Value:pub}\n      §CTOR{pub} ()\n      §MT{Run:pub} () -> void")]
-    [InlineData("§M{Demo}\n  §CL{Value:pub}\n    §PROP{Count:i32:pub:get,set}\n    §IXER{i32:pub:get,set} (i32:index)")]
-    [InlineData("§M{Demo}\n  §IFACE{IValue}\n    §MT{Get:pub} () -> i32")]
-    [InlineData("§M{Demo}\n  §EN{Color:pub:i32}\n    Red\n    Blue")]
-    [InlineData("§M{Demo}\n  §DEL{Handler}\n    §I{i32:value}\n    §O{void}")]
-    [InlineData("§M{Demo}\n  §CL{Value:pub}\n    §EVT{Changed:pub:Action}")]
+    [InlineData("module Demo\n  func Run () → void\n    !")]
+    [InlineData("module Demo\n  func Run async () → Task\n    !")]
+    [InlineData("module Demo Outer block\n  class Value\n    ctor ()\n    func Run () → void")]
+    [InlineData("module Demo\n  class Value\n    property int:Count\n      get\n      set\n    this[int:index] → int\n      get\n      set")]
+    [InlineData("module Demo\n  interface IValue\n    func Get () → int")]
+    [InlineData("module Demo\n  enum Color int\n    Red\n    Blue")]
+    [InlineData("module Demo\n  delegate Handler (int:value) → void")]
+    [InlineData("module Demo\n  class Value\n    event Action:Changed")]
     [InlineData("§M{Demo}\n  §RTYPE{Positive:i32} (> # 0)\n  §ITYPE{Vector:i32:n}")]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §PROOF{\"positive\"} (> 1 0)")]
-    [InlineData("§M{Demo}\n  §CL{Value:pub}\n    §OP{+:pub} (Value:a, Value:b) -> Value\n      §R a")]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §L{i:0:2:1}\n      §IF (> i 0)\n        §P i")]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §WH false\n      §BK\n    §DO\n      §BK\n    §/DO false")]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §EACH{value:i32} values\n      §P value\n    §EACHKV{key:value} map\n      §P value")]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §TR\n      §TH \"error\"\n    §CA{Exception:ex}\n      §P ex")]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §SYNC (gate)\n      §P 1\n    §UNSAFE\n      §P 2")]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §USE{resource:IDisposable} value\n      §P 1")]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> i32\n    §R §W value\n      §K 0\n        §R 1\n      §K _\n        §R 2")]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §B{handler} §LAM{x:i32} (+ x 1) §/LAM")]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §B{handler} §LAM{} 1 §/LAM")]
-    [InlineData("§M{m001}\n  §F{f001:pub} () -> void\n    §B{handler} §LAM{x1:i32} x1 §/LAM")]
-    [InlineData("§M{m_7k9m2npqrstv}\n  §CL{c001:pub}\n    §MT{mt001:pub} () -> void")]
-    [InlineData("§M{Demo}\n  §EN{e001:pub:i32}\n    Value\n  §DEL{d001}\n    §O{void}")]
-    [InlineData("§M{Demo}\n  §CL{c001:Base:pub}\n  §IFACE{i001:IBase}")]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §B{items} §ARR{i32} 1 2 §/ARR")]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §B{items} §LIST{i32} 1 2 §/LIST")]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §B{items} §DICT{str:i32} §KV \"a\" 1 §/DICT")]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §B{items} §HSET{str} \"a\" §/HSET")]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §B{items} §ARR2D{i32:1:2} §/ARR2D")]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §LIST{items:i32}\n      1\n      2")]
-    [InlineData("§M{Demo:overflow=checked}")]
-    [InlineData("§M{Demo:overflow=unchecked}")]
+    [InlineData("module Demo\n  func Run () → void\n    proof{\"positive\"} 1 > 0")]
+    [InlineData("module Demo\n  class Value\n    op + (Value:a, Value:b) → Value\n      return a")]
+    [InlineData("module Demo\n  func Run () → void\n    for i from 0 to 2 step 1\n      if i > 0\n        Console.WriteLine(i)")]
+    [InlineData("module Demo\n  func Run () → void\n    while false\n      break\n    do\n      break\n    while false")]
+    [InlineData("module Demo\n  func Run () → void\n    each int:value in values\n      Console.WriteLine(value)\n    each key, value in map\n      Console.WriteLine(value)")]
+    [InlineData("module Demo\n  func Run () → void\n    try\n      throw \"error\"\n    catch Exception:ex\n      Console.WriteLine(ex)")]
+    [InlineData("module Demo\n  func Run () → void\n    lock gate\n      Console.WriteLine(1)\n    unsafe\n      Console.WriteLine(2)")]
+    [InlineData("module Demo\n  func Run () → void\n    using IDisposable:resource = value\n      Console.WriteLine(1)")]
+    [InlineData("module Demo\n  func Run () → int\n    return match value\n      case 0\n        return 1\n      case _\n        return 2")]
+    [InlineData("module Demo\n  func Run () → void\n    let handler = (int:x) => x + 1")]
+    [InlineData("module Demo\n  func Run () → void\n    let handler = () => 1")]
+    [InlineData("module m001\n  func f001 () → void\n    let handler = (int:x1) => x1")]
+    [InlineData("module m_7k9m2npqrstv\n  class c001\n    func mt001 () → void")]
+    [InlineData("module Demo\n  enum e001 int\n    Value\n  delegate d001 () → void")]
+    [InlineData("module Demo\n  class c001 extends Base\n  interface i001 extends IBase")]
+    [InlineData("module Demo\n  func Run () → void\n    let items = new int[] {1, 2}")]
+    [InlineData("module Demo\n  func Run () → void\n    let items = new System.Collections.Generic.List<int> {1, 2}")]
+    [InlineData("module Demo\n  func Run () → void\n    let items = new System.Collections.Generic.Dictionary<string,int> {{\"a\", 1}}")]
+    [InlineData("module Demo\n  func Run () → void\n    let items = new System.Collections.Generic.HashSet<string> {\"a\"}")]
+    [InlineData("module Demo\n  func Run () → void\n    let items = new int[1, 2]")]
+    [InlineData("module Demo\n  func Run () → void\n    let System.Collections.Generic.List<int>:items = new System.Collections.Generic.List<int> {1, 2}")]
+    [InlineData("module Demo overflow checked")]
+    [InlineData("module Demo overflow unchecked")]
     public void CurrentHeadersHaveNoIdentityField(string source)
     {
         var diagnostics = new DiagnosticBag();
@@ -150,42 +150,42 @@ public sealed class IdentityFreeSyntaxTests
 
     [Theory]
     [InlineData("§M{m001:Demo}")]
-    [InlineData("§M{Demo}\n  §F{f001:Run:pub} () -> void")]
-    [InlineData("§M{Demo}\n  §AF{f001:Run:pub} () -> Task")]
-    [InlineData("§M{Demo}\n  §CL{c001:Value:Base:pub}")]
-    [InlineData("§M{Demo}\n  §IFACE{i001:IValue:IBase}")]
-    [InlineData("§M{Demo}\n  §EN{e001:Color:pub}\n    Red")]
-    [InlineData("§M{Demo}\n  §DEL{d001:Handler}\n    §O{void}")]
-    [InlineData("§M{Demo}\n  §CL{Value:pub}\n    §MT{mt001:Run:pub} () -> void")]
-    [InlineData("§M{Demo}\n  §CL{Value:pub}\n    §PROP{p001:Count:i32:pub:get,set}")]
-    [InlineData("§M{Demo}\n  §CL{Value:pub}\n    §CTOR{ctor1:pub} ()")]
-    [InlineData("§M{Demo}\n  §CL{Value:pub}\n    §IXER{ix1:i32:pub:get} (i32:index)")]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §IF{if1} true\n      §R")]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §WH{wh1} false\n      §BRK")]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §TR{tr1}\n      §R")]
-    [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §B{handler} §LAM{x:i32} x §/LAM{lam1}")]
+    [InlineData("module Demo\n  §F{f001:Run:pub} () -> void")]
+    [InlineData("module Demo\n  §AF{f001:Run:pub} () -> Task")]
+    [InlineData("module Demo\n  §CL{c001:Value:Base:pub}")]
+    [InlineData("module Demo\n  §IFACE{i001:IValue:IBase}")]
+    [InlineData("module Demo\n  §EN{e001:Color:pub}\n    Red")]
+    [InlineData("module Demo\n  §DEL{d001:Handler}\n    §O{void}")]
+    [InlineData("module Demo\n  class Value\n    §MT{mt001:Run:pub} () -> void")]
+    [InlineData("module Demo\n  class Value\n    §PROP{p001:Count:i32:pub:get,set}")]
+    [InlineData("module Demo\n  class Value\n    §CTOR{ctor1:pub} ()")]
+    [InlineData("module Demo\n  class Value\n    §IXER{ix1:i32:pub:get} (i32:index)")]
+    [InlineData("module Demo\n  func Run () → void\n    §IF{if1} true\n      return")]
+    [InlineData("module Demo\n  func Run () → void\n    §WH{wh1} false\n      break")]
+    [InlineData("module Demo\n  func Run () → void\n    §TR{tr1}\n      return")]
+    [InlineData("module Demo\n  func Run () → void\n    let handler = (int:x) => x §/LAM{lam1}")]
     public void SourceIdentityHeadersAreRejectedWithReplacement(string source)
     {
         var diagnostics = new DiagnosticBag();
         new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var marker = source[source.IndexOf('§')..].Split(['{', ' ', '\r', '\n'])[0];
         Assert.Contains(diagnostics.Errors, diagnostic =>
-            diagnostic.Code == DiagnosticCode.UnexpectedToken
-            && (diagnostic.Message.Contains("Source IDs are removed", StringComparison.Ordinal)
-                && diagnostic.Message.Contains(".calor/ids.json", StringComparison.Ordinal)
-                || diagnostic.Message.Contains("Invalid header field", StringComparison.Ordinal)
-                && diagnostic.Message.Contains("expected", StringComparison.Ordinal)));
+            diagnostic.Code == DiagnosticCode.UnknownSectionMarker
+            && diagnostic.Message.Contains($"'{marker}' is removed.", StringComparison.Ordinal)
+            && (diagnostic.Message.Contains("Use ", StringComparison.Ordinal)
+                || diagnostic.Message.Contains("dedenting", StringComparison.Ordinal)));
     }
 
     [Theory]
-    [InlineData("§M{Demo:overflow=bogus}", "overflow= bogus", "overflow=checked", 9)]
-    [InlineData("§M{Demo}\n  §F{Run:bogus} () -> void", "bogus", "visibility", 10)]
-    [InlineData("§M{Demo}\n  §NS{Outer:bogus}", "bogus", "namespace marker", 13)]
+    [InlineData("module Demo overflow bogus", "bogus", "'checked' or 'unchecked'", 22)]
+    [InlineData("module Demo\n  func Run bogus () → void", "bogus", "function modifier", 12)]
+    [InlineData("module Demo Outer bogus", "bogus", "[block]", 19)]
     public void InvalidCurrentFieldsAreLocatedAndNeverSuggestDeletingTheName(
         string source, string invalidField, string expected, int column)
     {
         var diagnostics = new DiagnosticBag();
         new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
-        var diagnostic = Assert.Single(diagnostics.Where(d => d.Message.Contains("Invalid header field")));
+        var diagnostic = Assert.Single(diagnostics.Errors.Where(d => d.Message.Contains(expected)));
         Assert.Contains(invalidField, diagnostic.Message);
         Assert.Contains(expected, diagnostic.Message);
         Assert.Equal(column, diagnostic.Span.Column);
