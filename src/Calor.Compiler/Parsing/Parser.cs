@@ -13574,7 +13574,7 @@ public sealed class Parser
             var owner = BeginBlockBody(startToken, TokenKind.EndDelegate, id);
             while (!IsAtEnd && IsInBlockBody(owner) && !Check(TokenKind.Dedent))
             {
-                if (Check(TokenKind.Effects))
+                if (Check(TokenKind.Effects) || Check(TokenKind.Exclamation))
                     effects = ParseEffects(EffectRowPosition.Delegate);
                 else
                 {

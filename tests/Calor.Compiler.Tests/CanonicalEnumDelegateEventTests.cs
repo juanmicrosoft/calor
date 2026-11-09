@@ -100,6 +100,56 @@ public sealed class CanonicalEnumDelegateEventTests
     private static void Observe(int value) { }
 
     [Theory]
+    [InlineData("")]
+    [InlineData("cw")]
+    [InlineData("mut,throw")]
+    public void IndentedDelegateEffectRowsRoundTripAndApplyToCalls(string effects)
+    {
+        var source = $"module DelegateEffects\n  delegate Handler (int:value) → void\n    ! {effects}\n"
+            + $"  func Invoke (Handler:handler ! {effects}) → void\n    ! {effects}\n    handler(7)";
+        var parsed = Parse(source);
+        var declared = parsed.Delegates.Single().Effects!;
+        var emitted = new CalorEmitter().Emit(parsed);
+        Assert.DoesNotContain('§', emitted);
+        Assert.Equal(declared.Effects, Parse(emitted).Delegates.Single().Effects!.Effects);
+        foreach (var input in new[] { source, emitted })
+        {
+            var compiled = Program.Compile(input, filePath: null, options: new CompilationOptions { EnforceEffects = true });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Execute(compiled.GeneratedCode, assembly =>
+            {
+                var receiver = new Receiver();
+                var handler = Delegate.CreateDelegate(assembly.GetType("Handler", throwOnError: true)!,
+                    receiver, typeof(Receiver).GetMethod(nameof(Receiver.Handle))!);
+                assembly.GetType("GlobalModule", throwOnError: true)!.GetMethod("Invoke")!.Invoke(null, [handler]);
+                Assert.Equal(7, receiver.Value);
+            });
+        }
+    }
+
+    [Fact]
+    public void EffectfulDelegateInvocationCannotBeLaunderedThroughAPureCaller()
+    {
+        const string source = """
+            module DelegateEffects
+              delegate Handler (int:value) → void
+                ! cw
+              func Invoke (Handler:handler ! cw) → void
+                !
+                handler(7)
+            """;
+        var compiled = Program.Compile(source, filePath: null, options: new CompilationOptions { EnforceEffects = true });
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.EffectRowUnknown);
+    }
+
+    private sealed class Receiver
+    {
+        public int Value { get; private set; }
+        public void Handle(int value) => Value = value;
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void UnsafeCallableModifierDoesNotTerminateTheNativeHeader(bool roundtrip)
