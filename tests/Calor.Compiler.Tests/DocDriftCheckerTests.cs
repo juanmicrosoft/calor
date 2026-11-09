@@ -144,6 +144,13 @@ public class DocDriftCheckerTests
         new[] { "YourModule", "FactorialBenchmark" }, new[] { "0", "120" },
         new[] { "((System.Func<int>)(() => { GlobalModule.Main(); return 0; }))()",
             "global::Math.MathModule.Factorial(5)" })]
+    [InlineData("benchmarking/metrics/error-detection.mdx", 5, 0,
+        new[] { "DivisionSignals", "NullSignals", "BoundsSignals", "BuggyCaller", "NullableSignals" },
+        new[] { "4", "3", "42", "Requires", "3" },
+        new[] { "GlobalModule.Divide(9, 2)", "GlobalModule.Length(\"abc\")",
+            "GlobalModule.At(new int[] { 42 }, 0)",
+            "((System.Func<string>)(() => { try { GlobalModule.Trigger(9, 5); return \"not rejected\"; } catch (Calor.Runtime.ContractViolationException failure) { return failure.Kind.ToString(); } }))()",
+            "GlobalModule.SafeDivide(6, 2)" })]
     [InlineData("structure-tags.mdx", 22, 4,
         new[] { "StructureModules", "BlockNamespace", "FunctionHeaders", "AsyncFunctions", "AsyncMethods",
             "AwaitExpressions", "LambdaExamples", "AsyncLambdas", "LocalCallables", "DelegateDefinitions",
@@ -624,6 +631,110 @@ public class DocDriftCheckerTests
                     }
                 }
                 """);
+    }
+
+    [Theory]
+    [InlineData("DivisionSignals", "GlobalModule.Divide(9, 0)", "!ContractViolationException", "!DivideByZeroException")]
+    [InlineData("DivisionSignals", "GlobalModule.Divide(-1, 2)", "!ContractViolationException", "0")]
+    [InlineData("DivisionSignals", "GlobalModule.Divide(9, -2)", "!ContractViolationException", "-4")]
+    [InlineData("DivisionSignals", "GlobalModule.Divide(0, -1)", "0", "0")]
+    [InlineData("NullSignals", "GlobalModule.Length(null!)", "!ContractViolationException", "!NullReferenceException")]
+    [InlineData("BoundsSignals", "GlobalModule.At(new int[] { 42 }, -1)", "!ContractViolationException", "!IndexOutOfRangeException")]
+    [InlineData("BoundsSignals", "GlobalModule.At(new int[] { 42 }, 1)", "!ContractViolationException", "!IndexOutOfRangeException")]
+    [InlineData("BoundsSignals", "GlobalModule.At(null!, 0)", "!NullReferenceException", "!NullReferenceException")]
+    [InlineData("BuggyCaller", "GlobalModule.Trigger(9, 5)", "!ContractViolationException", "!DivideByZeroException")]
+    [InlineData("NullableSignals", "GlobalModule.SafeDivide(6, 0)", "!ContractViolationException", "<null>")]
+    [InlineData("NullableSignals", "GlobalModule.SafeDivide(-7, 3)", "-2", "-2")]
+    [InlineData("NullableSignals", "GlobalModule.SafeDivide(int.MinValue, -1)", "!OverflowException", "!OverflowException")]
+    public void PublicErrorDetection_ObservesExactContractAndUncheckedBoundaries(
+        string module, string expression, string enabled, string disabled)
+    {
+        const string path = "website/content/benchmarking/metrics/error-detection.mdx";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith($"module {module}\n", StringComparison.Ordinal)).Source;
+        foreach (var mode in new[] { ContractMode.Debug, ContractMode.Off })
+        {
+            var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = mode });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Assert.Equal(mode == ContractMode.Debug ? enabled : disabled,
+                InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+                    public static class Probe
+                    {
+                        public static object? Run() => {{expression}};
+                    }
+                    """));
+        }
+    }
+
+    [Theory]
+    [InlineData("DivisionSignals", "GlobalModule.Divide(9, -2)", "Ensures")]
+    [InlineData("BuggyCaller", "GlobalModule.Trigger(9, 5)", "Requires")]
+    [InlineData("NullableSignals", "GlobalModule.SafeDivide(6, 0)", "Requires")]
+    public void PublicErrorDetection_IdentifiesTheActualFailedContract(
+        string module, string expression, string expectedKind)
+    {
+        const string path = "website/content/benchmarking/metrics/error-detection.mdx";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith($"module {module}\n", StringComparison.Ordinal)).Source;
+        var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = ContractMode.Debug });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Equal(expectedKind, InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+            public static class Probe
+            {
+                public static object? Run()
+                {
+                    try { return {{expression}}; }
+                    catch (Calor.Runtime.ContractViolationException failure) { return failure.Kind.ToString(); }
+                }
+            }
+            """));
+    }
+
+    [Fact]
+    public async Task PublicErrorDetection_ReportsActualLegacyDetectorScoresInsteadOfTheHistoricalIllustration()
+    {
+        const string path = "website/content/benchmarking/metrics/error-detection.mdx";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)).Replace("\r\n", "\n");
+        var programs = ExemplarCompileChecker.ExtractCompletePrograms(content);
+        Assert.Equal(5, programs.Count);
+        var csharp = System.Text.RegularExpressions.Regex.Matches(content,
+            @"```csharp\n(?<body>.*?)\n```", System.Text.RegularExpressions.RegexOptions.Singleline);
+        Assert.Equal(4, csharp.Count);
+        foreach (var program in programs)
+        {
+            var metric = await new Calor.Evaluation.Metrics.ErrorDetectionCalculator().CalculateAsync(
+                new Calor.Evaluation.Core.EvaluationContext
+                {
+                    CalorSource = program.Source,
+                    CSharpSource = csharp[3].Groups["body"].Value,
+                    FileName = path
+                });
+            Assert.Equal(0.30, metric.CalorScore, 10);
+            Assert.Equal(0.30, metric.CSharpScore, 10);
+            Assert.Equal(1.0, metric.AdvantageRatio, 10);
+            var factors = Assert.IsType<Dictionary<string, bool>>(metric.Details["calorDetectionFactors"]);
+            Assert.Equal(6, factors.Count);
+            Assert.All(factors, factor => Assert.False(factor.Value, factor.Key));
+        }
+        foreach (var (index, call, expected) in new[]
+        {
+            (0, "Original.Divide(9, 2)", "4"),
+            (3, "Original.SafeDivide(6, 2)", "3"),
+            (3, "Original.SafeDivide(6, 0)", "<null>")
+        })
+            Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(
+                "global using System;\nglobal using System.Diagnostics;\npublic static class Original {\n"
+                + csharp[index].Groups["body"].Value + "\n}\n" + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run() => {{call}};
+                }
+                """));
     }
 
     [Fact]
