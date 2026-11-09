@@ -1,8 +1,12 @@
+using System.Runtime.Loader;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
+using Calor.Compiler.Verification;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -93,6 +97,96 @@ public sealed class CanonicalDocumentationMetadataTests
         var emitter = new CalorEmitter();
         Assert.Throws<InvalidOperationException>(() =>
             emitter.Visit(new DeprecatedNode(span, "1.4.0", null, "Reason", "2.0.0", new AttributeCollection())));
+    }
+
+    [Theory]
+    [InlineData("module", false)]
+    [InlineData("module", true)]
+    [InlineData("class", false)]
+    public void MemberMetadataRetainsSelectedSpellingAndActualClrDeprecation(string ownerKind, bool isAsync)
+    {
+        var source = $$"""
+            module Api
+              {{ownerKind}} Owner
+                /// Explains the API.
+                /// since 1.2.0
+                /// deprecated 1.4.0 Rewrite
+                /// breaking 2.0.0 "Requires x > 0 & y < 5"
+                /// breaking 3.0.0 "Use \"options\"\nNext line ${value}"
+                func Old{{(isAsync ? " async" : "")}} () → int
+                  !
+                  return 7
+            """;
+        var original = Parse(source);
+        var method = original.Classes.Single().Methods.Single();
+        Assert.Equal("1.2.0", method.Since!.Version);
+        Assert.Equal("Rewrite", method.Deprecated!.Replacement);
+        Assert.Equal(2, method.BreakingChanges.Count);
+        var emitted = new CalorEmitter().Emit(original);
+        Assert.DoesNotContain('§', emitted);
+        Assert.Equal(1, emitted.Split("/// since").Length - 1);
+        Assert.Equal(1, emitted.Split("/// deprecated").Length - 1);
+        Assert.Equal(2, emitted.Split("/// breaking").Length - 1);
+        var reparsed = Parse(emitted);
+        var roundTrip = reparsed.Classes.Single().Methods.Single();
+        Assert.Equal(method.Since.Version, roundTrip.Since!.Version);
+        Assert.Equal(method.Deprecated.SinceVersion, roundTrip.Deprecated!.SinceVersion);
+        Assert.Equal(method.BreakingChanges.Select(change => change.Description),
+            roundTrip.BreakingChanges.Select(change => change.Description));
+        Assert.Equal(emitted, new CalorEmitter().Emit(reparsed));
+        var compilation = CSharpCompilation.Create("MemberMetadata",
+            [CSharpSyntaxTree.ParseText(new CSharpEmitter().Emit(reparsed),
+                new CSharpParseOptions(documentationMode: DocumentationMode.Diagnose))],
+            ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
+                .Select(path => MetadataReference.CreateFromFile(path)),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.Empty(compilation.GetDiagnostics().Where(diagnostic =>
+            diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
+        var member = compilation.GetTypeByMetadataName("Owner")!.GetMembers("Old").Single();
+        var attribute = Assert.Single(member.GetAttributes());
+        Assert.Equal("System.ObsoleteAttribute", attribute.AttributeClass!.ToDisplayString());
+        Assert.Equal("Deprecated since 1.4.0. Use Rewrite instead", attribute.ConstructorArguments.Single().Value);
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        stream.Position = 0;
+        var context = new AssemblyLoadContext(Guid.NewGuid().ToString("N"), isCollectible: true);
+        try
+        {
+            var loaded = context.LoadFromStream(stream);
+            var runtimeMethod = loaded.GetType("Owner")!.GetMethod("Old")!;
+            var obsolete = Assert.IsType<ObsoleteAttribute>(
+                Assert.Single(runtimeMethod.GetCustomAttributes(typeof(ObsoleteAttribute), inherit: false)));
+            Assert.Equal("Deprecated since 1.4.0. Use Rewrite instead", obsolete.Message);
+        }
+        finally
+        {
+            context.Unload();
+        }
+    }
+
+    [Fact]
+    public void ContractSimplificationRetainsMethodMetadataAndEffectBinders()
+    {
+        var original = Parse("""
+            module Api
+              module Owner
+                /// since 1.2.0
+                /// deprecated 1.4.0 Rewrite
+                /// breaking 2.0.0 "New behavior"
+                func Old <! e> () → int
+                  ! e
+                  => true && true
+                  return 7
+            """);
+        var before = original.Classes.Single().Methods.Single();
+        var simplified = new ContractSimplificationPass(new DiagnosticBag()).Simplify(original);
+        var after = simplified.Classes.Single().Methods.Single();
+        Assert.NotSame(before, after);
+        Assert.Same(before.Since, after.Since);
+        Assert.Same(before.Deprecated, after.Deprecated);
+        Assert.Same(before.BreakingChanges, after.BreakingChanges);
+        Assert.Same(before.EffectParameters, after.EffectParameters);
     }
 
     private static ModuleNode Parse(string source)

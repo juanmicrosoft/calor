@@ -288,7 +288,13 @@ public sealed class ContractSimplificationPass
             method.Attributes,
             method.CSharpAttributes,
             method.IsAsync,
-            method.IdentifierSpan));
+            method.IdentifierSpan,
+            method.Since,
+            method.Deprecated,
+            method.BreakingChanges)
+        {
+            EffectParameters = method.EffectParameters
+        });
     }
 
     private MethodSignatureNode SimplifyMethodSignature(MethodSignatureNode method)

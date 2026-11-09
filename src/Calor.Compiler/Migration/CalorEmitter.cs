@@ -1494,7 +1494,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(MethodNode node)
     {
-        EmitDocComment(node);
+        EmitCallableDocumentation(node, node.Since, node.Deprecated, node.BreakingChanges);
         var visibility = node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
         var modifiers = new List<string>();
 
@@ -1583,23 +1583,28 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(LocalFunctionStatementNode node)
         => throw new InvalidOperationException("Local functions must be lowered to §B lambda bindings before Calor emission");
 
-    public string Visit(FunctionNode node)
+    private void EmitCallableDocumentation(AstNode node, SinceNode? since, DeprecatedNode? deprecated,
+        IReadOnlyList<BreakingChangeNode> breakingChanges)
     {
         if (node.DocComment != null)
         {
             foreach (var line in node.DocComment.Split('\n'))
             {
                 var text = line.TrimStart();
-                if (node.Since != null && text.StartsWith("since ", StringComparison.Ordinal)
-                    || node.Deprecated != null && text.StartsWith("deprecated ", StringComparison.Ordinal)
-                    || node.BreakingChanges.Count > 0 && text.StartsWith("breaking ", StringComparison.Ordinal))
+                if (since != null && text.StartsWith("since ", StringComparison.Ordinal)
+                    || deprecated != null && text.StartsWith("deprecated ", StringComparison.Ordinal)
+                    || breakingChanges.Count > 0 && text.StartsWith("breaking ", StringComparison.Ordinal))
                     continue;
                 EmitDocumentationText(line);
             }
         }
-        if (node.Since != null) Visit(node.Since);
-        if (node.Deprecated != null) Visit(node.Deprecated);
-        foreach (var breaking in node.BreakingChanges) Visit(breaking);
+        if (since != null) Visit(since);
+        if (deprecated != null) Visit(deprecated);
+        foreach (var breaking in breakingChanges) Visit(breaking);
+    }
+
+    private void EmitRetiredFunctionMetadata(FunctionNode node)
+    {
         foreach (var issue in node.Issues) Visit(issue);
         if (node.Uses != null) Visit(node.Uses);
         if (node.UsedBy != null) Visit(node.UsedBy);
@@ -1607,6 +1612,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Lock != null) Visit(node.Lock);
         if (node.Author != null) Visit(node.Author);
         if (node.TaskRef != null) Visit(node.TaskRef);
+    }
+
+    public string Visit(FunctionNode node)
+    {
+        EmitCallableDocumentation(node, node.Since, node.Deprecated, node.BreakingChanges);
+        EmitRetiredFunctionMetadata(node);
         var visibility = GetVisibilityShorthand(node.Visibility);
         var visibilitySegment = node.Visibility == Visibility.Public ? "" : " " + visibility;
         var (typeParams, typeParamsAfterGroup) =
@@ -3992,7 +4003,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             throw new InvalidOperationException("An enum extension requires an unqualified enum name.");
         var methods = node.Methods.Select(function =>
         {
-            if (function.HasExtendedMetadata)
+            if (function.Examples.Count > 0 || function.Assumptions.Count > 0 || function.Properties.Count > 0)
                 throw new InvalidOperationException("Enum extension metadata requires native method metadata support.");
             var receiver = function.Parameters.FirstOrDefault(parameter =>
                 parameter.TypeName.Equals(enumName, StringComparison.OrdinalIgnoreCase)
@@ -4009,10 +4020,17 @@ public sealed class CalorEmitter : IAstVisitor<string>
             var method = function.CopyMetadataTo(new MethodNode(function.Span, function.LocalId, function.Name,
                 function.Visibility, MethodModifiers.Static, function.TypeParameters, parameters, function.Output,
                 function.Effects, function.Preconditions, function.Postconditions, function.Body, function.Attributes,
-                [], function.IsAsync, function.IdentifierSpan)
+                [], function.IsAsync, function.IdentifierSpan, function.Since, function.Deprecated,
+                function.BreakingChanges)
             {
                 EffectParameters = function.EffectParameters
             });
+            var guidance = new CalorEmitter();
+            guidance.EmitRetiredFunctionMetadata(function);
+            method.DocComment = string.Join("\n", new[] { function.DocComment }
+                .Concat(guidance._builder.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(line => line.StartsWith("/// ", StringComparison.Ordinal) ? line[4..] : line[3..]))
+                .Where(line => line != null));
             if (function.ToolingId != null) method.ToolingIdAllocationKind = function.ToolingIdAllocationKind ?? Ids.IdKind.Function;
             return method;
         }).ToArray();
@@ -4313,7 +4331,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(BreakingChangeNode node)
     {
         AppendLine($"/// breaking {node.Version} "
-            + Visit(new StringLiteralNode(node.Span, node.Description)));
+            + Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(node.Description, quote: true));
         return "";
     }
 

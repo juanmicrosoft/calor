@@ -186,6 +186,63 @@ public sealed class EnumExtensionIdentityMigrationTests : IDisposable
         }
     }
 
+    [Fact]
+    public void MigrationPreservesSelectedMethodMetadataWithoutAllocatingReplacementIds()
+    {
+        var original = Original("", """
+              /// Explains the helper.
+              /// since 1.2.0
+              /// deprecated 1.4.0 ReadNext
+              /// breaking 2.0.0 "Use \"options\"\nNext line"
+            """);
+        var initial = Seed(original);
+        var previous = original.EnumExtensions.Single().Methods.Single();
+        var migrated = Store.MigrateEnumExtensions(FilePath, Before, original);
+        var source = File.ReadAllText(FilePath);
+        var method = CalorSourceHelper.Parse(source, FilePath).Ast!.Classes.Single().Methods.Single();
+        Assert.Equal(previous.Since!.Version, method.Since!.Version);
+        Assert.Equal(previous.Deprecated!.Replacement, method.Deprecated!.Replacement);
+        Assert.Equal(previous.BreakingChanges.Single().Description, method.BreakingChanges.Single().Description);
+        Assert.Equal(initial.Declarations.Select(declaration => declaration.Id).Order(StringComparer.Ordinal),
+            migrated.Declarations.Select(declaration => declaration.Id).Order(StringComparer.Ordinal));
+        Assert.Equal(migrated.Declarations, Store.Sync().Declarations);
+        var reemitted = new CalorEmitter().Emit(CalorSourceHelper.Parse(source, FilePath).Ast!);
+        Store.Apply([new(FilePath, source, reemitted)]);
+        Assert.Equal(migrated.Declarations, Store.Sync().Declarations);
+        Assert.Contains("[System.Obsolete(", Program.Compile(reemitted).GeneratedCode);
+    }
+
+    [Fact]
+    public void LoweringRetainsRetiredGuidanceAsOrdinaryDocumentation()
+    {
+        var original = Original("");
+        var old = original.EnumExtensions.Single();
+        var function = old.Methods.Single();
+        var issue = new IssueNode(function.Span, IssueKind.Todo, null, "perf", IssuePriority.High,
+            "Optimize allocation.\nKeep receiver order.", new AttributeCollection());
+        var annotated = new FunctionNode(function.Span, function.LocalId, function.Name, function.Visibility,
+            function.TypeParameters, function.Parameters, function.Output, function.Effects,
+            function.Preconditions, function.Postconditions, function.Body, function.Attributes,
+            [], [issue], null, null, [], null, null, null, [], [], null, null, null)
+        {
+            DocComment = "Explains the helper."
+        };
+        var extension = new EnumExtensionNode(old.Span, old.LocalId, old.EnumName, [annotated], old.Attributes);
+        var lowered = CalorEmitter.LowerEnumExtension(extension);
+        Assert.Contains("Explains the helper.", lowered.Methods.Single().DocComment);
+        var module = original.With(update =>
+        {
+            update.EnumExtensions = [];
+            update.Classes = [lowered];
+            update.Items = [.. original.Enums, lowered];
+        });
+        var source = new CalorEmitter().Emit(module);
+        Assert.Contains("/// Todo perf (High): Optimize allocation.", source);
+        Assert.Contains("/// Keep receiver order.", source);
+        Assert.DoesNotContain('§', source);
+        Assert.Contains("Optimize allocation.", Parse(source).Classes.Single().Methods.Single().DocComment);
+    }
+
     [Theory]
     [InlineData("class Owner\n    module Nested\n      func Read (this Mode:self) → int\n        return 7")]
     [InlineData("module Owner<T>\n    func Read (this Mode:self) → int\n      return 7")]
@@ -207,16 +264,19 @@ public sealed class EnumExtensionIdentityMigrationTests : IDisposable
         return state;
     }
 
-    private static ModuleNode Original(string namespaceHeader)
+    private static ModuleNode Original(string namespaceHeader, string? metadata = null)
     {
-        var module = Parse($"""
+        var source = $"""
             module Extensions{namespaceHeader}
               enum Mode
                 First = 1
               func Read (Mode:self, int:delta) → int
                 !
                 return delta
-            """);
+            """;
+        if (metadata != null)
+            source = source.Replace("  func Read", metadata + "\n  func Read", StringComparison.Ordinal);
+        var module = Parse(source);
         var function = module.Functions.Single();
         var extension = new EnumExtensionNode(function.Span, "legacy-extension", "Mode", [function], new AttributeCollection())
         {

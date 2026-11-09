@@ -10383,6 +10383,7 @@ public sealed class Parser
     {
         var isModuleFunction = Check(TokenKind.Func);
         var startToken = Expect(isModuleFunction ? TokenKind.Func : TokenKind.Method);
+        var (since, deprecated, breakingChanges) = ParseDocumentationMetadata(startToken);
         var closer = isModuleFunction ? TokenKind.EndFunc : TokenKind.EndMethod;
         _lastIfToken = null; // scope Calor0117 fixes to this method's §IFs
         var attrs = ParseDeclarationAttributes(startToken);
@@ -10507,7 +10508,8 @@ public sealed class Parser
         var span = startToken.Span.Union(endToken.Span);
         return WithDocumentation(new MethodNode(span, id, name, visibility, modifiers, typeParameters, parameters,
             output, effects, preconditions, postconditions, body, attrs, csharpAttrs, isAsync: isAsync,
-            identifierSpan: GetIdentifierSpan(attrs, methodNameKey, name))
+            identifierSpan: GetIdentifierSpan(attrs, methodNameKey, name),
+            since: since, deprecated: deprecated, breakingChanges: breakingChanges)
         {
             EffectParameters = effectParameters,
         }, startToken);
@@ -10525,6 +10527,7 @@ public sealed class Parser
     {
         var isModuleFunction = _parsingModuleMembers && Check(TokenKind.AsyncFunc);
         var startToken = Expect(isModuleFunction ? TokenKind.AsyncFunc : TokenKind.AsyncMethod);
+        var (since, deprecated, breakingChanges) = ParseDocumentationMetadata(startToken);
         var closer = isModuleFunction ? TokenKind.EndAsyncFunc : TokenKind.EndAsyncMethod;
         _lastIfToken = null; // scope Calor0117 fixes to this method's §IFs
         var attrs = ParseAttributes();
@@ -10642,7 +10645,8 @@ public sealed class Parser
         return WithDocumentation(new MethodNode(span, id, name, visibility, modifiers, typeParameters, parameters,
             output, effects, preconditions, postconditions, body, attrs, csharpAttrs,
             isAsync: true,
-            identifierSpan: GetIdentifierSpan(attrs, methodNameKey, name))
+            identifierSpan: GetIdentifierSpan(attrs, methodNameKey, name),
+            since: since, deprecated: deprecated, breakingChanges: breakingChanges)
         {
             EffectParameters = effectParameters,
         }, startToken);

@@ -775,6 +775,9 @@ public sealed class MethodNode : AstNode
     /// True if this is an async method.
     /// </summary>
     public bool IsAsync { get; }
+    public SinceNode? Since { get; }
+    public DeprecatedNode? Deprecated { get; }
+    public IReadOnlyList<BreakingChangeNode> BreakingChanges { get; }
 
     public MethodNode(
         TextSpan span,
@@ -811,7 +814,10 @@ public sealed class MethodNode : AstNode
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes,
         bool isAsync = false,
-        TextSpan? identifierSpan = null)
+        TextSpan? identifierSpan = null,
+        SinceNode? since = null,
+        DeprecatedNode? deprecated = null,
+        IReadOnlyList<BreakingChangeNode>? breakingChanges = null)
         : base(span)
     {
         LocalId = id ?? throw new ArgumentNullException(nameof(id));
@@ -829,6 +835,9 @@ public sealed class MethodNode : AstNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
         IsAsync = isAsync;
+        Since = since;
+        Deprecated = deprecated;
+        BreakingChanges = breakingChanges ?? Array.Empty<BreakingChangeNode>();
     }
 
     public bool IsVirtual => (Modifiers & MethodModifiers.Virtual) != 0;

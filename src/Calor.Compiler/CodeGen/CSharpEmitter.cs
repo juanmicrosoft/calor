@@ -6180,6 +6180,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Clear declared variables tracking for new method scope
         ResetDeclScopes(node.Parameters, node);
 
+        if (node.Since != null) AppendLine(Visit(node.Since));
+        foreach (var breaking in node.BreakingChanges) AppendLine(Visit(breaking));
+        if (node.Deprecated != null) AppendLine(Visit(node.Deprecated));
         EmitCSharpAttributes(node.CSharpAttributes);
 
         var isExplicitInterfaceImplementation =
@@ -8032,7 +8035,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     /// </summary>
     public string Visit(BreakingChangeNode node)
     {
-        return $"// BREAKING CHANGE ({node.Version}): {node.Description}";
+        return $"// BREAKING CHANGE ({node.Version}): {SymbolDisplay.FormatLiteral(node.Description, quote: false)}";
     }
 
     /// <summary>
