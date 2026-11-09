@@ -22,7 +22,6 @@ public sealed class Lexer
     private static readonly Dictionary<string, TokenKind> CanonicalKeywords = new(StringComparer.Ordinal)
     {
         ["module"] = TokenKind.Module,
-        ["namespace"] = TokenKind.Namespace,
         ["class"] = TokenKind.Class,
         ["record"] = TokenKind.Record,
         ["interface"] = TokenKind.Interface,
@@ -43,6 +42,8 @@ public sealed class Lexer
         ["while"] = TokenKind.While,
         ["break"] = TokenKind.Break,
         ["continue"] = TokenKind.Continue,
+        ["goto"] = TokenKind.Goto,
+        ["yield"] = TokenKind.Yield,
         ["match"] = TokenKind.Match,
         ["case"] = TokenKind.Case,
         ["using"] = TokenKind.Using,
@@ -64,7 +65,8 @@ public sealed class Lexer
         ["delegate"] = TokenKind.Delegate,
         ["ctor"] = TokenKind.Constructor,
         ["property"] = TokenKind.Property,
-        ["indexer"] = TokenKind.Indexer,
+        ["op"] = TokenKind.OperatorOverload,
+        ["pp"] = TokenKind.Preprocessor,
         ["field"] = TokenKind.FieldDef,
         ["out"] = TokenKind.Out,
         ["get"] = TokenKind.Get,
@@ -702,6 +704,13 @@ public sealed class Lexer
 
     private Token ScanDotOrNumber()
     {
+        if (Lookahead == '.')
+        {
+            Advance();
+            Advance();
+            return MakeToken(TokenKind.RangeOp);
+        }
+
         // Check for decimal number starting with .
         if (char.IsDigit(Lookahead))
         {
@@ -873,7 +882,7 @@ public sealed class Lexer
 
     private Token ScanIdentifierOrTypedLiteral()
     {
-        while (char.IsLetterOrDigit(Current) || Current == '_' || Current == '.')
+        while (char.IsLetterOrDigit(Current) || Current == '_' || Current == '.' && Lookahead != '.')
         {
             Advance();
         }

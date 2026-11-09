@@ -56,7 +56,7 @@ public enum TokenKind
     ReadLine,           // §G = Console.ReadLine (renamed from Get to avoid conflict)
     DebugPrint,         // §D = Debug.WriteLine (renamed from Debug to avoid potential conflicts)
 
-    // Keywords (recognized after §)
+    // Canonical keywords and retained internal legacy kinds
     Module,
     EndModule,
     Func,
@@ -170,7 +170,7 @@ public enum TokenKind
     EndInit,
     Constructor,
     EndConstructor,
-    OperatorOverload,       // §OP
+    OperatorOverload,       // op
     EndOperatorOverload,    // §/OP
     BaseCall,
     EndBaseCall,
@@ -211,7 +211,7 @@ public enum TokenKind
     EndInterpolate,
     NullCoalesce,
     NullConditional,
-    RangeOp,
+    RangeOp,            // ..
     IndexEnd,
     Expression,
 
@@ -248,7 +248,7 @@ public enum TokenKind
     PropertyTest,       // §PROPERTY - Property-based testing (renamed to avoid conflict with Property)
 
     // Yield support
-    Yield,              // §YIELD - yield return
+    Yield,              // yield value / yield break
     YieldBreak,         // §YBRK - yield break
 
     // LINQ Support
@@ -262,7 +262,7 @@ public enum TokenKind
     CompilerDirective,  // §CDIR{base64} - exact nonconditional C# directive
 
     // Preprocessor Directives
-    Preprocessor,       // §PP{CONDITION} - preprocessor conditional start
+    Preprocessor,       // pp followed by a verbatim C# condition
     EndPreprocessor,    // §/PP{CONDITION} - preprocessor conditional end
     PreprocessorElse,   // §PPE - preprocessor else
 
@@ -343,7 +343,8 @@ public readonly struct Token : IEquatable<Token>
         Value = value;
     }
 
-    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.EndNamespace;
+    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.EndNamespace
+        && Kind != TokenKind.RangeOp;
 
     public bool IsLiteral => Kind is TokenKind.IntLiteral or TokenKind.StrLiteral or TokenKind.CharLiteral
         or TokenKind.BoolLiteral or TokenKind.FloatLiteral or TokenKind.DecimalLiteral;

@@ -34,6 +34,15 @@ public class LexerTests
     [InlineData("lower")]
     [InlineData("cast")]
     [InlineData("raw")]
+    [InlineData("forall")]
+    [InlineData("exists")]
+    [InlineData("namespace")]
+    [InlineData("indexer")]
+    [InlineData("operator")]
+    [InlineData("block")]
+    [InlineData("label")]
+    [InlineData("foreach")]
+    [InlineData("yieldbreak")]
     public void CanonicalOrdinaryNames_DoNotCaptureWordOperatorsOrBuiltins(string name)
     {
         var diagnostics = new DiagnosticBag();
@@ -145,6 +154,58 @@ public class LexerTests
             TokenKind.Step, TokenKind.Foreach, TokenKind.In, TokenKind.Do, TokenKind.While,
             TokenKind.Return, TokenKind.Assign, TokenKind.Exclamation, TokenKind.FatArrow,
             TokenKind.Arrow, TokenKind.Semicolon, TokenKind.Eof
+        }, tokens.Select(token => token.Kind));
+    }
+
+    [Fact]
+    public void SupplementalWords_ExposeOnlyTheSelectedReservedHeads()
+    {
+        var tokens = Tokenize("record op pp yield break goto case each", out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(new[]
+        {
+            TokenKind.Record, TokenKind.OperatorOverload, TokenKind.Preprocessor,
+            TokenKind.Yield, TokenKind.Break, TokenKind.Goto, TokenKind.Case,
+            TokenKind.Foreach, TokenKind.Eof
+        }, tokens.Select(token => token.Kind));
+        Assert.DoesNotContain("namespace", Lexer.KeywordNames);
+        Assert.DoesNotContain("indexer", Lexer.KeywordNames);
+        Assert.DoesNotContain("foreach", Lexer.KeywordNames);
+        Assert.DoesNotContain("yieldbreak", Lexer.KeywordNames);
+    }
+
+    [Theory]
+    [InlineData("0..items.Length", TokenKind.IntLiteral, TokenKind.Identifier)]
+    [InlineData("start..end", TokenKind.Identifier, TokenKind.Identifier)]
+    [InlineData("source.Start..source.End", TokenKind.Identifier, TokenKind.Identifier)]
+    [InlineData(".5..1.5", TokenKind.FloatLiteral, TokenKind.FloatLiteral)]
+    [InlineData("1..2", TokenKind.IntLiteral, TokenKind.IntLiteral)]
+    [InlineData("@start..@end", TokenKind.Identifier, TokenKind.Identifier)]
+    [InlineData("α..ω", TokenKind.Identifier, TokenKind.Identifier)]
+    public void SupplementalRange_UsesMaximalMunchWithoutCapturingDottedNames(
+        string source, TokenKind left, TokenKind right)
+    {
+        var tokens = Tokenize(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(new[] { left, TokenKind.RangeOp, right, TokenKind.Eof },
+            tokens.Select(token => token.Kind));
+        Assert.Equal("..", tokens[1].Text);
+        Assert.Equal(source.IndexOf("..", StringComparison.Ordinal), tokens[1].Span.Start);
+        Assert.Equal(2, tokens[1].Span.Length);
+        Assert.False(tokens[1].IsKeyword);
+        Assert.Equal(source, string.Concat(tokens.Take(3).Select(token => token.Text)));
+    }
+
+    [Fact]
+    public void SupplementalEffectsLabelsAndNamespaceOrigin_RemainContextualAtoms()
+    {
+        var tokens = Tokenize("<! e> done: block forall exists", out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(new[]
+        {
+            TokenKind.Less, TokenKind.Exclamation, TokenKind.Identifier, TokenKind.Greater,
+            TokenKind.Identifier, TokenKind.Colon, TokenKind.Identifier, TokenKind.Identifier,
+            TokenKind.Identifier, TokenKind.Eof
         }, tokens.Select(token => token.Kind));
     }
 
