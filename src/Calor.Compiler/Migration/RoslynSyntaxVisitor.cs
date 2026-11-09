@@ -7734,13 +7734,41 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             bound++;
         }
 
-        if (bound == 0 && castType == null)
+        if (bound == 0 && castType == null && !CanLowerPrimitiveVariableUpdate(site))
             return new CompoundAssignmentStatementNode(span, targetNode!, compound, value);
 
         ExpressionNode result = new BinaryOperationNode(span, ToBinaryOperator(compound), read, value);
         if (castType != null)
             result = new TypeOperationNode(span, TypeOp.Cast, result, castType);
         return new AssignmentStatementNode(span, targetNode!, result);
+    }
+
+    private bool CanLowerPrimitiveVariableUpdate(ExpressionSyntax site)
+    {
+        var target = _semanticModel?.GetOperation(site) switch
+        {
+            Microsoft.CodeAnalysis.Operations.ICompoundAssignmentOperation
+                { OperatorMethod: null, InConversion.IsUserDefined: false, OutConversion.IsIdentity: true } assignment
+                => assignment.Target,
+            Microsoft.CodeAnalysis.Operations.IIncrementOrDecrementOperation
+                { OperatorMethod: null } increment => increment.Target,
+            _ => null
+        };
+        var fixedVariable = target switch
+        {
+            Microsoft.CodeAnalysis.Operations.ILocalReferenceOperation local => local.Local.RefKind == RefKind.None,
+            Microsoft.CodeAnalysis.Operations.IParameterReferenceOperation parameter => parameter.Parameter.RefKind == RefKind.None,
+            Microsoft.CodeAnalysis.Operations.IFieldReferenceOperation field => field.Field.IsStatic
+                || field.Field.ContainingType.IsReferenceType
+                    && field.Instance is Microsoft.CodeAnalysis.Operations.IInstanceReferenceOperation
+                    { ReferenceKind: Microsoft.CodeAnalysis.Operations.InstanceReferenceKind.ContainingTypeInstance },
+            _ => false
+        };
+        return fixedVariable && target?.Type?.SpecialType is
+            SpecialType.System_SByte or SpecialType.System_Byte or SpecialType.System_Int16 or
+            SpecialType.System_UInt16 or SpecialType.System_Int32 or SpecialType.System_UInt32 or
+            SpecialType.System_Int64 or SpecialType.System_UInt64 or SpecialType.System_Char or
+            SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_String;
     }
 
     /// <summary>
