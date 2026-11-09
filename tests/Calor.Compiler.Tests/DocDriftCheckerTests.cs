@@ -41,10 +41,12 @@ public class DocDriftCheckerTests
     }
 
     [Theory]
-    [InlineData("calls.mdx", 3, 1, "CallExamples", "9", "44")]
-    [InlineData("binding.mdx", 8, 6, "BindingExamples", "150", "16")]
+    [InlineData("calls.mdx", 3, 1, new[] { "CallExamples", "RefOutDemo" }, new[] { "9", "44" })]
+    [InlineData("binding.mdx", 8, 6, new[] { "BindingExamples", "ExplicitBindings" }, new[] { "150", "16" })]
+    [InlineData("types.mdx", 6, 2, new[] { "ArrayTypes", "NullableFallback", "Division", "CollectionTypes" },
+        new[] { "6", "anonymous", "42", "51" })]
     public void PublicNativeReference_CompilesPositiveAndExactNegativeExamples(
-        string page, int completeCount, int negativeCount, string firstModule, string firstResult, string secondResult)
+        string page, int completeCount, int negativeCount, string[] moduleNames, string[] expectedResults)
     {
         var relativePath = "website/content/syntax-reference/" + page;
         var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), relativePath));
@@ -55,20 +57,22 @@ public class DocDriftCheckerTests
         Assert.Equal(completeCount, coverage.CompletePrograms);
         Assert.Equal(negativeCount, coverage.NegativePrograms);
         var programs = ExemplarCompileChecker.ExtractCompletePrograms(content);
-        Assert.Equal(2, programs.Count);
-        foreach (var program in programs)
+        Assert.Equal(moduleNames.Length, expectedResults.Length);
+        Assert.Equal(moduleNames.Length, programs.Count);
+        for (var index = 0; index < programs.Count; index++)
         {
+            var program = programs[index];
             var compiled = Program.Compile(program.Source, relativePath);
             Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Assert.Equal(moduleNames[index], Assert.IsType<Ast.ModuleNode>(compiled.Ast).Name);
             var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + """
 
                 public static class Probe
                 {
-                    public static int Run() => GlobalModule.Main();
+                    public static object? Run() => GlobalModule.Main();
                 }
                 """);
-            Assert.Equal(program.Source.StartsWith("module " + firstModule, StringComparison.Ordinal) ? firstResult : secondResult,
-                observed);
+            Assert.Equal(expectedResults[index], observed);
         }
     }
 

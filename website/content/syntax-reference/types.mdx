@@ -4,296 +4,204 @@ section: "syntax-reference"
 order: 2
 ---
 
+Calor uses C# type names, .NET nullable types, ordinary generics, and suffix
+array notation. A declaration's type precedes its name: `int:count`, not
+`count:int`. Initializers and arguments must be compatible with their
+receiving types.
 
-Calor has primitives, .NET nullable types, ordinary generics, and arrays.
+## Primitive types and literals
 
-Code blocks on this reference page are declaration, expression, or body
-fragments, not complete files. The
-[nullability guide](/docs/guides/nullability-and-dotnet-interop/) includes
-complete checked examples.
+| Type | Meaning | Literal examples |
+|:-----|:--------|:-----------------|
+| `int` | 32-bit signed integer | `42`, `-17` |
+| `long` | 64-bit signed integer | `42L`, `-17L` |
+| `uint`, `ulong` | Unsigned integers | `42U`, `42UL` |
+| `short`, `ushort`, `sbyte`, `byte` | Smaller integer types | Use a compatible value or an explicit cast |
+| `float` | 32-bit floating point | `3.14f` |
+| `double` | 64-bit floating point | `3.14`, `2.718` |
+| `decimal` | Decimal arithmetic | `18.00m` |
+| `char` | UTF-16 code unit | `'x'` |
+| `string` | UTF-16 text | `"hello"` |
+| `bool` | Boolean | `true`, `false` |
+| `object` | .NET object reference | An appropriate reference or boxed value |
+| `void` | No returned value | Return types only |
 
----
+Qualified .NET names such as `System.String` can also be used. Calor's former
+aliases, including `i32`, `f64`, and `str`, are not native source spellings.
+The parser reports `Calor0100` for a retired alias:
 
-## Primitive Types
-
-| Calor | Description | C# | Range |
-|:-----|:------------|:---|:------|
-| `i32` | 32-bit signed integer | `int` | -2^31 to 2^31-1 |
-| `i64` | 64-bit signed integer | `long` | -2^63 to 2^63-1 |
-| `f32` | 32-bit floating point | `float` | +/-3.4 x 10^38 |
-| `f64` | 64-bit floating point | `double` | +/-1.8 x 10^308 |
-| `str` | String | `string` | UTF-16 text |
-| `bool` | Boolean | `bool` | `true` or `false` |
-| `void` | No value | `void` | (return type only) |
-
----
-
-## Usage in Declarations
-
-### Input Parameters and Return Types
-
-Signature fragments (inside a module):
-```calor
-§F{Count:pub} (i32:count) -> i32
-§F{Name:pub} (str:name) -> str
-§F{Price:pub} (f64:price, bool:active) -> void
+```calor expect=Calor0100
+module RetiredType
+  func Main () → void
+    let i32:value = 42
 ```
 
----
+Function signatures put the same type-first declarations in parentheses:
 
-## Nullable Types (`?T`)
-
-`?str` is a nullable .NET string reference.
-`str` and `string` are aliases; `?str`, `?string`, `str?`, and `string?`
-are supported nullable spellings. A resolved `?User` remains an ordinary
-nullable object reference. Nullable value types such as `?i32` map to
-.NET `Nullable<T>` (`int?`).
-
-Signature fragments:
-
-```calor
-§F{Find:pub} (str:key) -> ?str
-§F{Process:pub} (?i32:maybeValue) -> void
+```calor-fragment
+func Count public (int:count) → int
+func Name public (string:name) → string
+func Price public (double:price, bool:active) → void
 ```
 
-Use ordinary values or `null` with nullable references. The existing
-null-coalescing expression supplies a fallback:
+## Arrays
+
+Use `T[]` for a one-dimensional array, `T[,]` for a two-dimensional array,
+and `T[][]` for an array of arrays. Array rank and element type are part of
+the type. An array is not a `List<T>`: for example, `File.ReadAllLines`
+returns `string[]`.
+
+Create arrays with `new`, read elements with brackets, and read their size
+with `Length`.
 
 ```calor
-§M{NullableFallback}
-  §F{Greeting:pub} (?str:name) -> str
-    §E{}
-    §R (?? name "anonymous")
+module ArrayTypes
+  func Main () → int
+    ! alloc
+    let int[]:values = new int[]{1, 2, 3}
+    return values[0] + values[1] + values[2]
 ```
 
+`Main()` returns `6`. Array creation requires the `alloc` effect. The
+declaration retains the explicit `int[]` type in generated C#.
+
+## Nullable types
+
+Write `T?`, with a suffix question mark. `string?` and a resolved `User?`
+are nullable references. `int?` is the .NET nullable value type
+`System.Nullable<int>`. Prefix spellings such as `?string` are retired.
+
+Use an ordinary compatible value or `null`. The `??` operator supplies a
+fallback when its left operand is null:
+
+```calor
+module NullableFallback
+  func Greeting public (string?:name) → string
+    !
+    return name ?? "anonymous"
+
+  func Main () → string
+    !
+    return Greeting(null)
+```
+
+`Main()` returns `"anonymous"`, not an option wrapper.
+
+Element and container nullability are different:
+
+| Type | Meaning |
+|:-----|:--------|
+| `string?[]` | Array whose string elements may be null |
+| `string[]?` | Possibly-null array of non-null string elements |
+| `string?[]?` | Both the array and its elements may be null |
+| `List<string?>` | List whose string elements may be null |
+
+A nullable annotation is not a universal proof that every operation is safe.
+Supported receiving boundaries check nullable input, but arbitrary later
+writes and constructor inputs remain outside the bounded guarantee.
 See [Nullability and .NET Interop](/docs/guides/nullability-and-dotnet-interop/)
-for complete nullable-reference examples and the bounded support table.
-Calor 0.22 checks scalar strings, supported arrays and one-level string
-generic payloads, and identity-proven nominal reference receiving boundaries.
-It does not guarantee non-null values after arbitrary writes or validate
-constructor inputs.
+for the exact support table and complete safe and rejected examples.
 
----
-
-## Failure Uses Exceptions
+## Failure uses exceptions
 
 Return the ordinary success type and throw on failure. The `throw` effect
 declares exceptions; `alloc` covers construction of the exception object.
+Use `try`, `catch`, and `finally` for handling and cleanup; a bare `throw`
+inside a catch body rethrows the current exception.
 
 ```calor
-§M{Division}
-  §F{Divide:pub} (i32:a, i32:b) -> i32
-    §E{throw,alloc}
-    §IF (== b 0)
-      §TH §NEW{ArgumentException} §A "Division by zero" §/NEW
-    §R (/ a b)
+module Division
+  func Divide public (int:a, int:b) → int
+    ! throw, alloc
+    if b == 0
+      throw new ArgumentException("Division by zero")
+    return a / b
+
+  func Main () → int
+    ! throw, alloc
+    try
+      return Divide(1, 0)
+    catch ArgumentException:error
+      return Divide(84, 2)
 ```
 
-Handle exceptions with `§TR` / `§CA`; use `§FI` for cleanup and `§RT` to
-rethrow. No special success/error return-type encoding is required.
+`Main()` catches the deliberate zero-divisor exception and returns `42`.
+There is no built-in success/error return-type encoding.
 
----
+## Generic types
 
-## Generic Types
+Generic arguments use angle brackets, including when nested:
 
-Generic types use angle bracket syntax inline.
+```calor-fragment
+List<int>
+Dictionary<string, List<int>>
+IEnumerable<string>
+Func<int, string>
+```
+
+Import the required namespace with `using`, or use a qualified type name.
+Type parameters declared by a generic function or class can be used in its
+parameters, return type, and body. A type annotation does not supply a
+missing reference, infer every generic method argument, or fix an invalid
+overload.
 
 Third-party types named `Option<T>` or `Result<T,E>` are ordinary generic
-types, not Calor built-ins. Import their namespace and use their library API.
+types, not Calor built-ins. Reference their assembly and use their library
+API. Square-bracket generic arguments are not native syntax.
 
-### Syntax
+## Collections
 
-```calor
-List<T>                 // List of T
-Dictionary<K, V>        // Dictionary with key K and value V
-IEnumerable<T>          // Enumerable of T
-Func<T, U>              // Function from T to U
-```
-
-### Examples
-
-Declaration fragments:
-```calor
-§F{Numbers:pub} (List<i32>:numbers) -> void
-§F{Scores:pub} (Dictionary<str, i32>:scores) -> IEnumerable<str>
-§FLD{HashSet<T>:_items:priv}     // Generic field with type parameter T
-```
-
-### Nested Generic Types
-
-Generic types can be nested.
+Use ordinary .NET construction and calls, not special collection tags:
 
 ```calor
-§F{Data:pub} (Dictionary<str, List<i32>>:data) -> List<Tuple<str, i32>>
+module CollectionTypes
+  using System.Collections.Generic
+  func Main () → int
+    ! alloc, mut
+    let List<int>:numbers = new List<int>{1, 2, 3}
+    let Dictionary<string,int>:ages = new Dictionary<string,int>{{"alice", 30}}
+    let HashSet<string>:tags = new HashSet<string>{"urgent", "review"}
+    numbers.Add(4)
+    set numbers[0] 10
+    set ages["charlie"] 35
+    return numbers[0] + numbers.Count + ages["charlie"] + tags.Count
 ```
 
-### Type Parameters
+`Main()` returns `51`. Construction and mutations require the appropriate effects.
+Built-in collection initializers can use the compiler's bounded fresh-object
+proof; a later `Add`, an arbitrary comparer, or an unknown user callback does
+not acquire that proof.
 
-When defining generic functions or classes, type parameters (like `T`, `U`) can be used as types.
+| Operation | Ordinary .NET member |
+|:----------|:---------------------|
+| Add or insert | `numbers.Add(value)`, `numbers.Insert(index, value)` |
+| Remove or clear | `numbers.Remove(value)`, `numbers.Clear()` |
+| Read size | `numbers.Count` |
+| Check membership | `numbers.Contains(value)` |
+| Check dictionary keys or values | `ages.ContainsKey(key)`, `ages.ContainsValue(value)` |
 
-```calor
-§F{First:pub}<T> (List<T>:items) -> T
-  §R items[0]
+## Type compatibility
+
+An annotation is a receiving boundary, not a cast. Supported implicit
+conversions include numeric widening, such as `int` to `long`. Unrelated
+types still produce `Calor0202`:
+
+```calor expect=Calor0202
+module IncompatibleType
+  func Main () → void
+    let int:value = "not an integer"
 ```
 
-See [Structure Tags - Generics](/docs/syntax-reference/structure-tags/#generics) for more on defining generic functions and classes.
+Use an explicit cast when the conversion requires one; a cast can still fail
+at runtime. Generic definitions and their arguments matter, so
+`List<int>` and `List<string>` are not interchangeable. Operators must be
+valid for their operands: logical operators require booleans, and two
+references having the same type does not invent an ordering operator.
 
----
+Types also apply in `requires` and `=>` contract predicates.
 
-## Collection Types
+## See also
 
-Calor provides built-in syntax for creating and manipulating collections with type-safe operations.
-
-### List Creation
-
-```calor
-§LIST{name:elementType}
-  element1
-  element2
-```
-
-| Part | Description |
-|:-----|:------------|
-| `name` | Variable name for the list |
-| `elementType` | Type of elements (`i32`, `str`, etc.) |
-
-**Example:**
-```calor
-§LIST{numbers:i32}
-  1
-  2
-  3
-```
-
-### Dictionary Creation
-
-```calor
-§DICT{name:keyType:valueType}
-  §KV key1 value1
-  §KV key2 value2
-```
-
-| Part | Description |
-|:-----|:------------|
-| `name` | Variable name for the dictionary |
-| `keyType` | Type of keys |
-| `valueType` | Type of values |
-| `§KV` | Key-value pair entry |
-
-**Example:**
-```calor
-§DICT{ages:str:i32}
-  §KV "alice" 30
-  §KV "bob" 25
-```
-
-### HashSet Creation
-
-```calor
-§HSET{name:elementType}
-  element1
-  element2
-```
-
-**Example:**
-```calor
-§HSET{tags:str}
-  "urgent"
-  "review"
-```
-
-### Inline Collections
-
-`§LIST`, `§DICT` and `§HSET` blocks are statements: they declare a local, so they belong in a
-method body. A block directly in a class body is error `Calor0100`. Where a value is needed
-instead, such as a field or property default or an element of another collection, write the
-collection on one line and close it with its id:
-
-```calor
-§FLD{List<i32>:xs:pub} = §LIST{i32} 1 2 3 §/LIST
-§FLD{List<List<i32>>:grid:pub} = §LIST{List<i32>} §LIST{i32} 1 §/LIST §/LIST
-§PROP{Tags:HashSet<str>:pub:get} = §HSET{str} "a" "b" §/HSET
-```
-
-This compiles to `new List<int>() { 1, 2, 3 }`: the elements are added in order, as a C#
-collection initializer does.
-
-### Collection Operations
-
-| Operation | Syntax | Description |
-|:----------|:-------|:------------|
-| Add to list/set | `§PUSH{coll} value` | `collection.Add(value)` |
-| Set dictionary entry | `§PUT{dict} key value` | `dict[key] = value` |
-| Set list index | `§SETIDX{list} idx value` | `list[index] = value` |
-| Insert at index | `§C{list.Insert} §A idx §A val §/C` | `list.Insert(idx, val)` |
-| Remove element | `§C{coll.Remove} §A val §/C` | `collection.Remove(val)` |
-| Clear collection | `§C{coll.Clear} §/C` | `collection.Clear()` |
-
-**Example:**
-```calor
-§PUSH{numbers} 4              // numbers.Add(4)
-§PUT{ages} "charlie" 35       // ages["charlie"] = 35
-§SETIDX{numbers} 0 10         // numbers[0] = 10
-```
-
-### Collection Queries
-
-| Query | Syntax | Returns |
-|:------|:-------|:--------|
-| Contains element | `§HAS{coll} value` | `bool` |
-| Contains key | `§HAS{dict} §KEY key` | `bool` |
-| Contains value | `§HAS{dict} §VAL value` | `bool` |
-| Collection count | `§CNT{coll}` | `i32` |
-
-**Example:**
-```calor
-§IF §HAS{numbers} 5
-  §P "Found 5"
-
-§B{count} §CNT{ages}
-```
-
----
-
-## Type Annotations in Contracts
-
-Types matter in contracts for proper comparisons:
-
-```calor
-§F{Clamp:pub} (i32:value, i32:min, i32:max) -> i32
-  §Q (<= min max)           // Requires: min <= max
-  §S (>= result min)        // Ensures: result >= min
-  §S (<= result max)        // Ensures: result <= max
-  // ...
-```
-
----
-
-## Type Compatibility
-
-| Operation | Valid Types |
-|:----------|:------------|
-| Arithmetic (`+`, `-`, `*`, `/`) | Numeric (`i32`, `i64`, `f32`, `f64`) |
-| Modulo (`%`) | Integer (`i32`, `i64`) |
-| Comparison (`<`, `>`, etc.) | Numeric, `str` |
-| Equality (`==`, `!=`) | Any matching types |
-| Logical (`&&`, `\|\|`) | `bool` |
-
----
-
-## Literals
-
-| Type | Literal Examples |
-|:-----|:-----------------|
-| `i32` | `42`, `-17`, `0` |
-| `i64` | `42L`, `-17L` |
-| `f32` | `3.14f` |
-| `f64` | `3.14`, `2.718` |
-| `str` | `"hello"`, `"world"` |
-| `bool` | `true`, `false` |
-
----
-
-## Next
-
-- [Expressions](/docs/syntax-reference/expressions/) - Operators and expressions
+- [Bindings](/docs/syntax-reference/binding/) — inference, initialization, and mutable locals.
+- [Expressions](/docs/syntax-reference/expressions/) — operators, casts, and precedence.
+- [Calls](/docs/syntax-reference/calls/) — argument and return boundaries.
