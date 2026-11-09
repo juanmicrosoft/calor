@@ -427,7 +427,8 @@ These are finite behavioral admissions, not universal proofs. Raw C# interop
 cannot establish a required feature. Nondelegate calls, arbitrary allocations,
 property/external static-state access in executed declarations, nested lambdas,
 noninteger captures, captured-variable mutations, constructor initializers,
-initialized event storage, or ambiguous backing storage are explicitly bounded
+initialized event storage, property initializers, non-`System.Object` base
+construction, or ambiguous backing storage are explicitly bounded
 unsupported scope, not guessed signatures. Generic/static publisher APIs and
 publishers without usable parameterless construction are also explicitly
 unsupported, as are overloaded target identities; no public constructor is
@@ -444,6 +445,19 @@ required or credited. The full current matrix contains 80 real entrypoints
 synthetic accounting mocks are separate from those counters.
 The same test also preserves 34 existing task profiles, one selected native
 prerequisite, and two arithmetic/carrier entrypoints, with separate counters.
+
+The focused construction-scope control runs without the full matrix:
+
+```bash
+python3 tests/E2E/agent-tasks/test-lambda-verifiers.py LambdaVerifierTests.test_event_construction_scope
+```
+
+It preserves plain field-backed events, native custom add/remove accessors,
+uninitialized properties, and explicit `System.Object` inheritance. Separate
+property-initializer and implicit non-object base-constructor candidates call
+a native helper that appends to an owned temporary file. Both are refused
+before construction and must leave that file absent. These two prerequisite
+refusals have separate counters and do not count as finite behavior rejections.
 
 The old mode archives exact commit
 `d82f3ae95175ecd09581c6922701706be72b0ca9`, verifies copied assets against its own

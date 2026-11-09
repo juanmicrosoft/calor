@@ -2,6 +2,7 @@
 """Original lam-001..004 disposable selected-native admission controls."""
 
 import importlib.util
+import json
 import os
 from pathlib import Path
 import re
@@ -111,6 +112,32 @@ def historical(text):
         if "§DEL{" in text and stripped.startswith("§O{"):
             lines.append(f"  §/DEL{{{delegate_id}}}")
     return "\n".join(lines) + "\n"
+
+
+def event_construction_source(kind, marker):
+    text = source("lam004")
+    probe = ("  §F{ConstructionProbe:pub} () -> i32\n    §E{fs:w}\n"
+             f"    §C{{System.IO.File.AppendAllText}} §A {json.dumps(str(marker))} §A \"constructed\\n\" §/C\n"
+             "    §R 1\n")
+    call = "§C{Domain.DomainModule.ConstructionProbe} §/C"
+    if kind == "property":
+        text = text.replace("    §EVT", f"    §PROP{{Probe:i32:pub:get,set}} = {call}\n    §EVT")
+    elif kind == "base":
+        text = text.replace("§CL{EventPublisher:pub}", "§CL{EventPublisher:pub}\n    §EXT{ConstructionBase}")
+        text += ("  §CL{ConstructionBase:pub}\n    §CTOR{pub} ()\n"
+                 "      §B{probe:i32} " + call + "\n")
+    else:
+        raise ValueError(kind)
+    return text + probe
+
+
+def event_custom_accessors_source():
+    return source("lam004").replace(
+        "    §EVT{OnDataReceived:pub:EventHandler}\n",
+        "    §FLD{?EventHandler:handlers:priv}\n"
+        "    §EVT{OnDataReceived:pub:EventHandler}\n"
+        "    §EADD\n      §SUB handlers value\n"
+        "    §EREM\n      §UNSUB handlers value\n")
 
 
 def controls(profile):
@@ -290,6 +317,43 @@ def run_compatibility(old, current, deadline):
 
 
 class LambdaVerifierTests(unittest.TestCase):
+    def test_event_construction_scope(self):
+        before = dict(EXECUTED)
+        accounted = {"accepted": 0, "refused": 0}
+        with tempfile.TemporaryDirectory(prefix="calor-event-construction-scope-") as temporary:
+            workspace = Path(temporary)
+            marker = workspace / "owned-construction.txt"
+            environment = dict(os.environ, CALOR_COMPILER_ROOT=str(ROOT))
+            environment.pop("CALOR_LOGIC_TIMEOUT_SECONDS", None)
+            command = ["bash", str(HERE / "tasks/lambdas-delegates/04_event_subscription/verify.sh"), str(workspace)]
+            positives = [
+                source("lam004"),
+                event_custom_accessors_source(),
+                source("lam004").replace("    §EVT", "    §PROP{Probe:i32:pub:get,set}\n    §EVT"),
+                source("lam004").replace("§CL{EventPublisher:pub}", "§CL{EventPublisher:pub}\n    §EXT{System.Object}"),
+            ]
+            for text in positives:
+                (workspace / "Domain.calr").write_text(text, encoding="utf-8")
+                output = PROCESS.run(command, HERE, time.monotonic() + 120, environment)
+                SHARED.assert_selected_compiler(output, environment)
+                self.assertEqual(output.splitlines(), expected_lines(
+                    "lam004", text, ROOT, environment.get("CALOR_COMPILER_CONFIGURATION", "Debug")))
+                accounted["accepted"] += 1
+            for kind, diagnostic in (
+                ("property", "Bounded unsupported event construction scope: property initializer."),
+                ("base", "Bounded unsupported event construction scope: non-object base constructor."),
+            ):
+                (workspace / "Domain.calr").write_text(event_construction_source(kind, marker), encoding="utf-8")
+                with self.assertRaises(RuntimeError) as refusal:
+                    PROCESS.run(command, HERE, time.monotonic() + 120, environment)
+                output = SHARED.control_failure(refusal.exception)
+                self.assertIn("Verification failed: System.InvalidOperationException: " + diagnostic, output)
+                self.assertFalse(marker.exists(), "Unsupported construction executed owned IO before refusal.")
+                accounted["refused"] += 1
+        self.assertEqual(accounted, {"accepted": 4, "refused": 2})
+        self.assertEqual(EXECUTED, before)
+        print("Event construction scope: 4 actual positives, 2 prerequisite refusals with no owned IO; separate counters.")
+
     def test_current_native_qualified_scalar_blocker(self):
         text = source("lam001")
         boundary = text.index("  §F{ApplyDouble:")

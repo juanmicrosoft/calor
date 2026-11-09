@@ -1604,6 +1604,10 @@ static void VerifyNativeEvent(ModuleNode module, Assembly original, CompilationU
         throw new InvalidOperationException("Bounded unsupported event scope: generic Subscribe requires type arguments.");
     var declaration = root.DescendantNodes().OfType<ClassDeclarationSyntax>()
         .Single(type => type.Identifier.ValueText == native.Name);
+    if (semantic.GetDeclaredSymbol(declaration)?.BaseType?.SpecialType != SpecialType.System_Object)
+        throw new InvalidOperationException("Bounded unsupported event construction scope: non-object base constructor.");
+    if (declaration.Members.OfType<PropertyDeclarationSyntax>().Any(property => property.Initializer != null))
+        throw new InvalidOperationException("Bounded unsupported event construction scope: property initializer.");
     var methodSyntax = declaration.Members.OfType<MethodDeclarationSyntax>()
         .Single(method => method.Identifier.ValueText == "Subscribe");
     var eventSyntax = declaration.Members.Where(member => member is EventDeclarationSyntax evt
