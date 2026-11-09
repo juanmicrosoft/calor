@@ -29,10 +29,12 @@ Alternatively, select one reversible migration operation:
 
 | Operation | Rewrite |
 |:----------|:--------|
-| `--heal-closers` | Delete removed structural closers such as `§/F` and `§/M` while leaving strings and comments untouched |
-| `--elide-call-closers` | Elide `§/C` for safe zero- and one-argument same-line calls |
+| `--heal-closers` | Archived source only: delete retired structural closer tags while leaving strings and comments untouched |
+| `--elide-call-closers` | Archived source only: elide retired call closers for safe zero- and one-argument same-line calls |
 
 The obsolete `--compact-ids` and `--drop-structural-ids` options are errors.
+These two migration operations do **not** convert archived declarations,
+expressions, or literals to the current native grammar.
 
 ```bash
 calor fix src/ --heal-closers --dry-run
@@ -45,5 +47,7 @@ UTF-8 byte ranges, and `--revert` restores the original bytes. `--format json`
 (`-f`) emits a schema 2.0 envelope. Migration flags, `--log` and `--revert`
 cannot be combined with `--apply`.
 
-Use this command—not format or lint—to heal structural closer syntax, because
-those tools must parse the file and `Calor0830` rejects the closer first.
+Use `--apply` for available safe diagnostic patches on active source. Use the
+explicit migration flags only when processing archived syntax. Removing its
+closers does not establish that the remaining program parses or compiles;
+format and lint also require valid current source.

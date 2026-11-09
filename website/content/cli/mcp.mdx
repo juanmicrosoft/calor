@@ -125,7 +125,7 @@ The defaults differ from the command line, on purpose:
   of members that fail the C# round trip. `calor_convert` does not; it returns
   `isError: true` with `lossSummary.paths.outcome: "refused"` and
   `rescueUnusableMembers: false`. Pass `passthroughOnError: true` to have those
-  members kept as `§CSHARP`. The report then says `passthrough`, because you
+  members kept in converter-owned raw C# frames. The report then says `passthrough`, because you
   asked for it. In the default lossless mode, members whose Calor does not parse are rescued
   on every surface. Constructs the converter already knows it cannot represent,
   such as iterator accessors, are preserved as converter interop instead.
