@@ -1063,21 +1063,21 @@ public static class WebsiteExampleChecker
         ["CodeComparison", "FirstProgram", "CatchBugs", "FeatureGrid", "CompetitivePositioning"];
     public static string LandingComponentPath(string name) => Path.Combine(LandingRelativePath, name + ".tsx");
 
-    // These are prose, not executable fragments. Everything else containing a section
-    // sign must move to the shared source, including new fragments without a §M opener.
+    // These are prose, not executable fragments. Inline source must move to the
+    // shared source, including fragments without a module opener.
     private static readonly IReadOnlyDictionary<string, string[]> LandingProse =
         new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
             ["CodeComparison"] =
             [
-                "'§Q and §S declare the input and normal-return obligations.'",
-                "'§E{} declares no effects; enforcement depends on resolved calls and documented coverage.'",
+                "'requires and => declare the input and normal-return obligations.'",
+                "'An empty ! row declares no effects; enforcement depends on resolved calls and documented coverage.'",
             ],
             ["CompetitivePositioning"] =
             [
-                "'First-class syntax (§Q, §S)'",
-                "'Declared explicitly (§E)'",
-                "'Expressed via §Q; checked or verified'",
+                "'First-class requires and => contracts'",
+                "'Declared explicitly in ! rows'",
+                "'Expressed with requires; checked or verified'",
             ],
         };
 
@@ -1151,8 +1151,21 @@ public static class WebsiteExampleChecker
             var name = Path.GetFileNameWithoutExtension(component.Path);
             foreach (var prose in LandingProse.GetValueOrDefault(name) ?? [])
                 proseOnly = proseOnly.Replace(prose, "", StringComparison.Ordinal);
-            if (proseOnly.Contains('§') || Regex.IsMatch(proseOnly, @"\\(?:u00[aA]7|u\{0*[aA]7\}|x[aA]7)"))
+            if (proseOnly.Contains('§') || Regex.IsMatch(proseOnly, @"\\(?:u00[aA]7|u\{0*[aA]7\}|x[aA]7)")
+                || Regex.IsMatch(proseOnly,
+                    """['"`](?:\s|\\[nr])*(?:(?:module|func|class|let|var|requires|return|set)\s|=>|!\s)"""))
                 Invalid("Inline Calor source bypasses landing snippet validation; render landingSnippets.<id>.code instead",
+                    component.Path);
+
+            var aliasSource = name switch
+            {
+                "CodeComparison" => "comparison",
+                "CatchBugs" => "missingEffect",
+                _ => null,
+            };
+            if (aliasSource != null && Regex.Matches(component.Content,
+                    $@"\bconst\s+calorCode\s*=\s*landingSnippets\.{aliasSource}\.code\s*;").Count != 1)
+                Invalid("Landing calorCode must be initialized directly from its registered shared snippet",
                     component.Path);
 
             var displays = Regex.Matches(component.Content, @"<code\b[^>]*>(?<body>[\s\S]*?)</code>")
@@ -1203,7 +1216,7 @@ public static class WebsiteExampleChecker
             }
             if (references.GetValueOrDefault(id) != 1)
                 Invalid($"Landing snippet '{id}' must have exactly one registered consumer", source.Path);
-            var fragment = !CompleteProgramStart.IsMatch(snippet.Code.TrimStart());
+            var fragment = !ExemplarCompileChecker.StartsWithModule(snippet.Code.Split('\n'));
             if (fragment && string.IsNullOrWhiteSpace(snippet.Before))
             {
                 Invalid($"Landing fragment '{id}' requires explicit compilation context", source.Path);

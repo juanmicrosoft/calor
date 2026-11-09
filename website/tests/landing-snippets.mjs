@@ -17,7 +17,8 @@ function check(displayed) {
     assert.equal(displayed.filter(code => code === snippet.code).length, 1,
       `${id}: exported page must display exactly the shared checked source once`);
   }
-  for (const code of displayed.filter(code => code.includes('§'))) {
+  for (const code of displayed.filter(code => code.includes('§')
+    || /^(?:(?:module|func|class|let|var|requires|return|set)\s|=>|!\s)/.test(code.trimStart()))) {
     assert.ok(codes.includes(code), `Unregistered displayed Calor code: ${code}`);
   }
 }
@@ -25,6 +26,8 @@ function check(displayed) {
 check(blocks);
 assert.throws(() => check(blocks.filter(code => code !== codes[0])), /must display/);
 assert.throws(() => check([...blocks, '§P "unchecked"']), /Unregistered/);
+assert.throws(() => check([...blocks, 'module Unchecked']), /Unregistered/);
+assert.throws(() => check([...blocks, 'requires unknown > 0']), /Unregistered/);
 assert.throws(() => check(blocks.map(code => code === codes[0] ? `${code}\n§R missing` : code)),
   /must display/);
 console.log(`Exported landing page displays all ${codes.length} mounted checked Calor snippets; mutation controls passed.`);

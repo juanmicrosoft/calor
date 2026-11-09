@@ -1,7 +1,7 @@
 {
   "comparison": {
     "component": "CodeComparison",
-    "code": "§M{Math}\n  §F{Square:pub} (i32:x) -> i32\n    §E{}\n    §Q (>= x 0)\n    §S (>= result 0)\n    §R (* x x)",
+    "code": "module Math\n  func Square (int:x) → int\n    !\n    requires x >= 0\n    => result >= 0\n    return x * x",
     "before": "",
     "after": "",
     "indent": 0,
@@ -10,7 +10,7 @@
   },
   "firstProgram": {
     "component": "FirstProgram",
-    "code": "§M{HelloApp}\n  §F{Main:pub} () -> void\n    §E{cw}\n    §P \"Hello from Calor!\"",
+    "code": "module HelloApp\n  func Main () → void\n    ! cw\n    Console.WriteLine(\"Hello from Calor!\")",
     "before": "",
     "after": "",
     "indent": 0,
@@ -19,12 +19,12 @@
   },
   "missingEffect": {
     "component": "CatchBugs",
-    "code": "§F{ProcessOrder:pub} (Order:order) -> void\n  §E{db:rw}\n  §C{SaveOrder} §A order §/C\n  §C{NotifyCustomer} §A order §/C",
-    "before": "§M{OrderService}\n  §CL{Order:pub}\n",
+    "code": "func ProcessOrder (Order:order) → void\n  ! db:rw\n  SaveOrder(order)\n  NotifyCustomer(order)",
+    "before": "module OrderService\n  class Order\n",
     "after": "",
     "indent": 2,
     "inputs": [
-      "§M{OrderDependencies}\n  §F{SaveOrder:pub} (object:order) -> void\n    §E{db:rw}\n  §F{NotifyCustomer:pub} (object:order) -> void\n    §E{net:rw}\n"
+      "module OrderDependencies\n  func SaveOrder (object:order) → void\n    ! db:rw\n  func NotifyCustomer (object:order) → void\n    ! net:rw\n"
     ],
     "expectedDiagnostics": [
       {
@@ -36,17 +36,17 @@
   },
   "contracts": {
     "component": "FeatureGrid",
-    "code": "§Q (>= x 0)\n§S (>= result 0)",
-    "before": "§M{ContractContext}\n  §F{Identity:pub} (i32:x) -> i32\n    §E{}\n",
-    "after": "    §R x\n",
+    "code": "requires x >= 0\n=> result >= 0",
+    "before": "module ContractContext\n  func Identity (int:x) → int\n    !\n",
+    "after": "    return x\n",
     "indent": 4,
     "inputs": [],
     "expectedDiagnostics": []
   },
   "effects": {
     "component": "FeatureGrid",
-    "code": "§E{db:rw,net:rw}",
-    "before": "§M{EffectContext}\n  §F{Process:pub} () -> void\n",
+    "code": "! db:rw,net:rw",
+    "before": "module EffectContext\n  func Process () → void\n",
     "after": "",
     "indent": 4,
     "inputs": [],
@@ -54,9 +54,9 @@
   },
   "stableId": {
     "component": "FeatureGrid",
-    "code": "§F{Process:pub}",
-    "before": "§M{IdContext}\n",
-    "after": "    §O{void}\n    §E{}\n",
+    "code": "func Process () → void",
+    "before": "module IdContext\n",
+    "after": "    !\n",
     "indent": 2,
     "inputs": [],
     "expectedDiagnostics": []

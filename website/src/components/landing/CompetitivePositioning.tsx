@@ -5,17 +5,17 @@ const comparisons = [
     rows: [
       {
         feature: 'Contracts',
-        calor: 'First-class syntax (§Q, §S)',
+        calor: 'First-class requires and => contracts',
         others: 'Deprecated / Comments / None',
       },
       {
         feature: 'Side Effects',
-        calor: 'Declared explicitly (§E)',
+        calor: 'Declared explicitly in ! rows',
         others: 'Implicit, inferred from I/O',
       },
       {
         feature: 'References',
-        calor: 'Optional stable IDs (f001, m001)',
+        calor: 'Tool-maintained IDs outside source',
         others: 'Line numbers, fragile paths',
       },
       {
@@ -72,7 +72,7 @@ const comparisons = [
       },
       {
         feature: 'AI Optimization',
-        calor: 'Optional stable IDs, explicit structure',
+        calor: 'Tool-maintained identity, explicit structure',
         others: 'Human-readable syntax only',
       },
       {
@@ -134,7 +134,7 @@ const comparisons = [
       },
       {
         feature: 'Division by Zero',
-        calor: 'Expressed via §Q; checked or verified',
+        calor: 'Expressed with requires; checked or verified',
         others: 'Runtime crash',
       },
       {

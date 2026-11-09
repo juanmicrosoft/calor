@@ -473,12 +473,12 @@ public sealed class WebsiteExampleCheckerTests
     }
 
     [Theory]
-    [InlineData("comparison", "§R (* x x)", "§R (* missing x)")]
-    [InlineData("firstProgram", "§P \"Hello from Calor!\"", "§R (+ 1 )")]
-    [InlineData("contracts", "(>= x 0)", "(>= missing 0)")]
-    [InlineData("effects", "§E{db:rw,net:rw}", "§E{db:rw,net:rw}\n§C{MissingType.Save} §/C")]
-    [InlineData("stableId", "§F{Process:pub}", "§F{Process:pub} (MissingType:x)")]
-    [InlineData("missingEffect", "§E{db:rw}", "§E{db:rw,net:rw}")]
+    [InlineData("comparison", "return x * x", "return missing * x")]
+    [InlineData("firstProgram", "Console.WriteLine(\"Hello from Calor!\")", "return (1 + )")]
+    [InlineData("contracts", "x >= 0", "missing >= 0")]
+    [InlineData("effects", "! db:rw,net:rw", "! db:rw,net:rw\nMissingType.Save()")]
+    [InlineData("stableId", "func Process () → void", "func Process (MissingType:x) → void")]
+    [InlineData("missingEffect", "! db:rw", "! db:rw,net:rw")]
     [InlineData("missingEffect", "NotifyCustomer", "MissingCustomer")]
     public void Landing_MutatedDisplayedCodeFails(string id, string original, string replacement)
     {
@@ -530,6 +530,9 @@ public sealed class WebsiteExampleCheckerTests
     [InlineData("const extra = `§P \"unchecked\"`;")]
     [InlineData("const extra = '§R unknown';")]
     [InlineData("const extra = '\\u00a7M{m999:Uncovered}';")]
+    [InlineData("const extra = `module Uncovered`;")]
+    [InlineData("const extra = 'requires unknown > 0';")]
+    [InlineData("const extra = 'return unknown';")]
     public void Landing_NewInlineCalorCannotBypassSharedSource(string extra)
     {
         var (source, components) = LandingInputs();
@@ -551,18 +554,36 @@ public sealed class WebsiteExampleCheckerTests
     }
 
     [Fact]
+    public void Landing_UnusedSharedReferenceCannotHideAReplacedDisplayedAlias()
+    {
+        var (source, components) = LandingInputs();
+        foreach (var id in new[] { "comparison", "missingEffect" })
+        {
+            var changed = components.Select(component => component with
+            {
+                Content = component.Content.Replace(
+                    $"const calorCode = landingSnippets.{id}.code;",
+                    $"const unused = landingSnippets.{id}.code;\nconst calorCode = 'unknown + 1';")
+            }).ToList();
+            Assert.Contains(WebsiteExampleChecker.CheckLanding(source, changed),
+                diagnostic => diagnostic.Code == DiagnosticCode.DocDriftWebsiteAnnotation
+                    && diagnostic.Message.Contains("initialized directly"));
+        }
+    }
+
+    [Fact]
     public void Landing_GeneratedCSharpValidationAndNegativeRepairAreReal()
     {
         var (source, components) = LandingInputs();
         var brokenType = MutateLanding(source, json =>
-            json["stableId"]!["code"] = "§F{Process:pub} (MissingType:x)");
+            json["stableId"]!["code"] = "func Process (MissingType:x) → void");
         Assert.Contains(WebsiteExampleChecker.CheckLanding(brokenType, components),
-            d => d.Message.Contains("Calor1002"));
+            d => d.Message.Contains("Calor1002") && d.Message.Contains("CS0246") && d.Message.Contains("MissingType"));
 
         var repaired = MutateLanding(source, json =>
         {
             json["missingEffect"]!["code"] = json["missingEffect"]!["code"]!.GetValue<string>()
-                .Replace("§E{db:rw}", "§E{db:rw,net:rw}");
+                .Replace("! db:rw", "! db:rw,net:rw");
             json["missingEffect"]!["expectedDiagnostics"] = new JsonArray();
         });
         Assert.Empty(WebsiteExampleChecker.CheckLanding(repaired, components));
@@ -604,7 +625,7 @@ public sealed class WebsiteExampleCheckerTests
     {
         var (source, components) = LandingInputs();
         var broken = MutateLanding(source, json =>
-            json["comparison"]!["code"] = json["comparison"]!["code"]!.GetValue<string>().Replace("(* x x)", "(* missing x)"));
+            json["comparison"]!["code"] = json["comparison"]!["code"]!.GetValue<string>().Replace("x * x", "missing * x"));
         var inputs = new DocDriftInputs
         {
             Version = "0.0.0",

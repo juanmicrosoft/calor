@@ -34,7 +34,7 @@ const features = [
   {
     name: 'Structure Agents Can Query',
     description:
-      'Tagged, indentation-defined code feeds a project index for callers, callees, effect rows, and change impact. Agents and humans query the same model.',
+      'Indentation-defined declarations feed a project index for callers, callees, effect rows, and change impact. Agents and humans query the same model.',
     icon: Layers,
     code: 'calor query impact Save\n  --effects --row fs:w',
     href: '/docs/guides/project-intelligence-for-agents/',

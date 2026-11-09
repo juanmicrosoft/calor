@@ -20,9 +20,9 @@ const csharpCode = `public static int Square(int x)
 
 const annotations = {
   calor: [
-    '§Q and §S declare the input and normal-return obligations.',
+    'requires and => declare the input and normal-return obligations.',
     'Tools keep persistent declaration identity in .calor/ids.json, outside the source.',
-    '§E{} declares no effects; enforcement depends on resolved calls and documented coverage.',
+    'An empty ! row declares no effects; enforcement depends on resolved calls and documented coverage.',
   ],
   csharp: [
     'The visible x >= 0 condition checks the same input requirement.',
