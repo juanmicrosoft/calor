@@ -2364,7 +2364,7 @@ public sealed class Binder
             ParameterModifier.None,
             forStmt.VariableSpan,
             "for");
-        loopVar.IsLoopVariable = true; // #1550
+        loopVar.IsLoopVariable = !forStmt.ReevaluatesCondition;
         if (!_scope.TryDeclare(loopVar))
         {
             _diagnostics.ReportError(forStmt.Span, DiagnosticCode.DuplicateDefinition,
@@ -8379,7 +8379,10 @@ public sealed class Binder
                 Check(dec.Operand, "decrement {0}"); break;
             case CallStatementNode call: CheckArguments(call.Arguments, call.ArgumentModifiers); break;
             case CallExpressionNode call: CheckArguments(call.Arguments, call.ArgumentModifiers); break;
-            case ForStatementNode loop: childScope[loop.VariableName] = UnboundLocal.Loop; break;
+            case ForStatementNode loop:
+                childScope[loop.VariableName] = loop.ReevaluatesCondition
+                    ? UnboundLocal.Writable : UnboundLocal.Loop;
+                break;
             case ForeachStatementNode each: childScope[each.VariableName] = UnboundLocal.Writable; break;
             case DictionaryForeachNode each:
                 childScope[each.KeyName] = UnboundLocal.Writable;

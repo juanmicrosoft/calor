@@ -1017,13 +1017,13 @@ public sealed class TypeChecker
         var fromType = InferExpressionType(forStmt.From);
         var toType = InferExpressionType(forStmt.To);
 
-        if (!IsNumeric(fromType))
+        if (IsDefinitelyNotNumeric(fromType))
         {
             _diagnostics.ReportError(forStmt.From.Span, DiagnosticCode.TypeMismatch,
                 $"FOR 'from' expression must be numeric, got {fromType.SurfaceName}");
         }
 
-        if (!IsNumeric(toType))
+        if (IsDefinitelyNotNumeric(toType))
         {
             _diagnostics.ReportError(forStmt.To.Span, DiagnosticCode.TypeMismatch,
                 $"FOR 'to' expression must be numeric, got {toType.SurfaceName}");
@@ -1032,7 +1032,7 @@ public sealed class TypeChecker
         if (forStmt.Step != null)
         {
             var stepType = InferExpressionType(forStmt.Step);
-            if (!IsNumeric(stepType))
+            if (IsDefinitelyNotNumeric(stepType))
             {
                 _diagnostics.ReportError(forStmt.Step.Span, DiagnosticCode.TypeMismatch,
                     $"FOR 'step' expression must be numeric, got {stepType.SurfaceName}");
@@ -1696,7 +1696,7 @@ public sealed class TypeChecker
             _env.DefineVariable(dictForeach.KeyName, keyType);
             _env.DefineVariable(dictForeach.ValueName, valueType);
         }
-        else if (IsKnownNonCollection(dictType))
+        else if (dictType is not (GenericInstanceType or ArrayType) && IsKnownNonCollection(dictType))
         {
             _diagnostics.ReportError(dictForeach.Dictionary.Span, DiagnosticCode.TypeMismatch,
                 $"Two-name each requires a deconstructable enumerable, got {dictType.SurfaceName}");
@@ -5286,6 +5286,10 @@ public sealed class TypeChecker
 
     private static bool IsNumeric(CalorType type)
         => IsNumericErased(EraseRefinement(type));
+
+    private static bool IsDefinitelyNotNumeric(CalorType type)
+        => EraseRefinement(type) is not (ErrorType or ExternalType or NeverType)
+            && !IsNumeric(type);
 
     private static bool IsNumericErased(CalorType type)
         => type.Equals(PrimitiveType.Int) || type.Equals(PrimitiveType.Float)

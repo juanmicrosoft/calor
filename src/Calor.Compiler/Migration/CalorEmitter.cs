@@ -2451,50 +2451,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(AssignmentStatementNode node)
     {
-        // AcceptInInlineSibling: §ASSIGN target value emits two space-separated
-        // expressions. In practice target is an lvalue (ref/member/index) — never
-        // a call — but if a future converter path produces a call-shaped target,
-        // a naked zero-arg §C{...} would absorb value as its inline arg. Defensive
-        // wrap; cheap and aligned with the inline-sibling discipline used elsewhere.
         var target = AcceptInInlineSibling(node.Target);
 
         if (node.Value is LambdaExpressionNode { IsExpressionLambda: false, StatementBody.Count: > 0 } lambda)
         {
-            EmitBlockLambdaWithHeader($"§ASSIGN {target}", lambda);
-            return "";
-        }
-
-        // Collection/array creation on the RHS of an ASSIGNMENT is a reassignment, not a
-        // declaration — but the *-WithName helpers emit a creation *block* (§ARR{arr:…},
-        // §LIST{arr:…}, …) that round-trips to a fresh `T[] arr = …` declaration. If `arr`
-        // was already declared (the converter's `arr = new int[]{…}` shape, #731) that is a
-        // duplicate declaration → CS0128. Emit the creation into a fresh temp and then
-        // `§ASSIGN target temp`, so the target is reassigned rather than re-declared. (This
-        // reuses the temp-then-§ASSIGN path the helpers already take for sanitized names.)
-        if (node.Value is ListCreationNode or DictionaryCreationNode or SetCreationNode
-                       or ArrayCreationNode or MultiDimArrayCreationNode)
-        {
-            var temp = FreshTemp("_reassign");
-            switch (node.Value)
-            {
-                case ListCreationNode listNode: EmitListCreationWithName(listNode, temp); break;
-                case DictionaryCreationNode dictNode: EmitDictionaryCreationWithName(dictNode, temp); break;
-                case SetCreationNode setNode: EmitSetCreationWithName(setNode, temp); break;
-                case ArrayCreationNode arrNode: EmitArrayCreationWithName(arrNode, temp); break;
-                case MultiDimArrayCreationNode mdArrNode: EmitMultiDimArrayCreationWithName(mdArrNode, temp, null); break;
-            }
-            AppendLine($"§ASSIGN {target} {temp}");
+            EmitBlockLambdaWithHeader($"set {target}", lambda);
             return "";
         }
 
         var value = node.Value.Accept(this);
-
-        // Skip empty assigns (can happen when value was hoisted as a side effect)
         if (string.IsNullOrWhiteSpace(value))
-            return "";
-
-        // Parser expects: §ASSIGN <target> <value>
-        AppendLine($"§ASSIGN {target} {value}");
+            throw new InvalidOperationException("Assignment value must emit a native expression.");
+        AppendLine($"set {target} {value}");
         return "";
     }
 
