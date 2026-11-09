@@ -1399,7 +1399,8 @@ public sealed class Binder
     {
         var classTypeParameters = containingTypeName is not null
             && _classesByQualifiedName.TryGetValue(containingTypeName, out var declaringClass)
-                ? declaringClass.TypeParameters.Select(parameter => parameter.Name)
+                ? ReturnShape.GetCallableTypeParameters(declaringClass, _asyncTypeModule)
+                    .Select(parameter => parameter.Name)
                 : [];
         var returnShape = ReturnShape.GetAsyncReturnTypes(returnType, isAsync, _asyncTypeModule,
             typeParameters.Concat(classTypeParameters));

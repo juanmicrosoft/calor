@@ -347,23 +347,23 @@ public sealed class ContractVerificationPass
 
         foreach (var cls in module.Classes)
         {
-            foreach (var fn in EnumerateClassMethodsAsFunctions(cls))
+            foreach (var fn in EnumerateClassMethodsAsFunctions(cls, module))
                 yield return fn;
         }
     }
 
-    private static IEnumerable<FunctionNode> EnumerateClassMethodsAsFunctions(ClassDefinitionNode cls)
+    private static IEnumerable<FunctionNode> EnumerateClassMethodsAsFunctions(ClassDefinitionNode cls, ModuleNode module)
     {
         foreach (var m in cls.Methods)
         {
             if (!m.HasContracts && !m.Parameters.Any(parameter => parameter.InlineRefinement != null))
                 continue;
-            yield return AdaptMethodAsFunction(m, cls);
+            yield return AdaptMethodAsFunction(m, cls, module);
         }
 
         foreach (var nested in cls.NestedClasses)
         {
-            foreach (var fn in EnumerateClassMethodsAsFunctions(nested))
+            foreach (var fn in EnumerateClassMethodsAsFunctions(nested, module))
                 yield return fn;
         }
     }
@@ -376,7 +376,7 @@ public sealed class ContractVerificationPass
     /// receiver state, only parameters and `result`. That matches what the
     /// existing free-function verifier already supports.
     /// </summary>
-    private static FunctionNode AdaptMethodAsFunction(MethodNode m, ClassDefinitionNode owner)
+    private static FunctionNode AdaptMethodAsFunction(MethodNode m, ClassDefinitionNode owner, ModuleNode module)
     {
         // Use a synthetic name so cache keys distinguish methods on different classes.
         var qualifiedName = owner.Name + "." + m.Name;
@@ -385,14 +385,29 @@ public sealed class ContractVerificationPass
             m.Id,
             qualifiedName,
             m.Visibility,
-            m.TypeParameters,
+            Analysis.ReturnShape.GetCallableTypeParameters(m, module),
             m.Parameters,
             m.Output,
             m.Effects,
             m.Preconditions,
             m.Postconditions,
             m.Body,
-            m.Attributes);
+            m.Attributes,
+            examples: [],
+            issues: [],
+            uses: null,
+            usedBy: null,
+            assumptions: [],
+            complexity: null,
+            since: null,
+            deprecated: null,
+            breakingChanges: [],
+            properties: [],
+            lockNode: null,
+            author: null,
+            taskRef: null,
+            isAsync: m.IsAsync,
+            identifierSpan: m.IdentifierSpan);
     }
 
     private static ModuleVerificationResult CreateSkippedResult(ModuleNode module)

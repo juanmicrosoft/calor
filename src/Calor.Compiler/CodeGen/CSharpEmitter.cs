@@ -1272,7 +1272,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         RequireNamespace("System.Threading.Tasks");
         var classParameters = _moduleClasses.SelectMany(DescendantsAndSelf).OfType<ClassDefinitionNode>()
             .Where(cls => cls.Name == _currentClassName)
-            .SelectMany(cls => cls.TypeParameters.Select(parameter => parameter.Name));
+            .SelectMany(cls => Analysis.ReturnShape.GetCallableTypeParameters(cls, _asyncTypeModule)
+                .Select(parameter => parameter.Name));
         var parameterNames = (typeParameterNames ?? []).Concat(classParameters).ToHashSet(StringComparer.Ordinal);
         var shape = Analysis.ReturnShape.GetAsyncReturnTypes(returnType, isAsync, _asyncTypeModule, parameterNames);
         if (shape.CallableType == returnType)

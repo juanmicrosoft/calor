@@ -185,7 +185,8 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
         var parameters = string.Join(", ", func.Parameters.Select(p => $"{p.Name}: {p.TypeName}"));
         var returnType = Compiler.Analysis.ReturnShape.GetAsyncReturnTypes(
             func.Output?.TypeName ?? "void", func.IsAsync, module,
-            func.TypeParameters.Select(parameter => parameter.Name)).CallableType;
+            Compiler.Analysis.ReturnShape.GetCallableTypeParameters(func, module)
+                .Select(parameter => parameter.Name)).CallableType;
         return $"{func.Name}({parameters}) -> {returnType}";
     }
 
@@ -194,7 +195,8 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
         var parameters = string.Join(", ", method.Parameters.Select(p => $"{p.Name}: {p.TypeName}"));
         var returnType = Compiler.Analysis.ReturnShape.GetAsyncReturnTypes(
             method.Output?.TypeName ?? "void", method.IsAsync, module,
-            method.TypeParameters.Select(parameter => parameter.Name)).CallableType;
+            Compiler.Analysis.ReturnShape.GetCallableTypeParameters(method, module)
+                .Select(parameter => parameter.Name)).CallableType;
         return $"{method.Name}({parameters}) -> {returnType}";
     }
 

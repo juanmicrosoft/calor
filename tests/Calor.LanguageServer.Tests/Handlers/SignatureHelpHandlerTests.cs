@@ -6,6 +6,42 @@ namespace Calor.LanguageServer.Tests.Handlers;
 
 public class SignatureHelpHandlerTests
 {
+    [Theory]
+    [InlineData("Task", false)]
+    [InlineData("ValueTask", false)]
+    [InlineData("Task", true)]
+    [InlineData("ValueTask", true)]
+    public void AsyncClassCarrierTypeParameter_FallbackSignatureReportsWrappedResult(string parameter, bool nested)
+    {
+        var source = $$"""
+            §M{AsyncClassSignature}
+              §CL{Box:pub}<{{parameter}}>
+                §AMT{Produce:pub} ({{parameter}}:value) -> {{parameter}}
+                  §R value
+            """;
+        if (nested)
+            source = source.Replace("    §AMT", "    §CL{Inner:pub}\n      §AMT", StringComparison.Ordinal)
+                .Replace("      §R", "        §R", StringComparison.Ordinal);
+        var compilation = Compiler.Program.Compile(source, "async-class-signature.calr",
+            new Compiler.CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.NotNull(compilation.Ast);
+        var cls = Assert.Single(compilation.Ast.Classes);
+        var method = Assert.Single(nested ? Assert.Single(cls.NestedClasses).Methods : cls.Methods);
+        var buildLabel = typeof(LanguageServer.Handlers.SignatureHelpHandler)
+            .GetMethods(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
+            .Single(candidate => candidate.Name == "BuildSignatureLabel"
+                && candidate.GetParameters()[0].ParameterType == typeof(Compiler.Ast.MethodNode));
+        var label = Assert.IsType<string>(buildLabel.Invoke(null, [method, compilation.Ast]));
+        Assert.Equal($"Produce(value: {parameter}) -> global::System.Threading.Tasks.Task<{parameter}>", label);
+        var completionType = typeof(LanguageServer.Handlers.CompletionHandler)
+            .GetMethods(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
+            .Single(candidate => candidate.Name == "CallableReturnType"
+                && candidate.GetParameters()[0].ParameterType == typeof(Compiler.Ast.MethodNode));
+        Assert.Equal($"global::System.Threading.Tasks.Task<{parameter}>",
+            Assert.IsType<string>(completionType.Invoke(null, [method, compilation.Ast, cls])));
+        Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
+    }
+
     [Fact]
     public void FindFunction_WithParameters_ReturnsFunction()
     {

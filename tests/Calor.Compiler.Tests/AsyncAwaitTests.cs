@@ -1570,6 +1570,103 @@ public class AsyncAwaitTests
             Binding.TypeIdentity.Canonicalize(initializer.ReturnTypeName));
     }
 
+    [Theory]
+    [InlineData("Task", false)]
+    [InlineData("Task", true)]
+    [InlineData("ValueTask", false)]
+    [InlineData("ValueTask", true)]
+    public async Task Compile_ClassCarrierTypeParameter_IsAValueReturn(string parameter, bool hasRefinement)
+    {
+        var assembly = CompileAndLoad($$"""
+            §M{AsyncClassParameter}
+              {{(hasRefinement ? "§RTYPE{Positive:i32} (> # 0)" : "")}}
+              §CL{Box:pub}<{{parameter}}>
+                §AMT{Produce:pub} ({{parameter}}:value) -> {{parameter}}
+                  §S true
+                  §R value
+            """);
+        var type = assembly.GetType("AsyncClassParameter.Box`1", throwOnError: true)!.MakeGenericType(typeof(int));
+        var method = type.GetMethod("Produce")!;
+        Assert.Equal(typeof(Task<int>), method.ReturnType);
+        Assert.Equal(42, await (Task<int>)method.Invoke(Activator.CreateInstance(type), [42])!);
+    }
+
+    [Theory]
+    [InlineData("Task")]
+    [InlineData("ValueTask")]
+    public async Task Compile_OuterClassCarrierTypeParameter_IsAValueReturn(string parameter)
+    {
+        var assembly = CompileAndLoad($$"""
+            §M{AsyncNestedClass}
+              §CL{Outer:pub}<{{parameter}}>
+                §CL{Inner:pub}
+                  §AMT{Produce:pub} ({{parameter}}:value) -> {{parameter}}
+                    §S true
+                    §R value
+            """);
+        var type = assembly.GetType("AsyncNestedClass.Outer`1+Inner", throwOnError: true)!.MakeGenericType(typeof(int));
+        var method = type.GetMethod("Produce")!;
+        Assert.Equal(typeof(Task<int>), method.ReturnType);
+        Assert.Equal(42, await (Task<int>)method.Invoke(Activator.CreateInstance(type), [42])!);
+    }
+
+    [Theory]
+    [InlineData("Task")]
+    [InlineData("ValueTask")]
+    public void Compile_ContractAdapter_PreservesAsyncAndEnclosingClassParameters(string parameter)
+    {
+        var compilation = Program.Compile($$"""
+            §M{AsyncContractContext}
+              §CL{Outer:pub}<{{parameter}}>
+                §CL{Inner:pub}<T>
+                  §AMT{Produce:pub}<U> ({{parameter}}:value) -> {{parameter}}
+                    §S true
+                    §R value
+            """, "async-contract-context.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.NotNull(compilation.Ast);
+        var enumerate = typeof(Verification.Z3.ContractVerificationPass).GetMethod("EnumerateContractBearers",
+            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
+        var adapted = Assert.Single(Assert.IsAssignableFrom<IEnumerable<FunctionNode>>(
+            enumerate.Invoke(null, [compilation.Ast])));
+        Assert.True(adapted.IsAsync);
+        Assert.Equal(["U", "T", parameter], adapted.TypeParameters.Select(typeParameter => typeParameter.Name));
+        Assert.Equal(parameter, Compiler.Analysis.ReturnShape.GetAsyncReturnTypes(
+            adapted.Output!.TypeName, adapted.IsAsync, compilation.Ast,
+            adapted.TypeParameters.Select(typeParameter => typeParameter.Name)).BodyType);
+        Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binding.Binder(diagnostics).Bind(compilation.Ast);
+        Assert.Empty(diagnostics.Errors);
+        var method = Assert.Single(bound.Functions);
+        Assert.Equal(parameter, method.Symbol.BodyReturnType);
+        Assert.Equal($"global::System.Threading.Tasks.Task<{parameter}>", method.Symbol.ReturnType);
+    }
+
+    [Theory]
+    [InlineData("i32")]
+    [InlineData("global::System.Threading.Tasks.Task<i32>")]
+    [InlineData("global::System.Threading.Tasks.ValueTask<i32>")]
+    public void Compile_AsyncMethodContract_VerifiesTheBodyResult(string output)
+    {
+        var options = new CompilationOptions
+        {
+            StatusWriter = TextWriter.Null,
+            VerifyContracts = true,
+            VerificationCacheOptions = Verification.Z3.Cache.VerificationCacheOptions.Disabled
+        };
+        var compilation = Program.Compile($$"""
+            §M{AsyncMethodProof}
+              §CL{Box:pub}<Task>
+                §AMT{Produce:pub} () -> {{output}}
+                  §S (== result 42)
+                  §R 42
+            """, "async-method-proof.calr", options);
+        Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
+        Assert.NotNull(options.VerificationResults);
+        var verification = Assert.Single(Assert.Single(options.VerificationResults.Functions).PostconditionResults);
+        Assert.Equal(Verification.Z3.ContractVerificationStatus.Proven, verification.Status);
+    }
+
     #region Helpers
 
     private static string GetErrorMessage(ConversionResult result)

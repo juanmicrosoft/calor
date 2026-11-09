@@ -116,6 +116,39 @@ public static class ReturnShape
             : ($"global::System.Threading.Tasks.Task<{declaredType}>", declaredType);
     }
 
+    /// <summary>Includes enclosing class parameters, with nearer declarations taking precedence.</summary>
+    public static IReadOnlyList<TypeParameterNode> GetCallableTypeParameters(AstNode owner, ModuleNode? module)
+    {
+        IReadOnlyList<TypeParameterNode> ownParameters = owner switch
+        {
+            FunctionNode function => function.TypeParameters,
+            MethodNode method => method.TypeParameters,
+            ClassDefinitionNode cls => cls.TypeParameters,
+            _ => []
+        };
+        IReadOnlyList<TypeParameterNode> enclosingParameters = [];
+
+        bool FindOwner(AstNode node, IReadOnlyList<TypeParameterNode> context)
+        {
+            if (ReferenceEquals(node, owner))
+            {
+                enclosingParameters = context;
+                return true;
+            }
+            if (node is FunctionNode or MethodNode or ExpressionNode)
+                return false;
+
+            var childContext = node is ClassDefinitionNode cls
+                ? cls.TypeParameters.Concat(context).ToArray()
+                : context;
+            return RecursiveAstWalker.GetAllChildren(node).Any(child => FindOwner(child, childContext));
+        }
+
+        if (module != null)
+            FindOwner(module, []);
+        return ownParameters.Concat(enclosingParameters).DistinctBy(parameter => parameter.Name).ToArray();
+    }
+
     private static Kind ClassifyCallable(OutputNode? output, bool isAsync, AstNode owner, ModuleNode? module)
     {
         if (IsIterator(owner))
@@ -123,12 +156,7 @@ public static class ReturnShape
             return Kind.Iterator;
         }
 
-        var typeParameters = owner switch
-        {
-            FunctionNode function => function.TypeParameters.Select(parameter => parameter.Name),
-            MethodNode method => method.TypeParameters.Select(parameter => parameter.Name),
-            _ => []
-        };
+        var typeParameters = GetCallableTypeParameters(owner, module).Select(parameter => parameter.Name);
         if (IsVoidType(GetAsyncReturnTypes(output?.TypeName ?? "void", isAsync, module, typeParameters).BodyType))
         {
             return isAsync ? Kind.AsyncVoid : Kind.Void;

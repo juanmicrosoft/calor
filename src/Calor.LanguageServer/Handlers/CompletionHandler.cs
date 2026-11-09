@@ -1099,12 +1099,14 @@ public sealed class CompletionHandler : CompletionHandlerBase
     private static string CallableReturnType(FunctionNode function, ModuleNode module)
         => Compiler.Analysis.ReturnShape.GetAsyncReturnTypes(
             function.Output?.TypeName ?? "void", function.IsAsync, module,
-            function.TypeParameters.Select(parameter => parameter.Name)).CallableType;
+            Compiler.Analysis.ReturnShape.GetCallableTypeParameters(function, module)
+                .Select(parameter => parameter.Name)).CallableType;
 
     private static string CallableReturnType(MethodNode method, ModuleNode module, ClassDefinitionNode? declaringClass = null)
         => Compiler.Analysis.ReturnShape.GetAsyncReturnTypes(
             method.Output?.TypeName ?? "void", method.IsAsync, module,
-            method.TypeParameters.Concat(declaringClass?.TypeParameters ?? [])
+            Compiler.Analysis.ReturnShape.GetCallableTypeParameters(method, module)
+                .Concat(declaringClass?.TypeParameters ?? [])
                 .Select(parameter => parameter.Name)).CallableType;
 
     private static IEnumerable<CompletionItem> GetMembersForType(
