@@ -634,7 +634,7 @@ public class RefOutImplementationTests
         return (result.CalorSource ?? "", result.Losses.Select(loss => loss.Feature).ToList());
     }
 
-    internal static string Run(string csharp)
+    internal static string Run(string csharp, string probeName = "Probe")
     {
         var compilation = CSharpCompilation.Create("F1_" + Guid.NewGuid().ToString("N"),
             [CSharpSyntaxTree.ParseText(csharp, new CSharpParseOptions(LanguageVersion.Preview))],
@@ -647,7 +647,7 @@ public class RefOutImplementationTests
         var context = new AssemblyLoadContext(compilation.AssemblyName!, isCollectible: true);
         try
         {
-            var run = context.LoadFromStream(stream).GetTypes().Single(t => t.Name == "Probe").GetMethod("Run", BindingFlags.Public | BindingFlags.Static)!;
+            var run = context.LoadFromStream(stream).GetTypes().Single(t => t.Name == probeName).GetMethod("Run", BindingFlags.Public | BindingFlags.Static)!;
             try { return run.Invoke(null, null)?.ToString() ?? "<null>"; }
             catch (TargetInvocationException e) { return "!" + e.InnerException!.GetType().Name; }
         }

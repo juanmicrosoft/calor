@@ -56,11 +56,23 @@ calor convert MyService.cs --benchmark
 | `--verbose` | `-v` | `false` | Enable verbose output |
 | `--explain` | `-e` | `false` | Explain unsupported features in detail |
 | `--no-fallback` | — | `false` | Disable TODO substitution; default faithful C# preservation still applies |
-| `--validate` | — | `false` | Parse generated Calor before writing and report errors |
+| `--validate` | — | `false` | Request validation reporting; generated Calor is always parse-validated before writing |
 | `--passthrough` | — | `false` | Widen the set of C# members preserved verbatim. Since 0.16 `calor convert` already rescues a member it cannot convert this way; see [What Changed in 0.16](#what-changed-in-0-16) |
 | `--timeout` | `-t` | `0` | Conversion timeout in seconds; 0 disables it |
 | `--explicit-call-closers` | — | `false` | Legacy compatibility option; current native calls use parentheses and never emit closer tags. |
 | `--format` | — | `text` | `text` or schema 2.0 `json`; there is no `-f` alias |
+| `--define` | — | None | Conditional-compilation symbol; repeat for several symbols |
+| `--language-version` | — | Converter default | C# language version used by Roslyn |
+| `--documentation-mode` | — | `parse` | Roslyn documentation mode: `none`, `parse` or `diagnose` |
+| `--source-kind` | — | `regular` | Roslyn source kind: `regular` or `script` |
+| `--feature` | — | None | Roslyn parse feature as `key=value`; repeat as needed |
+| `--reference` | — | None | Metadata reference path, optionally followed by `=alias1,alias2` |
+| `--configuration` | — | None | Configuration name recorded in conversion metadata |
+| `--framework` | — | None | Framework name recorded in conversion metadata |
+
+`--configuration` and `--framework` record context; they do not evaluate an
+MSBuild project or automatically load its dependencies. Use project migration
+when sibling sources and evaluated project settings are required.
 
 ---
 
@@ -73,9 +85,39 @@ If `--output` is not specified:
 | `MyFile.cs` | `MyFile.calr` |
 | `MyFile.calr` | `MyFile.g.cs` |
 
+## Generation receipts and safe refresh
+
+C# → Calor conversion also writes an adjacent generation receipt:
+`MyFile.calr.conversion.json`. It records the saved original source and parse
+options, supplied context and observed input hashes, generated Calor, and
+preserved-frame associations where an exact original syntax node is known.
+
+Automatic refresh requires both the previous output and receipt to match their
+saved generation. Edited output, missing or corrupt receipts, a different
+original-source association, stale inputs or a concurrent change are explicit
+errors, not permission to overwrite user work. Changing the original C# is
+allowed only while the destination still matches its previous generation.
+
+The output/identity commit and final receipt write are **separate artifacts,
+not one atomic transaction**. A final receipt error can happen after the output
+is written. The command then exits `1`, reports that output was already written
+and retains its actual path and conversion disposition. An interrupted or
+mismatched pair blocks subsequent automatic refresh; do not treat exit `1` as
+proof that no file changed.
+
+The cooperating lock does not exclude arbitrary editors. Observed hashes do
+not prove complete loaded metadata, generator or evaluated-project context.
+Inactive, transformed, composite-rescue and unmapped frames can remain
+unresolved. A receipt is not a native-support verdict, a verifier proof or an
+always-on build/LSP authority gate.
+
 ---
 
 ## Supported Constructs
+
+Native output is a conversion disposition, not proof that the original-context
+program passes binding, normal effect enforcement, verification or its tests.
+Check those gates separately.
 
 The converter validates generated C# before claiming a fully successful
 conversion. It reports semantic losses with `file:line` locations and exposes
@@ -99,7 +141,7 @@ and tests. Missing, malformed, unreadable inputs and failed writes remain errors
 The destructive `--lossy` and `--select-active-preprocessor-branch-lossy` flags
 are no longer available.
 
-In the unreleased 0.27 converter, collection expressions convert natively only for
+Collection expressions convert natively only for
 array targets without spreads or a single array-to-array spread. Other collection
 targets and mixed spreads stay C# to retain their runtime type and enumeration order.
 Declaration patterns remain native. Property and positional patterns, and other complex
@@ -239,14 +281,14 @@ transcripts behind each example.
 
 | C# Construct | Calor Equivalent |
 |:-------------|:----------------|
-| `namespace` | `§M{Name}` module |
-| `class` | `§CL{Name:vis}` class |
-| class `method` | `§MT{Name:vis}` method |
-| `property` | `§PROP{Name:vis:type}` property |
-| `field` | `§FLD{type:name}` field |
-| `if/else if/else` | `§IF` / `§EI` / `§EL` branches (end at dedent) |
-| `for` loop | `§L{var:from:to:step}` |
-| `while` loop | `§WH` |
+| One admitted namespace scope | `module FileLabel Namespace`; complex scopes remain preserved |
+| `class` | `class Name` |
+| Class method | `func Name (Type:parameter) → ReturnType` |
+| Property | `property Type:Name` with indented accessors |
+| Field | `field Type:name` |
+| `if/else if/else` | `if`, `else if`, `else`, ending at dedent |
+| `for` loop | Snapshot or reevaluated `for`, according to the original semantics |
+| `while` loop | `while condition` |
 
 ### Local Functions
 
@@ -297,17 +339,17 @@ module Probe overflow unchecked
 ```
 
 If a member has any local function outside the slice (capturing, generic, async,
-iterator, and so on), the whole member is preserved as a `§CSHARP` block, reported as
+iterator, and so on), the whole member is preserved in a converter-owned raw frame, reported as
 a `local-function` issue and counted as preservation. `--no-fallback`
 does not disable faithful preservation. The language rules are in
-[Local Functions](/syntax-reference/structure-tags#local-functions).
+[Local Functions](/docs/syntax-reference/structure-tags/#local-functions).
 
 ### Iterator Properties and Indexers
 
 A C# property or indexer getter that uses `yield return` or `yield break` is an
-*iterator accessor*. Calor has no iterator accessors: `§YIELD` inside a `§GET`
+*iterator accessor*. Calor has no iterator accessors: `yield` inside a property getter
 is rejected with `Calor0209` (illegal yield). So the converter keeps the whole
-member as a `§CSHARP` block and reports it as an `iterator-accessor` loss.
+member in a converter-owned raw frame and reports it as an `iterator-accessor` loss.
 
 This C# property:
 
@@ -324,29 +366,9 @@ public IEnumerable<int> Steps
 }
 ```
 
-converts to:
-
-```calor
-module Countdown overflow unchecked
-  using System.Collections.Generic
-
-  class Countdown
-    field int:Start = 3
-
-    raw member:iterator-accessor:Property:Unsupported%20Property%3A%20public%20IEnumerable%3Cint%3E%20Steps%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20get%0A%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20for%20%28in... 183
-
-    public IEnumerable<int> Steps
-    {
-        get
-        {
-            for (int i = Start; i > 0; i--)
-            {
-                yield return i;
-            }
-        }
-    }
-    }§/CSHARP
-```
+is preserved as a complete member, including its original getter body.
+The converter owns the raw-frame marker, UTF-8 count and payload; this page
+does not provide a handwritten frame to copy.
 
 The C# compiler still builds the iterator, so behavior does not change: the body
 runs only when someone enumerates the result, a `finally` runs when the
@@ -363,23 +385,23 @@ the getter return its result. Calling an iterator method also defers the work, s
 the timing is the same:
 
 ```calor
-§M{Countdown}
-  §U{System.Collections.Generic}
-  §CL{Countdown:pub}
-    §FLD{i32:Start:pub} = 3
+module Countdown
+  using System.Collections.Generic
+  class Countdown
+    field int:Start = 3
 
-    §PROP{Steps:Seq<i32>:pub}
-      §GET{pub}
-        §R §C{CountDown}
+    property IEnumerable<int>:Steps
+      get
+        return CountDown()
 
-    §MT{CountDown:priv} () -> Seq<i32>
-      §E{}
-      §L{i:Start:1:-1}
-        §YIELD i
+    func CountDown private () → IEnumerable<int>
+      !
+      for i from Start to 1 step -1
+        yield i
 ```
 
 Calor has no partial members either. Every declaration of a C# 13 `partial`
-property or indexer is kept as `§CSHARP`, so the defining declaration (`{ get; }`)
+property or indexer is preserved, so the defining declaration (`{ get; }`)
 does not turn into a second, auto-implemented property. It is reported as
 `partial-property`, or as `iterator-accessor` when any part in the same file yields.
 
@@ -391,9 +413,12 @@ does not turn into a second, auto-implemented property. It is reported as
 - When a larger declaration is already preserved for another reason, the loss
   names that reason. An interface whose iterator getter has a default body is kept
   whole as `interface-property-semantics`, and a record as `record`.
-- Iterators in ordinary methods still convert natively to `§YIELD`.
+- Iterators in ordinary methods can convert natively using `yield`.
 
 ### What Changed in 0.17
+
+This section and the 0.16 section below record historical release results,
+not current milestone acceptance measurements.
 
 0.16 got all 364 modules to **parse**. 0.17 is about what happens next: a module
 that parses can still stop at name binding, before any of the effect checking
@@ -416,7 +441,7 @@ interfaces, generic constraints, or `System.Object`. `IValidator.GetType()` was
 declared on `ICollection<T>`. Across the same three projects, the share of call
 sites the compiler can resolve went from **92.8% to 95.9%**.
 
-Four converter and emitter defects are fixed alongside them. A class using `§EXT`
+Four converter and emitter defects were fixed alongside them. A class using the old module-extension form
 emitted unqualified calls to module functions, which the C# compiler then
 rejected; the same function referenced as a method group rather than called had
 the same problem; a `var` bound to a method call lost its type, and with it every
@@ -444,8 +469,8 @@ three projects.
 
 There is one change to what you get back. `calor convert` now often rescues a
 member it could not convert into working Calor, by wrapping the original C# in a
-`§CSHARP` block rather than sinking the whole file. That means converted output
-can contain `§CSHARP` blocks even when you did not pass `--passthrough`, and the
+preserved C# frame rather than sinking the whole file. That means converted output
+can contain preserved frames even when you did not pass `--passthrough`, and the
 report tells you how many. Partly converted beats nothing converted, but treat
 each block as work still to do.
 
@@ -460,7 +485,7 @@ branch of `?:`, converts to native Calor. The C# evaluation order is kept: each
 element is evaluated once, left to right, in place. The unselected branch of `?:`,
 and the right operand of `&&` or `||`, are still not evaluated. Before 0.25, a
 `return new T[,] { … }` produced Calor whose C# did not compile, and arrays in a
-`?:` branch did not parse. Only the post-conversion rescue (`§CSHARP`) hid that.
+`?:` branch did not parse. Only post-conversion preservation hid that.
 
 This C#:
 
@@ -491,34 +516,34 @@ public static class Grid
 converts to:
 
 ```calor
-§M{Grids}
-  §M{Grid:pub}
-    §F{Pick:pub} (bool:wide, i32:v) -> i32[,]
-      §E{alloc}
-      §R §IF wide → §ARR2D{i32} §ROW v (+ v 1) §/ARR2D §EL → §ARR2D{i32} §ROW v §/ARR2D
+module Grids overflow unchecked
+  module Grid
+    func Pick (bool:wide, int:v) → int[,]
+      ! alloc
+      return wide ? new int[,] { { v, v + 1 } } : new int[,] { { v } }
 
-    §F{Sum:pub} (i32[]:xs, i32:start) -> i32
-      §B{~s:i32} start
-      §EACH{x:var} xs
-        §ASSIGN s (+ s x)
-      §R s
+    func Sum (int[]:xs, int:start) → int
+      !
+      var int:s = start
+      each int:x in xs
+        set s s + x
+      return s
 
-    §F{Total:pub} (i32:v) -> i32
-      §E{alloc}
-      §R §C{Sum} §A §ARR{i32} v (* v 2) §/ARR §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C
+    func Total (int:v) → int
+      ! alloc
+      return Sum(new int[] { v, v * 2 }, Pick(true, v)[0, 1])
 ```
 
 Three forms make this work:
 
-- **Inline `§ARR2D`.** In expression position the array is written on one line and
-  ends with `§/ARR2D`, the same way `§ARR` already did. An object initializer
-  used as an element stays on its `§ROW` line (`§NEW{Cell} V = v §/NEW`). The
+- **Inline array construction.** Ordinary `new int[,] { { v, v + 1 } }`
+  stays in expression position. An object initializer used as an element stays
+  inside that element. The
   converter no longer moves it into a temporary variable ahead of the statement.
-- **Rank 3 and up.** `§ARR2D{i32:2:1:2}` followed by `§ROW` lines gives the
-  shape. The rows are the innermost vectors in row-major order. A row count that
+- **Rank 3 and up.** Nested initializer braces retain the declared shape
+  and row-major element order. An initializer shape that
   does not match the shape is a C# compile error, never padded or cut.
-- **Grouped element access.** `(§IDX2D g 0 1).V` reads a member of an element.
-  Written without the parentheses, `.V` attached to the last index.
+- **Postfix element access.** `g[0, 1].V` reads a member of the selected element.
 
 Names the converter generates (`_hoist000`, `arr2d004`) skip every identifier that
 appears in your C# file, and in the other files of a `calor migrate` project. A
@@ -535,14 +560,11 @@ a declared array, and sized arrays without an initializer. They work as a return
 value, argument, binding, field or property initializer, member-access target, and
 `?:` branch. Elements can be calls, object initializers, `x++`, and other arrays.
 
-**Effects of array members are not modeled.** When the receiver is typed as an array
-(`i32[]`, `i32[,]`), a call to an array member, such as `g.GetLength(0)`, `g.Rank` or
-`g.Clone()`, is an unknown external call (`Calor0411`). A function that makes one and
-declares no matching effect reports `Calor0410` (an effect is used but not declared).
-Declare the effect, or compile converted code with `--permissive-effects`. Two cases
-resolve through Calor's built-in effect manifests instead, as before: a receiver declared
-as `System.Array`, and an array whose element type is in a namespace the manifests give a
-default (for example `System.Threading.Tasks.ValueTask[]`).
+**Array member effects require actual resolution.** Array construction support
+does not establish support for every array method or property. An unresolved
+member can report `Calor0411` and, under a declared row, `Calor0410`.
+Do not cast to an unrelated receiver type, add an unknown effect or disable
+enforcement to describe such a call as native acceptance.
 
 **Limits.** These shapes are kept as C# and reported as a conversion loss, never
 moved:
@@ -587,7 +609,7 @@ assuming it reproduces the website headline.
 | Code | Meaning |
 |:-----|:--------|
 | `0` | Conversion completed; inspect the loss report to distinguish fully native from preserved interop |
-| `1` | Invalid or missing input, filesystem failure, timeout, or a refused conversion (`outcome: "refused"`; no file written) |
+| `1` | Input, validation, timeout or write error. Refused conversions write nothing; a final receipt error can occur after output was written. Read the actual diagnostic and disposition. |
 | `2` | Exact original C# was preserved and written, but standalone compilation failed (`outcome: "unverified"`). Verify with the original project context. |
 
 ---

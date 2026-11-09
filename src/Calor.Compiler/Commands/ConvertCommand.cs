@@ -65,7 +65,7 @@ public static class ConvertCommand
 
         var passthroughOption = new Option<bool>(
             aliases: new[] { "--passthrough" },
-            description: "Preserve unconvertible members as §CSHARP interop blocks so the output always parses (C# → Calor). If a member's emitted Calor would be invalid, its original C# is kept verbatim instead of writing broken output.");
+            description: "Request member-level C# preservation on conversion errors (C# → Calor). Default lossless rescue also preserves unsupported code in converter-owned raw frames.");
 
         var defineOption = new Option<string[]>(
             aliases: new[] { "--define" },

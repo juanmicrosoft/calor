@@ -18,6 +18,39 @@ public class DocDriftCheckerTests
 {
     private const string ValidTeachingProgram = "module Good\n  func Value () → int\n    return 1\n";
 
+    [Fact]
+    public void ConverterPreservationHelp_UsesOwnedFramesWithoutAnUnconditionalParseGuarantee()
+    {
+        var option = Commands.ConvertCommand.Create().Options.Single(option => option.HasAlias("--passthrough"));
+        var description = Assert.IsType<string>(option.Description);
+        Assert.Contains("converter-owned raw frames", description);
+        Assert.DoesNotContain("§", description);
+        Assert.DoesNotContain("always parses", description);
+    }
+
+    [Fact]
+    public void PublicConvertGuide_RetainsExactOriginalInputAndCurrentCounterTranscript()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var content = File.ReadAllText(Path.Combine(root, "website/content/cli/convert.mdx")).Replace("\r\n", "\n");
+        var input = System.Text.RegularExpressions.Regex.Match(content,
+            @"\{/\* w1-source: W1-F6-rescue \*/\}\s*\n```csharp\n(?<body>.*?)\n```",
+            System.Text.RegularExpressions.RegexOptions.Singleline);
+        Assert.True(input.Success);
+        var fixture = File.ReadAllText(Path.Combine(root,
+            "tests/TestData/InteropScope/W1/fixtures/W1-F6-rescue.cs.txt")).Replace("\r\n", "\n");
+        Assert.Contains(input.Groups["body"].Value, fixture);
+        var output = System.Text.RegularExpressions.Regex.Match(content,
+            @"\{/\* w1-transcript: W1-F6-rescue \*/\}\s*\n```calor\n(?<body>.*?)\n```",
+            System.Text.RegularExpressions.RegexOptions.Singleline);
+        Assert.True(output.Success);
+        var transcript = ActiveSyntaxInputs.ForCurrentTranscript(root,
+            "tests/TestData/InteropScope/W1/transcripts/W1-F6-rescue.json");
+        using var expected = JsonDocument.Parse(File.ReadAllText(transcript));
+        Assert.Equal(expected.RootElement.GetProperty("cli-convert").GetProperty("calor").GetString()!
+            .Replace("\r\n", "\n").TrimEnd('\n'), output.Groups["body"].Value.TrimEnd('\n'));
+    }
+
     [Theory]
     [InlineData("CLAUDE.md")]
     [InlineData("AGENTS.md")]
@@ -88,6 +121,10 @@ public class DocDriftCheckerTests
         new[] { "PortConstraint", "TextConstraint", "TransferConstraint", "ConstraintBoundary" },
         new[] { "443", "5", "7", "-1" },
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()" })]
+    [InlineData("cli/convert.mdx", 4, 0,
+        new[] { "Counter", "Probe", "Countdown", "Grids" }, new[] { "1", "3", "3,2,1", "13" },
+        new[] { "new Counter().Next()", "Probe.UseShadow()", "System.String.Join(\",\", new Countdown().Steps)",
+            "Grid.Total(3)" })]
     [InlineData("structure-tags.mdx", 20, 2,
         new[] { "StructureModules", "BlockNamespace", "FunctionHeaders", "AsyncFunctions", "AsyncMethods",
             "AwaitExpressions", "LambdaExamples", "AsyncLambdas", "LocalCallables", "DelegateDefinitions",
@@ -107,7 +144,7 @@ public class DocDriftCheckerTests
         string page, int completeCount, int negativeCount, string[] moduleNames, string[] expectedResults,
         string[] expressions)
     {
-        var relativePath = "website/content/syntax-reference/" + page;
+        var relativePath = "website/content/" + (page.Contains('/') ? page : "syntax-reference/" + page);
         var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), relativePath));
         Assert.DoesNotContain("§", content);
         var coverage = new WebsiteExampleChecker.Coverage();
@@ -126,7 +163,7 @@ public class DocDriftCheckerTests
             Assert.Equal(moduleNames[index], Assert.IsType<Ast.ModuleNode>(compiled.Ast).Name);
             var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
 
-                public static class Probe
+                public static class __CalorPublishedProgramProbe
                 {
                     public static object? Run()
                     {
@@ -139,7 +176,7 @@ public class DocDriftCheckerTests
                         finally { System.Globalization.CultureInfo.CurrentCulture = previous; }
                     }
                 }
-                """);
+                """, "__CalorPublishedProgramProbe");
             Assert.Equal(expectedResults[index], observed);
         }
         Assert.True(diagnostics.Count == 0, string.Join("\n", diagnostics));
