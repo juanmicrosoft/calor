@@ -169,19 +169,24 @@ public class DocDriftCheckerTests
     [InlineData("benchmarking/metrics/task-completion.mdx", 2, 0,
         new[] { "TaskSafeDivide", "TaskNormalizeScore" }, new[] { "3", "75" },
         new[] { "GlobalModule.SafeDivide(6, 2)", "GlobalModule.NormalizeScore(75, 100)" })]
-    [InlineData("structure-tags.mdx", 22, 3,
+    [InlineData("philosophy/index.mdx", 2, 0,
+        new[] { "DivisionObligations", "Calculator" }, new[] { "4", "42" },
+        new[] { "GlobalModule.Divide(9, 2)", "GlobalModule.Add(20, 22)" })]
+    [InlineData("philosophy/design-principles.mdx", 1, 0,
+        new[] { "DesignContracts" }, new[] { "4" }, new[] { "GlobalModule.Divide(9, 2)" })]
+    [InlineData("structure-tags.mdx", 22, 2,
         new[] { "StructureModules", "BlockNamespace", "FunctionHeaders", "AsyncFunctions", "AsyncMethods",
             "AwaitExpressions", "ConfigureAwaitLimit", "LambdaExamples", "AsyncLambdas", "LocalCallables", "DelegateDefinitions",
-            "EnumDefinitions", "EnumExtensions", "EventDefinitions", "ParameterArrays", "ArrayDeclarations",
+            "EnumDefinitions", "EnumExtensions", "EnumReceiverLimit", "EventDefinitions", "ParameterArrays", "ArrayDeclarations",
             "IndentedBlocks", "GenericDeclarations", "AttributeDeclarations" },
         new[] { "42", "42", "10", "21:7:9", "42", "42", "42", "24", "42", "3", "5", "True",
-            "#FF0000:True", "0", "7", "2:7", "15", "42", "7" },
+            "#FF0000:True", "#FF0000", "0", "7", "2:7", "15", "42", "7" },
         new[] { "Demo.DemoModule.Main()", "new Demo.Tools.Box().Read()", "GlobalModule.Main()",
             "GlobalModule.Read().GetAwaiter().GetResult() + \":\" + GlobalModule.ExplicitTask().GetAwaiter().GetResult() + \":\" + GlobalModule.ExplicitValueTask().GetAwaiter().GetResult()",
             "GlobalModule.Main().GetAwaiter().GetResult()", "GlobalModule.Main().GetAwaiter().GetResult()",
             "GlobalModule.Read().GetAwaiter().GetResult()",
             "GlobalModule.Main()", "GlobalModule.Main().GetAwaiter().GetResult()", "GlobalModule.Use(2)",
-            "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()",
+            "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Receiver()",
             "new SubscriptionCounter().Count", "GlobalModule.Main()",
             "new DataProcessor().ProcessData(new string[] { \"a\", \"b\" }) + \":\" + GlobalModule.First(new int[][] { new int[] { 7 } })",
             "GlobalModule.Main()", "GlobalModule.Main()", "new Data().Read()" })]
@@ -932,6 +937,41 @@ public class DocDriftCheckerTests
             Assert.Equal(original, File.ReadAllBytes(input));
         }
         finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Theory]
+    [InlineData("philosophy/index.mdx", "DivisionObligations", "9, 2", "4", "4")]
+    [InlineData("philosophy/index.mdx", "DivisionObligations", "-9, 2", "Ensures", "-4")]
+    [InlineData("philosophy/index.mdx", "DivisionObligations", "9, 0", "Requires", "!DivideByZeroException")]
+    [InlineData("philosophy/index.mdx", "DivisionObligations", "int.MinValue, -1", "!OverflowException", "!OverflowException")]
+    [InlineData("philosophy/design-principles.mdx", "DesignContracts", "9, 2", "4", "4")]
+    [InlineData("philosophy/design-principles.mdx", "DesignContracts", "-9, 2", "Requires", "-4")]
+    [InlineData("philosophy/design-principles.mdx", "DesignContracts", "9, -2", "Requires", "-4")]
+    [InlineData("philosophy/design-principles.mdx", "DesignContracts", "9, 0", "Requires", "!DivideByZeroException")]
+    public void PublicPhilosophy_ObservesActualPreconditionPostconditionAndArithmeticBoundaries(
+        string page, string module, string arguments, string enabled, string disabled)
+    {
+        var path = "website/content/" + page;
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith("module " + module + "\n", StringComparison.Ordinal)).Source;
+        foreach (var (mode, expected) in new[] { (ContractMode.Debug, enabled), (ContractMode.Off, disabled) })
+        {
+            var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = mode });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run()
+                    {
+                        try { return GlobalModule.Divide({{arguments}}); }
+                        catch (Calor.Runtime.ContractViolationException failure) { return failure.Kind.ToString(); }
+                    }
+                }
+                """);
+            Assert.Equal(expected, observed);
+        }
     }
 
     [Theory]

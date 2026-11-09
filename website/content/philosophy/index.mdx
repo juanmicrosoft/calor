@@ -16,10 +16,10 @@ When an AI agent reads code, it needs answers to specific questions:
 
 | Question | Traditional Languages | Calor |
 |:---------|:---------------------|:-----|
-| What does this function **do**? | Infer from implementation | Explicit contracts (`§Q`, `§S`) |
-| What are the **side effects**? | Guess from I/O patterns | Declared with `§E{cw,fs:r,net:rw}` |
+| What does this function **do**? | Infer from implementation | Explicit contracts (`requires`, `=>`) |
+| What are the **side effects**? | Guess from I/O patterns | Declared with `! cw,fs:r,net:rw` |
 | What **constraints** must hold? | Parse exception patterns | First-class preconditions/postconditions |
-| How do I **precisely reference** this? | Hope line numbers don't change | Optional stable IDs (`§F{Main}`) |
+| How do I **precisely reference** this? | Use editor and refactoring tools | Declaration identities in `.calor/ids.json` |
 | Where does this **scope end**? | Count braces, handle nesting | Indentation (Python-style) |
 
 Traditional languages make agents *infer* these answers through complex analysis. Calor makes them *explicit* in the syntax.
@@ -51,13 +51,19 @@ public int Divide(int a, int b) {
 ```
 
 ```calor
-// Calor — Z3 catches the bug at compile time
-§F{Divide:pub} (i32:a, i32:b) -> i32
-  §E{}
-  §Q (!= b 0)          // ← Contract: b must not be zero
-  §S (>= result 0)     // ← Contract: result non-negative
-  §R (/ a b)
+module DivisionObligations
+  func Divide public (int:a, int:b) → int
+    !
+    requires b != 0
+    => result >= 0
+    return a / b
 ```
+
+`Divide(9, 2)` returns `4`. The precondition excludes division by zero, but
+does not imply the postcondition: `Divide(-9, 2)` produces a negative result
+and fails the enabled runtime postcondition check. The signed integer overflow
+case `int.MinValue / -1` is also outside the precondition's protection.
+Writing a contract does not prove it.
 
 Calor's Z3 integration classifies each obligation. Supported obligations may
 be `proven` or `refuted` with a counterexample; incomplete modeling is reported
@@ -90,20 +96,19 @@ the [results caveats](/docs/benchmarking/results/) alongside the numbers.
 Calor deliberately optimizes for machine readability over human aesthetics:
 
 ```calor
-§M{Calculator}
-  §F{Add:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (+ a b)
+module Calculator
+  func Add public (int:a, int:b) → int
+    !
+    return a + b
 ```
 
-This might look unusual to human programmers, but for an AI agent:
+The source uses familiar type names and infix expressions while making selected
+interfaces explicit:
 
 1. **Explicit scope** - Indentation defines blocks
 2. **Semantic density** - Type and visibility appear in the declaration
 3. **Precise targeting** - Sidecar identities survive supported renames and moves; ambiguous edits are rejected
-4. **Symbolic operations** - `(+ a b)` is directly manipulable without parsing precedence
+4. **Familiar operations** - `a + b` follows C# precedence; parentheses make other grouping explicit
 
 ---
 
@@ -123,11 +128,12 @@ This might look unusual to human programmers, but for an AI agent:
 
 ### 3. Can explicit IDs make structural targets easier to identify?
 
-**Hypothesis:** Preserved explicit identifiers make structural targets less ambiguous.
+**Hypothesis:** Persistent declaration identities make structural targets less ambiguous.
 
-**Calculator score:** 1.36x under the deterministic source-pattern calculator. It
+**Historical calculator score:** 1.36x under the deterministic source-pattern calculator. It
 does not execute agent edits, and it does not model mature C#/Roslyn refactoring
-tools; see the [metric limits](/docs/benchmarking/metrics/edit-precision/).
+tools or measure the current sidecar identity system; see the
+[metric limits](/docs/benchmarking/metrics/edit-precision/).
 
 ### 4. What's the cost of explicit semantics?
 
@@ -176,7 +182,7 @@ remove human ownership of intent, tests, or accepted behavior.
 **Yes.** Calor changes what the review can lead with, but it does not eliminate
 review. Focus first on:
 - **Defining outcomes**: What should this function guarantee? What preconditions must callers satisfy?
-- **Specifying contracts**: The AI writes the code, but you approve the contracts (`§Q` preconditions, `§S` postconditions)
+- **Specifying contracts**: The AI writes the code, but you approve the contracts (`requires` preconditions, `=>` postconditions)
 - **Reviewing verification results**: Which obligations are cleanly proven, and which are assumed, unknown, unsupported, unavailable, timed out, vacuous, or refuted?
 - **Inspecting the remainder**: Generated C#, tests, interop blocks, waivers, and caller impact
 

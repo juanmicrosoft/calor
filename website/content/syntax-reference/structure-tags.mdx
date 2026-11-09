@@ -410,13 +410,14 @@ identity when selecting the overload; it does not substitute an integer or a
 same-named metadata enum.
 
 The methods also carry CLR extension-method metadata. A C# caller evaluating
-`Color.Red.ToHex() + ":" + Color.Blue.IsPrimary()` gets the same string, but
-that receiver-style C# observation is separate from native invocation support.
+`Color.Red.ToHex() + ":" + Color.Blue.IsPrimary()` gets the same string.
 
-The following complete negative example reports `Calor0410` and `Calor0411`.
-It does not establish native receiver-style invocation support.
+Native receiver-style calls are supported when the receiver and the first
+`this` parameter resolve to actual source enum types. The following program
+returns `"#FF0000"` under normal effect enforcement. The compiler selects the
+source method and emits its fully qualified static call:
 
-```calor expect=Calor0410,Calor0411
+```calor
 module EnumReceiverLimit
   enum Color
     Red
@@ -428,6 +429,11 @@ module EnumReceiverLimit
     !
     return Color.Red.ToHex()
 ```
+
+This admission does not cover arbitrary object, generic, or metadata extension
+receivers. Ambiguous, inaccessible, or preserved competing declarations cannot
+borrow the source method's effect contract. Inherited enum instance-member
+names remain conservatively unresolved.
 
 Two other forms remain explicit limits. An escaped enum member can bind to
 the correct source symbol while the separate AST type checker still rejects
