@@ -400,10 +400,18 @@ public sealed class DeclarationIdentityStore
             || state.Declarations.Select(d => d.Id).Distinct(StringComparer.Ordinal).Count() != state.Declarations.Count
             || state.Declarations.Select(d => d.Key).Distinct(StringComparer.Ordinal).Count() != state.Declarations.Count
             || state.Declarations.Any(d => !state.Files.Contains(d.File, StringComparer.Ordinal)
-                || !IdValidator.IsCanonicalId(d.Id) || !Enum.IsDefined(d.Kind)
-                || IdGenerator.GetKindFromId(d.Id) != d.Kind
+                || !Enum.IsDefined(d.Kind) || !IsValidPersistedIdentity(d)
                 || d.Container == null || string.IsNullOrEmpty(d.Name) || d.Signature == null))
             throw new InvalidDataException("Identity sidecar contains duplicate or invalid declarations. Resolve conflicts with ids sync, not by choosing an ID.");
+    }
+
+    private bool IsValidPersistedIdentity(DeclarationIdentity declaration)
+    {
+        if (IdValidator.IsTestId(declaration.Id))
+            return IdValidator.Validate(declaration.Id, declaration.Kind,
+                IdValidator.IsTestPath(CanonicalPath.Resolve(ValidatePath(declaration.File)))) == IdValidationResult.Valid;
+        return IdValidator.IsCanonicalId(declaration.Id)
+            && IdGenerator.GetKindFromId(declaration.Id) == declaration.Kind;
     }
 
     /// <summary>
