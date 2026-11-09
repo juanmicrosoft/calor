@@ -23,8 +23,8 @@ public sealed class FixResult
 }
 
 /// <summary>
-/// Auto-fixes known invalid patterns in converter output.
-/// Applies ordered regex-based rules and re-parses after each pass.
+/// Preserves converter output for native parser validation.
+/// Retired prefix syntax is not repaired into a native-positive candidate.
 /// </summary>
 public sealed class PostConversionFixer
 {
@@ -32,21 +32,6 @@ public sealed class PostConversionFixer
 
     private static readonly List<(string Name, string Description, Func<string, (string Result, bool Changed)> Apply)> Rules = new()
     {
-        ("OrphanedClosingTag", "Remove unmatched §/NEW or §/C closing tags at statement level",
-            FixOrphanedClosingTags),
-
-        ("UnmatchedParentheses", "Remove extra closing parentheses or add missing opening parentheses",
-            FixUnmatchedParentheses),
-
-        ("CommaLeaks", "Strip raw commas from Lisp expression positions",
-            FixCommaLeaks),
-
-        ("GenericInLisp", "Extract generic type arguments from Lisp call position to binding",
-            FixGenericInLisp),
-
-        ("InlineErrLam", "Extract §LAM from inside Lisp call arguments to preceding binding",
-            FixInlineErrLam),
-
     };
 
     /// <summary>

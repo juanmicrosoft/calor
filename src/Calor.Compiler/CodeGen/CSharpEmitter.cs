@@ -5285,7 +5285,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             // Sized array expression: new int[10] or new int[n]
             var size = node.Size.Accept(this);
-            return $"new {elementType}[{size}]{elementRanks}";
+            var initializer = node.Initializer.Count > 0
+                ? $" {{ {string.Join(", ", node.Initializer.Select(e => e.Accept(this)))} }}" : "";
+            return $"new {elementType}[{size}]{elementRanks}{initializer}";
         }
         else if (node.Initializer.Count > 0)
         {
@@ -5295,8 +5297,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         else
         {
-            // Empty array expression
-            return $"Array.Empty<{elementType}{elementRanks}>()";
+            return $"new {elementType}[]{elementRanks} {{ }}";
         }
     }
 
@@ -9631,8 +9632,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     }
 
     public string Visit(MultiDimArrayCreationNode node)
+        => EmitMultiDimArrayCreation(node, expression => expression.Accept(this), MapTypeName(node.ElementType));
+
+    internal static string EmitMultiDimArrayCreation(MultiDimArrayCreationNode node,
+        Func<ExpressionNode, string> emitExpression, string mappedElementType)
     {
-        var (elementType, elementRanks) = SplitArrayRanks(MapTypeName(node.ElementType));
+        var (elementType, elementRanks) = SplitArrayRanks(mappedElementType);
 
         if (node.DimensionSizes.Count > 0 && node.Initializer.Count > 0)
         {
@@ -9640,7 +9645,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             // initializer). Rows are the innermost vectors, row-major; regroup them into
             // nested braces by the outer sizes. C# rejects a shape mismatch (CS0847).
             var rows = node.Initializer.Select(row =>
-                "{ " + string.Join(", ", row.Select(e => e.Accept(this))) + " }").ToList();
+                "{ " + string.Join(", ", row.Select(emitExpression)) + " }").ToList();
             for (var level = node.DimensionSizes.Count - 2; level > 0; level--)
             {
                 if (node.DimensionSizes[level] is not IntLiteralNode { Value: > 0 and <= int.MaxValue } size
@@ -9648,20 +9653,20 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     break;
                 rows = rows.Chunk((int)size.Value).Select(group => "{ " + string.Join(", ", group) + " }").ToList();
             }
-            var sizes = string.Join(", ", node.DimensionSizes.Select(d => d.Accept(this)));
+            var sizes = string.Join(", ", node.DimensionSizes.Select(emitExpression));
             return $"new {elementType}[{sizes}]{elementRanks} {{ {string.Join(", ", rows)} }}";
         }
 
         if (node.DimensionSizes.Count > 0)
         {
-            var dims = string.Join(", ", node.DimensionSizes.Select(d => d.Accept(this)));
+            var dims = string.Join(", ", node.DimensionSizes.Select(emitExpression));
             return $"new {elementType}[{dims}]{elementRanks}";
         }
         else if (node.Initializer.Count > 0)
         {
             var commas = new string(',', Math.Max(node.Rank - 1, 0));
             var rows = node.Initializer.Select(row =>
-                "{ " + string.Join(", ", row.Select(e => e.Accept(this))) + " }");
+                "{ " + string.Join(", ", row.Select(emitExpression)) + " }");
             return $"new {elementType}[{commas}]{elementRanks} {{ {string.Join(", ", rows)} }}";
         }
         else
@@ -9676,7 +9681,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     /// In C# the created array's rank comes first: an int[] element sized 2 is
     /// `new int[2][]`, not `new int[][2]`; a 2-D array of int[] is `new int[,][]`.
     /// </summary>
-    private static (string Base, string Ranks) SplitArrayRanks(string elementType)
+    internal static (string Base, string Ranks) SplitArrayRanks(string elementType)
     {
         var match = System.Text.RegularExpressions.Regex.Match(elementType, @"^(.+?)((?:\[,*\])+)$");
         return match.Success ? (match.Groups[1].Value, match.Groups[2].Value) : (elementType, "");

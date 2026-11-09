@@ -2521,7 +2521,7 @@ public sealed class Parser
         {
             return ParseTryStatement();
         }
-        else if (Check(TokenKind.Use))
+        else if (Check(TokenKind.Use) || Check(TokenKind.Using))
         {
             return ParseUsingStatement();
         }
@@ -2668,14 +2668,18 @@ public sealed class Parser
         else if (Check(TokenKind.OpenParen))
         {
             var expr = ParseExpression();
+            if (expr is not (CallExpressionNode or ExpressionCallNode or NewExpressionNode))
+                _diagnostics.ReportError(expr.Span, DiagnosticCode.UnexpectedToken,
+                    "A native expression statement must be an invocation or object creation.");
             return new ExpressionStatementNode(expr.Span, expr);
         }
-        else if (Check(TokenKind.Identifier) || Check(TokenKind.At))
+        else if (Check(TokenKind.Identifier) || Check(TokenKind.At)
+            || Check(TokenKind.This) || Check(TokenKind.Base) || Check(TokenKind.New))
         {
             var expr = ParseExpression();
-            if (expr is not (CallExpressionNode or ExpressionCallNode))
+            if (expr is not (CallExpressionNode or ExpressionCallNode or NewExpressionNode))
                 _diagnostics.ReportError(expr.Span, DiagnosticCode.UnexpectedToken,
-                    "A native expression statement must be an invocation.");
+                    "A native expression statement must be an invocation or object creation.");
             return new ExpressionStatementNode(expr.Span, expr);
         }
         // Stray §EI/§EL: the clause was dedented past its §IF, so the
@@ -3145,7 +3149,7 @@ public sealed class Parser
                     {
                         if (escapedName)
                             Advance();
-                        name = Advance().Text;
+                        name = TokenIdentifier(Advance());
                         Advance(); // :
                     }
                     string? modifier = null;
@@ -3732,31 +3736,31 @@ public sealed class Parser
     /// </summary>
     private (ExpressionNode?, IReadOnlyList<StatementNode>?, TextSpan) ParseLambdaBody()
     {
-        // Check for statement block: { ... }
-        if (Check(TokenKind.OpenBrace))
+        var arrow = PreviousToken;
+        if (Current.Span.Line > TokenEndLine(arrow))
         {
+            var owner = BeginBlockBody(arrow, TokenKind.EndLambda, null);
             var statements = new List<StatementNode>();
-            Advance(); // consume {
-
-            // Parse statements until closing brace
-            while (!IsAtEnd && !Check(TokenKind.CloseBrace))
+            while (!IsAtEnd && !Check(TokenKind.Dedent) && IsInBlockBody(owner)
+                && Current.Kind is not (TokenKind.Comma or TokenKind.CloseParen
+                    or TokenKind.CloseBracket or TokenKind.Colon or TokenKind.Semicolon))
             {
-                var stmt = ParseStatement();
-                if (stmt != null)
-                {
-                    statements.Add(stmt);
-                }
+                var statement = ParseStatement();
+                if (statement is not null)
+                    statements.Add(statement);
             }
+            if (statements.Count == 0)
+                _diagnostics.ReportError(arrow.Span, DiagnosticCode.UnexpectedToken,
+                    "A multiline lambda requires an indented statement body.");
+            var end = Current.Kind is TokenKind.Comma or TokenKind.CloseParen
+                or TokenKind.CloseBracket or TokenKind.Colon or TokenKind.Semicolon
+                ? ImplicitBlockEndToken()
+                : ExpectOwnedBlockEnd(TokenKind.EndLambda, owner);
+            return (null, statements, end.Span);
+        }
 
-            var endToken = Expect(TokenKind.CloseBrace);
-            return (null, statements, endToken.Span);
-        }
-        else
-        {
-            // Expression body
-            var body = ParseExpression();
-            return (body, null, body.Span);
-        }
+        var body = ParseExpression();
+        return (body, null, body.Span);
     }
 
     /// <summary>
@@ -4691,31 +4695,22 @@ public sealed class Parser
     /// </summary>
     private ExpressionNode ParseTrailingMemberAccess(ExpressionNode expr)
     {
-        while (Check(TokenKind.Dot) || Check(TokenKind.NullConditional) || Check(TokenKind.OpenBrace))
+        while (Check(TokenKind.Dot) || Check(TokenKind.NullConditional))
         {
-            if (Check(TokenKind.OpenBrace))
-            {
-                // Array access: array{index}
-                Advance(); // consume '{'
-                var indexExpr = ParseLispArgument();
-                var endToken = Expect(TokenKind.CloseBrace);
-                var span = expr.Span.Union(endToken.Span);
-                expr = new ArrayAccessNode(span, expr, indexExpr);
-            }
-            else
             {
                 var isNullConditional = Check(TokenKind.NullConditional);
                 Advance(); // consume '.' or '?.'
                 var escapedSpan = Check(TokenKind.At) ? Advance().Span : (TextSpan?)null;
                 var memberToken = Expect(TokenKind.Identifier);
                 var memberOffset = 0;
-                foreach (var memberName in memberToken.Text.Split('.'))
+                foreach (var memberName in TokenIdentifier(memberToken).Split('.'))
                 {
                     var memberSpan = new TextSpan(memberToken.Span.Start + memberOffset, memberName.Length,
                         memberToken.Span.Line, memberToken.Span.Column + memberOffset);
                     if (memberOffset == 0 && escapedSpan is { } escaped)
                         memberSpan = escaped.Union(memberSpan);
-                    else if (memberOffset == 0 && memberName.Length == memberToken.Text.Length)
+                    else if (memberOffset == 0 && (memberName.Length == memberToken.Text.Length
+                        || memberToken.Text.StartsWith('@')))
                         memberSpan = memberToken.Span;
                     var span = expr.Span.Union(memberSpan);
                     expr = isNullConditional && memberOffset == 0
@@ -5300,27 +5295,6 @@ public sealed class Parser
         // 0.25 F2 (#906): lex the hole at its real position, so a diagnostic inside it (an
         // undefined name, a type error) points at the hole instead of line 1, column 1.
         var holeSpan = new TextSpan(part.Start, source.Length, part.Line, part.Column);
-        // Native call parsing must retain the existing intrinsic and literal-value safeguards.
-        if (source.Contains("nameof", StringComparison.Ordinal) || source.Contains('"')
-            || source.Contains("=>", StringComparison.Ordinal) || source.Contains('{'))
-        {
-            const int prefix = 3;
-            if (SyntaxFactory.ParseExpression($"$\"{{{source}}}\"") is InterpolatedStringExpressionSyntax
-                { Contents: [InterpolationSyntax interpolation] })
-            {
-                var calls = interpolation.Expression.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>();
-                if (interpolation.Expression.DescendantNodesAndSelf()
-                        .Any(node => node is AnonymousFunctionExpressionSyntax or InitializerExpressionSyntax)
-                    || calls.Any(invocation =>
-                        invocation.Expression is IdentifierNameSyntax { Identifier.Text: "nameof" })
-                    || calls.SelectMany(invocation => invocation.ArgumentList.Arguments)
-                        .SelectMany(argument => argument.Expression.DescendantNodesAndSelf()
-                            .OfType<LiteralExpressionSyntax>())
-                        .Any(literal => literal.Token.Value is string
-                            && TryParseCompleteHoleExpression(literal, part, prefix) is null))
-                    return ParseRawCSharpInterpolationPart(part, holeSpan);
-            }
-        }
         var lexer = new Lexer(source, _diagnostics, part.Start, part.Line, part.Column);
         var parser = new Parser(lexer.TokenizeAllForParser(), _diagnostics);
         var expression = parser.ParseExpression();
@@ -5337,7 +5311,8 @@ public sealed class Parser
             && !suffix.StartsWith(",", StringComparison.Ordinal)
             && !suffix.StartsWith(":", StringComparison.Ordinal))
         {
-            return ParseRawCSharpInterpolationPart(part, holeSpan);
+            _diagnostics.ReportError(holeSpan, DiagnosticCode.UnexpectedToken,
+                $"Unexpected native interpolation suffix '{suffix}'.");
         }
 
         if (suffix.StartsWith(",", StringComparison.Ordinal))
@@ -5558,6 +5533,11 @@ public sealed class Parser
         var token = Expect(TokenKind.Identifier);
         var name = TokenIdentifier(token);
         verbatim |= token.Text.StartsWith('@');
+        if (!verbatim && name is "static" or "async" && Check(TokenKind.OpenParen)
+            && TryParseNativeLambda(out var parsedLambda) && parsedLambda is LambdaExpressionNode lambda)
+            return new LambdaExpressionNode(token.Span.Union(lambda.Span), lambda.Id,
+                lambda.Parameters, lambda.Effects, name == "async",
+                lambda.ExpressionBody, lambda.StatementBody, lambda.Attributes, name == "static");
         if (!verbatim && name is "typeof" or "nameof")
         {
             Expect(TokenKind.OpenParen);
@@ -5568,19 +5548,24 @@ public sealed class Parser
                 : new NameOfExpressionNode(token.Span.Union(close.Span), value);
         }
 
-        // Qualified identifier tokens retain dots; @ starts a separate token.
-        if (name.EndsWith('.') && Check(TokenKind.At))
+        if (name.EndsWith('.') && (Check(TokenKind.At)
+            || Check(TokenKind.Identifier) && Current.Text.StartsWith('@')))
         {
-            var escaped = Advance();
+            var escapedSpan = Check(TokenKind.At) ? Advance().Span : (TextSpan?)null;
             var member = Expect(TokenKind.Identifier);
             var receiverSpan = new TextSpan(token.Span.Start, token.Span.Length - 1,
                 token.Span.Line, token.Span.Column);
             var reference = new ReferenceNode(receiverSpan, name[..^1]);
             if (verbatim || token.Value is string)
                 _verbatimReferences.Add(reference);
-            var receiver = SplitNativeMemberReference(reference);
+            var receiver = name[..^1] switch
+            {
+                "this" when !verbatim => new ThisExpressionNode(receiverSpan),
+                "base" when !verbatim => new BaseExpressionNode(receiverSpan),
+                _ => SplitNativeMemberReference(reference)
+            };
             return ParseTrailingMemberAccess(new FieldAccessNode(token.Span.Union(member.Span),
-                receiver, member.Text, escaped.Span.Union(member.Span)));
+                receiver, TokenIdentifier(member), escapedSpan?.Union(member.Span) ?? member.Span));
         }
 
         // Handle generic type references: Type<T> or Type<T1, T2>
@@ -5615,7 +5600,7 @@ public sealed class Parser
             var memberToken = Expect(TokenKind.Identifier);
 
             // Handle generic type after member access: Type<T>.Member<U>
-            var memberName = memberToken.Text;
+            var memberName = TokenIdentifier(memberToken);
             if (Check(TokenKind.Less) && IsGenericTypeBracket() && !IsGenericTypeBracket(requireCall: true))
             {
                 var sb = new System.Text.StringBuilder(memberName);
@@ -10419,13 +10404,32 @@ public sealed class Parser
     }
 
     /// <summary>
-    /// Parses a new expression.
-    /// §NEW[Circle] §A "MyCircle" §A 5.0 §/NEW
+    /// Parses native constructor and array creation.
     /// </summary>
     private ExpressionNode ParseNewExpression()
     {
         var start = Expect(TokenKind.New);
         var type = ParseLispTypeName(out var typeSpan);
+        if (SyntaxFactory.ParseTypeName(type) is ArrayTypeSyntax arrayType)
+        {
+            var rank = arrayType.RankSpecifiers[0].Sizes.Count;
+            var element = arrayType.RankSpecifiers.Count == 1
+                ? arrayType.ElementType.ToString()
+                : arrayType.WithRankSpecifiers(SyntaxFactory.List(arrayType.RankSpecifiers.Skip(1))).ToString();
+            return ParseNativeArrayCreation(start, element, typeSpan, rank, []);
+        }
+        if (Match(TokenKind.OpenBracket))
+        {
+            var sizes = new List<ExpressionNode>();
+            while (!IsAtEnd && !Check(TokenKind.CloseBracket))
+            {
+                sizes.Add(ParseExpression());
+                if (!Match(TokenKind.Comma))
+                    break;
+            }
+            Expect(TokenKind.CloseBracket);
+            return ParseNativeArrayCreation(start, type, typeSpan, Math.Max(1, sizes.Count), sizes);
+        }
         var arguments = new List<ExpressionNode>();
         var names = new List<string?>();
         if (Match(TokenKind.OpenParen))
@@ -10464,6 +10468,50 @@ public sealed class Parser
         }
         return new NewExpressionNode(start.Span.Union(PreviousToken.Span), type, [], arguments,
             initializers, typeSpan, argumentNames: names.Any(name => name is not null) ? names : null);
+    }
+
+    private ExpressionNode ParseNativeArrayCreation(Token start, string elementType, TextSpan typeSpan,
+        int rank, IReadOnlyList<ExpressionNode> sizes)
+    {
+        var elements = new List<ExpressionNode>();
+        var rows = new List<IReadOnlyList<ExpressionNode>>();
+        var hasInitializer = Match(TokenKind.OpenBrace);
+        if (hasInitializer)
+        {
+            if (rank > 2)
+                _diagnostics.ReportError(start.Span, DiagnosticCode.UnexpectedToken,
+                    "Native array initializers of rank greater than two are not yet supported.");
+            while (!IsAtEnd && !Check(TokenKind.CloseBrace))
+            {
+                if (rank == 1)
+                    elements.Add(ParseExpression());
+                else
+                {
+                    Expect(TokenKind.OpenBrace);
+                    var row = new List<ExpressionNode>();
+                    while (!IsAtEnd && !Check(TokenKind.CloseBrace))
+                    {
+                        row.Add(ParseExpression());
+                        if (!Match(TokenKind.Comma))
+                            break;
+                    }
+                    Expect(TokenKind.CloseBrace);
+                    rows.Add(row);
+                }
+                if (!Match(TokenKind.Comma))
+                    break;
+            }
+            Expect(TokenKind.CloseBrace);
+        }
+        else if (sizes.Count == 0)
+            _diagnostics.ReportError(start.Span.Union(typeSpan), DiagnosticCode.UnexpectedToken,
+                "An array creation requires dimension sizes or an initializer.");
+        var span = start.Span.Union(PreviousToken.Span);
+        var id = GenerateParserAutoId("a");
+        return rank == 1
+            ? new ArrayCreationNode(span, id, "", elementType, sizes.FirstOrDefault(), elements,
+                new AttributeCollection(), typeSpan)
+            : new MultiDimArrayCreationNode(span, id, "", elementType, rank, sizes, rows, typeSpan);
     }
 
     private ExpressionNode ParseLegacyNewExpression()

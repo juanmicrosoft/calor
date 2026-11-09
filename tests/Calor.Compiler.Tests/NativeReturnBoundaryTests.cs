@@ -11,7 +11,7 @@ public sealed class NativeReturnBoundaryTests
     public void BareReturn_LeavesFollowingCallAsASeparateStatement()
     {
         var diagnostics = new DiagnosticBag();
-        var lambda = ParseLambda("() => { return\nWork() }", diagnostics);
+        var lambda = ParseLambda("() =>\n  return\n  Work()", diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
         Assert.Collection(lambda.StatementBody!,
             statement => Assert.Null(Assert.IsType<ReturnStatementNode>(statement).Expression),
@@ -23,7 +23,7 @@ public sealed class NativeReturnBoundaryTests
     public void BareReturn_DoesNotConsumeNextLineEffectClause()
     {
         var diagnostics = new DiagnosticBag();
-        var lambda = ParseLambda("() => { return\n! cw }", diagnostics);
+        var lambda = ParseLambda("() =>\n  return\n  ! cw", diagnostics);
         Assert.Null(Assert.IsType<ReturnStatementNode>(lambda.StatementBody![0]).Expression);
         Assert.True(diagnostics.HasErrors);
     }
@@ -32,7 +32,7 @@ public sealed class NativeReturnBoundaryTests
     public void Return_RetainsSameLineUnaryOperand()
     {
         var diagnostics = new DiagnosticBag();
-        var lambda = ParseLambda("() => { return !flag }", diagnostics);
+        var lambda = ParseLambda("() =>\n  return !flag", diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
         var statement = Assert.IsType<ReturnStatementNode>(Assert.Single(lambda.StatementBody!));
         Assert.IsType<UnaryOperationNode>(statement.Expression);

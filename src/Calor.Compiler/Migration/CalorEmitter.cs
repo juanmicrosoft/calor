@@ -103,8 +103,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private void AppendIndentedLine(string line)
     {
         var indent = new string(' ', _indentLevel * 2);
-        if (line.Contains('\n')
-            && RawCSharpFrame.ReadTokens(line).Any(t => t.Value is RawCSharpFrame))
+        if (line.Contains('\n'))
         {
             _builder.AppendLine(RawCSharpFrame.RewriteOutsideFrames(line, text =>
                 indent + text.Replace("\n", "\n" + indent, StringComparison.Ordinal)));
@@ -2102,37 +2101,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
             return "";
         }
 
-        // Block-bodied lambda initializer must use block form so its statements are
-        // emitted at the correct nested indent and §/LAM lands at the §B column.
-        // The naive `Initializer.Accept(this)` returns a multi-line string with a
-        // fixed indent that gets jammed onto the §B line and dedents below the
-        // enclosing scope, producing unparseable output (#705).
-        if (node.Initializer is LambdaExpressionNode { IsExpressionLambda: false, StatementBody.Count: > 0 } blockLambda
-            && !(blockLambda.StatementBody.Count <= 2 && !blockLambda.StatementBody.Any(s => s is FallbackCommentNode or RawCSharpNode)))
-        {
-            EmitBlockLambdaWithHeader(bindHeader, blockLambda);
-            return "";
-        }
-
-        // Short (1-2 statement) block lambda: inline when its statements render on
-        // one line; otherwise block form under the binding's OWN name (#903 cluster
-        // 1). Routing through the generic path would hoist a §B{_hoistLamNNN}
-        // alias and bind the name to a reference instead of the lambda.
-        if (node.Initializer is LambdaExpressionNode { IsExpressionLambda: false, StatementBody.Count: > 0 } shortLambda)
-        {
-            var lamHeader = BuildLambdaHeader(shortLambda);
-            var lamRow = shortLambda.Effects != null ? " " + FormatEffectsTag(shortLambda.Effects) : "";
-            if (TryRenderStatementLambdaInline(shortLambda, lamHeader, lamRow, out var inline, out var stmts))
-            {
-                AppendLine($"{bindHeader} {inline}");
-                return "";
-            }
-            foreach (var line in BuildBlockLambdaLines($"{bindHeader} ", lamHeader, lamRow, stmts))
-                AppendLine(line);
-            return "";
-        }
-
-        // Parser expects: §B[type:name] expression (no = sign)
         var initPart = node.Initializer != null ? $" = {node.Initializer.Accept(this)}" : "";
         AppendLine($"{bindHeader}{initPart}");
         return "";
@@ -3376,11 +3344,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ReferenceNode node)
     {
-        // Strip @ from verbatim identifiers (both simple and dotted like this.@object)
         var name = node.Name.Replace("@", "");
-        // Don't escape literal keywords (true, false, null) when used as expression values —
-        // they're valid Calor expressions, not identifiers needing backtick escaping.
-        if (name is "true" or "false" or "null")
+        if (node.Name == "null")
             return name;
         return EscapeCalorIdentifier(name.Contains('<') ? AttributeHelper.ToSurfaceSpelling(name) : name);
     }
@@ -3420,14 +3385,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (!_inInterpolation && node.Target is ArrayAccessNode or MultiDimArrayAccessNode)
         {
             var element = AcceptInConditionalRegion(node.Target);
-            return $"({element}).{(node.FieldName.StartsWith('@') ? node.FieldName[1..] : node.FieldName)}";
+            return $"({element}).{EscapeCalorIdentifier(node.FieldName)}";
         }
         // `new T[,] { … }.Length` in place: the inline creation ends at its closer.
         if (!_inInterpolation && node.Target is ArrayCreationNode { Initializer.Count: > 0 }
                 or MultiDimArrayCreationNode { Initializer.Count: > 0 })
         {
             var creation = AcceptInConditionalRegion(node.Target);
-            return $"{creation}.{(node.FieldName.StartsWith('@') ? node.FieldName[1..] : node.FieldName)}";
+            return $"{creation}.{EscapeCalorIdentifier(node.FieldName)}";
         }
 
         var conditional = IsConditionalCallTarget(node.Target);
@@ -3442,7 +3407,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // would copy the value-type step and lose by-reference and store identity.
         else if (!conditional && ContainsSectionMarker(target) && _memberBodyDepth > 0 && !IsElementFieldPath(node.Target))
             target = HoistToTempVar(target);
-        var fieldName = node.FieldName.StartsWith('@') ? node.FieldName[1..] : node.FieldName;
+        var fieldName = EscapeCalorIdentifier(node.FieldName);
         return $"{target}.{fieldName}";
     }
 
@@ -3565,6 +3530,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var target = NormalizeCallTarget(node.Target);
         if (target.IndexOfAny(['(', ')', '[', ']']) >= 0)
             throw new InvalidOperationException("A computed call requires an expression-valued callee.");
+        if (!target.Contains('.'))
+            target = EscapeCalorIdentifier(target);
+        else
+        {
+            var separator = target.LastIndexOf('.');
+            target = target[..(separator + 1)] + EscapeCalorIdentifier(target[(separator + 1)..]);
+        }
         var arguments = node.Arguments.Select((argument, index) =>
         {
             var name = node.ArgumentNames?.ElementAtOrDefault(index);
@@ -3578,12 +3550,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ThisExpressionNode node)
     {
-        return "§THIS";
+        return "this";
     }
 
     public string Visit(BaseExpressionNode node)
     {
-        return "§BASE";
+        return "base";
     }
 
     /// <summary>
@@ -3738,29 +3710,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ArrayCreationNode node)
     {
-        var elementType = TypeMapper.ToSurfaceType(node.ElementType);
-
-        if (node.Initializer.Count > 0)
-        {
-            // Return inline format so this works in expression context (return, call args, etc.)
-            // Multi-line format is handled by EmitArrayCreationWithName for bind-statement context.
-            // Visit elements in inline-sibling context so that nested zero-arg
-            // calls keep explicit §/C (otherwise `§ARR{...} §C{A} §C{B}` would
-            // parse as ONE element `A(B())` instead of TWO `A(), B()`).
-            var elements = string.Join(" ", RenderInPlace(node.Initializer));
-            return $"§ARR{{{elementType}}} {elements} §/ARR";
-        }
-        else if (node.Size != null)
-        {
-            var size = EmitSizeAttribute(node.Size);
-            // A sized element cannot consume its parent's closer.
-            return $"§ARR{{{elementType}:{size}}} §/ARR";
-        }
-        else
-        {
-            // Empty array — use Array.Empty<T>() to avoid nested array parsing issues
-            return $"§C{{Array.Empty<{elementType}>}} §/C";
-        }
+        var (elementType, elementRanks) = CodeGen.CSharpEmitter.SplitArrayRanks(
+            TypeMapper.ToSurfaceType(node.ElementType));
+        var size = node.Size is null ? "" : AcceptInConditionalRegion(node.Size);
+        var initializer = node.Size is null || node.Initializer.Count > 0
+            ? $" {{ {string.Join(", ", RenderInPlace(node.Initializer))} }}" : "";
+        return $"new {elementType}[{size}]{elementRanks}{initializer}";
     }
 
     public string Visit(ArrayAccessNode node)
@@ -3786,11 +3741,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var parameters = string.Join(", ", node.Parameters.Select(parameter =>
             (parameter.TypeName is null ? "" : $"{TypeMapper.ToSurfaceType(parameter.TypeName)}:")
             + EscapeCalorIdentifier(parameter.Name)));
-        var head = (node.IsStatic ? "static " : "") + $"({parameters}) => ";
+        var head = (node.IsStatic ? "static " : "") + (node.IsAsync ? "async " : "") + $"({parameters}) =>";
         if (node.ExpressionBody is not null)
-            return head + AcceptInConditionalRegion(node.ExpressionBody);
+            return head + " " + AcceptInConditionalRegion(node.ExpressionBody);
         var statements = CaptureLambdaStatements(node, inlineSibling: false);
-        return head + "{\n" + string.Join("\n", statements.Select(statement => "  " + statement)) + "\n}";
+        return head + "\n" + string.Join("\n", statements.Select(statement =>
+            RawCSharpFrame.RewriteOutsideFrames(statement,
+                text => "  " + text.Replace("\n", "\n  ", StringComparison.Ordinal))));
     }
 
     private string EmitLegacyLambda(LambdaExpressionNode node)
@@ -4862,36 +4819,38 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // so a nested zero-arg antecedent without §/C would absorb the consequent.
         var ante = AcceptInInlineSibling(node.Antecedent);
         var cons = AcceptInInlineSibling(node.Consequent);
-        return $"(-> {ante} {cons})";
+        return $"(!({ante}) || {cons})";
     }
 
     // Native String Operations
 
     public string Visit(StringOperationNode node)
     {
-        var opName = node.Operation.ToCalorName();
-        var args = node.Arguments.Select(a =>
+        var arguments = node.Arguments.Select(AcceptInConditionalRegion).ToList();
+        var method = node.Operation switch
         {
-            // AcceptInInlineSibling: args in Lisp (op a b ...) form are space-separated,
-            // so a nested zero-arg call without §/C would absorb the next arg.
-            var val = AcceptInInlineSibling(a);
-            // Hoist values with section markers or unquoted commas (tuples)
-            if (ContainsSectionMarker(val))
-                val = HoistToTempVar(val);
-            else if (val.Contains(',') && !val.StartsWith("\""))
-                val = HoistToTempVar(val);
-            return val;
-        });
-        var argsStr = string.Join(" ", args);
-
-        // Append comparison mode keyword if present
-        if (node.ComparisonMode.HasValue)
-        {
-            var keyword = node.ComparisonMode.Value.ToKeyword();
-            return $"({opName} {argsStr} :{keyword})";
-        }
-
-        return $"({opName} {argsStr})";
+            StringOp.SubstringFrom => "Substring",
+            StringOp.ToUpper => "ToUpper",
+            StringOp.ToLower => "ToLower",
+            StringOp.RegexTest => "IsMatch",
+            StringOp.RegexMatch => "Match",
+            StringOp.RegexReplace => "Replace",
+            StringOp.RegexSplit => "Split",
+            _ => node.Operation.ToString()
+        };
+        var staticString = node.Operation is StringOp.Join or StringOp.Format or StringOp.Concat
+            or StringOp.IsNullOrEmpty or StringOp.IsNullOrWhiteSpace;
+        var regex = node.Operation is StringOp.RegexTest or StringOp.RegexMatch
+            or StringOp.RegexReplace or StringOp.RegexSplit;
+        var receiver = staticString ? "string"
+            : regex ? "System.Text.RegularExpressions.Regex" : $"({arguments[0]})";
+        if (!staticString && !regex)
+            arguments.RemoveAt(0);
+        if (node.Operation == StringOp.Length)
+            return $"{receiver}.Length";
+        if (node.ComparisonMode is { } comparison)
+            arguments.Add(comparison.ToCSharpName());
+        return $"{receiver}.{method}({string.Join(", ", arguments)})";
     }
 
     public string Visit(CharOperationNode node)
@@ -4900,20 +4859,29 @@ public sealed class CalorEmitter : IAstVisitor<string>
             && node.Arguments is [StringLiteralNode { Value.Length: 1 } literal])
             return Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(literal.Value[0], quote: true);
 
-        // AcceptInInlineSibling: args in Lisp (op a b) form are space-separated,
-        // so a nested zero-arg call without §/C would absorb the next arg.
-        var opName = node.Operation.ToCalorName();
-        var args = node.Arguments.Select(a => AcceptInInlineSibling(a));
-        return $"({opName} {string.Join(" ", args)})";
+        var arguments = node.Arguments.Select(AcceptInConditionalRegion).ToArray();
+        return node.Operation switch
+        {
+            CharOp.CharAt => $"({arguments[0]})[{arguments[1]}]",
+            CharOp.CharCode => $"((int){arguments[0]})",
+            CharOp.CharFromCode => $"((char){arguments[0]})",
+            CharOp.ToUpperChar => $"char.ToUpper({arguments[0]})",
+            CharOp.ToLowerChar => $"char.ToLower({arguments[0]})",
+            CharOp.IsLetter or CharOp.IsDigit or CharOp.IsWhiteSpace or CharOp.IsUpper or CharOp.IsLower
+                => $"char.{node.Operation}({string.Join(", ", arguments)})",
+            _ => throw new NotSupportedException($"Unsupported native char operation {node.Operation}.")
+        };
     }
 
     public string Visit(StringBuilderOperationNode node)
     {
-        // See CharOperationNode.
-        var opName = node.Operation.ToCalorName();
-        var args = node.Arguments.Select(a => AcceptInInlineSibling(a));
-        var argsStr = string.Join(" ", args);
-        return args.Any() ? $"({opName} {argsStr})" : $"({opName})";
+        var arguments = node.Arguments.Select(AcceptInConditionalRegion).ToList();
+        if (node.Operation == StringBuilderOp.New)
+            return $"new System.Text.StringBuilder({string.Join(", ", arguments)})";
+        var receiver = arguments[0];
+        arguments.RemoveAt(0);
+        return node.Operation == StringBuilderOp.Length ? $"({receiver}).Length"
+            : $"({receiver}).{node.Operation}({string.Join(", ", arguments)})";
     }
 
     public string Visit(TypeOperationNode node)
@@ -5335,42 +5303,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     public string Visit(MultiDimArrayCreationNode node)
-    {
-        var elementType = TypeMapper.ToSurfaceType(node.ElementType);
-
-        if (node.Initializer.Count > 0)
-        {
-            // #1132: inline, where the C# had it. The old block bound an undeclared name
-            // (CS0103/CS0201) and ran hoisted elements early, even in an unselected branch.
-            var dims = node.DimensionSizes.Count > 0
-                ? ":" + string.Join(":", node.DimensionSizes.Select(d => d.Accept(this)))
-                : "";
-            var rows = RenderMultiDimRows(node);
-            return $"§ARR2D{{{elementType}{dims}}} "
-                + string.Concat(rows.Select(row => $"§ROW {row} "))
-                + $"§/ARR2D";
-        }
-        else if (node.DimensionSizes.Count > 0)
-        {
-            var dims = string.Join(":", node.DimensionSizes.Select(EmitSizeAttribute));
-            return $"§ARR2D{{{elementType}:{dims}}} §/ARR2D";
-        }
-        else
-        {
-            var zeros = string.Join(":", Enumerable.Repeat("0", node.Rank));
-            return $"§ARR2D{{{elementType}:{zeros}}} §/ARR2D";
-        }
-    }
+        => CodeGen.CSharpEmitter.EmitMultiDimArrayCreation(node, AcceptInConditionalRegion,
+            TypeMapper.ToSurfaceType(node.ElementType));
 
     public string Visit(MultiDimArrayAccessNode node)
     {
-        var array = AcceptInInlineSibling(node.Array);
-        var indices = string.Join(" ", node.Indices.Select(i => AcceptInInlineSibling(i)));
-        // For 3D+ arrays, the parser can't distinguish index count from surrounding args.
-        // Encode dimension count in attributes: §IDX2D{3} for 3D access.
-        if (node.Indices.Count > 2)
-            return $"§IDX2D{{{node.Indices.Count}}} {array} {indices}";
-        return $"§IDX2D {array} {indices}";
+        var indices = string.Join(", ", node.Indices.Select(AcceptInConditionalRegion));
+        return $"{EmitPostfixOperand(node.Array)}[{indices}]";
     }
 
     // Dependent Types: Refinement Types and Proof Obligations
