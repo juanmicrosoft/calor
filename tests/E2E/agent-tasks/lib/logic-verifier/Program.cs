@@ -19,7 +19,7 @@ using Microsoft.Z3;
 
 try
 {
-    if (args is ["--check-native"])
+    if (args is ["--check-native"] or ["--check-benchmark-native-topology"])
     {
         using var context = new Context();
         using var solver = context.MkSolver();
@@ -27,6 +27,8 @@ try
         if (solver.Check() != Status.SATISFIABLE)
             throw new InvalidOperationException("Selected native Z3 prerequisite did not solve the control.");
         Console.WriteLine("Selected native Z3 prerequisite passed: SATISFIABLE.");
+        if (args[0] == "--check-benchmark-native-topology")
+            VerifyNativeBenchmarkTopologyGuards();
         return 0;
     }
     if (args.Length != 2)
@@ -4183,6 +4185,114 @@ static void VerifyNativeBenchmarkPrerequisite(string task, string workspace)
             ?? throw new InvalidOperationException("Native benchmark parser diagnostic prerequisite unavailable.", error);
         throw new InvalidOperationException($"Native benchmark source parse failed:\n{string.Join("\n", diagnostics)}", error.InnerException);
     }
+}
+
+static void VerifyNativeBenchmarkTopologyGuards()
+{
+    const string source = """
+        module GuardOwner GuardOwner
+          func First (int:value) → int
+            return (value)
+          func Second (int:value) → int
+            return (value)
+          func Local priv (int:value) → int
+            return (value)
+        """;
+    ModuleNode Parse(string text)
+    {
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(text, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        if (diagnostics.HasErrors)
+            throw new InvalidOperationException($"Native benchmark topology prerequisite refused: selected parser cannot supply the metadata fixture:\n{string.Join("\n", diagnostics)}");
+        if (module.Functions.Count != 3 || module.Functions[2].Visibility != Visibility.Private
+            || module.NamespaceScopes.Count != 1)
+            throw new InvalidOperationException("Native benchmark topology prerequisite refused: selected parser did not supply the required function/scope metadata.");
+        return module;
+    }
+    void Report(string name, bool accepted, ModuleNode module) =>
+        Console.WriteLine("Direct native topology guard (zero task credit): " + JsonSerializer.Serialize(new
+        {
+            Case = name, Accepted = accepted,
+            Scopes = module.NamespaceScopes.Select(scope => new
+            {
+                scope.Id, scope.Name, scope.FullName, scope.ParentScopeId, scope.IsFileScoped, Kind = scope.Kind.ToString()
+            }),
+            Functions = module.Functions.Select(function => new
+            {
+                function.Name, Visibility = function.Visibility.ToString(), function.NamespaceIdentity, function.NamespaceScopeId
+            })
+        }));
+    var valid = Parse(source);
+    var targets = NativeBenchmarkTargets([valid]);
+    if (!targets.Keys.Order(StringComparer.Ordinal).SequenceEqual(
+            new[] { "First", "GuardOwner.First", "GuardOwner.Second", "Second" })
+        || targets.Values.Any(target => target.ModuleName != "GuardOwner"
+            || target.NamespaceIdentity != "GuardOwner" || target.ModuleClassName != "GuardOwnerModule"))
+        throw new InvalidOperationException("Native benchmark topology guard changed the original cross-module target identities.");
+    Report("exact-named-file-scope", true, valid);
+    var rejected = 0;
+    void Reject(string name, ModuleNode module)
+    {
+        try
+        {
+            _ = NativeBenchmarkTargets([module]);
+        }
+        catch (InvalidOperationException error) when (error.Message == "Wrong native benchmark module namespace topology.")
+        {
+            rejected++;
+            Report(name, false, module);
+            return;
+        }
+        throw new InvalidOperationException($"Native benchmark topology guard accepted forbidden metadata: {name}.");
+    }
+    Reject("wrong-namespace", Parse(source.Replace("module GuardOwner GuardOwner", "module GuardOwner Other", StringComparison.Ordinal)));
+    Reject("global-scope", Parse(source.Replace("module GuardOwner GuardOwner", "module GuardOwner", StringComparison.Ordinal)));
+    Reject("block-scope", Parse(source.Replace("module GuardOwner GuardOwner", "module GuardOwner GuardOwner block", StringComparison.Ordinal)));
+    // These are parser-backed metadata counterfactuals, not task inputs or persisted declaration-ID edits.
+    var additional = Parse(source);
+    var other = Parse(source.Replace("module GuardOwner GuardOwner", "module GuardOwner Other", StringComparison.Ordinal));
+    Reject("additional-scope-parser-records", additional.With(update =>
+        update.NamespaceScopes =
+        [
+            additional.NamespaceScopes[0],
+            other.NamespaceScopes[0] with { Id = other.NamespaceScopes[0].Id + "_additional" }
+        ]));
+    var ambiguous = Parse(source);
+    Reject("duplicate-scope-parser-records", ambiguous.With(update =>
+        update.NamespaceScopes = [ambiguous.NamespaceScopes[0], ambiguous.NamespaceScopes[0]]));
+    var nested = Parse(source);
+    var child = Parse(source.Replace("module GuardOwner GuardOwner", "module GuardOwner GuardOwner.Inner", StringComparison.Ordinal));
+    var childScope = child.NamespaceScopes[0] with
+    {
+        Id = child.NamespaceScopes[0].Id + "_nested", Name = "Inner",
+        ParentScopeId = nested.NamespaceScopes[0].Id, IsFileScoped = false
+    };
+    nested.Functions[1].NamespaceIdentity = childScope.FullName;
+    nested.Functions[1].NamespaceScopeId = childScope.Id;
+    Reject("nested-scope-parser-record-counterfactual", nested.With(update =>
+        update.NamespaceScopes = [nested.NamespaceScopes[0], childScope]));
+    var unmappedParent = Parse(source);
+    Reject("unmapped-parent-scope-metadata-counterfactual", unmappedParent.With(update =>
+        update.NamespaceScopes =
+        [
+            unmappedParent.NamespaceScopes[0] with { ParentScopeId = unmappedParent.NamespaceScopes[0].Id + "_parent" }
+        ]));
+    foreach (var name in new[] { "wrong-function-namespace", "unmapped-function-namespace", "wrong-function-scope", "unmapped-function-scope" })
+    {
+        var module = Parse(source);
+        var function = module.Functions[2];
+        switch (name)
+        {
+            case "wrong-function-namespace": function.NamespaceIdentity = "Other"; break;
+            case "unmapped-function-namespace": function.NamespaceIdentity = null; break;
+            case "wrong-function-scope": function.NamespaceScopeId = module.NamespaceScopes[0].Id + "_unmapped"; break;
+            default: function.NamespaceScopeId = null; break;
+        }
+        Reject(name, module);
+    }
+    if (rejected != 11)
+        throw new InvalidOperationException("Native benchmark topology guard unit census is incomplete.");
+    Console.WriteLine("Native benchmark topology guard checks passed: 12 parser-backed metadata cases (1 accepted, 11 rejected); 0 benchmark task/behavior credit.");
 }
 
 static Dictionary<string, CrossModuleFunctionTarget> NativeBenchmarkTargets(IEnumerable<ModuleNode> modules)

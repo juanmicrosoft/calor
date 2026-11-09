@@ -2506,6 +2506,27 @@ canonical-ID format rejection or replacement identity was involved.
 Default native validation stops at the first unavailable canonical positive,
 without running adversaries or claiming the unchanged required census passed.
 
+Direct topology guard coverage is separate from task admission:
+
+```bash
+CALOR_COMPILER_ROOT=/path/to/built-selected-source \
+  python3 tests/E2E/agent-tasks/test-refactoring-benchmark-verifiers.py \
+  BenchmarkTests.test_actual_native_namespace_topology_guards
+```
+
+This supervised, manifest/image-verified check parses the selected compiler's
+actual namespace and function metadata. It accepts the exact named file scope
+and rejects 11 wrong, global, block, additional, duplicate, nested, unmapped-parent
+or function-metadata cases. Additional/nested scope compositions and field
+mutations are explicit parser-backed AST counterfactuals, not claims that the
+parser accepts their source spelling. Function mismatch checks target a parsed
+private function, which must also match the module scope despite exclusion from
+the public cross-module target map. Unsupported parser metadata is an explicit
+prerequisite refusal, not finite rejection. These 12 direct cases have **zero
+benchmark task or behavior credit** and leave the task census unchanged. They
+use a 120-second helper bound; original task deadlines and the separate
+600-second archived cap do not change.
+
 The current suite requires **167 independent C# entrypoints**: 40 accepted
 canonical/equivalent edits and 127 substantive rejections. They compile the
 actual C# files directly with Roslyn and execute their own CLR methods; there

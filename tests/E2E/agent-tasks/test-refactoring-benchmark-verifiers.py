@@ -813,6 +813,34 @@ def run_native_compatibility(old, current, deadline):
 class BenchmarkTests(unittest.TestCase):
     native_control_root = ROOT
 
+    def test_actual_native_namespace_topology_guards(self):
+        before = dict(EXECUTED)
+        environment = dict(os.environ, CALOR_COMPILER_ROOT=str(self.native_control_root), CALOR_LOGIC_TIMEOUT_SECONDS="120")
+        try:
+            output = PROCESS.run([sys.executable, str(HERE / "lib/verify-logic.py"), "--check-benchmark-native-topology"],
+                                 HERE, time.monotonic() + 120, environment)
+        except RuntimeError as error:
+            failure = ADMISSION.control_failure(error)
+            if "Native benchmark topology prerequisite refused:" in failure:
+                print("Direct topology metadata prerequisite refused; 0 benchmark task/behavior credit.\n" + failure)
+            raise
+        ADMISSION.assert_selected_compiler(output, environment)
+        verdict = "Native benchmark topology guard checks passed: 12 parser-backed metadata cases (1 accepted, 11 rejected); 0 benchmark task/behavior credit."
+        self.assertEqual(output.count(verdict), 1, output)
+        self.assertEqual(output.count("Direct native topology guard (zero task credit): "), 12, output)
+        self.assertEqual(EXECUTED, before)
+        print(output, end="")
+
+    def test_mock_topology_prerequisite_failure_has_no_credit(self):
+        before = dict(EXECUTED)
+        failure = "Verifier command exited 1:\nVerification failed: Native benchmark topology prerequisite refused: missing parser metadata."
+        with patch.object(PROCESS, "run", side_effect=RuntimeError(failure)), patch("builtins.print") as report:
+            with self.assertRaisesRegex(RuntimeError, "Native benchmark topology prerequisite refused:"):
+                self.test_actual_native_namespace_topology_guards()
+        report.assert_called_once()
+        self.assertIn("Direct topology metadata prerequisite refused; 0 benchmark task/behavior credit.", report.call_args.args[0])
+        self.assertEqual(EXECUTED, before)
+
     def test_actual_current_native_controls(self):
         before = dict(EXECUTED)
         expected = {"accepted": 0, "rejected": 0}

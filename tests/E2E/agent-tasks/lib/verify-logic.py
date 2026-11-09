@@ -96,8 +96,10 @@ def run(command, cwd, deadline, env=None):
 
 def main():
     native_only = sys.argv[1:] == ["--check-native"]
-    if not native_only and len(sys.argv) != 3:
-        raise RuntimeError("Usage: verify-logic.py FUNCTION WORKSPACE | --check-native")
+    topology_only = sys.argv[1:] == ["--check-benchmark-native-topology"]
+    direct_check = native_only or topology_only
+    if not direct_check and len(sys.argv) != 3:
+        raise RuntimeError("Usage: verify-logic.py FUNCTION WORKSPACE | --check-native | --check-benchmark-native-topology")
     helper = Path(__file__).resolve().parent
     selected_root = os.environ.get("CALOR_COMPILER_ROOT", str(helper.parents[3]))
     if not selected_root.strip():
@@ -113,7 +115,7 @@ def main():
     for dependency in ("calor.dll", "Calor.Runtime.dll", "Microsoft.Z3.dll", native):
         if not (compiler / dependency).is_file():
             raise RuntimeError(f"Selected compiler dependency missing: {compiler / dependency}; build the selected root first.")
-    benchmark = not native_only and sys.argv[1].startswith("bench-")
+    benchmark = not direct_check and sys.argv[1].startswith("bench-")
     filename = ("Domain.calr" if sys.argv[1] in ("oop001", "oop002", "oop003", "oop004", "oop005", "oop006", "async004", "lam003", "lam004") else
                 "AsyncOps.calr" if sys.argv[1] in ("async001", "async002", "async003") else
                 "Generic.calr" if sys.argv[1] in ("gen001", "gen002", "gen003") else
@@ -125,7 +127,7 @@ def main():
                 "Collections.calr" if sys.argv[1] in ("PrintDictionary", "coll001", "coll002", "coll003", "coll004", "coll005", "coll006") else "Effects.calr"
                 if sys.argv[1] in ("PrintNumbers", "Countdown", "DoWhileDemo", "PrintEvenNumbers",
                                     "eff001", "eff002", "eff003", "eff004", "eff005", "eff006", "ref002") else "Calculator.calr")
-    source = None if native_only else Path(sys.argv[2]).resolve()
+    source = None if direct_check else Path(sys.argv[2]).resolve()
     if source is not None and not benchmark:
         source /= filename
     if source is not None and not (source.is_dir() if benchmark else source.is_file()):
@@ -141,9 +143,9 @@ def main():
     if not 0 < timeout <= maximum_timeout:
         raise RuntimeError(f"CALOR_LOGIC_TIMEOUT_SECONDS must be in (0, {maximum_timeout}].")
     deadline = time.monotonic() + timeout
-    advanced = not native_only and sys.argv[1] in ("ac001", "ac002", "ac003", "ac004", "ac005",
+    advanced = not direct_check and sys.argv[1] in ("ac001", "ac002", "ac003", "ac004", "ac005",
                                                 "advanced001", "advanced002", "advanced003", "advanced004")
-    carrier = benchmark or advanced or not native_only and sys.argv[1] in (
+    carrier = topology_only or benchmark or advanced or not direct_check and sys.argv[1] in (
         "type001", "type002", "type003", "type004", "pm004", "pm005",
         "ref001", "ref002", "ref003", "ref004", "ref005", "ref006", "ref007", "ref008",
         "lam001", "lam002", "lam003", "lam004")
@@ -200,7 +202,7 @@ def main():
         print(f"Selected compiler: {compiler / 'calor.dll'}")
         output = run([
             "dotnet", str(project / "bin/Debug/net10.0/LogicVerifier.dll"),
-            *(["--check-native"] if native_only else [sys.argv[1], str(source)]),
+            *([sys.argv[1]] if direct_check else [sys.argv[1], str(source)]),
         ], project, deadline)
         if carrier:
             check_images(project / "bin/Debug/net10.0")
