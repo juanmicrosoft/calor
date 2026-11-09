@@ -11,22 +11,18 @@ namespace Calor.Semantics.Tests;
 public class ContractTests
 {
     /// <summary>
-    /// S9: Option.None behaves correctly.
+    /// Historical S9 compilation placeholder; does not exercise Option.None.
     /// </summary>
     [Fact]
     public void S9_OptionNone_BehavesCorrectly()
     {
-        // Test that None can be created and pattern matched
-        // For now, just verify a simple function compiles and runs
+        // Retain the original integer-returning fixture without claiming Option coverage.
         var source = @"
-§M{Test}
-  §F{getNone:pub}
-      §O{i32}
-      §R INT:0
+module Test Test
+  func getNone () → int
+    return 0
 ";
 
-        // For now, just verify compilation succeeds
-        // Full Option<T> support would require runtime integration
         var result = Program.Compile(source, "test.calr", new CompilationOptions
         {
             EnforceEffects = false
@@ -42,12 +38,10 @@ public class ContractTests
     public void S10_RequiresFails_ThrowsContractViolation()
     {
         var source = @"
-§M{Test}
-  §F{positiveOnly:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (> x INT:0)
-      §R x
+module Test Test
+  func positiveOnly (int:x) → int
+    requires x > 0
+    return x
 ";
 
         // With x = -1, precondition should fail
@@ -76,12 +70,10 @@ public class ContractTests
     public void Requires_Passes_WhenConditionTrue()
     {
         var source = @"
-§M{Test}
-  §F{positiveOnly:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (> x INT:0)
-      §R (* x INT:2)
+module Test Test
+  func positiveOnly (int:x) → int
+    requires x > 0
+    return x * 2
 ";
 
         // With x = 5, precondition should pass
@@ -98,13 +90,11 @@ public class ContractTests
     public void MultipleRequires_EvaluatedInOrder()
     {
         var source = @"
-§M{Test}
-  §F{bounded:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (> x INT:0)
-      §Q (< x INT:100)
-      §R x
+module Test Test
+  func bounded (int:x) → int
+    requires x > 0
+    requires x < 100
+    return x
 ";
 
         // x = 50 should pass both
@@ -132,12 +122,10 @@ public class ContractTests
         // This test uses simple REQUIRES without custom message
         // since message syntax may not be supported
         var source = @"
-§M{Test}
-  §F{withMessage:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (> x INT:0)
-      §R x
+module Test Test
+  func withMessage (int:x) → int
+    requires x > 0
+    return x
 ";
 
         var result = SemanticsTestHarness.Execute(source, "withMessage", new object[] { -1 });

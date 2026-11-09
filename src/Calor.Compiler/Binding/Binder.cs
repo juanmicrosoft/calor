@@ -2695,14 +2695,14 @@ public sealed class Binder
         }
         else
         {
-            // §B{name} with neither :type nor initializer: previously
+            // A binding with neither a type nor initializer previously
             // silently defaulted to INT (latent bug). Per RFC v0.6 bind
             // inference formalization §3.2, this is now Calor0250.
             // Fall back to "INT" so subsequent binding still produces a
             // usable symbol and we don't cascade NREs through the bound tree.
             _diagnostics.ReportError(bind.Span, DiagnosticCode.BindRequiresTypeOrInitializer,
                 $"Binding '{bind.Name}' has no type annotation and no initializer. " +
-                "Add either ':type' (e.g. '§B{" + bind.Name + ":i32}') " +
+                "Add either a type before the name (e.g. 'int:name') " +
                 "or an initializer expression so the binder can infer the type.");
             typeName = "INT";
         }

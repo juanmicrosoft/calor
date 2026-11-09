@@ -17,14 +17,12 @@ public class ScopingTests
     {
         // Inner scope can use outer variable in return
         var source = @"
-§M{Test}
-  §F{testAccess:pub}
-      §I{bool:cond}
-      §O{i32}
-      §B{x} INT:42
-      §IF cond
-          §R (+ x INT:1)
-      §R x
+module Test Test
+  func testAccess (bool:cond) → int
+    let x = 42
+    if cond
+      return x + 1
+    return x
 ";
 
         // When cond is true, returns x+1=43 (accessed x from outer scope in inner scope)
@@ -47,13 +45,11 @@ public class ScopingTests
         // Return statement inside if block should return from function
 
         var source = @"
-§M{Test}
-  §F{testReturn:pub}
-      §I{bool:condition}
-      §O{i32}
-      §IF condition
-          §R INT:42
-      §R INT:0
+module Test Test
+  func testReturn (bool:condition) → int
+    if condition
+      return 42
+    return 0
 ";
 
         // With condition=true, should return 42
@@ -75,17 +71,14 @@ public class ScopingTests
     {
         // Access variable from outer scope in deeply nested scope
         var source = @"
-§M{Test}
-  §F{testLookup:pub}
-      §I{bool:a}
-      §I{bool:b}
-      §O{i32}
-      §B{outer} INT:100
-      §IF a
-          §IF b
-              §R outer
-          §R (+ outer INT:10)
-      §R (+ outer INT:20)
+module Test Test
+  func testLookup (bool:a, bool:b) → int
+    let outer = 100
+    if a
+      if b
+        return outer
+      return outer + 10
+    return outer + 20
 ";
 
         // a=true, b=true: return outer (100)
@@ -111,13 +104,10 @@ public class ScopingTests
     public void Scope_FunctionParameters_Accessible()
     {
         var source = @"
-§M{Test}
-  §F{useParams:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §B{sum} (+ a b)
-      §R sum
+module Test Test
+  func useParams (int:a, int:b) → int
+    let sum = a + b
+    return sum
 ";
 
         var result = SemanticsTestHarness.Execute(source, "useParams", new object[] { 10, 20 });
@@ -132,12 +122,11 @@ public class ScopingTests
     public void Scope_VariableInitialization_InCNF()
     {
         var source = @"
-§M{Test}
-  §F{test:pub}
-      §O{i32}
-      §B{x} INT:5
-      §B{y} (* x INT:2)
-      §R y
+module Test Test
+  func test () → int
+    let x = 5
+    let y = x * 2
+    return y
 ";
 
         var cnf = SemanticsTestHarness.CompileToCnf(source);
@@ -157,13 +146,12 @@ public class ScopingTests
     public void Scope_SameLevel_DifferentNames()
     {
         var source = @"
-§M{Test}
-  §F{test:pub}
-      §O{i32}
-      §B{a} INT:1
-      §B{b} INT:2
-      §B{c} INT:3
-      §R (+ (+ a b) c)
+module Test Test
+  func test () → int
+    let a = 1
+    let b = 2
+    let c = 3
+    return (a + b) + c
 ";
 
         var result = SemanticsTestHarness.Execute(source, "test");
