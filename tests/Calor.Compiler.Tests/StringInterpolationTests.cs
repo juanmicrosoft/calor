@@ -136,6 +136,19 @@ public static class Formatting
         var output = compilationResult.GeneratedCode;
         Assert.Contains("$\"Hello, {name}!\"", output);
         Assert.Contains("$\"{a} + {b} = {unchecked(a + b)}\"", output);
+        const string probe = """
+
+            public static class Probe
+            {
+                public static string Run() =>
+                    Formatting.Greet("Calor") + "|" +
+                    Formatting.Format(int.MaxValue, 1) + "|" +
+                    Formatting.Format(-2, 3);
+            }
+            """;
+        const string expected = "Hello, Calor!|2147483647 + 1 = -2147483648|-2 + 3 = 1";
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(csharp + probe));
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(output + probe));
     }
 
     [Fact]
@@ -160,6 +173,17 @@ public static class MultiLine
             new CompilationOptions { EnforceEffects = false });
         Assert.False(compilationResult.HasErrors,
             $"Roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+        const string probe = """
+
+            public static class Probe
+            {
+                public static string Run() =>
+                    MultiLine.Format("quote \" and ${0}", "first\nsecond\\third");
+            }
+            """;
+        const string expected = "Title: quote \" and ${0}\nBody: first\nsecond\\third";
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(csharp + probe));
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(compilationResult.GeneratedCode + probe));
     }
 
     [Fact]
@@ -183,5 +207,19 @@ public static class NumberFormat
             new CompilationOptions { EnforceEffects = false });
         Assert.False(compilationResult.HasErrors,
             $"Roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+        const string probe = """
+
+            public static class Probe
+            {
+                public static string Run() =>
+                    NumberFormat.FormatNumber(1.25) + "|" +
+                    NumberFormat.FormatNumber(-2.5) + "|" +
+                    NumberFormat.FormatNumber(double.NaN) + "|" +
+                    NumberFormat.FormatNumber(double.PositiveInfinity);
+            }
+            """;
+        var expected = InteropScope.RefOutImplementationTests.Run(csharp + probe);
+        Assert.StartsWith("Value: ", expected);
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(compilationResult.GeneratedCode + probe));
     }
 }
