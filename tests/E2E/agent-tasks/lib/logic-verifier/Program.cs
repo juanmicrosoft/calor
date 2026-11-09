@@ -41,6 +41,11 @@ static void Verify(string profile, string path)
     // Every profile validates the selected native prerequisite, even when it
     // needs no contract proof. A corrupt/mismatched asset must not go unused.
     using var nativePrerequisite = new Context();
+    if (profile is "pm004" or "pm005")
+    {
+        VerifyCarrierPatterns(profile, path);
+        return;
+    }
     if (profile is "pm001" or "pm002" or "pm003" or "pm006")
     {
         VerifyScalarPatterns(profile, path);
@@ -1821,6 +1826,261 @@ static void VerifyAsync(string profile, string path)
     }
     Console.WriteLine($"Verification passed: {name}; exact native/CLR async signatures, {executed} controlled cases and same-task await coupling.");
     Console.WriteLine("Limits: finite representable values and controlled completed/pending/faulted tasks; no scheduling/delay or universal body proof. No real network; auxiliary bodies and constructors are not executed.");
+}
+
+static void VerifyCarrierPatterns(string profile, string path)
+{
+    var option = profile == "pm004";
+    var name = option ? "UnwrapOrDefault" : "HandleResult";
+    var carrierName = option ? "Option" : "Result";
+    var compiled = Calor.Compiler.Program.Compile(File.ReadAllText(path), path,
+        new Calor.Compiler.CompilationOptions { ContractMode = ContractMode.Debug });
+    if (compiled.HasErrors || compiled.Ast == null)
+        throw new InvalidOperationException($"Calor compilation failed:\n{string.Join("\n", compiled.Diagnostics)}");
+    var module = compiled.Ast;
+    RejectRawInterop(module, "carrier pattern behavior");
+    var functions = module.Functions.Where(candidate => candidate.Name == name).ToArray();
+    if (functions.Length != 1)
+        throw new InvalidOperationException($"Expected exactly one native {name} function.");
+    var function = functions[0];
+    var parameterType = function.Parameters.Count == 0 ? null
+        : SyntaxFactory.ParseTypeName(function.Parameters[0].TypeName);
+    var generic = parameterType switch
+    {
+        GenericNameSyntax simple => simple,
+        QualifiedNameSyntax { Right: GenericNameSyntax simple } qualified
+            when qualified.Left.ToString() == module.Name => simple,
+        _ => null
+    };
+    if (function.Visibility != Visibility.Public || function.IsAsync || function.TypeParameters.Count != 0
+        || function.Output == null || AttributeHelper.ExpandType(function.Output.TypeName) != "INT"
+        || function.Parameters.Count != (option ? 2 : 1)
+        || !function.Parameters.Select(parameter => parameter.Name)
+            .SequenceEqual(option ? new[] { "opt", "defaultVal" } : new[] { "res" })
+        || function.Parameters.Any(parameter => parameter.Modifier != Calor.Compiler.Ast.ParameterModifier.None)
+        || option && AttributeHelper.ExpandType(function.Parameters[1].TypeName) != "INT"
+        || generic == null || generic.Identifier.ValueText != carrierName
+        || !generic.TypeArgumentList.Arguments.Select(argument => AttributeHelper.ExpandType(argument.ToString()))
+            .SequenceEqual(option ? new[] { "INT" } : new[] { "INT", "STRING" }))
+        throw new InvalidOperationException($"Wrong native public carrier matching signature for {name}.");
+    var native = module.Classes.Where(candidate => candidate.Name == carrierName).ToArray();
+    if (native.Length != 1 || native[0].Visibility != Visibility.Public || native[0].IsStatic
+        || native[0].TypeParameters.Count != (option ? 1 : 2))
+        throw new InvalidOperationException("Missing exact native public generic input carrier.");
+
+    IEnumerable<AstNode> Nodes(AstNode node)
+    {
+        yield return node;
+        foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+            foreach (var descendant in Nodes(child))
+                yield return descendant;
+    }
+    var aliases = new HashSet<string>(StringComparer.Ordinal) { function.Parameters[0].Name };
+    foreach (var binding in function.Body.OfType<BindStatementNode>())
+        if (!binding.IsMutable && binding.Initializer is ReferenceNode reference && aliases.Contains(reference.Name))
+            aliases.Add(binding.Name);
+    var matches = Nodes(function).OfType<MatchExpressionNode>()
+        .Where(match => match.Target is ReferenceNode reference && aliases.Contains(reference.Name)).ToArray();
+    if (matches.Length == 0)
+        throw new InvalidOperationException("Required native carrier-input switch expression missing.");
+
+    var values = new[] { int.MinValue, int.MinValue + 1, -65536, -100, -17, -2, -1, 0, 1, 2, 17,
+        100, 65536, int.MaxValue - 1, int.MaxValue };
+    var defaults = option ? new[] { int.MinValue, -101, -1, 0, 1, 73, int.MaxValue } : new[] { 0 };
+    var errors = option ? new[] { "" } : new[] { "", "failure", "other payload" };
+    var inputs = (from positive in new[] { true, false }
+                  from value in values
+                  from fallback in defaults
+                  from error in errors
+                  select (Positive: positive, Value: value, Default: fallback, Error: error)).ToArray();
+    int Expected((bool Positive, int Value, int Default, string Error) input)
+        => input.Positive ? input.Value : option ? input.Default : -1;
+    (MethodInfo Method, CarrierPatternInput Carrier) Target(Assembly assembly)
+    {
+        var definition = assembly.GetType($"{module.Name}.{carrierName}`{(option ? 1 : 2)}")
+            ?? throw new InvalidOperationException("Missing actual native CLR carrier identity.");
+        if (!definition.IsPublic || !definition.IsClass || definition.IsAbstract
+            || definition.Assembly != assembly || !definition.IsGenericTypeDefinition)
+            throw new InvalidOperationException("Wrong reflected generic input carrier identity.");
+        var closed = definition.MakeGenericType(option ? new[] { typeof(int) } : new[] { typeof(int), typeof(string) });
+        var owner = assembly.GetType($"{module.Name}.{module.Name}Module")
+            ?? throw new InvalidOperationException("Missing native carrier pattern module.");
+        var methods = owner.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
+            | BindingFlags.Instance | BindingFlags.DeclaredOnly).Where(method => method.Name == name).ToArray();
+        if (!owner.IsPublic || methods.Length != 1 || !methods[0].IsPublic || !methods[0].IsStatic
+            || methods[0].IsGenericMethod || methods[0].ReturnType != typeof(int)
+            || !methods[0].GetParameters().Select(parameter => parameter.ParameterType)
+                .SequenceEqual(option ? new[] { closed, typeof(int) } : new[] { closed }))
+            throw new InvalidOperationException("Wrong reflected exact closed CLR carrier matching signature.");
+        return (methods[0], new CarrierPatternInput(closed, option));
+    }
+    int Invoke((MethodInfo Method, CarrierPatternInput Carrier) target,
+        (bool Positive, int Value, int Default, string Error) input)
+    {
+        var saved = Console.Out;
+        using var output = new BoundedOutput();
+        try
+        {
+            Console.SetOut(output);
+            var instance = target.Carrier.Create(input.Positive, input.Value, input.Error);
+            var result = (int)(target.Method.Invoke(null, option ? new object[] { instance, input.Default } : new[] { instance })
+                ?? throw new InvalidOperationException("Null carrier pattern output."));
+            target.Carrier.Check(instance, input.Positive, input.Value, input.Error);
+            return result;
+        }
+        finally
+        {
+            Console.SetOut(saved);
+        }
+    }
+    void Behavior((MethodInfo Method, CarrierPatternInput Carrier) target)
+    {
+        foreach (var input in inputs)
+            if (Invoke(target, input) != Expected(input))
+                throw new InvalidOperationException($"Wrong carrier matching output for {name}: {input}.");
+    }
+    var previous = Console.Out;
+    using var capture = new BoundedOutput();
+    var counterfactuals = 0;
+    try
+    {
+        Console.SetOut(capture);
+        var (original, trees) = CompileRuntime(compiled.GeneratedCode, warningsAsErrors: true);
+        Behavior(Target(original));
+        var options = new CSharpParseOptions(LanguageVersion.Preview);
+        var debug = CSharpSyntaxTree.ParseText(
+            new CSharpEmitter(ContractMode.Debug) { LineDirectiveFilePath = path }.Emit(module), options);
+        if (!SyntaxFactory.AreEquivalent(debug.GetRoot(), trees[1].GetRoot()))
+            throw new InvalidOperationException("Mapped selected carrier pattern emission differs from compiled C#.");
+        var off = CSharpSyntaxTree.ParseText(
+            new CSharpEmitter(ContractMode.Off) { LineDirectiveFilePath = path }.Emit(module), options)
+            .GetCompilationUnitRoot();
+        Behavior(Target(CompileRuntime(off.ToFullString(), warningsAsErrors: true).Assembly));
+        var declaration = off.DescendantNodes().OfType<ClassDeclarationSyntax>()
+            .Single(type => type.Identifier.ValueText == module.Name + "Module")
+            .Members.OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == name);
+        var accepted = 0;
+        foreach (var match in matches)
+        {
+            bool CaseArm(MatchCaseNode arm)
+            {
+                if (Nodes(arm.Pattern).OfType<PropertyPatternNode>().Any(property =>
+                    property.Matches.Any(member => member.PropertyName == (option ? "IsSome" : "IsOk")
+                        || member.PropertyName == (option ? "IsNone" : "IsErr"))))
+                    return true;
+                var binding = arm.Pattern switch
+                {
+                    VarPatternNode variable => variable.Name,
+                    VariablePatternNode variable => variable.Name,
+                    TypePatternNode typed => typed.BindingName,
+                    _ => null
+                };
+                return binding != null && arm.Guard != null
+                    && Nodes(arm.Guard).OfType<ReferenceNode>().Any(reference =>
+                        reference.Name == $"{binding}.{(option ? "IsSome" : "IsOk")}"
+                        || reference.Name == $"{binding}.{(option ? "IsNone" : "IsErr")}");
+            }
+            if (!match.Cases.Any(CaseArm))
+                continue;
+            var emitted = declaration.DescendantNodes().OfType<SwitchExpressionSyntax>()
+                .Where(node => node.GetLocation().GetMappedLineSpan().Path == path
+                    && node.GetLocation().GetMappedLineSpan().StartLinePosition.Line + 1 == match.Span.Line).ToArray();
+            if (emitted.Length != 1 || emitted[0].Arms.Count != match.Cases.Count)
+                throw new InvalidOperationException("Ambiguous native/emitted carrier switch expression or arm count.");
+            var selected = emitted[0];
+            var probe = "CarrierPatternTrace_" + Guid.NewGuid().ToString("N");
+            var traced = selected.WithGoverningExpression(SyntaxFactory.ParseExpression(
+                    $"{probe}.Swap({selected.GoverningExpression.ToFullString()})"))
+                .WithArms(SyntaxFactory.SeparatedList(selected.Arms.Select((arm, index) => arm.WithExpression(
+                    SyntaxFactory.ParseExpression($"{probe}.Observe({index}, ({arm.Expression.ToFullString()}))")))));
+            var traceType = SyntaxFactory.ParseMemberDeclaration(
+                $"internal static class {probe} {{ public static int Arm = -1; public static int Value; "
+                + "public static bool Flip = false; public static object? Replacement = null; "
+                + "public static T Swap<T>(T original) => Replacement == null ? original : (T)Replacement; "
+                + "public static int Observe(int arm, int value) { Arm = arm; Value = value; return Flip ? ~value : value; } }")
+                ?? throw new InvalidOperationException("Carrier pattern trace declaration failed.");
+            var instrumented = off.ReplaceNode(selected, traced).AddMembers(traceType);
+            var assembly = CompileRuntime(instrumented.ToFullString(), warningsAsErrors: true).Assembly;
+            var target = Target(assembly);
+            var trace = assembly.GetType(probe) ?? throw new InvalidOperationException("Missing carrier trace identity.");
+            var armField = trace.GetField("Arm") ?? throw new InvalidOperationException("Missing carrier arm trace.");
+            var valueField = trace.GetField("Value") ?? throw new InvalidOperationException("Missing carrier payload trace.");
+            var flip = trace.GetField("Flip") ?? throw new InvalidOperationException("Missing carrier arm intervention.");
+            var replacement = trace.GetField("Replacement") ?? throw new InvalidOperationException("Missing carrier input intervention.");
+            var positiveArms = new HashSet<int>();
+            var negativeArms = new HashSet<int>();
+            var supplies = true;
+            foreach (var input in inputs)
+            {
+                armField.SetValue(null, -1);
+                if (Invoke(target, input) != Expected(input))
+                    throw new InvalidOperationException("Carrier pattern instrumentation changed baseline behavior.");
+                var arm = (int)armField.GetValue(null)!;
+                if (arm < 0 || arm >= match.Cases.Count || !Equals(valueField.GetValue(null), Expected(input)))
+                    supplies = false;
+                else
+                    (input.Positive ? positiveArms : negativeArms).Add(arm);
+            }
+            if (!supplies || positiveArms.Overlaps(negativeArms)
+                || !positiveArms.Concat(negativeArms).Any(index => CaseArm(match.Cases[index])))
+                continue;
+            var candidateCounterfactuals = 0;
+            var coupled = true;
+            flip.SetValue(null, true);
+            foreach (var input in inputs)
+            {
+                if (Invoke(target, input) != ~Expected(input))
+                    coupled = false;
+                candidateCounterfactuals++;
+            }
+            if (!coupled)
+                continue;
+            flip.SetValue(null, false);
+            // Replace only this native switch's governing carrier, not the
+            // caller argument. Captures must supply the new case and payload.
+            foreach (var input in inputs)
+            {
+                foreach (var changed in new[]
+                {
+                    (Positive: !input.Positive, input.Value, input.Default, input.Error),
+                    (input.Positive, Value: ~input.Value, input.Default, Error: input.Error + " changed"),
+                    (Positive: !input.Positive, Value: ~input.Value, input.Default, Error: input.Error + " changed")
+                })
+                {
+                    var changedCarrier = target.Carrier.Create(changed.Positive, changed.Value, changed.Error);
+                    replacement.SetValue(null, changedCarrier);
+                    if (Invoke(target, input) != Expected(changed))
+                        coupled = false;
+                    target.Carrier.Check(changedCarrier, changed.Positive, changed.Value, changed.Error);
+                    candidateCounterfactuals++;
+                }
+            }
+            replacement.SetValue(null, null);
+            if (option)
+                foreach (var input in inputs)
+                {
+                    var changed = (input.Positive, input.Value, Default: ~input.Default, input.Error);
+                    if (Invoke(target, changed) != Expected(changed))
+                        coupled = false;
+                    candidateCounterfactuals++;
+                }
+            if (!coupled)
+                continue;
+            counterfactuals = candidateCounterfactuals;
+            accepted++;
+            break;
+        }
+        if (accepted == 0)
+            throw new InvalidOperationException("Required native carrier case arms missing or do not supply the output.");
+    }
+    finally
+    {
+        Console.SetOut(previous);
+    }
+    Console.WriteLine($"Verification passed: {name}; native/reflected exact closed CLR input carrier; "
+        + $"{inputs.Length} independent runtime cases; {counterfactuals} successful complete-case arm/case/payload/default/input-output counterfactuals.");
+    Console.WriteLine("Limits: public parameterless writable named carrier APIs; every present active case/payload observation agrees; "
+        + "finite signed/boundary payload and default cases, not universal carrier/body/contract proof; optional contracts execute.");
 }
 
 static void VerifyStrings(string profile, string path)
@@ -4888,6 +5148,135 @@ static class EffectsTaskProbe
             }
         }
         """;
+}
+
+sealed class CarrierPatternInput
+{
+    private const BindingFlags Members = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
+        | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+    private readonly Type closed;
+    private readonly bool option;
+    private readonly MemberInfo[] tags;
+    private readonly MemberInfo[] values;
+    private readonly MemberInfo[] errors;
+    private readonly MemberInfo[] writableTags;
+    private readonly MemberInfo value;
+    private readonly MemberInfo? error;
+
+    public CarrierPatternInput(Type closed, bool option)
+    {
+        this.closed = closed;
+        this.option = option;
+        var definition = closed.GetGenericTypeDefinition();
+        var parameters = definition.GetGenericArguments();
+        MemberInfo? Member(string name, Type expected, bool accessor = false)
+        {
+            var members = closed.GetMember(name, Members);
+            if (members.Length == 0)
+                return null;
+            if (members.Length != 1)
+                throw new InvalidOperationException($"Ambiguous carrier member {name}.");
+            var generic = definition.GetMember(name, Members).Single();
+            var valid = (members[0], generic) switch
+            {
+                (FieldInfo field, FieldInfo open) when !accessor => field.IsPublic && !field.IsStatic
+                    && open.FieldType == expected,
+                (PropertyInfo property, PropertyInfo open) when !accessor
+                    => property.GetMethod is { IsPublic: true, IsStatic: false }
+                        && property.GetIndexParameters().Length == 0 && open.PropertyType == expected,
+                (MethodInfo method, MethodInfo open) when accessor => method.IsPublic && !method.IsStatic
+                    && !method.IsGenericMethod && method.GetParameters().Length == 0 && open.ReturnType == expected,
+                _ => false
+            };
+            if (!valid)
+                throw new InvalidOperationException($"Wrong carrier member shape/type: {name}.");
+            return members[0];
+        }
+        tags = new[] { Member(option ? "IsSome" : "IsOk", typeof(bool)),
+            Member(option ? "IsNone" : "IsErr", typeof(bool)) }.OfType<MemberInfo>().ToArray();
+        values = new[] { Member("Value", parameters[0]), Member("Unwrap", parameters[0], true) }
+            .OfType<MemberInfo>().ToArray();
+        errors = option ? [] : new[] { Member("Error", parameters[1]), Member("UnwrapErr", parameters[1], true) }
+            .OfType<MemberInfo>().ToArray();
+        if (tags.Length == 0 || values.Length == 0 || !option && errors.Length == 0)
+            throw new InvalidOperationException("Missing authoritative typed carrier case/payload APIs.");
+        static bool Writable(MemberInfo member) => member switch
+        {
+            FieldInfo field => !field.IsInitOnly && !field.IsLiteral,
+            PropertyInfo property => property.SetMethod is { IsPublic: true, IsStatic: false },
+            _ => false
+        };
+        writableTags = tags.Where(Writable).ToArray();
+        value = values.FirstOrDefault(Writable)
+            ?? throw new InvalidOperationException("Unmodeled carrier input: a public writable Value API is required.");
+        error = option ? null : errors.FirstOrDefault(Writable)
+            ?? throw new InvalidOperationException("Unmodeled carrier input: a public writable Error API is required.");
+        if (writableTags.Length == 0 || closed.GetConstructor(Type.EmptyTypes) == null)
+            throw new InvalidOperationException("Unmodeled carrier input: public parameterless construction and writable named case tag required.");
+    }
+
+    private static object? Read(MemberInfo member, object instance) => member switch
+    {
+        FieldInfo field => field.GetValue(instance),
+        PropertyInfo property => property.GetValue(instance),
+        MethodInfo accessor => accessor.Invoke(instance, null),
+        _ => throw new InvalidOperationException("Unsupported carrier observation.")
+    };
+
+    private static void Write(MemberInfo member, object instance, object payload)
+    {
+        switch (member)
+        {
+            case FieldInfo field: field.SetValue(instance, payload); break;
+            case PropertyInfo property: property.SetValue(instance, payload); break;
+            default: throw new InvalidOperationException("Unsupported carrier input API.");
+        }
+    }
+
+    public object Create(bool positive, int payload, string failure)
+    {
+        var saved = Console.Out;
+        using var output = new BoundedOutput();
+        try
+        {
+            Console.SetOut(output);
+            var instance = Activator.CreateInstance(closed)
+                ?? throw new InvalidOperationException("Null constructed native carrier.");
+            foreach (var tag in writableTags)
+                Write(tag, instance, tag.Name == (option ? "IsSome" : "IsOk") ? positive : !positive);
+            Write(value, instance, payload);
+            if (error != null)
+                Write(error, instance, failure);
+            Check(instance, positive, payload, failure);
+            return instance;
+        }
+        finally
+        {
+            Console.SetOut(saved);
+        }
+    }
+
+    public void Check(object instance, bool positive, int payload, string failure)
+    {
+        var saved = Console.Out;
+        using var output = new BoundedOutput();
+        try
+        {
+            Console.SetOut(output);
+            if (instance.GetType() != closed)
+                throw new InvalidOperationException("Wrong actual carrier input identity.");
+            foreach (var tag in tags)
+                if (!Equals(Read(tag, instance), tag.Name == (option ? "IsSome" : "IsOk") ? positive : !positive))
+                    throw new InvalidOperationException($"Contradictory carrier case observation: {tag.Name}.");
+            foreach (var observation in positive ? values : errors)
+                if (!Equals(Read(observation, instance), positive ? (object)payload : failure))
+                    throw new InvalidOperationException($"Contradictory active carrier payload observation: {observation.Name}.");
+        }
+        finally
+        {
+            Console.SetOut(saved);
+        }
+    }
 }
 
 sealed class WitnessRewriter(SyntaxAnnotation marker, string probe, bool neutralize) : CSharpSyntaxRewriter

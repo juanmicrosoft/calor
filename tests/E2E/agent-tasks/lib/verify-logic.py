@@ -94,7 +94,7 @@ def main():
     if not 0 < timeout <= 120:
         raise RuntimeError("CALOR_LOGIC_TIMEOUT_SECONDS must be in (0, 120].")
     deadline = time.monotonic() + timeout
-    carrier = not native_only and sys.argv[1] in ("type001", "type002", "type003", "type004")
+    carrier = not native_only and sys.argv[1] in ("type001", "type002", "type003", "type004", "pm004", "pm005")
     images = {}
     manifest_digest = None
     if carrier:

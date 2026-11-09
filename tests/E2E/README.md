@@ -1704,3 +1704,83 @@ task definitions, original fixtures, TestData, active `.calr` subjects, corpus
 membership, historical inputs/ledgers/floors, versions and workflows remain
 byte-unchanged. It does not claim all 129 prerequisites, agent or milestone
 acceptance, or release readiness.
+
+### Original carrier matching tasks (pm-004 and pm-005)
+
+`UnwrapOrDefault(Option<int> opt, int defaultVal)` and
+`HandleResult(Result<int,string> res)` now use behavioral prerequisites, not
+grep checks for retired constructor tokens. Both require the original public
+integer-returning signatures and a native **carrier-input switch expression**.
+A switch over a boolean tag alone cannot satisfy these prompts.
+
+The selected public AST must declare ordinary public generic `Option<T>` or
+`Result<T,E>` classes. The selected emission is independently compiled with
+warnings as errors, and reflection checks exact closed CLR input identities,
+parameter order, public/static method identity and integer output. Inputs are
+real instances constructed through public parameterless constructors and public
+writable named case/payload fields or properties. Unknown construction APIs fail
+explicitly; this bounded model does not promise arbitrary third-party carriers.
+
+At least one complementary named tag (`IsSome`/`IsNone`, `IsOk`/`IsErr`) must
+exist. Every present tag must agree. Active typed `Value`/`Unwrap` observations
+must agree for positive cases; `Error`/`UnwrapErr` observations must agree for
+error cases. Payload members must use the actual generic type parameters, not
+fixed-width stand-ins. Unrelated flags such as `IsSuccess` are not guessed as
+case evidence. Observations run before and after calls, including interventions.
+
+Native type-capture/guard patterns and combined type/property patterns work on
+both real compiler arms. Positive controls include scalar aliases, complementary
+tags, all active observations, immutable input/result bindings, an unused match
+beside a genuinely supplying match, and namespace-qualified factory return
+annotations with inferred allocations. Bare nested property payload capture
+(`§PPROP §PMATCH{Value} §VAR{v}` with arm result `v`) currently fails with
+`Calor0200 Undefined variable 'v'`. These prerequisites use the supported native
+forms; no parser, binder or retired carrier runtime is restored.
+
+Each Option positive checks **210** independent runtime cases and **1,050**
+successful counterfactuals. Each Result positive checks **90** runtime cases and
+**360** counterfactuals. Payloads cover 15 signed/boundary integers; defaults
+cover seven integers and errors cover three distinct strings. Debug contracts
+execute on every original input; contract-disabled emission must preserve those
+outputs before intervention. This is finite evidence, not a universal body or
+carrier-contract proof; null carriers and unsampled bodies are not modeled.
+
+Source-mapped selected emission identifies the actual native switch and its
+arms. Traces must show distinct positive/negative arm selections and the
+independently expected output. Complementing each supplying arm's result must
+complement the function output. Replacing only that switch's governing carrier
+must produce independently predicted outputs when its case, payload/error or
+both change. Option defaults are also complemented independently across the
+complete case set. Dead witnesses, captures replaced by reads from the original
+caller argument, ignored switches and guessed outputs cannot pass.
+
+```bash
+CALOR_COMPILER_CONFIGURATION=Release python3 tests/E2E/agent-tasks/test-carrier-pattern-verifiers.py
+CALOR_COMPILER_CONFIGURATION=Release python3 tests/E2E/agent-tasks/test-logic-old-release.py --carrier-patterns
+```
+
+The current suite requires **71 actual behavioral entrypoints** (**24 accepted,
+47 rejected**), six actual selected-root/configuration/native infrastructure
+guards, one explicitly declared timeout, and two actual helper-build image
+substitution controls. Finite negatives require exited verifier failures with
+declared behavioral diagnostics. Direct or wrapped timeout, EOF, cleanup, build,
+native-loading and unknown failures propagate; they never count as behavioral
+rejections.
+
+The additive `--carrier-patterns` mode executes **97 actual entrypoints**
+(**48 accepted, 49 rejected**). All positive forms run for both signatures;
+shared adversarial categories alternate signatures in the identical
+representative matrix on each arm. It archives unchanged v0.29 commit
+`d82f3ae95175ecd09581c6922701706be72b0ca9`, verifies its own native manifest,
+locked-restores only from the local package cache and builds its own source.
+Historical IDs occur only in disposable old inputs; current rejection of those
+IDs is mandatory. Each positive checks the exact selected root/configuration/
+`calor.dll` path. Missing cached dependencies fail without a network fallback.
+
+The shared selected-image checks retain their top-level/`runtimes/` copy scope,
+excluding unrelated publish artifacts. Native `Context` loading, per-process/
+entry/EOF cleanup deadlines of **120 seconds**, the old-run **600-second total**
+deadline and **4,096-character** per-invocation/observation output bounds remain.
+All 56 accepted prior profiles, all 65,536 SumToN probes and their output-only/
+successful-counterfactual checks are unchanged. These two prerequisites are not
+full milestone, agent-task-set, publication or release acceptance.
