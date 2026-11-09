@@ -490,6 +490,34 @@ public class KInductionTests
 
     #region K-Induction Prover Tests (Z3 Required)
 
+    [Fact]
+    public void NativeLoopModes_DoNotShareSnapshotInvariantProofs()
+    {
+        Assert.True(Z3ContextFactory.IsAvailable, "this witness needs Z3");
+        var function = GetFunction("""
+            module NativeProofs
+              func Probe public () → int
+                for i from 0 to 10 step 1
+                  let int:copy = i
+                for j = 0; j <= 10; j = j + 1
+                  let int:copy = j
+                return 0
+            """, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var loops = function.Body.OfType<BoundForStatement>().ToArray();
+        Assert.Equal(2, loops.Length);
+        using var prover = new KInductionProver(new KInductionOptions());
+        Assert.Equal(KInductionStatus.Proven,
+            prover.ProveInvariant(loops[0], "i <= 11", function).Status);
+        Assert.Equal(KInductionStatus.Unsupported,
+            prover.ProveInvariant(loops[1], "j <= 11", function).Status);
+        using var synthesizer = new LoopInvariantSynthesizer(new KInductionOptions());
+        var synthesis = synthesizer.SynthesizeForLoop(loops[1], function);
+        Assert.False(synthesis.Success);
+        Assert.Null(synthesis.ProofResult);
+        Assert.Contains("re-evaluated", synthesis.Message);
+    }
+
     [SkippableFact]
     public void KInductionProver_SimpleInvariant_Verifies()
     {

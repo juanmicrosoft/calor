@@ -2588,7 +2588,12 @@ public sealed class Parser
         // a catchable exception rather than a process abort.
         System.Runtime.CompilerServices.RuntimeHelpers.EnsureSufficientExecutionStack();
 
-        if (Check(TokenKind.Call))
+        if (Check(TokenKind.Identifier) && Peek(1).Kind == TokenKind.Colon
+            && Peek(1).Span.Line == Current.Span.Line)
+        {
+            return ParseLabelStatement();
+        }
+        else if (Check(TokenKind.Call))
         {
             if (Peek(1).Kind is not (TokenKind.OpenBrace or TokenKind.OpenBracket))
             {
@@ -2678,17 +2683,9 @@ public sealed class Parser
         {
             return ParseGotoStatement();
         }
-        else if (Check(TokenKind.Label))
-        {
-            return ParseLabelStatement();
-        }
         else if (Check(TokenKind.Yield))
         {
             return ParseYieldReturnStatement();
-        }
-        else if (Check(TokenKind.YieldBreak))
-        {
-            return ParseYieldBreakStatement();
         }
         // Print aliases
         else if (Check(TokenKind.Print))
@@ -5989,16 +5986,21 @@ public sealed class Parser
             return new WildcardPatternNode(braceStart.Span);
         }
 
-        // Handle §VAR{name} pattern
         if (Check(TokenKind.Var))
         {
-            var varToken = Expect(TokenKind.Var);
-            var attrs = ParseAttributes();
-            var name = attrs["_pos0"] ?? attrs["name"] ?? "_";
+            var varToken = Advance();
+            var name = Expect(TokenKind.Identifier);
             return new VarPatternNode(
-                varToken.Span,
-                name,
-                GetIdentifierSpan(attrs, "_pos0", name));
+                varToken.Span.Union(name.Span),
+                TokenIdentifier(name),
+                name.Span);
+        }
+
+        if (Current.Kind is TokenKind.GreaterEqual or TokenKind.LessEqual or TokenKind.Greater or TokenKind.Less)
+        {
+            var operation = Advance();
+            var operand = ParseExpression(allowSpacedCall: false);
+            return new RelationalPatternNode(operation.Span.Union(operand.Span), operation.Text, operand);
         }
 
         // Handle §PREL{op} value pattern (relational pattern)
@@ -6022,36 +6024,9 @@ public sealed class Parser
             return new RelationalPatternNode(relToken.Span.Union(operand.Span), op, operand);
         }
 
-        // Handle relational patterns: gte, lte, gt, lt followed by a value (legacy syntax)
         if (Check(TokenKind.Identifier))
         {
             var token = Current;
-            var op = token.Text switch
-            {
-                "gte" => ">=",
-                "lte" => "<=",
-                "gt" => ">",
-                "lt" => "<",
-                _ => null
-            };
-
-            if (op != null)
-            {
-                Advance(); // consume the operator keyword
-                var operand = ParseExpression(allowSpacedCall: false);
-                return new RelationalPatternNode(token.Span.Union(operand.Span), op, operand);
-            }
-
-            // Handle var pattern: var name (legacy syntax)
-            if (token.Text == "var" && Peek(1).Kind == TokenKind.Identifier)
-            {
-                Advance(); // consume 'var'
-                var nameToken = Advance(); // consume name
-                return new VarPatternNode(
-                    token.Span.Union(nameToken.Span),
-                    nameToken.Text,
-                    nameToken.Span);
-            }
 
             // Handle null pattern
             if (token.Text == "null")
@@ -6317,7 +6292,7 @@ public sealed class Parser
         return new ForStatementNode(
             startToken.Span.Union(endToken.Span),
             id,
-            variable.Text,
+            TokenIdentifier(variable),
             from,
             to,
             step,
@@ -6622,7 +6597,7 @@ public sealed class Parser
                 var edits = new List<TextEdit>
                 {
                     TextEdit.Replace(file, elseToken.Span.Line, elseToken.Span.Column,
-                        elseToken.Span.Line + 1, 1, "")
+                        elseToken.Span.Line, elseToken.Span.Column + elseToken.Span.Length, "")
                 };
                 var firstIf = _tokens.First(token => token.Kind == TokenKind.If
                     && token.Span.Start >= nested.Span.Start);
@@ -8497,12 +8472,12 @@ public sealed class Parser
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndForeach, bodyOwner);
         var span = startToken.Span.Union(endToken.Span);
         if (secondVariable is { } value)
-            return new DictionaryForeachNode(span, id, variable.Text, value.Text, collection, body, attrs,
+            return new DictionaryForeachNode(span, id, TokenIdentifier(variable), TokenIdentifier(value), collection, body, attrs,
                 variable.Span, value.Span);
         return new ForeachStatementNode(
             span,
             id,
-            variable.Text,
+            TokenIdentifier(variable),
             variableType,
             collection,
             body,
@@ -12592,55 +12567,42 @@ public sealed class Parser
     }
 
     /// <summary>
-    /// Parses a goto statement.
-    /// §GOTO{labelName}       -- goto label;
-    /// §GOTO{CASE:expression} -- goto case expression;
-    /// §GOTO{DEFAULT}         -- goto default;
+    /// Parses a label jump or a switch case/default jump.
     /// </summary>
     private GotoStatementNode ParseGotoStatement()
     {
         var token = Expect(TokenKind.Goto);
-        var label = token.Value as string ?? "";
-
-        if (label == "DEFAULT")
+        if (Current.Span.Line != token.Span.Line)
         {
-            return new GotoStatementNode(token.Span, "") { IsDefault = true };
+            _diagnostics.ReportError(token.Span, DiagnosticCode.ExpectedExpression,
+                "A goto requires a same-line label, 'case value', or 'default'.");
+            return new GotoStatementNode(token.Span, "");
         }
-
-        if (label.StartsWith("CASE:", StringComparison.Ordinal))
+        if (Match(TokenKind.Case))
         {
-            var caseValue = label.Substring(5);
-            var caseExpr = ParseGotoCaseValue(caseValue, token.Span);
-            return new GotoStatementNode(token.Span, "") { CaseLabel = caseExpr };
+            if (Current.Span.Line != token.Span.Line)
+            {
+                _diagnostics.ReportError(token.Span, DiagnosticCode.ExpectedExpression,
+                    "A goto case requires a same-line constant expression.");
+                return new GotoStatementNode(token.Span, "") { CaseLabel = new IntLiteralNode(token.Span, 0) };
+            }
+            var value = ParseExpression(allowSpacedCall: false);
+            return new GotoStatementNode(token.Span.Union(value.Span), "") { CaseLabel = value };
         }
-
-        return new GotoStatementNode(token.Span, label);
+        if (Current.Text == "default")
+            return new GotoStatementNode(token.Span.Union(Advance().Span), "") { IsDefault = true };
+        var label = Expect(TokenKind.Identifier);
+        return new GotoStatementNode(token.Span.Union(label.Span), TokenIdentifier(label));
     }
 
     /// <summary>
-    /// Parses the constant expression value from a §GOTO{CASE:value} token.
-    /// </summary>
-    private ExpressionNode ParseGotoCaseValue(string value, TextSpan span)
-    {
-        if (long.TryParse(value, System.Globalization.NumberStyles.Integer,
-                System.Globalization.CultureInfo.InvariantCulture, out var intVal))
-            return new IntLiteralNode(span, intVal);
-
-        if (value.Length >= 2 && value[0] == '"' && value[^1] == '"')
-            return new StringLiteralNode(span, value[1..^1]);
-
-        return new ReferenceNode(span, value);
-    }
-
-    /// <summary>
-    /// Parses a label statement.
-    /// §LABEL{labelName}
+    /// Parses a name followed by a colon.
     /// </summary>
     private LabelStatementNode ParseLabelStatement()
     {
-        var token = Expect(TokenKind.Label);
-        var label = token.Value as string ?? "";
-        return new LabelStatementNode(token.Span, label);
+        var token = Expect(TokenKind.Identifier);
+        var colon = Expect(TokenKind.Colon);
+        return new LabelStatementNode(token.Span.Union(colon.Span), TokenIdentifier(token));
     }
 
     /// <summary>
@@ -12705,44 +12667,33 @@ public sealed class Parser
 
     /// <summary>
     /// Parses a preprocessor conditional block.
-    /// §PP{CONDITION} ... §PPE ... §/PP{CONDITION}
+    /// Native pp condition / pp elif condition / pp else at the owner's indentation.
     /// </summary>
-    private PreprocessorDirectiveNode ParsePreprocessorDirective()
+    private PreprocessorDirectiveNode ParsePreprocessorDirective(bool continuation = false)
     {
         var startToken = Expect(TokenKind.Preprocessor);
-        var condition = startToken.Value as string ?? "";
-
+        var condition = ParseNativePreprocessorCondition(startToken, continuation);
         var body = new List<StatementNode>();
         List<StatementNode>? elseBody = null;
-
-        // #1485: an indent-form §PP owns only the lines indented under it.
         var ppOwner = BeginBlockBody(startToken, TokenKind.EndPreprocessor, null);
-        while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.PreprocessorElse) && !Check(TokenKind.Eof)
+        while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.Eof)
                && IsInBlockBody(ppOwner))
         {
             var stmt = ParseStatement();
             if (stmt != null) body.Add(stmt);
         }
 
-        // Phase 3 (indent-aware): consume the body's own Dedent before §PPE/§/PP
-        // so the chain continues even when the body lived at a deeper indent.
-        ConsumeOwnedDedentBeforeChain(ppOwner, TokenKind.PreprocessorElse, TokenKind.EndPreprocessor);
-
-        if (Check(TokenKind.PreprocessorElse) && ContinuesChain(ppOwner))
+        ConsumeOwnedDedentBeforeChain(ppOwner, TokenKind.Preprocessor, TokenKind.EndPreprocessor);
+        var endSpan = body.LastOrDefault()?.Span ?? startToken.Span;
+        if (condition.Length != 0 && IsNativePreprocessorContinuation(startToken))
         {
-            var elseToken = Advance();
-            elseBody = new List<StatementNode>();
-            ppOwner = BeginBlockBody(elseToken, TokenKind.EndPreprocessor, null);
-            while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.Eof) && IsInBlockBody(ppOwner))
-            {
-                var stmt = ParseStatement();
-                if (stmt != null) elseBody.Add(stmt);
-            }
-            ConsumeOwnedDedentBeforeChain(ppOwner, TokenKind.EndPreprocessor);
+            var branch = ParsePreprocessorDirective(continuation: true);
+            elseBody = branch.Condition.Length == 0 ? branch.Body.ToList() : [branch];
+            endSpan = branch.Span;
         }
-
-        ExpectOwnedBlockEnd(TokenKind.EndPreprocessor, ppOwner);
-        return new PreprocessorDirectiveNode(startToken.Span, condition, body, elseBody);
+        else
+            ExpectOwnedBlockEnd(TokenKind.EndPreprocessor, ppOwner);
+        return new PreprocessorDirectiveNode(startToken.Span.Union(endSpan), condition, body, elseBody);
     }
 
     /// <summary>
@@ -13189,21 +13140,22 @@ public sealed class Parser
     }
 
     /// <summary>
-    /// Parses a yield return statement.
-    /// §YIELD expression
+    /// Parses yield value or yield break without crossing a statement line.
     /// </summary>
-    private YieldReturnStatementNode ParseYieldReturnStatement()
+    private StatementNode ParseYieldReturnStatement()
     {
         var startToken = Expect(TokenKind.Yield);
 
-        ExpressionNode? expression = null;
-        if (IsExpressionStart())
+        if (Current.Span.Line == startToken.Span.Line && Match(TokenKind.Break))
+            return new YieldBreakStatementNode(startToken.Span.Union(PreviousToken.Span));
+        if (Current.Span.Line != startToken.Span.Line || !IsExpressionStart())
         {
-            expression = ParseExpression();
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.ExpectedExpression,
+                "Use 'yield value' or 'yield break' on one line.");
+            return new YieldReturnStatementNode(startToken.Span, null);
         }
-
-        var span = expression != null ? startToken.Span.Union(expression.Span) : startToken.Span;
-        return new YieldReturnStatementNode(span, expression);
+        var expression = ParseExpression();
+        return new YieldReturnStatementNode(startToken.Span.Union(expression.Span), expression);
     }
 
     /// <summary>

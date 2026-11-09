@@ -1977,34 +1977,29 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         else
         {
-            AppendLine($"goto {node.Label}");
+            AppendLine($"goto {EscapeCalorIdentifier(node.Label)}");
         }
         return "";
     }
 
     public string Visit(LabelStatementNode node)
     {
-        AppendLine($"label {node.Label}");
+        AppendLine($"{EscapeCalorIdentifier(node.Label)}:");
         return "";
     }
 
     public string Visit(YieldReturnStatementNode node)
     {
-        if (node.Expression != null)
-        {
-            var expr = node.Expression.Accept(this);
-            AppendLine($"§YIELD {expr}");
-        }
-        else
-        {
-            AppendLine("§YIELD");
-        }
+        if (node.Expression == null)
+            throw new InvalidOperationException("Use 'yield value' or 'yield break'; a valueless yield is invalid.");
+        var expr = node.Expression.Accept(this);
+        AppendLine($"yield {expr}");
         return "";
     }
 
     public string Visit(YieldBreakStatementNode node)
     {
-        AppendLine("§YBRK");
+        AppendLine("yield break");
         return "";
     }
 
@@ -2525,8 +2520,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ForStatementNode node)
     {
         var from = node.From.Accept(this);
-        var binder = node.VariableType == "int" ? node.VariableName
-            : $"{TypeMapper.ToSurfaceType(node.VariableType)}:{node.VariableName}";
+        var variableName = EscapeCalorIdentifier(node.VariableName);
+        var binder = node.VariableType == "int" ? variableName
+            : $"{TypeMapper.ToSurfaceType(node.VariableType)}:{variableName}";
         if (node.Condition != null && node.Update != null)
         {
             var update = node.Update switch
@@ -2592,7 +2588,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         if (node.IndexVariableName != null)
             throw new InvalidOperationException("Indexed foreach is removed; use an explicit counter with each.");
-        var binder = varType == "var" ? node.VariableName : $"{varType}:{node.VariableName}";
+        var variableName = EscapeCalorIdentifier(node.VariableName);
+        var binder = varType == "var" ? variableName : $"{varType}:{variableName}";
         AppendLine($"each {binder} in {collection}");
         Indent();
 
@@ -2822,7 +2819,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var dictionary = node.Dictionary.Accept(this);
 
-        AppendLine($"each {node.KeyName}, {node.ValueName} in {dictionary}");
+        AppendLine($"each {EscapeCalorIdentifier(node.KeyName)}, {EscapeCalorIdentifier(node.ValueName)} in {dictionary}");
         Indent();
 
         foreach (var stmt in node.Body)
@@ -3791,9 +3788,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return pattern switch
         {
             WildcardPatternNode => "_",
-            VariablePatternNode vp => $"§VAR{{{vp.Name}}}",
+            VariablePatternNode vp => Visit(vp),
             LiteralPatternNode lp => lp.Literal.Accept(this),
-            VarPatternNode varp => $"§VAR{{{varp.Name}}}",
+            VarPatternNode varp => Visit(varp),
             TypePatternNode tp => Visit(tp),
             ConstantPatternNode cp => cp.Value.Accept(this),
             RelationalPatternNode rp => EmitRelationalPattern(rp),
@@ -3812,30 +3809,25 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     private string EmitRelationalPattern(RelationalPatternNode node)
     {
-        // Map C# operator back to Calor keyword
-        var opKeyword = node.Operator switch
+        var operation = node.Operator switch
         {
-            ">=" => "gte",
-            "<=" => "lte",
-            ">" => "gt",
-            "<" => "lt",
-            "gte" => "gte",
-            "lte" => "lte",
-            "gt" => "gt",
-            "lt" => "lt",
-            _ => "gte"
+            ">=" or "gte" => ">=",
+            "<=" or "lte" => "<=",
+            ">" or "gt" => ">",
+            "<" or "lt" => "<",
+            _ => throw new ArgumentOutOfRangeException(nameof(node), $"Unknown relational pattern operator: {node.Operator}")
         };
         var value = node.Value.Accept(this);
-        return $"§PREL{{{opKeyword}}} {value}";
+        return $"{operation} {value}";
     }
 
     public string Visit(WildcardPatternNode node) => "_";
     public string Visit(TypePatternNode node) => node.BindingName is { } name
         ? $"§PTYPE{{{TypeMapper.ToSurfaceType(node.TypeName)}:{name}}}"
         : $"§PTYPE{{{TypeMapper.ToSurfaceType(node.TypeName)}}}";
-    public string Visit(VariablePatternNode node) => $"§VAR{{{node.Name}}}";
+    public string Visit(VariablePatternNode node) => $"var {EscapeCalorIdentifier(node.Name)}";
     public string Visit(LiteralPatternNode node) => node.Literal.Accept(this);
-    public string Visit(VarPatternNode node) => $"§VAR{{{node.Name}}}";
+    public string Visit(VarPatternNode node) => $"var {EscapeCalorIdentifier(node.Name)}";
     public string Visit(ConstantPatternNode node) => node.Value.Accept(this);
     public string Visit(NegatedPatternNode node) => $"(not {EmitPattern(node.Inner)})";
     public string Visit(OrPatternNode node) => $"(or {EmitPattern(node.Left)} {EmitPattern(node.Right)})";
@@ -4904,16 +4896,29 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(PreprocessorDirectiveNode node)
     {
-        AppendLine($"§PP{{{node.Condition}}}");
-        foreach (var stmt in node.Body)
-            stmt.Accept(this);
-        if (node.ElseBody != null && node.ElseBody.Count > 0)
+        var first = true;
+        for (var branch = node; ; first = false)
         {
-            AppendLine("§PPE");
-            foreach (var stmt in node.ElseBody)
+            AppendLine(first ? $"pp {branch.Condition}" : $"pp elif {branch.Condition}");
+            Indent();
+            foreach (var stmt in branch.Body)
                 stmt.Accept(this);
+            Dedent();
+            if (branch.ElseBody is { Count: 1 } && branch.ElseBody[0] is PreprocessorDirectiveNode next)
+            {
+                branch = next;
+                continue;
+            }
+            if (branch.ElseBody is { Count: > 0 })
+            {
+                AppendLine("pp else");
+                Indent();
+                foreach (var stmt in branch.ElseBody)
+                    stmt.Accept(this);
+                Dedent();
+            }
+            break;
         }
-        AppendLine($"§/PP{{{node.Condition}}}");
         return "";
     }
 

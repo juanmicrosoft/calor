@@ -4602,12 +4602,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             return $"goto case {node.CaseLabel.Accept(this)};";
         if (node.IsDefault)
             return "goto default;";
-        return $"goto {node.Label};";
+        return $"goto {SanitizeIdentifier(node.Label)};";
     }
 
     public string Visit(LabelStatementNode node)
     {
-        return $"{node.Label}:";
+        return $"{SanitizeIdentifier(node.Label)}:;";
     }
 
     public string Visit(YieldReturnStatementNode node)
@@ -4615,7 +4615,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (node.Expression == null)
         {
             throw new InvalidOperationException(
-                "A valueless §YIELD is invalid. Use §YBRK to emit 'yield break;'.");
+                "A valueless yield is invalid. Use 'yield break'.");
         }
         var expr = node.Expression.Accept(this);
         if (_currentYieldRefinement != null

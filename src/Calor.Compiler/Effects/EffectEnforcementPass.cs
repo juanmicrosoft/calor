@@ -5315,12 +5315,7 @@ public sealed class EffectEnforcementPass
             var resourceType = usingStatement.VariableType;
             if (string.IsNullOrWhiteSpace(resourceType))
             {
-                resourceType = usingStatement.Resource switch
-                {
-                    NewExpressionNode creation => creation.TypeName,
-                    ReferenceNode reference => ResolveLocalValueType(reference.Name),
-                    _ => null
-                };
+                resourceType = InferExpressionType(usingStatement.Resource);
             }
 
             if (string.IsNullOrWhiteSpace(resourceType) || resourceType == "?")
