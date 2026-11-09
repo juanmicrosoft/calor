@@ -226,7 +226,7 @@ public static class HookCommand
             var systemMessage = $"This is a Calor-first project. Create an .calr file instead: {suggestedPath}\n\n" +
                                 $"Calor has formal semantics v{SemanticsVersion.VersionString}. Key rules:\n" +
                                 "- Overflow traps, evaluation is left-to-right\n" +
-                                $"- Always add §SEMVER{{{SemanticsVersion.VersionString}}} to modules\n\n" +
+                                "- Native source uses the installed compiler's semantics; pin the compiler version\n\n" +
                                 "Use @calor for syntax, @calor-semantics for behavior rules.";
             response = new GeminiDenyResponse
             {
@@ -305,7 +305,8 @@ public static class HookCommand
                                   "IMPORTANT: Calor has formal semantics that differ from C#:\n" +
                                   "  - Integer overflow TRAPS (throws OverflowException)\n" +
                                   "  - Evaluation is strictly left-to-right\n" +
-                                  $"  - Always include §SEMVER{{{SemanticsVersion.VersionString}}} in modules\n\n" +
+                                  $"  - This compiler implements semantics v{SemanticsVersion.VersionString}\n" +
+                                  "  - Pin the compiler version; native source has no semantics-version declaration\n\n" +
                                   "Use /calor skill for syntax, /calor-semantics for behavior rules.";
 
                 return (1, blockReason, suggestedPath);
@@ -375,7 +376,7 @@ public static class HookCommand
             name: "tool-input",
             description: "The JSON tool input from the AI agent");
 
-        var command = new Command("validate-calr-content", "Check .calr file content for semantic version declaration")
+        var command = new Command("validate-calr-content", "Report native .calr syntax diagnostics without blocking the write")
         {
             inputArgument
         };
@@ -397,8 +398,8 @@ public static class HookCommand
     }
 
     /// <summary>
-    /// Validates .calr file content for semantic version declaration.
-    /// Returns (0, warning) - always allows but may warn if §SEMVER is missing.
+    /// Checks supplied .calr content with the native parser.
+    /// Always allows the write; full compilation remains a separate check.
     /// </summary>
     public static (int ExitCode, string? Warning) ValidateCalrContent(string toolInputJson)
     {
@@ -420,21 +421,17 @@ public static class HookCommand
                 return (0, null);
             }
 
-            // Check if content contains §SEMVER declaration
             if (string.IsNullOrEmpty(content))
             {
                 return (0, null);
             }
 
-            // Look for §SEMVER{x.y.z}. The legacy bracket form §SEMVER[x.y.z] is not
-            // a declaration — the lexer rejects it with Calor0702 — so it does not
-            // satisfy the presence check either.
-            if (!content.Contains("§SEMVER{"))
-            {
-                return (0, $"REMINDER: Add §SEMVER{{{SemanticsVersion.VersionString}}} to your module for semantic versioning");
-            }
-
-            return (0, null);
+            var diagnostics = new DiagnosticBag();
+            var tokens = new Lexer(content, diagnostics).TokenizeAllForParser();
+            new Parser(tokens, diagnostics).Parse();
+            return (0, diagnostics.HasErrors
+                ? "Calor source syntax diagnostics:\n" + string.Join("\n", diagnostics.Errors)
+                : null);
         }
         catch (JsonException)
         {

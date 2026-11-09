@@ -174,6 +174,8 @@ public class DocDriftCheckerTests
         new[] { "GlobalModule.Divide(9, 2)", "GlobalModule.Add(20, 22)" })]
     [InlineData("philosophy/design-principles.mdx", 1, 0,
         new[] { "DesignContracts" }, new[] { "4" }, new[] { "GlobalModule.Divide(9, 2)" })]
+    [InlineData("semantics/versioning.mdx", 1, 0,
+        new[] { "InstalledSemantics" }, new[] { "42" }, new[] { "GlobalModule.Next(41)" })]
     [InlineData("structure-tags.mdx", 22, 1,
         new[] { "StructureModules", "BlockNamespace", "FunctionHeaders", "AsyncFunctions", "AsyncMethods",
             "AwaitExpressions", "ConfigureAwaitLimit", "LambdaExamples", "AsyncLambdas", "LocalCallables", "DelegateDefinitions",

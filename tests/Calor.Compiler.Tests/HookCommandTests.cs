@@ -1,5 +1,7 @@
 using Calor.Compiler.Commands;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Init;
+using Calor.Compiler.Parsing;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -592,11 +594,96 @@ public class HookCommandTests : IDisposable
 
         Assert.NotNull(blockReason);
         Assert.Contains("overflow", blockReason, StringComparison.OrdinalIgnoreCase);
-        // Brace form at the current major — the bracket form §SEMVER[1.0.0] the hook
-        // used to recommend is refused by the lexer (Calor0702) since #1087.
-        Assert.Contains($"§SEMVER{{{SemanticsVersion.VersionString}}}", blockReason);
-        Assert.Contains("§SEMVER{2.0.0}", blockReason);
-        Assert.DoesNotContain("§SEMVER[", blockReason);
+        Assert.Contains($"semantics v{SemanticsVersion.VersionString}", blockReason);
+        Assert.Contains("Pin the compiler version", blockReason);
+        Assert.DoesNotContain("§", blockReason);
+    }
+
+    [Theory]
+    [InlineData("module Native\n  func Main () → int\n    !\n    return 42")]
+    [InlineData("module Native\n  // §SEMVER{0.0.0} is only comment text\n  func Main () → int\n    !\n    return 42")]
+    [InlineData("module Native\n  func Main () → string\n    !\n    return \"§SEMVER{0.0.0}\"")]
+    public void ValidateCalrContent_ValidNativeSourceNeedsNoRetiredVersionDeclaration(string source)
+    {
+        var input = System.Text.Json.JsonSerializer.Serialize(new { file_path = "Native.calr", content = source });
+        var (exitCode, warning) = HookCommand.ValidateCalrContent(input);
+        Assert.Equal(0, exitCode);
+        Assert.Null(warning);
+        var compiled = Program.Compile(source);
+        Assert.Empty(compiled.Diagnostics);
+    }
+
+    [Theory]
+    [InlineData("module Native\n  §SEMVER{2.0.0}\n")]
+    [InlineData("module Native\n  §SEMVER[2.0.0]\n")]
+    [InlineData("module Native\n  func Main () → int\n    return (")]
+    public void ValidateCalrContent_ReportsActualSyntaxErrorsWithoutInventingAReplacementDirective(string source)
+    {
+        var input = System.Text.Json.JsonSerializer.Serialize(new { file_path = "Native.calr", content = source });
+        var (exitCode, warning) = HookCommand.ValidateCalrContent(input);
+        Assert.Equal(0, exitCode);
+        var diagnostics = new DiagnosticBag();
+        new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.True(diagnostics.HasErrors);
+        Assert.NotNull(warning);
+        Assert.All(diagnostics.Errors, diagnostic => Assert.Contains(diagnostic.ToString(), warning));
+        Assert.DoesNotContain("REMINDER: Add", warning);
+    }
+
+    [Theory]
+    [InlineData("not json")]
+    [InlineData("{}")]
+    [InlineData("{\"file_path\":\"Other.cs\",\"content\":\"not Calor\"}")]
+    [InlineData("{\"filePath\":\"Native.calr\",\"content\":\"\"}")]
+    public void ValidateCalrContent_PreservesNonContentEnvelopeBehavior(string input)
+    {
+        var (exitCode, warning) = HookCommand.ValidateCalrContent(input);
+        Assert.Equal(0, exitCode);
+        Assert.Null(warning);
+    }
+
+    [Theory]
+    [InlineData("module Native\n  func Main () → int\n    !\n    return 42", false)]
+    [InlineData("module Native\n  §SEMVER{2.0.0}\n", true)]
+    public void ValidateCalrContentCli_UsesNativeParserAndPreservesNonblockingExit(string source, bool syntaxError)
+    {
+        var input = System.Text.Json.JsonSerializer.Serialize(new { file_path = "Native.calr", content = source });
+        var run = CliTestHarness.RunCli(_testDirectory, "hook", "validate-calr-content", input);
+        Assert.Equal(0, run.ExitCode);
+        Assert.Equal(syntaxError, run.StdErr.Contains("Calor source syntax diagnostics:", StringComparison.Ordinal));
+        Assert.DoesNotContain("REMINDER: Add", run.StdErr);
+        if (!syntaxError) Assert.Empty(run.StdErr);
+    }
+
+    [Fact]
+    public void ValidateCalrContent_DoesNotMisrepresentSyntaxCheckingAsSemanticValidation()
+    {
+        const string source = "module Native\n  func Main () → int\n    !\n    return missing";
+        var input = System.Text.Json.JsonSerializer.Serialize(new { file_path = "Native.calr", content = source });
+        Assert.Null(HookCommand.ValidateCalrContent(input).Warning);
+        Assert.True(Program.Compile(source).HasErrors);
+    }
+
+    [Theory]
+    [InlineData("claude")]
+    [InlineData("gemini")]
+    public void ValidateWriteCli_DenialsTeachCompilerPinningInsteadOfRetiredSyntax(string format)
+    {
+        var input = System.Text.Json.JsonSerializer.Serialize(new { file_path = "New.cs" });
+        var run = CliTestHarness.RunCli(_testDirectory, "hook", "validate-write", input, "--format", format);
+        Assert.Equal(1, run.ExitCode);
+        var message = run.StdErr;
+        if (format == "gemini")
+        {
+            using var json = System.Text.Json.JsonDocument.Parse(run.StdOut);
+            Assert.Equal("deny", json.RootElement.GetProperty("decision").GetString());
+            message = json.RootElement.GetProperty("systemMessage").GetString();
+        }
+        Assert.NotNull(message);
+        Assert.Contains("New.calr", message);
+        Assert.Contains(SemanticsVersion.VersionString, message);
+        Assert.Contains("pin the compiler version", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("§", message);
     }
 
     [Fact]
