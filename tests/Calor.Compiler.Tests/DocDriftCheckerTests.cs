@@ -141,6 +141,8 @@ public class DocDriftCheckerTests
         new[] { "InitializedExample" }, new[] { "42" }, new[] { "GlobalModule.Answer()" })]
     [InlineData("cli/compile.mdx", 2, 1,
         new[] { "CompileExample" }, new[] { "42" }, new[] { "GlobalModule.Increment(41)" })]
+    [InlineData("cli/ids.mdx", 1, 0,
+        new[] { "Calculator" }, new[] { "42" }, new[] { "GlobalModule.Double(21)" })]
     [InlineData("guides/dependent-types-tutorial.mdx", 4, 0,
         new[] { "ServerContracts", "BankingContracts", "MissingFundsContract", "DivisionContracts" },
         new[] { "10", "70", "70", "-2" },
@@ -754,6 +756,62 @@ public class DocDriftCheckerTests
                     public static object? Run() => {{call}};
                 }
                 """));
+    }
+
+    [Theory]
+    [InlineData("cli/query.mdx")]
+    [InlineData("cli/self-check.mdx")]
+    public void PublicNativeCliProse_DoesNotTeachRetiredSectionHeaders(string page)
+    {
+        var path = "website/content/" + page;
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path));
+        Assert.DoesNotContain("§", content);
+        Assert.Empty(WebsiteExampleChecker.Check([new DocFile(path, content)]));
+    }
+
+    [Fact]
+    public void PublicIdsGuide_ActualCommandsPreserveSourceAndPersistedIdentity()
+    {
+        const string path = "website/content/cli/ids.mdx";
+        var source = Assert.Single(ExemplarCompileChecker.ExtractCompletePrograms(
+            File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))).Source;
+        var directory = Path.Combine(Path.GetTempPath(), "calor-published-ids-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(directory, "src"));
+        try
+        {
+            var input = Path.Combine(directory, "src", "Calculator.calr");
+            File.WriteAllText(input, source);
+            var original = File.ReadAllBytes(input);
+            var sync = CliTestHarness.RunCli(directory, "ids", "sync", ".", "--register", "src/Calculator.calr");
+            Assert.True(sync.ExitCode == 0, sync.StdOut + sync.StdErr);
+            Assert.True(File.Exists(Path.Combine(directory, ".calor", "ids.json")));
+            var check = CliTestHarness.RunCli(directory, "ids", "check", "src/Calculator.calr", "--format", "json");
+            Assert.True(check.ExitCode == 0, check.StdOut + check.StdErr);
+            using var diagnostics = JsonDocument.Parse(check.StdOut);
+            Assert.Empty(diagnostics.RootElement.GetProperty("diagnostics").EnumerateArray());
+            Assert.Equal(2, diagnostics.RootElement.GetProperty("data").GetProperty("totalIds").GetInt32());
+            var export = CliTestHarness.RunCli(directory, "ids", "index", "src/Calculator.calr",
+                "--output", "declaration-index.json");
+            Assert.True(export.ExitCode == 0, export.StdOut + export.StdErr);
+            var report = File.ReadAllText(Path.Combine(directory, "declaration-index.json"));
+            using var index = JsonDocument.Parse(report);
+            Assert.Equal(new[] { "Calculator", "Double" },
+                index.RootElement.EnumerateArray().Select(entry => entry.GetProperty("name").GetString()).Order());
+            Assert.All(index.RootElement.EnumerateArray(),
+                entry => Assert.False(string.IsNullOrEmpty(entry.GetProperty("id").GetString())));
+            sync = CliTestHarness.RunCli(directory, "ids", "sync", ".");
+            Assert.True(sync.ExitCode == 0, sync.StdOut + sync.StdErr);
+            export = CliTestHarness.RunCli(directory, "ids", "index", "src/Calculator.calr",
+                "--output", "declaration-index.json");
+            Assert.True(export.ExitCode == 0, export.StdOut + export.StdErr);
+            Assert.Equal(report, File.ReadAllText(Path.Combine(directory, "declaration-index.json")));
+            var refused = CliTestHarness.RunCli(directory, "ids", "index", "src/Calculator.calr",
+                "--output", "src/Calculator.calr");
+            Assert.Equal(1, refused.ExitCode);
+            Assert.Contains("must not overwrite", refused.StdErr);
+            Assert.Equal(original, File.ReadAllBytes(input));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
     }
 
     [Theory]

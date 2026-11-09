@@ -8,9 +8,10 @@ identities in the project's `.calor/ids.json` sidecar. Commit that file alongsid
 the source; do not copy its IDs into declaration headers.
 
 ```calor
-§M{Calculator}
-  §F{Double:pub} (i32:value) -> i32
-    §R (* value 2)
+module Calculator
+  func Double public (int:value) → int
+    !
+    return value * 2
 ```
 
 Build, check, watch, migration, and project indexing synchronize their actual
