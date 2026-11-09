@@ -60,6 +60,34 @@ public sealed class W1GuideTranscriptTests : IDisposable
     [MemberData(nameof(Ids))]
     public async Task Transcript_MatchesTheCommittedFixture(string id) => Compare(id, await ObserveAsync(id));
 
+    [Fact]
+    public void CurrentTranscripts_PreserveOriginalNativeConversionAndCompilation()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var regressions = new List<string>();
+        foreach (var (id, _) in Fixtures)
+        {
+            var original = JsonNode.Parse(File.ReadAllText(Path.Combine(root, Dir, "transcripts", id + ".json")))!;
+            var current = JsonNode.Parse(File.ReadAllText(CurrentTranscript(id)))!;
+            foreach (var (surface, field) in new[]
+            {
+                ("cli-convert-json", "interopPreservationCount"),
+                ("mcp-convert", "interopPreservations"),
+                ("mcp-convert-passthroughOnError", "interopPreservations")
+            })
+            {
+                var previous = original[surface]![field]!.GetValue<int>();
+                var actual = current[surface]![field]!.GetValue<int>();
+                if (actual > previous)
+                    regressions.Add($"{id} {surface}: interop preservations increased from {previous} to {actual}");
+            }
+            if (original["cli-compile"]!["exit"]!.GetValue<int>() == 0
+                && current["cli-compile"]!["exit"]!.GetValue<int>() != 0)
+                regressions.Add($"{id}: previously compilable output no longer compiles");
+        }
+        Assert.True(regressions.Count == 0, string.Join(Environment.NewLine, regressions));
+    }
+
     /// <summary>
     /// W1-F6-project: the historical refusal now has a native current result after the
     /// private-property accessor fix. Both files must be written, without changing rescue policy.

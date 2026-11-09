@@ -19,7 +19,7 @@
       "Output: <dir>/Cells.calr"
     ],
     "stderr": [],
-    "calor": "§M{Cells:overflow=unchecked}\n  §NS{_global:global}\n    §M{Cells:pub}\n      §CSHARP{    public static ref int First(int[] a) => ref a[0];\n}§/CSHARP\n\n      §CSHARP{\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n}§/CSHARP\n\n\n\n"
+    "calor": "module Cells overflow unchecked\n  module Cells\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20ref%20int%20First%28int%5B%5D%20a%29%20%3D%3E%20ref%20a%5B0%5D%3B 54\n    public static ref int First(int[] a) => ref a[0];\n\n\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20ref%20int%20Last%28int%5B%5D%20a%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20return%20ref%20a%5Ba.Length%20-%201%5D%3B... 89\n\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n\n\n\n"
   },
   "cli-convert-json": {
     "command": "calor convert Cells.cs -o Cells.calr --format json",
@@ -120,7 +120,7 @@
       "warning:Calor1343:nullable-oblivious-nested-shape",
       "warning:Calor1343:ref-parameter"
     ],
-    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §NS{_global:global}\n    §M{Cells:pub}\n      §CSHARP{    public static ref int First(int[] a) => ref a[0];\n}§/CSHARP\n\n      §CSHARP{\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n}§/CSHARP\n\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked\n  module Cells\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20ref%20int%20First%28int%5B%5D%20a%29%20%3D%3E%20ref%20a%5B0%5D%3B 54\n    public static ref int First(int[] a) => ref a[0];\n\n\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20ref%20int%20Last%28int%5B%5D%20a%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20return%20ref%20a%5Ba.Length%20-%201%5D%3B... 89\n\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n\n\n\n"
   },
   "mcp-convert-passthroughOnError": {
     "arguments": "{ source, passthroughOnError: true }",
@@ -160,6 +160,6 @@
       "warning:Calor1343:nullable-oblivious-nested-shape",
       "warning:Calor1343:ref-parameter"
     ],
-    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §NS{_global:global}\n    §M{Cells:pub}\n      §CSHARP{    public static ref int First(int[] a) => ref a[0];\n}§/CSHARP\n\n      §CSHARP{\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n}§/CSHARP\n\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked\n  module Cells\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20ref%20int%20First%28int%5B%5D%20a%29%20%3D%3E%20ref%20a%5B0%5D%3B 54\n    public static ref int First(int[] a) => ref a[0];\n\n\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20ref%20int%20Last%28int%5B%5D%20a%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20return%20ref%20a%5Ba.Length%20-%201%5D%3B... 89\n\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n\n\n\n"
   }
 }

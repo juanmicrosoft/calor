@@ -7,7 +7,7 @@
       "Output: <dir>/Counter.calr"
     ],
     "stderr": [],
-    "calor": "§M{Counter:overflow=unchecked}\n  §NS{_global:global}\n    §CL{Counter:pub}\n      §FLD{int:count:priv:stat}\n\n      §PROP{Count:int:priv:stat}\n        §GET{priv}\n          §R count\n        §SET{priv}\n          §ASSIGN count value\n\n      §MT{Next:pub} () -> int\n        §ASSIGN Count (+ Count 1)\n        §R Count\n\n\n\n"
+    "calor": "module Counter overflow unchecked\n  class Counter\n    field int:count private static\n\n    property int:Count private static\n      get private\n        return count\n      set private\n        set count value\n\n    func Next () → int\n      set Count (Count + 1)\n      return Count\n\n\n"
   },
   "cli-convert-json": {
     "command": "calor convert Counter.cs -o Counter.calr --format json",
@@ -81,7 +81,7 @@
       "roundTrip": "verified"
     },
     "issueCodes": [],
-    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §NS{_global:global}\n    §CL{Counter:pub}\n      §FLD{int:count:priv:stat}\n\n      §PROP{Count:int:priv:stat}\n        §GET{priv}\n          §R count\n        §SET{priv}\n          §ASSIGN count value\n\n      §MT{Next:pub} () -> int\n        §ASSIGN Count (+ Count 1)\n        §R Count\n\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked\n  class Counter\n    field int:count private static\n\n    property int:Count private static\n      get private\n        return count\n      set private\n        set count value\n\n    func Next () → int\n      set Count (Count + 1)\n      return Count\n\n\n"
   },
   "mcp-convert-passthroughOnError": {
     "arguments": "{ source, passthroughOnError: true }",
@@ -104,6 +104,6 @@
       "roundTrip": "verified"
     },
     "issueCodes": [],
-    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §NS{_global:global}\n    §CL{Counter:pub}\n      §FLD{int:count:priv:stat}\n\n      §PROP{Count:int:priv:stat}\n        §GET{priv}\n          §R count\n        §SET{priv}\n          §ASSIGN count value\n\n      §MT{Next:pub} () -> int\n        §ASSIGN Count (+ Count 1)\n        §R Count\n\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked\n  class Counter\n    field int:count private static\n\n    property int:Count private static\n      get private\n        return count\n      set private\n        set count value\n\n    func Next () → int\n      set Count (Count + 1)\n      return Count\n\n\n"
   }
 }

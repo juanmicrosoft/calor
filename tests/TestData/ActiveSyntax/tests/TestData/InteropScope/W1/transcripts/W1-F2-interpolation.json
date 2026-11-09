@@ -13,7 +13,7 @@
       "Output: <dir>/Report.calr"
     ],
     "stderr": [],
-    "calor": "§M{Report:overflow=unchecked}\n  §U{System}\n  §U{System.Text}\n\n  §NS{_global:global}\n    §M{Report:pub}\n      §F{Line:pub} (string:item, double:amount) -> string\n        §R \"${item,-8}|${amount,10:F2}\"\n\n      §F{Kind:pub} (FormattableString:f) -> string\n        §R (+ \"fs:\" f.Format)\n\n      §F{Kind:pub} (object:o) -> string\n        §R (+ \"object:\" o)\n\n      §F{Pick:pub} (int:x) -> string\n        §R §C{Kind} (cast global::System.FormattableString \"k=${x}\")\n\n      §F{Build:pub} (int:x) -> string\n        §B{sb} (sb-new)\n        §RAW\n        sb.Append($\"x={x}\");\n        §/RAW\n        §R (sb-tostring sb)\n\n\n\n"
+    "calor": "module Report overflow unchecked\n  using System\n  using System.Text\n\n  module Report\n    func Line (string:item, double:amount) → string\n      return \"${item,-8}|${amount,10:F2}\"\n\n    func Kind (FormattableString:f) → string\n      return (\"fs:\" + f.Format)\n\n    func Kind (object:o) → string\n      return (\"object:\" + o)\n\n    func Pick (int:x) → string\n      return Kind(((global::System.FormattableString)\"k=${x}\"))\n\n    func Build (int:x) → string\n      ! alloc\n      let sb = new System.Text.StringBuilder()\n      raw statement 29\n        sb.Append($\"x={x}\");\n\n      return (sb).ToString()\n\n\n"
   },
   "cli-convert-json": {
     "command": "calor convert Report.cs -o Report.calr --format json",
@@ -106,7 +106,7 @@
       "warning:Calor1343:string-interpolation-formattable",
       "warning:Calor1343:string-interpolation-handler"
     ],
-    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §U{System}\n  §U{System.Text}\n\n  §NS{_global:global}\n    §M{Report:pub}\n      §F{Line:pub} (string:item, double:amount) -> string\n        §R \"${item,-8}|${amount,10:F2}\"\n\n      §F{Kind:pub} (FormattableString:f) -> string\n        §R (+ \"fs:\" f.Format)\n\n      §F{Kind:pub} (object:o) -> string\n        §R (+ \"object:\" o)\n\n      §F{Pick:pub} (int:x) -> string\n        §R §C{Kind} (cast global::System.FormattableString \"k=${x}\")\n\n      §F{Build:pub} (int:x) -> string\n        §B{sb} (sb-new)\n        §RAW\n        sb.Append($\"x={x}\");\n        §/RAW\n        §R (sb-tostring sb)\n\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked\n  using System\n  using System.Text\n\n  module Report\n    func Line (string:item, double:amount) → string\n      return \"${item,-8}|${amount,10:F2}\"\n\n    func Kind (FormattableString:f) → string\n      return (\"fs:\" + f.Format)\n\n    func Kind (object:o) → string\n      return (\"object:\" + o)\n\n    func Pick (int:x) → string\n      return Kind(((global::System.FormattableString)\"k=${x}\"))\n\n    func Build (int:x) → string\n      ! alloc\n      let sb = new System.Text.StringBuilder()\n      raw statement 29\n        sb.Append($\"x={x}\");\n\n      return (sb).ToString()\n\n\n"
   },
   "mcp-convert-passthroughOnError": {
     "arguments": "{ source, passthroughOnError: true }",
@@ -139,6 +139,6 @@
       "warning:Calor1343:string-interpolation-formattable",
       "warning:Calor1343:string-interpolation-handler"
     ],
-    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §U{System}\n  §U{System.Text}\n\n  §NS{_global:global}\n    §M{Report:pub}\n      §F{Line:pub} (string:item, double:amount) -> string\n        §R \"${item,-8}|${amount,10:F2}\"\n\n      §F{Kind:pub} (FormattableString:f) -> string\n        §R (+ \"fs:\" f.Format)\n\n      §F{Kind:pub} (object:o) -> string\n        §R (+ \"object:\" o)\n\n      §F{Pick:pub} (int:x) -> string\n        §R §C{Kind} (cast global::System.FormattableString \"k=${x}\")\n\n      §F{Build:pub} (int:x) -> string\n        §B{sb} (sb-new)\n        §RAW\n        sb.Append($\"x={x}\");\n        §/RAW\n        §R (sb-tostring sb)\n\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked\n  using System\n  using System.Text\n\n  module Report\n    func Line (string:item, double:amount) → string\n      return \"${item,-8}|${amount,10:F2}\"\n\n    func Kind (FormattableString:f) → string\n      return (\"fs:\" + f.Format)\n\n    func Kind (object:o) → string\n      return (\"object:\" + o)\n\n    func Pick (int:x) → string\n      return Kind(((global::System.FormattableString)\"k=${x}\"))\n\n    func Build (int:x) → string\n      ! alloc\n      let sb = new System.Text.StringBuilder()\n      raw statement 29\n        sb.Append($\"x={x}\");\n\n      return (sb).ToString()\n\n\n"
   }
 }

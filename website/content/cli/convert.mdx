@@ -57,7 +57,7 @@ calor convert MyService.cs --benchmark
 | `--explain` | `-e` | `false` | Explain unsupported features in detail |
 | `--no-fallback` | — | `false` | Disable TODO substitution; default faithful C# preservation still applies |
 | `--validate` | — | `false` | Parse generated Calor before writing and report errors |
-| `--passthrough` | — | `false` | Widen the set of C# members preserved as `§CSHARP` interop blocks. Since 0.16 `calor convert` already rescues a member it cannot convert this way; see [What Changed in 0.16](#what-changed-in-0-16) |
+| `--passthrough` | — | `false` | Widen the set of C# members preserved verbatim. Since 0.16 `calor convert` already rescues a member it cannot convert this way; see [What Changed in 0.16](#what-changed-in-0-16) |
 | `--timeout` | `-t` | `0` | Conversion timeout in seconds; 0 disables it |
 | `--explicit-call-closers` | — | `false` | Legacy compatibility option; current native calls use parentheses and never emit closer tags. |
 | `--format` | — | `text` | `text` or schema 2.0 `json`; there is no `-f` alias |
@@ -83,9 +83,10 @@ the same list as `data.lossCount` and `data.losses[]` in JSON. Unknown
 operators, patterns, compound assignments, namespace handling, and local
 functions no longer silently substitute a different construct.
 
-When native conversion is impossible, the containing member is preserved as a
-`§CSHARP` interop block (for some features only the statement, as `§RAW`, or the
-expression, as `§CS{...}`) and counted — on the command line this happens by
+When native conversion is impossible, the containing member or statement is preserved
+in a converter-owned `raw` frame with a UTF-8 byte count. The converter chooses a
+larger boundary when needed. Do not write these frames by hand. Each preservation
+is counted — on the command line this happens by
 default, without `--passthrough`, which widens it further. "Conversion
 successful" is printed only when there are no recorded losses and requested
 validation passed.
@@ -153,20 +154,21 @@ The current output keeps the ordinary class and its static members:
 
 {/* w1-transcript: W1-F6-rescue */}
 ```calor
-§M{Counter:overflow=unchecked}
-  §NS{_global:global}
-    §CL{Counter:pub}
-      §FLD{int:count:priv:stat}
+module Counter overflow unchecked
+  class Counter
+    field int:count private static
 
-      §PROP{Count:int:priv:stat}
-        §GET{priv}
-          §R count
-        §SET{priv}
-          §ASSIGN count value
+    property int:Count private static
+      get private
+        return count
+      set private
+        set count value
 
-      §MT{Next:pub} () -> int
-        §ASSIGN Count (+ Count 1)
-        §R Count
+    func Next () → int
+      set Count (Count + 1)
+      return Count
+
+
 ```
 
 With `--format json`, every `data.losses[]` entry carries `path`, and `trigger`
@@ -261,7 +263,7 @@ Since 0.25 (#847), a C# local function converts natively when it is in this slic
   initializer, `return` value or simple assignment value. Other uses, such as an array
   element, keep the member as C#.
 
-It becomes a typed delegate binding with a static `§LAM` in the same method.
+It becomes a typed delegate binding with a static lambda in the same method.
 The binding preserves local name shadowing, even when the class has a method
 with the same name. Converted output compiles with
 default options; `--permissive-effects` is not needed for these members.
@@ -282,15 +284,16 @@ public static class Probe
 converts to:
 
 ```calor
-§M{Probe:overflow=unchecked}
-  §NS{_global:global}
-    §M{Probe:pub}
-      §F{Add:pub} (i32:x) -> i32
-        §R (+ x 1000)
+module Probe overflow unchecked
+  module Probe
+    func Add (int:x) → int
+      return (x + 1000)
 
-      §F{UseShadow:pub} () -> i32
-        §B{Add:System.Func<i32, i32>} §LAM{static:x:i32} (+ x 1) §/LAM
-        §R §C{Add} 2
+    func UseShadow () → int
+      let System.Func<int, int>:Add = static (int:x) => (x + 1)
+      return Add(2)
+
+
 ```
 
 If a member has any local function outside the slice (capturing, generic, async,
@@ -324,12 +327,14 @@ public IEnumerable<int> Steps
 converts to:
 
 ```calor
-§M{Countdown}
-  §U{System.Collections.Generic}
-  §CL{Countdown:pub}
-    §FLD{i32:Start:pub} = 3
+module Countdown overflow unchecked
+  using System.Collections.Generic
 
-    §CSHARP{
+  class Countdown
+    field int:Start = 3
+
+    raw member:iterator-accessor:Property:Unsupported%20Property%3A%20public%20IEnumerable%3Cint%3E%20Steps%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20get%0A%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20for%20%28in... 183
+
     public IEnumerable<int> Steps
     {
         get

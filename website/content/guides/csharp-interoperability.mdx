@@ -21,11 +21,12 @@ CLI and MCP transcripts are in the repository under `tests/TestData/InteropScope
 Two terms used throughout:
 
 - **Native** means the converter wrote Calor for the code. The Calor compiler then
-  type-checks it and checks its effects (the `§E{...}` declaration of what a function may
+  type-checks it and checks its effects (the `!` declaration of what a function may
   do, such as console output or allocation).
 - **Preserved** means the converter kept the original C# text inside the Calor file. A
-  whole member is kept in a `§CSHARP{...}§/CSHARP` block, a single statement in a
-  `§RAW ... §/RAW` block, and a single expression as `§CS{...}`. Preserved C# still
+  member or statement uses a converter-owned `raw` frame with a UTF-8 byte count.
+  The converter chooses a larger preservation boundary when needed. Do not write
+  these frames by hand. Preserved C# still
   builds and runs as before, but the Calor compiler cannot see inside it. It assumes the
   worst about its effects and warns with `Calor0419` where that matters.
 
@@ -61,8 +62,8 @@ version, add `--format json` and read `data.conversionPaths`.
 ## Call TryParse, TryGetValue, and other ref/out/in methods
 
 C# passes `ref`, `out` and `in` arguments by reference: the callee writes the caller's own
-variable. Calor has the same feature. A parameter is declared `(T:name:ref)`, `(T:name:out)`
-or `(T:name:in)`, and the argument is marked `§A{ref} x`, `§A{out} x` or `§A{in} x`. The
+variable. Calor has the same feature. A parameter is declared `(ref T:name)`, `(out T:name)`
+or `(in T:name)`, and the argument is written `ref x`, `out x` or `in x`. The
 generated C# passes the variable itself, never a copy.
 
 This C#:
@@ -112,39 +113,40 @@ with default options:
 
 {/* w1-transcript: W1-F1-refout */}
 ```calor
-§M{Inventory:overflow=unchecked}
-  §U{System.Collections.Generic}
+module Inventory overflow unchecked
+  using System.Collections.Generic
 
-  §NS{_global:global}
-    §M{Inventory:pub}
-      §F{ParseOr:pub} (string:text, int:fallback) -> int
-        §B{~n:int} `default`
-        §IF §C{int.TryParse} §A text §A{out} n §/C
-          §R n
-        §R fallback
+  module Inventory
+    func ParseOr (string:text, int:fallback) → int
+      var int:n = default(int)
+      if int.TryParse(text, out n)
+        return n
+      return fallback
 
-      §F{CountOf:pub} (Dict<string, int>:stock, string:item) -> int
-        §B{~count:int} `default`
-        §C{stock.TryGetValue} §A item §A{out} count §/C
-        §R count
+    func CountOf (Dictionary<string, int>:stock, string:item) → int
+      var int:count = default(int)
+      stock.TryGetValue(item, out count)
+      return count
 
-      §F{IsNumber:pub} (string:text) -> bool
-        §R §C{int.TryParse} §A text §A{out} _ §/C
+    func IsNumber (string:text) → bool
+      return int.TryParse(text, out _)
 
-      §F{Bump:pub} (int:x:ref)
-        §ASSIGN x (+ x 1)
+    func Bump (ref int:x)
+      set x (x + 1)
 
-      §F{Twice:pub} (int:x:in) -> int
-        §R (* x 2)
+    func Twice (in int:x) → int
+      return (x * 2)
 
-      §F{Run:pub} () -> int
-        §B{~total:int} 1
-        §C{Bump} §A{ref} total §/C
-        §R (+ §C{Twice} §A{in} total §/C §C{ParseOr} §A "40" §A 0 §/C)
+    func Run () → int
+      var int:total = 1
+      Bump(ref total)
+      return (Twice(in total) + ParseOr("40", 0))
+
+
 ```
 
-(`§NS{_global:global}` stands for C#'s global namespace, and
-`overflow=unchecked` keeps C#'s default integer overflow behavior.)
+The outer module label does not add a C# namespace; omitting the namespace keeps
+C#'s global namespace. `overflow unchecked` keeps C#'s default integer overflow behavior.
 
 **What converts natively:**
 
@@ -153,11 +155,11 @@ with default options:
 - `out var n` / `out T n` when the call is a statement by itself, a local declaration
   (`bool ok = int.TryParse(s, out var n);`), a `return`, or an `if` condition directly
   inside a block. Calor has no inline declaration, so the converter writes a mutable
-  binding (`§B{~n:i32} \`default\``) just before the statement.
+  binding (`var int:n = default(int)`) just before the statement.
 - `ref` and `in` arguments that are locals, parameters, fields, array elements, or fields
   of struct array elements (`Bump(ref pts[0].X)` passes the element's own field), when
   the operand runs no code of its own. A C# `ref` argument to an `in` parameter becomes
-  `§A{in}`.
+  `in x`.
 - Plain method-generic `ref T` parameters and calls, including aliased arguments.
   The callee writes the original storage; there is no tuple or wrapper copy.
 
@@ -171,19 +173,19 @@ with default options:
   `scoped` and `ref readonly` parameters, `this ref`/`this in` extension calls,
   by-reference delegates and lambdas, by-reference constructor and indexer arguments,
   and method-generic `out T`/`in T` or nullable-type-parameter `ref T?` declarations.
-  The member stays `§CSHARP`; the
+  The member stays C#; the
   report names feature `method` and warns with the shape, such as `ref-parameter`.
 - Call sites C# allows but Calor cannot write: an `in` argument passed without `in`
   (`Twice(x)`), or a by-reference operand that runs code (`Bump(ref a[Next()])`). In a
-  block body only that statement stays C#, as `§RAW`, reported as `in-parameter` or `ref-parameter`. In an
+  block body only that statement stays C#, reported as `in-parameter` or `ref-parameter`. In an
   expression-bodied member (`int Run(int x) => Twice(x);`) the whole member stays
-  `§CSHARP`, reported as `method`.
+  C#, reported as `method`.
 
 In the tested cases, each shape on this list either keeps its C# or fails with a report.
 
 **Flow attributes are kept but have no effect.** An `out` parameter with
-`[NotNullWhen(true)]` converts natively; the attribute is copied as
-`[@NotNullWhen(true)]` (fixture `W1-F1-notnullwhen`). Calor does not use it to narrow
+`[NotNullWhen(true)]` converts natively; the original attribute is retained
+(fixture `W1-F1-notnullwhen`). Calor does not use it to narrow
 the variable after a `true` result, so a caller may still need a null check where C#
 needed none.
 Writing the same
@@ -207,7 +209,7 @@ type can also pick a different overload. The converter keeps that choice.
 | `string` or `object`, including a `return` | Native: a Calor string with `${...}` holes. Alignment, format specifiers, culture and left-to-right hole order are kept. |
 | `FormattableString` or `IFormattable`, with at least one hole | Native, with an explicit cast, so the same overload is chosen. |
 | `FormattableString` with no holes, such as `FormattableString.Invariant($"text")` | Preserved: the statement or member stays C#. Reported as `string-interpolation-formattable-constant`. |
-| An `[InterpolatedStringHandler]` parameter: custom logging APIs, `StringBuilder.Append($"...")`, `string.Create(provider, $"...")` | Preserved: the statement (`§RAW`) or member (`§CSHARP`) stays C#, so the handler still runs. Reported as `string-interpolation-handler`. |
+| An `[InterpolatedStringHandler]` parameter: custom logging APIs, `StringBuilder.Append($"...")`, `string.Create(provider, $"...")` | Preserved: the statement or member stays C#, so the handler still runs. Reported as `string-interpolation-handler`. |
 
 For this C#:
 
@@ -240,18 +242,19 @@ public static class Report
 
 {/* w1-transcript-lines: W1-F2-interpolation */}
 ```calor
-        §R "${item,-8}|${amount,10:F2}"
-        §R §C{Kind} (cast global::System.FormattableString "k=${x}")
-        §RAW
+      return "${item,-8}|${amount,10:F2}"
+      return Kind(((global::System.FormattableString)"k=${x}"))
+      raw statement 29
         sb.Append($"x={x}");
-        §/RAW
 ```
 
 The report shows one preserved statement, `string-interpolation-handler`, on every
-surface. This output does not compile with default options: the converted functions
-declare no effects, so the compiler reports `Calor0410` (an effect is used but not
-declared). Add the effect declarations, or compile with `--permissive-effects` while you
-migrate.
+surface. This fixture retains an existing default-compilation failure:
+`FormattableString.get_Format` has no resolved effect contract (`Calor0411`), so
+`Kind` reports `Calor0410` for an unknown effect. `Build` declares allocation, but
+its preserved statement makes that row assumed rather than verified (`Calor0419`).
+Resolve the external member's effect contract; `--permissive-effects` is a migration
+option, not proof that the effects are safe.
 
 **Holes.** A hole converts natively when it is a name; a regular (not verbatim) string,
 `char`, `bool` or `int` literal; a `double` literal written as plain digits with a
@@ -292,8 +295,8 @@ A C# local function converts natively when it is *bounded*:
   initializer, a `return` value or the value of a simple assignment. Any other use, such
   as `new Func<int, int>[] { Clamp }`, keeps the member as C#.
 
-It becomes a typed delegate binding with a static `§LAM`. Its binding keeps the
-local name and scope; active source has no local `§F` declaration.
+It becomes a typed delegate binding with a static lambda. Its binding keeps the
+local name and scope; active source has no nested `func` declaration.
 
 {/* w1-source: W1-F3-local-functions */}
 ```csharp
@@ -317,23 +320,25 @@ public static class Shapes
 
 {/* w1-transcript: W1-F3-local-functions */}
 ```calor
-§M{Shapes:overflow=unchecked}
-  §NS{_global:global}
-    §M{Shapes:pub}
-      §F{Area:pub} (int:w, int:h) -> int
-        §B{Clamp:System.Func<int, int>} §LAM{static:v:int} (? (< v 0) 0 v) §/LAM
-        §R (* §C{Clamp} §A w §/C §C{Clamp} §A h §/C)
+module Shapes overflow unchecked
+  module Shapes
+    func Area (int:w, int:h) → int
+      let System.Func<int, int>:Clamp = static (int:v) => ((v < 0) ? 0 : v)
+      return (Clamp(w) * Clamp(h))
 
-      §CSHARP{
+    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20int%20Scaled%28int%20w%2C%20int%20factor%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20int%20Scale%28int%20v%29%20%3D%3E... 126
+
     public static int Scaled(int w, int factor)
     {
         int Scale(int v) => v * factor;
         return Scale(w);
     }
-}§/CSHARP
+
+
+
 ```
 
-A member with any local function outside the bounded slice is kept whole as `§CSHARP`.
+A member with any local function outside the bounded slice is kept whole as C#.
 The report names the member (feature `method`) and warns with `local-function`.
 To convert it, pass the captured value as a parameter (`int Scale(int v, int f) => v * f;`)
 or move the helper to a private method. The language rules for local functions are in
@@ -385,30 +390,31 @@ public static class Grid
 
 {/* w1-transcript: W1-F5-arrays */}
 ```calor
-§M{Grid:overflow=unchecked}
-  §U{System.Collections.Generic}
+module Grid overflow unchecked
+  using System.Collections.Generic
 
-  §NS{_global:global}
-    §M{Grid:pub}
-      §F{Pick:pub} (bool:wide, int:v) -> int[,]
-        §E{alloc}
-        §R §IF wide → §ARR2D{int} §ROW v (+ v 1) §/ARR2D §EL → §ARR2D{int} §ROW v §/ARR2D
+  module Grid
+    func Pick (bool:wide, int:v) → int[,]
+      ! alloc
+      return (wide ? new int[,] { { v, (v + 1) } } : new int[,] { { v } })
 
-      §F{Sum:pub} (int[]:xs, int:start) -> int
-        §B{~s:int} start
-        §EACH{x:var} xs
-          §ASSIGN s (+ s x)
-        §R s
+    func Sum (int[]:xs, int:start) → int
+      var int:s = start
+      each x in xs
+        set s (s + x)
+      return s
 
-      §F{Total:pub} (int:v) -> int
-        §E{alloc}
-        §R §C{Sum} §A §ARR{int} v (* v 2) §/ARR §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C
+    func Total (int:v) → int
+      ! alloc
+      return Sum(new int[] { v, (v * 2) }, (Pick(true, v))[0, 1])
 
-      §F{Mixed:pub} () -> int
-        §RAW
+    func Mixed () → int
+      raw statement 53
         object[] items = { new List<int> { 1 }, 2 };
-        §/RAW
-        §R items.Length
+
+      return items.Length
+
+
 ```
 
 `Mixed` shows a limit: an element that Calor would write as a block, such as a collection
@@ -431,24 +437,24 @@ the whole type as C#.
 ## Convert a class with iterator properties
 
 A property or indexer getter that uses `yield return` is an *iterator accessor*. Calor has
-none (`§YIELD` inside a getter is error `Calor0209`), so the converter keeps that member as
-`§CSHARP` and converts the rest of the class:
+none (`yield` inside a getter is error `Calor0209`), so the converter keeps that member as
+C# and converts the rest of the class:
 
 {/* w1-transcript: W1-F4-iterator-accessor */}
 ```calor
-§M{Countdown:overflow=unchecked}
-  §U{System.Collections.Generic}
+module Countdown overflow unchecked
+  using System.Collections.Generic
 
-  §NS{_global:global}
-    §CL{Countdown:pub}
-      §FLD{int:Start:pub} = 3
+  class Countdown
+    field int:Start = 3
 
-      §MT{First:pub} () -> int
-        §EACH{s:var} Steps
-          §R s
-        §R 0
+    func First () → int
+      each s in Steps
+        return s
+      return 0
 
-      §CSHARP{
+    raw member:iterator-accessor:Property:Unsupported%20Property%3A%20public%20IEnumerable%3Cint%3E%20Steps%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20get%0A%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20for%20%28in... 183
+
     public IEnumerable<int> Steps
     {
         get
@@ -459,7 +465,9 @@ none (`§YIELD` inside a getter is error `Calor0209`), so the converter keeps th
             }
         }
     }
-}§/CSHARP
+
+
+
 ```
 
 The C# compiler still builds the iterator, so laziness, `finally` on dispose, and the
@@ -468,7 +476,7 @@ without passthrough, because the converter does it itself (feature `iterator-acc
 `--no-fallback` disables TODO substitution, not faithful C# preservation. To make the member native, move the loop into an
 iterator method and return its result from the getter; see
 [Iterator Properties and Indexers](/docs/cli/convert/#iterator-properties-and-indexers).
-Iterators in ordinary methods already convert to `§YIELD`.
+Iterators in ordinary methods already convert to `yield`.
 
 **Changed since 0.24:** the converter wrote `§YIELD` inside the getter. That fails with
 `Calor0209`; only the CLI's rescue hid it, and MCP `calor_convert` returned Calor that did
