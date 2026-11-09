@@ -2099,7 +2099,7 @@ public sealed class TypeChecker
         // #943 (RO-DECL-2): `§A{out} _` with no `_` in scope is a discard, typed by the parameter.
         var preliminaryTypes = call.Arguments
             .Select((argument, index) => RequiresTargetType(argument)
-                    || argument is ReferenceNode { Name: "_" }
+                    || argument is ReferenceNode { Name: "_", IsVerbatim: false }
                         && !string.IsNullOrEmpty(call.ArgumentModifiers?.ElementAtOrDefault(index))
                         && _env.LookupVariable("_") == null
                 ? ErrorType.Instance
@@ -2159,8 +2159,15 @@ public sealed class TypeChecker
             if (root is not ReferenceNode reference
                 || _env.LookupVariable(reference.Name.Split('.')[0]) != null)
                 InferExpressionType(member.Target);
-            foreach (var argument in call.Arguments)
+            for (var index = 0; index < call.Arguments.Count; index++)
+            {
+                var argument = call.Arguments[index];
+                if (argument is ReferenceNode { Name: "_", IsVerbatim: false }
+                    && !string.IsNullOrEmpty(call.ArgumentModifiers?.ElementAtOrDefault(index))
+                    && _env.LookupVariable("_") is null)
+                    continue;
                 InferExpressionType(argument);
+            }
             // Member overloads remain binder-owned, just as for dotted named calls.
             return ErrorType.Instance;
         }

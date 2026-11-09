@@ -13,6 +13,21 @@ namespace Calor.Compiler.Tests;
 public sealed class FinalExpressionGrammarTests
 {
     [Theory]
+    [InlineData("Call(ref first, out second, in third)")]
+    [InlineData("Call(a: ref first, b: out second, c: in third)")]
+    public void NativeCallModifiers_RetainKeywordTokensAndOrderedChannels(string source)
+    {
+        var call = Assert.IsType<CallExpressionNode>(Parse(source));
+        Assert.Equal(new[] { "ref", "out", "in" }, call.ArgumentModifiers);
+        Assert.Equal(new[] { "first", "second", "third" },
+            call.Arguments.Select(argument => Assert.IsType<ReferenceNode>(argument).Name));
+        var emitted = call.Accept(new CalorEmitter());
+        var reparsed = Assert.IsType<CallExpressionNode>(Parse(emitted));
+        Assert.Equal(call.ArgumentModifiers, reparsed.ArgumentModifiers);
+        Assert.Equal(call.ArgumentNames, reparsed.ArgumentNames);
+    }
+
+    [Theory]
     [InlineData("await next() + 1")]
     [InlineData("await next() * 2")]
     [InlineData("await next() ?? 1")]

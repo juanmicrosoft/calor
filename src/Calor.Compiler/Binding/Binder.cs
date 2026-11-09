@@ -7486,7 +7486,7 @@ public sealed class Binder
                 continue;
             }
             string? reason;
-            if (arguments[index] is ReferenceNode { Name: "_" } discard)
+            if (arguments[index] is ReferenceNode { Name: "_", IsVerbatim: false } discard)
             {
                 var declared = _scope.LookupAll("_").Count > 0 || ResolveLexicalMembers("_").Count > 0;
                 reason = modifier != "out" ? $"'{modifier} _' is not a discard; only 'out _' is"

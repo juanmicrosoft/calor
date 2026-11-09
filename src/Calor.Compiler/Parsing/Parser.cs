@@ -3275,7 +3275,8 @@ public sealed class Parser
                         Advance(); // :
                     }
                     string? modifier = null;
-                    if (Check(TokenKind.Identifier) && Current.Text is "ref" or "out" or "in")
+                    if (Check(TokenKind.Out) || Check(TokenKind.In)
+                        || Check(TokenKind.Identifier) && Current.Text == "ref")
                         modifier = Advance().Text;
                     if (!IsExpressionStart())
                     {

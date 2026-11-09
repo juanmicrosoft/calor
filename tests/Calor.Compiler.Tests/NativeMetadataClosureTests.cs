@@ -383,6 +383,66 @@ public sealed class NativeMetadataClosureTests
         Assert.True(Compile(source).HasErrors);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NativeTryParseOut_RetainsLocalWritesAndDiscard(bool discard)
+    {
+        var source = $$"""
+            module NativeOut
+              func ParseNumber (string:text) → int
+                var int:n = 0
+                if int.TryParse(text, out {{(discard ? "_" : "n")}})
+                  return {{(discard ? "1" : "n")}}
+                return -1
+            """;
+        var result = Compile(source);
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        var method = CompileAssembly(result.GeneratedCode).GetTypes().SelectMany(type => type.GetMethods())
+            .Single(method => method.Name == "ParseNumber");
+        Assert.Equal(discard ? 1 : 42, method.Invoke(null, ["42"]));
+        Assert.Equal(-1, method.Invoke(null, ["invalid"]));
+    }
+
+    [Fact]
+    public void NativeRefAndIn_RetainStorageAndRejectNonLvalues()
+    {
+        const string source = """
+            module NativeByRef
+              func Increment (ref int:x) → void
+                ! mut
+                set x x + 1
+              func Read (in int:x) → int
+                return x
+              func Run () → int
+                ! mut
+                var int:n = 41
+                Increment(ref n)
+                return Read(in n)
+            """;
+        var result = Compile(source);
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        var method = CompileAssembly(result.GeneratedCode).GetTypes().SelectMany(type => type.GetMethods())
+            .Single(method => method.Name == "Run");
+        Assert.Equal(42, method.Invoke(null, null));
+        var invalid = Compile(source.Replace("Increment(ref n)", "Increment(ref (n + 1))", StringComparison.Ordinal));
+        Assert.Contains(invalid.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.InvalidByReferenceOperand);
+    }
+
+    [Fact]
+    public void NativeCallDiscard_DoesNotHideEscapedReferencesOrInvalidRefOperands()
+    {
+        const string source = """
+            module NativeDiscard
+              func ParseNumber (string:text) → bool
+                return int.TryParse(text, out _)
+            """;
+        var escaped = Compile(source.Replace("out _", "out @_", StringComparison.Ordinal));
+        Assert.Contains(escaped.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference);
+        var invalidRef = Compile(source.Replace("out _", "ref _", StringComparison.Ordinal));
+        Assert.Contains(invalidRef.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.InvalidByReferenceOperand);
+    }
+
     private static CompilationResult Compile(string source) => Program.Compile(source, "native-metadata.calr",
         new CompilationOptions { EnableTypeChecking = true, EnforceEffects = true, StatusWriter = TextWriter.Null });
 
