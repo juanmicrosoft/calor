@@ -16,12 +16,10 @@ public class InheritanceTests
     public void CodeGen_AbstractClass_GeneratesValidCSharp()
     {
         var source = @"
-§M{Test}
-  §CL{Shape:pub:abs}
-      §MT{Area:pub:abs}
-          §O{double}
-      §MT{Name:pub:abs}
-          §O{str}
+module Test
+  class Shape public abstract
+    func Area public abstract () → double
+    func Name public abstract () → string
 ";
 
         var result = ParseAndEmit(source);
@@ -35,16 +33,14 @@ public class InheritanceTests
     public void CodeGen_DerivedClass_GeneratesValidCSharp()
     {
         var source = @"
-§M{Test}
-  §CL{Shape:pub:abs}
-      §MT{Area:pub:abs}
-          §O{double}
-  §CL{Circle:pub}
-      §EXT{Shape}
-      §FLD{f64:radius:priv}
-      §MT{Area:pub:over}
-          §O{double}
-          §R (* 3.14159 (* radius radius))
+module Test
+  class Shape public abstract
+    func Area public abstract () → double
+  class Circle public
+    extends Shape
+    field double:radius private
+    func Area public override () → double
+      return 3.14159 * (radius * radius)
 ";
 
         var result = ParseAndEmit(source);
@@ -58,11 +54,10 @@ public class InheritanceTests
     public void CodeGen_VirtualMethod_GeneratesValidCSharp()
     {
         var source = @"
-§M{Test}
-  §CL{Animal:pub}
-      §MT{Speak:pub:virt}
-          §O{str}
-          §R ""...""
+module Test
+  class Animal public
+    func Speak public virtual () → string
+      return ""...""
 ";
 
         var result = ParseAndEmit(source);
@@ -75,16 +70,14 @@ public class InheritanceTests
     public void CodeGen_SealedOverride_GeneratesValidCSharp()
     {
         var source = @"
-§M{Test}
-  §CL{Base:pub}
-      §MT{Compute:pub:virt}
-          §O{i32}
-          §R 0
-  §CL{Derived:pub}
-      §EXT{Base}
-      §MT{Compute:pub:seal over}
-          §O{i32}
-          §R 42
+module Test
+  class Base public
+    func Compute public virtual () → int
+      return 0
+  class Derived public
+    extends Base
+    func Compute public sealed override () → int
+      return 42
 ";
 
         var result = ParseAndEmit(source);
@@ -97,16 +90,14 @@ public class InheritanceTests
     public void CodeGen_BaseMethodCall_GeneratesValidCSharp()
     {
         var source = @"
-§M{Test}
-  §CL{Base:pub}
-      §MT{GetValue:pub:virt}
-          §O{i32}
-          §R 10
-  §CL{Derived:pub}
-      §EXT{Base}
-      §MT{GetValue:pub:over}
-          §O{i32}
-          §R (+ §C{base.GetValue} §/C 5)
+module Test
+  class Base public
+    func GetValue public virtual () → int
+      return 10
+  class Derived public
+    extends Base
+    func GetValue public override () → int
+      return base.GetValue() + 5
 ";
 
         var result = ParseAndEmit(source);
@@ -120,22 +111,17 @@ public class InheritanceTests
     public void CodeGen_ConstructorWithBaseCall_GeneratesValidCSharp()
     {
         var source = @"
-§M{Test}
-  §CL{Animal:pub}
-      §FLD{str:_name:prot}
-      §CTOR{pub}
-        §I{str:name}
-        §ASSIGN §THIS._name name
-      §/CTOR
-  §CL{Dog:pub}
-      §EXT{Animal}
-      §FLD{str:_breed:priv}
-      §CTOR{pub}
-        §I{str:name}
-        §I{str:breed}
-        §BASE §A name §/BASE
-        §ASSIGN §THIS._breed breed
-      §/CTOR
+module Test
+  class Animal public
+    field string:_name protected
+    ctor (string:name)
+      set this._name name
+  class Dog public
+    extends Animal
+    field string:_breed private
+    ctor (string:name, string:breed)
+      base(name)
+      set this._breed breed
 ";
 
         var result = ParseAndEmit(source);
@@ -149,20 +135,16 @@ public class InheritanceTests
     public void CodeGen_MultipleInterfaceImplementation_GeneratesValidCSharp()
     {
         var source = @"
-§M{Test}
-  §IFACE{IMovable}
-      §MT{Move}
-          §O{void}
-  §IFACE{IDrawable}
-      §MT{Draw}
-          §O{void}
-  §CL{GameObject:pub}
-      §IMPL{IMovable}
-      §IMPL{IDrawable}
-      §MT{Move:pub}
-          §O{void}
-      §MT{Draw:pub}
-          §O{void}
+module Test
+  interface IMovable
+    func Move () → void
+  interface IDrawable
+    func Draw () → void
+  class GameObject public
+    implements IMovable
+    implements IDrawable
+    func Move public () → void
+    func Draw public () → void
 ";
 
         var result = ParseAndEmit(source);
@@ -173,14 +155,12 @@ public class InheritanceTests
     [Fact]
     public void CodeGen_StaticMethod_GeneratesValidCSharp()
     {
-        // This test verifies static methods in a non-static class (class uses :pub, not :static)
+        // Ordinary classes can contain static methods without becoming named modules.
         var source = @"
-§M{Test}
-  §CL{MathUtils:pub}
-      §MT{Square:pub:stat}
-          §I{i32:x}
-          §O{i32}
-          §R (* x x)
+module Test
+  class MathUtils public
+    func Square public static (int:x) → int
+      return x * x
 ";
 
         var result = ParseAndEmit(source);
@@ -193,11 +173,10 @@ public class InheritanceTests
     public void CodeGen_PartialClass_GeneratesValidCSharp()
     {
         var source = @"
-§M{Test}
-  §CL{DataService:pub:partial}
-      §MT{GetData:pub}
-          §O{str}
-          §R ""data""
+module Test
+  class DataService public partial
+    func GetData public () → string
+      return ""data""
 ";
 
         var result = ParseAndEmit(source);
@@ -209,10 +188,9 @@ public class InheritanceTests
     public void CodeGen_SealedClass_GeneratesValidCSharp()
     {
         var source = @"
-§M{Test}
-  §CL{FinalClass:pub:seal}
-      §MT{DoWork:pub}
-          §O{void}
+module Test
+  class FinalClass public sealed
+    func DoWork public () → void
 ";
 
         var result = ParseAndEmit(source);
@@ -224,9 +202,9 @@ public class InheritanceTests
     public void CodeGen_GenericInterfaceImplementation_PreservesGenericSyntax()
     {
         var source = @"
-§M{Test}
-  §CL{MyOption:pub}<T>
-      §IMPL{IEquatable<MyOption<T>>}
+module Test
+  class MyOption<T> public
+    implements IEquatable<MyOption<T>>
 ";
 
         var result = ParseAndEmit(source);
@@ -238,9 +216,9 @@ public class InheritanceTests
     public void CodeGen_GenericBaseClass_PreservesGenericSyntax()
     {
         var source = @"
-§M{Test}
-  §CL{StringList:pub}
-      §EXT{List<string>}
+module Test
+  class StringList public
+    extends List<string>
 ";
 
         var result = ParseAndEmit(source);
@@ -252,9 +230,9 @@ public class InheritanceTests
     public void CodeGen_InterfaceExtendsGenericInterface_PreservesGenericSyntax()
     {
         var source = @"
-§M{Test}
-  §IFACE{IMyCollection}<T>
-      §EXT{IEnumerable<T>}
+module Test
+  interface IMyCollection<T>
+    extends IEnumerable<T>
 ";
 
         var result = ParseAndEmit(source);
@@ -266,9 +244,9 @@ public class InheritanceTests
     public void CodeGen_DeeplyNestedGenericInheritance_PreservesGenericSyntax()
     {
         var source = @"
-§M{Test}
-  §CL{MyMapper:pub}<TKey,TValue>
-      §IMPL{IEquatable<Dictionary<TKey,List<TValue>>>}
+module Test
+  class MyMapper<TKey,TValue> public
+    implements IEquatable<Dictionary<TKey,List<TValue>>>
 ";
 
         var result = ParseAndEmit(source);
@@ -280,8 +258,8 @@ public class InheritanceTests
     public void CodeGen_EmittedCode_ContainsNullableEnable()
     {
         var source = @"
-§M{Test}
-  §CL{Foo:pub}
+module Test
+  class Foo public
 ";
 
         var result = ParseAndEmit(source);
@@ -293,8 +271,8 @@ public class InheritanceTests
     public void CodeGen_NullableEnable_AppearsBeforeUsings()
     {
         var source = @"
-§M{Test}
-  §CL{Foo:pub}
+module Test
+  class Foo public
 ";
 
         var result = ParseAndEmit(source);
@@ -314,10 +292,9 @@ public class InheritanceTests
     public void Parser_AbstractClass_ParsesCorrectly()
     {
         var source = @"
-§M{Test}
-  §CL{AbstractBase:abs}
-      §MT{Method:pub:abs}
-          §O{void}
+module Test
+  class AbstractBase abstract
+    func Method public abstract () → void
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -332,8 +309,8 @@ public class InheritanceTests
     public void Parser_SealedClass_ParsesCorrectly()
     {
         var source = @"
-§M{Test}
-  §CL{SealedClass:seal}
+module Test
+  class SealedClass sealed
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -348,11 +325,11 @@ public class InheritanceTests
     public void Parser_BaseClass_ParsesCorrectly()
     {
         var source = @"
-§M{Test}
-  §CL{Parent:pub}
-    §FLD{i32:Dummy:priv}
-  §CL{Child:pub}
-      §EXT{Parent}
+module Test
+  class Parent public
+    field int:Dummy private
+  class Child public
+    extends Parent
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -367,10 +344,9 @@ public class InheritanceTests
     public void Parser_VirtualMethod_ParsesModifiersCorrectly()
     {
         var source = @"
-§M{Test}
-  §CL{Base:pub}
-      §MT{VirtualMethod:pub:virt}
-          §O{void}
+module Test
+  class Base public
+    func VirtualMethod public virtual () → void
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -387,10 +363,9 @@ public class InheritanceTests
     public void Parser_OverrideMethod_ParsesModifiersCorrectly()
     {
         var source = @"
-§M{Test}
-  §CL{Derived:pub}
-      §MT{Method:pub:over}
-          §O{void}
+module Test
+  class Derived public
+    func Method public override () → void
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -407,10 +382,9 @@ public class InheritanceTests
     public void Parser_AbstractMethod_ParsesModifiersCorrectly()
     {
         var source = @"
-§M{Test}
-  §CL{Abstract:abs}
-      §MT{Method:pub:abs}
-          §O{void}
+module Test
+  class Abstract abstract
+    func Method public abstract () → void
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -426,13 +400,11 @@ public class InheritanceTests
     [Fact]
     public void Parser_CombinedModifiers_ParsesCorrectly()
     {
-        // Class modifiers: space-separated in 3rd position
-        // Method modifiers: space-separated in 4th position
+        // This is a parser-only modifier check, not valid C# modifier combinations.
         var source = @"
-§M{Test}
-  §CL{Base:abs seal}
-      §MT{Method:pub:stat virt}
-          §O{void}
+module Test
+  class Base abstract sealed
+    func Method public static virtual () → void
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -457,10 +429,9 @@ public class InheritanceTests
     {
         // Parser accepts this; semantic analysis would catch the error
         var source = @"
-§M{Test}
-  §CL{NonAbstract:pub}
-      §MT{AbstractMethod:pub:abs}
-          §O{void}
+module Test
+  class NonAbstract public
+    func AbstractMethod public abstract () → void
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -472,19 +443,18 @@ public class InheritanceTests
     [Fact]
     public void Parse_LegacyClassCloser_ReportsError()
     {
-        // §/CL is removed closer-form syntax (Phase 4d): rejected with
-        // Calor0830, not the obsolete id-mismatch diagnostic (Calor0101).
+        // The native lexer rejects the retired closer, not an ID mismatch.
         var source = @"
-§M{Test}
-§CL{MyClass:pub}
+module Test
+  class MyClass public
 §/CL
-§/M
 ";
 
         var module = Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Code == "Calor0830");
+        var error = Assert.Single(diagnostics.Where(d => d.Code == "Calor0006"));
+        Assert.Contains("§/CL", error.Message);
         Assert.DoesNotContain(diagnostics, d => d.Code == "Calor0101");
     }
 
@@ -492,14 +462,15 @@ public class InheritanceTests
     public void Parse_InvalidVisibility_ReportsError()
     {
         var source = @"
-§M{Test}
-  §CL{MyClass:invalid}
+module Test
+  class MyClass invalid
 ";
 
         var module = Parse(source, out var diagnostics);
 
-        // The visibility will be treated as default private
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+        Assert.True(diagnostics.HasErrors);
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.InvalidModifier);
+        Assert.DoesNotContain(diagnostics, d => d.Code is "Calor0003" or "Calor0006" or "Calor0007");
     }
 
     #endregion
@@ -510,12 +481,10 @@ public class InheritanceTests
     public void RoundTrip_AbstractClass_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §CL{Shape:abs}
-      §MT{Area:pub:abs}
-          §O{double}
-      §MT{Perimeter:pub:abs}
-          §O{double}
+module Test
+  class Shape abstract
+    func Area public abstract () → double
+    func Perimeter public abstract () → double
 ";
 
         // Parse original
@@ -526,11 +495,9 @@ public class InheritanceTests
         var formatter = new Formatting.CalorFormatter();
         var formatted = formatter.Format(module);
 
-        // Verify key elements are preserved (Phase 4b indent-form output puts
-        // visibility before modifiers, so `abs` appears as part of the modifier
-        // list — assert by substring, not exact tag shape).
+        // Verify the canonical modifier survives formatting.
         Assert.Contains("Shape", formatted);
-        Assert.Contains("abs", formatted);
+        Assert.Contains("abstract", formatted);
 
         // Re-parse formatted output
         var module2 = Parse(formatted, out var diagnostics2);
@@ -546,16 +513,14 @@ public class InheritanceTests
     public void RoundTrip_InheritanceHierarchy_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §CL{Animal:pub}
-      §MT{Speak:pub:virt}
-          §O{str}
-          §R ""...""
-  §CL{Dog:pub}
-      §EXT{Animal}
-      §MT{Speak:pub:over}
-          §O{str}
-          §R ""Woof!""
+module Test
+  class Animal public
+    func Speak public virtual () → string
+      return ""...""
+  class Dog public
+    extends Animal
+    func Speak public override () → string
+      return ""Woof!""
 ";
 
         // Parse original
@@ -567,7 +532,7 @@ public class InheritanceTests
         var formatted = formatter.Format(module);
 
         // Verify key elements are preserved
-        Assert.Contains("§EXT{Animal}", formatted);
+        Assert.Contains("extends Animal", formatted);
 
         // Re-parse formatted output
         var module2 = Parse(formatted, out var diagnostics2);
@@ -593,6 +558,8 @@ public class InheritanceTests
 
         Assert.False(diagnostics.HasErrors, $"TemplateMethod.calr should parse. Errors:\n{string.Join("\n", diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Message))}");
         Assert.True(module.Classes.Count >= 4, "Should have DataProcessor, CsvProcessor, JsonProcessor, and TemplateMethodDemo classes");
+        // The active copy changes syntax, not the original parser-only fixture's invalid accessibility.
+        Assert.Contains("private abstract string ReadData();", new CSharpEmitter().Emit(module));
     }
 
     [Fact]
@@ -606,6 +573,10 @@ public class InheritanceTests
         Assert.False(diagnostics.HasErrors, $"Visitor.calr should parse. Errors:\n{string.Join("\n", diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Message))}");
         Assert.True(module.Classes.Count >= 5, "Should have Expression, NumberExpression, AddExpression, MultiplyExpression, and visitors");
         Assert.True(module.Interfaces.Count >= 1, "Should have IExpressionVisitor interface");
+        var emitted = new CSharpEmitter().Emit(module);
+        Assert.Contains("public double Value;", emitted);
+        Assert.Contains("private float Accept(", emitted);
+        Assert.Contains("return;", emitted);
     }
 
     #endregion
@@ -614,22 +585,20 @@ public class InheritanceTests
 
     /// <summary>
     /// Verifies the documented syntax for base method calls works.
-    /// Documentation says: use base.Method not §BASE.Method inside §C{...}
+    /// Native base calls use ordinary member-call punctuation.
     /// </summary>
     [Fact]
     public void DocSyntax_BaseMethodCall_UsesLowercase()
     {
         var source = @"
-§M{Test}
-  §CL{Base:pub}
-      §MT{GetValue:pub:virt}
-          §O{i32}
-          §R 10
-  §CL{Derived:pub}
-      §EXT{Base}
-      §MT{GetValue:pub:over}
-          §O{i32}
-          §R (+ §C{base.GetValue} §/C 5)
+module Test
+  class Base public
+    func GetValue public virtual () → int
+      return 10
+  class Derived public
+    extends Base
+    func GetValue public override () → int
+      return base.GetValue() + 5
 ";
 
         var result = ParseAndEmit(source);
@@ -638,20 +607,18 @@ public class InheritanceTests
 
     /// <summary>
     /// Verifies the documented syntax for this method calls works.
-    /// Documentation says: use this.Method not §THIS.Method inside §C{...}
+    /// Native this calls use ordinary member-call punctuation.
     /// </summary>
     [Fact]
     public void DocSyntax_ThisMethodCall_UsesLowercase()
     {
         var source = @"
-§M{Test}
-  §CL{Service:pub}
-      §MT{Helper:priv}
-          §O{str}
-          §R ""done""
-      §MT{Process:pub}
-          §O{str}
-          §R §C{this.Helper} §/C
+module Test
+  class Service public
+    func Helper private () → string
+      return ""done""
+    func Process public () → string
+      return this.Helper()
 ";
 
         var result = ParseAndEmit(source);
@@ -660,22 +627,20 @@ public class InheritanceTests
 
     /// <summary>
     /// Verifies the documented syntax for space-separated modifiers.
-    /// Documentation says: use 'seal over' not 'seal:over'
+    /// Native modifiers use full words separated by spaces.
     /// </summary>
     [Fact]
     public void DocSyntax_CombinedModifiers_UseSpaceSeparation()
     {
         var source = @"
-§M{Test}
-  §CL{Base:pub}
-      §MT{Compute:pub:virt}
-          §O{i32}
-          §R 0
-  §CL{Final:pub}
-      §EXT{Base}
-      §MT{Compute:pub:seal over}
-          §O{i32}
-          §R 42
+module Test
+  class Base public
+    func Compute public virtual () → int
+      return 0
+  class Final public
+    extends Base
+    func Compute public sealed override () → int
+      return 42
 ";
 
         var result = ParseAndEmit(source);
@@ -684,18 +649,16 @@ public class InheritanceTests
     }
 
     /// <summary>
-    /// Verifies the documented syntax for class modifiers (3 parts).
-    /// Documentation says: §CL{Name:modifiers} with 3 parts
+    /// Verifies native class modifiers follow the declaration name.
     /// </summary>
     [Fact]
     public void DocSyntax_ClassModifiers_Uses3Parts()
     {
         var source = @"
-§M{Test}
-  §CL{MyAbstract:abs}
-      §MT{DoWork:pub:abs}
-          §O{void}
-  §CL{MySealed:seal}
+module Test
+  class MyAbstract abstract
+    func DoWork public abstract () → void
+  class MySealed sealed
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -709,21 +672,17 @@ public class InheritanceTests
     }
 
     /// <summary>
-    /// Verifies the documented syntax for method modifiers (4 parts).
-    /// Documentation says: §MT{Name:visibility:modifiers}
+    /// Verifies native method modifiers follow the declaration name.
     /// </summary>
     [Fact]
     public void DocSyntax_MethodModifiers_Uses4Parts()
     {
         var source = @"
-§M{Test}
-  §CL{Test:pub}
-      §MT{VirtualMethod:pub:virt}
-          §O{void}
-      §MT{StaticMethod:pub:stat}
-          §O{void}
-      §MT{PrivateMethod:priv}
-          §O{void}
+module Test
+  class Test public
+    func VirtualMethod public virtual () → void
+    func StaticMethod public static () → void
+    func PrivateMethod private () → void
 ";
 
         var result = ParseAndEmit(source);
@@ -733,21 +692,18 @@ public class InheritanceTests
     }
 
     /// <summary>
-    /// Verifies §NEW does not require an end tag.
+    /// Verifies native object construction uses ordinary argument parentheses.
     /// </summary>
     [Fact]
     public void DocSyntax_NewExpression_NoEndTag()
     {
         var source = @"
-§M{Test}
-  §CL{Item:pub}
-      §CTOR{pub}
-        §I{i32:val}
-      §/CTOR
-  §CL{Factory:pub}
-      §MT{Create:pub:stat}
-          §O{Item}
-          §R §NEW{Item} §A 42
+module Test
+  class Item public
+    ctor (int:val)
+  class Factory public
+    func Create public static () → Item
+      return new Item(42)
 ";
 
         var result = ParseAndEmit(source);
@@ -755,19 +711,17 @@ public class InheritanceTests
     }
 
     /// <summary>
-    /// Verifies §ASSIGN syntax for field assignment (not §SET).
+    /// Verifies native field assignment uses set target value.
     /// </summary>
     [Fact]
     public void DocSyntax_Assignment_UsesAssign()
     {
         var source = @"
-§M{Test}
-  §CL{Person:pub}
-      §FLD{str:_name:priv}
-      §CTOR{pub}
-        §I{str:name}
-        §ASSIGN §THIS._name name
-      §/CTOR
+module Test
+  class Person public
+    field string:_name private
+    ctor (string:name)
+      set this._name name
 ";
 
         var result = ParseAndEmit(source);

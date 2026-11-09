@@ -1,81 +1,80 @@
-§M{DesignPatterns}
-  §IFACE{IExpressionVisitor}
-    §MT{VisitNumber} (NumberExpression:expr) -> f32
-    §MT{VisitAdd} (AddExpression:expr) -> f32
-    §MT{VisitMultiply} (MultiplyExpression:expr) -> f32
+module DesignPatterns
+  interface IExpressionVisitor
+    func VisitNumber (NumberExpression:expr) → float
+    func VisitAdd (AddExpression:expr) → float
+    func VisitMultiply (MultiplyExpression:expr) → float
 
-  §CL{Expression:int:abs}
-    §MT{Accept:priv} (IExpressionVisitor:visitor) -> f32
-      §R
-
-
-  §CL{NumberExpression:pub}
-    §EXT{Expression}
-
-    §FLD{f64:Value:pub}
-
-    §CTOR{pub} (f32:value)
-      §ASSIGN this.Value value
-
-    §MT{Accept:pub:over} (IExpressionVisitor:visitor) -> f32
-      §R §C{visitor.VisitNumber} §THIS
+  class Expression internal abstract
+    func Accept private (IExpressionVisitor:visitor) → float
+      return
 
 
-  §CL{AddExpression:pub}
-    §EXT{Expression}
+  class NumberExpression public
+    extends Expression
 
-    §FLD{Expression:Left:pub}
-    §FLD{Expression:Right:pub}
+    field double:Value public
 
-    §CTOR{pub} (Expression:left, Expression:right)
-      §ASSIGN this.Left left
-      §ASSIGN this.Right right
+    ctor (float:value)
+      set this.Value value
 
-    §MT{Accept:pub:over} (IExpressionVisitor:visitor) -> f32
-      §R §C{visitor.VisitAdd} §THIS
+    func Accept public override (IExpressionVisitor:visitor) → float
+      return visitor.VisitNumber(this)
 
 
-  §CL{MultiplyExpression:pub}
-    §EXT{Expression}
+  class AddExpression public
+    extends Expression
 
-    §FLD{Expression:Left:pub}
-    §FLD{Expression:Right:pub}
+    field Expression:Left public
+    field Expression:Right public
 
-    §CTOR{pub} (Expression:left, Expression:right)
-      §ASSIGN this.Left left
-      §ASSIGN this.Right right
+    ctor (Expression:left, Expression:right)
+      set this.Left left
+      set this.Right right
 
-    §MT{Accept:pub:over} (IExpressionVisitor:visitor) -> f32
-      §R §C{visitor.VisitMultiply} §THIS
-
-
-  §CL{EvaluatorVisitor:pub}
-    §IMPL{IExpressionVisitor}
-
-    §MT{VisitNumber:pub} (NumberExpression:expr) -> f32
-      §R expr.Value
-
-    §MT{VisitAdd:pub} (AddExpression:expr) -> f32
-      §B{~_hoist000} §C{expr.Left.Accept} §THIS
-      §B{~_hoist001} §C{expr.Right.Accept} §THIS
-      §R (+ _hoist000 _hoist001)
-
-    §MT{VisitMultiply:pub} (MultiplyExpression:expr) -> f32
-      §B{~_hoist002} §C{expr.Left.Accept} §THIS
-      §B{~_hoist003} §C{expr.Right.Accept} §THIS
-      §R (* _hoist002 _hoist003)
+    func Accept public override (IExpressionVisitor:visitor) → float
+      return visitor.VisitAdd(this)
 
 
-  §M{VisitorDemo:int}
-    §F{Evaluate:pub} (Expression:expr) -> f32
-      §B{EvaluatorVisitor:visitor} §NEW{EvaluatorVisitor} §/NEW
-      §R §C{expr.Accept} visitor
+  class MultiplyExpression public
+    extends Expression
 
-    §F{BuildSampleExpression:pub} () -> Expression
-      §B{NumberExpression:two} §NEW{NumberExpression} §A 2 §/NEW
-      §B{NumberExpression:three} §NEW{NumberExpression} §A 3 §/NEW
-      §B{NumberExpression:four} §NEW{NumberExpression} §A 4 §/NEW
-      §B{AddExpression:sum} §NEW{AddExpression} §A two §A three §/NEW
-      §R §NEW{MultiplyExpression} §A sum §A four §/NEW
+    field Expression:Left public
+    field Expression:Right public
 
+    ctor (Expression:left, Expression:right)
+      set this.Left left
+      set this.Right right
+
+    func Accept public override (IExpressionVisitor:visitor) → float
+      return visitor.VisitMultiply(this)
+
+
+  class EvaluatorVisitor public
+    implements IExpressionVisitor
+
+    func VisitNumber public (NumberExpression:expr) → float
+      return expr.Value
+
+    func VisitAdd public (AddExpression:expr) → float
+      var _hoist000 = expr.Left.Accept(this)
+      var _hoist001 = expr.Right.Accept(this)
+      return _hoist000 + _hoist001
+
+    func VisitMultiply public (MultiplyExpression:expr) → float
+      var _hoist002 = expr.Left.Accept(this)
+      var _hoist003 = expr.Right.Accept(this)
+      return _hoist002 * _hoist003
+
+
+  module VisitorDemo internal
+    func Evaluate public (Expression:expr) → float
+      let EvaluatorVisitor:visitor = new EvaluatorVisitor()
+      return expr.Accept(visitor)
+
+    func BuildSampleExpression public () → Expression
+      let NumberExpression:two = new NumberExpression(2)
+      let NumberExpression:three = new NumberExpression(3)
+      let NumberExpression:four = new NumberExpression(4)
+      let AddExpression:sum = new AddExpression(two, three)
+      return new MultiplyExpression(sum, four)
 

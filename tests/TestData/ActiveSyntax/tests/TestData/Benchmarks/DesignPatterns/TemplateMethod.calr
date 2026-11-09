@@ -1,74 +1,73 @@
-§M{DesignPatterns}
-  §CL{DataProcessor:int:abs}
-    §MT{Process:pub} () -> str
-      §B{str:data} §C{this.ReadData}
-      §IF (== data "")
-        §R "Validation failed"
-      §B{str:processed} §C{this.ProcessData} data
-      §R §C{this.SaveResults} processed
+module DesignPatterns
+  class DataProcessor internal abstract
+    func Process public () → string
+      let string:data = this.ReadData()
+      if data == ""
+        return "Validation failed"
+      let string:processed = this.ProcessData(data)
+      return this.SaveResults(processed)
 
-    §MT{ReadData:priv:abs} () -> str
+    func ReadData private abstract () → string
 
-    §MT{ProcessData:priv:abs} (str:data) -> str
+    func ProcessData private abstract (string:data) → string
 
-    §MT{SaveResults:priv:abs} (str:data) -> str
+    func SaveResults private abstract (string:data) → string
 
-    §MT{ValidateData:priv:virt} (str:data) -> bool
-      §R (!= data "")
-
-
-  §CL{CsvProcessor:pub}
-    §EXT{DataProcessor}
-
-    §FLD{str:_inputPath:priv}
-    §FLD{str:_outputPath:priv}
-
-    §CTOR{pub} (str:inputPath, str:outputPath)
-      §ASSIGN this._inputPath inputPath
-      §ASSIGN this._outputPath outputPath
-
-    §MT{ReadData:priv:over} () -> str
-      §R "CSV data from input"
-
-    §MT{ProcessData:priv:over} (str:data) -> str
-      §R §C{data.Replace} §A "," §A "|" §/C
-
-    §MT{SaveResults:priv:over} (str:data) -> str
-      §R "Saved CSV"
-
-    §MT{ValidateData:priv:over} (str:data) -> bool
-      §B{~_hoist000} §C{base.ValidateData} data
-      §B{~_hoist001} §C{data.Contains} "CSV"
-      §R (&& _hoist000 _hoist001)
+    func ValidateData private virtual (string:data) → bool
+      return data != ""
 
 
-  §CL{JsonProcessor:pub}
-    §EXT{DataProcessor}
+  class CsvProcessor public
+    extends DataProcessor
 
-    §FLD{str:_endpoint:priv}
-    §FLD{str:_outputPath:priv}
+    field string:_inputPath private
+    field string:_outputPath private
 
-    §CTOR{pub} (str:endpoint, str:outputPath)
-      §ASSIGN this._endpoint endpoint
-      §ASSIGN this._outputPath outputPath
+    ctor (string:inputPath, string:outputPath)
+      set this._inputPath inputPath
+      set this._outputPath outputPath
 
-    §MT{ReadData:priv:over} () -> str
-      §R "JSON content"
+    func ReadData private override () → string
+      return "CSV data from input"
 
-    §MT{ProcessData:priv:over} (str:data) -> str
-      §R §C{data.Replace} §A "JSON" §A "PROCESSED_JSON" §/C
+    func ProcessData private override (string:data) → string
+      return data.Replace(",", "|")
 
-    §MT{SaveResults:priv:over} (str:data) -> str
-      §R "Saved JSON"
+    func SaveResults private override (string:data) → string
+      return "Saved CSV"
+
+    func ValidateData private override (string:data) → bool
+      var _hoist000 = base.ValidateData(data)
+      var _hoist001 = data.Contains("CSV")
+      return _hoist000 && _hoist001
 
 
-  §M{TemplateMethodDemo:int}
-    §F{ProcessCsv:pub} (str:input, str:output) -> str
-      §B{CsvProcessor:processor} §NEW{CsvProcessor} §A input §A output §/NEW
-      §R §C{processor.Process}
+  class JsonProcessor public
+    extends DataProcessor
 
-    §F{ProcessJson:pub} (str:endpoint, str:output) -> str
-      §B{JsonProcessor:processor} §NEW{JsonProcessor} §A endpoint §A output §/NEW
-      §R §C{processor.Process}
+    field string:_endpoint private
+    field string:_outputPath private
 
+    ctor (string:endpoint, string:outputPath)
+      set this._endpoint endpoint
+      set this._outputPath outputPath
+
+    func ReadData private override () → string
+      return "JSON content"
+
+    func ProcessData private override (string:data) → string
+      return data.Replace("JSON", "PROCESSED_JSON")
+
+    func SaveResults private override (string:data) → string
+      return "Saved JSON"
+
+
+  module TemplateMethodDemo internal
+    func ProcessCsv public (string:input, string:output) → string
+      let CsvProcessor:processor = new CsvProcessor(input, output)
+      return processor.Process()
+
+    func ProcessJson public (string:endpoint, string:output) → string
+      let JsonProcessor:processor = new JsonProcessor(endpoint, output)
+      return processor.Process()
 
