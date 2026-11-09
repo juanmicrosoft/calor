@@ -26,10 +26,10 @@ module, entry point, and console effect as the
 [tested Hello World example](/docs/getting-started/hello-world/).
 
 ```calor
-§M{HelloApp}
-  §F{Main:pub} () -> void
-    §E{cw}
-    §P "Hello from Calor!"
+module HelloApp
+  func Main () → void
+    ! cw
+    Console.WriteLine("Hello from Calor!")
 ```
 
 Compile it to inspect the generated C#, then run the Calor source:
@@ -51,7 +51,7 @@ required. `calor run` builds its own managed workspace; the generated C# here
 is for inspection, not an automatically updated project input.
 
 If a command fails, read the first diagnostic's file, location, and message.
-Check that the source uses two-space indentation and that `§E{cw}` declares
+Check that the source uses two-space indentation and that `! cw` declares
 the console output. Fix the source rather than editing generated C#, then
 rerun. A missing tool or SDK is an
 [installation problem](/docs/getting-started/installation/), not a source

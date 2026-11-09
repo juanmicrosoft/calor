@@ -55,13 +55,13 @@ With [.NET 10 and Calor installed](/docs/getting-started/installation/), save
 this complete illustrative program as `Price.calr` in an empty directory:
 
 ```calor
-§M{PriceExample}
-  §F{Main:pub} () -> void
-    §E{cw}
-    §B{unitPrice:i32} 10
-    §B{quantity:i32} 3
-    §B{rate:i32} 2
-    §P (* (* unitPrice quantity) rate)
+module PriceExample
+  func Main () → void
+    ! cw
+    let int:unitPrice = 10
+    let int:quantity = 3
+    let int:rate = 2
+    Console.WriteLine(unitPrice * quantity * rate)
 ```
 
 ```bash

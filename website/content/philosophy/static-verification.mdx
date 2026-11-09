@@ -21,10 +21,10 @@ arithmetic. See
 When you write contracts in Calor:
 
 ```calor
-§F{Square:pub} (i32:x) -> i32
-  §Q (>= x 0)
-  §S (>= result 0)
-  §R (* x x)
+func Square (int:x) → int
+  requires x >= 0
+  => result >= 0
+  return x * x
 ```
 
 Native Calor checks this integer multiplication for overflow. `x = 46340`
