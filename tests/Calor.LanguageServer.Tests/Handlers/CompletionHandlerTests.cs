@@ -34,6 +34,7 @@ public class CompletionHandlerTests
         Assert.Contains(items.Items, item => item.Label == expected && item.InsertText == expected);
         Assert.DoesNotContain(items.Items, item => item.Label.StartsWith('§'));
         Assert.DoesNotContain(items.Items, item => item.Label is "i32" or "str" or "f64" or "FLOAT");
+        Assert.DoesNotContain(items.Items, item => item.Label is "namespace" or "indexer" or "foreach" or "yieldbreak");
         if (source.Length == 0)
         {
             Assert.Equal(1, items.Items.Count(item => item.Label == "raw"));
@@ -208,19 +209,18 @@ public class CompletionHandlerTests
     public void GetAst_ValidModule_ReturnsAst()
     {
         var source = """
-            §M{TestModule}
-              §F{Add}
-                §I{i32:a}
-                §I{i32:b}
-                §O{i32}
-                §R a + b
+            module TestModule
+              func Add private (int:a, int:b) → int
+                return a + b
             """;
 
+        AssertNativeSource(source);
         var ast = LspTestHarness.GetAst(source);
 
         Assert.NotNull(ast);
         Assert.Single(ast.Functions);
         Assert.Equal("Add", ast.Functions[0].Name);
+        Assert.Equal(Visibility.Private, ast.Functions[0].Visibility);
     }
 
     [Fact]
@@ -306,71 +306,70 @@ public class CompletionHandlerTests
     public void Function_Parameters_AreExtracted()
     {
         var source = """
-            §M{TestModule}
-              §F{Calculate}
-                §I{i32:x}
-                §I{i32:y}
-                §I{str:label}
-                §O{i32}
-                §R x + y
+            module TestModule
+              func Calculate private (int:x, int:y, string:label) → int
+                return x + y
             """;
 
+        AssertNativeSource(source);
         var ast = LspTestHarness.GetAst(source);
 
         Assert.NotNull(ast);
         var func = ast.Functions[0];
         Assert.Equal(3, func.Parameters.Count);
         Assert.Equal("x", func.Parameters[0].Name);
-        Assert.Equal("INT", func.Parameters[0].TypeName);
+        Assert.Equal("int", func.Parameters[0].TypeName);
         Assert.Equal("y", func.Parameters[1].Name);
         Assert.Equal("label", func.Parameters[2].Name);
-        Assert.Equal("STRING", func.Parameters[2].TypeName);
+        Assert.Equal("string", func.Parameters[2].TypeName);
     }
 
     [Fact]
     public void Function_OutputType_IsExtracted()
     {
         var source = """
-            §M{TestModule}
-              §F{GetValue}
-                §O{str}
-                §R "hello"
+            module TestModule
+              func GetValue private () → string
+                return "hello"
             """;
 
+        AssertNativeSource(source);
         var ast = LspTestHarness.GetAst(source);
 
         Assert.NotNull(ast);
         var func = ast.Functions[0];
         Assert.NotNull(func.Output);
-        Assert.Equal("STRING", func.Output.TypeName);
+        Assert.Equal("string", func.Output.TypeName);
     }
 
     [Fact]
-    public void Function_VoidReturn_HasNoOutput()
+    public void Function_VoidReturn_HasExplicitVoidOutput()
     {
         var source = """
-            §M{TestModule}
-              §F{DoNothing}
-                §R
+            module TestModule
+              func DoNothing private () → void
+                return
             """;
 
+        AssertNativeSource(source);
         var ast = LspTestHarness.GetAst(source);
 
         Assert.NotNull(ast);
         var func = ast.Functions[0];
-        Assert.Null(func.Output);
+        Assert.Equal("void", Assert.IsType<OutputNode>(func.Output).TypeName);
     }
 
     [Fact]
     public void LocalBinding_IsRecognized()
     {
         var source = """
-            §M{TestModule}
-              §F{Test}
-                §B{x:i32} 42
-                §R x
+            module TestModule
+              func Test private () → void
+                let int:x = 42
+                return
             """;
 
+        AssertNativeSource(source);
         var ast = LspTestHarness.GetAst(source);
 
         Assert.NotNull(ast);
@@ -379,19 +378,21 @@ public class CompletionHandlerTests
         var bind = func.Body[0] as BindStatementNode;
         Assert.NotNull(bind);
         Assert.Equal("x", bind.Name);
-        Assert.Equal("INT", bind.TypeName);
+        Assert.Equal("int", bind.TypeName);
     }
 
     [Fact]
     public void ForLoop_IsRecognized()
     {
         var source = """
-            §M{TestModule}
-              §F{Test}
-                §L{i:0:10}
-                  §P i
+            module TestModule
+              func Test private () → void
+                ! cw
+                for i from 0 to 10 step 1
+                  System.Console.WriteLine(i)
             """;
 
+        AssertNativeSource(source);
         var ast = LspTestHarness.GetAst(source);
 
         Assert.NotNull(ast);
@@ -406,13 +407,14 @@ public class CompletionHandlerTests
     public void WhileLoop_IsRecognized()
     {
         var source = """
-            §M{TestModule}
-              §F{Test}
-                §B{bool:running} true
-                §WH running
-                  §B{bool:running} false
+            module TestModule
+              func Test private () → void
+                var bool:running = true
+                while running
+                  set running false
             """;
 
+        AssertNativeSource(source);
         var ast = LspTestHarness.GetAst(source);
 
         Assert.NotNull(ast);
@@ -426,16 +428,15 @@ public class CompletionHandlerTests
     public void IfStatement_IsRecognized()
     {
         var source = """
-            §M{TestModule}
-              §F{Test}
-                §I{bool:condition}
-                §O{i32}
-                §IF condition
-                  §R 1
-                §EL
-                  §R 0
+            module TestModule
+              func Test private (bool:condition) → int
+                if condition
+                  return 1
+                else
+                  return 0
             """;
 
+        AssertNativeSource(source);
         var ast = LspTestHarness.GetAst(source);
 
         Assert.NotNull(ast);
@@ -511,13 +512,12 @@ public class CompletionHandlerTests
     public void MemberCompletion_StringType_ShowsStringMethods()
     {
         var source = """
-            §M{TestModule}
-              §F{Test}
-                §I{str:text}
-                §O{str}
-                §R text.
+            module TestModule
+              func Test private (string:text) → string
+                return text.Trim()
             """;
 
+        AssertNativeSource(source);
         var completions = LspTestHarness.GetCompletions(source, "text.");
 
         Assert.NotEmpty(completions);
@@ -638,14 +638,12 @@ public class CompletionHandlerTests
     public void ChainedAccess_StringMethodChaining_WorksCorrectly()
     {
         var source = """
-            §M{TestModule}
-              §F{Test}
-                §I{str:text}
-                §O{str}
-                §R text.ToUpper().
+            module TestModule
+              func Test private (string:text) → string
+                return text.ToUpper().Trim()
             """;
 
-        // ToUpper() returns str, so should show string members
+        AssertNativeSource(source);
         var completions = LspTestHarness.GetCompletions(source, "text.ToUpper().");
 
         Assert.NotEmpty(completions);
@@ -887,19 +885,14 @@ public class CompletionHandlerTests
     [Fact]
     public void StringIndexAccess_ReturnsCharMembers()
     {
-        // String index access returns char, which is a primitive
-        // This test verifies the type resolution works even if no members are shown
         var source = """
-            §M{TestModule}
-              §F{Test}
-                §I{str:text}
-                §O{str}
-                §R text[0].
+            module TestModule
+              func Test private (string:text) → string
+                return text[0].ToString()
             """;
 
-        // We don't expect char members but the expression should parse without error
+        AssertNativeSource(source);
         var completions = LspTestHarness.GetCompletions(source, "text[0].");
-        // char type doesn't have many completion items but shouldn't throw
         Assert.NotNull(completions);
     }
 
@@ -951,14 +944,12 @@ public class CompletionHandlerTests
     public void ScopeCompletion_ParametersAvailable()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §I{i32:myParam}
-                §I{str:anotherParam}
-                §O{i32}
-                §R myP
+            module TestModule
+              func Test (int:myParam, string:anotherParam) → int
+                return myParam
             """;
 
+        AssertNativeSource(source);
         var doc = LspTestHarness.CreateDocument(source);
         Assert.NotNull(doc.Ast);
 
@@ -972,14 +963,14 @@ public class CompletionHandlerTests
     public void ScopeCompletion_LocalBindingsAvailable()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §O{i32}
-                §B{x} 10
-                §B{y} 20
-                §R x
+            module TestModule
+              func Test () → int
+                let x = 10
+                let y = 20
+                return x
             """;
 
+        AssertNativeSource(source);
         var doc = LspTestHarness.CreateDocument(source);
         Assert.NotNull(doc.Ast);
 
@@ -993,15 +984,15 @@ public class CompletionHandlerTests
     public void ScopeCompletion_BindingsBeforeCursor_AreVisible()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §O{i32}
-                §B{first} 1
-                §B{second} 2
-                §B{third} 3
-                §R first
+            module TestModule
+              func Test () → int
+                let first = 1
+                let second = 2
+                let third = 3
+                return first
             """;
 
+        AssertNativeSource(source);
         // Verify all bindings are created
         var doc = LspTestHarness.CreateDocument(source);
         Assert.NotNull(doc.Ast);
@@ -1034,17 +1025,16 @@ public class CompletionHandlerTests
     public void ScopeCompletion_NestedIfStatement_BindingsVisible()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §I{bool:condition}
-                §O{i32}
-                §B{outer} 1
-                §IF condition
-                  §B{inner} 2
-                  §R inner
-                §R outer
+            module TestModule
+              func Test (bool:condition) → int
+                let outer = 1
+                if condition
+                  let inner = 2
+                  return inner
+                return outer
             """;
 
+        AssertNativeSource(source);
         var doc = LspTestHarness.CreateDocument(source);
         Assert.NotNull(doc.Ast);
 
@@ -1063,15 +1053,14 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_IncludesParameters()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §I{i32:myParam}
-                §I{str:otherParam}
-                §O{i32}
-                §R _CURSOR_
+            module TestModule
+              func Test (int:myParam, string:otherParam) → int
+                return myParam
             """;
 
-        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+        AssertNativeSource(source);
+        var completions = LspTestHarness.GetExpressionCompletions(source,
+            source.LastIndexOf("myParam", StringComparison.Ordinal));
 
         Assert.Contains(completions, c => c.Label == "myParam");
         Assert.Contains(completions, c => c.Label == "otherParam");
@@ -1081,15 +1070,16 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_IncludesLocalBindings()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §O{i32}
-                §B{localVar:i32} 42
-                §B{anotherVar:str} "hello"
-                §R _CURSOR_
+            module TestModule
+              func Test () → int
+                let int:localVar = 42
+                let string:anotherVar = "hello"
+                return localVar
             """;
 
-        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+        AssertNativeSource(source);
+        var completions = LspTestHarness.GetExpressionCompletions(source,
+            source.LastIndexOf("localVar", StringComparison.Ordinal));
 
         Assert.Contains(completions, c => c.Label == "localVar");
         Assert.Contains(completions, c => c.Label == "anotherVar");
@@ -1099,16 +1089,16 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_IncludesFunctions()
     {
         var source = """
-            §M{TestModule}
-              §F{Helper:pub}
-                §O{i32}
-                §R 42
-              §F{Main:pub}
-                §O{i32}
-                §R _CURSOR_
+            module TestModule
+              func Helper () → int
+                return 42
+              func Main () → int
+                return Helper()
             """;
 
-        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+        AssertNativeSource(source);
+        var completions = LspTestHarness.GetExpressionCompletions(source,
+            source.LastIndexOf("Helper", StringComparison.Ordinal));
 
         Assert.Contains(completions, c => c.Label == "Helper");
     }
@@ -1117,13 +1107,13 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_IncludesBooleanLiterals()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §O{bool}
-                §R _CURSOR_
+            module TestModule
+              func Test () → bool
+                return true
             """;
 
-        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+        AssertNativeSource(source);
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "true");
 
         Assert.Contains(completions, c => c.Label == "true");
         Assert.Contains(completions, c => c.Label == "false");
@@ -1133,53 +1123,55 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_ShowsParameterTypes()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §I{i32:count}
-                §O{i32}
-                §R _CURSOR_
+            module TestModule
+              func Test (int:count) → int
+                return count
             """;
 
-        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+        AssertNativeSource(source);
+        var completions = LspTestHarness.GetExpressionCompletions(source,
+            source.LastIndexOf("count", StringComparison.Ordinal));
 
         var countCompletion = completions.FirstOrDefault(c => c.Label == "count");
         Assert.NotNull(countCompletion);
         Assert.Contains("parameter", countCompletion.Detail ?? "");
-        Assert.Contains("INT", countCompletion.Detail ?? "");
+        Assert.Contains("int", countCompletion.Detail ?? "");
     }
 
     [Fact]
     public void ExpressionCompletions_ShowsBindingTypes()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §O{str}
-                §B{name:str} "test"
-                §R _CURSOR_
+            module TestModule
+              func Test () → string
+                let string:name = "test"
+                return name
             """;
 
-        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+        AssertNativeSource(source);
+        var completions = LspTestHarness.GetExpressionCompletions(source,
+            source.LastIndexOf("name", StringComparison.Ordinal));
 
         var nameCompletion = completions.FirstOrDefault(c => c.Label == "name");
         Assert.NotNull(nameCompletion);
-        Assert.Contains("STRING", nameCompletion.Detail ?? "");
+        Assert.Contains("string", nameCompletion.Detail ?? "");
     }
 
     [Fact]
     public void ExpressionCompletions_ForLoopVariable()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §O{i32}
-                §B{~sum:i32} 0
-                §L{i:0:10}
-                  §ASSIGN sum (+ sum _CURSOR_)
-                §R sum
+            module TestModule
+              func Test () → int
+                var int:sum = 0
+                for i from 0 to 10 step 1
+                  set sum sum + i
+                return sum
             """;
 
-        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+        AssertNativeSource(source);
+        var completions = LspTestHarness.GetExpressionCompletions(source,
+            source.IndexOf("sum + i", StringComparison.Ordinal) + "sum + ".Length);
 
         // Loop variable 'i' should be in scope
         Assert.Contains(completions, c => c.Label == "i");
@@ -1190,17 +1182,17 @@ public class CompletionHandlerTests
     [Fact]
     public void ExpressionCompletions_ForeachVariable()
     {
-        // Syntax: §EACH{id:variable:type} collection
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §I{List<str>:items}
-                §O{void}
-                §EACH{item:str} items
-                  §P _CURSOR_
+            module TestModule
+              func Test (System.Collections.Generic.List<string>:items) → void
+                ! cw
+                each string:item in items
+                  System.Console.WriteLine(item)
             """;
 
-        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+        AssertNativeSource(source);
+        var completions = LspTestHarness.GetExpressionCompletions(source,
+            source.LastIndexOf("item", StringComparison.Ordinal));
 
         // Foreach variable 'item' should be in scope
         Assert.Contains(completions, c => c.Label == "item");
@@ -1252,15 +1244,16 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_MutableVsImmutableBindings()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §O{i32}
-                §B{immutable:i32} 10
-                §B{~mutable:i32} 20
-                §R _CURSOR_
+            module TestModule
+              func Test () → int
+                let int:immutable = 10
+                var int:mutable = 20
+                return immutable + mutable
             """;
 
-        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+        AssertNativeSource(source);
+        var completions = LspTestHarness.GetExpressionCompletions(source,
+            source.LastIndexOf("immutable", StringComparison.Ordinal));
 
         var immutableCompletion = completions.FirstOrDefault(c => c.Label == "immutable");
         var mutableCompletion = completions.FirstOrDefault(c => c.Label == "mutable");
@@ -1278,17 +1271,17 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_DoWhileLoop()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §O{i32}
-                §B{~counter:i32} 0
-                §DO
-                §ASSIGN counter (+ counter _CURSOR_)
-                §/DO (< counter 10)
-                §R counter
+            module TestModule
+              func Test () → int
+                var int:counter = 0
+                do
+                  set counter counter + 1
+                while counter < 10
+                return counter
             """;
 
-        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+        AssertNativeSource(source);
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "counter + 1");
 
         // 'counter' should be visible inside do-while body
         Assert.Contains(completions, c => c.Label == "counter");
@@ -1298,15 +1291,16 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_DictionaryForeach_KeyAndValue()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §I{Dict<str,i32>:scores}
-                §O{void}
-                §EACHKV{name:score} scores
-                  §P _CURSOR_
+            module TestModule
+              func Test (System.Collections.Generic.Dictionary<string,int>:scores) → void
+                ! cw
+                each name, score in scores
+                  System.Console.WriteLine(score)
             """;
 
-        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+        AssertNativeSource(source);
+        var completions = LspTestHarness.GetExpressionCompletions(source,
+            source.LastIndexOf("score", StringComparison.Ordinal));
 
         // Both key and value variables should be in scope
         Assert.Contains(completions, c => c.Label == "name");
@@ -1359,19 +1353,18 @@ public class CompletionHandlerTests
     public void ExpressionCompletions_NestedScopes_AllVisible()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §I{i32:param}
-                §O{i32}
-                §B{outer:i32} 1
-                §IF (> param 0)
-                  §B{inner:i32} 2
-                  §L{i:0:10}
-                    §B{deepest:i32} _CURSOR_
-                §R outer
+            module TestModule
+              func Test (int:param) → int
+                let int:outer = 1
+                if param > 0
+                  let int:inner = 2
+                  for i from 0 to 10 step 1
+                    let int:deepest = outer + inner + i
+                return outer
             """;
 
-        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+        AssertNativeSource(source);
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "outer + inner + i");
 
         // All variables from enclosing scopes should be visible
         Assert.Contains(completions, c => c.Label == "param");
