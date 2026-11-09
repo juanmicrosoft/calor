@@ -18,9 +18,12 @@ calor init [options]
 The `init` command sets up your project for Calor development by:
 
 1. **Adding MSBuild targets** - Integrates Calor compilation into your .NET build process
-2. **Configuring AI agent integration** (optional) - Creates skills/prompts for your preferred AI coding assistant
+2. **Configuring AI agent integration** (optional) - Writes project instructions and client-specific MCP and hook configuration
 
 After running `init`, you can write `.calr` files alongside your `.cs` files and they'll compile automatically during `dotnet build`.
+
+The compiler and .NET SDK must be available. Initialization changes configuration;
+it does not itself build the project or prove that its programs are correct.
 
 ---
 
@@ -44,9 +47,13 @@ calor init --project MyApp.csproj
 | Option | Short | Required | Description |
 |:-------|:------|:---------|:------------|
 | `--ai` | `-a` | No | Agent to configure; repeat for `claude`, `codex`, `gemini`, and/or `github` |
-| `--project` | `-p` | No | Target .csproj file (auto-detects if single .csproj exists) |
+| `--project` | `-p` | No | Target .csproj file; without either project option, detection tries solutions before projects |
 | `--solution` | `-s` | No | Initialize all projects in a `.sln` or `.slnx` solution |
-| `--force` | `-f` | No | Overwrite existing files without prompting |
+| `--force` | `-f` | No | Replace managed configuration where supported; review changes and backups |
+
+`--project` and `--solution` are mutually exclusive. Multiple detected solutions
+require an explicit selection. Review the actual created/updated-file report;
+initialization is not an atomic transaction across all files.
 
 ---
 
@@ -60,37 +67,22 @@ Creates the following files:
 
 | File | Purpose |
 |:-----|:--------|
-| `.claude/skills/calor/SKILL.md` | Calor code writing skill with YAML frontmatter |
-| `.claude/skills/calor-convert/SKILL.md` | C# to Calor conversion skill |
-| `.claude/settings.json` | **Hook configuration** - enforces Calor-first development |
+| `.claude/settings.json` | Supported write/edit checks and post-write lint hooks |
 | `CLAUDE.md` | Project guidelines instructing Claude to prefer Calor for new code |
+| `~/.claude.json` | Project-specific `calor` MCP server entry |
 
 #### Calor-First Enforcement
 
-The `.claude/settings.json` file configures a `PreToolUse` hook that **blocks Claude from creating `.cs` files**. When Claude tries to write a C# file, it will see:
+The hooks check supported Write/Edit operations and lint changed Calor files.
+Generated C# and build artifacts have specific allowances; Calor writes still
+undergo content and identity checks.
 
-```text illustrative
-BLOCKED: Cannot create C# file 'MyClass.cs'
+A hook is not an operating-system sandbox. It does not cover every file-writing
+mechanism or guarantee that the agent retries correctly. Read refusals and review
+the resulting files.
 
-This is an Calor-first project. Create an .calr file instead:
-  MyClass.calr
-
-Use /calor skill for Calor syntax help.
-```
-
-Claude will then automatically retry with an `.calr` file. This enforcement ensures all new code is written in Calor.
-
-**Allowed file types:**
-- `.calr` files (always allowed)
-- `.g.cs` generated files (build output)
-- Files in `obj/` directory (build artifacts)
-
-After initialization, use these Claude Code commands:
-
-| Command | Description |
-|:--------|:------------|
-| `/calor` | Write new Calor code with Claude's assistance |
-| `/calor-convert` | Convert existing C# code to Calor syntax |
+Initialization does not install `/calor` or `/calor-convert` slash skills.
+The generated instructions and MCP tools provide language guidance.
 
 ### Codex (`--ai codex`)
 
@@ -133,28 +125,17 @@ Creates the following files:
 
 | File | Purpose |
 |:-----|:--------|
-| `.gemini/skills/calor/SKILL.md` | Calor code writing skill with YAML frontmatter |
-| `.gemini/skills/calor-convert/SKILL.md` | C# to Calor conversion skill |
-| `.gemini/settings.json` | **Hook configuration** - enforces Calor-first development |
+| `.gemini/settings.json` | BeforeTool hooks and the `calor` MCP server configuration |
 | `GEMINI.md` | Project guidelines instructing Gemini to prefer Calor for new code |
 
 #### Calor-First Enforcement
 
-Like Claude Code, **Gemini CLI supports hooks** (since its v0.26 release). The `.gemini/settings.json` file configures a `BeforeTool` hook that **blocks Gemini from creating `.cs` files**.
+The generated BeforeTool configuration checks supported file-writing operations.
+The client must load and accept that configuration. These checks are not a
+sandbox or a guarantee about every generated program.
 
-Gemini will receive a JSON response blocking the operation and suggesting an `.calr` file instead. This enforcement ensures all new code is written in Calor.
-
-**Allowed file types:**
-- `.calr` files (always allowed)
-- `.g.cs` generated files (build output)
-- Files in `obj/` directory (build artifacts)
-
-After initialization, use these Gemini CLI commands:
-
-| Command | Description |
-|:--------|:------------|
-| `@calor` | Write new Calor code with Gemini's assistance |
-| `@calor-convert` | Convert existing C# code to Calor syntax |
+Initialization does not install `@calor` or `@calor-convert` skills. Use the
+generated instructions and the configured compiler tools.
 
 ### GitHub Copilot (`--ai github`)
 
@@ -162,14 +143,14 @@ Creates the following files:
 
 | File | Purpose |
 |:-----|:--------|
-| `.github/copilot/skills/calor/SKILL.md` | Calor code writing skill with YAML frontmatter |
-| `.github/copilot/skills/calor-convert/SKILL.md` | C# to Calor conversion skill |
 | `.github/copilot-instructions.md` | Project documentation with Calor-first guidelines |
 | `.vscode/mcp.json` | MCP server configuration for Copilot Agent mode |
 
 #### Guidance + MCP Tool Enforcement
 
-GitHub Copilot does not support hooks like Claude Code or Gemini CLI. Calor-first development is **guidance-based with MCP tool support**.
+This initializer does not install GitHub Copilot hooks. Its Calor-first setup is
+**guidance-based with MCP tool support**; this is not a claim about every
+Copilot client's capabilities.
 
 MCP tools give Copilot programmatic access to the Calor compiler:
 - `calor_compile`, `calor_verify`, `calor_analyze`, and `calor_convert`
@@ -177,12 +158,8 @@ MCP tools give Copilot programmatic access to the Calor compiler:
 - Enforcement is not automatic - review file extensions after generation
 - Use `calor assess` to find any unconverted `.cs` files
 
-After initialization, reference skills by name in your prompts:
-
-| Usage | Description |
-|:------|:------------|
-| Reference `calor` skill | Write new Calor code with Copilot's assistance |
-| Reference `calor-convert` skill | Convert existing C# code to Calor syntax |
+Initialization does not create project-local Copilot skills. Starting or
+approving the configured MCP server remains the client's responsibility.
 
 ---
 
@@ -206,54 +183,33 @@ This keeps generated files out of your source tree.
 
 ### Build Settings
 
-You can change how Calor builds by adding properties to your `.csproj`. For
-example, to turn off contract proving and keep the default for everything else:
+The inline targets written by `init` invoke the compiler once per source file
+with input and output paths. They are distinct from the `Calor.Sdk` build-task
+integration.
 
-```xml
-<PropertyGroup>
-  <CalorVerify>false</CalorVerify>
-</PropertyGroup>
-```
+| Property | Inline target behavior |
+|:---------|:-----------------------|
+| `CalorOutputDirectory` | Defaults to `$(BaseIntermediateOutputPath)$(Configuration)/$(TargetFramework)/calor/` |
+| `CalorCompilerPath` | Compiler executable; defaults to `calor` when unset |
+| `CalorCompilerOverride` | Supplies the compiler path when `CalorCompilerPath` is unset; the target checks that the override exists |
+| `CalorToolVersion` | Version used to locate the packaged runtime |
+| `CalorRuntimePath` | Runtime assembly reference path |
+| `CalorSkipRuntimeReference` | Set to `true` when the injected runtime reference should be omitted |
 
-| Property | Default | What it does |
-|:---------|:--------|:-------------|
-| `CalorEnforceEffects` | `true` | Check that each function's `§E{…}` list covers what its body really does. Set it to `false` to switch the check off. |
-| `CalorPermissiveEffects` | `false` | Keep the effect checks on, but go easy on calls the compiler cannot look up. See below. |
-| `CalorTypeCheck` | `true` | Run the type checker. |
-| `CalorVerify` | `false` | Try to prove contracts with Z3 during the build. |
-| `CalorElideProvenGuards` | `true` | When a contract is proved, leave its runtime check out of the generated C#. Only matters with `CalorVerify`. |
-| `CalorEnableILAnalysis` | `false` | Read the compiled .NET assemblies you reference to work out what library calls do. |
-| `CalorTranspileOnly` | `false` | Write the C# without type checking or Roslyn validation. Output made this way is never cached. |
-| `CalorOutputDirectory` | `obj/…/calor/` | Where the generated `.g.cs` files go. |
-| `CalorVerbose` | `false` | Print more detail while compiling. |
+Adding a property does not automatically forward it to a CLI invocation.
+The injected targets do not pass effect, verifier, transpile-only or verbosity
+properties, nor do they supply a complete evaluated-project reference context.
+Inspect the actual targets before relying on such settings.
 
 ### CalorPermissiveEffects (New in 0.16)
 
-This is the project-file version of the command line's
-[`--permissive-effects`](/docs/cli/compile/). Turning it on tells the compiler
-to assume that a call it cannot look up does nothing surprising, which helps
-while you are converting older code:
+`Calor.Sdk` supports this setting through its build task; the inline targets
+generated by `init` do not forward it. The CLI equivalent is
+[`--permissive-effects`](/docs/cli/compile/).
 
-```xml
-<PropertyGroup>
-  <CalorPermissiveEffects>true</CalorPermissiveEffects>
-</PropertyGroup>
-```
-
-It stops the two "I cannot tell what this does" messages (`Calor0411` and
-`Calor0425`) and reports "this function does something it never said it would"
-(`Calor0410`) as a warning instead of an error, both inside one file and across
-files. It never excuses an effect you wrote down yourself and then broke:
-`Calor0424`, `Calor0420`, and `Calor0421` stay errors. See
-[Effects](/docs/syntax-reference/effects/) for the full list.
-
-Two things worth knowing:
-
-- **Only `true` and `false` work.** Writing `1` is not a value MSBuild can read
-  as a yes-or-no answer, so the build stops with `MSB4030`.
-- **The first build after you change it is a full rebuild.** The setting is part
-  of the fingerprint that decides whether cached work can be reused, so flipping
-  it makes every file compile again once. Builds after that are back to normal.
+Permissive compilation is a migration policy, not proof that unknown calls are
+pure. Do not count it as ordinary enforced native acceptance. See
+[Effects](/docs/syntax-reference/effects/) for diagnostic meanings.
 
 ---
 
@@ -291,6 +247,18 @@ cd MyCalorApp
 calor init
 calor init --ai claude  # Optional
 ```
+
+For example, save this native source as `Answer.calr`:
+
+```calor
+module InitializedExample
+  func Answer () → int
+    !
+    return 42
+```
+
+`GlobalModule.Answer()` returns `42`. Run `dotnet build` and inspect its actual
+result; the presence of injected targets alone is not a successful build.
 
 ---
 

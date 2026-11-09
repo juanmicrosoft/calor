@@ -129,6 +129,8 @@ public class DocDriftCheckerTests
         new[] { "ContractReview", "LoopReview", "BoundedFactorial", "ExtractedCalculation" },
         new[] { "42", "15", "120", "25" },
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()" })]
+    [InlineData("cli/init.mdx", 1, 0,
+        new[] { "InitializedExample" }, new[] { "42" }, new[] { "GlobalModule.Answer()" })]
     [InlineData("structure-tags.mdx", 20, 2,
         new[] { "StructureModules", "BlockNamespace", "FunctionHeaders", "AsyncFunctions", "AsyncMethods",
             "AwaitExpressions", "LambdaExamples", "AsyncLambdas", "LocalCallables", "DelegateDefinitions",
