@@ -670,16 +670,16 @@ public sealed class LosslessConversionContractTests
         await File.WriteAllTextAsync(
             libraryPath,
             """
-            §M{Library}
-              §F{Square:pub} (i32:x) -> i32
-                §R (* x x)
+            module Library Library
+              func Square public (int:x) → int
+                return x * x
             """);
         await File.WriteAllTextAsync(
             consumerPath,
             """
-            §M{Consumer}
-              §F{UseSquare:pub} (i32:x) -> i32
-                §R §C{Square} §A x §/C
+            module Consumer Consumer
+              func UseSquare public (int:x) → int
+                return Square(x)
             """);
 
         var plan = new MigrationPlan
@@ -743,13 +743,20 @@ public sealed class LosslessConversionContractTests
         await File.WriteAllTextAsync(
             Path.Combine(directory, "Existing.cs"),
             "public sealed class Existing { }");
-        await File.WriteAllTextAsync(
-            sourcePath,
-            """
-            §M{Consumer}
-              §CL{Factory:pub}
-                §CSHARP{public Existing Create() => new Existing();}§/CSHARP
-            """);
+        const string original = """
+            namespace Consumer
+            {
+                public class Factory
+                {
+                    public Existing Create() => new Existing();
+                }
+            }
+            """;
+        var converted = new CSharpToCalorConverter().Convert(original);
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        Assert.True(converted.InteropPreservationCount > 0);
+        Assert.NotNull(converted.CalorSource);
+        await File.WriteAllTextAsync(sourcePath, converted.CalorSource);
         await RestoreAsync(projectPath);
         var plan = new MigrationPlan
         {
@@ -772,8 +779,12 @@ public sealed class LosslessConversionContractTests
             var report = await new ProjectMigrator(
                 new MigrationPlanOptions { Parallel = false }).ExecuteAsync(plan);
 
+            Assert.Empty(Assert.Single(report.FileResults).Issues
+                .Where(issue => issue.Severity == ConversionIssueSeverity.Error));
             Assert.Equal(FileMigrationStatus.Success, Assert.Single(report.FileResults).Status);
             Assert.True(File.Exists(Path.ChangeExtension(sourcePath, ".g.cs")));
+            Assert.Contains("public Existing Create() => new Existing();",
+                await File.ReadAllTextAsync(Path.ChangeExtension(sourcePath, ".g.cs")));
         }
         finally
         {
@@ -798,9 +809,9 @@ public sealed class LosslessConversionContractTests
         await File.WriteAllTextAsync(
             sourcePath,
             """
-            §M{Consumer}
-              §F{Read:pub} () -> i32
-                §R INT:42
+            module Consumer Consumer
+              func Read public () → int
+                return 42
             """);
         var plan = new MigrationPlan
         {
@@ -859,13 +870,12 @@ public sealed class LosslessConversionContractTests
         await File.WriteAllTextAsync(
             sourcePath,
             """
-            §M{Unsafe}
-              §CL{Worker:pub}
-                §MT{Run:pub} () -> void
-                  §E{unsafe}
-                  §UNSAFE
-                    §B{~x:i32} INT:42
-                  §/UNSAFE
+            module Unsafe Unsafe
+              class Worker public
+                func Run public () → void
+                  ! unsafe
+                  unsafe
+                    var int:x = 42
             """);
         await RestoreAsync(projectPath);
         var plan = new MigrationPlan
