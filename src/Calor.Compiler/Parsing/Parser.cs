@@ -123,7 +123,7 @@ public sealed class Parser
     /// </remarks>
     private void TryRecoverTrailingEffectRow(string subject, string subjectKind)
     {
-        if (!Check(TokenKind.Effects))
+        if (!Check(TokenKind.Effects) && !Check(TokenKind.Exclamation))
             return;
 
         // Calor0405's whole claim is that a row is on the wrong LINE. A §E still on
@@ -2256,23 +2256,7 @@ public sealed class Parser
         var startToken = canonical ? Advance() : Expect(TokenKind.Effects);
         var attrs = canonical ? new AttributeCollection() : ParseAttributes();
         if (canonical)
-        {
-            var index = 0;
-            while (!IsAtEnd && Current.Span.Line == startToken.Span.Line
-                   && (Check(TokenKind.Identifier) || Current.IsKeyword || Check(TokenKind.Star)))
-            {
-                var effect = Advance();
-                var code = effect.Text;
-                while (Match(TokenKind.Colon))
-                    code += ":" + (Check(TokenKind.Identifier) || Current.IsKeyword
-                        ? Advance().Text : Expect(TokenKind.Identifier).Text);
-                attrs.Add($"_pos{index++}", code, effect.Span);
-                if (position == EffectRowPosition.Parameter && Check(TokenKind.Comma)
-                    && NativeRowCommaStartsParameter())
-                    break;
-                if (!Match(TokenKind.Comma)) break;
-            }
-        }
+            ReadNativeEffectAttributes(startToken, attrs, position);
 
         var variables = new List<string>();
 
@@ -2311,6 +2295,25 @@ public sealed class Parser
             ordinals.Add(ResolveEffectVariable(variable));
 
         return new EffectsNode(startToken.Span, effects, variables, ordinals);
+    }
+
+    private void ReadNativeEffectAttributes(Token startToken, AttributeCollection attrs, EffectRowPosition position)
+    {
+        var index = 0;
+        while (!IsAtEnd && Current.Span.Line == startToken.Span.Line
+               && (Check(TokenKind.Identifier) || Current.IsKeyword || Check(TokenKind.Star)))
+        {
+            var effect = Advance();
+            var code = effect.Text;
+            while (Match(TokenKind.Colon))
+                code += ":" + (Check(TokenKind.Identifier) || Current.IsKeyword
+                    ? Advance().Text : Expect(TokenKind.Identifier).Text);
+            attrs.Add($"_pos{index++}", code, effect.Span);
+            if (position == EffectRowPosition.Parameter && Check(TokenKind.Comma)
+                && NativeRowCommaStartsParameter())
+                break;
+            if (!Match(TokenKind.Comma)) break;
+        }
     }
 
     private bool NativeRowCommaStartsParameter()
@@ -2408,8 +2411,11 @@ public sealed class Parser
             + "or — if this is meant to be the function's own effect declaration — onto its own line in the §F body.");
 
         // Consume §E and its attribute group(s) so the caller resumes cleanly.
-        Advance();
-        ParseAttributes();
+        var startToken = Advance();
+        if (startToken.Kind == TokenKind.Exclamation)
+            ReadNativeEffectAttributes(startToken, new AttributeCollection(), EffectRowPosition.Declaration);
+        else
+            ParseAttributes();
     }
 
     private RequiresNode ParseRequires()
