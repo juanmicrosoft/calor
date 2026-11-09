@@ -461,6 +461,50 @@ public sealed class CanonicalControlFlowTests
         }
     }
 
+    [Theory]
+    [InlineData("", 13)]
+    [InlineData("FIRST", 11)]
+    [InlineData("SECOND", 12)]
+    [InlineData("FIRST,SECOND", 11)]
+    public void StatementPreprocessor_AlternateDeclarationsRemainVisibleToTheirFollowingSibling(
+        string symbols, int expected)
+    {
+        const string source = """
+            module Conditions
+              func Probe () → int
+                pp FIRST
+                  let int:value = 1
+                pp elif SECOND
+                  let int:value = 2
+                pp else
+                  let int:value = 3
+                return value + 10
+            """;
+        foreach (var program in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var type = Load(Compile(program).GeneratedCode,
+                symbols.Split(',', StringSplitOptions.RemoveEmptyEntries));
+            Assert.Equal(expected, type.GetMethod("Probe")!.Invoke(null, null));
+        }
+    }
+
+    [Theory]
+    [InlineData("pp", "valid same-line")]
+    [InlineData("pp FLAG &&", "valid same-line")]
+    [InlineData("pp elif FLAG", "preceding branch")]
+    [InlineData("pp else", "preceding branch")]
+    [InlineData("pp FLAG\n  return 1\npp else FLAG", "cannot carry a condition")]
+    [InlineData("pp FLAG\n  return 1\npp else\n  return 2\npp else", "preceding branch")]
+    [InlineData("pp FLAG\n  return 1\npp else\n  return 2\npp elif OTHER", "preceding branch")]
+    public void StatementPreprocessor_RejectsMalformedAndOrphanContinuations(string body, string message)
+    {
+        var source = "module Conditions\n  func Probe () → int\n" +
+            string.Join("\n", body.Split('\n').Select(line => "    " + line)) + "\n      return 3";
+        var diagnostics = new DiagnosticBag();
+        _ = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Message.Contains(message, StringComparison.Ordinal));
+    }
+
     [Fact]
     public void StatementPreprocessor_ConverterRetainsExactInactiveStatementsInEveryBranch()
     {
