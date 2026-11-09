@@ -19,12 +19,12 @@ public sealed class FactScopingTests
     public void DoWhile_FirstIterationIsExactWithoutAssumingItsCondition()
     {
         var module = Parse("""
-            §M{Test}
-              §F{Probe:pub} (i32:n) -> void
-                §DO
-                  §PROOF{} (== n 0)
-                §/DO (> n 0)
-                §PROOF{} (== n 0)
+            module Test
+              func Probe (int:n) → void
+                do
+                  proof n == 0
+                while n > 0
+                proof n == 0
             """, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Select(d => d.Message)));
         var function = Assert.Single(module.Functions);
@@ -45,11 +45,11 @@ public sealed class FactScopingTests
         string step, BinaryOperator fromOperator, BinaryOperator toOperator)
     {
         var module = Parse($$"""
-            §M{Test}
-              §F{Probe:pub} (i32:start, i32:end) -> void
-                §L{i:start:end:{{step}}}
-                  §PROOF{} (== i i)
-                §PROOF{} (== start start)
+            module Test
+              func Probe (int:start, int:end) → void
+                for i from start to end step {{step}}
+                  proof i == i
+                proof start == start
             """, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Select(d => d.Message)));
         var function = Assert.Single(module.Functions);
@@ -66,6 +66,46 @@ public sealed class FactScopingTests
         Assert.All(collector.ScopedFacts, fact => Assert.False(fact.AppliesTo(function.Body[1].Span)));
     }
 
+    [Fact]
+    public void ReEvaluatedFor_UsesItsGuardAndNeverInventsSnapshotBounds()
+    {
+        var module = Parse("""
+            module Test
+              func Probe (int:start, int:end) → void
+                for i = start; i < end; i = i + 2
+                  proof i < end
+                proof start == start
+            """, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Select(d => d.Message)));
+        var function = Assert.Single(module.Functions);
+        var loop = Assert.IsType<ForStatementNode>(function.Body[0]);
+        var collector = new FactCollector();
+        collector.CollectFromFunction(function);
+
+        var fact = Assert.Single(collector.ScopedFacts);
+        Assert.Same(loop.Condition, fact.Fact);
+        Assert.True(fact.AppliesTo(loop.Body[0].Span));
+        Assert.False(fact.AppliesTo(function.Body[1].Span));
+        Assert.DoesNotContain(collector.Facts, expression =>
+            expression is BinaryOperationNode { Operator: BinaryOperator.GreaterOrEqual or BinaryOperator.LessOrEqual });
+    }
+
+    [Fact]
+    public void ReEvaluatedFor_BodyMutationKillsTheGuard()
+    {
+        var module = Parse("""
+            module Test
+              func Probe (int:end) → void
+                for i = 0; i < end; i = i + 1
+                  set i end
+                  proof i < end
+            """, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Select(d => d.Message)));
+        var collector = new FactCollector();
+        collector.CollectFromFunction(Assert.Single(module.Functions));
+        Assert.Empty(collector.ScopedFacts);
+    }
+
     private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)
     {
         diagnostics = new DiagnosticBag();
@@ -79,15 +119,13 @@ public sealed class FactScopingTests
     public void SiblingGuards_HaveDisjointScopes()
     {
         var source = """
-            §M{Test}
-              §F{Branchy:priv}
-                  §I{i32:x}
-                  §O{i32}
-                  §IF (== x 1)
-                      §R INT:1
-                  §EI (== x 2)
-                      §R INT:2
-                  §R INT:0
+            module Test
+              func Branchy private (int:x) → int
+                if x == 1
+                  return 1
+                else if x == 2
+                  return 2
+                return 0
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -113,13 +151,11 @@ public sealed class FactScopingTests
     public void GuardFact_DoesNotApply_OutsideItsBranch()
     {
         var source = """
-            §M{Test}
-              §F{Guarded:priv}
-                  §I{i32:x}
-                  §O{i32}
-                  §IF (> x 0)
-                      §R INT:1
-                  §R INT:0
+            module Test
+              func Guarded private (int:x) → int
+                if x > 0
+                  return 1
+                return 0
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -131,7 +167,7 @@ public sealed class FactScopingTests
 
         var guard = Assert.Single(collector.ScopedFacts);
 
-        // The trailing §R INT:0 sits after the then-body; the guard must not
+        // The trailing return sits after the then-body; the guard must not
         // govern it
         var trailingReturn = func.Body[^1];
         Assert.False(guard.AppliesTo(trailingReturn.Span),
@@ -142,14 +178,12 @@ public sealed class FactScopingTests
     public void WhileCondition_Killed_WhenBodyRebindsItsVariable()
     {
         var source = """
-            §M{Test}
-              §F{Counter:priv}
-                  §I{i32:n}
-                  §O{i32}
-                  §B{~i:i32} INT:0
-                  §WH (< i n)
-                      §B{i:i32} (+ i INT:1)
-                  §R i
+            module Test
+              func Counter private (int:n) → int
+                var int:i = 0
+                while i < n
+                  set i i + 1
+                return i
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -170,13 +204,11 @@ public sealed class FactScopingTests
     public void BranchGuard_Killed_WhenBodyAssignsItsVariable()
     {
         var source = """
-            §M{Test}
-              §F{Mutate:priv}
-                §I{i32:x}
-                §O{void}
-                §IF (> x INT:0)
-                  §ASSIGN x INT:-1
-                  §PROOF{} (> x INT:0)
+            module Test
+              func Mutate private (int:x) → void
+                if x > 0
+                  set x -1
+                  proof x > 0
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -197,13 +229,11 @@ public sealed class FactScopingTests
     public void BranchGuard_Killed_WhenBodyMutatesVariableWithExplicitUpdate()
     {
         var source = """
-            §M{Test}
-              §F{Mutate:priv}
-                §I{i32:x}
-                §O{void}
-                §IF (> x INT:0)
-                  §ASSIGN x (- x INT:1)
-                  §PROOF{} (> x INT:0)
+            module Test
+              func Mutate private (int:x) → void
+                if x > 0
+                  set x x - 1
+                  proof x > 0
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -224,13 +254,11 @@ public sealed class FactScopingTests
     public void MethodBranchGuard_IsCollectedWithFunctionSemantics()
     {
         var source = """
-            §M{Test}
-              §CL{Checker:pub}
-                §MT{Check:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §IF (> x INT:0)
-                    §PROOF{} (> x INT:0)
+            module Test
+              class Checker
+                func Check (int:x) → void
+                  if x > 0
+                    proof x > 0
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -253,12 +281,11 @@ public sealed class FactScopingTests
     public void NegativeStepForLoop_UsesInclusiveDescendingBounds()
     {
         var source = """
-            §M{Test}
-              §F{Descending:priv}
-                §O{i32}
-                §L{i:2:0:-1}
-                  §P (>= i INT:0)
-                §R INT:0
+            module Test
+              func Descending private () → int
+                for i from 2 to 0 step -1
+                  System.Console.WriteLine(i >= 0)
+                return 0
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -279,17 +306,15 @@ public sealed class FactScopingTests
     public void DynamicStepForLoop_DoesNotAssumeDirection()
     {
         var source = """
-            §M{Test}
-              §F{Dynamic:priv}
-                §I{i32:step}
-                §O{i32}
-                §L{i:0:10:step}
-                  §PROOF{} (>= i INT:0)
-                §R INT:0
+            module Test
+              func Dynamic private (int:@step) → int
+                for i from 0 to 10 step @step
+                  proof i >= 0
+                return 0
             """;
 
         var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
+        Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Select(d => d.Message)));
 
         var collector = new FactCollector();
         collector.CollectFromFunction(Assert.Single(module.Functions));
