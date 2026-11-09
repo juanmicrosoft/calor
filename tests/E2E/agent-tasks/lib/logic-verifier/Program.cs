@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Text.Json;
 using Calor.Compiler;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
@@ -46,6 +47,11 @@ static void Verify(string profile, string path)
     if (profile is "advanced001" or "advanced002" or "advanced003" or "advanced004")
     {
         VerifyAdvancedMath(profile, path);
+        return;
+    }
+    if (profile.StartsWith("bench-", StringComparison.Ordinal))
+    {
+        VerifyRefactoringBenchmark(profile, path);
         return;
     }
     if (profile is "ref001" or "ref003" or "ref004" or "ref005" or "ref006" or "ref007" or "ref008")
@@ -4102,6 +4108,573 @@ static IEnumerable<(int[] Inputs, bool Positive, object? Payload)> CarrierCases(
     else
         for (var repetition = 0; repetition < 8; repetition++)
             yield return ([], false, profile == "type004" ? "Operation not supported" : null);
+}
+
+static void VerifyNativeBenchmarkPrerequisite(string task, string workspace)
+{
+    var category = task.Split('-')[0];
+    var files = category switch
+    {
+        "contract" => new[] { "Contract.calr" }, "extract" => new[] { "Extract.calr" },
+        "inline" => new[] { "Inline.calr" }, "rename" => new[] { "Rename.calr" },
+        "sig" => new[] { "Signature.calr" }, "move" => new[] { "src/Math.calr", "src/Utils.calr" },
+        _ => throw new InvalidOperationException("Unknown native benchmark task.")
+    };
+    foreach (var file in files)
+        if (!File.Exists(Path.Combine(workspace, file)))
+            throw new InvalidOperationException($"Benchmark input missing: {file}");
+    var sidecar = Path.Combine(workspace, ".calor", "ids.json");
+    if (!File.Exists(sidecar))
+        throw new InvalidOperationException("Native benchmark identity prerequisite missing: original persisted sidecar.");
+    using var document = JsonDocument.Parse(File.ReadAllText(sidecar));
+    var identities = document.RootElement.GetProperty("Declarations").EnumerateArray()
+        .Select(declaration => declaration.GetProperty("Id").GetString()).ToArray();
+    if (!identities.Contains("f001") || identities.Any(identity => identity == null)
+        || identities.Distinct(StringComparer.Ordinal).Count() != identities.Length)
+        throw new InvalidOperationException("Native benchmark original literal-ID lineage is missing or ambiguous.");
+    var compiler = typeof(Calor.Compiler.Program).Assembly;
+    var storeType = compiler.GetType("Calor.Compiler.Ids.DeclarationIdentityStore")
+        ?? throw new InvalidOperationException("Native benchmark sidecar prerequisite unavailable in selected archived compiler; current literal-ID admission remains blocked.");
+    var canonical = compiler.GetType("Calor.Compiler.Ids.IdValidator")?.GetMethod("IsCanonicalId")
+        ?? throw new InvalidOperationException("Native benchmark canonical identity API unavailable.");
+    if (canonical.Invoke(null, ["f001"]) is not false)
+        throw new InvalidOperationException("Native benchmark identity capability changed; full behavioral admission must be implemented before acceptance.");
+    var store = Activator.CreateInstance(storeType, workspace)
+        ?? throw new InvalidOperationException("Native benchmark identity store unavailable.");
+    var sync = storeType.GetMethod("Sync")
+        ?? throw new InvalidOperationException("Native benchmark identity sync API unavailable.");
+    try
+    {
+        _ = sync.Invoke(store, [files.Select(file => Path.Combine(workspace, file)).ToArray()]);
+    }
+    catch (TargetInvocationException error) when (error.InnerException is InvalidDataException
+        { Message: "Identity sidecar contains duplicate or invalid declarations. Resolve conflicts with ids sync, not by choosing an ID." })
+    {
+        throw new InvalidOperationException(
+            "Native benchmark literal-ID prerequisite refused: selected DeclarationIdentityStore.Sync requires canonical identities and rejects proven original m001/f001-style IDs. This is not a behavior rejection.",
+            error.InnerException);
+    }
+    throw new InvalidOperationException("Native benchmark identity capability changed; full behavioral admission must be implemented before acceptance.");
+}
+
+static void VerifyRefactoringBenchmark(string profile, string workspace)
+{
+    var native = profile.EndsWith("-calor", StringComparison.Ordinal);
+    if (!native && !profile.EndsWith("-csharp", StringComparison.Ordinal))
+        throw new InvalidOperationException("Unknown benchmark language.");
+    var task = profile["bench-refactor-".Length..^(native ? "-calor".Length : "-csharp".Length)];
+    if (native)
+    {
+        VerifyNativeBenchmarkPrerequisite(task, workspace);
+        return;
+    }
+    var category = task.Split('-')[0];
+    var filename = category switch
+    {
+        "contract" => "Contract.cs", "extract" => "Extract.cs", "inline" => "Inline.cs",
+        "rename" => "Rename.cs", "sig" => "Signature.cs", "move" => "src/Math.cs",
+        _ => throw new InvalidOperationException($"Unknown refactoring benchmark profile: {profile}")
+    };
+    var target = task switch
+    {
+        "contract-pre" => "Sqrt", "contract-post" => "Abs", "contract-bounds" => "GetElement",
+        "contract-effect" => "PrintValue", "extract-simple" => "Distance",
+        "extract-contracts" => "ProcessArray", "extract-effects" => "LogAndCompute",
+        "extract-nested" => "ComputeNested", "inline-simple" or "rename-param" => "Calculate",
+        "inline-multi" => "SumOfSquares", "inline-contracts" => "NormalizeScore",
+        "rename-contract" => "ValidatedOp", "rename-shadow" => "OuterCalc",
+        "sig-addparam" => "Greet", "sig-return" => "TryParse", "sig-reorder" => "CreateRange",
+        "move-module" or "move-deps" => "Abs", "move-contracts" => "SafeDivide",
+        _ => throw new InvalidOperationException($"Unknown refactoring benchmark profile: {profile}")
+    };
+    var files = category == "move" ? new[] { filename, "src/Utils.cs" } : new[] { filename };
+    var additionalFiles = Directory.EnumerateFiles(workspace, "*.cs", SearchOption.AllDirectories)
+        .Select(path => Path.GetRelativePath(workspace, path).Replace(Path.DirectorySeparatorChar, '/'))
+        .Where(file => !file.Split('/').SkipLast(1)
+            .Any(directory => directory.Equals("bin", StringComparison.OrdinalIgnoreCase)
+                || directory.Equals("obj", StringComparison.OrdinalIgnoreCase)))
+        .Where(file => !files.Contains(file, StringComparer.Ordinal))
+        .OrderBy(file => file, StringComparer.Ordinal).ToArray();
+    files = files.Concat(additionalFiles).ToArray();
+    var options = new CSharpParseOptions(LanguageVersion.Preview);
+    var trees = files.Select(file =>
+    {
+        var path = Path.Combine(workspace, file);
+        if (!File.Exists(path))
+            throw new InvalidOperationException($"Benchmark input missing: {file}");
+        return CSharpSyntaxTree.ParseText(File.ReadAllText(path), options, path);
+    }).ToArray();
+    var compilation = CSharpCompilation.Create("IndependentCSharpBenchmark",
+        trees.Prepend(CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble, options)),
+        GeneratedCSharpCompiler.References,
+        new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
+    Assembly Emit(CSharpCompilation candidate)
+    {
+        using var bytes = new MemoryStream();
+        var result = candidate.Emit(bytes);
+        if (!result.Success)
+            throw new InvalidOperationException($"Benchmark C# compilation failed:\n{string.Join("\n", result.Diagnostics)}");
+        return Assembly.Load(bytes.ToArray());
+    }
+    var assembly = Emit(compilation);
+    var methods = trees.SelectMany(tree => tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()).ToArray();
+    var classes = trees.SelectMany(tree => tree.GetRoot().DescendantNodes().OfType<ClassDeclarationSyntax>()).ToArray();
+    if (methods.Any(method => method.AttributeLists.Count != 0
+            || method.Modifiers.Any(modifier => modifier.IsKind(SyntaxKind.ExternKeyword) || modifier.IsKind(SyntaxKind.UnsafeKeyword)))
+        || classes.Any(type => type.Members.Any(member => member is not MethodDeclarationSyntax))
+        || trees.Any(tree => tree.GetRoot().DescendantNodes().Any(node => node is GlobalStatementSyntax
+            or PropertyDeclarationSyntax or EventDeclarationSyntax or LocalFunctionStatementSyntax
+            or AnonymousFunctionExpressionSyntax or UnsafeStatementSyntax or DestructorDeclarationSyntax)))
+        throw new InvalidOperationException("Unsupported finite benchmark executable surface.");
+    var owners = category == "move" ? new[] { "MoveExamples.MathModule", "MoveExamples.UtilsModule" }
+        : new[] { category switch
+        {
+            "contract" => "ContractExamples.Calculator", "extract" => "ExtractExamples.Calculator",
+            "inline" => "InlineExamples.Calculator", "rename" => "RenameExamples.Calculator",
+            _ => "SignatureExamples.Functions"
+        } };
+    foreach (var tree in trees)
+    {
+        var semantic = compilation.GetSemanticModel(tree);
+        foreach (var call in tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>())
+        {
+            if (semantic.GetOperation(call) is Microsoft.CodeAnalysis.Operations.INameOfOperation)
+                continue;
+            if (semantic.GetSymbolInfo(call).Symbol is not IMethodSymbol symbol)
+                throw new InvalidOperationException("Unresolved benchmark invocation.");
+            if (!symbol.ContainingAssembly.Equals(compilation.Assembly, SymbolEqualityComparer.Default)
+                && !(symbol.ContainingType.ToDisplayString() == "System.Console" && symbol.Name == "WriteLine")
+                && !(symbol.ContainingType.ToDisplayString() == "System.Math" && symbol.Name == "Abs"))
+                throw new InvalidOperationException($"Unsupported finite benchmark invocation: {symbol}.");
+        }
+        foreach (var creation in tree.GetRoot().DescendantNodes().Where(node =>
+                     node is ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax))
+        {
+            var type = semantic.GetTypeInfo(creation).Type?.ToDisplayString();
+            if (type is not ("System.ArgumentOutOfRangeException" or "System.DivideByZeroException")
+                && (type == null || !owners.Contains(type)))
+                throw new InvalidOperationException($"Unsupported finite benchmark construction: {type}.");
+        }
+    }
+    MethodDeclarationSyntax Declaration(string name, string[] parameters, string result, bool helper = false, bool moved = false)
+    {
+        var declarations = methods.Where(method => method.Identifier.ValueText == name).ToArray();
+        if (declarations.Length != 1)
+            throw new InvalidOperationException($"Benchmark requires exactly one selected method: {name}.");
+        var declaration = declarations[0];
+        var semantic = compilation.GetSemanticModel(declaration.SyntaxTree);
+        var symbol = semantic.GetDeclaredSymbol(declaration)
+            ?? throw new InvalidOperationException("Benchmark method identity unresolved.");
+        var expectedOwner = owners[moved ? 1 : 0];
+        var expectedTypes = parameters.Select(parameter => parameter.Split(':')[0]).ToArray();
+        var expectedNames = parameters.Select(parameter => parameter.Split(':')[1]).ToArray();
+        if (symbol.ContainingType.ToDisplayString() != expectedOwner
+            || !symbol.Parameters.Select(parameter => parameter.Name).SequenceEqual(expectedNames)
+            || !symbol.Parameters.Select(parameter => parameter.Type.ToDisplayString()).SequenceEqual(expectedTypes)
+            || symbol.Parameters.Any(parameter => parameter.RefKind != RefKind.None || parameter.IsOptional || parameter.IsParams)
+            || symbol.ReturnType.ToDisplayString() != result || symbol.IsGenericMethod || symbol.IsAsync
+            || symbol.DeclaredAccessibility != (helper ? Accessibility.Private : Accessibility.Public)
+            || declaration.Body == null && declaration.ExpressionBody == null
+            || moved && declaration.SyntaxTree != trees[1])
+            throw new InvalidOperationException($"Wrong benchmark selected method signature/owner: {name}.");
+        return declaration;
+    }
+    string[] parameters = target switch
+    {
+        "Sqrt" or "Abs" or "PrintValue" => ["int:x"],
+        "GetElement" or "ProcessArray" => ["int:index", "int:length"],
+        "Distance" or "SumOfSquares" => ["int:x", "int:y"],
+        "LogAndCompute" or "SafeDivide" => ["int:a", "int:b"],
+        "ComputeNested" => ["int:x", "int:y", "int:z"],
+        "Calculate" when category == "rename" => ["int:value"],
+        "Calculate" => ["int:a", "int:b"],
+        "NormalizeScore" => ["int:score"], "ValidatedOp" => ["int:value", "int:max"],
+        "OuterCalc" => ["int:input"], "Greet" => ["string:greeting", "string:name"],
+        "TryParse" => ["string:input"], _ => ["int:step", "int:start", "int:end"]
+    };
+    var resultType = target == "PrintValue" ? "void" : target == "Greet" ? "string" : target == "TryParse" ? "int?" : "int";
+    var selected = Declaration(target, parameters, resultType, moved: category == "move");
+    var required = new List<MethodDeclarationSyntax> { selected };
+    var helperName = task switch
+    {
+        "extract-simple" => "SumOfSquares", "extract-contracts" => "ValidateIndex",
+        "extract-effects" => "ComputeSum", "extract-nested" => "Square", _ => ""
+    };
+    MethodDeclarationSyntax? helper = null;
+    if (helperName.Length != 0)
+    {
+        string[] helperParameters = task switch
+        {
+            "extract-contracts" => ["int:index", "int:length"],
+            "extract-nested" => ["int:n"], _ => ["int:a", "int:b"]
+        };
+        helper = Declaration(helperName, helperParameters, task == "extract-contracts" ? "bool" : "int", helper: true);
+        required.Add(helper);
+    }
+    if (task == "sig-reorder")
+        required.Add(Declaration("CountSteps", ["int:max"], "int"));
+    if (category == "move" && target == "Abs")
+        required.Add(Declaration("Distance", ["int:x", "int:y"], "int"));
+
+    void Comments(MethodDeclarationSyntax method, string[] pre, string[] post)
+    {
+        var text = method.DescendantTrivia()
+            .Where(trivia => trivia.IsKind(SyntaxKind.SingleLineCommentTrivia)).Select(trivia => trivia.ToString()[2..].Trim()).ToArray();
+        string[] Conditions(string label) => text.Where(line => line.StartsWith(label + ":", StringComparison.Ordinal))
+            .Select(line => line[(label.Length + 1)..].Trim().Replace(" (when valid)", "", StringComparison.Ordinal)).ToArray();
+        var names = method.ParameterList.Parameters.Select(parameter => parameter.Identifier.ValueText).Append("result").ToArray();
+        var booleanResult = compilation.GetSemanticModel(method.SyntaxTree).GetDeclaredSymbol(method)?.ReturnType.SpecialType
+            == SpecialType.System_Boolean;
+        using var context = new Context();
+        BitVecExpr Value(ExpressionSyntax expression) => expression switch
+        {
+            ParenthesizedExpressionSyntax parenthesized => Value(parenthesized.Expression),
+            IdentifierNameSyntax identifier when names.Contains(identifier.Identifier.ValueText) =>
+                context.MkBVConst(identifier.Identifier.ValueText, 32),
+            LiteralExpressionSyntax literal when literal.Token.Value is int number => context.MkBV(number, 32),
+            PrefixUnaryExpressionSyntax unary when unary.IsKind(SyntaxKind.UnaryMinusExpression) => context.MkBVNeg(Value(unary.Operand)),
+            BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.AddExpression) => context.MkBVAdd(Value(binary.Left), Value(binary.Right)),
+            BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.SubtractExpression) => context.MkBVSub(Value(binary.Left), Value(binary.Right)),
+            BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.MultiplyExpression) => context.MkBVMul(Value(binary.Left), Value(binary.Right)),
+            BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.DivideExpression) => context.MkBVSDiv(Value(binary.Left), Value(binary.Right)),
+            _ => throw new InvalidOperationException("Unsupported benchmark contract documentation expression.")
+        };
+        BoolExpr Predicate(ExpressionSyntax expression) => expression switch
+        {
+            ParenthesizedExpressionSyntax parenthesized => Predicate(parenthesized.Expression),
+            LiteralExpressionSyntax literal when literal.IsKind(SyntaxKind.TrueLiteralExpression) => context.MkTrue(),
+            LiteralExpressionSyntax literal when literal.IsKind(SyntaxKind.FalseLiteralExpression) => context.MkFalse(),
+            IdentifierNameSyntax identifier when identifier.Identifier.ValueText == "result"
+                && booleanResult => context.MkBoolConst("result"),
+            PrefixUnaryExpressionSyntax unary when unary.IsKind(SyntaxKind.LogicalNotExpression) => context.MkNot(Predicate(unary.Operand)),
+            BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.LogicalAndExpression) => context.MkAnd(Predicate(binary.Left), Predicate(binary.Right)),
+            BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.LogicalOrExpression) => context.MkOr(Predicate(binary.Left), Predicate(binary.Right)),
+            BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.EqualsExpression)
+                && booleanResult => context.MkEq(Predicate(binary.Left), Predicate(binary.Right)),
+            BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.EqualsExpression) => context.MkEq(Value(binary.Left), Value(binary.Right)),
+            BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.NotEqualsExpression) => context.MkNot(context.MkEq(Value(binary.Left), Value(binary.Right))),
+            BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.GreaterThanOrEqualExpression) => context.MkBVSGE(Value(binary.Left), Value(binary.Right)),
+            BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.GreaterThanExpression) => context.MkBVSGT(Value(binary.Left), Value(binary.Right)),
+            BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.LessThanOrEqualExpression) => context.MkBVSLE(Value(binary.Left), Value(binary.Right)),
+            BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.LessThanExpression) => context.MkBVSLT(Value(binary.Left), Value(binary.Right)),
+            _ => throw new InvalidOperationException("Unsupported benchmark contract documentation predicate.")
+        };
+        BoolExpr Parse(string expression)
+        {
+            var parsed = SyntaxFactory.ParseExpression(expression);
+            if (parsed.ContainsDiagnostics)
+                throw new InvalidOperationException("Invalid benchmark contract documentation predicate.");
+            return Predicate(parsed);
+        }
+        foreach (var (actual, expected) in new[] { (Conditions("Precondition"), pre), (Conditions("Postcondition"), post) })
+        {
+            if (actual.Length != expected.Length)
+                throw new InvalidOperationException($"Wrong benchmark contract documentation count: {method.Identifier.ValueText}.");
+            using var solver = context.MkSolver();
+            using var solverParameters = context.MkParams();
+            solverParameters.Add("timeout", 5000u);
+            solver.Parameters = solverParameters;
+            solver.Assert(context.MkNot(context.MkEq(context.MkAnd(actual.Select(Parse).ToArray()),
+                context.MkAnd(expected.Select(Parse).ToArray()))));
+            var status = solver.Check();
+            if (status == Status.UNKNOWN)
+                throw new InvalidOperationException($"UNKNOWN benchmark contract equivalence: {solver.ReasonUnknown}");
+            if (status != Status.UNSATISFIABLE)
+                throw new InvalidOperationException($"Wrong benchmark contract documentation predicate: {method.Identifier.ValueText}.");
+        }
+    }
+    void EffectComment(MethodDeclarationSyntax method, bool pure)
+    {
+        var comments = method.GetLeadingTrivia().Where(trivia => trivia.IsKind(SyntaxKind.SingleLineCommentTrivia))
+            .Select(trivia => trivia.ToString()[2..].Trim()).Where(text => text.StartsWith("Effect:", StringComparison.Ordinal)).ToArray();
+        var allowed = pure ? new[] { "Effect: None (pure function)", "Effect: None", "Effect: Pure" }
+            : new[] { "Effect: Writes to console", "Effect: Writes to console (cw)" };
+        if (comments.Length != 1 || !allowed.Contains(comments[0]))
+            throw new InvalidOperationException($"Wrong benchmark effect documentation: {method.Identifier.ValueText}.");
+    }
+    switch (task)
+    {
+        case "contract-pre": Comments(selected, ["x >= 0"], []); break;
+        case "contract-post": Comments(selected, [], ["result >= 0"]); break;
+        case "contract-bounds": Comments(selected, ["index >= 0", "index < length", "length > 0"], []); break;
+        case "contract-effect": EffectComment(selected, false); break;
+        case "extract-contracts":
+            Comments(selected, ["index >= 0", "index < length"], ["result >= 0"]);
+            Comments(helper!, ["length >= 0"], ["result == (index >= 0 && index < length)"]);
+            break;
+        case "extract-effects": EffectComment(selected, false); EffectComment(helper!, true); break;
+        case "extract-nested": Comments(helper!, [], ["result >= 0"]); break;
+        case "inline-contracts": Comments(selected, [], ["result >= 0", "result <= 100"]); break;
+        case "inline-multi": Comments(selected, [], ["result >= 0"]); break;
+        case "rename-param": Comments(selected, [], ["result == value * 2"]); break;
+        case "rename-contract": Comments(selected, ["value >= 0", "value <= max"], ["result <= max"]); break;
+        case "sig-reorder":
+            Comments(selected, ["step > 0", "start <= end"], []);
+            Comments(required[1], ["max > 0"], []);
+            break;
+        case "move-module": case "move-deps":
+            Comments(selected, [], ["result >= 0"]);
+            Comments(required[1], [], ["result >= 0"]);
+            break;
+        case "move-contracts": Comments(selected, ["b != 0"], ["result == a / b"]); break;
+        case "sig-return":
+            var nullableComments = selected.GetLeadingTrivia().Where(trivia => trivia.IsKind(SyntaxKind.SingleLineCommentTrivia))
+                .Select(trivia => trivia.ToString()[2..].Trim()).ToArray();
+            if (!nullableComments.Contains("Postcondition: result is null for invalid input, or the parsed value"))
+                throw new InvalidOperationException("Wrong benchmark nullable-result documentation.");
+            break;
+    }
+    if (task == "rename-shadow")
+    {
+        var locals = selected.DescendantNodes().OfType<VariableDeclaratorSyntax>()
+            .Where(variable => variable.Identifier.ValueText == "inner").ToArray();
+        if (locals.Length != 1 || compilation.GetSemanticModel(selected.SyntaxTree).GetDeclaredSymbol(locals[0]) is not ILocalSymbol)
+            throw new InvalidOperationException("Benchmark renamed parameter must preserve the independent inner local.");
+    }
+    IMethodSymbol Symbol(MethodDeclarationSyntax method) =>
+        compilation.GetSemanticModel(method.SyntaxTree).GetDeclaredSymbol(method)
+            ?? throw new InvalidOperationException("Benchmark selected symbol missing.");
+    var couplingCalls = new List<InvocationExpressionSyntax>();
+    if (helper != null || task == "sig-reorder" || category == "move" && target == "Abs")
+    {
+        var caller = helper != null ? selected : required[1];
+        var supplied = helper ?? selected;
+        var semantic = compilation.GetSemanticModel(caller.SyntaxTree);
+        couplingCalls.AddRange(caller.DescendantNodes().OfType<InvocationExpressionSyntax>()
+            .Where(call => SymbolEqualityComparer.Default.Equals(semantic.GetSymbolInfo(call).Symbol, Symbol(supplied))));
+        var minimum = task == "extract-nested" ? 3 : 1;
+        if (couplingCalls.Count < minimum)
+            throw new InvalidOperationException("Required benchmark supplying helper call missing.");
+    }
+    if (category == "inline")
+    {
+        var retired = task == "inline-simple" ? "Double" : task == "inline-multi" ? "Square" : "Clamp";
+        var semantic = compilation.GetSemanticModel(selected.SyntaxTree);
+        if (selected.DescendantNodes().OfType<InvocationExpressionSyntax>().Any(call =>
+                semantic.GetSymbolInfo(call).Symbol is IMethodSymbol symbol && (symbol.Name == retired
+                    || symbol.ContainingAssembly.Equals(compilation.Assembly, SymbolEqualityComparer.Default))))
+            throw new InvalidOperationException("Benchmark inline target still calls the original helper.");
+        var minimum = task == "inline-contracts" ? 0 : 2;
+        if (selected.DescendantNodes().OfType<BinaryExpressionSyntax>().Count(binary => binary.IsKind(SyntaxKind.MultiplyExpression)) < minimum)
+            throw new InvalidOperationException("Required benchmark inlined multiplication missing.");
+    }
+    var cases = new List<(string Name, object[] Inputs, object? Expected, string Output, Type? Exception, string? Parameter)>();
+    void Case(string name, object[] inputs, object? expected, string output = "", Type? exception = null, string? parameter = null) =>
+        cases.Add((name, inputs, expected, output, exception, parameter));
+    int[] values = [int.MinValue, -46341, -46340, -101, -17, -2, -1, 0, 1, 2, 17, 99, 100, 101, 46340, 46341, int.MaxValue];
+    foreach (var x in values)
+    {
+        if (target == "Sqrt")
+            Case(target, [x], x, exception: x < 0 ? typeof(ArgumentOutOfRangeException) : null, parameter: x < 0 ? "x" : null);
+        else if (target == "Abs" && x != int.MinValue)
+            Case(target, [x], Math.Abs(x));
+        else if (target == "PrintValue")
+            Case(target, [x], null, x.ToString(System.Globalization.CultureInfo.InvariantCulture) + "\n");
+        else if (target == "NormalizeScore")
+            Case(target, [x], Math.Clamp(x, 0, 100));
+        else if (target == "OuterCalc" && (long)x * 3 is >= int.MinValue and <= int.MaxValue)
+            Case(target, [x], x * 3);
+        else if (target == "Calculate" && category == "rename" && (long)x * 2 is >= int.MinValue and <= int.MaxValue)
+            Case(target, [x], x * 2);
+        foreach (var y in values)
+        {
+            if (target is "Distance" or "SumOfSquares")
+            {
+                var first = (long)x * x;
+                var second = (long)y * y;
+                if (first <= int.MaxValue && second <= int.MaxValue && first + second <= int.MaxValue)
+                    Case(target, [x, y], (int)(first + second));
+            }
+            else if (target == "LogAndCompute" && (long)x + y is >= int.MinValue and <= int.MaxValue)
+                Case(target, [x, y], x + y, "Computing sum\n");
+            else if (target == "Calculate" && category == "inline" && 2L * (x + (long)y) is >= int.MinValue and <= int.MaxValue)
+                Case(target, [x, y], (int)(2L * (x + (long)y)));
+            else if (target == "GetElement")
+                Case(target, [x, y], x, exception: y <= 0 || x < 0 || x >= y ? typeof(ArgumentOutOfRangeException) : null,
+                    parameter: y <= 0 ? "length" : x < 0 || x >= y ? "index" : null);
+            else if (target == "ProcessArray" && y >= 0)
+                Case(target, [x, y], x >= 0 && x < y ? x : -1);
+            else if (target == "ValidatedOp")
+                Case(target, [x, y], x, exception: x < 0 || x > y ? typeof(ArgumentOutOfRangeException) : null,
+                    parameter: x < 0 || x > y ? "value" : null);
+            else if (target == "SafeDivide" && (x != int.MinValue || y != -1))
+                Case(target, [x, y], y == 0 ? null : x / y, exception: y == 0 ? typeof(DivideByZeroException) : null);
+        }
+    }
+    if (target == "ComputeNested")
+        foreach (var x in new[] { -101, -2, -1, 0, 1, 2, 101 })
+            foreach (var y in new[] { -101, -2, -1, 0, 1, 2, 101 })
+                foreach (var z in new[] { -101, -2, -1, 0, 1, 2, 101 })
+                    Case(target, [x, y, z], x * x + y * y + z * z);
+    if (target == "Greet")
+        foreach (var greeting in new[] { "", "Hello ", "a", "Ω", "line\n", "\0" })
+            foreach (var name in new[] { "", "Bob", "a", "世界", "\0", "line\n" })
+                Case(target, [greeting, name], greeting + name);
+    if (target == "TryParse")
+        foreach (var input in new[] { "", "invalid", " ", "2147483648", "-2147483649", "x1", "1x" })
+            Case(target, [input], null);
+    if (task == "sig-reorder")
+    {
+        foreach (var step in new[] { 1, 2, 3, 17, 100 })
+            foreach (var start in new[] { -101, -17, -1, 0, 1, 17 })
+                foreach (var end in new[] { -1, 0, 1, 17, 99, 100, 101 })
+                    if (start <= end)
+                        Case("CreateRange", [step, start, end], (end - start) / step);
+        foreach (var max in new[] { 1, 2, 3, 17, 99, 100, 101, int.MaxValue })
+            Case("CountSteps", [max], max);
+    }
+    if (category == "move" && target == "Abs")
+        foreach (var x in new[] { -101, -1, 0, 1, 17 })
+            foreach (var y in new[] { -101, -1, 0, 1, 17 })
+                Case("Distance", [x, y], x * x + y * y);
+    if (helper != null)
+    {
+        if (task == "extract-nested")
+            foreach (var n in values.Where(n => (long)n * n <= int.MaxValue))
+                Case(helperName, [n], n * n);
+        else
+            foreach (var a in new[] { -17, -1, 0, 1, 17 })
+                foreach (var b in new[] { -17, -1, 0, 1, 17 })
+                    if (task != "extract-contracts" || b >= 0)
+                        Case(helperName, [a, b], task == "extract-contracts" ? a >= 0 && a < b
+                            : task == "extract-effects" ? a + b : a * a + b * b);
+    }
+    bool Behavior(Assembly candidate, bool dependence = false)
+    {
+        var correct = true;
+        foreach (var test in cases)
+        {
+            var declaration = required.Single(method => method.Identifier.ValueText == test.Name);
+            var symbol = Symbol(declaration);
+            var type = candidate.GetType(symbol.ContainingType.ToDisplayString())
+                ?? throw new InvalidOperationException("Benchmark reflected owner missing.");
+            var matches = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                .Where(method => method.Name == test.Name).ToArray();
+            if (matches.Length != 1 || !matches[0].GetParameters().Select(parameter => parameter.Name)
+                    .SequenceEqual(symbol.Parameters.Select(parameter => parameter.Name)))
+                throw new InvalidOperationException("Benchmark reflected method identity differs.");
+            var method = matches[0];
+            var instance = method.IsStatic ? null : Activator.CreateInstance(type);
+            var previous = Console.Out;
+            var previousError = Console.Error;
+            using var output = new BoundedOutput();
+            using var errorOutput = new BoundedOutput();
+            object? value = null;
+            Exception? thrown = null;
+            try
+            {
+                Console.SetOut(output);
+                Console.SetError(errorOutput);
+                value = method.Invoke(instance, test.Inputs);
+            }
+            catch (TargetInvocationException error)
+            {
+                thrown = error.InnerException;
+            }
+            finally
+            {
+                Console.SetOut(previous);
+                Console.SetError(previousError);
+            }
+            if (dependence && thrown != null && test.Exception == null)
+                throw new InvalidOperationException("Benchmark counterfactual threw; exceptions are not supplying-path evidence.", thrown);
+            if (!dependence || test.Exception == null)
+            {
+                correct &= test.Exception == null ? thrown == null && Equals(value, test.Expected)
+                    : thrown?.GetType() == test.Exception
+                      && (test.Parameter == null || thrown is ArgumentOutOfRangeException range && range.ParamName == test.Parameter);
+                correct &= output.ToString().Replace("\r\n", "\n", StringComparison.Ordinal) == test.Output && errorOutput.ToString() == "";
+            }
+        }
+        return correct;
+    }
+    if (cases.Count == 0 || !Behavior(assembly))
+        throw new InvalidOperationException("Wrong independent benchmark runtime behavior, validation, or output.");
+    var interventions = 0;
+    foreach (var call in couplingCalls)
+    {
+        var tree = call.SyntaxTree;
+        var type = compilation.GetSemanticModel(tree).GetTypeInfo(call).Type;
+        var replacement = type?.SpecialType == SpecialType.System_Boolean
+            ? SyntaxFactory.ParseExpression($"!({call})") : SyntaxFactory.ParseExpression($"unchecked(({call}) + 1)");
+        var counter = tree.WithRootAndOptions(tree.GetRoot().ReplaceNode(call, replacement), tree.Options);
+        if (!Behavior(Emit(compilation.ReplaceSyntaxTree(tree, counter)), dependence: true))
+            interventions++;
+    }
+    if (couplingCalls.Count > 0 && interventions != couplingCalls.Count)
+        throw new InvalidOperationException("Benchmark supplying helper calls do not all affect successful observed output.");
+    if (couplingCalls.Count == 0)
+    {
+        foreach (var statement in selected.DescendantNodes().OfType<ReturnStatementSyntax>().Where(statement => statement.Expression != null))
+        {
+            var tree = selected.SyntaxTree;
+            var expression = resultType == "string" ? $"({statement.Expression}) + \"!\""
+                : resultType == "int?" ? "((int?)1)" : $"unchecked(({statement.Expression}) + 1)";
+            var counter = tree.WithRootAndOptions(tree.GetRoot().ReplaceNode(statement,
+                statement.WithExpression(SyntaxFactory.ParseExpression(expression))), tree.Options);
+            if (!Behavior(Emit(compilation.ReplaceSyntaxTree(tree, counter)), dependence: true))
+                interventions++;
+        }
+        if (selected.ExpressionBody is { Expression: var expressionBody })
+        {
+            var tree = selected.SyntaxTree;
+            var expression = resultType == "string" ? $"({expressionBody}) + \"!\""
+                : resultType == "int?" ? "((int?)1)" : $"unchecked(({expressionBody}) + 1)";
+            var counter = tree.WithRootAndOptions(tree.GetRoot().ReplaceNode(expressionBody,
+                SyntaxFactory.ParseExpression(expression)), tree.Options);
+            if (!Behavior(Emit(compilation.ReplaceSyntaxTree(tree, counter)), dependence: true))
+                interventions++;
+        }
+        if (resultType == "void")
+        {
+            var semantic = compilation.GetSemanticModel(selected.SyntaxTree);
+            var writes = selected.DescendantNodes().OfType<InvocationExpressionSyntax>().Where(call =>
+                semantic.GetSymbolInfo(call).Symbol is IMethodSymbol symbol
+                && symbol.ContainingType.ToDisplayString() == "System.Console" && symbol.Name == "WriteLine"
+                && call.ArgumentList.Arguments.Count == 1).ToArray();
+            foreach (var write in writes)
+            {
+                var argument = write.ArgumentList.Arguments[0].Expression;
+                var tree = selected.SyntaxTree;
+                var counter = tree.WithRootAndOptions(tree.GetRoot().ReplaceNode(argument,
+                    SyntaxFactory.ParseExpression($"unchecked(({argument}) + 1)")), tree.Options);
+                if (!Behavior(Emit(compilation.ReplaceSyntaxTree(tree, counter)), dependence: true))
+                    interventions++;
+            }
+        }
+        if (interventions == 0)
+            throw new InvalidOperationException("Benchmark supplying return does not affect successful observed output.");
+    }
+    if (task is "inline-simple" or "inline-multi")
+    {
+        var supplyingMultiplications = 0;
+        foreach (var multiplication in selected.DescendantNodes().OfType<BinaryExpressionSyntax>()
+                     .Where(binary => binary.IsKind(SyntaxKind.MultiplyExpression)))
+        {
+            var tree = selected.SyntaxTree;
+            var counter = tree.WithRootAndOptions(tree.GetRoot().ReplaceNode(multiplication,
+                SyntaxFactory.ParseExpression($"unchecked(({multiplication}) + 1)")), tree.Options);
+            if (!Behavior(Emit(compilation.ReplaceSyntaxTree(tree, counter)), dependence: true))
+                supplyingMultiplications++;
+        }
+        if (supplyingMultiplications < 2)
+            throw new InvalidOperationException("Required benchmark inlined multiplications do not both supply successful output.");
+        interventions += supplyingMultiplications;
+    }
+    if (task == "rename-shadow")
+    {
+        var initializer = selected.DescendantNodes().OfType<VariableDeclaratorSyntax>()
+            .Single(variable => variable.Identifier.ValueText == "inner").Initializer?.Value
+            ?? throw new InvalidOperationException("Benchmark inner local initializer missing.");
+        var tree = selected.SyntaxTree;
+        var counter = tree.WithRootAndOptions(tree.GetRoot().ReplaceNode(initializer,
+            SyntaxFactory.ParseExpression($"unchecked(({initializer}) + 1)")), tree.Options);
+        if (Behavior(Emit(compilation.ReplaceSyntaxTree(tree, counter)), dependence: true))
+            throw new InvalidOperationException("Benchmark renamed parameter discarded the supplying inner local.");
+        interventions++;
+    }
+    Console.WriteLine($"Verification passed: {profile}; independent C# compilation and selected Roslyn/CLR identities; {cases.Count} runtime cases; {interventions} successful source counterfactuals.");
+    Console.WriteLine("Limits: finite representable Int32 results and explicit validation cases; comments are symbol-scoped predicate-equivalence documentation, not runtime contracts; no universal body proof or overflow claim.");
 }
 
 static void VerifyRefactoring(string profile, string path)

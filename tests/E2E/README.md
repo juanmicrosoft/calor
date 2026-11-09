@@ -2410,3 +2410,101 @@ This unit changes no product source, authoritative task/fixture, TestData,
 active `.calr`/corpus subject, historical ledger/floor, version or workflow.
 The current five-task controls do not resolve the archived blocker or establish
 all 129 prerequisites, agent evaluation, milestone acceptance or release readiness.
+
+### Paired refactoring benchmark prerequisites
+
+The 40 original `refactoring-benchmark` entries now invoke the selected-image
+supervised helper, not declaration greps. **Only the 20 C# behavioral profiles
+are implemented and admitted. The 20 Calor behavioral profiles remain
+unimplemented and unadmitted.** This is a bounded prerequisite unit, not Calor
+0.30 milestone acceptance or a benchmark result.
+
+```bash
+python3 tests/E2E/agent-tasks/test-refactoring-benchmark-verifiers.py
+python3 tests/E2E/agent-tasks/test-logic-old-release.py --refactoring-benchmark
+```
+
+The current suite requires **167 independent C# entrypoints**: 40 accepted
+canonical/equivalent edits and 127 substantive rejections. They compile the
+actual C# files directly with Roslyn and execute their own CLR methods; there
+is no conversion to Calor. Selected namespace, file, method, access, parameter
+names/order/types and result type are checked. Additional C# sources participate
+in compilation and identity checks; SDK `bin`/`obj` artifacts are excluded.
+Extraction and moved-call
+relationships resolve actual symbols. Each supplying call must change successful
+observed output when intervened on. Inlined multiplications and the renamed
+`inner` local must supply output, not merely occur as decoys. Runtime controls
+cover values, exact console output, requested exception types and `nameof`
+parameter identities. Contract comments are attached to the selected method
+and checked by signed-Int32 predicate equivalence; comments are documentation,
+not executable contracts. Console-effect comments and nullable-result
+documentation have explicit finite supported spellings.
+
+The finite arithmetic domain excludes mathematical results outside Int32.
+Absolute value excludes `Int32.MinValue`; division also excludes
+`Int32.MinValue / -1`. Squaring uses widened independent expected values, and
+each square is checked before adding to avoid overflow in the expected-value
+calculation. Nested squares use seven values per argument. String concatenation
+uses 36 pairs including empty strings, Unicode, newlines and NUL. Nullable
+`TryParse` uses seven invalid inputs; the prompt explicitly permits its
+simplified null implementation. Preconditions, validation exceptions, and
+console output use separate cases. This is not universal body equivalence,
+an overflow policy, or an IO sandbox. Executable candidates are limited to
+ordinary scalar methods, resolved local calls, console writes, `Math.Abs`,
+and the requested exceptions/module construction. Fields, constructors,
+properties, lambdas, local functions, attributed/extern/unsafe methods, raw/global executable surfaces and
+unmodeled external calls do not enter the runtime domain.
+
+The suite separately requires **20 actual native literal-ID prerequisite
+refusals** and **six selected-compiler/native/managed prerequisite refusals**.
+The 20 native task entrypoints share six original fixture projects; these are
+not 20 distinct native behaviors. Probes use actual disposable `tests/` paths,
+copy the unchanged matching active `.calr` inputs, and recover
+their unique original module/function identities from unchanged Git commit
+`d82f3ae95175ecd09581c6922701706be72b0ca9`. Those records are seeded in a
+disposable supported sidecar document and passed to the selected
+`DeclarationIdentityStore.Sync`. This is an actual API call, not an admission
+mock. At selected compiler source `6dc83658cf41a59d34830ae2a3533ba58341b331`,
+the store rejects `m001`/`f001`-style identities because its state
+validator requires `IdValidator.IsCanonicalId` and the production ID-kind
+encoding, even though `IdValidator.Validate(..., isTestPath: true)` accepts
+test IDs in a different validation surface. Replacing those IDs with newly
+generated canonical IDs would not preserve the original literal requirement.
+No such substitution is made. `v001` is additionally absent from both the
+released and earliest tracked `OuterCalc` fixtures, despite its prompt. The
+archived parser constructs `BindStatementNode` without an ID, and neither that
+node nor its `StatementNode`/`AstNode` bases supply an inherited ID.
+**These refusals contribute zero Calor behavioral acceptance or rejection
+credit.** No current-native benchmark edit, contract/effect proof or full
+archived-native behavioral compatibility is claimed.
+
+The subsequent identity dependency `260f086936198c112b1cf0f4d4b053771809513a`
+supports literal test IDs through the existing physical-test-path and kind
+policy; production canonical validation is unchanged. A separate disposable
+source-build capability probe compiled the unchanged archived Contract fixture
+and an exact current-native `m001`/`f001` anchor using supported `State`/`Sync`
+seeding. Actual `Program.Compile` and CLR execution retained both identities
+through an unambiguous `Sqrt` rename: 15 runtime cases across archive/current/
+current rename. Both source builds used their own verified manifests and copied
+image integrity checks. This removes the general format-capability objection,
+but does not implement the 19 remaining provenance-supported native behavioral
+profiles or invent the missing `v001`. The benchmark prerequisite tests above
+describe the selected `6dc83658` baseline, not this later dependency.
+
+The archived mode retains the **600-second total deadline**, builds unchanged
+released source with locked dependencies from the local package cache, and
+verifies that archive's own managed/native manifest. It requires an identical
+82-entry independent C# matrix across the archived and current compiler/helper
+assets: 40 accepted original edits, 40 adversarial edits, and two actual
+foreign-native executable-surface refusals. It does not cover
+the full current adversarial matrix or unblock Calor identity admission.
+Original task deadlines are read unchanged from `task.json`: **120, 150 or
+180 seconds**, including helper build, execution, EOF and cleanup. Prior
+profiles retain their 120-second entry bounds. No deadline is enlarged,
+no compiler/helper result is cached, and no archived source/contract is changed.
+Finite negatives require exit 1 and explicit modeled failures; native/image,
+build, UNKNOWN, timeout, EOF, cleanup and abnormal exits never become behavior
+negatives. Synthetic admission checks contribute zero actual entries.
+
+Task/fixture bytes and modes, historical ledgers, corpus membership, versions
+and workflows are unchanged. Large run logs remain outside the repository.

@@ -2,6 +2,7 @@
 """Compiler-backed logic/control-flow/basic oracles; never invokes an agent."""
 
 import os
+import json
 import hashlib
 import platform
 import re
@@ -112,6 +113,7 @@ def main():
     for dependency in ("calor.dll", "Calor.Runtime.dll", "Microsoft.Z3.dll", native):
         if not (compiler / dependency).is_file():
             raise RuntimeError(f"Selected compiler dependency missing: {compiler / dependency}; build the selected root first.")
+    benchmark = not native_only and sys.argv[1].startswith("bench-")
     filename = ("Domain.calr" if sys.argv[1] in ("oop001", "oop002", "oop003", "oop004", "oop005", "oop006", "async004", "lam003", "lam004") else
                 "AsyncOps.calr" if sys.argv[1] in ("async001", "async002", "async003") else
                 "Generic.calr" if sys.argv[1] in ("gen001", "gen002", "gen003") else
@@ -123,16 +125,25 @@ def main():
                 "Collections.calr" if sys.argv[1] in ("PrintDictionary", "coll001", "coll002", "coll003", "coll004", "coll005", "coll006") else "Effects.calr"
                 if sys.argv[1] in ("PrintNumbers", "Countdown", "DoWhileDemo", "PrintEvenNumbers",
                                     "eff001", "eff002", "eff003", "eff004", "eff005", "eff006", "ref002") else "Calculator.calr")
-    source = None if native_only else Path(sys.argv[2]).resolve() / filename
-    if source is not None and not source.is_file():
+    source = None if native_only else Path(sys.argv[2]).resolve()
+    if source is not None and not benchmark:
+        source /= filename
+    if source is not None and not (source.is_dir() if benchmark else source.is_file()):
         raise RuntimeError(f"Input missing: {source}")
-    timeout = float(os.environ.get("CALOR_LOGIC_TIMEOUT_SECONDS", "120"))
-    if not 0 < timeout <= 120:
-        raise RuntimeError("CALOR_LOGIC_TIMEOUT_SECONDS must be in (0, 120].")
+    maximum_timeout = 120
+    if benchmark:
+        task = helper.parent / "tasks/refactoring-benchmark" / sys.argv[1].removeprefix("bench-") / "task.json"
+        definition = json.loads(task.read_text(encoding="utf-8"))
+        if definition["id"] != sys.argv[1].removeprefix("bench-") or definition["timeout"] not in (120, 150, 180):
+            raise RuntimeError("Invalid original benchmark task identity/deadline.")
+        maximum_timeout = definition["timeout"]
+    timeout = float(os.environ.get("CALOR_LOGIC_TIMEOUT_SECONDS", str(maximum_timeout)))
+    if not 0 < timeout <= maximum_timeout:
+        raise RuntimeError(f"CALOR_LOGIC_TIMEOUT_SECONDS must be in (0, {maximum_timeout}].")
     deadline = time.monotonic() + timeout
     advanced = not native_only and sys.argv[1] in ("ac001", "ac002", "ac003", "ac004", "ac005",
                                                 "advanced001", "advanced002", "advanced003", "advanced004")
-    carrier = advanced or not native_only and sys.argv[1] in (
+    carrier = benchmark or advanced or not native_only and sys.argv[1] in (
         "type001", "type002", "type003", "type004", "pm004", "pm005",
         "ref001", "ref002", "ref003", "ref004", "ref005", "ref006", "ref007", "ref008",
         "lam001", "lam002", "lam003", "lam004")
