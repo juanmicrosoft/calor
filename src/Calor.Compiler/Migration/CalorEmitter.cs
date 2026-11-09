@@ -1880,37 +1880,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     /// <summary>
-    /// Emits a block-bodied lambda after a binding or assignment header:
-    /// <c>§LAM{header}</c> on the opener line, body statements indented one
-    /// level under it, and <c>§/LAM</c> at the opener's own column. This mirrors
-    /// the match-expression binding path and, crucially, routes body statements
-    /// through the normal statement visitor so their indentation tracks the current
-    /// scope instead of a fixed column (the #705 defect).
+    /// Emits a native block lambda beneath its statement header without lifting it.
     /// </summary>
     private void EmitBlockLambdaWithHeader(string statementHeader, LambdaExpressionNode lambda)
     {
-        var header = BuildLambdaHeader(lambda);
-
-        AppendLine($"{statementHeader} §LAM{{{header}}}{(lambda.Effects != null ? " " + FormatEffectsTag(lambda.Effects) : "")}");
-        Indent();
-        // Review m12: this is a lambda BODY like any other, so it bumps the depth
-        // that stops a nested block lambda being hoisted out of scope. Benign
-        // today (the statements are emitted at the correct indent right here), but
-        // the invariant should not depend on that happening to be true.
-        _lambdaBodyDepth++;
-        try
-        {
-            foreach (var stmt in lambda.StatementBody!)
-            {
-                stmt.Accept(this);
-            }
-        }
-        finally
-        {
-            _lambdaBodyDepth--;
-        }
-        Dedent();
-        AppendLine($"§/LAM");
+        AppendLine($"{statementHeader} {lambda.Accept(this)}");
     }
 
     public string Visit(CallStatementNode node)

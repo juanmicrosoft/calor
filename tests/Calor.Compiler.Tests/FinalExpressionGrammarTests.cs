@@ -226,6 +226,48 @@ public sealed class FinalExpressionGrammarTests
     }
 
     [Fact]
+    public void AssignedBlockLambda_PreservesComputedLvalueOrderAndDelayedBody()
+    {
+        const string authored = """
+            module NativeAssignment
+              func Run (Func<Func<int>[]>:factory, Func<int>:index, Func<int>:next) → int
+                set factory()[index()] () =>
+                  return next()
+                return 0
+            """;
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(authored, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
+        var emitted = new CalorEmitter().Emit(module);
+        Assert.DoesNotContain('§', emitted);
+        Assert.DoesNotContain("_hoist", emitted);
+        foreach (var source in new[] { authored, emitted })
+        {
+            diagnostics = new DiagnosticBag();
+            module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+            Assert.False(diagnostics.HasErrors, source + Environment.NewLine + string.Join(Environment.NewLine, diagnostics.Errors));
+            var generated = new CSharpEmitter().Emit(module);
+            var compilation = CSharpCompilation.Create("AssignedLambda_" + Guid.NewGuid().ToString("N"),
+                [CSharpSyntaxTree.ParseText(generated)], GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var result = compilation.Emit(stream);
+            Assert.True(result.Success, generated + Environment.NewLine + string.Join(Environment.NewLine, result.Diagnostics));
+            var method = Assembly.Load(stream.ToArray()).GetTypes().SelectMany(type => type.GetMethods())
+                .Single(method => method.Name == "Run");
+            var trace = new List<string>();
+            var slots = new Func<int>[1];
+            Func<Func<int>[]> factory = () => { trace.Add("F"); return slots; };
+            Func<int> index = () => { trace.Add("I"); return 0; };
+            Func<int> next = () => { trace.Add("N"); return 42; };
+            Assert.Equal(0, method.Invoke(null, [factory, index, next]));
+            Assert.Equal(["F", "I"], trace);
+            Assert.Equal(42, slots[0]());
+            Assert.Equal(["F", "I", "N"], trace);
+        }
+    }
+
+    [Fact]
     public void NativeArrays_PreserveFreshEmptyAllocationAndElementOrderAtRuntime()
     {
         var empty = Parse("new int[] { }").Accept(new CSharpEmitter());
