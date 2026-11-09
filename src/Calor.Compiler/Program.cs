@@ -925,39 +925,6 @@ public class Program
             }
         }
 
-        // Effect enforcement checking
-        if (options.EnforceEffects)
-        {
-            phaseSw.Restart();
-            // Use shared resolver from CompilationContext if available (IL analysis enabled, task-level caching)
-            var sharedResolver = options.Context?.SharedEffectResolver;
-            var enforcementPass = new EffectEnforcementPass(
-                diagnostics,
-                options.UnknownCallPolicy,
-                resolver: sharedResolver,
-                strictEffects: options.StrictEffects,
-                projectDirectory: options.ProjectDirectory,
-                crossModuleFunctionNames: options.CrossModuleFunctionModules?.Keys)
-            {
-                CrossModuleTypes = options.CrossModuleTypes,
-                CrossModuleFunctionModules = options.CrossModuleFunctionModules
-            };
-            enforcementPass.Enforce(ast);
-            phaseSw.Stop();
-            telemetry?.TrackPhase("EffectEnforcement", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
-
-            if (options.Verbose)
-            {
-                status.WriteLine(EffectEnforcementCompletedStatus);
-            }
-        }
-
-        if (diagnostics.HasErrors)
-        {
-            TrackDiagnostics(telemetry, diagnostics);
-            return new CompilationResult(diagnostics, ast, "");
-        }
-
         // Contract inheritance checking
         phaseSw.Restart();
         using var contractInheritanceChecker = new ContractInheritanceChecker(
@@ -971,6 +938,41 @@ public class Program
         if (options.Verbose)
         {
             status.WriteLine("Contract inheritance checking completed");
+        }
+
+        if (diagnostics.HasErrors)
+        {
+            TrackDiagnostics(telemetry, diagnostics);
+            return new CompilationResult(diagnostics, ast, "");
+        }
+
+        if (inheritanceResult.RuntimeContracts.Count > 0)
+        {
+            binder.Bind(ast, inheritanceResult);
+            BindingDiagnosticPolicy.PropagateCompilationErrors(bindingDiagnostics, diagnostics);
+        }
+
+        // Charge the same effective contracts that runtime emission executes.
+        if (options.EnforceEffects)
+        {
+            phaseSw.Restart();
+            var sharedResolver = options.Context?.SharedEffectResolver;
+            var enforcementPass = new EffectEnforcementPass(
+                diagnostics,
+                options.UnknownCallPolicy,
+                resolver: sharedResolver,
+                strictEffects: options.StrictEffects,
+                projectDirectory: options.ProjectDirectory,
+                crossModuleFunctionNames: options.CrossModuleFunctionModules?.Keys)
+            {
+                CrossModuleTypes = options.CrossModuleTypes,
+                CrossModuleFunctionModules = options.CrossModuleFunctionModules
+            };
+            enforcementPass.Enforce(ast, inheritanceResult);
+            phaseSw.Stop();
+            telemetry?.TrackPhase("EffectEnforcement", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
+            if (options.Verbose)
+                status.WriteLine(EffectEnforcementCompletedStatus);
         }
 
         if (diagnostics.HasErrors)

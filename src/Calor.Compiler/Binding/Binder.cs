@@ -98,6 +98,13 @@ public sealed class Binder
         new(ReferenceEqualityComparer.Instance);
     internal IReadOnlyDictionary<ExpressionNode, BoundFieldAccessExpression> BoundSourceEnumConstants =>
         _boundSourceEnumConstants;
+    private readonly Dictionary<ExpressionNode, BoundExpression> _boundContractExpressions = new();
+    internal IReadOnlyDictionary<ExpressionNode, BoundExpression> BoundContractExpressions =>
+        _boundContractExpressions;
+    private bool _bindingContract;
+    private Verification.ModuleInheritanceResult? _contractInheritance;
+    internal Verification.ModuleInheritanceResult? ContractInheritance => _contractInheritance;
+    internal bool IsStaticSourceMethod(FunctionSymbol symbol) => _staticMethodSymbols.Contains(symbol);
     private readonly HashSet<FunctionSymbol> _staticMethodSymbols = new();
     private readonly Dictionary<SymbolId, string?> _functionNamespaces = new();
     private readonly Dictionary<ClassDefinitionNode, Scope> _classScopes = new();
@@ -958,8 +965,11 @@ public sealed class Binder
         public void Dispose() => _binder._currentFunctionReturnType = _previous;
     }
 
-    public BoundModule Bind(ModuleNode module)
+    public BoundModule Bind(ModuleNode module) => Bind(module, null);
+
+    internal BoundModule Bind(ModuleNode module, Verification.ModuleInheritanceResult? contractInheritance)
     {
+        _contractInheritance = contractInheritance;
         using var diagnosticContext = _diagnostics.EnterBindingContext();
         _declaredReferenceTypes = Parsing.AttributeHelper.GetDeclaredReferenceTypeNames(module);
         _metadataUsings = module.Usings;
@@ -970,6 +980,7 @@ public sealed class Binder
         _functionSymbols.Clear();
         _boundAwaits.Clear();
         _boundSourceEnumConstants.Clear();
+        _boundContractExpressions.Clear();
         CrossModuleCallTargets.Clear();
         SourceExtensionCallTargets.Clear();
         _staticMethodSymbols.Clear();
@@ -1029,6 +1040,15 @@ public sealed class Binder
         foreach (var cls in module.Classes)
             BindClassMembers(cls, functions);
 
+        foreach (var (owner, declaration) in _interfacesBySymbolId.Values)
+        {
+            foreach (var method in declaration.Methods.Where(method =>
+                         method.Preconditions.Count > 0 || method.Postconditions.Count > 0))
+            {
+                functions.Add(BindInterfaceContracts(owner, declaration, method));
+            }
+        }
+
         functions.AddRange(_boundLocalFunctions);
 
         return new BoundModule(
@@ -1036,6 +1056,41 @@ public sealed class Binder
             module.Name,
             functions,
             _symbolOrder.ToDictionary(id => id, id => _symbolsById[id]));
+    }
+
+    private BoundFunction BindInterfaceContracts(
+        TypeSymbol owner, InterfaceDefinitionNode declaration, MethodSignatureNode method)
+    {
+        var declarationScope = _scope.CreateChild();
+        foreach (var member in declaration.Methods)
+            declarationScope.TryDeclareOverload(GetCallableLookupName(member.Name), _functionSymbols[member], out _);
+        var functionScope = declarationScope.CreateChild();
+        using var scope = PushScope(functionScope);
+        using var typeParameters = PushMemberTypeParameters(
+            declaration.TypeParameters.Concat(method.TypeParameters).ToArray());
+        var symbol = _functionSymbols[method];
+        using var identity = PushDeclarationContext(symbol.Id);
+        var previousClassName = _currentClassName;
+        var previousNamespaceIdentity = _currentNamespaceIdentity;
+        var previousNamespaceScopeId = _currentNamespaceScopeId;
+        _currentClassName = owner.QualifiedName;
+        _currentNamespaceIdentity = declaration.NamespaceIdentity;
+        _currentNamespaceScopeId = declaration.NamespaceScopeId;
+        try
+        {
+            DeclareParameters(symbol.Parameters, method.Parameters);
+            return new BoundFunction(method.Span, symbol, [], functionScope,
+                ExtractMethodEffects(method.Effects), BoundMemberKind.Method, owner.QualifiedName)
+            {
+                ContractConditions = BindContracts(method.Preconditions, method.Postconditions, symbol.BodyReturnType)
+            };
+        }
+        finally
+        {
+            _currentClassName = previousClassName;
+            _currentNamespaceIdentity = previousNamespaceIdentity;
+            _currentNamespaceScopeId = previousNamespaceScopeId;
+        }
     }
 
     private void RegisterTopLevelFunctions(ModuleNode module)
@@ -2194,11 +2249,13 @@ public sealed class Binder
                 using var _identity = PushDeclarationContext(symbol.Id);
                 using var _returnCtx = PushReturnTypeContext(symbol.BodyReturnType);
                 DeclareParameters(symbol.Parameters, function.Parameters);
+                var contracts = BindContracts(function.Preconditions, function.Postconditions, symbol.BodyReturnType);
                 var body = BindStatements(function.Body);
                 _boundLocalFunctions.Add(new BoundFunction(function.Span, symbol, body, bodyScope,
                     Array.Empty<string>(), BoundMemberKind.LocalFunction, containingTypeName: null)
                 {
-                    EnclosingSymbolId = enclosing
+                    EnclosingSymbolId = enclosing,
+                    ContractConditions = contracts
                 });
             }
             finally
@@ -2248,6 +2305,7 @@ public sealed class Binder
         try
         {
             DeclareParameters(functionSymbol.Parameters, func.Parameters);
+            var contracts = BindContracts(func.Preconditions, func.Postconditions, functionSymbol.BodyReturnType);
 
             // Bind body
             var boundBody = BindStatements(func.Body);
@@ -2256,7 +2314,10 @@ public sealed class Binder
             // Extract declared effects for taint analysis
             var declaredEffects = ExtractEffects(func);
 
-            return new BoundFunction(func.Span, functionSymbol, boundBody, functionScope, declaredEffects);
+            return new BoundFunction(func.Span, functionSymbol, boundBody, functionScope, declaredEffects)
+            {
+                ContractConditions = contracts
+            };
         }
         finally
         {
@@ -2283,6 +2344,29 @@ public sealed class Binder
                     symbol.Name,
                     suggestedName);
             }
+        }
+    }
+
+    private IReadOnlyList<BoundExpression> BindContracts(
+        IReadOnlyList<RequiresNode> preconditions,
+        IReadOnlyList<EnsuresNode> postconditions,
+        string returnType)
+    {
+        var previous = _bindingContract;
+        _bindingContract = true;
+        try
+        {
+            var conditions = preconditions.Select(precondition => BindExpression(precondition.Condition)).ToList();
+            using var scope = PushScope(_scope.CreateChild());
+            if (!ReturnShape.IsVoidType(returnType))
+                _scope.TryDeclare(CreateLocalVariable("result", returnType, isMutable: false,
+                    isParameter: true, ParameterModifier.None, Parsing.TextSpan.Empty, "contract-result"));
+            conditions.AddRange(postconditions.Select(postcondition => BindExpression(postcondition.Condition)));
+            return conditions;
+        }
+        finally
+        {
+            _bindingContract = previous;
         }
     }
 
@@ -3861,6 +3945,8 @@ public sealed class Binder
             : ExpressionBinders.TryGetValue(expr.GetType(), out var binder)
             ? binder(this, expr)
             : BindUnsupportedExpression(expr);
+        if (_bindingContract)
+            _boundContractExpressions[expr] = bound;
         if (MayChangeHeap(bound))
             InvalidateByReferenceParameterNarrowing();
         if (bound is BoundFieldAccessExpression
@@ -4041,6 +4127,19 @@ public sealed class Binder
         }
         if (fieldAccess.FieldName == "Length" && IsArrayReceiver(target))
             return new BoundArrayLength(fieldAccess.Span, target);
+        if (target is BoundVariableExpression { ResolvedSymbols.Count: 1 } tupleVariable
+            && tupleVariable.Variable.TypeName.StartsWith('(')
+            && SyntaxFactory.ParseTypeName(tupleVariable.Variable.TypeName) is TupleTypeSyntax tupleType
+            && !tupleType.ContainsDiagnostics
+            && fieldAccess.FieldName.StartsWith("Item", StringComparison.Ordinal)
+            && int.TryParse(fieldAccess.FieldName.AsSpan(4), out var tupleIndex)
+            && tupleIndex >= 1 && tupleIndex <= tupleType.Elements.Count
+            && fieldAccess.FieldName == $"Item{tupleIndex}")
+            return new BoundFieldAccessExpression(fieldAccess.Span, target, fieldAccess.FieldName,
+                tupleType.Elements[tupleIndex - 1].Type.ToString(), fieldNameSpan: fieldAccess.FieldNameSpan)
+            {
+                IsTupleElementRead = true
+            };
         if (fieldAccess.FieldName == "Length" && target is BoundStringLiteral
             && GetOrCreateMetadataBinder() is { } stringMetadata
             && stringMetadata.Context.TryResolveType("System.String") is { } stringType
@@ -5969,6 +6068,10 @@ public sealed class Binder
                 if (receiver is null && _scope.Lookup(receiverName) is VariableSymbol)
                     receiver = BindReferenceExpression(receiverNode);
                 if (receiver is BoundTypeReferenceExpression { ResolvedType.IsEnum: true }
+                    || receiver is BoundVariableExpression tupleVariable
+                        && tupleVariable.Variable.TypeName.StartsWith('(')
+                        && SyntaxFactory.ParseTypeName(tupleVariable.Variable.TypeName)
+                            is TupleTypeSyntax { ContainsDiagnostics: false }
                     || receiver?.Type is BoundTypes.NominalBoundType { RoslynSymbol: not null }
                     || receiver is not null && ResolveMetadataArrayProperty(receiver, refNode.Name[(lastDot + 1)..]) is not null
                     || refNode.Name[(lastDot + 1)..] == "Length"
@@ -9344,7 +9447,9 @@ public sealed class Binder
             // Methods
             foreach (var method in EnumerateMethods(cls))
             {
-                if (method.IsAbstract || method.IsExtern || method.Body.Count == 0)
+                if (method.Body.Count == 0 && !method.HasContracts
+                    && _contractInheritance?.RuntimeContracts.ContainsKey(method) != true
+                    && !method.Parameters.Any(parameter => parameter.InlineRefinement != null))
                     continue;
                 var bound = TryBindMember(() => BindMethod(method, className), method.Span, className, method.Name);
                 if (bound != null) functions.Add(bound);
@@ -9353,7 +9458,8 @@ public sealed class Binder
             // Constructors
             foreach (var ctor in EnumerateConstructors(cls))
             {
-                if (ctor.Body.Count == 0 && ctor.Initializer == null && !cls.IsRecord)
+                if (ctor.Body.Count == 0 && ctor.Initializer == null && !cls.IsRecord
+                    && ctor.Preconditions.Count == 0)
                     continue;
                 var memberName = ctor.IsStatic ? ".cctor" : ".ctor";
                 var bound = TryBindMember(
@@ -9564,11 +9670,15 @@ public sealed class Binder
         using var _returnCtx = PushReturnTypeContext(functionSymbol.BodyReturnType);
 
         DeclareParameters(functionSymbol.Parameters, method.Parameters);
+        var inherited = !method.HasContracts
+            ? _contractInheritance?.RuntimeContracts.GetValueOrDefault(method) : null;
+        var contracts = BindContracts(inherited?.Preconditions ?? method.Preconditions,
+            inherited?.Postconditions ?? method.Postconditions, functionSymbol.BodyReturnType);
         var boundBody = BindStatements(method.Body);
         BindLocalFunctions(localFunctions, localFunctionScope, functionSymbol.Id);
         var declaredEffects = ExtractMethodEffects(method.Effects);
         return new BoundFunction(method.Span, functionSymbol, boundBody, functionScope,
-            declaredEffects, BoundMemberKind.Method, className);
+            declaredEffects, BoundMemberKind.Method, className) { ContractConditions = contracts };
     }
 
     private BoundFunction BindConstructor(ConstructorNode ctor, string className)
@@ -9584,6 +9694,7 @@ public sealed class Binder
         using var _returnCtx = PushReturnTypeContext(functionSymbol.ReturnType);
 
         DeclareParameters(functionSymbol.Parameters, ctor.Parameters);
+        var contracts = BindContracts(ctor.Preconditions, [], "VOID");
 
         // Bind constructor initializer (: base(...) / : this(...)) as a call prepended to body.
         // This makes initializer arguments visible to bug pattern checkers (e.g., div-by-zero in base(x / y)).
@@ -9616,7 +9727,7 @@ public sealed class Binder
         return new BoundFunction(ctor.Span, functionSymbol, boundBody, functionScope,
             Array.Empty<string>(),
             ctor.IsStatic ? BoundMemberKind.StaticConstructor : BoundMemberKind.Constructor,
-            className);
+            className) { ContractConditions = contracts };
     }
 
     private BoundFunction BindPropertyAccessor(
@@ -9674,9 +9785,10 @@ public sealed class Binder
         TrackSymbol(functionSymbol);
         // v0.14 §S4 — property getters that return :string flow through here.
         using var _returnCtx = PushReturnTypeContext(returnType);
+        var contracts = BindContracts(accessor.Preconditions, [], returnType);
         var boundBody = BindStatements(accessor.Body);
         return new BoundFunction(accessor.Span, functionSymbol, boundBody, functionScope,
-            Array.Empty<string>(), memberKind, className);
+            Array.Empty<string>(), memberKind, className) { ContractConditions = contracts };
     }
 
     private BoundFunction BindOperator(
@@ -9709,11 +9821,12 @@ public sealed class Binder
         TrackSymbol(functionSymbol);
         // v0.14 §S4 — operator overloads with a declared return type.
         using var _returnCtx = PushReturnTypeContext(returnType);
+        var contracts = BindContracts(op.Preconditions, op.Postconditions, returnType);
         var boundBody = BindStatements(op.Body);
         // OperatorOverloadNode has no Effects field — mark as unknown
         var declaredEffects = new List<string> { "*:*" };
         return new BoundFunction(op.Span, functionSymbol, boundBody, functionScope,
-            declaredEffects, BoundMemberKind.OperatorOverload, className);
+            declaredEffects, BoundMemberKind.OperatorOverload, className) { ContractConditions = contracts };
     }
 
     private BoundFunction BindIndexerAccessor(
@@ -9766,9 +9879,10 @@ public sealed class Binder
         TrackSymbol(functionSymbol);
         // v0.14 §S4 — indexer getters that return :string flow through here.
         using var _returnCtx = PushReturnTypeContext(returnType);
+        var contracts = BindContracts(accessor.Preconditions, [], returnType);
         var boundBody = BindStatements(accessor.Body);
         return new BoundFunction(accessor.Span, functionSymbol, boundBody, functionScope,
-            Array.Empty<string>(), memberKind, className);
+            Array.Empty<string>(), memberKind, className) { ContractConditions = contracts };
     }
 
     private BoundFunction BindEventAccessor(

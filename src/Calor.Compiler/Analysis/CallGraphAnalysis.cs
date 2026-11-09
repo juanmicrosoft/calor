@@ -93,6 +93,7 @@ public sealed class CallGraphAnalysis
         internal Dictionary<(string CallerId, int Start, int End), VariableSymbol>
             SourceEnumConstants { get; } = new();
         internal HashSet<(string CallerId, int Start, int End)> UnresolvedArgumentCalls { get; } = new();
+        internal HashSet<(string CallerId, int Start, int End)> TupleElementReads { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), Microsoft.CodeAnalysis.IArrayTypeSymbol>
             MetadataArrayTypes { get; } = new();
         /// <summary>(callerId, reference start, reference end) → the resolved
@@ -114,6 +115,7 @@ public sealed class CallGraphAnalysis
     }
 
     private BoundValueIndex _boundValues = new();
+    internal Verification.ModuleInheritanceResult? ContractInheritance { get; private set; }
 
     internal BoundCallExpression? ComputedMemberCall(string callerId, TextSpan span) =>
         _boundValues.ComputedMemberCalls.GetValueOrDefault((callerId, span.Start, span.End));
@@ -141,6 +143,9 @@ public sealed class CallGraphAnalysis
 
     internal bool HasUnresolvedCallArguments(string callerId, TextSpan span) =>
         _boundValues.UnresolvedArgumentCalls.Contains((callerId, span.Start, span.End));
+
+    internal bool IsTupleElementRead(string callerId, TextSpan span) =>
+        _boundValues.TupleElementReads.Contains((callerId, span.Start, span.End));
 
     /// <summary>The declaration span of the variable the binder resolved a bare
     /// value reference (a call target or a <c>ReferenceNode</c>) to, or
@@ -433,16 +438,27 @@ public sealed class CallGraphAnalysis
     public static IEnumerable<ClassDefinitionNode> EnumerateClasses(ModuleNode module)
     {
         foreach (var cls in module.Classes)
-            yield return cls;
+            foreach (var declaration in ClassTree(cls))
+                yield return declaration;
         foreach (var block in module.TypePreprocessorBlocks)
         {
             var branch = block;
             while (branch != null)
             {
                 foreach (var cls in branch.Classes)
-                    yield return cls;
+                    foreach (var declaration in ClassTree(cls))
+                        yield return declaration;
                 branch = branch.ElseBranch;
             }
+        }
+
+        static IEnumerable<ClassDefinitionNode> ClassTree(ClassDefinitionNode cls)
+        {
+            yield return cls;
+            foreach (var nested in cls.NestedClasses.Concat(
+                         PreprocessorMembers(cls).OfType<ClassDefinitionNode>()))
+                foreach (var declaration in ClassTree(nested))
+                    yield return declaration;
         }
     }
 
@@ -464,17 +480,9 @@ public sealed class CallGraphAnalysis
             }
         }
         foreach (var cls in EnumerateClasses(module))
-            foreach (var iface in NestedInterfaces(cls))
+            foreach (var iface in cls.NestedInterfaces.Concat(
+                         PreprocessorMembers(cls).OfType<InterfaceDefinitionNode>()))
                 yield return iface;
-
-        static IEnumerable<InterfaceDefinitionNode> NestedInterfaces(ClassDefinitionNode cls)
-        {
-            foreach (var iface in cls.NestedInterfaces)
-                yield return iface;
-            foreach (var nested in cls.NestedClasses)
-                foreach (var iface in NestedInterfaces(nested))
-                    yield return iface;
-        }
     }
 
     /// <summary>
@@ -568,14 +576,35 @@ public sealed class CallGraphAnalysis
         }
     }
 
+    internal static IEnumerable<OperatorOverloadNode> EnumerateOperators(ClassDefinitionNode cls)
+        => cls.OperatorOverloads.Concat(PreprocessorMembers(cls).OfType<OperatorOverloadNode>());
+
+    internal static IEnumerable<IndexerNode> EnumerateIndexers(ClassDefinitionNode cls)
+        => cls.Indexers.Concat(PreprocessorMembers(cls).OfType<IndexerNode>());
+
+    private static IEnumerable<AstNode> PreprocessorMembers(ClassDefinitionNode cls)
+    {
+        foreach (var block in cls.PreprocessorBlocks)
+            for (var branch = block; branch != null; branch = branch.ElseBranch)
+                foreach (var member in RecursiveAstWalker.GetAllChildren(branch))
+                    yield return member;
+    }
+
     /// <summary>
     /// Builds a call graph analysis from a module AST.
     /// </summary>
     public static CallGraphAnalysis Build(ModuleNode ast) => Build(ast, null);
 
     internal static CallGraphAnalysis Build(ModuleNode ast,
-        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions)
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions,
+        Verification.ModuleInheritanceResult? contractInheritance = null)
     {
+        if (contractInheritance is null)
+        {
+            using var checker = new Verification.ContractInheritanceChecker(
+                new Diagnostics.DiagnosticBag(), useZ3: false);
+            contractInheritance = checker.Check(ast);
+        }
         var functions = new Dictionary<string, FunctionNode>(StringComparer.Ordinal);
         var functionNameToId = new Dictionary<string, string>(StringComparer.Ordinal);
         var ambiguousFunctionNames = new HashSet<string>(StringComparer.Ordinal);
@@ -617,7 +646,7 @@ public sealed class CallGraphAnalysis
         {
             foreach (var method in EnumerateMethods(cls))
             {
-                var wrapped = ToFunctionNode(method, cls.Name);
+                var wrapped = ToFunctionNode(method, cls.Name, contractInheritance);
                 functions[wrapped.Id] = wrapped;
                 AddUniqueName(functionNameToId, ambiguousFunctionNames, wrapped.Name, wrapped.Id);
                 calleeToCallers[wrapped.Id] = new List<string>();
@@ -650,6 +679,31 @@ public sealed class CallGraphAnalysis
                     callerToCallees[wrapped.Id] = new List<(string, TextSpan)>();
                 }
             }
+            foreach (var op in EnumerateOperators(cls))
+            {
+                var wrapped = new FunctionNode(op.Span, $"{cls.Name}.{op.Id}", $"{cls.Name}.op_{op.Kind}",
+                    op.Visibility, op.Parameters, op.Output, effects: null,
+                    op.Preconditions, op.Postconditions, op.Body, op.Attributes);
+                functions[wrapped.Id] = wrapped;
+                calleeToCallers[wrapped.Id] = [];
+                callerToCallees[wrapped.Id] = [];
+            }
+            foreach (var indexer in EnumerateIndexers(cls))
+            {
+                foreach (var accessor in new[] { indexer.Getter, indexer.Setter, indexer.Initer }.OfType<PropertyAccessorNode>())
+                {
+                    var parameters = indexer.Parameters.Concat(accessor.Kind == PropertyAccessorNode.AccessorKind.Get
+                        ? [] : new[] { new ParameterNode(accessor.Span, "value", indexer.TypeName, new AttributeCollection()) }).ToArray();
+                    var wrapped = new FunctionNode(accessor.Span,
+                        $"{cls.Name}.{indexer.Id}.{accessor.Kind.ToString().ToLowerInvariant()}",
+                        $"{cls.Name}.this[].{accessor.Kind.ToString().ToLowerInvariant()}",
+                        accessor.Visibility ?? indexer.Visibility, parameters, output: null, effects: null,
+                        accessor.Preconditions, Array.Empty<EnsuresNode>(), accessor.Body, accessor.Attributes);
+                    functions[wrapped.Id] = wrapped;
+                    calleeToCallers[wrapped.Id] = [];
+                    callerToCallees[wrapped.Id] = [];
+                }
+            }
             foreach (var evt in EnumerateEvents(cls))
             {
                 if (evt.AddBody != null)
@@ -673,7 +727,7 @@ public sealed class CallGraphAnalysis
 
         var (resolvedCallIds, boundCallSites, boundResolutionComplete, boundValueTypes,
              declaredFunctionTypes, declaredReturnTypes, declaredFieldTypes, boundValues) =
-            ResolveBoundCallSites(ast, functions, crossModuleFunctions);
+            ResolveBoundCallSites(ast, functions, crossModuleFunctions, contractInheritance);
 
         // Build call edges
         var unresolvedCalls = new List<AstUnresolvedCallSite>();
@@ -733,6 +787,7 @@ public sealed class CallGraphAnalysis
         analysis._declaredReturnFunctionTypes = declaredReturnTypes;
         analysis._declaredFieldFunctionTypes = declaredFieldTypes;
         analysis._boundValues = boundValues;
+        analysis.ContractInheritance = contractInheritance;
         return analysis;
     }
 
@@ -750,7 +805,8 @@ public sealed class CallGraphAnalysis
         ResolveBoundCallSites(
             ModuleNode ast,
             IReadOnlyDictionary<string, FunctionNode> functions,
-            IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions)
+            IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions,
+            Verification.ModuleInheritanceResult contractInheritance)
     {
         var resolved = new Dictionary<AstCallKey, IReadOnlyList<string>>();
         var boundCallSites = new HashSet<AstCallKey>();
@@ -819,7 +875,7 @@ public sealed class CallGraphAnalysis
             var boundModule = new Binder(diagnostics)
             {
                 CrossModuleFunctionModules = crossModuleFunctions
-            }.Bind(ast);
+            }.Bind(ast, contractInheritance);
             boundValues.Complete = true;
             var incompatibleCallSpans = diagnostics
                 .Where(diagnostic =>
@@ -920,6 +976,8 @@ public sealed class CallGraphAnalysis
                             ResolvedField: { IsEnumMember: true } sourceConstant
                         })
                         boundValues.SourceEnumConstants.TryAdd((callerId, node.Span.Start, node.Span.End), sourceConstant);
+                    if (node is BoundFieldAccessExpression { IsTupleElementRead: true })
+                        boundValues.TupleElementReads.Add((callerId, node.Span.Start, node.Span.End));
                     if (node is BoundFieldAccessExpression
                         {
                             Target: BoundTypeReferenceExpression,
@@ -1224,9 +1282,12 @@ public sealed class CallGraphAnalysis
         return fallback == null ? Array.Empty<string>() : [fallback];
     }
 
-    private static FunctionNode ToFunctionNode(MethodNode method, string className)
+    private static FunctionNode ToFunctionNode(MethodNode method, string className,
+        Verification.ModuleInheritanceResult contractInheritance)
     {
         var qualifiedId = $"{className}.{method.Id}";
+        var inherited = !method.HasContracts
+            ? contractInheritance.RuntimeContracts.GetValueOrDefault(method) : null;
         return new FunctionNode(
             method.Span,
             qualifiedId,
@@ -1236,8 +1297,8 @@ public sealed class CallGraphAnalysis
             method.Parameters,
             method.Output,
             method.Effects,
-            method.Preconditions,
-            method.Postconditions,
+            inherited?.Preconditions ?? method.Preconditions,
+            inherited?.Postconditions ?? method.Postconditions,
             method.Body,
             method.Attributes)
         {
@@ -1258,6 +1319,8 @@ public sealed class CallGraphAnalysis
             ctor.Parameters,
             output: null,
             effects: null,
+            ctor.Preconditions,
+            Array.Empty<EnsuresNode>(),
             ctor.Body,
             ctor.Attributes);
     }
@@ -1294,6 +1357,8 @@ public sealed class CallGraphAnalysis
             parameters,
             output: null,
             effects: null,
+            accessor.Preconditions,
+            Array.Empty<EnsuresNode>(),
             accessor.Body,
             accessor.Attributes);
     }
@@ -1323,6 +1388,9 @@ public sealed class CallGraphAnalysis
     private static List<(string Callee, TextSpan Span)> CollectCalls(FunctionNode function)
     {
         var calls = new List<(string, TextSpan)>();
+        foreach (var contract in function.Preconditions.Select(precondition => precondition.Condition)
+                     .Concat(function.Postconditions.Select(postcondition => postcondition.Condition)))
+            CollectCallsFromNode(contract, calls);
         foreach (var statement in function.Body)
             CollectCallsFromNode(statement, calls);
         return calls;
@@ -1346,8 +1414,7 @@ public sealed class CallGraphAnalysis
                 break;
             case LocalFunctionStatementNode local:
                 // 0.25 F3 (#847): a leaf for the walker; its calls are the enclosing callable's.
-                foreach (var statement in local.Function.Body)
-                    CollectCallsFromNode(statement, calls);
+                calls.AddRange(CollectCalls(local.Function));
                 return;
         }
 

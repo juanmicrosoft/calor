@@ -150,23 +150,13 @@ public sealed class ExternalCallCollector
     public static List<CollectedCall> Collect(ModuleNode module)
     {
         var collector = new ExternalCallCollector();
-        collector.IndexBoundCallReceivers(module);
+        var callGraph = CallGraphAnalysis.Build(module);
+        collector.IndexBoundCallReceivers(module, callGraph.ContractInheritance);
 
-        foreach (var function in module.Functions)
+        foreach (var function in callGraph.Functions.Values)
         {
+            collector.CollectContracts(function.Preconditions, function.Postconditions);
             collector.CollectFromFunctionBody(function.Body);
-        }
-
-        foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
-        {
-            foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))
-            {
-                collector.CollectFromFunctionBody(method.Body);
-            }
-            foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(cls))
-            {
-                collector.CollectFromFunctionBody(ctor.Body);
-            }
         }
 
         return collector._calls.Distinct().ToList();
@@ -181,41 +171,37 @@ public sealed class ExternalCallCollector
         => CollectPerFunctionWithBareNames(module, null);
 
     internal static List<RawCall> CollectPerFunctionWithBareNames(ModuleNode module,
-        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions)
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions,
+        CallGraphAnalysis? callGraph = null)
     {
         var collector = new ExternalCallCollector
         {
             _rawMode = true,
             _crossModuleFunctions = crossModuleFunctions
         };
-        collector.IndexBoundCallReceivers(module);
+        callGraph ??= CallGraphAnalysis.Build(module, crossModuleFunctions);
+        collector.IndexBoundCallReceivers(module, callGraph.ContractInheritance);
+        var methodNames = CallGraphAnalysis.EnumerateClasses(module)
+            .SelectMany(cls => CallGraphAnalysis.EnumerateMethods(cls)
+                .Select(method => (Id: $"{cls.Name}.{method.Id}", Name: $"{cls.Name}.{method.Name}")))
+            .ToLookup(method => method.Id, method => method.Name, StringComparer.Ordinal);
 
-        foreach (var function in module.Functions)
+        foreach (var function in callGraph.Functions.Values)
         {
             collector._currentCallerId = function.Id;
-            collector._currentCaller = function.Name;
+            collector._currentCaller = methodNames[function.Id].FirstOrDefault() ?? function.Name;
+            collector.CollectContracts(function.Preconditions, function.Postconditions);
             collector.CollectFromFunctionBody(function.Body);
         }
 
-        foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
-        {
-            foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))
-            {
-                // The same qualified id CallGraphAnalysis.ToFunctionNode assigns.
-                collector._currentCallerId = $"{cls.Name}.{method.Id}";
-                collector._currentCaller = $"{cls.Name}.{method.Name}";
-                collector.CollectFromFunctionBody(method.Body);
-            }
-            foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(cls))
-            {
-                collector._currentCallerId = $"{cls.Name}.{ctor.Id}";
-                collector._currentCaller =
-                    $"{cls.Name}.{(ctor.IsStatic ? ".cctor" : ".ctor")}";
-                collector.CollectFromFunctionBody(ctor.Body);
-            }
-        }
-
         return collector._rawCalls;
+    }
+
+    private void CollectContracts(IReadOnlyList<RequiresNode> preconditions, IReadOnlyList<EnsuresNode> postconditions)
+    {
+        foreach (var condition in preconditions.Select(precondition => precondition.Condition)
+                     .Concat(postconditions.Select(postcondition => postcondition.Condition)))
+            CollectFromNode(condition);
     }
 
     private void CollectFromFunctionBody(IReadOnlyList<StatementNode> body)
@@ -337,14 +323,14 @@ public sealed class ExternalCallCollector
 
     private readonly Dictionary<(int Start, int End), BoundCallExpression> _computedMemberCalls = new();
 
-    private void IndexBoundCallReceivers(ModuleNode module)
+    private void IndexBoundCallReceivers(ModuleNode module, Verification.ModuleInheritanceResult? contractInheritance)
     {
         try
         {
             var bound = new Binder(new Calor.Compiler.Diagnostics.DiagnosticBag())
             {
                 CrossModuleFunctionModules = _crossModuleFunctions
-            }.Bind(module);
+            }.Bind(module, contractInheritance);
             foreach (var node in Descendants(bound))
             {
                 switch (node)

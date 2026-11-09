@@ -252,19 +252,27 @@ public sealed class EffectEnforcementPass
     /// <summary>
     /// Enforces effect declarations across all functions and class methods in the module.
     /// </summary>
-    public void Enforce(ModuleNode module)
+    public void Enforce(ModuleNode module) => Enforce(module, null);
+
+    internal void Enforce(ModuleNode module, Verification.ModuleInheritanceResult? contractInheritance)
     {
         _chargedVariables.Clear();
+        if (contractInheritance is null)
+        {
+            using var checker = new Verification.ContractInheritanceChecker(_diagnostics, useZ3: false);
+            contractInheritance = checker.Check(module);
+        }
 
         // Phase 1: Build function map and call graph (includes functions and methods)
-        _callGraphAnalysis = CallGraphAnalysis.Build(module, CrossModuleFunctionModules);
+        _callGraphAnalysis = CallGraphAnalysis.Build(module, CrossModuleFunctionModules, contractInheritance);
 
         // Phase 1b: index module shape for delegate detection, static-receiver
         // resolution and variance checks. All enumerations include §PP-wrapped
         // types/members (W2 review C1).
         _classesByName = new Dictionary<string, ClassDefinitionNode>(StringComparer.Ordinal);
-        foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
-            _classesByName[cls.Name] = cls;
+        foreach (var group in CallGraphAnalysis.EnumerateClasses(module).GroupBy(cls => cls.Name, StringComparer.Ordinal))
+            if (group.Take(2).ToArray() is [var cls])
+                _classesByName[cls.Name] = cls;
         _interfacesByName = new Dictionary<string, InterfaceDefinitionNode>(StringComparer.Ordinal);
         foreach (var group in CallGraphAnalysis.EnumerateInterfaces(module).GroupBy(iface => iface.Name, StringComparer.Ordinal))
             if (group.Take(2).ToArray() is [var iface])
@@ -311,6 +319,24 @@ public sealed class EffectEnforcementPass
                         property.Name,
                         accessor!.Kind.ToString().ToLowerInvariant(),
                         accessor);
+                }
+            }
+            foreach (var op in CallGraphAnalysis.EnumerateOperators(cls))
+            {
+                var id = $"{cls.Name}.{op.Id}";
+                _ownerClassByFunctionId[id] = cls;
+                _implicitAccessorsByFunctionId[id] =
+                    new ImplicitAccessorDeclaration(cls.Name, $"op_{op.Kind}", "operator", op);
+            }
+            foreach (var indexer in CallGraphAnalysis.EnumerateIndexers(cls))
+            {
+                foreach (var accessor in new[] { indexer.Getter, indexer.Setter, indexer.Initer }.OfType<PropertyAccessorNode>())
+                {
+                    var kind = accessor.Kind.ToString().ToLowerInvariant();
+                    var id = $"{cls.Name}.{indexer.Id}.{kind}";
+                    _ownerClassByFunctionId[id] = cls;
+                    _implicitAccessorsByFunctionId[id] =
+                        new ImplicitAccessorDeclaration(cls.Name, "this[]", kind, accessor);
                 }
             }
             foreach (var evt in CallGraphAnalysis.EnumerateEvents(cls))
@@ -631,7 +657,8 @@ public sealed class EffectEnforcementPass
 
     private EffectSet InferEffects(FunctionNode function, HashSet<string> sccMembers)
     {
-        if (_declarationOnlyRows.TryGetValue(function.Id, out var row))
+        var declarationOnly = _declarationOnlyRows.TryGetValue(function.Id, out var row);
+        if (declarationOnly && function.Preconditions.Count == 0 && function.Postconditions.Count == 0)
             return GetDeclaredEffects(row);
         var assumptions = new List<string>();
         var context = new InferenceContext(
@@ -657,7 +684,9 @@ public sealed class EffectEnforcementPass
             AstResolution = AstResolution,
         };
         var inferrer = new EffectInferrer(context);
-        var effects = inferrer.InferFromStatements(function.Body);
+        var effects = inferrer.InferFromFunction(function);
+        if (declarationOnly)
+            effects = effects.Union(GetDeclaredEffects(row));
         if (context.CurrentConstructor is { Constructor.IsStatic: false }
             && context.CurrentConstructor.Constructor.Initializer != null)
         {
@@ -2068,6 +2097,9 @@ public sealed class EffectEnforcementPass
                 }
             }
 
+            foreach (var condition in _function.Preconditions.Select(precondition => precondition.Condition)
+                         .Concat(_function.Postconditions.Select(postcondition => postcondition.Condition)))
+                Walk(condition);
             foreach (var statement in _function.Body)
                 Walk(statement);
         }
@@ -3296,6 +3328,15 @@ public sealed class EffectEnforcementPass
             return effects;
         }
 
+        public EffectSet InferFromFunction(FunctionNode function)
+        {
+            var effects = InferFromStatements(function.Body);
+            foreach (var condition in function.Preconditions.Select(precondition => precondition.Condition)
+                         .Concat(function.Postconditions.Select(postcondition => postcondition.Condition)))
+                effects = effects.Union(InferFromExpression(condition));
+            return effects;
+        }
+
         /// <summary>0.25 F3 (#847): the local function whose parameters AST searches read.</summary>
         private FunctionNode? _localFunctionScope;
 
@@ -3310,7 +3351,7 @@ public sealed class EffectEnforcementPass
             _localFunctionScope = local.Function;
             try
             {
-                var body = InferFromStatements(local.Function.Body);
+                var body = InferFromFunction(local.Function);
                 _localBodies[local.Function] = body;
                 _context.RecordLocalFunctionBody?.Invoke(local.Function, body, _context.Assumptions.ToArray());
                 return body;
@@ -5544,6 +5585,8 @@ public sealed class EffectEnforcementPass
             if (_context.CallGraph.IsResolvedEnumConstant(_context.CurrentFunctionId, span))
                 return EffectSet.Empty;
             var effects = InferFromExpression(target);
+            if (_context.CallGraph.IsTupleElementRead(_context.CurrentFunctionId, span))
+                return effects;
             var targetType = InferExpressionType(target);
             if (memberName == "Length"
                 && InferMetadataArrayLength(target.Span, span) is { } arrayEffects)
@@ -5616,6 +5659,8 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromReference(ReferenceNode reference, bool chargeMethodGroup = true)
         {
+            if (_context.CallGraph.IsTupleElementRead(_context.CurrentFunctionId, reference.Span))
+                return EffectSet.Empty;
             if (_context.CallGraph.IsResolvedEnumConstant(_context.CurrentFunctionId, reference.Span))
                 return EffectSet.Empty;
             if (!TrySplitMemberReference(reference.Name, out var receiver, out var member))

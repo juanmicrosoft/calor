@@ -130,7 +130,8 @@ public sealed class BoundFunction : BoundNode
     /// declares it. Analyses keyed by callable charge its body to that callable.
     /// </summary>
     public SymbolId? EnclosingSymbolId { get; init; }
-    public override IEnumerable<BoundNode> ChildNodes => Body;
+    public IReadOnlyList<BoundExpression> ContractConditions { get; init; } = [];
+    public override IEnumerable<BoundNode> ChildNodes => ContractConditions.Cast<BoundNode>().Concat(Body);
 
     public BoundFunction(TextSpan span, FunctionSymbol symbol, IReadOnlyList<BoundStatement> body, Scope scope)
         : this(span, symbol, body, scope, Array.Empty<string>(), BoundMemberKind.TopLevelFunction, null)
@@ -1751,6 +1752,7 @@ public sealed class BoundBaseExpression : BoundExpression
 /// </summary>
 public sealed class BoundFieldAccessExpression : BoundExpression
 {
+    internal bool IsTupleElementRead { get; init; }
     internal Microsoft.CodeAnalysis.ISymbol? ResolvedMetadataMember { get; init; }
     /// <summary>#943: a metadata member whose read is unsupported here (the result stays unresolved).</summary>
     internal Microsoft.CodeAnalysis.ISymbol? UnsupportedMetadataMember { get; init; }

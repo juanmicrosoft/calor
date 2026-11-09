@@ -57,7 +57,8 @@ public static class EffectSummaryBuilder
         // are gone; `NoNameKeyedEffectStoreRemains` pins it), then attach them
         // with the caller's declared effects + a diagnostic span for any
         // cross-module errors.
-        var rawCalls = ExternalCallCollector.CollectPerFunctionWithBareNames(module, crossModuleFunctions);
+        var callGraph = Analysis.CallGraphAnalysis.Build(module, crossModuleFunctions);
+        var rawCalls = ExternalCallCollector.CollectPerFunctionWithBareNames(module, crossModuleFunctions, callGraph);
         var callsByCaller = new Dictionary<string, List<RawCall>>(StringComparer.Ordinal);
         foreach (var call in rawCalls)
         {
@@ -86,6 +87,14 @@ public static class EffectSummaryBuilder
                     displayName: $"{cls.Name}.{method.Name}",
                     callsByCaller);
             }
+        }
+
+        var existingCallers = summary.Callers.Select(caller => caller.CallerId).ToHashSet(StringComparer.Ordinal);
+        foreach (var function in callGraph.Functions.Values)
+        {
+            if (!existingCallers.Contains(function.Id))
+                AppendCallerSummary(summary, function.Effects, function.Span,
+                    function.Id, function.Name, callsByCaller);
         }
 
         return summary;

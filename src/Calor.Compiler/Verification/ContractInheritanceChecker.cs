@@ -28,6 +28,7 @@ public sealed class ContractInheritanceChecker : IDisposable
     private readonly Dictionary<AstNode, string> _displayNames = new();
     private readonly Dictionary<AstNode, AstNode?> _enclosingDeclarations = new();
     private string _moduleNamespace = "";
+    private readonly Dictionary<MethodNode, InheritedContractInfo> _runtimeContracts = new();
 
     public ContractInheritanceChecker(
         DiagnosticBag diagnostics,
@@ -71,6 +72,7 @@ public sealed class ContractInheritanceChecker : IDisposable
             new Dictionary<MethodContractKey, InheritedContractInfo>();
 
         _qualifiedNames.Clear();
+        _runtimeContracts.Clear();
         _displayNames.Clear();
         _enclosingDeclarations.Clear();
         _moduleNamespace = module.NamespaceScopes.Count == 1
@@ -122,7 +124,10 @@ public sealed class ContractInheritanceChecker : IDisposable
             results.Add(classResult);
         }
 
-        return new ModuleInheritanceResult(results, inheritedContracts);
+        return new ModuleInheritanceResult(results, inheritedContracts)
+        {
+            RuntimeContracts = new Dictionary<MethodNode, InheritedContractInfo>(_runtimeContracts)
+        };
     }
 
     private sealed record ResolvedDeclaration(
@@ -436,6 +441,7 @@ public sealed class ContractInheritanceChecker : IDisposable
 
             var inherited = combinedInherited!;
             inheritedContracts[key] = inherited;
+            _runtimeContracts[implementingMethod] = inherited;
 
             _diagnostics.ReportInfo(
                 implementingMethod.Span,
@@ -2435,6 +2441,8 @@ public sealed class ClassInheritanceResult
 /// </summary>
 public sealed class ModuleInheritanceResult
 {
+    internal IReadOnlyDictionary<MethodNode, InheritedContractInfo> RuntimeContracts { get; init; } =
+        new Dictionary<MethodNode, InheritedContractInfo>();
     public IReadOnlyList<ClassInheritanceResult> Classes { get; }
 
     /// <summary>

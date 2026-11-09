@@ -184,17 +184,34 @@ public sealed class ContractVerifier
         {
             VerifyFunction(function);
         }
-        VerifyNestedInlineParameters(module);
+        VerifyNestedContracts(module);
 
-        void VerifyNestedInlineParameters(AstNode node)
+        void VerifyNestedContracts(AstNode node)
         {
+            if (node is FunctionNode local && !module.Functions.Contains(local))
+                VerifyFunction(local);
+            else if (node is MethodNode method)
+            {
+                var inherited = !method.HasContracts
+                    ? _contractBinder.ContractInheritance?.RuntimeContracts.GetValueOrDefault(method) : null;
+                VerifyMemberContracts(inherited?.Preconditions ?? method.Preconditions,
+                    inherited?.Postconditions ?? method.Postconditions);
+            }
+            else if (node is MethodSignatureNode signature)
+                VerifyMemberContracts(signature.Preconditions, signature.Postconditions);
+            else if (node is ConstructorNode constructor)
+                VerifyMemberContracts(constructor.Preconditions, []);
+            else if (node is PropertyAccessorNode accessor)
+                VerifyMemberContracts(accessor.Preconditions, []);
+            else if (node is OperatorOverloadNode op)
+                VerifyMemberContracts(op.Preconditions, op.Postconditions);
+
             IReadOnlyList<ParameterNode>? parameters = node switch
             {
                 MethodNode method => method.Parameters,
                 MethodSignatureNode signature => signature.Parameters,
                 ConstructorNode constructor => constructor.Parameters,
                 OperatorOverloadNode op => op.Parameters,
-                FunctionNode function when !module.Functions.Contains(function) => function.Parameters,
                 _ => null
             };
             if (parameters?.Any(parameter => parameter.InlineRefinement != null) == true)
@@ -204,7 +221,23 @@ public sealed class ContractVerifier
                     VerifyPrecondition(precondition, parameters);
             }
             foreach (var child in RecursiveAstWalker.GetAllChildren(node))
-                VerifyNestedInlineParameters(child);
+                VerifyNestedContracts(child);
+        }
+    }
+
+    private void VerifyMemberContracts(
+        IReadOnlyList<RequiresNode> preconditions, IReadOnlyList<EnsuresNode> postconditions)
+    {
+        foreach (var (condition, span, kind) in preconditions
+                     .Select(precondition => (precondition.Condition, precondition.Span, "Precondition"))
+                     .Concat(postconditions.Select(postcondition =>
+                         (postcondition.Condition, postcondition.Span, "Postcondition"))))
+        {
+            var bound = _contractBinder.BoundContractExpressions.GetValueOrDefault(condition);
+            if (bound is null || PrimitiveType.FromName(bound.Type.DisplayString) != PrimitiveType.Bool)
+                _diagnostics.Report(span, DiagnosticCode.TypeMismatch,
+                    $"{kind} must be a boolean expression, got {bound?.Type.DisplayString ?? "unknown"}");
+            VerifyQuantifierTypes(condition);
         }
     }
 
@@ -392,8 +425,8 @@ public sealed class ContractVerifier
             FloatLiteralNode => PrimitiveType.Float,
             BoolLiteralNode => PrimitiveType.Bool,
             StringLiteralNode => PrimitiveType.String,
-            CallExpressionNode call => InferBclCallType(call),
-            ExpressionCallNode call => InferBclExpressionCallType(call),
+            CallExpressionNode call => InferSelectedSourceCallType(call) ?? InferBclCallType(call),
+            ExpressionCallNode call => InferSelectedSourceCallType(call) ?? InferBclExpressionCallType(call),
             StringOperationNode operation => operation.Operation switch
             {
                 StringOp.Contains or StringOp.StartsWith or StringOp.EndsWith
@@ -422,6 +455,16 @@ public sealed class ContractVerifier
             _ => null
         };
     }
+
+    private CalorType? InferSelectedSourceCallType(ExpressionNode expression)
+        => _contractBinder.BoundContractExpressions.GetValueOrDefault(expression) is BoundCallExpression
+        {
+            ResolvedSymbol: not null,
+            ResolvedSymbols.Count: 1,
+            IsInaccessibleCall: false,
+            HasOpaqueOverloads: false,
+            HasUnresolvedArguments: false
+        } selected ? PrimitiveType.FromName(selected.Type.DisplayString) : null;
 
     private CalorType? InferBclCallType(CallExpressionNode call)
     {
@@ -521,7 +564,8 @@ public sealed class ContractVerifier
                 var name = call.Target[..dot];
                 var receiver = _contractBinder.BindVerificationReceiver(
                     new ReferenceNode(call.Span, name, isVerbatim: true), _contractVariables);
-                if (receiver is not BoundTypeReferenceExpression)
+                if (receiver is not BoundTypeReferenceExpression { Type: NominalBoundType { RoslynSymbol: not null } }
+                    && !HasSelectedStaticSourceOwner(call))
                     CollectReferencesInternal(new ReferenceNode(call.Span, name, isVerbatim: true), references, boundVariables);
             }
         }
@@ -529,7 +573,8 @@ public sealed class ContractVerifier
         if (expr is ExpressionCallNode { TargetExpression: FieldAccessNode member } expressionCall)
         {
             var receiver = _contractBinder.BindVerificationReceiver(member.Target, _contractVariables);
-            if (receiver is not BoundTypeReferenceExpression)
+            if (receiver is not BoundTypeReferenceExpression { Type: NominalBoundType { RoslynSymbol: not null } }
+                && !HasSelectedStaticSourceOwner(expressionCall))
                 CollectReferencesInternal(member.Target, references, boundVariables);
             foreach (var argument in expressionCall.Arguments)
                 CollectReferencesInternal(argument, references, boundVariables);
@@ -555,6 +600,17 @@ public sealed class ContractVerifier
         foreach (var child in RecursiveAstWalker.GetAllChildren(expr))
             CollectReferencesInNode(child, references, boundVariables);
     }
+
+    private bool HasSelectedStaticSourceOwner(ExpressionNode expression)
+        => _contractBinder.BoundContractExpressions.GetValueOrDefault(expression) is BoundCallExpression
+        {
+            ResolvedSymbol: { } selected,
+            ResolvedSymbols.Count: 1,
+            IsInaccessibleCall: false,
+            HasOpaqueOverloads: false,
+            HasUnresolvedArguments: false,
+            Receiver: BoundTypeReferenceExpression { ResolvedType: not null }
+        } && _contractBinder.IsStaticSourceMethod(selected);
 
     private void CollectReferencesInNode(
         AstNode node,

@@ -9,6 +9,38 @@ nav_order: 5
 
 Contracts are first-class citizens in Calor. They define what a function requires (preconditions) and guarantees (postconditions).
 
+## Source predicates
+
+A contract can call a source function that returns `bool`, including a selected
+static member such as `Predicates.Positive(x)`. Calls use ordinary overload
+resolution, accessibility and argument checking. A static declaration is not a
+value reference; actual value receivers and arguments still need valid bindings.
+
+```calor
+module FunctionCallBoundary
+  func Positive (int:value) → bool
+    !
+    return value > 0
+  func Identity (int:x) → int
+    !
+    requires Positive(x)
+    => Positive(result)
+    return x
+```
+
+Contract calls contribute their selected effects, including receiver and argument
+evaluation, to the enclosing callable. A pure callable cannot hide console output
+(`cw`) in a predicate. This check also applies when runtime contracts are off.
+Methods account for the inherited contracts that will actually execute, including
+their selected predicate calls.
+With runtime contracts enabled, receivers and arguments execute once in source
+order. Turning contracts off removes those checks and their evaluation, not the
+function body.
+
+Runtime support does **not** make source-function calls provable by Z3. Such
+contracts remain unsupported by static verification and retain their runtime
+guards when verification is enabled.
+
 ---
 
 ## Preconditions (`§Q`)
