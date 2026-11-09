@@ -1581,10 +1581,11 @@ exception and corruption diagnostic, rejects timeout/EOF/cleanup contamination,
 and counts that actual invocation separately as a prerequisite refusal, never a
 finite behavioral rejection.
 
-Known native/API limits are explicit, not repaired by this test-only unit.
-The current binder rejects an explicitly typed Task<int> local initialized
-directly from a scalar-output native async function with Calor0202; inferred
-locals and native task-returning auxiliary functions are covered alternatives.
+The integrated async callable-type repair accepts an explicitly typed
+Task<int> local initialized directly from a scalar-output native async function.
+The original current control retains its exact input and now requires native/CLR
+behavioral success instead of the former Calor0202 refusal. The 100/139 control
+counts and strict representatives are unchanged.
 The archived compiler rejects the inferred task.Result negative before CLR
 execution because its getter has unknown effect (Calor0410). The old mode
 asserts that exact blocker and does not label it CLR behavioral evidence.

@@ -358,9 +358,9 @@ class AsyncVerifierTests(unittest.TestCase):
         self.verify("async001", source("async001", body="§WH true\n  §CN\n§R 42"), False,
                     env={"CALOR_LOGIC_TIMEOUT_SECONDS": "10"}, detail="timeout", allow_timeout=True)
 
-    def test_current_native_task_binding_blocker(self):
+    def test_current_native_task_binding(self):
         self.verify("async002", source("async002", body="§B{task:Task<int>} §C{FetchDataAsync} §/C\n"
-                    "§B{value} §AWAIT task\n§R (* value 2)"), False, detail="Calor0202")
+                    "§B{value} §AWAIT task\n§R (* value 2)"), True)
 
     def test_actual_http_default_instances(self):
         for text, expected, detail in http_instance_cases():
