@@ -85,7 +85,7 @@ public sealed class IdentityFreeSyntaxTests
             module m001
               class c001 extends Value
               func f001 () → void
-                let handler = (x:lam1, i32) => lam1
+                let handler = (x:lam1, @i32) => lam1
               interface i001 extends IValue
             """;
         var diagnostics = new DiagnosticBag();
