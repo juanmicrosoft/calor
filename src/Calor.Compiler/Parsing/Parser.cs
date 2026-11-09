@@ -6153,7 +6153,8 @@ public sealed class Parser
         if (Current.Kind is TokenKind.GreaterEqual or TokenKind.LessEqual or TokenKind.Greater or TokenKind.Less)
         {
             var operation = Advance();
-            var operand = ParseExpression(allowSpacedCall: false);
+            // The next relational operator can start a sibling in an emitted (and/or ...) pattern.
+            var operand = ParseExpression(InfixPrecedence(operation.Kind) + 1, allowSpacedCall: false);
             return new RelationalPatternNode(operation.Span.Union(operand.Span), operation.Text, operand);
         }
 

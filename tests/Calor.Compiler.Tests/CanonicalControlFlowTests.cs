@@ -656,6 +656,111 @@ public sealed class CanonicalControlFlowTests
         => AssertObservation($"return match {value}\n  case {pattern} → 1\n  case _ → 0", expected);
 
     [Theory]
+    [InlineData("(and > 0 < 10)", 0, "0")]
+    [InlineData("(and > 0 < 10)", 1, "1")]
+    [InlineData("(and > 0 < 10)", 9, "1")]
+    [InlineData("(and > 0 < 10)", 10, "0")]
+    [InlineData("(and >= 10 < 100)", 9, "0")]
+    [InlineData("(and >= 10 < 100)", 10, "1")]
+    [InlineData("(and >= 10 < 100)", 99, "1")]
+    [InlineData("(and >= 10 < 100)", 100, "0")]
+    [InlineData("(or < -10 >= 10)", -11, "1")]
+    [InlineData("(or < -10 >= 10)", -10, "0")]
+    [InlineData("(or < -10 >= 10)", 9, "0")]
+    [InlineData("(or < -10 >= 10)", 10, "1")]
+    [InlineData("(and > (1 + 1) <= (3 * 3))", 2, "0")]
+    [InlineData("(and > (1 + 1) <= (3 * 3))", 3, "1")]
+    [InlineData("(and > (1 + 1) <= (3 * 3))", 9, "1")]
+    [InlineData("(and > (1 + 1) <= (3 * 3))", 10, "0")]
+    [InlineData("(and (or < -10 > 10) < 100)", -11, "1")]
+    [InlineData("(and (or < -10 > 10) < 100)", 0, "0")]
+    [InlineData("(and (or < -10 > 10) < 100)", 11, "1")]
+    [InlineData("(and (or < -10 > 10) < 100)", 100, "0")]
+    public void RelationalPatternCombinators_PreserveOperandBoundaries(
+        string pattern, int value, string expected)
+        => AssertObservation($"return match {value}\n  case {pattern} → 1\n  case _ → 0", expected);
+
+    [Fact]
+    public void Original094Patterns_ConvertAndReemitNativelyWithIndependentClrOracles()
+    {
+        var path = Path.Combine(CliTestHarness.FindRepoRoot(),
+            "tests/TestData/CSharpImport/Level5_Advanced/094_PatternMatching.cs");
+        var bytes = File.ReadAllBytes(path);
+        var source = File.ReadAllText(path);
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Empty(conversion.Losses);
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.Equal(0, conversion.LossySubstitutionCount);
+        Assert.Equal(0, conversion.DropCount);
+        Assert.DoesNotContain("raw ", conversion.CalorSource!);
+        Assert.DoesNotContain('§', conversion.CalorSource!);
+
+        var native = Parse(conversion.CalorSource!);
+        var methods = Assert.Single(native.Classes).Methods;
+        Assert.Equal(new[] { "DescribeObject", "DescribeNumber", "GetLength" },
+            methods.Select(method => method.Name));
+        var numberMatch = Assert.IsType<MatchExpressionNode>(
+            Assert.IsType<ReturnStatementNode>(methods[1].Body.Single()).Expression);
+        Assert.Equal(5, numberMatch.Cases.Count);
+        static (string Operator, long Value) Relational(PatternNode pattern)
+        {
+            var relation = Assert.IsType<RelationalPatternNode>(pattern);
+            return (relation.Operator, Assert.IsType<IntLiteralNode>(relation.Value).Value);
+        }
+        Assert.Equal(("<", 0L), Relational(numberMatch.Cases[0].Pattern));
+        Assert.Equal(0L, Assert.IsType<IntLiteralNode>(
+            Assert.IsType<LiteralPatternNode>(numberMatch.Cases[1].Pattern).Literal).Value);
+        var small = Assert.IsType<AndPatternNode>(numberMatch.Cases[2].Pattern);
+        var medium = Assert.IsType<AndPatternNode>(numberMatch.Cases[3].Pattern);
+        Assert.Equal((">", 0L), Relational(small.Left));
+        Assert.Equal(("<", 10L), Relational(small.Right));
+        Assert.Equal((">=", 10L), Relational(medium.Left));
+        Assert.Equal(("<", 100L), Relational(medium.Right));
+        Assert.IsType<WildcardPatternNode>(numberMatch.Cases[4].Pattern);
+
+        var reemitted = new CalorEmitter().Emit(native);
+        Assert.DoesNotContain("raw ", reemitted);
+        Assert.DoesNotContain('§', reemitted);
+        foreach (var code in new[] { source, Compile(conversion.CalorSource!).GeneratedCode,
+            Compile(reemitted).GeneratedCode })
+        {
+            var owner = LoadAssembly(code).GetType("PatternMatching.Patterns")!;
+            Assert.True(owner.IsAbstract && owner.IsSealed);
+            var describeNumber = owner.GetMethod("DescribeNumber")!;
+            Assert.Equal(typeof(string), describeNumber.ReturnType);
+            Assert.Equal(typeof(int), Assert.Single(describeNumber.GetParameters()).ParameterType);
+            foreach (var n in Enumerable.Range(-105, 215).Append(int.MinValue).Append(int.MaxValue))
+            {
+                var expected = n < 0 ? "negative" : n == 0 ? "zero" : n < 10 ? "small positive"
+                    : n < 100 ? "medium positive" : "large positive";
+                Assert.Equal(expected, describeNumber.Invoke(null, [n]));
+            }
+            var describeObject = owner.GetMethod("DescribeObject")!;
+            Assert.Equal(typeof(string), describeObject.ReturnType);
+            Assert.Equal(typeof(object), Assert.Single(describeObject.GetParameters()).ParameterType);
+            foreach (var (input, expected) in new (object?, string)[]
+            {
+                (int.MinValue, "Integer: -2147483648"), (0, "Integer: 0"),
+                (int.MaxValue, "Integer: 2147483647"), ("", "String: "), ("text", "String: text"),
+                (false, "Boolean: False"), (true, "Boolean: True"), (null, "Unknown"),
+                (7L, "Unknown"), (new object(), "Unknown")
+            })
+                Assert.Equal(expected, describeObject.Invoke(null, [input]));
+            var getLength = owner.GetMethod("GetLength")!;
+            Assert.Equal(typeof(int), getLength.ReturnType);
+            Assert.Equal(typeof(object), Assert.Single(getLength.GetParameters()).ParameterType);
+            foreach (var (input, expected) in new (object?, int)[]
+            {
+                ("", 0), ("text", 4), (Array.Empty<int>(), 0), (new[] { -1, 0, 7 }, 3),
+                (null, 0), (7, -1), (false, -1), (new byte[2], -1), (new object(), -1)
+            })
+                Assert.Equal(expected, getLength.Invoke(null, [input]));
+        }
+        Assert.Equal(bytes, File.ReadAllBytes(path));
+    }
+
+    [Theory]
     [InlineData(110, "110")]
     [InlineData(50, "0")]
     public void GuardedVarPattern_PreservesEscapedBindingAndGuard(int value, string expected)
@@ -1401,6 +1506,10 @@ public sealed class CanonicalControlFlowTests
     }
 
     private static Type Load(string code, IEnumerable<string>? preprocessorSymbols = null)
+        => LoadAssembly(code, preprocessorSymbols).GetTypes()
+            .Single(type => type.GetMethod("Probe") != null || type.GetMethod("Assign") != null);
+
+    private static Assembly LoadAssembly(string code, IEnumerable<string>? preprocessorSymbols = null)
     {
         var compilation = CSharpCompilation.Create("CanonicalControls_" + Guid.NewGuid().ToString("N"),
             [CSharpSyntaxTree.ParseText(code, CSharpParseOptions.Default
@@ -1409,7 +1518,6 @@ public sealed class CanonicalControlFlowTests
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics) + "\n" + code);
-        return Assembly.Load(image.ToArray()).GetTypes()
-            .Single(type => type.GetMethod("Probe") != null || type.GetMethod("Assign") != null);
+        return Assembly.Load(image.ToArray());
     }
 }

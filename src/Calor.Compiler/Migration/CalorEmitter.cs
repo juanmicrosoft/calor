@@ -4750,6 +4750,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
             or StringOp.RegexReplace or StringOp.RegexSplit;
         var receiver = staticString ? "string"
             : regex ? "System.Text.RegularExpressions.Regex" : $"({arguments[0]})";
+        if (node.Operation == StringOp.Length && node.Arguments[0] is ReferenceNode)
+            receiver = arguments[0];
         if (!staticString && !regex)
             arguments.RemoveAt(0);
         if (node.Operation == StringOp.Length)
