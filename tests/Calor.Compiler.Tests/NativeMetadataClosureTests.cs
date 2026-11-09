@@ -184,6 +184,74 @@ public sealed class NativeMetadataClosureTests
         Assert.True(Compile(source).HasErrors);
     }
 
+    [Fact]
+    public void NativeInventory_ByReferenceCallsRetainMetadataThroughTheProjectDriver()
+    {
+        const string source = """
+            module Inventory overflow unchecked
+              using System.Collections.Generic
+
+              module Inventory
+                func ParseOr (string:text, int:fallback) → int
+                  var int:n = default(int)
+                  if int.TryParse(text, out n)
+                    return n
+                  return fallback
+
+                func CountOf (Dictionary<string,int>:stock, string:item) → int
+                  var int:count = default(int)
+                  stock.TryGetValue(item, out count)
+                  return count
+
+                func IsNumber (string:text) → bool
+                  return int.TryParse(text, out _)
+
+                func Bump (ref int:x) → void
+                  set x (x + 1)
+
+                func Twice (in int:x) → int
+                  return x * 2
+
+                func Run () → int
+                  var int:total = 1
+                  Bump(ref total)
+                  return Twice(in total) + ParseOr("40", 0)
+            """;
+        var directory = Path.Combine(Path.GetTempPath(), "calor-inventory-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var file = new FileInfo(Path.Combine(directory, "inventory.calr"));
+            File.WriteAllText(file.FullName, source);
+            var diagnostics = new DiagnosticBag();
+            var result = CompilationDriver.CompileAll([file],
+                _ => new CompilationOptions { StatusWriter = TextWriter.Null },
+                crossModuleEnforcement: true, crossModulePolicy: Calor.Compiler.Effects.UnknownCallPolicy.Strict,
+                diagnosticSink: diagnostics);
+            Assert.False(result.AnyErrors, string.Join(Environment.NewLine, diagnostics));
+            Assert.Empty(result.Skipped);
+            var compiled = Assert.Single(result.Compiled);
+            var methods = CompileAssembly(compiled.Result.GeneratedCode).GetTypes()
+                .SelectMany(type => type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                .ToArray();
+            Assert.Equal(44, methods.Single(method => method.Name == "Run").Invoke(null, null));
+            var parse = methods.Single(method => method.Name == "ParseOr");
+            Assert.Equal(13, parse.Invoke(null, ["13", 7]));
+            Assert.Equal(7, parse.Invoke(null, ["bad", 7]));
+            var count = methods.Single(method => method.Name == "CountOf");
+            var stock = new Dictionary<string, int> { ["found"] = 9 };
+            Assert.Equal(9, count.Invoke(null, [stock, "found"]));
+            Assert.Equal(0, count.Invoke(null, [stock, "missing"]));
+            var isNumber = methods.Single(method => method.Name == "IsNumber");
+            Assert.Equal(true, isNumber.Invoke(null, ["13"]));
+            Assert.Equal(false, isNumber.Invoke(null, ["bad"]));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [Theory]
     [InlineData("int[]", "new int[] {10, 20, 30, 40}")]
     [InlineData("string", "\"abcd\"")]

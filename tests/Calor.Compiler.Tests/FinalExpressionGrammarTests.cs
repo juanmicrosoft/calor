@@ -47,6 +47,66 @@ public sealed class FinalExpressionGrammarTests
     }
 
     [Theory]
+    [InlineData("sbyte", typeof(sbyte))]
+    [InlineData("byte", typeof(byte))]
+    [InlineData("short", typeof(short))]
+    [InlineData("ushort", typeof(ushort))]
+    [InlineData("int", typeof(int))]
+    [InlineData("uint", typeof(uint))]
+    [InlineData("long", typeof(long))]
+    [InlineData("ulong", typeof(ulong))]
+    [InlineData("nint", typeof(nint))]
+    [InlineData("nuint", typeof(nuint))]
+    [InlineData("char", typeof(char))]
+    [InlineData("float", typeof(float))]
+    [InlineData("double", typeof(double))]
+    [InlineData("decimal", typeof(decimal))]
+    [InlineData("bool", typeof(bool))]
+    [InlineData("string", typeof(string))]
+    [InlineData("object", typeof(object))]
+    public void NativePrimitiveDefaults_RetainTheirClrValueTypeAndAuthoredSpan(string spelling, Type expectedType)
+    {
+        var authored = $"default({spelling})";
+        var expression = Parse(authored);
+        Assert.Equal(authored.Length, expression.Span.Length);
+        Assert.IsNotType<CallExpressionNode>(expression);
+        foreach (var node in new[] { expression, Parse(expression.Accept(new CalorEmitter())) })
+        {
+            var generated = node.Accept(new CSharpEmitter());
+            var source = $"public static class Probe {{ public static {spelling} Run() => {generated}; }}";
+            var compilation = CSharpCompilation.Create("Default_" + Guid.NewGuid().ToString("N"),
+                [CSharpSyntaxTree.ParseText(source)], GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var result = compilation.Emit(stream);
+            Assert.True(result.Success, source + Environment.NewLine + string.Join(Environment.NewLine, result.Diagnostics));
+            var method = Assembly.Load(stream.ToArray()).GetType("Probe")!.GetMethod("Run")!;
+            Assert.Equal(expectedType, method.ReturnType);
+            var value = method.Invoke(null, null);
+            Assert.Equal(expectedType.IsValueType ? Activator.CreateInstance(expectedType) : null, value);
+            if (value is float single)
+                Assert.Equal(0, BitConverter.SingleToInt32Bits(single));
+            else if (value is double number)
+                Assert.Equal(0L, BitConverter.DoubleToInt64Bits(number));
+            else if (value is decimal fraction)
+                Assert.Equal(new[] {0, 0, 0, 0}, decimal.GetBits(fraction));
+        }
+    }
+
+    [Theory]
+    [InlineData("default(T)")]
+    [InlineData("default(int?)")]
+    [InlineData("default(System.Int32)")]
+    public void NativeDefaults_UnsupportedTypedFormsDoNotBecomeFakeCalls(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        Parse(source, diagnostics);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Message.Contains(
+            "requires a built-in primitive type", StringComparison.Ordinal));
+        Assert.IsType<CallExpressionNode>(Parse("@default(1)"));
+    }
+
+    [Theory]
     [InlineData("1..3")]
     [InlineData("..3")]
     [InlineData("1..")]

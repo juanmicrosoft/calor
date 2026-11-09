@@ -5801,6 +5801,26 @@ public sealed class Parser
         var token = Expect(TokenKind.Identifier);
         var name = TokenIdentifier(token);
         verbatim |= token.Text.StartsWith('@');
+        if (!verbatim && name == "default" && Check(TokenKind.OpenParen)
+            && Current.Span.Line == token.Span.Line)
+        {
+            Advance();
+            var typeStart = _position;
+            var type = ReadInlineTypeToken();
+            var typeSpan = GetConsumedSpan(typeStart);
+            var close = Expect(TokenKind.CloseParen);
+            var span = token.Span.Union(close.Span);
+            if (type == "bool")
+                return new BoolLiteralNode(span, false);
+            if (type is "string" or "object")
+                return new ReferenceNode(span, "null");
+            if (type is "sbyte" or "byte" or "short" or "ushort" or "int" or "uint"
+                or "long" or "ulong" or "nint" or "nuint" or "char" or "float" or "double" or "decimal")
+                return new TypeOperationNode(span, TypeOp.Cast, new IntLiteralNode(span, 0), type, typeSpan);
+            _diagnostics.ReportError(typeSpan, DiagnosticCode.UnexpectedToken,
+                "Native default(T) currently requires a built-in primitive type.");
+            return new IntLiteralNode(span, 0);
+        }
         if (!verbatim && name is "static" or "async" && Check(TokenKind.OpenParen)
             && TryParseNativeLambda(out var parsedLambda) && parsedLambda is LambdaExpressionNode lambda)
             return new LambdaExpressionNode(token.Span.Union(lambda.Span), lambda.Id,
