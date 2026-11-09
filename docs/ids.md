@@ -5,9 +5,9 @@ persisted declaration identities in `.calor/ids.json`. Commit that file alongsid
 the source. Agents edit names, signatures, and bodies, not identity records.
 
 ```calor
-§M{Calculator}
-  §F{Double:pub} (i32:value) -> i32
-    §R (* value 2)
+module Calculator
+  func Double (int:value) → int
+    return value * 2
 ```
 
 An ID identifies a declaration independently of its source spelling and offsets.
@@ -84,6 +84,14 @@ Container renames are reconciled before retrying unique signature edits, so a
 class rename preserves a self-typed member such as `Echo(A) -> A`. Multiple
 changed overloads remain ambiguous unless tooling supplies an explicit mapping.
 Failed parsing or ambiguous reconciliation must not write a partial sidecar.
+
+The enum-extension syntax migration keeps the allocated IDs when an enum extension
+becomes a named module and its functions become methods. Migrated entries record
+their original `AllocationKind`; their ordinary `Kind` describes the new declaration.
+Only explicit migration mappings can make these two kind changes. A child mapping
+must target its migrated owner. Ordinary rename/move mappings still require the same
+kind, and synchronization never infers an enum-extension origin from an `Extensions`
+name suffix. The source and provenance update use the same recoverable transaction.
 
 The shared declaration inventory includes delegates, events, records, unions,
 fields, variants, and proof obligations, including declarations

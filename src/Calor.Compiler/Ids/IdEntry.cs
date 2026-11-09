@@ -22,6 +22,9 @@ public sealed record IdEntry(
     TextSpan Span,
     string FilePath)
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IdKind? AllocationKind { get; internal init; }
+
     /// <summary>
     /// Returns true if this is a test ID (e.g., f001, m001).
     /// </summary>
@@ -37,11 +40,14 @@ public sealed record IdEntry(
 public sealed record DeclarationIdentity(
     string Id, string File, string Container, IdKind Kind, string Name, string Signature)
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IdKind? AllocationKind { get; init; }
+
     [JsonIgnore]
     public string Key => JsonSerializer.Serialize(new[] { File, Container, Kind.ToString(), Name, Signature });
 }
 
-public sealed record DeclarationRelocation(string Id, string DestinationKey);
+public sealed record DeclarationRelocation(string Id, string DestinationKey, bool AllowKindMigration = false);
 
 public sealed class DeclarationIdentityException(string message, Exception innerException)
     : InvalidOperationException(message, innerException);
@@ -407,12 +413,18 @@ public sealed class DeclarationIdentityStore
 
     private bool IsValidPersistedIdentity(DeclarationIdentity declaration)
     {
+        var allocationKind = declaration.AllocationKind ?? declaration.Kind;
+        if (declaration.AllocationKind != null && !IsSupportedKindMigration(allocationKind, declaration.Kind))
+            return false;
         if (IdValidator.IsTestId(declaration.Id))
-            return IdValidator.Validate(declaration.Id, declaration.Kind,
+            return IdValidator.Validate(declaration.Id, allocationKind,
                 IdValidator.IsTestPath(CanonicalPath.Resolve(ValidatePath(declaration.File)))) == IdValidationResult.Valid;
         return IdValidator.IsCanonicalId(declaration.Id)
-            && IdGenerator.GetKindFromId(declaration.Id) == declaration.Kind;
+            && IdGenerator.GetKindFromId(declaration.Id) == allocationKind;
     }
+
+    internal static bool IsSupportedKindMigration(IdKind allocated, IdKind current) =>
+        (allocated, current) is (IdKind.EnumExtension, IdKind.Module) or (IdKind.Function, IdKind.Method);
 
     /// <summary>
     /// Registers explicit inputs and reconciles the complete registered set.
@@ -460,6 +472,75 @@ public sealed class DeclarationIdentityStore
         if (File.ReadAllText(SidecarPath) != before)
             throw new IOException("Sidecar changed during edit preparation.");
         return new(SidecarPath, before, JsonSerializer.Serialize(next, JsonOptions));
+    }
+
+    public State MigrateEnumExtensions(string file, string before, ModuleNode original)
+    {
+        var relative = Relative(file);
+        State previous;
+        string expectedSidecar;
+        using (Acquire())
+        {
+            RecoverCore();
+            previous = Read();
+            expectedSidecar = File.ReadAllText(SidecarPath);
+        }
+        var identities = previous.Declarations.ToDictionary(declaration => declaration.Key, StringComparer.Ordinal);
+        var described = Describe(relative, original);
+        if (!described.Any(declaration => declaration.Node is EnumExtensionNode)
+            || !described.Select(declaration => declaration.Identity.Key).ToHashSet(StringComparer.Ordinal)
+                .SetEquals(previous.Declarations.Where(declaration => declaration.File == relative)
+                    .Select(declaration => declaration.Key)))
+            throw new InvalidOperationException("The migration requires the complete registered enum-extension inventory.");
+        foreach (var declaration in described)
+        {
+            if (!identities.TryGetValue(declaration.Identity.Key, out var identity))
+                throw new InvalidOperationException("The migration AST does not match the registered declaration inventory.");
+            declaration.Node.ToolingId = identity.Id;
+            declaration.Node.ToolingIdAllocationKind = identity.AllocationKind;
+        }
+        var after = new Migration.CalorEmitter().Emit(original);
+        var diagnostics = new DiagnosticBag();
+        var native = new Parser(new Lexer(after, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        if (!diagnostics.HasErrors)
+            new Binding.Binder(diagnostics, ValidatePath(relative)).Bind(native);
+        if (diagnostics.HasErrors)
+            throw new DeclarationIdentityParseException(ValidatePath(relative), diagnostics);
+        var destinations = ParseDeclarations(relative, after).ToDictionary(declaration => declaration.Identity.Key,
+            StringComparer.Ordinal);
+        var relocations = new List<DeclarationRelocation>();
+        foreach (var declaration in described.Where(declaration => declaration.Node is EnumExtensionNode))
+        {
+            var extension = (EnumExtensionNode)declaration.Node;
+            var lowered = Migration.CalorEmitter.LowerEnumExtension(extension);
+            lowered.NamespaceIdentity = declaration.Identity.Container;
+            var projection = original.With(update =>
+            {
+                update.Classes = [lowered];
+                update.Functions = [];
+                update.EnumExtensions = [];
+                update.Items = [lowered];
+                update.TypePreprocessorBlocks = [];
+                update.Enums = [];
+                update.Interfaces = [];
+                update.Delegates = [];
+                update.RefinementTypes = [];
+                update.IndexedTypes = [];
+            });
+            var oldIds = extension.Methods.Select(method => method.ToolingId!)
+                .Append(extension.ToolingId!).ToHashSet(StringComparer.Ordinal);
+            foreach (var target in Describe(relative, projection).Where(target =>
+                target.Node.ToolingId != null && oldIds.Contains(target.Node.ToolingId)))
+            {
+                if (!destinations.ContainsKey(target.Identity.Key))
+                    throw new InvalidOperationException("The lowered declaration does not match the native migration output.");
+                relocations.Add(new DeclarationRelocation(target.Node.ToolingId!, target.Identity.Key,
+                    AllowKindMigration: true));
+            }
+            if (relocations.Count(relocation => oldIds.Contains(relocation.Id)) != oldIds.Count)
+                throw new InvalidOperationException("The enum extension migration does not map every declaration.");
+        }
+        return Apply([new SourceChange(file, before, after)], relocations, expectedSidecar);
     }
 
     private State Update(IReadOnlyList<SourceChange> changes, IReadOnlyList<DeclarationRelocation>? relocations, bool persist,
@@ -636,7 +717,11 @@ public sealed class DeclarationIdentityStore
         {
             if (!remainingOld.Remove(old.Id) || !remainingNew.Remove(added.Key))
                 throw new InvalidOperationException("Identity mapped more than once.");
-            result.Add(added with { Id = old.Id });
+            result.Add(added with
+            {
+                Id = old.Id,
+                AllocationKind = old.AllocationKind ?? (old.Kind != added.Kind ? old.Kind : null)
+            });
             if (Scope(old) is { } oldScope && Scope(added) is { } newScope && oldScope != newScope)
             {
                 if (containerMoves.TryGetValue(oldScope, out var existing) && existing != newScope)
@@ -648,7 +733,16 @@ public sealed class DeclarationIdentityStore
         {
             if (!remainingOld.TryGetValue(relocation.Id, out var old)
                 || !remainingNew.TryGetValue(relocation.DestinationKey, out var added)
-                || old.Kind != added.Kind)
+                || old.Kind != added.Kind && (!relocation.AllowKindMigration
+                    || !IsSupportedKindMigration(old.Kind, added.Kind)
+                    || old.Kind == IdKind.EnumExtension
+                        && (added.Signature != "0" || old.Container != added.Container
+                            || added.Name != (CodeGen.CSharpEmitter.SanitizeIdentifier(old.Name) + "Extensions").TrimStart('@'))
+                    || old.Kind == IdKind.Function && !relocations.Any(parent =>
+                        parent.AllowKindMigration
+                        && previous.Declarations.SingleOrDefault(d => d.Id == parent.Id) is { Kind: IdKind.EnumExtension } oldParent
+                        && current.SingleOrDefault(d => d.Key == parent.DestinationKey) is { Kind: IdKind.Module } newParent
+                        && old.Container == Scope(oldParent) && added.Container == Scope(newParent))))
                 throw new InvalidOperationException($"Invalid explicit identity relocation: {relocation.Id}");
             Match(old, added);
         }
@@ -765,7 +859,10 @@ public sealed class DeclarationIdentityStore
                     && error.Span.Start <= headerEnd))
                     continue;
                 if (existing.TryGetValue(declaration.Identity.Key, out var identity))
+                {
                     declaration.Node.ToolingId = identity.Id;
+                    declaration.Node.ToolingIdAllocationKind = identity.AllocationKind;
+                }
             }
             return;
         }
@@ -773,14 +870,17 @@ public sealed class DeclarationIdentityStore
             .ToDictionary(f => f, f => f == relative ? source : File.ReadAllText(ValidatePath(f)), StringComparer.Ordinal);
         sources[relative] = source;
         var projected = Reconcile(state, sources, []);
-        var identities = projected.Declarations.ToDictionary(d => d.Key, d => d.Id, StringComparer.Ordinal);
+        var identities = projected.Declarations.ToDictionary(d => d.Key, StringComparer.Ordinal);
         foreach (var declaration in parsed)
         {
-            var id = identities[declaration.Identity.Key];
+            var identity = identities[declaration.Identity.Key];
             // Unsaved additions are not persisted identities. Never present a
             // newly randomized projection as stable across independent reads.
-            if (state.Declarations.Any(d => d.Id == id))
-                declaration.Node.ToolingId = id;
+            if (state.Declarations.Any(d => d.Id == identity.Id))
+            {
+                declaration.Node.ToolingId = identity.Id;
+                declaration.Node.ToolingIdAllocationKind = identity.AllocationKind;
+            }
         }
     }
 
@@ -813,6 +913,9 @@ public sealed class DeclarationIdentityStore
     public static IReadOnlyList<DeclarationIdentity> Describe(string file, string source) =>
         ParseDeclarations(file, source).Select(d => d.Identity).ToArray();
 
+    internal static IReadOnlyList<DeclarationIdentity> DescribeAst(string file, ModuleNode module) =>
+        Describe(file, module).Select(declaration => declaration.Identity).ToArray();
+
     public static DeclarationIdentity Locate(string file, string source, int line, int column)
     {
         var lines = source.Split('\n');
@@ -835,7 +938,10 @@ public sealed class DeclarationIdentityStore
             .GroupBy(d => d.Node.ToolingId)
             .SelectMany(group => group.Key == null ? group : group.Take(1))
             .Select(d => new IdEntry(d.Node.ToolingId ?? d.Identity.Id, d.Identity.Kind,
-                d.Identity.Name, d.Node.Span, file));
+                d.Identity.Name, d.Node.Span, file)
+            {
+                AllocationKind = d.Node.ToolingIdAllocationKind
+            });
 
     private static IReadOnlyList<ParsedDeclaration> Describe(string file, ModuleNode module)
     {

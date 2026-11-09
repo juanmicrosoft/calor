@@ -3982,20 +3982,46 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(EnumExtensionNode node)
     {
-        EmitDocComment(node);
-        // Format: §EEXT{EnumName} (note: §EXT is for class inheritance)
-        AppendLine($"§EEXT{{{node.EnumName}}}");
-        Indent();
+        return Visit(LowerEnumExtension(node));
+    }
 
-        foreach (var method in node.Methods)
+    internal static ClassDefinitionNode LowerEnumExtension(EnumExtensionNode node)
+    {
+        var enumName = CodeGen.CSharpEmitter.SanitizeIdentifier(node.EnumName);
+        if (enumName.Contains('.') || enumName.Contains(':'))
+            throw new InvalidOperationException("An enum extension requires an unqualified enum name.");
+        var methods = node.Methods.Select(function =>
         {
-            Visit(method);
-            AppendLine();
-        }
-
-        Dedent();
-        EmitBlockEnd($"§/EEXT");
-        return "";
+            if (function.HasExtendedMetadata)
+                throw new InvalidOperationException("Enum extension metadata requires native method metadata support.");
+            var receiver = function.Parameters.FirstOrDefault(parameter =>
+                parameter.TypeName.Equals(enumName, StringComparison.OrdinalIgnoreCase)
+                || parameter.Name.Equals("self", StringComparison.OrdinalIgnoreCase));
+            if (receiver != null && !ReferenceEquals(receiver, function.Parameters[0]))
+                throw new InvalidOperationException("An enum extension receiver must be the first parameter.");
+            var parameters = function.Parameters.Select(parameter =>
+                ReferenceEquals(parameter, receiver)
+                    ? parameter.CopyMetadataTo(new ParameterNode(parameter.Span, parameter.Name, parameter.TypeName,
+                        parameter.Modifier | ParameterModifier.This, parameter.Attributes, parameter.CSharpAttributes,
+                        parameter.DefaultValue, parameter.InlineRefinement, parameter.IdentifierSpan,
+                        parameter.TypeNameSpan, parameter.Row))
+                    : parameter).ToArray();
+            var method = function.CopyMetadataTo(new MethodNode(function.Span, function.LocalId, function.Name,
+                function.Visibility, MethodModifiers.Static, function.TypeParameters, parameters, function.Output,
+                function.Effects, function.Preconditions, function.Postconditions, function.Body, function.Attributes,
+                [], function.IsAsync, function.IdentifierSpan)
+            {
+                EffectParameters = function.EffectParameters
+            });
+            if (function.ToolingId != null) method.ToolingIdAllocationKind = function.ToolingIdAllocationKind ?? Ids.IdKind.Function;
+            return method;
+        }).ToArray();
+        var result = node.CopyMetadataTo(new ClassDefinitionNode(node.Span, node.LocalId,
+            (enumName + "Extensions").TrimStart('@'), false, false, false, true, null,
+            [], [], [], [], [], methods, [], [], node.Attributes, [],
+            visibility: Visibility.Public, isModule: true));
+        if (node.ToolingId != null) result.ToolingIdAllocationKind = Ids.IdKind.EnumExtension;
+        return result;
     }
 
     public string Visit(RecordCreationNode node)

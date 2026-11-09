@@ -17,6 +17,7 @@ public abstract class AstNode
     /// Declaration LocalId values are ephemeral parser/converter handles, never source fields or durable identities.
     /// </summary>
     public string? ToolingId { get; internal set; }
+    internal Ids.IdKind? ToolingIdAllocationKind { get; set; }
 
     /// <summary>
     /// Fully-qualified C# namespace associated with this declaration.
@@ -53,6 +54,7 @@ public abstract class AstNode
     {
         ArgumentNullException.ThrowIfNull(target);
         target.ToolingId = ToolingId;
+        target.ToolingIdAllocationKind = ToolingIdAllocationKind;
         target.NamespaceIdentity = NamespaceIdentity;
         target.NamespaceScopeId = NamespaceScopeId;
         target.FullyQualifiedSymbolIdentity = FullyQualifiedSymbolIdentity;
