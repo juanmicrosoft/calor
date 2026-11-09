@@ -240,7 +240,8 @@ public static class FixCommand
         IEnumerable<string> fixedFileNames,
         FileInfo? logFile,
         string textLine,
-        int? filesSkipped = null)
+        int? filesSkipped = null,
+        DiagnosticBag? diagnostics = null)
     {
         if (!json)
         {
@@ -267,7 +268,7 @@ public static class FixCommand
             filesSkipped,
             fixes,
             log = logFile?.FullName
-        }));
+        }, diagnostics));
     }
 
     private static void EmitRevertSummary(bool json, string operation, bool dryRun, int filesRestored)
@@ -295,6 +296,7 @@ public static class FixCommand
         int filesChanged = 0;
         int totalRemovals = 0;
         int filesSkipped = 0;
+        var diagnostics = new DiagnosticBag();
 
         foreach (var path in EnumerateCalrFiles(root))
         {
@@ -304,6 +306,9 @@ public static class FixCommand
             if (result.Skipped)
             {
                 filesSkipped++;
+                diagnostics.Add(new Diagnostic(DiagnosticCode.CliInternalError, DiagnosticSeverity.Error,
+                    $"Archived call-closer migration could not validate the source: {result.SkipReason}. No edits were applied to this file.",
+                    path, 1, 1));
                 Console.Error.WriteLine($"skip {rel}: {result.SkipReason}");
                 continue;
             }
@@ -321,18 +326,20 @@ public static class FixCommand
             }
         }
 
-        if (logFile != null)
+        FileInfo? writtenLog = null;
+        if (logFile != null && (!diagnostics.HasErrors || totalRemovals > 0))
         {
             var logJson = CallCloserElider.SerializeLog(migrationLog);
             await File.WriteAllTextAsync(logFile.FullName, logJson, new UTF8Encoding(false));
+            writtenLog = logFile;
         }
 
         EmitSummary(json, "elide-call-closers", dryRun, filesChanged, totalRemovals,
-            migrationLog.Entries.Select(e => e.File), logFile,
+            migrationLog.Entries.Select(e => e.File), writtenLog,
             $"elide-call-closers: {(dryRun ? "[dry-run] " : "")}files_changed={filesChanged} elisions={totalRemovals} files_skipped={filesSkipped}",
-            filesSkipped);
+            filesSkipped, diagnostics);
 
-        return 0;
+        return diagnostics.HasErrors ? 1 : 0;
     }
 
     private static async Task<int> RevertElideCallClosersAsync(
