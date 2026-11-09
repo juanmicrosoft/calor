@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 4,
-  "Scope": "Current compiler conversion/effect regression expectations over the pinned MediatR, serilog and FluentValidation source corpora; Lossy/SelectActiveBranchLossy, empty defined symbols, propagated binding errors and built-in manifests only. CLI cross-check executes every converted module in an independent scratch directory.",
+  "Scope": "Current compiler conversion/effect regression expectations over the pinned MediatR, serilog and FluentValidation source corpora; Lossy/SelectActiveBranchLossy, empty defined symbols, propagated binding errors and built-in manifests only. CLI cross-check executes every converted module in an independent scratch directory. CLR async-void preservation moves 23 CascadingFailuresTester calls behind an opaque boundary; they are not newly proven pure. Enforced-module and Calor0425 counts are unchanged.",
   "BindRule": "propagated",
   "FloorRule": {
     "Gate": "roadmap-v0.16.md \u00a75 gate 9 \u2014 conversion denominator, re-set on the production rule",
@@ -248,7 +248,7 @@
         "Calor0201 FluentValidation/Validators/RangeValidator.cs"
       ],
       "BindFailureMultiCause": 0,
-      "Calor0411Sites": 4934,
+      "Calor0411Sites": 4911,
       "Calor0411Modules": 121
     }
   ]

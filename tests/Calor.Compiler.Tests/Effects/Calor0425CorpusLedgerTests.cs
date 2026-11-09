@@ -130,7 +130,9 @@ public class Calor0425CorpusLedgerTests
         "Current compiler conversion/effect regression expectations over the pinned MediatR, "
         + "serilog and FluentValidation source corpora; Lossy/SelectActiveBranchLossy, empty "
         + "defined symbols, propagated binding errors and built-in manifests only. CLI cross-check "
-        + "executes every converted module in an independent scratch directory.";
+        + "executes every converted module in an independent scratch directory. CLR async-void "
+        + "preservation moves 23 CascadingFailuresTester calls behind an opaque boundary; "
+        + "they are not newly proven pure. Enforced-module and Calor0425 counts are unchanged.";
 
     /// <summary>
     /// v0.16 K1 — the rule the denominator is measured under, written into the
