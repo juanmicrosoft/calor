@@ -143,9 +143,25 @@ public sealed class NativePostfixTests
                 var cast = Assert.IsType<TypeOperationNode>(call.TargetExpression);
                 Assert.Equal(TypeOp.Cast, cast.Operation);
                 Assert.Equal("Func<int>", cast.TargetType);
-                Assert.Equal(9, Assert.IsType<IntLiteralNode>(
-                    Assert.IsType<LambdaExpressionNode>(cast.Operand).ExpressionBody).Value);
+                var lambda = Assert.IsType<LambdaExpressionNode>(cast.Operand);
+                Assert.Empty(lambda.Parameters);
+                Assert.Equal(9, Assert.IsType<IntLiteralNode>(lambda.ExpressionBody).Value);
+                var boundCall = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundExpressionCall>());
+                Assert.Empty(boundCall.Arguments);
+                var boundCast = Assert.IsType<BoundTypeOperationExpression>(boundCall.Target);
+                Assert.Equal(cast.Operation, boundCast.Operation);
+                Assert.Equal(cast.TargetType, boundCast.TargetType);
+                var boundLambda = Assert.IsType<BoundLambdaExpression>(boundCast.Operand);
+                Assert.Equal(lambda.Id, boundLambda.Id);
+                Assert.Empty(boundLambda.Parameters);
+                Assert.Equal(9, Assert.IsType<BoundIntLiteral>(boundLambda.ExpressionBody).Value);
+                var signature = Assert.IsType<Calor.Compiler.Binding.BoundTypes.FunctionBoundType>(boundCast.Type);
+                Assert.Empty(signature.ParameterTypes);
+                Assert.Equal(Calor.Compiler.Binding.BoundTypes.EffectRow.Unknown, signature.Row);
+                Assert.Equal(signature.ReturnType, boundCall.Type);
+                Assert.False(boundCall.HasUnknownInferredType);
                 Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+                Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code.StartsWith("Calor04", StringComparison.Ordinal));
             }
         }
     }
