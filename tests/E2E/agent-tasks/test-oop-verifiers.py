@@ -10,7 +10,9 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest.mock import patch
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
+from unittest.mock import Mock, patch
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
@@ -252,6 +254,7 @@ def cases(name):
 
 class OopVerifierTests(unittest.TestCase):
     entry_points_executed = 0
+    counter_lock = Lock()
 
     @classmethod
     def tearDownClass(cls):
@@ -259,7 +262,7 @@ class OopVerifierTests(unittest.TestCase):
             raise RuntimeError(f"Expected exactly 160 actual OOP controls, observed {cls.entry_points_executed}.")
         print(f"Executed {cls.entry_points_executed} actual OOP verify.sh controls.")
 
-    def verify(self, name, text, expected=True, *, env=None, detail=None, allow_timeout=False):
+    def verify(self, name, text, expected=True, *, env=None, detail=None, allow_timeout=False, deadline=None):
         if allow_timeout and (expected or detail != "timeout"):
             raise ValueError("Only an explicitly negative timeout control may opt in.")
         with tempfile.TemporaryDirectory(prefix="calor-oop-control-") as temporary:
@@ -269,11 +272,13 @@ class OopVerifierTests(unittest.TestCase):
             environment = dict(os.environ, CALOR_COMPILER_ROOT=str(COMPILER_ROOT))
             environment.pop("CALOR_LOGIC_TIMEOUT_SECONDS", None)
             environment.update(env or {})
-            deadline = time.monotonic() + min(120, float(environment.get("CALOR_LOGIC_TIMEOUT_SECONDS", "120")))
+            entry_deadline = time.monotonic() + min(120, float(environment.get("CALOR_LOGIC_TIMEOUT_SECONDS", "120")))
+            if deadline is not None:
+                entry_deadline = min(entry_deadline, deadline)
             try:
                 output = PROCESS.run(
                     [str(HERE / "tasks/oop-features" / TASKS[name] / "verify.sh"), str(workspace)],
-                    HERE, deadline, env=environment)
+                    HERE, entry_deadline, env=environment)
                 success = True
             except RuntimeError as error:
                 output = control_failure(error, allow_timeout=allow_timeout)
@@ -289,7 +294,8 @@ class OopVerifierTests(unittest.TestCase):
                     self.assertIn(f"; {count} finite runtime cases.", output)
             if detail:
                 self.assertIn(detail, output)
-            type(self).entry_points_executed += 1
+            with type(self).counter_lock:
+                type(self).entry_points_executed += 1
             return output
 
     def test_native_identity_state_and_signed_boundaries(self):
@@ -547,11 +553,53 @@ class OopAdmissionTests(unittest.TestCase):
         finally:
             OopVerifierTests.entry_points_executed = before
 
+    def test_compatibility_workers_preserve_counts_and_propagate_failures(self):
+        before = OopVerifierTests.entry_points_executed
+        old, current = ROOT / "synthetic-old", ROOT / "synthetic-current"
+        deadline = time.monotonic() + 600
+        calls = []
+        calls_lock = Lock()
+
+        def admitted(instance, name, text, expected=True, *, env=None, detail=None, deadline=None):
+            self.assertIsNotNone(deadline)
+            self.assertGreater(deadline, time.monotonic())
+            self.assertGreater(float(env["CALOR_LOGIC_TIMEOUT_SECONDS"]), 0)
+            self.assertLessEqual(float(env["CALOR_LOGIC_TIMEOUT_SECONDS"]), 120)
+            with calls_lock:
+                calls.append((env["CALOR_COMPILER_ROOT"], name, expected))
+            with OopVerifierTests.counter_lock:
+                OopVerifierTests.entry_points_executed += 1
+
+        try:
+            OopVerifierTests.entry_points_executed = 0
+            workers = Mock(wraps=ThreadPoolExecutor)
+            with patch.object(OopVerifierTests, "verify", admitted), \
+                    patch.dict(globals(), {"ThreadPoolExecutor": workers}), patch("builtins.print"):
+                run_compatibility(old, current, deadline)
+            self.assertEqual(workers.call_count, 2)
+            self.assertEqual([call.kwargs for call in workers.call_args_list], [{"max_workers": 2}] * 2)
+            self.assertEqual(len(calls), 107)
+            self.assertEqual(sum(root == str(old) for root, _, _ in calls), 53)
+            self.assertEqual(sum(root == str(current) for root, _, _ in calls), 54)
+            self.assertTrue(all(root == str(old) for root, _, _ in calls[:53]))
+            self.assertTrue(all(root == str(current) for root, _, _ in calls[53:]))
+            for failure in (RuntimeError("Verifier command exited 139:\n"),
+                            RuntimeError("UNKNOWN"), OSError("launch failed"),
+                            EOFError("inherited pipe"), TimeoutError("deadline")):
+                OopVerifierTests.entry_points_executed = 0
+                with self.subTest(failure=failure), patch.object(
+                        OopVerifierTests, "verify", side_effect=failure):
+                    with self.assertRaises(type(failure)) as refused:
+                        run_compatibility(old, current, deadline)
+                    self.assertIs(refused.exception, failure)
+                    self.assertEqual(OopVerifierTests.entry_points_executed, 0)
+        finally:
+            OopVerifierTests.entry_points_executed = before
+
 
 def run_compatibility(old, current, deadline):
     test = OopVerifierTests()
-    # Named representatives keep both real arms well within the unchanged total
-    # deadline. All omitted permutations still run in the full current suite.
+    # The full current suite retains all omitted permutations.
     selected = {
         "Person": {
             "empty-sealed": 4, "private-class": 1,
@@ -586,19 +634,24 @@ def run_compatibility(old, current, deadline):
             "swapped-state": 14, "missing-assignment": 16,
         },
     }
+    def execute(item):
+        arm, root, historical, name, category, text, expected, detail = item
+        remaining = min(120, deadline - time.monotonic())
+        if remaining <= 0:
+            raise RuntimeError("OOP compatibility exceeded its 600-second deadline.")
+        test.verify(name, historical_syntax(text) if historical and text is not None else text, expected,
+                    env={"CALOR_COMPILER_ROOT": str(root),
+                         "CALOR_LOGIC_TIMEOUT_SECONDS": str(remaining)}, detail=detail, deadline=deadline)
+        return f"{arm} {name} {category}: {'passed' if expected else 'rejected'}"
+
     for arm, root, historical in (("v0.29", old, True), ("current", current, False)):
+        batch = []
         for name in TASKS:
             controls = [(category, cases(name)[index]) for category, index in selected[name].items()]
             controls.append(("recursive-interop", (
                 source(name) + "  §CSHARP{public class Unrelated { }}§/CSHARP\n", False, "Raw interop")))
             for category, (text, expected, detail) in controls:
-                remaining = min(120, deadline - time.monotonic())
-                if remaining <= 0:
-                    raise RuntimeError("OOP compatibility exceeded its 600-second deadline.")
-                test.verify(name, historical_syntax(text) if historical else text, expected,
-                            env={"CALOR_COMPILER_ROOT": str(root),
-                                 "CALOR_LOGIC_TIMEOUT_SECONDS": str(remaining)}, detail=detail)
-                print(f"{arm} {name} {category}: {'passed' if expected else 'rejected'}", flush=True)
+                batch.append((arm, root, historical, name, category, text, expected, detail))
         text = source("Calculator")
         adversarial = {
             "missing-input": None,
@@ -609,17 +662,18 @@ def run_compatibility(old, current, deadline):
                 "  §CL{Calculator:pub}\n  §CL{Unrelated:pub}"),
         }
         for category, text in adversarial.items():
-            remaining = min(120, deadline - time.monotonic())
-            if remaining <= 0:
-                raise RuntimeError("OOP compatibility exceeded its 600-second deadline.")
-            test.verify("Calculator", historical_syntax(text) if historical and text is not None else text, False,
-                        env={"CALOR_COMPILER_ROOT": str(root),
-                             "CALOR_LOGIC_TIMEOUT_SECONDS": str(remaining)})
-            print(f"{arm} Calculator {category}: rejected", flush=True)
+            batch.append((arm, root, historical, "Calculator", category, text, False, None))
+        if len(batch) != 53:
+            raise RuntimeError("Expected exactly 53 independent OOP controls per genuine arm.")
+        # Each worker owns its entrypoint, temporary source and fresh helper build.
+        # Complete one arm before starting the other; share the original absolute deadline.
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            for verdict in workers.map(execute, batch):
+                print(verdict, flush=True)
     test.verify("Person", historical_syntax(source("Person")), False,
                 env={"CALOR_COMPILER_ROOT": str(current),
                      "CALOR_LOGIC_TIMEOUT_SECONDS": str(min(120, deadline - time.monotonic()))},
-                detail="Calor compilation failed")
+                detail="Calor compilation failed", deadline=deadline)
     expected_count = 2 * (sum(len(indices) + 1 for indices in selected.values()) + 4) + 1
     if expected_count != 107 or OopVerifierTests.entry_points_executed != expected_count:
         raise RuntimeError(f"Expected {expected_count} actual OOP compatibility controls.")

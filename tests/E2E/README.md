@@ -1120,6 +1120,20 @@ ordinary missing-library text; appended OS/EOF/cleanup diagnostics still fail.
 These guards preserve the 160/107 real controls and unchanged limits; they do
 not establish milestone acceptance.
 
+The strict replay uses two isolated workers within each arm, as the async replay
+does. Every entry still builds its own disposable helper and selects the actual
+compiler; there is no helper cache or binary substitution. The old arm finishes
+before the current arm starts. The 107 entries, categories, 120-second entry bound
+and shared 600-second total deadline are unchanged. Counter updates are locked,
+and worker failures propagate without a success summary. The dedicated worker
+mock checks both arm counts, the two-worker limit and direct infrastructure
+exceptions; it contributes no real entries.
+
+Before this scheduling change, the parent current suite passed all 160 entries
+on `4fcd72d60` in 983.922 seconds. Its sequential 107-entry replay exhausted the
+600-second total budget during the current Counter controls; that failed run is
+not acceptance evidence. The bounded-worker replay must pass in full separately.
+
 ### Original arithmetic binding prerequisites: type-005 and type-006
 
 Only the original variable-binding and variable-assignment wrappers dispatch
