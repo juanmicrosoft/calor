@@ -11,6 +11,8 @@ namespace Calor.LanguageServer.Tests.Integration;
 /// <summary>
 /// Tests for cross-file resolution functionality - go-to-definition and completions
 /// across multiple open documents.
+/// Native fixtures retain the original implicit CLR namespaces as explicit headers;
+/// compilation-unit labels do not stand in for namespaces.
 /// </summary>
 public class CrossFileResolutionTests
 {
@@ -21,13 +23,12 @@ public class CrossFileResolutionTests
         var firstUri = DocumentUri.FromFileSystemPath("/workspace/first.calr");
         var secondUri = DocumentUri.FromFileSystemPath("/workspace/second.calr");
         var source = """
-            §M{Shared}
-              §F{Same:pub}
-                §O{void}
+            module Shared Shared
+              func Same () → void
             """;
 
-        var first = workspace.GetOrCreate(firstUri, source);
-        var second = workspace.GetOrCreate(secondUri, source);
+        var first = OpenDocument(workspace, firstUri, source);
+        var second = OpenDocument(workspace, secondUri, source);
         var firstSymbol = Assert.Single(first.BoundModule!.Functions).Symbol;
         var secondSymbol = Assert.Single(second.BoundModule!.Functions).Symbol;
 
@@ -41,26 +42,21 @@ public class CrossFileResolutionTests
     {
         var workspace = new WorkspaceState();
         var definitions = """
-            §M{Utils}
-              §F{Pick:pub}
-                §I{i32:value}
-                §O{i32}
-                §R value
-              §F{Pick:pub}
-                §I{str:value}
-                §O{str}
-                §R value
+            module Utils Utils
+              func Pick (int:value) → int
+                return value
+              func Pick (string:value) → string
+                return value
             """;
         var use = """
-            §M{Main}
-              §F{Run:pub}
-                §O{i32}
-                §R §C{Pick} §A INT:1 §/C
+            module Main Main
+              func Run () → int
+                return Pick(1)
             """;
-        var definitionsState = workspace.GetOrCreate(
+        var definitionsState = OpenDocument(workspace,
             DocumentUri.From("file:///utils.calr"),
             definitions);
-        var useState = workspace.GetOrCreate(
+        var useState = OpenDocument(workspace,
             DocumentUri.From("file:///main.calr"),
             use);
 
@@ -69,10 +65,11 @@ public class CrossFileResolutionTests
         var call = SymbolFinder.FindBoundCallAtOffset(
             useState.BoundModule,
             use.IndexOf("Pick", StringComparison.Ordinal));
+        Assert.NotNull(call);
         var resolved = workspace.ResolveProjectCall(call);
 
         Assert.NotNull(resolved.Symbol);
-        Assert.Equal("INT", resolved.Symbol.Parameters[0].TypeName);
+        Assert.Equal("int", resolved.Symbol.Parameters[0].TypeName);
         Assert.Equal(
             definitionsState.BoundModule.Functions[0].SymbolId,
             resolved.Symbol.Id);
@@ -92,28 +89,26 @@ public class CrossFileResolutionTests
     public void ResolveProjectCall_DoesNotNameResolveIncompatibleOverload()
     {
         var workspace = new WorkspaceState();
-        workspace.GetOrCreate(
+        OpenDocument(workspace,
             DocumentUri.From("file:///utils.calr"),
             """
-            §M{Utils}
-              §F{Pick:pub}
-                §I{str:value}
-                §O{str}
-                §R value
+            module Utils Utils
+              func Pick (string:value) → string
+                return value
             """);
         var use = """
-            §M{Main}
-              §F{Run:pub}
-                §O{i32}
-                §R §C{Pick} §A INT:1 §/C
+            module Main Main
+              func Run () → int
+                return Pick(1)
             """;
-        var useState = workspace.GetOrCreate(
+        var useState = OpenDocument(workspace,
             DocumentUri.From("file:///main.calr"),
             use);
         var call = SymbolFinder.FindBoundCallAtOffset(
             useState.BoundModule,
             use.IndexOf("Pick", StringComparison.Ordinal));
 
+        Assert.NotNull(call);
         var resolved = workspace.ResolveProjectCall(call);
 
         Assert.Null(resolved.Doc);
@@ -124,27 +119,28 @@ public class CrossFileResolutionTests
     public void ResolveProjectCall_UsesNullableStringCompatibilityAcrossFiles()
     {
         var workspace = new WorkspaceState();
-        var definitionsState = workspace.GetOrCreate(
+        var definitionsState = OpenDocument(workspace,
             DocumentUri.From("file:///utils.calr"),
             """
-            §M{Utils}
-              §F{Take:pub} (str:value) -> str
-                §E{}
-                §R value
+            module Utils Utils
+              func Take (string:value) → string
+                !
+                return value
             """);
         var use = """
-            §M{Main}
-              §F{Run:pub} (?str:value) -> str
-                §E{}
-                §R §C{Take} §A value §/C
+            module Main Main
+              func Run (string?:value) → string
+                !
+                return Take(value)
             """;
-        var useState = workspace.GetOrCreate(
+        var useState = OpenDocument(workspace,
             DocumentUri.From("file:///main.calr"),
             use);
         var call = SymbolFinder.FindBoundCallAtOffset(
             useState.BoundModule,
             use.IndexOf("Take", StringComparison.Ordinal));
 
+        Assert.NotNull(call);
         var resolved = workspace.ResolveProjectCall(call);
 
         Assert.Same(definitionsState, resolved.Doc);
@@ -157,26 +153,26 @@ public class CrossFileResolutionTests
     public void ResolveProjectCall_DoesNotApplyNullableStringCompatibilityToConstructors()
     {
         var workspace = new WorkspaceState();
-        workspace.GetOrCreate(
+        OpenDocument(workspace,
             DocumentUri.From("file:///models.calr"),
             """
-            §M{Models}
-              §CL{Box:pub}
-                §CTOR{pub} (str:value)
+            module Models Models
+              class Box
+                ctor (string:value)
             """);
         var use = """
-            §M{Main}
-              §F{Run:pub} (?str:value) -> Box
-                §E{}
-                §R §NEW{Box} §A value §/NEW
+            module Main Main
+              func Run (string?:value) → Box
+                !
+                return new Box(value)
             """;
-        var useState = workspace.GetOrCreate(
+        var useState = OpenDocument(workspace,
             DocumentUri.From("file:///main.calr"),
             use);
         var creation = Assert.IsType<BoundNewExpression>(
             SymbolFinder.FindBoundCallAtOffset(
                 useState.BoundModule,
-                use.IndexOf("Box}", StringComparison.Ordinal)));
+                use.LastIndexOf("Box(", StringComparison.Ordinal)));
 
         var resolved = workspace.ResolveProjectCall(creation);
 
@@ -188,26 +184,25 @@ public class CrossFileResolutionTests
     public void ResolveProjectCall_DoesNotApplyNullableStringCompatibilityToBaseInitializers()
     {
         var workspace = new WorkspaceState();
-        workspace.GetOrCreate(
+        OpenDocument(workspace,
             DocumentUri.From("file:///base.calr"),
             """
-            §M{Models}
-              §CL{Base:pub}
-                §CTOR{pub} (str:value)
+            module Models Models
+              class Base
+                ctor (string:value)
             """);
         var use = """
-            §M{Main}
-              §CL{Derived:Base:pub}
-                §CTOR{pub} (?str:value)
-                  §BASE
-                    §A value
+            module Main Main
+              class Derived extends Base
+                ctor (string?:value)
+                  base(value)
             """;
-        var useState = workspace.GetOrCreate(
+        var useState = OpenDocument(workspace,
             DocumentUri.From("file:///derived.calr"),
             use);
         var initializer = SymbolFinder.FindBoundCallAtOffset(
             useState.BoundModule,
-            use.IndexOf("§BASE", StringComparison.Ordinal));
+            use.IndexOf("base(value)", StringComparison.Ordinal));
 
         var resolved = workspace.ResolveProjectCall(initializer);
 
@@ -219,17 +214,16 @@ public class CrossFileResolutionTests
     public void EquivalentWorkspaceRoots_ProducePortableStableSymbolIds()
     {
         const string source = """
-            §M{Shared}
-              §F{Same:pub}
-                §O{void}
+            module Shared Shared
+              func Same () → void
             """;
         var first = new WorkspaceState("/checkout/one");
         var second = new WorkspaceState("/different/checkout");
 
-        var firstSymbol = Assert.Single(first.GetOrCreate(
+        var firstSymbol = Assert.Single(OpenDocument(first,
             DocumentUri.FromFileSystemPath("/checkout/one/src/shared.calr"),
             source).BoundModule!.Functions).Symbol;
-        var secondSymbol = Assert.Single(second.GetOrCreate(
+        var secondSymbol = Assert.Single(OpenDocument(second,
             DocumentUri.FromFileSystemPath("/different/checkout/src/shared.calr"),
             source).BoundModule!.Functions).Symbol;
 
@@ -242,9 +236,8 @@ public class CrossFileResolutionTests
     public void MultipleWorkspaceRoots_DisambiguateIdenticalRelativePathsPortably()
     {
         const string source = """
-            §M{Shared}
-              §F{Same:pub}
-                §O{void}
+            module Shared Shared
+              func Same () → void
             """;
         var firstWorkspace = new WorkspaceState();
         firstWorkspace.ConfigureWorkspaceRoots(
@@ -259,16 +252,16 @@ public class CrossFileResolutionTests
             new Uri("file:///relocated/second"),
         ]);
 
-        var firstRootSymbol = Assert.Single(firstWorkspace.GetOrCreate(
+        var firstRootSymbol = Assert.Single(OpenDocument(firstWorkspace,
             DocumentUri.FromFileSystemPath("/checkout/first/src/shared.calr"),
             source).BoundModule!.Functions).Symbol;
-        var secondRootSymbol = Assert.Single(firstWorkspace.GetOrCreate(
+        var secondRootSymbol = Assert.Single(OpenDocument(firstWorkspace,
             DocumentUri.FromFileSystemPath("/checkout/second/src/shared.calr"),
             source).BoundModule!.Functions).Symbol;
-        var relocatedFirst = Assert.Single(secondWorkspace.GetOrCreate(
+        var relocatedFirst = Assert.Single(OpenDocument(secondWorkspace,
             DocumentUri.FromFileSystemPath("/relocated/first/src/shared.calr"),
             source).BoundModule!.Functions).Symbol;
-        var relocatedSecond = Assert.Single(secondWorkspace.GetOrCreate(
+        var relocatedSecond = Assert.Single(OpenDocument(secondWorkspace,
             DocumentUri.FromFileSystemPath("/relocated/second/src/shared.calr"),
             source).BoundModule!.Functions).Symbol;
 
@@ -285,25 +278,26 @@ public class CrossFileResolutionTests
     public void ResolveProjectCall_ExcludesPrivateFunctionsFromOtherDocuments()
     {
         var workspace = new WorkspaceState();
-        workspace.GetOrCreate(
+        OpenDocument(workspace,
             DocumentUri.From("file:///private.calr"),
             """
-            §M{Utils}
-              §F{Hidden:priv} () -> i32
-                §R 1
+            module Utils Utils
+              func Hidden private () → int
+                return 1
             """);
         var use = """
-            §M{Main}
-              §F{Run:pub} () -> i32
-                §R §C{Hidden} §/C
+            module Main Main
+              func Run () → int
+                return Hidden()
             """;
-        var useState = workspace.GetOrCreate(
+        var useState = OpenDocument(workspace,
             DocumentUri.From("file:///main.calr"),
             use);
         var call = SymbolFinder.FindBoundCallAtOffset(
             useState.BoundModule,
             use.IndexOf("Hidden", StringComparison.Ordinal));
 
+        Assert.NotNull(call);
         var resolved = workspace.ResolveProjectCall(useState, useState.Snapshot, call);
 
         Assert.Null(resolved.Symbol);
@@ -313,26 +307,27 @@ public class CrossFileResolutionTests
     public void ResolveProjectCall_DoesNotExposeUnqualifiedClassMethods()
     {
         var workspace = new WorkspaceState();
-        workspace.GetOrCreate(
+        OpenDocument(workspace,
             DocumentUri.From("file:///service.calr"),
             """
-            §M{Service}
-              §CL{Worker:pub}
-                §MT{Run:pub} () -> i32
-                  §R 1
+            module Service Service
+              class Worker
+                func Run () → int
+                  return 1
             """);
         var use = """
-            §M{Main}
-              §F{RunMain:pub} () -> i32
-                §R §C{Run} §/C
+            module Main Main
+              func RunMain () → int
+                return Run()
             """;
-        var useState = workspace.GetOrCreate(
+        var useState = OpenDocument(workspace,
             DocumentUri.From("file:///main.calr"),
             use);
         var call = SymbolFinder.FindBoundCallAtOffset(
             useState.BoundModule,
             use.LastIndexOf("Run", StringComparison.Ordinal));
 
+        Assert.NotNull(call);
         var resolved = workspace.ResolveProjectCall(useState, useState.Snapshot, call);
 
         Assert.Null(resolved.Symbol);
@@ -343,18 +338,19 @@ public class CrossFileResolutionTests
     {
         var workspace = new WorkspaceState();
         var source = """
-            §M{Main}
-              §CL{Worker:pub}
-                §MT{Hidden:priv} () -> i32
-                  §R 1
-              §F{Run:pub} () -> i32
-                §R §C{Worker.Hidden} §/C
+            module Main Main
+              class Worker
+                func Hidden private () → int
+                  return 1
+              func Run () → int
+                return Worker.Hidden()
             """;
-        var state = workspace.GetOrCreate(DocumentUri.From("file:///main.calr"), source);
+        var state = OpenDocument(workspace, DocumentUri.From("file:///main.calr"), source);
         var call = SymbolFinder.FindBoundCallAtOffset(
             state.BoundModule,
             source.IndexOf("Worker.Hidden", StringComparison.Ordinal));
 
+        Assert.NotNull(call);
         var resolved = workspace.ResolveProjectCall(state, state.Snapshot, call);
 
         Assert.Null(resolved.Symbol);
@@ -365,67 +361,74 @@ public class CrossFileResolutionTests
     {
         var workspace = new WorkspaceState();
         var source = """
-            §M{Main}
-              §CL{Worker:pub}
-                §MT{Hidden:priv} () -> i32
-                  §R 1
-                §MT{Run:pub} () -> i32
-                  §R §C{Hidden} §/C
+            module Main Main
+              class Worker
+                func Hidden private () → int
+                  return 1
+                func Run () → int
+                  return Hidden()
             """;
-        var state = workspace.GetOrCreate(DocumentUri.From("file:///main.calr"), source);
+        var state = OpenDocument(workspace, DocumentUri.From("file:///main.calr"), source);
         var call = SymbolFinder.FindBoundCallAtOffset(
             state.BoundModule,
             source.LastIndexOf("Hidden", StringComparison.Ordinal));
 
+        Assert.NotNull(call);
         var resolved = workspace.ResolveProjectCall(state, state.Snapshot, call);
 
-        Assert.Equal("Worker.Hidden", resolved.Symbol?.Name);
+        Assert.Equal("Main.Worker.Hidden", resolved.Symbol?.Name);
+        Assert.Equal("Main.Worker", resolved.Symbol!.ContainingTypeName);
+        Assert.Equal(state.BoundModule!.Functions.Single(function =>
+            function.Symbol.Name == "Main.Worker.Hidden").SymbolId, resolved.Symbol.Id);
     }
 
     [Fact]
     public void ResolveProjectCall_UsesCrossFileBaseClassIdentity()
     {
         var workspace = new WorkspaceState();
-        workspace.GetOrCreate(
+        var baseDocument = OpenDocument(workspace,
             DocumentUri.From("file:///base.calr"),
             """
-            §M{BaseModule}
-              §CL{Base:pub}
-                §MT{Pick:pub} (i32:value) -> i32
-                  §R value
+            module BaseModule BaseModule
+              class Base
+                func Pick (int:value) → int
+                  return value
             """);
         var source = """
-            §M{DerivedModule}
-              §CL{Derived:Base:pub}
-                §MT{Use:pub} () -> i32
-                  §R §C{base.Pick} §A INT:1 §/C
+            module DerivedModule DerivedModule
+              class Derived extends Base
+                func Use () → int
+                  return base.Pick(1)
             """;
-        var state = workspace.GetOrCreate(DocumentUri.From("file:///derived.calr"), source);
+        var state = OpenDocument(workspace, DocumentUri.From("file:///derived.calr"), source);
         var call = SymbolFinder.FindBoundCallAtOffset(
             state.BoundModule,
             source.IndexOf("base.Pick", StringComparison.Ordinal));
 
+        Assert.NotNull(call);
         var resolved = workspace.ResolveProjectCall(state, state.Snapshot, call);
 
-        Assert.Equal("Base.Pick", resolved.Symbol?.Name);
+        Assert.Equal("BaseModule.Base.Pick", resolved.Symbol?.Name);
+        Assert.Same(baseDocument, resolved.Doc);
+        Assert.Equal(Assert.Single(baseDocument.BoundModule!.Functions).SymbolId, resolved.Symbol!.Id);
     }
 
     [Fact]
     public void NewWithoutConstructor_ResolvesToClassDeclaration()
     {
         var workspace = new WorkspaceState();
-        var classState = workspace.GetOrCreate(
+        var classState = OpenDocument(workspace,
             DocumentUri.From("file:///model.calr"),
             """
-            §M{Models}
-              §CL{Widget:pub}
+            module Models Models
+              class Widget
             """);
         var use = """
-            §M{Main}
-              §F{Make:pub} () -> Widget
-                §R §NEW{Widget} §/NEW
+            module Main Main
+              func Make () → Widget
+                return new Widget()
             """;
-        var useState = workspace.GetOrCreate(
+        var useState = OpenDocument(workspace,
             DocumentUri.From("file:///main.calr"),
             use);
         var creation = Assert.IsType<BoundNewExpression>(
@@ -448,31 +451,31 @@ public class CrossFileResolutionTests
     {
         var workspace = new WorkspaceState();
         var definitionsUri = DocumentUri.From("file:///utils.calr");
-        var definitions = workspace.GetOrCreate(
+        var definitions = OpenDocument(workspace,
             definitionsUri,
             """
-            §M{Utils}
-              §F{Pick:pub} () -> i32
-                §R 1
+            module Utils Utils
+              func Pick () → int
+                return 1
             """);
         var oldSymbol = Assert.Single(definitions.BoundModule!.Functions).Symbol;
         workspace.Update(
             definitionsUri,
             """
-            §M{Utils}
-              §F{Before:pub} () -> i32
-                §R 0
-              §F{Pick:pub} () -> i32
-                §B{value:i32} 1
-                §R value
+            module Utils Utils
+              func Before () → int
+                return 0
+              func Pick () → int
+                let int:value = 1
+                return value
             """,
             version: 2);
         var use = """
-            §M{Main}
-              §F{Run:pub} () -> i32
-                §R §C{Pick} §/C
+            module Main Main
+              func Run () → int
+                return Pick()
             """;
-        var useState = workspace.GetOrCreate(DocumentUri.From("file:///main.calr"), use);
+        var useState = OpenDocument(workspace, DocumentUri.From("file:///main.calr"), use);
 
         var references = workspace.FindProjectFunctionReferences(oldSymbol, includeDeclaration: true);
 
@@ -491,24 +494,24 @@ public class CrossFileResolutionTests
     {
         var workspace = new WorkspaceState();
         var uri = DocumentUri.From("file:///state.calr");
-        var state = workspace.GetOrCreate(
+        var state = OpenDocument(workspace,
             uri,
-            "§M{State}\n  §F{Value:pub} () -> i32\n    §R 1\n",
+            "module State State\n  func Value () → int\n    return 1\n",
             version: 1);
         var captured = state.Snapshot;
         workspace.Update(
             uri,
-            "§M{State}\n  §F{Value:pub} () -> i32\n    §R 2\n",
+            "module State State\n  func Value () → int\n    return 2\n",
             version: 2);
         workspace.Update(
             uri,
-            "§M{State}\n  §F{Value:pub} () -> i32\n    §R 0\n",
+            "module State State\n  func Value () → int\n    return 0\n",
             version: 1);
 
         Assert.Equal(1, captured.Version);
-        Assert.Contains("§R 1", captured.Source);
+        Assert.Contains("return 1", captured.Source);
         Assert.Equal(2, state.Version);
-        Assert.Contains("§R 2", state.Source);
+        Assert.Contains("return 2", state.Source);
     }
 
     #region WorkspaceState Tests
@@ -520,24 +523,20 @@ public class CrossFileResolutionTests
 
         // First document defines a function
         var source1 = """
-            §M{Utils}
-              §F{Add:pub}
-                §I{i32:a}
-                §I{i32:b}
-                §O{i32}
-                §R a + b
+            module Utils Utils
+              func Add (int:a, int:b) → int
+                return a + b
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///utils.calr"), source1);
+        OpenDocument(workspace, DocumentUri.From("file:///utils.calr"), source1);
 
         // Second document uses the function
         var source2 = """
-            §M{Main}
-              §F{Test}
-                §O{i32}
-                §B{result} §C{Add} 1 2 §/C
-                §R result
+            module Main Main
+              func Test () → int
+                let result = Add(1, 2)
+                return result
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///main.calr"), source2);
+        OpenDocument(workspace, DocumentUri.From("file:///main.calr"), source2);
 
         // Find the function definition
         var (doc, node) = workspace.FindDefinitionAcrossFiles("Add");
@@ -554,21 +553,20 @@ public class CrossFileResolutionTests
 
         // First document defines a class
         var source1 = """
-            §M{Models}
-              §CL{Person}
-                §FLD{str:name}
-                §FLD{i32:age}
+            module Models Models
+              class Person
+                field string:name
+                field int:age
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///models.calr"), source1);
+        OpenDocument(workspace, DocumentUri.From("file:///models.calr"), source1);
 
         // Second document uses the class
         var source2 = """
-            §M{Main}
-              §F{CreatePerson}
-                §O{Person}
-                §R §NEW Person
+            module Main Main
+              func CreatePerson () → Person
+                return new Person()
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///main.calr"), source2);
+        OpenDocument(workspace, DocumentUri.From("file:///main.calr"), source2);
 
         var (doc, node) = workspace.FindDefinitionAcrossFiles("Person");
 
@@ -584,12 +582,11 @@ public class CrossFileResolutionTests
 
         // First document defines an interface
         var source1 = """
-            §M{Interfaces}
-              §IFACE{IShape}
-                §MT{GetArea}
-                  §O{f64}
+            module Interfaces Interfaces
+              interface IShape
+                func GetArea () → double
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///interfaces.calr"), source1);
+        OpenDocument(workspace, DocumentUri.From("file:///interfaces.calr"), source1);
 
         var (doc, node) = workspace.FindDefinitionAcrossFiles("IShape");
 
@@ -605,14 +602,13 @@ public class CrossFileResolutionTests
 
         // First document defines an enum
         var source1 = """
-            §M{Types}
-              §EN{Color}
-              §EM{Red}
-              §EM{Green}
-              §EM{Blue}
-              §/EN
+            module Types Types
+              enum Color
+                Red
+                Green
+                Blue
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///types.calr"), source1);
+        OpenDocument(workspace, DocumentUri.From("file:///types.calr"), source1);
 
         var (doc, node) = workspace.FindDefinitionAcrossFiles("Color");
 
@@ -627,11 +623,11 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{Test}
-              §F{Test}
-                §R 42
+            module Test Test
+              func Test () → void
+                return 42
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///test.calr"), source);
+        OpenDocument(workspace, DocumentUri.From("file:///test.calr"), source);
 
         var (doc, node) = workspace.FindDefinitionAcrossFiles("NonExistent");
 
@@ -645,14 +641,14 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{Test}
-              §F{Helper}
-                §R 42
-              §F{Main}
-                §B{x} §C{Helper} §/C
-                §R x
+            module Test Test
+              func Helper () → void
+                return 42
+              func Main () → void
+                let x = Helper()
+                return x
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///test.calr"), source);
+        OpenDocument(workspace, DocumentUri.From("file:///test.calr"), source);
 
         var (doc, node) = workspace.FindDefinitionAcrossFiles("Helper");
 
@@ -671,13 +667,13 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{Test}
-              §F{PublicFunc:pub}
-                §R 42
-              §F{PrivateFunc:priv}
-                §R 0
+            module Test Test
+              func PublicFunc () → void
+                return 42
+              func PrivateFunc private () → void
+                return 0
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///test.calr"), source);
+        OpenDocument(workspace, DocumentUri.From("file:///test.calr"), source);
 
         var symbols = workspace.GetAllPublicSymbols().ToList();
 
@@ -691,11 +687,11 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{Test}
-              §CL{MyClass}
-                §FLD{i32:value}
+            module Test Test
+              class MyClass
+                field int:value
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///test.calr"), source);
+        OpenDocument(workspace, DocumentUri.From("file:///test.calr"), source);
 
         var symbols = workspace.GetAllPublicSymbols().ToList();
 
@@ -708,12 +704,11 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{Test}
-              §IFACE{IMyInterface}
-                §MT{DoSomething}
-                  §O{void}
+            module Test Test
+              interface IMyInterface
+                func DoSomething () → void
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///test.calr"), source);
+        OpenDocument(workspace, DocumentUri.From("file:///test.calr"), source);
 
         var symbols = workspace.GetAllPublicSymbols().ToList();
 
@@ -726,13 +721,12 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{Test}
-              §EN{Status}
-              §EM{Active}
-              §EM{Inactive}
-              §/EN
+            module Test Test
+              enum Status
+                Active
+                Inactive
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///test.calr"), source);
+        OpenDocument(workspace, DocumentUri.From("file:///test.calr"), source);
 
         var symbols = workspace.GetAllPublicSymbols().ToList();
 
@@ -745,13 +739,10 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{Test}
-              §DEL{Callback}
-              §I{i32:value}
-              §O{void}
-              §/DEL
+            module Test Test
+              delegate Callback (int:value) → void
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///test.calr"), source);
+        OpenDocument(workspace, DocumentUri.From("file:///test.calr"), source);
 
         var symbols = workspace.GetAllPublicSymbols().ToList();
 
@@ -764,24 +755,24 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source1 = """
-            §M{File1}
-              §F{FuncA:pub}
-                §R 1
+            module File1 File1
+              func FuncA () → void
+                return 1
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///file1.calr"), source1);
+        OpenDocument(workspace, DocumentUri.From("file:///file1.calr"), source1);
 
         var source2 = """
-            §M{File2}
-              §F{FuncB:pub}
-                §R 2
+            module File2 File2
+              func FuncB () → void
+                return 2
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///file2.calr"), source2);
+        OpenDocument(workspace, DocumentUri.From("file:///file2.calr"), source2);
 
         var source3 = """
-            §M{File3}
-              §CL{ClassC}
+            module File3 File3
+              class ClassC
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///file3.calr"), source3);
+        OpenDocument(workspace, DocumentUri.From("file:///file3.calr"), source3);
 
         var symbols = workspace.GetAllPublicSymbols().ToList();
 
@@ -801,20 +792,19 @@ public class CrossFileResolutionTests
 
         // First document defines a class
         var source1 = """
-            §M{Models}
-              §CL{Customer}
-                §FLD{str:name}
+            module Models Models
+              class Customer
+                field string:name
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///models.calr"), source1);
+        OpenDocument(workspace, DocumentUri.From("file:///models.calr"), source1);
 
         // Second document should have access to Customer type in completions
         var source2 = """
-            §M{Service}
-              §F{GetCustomer}
-                §O{i32}
-                §R 0
+            module Service Service
+              func GetCustomer () → int
+                return 0
             """;
-        var doc2 = workspace.GetOrCreate(DocumentUri.From("file:///service.calr"), source2);
+        var doc2 = OpenDocument(workspace, DocumentUri.From("file:///service.calr"), source2);
 
         // Get all public symbols (simulating what CompletionHandler does)
         var symbols = workspace.GetAllPublicSymbols()
@@ -831,22 +821,19 @@ public class CrossFileResolutionTests
 
         // First document defines a utility function
         var source1 = """
-            §M{Utils}
-              §F{Calculate:pub}
-                §I{i32:x}
-                §O{i32}
-                §R x * 2
+            module Utils Utils
+              func Calculate (int:x) → int
+                return x * 2
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///utils.calr"), source1);
+        OpenDocument(workspace, DocumentUri.From("file:///utils.calr"), source1);
 
         // Second document should see Calculate in completions
         var source2 = """
-            §M{Main}
-              §F{Test}
-                §O{i32}
-                §R 0
+            module Main Main
+              func Test () → int
+                return 0
             """;
-        var doc2 = workspace.GetOrCreate(DocumentUri.From("file:///main.calr"), source2);
+        var doc2 = OpenDocument(workspace, DocumentUri.From("file:///main.calr"), source2);
 
         var symbols = workspace.GetAllPublicSymbols()
             .Where(s => s.Doc.Uri != doc2.Uri)
@@ -866,12 +853,12 @@ public class CrossFileResolutionTests
 
         // First document defines a class
         var source1 = """
-            §M{Models}
-              §CL{Address}
-                §FLD{str:street}
-                §FLD{str:city}
+            module Models Models
+              class Address
+                field string:street
+                field string:city
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///models.calr"), source1);
+        OpenDocument(workspace, DocumentUri.From("file:///models.calr"), source1);
 
         // Verify class can be found in workspace
         var (doc, node) = workspace.FindDefinitionAcrossFiles("Address");
@@ -894,23 +881,21 @@ public class CrossFileResolutionTests
 
         // First document defines a base class
         var source1 = """
-            §M{Base}
-              §CL{Animal}
-                §FLD{str:name}
-                §MT{Speak}
-                  §O{str}
-                  §R "..."
+            module Base Base
+              class Animal
+                field string:name
+                func Speak () → string
+                  return "..."
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///base.calr"), source1);
+        OpenDocument(workspace, DocumentUri.From("file:///base.calr"), source1);
 
         // Second document defines a derived class
         var source2 = """
-            §M{Derived}
-              §CL{Dog}
-                §EXT{Animal}
-                §FLD{str:breed}
+            module Derived Derived
+              class Dog extends Animal
+                field string:breed
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///derived.calr"), source2);
+        OpenDocument(workspace, DocumentUri.From("file:///derived.calr"), source2);
 
         // Verify we can find Dog class
         var (dogDoc, dogNode) = workspace.FindDefinitionAcrossFiles("Dog");
@@ -939,12 +924,12 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{Test}
-              §F{ToRemove:pub}
-                §R 42
+            module Test Test
+              func ToRemove () → void
+                return 42
             """;
         var uri = DocumentUri.From("file:///toremove.calr");
-        workspace.GetOrCreate(uri, source);
+        OpenDocument(workspace, uri, source);
 
         // Verify symbol is found initially
         var (doc1, node1) = workspace.FindDefinitionAcrossFiles("ToRemove");
@@ -967,11 +952,11 @@ public class CrossFileResolutionTests
 
         // Initial source
         var source1 = """
-            §M{Test}
-              §F{OldName:pub}
-                §R 42
+            module Test Test
+              func OldName () → void
+                return 42
             """;
-        workspace.GetOrCreate(uri, source1);
+        OpenDocument(workspace, uri, source1);
 
         // Verify old name is found
         var (doc1, _) = workspace.FindDefinitionAcrossFiles("OldName");
@@ -979,9 +964,9 @@ public class CrossFileResolutionTests
 
         // Update the document
         var source2 = """
-            §M{Test}
-              §F{NewName:pub}
-                §R 42
+            module Test Test
+              func NewName () → void
+                return 42
             """;
         workspace.Update(uri, source2, 2);
 
@@ -1004,12 +989,12 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{Models}
-              §CL{Person}
-                §FLD{str:name}
-                §FLD{i32:age}
+            module Models Models
+              class Person
+                field string:name
+                field int:age
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///models.calr"), source);
+        OpenDocument(workspace, DocumentUri.From("file:///models.calr"), source);
 
         var (doc, node) = workspace.FindMemberAcrossFiles("Person", "name");
 
@@ -1024,14 +1009,13 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{Models}
-              §CL{Person}
-                §FLD{str:name}
-                §MT{GetName}
-                  §O{str}
-                  §R name
+            module Models Models
+              class Person
+                field string:name
+                func GetName () → string
+                  return name
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///models.calr"), source);
+        OpenDocument(workspace, DocumentUri.From("file:///models.calr"), source);
 
         var (doc, node) = workspace.FindMemberAcrossFiles("Person", "GetName");
 
@@ -1045,15 +1029,13 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{Models}
-              §CL{Person}
-                §PROP{FullName:str}
-                §GET
-                §R "test"
-                §/GET
-                §/PROP
+            module Models Models
+              class Person
+                property string:FullName
+                  get
+                    return "test"
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///models.calr"), source);
+        OpenDocument(workspace, DocumentUri.From("file:///models.calr"), source);
 
         var (doc, node) = workspace.FindMemberAcrossFiles("Person", "FullName");
 
@@ -1067,14 +1049,13 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{Types}
-              §EN{Color}
-              §EM{Red}
-              §EM{Green}
-              §EM{Blue}
-              §/EN
+            module Types Types
+              enum Color
+                Red
+                Green
+                Blue
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///types.calr"), source);
+        OpenDocument(workspace, DocumentUri.From("file:///types.calr"), source);
 
         var (doc, node) = workspace.FindMemberAcrossFiles("Color", "Red");
 
@@ -1088,12 +1069,11 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{Interfaces}
-              §IFACE{IShape}
-                §MT{GetArea}
-                  §O{f64}
+            module Interfaces Interfaces
+              interface IShape
+                func GetArea () → double
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///interfaces.calr"), source);
+        OpenDocument(workspace, DocumentUri.From("file:///interfaces.calr"), source);
 
         var (doc, node) = workspace.FindMemberAcrossFiles("IShape", "GetArea");
 
@@ -1108,20 +1088,19 @@ public class CrossFileResolutionTests
 
         // Base class in one file
         var source1 = """
-            §M{Base}
-              §CL{Animal}
-                §FLD{str:name}
+            module Base Base
+              class Animal
+                field string:name
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///base.calr"), source1);
+        OpenDocument(workspace, DocumentUri.From("file:///base.calr"), source1);
 
         // Derived class in another file
         var source2 = """
-            §M{Derived}
-              §CL{Dog}
-                §EXT{Animal}
-                §FLD{str:breed}
+            module Derived Derived
+              class Dog extends Animal
+                field string:breed
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///derived.calr"), source2);
+        OpenDocument(workspace, DocumentUri.From("file:///derived.calr"), source2);
 
         // Looking up "name" on Dog should find it in Animal
         var (doc, node) = workspace.FindMemberAcrossFiles("Dog", "name");
@@ -1137,15 +1116,13 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
         var aUri = DocumentUri.From("file:///cycle-a.calr");
         var bUri = DocumentUri.From("file:///cycle-b.calr");
-        workspace.GetOrCreate(aUri, """
-            §M{CycleA}
-              §CL{A}
-                §EXT{B}
+        OpenDocument(workspace, aUri, """
+            module CycleA CycleA
+              class A extends B
             """);
-        workspace.GetOrCreate(bUri, """
-            §M{CycleB}
-              §CL{B}
-                §EXT{A}
+        OpenDocument(workspace, bUri, """
+            module CycleB CycleB
+              class B extends A
             """);
 
         var snapshot = workspace.CaptureSnapshot();
@@ -1174,20 +1151,17 @@ public class CrossFileResolutionTests
         var aUri = DocumentUri.From("file:///indirect-a.calr");
         var bUri = DocumentUri.From("file:///indirect-b.calr");
         var cUri = DocumentUri.From("file:///indirect-c.calr");
-        workspace.GetOrCreate(aUri, """
-            §M{CycleA}
-              §CL{A}
-                §EXT{B}
+        OpenDocument(workspace, aUri, """
+            module CycleA CycleA
+              class A extends B
             """);
-        workspace.GetOrCreate(bUri, """
-            §M{CycleB}
-              §CL{B}
-                §EXT{C}
+        OpenDocument(workspace, bUri, """
+            module CycleB CycleB
+              class B extends C
             """);
-        workspace.GetOrCreate(cUri, """
-            §M{CycleC}
-              §CL{C}
-                §EXT{A}
+        OpenDocument(workspace, cUri, """
+            module CycleC CycleC
+              class C extends A
             """);
 
         var snapshot = workspace.CaptureSnapshot();
@@ -1216,15 +1190,13 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
         var aUri = DocumentUri.From("file:///qualified-cycle-a.calr");
         var bUri = DocumentUri.From("file:///qualified-cycle-b.calr");
-        workspace.GetOrCreate(aUri, """
-            §M{CycleA}
-              §CL{A}
-                §EXT{CycleB.B}
+        OpenDocument(workspace, aUri, """
+            module CycleA CycleA
+              class A extends CycleB.B
             """);
-        workspace.GetOrCreate(bUri, """
-            §M{CycleB}
-              §CL{B}
-                §EXT{CycleA.A}
+        OpenDocument(workspace, bUri, """
+            module CycleB CycleB
+              class B extends CycleA.A
             """);
 
         var snapshot = workspace.CaptureSnapshot();
@@ -1246,28 +1218,24 @@ public class CrossFileResolutionTests
         var sources = new Dictionary<DocumentUri, string>
         {
             [DocumentUri.From("file:///left-a.calr")] = """
-                §M{LeftA}
-                  §CL{A}
-                    §EXT{LeftB.B}
+                module LeftA LeftA
+                  class A extends LeftB.B
                 """,
             [DocumentUri.From("file:///left-b.calr")] = """
-                §M{LeftB}
-                  §CL{B}
-                    §EXT{LeftA.A}
+                module LeftB LeftB
+                  class B extends LeftA.A
                 """,
             [DocumentUri.From("file:///right-a.calr")] = """
-                §M{RightA}
-                  §CL{A}
-                    §EXT{RightB.B}
+                module RightA RightA
+                  class A extends RightB.B
                 """,
             [DocumentUri.From("file:///right-b.calr")] = """
-                §M{RightB}
-                  §CL{B}
-                    §EXT{RightA.A}
+                module RightB RightB
+                  class B extends RightA.A
                 """,
         };
         foreach (var (uri, source) in sources)
-            workspace.GetOrCreate(uri, source);
+            OpenDocument(workspace, uri, source);
 
         var snapshot = workspace.CaptureSnapshot();
         var diagnostics = sources.Keys
@@ -1289,28 +1257,26 @@ public class CrossFileResolutionTests
         var sources = new Dictionary<DocumentUri, string>
         {
             [DocumentUri.From("file:///partial-a-base.calr")] = """
-                §M{CycleA}
-                  §CL{A:pub:partial}
-                    §EXT{CycleB.B}
+                module CycleA CycleA
+                  class A partial extends CycleB.B
                 """,
             [DocumentUri.From("file:///partial-a-members.calr")] = """
-                §M{CycleA}
-                  §CL{A:pub:partial}
-                    §FLD{i32:value}
+                module CycleA CycleA
+                  class A partial
+                    field int:value
                 """,
             [DocumentUri.From("file:///partial-b-base.calr")] = """
-                §M{CycleB}
-                  §CL{B:pub:partial}
-                    §EXT{CycleA.A}
+                module CycleB CycleB
+                  class B partial extends CycleA.A
                 """,
             [DocumentUri.From("file:///partial-b-members.calr")] = """
-                §M{CycleB}
-                  §CL{B:pub:partial}
-                    §FLD{i32:value}
+                module CycleB CycleB
+                  class B partial
+                    field int:value
                 """,
         };
         foreach (var (uri, source) in sources)
-            workspace.GetOrCreate(uri, source);
+            OpenDocument(workspace, uri, source);
 
         var snapshot = workspace.CaptureSnapshot();
         var diagnostics = sources.Keys
@@ -1332,35 +1298,32 @@ public class CrossFileResolutionTests
         var sources = new Dictionary<DocumentUri, string>
         {
             [DocumentUri.From("file:///partial-indirect-a-base.calr")] = """
-                §M{CycleA}
-                  §CL{A:pub:partial}
-                    §EXT{CycleB.B}
+                module CycleA CycleA
+                  class A partial extends CycleB.B
                 """,
             [DocumentUri.From("file:///partial-indirect-a-part.calr")] = """
-                §M{CycleA}
-                  §CL{A:pub:partial}
+                module CycleA CycleA
+                  class A partial
                 """,
             [DocumentUri.From("file:///partial-indirect-b-base.calr")] = """
-                §M{CycleB}
-                  §CL{B:pub:partial}
-                    §EXT{CycleC.C}
+                module CycleB CycleB
+                  class B partial extends CycleC.C
                 """,
             [DocumentUri.From("file:///partial-indirect-b-part.calr")] = """
-                §M{CycleB}
-                  §CL{B:pub:partial}
+                module CycleB CycleB
+                  class B partial
                 """,
             [DocumentUri.From("file:///partial-indirect-c-base.calr")] = """
-                §M{CycleC}
-                  §CL{C:pub:partial}
-                    §EXT{CycleA.A}
+                module CycleC CycleC
+                  class C partial extends CycleA.A
                 """,
             [DocumentUri.From("file:///partial-indirect-c-part.calr")] = """
-                §M{CycleC}
-                  §CL{C:pub:partial}
+                module CycleC CycleC
+                  class C partial
                 """,
         };
         foreach (var (uri, source) in sources)
-            workspace.GetOrCreate(uri, source);
+            OpenDocument(workspace, uri, source);
 
         var snapshot = workspace.CaptureSnapshot();
         var diagnostics = sources.Keys
@@ -1384,22 +1347,20 @@ public class CrossFileResolutionTests
         var sources = new Dictionary<DocumentUri, string>
         {
             [DocumentUri.From("file:///duplicate-a-one.calr")] = """
-                §M{Duplicate}
-                  §CL{A:pub}
-                    §EXT{Other.B}
+                module Duplicate Duplicate
+                  class A extends Other.B
                 """,
             [DocumentUri.From("file:///duplicate-a-two.calr")] = """
-                §M{Duplicate}
-                  §CL{A:pub}
+                module Duplicate Duplicate
+                  class A
                 """,
             [DocumentUri.From("file:///duplicate-b.calr")] = """
-                §M{Other}
-                  §CL{B:pub}
-                    §EXT{Duplicate.A}
+                module Other Other
+                  class B extends Duplicate.A
                 """,
         };
         foreach (var (uri, source) in sources)
-            workspace.GetOrCreate(uri, source);
+            OpenDocument(workspace, uri, source);
 
         var snapshot = workspace.CaptureSnapshot();
         Assert.All(sources.Keys, uri =>
@@ -1416,28 +1377,24 @@ public class CrossFileResolutionTests
         var sources = new Dictionary<DocumentUri, string>
         {
             [DocumentUri.From("file:///generic-foo-one.calr")] = """
-                §M{Generic}
-                  §CL{Foo:pub}<T>
-                    §EXT{Generic.Bar<T>}
+                module Generic Generic
+                  class Foo<T> extends Generic.Bar<T>
                 """,
             [DocumentUri.From("file:///generic-bar-one.calr")] = """
-                §M{Generic}
-                  §CL{Bar:pub}<T>
-                    §EXT{Generic.Foo<T>}
+                module Generic Generic
+                  class Bar<T> extends Generic.Foo<T>
                 """,
             [DocumentUri.From("file:///generic-foo-two.calr")] = """
-                §M{Generic}
-                  §CL{Foo:pub}<T,U>
-                    §EXT{Generic.Bar<T,U>}
+                module Generic Generic
+                  class Foo<T,U> extends Generic.Bar<T,U>
                 """,
             [DocumentUri.From("file:///generic-bar-two.calr")] = """
-                §M{Generic}
-                  §CL{Bar:pub}<T,U>
-                    §EXT{Generic.Foo<T,U>}
+                module Generic Generic
+                  class Bar<T,U> extends Generic.Foo<T,U>
                 """,
         };
         foreach (var (uri, source) in sources)
-            workspace.GetOrCreate(uri, source);
+            OpenDocument(workspace, uri, source);
 
         var snapshot = workspace.CaptureSnapshot();
         foreach (var uri in sources.Keys)
@@ -1465,20 +1422,21 @@ public class CrossFileResolutionTests
     public void GenericArityParser_IgnoresNestedDelimiterCommas(
         string typeArgument)
     {
+        // Keep the original data-row identity while using the selected native
+        // spelling of the same CLR Int32 rectangular-array type.
+        var nativeTypeArgument = typeArgument == "i32[,]" ? "int[,]" : typeArgument;
         var workspace = new WorkspaceState();
         var fooUri = DocumentUri.From(
             $"file:///arity-foo-{typeArgument.Length}.calr");
         var barUri = DocumentUri.From(
             $"file:///arity-bar-{typeArgument.Length}.calr");
-        workspace.GetOrCreate(fooUri, $$"""
-            §M{Generic}
-              §CL{Foo:pub}<T>
-                §EXT{Generic.Bar<{{typeArgument}}>}
+        OpenDocument(workspace, fooUri, $$"""
+            module Generic Generic
+              class Foo<T> extends Generic.Bar<{{nativeTypeArgument}}>
             """);
-        workspace.GetOrCreate(barUri, $$"""
-            §M{Generic}
-              §CL{Bar:pub}<T>
-                §EXT{Generic.Foo<{{typeArgument}}>}
+        OpenDocument(workspace, barUri, $$"""
+            module Generic Generic
+              class Bar<T> extends Generic.Foo<{{nativeTypeArgument}}>
             """);
 
         var snapshot = workspace.CaptureSnapshot();
@@ -1499,17 +1457,15 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
         var localUri = DocumentUri.From("file:///lexical-local.calr");
         var globalUri = DocumentUri.From("file:///lexical-global.calr");
-        workspace.GetOrCreate(localUri, """
-            §M{Local}
-              §CL{Host:pub}
-                §CL{Parent:pub}
-                  §EXT{Child}
-                §CL{Child:pub}
-                  §EXT{Parent}
+        OpenDocument(workspace, localUri, """
+            module Local Local
+              class Host
+                class Parent extends Child
+                class Child extends Parent
             """);
-        workspace.GetOrCreate(globalUri, """
-            §M{Other}
-              §CL{Parent:pub}
+        OpenDocument(workspace, globalUri, """
+            module Other Other
+              class Parent
             """);
 
         var snapshot = workspace.CaptureSnapshot();
@@ -1545,27 +1501,25 @@ public class CrossFileResolutionTests
         var sources = new Dictionary<DocumentUri, string>
         {
             [DocumentUri.From("file:///ambiguous-base-one.calr")] = """
-                §M{Local}
-                  §CL{Base:pub}
+                module Local Local
+                  class Base
                 """,
             [DocumentUri.From("file:///ambiguous-base-two.calr")] = """
-                §M{Local}
-                  §CL{Base:pub}
+                module Local Local
+                  class Base
                 """,
             [DocumentUri.From("file:///ambiguous-derived.calr")] = """
-                §M{Local}
-                  §U{Other}
-                  §CL{Derived:pub}
-                    §EXT{Base}
+                module Local Local
+                  using Other
+                  class Derived extends Base
                 """,
             [DocumentUri.From("file:///ambiguous-import.calr")] = """
-                §M{Other}
-                  §CL{Base:pub}
-                    §EXT{Local.Derived}
+                module Other Other
+                  class Base extends Local.Derived
                 """,
         };
         foreach (var (uri, source) in sources)
-            workspace.GetOrCreate(uri, source);
+            OpenDocument(workspace, uri, source);
 
         var snapshot = workspace.CaptureSnapshot();
         Assert.All(sources.Keys, uri =>
@@ -1578,16 +1532,16 @@ public class CrossFileResolutionTests
     public void PartialGenericParameterNameMismatch_IsNotMergedIntoCycle()
     {
         AssertIncompatiblePartialGenericDoesNotCycle(
-            "§CL{Foo:pub:partial}<T>\n    §EXT{Generic.Bar<T>}",
-            "§CL{Foo:pub:partial}<U>");
+            "class Foo<T> partial extends Generic.Bar<T>\n",
+            "class Foo<U> partial");
     }
 
     [Fact]
     public void PartialGenericConstraintMismatch_IsNotMergedIntoCycle()
     {
         AssertIncompatiblePartialGenericDoesNotCycle(
-            "§CL{Foo:pub:partial}<T>\n    §WHERE T : class\n    §EXT{Generic.Bar<T>}",
-            "§CL{Foo:pub:partial}<T>\n    §WHERE T : struct");
+            "class Foo<T> partial extends Generic.Bar<T>\n    where T : class\n",
+            "class Foo<T> partial\n    where T : struct");
     }
 
     [Fact]
@@ -1597,21 +1551,19 @@ public class CrossFileResolutionTests
         var firstUri = DocumentUri.From("file:///compatible-partial-one.calr");
         var secondUri = DocumentUri.From("file:///compatible-partial-two.calr");
         var barUri = DocumentUri.From("file:///compatible-partial-bar.calr");
-        var firstState = workspace.GetOrCreate(firstUri, """
-            §M{Generic}
-              §CL{Foo:pub:partial}<T>
-                §WHERE T : class
-                §EXT{Generic.Bar<T>}
+        var firstState = OpenDocument(workspace, firstUri, """
+            module Generic Generic
+              class Foo<T> partial extends Generic.Bar<T>
+                where T : class
             """);
-        var secondState = workspace.GetOrCreate(secondUri, """
-            §M{Generic}
-              §CL{Foo:pub:partial}<T>
-                §WHERE T : class
+        var secondState = OpenDocument(workspace, secondUri, """
+            module Generic Generic
+              class Foo<T> partial
+                where T : class
             """);
-        workspace.GetOrCreate(barUri, """
-            §M{Generic}
-              §CL{Bar:pub}<T>
-                §EXT{Generic.Foo<T>}
+        OpenDocument(workspace, barUri, """
+            module Generic Generic
+              class Bar<T> extends Generic.Foo<T>
             """);
 
         foreach (var node in new[]
@@ -1652,16 +1604,14 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
         var nestedUri = DocumentUri.From("file:///structured-nested.calr");
         var moduleUri = DocumentUri.From("file:///structured-module.calr");
-        workspace.GetOrCreate(nestedUri, """
-            §M{A}
-              §CL{B:pub}
-                §CL{C:pub}
-                  §EXT{A.B.C}
+        OpenDocument(workspace, nestedUri, """
+            module A A
+              class B
+                class C extends A.B.C
             """);
-        workspace.GetOrCreate(moduleUri, """
-            §M{A.B}
-              §CL{C:pub}
-                §EXT{A.B.C}
+        OpenDocument(workspace, moduleUri, """
+            module A.B A.B
+              class C extends A.B.C
             """);
 
         var snapshot = workspace.CaptureSnapshot();
@@ -1682,12 +1632,11 @@ public class CrossFileResolutionTests
         var firstUri = DocumentUri.From("file:///incompatible-partial-one.calr");
         var secondUri = DocumentUri.From("file:///incompatible-partial-two.calr");
         var barUri = DocumentUri.From("file:///incompatible-partial-bar.calr");
-        workspace.GetOrCreate(firstUri, $"§M{{Generic}}\n  {firstDeclaration}\n");
-        workspace.GetOrCreate(secondUri, $"§M{{Generic}}\n  {secondDeclaration}\n");
-        workspace.GetOrCreate(barUri, """
-            §M{Generic}
-              §CL{Bar:pub}<T>
-                §EXT{Generic.Foo<T>}
+        OpenDocument(workspace, firstUri, $"module Generic Generic\n  {firstDeclaration}\n");
+        OpenDocument(workspace, secondUri, $"module Generic Generic\n  {secondDeclaration}\n");
+        OpenDocument(workspace, barUri, """
+            module Generic Generic
+              class Bar<T> extends Generic.Foo<T>
             """);
 
         var snapshot = workspace.CaptureSnapshot();
@@ -1701,22 +1650,22 @@ public class CrossFileResolutionTests
     public async Task CapturedWorkspaceIndex_RemainsVersionCoherentAfterUpdateAsync()
     {
         const string original = """
-            §M{TestModule}
-              §F{Compute:pub} () -> i32
-                §R 42
-              §F{Use:pub} () -> i32
-                §R §C{Compute} §/C
+            module TestModule TestModule
+              func Compute () → int
+                return 42
+              func Use () → int
+                return Compute()
             """;
         const string updated = """
-            §M{TestModule}
-              §F{Calculate:pub} () -> i32
-                §R 42
-              §F{Use:pub} () -> i32
-                §R §C{Calculate} §/C
+            module TestModule TestModule
+              func Calculate () → int
+                return 42
+              func Use () → int
+                return Calculate()
             """;
         var workspace = new WorkspaceState();
         var uri = DocumentUri.From("file:///workspace-snapshot.calr");
-        workspace.GetOrCreate(uri, original, version: 1);
+        OpenDocument(workspace, uri, original, version: 1);
         var captured = workspace.CaptureSnapshot();
         var capturedDocument = captured.GetDocument(uri)!;
         var originalReference = original.LastIndexOf("Compute", StringComparison.Ordinal);
@@ -1772,7 +1721,7 @@ public class CrossFileResolutionTests
         Directory.CreateDirectory(directory);
         await File.WriteAllTextAsync(
             Path.Combine(directory, "blocked.calr"),
-            "§M{Blocked}\n");
+            "module Blocked Blocked\n");
         var readerStarted = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var workspace = new WorkspaceState(
@@ -1869,9 +1818,9 @@ public class CrossFileResolutionTests
             $"workspace-registry-{Guid.NewGuid():N}");
         Directory.CreateDirectory(directory);
         var path = Path.Combine(directory, "race.calr");
-        const string diskSource = "§M{Disk}\n";
-        const string openSource = "§M{Open}\n";
-        const string reopenedSource = "§M{Reopened}\n";
+        const string diskSource = "module Disk Disk\n";
+        const string openSource = "module Open Open\n";
+        const string reopenedSource = "module Reopened Reopened\n";
         await File.WriteAllTextAsync(path, diskSource);
         var uri = DocumentUri.FromFileSystemPath(path);
         var scanReadyToApply = new TaskCompletionSource(
@@ -1949,11 +1898,11 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{Models}
-              §CL{Person}
-                §FLD{str:name}
+            module Models Models
+              class Person
+                field string:name
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///models.calr"), source);
+        OpenDocument(workspace, DocumentUri.From("file:///models.calr"), source);
 
         var (doc, node) = workspace.FindMemberAcrossFiles("Person", "nonexistent");
 
@@ -1967,11 +1916,11 @@ public class CrossFileResolutionTests
         var workspace = new WorkspaceState();
 
         var source = """
-            §M{Models}
-              §CL{Person}
-                §FLD{str:name}
+            module Models Models
+              class Person
+                field string:name
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///models.calr"), source);
+        OpenDocument(workspace, DocumentUri.From("file:///models.calr"), source);
 
         var (doc, node) = workspace.FindMemberAcrossFiles("NonExistent", "name");
 
@@ -2013,15 +1962,16 @@ public class CrossFileResolutionTests
         var source1 = """
             §M{m001:Invalid
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///invalid.calr"), source1);
+        var invalid = workspace.GetOrCreate(DocumentUri.From("file:///invalid.calr"), source1);
+        Assert.True(invalid.Diagnostics.HasErrors);
 
         // Valid document
         var source2 = """
-            §M{Valid}
-              §F{ValidFunc:pub}
-                §R 0
+            module Valid Valid
+              func ValidFunc () → void
+                return 0
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///valid.calr"), source2);
+        OpenDocument(workspace, DocumentUri.From("file:///valid.calr"), source2);
 
         // Should still find the valid function
         var (doc, node) = workspace.FindDefinitionAcrossFiles("ValidFunc");
@@ -2036,24 +1986,38 @@ public class CrossFileResolutionTests
 
         // First document defines Helper
         var source1 = """
-            §M{File1}
-              §F{Helper:pub}
-                §R 1
+            module File1 File1
+              func Helper () → void
+                return 1
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///file1.calr"), source1);
+        OpenDocument(workspace, DocumentUri.From("file:///file1.calr"), source1);
 
         // Second document also defines Helper
         var source2 = """
-            §M{File2}
-              §F{Helper:pub}
-                §R 2
+            module File2 File2
+              func Helper () → void
+                return 2
             """;
-        workspace.GetOrCreate(DocumentUri.From("file:///file2.calr"), source2);
+        OpenDocument(workspace, DocumentUri.From("file:///file2.calr"), source2);
 
         // Should find one of them (first encountered)
         var (doc, node) = workspace.FindDefinitionAcrossFiles("Helper");
         Assert.NotNull(doc);
         Assert.NotNull(node);
+    }
+
+    private static DocumentState OpenDocument(
+        WorkspaceState workspace, DocumentUri uri, string source, int version = 0)
+    {
+        var document = workspace.GetOrCreate(uri, source, version);
+        Assert.NotNull(document.Ast);
+        Assert.Equal(document.Ast.Name, Assert.Single(document.Ast.NamespaceScopes).FullName);
+        Assert.DoesNotContain(document.Diagnostics, diagnostic =>
+            diagnostic.Severity == Compiler.Diagnostics.DiagnosticSeverity.Error
+            && (diagnostic.Code.StartsWith("Calor00", StringComparison.Ordinal)
+                || diagnostic.Code.StartsWith("Calor01", StringComparison.Ordinal)
+                || diagnostic.Code.StartsWith("Calor083", StringComparison.Ordinal)));
+        return document;
     }
 
     private sealed class CapturingWorkspaceLogger : ILogger<WorkspaceState>
