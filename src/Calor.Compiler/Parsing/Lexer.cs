@@ -931,7 +931,16 @@ public sealed class Lexer
         }
 
         if (CanonicalKeywords.TryGetValue(text, out var keyword))
+        {
+            if (keyword == TokenKind.Preprocessor)
+            {
+                var lineEnd = _position;
+                while (lineEnd < _source.Length && _source[lineEnd] is not ('\r' or '\n'))
+                    lineEnd++;
+                return MakeToken(keyword, _source[_position..lineEnd]);
+            }
             return MakeToken(keyword);
+        }
 
         return MakeToken(TokenKind.Identifier);
     }

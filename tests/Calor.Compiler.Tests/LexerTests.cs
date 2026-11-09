@@ -314,6 +314,60 @@ public class LexerTests
         }, tokens.Select(token => token.Kind));
     }
 
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void SupplementalPreprocessor_PreservesThePhysicalLineWithoutConsumingTokens(string newline)
+    {
+        const string condition = "\tDEBUG  && !TRACE /* preserve  spacing */ \t";
+        var source = "/// since 1.0" + newline + "pp" + condition + newline + "func Next () → void";
+        var tokens = Tokenize(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(TokenKind.Preprocessor, tokens[0].Kind);
+        Assert.Equal("pp", tokens[0].Text);
+        Assert.Equal(condition, tokens[0].Value);
+        Assert.Equal(2, tokens[0].Span.Length);
+        Assert.Equal("since 1.0", tokens[0].DocComment);
+        Assert.Equal(TokenKind.Identifier, tokens[1].Kind);
+        Assert.Equal("DEBUG", tokens[1].Text);
+        Assert.Null(tokens[1].DocComment);
+        Assert.Equal(source.IndexOf("DEBUG", StringComparison.Ordinal), tokens[1].Span.Start);
+        var next = Assert.Single(tokens.Where(token => token.Kind == TokenKind.Func));
+        Assert.Equal(3, next.Span.Line);
+        Assert.Equal(source.IndexOf("func", StringComparison.Ordinal), next.Span.Start);
+    }
+
+    [Theory]
+    [InlineData("pp", "")]
+    [InlineData("pp DEBUG  ", " DEBUG  ")]
+    [InlineData("pp DEBUG  \r", " DEBUG  ")]
+    public void SupplementalPreprocessor_EndOfFileKeepsTheExactRemainder(string source, string condition)
+    {
+        var tokens = Tokenize(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(TokenKind.Preprocessor, tokens[0].Kind);
+        Assert.Equal(condition, tokens[0].Value);
+        Assert.Equal(TokenKind.Eof, tokens[^1].Kind);
+    }
+
+    [Fact]
+    public void SupplementalPreprocessor_EscapedNamesAndOpaquePayloadsDoNotCaptureConditions()
+    {
+        const string payload = "pp\tDEBUG  // preserved\r\n§/PP";
+        var source = $"raw statement {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n@pp(DEBUG) \"pp OTHER\"";
+        var tokens = Tokenize(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(payload, Assert.IsType<RawCSharpFrame>(tokens[0].Value).Code);
+        Assert.Equal(TokenKind.Identifier, tokens[1].Kind);
+        Assert.Equal("@pp", tokens[1].Text);
+        Assert.Equal("pp", tokens[1].Value);
+        Assert.DoesNotContain(tokens, token => token.Kind == TokenKind.Preprocessor);
+        Assert.Equal(TokenKind.StrLiteral, tokens[^2].Kind);
+        Assert.Equal("pp OTHER", tokens[^2].Value);
+    }
+
     [Fact]
     public void CanonicalEscapedNames_KeepSourceTextAndUnescapedIdentity()
     {

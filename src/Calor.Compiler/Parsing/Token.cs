@@ -262,7 +262,7 @@ public enum TokenKind
     CompilerDirective,  // §CDIR{base64} - exact nonconditional C# directive
 
     // Preprocessor Directives
-    Preprocessor,       // pp followed by a verbatim C# condition
+    Preprocessor,       // pp; Value is exact physical-line remainder, excluding CR/LF
     EndPreprocessor,    // §/PP{CONDITION} - preprocessor conditional end
     PreprocessorElse,   // §PPE - preprocessor else
 
