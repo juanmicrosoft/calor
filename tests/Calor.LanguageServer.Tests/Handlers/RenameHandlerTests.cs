@@ -1566,6 +1566,252 @@ public class RenameHandlerTests
         }
     }
 
+    [Theory]
+    [InlineData(
+        "module First\n  class Worker partial\n    field int:Left",
+        "module Second\n  class Worker partial\n    field int:Right", true)]
+    [InlineData(
+        "module First Shared\n  class Worker partial\n    field int:Left",
+        "module Second Shared\n  class Worker partial\n    field int:Right", true)]
+    [InlineData(
+        "module Same Left\n  class Worker partial\n    field int:Left",
+        "module Same Right\n  class Worker partial\n    field int:Right", false)]
+    [InlineData(
+        "module Same\n  class Worker<T> partial\n    field int:Left",
+        "module Same\n  class Worker<T,U> partial\n    field int:Right", false)]
+    [InlineData(
+        "module Same\n  class OwnerA\n    class Worker partial\n      field int:Left",
+        "module Same\n  class OwnerB\n    class Worker partial\n      field int:Right", false)]
+    [InlineData(
+        "module Same\n  class Owner<T>\n    class Worker partial\n      field int:Left",
+        "module Same\n  class Owner<T,U>\n    class Worker partial\n      field int:Right", false)]
+    public async Task PartialTypeSplitProtectionUsesActualQualifiedIdentityAsync(
+        string first, string second, bool splitType)
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            var firstPath = Path.Combine(root, "first.calr");
+            var secondPath = Path.Combine(root, "second.calr");
+            File.WriteAllText(firstPath, first);
+            File.WriteAllText(secondPath, second);
+            var sources = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [firstPath] = first,
+                [secondPath] = second,
+            };
+            AssertWorkspaceRoslynCleanWithProductionMap(sources);
+            var workspace = new WorkspaceState(root);
+            var uri = DocumentUri.FromFileSystemPath(firstPath);
+            var state = workspace.GetOrCreate(uri, first, version: 1);
+            Assert.False(state.Diagnostics.HasErrors, string.Join("\n", state.Diagnostics));
+            var symbol = Assert.Single(state.BoundModule!.SymbolsById.Values
+                .OfType<Calor.Compiler.Binding.TypeSymbol>().Where(symbol => symbol.Name == "Worker"));
+            workspace.RefreshClosedDocuments();
+            Assert.Equal(splitType, workspace.FindSymbolOccurrences(symbol.Id, includeDeclaration: true)
+                .Any(occurrence => occurrence.IsSplitDeclaration));
+            var edit = await RenameAtAsync(workspace, uri, first, "Worker", "Renamed");
+            Assert.Equal(first, File.ReadAllText(firstPath));
+            Assert.Equal(second, File.ReadAllText(secondPath));
+            if (splitType)
+            {
+                Assert.Null(edit);
+                return;
+            }
+            Assert.NotNull(edit);
+            var documentEdit = Assert.Single(edit!.DocumentChanges!).TextDocumentEdit!;
+            Assert.Equal(uri, documentEdit.TextDocument.Uri);
+            var textEdit = Assert.Single(documentEdit.Edits);
+            Assert.Equal("Worker", TextAt(first, textEdit.Range));
+            Assert.Equal("Renamed", textEdit.NewText);
+            sources[firstPath] = ApplySingleDocumentEdit(first, edit);
+            AssertWorkspaceRoslynCleanWithProductionMap(sources);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FileLabelRenamePreservesSidecarIdentityNamespaceAndClrOwnersAsync(bool importedNamespace)
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            var label = importedNamespace ? "Shared" : "Same";
+            var source = importedNamespace
+                ? "module Shared Shared\n  class LeftType\n    field int:Value\n"
+                : "module Same\n  class Worker partial\n    field int:Left\n";
+            var other = importedNamespace
+                ? "module Other\n  using Shared\n  class RightType\n    field LeftType:Value\n"
+                : "module Same\n  class Worker partial\n    field int:Right\n";
+            var file = Path.Combine(root, "target.calr");
+            var otherFile = Path.Combine(root, "other.calr");
+            File.WriteAllText(file, source);
+            File.WriteAllText(otherFile, other);
+            var store = new Calor.Compiler.Ids.DeclarationIdentityStore(root);
+            var before = store.Sync([file, otherFile]);
+            var originalSidecar = File.ReadAllText(store.SidecarPath);
+            var expected = before.Declarations.Single(declaration =>
+                declaration.File == "target.calr" && declaration.Name == label).Id;
+            var workspace = new WorkspaceState(root);
+            var uri = DocumentUri.FromFileSystemPath(file);
+            workspace.GetOrCreate(uri, source, version: 7);
+            var originalSymbol = workspace.ResolveOccurrence(uri, source.IndexOf(label, StringComparison.Ordinal))!.SymbolId;
+            var edit = await RenameAtAsync(workspace, uri, source, label, "Renamed",
+                supportsTransactionalEdits: true);
+            Assert.NotNull(edit);
+            Assert.Equal(source, File.ReadAllText(file));
+            Assert.Equal(other, File.ReadAllText(otherFile));
+            Assert.Equal(originalSidecar, File.ReadAllText(store.SidecarPath));
+            var changes = edit!.DocumentChanges!.ToArray();
+            Assert.Equal(2, changes.Length);
+            var sourceChange = Assert.Single(changes.Where(change =>
+                change.TextDocumentEdit is { } documentEdit && documentEdit.TextDocument.Uri == uri));
+            Assert.Equal(7, sourceChange.TextDocumentEdit!.TextDocument.Version);
+            var tokenEdit = Assert.Single(sourceChange.TextDocumentEdit.Edits);
+            Assert.Equal(label, TextAt(source, tokenEdit.Range));
+            var updated = ApplySingleDocumentEdit(source, new WorkspaceEdit
+            {
+                DocumentChanges = new Container<WorkspaceEditDocumentChange>(sourceChange)
+            });
+            var sidecarChange = Assert.Single(changes.Where(change =>
+                change.TextDocumentEdit?.TextDocument.Uri.GetFileSystemPath() == store.SidecarPath)).TextDocumentEdit!;
+            File.WriteAllText(file, updated);
+            File.WriteAllText(store.SidecarPath, Assert.Single(sidecarChange.Edits).NewText);
+            var after = store.Sync();
+            Assert.Equal(before.Declarations.Select(declaration => declaration.Id).Order(StringComparer.Ordinal),
+                after.Declarations.Select(declaration => declaration.Id).Order(StringComparer.Ordinal));
+            foreach (var declaration in before.Declarations)
+            {
+                var retained = after.Declarations.Single(candidate => candidate.Id == declaration.Id);
+                Assert.Equal(declaration.Kind, retained.Kind);
+                Assert.Equal(declaration.File, retained.File);
+                Assert.Equal(declaration.Container, retained.Container);
+                Assert.Equal(declaration.Id == expected ? "Renamed" : declaration.Name, retained.Name);
+            }
+            Assert.Equal(other, File.ReadAllText(otherFile));
+            Assert.DoesNotContain(expected, updated);
+            var reloaded = new WorkspaceState(root);
+            reloaded.GetOrCreate(uri, updated, version: 8);
+            Assert.Equal(originalSymbol, reloaded.ResolveOccurrence(uri,
+                updated.IndexOf("Renamed", StringComparison.Ordinal))!.SymbolId);
+            AssertWorkspaceRoslynCleanWithProductionMap(
+                new Dictionary<string, string> { [file] = updated, [otherFile] = other },
+                compilation =>
+                {
+                    Assert.NotNull(compilation.GetTypeByMetadataName(importedNamespace ? "Shared.LeftType" : "Worker"));
+                    Assert.Null(compilation.GetTypeByMetadataName("Renamed.LeftType"));
+                    Assert.Null(compilation.GetTypeByMetadataName("Renamed.Worker"));
+                });
+            if (importedNamespace)
+            {
+                Assert.Contains("module Renamed Shared", updated);
+                Assert.Contains("using Shared", other);
+            }
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData("", false)]
+    [InlineData("Shared.Tools", false)]
+    [InlineData("", true)]
+    [InlineData("Shared.Tools", true)]
+    public void FileLabelsDoNotPartitionPartialInheritanceDiagnostics(string namespaceName, bool nested)
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            var header = $"module Same{(namespaceName.Length == 0 ? "" : $" {namespaceName}")}\n";
+            if (nested)
+                header += "  class Outer<T> partial\n";
+            var indent = nested ? "    " : "  ";
+            var sources = new[]
+            {
+                $"{header}{indent}class A extends B",
+                $"{header}{indent}class B partial extends A\n{indent}  field int:Left",
+                $"{header}{indent}class B partial extends A\n{indent}  field int:Right",
+            };
+            for (var index = 0; index < sources.Length; index++)
+                File.WriteAllText(Path.Combine(root, $"{index}.calr"), sources[index]);
+            var workspace = new WorkspaceState(root);
+            var uri = DocumentUri.FromFileSystemPath(Path.Combine(root, "0.calr"));
+            workspace.GetOrCreate(uri, sources[0], version: 1);
+            var before = Cycles(workspace.CaptureSnapshot(refreshClosedDocuments: true));
+            Assert.Equal(3, before.Length);
+            File.WriteAllText(Path.Combine(root, "2.calr"),
+                sources[2].Replace("module Same", "module Other", StringComparison.Ordinal));
+            var after = workspace.CaptureSnapshot(refreshClosedDocuments: true);
+            Assert.Contains(after.Documents, document => document.Analysis.Source.StartsWith("module Other", StringComparison.Ordinal));
+            Assert.Equal(before, Cycles(after));
+
+            string[] Cycles(WorkspaceIndexSnapshot snapshot)
+                => snapshot.Documents.SelectMany(document => workspace.GetDiagnostics(snapshot, document)
+                        .Where(diagnostic => diagnostic.Code == Calor.Compiler.Diagnostics.DiagnosticCode.InheritanceCycle)
+                        .Select(diagnostic => $"{document.Document.Uri}:{diagnostic.Message}"))
+                    .Order(StringComparer.Ordinal).ToArray();
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ActualNamespacesKeepSameNamedInheritanceCyclesSeparate()
+    {
+        var workspace = new WorkspaceState();
+        foreach (var namespaceName in new[] { "Left", "Right" })
+        {
+            foreach (var (name, baseName) in new[] { ("A", "B"), ("B", "A") })
+            {
+                workspace.GetOrCreate(DocumentUri.From($"file:///{namespaceName}-{name}.calr"),
+                    $"module Same {namespaceName}\n  class {name} extends {baseName}");
+            }
+        }
+
+        var snapshot = workspace.CaptureSnapshot();
+        Assert.Equal(4, snapshot.Documents.Length);
+        foreach (var document in snapshot.Documents)
+        {
+            var diagnostic = Assert.Single(workspace.GetDiagnostics(snapshot, document)
+                .Where(diagnostic => diagnostic.Code == Calor.Compiler.Diagnostics.DiagnosticCode.InheritanceCycle));
+            Assert.Equal("Inheritance cycle detected: A -> B -> A.", diagnostic.Message);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CrossNamespaceInheritanceUsesNamespacesNotFileLabels(bool imports)
+    {
+        var workspace = new WorkspaceState();
+        var aBase = imports ? "B" : "Right.B";
+        var bBase = imports ? "A" : "Left.A";
+        var aImport = imports ? "  using Right\n" : "";
+        var bImport = imports ? "  using Left\n" : "";
+        workspace.GetOrCreate(DocumentUri.From("file:///left-a.calr"),
+            $"module Same Left\n{aImport}  class A extends {aBase}");
+        workspace.GetOrCreate(DocumentUri.From("file:///right-b.calr"),
+            $"module Same Right\n{bImport}  class B extends {bBase}");
+
+        var snapshot = workspace.CaptureSnapshot();
+        Assert.Equal(2, snapshot.Documents.Length);
+        foreach (var document in snapshot.Documents)
+        {
+            var diagnostic = Assert.Single(workspace.GetDiagnostics(snapshot, document)
+                .Where(diagnostic => diagnostic.Code == Calor.Compiler.Diagnostics.DiagnosticCode.InheritanceCycle));
+            Assert.Equal("Inheritance cycle detected: A -> B -> A.", diagnostic.Message);
+        }
+    }
+
     private static async Task<WorkspaceEdit?> RenameAtAsync(
         WorkspaceState workspace,
         DocumentUri uri,
@@ -1658,8 +1904,9 @@ public class RenameHandlerTests
             .ToArray();
     }
 
-    private static Dictionary<string, string> AssertWorkspaceRoslynCleanWithProductionMap(
-        IReadOnlyDictionary<string, string> sources)
+    internal static Dictionary<string, string> AssertWorkspaceRoslynCleanWithProductionMap(
+        IReadOnlyDictionary<string, string> sources,
+        Action<CSharpCompilation>? inspect = null)
     {
         var modules = sources
             .OrderBy(pair => pair.Key, StringComparer.Ordinal)
@@ -1706,6 +1953,7 @@ public class RenameHandlerTests
             compilation.GetDiagnostics(),
             diagnostic => diagnostic.Severity
                 == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        inspect?.Invoke(compilation);
         return generated;
     }
 
@@ -1994,17 +2242,14 @@ public sealed class ExactSpanRefactoringGateTests
         }
     }
 
-    // A module, and a type declared across several files, are one declaration in
-    // the language but one SymbolId per file in the index. Renaming from a
-    // file-local occurrence set edits a single part and splits the declaration —
-    // and Calor reports no error, so the break surfaces only in generated C#
-    // (CS0103 on the other part's members). Rename must refuse instead.
+    // File labels are independent, but a partial type is one CLR declaration.
     [Theory]
-    [InlineData("Collision", "Renamed")]
-    [InlineData("Worker", "Employee")]
-    public async Task RenameRefusesDeclarationsSplitAcrossFilesAsync(
+    [InlineData("Collision", "Renamed", false)]
+    [InlineData("Worker", "Employee", true)]
+    public async Task RenameDistinguishesFileLabelsFromSplitPartialTypesAsync(
         string cursorText,
-        string newName)
+        string newName,
+        bool splitType)
     {
         var root = CreateWorkspaceDirectory();
         try
@@ -2012,16 +2257,16 @@ public sealed class ExactSpanRefactoringGateTests
             var sources = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["definitions.calr"] = """
-                    §M{Collision}
-                      §CL{Worker:pub:partial}
-                        §MT{Pick:pub} (i32:value) -> i32
-                          §R value
+                    module Collision
+                      class Worker partial
+                        func Pick (int:value) → int
+                          return value
                     """,
                 ["open-use.calr"] = """
-                    §M{Collision}
-                      §CL{Worker:pub:partial}
-                        §MT{UseOne:pub} () -> i32
-                          §R §C{Pick} §A INT:1 §/C
+                    module Collision
+                      class Worker partial
+                        func UseOne () → int
+                          return Pick(1)
                     """,
             };
             foreach (var (fileName, source) in sources)
@@ -2030,14 +2275,39 @@ public sealed class ExactSpanRefactoringGateTests
             var workspace = new WorkspaceState(root);
             var openUri = DocumentUri.FromFileSystemPath(
                 Path.Combine(root, "definitions.calr"));
-            workspace.GetOrCreate(openUri, sources["definitions.calr"], version: 1);
+            var state = workspace.GetOrCreate(openUri, sources["definitions.calr"], version: 1);
+            Assert.False(state.Diagnostics.HasErrors, string.Join("\n", state.Diagnostics));
 
-            Assert.Null(await RenameAtAsync(
+            var edit = await RenameAtAsync(
                 workspace,
                 openUri,
                 sources["definitions.calr"],
                 cursorText,
-                newName));
+                newName);
+            if (splitType)
+                Assert.Null(edit);
+            else
+            {
+                Assert.NotNull(edit);
+                var change = Assert.Single(edit!.DocumentChanges!);
+                var documentEdit = Assert.IsType<TextDocumentEdit>(change.TextDocumentEdit);
+                Assert.Equal(openUri, documentEdit.TextDocument.Uri);
+                var textEdit = Assert.Single(documentEdit.Edits);
+                Assert.Equal("Collision", TextAt(sources["definitions.calr"], textEdit.Range));
+                Assert.Equal(newName, textEdit.NewText);
+                var updated = sources.ToDictionary(
+                    pair => Path.Combine(root, pair.Key),
+                    pair => pair.Value,
+                    StringComparer.Ordinal);
+                var start = PositionConverter.ToOffset(textEdit.Range.Start, sources["definitions.calr"]);
+                var end = PositionConverter.ToOffset(textEdit.Range.End, sources["definitions.calr"]);
+                updated[Path.Combine(root, "definitions.calr")] = sources["definitions.calr"][..start]
+                    + textEdit.NewText + sources["definitions.calr"][end..];
+                RenameHandlerTests.AssertWorkspaceRoslynCleanWithProductionMap(updated, compilation =>
+                    Assert.NotNull(compilation.GetTypeByMetadataName("Worker")));
+            }
+            Assert.All(sources, pair => Assert.Equal(
+                pair.Value, File.ReadAllText(Path.Combine(root, pair.Key))));
 
             // The refusal must be specific to split declarations: a method declared
             // in one file still renames across the workspace.
@@ -2055,11 +2325,9 @@ public sealed class ExactSpanRefactoringGateTests
         }
     }
 
-    // A module emits a C# namespace that another file can import. Using directives
-    // are not indexed as occurrences, so renaming an imported module would leave the
-    // importer pointing at a namespace that no longer exists.
+    // An explicit namespace is not owned by a compilation-unit label with the same text.
     [Fact]
-    public async Task RenameRefusesModuleImportedByAnotherFileAsync()
+    public async Task RenameFileLabelPreservesAnExplicitImportedNamespaceAsync()
     {
         var root = CreateWorkspaceDirectory();
         try
@@ -2067,14 +2335,14 @@ public sealed class ExactSpanRefactoringGateTests
             var sources = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["models.calr"] = """
-                    §M{Models}
-                      §CL{Widget:pub}
+                    module Models Models
+                      class Widget
                     """,
                 ["app.calr"] = """
-                    §M{App}
-                      §U{Models}
-                      §F{Make:pub} () -> Widget
-                        §R §NEW{Widget} §/NEW
+                    module App
+                      using Models
+                      func Make () → Widget
+                        return new Widget()
                     """,
             };
             foreach (var (fileName, source) in sources)
@@ -2084,12 +2352,30 @@ public sealed class ExactSpanRefactoringGateTests
             var openUri = DocumentUri.FromFileSystemPath(Path.Combine(root, "models.calr"));
             workspace.GetOrCreate(openUri, sources["models.calr"], version: 1);
 
-            Assert.Null(await RenameAtAsync(
+            var edit = await RenameAtAsync(
                 workspace,
                 openUri,
                 sources["models.calr"],
                 "Models",
-                "Domain"));
+                "Domain");
+            var documentEdit = Assert.IsType<TextDocumentEdit>(Assert.Single(edit!.DocumentChanges!).TextDocumentEdit);
+            Assert.Equal(openUri, documentEdit.TextDocument.Uri);
+            var textEdit = Assert.Single(documentEdit.Edits);
+            Assert.Equal("Models", TextAt(sources["models.calr"], textEdit.Range));
+            var start = PositionConverter.ToOffset(textEdit.Range.Start, sources["models.calr"]);
+            var end = PositionConverter.ToOffset(textEdit.Range.End, sources["models.calr"]);
+            var updated = sources.ToDictionary(pair => Path.Combine(root, pair.Key), pair => pair.Value);
+            updated[Path.Combine(root, "models.calr")] = sources["models.calr"][..start]
+                + textEdit.NewText + sources["models.calr"][end..];
+            Assert.Contains("module Domain Models", updated[Path.Combine(root, "models.calr")]);
+            Assert.Contains("using Models", updated[Path.Combine(root, "app.calr")]);
+            RenameHandlerTests.AssertWorkspaceRoslynCleanWithProductionMap(updated, compilation =>
+            {
+                Assert.NotNull(compilation.GetTypeByMetadataName("Models.Widget"));
+                Assert.Null(compilation.GetTypeByMetadataName("Domain.Widget"));
+                Assert.Equal("Models.Widget", compilation.GetTypeByMetadataName("GlobalModule")!
+                    .GetMembers("Make").OfType<IMethodSymbol>().Single().ReturnType.ToDisplayString());
+            });
 
             // The importing module is not imported anywhere, so it still renames.
             var appUri = DocumentUri.FromFileSystemPath(Path.Combine(root, "app.calr"));

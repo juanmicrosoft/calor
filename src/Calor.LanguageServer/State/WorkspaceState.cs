@@ -91,7 +91,7 @@ public sealed class WorkspaceState
         string Baseline,
         string Candidate);
     private readonly record struct WorkspaceTypeGraphKey(
-        string ModuleName,
+        string NamespaceIdentity,
         string ContainingTypePath,
         string SimpleName,
         int Arity)
@@ -1692,44 +1692,19 @@ public sealed class WorkspaceState
                 ?? Enumerable.Empty<(WorkspaceDocumentSnapshot Owner, TypeSymbol Symbol)>())
             .ToArray();
 
-        // A module, or a type declared `partial` across several files, is a single
-        // declaration in the language but many per-file symbols in this index: each
-        // file's declaration carries its own SymbolId. Occurrence sets keyed on
-        // those ids are file-local rather than workspace-complete, so edits derived
-        // from them rename one part and silently split the module or the type.
-        // Mark those declarations so RenameHandler can refuse them.
-        var moduleDeclaringDocumentCounts = documents
-            .Where(document => document.Analysis.Ast != null)
-            .GroupBy(document => document.Analysis.Ast!.Name, StringComparer.Ordinal)
-            .ToDictionary(
-                group => group.Key,
-                group => group
-                    .Select(document => document.Document.Uri.ToString())
-                    .Distinct(StringComparer.Ordinal)
-                    .Count(),
-                StringComparer.Ordinal);
-
-        // A module emits a C# namespace, so another file can import it by name.
-        // Using directives are not indexed as occurrences, so a module that is
-        // imported anywhere cannot be renamed workspace-completely either.
-        var importedNamespaces = documents
-            .Where(document => document.Analysis.Ast != null)
-            .SelectMany(document => document.Analysis.Ast!.Usings)
-            .Select(directive => directive.Namespace)
-            .ToHashSet(StringComparer.Ordinal);
-
+        // Type parts share CLR identity across file labels. Per-file occurrence
+        // sets cannot safely rename one part of that declaration.
         var declaringDocumentCounts = typeSymbols
             .Where(candidate => !candidate.Symbol.Id.IsNone
                 && candidate.Owner.Analysis.Ast != null)
-            .GroupBy(candidate => (
-                Module: candidate.Owner.Analysis.Ast!.Name,
-                Type: candidate.Symbol.Name))
+            .GroupBy(candidate => candidate.Symbol.QualifiedName, StringComparer.Ordinal)
             .ToDictionary(
                 group => group.Key,
                 group => group
                     .Select(candidate => candidate.Owner.Document.Uri.ToString())
                     .Distinct(StringComparer.Ordinal)
-                    .Count());
+                    .Count(),
+                StringComparer.Ordinal);
 
         foreach (var document in documents)
         {
@@ -1748,13 +1723,7 @@ public sealed class WorkspaceState
                 document,
                 moduleId,
                 document.Analysis.Ast.IdentifierSpan,
-                SymbolOccurrenceKind.Definition,
-                isSplitDeclaration:
-                    (moduleDeclaringDocumentCounts.TryGetValue(
-                            document.Analysis.Ast.Name,
-                            out var declaringModuleDocuments)
-                        && declaringModuleDocuments > 1)
-                    || importedNamespaces.Contains(document.Analysis.Ast.Name));
+                SymbolOccurrenceKind.Definition);
 
             foreach (var symbol in boundModule.SymbolsById.Values)
             {
@@ -1770,9 +1739,9 @@ public sealed class WorkspaceState
                         symbol.DeclarationSpan,
                         SymbolOccurrenceKind.Definition,
                         isAmbiguous: symbol.ConditionalAlternative != null,
-                        isSplitDeclaration: symbol is TypeSymbol
+                        isSplitDeclaration: symbol is TypeSymbol typeSymbol
                             && declaringDocumentCounts.TryGetValue(
-                                (document.Analysis.Ast!.Name, symbol.Name),
+                                typeSymbol.QualifiedName,
                                 out var declaringDocuments)
                             && declaringDocuments > 1);
                 }
@@ -2017,16 +1986,18 @@ public sealed class WorkspaceState
         var nodes = declarationParts
             .GroupBy(part => part.Key)
             .Select(group => CreateGraphNode(group.ToArray()))
-            .OrderBy(node => node.Key.ModuleName, StringComparer.Ordinal)
+            .OrderBy(node => node.Key.NamespaceIdentity, StringComparer.Ordinal)
             .ThenBy(node => node.Key.ContainingTypePath, StringComparer.Ordinal)
             .ThenBy(node => node.Key.SimpleName, StringComparer.Ordinal)
             .ThenBy(node => node.Key.Arity)
             .ToArray();
         var byKey = nodes.ToDictionary(
             node => node.Key);
-        var byModuleQualifiedName = nodes
+        var byNamespaceQualifiedName = nodes
             .GroupBy(node => new WorkspaceTypeLookupKey(
-                $"{node.Key.ModuleName}.{node.Key.QualifiedName}",
+                string.IsNullOrEmpty(node.Key.NamespaceIdentity)
+                    ? node.Key.QualifiedName
+                    : $"{node.Key.NamespaceIdentity}.{node.Key.QualifiedName}",
                 node.Key.Arity))
             .ToDictionary(
                 group => group.Key,
@@ -2084,7 +2055,7 @@ public sealed class WorkspaceState
                     ? reference.Name
                     : $"{containingPath}.{reference.Name}";
                 var lexical = ResolveKey(CreateGraphKey(
-                    source.Key.ModuleName,
+                    source.Key.NamespaceIdentity,
                     lexicalName,
                     reference.Arity));
                 if (lexical.Kind != WorkspaceTypeResolutionKind.NotFound)
@@ -2104,11 +2075,11 @@ public sealed class WorkspaceState
             var lookup = new WorkspaceTypeLookupKey(
                 reference.Name,
                 reference.Arity);
-            var moduleQualified = ResolveLookup(
-                byModuleQualifiedName,
+            var namespaceQualified = ResolveLookup(
+                byNamespaceQualifiedName,
                 lookup);
-            if (moduleQualified.Kind != WorkspaceTypeResolutionKind.NotFound)
-                return moduleQualified;
+            if (namespaceQualified.Kind != WorkspaceTypeResolutionKind.NotFound)
+                return namespaceQualified;
 
             var qualified = ResolveLookup(byUnqualifiedName, lookup);
             if (qualified.Kind != WorkspaceTypeResolutionKind.NotFound)
@@ -2135,7 +2106,7 @@ public sealed class WorkspaceState
             foreach (var import in source.Imports)
             {
                 var resolution = ResolveLookup(
-                    byModuleQualifiedName,
+                    byNamespaceQualifiedName,
                     new WorkspaceTypeLookupKey(
                         $"{import}.{reference.Name}",
                         reference.Arity));
@@ -2240,7 +2211,7 @@ public sealed class WorkspaceState
                     index => cycle[index].Key.DisplayName,
                     StringComparer.Ordinal)
                 .ThenBy(
-                    index => cycle[index].Key.ModuleName,
+                    index => cycle[index].Key.NamespaceIdentity,
                     StringComparer.Ordinal)
                 .First();
             var ordered = Enumerable.Range(0, cycle.Length)
@@ -2392,10 +2363,7 @@ public sealed class WorkspaceState
             {
                 var symbol = symbols.SingleOrDefault(candidate =>
                     candidate.DeclarationSpan == item.Node.IdentifierSpan
-                    && string.Equals(
-                        candidate.QualifiedName,
-                        item.QualifiedName,
-                        StringComparison.Ordinal));
+                    && candidate.Name == item.Node.Name);
                 var identity = symbol?.Id ?? SymbolId.Create(
                     "lsp-inheritance",
                     SymbolSourceIdentity.Canonicalize(
@@ -2403,14 +2371,18 @@ public sealed class WorkspaceState
                     ast.Id,
                     item.Node.Id,
                     item.QualifiedName);
-                var lastSeparator = item.QualifiedName.LastIndexOf('.');
+                var namespaceIdentity = item.Node.NamespaceIdentity ?? string.Empty;
+                var qualifiedName = symbol?.QualifiedName ?? item.QualifiedName;
+                if (symbol != null && !string.IsNullOrEmpty(namespaceIdentity))
+                    qualifiedName = qualifiedName[(namespaceIdentity.Length + 1)..];
+                var lastSeparator = qualifiedName.LastIndexOf('.');
                 var containingTypePath = lastSeparator < 0
                     ? string.Empty
-                    : item.QualifiedName[..lastSeparator];
+                    : qualifiedName[..lastSeparator];
                 yield return new WorkspaceTypeDeclarationPart(
                     identity,
                     new WorkspaceTypeGraphKey(
-                        ast.Name,
+                        namespaceIdentity,
                         containingTypePath,
                         item.Node.Name,
                         item.Node.TypeParameters.Count),
@@ -2420,13 +2392,13 @@ public sealed class WorkspaceState
         }
 
         static WorkspaceTypeGraphKey CreateGraphKey(
-            string moduleName,
+            string namespaceIdentity,
             string qualifiedName,
             int arity)
         {
             var lastSeparator = qualifiedName.LastIndexOf('.');
             return new WorkspaceTypeGraphKey(
-                moduleName,
+                namespaceIdentity,
                 lastSeparator < 0
                     ? string.Empty
                     : qualifiedName[..lastSeparator],
