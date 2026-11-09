@@ -2129,13 +2129,54 @@ codec coupling/counterfactual-exception controls. Current authoring was
 explicitly disabled for every archived candidate. This is separate partial
 evidence, not a result for the full 139-entry old/current matrix.
 
-Native acceptance remains blocked on that selected product commit: each of the
-three retained codec coupling controls fails before its required oracle.
-The faithful `bytes.Length` and `text.Length` loop conditions receive
+On that selected product commit, each of the three retained codec coupling
+controls failed before its required oracle.
+The faithful `bytes.Length` and `text.Length` loop conditions received
 `Calor0202 Cannot access field on non-record type u8[]` or `str`. They have not
 been replaced with aliases, different types, weakened controls or compile-error
-credit. Full native current and genuine-old/current matrices await the product
-repair and parent integration/replay schedule; no whole heavy matrix ran here.
+credit.
+
+Fresh immutable-source replay of the parent's `b4cec3806b98abf01d4d96afe3be9f03f9a6b386`
+Length repair validated nine of 11 focused entries in 53.084 seconds: seven
+positives and two finite rejections. The read-codec control reached its exact
+coupling oracle; the write/append codec controls instead exposed missing native
+byte metadata identity. Replay of `ac71325483c2b5c77b176232052ee04cc5268670`,
+which repairs that identity, again validated nine of 11 entries in 49.372 seconds.
+List construction, `Add` and `ToArray` no longer produce unknown effects.
+At that pin, the remaining two controls failed before their required coupling
+oracle:
+`File.WriteAllBytes(path, Encode(...))` received `Calor0411` and propagated an
+undeclared `unknown` effect (`Calor0410`). Both failures retain zero behavioral
+credit. The parent then repaired the internal byte-array return bridge in
+`e0ba25aae4e6e9a96a45d60c1db219ee1889054c`. Its unchanged focused replay
+again validated nine of 11 entries in 51.432 seconds: the two encoder controls
+failed generated C# compilation (`Calor1002`, `CS0149`), not metadata binding.
+A separate zero-credit emission probe exposed `(text[i])(-56320)` in the
+generated expression. Cast lookahead mistook the indexed expression `(text[i])`
+for a sized array type when followed by subtraction. The canonical source and
+the required coupling oracles remained unchanged. All six canonical prompt
+positives, the allocating StringBuilder equivalent and the unchanged
+direct-nullable-return rejection passed all three pins.
+Each replay used a fresh locked source build, bootstrapping verified native
+assets only after its real pristine missing-asset failure, and removed its owned
+archive afterward.
+
+The parent's cast-lookahead repair, selected source
+`bd203b2377bc546134c90370312a01bdf406ef0d`, closes these focused blockers.
+Its fresh locked source build and unchanged focused replay passed all 11 entries
+in 70.023 seconds: seven positives and four finite rejections. All three original
+read/write/append codec decoys reached their exact required coupling oracles;
+the fourth rejection is the separately identified `Calor0273` nullable-return
+API incompatibility, not coupling evidence. The six canonical prompt positives
+and allocating StringBuilder equivalent passed exact resolved selected-root and
+configuration identity checks. No alias, type, effect row, codec source,
+counterfactual, oracle, deadline or engine change was needed for these repairs.
+The build again first encountered the real pristine missing-native refusal,
+then verified bootstrapped assets against that immutable source's own manifest.
+Its owned source/helper/control directories were removed. Full native current
+and genuine-old/current matrices remain deferred to the parent integration/replay
+schedule; no whole heavy matrix ran here, and these focused results do not grant
+whole-suite or milestone acceptance.
 
 **Limits:** this is finite process supervision, not a sandbox or universal
 proof. The interposer refuses non-owned supplied paths and unmodeled external
