@@ -433,14 +433,19 @@ public sealed class Binder
         var syntax = tree.GetRoot().DescendantNodes().OfType<TypeOfExpressionSyntax>().Single().Type;
         var diagnostics = model.GetDiagnostics();
         var symbol = model.GetTypeInfo(syntax).Type;
-        if (!diagnostics.Any(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+        var ambiguous = diagnostics.Any(diagnostic => diagnostic.Id is "CS0104" or "CS0576" or "CS1537");
+        // Missing peer imports do not invalidate an independently resolved BCL type.
+        // Errors at the lookup itself and conflicting imports still veto its identity.
+        if (!ambiguous && !diagnostics.Any(diagnostic =>
+                diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error
+                && (!diagnostic.Location.IsInSource
+                    || diagnostic.Location.SourceSpan.IntersectsWith(syntax.Span)))
             && symbol is Microsoft.CodeAnalysis.INamedTypeSymbol { TypeKind: not Microsoft.CodeAnalysis.TypeKind.Error } named)
             return _scopedMetadataTypes[key] = (true, named.IsUnboundGenericType ? named.OriginalDefinition : named);
 
         var head = name.Split('.')[0].TrimStart('@');
         var alias = !name.StartsWith("global::", StringComparison.Ordinal)
             && imports.Any(import => import.Alias == head);
-        var ambiguous = diagnostics.Any(diagnostic => diagnostic.Id is "CS0104" or "CS0576" or "CS1537");
         return _scopedMetadataTypes[key] = (alias || ambiguous, null);
     }
 
@@ -5043,13 +5048,31 @@ public sealed class Binder
 
     private BoundExpression BindTypeOf(TypeOfExpressionNode typeOf)
     {
-        return Structural(
-            typeOf,
-            "TYPE",
+        var symbol = GetOrCreateMetadataBinder()?.Context.TryResolveType("System.Type");
+        BoundTypes.BoundType resultType;
+        if (symbol is not null)
+            resultType = new BoundTypes.NominalBoundType("System.Type",
+                BoundTypes.NullableAnnotation.NotAnnotated, roslynSymbol: symbol);
+        else
+        {
+            ReportAnalysisIncomplete(typeOf, "The runtime System.Type metadata could not be resolved.");
+            resultType = new BoundTypes.UnresolvedBoundType("System.Type metadata unavailable", reported: true);
+        }
+        return new BoundStructuralExpression(
+            typeOf.Span,
+            nameof(TypeOfExpressionNode),
+            "System.Type",
+            children: null,
             metadata: new Dictionary<string, object?>
             {
                 ["OperandType"] = typeOf.TypeName,
-            });
+            },
+            deferredChildren: null,
+            typeAnnotation: BoundTypes.NullableAnnotation.NotAnnotated,
+            resultType: resultType)
+        {
+            HasUnknownInferredType = symbol is null
+        };
     }
 
     private BoundExpression BindGenericType(GenericTypeNode genericType)
