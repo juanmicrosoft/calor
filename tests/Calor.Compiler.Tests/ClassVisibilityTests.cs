@@ -181,7 +181,7 @@ public class ClassVisibilityTests
         // C# → Calor
         var conversionResult = _converter.Convert(csharp);
         Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
-        Assert.Contains(":int", conversionResult.CalorSource!);
+        Assert.Contains("class Program internal", conversionResult.CalorSource!);
 
         // Calor → C#
         var compilationResult = Program.Compile(conversionResult.CalorSource!);
@@ -201,8 +201,8 @@ public class ClassVisibilityTests
     public void Parser_ClassWithVisibility_Parsed()
     {
         var calorSource = """
-            §M{Test}
-                §M{Foo:int}
+            module Test
+              module Foo internal
             """;
 
         var compilationResult = Program.Compile(
@@ -215,6 +215,7 @@ public class ClassVisibilityTests
         var cls = Assert.Single(compilationResult.Ast!.Classes);
         Assert.Equal(Visibility.Internal, cls.Visibility);
         Assert.True(cls.IsStatic);
+        Assert.True(cls.IsModule);
     }
 
     [Fact]
@@ -222,8 +223,8 @@ public class ClassVisibilityTests
     {
         // Private visibility can appear in hand-written Calor (e.g., nested class scenarios)
         var calorSource = """
-            §M{Test}
-                §CL{Inner:priv}
+            module Test
+              class Inner private
             """;
 
         var compilationResult = Program.Compile(
@@ -280,7 +281,11 @@ public class ClassVisibilityTests
         var emitter = new CalorEmitter();
         var output = emitter.Emit(module);
 
-        Assert.Contains("§CL{Program:int}", output);
+        Assert.Contains("class Program internal", output);
+        Assert.DoesNotContain("§", output);
+        var reparsed = Program.Compile(output);
+        Assert.False(reparsed.HasErrors, string.Join("\n", reparsed.Diagnostics));
+        Assert.Equal(Visibility.Internal, Assert.Single(reparsed.Ast!.Classes).Visibility);
     }
 
     #endregion
