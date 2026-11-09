@@ -40,6 +40,35 @@ public class DocDriftCheckerTests
         Assert.Empty(ExemplarCompileChecker.CheckAgentTaskReference(new DocFile(relativePath, content)));
     }
 
+    [Fact]
+    public void PublicCallsReference_CompilesPositiveAndExactNegativeExamples()
+    {
+        const string relativePath = "website/content/syntax-reference/calls.mdx";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), relativePath));
+        Assert.DoesNotContain("§", content);
+        var coverage = new WebsiteExampleChecker.Coverage();
+        var diagnostics = WebsiteExampleChecker.Check([new DocFile(relativePath, content)], coverage);
+        Assert.Empty(diagnostics);
+        Assert.Equal(3, coverage.CompletePrograms);
+        Assert.Equal(1, coverage.NegativePrograms);
+        var programs = ExemplarCompileChecker.ExtractCompletePrograms(content);
+        Assert.Equal(2, programs.Count);
+        foreach (var program in programs)
+        {
+            var compiled = Program.Compile(program.Source, relativePath);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + """
+
+                public static class Probe
+                {
+                    public static int Run() => GlobalModule.Main();
+                }
+                """);
+            Assert.Equal(program.Source.StartsWith("module CallExamples", StringComparison.Ordinal) ? "9" : "44",
+                observed);
+        }
+    }
+
     [Theory]
     [InlineData("module Good\n  func Value () → int\n    return 1\n", false)]
     [InlineData("// Header\nmodule Good\n  func Value () → int\n    return 1\n", false)]
