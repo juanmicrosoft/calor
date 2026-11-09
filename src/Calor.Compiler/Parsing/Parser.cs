@@ -1087,11 +1087,9 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Module);
         _moduleIndentColumn = LineIndentColumnAt(_position - 1);
-        var attrs = ParseDeclarationAttributes(startToken);
+        var attrs = IsCanonicalDeclaration(startToken)
+            ? ParseCanonicalModuleAttributes(startToken) : ParseDeclarationAttributes(startToken);
         ValidateIdentityFreeHeader(startToken, attrs, 2);
-        if (IsCanonicalDeclaration(startToken) && (attrs["_pos1"] != null || attrs["_pos2"] != null))
-            _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
-                "The compilation-unit module header accepts only its name and overflow policy.");
         var overflowModifier = attrs["_pos1"];
         if (overflowModifier?.StartsWith("overflow=", StringComparison.Ordinal) == true)
             attrs.Add("overflow", overflowModifier["overflow=".Length..].Trim());
@@ -1129,6 +1127,13 @@ public sealed class Parser
         var typePreprocessorBlocks = new List<TypePreprocessorBlockNode>();
         var moduleItems = new List<AstNode>();
         var namespaceScopes = new List<NamespaceScopeInfo>();
+        if (IsCanonicalDeclaration(startToken))
+        {
+            var namespaceName = attrs["namespace"] ?? "";
+            namespaceScopes.Add(new NamespaceScopeInfo(GenerateParserAutoId("ns"),
+                namespaceName, namespaceName, null, attrs["namespaceOrigin"] != "block", startToken.Span,
+                namespaceName.Length == 0 ? NamespaceScopeKind.Global : NamespaceScopeKind.Named));
+        }
         string? declaredSemanticsVersion = null;
         var sawSemVer = false;
 
@@ -1166,7 +1171,8 @@ public sealed class Parser
                     }
                 }
             }
-            else if (Check(TokenKind.Using))
+            else if (Check(TokenKind.Using)
+                || Current.Text == "global" && Peek(1).Kind == TokenKind.Using)
             {
                 var node = ParseUsingDirective();
                 usings.Add(node);
@@ -1319,7 +1325,10 @@ public sealed class Parser
                              item.NamespaceIdentity == null
                              && item.NamespaceScopeId == null))
             {
-                ApplyNamespaceMetadata(declaration, "", "");
+                var scope = namespaceScopes[0];
+                ApplyNamespaceMetadata(declaration,
+                    IsCanonicalDeclaration(startToken) ? scope.FullName : "",
+                    IsCanonicalDeclaration(startToken) ? scope.Id : "");
             }
         }
 
@@ -1332,6 +1341,41 @@ public sealed class Parser
             moduleItems,
             namespaceScopes,
             declaredSemanticsVersion), startToken);
+    }
+
+    private AttributeCollection ParseCanonicalModuleAttributes(Token start)
+    {
+        var attributes = new AttributeCollection();
+        var name = Expect(TokenKind.Identifier);
+        attributes.Add("_pos0", name.Value as string ?? name.Text, name.Span);
+        var namespaceName = "";
+        if (Current.Span.Line == start.Span.Line && Check(TokenKind.Identifier)
+            && Current.Text is not ("overflow" or "block"))
+        {
+            var namespaceStart = _position;
+            var spelling = ReadInlineTypeToken(validateCanonicalSpelling: false);
+            var syntax = SyntaxFactory.ParseName(spelling);
+            if (syntax.ContainsDiagnostics
+                || syntax.DescendantNodesAndSelf().Any(node => node is GenericNameSyntax or AliasQualifiedNameSyntax))
+                _diagnostics.ReportError(GetConsumedSpan(namespaceStart), DiagnosticCode.UnexpectedToken,
+                    "The module namespace must be a C# namespace name, with keyword segments escaped using '@'.");
+            namespaceName = spelling.Replace("@", "", StringComparison.Ordinal);
+        }
+        attributes.Add("namespace", namespaceName);
+        if (Current.Span.Line == start.Span.Line && Current.Text == "block")
+        {
+            Advance();
+            attributes.Add("namespaceOrigin", "block");
+        }
+        if (Current.Span.Line == start.Span.Line && Current.Text == "overflow")
+        {
+            Advance();
+            attributes.Add("overflow", Expect(TokenKind.Identifier).Text);
+        }
+        if (Current.Span.Line == start.Span.Line && !IsAtEnd)
+            _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                "A module header is 'module name [namespace] [block] [overflow checked|unchecked]'.");
+        return attributes;
     }
 
     private void ParseNamespaceScope(
@@ -1617,7 +1661,35 @@ public sealed class Parser
     /// </summary>
     private UsingDirectiveNode ParseUsingDirective()
     {
+        var globalPrefix = Current.Text == "global" && Peek(1).Kind == TokenKind.Using;
+        if (globalPrefix) Advance();
         var startToken = Expect(TokenKind.Using);
+        if (IsCanonicalDeclaration(startToken))
+        {
+            var isGlobalUsing = globalPrefix;
+            var isStaticUsing = Current.Span.Line == startToken.Span.Line && Current.Text == "static";
+            if (isStaticUsing) Advance();
+            string? nativeAlias = null;
+            if (Current.Span.Line == startToken.Span.Line && Check(TokenKind.Identifier)
+                && Peek(1).Kind == TokenKind.Equals)
+            {
+                var aliasToken = Advance();
+                nativeAlias = aliasToken.Value as string ?? aliasToken.Text;
+                Advance();
+            }
+            if (Current.Span.Line != startToken.Span.Line)
+            {
+                _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnexpectedToken,
+                    "A using directive requires its namespace or alias target on the same line.");
+                return new UsingDirectiveNode(startToken.Span, "", nativeAlias, isStaticUsing, isGlobalUsing);
+            }
+            var target = ReadInlineTypeToken();
+            if (target.Length == 0 || Current.Span.Line == startToken.Span.Line && !IsAtEnd)
+                _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnexpectedToken,
+                    "Use 'using Namespace', 'using static Type', or 'using Alias = Target'.");
+            return new UsingDirectiveNode(startToken.Span.Union(PreviousToken.Span),
+                target, nativeAlias, isStaticUsing, isGlobalUsing);
+        }
         var attrs = ParseAttributes();
 
         // Interpret using attributes
@@ -14852,6 +14924,10 @@ public sealed class Parser
             // For types like "i32", "f64" that might lex as identifier
             sb.Append(Advance().Text);
         }
+
+        if (sb.Length > 0 && sb[^1] == '.' && Check(TokenKind.Identifier)
+            && Current.Text.StartsWith('@') && Current.Span.Line == PreviousToken.Span.Line)
+            sb.Append(Advance().Text);
 
         // Handle alias-qualified names: global::System.Namespace.Type
         if (Check(TokenKind.Colon) && Peek(1).Kind == TokenKind.Colon)

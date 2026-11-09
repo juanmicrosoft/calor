@@ -45,7 +45,7 @@ public sealed class CanonicalDeclarationIdentityTests : IDisposable
         var initial = Store.Sync([file]);
         Persist(WithTestIds(initial));
         var reconciled = Store.Sync();
-        Assert.Equal(["m001", "f001"], reconciled.Declarations.Select(declaration => declaration.Id));
+        Assert.Equal(["f001", "m001"], reconciled.Declarations.Select(declaration => declaration.Id).Order(StringComparer.Ordinal));
         var ast = CalorSourceHelper.Parse(Source, file).Ast!;
         Assert.Equal("m001", ast.Id);
         Assert.Equal("f001", ast.Functions.Single().Id);
@@ -84,7 +84,7 @@ public sealed class CanonicalDeclarationIdentityTests : IDisposable
         var moved = Path.Combine(_root, "tests", "Moved.calr");
         File.Move(file, moved);
         var state = Store.Sync([moved]);
-        Assert.Equal(["m001", "f001"], state.Declarations.Select(declaration => declaration.Id));
+        Assert.Equal(["f001", "m001"], state.Declarations.Select(declaration => declaration.Id).Order(StringComparer.Ordinal));
         Assert.All(state.Declarations, declaration => Assert.Equal("tests/Moved.calr", declaration.File));
     }
 

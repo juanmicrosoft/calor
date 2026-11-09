@@ -661,9 +661,14 @@ public sealed class CSharpToCalorConverter
             if (namespaceFeature != null)
                 context.RecordFeatureUsage(namespaceFeature);
 
-            if (_options.Fidelity == ConversionFidelity.Lossless
-                && RequiresWholeFileNamespaceInterop(root))
+            if (RequiresWholeFileNamespaceInterop(root))
             {
+                if (!context.PreservesCSharp)
+                {
+                    context.AddError("Native module headers cannot flatten this namespace or using topology.",
+                        feature: "namespace-topology");
+                    return new ConversionResult { Success = false, Context = context, Duration = DateTime.UtcNow - startTime };
+                }
                 return ConvertWholeFileNamespaceInterop(
                     csharpSource,
                     context,
@@ -1295,6 +1300,8 @@ public sealed class CSharpToCalorConverter
             .OfType<BaseNamespaceDeclarationSyntax>()
             .ToList();
         if (namespaceDeclarations.Count > 1)
+            return true;
+        if (namespaceDeclarations.Any(declaration => declaration.Usings.Count > 0))
             return true;
 
         return namespaceDeclarations.Count == 1

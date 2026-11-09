@@ -334,8 +334,21 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Context != null) Visit(node.Context);
         // Module header — sanitize backtick (C# generic arity) and @ from name
         var moduleName = node.Name.Replace("`", "").Replace("@", "");
-        var overflow = node.Attributes["overflow"] is { } mode ? $" overflow={mode}" : "";
-        AppendLine($"module {EscapeCalorIdentifier(moduleName)}{overflow}");
+        if (node.NamespaceScopes.Count > 1 || node.NamespaceScopes.Any(scope => scope.ParentScopeId != null))
+            throw new InvalidOperationException("Native modules support one namespace per file; preserve other topologies as whole-file C#.");
+        var namespaceScope = node.NamespaceScopes.SingleOrDefault();
+        var declarationNamespaces = EnumerateModuleDeclarations(node)
+            .Select(declaration => declaration.NamespaceIdentity).Where(name => name != null)
+            .Distinct(StringComparer.Ordinal).ToArray();
+        var namespaceName = namespaceScope?.FullName
+            ?? node.NamespaceIdentity ?? declarationNamespaces.FirstOrDefault() ?? "";
+        if (declarationNamespaces.Any(name => name != namespaceName)
+            || node.Usings.Any(directive => directive.NamespaceScopeId != null))
+            throw new InvalidOperationException("Native module headers cannot flatten distinct namespace or using scopes; preserve the original C#.");
+        var namespaceHeader = namespaceName.Length == 0 ? "" : " " + EscapeNamespaceName(namespaceName);
+        var origin = namespaceScope is { IsGlobal: false, IsFileScoped: false } ? " block" : "";
+        var overflow = node.Attributes["overflow"] is { } mode ? $" overflow {mode}" : "";
+        AppendLine($"module {EscapeCalorIdentifier(moduleName)}{namespaceHeader}{origin}{overflow}");
         Indent();
 
         if (node.DeclaredSemanticsVersion != null)
@@ -345,14 +358,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         foreach (var assumption in node.Assumptions) Visit(assumption);
         foreach (var invariant in node.Invariants) Visit(invariant);
 
-        if (HasExplicitNamespaceTopology(node))
-        {
-            EmitScopedModuleBody(node);
-        }
-        else
-        {
-            EmitModuleItems(node, scopeId: null, includeUsings: true);
-        }
+        EmitModuleItems(node, scopeId: null, includeUsings: true);
 
         Dedent();
         EmitBlockEnd($"§/M");
@@ -774,23 +780,25 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(UsingDirectiveNode node)
     {
-        var globalPrefix = node.IsGlobal ? "global:" : "";
+        var globalPrefix = node.IsGlobal ? "global " : "";
         if (node.IsStatic)
         {
-            AppendLine($"§U{{{globalPrefix}static:{node.Namespace}}}");
+            AppendLine($"{globalPrefix}using static {node.Namespace}");
         }
         else if (node.Alias != null)
         {
-            AppendLine($"§U{{{globalPrefix}{node.Alias}:{node.Namespace}}}");
+            AppendLine($"{globalPrefix}using {EscapeCalorIdentifier(node.Alias)} = {node.Namespace}");
         }
         else
         {
-            AppendLine(node.IsGlobal
-                ? $"§U{{global:{node.Namespace}}}"
-                : $"§U{{{node.Namespace}}}");
+            AppendLine($"{globalPrefix}using {node.Namespace}");
         }
         return "";
     }
+
+    private static string EscapeNamespaceName(string name) =>
+        string.Join(".", name.Split('.').Select(segment => segment is "overflow" or "block"
+            ? "@" + segment : EscapeCalorIdentifier(segment.TrimStart('@'))));
 
     public string Visit(InterfaceDefinitionNode node)
     {
