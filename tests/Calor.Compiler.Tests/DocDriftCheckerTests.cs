@@ -571,6 +571,62 @@ public class DocDriftCheckerTests
     }
 
     [Fact]
+    public void PublicTokenEconomics_ExecutesNativeProgramsAndExactOriginalConsoleExamples()
+    {
+        var path = "website/content/benchmarking/metrics/token-economics.mdx";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)).Replace("\r\n", "\n");
+        var coverage = new WebsiteExampleChecker.Coverage();
+        var diagnostics = WebsiteExampleChecker.Check([new DocFile(path, content)], coverage);
+        Assert.Empty(diagnostics);
+        Assert.Equal(3, coverage.CompletePrograms);
+        Assert.Equal(0, coverage.NegativePrograms);
+        var programs = ExemplarCompileChecker.ExtractCompletePrograms(content);
+        Assert.Equal(new[] { "module TokenHello\n", "module TokenFizzBuzz\n", "module TokenContracts\n" },
+            programs.Select(program => program.Source[..(program.Source.IndexOf('\n') + 1)]));
+        var compiled = programs.Select(program => Program.Compile(program.Source, path,
+            new CompilationOptions { ContractMode = ContractMode.Debug })).ToArray();
+        Assert.All(compiled, result => Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics)));
+        var csharp = System.Text.RegularExpressions.Regex.Matches(content,
+            @"```csharp\n(?<body>.*?)\n```", System.Text.RegularExpressions.RegexOptions.Singleline);
+        var originalHello = Observe(csharp[1].Groups["body"].Value,
+            "typeof(Program).GetMethod(\"Main\", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!.Invoke(null, null)");
+        var originalFizzBuzz = Observe("public static class Original { public static void Run() {\n"
+            + csharp[2].Groups["body"].Value + "\n} }", "Original.Run()");
+        Assert.Equal("Hello World\n", originalHello);
+        Assert.Equal(originalHello, Observe(compiled[0].GeneratedCode, "GlobalModule.Main()"));
+        Assert.Equal(100, originalFizzBuzz.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length);
+        Assert.Equal(originalFizzBuzz, Observe(compiled[1].GeneratedCode, "GlobalModule.Main()"));
+        Assert.Equal("3", InteropScope.RefOutImplementationTests.Run(compiled[2].GeneratedCode + """
+
+            public static class Probe
+            {
+                public static object? Run() => GlobalModule.Divide(6, 2);
+            }
+            """));
+
+        static string Observe(string source, string operation) =>
+            InteropScope.RefOutImplementationTests.Run("global using System;\n" + source + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run()
+                    {
+                        var previous = Console.Out;
+                        using var writer = new System.IO.StringWriter(System.Globalization.CultureInfo.InvariantCulture);
+                        writer.NewLine = "\n";
+                        try
+                        {
+                            Console.SetOut(writer);
+                            {{operation}};
+                            return writer.ToString();
+                        }
+                        finally { Console.SetOut(previous); }
+                    }
+                }
+                """);
+    }
+
+    [Fact]
     public void PublicInheritanceInterfaceCall_CompilesOriginalSourceWithoutPolicyOrRowChanges()
     {
         const string source = """
