@@ -875,9 +875,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (parameters.Any(p => p.CSharpAttributes.Count > 0))
             return null;
 
-        return string.Join(", ", parameters.Select(p =>
+        return string.Join(", ", parameters.Select((p, index) =>
         {
             var typeName = TypeMapper.ToSurfaceType(p.TypeName);
+            if (index > 0 && parameters[index - 1].Row != null
+                && EffectCodes.IsKnownCompactCode($"{typeName}:{p.Name}"))
+                typeName = "@" + typeName;
             var modifiers = new List<string>();
             if (p.Modifier.HasFlag(ParameterModifier.This)) modifiers.Add("this");
             if (p.Modifier.HasFlag(ParameterModifier.Ref)) modifiers.Add("ref");
@@ -4559,7 +4562,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         IReadOnlyList<EffectParameterInfo> effectParameters)
     {
         var rendered = FormatTypeParameterList(typeParameters, effectParameters);
-        return effectParameters.Count > 0 ? ("", rendered) : (rendered, "");
+        return effectParameters.Count > 0 ? ("", " " + rendered) : (rendered, "");
     }
 
     /// <summary>
@@ -4578,7 +4581,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         foreach (var binder in effectParameters)
         {
             if (binder.Ordinal >= 0 && binder.Ordinal < slots.Length && slots[binder.Ordinal] is null)
-                slots[binder.Ordinal] = $"eff {binder.Name}";
+                slots[binder.Ordinal] = $"! {EscapeCalorIdentifier(binder.Name)}";
         }
 
         var next = 0;

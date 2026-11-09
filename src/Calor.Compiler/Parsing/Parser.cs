@@ -2243,6 +2243,9 @@ public sealed class Parser
                     code += ":" + (Check(TokenKind.Identifier) || Current.IsKeyword
                         ? Advance().Text : Expect(TokenKind.Identifier).Text);
                 attrs.Add($"_pos{index++}", code, effect.Span);
+                if (position == EffectRowPosition.Parameter && Check(TokenKind.Comma)
+                    && NativeRowCommaStartsParameter())
+                    break;
                 if (!Match(TokenKind.Comma)) break;
             }
         }
@@ -2284,6 +2287,34 @@ public sealed class Parser
             ordinals.Add(ResolveEffectVariable(variable));
 
         return new EffectsNode(startToken.Span, effects, variables, ordinals);
+    }
+
+    private bool NativeRowCommaStartsParameter()
+    {
+        var type = new System.Text.StringBuilder();
+        var depth = 0;
+        for (var offset = 1; Peek(offset).Kind != TokenKind.Eof; offset++)
+        {
+            var token = Peek(offset);
+            if (token.Span.Line != Current.Span.Line) break;
+            if (depth == 0 && token.Kind is TokenKind.Comma or TokenKind.CloseParen)
+                break;
+            if (depth == 0 && token.Kind == TokenKind.Colon)
+            {
+                if (Peek(offset + 1).Kind == TokenKind.Colon)
+                {
+                    type.Append("::");
+                    offset++;
+                    continue;
+                }
+                return !EffectCodes.IsKnownCompactCode($"{type}:{Peek(offset + 1).Text}");
+            }
+            if (token.Kind is TokenKind.Less or TokenKind.OpenBracket or TokenKind.OpenParen) depth++;
+            else if (token.Kind is TokenKind.Greater or TokenKind.CloseBracket or TokenKind.CloseParen) depth--;
+            else if (token.Kind == TokenKind.GreaterGreater) depth -= 2;
+            type.Append(token.Text);
+        }
+        return false;
     }
 
     /// <summary>
@@ -8946,17 +8977,9 @@ public sealed class Parser
 
         do
         {
-            // §7.2(a): `eff e` binds an effect variable. Matched with a ONE-TOKEN
-            // lookahead so a type parameter literally named `eff` keeps working —
-            // Z4 (`§F{f001:M:pub}<eff> (eff:x) -> void`) compiles today and must
-            // keep compiling. `in`/`out` above are matched with no lookahead at all;
-            // this branch deliberately does not copy that.
-            if (Check(TokenKind.Identifier)
-                && Current.Text == "eff"
-                && Peek(1).Kind == TokenKind.Identifier)
+            if (Match(TokenKind.Exclamation))
             {
-                Advance(); // consume `eff`
-                var effNameToken = Advance();
+                var effNameToken = Expect(TokenKind.Identifier);
                 RecordEffectBinder(effNameToken, effectParameters, typeParams.Count, effectOwner ?? owner);
                 continue;
             }
@@ -9007,7 +9030,7 @@ public sealed class Parser
         int typeParameterCount,
         string owner)
     {
-        var name = nameToken.Text;
+        var name = nameToken.Value as string ?? nameToken.Text;
 
         if (effectParameters is null)
         {
