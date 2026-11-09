@@ -7585,10 +7585,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var eventName = SanitizeIdentifier(node.Name);
         var delegateType = MapTypeName(node.DelegateType);
+        var staticModifier = node.IsStatic ? " static" : "";
 
         if (node.HasAccessors)
         {
-            AppendLine($"{visibility} event {delegateType} {eventName}");
+            AppendLine($"{visibility}{staticModifier} event {delegateType} {eventName}");
             AppendLine("{");
             Indent();
 
@@ -7625,7 +7626,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         else
         {
-            AppendLine($"{visibility} event {delegateType} {eventName};");
+            AppendLine($"{visibility}{staticModifier} event {delegateType} {eventName};");
         }
 
         return "";

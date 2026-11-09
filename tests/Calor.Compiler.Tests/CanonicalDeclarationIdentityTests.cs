@@ -39,6 +39,34 @@ public sealed class CanonicalDeclarationIdentityTests : IDisposable
         };
 
     [Fact]
+    public void EnumsDelegatesAndEventsKeepIdentityAcrossEmissionAndMove()
+    {
+        const string source = """
+            module Native
+              enum Mode byte
+                @event = 7
+              delegate Handler (int:value) → void
+              class Source
+                event Handler:Changed
+            """;
+        var file = Write("src/Events.calr", source);
+        var initial = Store.Sync([file]);
+        Assert.Single(initial.Declarations.Where(declaration => declaration.Kind == IdKind.Enum));
+        Assert.Single(initial.Declarations.Where(declaration => declaration.Kind == IdKind.Delegate));
+        Assert.Single(initial.Declarations.Where(declaration => declaration.Kind == IdKind.Event));
+        var parsed = CalorSourceHelper.Parse(source, file).Ast!;
+        File.WriteAllText(file, new Calor.Compiler.Migration.CalorEmitter().Emit(parsed));
+        Assert.Equal(initial.Declarations.Select(declaration => declaration.Id).Order(StringComparer.Ordinal),
+            Store.Sync().Declarations.Select(declaration => declaration.Id).Order(StringComparer.Ordinal));
+        var moved = Path.Combine(_root, "src", "Moved.calr");
+        File.Move(file, moved);
+        var reconciled = Store.Sync([moved]);
+        Assert.Equal(initial.Declarations.Select(declaration => declaration.Id).Order(StringComparer.Ordinal),
+            reconciled.Declarations.Select(declaration => declaration.Id).Order(StringComparer.Ordinal));
+        Assert.All(reconciled.Declarations, declaration => Assert.Equal("src/Moved.calr", declaration.File));
+    }
+
+    [Fact]
     public void OperatorsIndexersAndConditionalMembersKeepIdentityAcrossEmissionAndMove()
     {
         const string source = """

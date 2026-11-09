@@ -3928,11 +3928,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         EmitDocComment(node);
         // Format: §EN{Name:vis} or §EN{Name:vis:underlyingType}
-        var vis = GetVisibilityShorthand(node.Visibility);
+        var vis = node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
         var header = node.UnderlyingType != null
-            ? $"§EN{{{node.Name}:{vis}:{TypeMapper.ToSurfaceType(node.UnderlyingType)}}}{attrs}"
-            : $"§EN{{{node.Name}:{vis}}}{attrs}";
+            ? $"enum {EscapeCalorIdentifier(node.Name)}{vis} {TypeMapper.ToSurfaceType(node.UnderlyingType)}{attrs}"
+            : $"enum {EscapeCalorIdentifier(node.Name)}{vis}{attrs}";
         AppendLine(header);
         Indent();
 
@@ -3975,8 +3975,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
             }
         }
         var line = value != null
-            ? $"{node.Name} = {value}"
-            : node.Name;
+            ? $"{EscapeCalorIdentifier(node.Name)} = {value}"
+            : EscapeCalorIdentifier(node.Name);
         AppendLine(line);
         return "";
     }
@@ -4070,17 +4070,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(DelegateDefinitionNode node)
     {
         EmitDocComment(node);
-        AppendLine($"§DEL{{{node.Name}}}");
+        var parameters = TryFormatInlineParams(node.Parameters)
+            ?? throw new InvalidOperationException("Native delegates require inline parameters.");
+        var output = node.Output == null ? "" : $" → {TypeMapper.ToSurfaceType(node.Output.TypeName)}{FormatEffectRow(node.Output.Row)}";
+        AppendLine($"delegate {EscapeCalorIdentifier(node.Name)} ({parameters}){output}");
         Indent();
-
-        foreach (var param in node.Parameters)
-        {
-            AppendLine(Visit(param));
-        }
-        if (node.Output != null)
-        {
-            AppendLine(Visit(node.Output));
-        }
         if (node.Effects != null)
         {
             // Was `string.Join(",", node.Effects.Effects)`, which stringifies
@@ -4097,17 +4091,19 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(EventDefinitionNode node)
     {
         EmitDocComment(node);
-        var visibility = GetVisibilityShorthand(node.Visibility);
+        var visibility = node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
+        var modifiers = node.IsStatic ? " static" : "";
         var delegateType = TypeMapper.ToSurfaceType(node.DelegateType);
 
         if (node.HasAccessors)
         {
-            AppendLine($"§EVT{{{node.Name}:{visibility}:{delegateType}}}");
+            AppendLine($"event {delegateType}:{EscapeCalorIdentifier(node.Name)}{visibility}{modifiers}");
             Indent();
+            _memberBodyDepth++;
 
             if (node.AddBody != null)
             {
-                AppendLine("§EADD");
+                AppendLine("add");
                 Indent();
                 foreach (var stmt in node.AddBody)
                 {
@@ -4119,7 +4115,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
             if (node.RemoveBody != null)
             {
-                AppendLine("§EREM");
+                AppendLine("remove");
                 Indent();
                 foreach (var stmt in node.RemoveBody)
                 {
@@ -4129,12 +4125,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 EmitBlockEnd("§/EREM");
             }
 
+            _memberBodyDepth--;
             Dedent();
             EmitBlockEnd($"§/EVT");
         }
         else
         {
-            AppendLine($"§EVT{{{node.Name}:{visibility}:{delegateType}}}");
+            AppendLine($"event {delegateType}:{EscapeCalorIdentifier(node.Name)}{visibility}{modifiers}");
         }
 
         return "";
@@ -4374,8 +4371,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return visibility switch
         {
             Visibility.Public => "public",
-            Visibility.ProtectedInternal => "protected-internal",
-            Visibility.PrivateProtected => "private-protected",
+            Visibility.ProtectedInternal => "protected internal",
+            Visibility.PrivateProtected => "private protected",
             Visibility.Protected => "protected",
             Visibility.Internal => "internal",
             Visibility.Private => "private",

@@ -6752,6 +6752,10 @@ public sealed class Parser
         {
             var token = Advance();
             var word = token.Text;
+            if (Current.Span.Line == start.Span.Line
+                && ((word == "protected" && Current.Text == "internal")
+                    || (word == "private" && Current.Text == "protected")))
+                word += "-" + Advance().Text;
             if (TryParseVisibilityWord(word, out _))
                 attributes.Add("_pos1", word, token.Span);
             else if (word == "overflow" && Match(TokenKind.Equals))
@@ -13411,7 +13415,7 @@ public sealed class Parser
     private DelegateDefinitionNode ParseDelegateDefinition()
     {
         var startToken = Expect(TokenKind.Delegate);
-        var attrs = ParseAttributes();
+        var attrs = ParseDeclarationAttributes(startToken);
         ValidateIdentityFreeHeader(startToken, attrs, 1);
 
         // Positional: [id:name]
@@ -13426,6 +13430,28 @@ public sealed class Parser
         var parameters = new List<ParameterNode>();
         OutputNode? output = null;
         EffectsNode? effects = null;
+        if (IsCanonicalDeclaration(startToken))
+        {
+            if (attrs["_pos2"] != null
+                || attrs["_pos1"] is { } visibility && ParseVisibility(visibility, startToken.Span) != Visibility.Public)
+                _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
+                    "Native delegates currently support public, non-generic declarations only.");
+            TryParseInlineSignature(startToken.Span, parameters, ref output);
+            var owner = BeginBlockBody(startToken, TokenKind.EndDelegate, id);
+            while (!IsAtEnd && IsInBlockBody(owner) && !Check(TokenKind.Dedent))
+            {
+                if (Check(TokenKind.Effects))
+                    effects = ParseEffects(EffectRowPosition.Delegate);
+                else
+                {
+                    _diagnostics.ReportUnexpectedToken(Current.Span, "a delegate effect row", Current.Kind);
+                    Advance();
+                }
+            }
+            var end = ExpectOwnedBlockEnd(TokenKind.EndDelegate, owner);
+            return WithDocumentation(new DelegateDefinitionNode(startToken.Span.Union(end.Span),
+                id, name, parameters, output, effects, attrs, GetIdentifierSpan(attrs, "_pos0", name)), startToken);
+        }
 
         // Parse parameters, output, and effects until END_DEL
         while (!IsAtEnd && !IsBlockEnd(TokenKind.EndDelegate))
@@ -13472,6 +13498,8 @@ public sealed class Parser
     private EventDefinitionNode ParseEventDefinition()
     {
         var startToken = Expect(TokenKind.Event);
+        if (IsCanonicalDeclaration(startToken))
+            return ParseCanonicalEvent(startToken);
         var attrs = ParseAttributes();
         ValidateIdentityFreeHeader(startToken, attrs, 3);
 
@@ -13549,10 +13577,52 @@ public sealed class Parser
             attrs.GetSpan(delegateTypeKey)), startToken);
     }
 
+    private EventDefinitionNode ParseCanonicalEvent(Token start)
+    {
+        var attrs = ParseTypedDeclarationAttributes(start, typeFirst: false);
+        var modifiers = attrs["_pos3"]?.Split(',') ?? [];
+        if (modifiers.Any(modifier => modifier != "static"))
+            _diagnostics.ReportError(start.Span, DiagnosticCode.InvalidModifier,
+                "Only the static modifier is represented by this event declaration.");
+        var name = attrs["_pos0"] ?? "";
+        var type = attrs["_pos1"] ?? "";
+        var visibility = ParseVisibility(attrs["_pos2"], start.Span);
+        var owner = BeginBlockBody(start, TokenKind.EndEvent, null);
+        List<StatementNode>? addBody = null;
+        List<StatementNode>? removeBody = null;
+        while (!IsAtEnd && !Check(TokenKind.Dedent) && IsInBlockBody(owner))
+        {
+            if (Current.Text == "add")
+            {
+                if (addBody != null)
+                    _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken, "Duplicate event add accessor.");
+                addBody = ParseEventAccessorBody(TokenKind.EventAdd, TokenKind.EndEventAdd);
+            }
+            else if (Current.Text == "remove")
+            {
+                if (removeBody != null)
+                    _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken, "Duplicate event remove accessor.");
+                removeBody = ParseEventAccessorBody(TokenKind.EventRemove, TokenKind.EndEventRemove);
+            }
+            else
+            {
+                _diagnostics.ReportUnexpectedToken(Current.Span, "'add' or 'remove'", Current.Kind);
+                Advance();
+            }
+        }
+        if ((addBody == null) != (removeBody == null))
+            _diagnostics.ReportError(start.Span, DiagnosticCode.UnexpectedToken,
+                "An explicit event requires both add and remove accessors.");
+        var end = ExpectOwnedBlockEnd(TokenKind.EndEvent, owner);
+        return WithDocumentation(new EventDefinitionNode(start.Span.Union(end.Span),
+            GenerateParserAutoId("ev"), name, visibility, type, attrs, addBody, removeBody,
+            attrs.GetSpan("_pos1"), isStatic: _parsingModuleMembers || modifiers.Contains("static")), start);
+    }
+
     private List<StatementNode> ParseEventAccessorBody(TokenKind startKind, TokenKind endKind)
     {
         var startToken = Advance(); // consume §EADD or §EREM
-        ParseAttributes(); // consume any attributes
+        if (!IsCanonicalDeclaration(startToken)) ParseAttributes();
 
         var body = new List<StatementNode>();
 
@@ -14153,7 +14223,7 @@ public sealed class Parser
     private EnumDefinitionNode ParseEnumDefinition()
     {
         var startToken = Expect(TokenKind.Enum);
-        var attrs = ParseAttributes();
+        var attrs = ParseDeclarationAttributes(startToken);
         ValidateIdentityFreeHeader(startToken, attrs, 3);
         var csharpAttrs = ParseCSharpAttributes();
 
@@ -14218,7 +14288,8 @@ public sealed class Parser
             if (Check(TokenKind.Identifier) || Current.IsKeyword)
             {
                 var memberStartToken = Current;
-                var memberName = Advance().Text;
+                var memberNameToken = Advance();
+                var memberName = memberNameToken.Value as string ?? memberNameToken.Text;
                 string? memberValue = null;
 
                 // Check for = value

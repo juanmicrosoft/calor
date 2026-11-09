@@ -126,6 +126,7 @@ public sealed class EventDefinitionNode : AstNode
     public Visibility Visibility { get; }
     public string DelegateType { get; }
     public TextSpan DelegateTypeSpan { get; }
+    public bool IsStatic { get; }
     public AttributeCollection Attributes { get; }
 
     /// <summary>Optional body for the add accessor.</summary>
@@ -144,7 +145,8 @@ public sealed class EventDefinitionNode : AstNode
         Visibility visibility,
         string delegateType,
         AttributeCollection attributes,
-        TextSpan? delegateTypeSpan = null)
+        TextSpan? delegateTypeSpan = null,
+        bool isStatic = false)
         : this(
             span,
             id,
@@ -154,7 +156,8 @@ public sealed class EventDefinitionNode : AstNode
             attributes,
             null,
             null,
-            delegateTypeSpan)
+            delegateTypeSpan,
+            isStatic)
     {
     }
 
@@ -167,7 +170,8 @@ public sealed class EventDefinitionNode : AstNode
         AttributeCollection attributes,
         IReadOnlyList<StatementNode>? addBody,
         IReadOnlyList<StatementNode>? removeBody,
-        TextSpan? delegateTypeSpan = null)
+        TextSpan? delegateTypeSpan = null,
+        bool isStatic = false)
         : base(span)
     {
         LocalId = id ?? throw new ArgumentNullException(nameof(id));
@@ -175,6 +179,7 @@ public sealed class EventDefinitionNode : AstNode
         Visibility = visibility;
         DelegateType = delegateType ?? throw new ArgumentNullException(nameof(delegateType));
         DelegateTypeSpan = delegateTypeSpan ?? TextSpan.Empty;
+        IsStatic = isStatic;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         AddBody = addBody;
         RemoveBody = removeBody;
