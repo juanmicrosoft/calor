@@ -6,7 +6,7 @@ description: "How Calor verifies that effect declarations stay consistent across
 ---
 
 
-In a single-file project, Calor's effect system checks that every function's `§E{...}` declaration covers the effects of the calls it makes. In a **multi-file project**, that check has to cross file boundaries: if `b.calr` calls a public function defined in `a.calr`, `b.calr` must declare the effects that `a.calr`'s function declared.
+In a single-file project, Calor's effect system checks that every function's `!` row covers the effects of the calls it makes. In a **multi-file project**, that check has to cross file boundaries: if `b.calr` calls a public function defined in `a.calr`, `b.calr` must declare the effects that `a.calr`'s function declared.
 
 This guide explains how Calor enforces that boundary — and what it means for your project layout, your MSBuild integration, and your build performance.
 
@@ -19,39 +19,35 @@ Suppose you split your code across two files:
 **`OrderService.calr`**
 
 ```calor group=orders,orders-using
-§M{OrderService}
+module OrderService OrderService
 
-  §F{SaveOrder:pub}
-    §O{void}
-    §E{db:w}
+  func SaveOrder () → void
+    ! db:w
     // A real implementation writes the order to a database here.
-
 ```
 
 **`Handler.calr`**
 
 ```calor group=orders expect=Calor0410,Calor0417
-§M{Handler}
+module Handler
 
-  §F{HandleRequest:pub}
-    §O{void}
-    §C{SaveOrder} §/C
-
+  func HandleRequest () → void
+    SaveOrder()
 ```
 
 `HandleRequest` calls `SaveOrder` — a function defined in another module — but declares no effects. `SaveOrder` has effect `db:w`, so `HandleRequest` must also declare `db:w`.
 
-Without cross-module enforcement, `HandleRequest` silently gets a free pass because the bare-name call `§C{SaveOrder}` is invisible to the per-file effect pass (it can't see another file's declarations). The effect system is only useful if it works across files.
+The per-file effect pass cannot see another file's declarations for the bare-name call `SaveOrder()`. The cross-module pass supplies that boundary check; a single-file result is not proof of the complete project's effect safety.
 
 ## What Calor Does
 
-Starting in v0.4.9, Calor runs a **cross-module effect enforcement pass** after per-file compilation. It verifies that each caller's `§E{...}` covers the declared effects of any cross-module Calor functions it calls.
+Starting in v0.4.9, Calor runs a **cross-module effect enforcement pass** after per-file compilation. It verifies that each caller's `!` row covers the declared effects of any cross-module Calor functions it calls.
 
 For the example above, `calor --input OrderService.calr --input Handler.calr` reports:
 
 ```text output
 warning Calor0417: Public function 'HandleRequest' in module 'Handler' has no effect
-declaration. Cross-module callers cannot verify effect safety. Add §E{...} to
+declaration. Cross-module callers cannot verify effect safety. Add an indented ! row to
 declare effects.
 error Calor0410: Function 'HandleRequest' uses effect 'db:w' via cross-module call
 to 'SaveOrder' (in module 'OrderService') but does not declare it.
@@ -63,15 +59,14 @@ under "Undeclared public functions" below.
 Fix by adding the effect to the caller:
 
 ```calor
-§F{HandleRequest:pub}
-  §O{void}
-  §E{db:w}                    ← now declared
-  §C{SaveOrder} §/C
+func HandleRequest () → void
+  ! db:w                       // now declared
+  SaveOrder()
 ```
 
 ### The contract model: declared effects propagate, not inferred ones
 
-The cross-module pass uses each function's **declared** effects (what appears in `§E{...}`), not the effects the per-file pass inferred from its body. This matters because:
+The cross-module pass uses each function's **declared** effects (what appears in its `!` row), not the effects the per-file pass inferred from its body. This matters because:
 
 - **Declarations are contracts.** Callers rely on them. If you change a function's body but not its declaration, no cross-module caller needs to be re-checked.
 - **Declarations are stable across compilation order.** A→B→C and C→B→A produce identical enforcement results.
@@ -80,10 +75,10 @@ The cross-module pass uses each function's **declared** effects (what appears in
 ### One hop per boundary
 
 If A calls B, and B calls C, the cross-module pass checks **each boundary independently**:
-- A's `§E{...}` must cover B's declared effects.
-- B's `§E{...}` must cover C's declared effects.
+- A's `!` row must cover B's declared effects.
+- B's `!` row must cover C's declared effects.
 
-It does **not** transitively require A to cover C's effects directly. Each module's `§E` is its contract — if B declares `db:w`, A only needs to declare `db:w` too, regardless of whether that `db:w` came from B's body or from B's own call to C.
+It does **not** transitively require A to cover C's effects directly. Each function's `!` row is its contract — if B declares `db:w`, A only needs to declare `db:w` too, regardless of whether that `db:w` came from B's body or from B's own call to C.
 
 ### Violations are errors, unless you waive them
 
@@ -102,31 +97,31 @@ and `Calor0421` stay errors under every flag. See
 
 ## Bare-name vs. qualified calls
 
-Both forms resolve correctly:
+The intended lookup forms are:
 
 ```calor
-§C{SaveOrder}                   ← bare name — resolved if unambiguous across modules
-§C{OrderService.SaveOrder}      ← module-qualified — always resolves
-§C{OrderRepo.Save}              ← class-qualified — resolves to a class method
+SaveOrder()                     // bare name, when unambiguous across modules
+OrderService.SaveOrder()        // module-qualified
+OrderRepo.Save()                // class-qualified
 ```
 
-**Ambiguous bare names:** If two modules both export a function named `Emit`, a bare `§C{Emit}` call is **not** resolved — the pass skips it because it can't determine which module was meant. Use a qualified name instead.
+**Ambiguous bare names:** If two modules both export a function named `Emit`, the effect pass cannot attribute a bare `Emit()` call to one module. That is not evidence that the whole compilation succeeds. Use a qualified name instead.
 
-**Internal calls win:** If your module defines a function `Save` and you call `§C{Save}`, it resolves to your internal function — never to another module's `Save`. If you want to call the other module's version, qualify it: `§C{OtherModule.Save}`.
+**Internal calls win:** If your module defines a function `Save` and you call `Save()`, it resolves to your internal function — never to another module's `Save`. If you want to call the other module's version, qualify it: `OtherModule.Save()`.
 
 ---
 
 ## Undeclared public functions: Calor0417
 
-If a public or internal function lacks `§E{...}` entirely, cross-module callers have nothing to verify against. Rather than silently assuming the function is pure, the compiler emits a **warning**:
+If a public or internal function lacks an `!` row entirely, cross-module callers have nothing to verify against. Rather than silently assuming the function is pure, the compiler emits a **warning**:
 
 ```text illustrative
 Calor0417: Public function 'SaveOrder' in module 'OrderService' has no effect
-declaration. Cross-module callers cannot verify effect safety. Add §E{...} to
+declaration. Cross-module callers cannot verify effect safety. Add an indented ! row to
 declare effects.
 ```
 
-The function is excluded from the cross-module registry, so callers get no cross-module check for it — and no false positives. Add an `§E` declaration (even `§E{}` for a provably pure function) to enable the check.
+The function is excluded from the cross-module registry, so callers get no cross-module check for it. Add an `!` row (even bare `!` for a provably pure function) to enable the check.
 
 ---
 
@@ -134,7 +129,7 @@ The function is excluded from the cross-module registry, so callers get no cross
 
 On warm builds, the cross-module pass runs using a mix of **fresh summaries** (from files that just recompiled) and **cached summaries** (from files that the incremental cache skipped). This means:
 
-- If you edit a callee's `§E{...}` and its file recompiles, the pass still sees every unchanged caller's call sites (because they're cached) and can still flag new violations.
+- If you edit a callee's `!` row and its file recompiles, the pass still sees every unchanged caller's call sites (because they're cached) and can still flag new violations.
 - If no file changed, both summaries come from the cache; the pass runs quickly and produces the same result as a cold build.
 - The cache stores each module's: public function effect declarations, internal function/method names, and per-caller call-target listings with diagnostic spans.
 
@@ -168,43 +163,46 @@ MSBuild projects using `Calor.Sdk` get cross-module enforcement automatically �
 
 The cross-module effect pass works at the AST level, so it's independent of the generated C#. But the **generated C#** still has to compile — which means your call target must resolve as a C# symbol too.
 
-Two patterns work:
+The original examples use two patterns. The using-directive pattern below
+compiles and runs. The native module-qualified example currently exposes a
+compiler regression: its target is treated as an unknown external call rather
+than the declared module function. It remains shown unchanged, not replaced by
+a bare call or granted an `unknown` effect.
 
 ### 1. Using directive + bare name
 
 ```calor group=orders-using
-§M{Handler}
-  §U{OrderService}                // adds `using OrderService;` to generated C#
+module Handler
+  using OrderService              // adds `using OrderService;` to generated C#
 
-  §F{HandleRequest:pub}
-    §O{void}
-    §E{db:w}
-    §C{SaveOrder} §/C             // resolves via the using directive
-
+  func HandleRequest () → void
+    ! db:w
+    SaveOrder()                   // resolves via the using directive
 ```
 
 ### 2. Module-qualified call
 
 ```calor
-§F{HandleRequest:pub}
-  §O{void}
-  §E{db:w}
-  §C{OrderService.SaveOrder} §/C
+func HandleRequest () → void
+  ! db:w
+  OrderService.SaveOrder()
 ```
 
-The cross-module effect pass handles both forms identically. Pick whichever reads better for your project.
+Both forms must preserve the same declared effect boundary. The native
+module-qualified regression must be repaired before the second pattern is a
+working alternative; a successful bare-call control does not validate it.
 
 ---
 
 ## Troubleshooting
 
 **"Calor0410 appears on a warm build, but I didn't change the caller."**
-Someone else (or an earlier session) edited the callee's `§E{...}`. The cached summary for the caller still refers to the old call target, and the fresh summary for the callee now declares effects the caller doesn't cover. Fix the caller's `§E{...}` to include the new effects — or revert the callee.
+Someone else (or an earlier session) edited the callee's `!` row. The cached summary for the caller still refers to the old call target, and the fresh summary for the callee now declares effects the caller doesn't cover. Fix the caller's `!` row to include the new effects — or revert the callee.
 
 **"Cross-module pass isn't catching a call I expect it to."**
 Check three things:
-1. The callee is `pub` or `int` (private functions aren't exported).
-2. The callee has a `§E{...}` declaration. Without one, it's excluded and a Calor0417 warning is emitted.
+1. The callee is public or internal (private functions aren't exported).
+2. The callee has an `!` row. Without one, it's excluded and a Calor0417 warning is emitted.
 3. The bare name isn't ambiguous across modules — if two modules define the same public function name, use a qualified call.
 
 **"Cache seems stale after upgrading the compiler."**

@@ -8,22 +8,21 @@ description: "Nullable references, receiving-boundary diagnostics, and explicit 
 Calor rejects possibly-null values at specified initialization, return and
 method-input boundaries. This is not whole-program null safety.
 
-**Version scope:** this guide describes Calor 0.22's bounded receiving-boundary
-checks. Stage A established scalar string checks; Stage B adds
+**Version scope:** the receiving-boundary checks were introduced in Calor 0.22;
+the examples below use current native syntax. Stage A established scalar string checks; Stage B added
 the bounded shapes below. See [Stage A evidence (#1386)](https://github.com/juanmicrosoft/calor/issues/1386)
 and [Stage B activation (#1402)](https://github.com/juanmicrosoft/calor/issues/1402).
 
 ## Types: native .NET nullability
 
-`str` and `string` name the same .NET string type. `?str`, `?string`, `str?`,
-and `string?` mark a nullable string reference. `?System.String` is also
-supported. For a resolved reference type such as `Widget`, `?Widget` permits
-null without wrapping the object. Nullable value types, such as `?i32`, map
-to .NET nullable values (`int?`).
+Use `string` or `System.String` for a .NET string and `string?` or
+`System.String?` for a nullable string reference. For a resolved reference type
+such as `Widget`, `Widget?` permits null without wrapping the object.
+Nullable value types use .NET syntax too, such as `int?`.
 
-A nullable reference uses `null` and ordinary reference values. Use `(?? value
-fallback)` to choose a default, or preserve the nullable annotation through the
-API. Failure uses native exceptions (`§TH`, `§TR`, `§CA`), not a second
+A nullable reference uses `null` and ordinary reference values. Use `value ??
+fallback` to choose a default, or preserve the nullable annotation through the
+API. Failure uses native exceptions (`throw`, `try`, `catch`), not a second
 success/error representation.
 
 ## Supported receiving boundaries
@@ -34,12 +33,12 @@ not general conversions between arbitrary types.
 
 | Shape | Calor 0.22 status | Boundary covered |
 |:------|:-----------------|:-----------------|
-| Scalar STRING (`str`, `string`) | Active since Stage A | Initialization, native return, resolved method input |
-| Arrays | Active in Stage B | `?[str]` is a nullable container; `[?str]` has possibly-null STRING elements. Neither satisfies `[str]` at these boundaries; jagged arrays retain separate container/element information |
-| One-level string payloads | Active in Stage B | Matching definitions of `List`, `IList`, `IEnumerable`, `IReadOnlyList`, `ICollection`, `IReadOnlyCollection`; for example `List<?str>` cannot satisfy `List<str>` |
-| Nominal reference types | Active in Stage B when identity is established | `?Widget` cannot satisfy `Widget` when both share a resolved underlying reference identity; this is not a name-based guess that every unknown type is a reference |
+| Scalar STRING (`string`) | Active since Stage A | Initialization, native return, resolved method input |
+| Arrays | Active in Stage B | `string[]?` is a nullable container; `string?[]` has possibly-null STRING elements. Neither satisfies `string[]` at these boundaries; jagged arrays retain separate container/element information |
+| One-level string payloads | Active in Stage B | Matching definitions of `List`, `IList`, `IEnumerable`, `IReadOnlyList`, `ICollection`, `IReadOnlyCollection`; for example `List<string?>` cannot satisfy `List<string>` |
+| Nominal reference types | Active in Stage B when identity is established | `Widget?` cannot satisfy `Widget` when both share a resolved underlying reference identity; this is not a name-based guess that every unknown type is a reference |
 | Other generic payloads, nested generics, unknown nominal identities | Outside the active guarantee | Analysis may retain type information; no promise of Calor0272–0274 coverage |
-| Mutable assignment/rebinding and constructor inputs | Excluded | Initializing a mutable local is checked; later writes and `§NEW` arguments are not covered by this receiving-boundary guarantee |
+| Mutable assignment/rebinding and constructor inputs | Excluded | Initializing a mutable local is checked; later writes and `new` arguments are not covered by this receiving-boundary guarantee |
 
 Unsupported nullability shapes may still fail ordinary type checking. Absence
 of one of these three diagnostics is not evidence that a value is non-null.
@@ -62,66 +61,66 @@ are intentionally invalid. Their corrected controls use an explicit default.
 
 ### Calor0272: initialization
 
-**Rejected:** `input` on line 4, column 22.
+**Rejected:** `input` on line 4, column 27.
 
 ```calor expect=Calor0272
-§M{InitRejected}
-  §F{Copy:pub} (?str:input) -> void
-    §E{}
-    §B{required:str} input
+module InitRejected
+  func Copy (string?:input) → void
+    !
+    let string:required = input
 ```
 
 **Corrected:** choose a meaningful default for missing input.
 
 ```calor
-§M{InitSafe}
-  §F{Copy:pub} (?str:input) -> void
-    §E{}
-    §B{required:str} (?? input "anonymous")
+module InitSafe
+  func Copy (string?:input) → void
+    !
+    let string:required = input ?? "anonymous"
 ```
 
 ### Calor0273: return
 
-**Rejected:** `input` on line 4, column 8.
+**Rejected:** `input` on line 4, column 12.
 
 ```calor expect=Calor0273
-§M{ReturnRejected}
-  §F{Name:pub} (?str:input) -> str
-    §E{}
-    §R input
+module ReturnRejected
+  func Name (string?:input) → string
+    !
+    return input
 ```
 
 **Corrected:** return a non-null fallback.
 
 ```calor
-§M{ReturnSafe}
-  §F{Name:pub} (?str:input) -> str
-    §E{}
-    §R (?? input "anonymous")
+module ReturnSafe
+  func Name (string?:input) → string
+    !
+    return input ?? "anonymous"
 ```
 
 ### Calor0274: method input
 
-**Rejected:** `input` on line 6, column 17.
+**Rejected:** `input` on line 6, column 10.
 
 ```calor expect=Calor0274
-§M{ArgumentRejected}
-  §F{Take:pub} (str:value) -> void
-    §E{}
-  §F{Send:pub} (?str:input) -> void
-    §E{}
-    §C{Take} §A input §/C
+module ArgumentRejected
+  func Take (string:value) → void
+    !
+  func Send (string?:input) → void
+    !
+    Take(input)
 ```
 
 **Corrected:** default before crossing the boundary.
 
 ```calor
-§M{ArgumentSafe}
-  §F{Take:pub} (str:value) -> void
-    §E{}
-  §F{Send:pub} (?str:input) -> void
-    §E{}
-    §C{Take} §A (?? input "anonymous") §/C
+module ArgumentSafe
+  func Take (string:value) → void
+    !
+  func Send (string?:input) → void
+    !
+    Take(input ?? "anonymous")
 ```
 
 Statement calls and expression calls use the same argument check. Discarding
@@ -129,13 +128,13 @@ the result does not waive it. Named arguments are matched to the named
 parameter, not to their source position:
 
 ```calor
-§M{NamedSafe}
-  §F{Choose:pub} (str:required, ?str:optional) -> str
-    §E{}
-    §R required
-  §F{Send:pub} (?str:input) -> str
-    §E{}
-    §R §C{Choose} §A[optional] input §A[required] "ready" §/C
+module NamedSafe
+  func Choose (string:required, string?:optional) → string
+    !
+    return required
+  func Send (string?:input) → string
+    !
+    return Choose(optional: input, required: "ready")
 ```
 
 For an otherwise applicable native overload, a nullable argument now yields
@@ -150,21 +149,21 @@ A default changes behavior when the input is missing. If absence is an error,
 throw instead. Declare the allocation and throw effects:
 
 ```calor
-§M{ThrowSafe}
-  §F{Require:pub} (?str:input) -> str
-    §E{alloc,throw}
-    §R (?? input §TH §NEW{ArgumentNullException})
+module ThrowSafe
+  func Require (string?:input) → string
+    ! alloc,throw
+    return input ?? throw new ArgumentNullException()
 ```
 
 A typed pattern binds a new non-null value in its matching arm:
 
 ```calor
-§M{PatternSafe}
-  §F{Name:pub} (?str:input) -> str
-    §E{}
-    §R §W input
-      §K §PTYPE{str:text} → text
-      §K _ → "anonymous"
+module PatternSafe
+  func Name (string?:input) → string
+    !
+    return match input
+      case string text → text
+      case _ → "anonymous"
 ```
 
 These are explicit consumption constructs, not whole-program flow analysis.
@@ -199,15 +198,15 @@ For example, an environment variable may be absent. Preserve that possibility
 or choose an application-specific default:
 
 ```calor
-§M{EnvironmentSafe}
-  §F{Name:pub} () -> str
-    §E{env}
-    §B{input} §C{System.Environment.GetEnvironmentVariable} §A "CALOR_NAME" §/C
-    §R (?? input "anonymous")
+module EnvironmentSafe
+  func Name () → string
+    ! env
+    let input = System.Environment.GetEnvironmentVariable("CALOR_NAME")
+    return input ?? "anonymous"
 ```
 
 An inferred local retains supported nullability information from its
-initializer; omitting `:str` does not make a nullable result non-null.
+initializer; omitting the explicit `string` type does not make a nullable result non-null.
 Constructor expressions can establish a non-null result without checking
 their inputs. That distinction matters when migrating object creation.
 
@@ -221,7 +220,7 @@ Missing information is not an instruction to add `?` to every declaration.
 
 Migration should follow the API's meaning: preserve a nullable result if
 absence is legitimate, provide a meaningful default, reject absence explicitly,
-or correct inaccurate upstream annotations. Changing a destination to `?str`
+or correct inaccurate upstream annotations. Changing a destination to `string?`
 only moves the obligation to its consumers. A working manual default/throw
 example does not establish behavior-preserving automatic conversion or
 automatic guard insertion.
@@ -255,7 +254,8 @@ a failed invocation is not evidence that an older output file was deleted.
 `NullabilityDocumentationTests` reads these MDX examples and checks the
 production `Program.Compile` result, severity, span, and generated output,
 including type-off, effect-off, transpile-only, and verification modes. This dedicated
-test is not general MDX support in `calor self-check docs` ([#1143](https://github.com/juanmicrosoft/calor/issues/1143)).
+test complements the MDX example checks in `calor self-check docs`
+([#1143](https://github.com/juanmicrosoft/calor/issues/1143)).
 
 This is a bounded regression set, not a corpus measurement or universal proof.
 Revision-specific command results belong with the source review evidence;

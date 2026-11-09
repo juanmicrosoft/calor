@@ -20,10 +20,8 @@ In traditional languages, you must read the entire implementation to know if a f
 Calor requires explicit effect declarations:
 
 ```calor
-§F{SaveUser:pub}
-  §I{User:user}
-  §O{bool}
-  §E{db:rw,net:rw}        // Declares: database and network operations
+func SaveUser (User:user) → bool
+  ! db:rw,net:rw           // Declares: database and network operations
   // ...
 ```
 
@@ -34,19 +32,18 @@ Now an agent knows immediately what side effects to expect.
 ## Effect Syntax
 
 ```calor
-§E{code1,code2,...}
-§E{}                      // No effects (pure function)
+! cw,fs:w                 // Console write and filesystem write
+!                         // No effects (pure function)
 ```
 
-Place the effect declaration after the output type:
+Place the effect declaration on its own indented line after the signature.
+This is a template, not a complete function:
 
 ```calor
-§F{name:vis}
-  §I{...}
-  §O{...}
-  §E{effects}             // Here
-  §Q ...
-  §S ...
+func Name (Type:parameter) → ReturnType
+  ! effects               // Here
+  requires condition
+  => condition
   // body
 ```
 
@@ -57,71 +54,70 @@ Place the effect declaration after the output type:
 When a function accepts another function — a callback, handler, predicate, or
 transform — an effect row says what that callback is allowed to do.
 
-**The line matters.** A `§E{...}` on its **own line** is the containing
-function's effect declaration. A `§E{...}` on the **same line** as a function
+**The line matters.** An `!` row on its **own line** is the containing
+function's effect declaration. An `!` row on the **same line** as a function
 type belongs to that callback, binding, field, property, or return value.
 
 ```calor
-§M{Callbacks}
-  §F{Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
-    §E{cw}
-    §R §C{transform} §A value §/C
+module Callbacks
+  func Apply (Func<int,int>:transform ! cw, int:value) → int
+    ! cw
+    return transform(value)
 ```
 
-The `§E{cw}` beside `transform` belongs to the callback type. The `§E{cw}` on
+The `! cw` beside `transform` belongs to the callback type. The `! cw` on
 its own line belongs to `Apply`. Calling `transform` charges its `cw` effect to
 `Apply`, so both rows are required here.
 
-Rows are part of the type. `Func<i32,i32> §E{}` and
-`Func<i32,i32> §E{cw}` have the same inputs and output, but different effect
+Rows are part of the type. `Func<int,int> !` and
+`Func<int,int> ! cw` have the same inputs and output, but different effect
 permissions.
 
 ### Where a row can appear
 
 ```calor
-§M{Rows}
-  §F{Use:pub} (Func<i32,i32>:callback §E{cw}, i32:value) -> Func<i32,i32> §E{cw}
-    §E{cw}
-    §B{saved:Func<i32,i32>} §E{cw} callback
-    §B{local} §LAM{x:i32} §E{cw}
-      §P x
-      §R x
-    §/LAM
-    §R callback
+module Rows
+  func Use (Func<int,int>:callback ! cw, int:value) → Func<int,int> ! cw
+    ! cw
+    let Func<int,int>:saved ! cw = callback
+    let local = (int:x) ! cw =>
+      Console.WriteLine(x)
+      return x
+    return callback
 
-  §DEL{Handler}
-    §I{i32:value}
-    §O{void}
-    §E{cw}
+  delegate Handler (int:value) → void
+    ! cw
 
-  §CL{Callbacks:pub}
-    §FLD{Action<i32>:onChange:priv} §E{cw}
-    §PROP{Current:Action<i32>:pub:get,set} §E{cw}
+  class Callbacks
+    field Action<int>:onChange private ! cw
+    property Action<int>:Current ! cw
+      get
+      set
 ```
 
 Rows are supported on:
 
 - function and method declarations,
 - lambdas and delegates,
-- parameters in tag or inline signature form,
-- return types in tag or arrow form,
+- parameters in inline signatures,
+- return types after `→`,
 - bindings, fields, and properties.
 
 A type carries one row. Put multiple permissions in that row
-(`§E{cw,fs:w}`), rather than writing multiple `§E` tags.
+(`! cw,fs:w`), rather than writing multiple `!` rows.
 
 ### Effect placeholders
 
 A higher-order helper often needs to have exactly the effects of the callback
-passed to it. Declare an effect placeholder with `<eff name>` and use it in the
+passed to it. Declare an effect placeholder with `<! e>` and use it in the
 callback and function rows:
 
 ```calor
-§M{HigherOrder}
-  §F{Twice:pub}<eff e> (Func<i32,i32>:callback §E{e}, i32:value) -> i32
-    §E{e}
-    §B{first:i32} §C{callback} §A value §/C
-    §R §C{callback} §A first §/C
+module HigherOrder
+  func Twice<! e> (Func<int,int>:callback ! e, int:value) → int
+    ! e
+    let int:first = callback(value)
+    return callback(first)
 ```
 
 `Twice` is pure when `callback` is pure and carries `cw` when the callback may
@@ -156,9 +152,14 @@ compiler infers one from the body when it can.
 the wrong line, or duplicates another row:
 
 ```calor
-§FLD{i32:count:priv}
-§E{cw} // Wrong: count is not a function value, and this is a separate line.
+field int:count private
+! cw // Wrong: count is not a function value, and this is a separate line.
 ```
+
+The native parser currently reports `Calor0100` instead of the original
+`Calor0405` for this separate-line field example. That diagnostic regression
+remains to be repaired; this is not a valid field declaration or an accepted
+replacement diagnostic.
 
 `Calor0404` means an effect placeholder is declared or used somewhere it is
 not allowed, or is named after a real effect code.
@@ -199,73 +200,59 @@ boundary.
 ### Pure Function (No Effects)
 
 ```calor
-§F{Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  // No §E declares this function pure; an effectful body would be an error.
-  §R (+ a b)
+func Add (int:a, int:b) → int
+  // No ! row declares this function pure; an effectful body would be an error.
+  return a + b
 ```
 
 Or explicitly:
 
 ```calor
-§F{Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §E{}                    // Explicitly no effects
-  §R (+ a b)
+func Add (int:a, int:b) → int
+  !                       // Explicitly no effects
+  return a + b
 ```
 
 ### Console Output
 
 ```calor
-§F{Greet:pub}
-  §I{str:name}
-  §O{void}
-  §E{cw}                  // Console write
-  §P name
+func Greet (string:name) → void
+  ! cw                    // Console write
+  Console.WriteLine(name)
 ```
 
 ### File Operations
 
 ```calor
-§F{CopyFile:pub}
-  §I{str:source}
-  §I{str:dest}
-  §O{bool}
-  §E{fs:rw}               // Filesystem read and write
+func CopyFile (string:source, string:dest) → bool
+  ! fs:rw                 // Filesystem read and write
   // ...
 ```
 
 ### Network Call
 
+The historical public `FetchData` fragment took a string parameter named `url`
+and returned the retired `str!str` result carrier. There is no approved replacement signature for that
+example here. This fragment preserves only its network effect row; it does not
+claim that the original return type is currently authorable:
+
 ```calor
-§F{FetchData:pub}
-  §I{str:url}
-  §O{str!str}
-  §E{net:rw}              // Network operations
-  // ...
+! net:rw                  // Network operations
 ```
 
 ### Database with Logging
 
 ```calor
-§F{CreateUser:pub}
-  §I{User:user}
-  §O{i32}
-  §E{db:rw,cw}            // Database and console (for logging)
+func CreateUser (User:user) → int
+  ! db:rw,cw              // Database and console (for logging)
   // ...
 ```
 
 ### Multiple Effects
 
 ```calor
-§F{ProcessOrder:pub}
-  §I{Order:order}
-  §O{bool}
-  §E{db:rw,net:rw,fs:w,cw} // Database, network, filesystem write, console write
+func ProcessOrder (Order:order) → bool
+  ! db:rw,net:rw,fs:w,cw   // Database, network, filesystem write, console write
   // ...
 ```
 
@@ -277,31 +264,29 @@ Or explicitly:
 
 ```calor
 // Read-only file operation
-§F{LoadConfig:pub}
-  §I{str:path}
-  §O{Config}
-  §E{fs:r}                // Only filesystem read
+func LoadConfig (string:path) → Config
+  ! fs:r                  // Only filesystem read
   // ...
 
 // Read-write file operation
-§F{UpdateConfig:pub}
-  §I{str:path}
-  §I{Config:config}
-  §O{void}
-  §E{fs:rw}               // Filesystem read and write
+func UpdateConfig (string:path, Config:config) → void
+  ! fs:rw                 // Filesystem read and write
   // ...
 ```
 
 ### Interactive Console
 
 ```calor
-§F{Prompt:pub}
-  §I{str:question}
-  §O{str}
-  §E{cw,cr}               // Console write and read
-  §P question
-  §R §C{Console.ReadLine} §/C
+func Prompt (string:question) → string
+  ! cw,cr                 // Console write and read
+  Console.WriteLine(question)
+  return Console.ReadLine()
 ```
+
+This fragment retains the original non-null return signature. `ReadLine()` can
+return null at end of input, so completing it as written reports `Calor0273`.
+Choose the API's null-handling policy before using it as a complete program;
+the effect row alone does not establish a non-null result.
 
 ---
 
@@ -311,16 +296,15 @@ Or explicitly:
 
 "Find all functions that access the database":
 ```
-// Agent searches for §E{..db..}
+// Agent queries for functions whose effect rows include db:r, db:w or db:rw.
 ```
 
 ### 2. Refactoring Safety
 
 "This function should be pure, but it has effects":
 ```calor
-§F{Calculate:pub}
-  §O{i32}
-  §E{cw}                  // Wait, why is Calculate logging?
+func Calculate () → int
+  ! cw                    // Wait, why is Calculate logging?
 ```
 
 ### 3. Testing Strategy
@@ -335,12 +319,12 @@ Or explicitly:
 
 ```calor
 // If f1 calls f2, f1's effects must include f2's effects
-§F{ProcessAndSave:pub}
-  §E{db:rw,cw}            // Must include f002's effects
-  §C{f002:Process} ... §/C
+func ProcessAndSave () → void
+  ! db:rw,cw              // Must include Process's effects
+  Process()
 
-§F{Process:priv}
-  §E{cw}                  // Has console write effect
+func Process private () → void
+  ! cw                    // Has console write effect
   // ...
 ```
 
@@ -360,20 +344,20 @@ Collection mutators such as `Add`, `Remove`, `Clear`, `Insert`, `Sort`, and
 
 | Code | Level | What it means |
 |:-----|:------|:--------------|
-| `Calor0410` | Error | A function does something its `§E{…}` line does not list. The message often shows the chain of calls that got there. |
+| `Calor0410` | Error | A function does something its `!` row does not list. The message often shows the chain of calls that got there. |
 | `Calor0411` | Warning | The compiler cannot look up what an outside call does. Add the method to a `.calor-effects.json` manifest. `--strict-effects` makes it an error. |
-| `Calor0417` | Warning | A public function has no `§E{…}` at all, so callers in other files have nothing to check against. Raised by the cross-module pass, so it only appears when you compile more than one file together. |
+| `Calor0417` | Warning | A public function has no `!` row at all, so callers in other files have nothing to check against. Raised by the cross-module pass, so it only appears when you compile more than one file together. |
 | `Calor0419` | Warning | The effects are assumed rather than checked — the body holds raw C# interop, or something the compiler does not recognise, or a call to a function whose own effects are assumed. `--strict-effects` makes it an error. |
 | `Calor0420` | Error | An override declares **more** effects than the method it overrides. Declaring fewer is fine. |
 | `Calor0421` | Error | An interface implementation declares **more** effects than the interface method. Declaring fewer is fine. |
 | `Calor0424` | Error | A callback's effects do not fit where it is being bound, passed, or returned. |
-| `Calor0425` | Warning | The compiler cannot decide whether a callback fits, because one side carries no `§E{…}`. `--strict-effects` makes it an error. |
-| `Calor0418` | Error | You invoked something that is provably not a function — an `i32`, a string, an array — so there is no effect list to charge. |
+| `Calor0425` | Warning | The compiler cannot decide whether a callback fits, because one side carries no `!` row. `--strict-effects` makes it an error. |
+| `Calor0418` | Error | You invoked something that is provably not a function — an `int`, a string, an array — so there is no effect list to charge. |
 | `Calor0406` | Error | Effect checking stopped before it finished. New in 0.16; see below. |
 
 Calling a function value — a callback parameter, a lambda you bound to a name,
 a callback field — is not an error. Since 0.15 the compiler reads the
-callback's own `§E{…}` and charges it to whoever calls it. `Calor0418` is left
+callback's own `!` row and charges it to whoever calls it. `Calor0418` is left
 for the one case where the thing being invoked is not a function at all.
 
 ### When Effect Checking Gives Up: Calor0406
@@ -426,7 +410,7 @@ What it never waives — these stay errors under every flag:
   declares **more** effects than the member it inherits from. Declaring fewer
   is always allowed.
 - `Calor0418` and `Calor0406`.
-- Three narrower forms of `Calor0410`: the one about a lambda's own `§E{…}`
+- Three narrower forms of `Calor0410`: the one about a lambda's own `!`
   line, and two about effect variables.
 
 Waiving "we cannot tell" is honest; waiving "we know this is wrong" is not.
