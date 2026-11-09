@@ -140,7 +140,7 @@ public sealed class SourceHealer
         public string Content = "";
         /// <summary>Original text (used when <see cref="Verbatim"/>).</summary>
         public string Original = "";
-        /// <summary>Leading §-tag letters (e.g. "IF", "EI", "/C"), or null.</summary>
+        /// <summary>Leading canonical structural word, or null.</summary>
         public string? Tag;
         /// <summary>Raw indent of the next non-blank structural line, or -1.</summary>
         public int NextStructuralIndent = -1;
@@ -154,10 +154,10 @@ public sealed class SourceHealer
     /// <summary>
     /// Upper bound on how many lines a bracket continuation may span. A
     /// single unbalanced <c>{</c>/<c>(</c> (the canonical agent typo:
-    /// <c>§F{f1:Main:pub ( ) -> void</c> with the header brace never closed)
+    /// <c>func Main ( → void</c> with the signature parenthesis never closed)
     /// would otherwise mark every following line as continuation and make
     /// heal a silent no-op on the whole file. Genuine multi-line bracketed
-    /// expressions are short; long C# payloads belong in §RAW/§CSHARP blocks.
+    /// expressions are short; exact raw payloads are shielded before classification.
     /// </summary>
     private const int MaxBracketContinuationLines = 10;
 
@@ -175,7 +175,7 @@ public sealed class SourceHealer
 
             if (bracketDepth > 0)
             {
-                // A continuation may not cross a line that starts a §-tag,
+                // A continuation may not cross a canonical structural-word head,
                 // and may not exceed MaxBracketContinuationLines: past either
                 // bound the open bracket is assumed to be an authoring typo
                 // (never closed), and the line is treated as structural again.
@@ -183,8 +183,7 @@ public sealed class SourceHealer
                 if (!startsStructuralTag && continuationRun < MaxBracketContinuationLines)
                 {
                     // Continuation of a multi-line bracketed expression: the
-                    // parser ignores its indentation, and its content may be a
-                    // §CS{…} C# payload — pass through untouched (except CR).
+                    // parser ignores its indentation — pass through untouched (except CR).
                     info.Verbatim = true;
                     info.Original = line.TrimEnd('\r');
                     bracketDepth = Math.Max(0, bracketDepth + BracketDelta(line));
@@ -294,7 +293,7 @@ public sealed class SourceHealer
                 // Chain clause: align with its opener's column, popping any
                 // blocks opened inside the preceding clause body. When the
                 // clause was written DEEPER than its opener (the classic
-                // body-level §EI mistake), re-anchor the block just below
+                // body-level else mistake), re-anchor the block just below
                 // the clause's written indent so the clause body — written
                 // at the clause's own level — still nests inside the block.
                 stack.RemoveRange(openerIndex + 1, stack.Count - openerIndex - 1);
@@ -352,7 +351,7 @@ public sealed class SourceHealer
     }
 
     /// <summary>
-    /// Finds the chain-clause opener (e.g. the <c>§IF</c> an <c>§EI</c>
+    /// Finds the chain-clause opener (e.g. the <c>if</c> an <c>else</c>
     /// belongs to): the stack entry with the matching tag whose written
     /// indent is closest to the clause's written indent; ties prefer the
     /// innermost candidate.

@@ -344,8 +344,8 @@ public class LexerTests
     }
 
     [Theory]
-    [InlineData("§M{Bad}\n  §F{Main:pub} () -> void\n    §INVALID_TAG\n", DiagnosticCode.UnknownSectionMarker)]
-    [InlineData("§M{Bad}\n  §F{Main:pub} () -> void\n    §E{cw}\n    §P \"unfinished\n", DiagnosticCode.UnterminatedString)]
+    [InlineData("module Bad\n  func Main () → void\n    §INVALID_TAG\n", DiagnosticCode.UnknownSectionMarker)]
+    [InlineData("module Bad\n  func Main () → void\n    ! cw\n    System.Console.WriteLine(\"unfinished\n", DiagnosticCode.UnterminatedString)]
     public void LexicalErrors_RemainFatalWithoutGenericParserCascades(string source, string code)
     {
         var result = Program.Compile(source, "lexical-error.calr",
@@ -360,10 +360,16 @@ public class LexerTests
     [Fact]
     public void IdentityParsing_StillRejectsParserErrorsAfterSuccessfulLexing()
     {
-        const string source = "§M{Bad}\n  §F{Main:pub} () -> void\n    §R §/C\n";
+        DeclarationIdentityStore.Describe("valid-parser-boundary.calr",
+            "module Good\n  func Main () → int\n    return 1\n");
+        const string source = "module Bad\n  func Main () → void\n    return f(,)\n";
+        var lexicalDiagnostics = new DiagnosticBag();
+        new Lexer(source, lexicalDiagnostics).TokenizeAllForParser();
+        Assert.False(lexicalDiagnostics.HasErrors);
         var exception = Assert.Throws<DeclarationIdentityParseException>(() =>
             DeclarationIdentityStore.Describe("parser-error.calr", source));
-        Assert.Contains(exception.Diagnostics.Errors, error => error.Code == DiagnosticCode.UnexpectedToken);
+        Assert.Contains(exception.Diagnostics.Errors, error =>
+            error.Code == DiagnosticCode.UnexpectedToken && error.Span.Line == 3);
     }
 
     [Theory]
@@ -377,12 +383,15 @@ public class LexerTests
     [InlineData("ulong:42", "ULONG:")]
     [InlineData("dec:1.5", "DEC:")]
     [InlineData("decimal:1.5", "DECIMAL:")]
-    public void Tokenize_LiteralPrefixCaseVariant_ReportsExactSpelling(string source, string canonical)
+    public void Tokenize_LiteralPrefixCaseVariant_ReportsRetirement(string source, string formerCanonical)
     {
         var tokens = Tokenize(source, out var diagnostics);
         Assert.Equal(TokenKind.Error, tokens[0].Kind);
         Assert.Contains(diagnostics.Errors, diagnostic =>
-            diagnostic.Code == DiagnosticCode.InvalidTypedLiteral && diagnostic.Message.Contains(canonical));
+            diagnostic.Code == DiagnosticCode.InvalidTypedLiteral
+            && diagnostic.Message.Contains(source[..(source.IndexOf(':') + 1)])
+            && diagnostic.Message.Contains("removed"));
+        Assert.DoesNotContain(diagnostics.Errors, diagnostic => diagnostic.Message.Contains($"Use '{formerCanonical}'"));
     }
 
     [Theory]
@@ -398,28 +407,29 @@ public class LexerTests
     }
 
     [Theory]
-    [InlineData("T", "§CL")]
-    [InlineData("/T", "§CL")]
-    [InlineData("V", "§EN")]
-    [InlineData("DEFAULT", "'_'")]
-    [InlineData("ASYNC", "§AF")]
-    [InlineData("VR", "'vr'")]
-    [InlineData("OV", "'ov'")]
-    [InlineData("AB", "'abs'")]
-    [InlineData("SD", "'seal'")]
-    [InlineData("XP", "///")]
-    [InlineData("SB", "///")]
-    [InlineData("BODY", "indentation")]
-    [InlineData("END_BODY", "indentation")]
-    [InlineData("TP", "<T>")]
-    [InlineData("G", "List<i32>")]
-    public void Tokenize_RemovedKeyword_ReportsReplacement(string marker, string replacement)
+    [InlineData("T")]
+    [InlineData("/T")]
+    [InlineData("V")]
+    [InlineData("DEFAULT")]
+    [InlineData("ASYNC")]
+    [InlineData("VR")]
+    [InlineData("OV")]
+    [InlineData("AB")]
+    [InlineData("SD")]
+    [InlineData("XP")]
+    [InlineData("SB")]
+    [InlineData("BODY")]
+    [InlineData("END_BODY")]
+    [InlineData("TP")]
+    [InlineData("G")]
+    public void Tokenize_RemovedKeyword_DiagnosesWithoutConsumingNextNativeWord(string marker)
     {
-        var tokens = Tokenize($"§{marker} §M", out var diagnostics);
+        var tokens = Tokenize($"§{marker} module", out var diagnostics);
 
         Assert.Equal(TokenKind.Error, tokens[0].Kind);
         Assert.Equal(TokenKind.Module, tokens[1].Kind);
-        Assert.Contains(replacement, Assert.Single(diagnostics.Errors).Message);
+        Assert.Contains($"'{tokens[0].Text}' is removed", Assert.Single(diagnostics.Errors).Message);
+        Assert.Empty(diagnostics.DiagnosticsWithFixes);
         Assert.DoesNotContain(marker, Lexer.KeywordNames);
         Assert.DoesNotContain(marker, SectionMarkerSuggestions.AllMarkers);
     }
@@ -442,9 +452,9 @@ public class LexerTests
     }
 
     [Fact]
-    public void Tokenize_SectionMarker_ReturnsCorrectToken()
+    public void Tokenize_ModuleWord_ReturnsCorrectToken()
     {
-        var tokens = Tokenize("§M", out var diagnostics);
+        var tokens = Tokenize("module", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(2, tokens.Count); // M + EOF
@@ -457,35 +467,25 @@ public class LexerTests
     [InlineData("WR", "WHERE")]
     [InlineData("ADD", "PUSH")]
     [InlineData("when", "WHEN")]
-    public void Tokenize_RemovedAlias_ReportsCanonicalMarkerAndFix(string alias, string canonical)
+    public void Tokenize_RemovedAlias_DoesNotOfferSuccessShapedKeywordOnlyMigration(string alias, string formerCanonical)
     {
         var source = $"§{alias}{{value}}";
         var tokens = Tokenize(source, out var diagnostics);
 
         Assert.Equal(TokenKind.Error, tokens[0].Kind);
-        Assert.DoesNotContain(alias, Lexer.KeywordNames);
-        Assert.DoesNotContain(alias, SectionMarkerSuggestions.AllMarkers);
+        Assert.DoesNotContain("§" + alias, Lexer.KeywordNames);
+        Assert.DoesNotContain("§" + alias, SectionMarkerSuggestions.AllMarkers);
         var diagnostic = Assert.Single(diagnostics.Errors);
         Assert.Equal(DiagnosticCode.UnknownSectionMarker, diagnostic.Code);
-        Assert.Contains($"'§{canonical}'", diagnostic.Message);
-
-        var fix = Assert.Single(diagnostics.DiagnosticsWithFixes);
-        var edit = Assert.Single(fix.Fix.Edits);
-        Assert.Equal(1, edit.StartLine);
-        Assert.Equal(1, edit.StartColumn);
-        Assert.Equal(1, edit.EndLine);
-        Assert.Equal(alias.Length + 2, edit.EndColumn);
-        Assert.Equal($"§{canonical}", edit.NewText);
-        var corrected = edit.NewText + source[(edit.EndColumn - 1)..];
-        var correctedTokens = Tokenize(corrected, out var correctedDiagnostics);
-        Assert.False(correctedDiagnostics.HasErrors);
-        Assert.NotEqual(TokenKind.Error, correctedTokens[0].Kind);
+        Assert.Contains("removed", diagnostic.Message);
+        Assert.DoesNotContain($"'§{formerCanonical}'", diagnostic.Message);
+        Assert.Empty(diagnostics.DiagnosticsWithFixes);
     }
 
     [Theory]
     [InlineData("/SW", "W")]
     [InlineData("/ENUM", "EN")]
-    public void Tokenize_RemovedAliasCloser_RequiresDedentInsteadOfAnotherCloser(string alias, string canonical)
+    public void Tokenize_RemovedAliasCloser_RequiresDedentInsteadOfAnotherCloser(string alias, string formerCanonical)
     {
         var tokens = Tokenize($"§{alias}", out var diagnostics);
 
@@ -494,20 +494,20 @@ public class LexerTests
         Assert.DoesNotContain(alias, SectionMarkerSuggestions.AllMarkers);
         var diagnostic = Assert.Single(diagnostics.Errors);
         Assert.Equal(DiagnosticCode.UnknownSectionMarker, diagnostic.Code);
-        Assert.Contains($"'§{canonical}'", diagnostic.Message);
-        Assert.Contains("dedenting", diagnostic.Message);
+        Assert.DoesNotContain($"'§{formerCanonical}'", diagnostic.Message);
+        Assert.Contains("dedent", diagnostic.Message);
         Assert.Empty(diagnostics.DiagnosticsWithFixes);
     }
 
     [Theory]
-    [InlineData("W", TokenKind.Match)]
-    [InlineData("EN", TokenKind.Enum)]
-    [InlineData("WHERE", TokenKind.Where)]
-    [InlineData("PUSH", TokenKind.Push)]
-    [InlineData("WHEN", TokenKind.When)]
-    public void Tokenize_CanonicalAliasReplacement_ReturnsCorrectToken(string marker, TokenKind kind)
+    [InlineData("match", TokenKind.Match)]
+    [InlineData("enum", TokenKind.Enum)]
+    [InlineData("where", TokenKind.Where)]
+    [InlineData("push", TokenKind.Identifier)]
+    [InlineData("when", TokenKind.When)]
+    public void Tokenize_CanonicalWordsAndOrdinaryCallNames_ReturnCorrectTokens(string marker, TokenKind kind)
     {
-        var tokens = Tokenize($"§{marker}", out var diagnostics);
+        var tokens = Tokenize(marker, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(kind, tokens[0].Kind);
@@ -517,7 +517,7 @@ public class LexerTests
     [Fact]
     public void Tokenize_RemovedAlias_DoesNotConsumeFollowingMarker()
     {
-        var tokens = Tokenize("§SW §W", out var diagnostics);
+        var tokens = Tokenize("§SW match", out var diagnostics);
 
         Assert.Single(diagnostics.Errors);
         Assert.Equal(TokenKind.Error, tokens[0].Kind);
@@ -528,21 +528,21 @@ public class LexerTests
     [Fact]
     public void Tokenize_AllKeywords_ReturnsCorrectTokens()
     {
-        var source = "§M §/M §F §/F §I §O §E §C §/C §A §R";
+        var source = "module func in out ! return let var => →";
         var tokens = Tokenize(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(TokenKind.Module, tokens[0].Kind);
-        Assert.Equal(TokenKind.EndModule, tokens[1].Kind);
-        Assert.Equal(TokenKind.Func, tokens[2].Kind);
-        Assert.Equal(TokenKind.EndFunc, tokens[3].Kind);
-        Assert.Equal(TokenKind.In, tokens[4].Kind);
-        Assert.Equal(TokenKind.Out, tokens[5].Kind);
-        Assert.Equal(TokenKind.Effects, tokens[6].Kind);
-        Assert.Equal(TokenKind.Call, tokens[7].Kind);
-        Assert.Equal(TokenKind.EndCall, tokens[8].Kind);
-        Assert.Equal(TokenKind.Arg, tokens[9].Kind);
-        Assert.Equal(TokenKind.Return, tokens[10].Kind);
+        Assert.Equal(TokenKind.Func, tokens[1].Kind);
+        Assert.Equal(TokenKind.In, tokens[2].Kind);
+        Assert.Equal(TokenKind.Out, tokens[3].Kind);
+        Assert.Equal(TokenKind.Exclamation, tokens[4].Kind);
+        Assert.Equal(TokenKind.Return, tokens[5].Kind);
+        Assert.Equal(TokenKind.Let, tokens[6].Kind);
+        Assert.Equal(TokenKind.Var, tokens[7].Kind);
+        Assert.Equal(TokenKind.FatArrow, tokens[8].Kind);
+        Assert.Equal(TokenKind.Arrow, tokens[9].Kind);
+        Assert.Equal(TokenKind.Eof, tokens[10].Kind);
     }
 
     [Fact]
@@ -563,7 +563,7 @@ public class LexerTests
     [Fact]
     public void Tokenize_IntLiteral_ReturnsCorrectToken()
     {
-        var tokens = Tokenize("INT:42", out var diagnostics);
+        var tokens = Tokenize("42", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(2, tokens.Count);
@@ -579,19 +579,20 @@ public class LexerTests
     [Fact]
     public void Tokenize_NegativeIntLiteral_ReturnsCorrectToken()
     {
-        var tokens = Tokenize("INT:-123", out var diagnostics);
+        var tokens = Tokenize("-123", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
-        Assert.Equal(TokenKind.IntLiteral, tokens[0].Kind);
-        var info = Assert.IsType<IntLiteralInfo>(tokens[0].Value);
+        Assert.Equal(TokenKind.Minus, tokens[0].Kind);
+        Assert.Equal(TokenKind.IntLiteral, tokens[1].Kind);
+        var info = Assert.IsType<IntLiteralInfo>(tokens[1].Value);
         Assert.Equal(123UL, info.Magnitude);
-        Assert.Equal(IntegerLiteralSign.Negative, info.Sign);
+        Assert.Equal(IntegerLiteralSign.Positive, info.Sign);
     }
 
     [Fact]
     public void Tokenize_StringLiteral_ReturnsCorrectToken()
     {
-        var tokens = Tokenize("STR:\"Hello, World!\"", out var diagnostics);
+        var tokens = Tokenize("\"Hello, World!\"", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(TokenKind.StrLiteral, tokens[0].Kind);
@@ -601,7 +602,7 @@ public class LexerTests
     [Fact]
     public void Tokenize_StringLiteralWithEscapes_ReturnsCorrectToken()
     {
-        var tokens = Tokenize("STR:\"Hello\\nWorld\"", out var diagnostics);
+        var tokens = Tokenize("\"Hello\\nWorld\"", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(TokenKind.StrLiteral, tokens[0].Kind);
@@ -611,7 +612,7 @@ public class LexerTests
     [Fact]
     public void Tokenize_BoolLiteralTrue_ReturnsCorrectToken()
     {
-        var tokens = Tokenize("BOOL:true", out var diagnostics);
+        var tokens = Tokenize("true", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(TokenKind.BoolLiteral, tokens[0].Kind);
@@ -621,7 +622,7 @@ public class LexerTests
     [Fact]
     public void Tokenize_BoolLiteralFalse_ReturnsCorrectToken()
     {
-        var tokens = Tokenize("BOOL:false", out var diagnostics);
+        var tokens = Tokenize("false", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(TokenKind.BoolLiteral, tokens[0].Kind);
@@ -631,7 +632,7 @@ public class LexerTests
     [Fact]
     public void Tokenize_FloatLiteral_ReturnsCorrectToken()
     {
-        var tokens = Tokenize("FLOAT:3.14159", out var diagnostics);
+        var tokens = Tokenize("3.14159", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(TokenKind.FloatLiteral, tokens[0].Kind);
@@ -661,7 +662,7 @@ public class LexerTests
     [Fact]
     public void Tokenize_UnterminatedString_ReportsError()
     {
-        var tokens = Tokenize("STR:\"unterminated", out var diagnostics);
+        var tokens = Tokenize("\"unterminated", out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.UnterminatedString);
@@ -671,15 +672,10 @@ public class LexerTests
     public void Tokenize_HelloWorldProgram_ReturnsCorrectTokens()
     {
         var source = """
-            §M{Hello}
-            §F{Main:pub}
-              §O{void}
-              §E{cw}
-              §C{Console.WriteLine}
-                §A "Hello from Calor!"
-              §/C
-            §/F
-            §/M
+            module Hello
+              func Main () → void
+                ! cw
+                System.Console.WriteLine("Hello from Calor!")
             """;
 
         var tokens = Tokenize(source, out var diagnostics);
@@ -687,15 +683,15 @@ public class LexerTests
         Assert.False(diagnostics.HasErrors);
         Assert.Contains(tokens, t => t.Kind == TokenKind.Module);
         Assert.Contains(tokens, t => t.Kind == TokenKind.Func);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.Call);
+        Assert.Contains(tokens, t => t.Kind == TokenKind.Identifier && t.Text == "System.Console.WriteLine");
         Assert.Contains(tokens, t => t.Kind == TokenKind.StrLiteral && (string)t.Value! == "Hello from Calor!");
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EndModule);
+        Assert.Equal(TokenKind.Eof, tokens[^1].Kind);
     }
 
     [Fact]
     public void Tokenize_TracksLineNumbers()
     {
-        var source = "§M\n§F";
+        var source = "module\nfunc";
         var tokens = Tokenize(source, out _);
 
         Assert.Equal(1, tokens[0].Span.Line);
@@ -705,44 +701,43 @@ public class LexerTests
     [Fact]
     public void Tokenize_TracksColumnNumbers()
     {
-        var source = "§M {m001:Test}";
+        var source = "module Hello";
         var tokens = Tokenize(source, out _);
 
         Assert.Equal(1, tokens[0].Span.Column);
-        Assert.Equal(4, tokens[1].Span.Column); // {
+        Assert.Equal(8, tokens[1].Span.Column);
     }
 
     [Fact]
     public void Tokenize_NullCoalesceOperator_ReturnsCorrectToken()
     {
-        var tokens = Tokenize("§??", out var diagnostics);
+        var tokens = Tokenize("??", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(2, tokens.Count); // NullCoalesce + EOF
         Assert.Equal(TokenKind.NullCoalesce, tokens[0].Kind);
-        Assert.Equal("§??", tokens[0].Text);
+        Assert.Equal("??", tokens[0].Text);
     }
 
     [Fact]
     public void Tokenize_NullConditionalOperator_ReturnsCorrectToken()
     {
-        var tokens = Tokenize("§?.", out var diagnostics);
+        var tokens = Tokenize("?.", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(2, tokens.Count); // NullConditional + EOF
         Assert.Equal(TokenKind.NullConditional, tokens[0].Kind);
-        Assert.Equal("§?.", tokens[0].Text);
+        Assert.Equal("?.", tokens[0].Text);
     }
 
     [Fact]
     public void Tokenize_NullOperatorsInContext_ReturnsCorrectTokens()
     {
-        // Test §?? and §?. in a more realistic context
-        var source = "§B result §?? defaultValue";
+        var source = "let result ?? defaultValue";
         var tokens = Tokenize(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
-        Assert.Equal(TokenKind.Bind, tokens[0].Kind);
+        Assert.Equal(TokenKind.Let, tokens[0].Kind);
         Assert.Equal(TokenKind.Identifier, tokens[1].Kind);
         Assert.Equal("result", tokens[1].Text);
         Assert.Equal(TokenKind.NullCoalesce, tokens[2].Kind);
