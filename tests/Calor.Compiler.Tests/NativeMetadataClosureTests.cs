@@ -15,6 +15,72 @@ namespace Calor.Compiler.Tests;
 public sealed class NativeMetadataClosureTests
 {
     [Theory]
+    [InlineData("byte[]", 3)]
+    [InlineData("int[]", 3)]
+    [InlineData("int[,]", 6)]
+    [InlineData("string", 3)]
+    public void NativeLength_HasIntegerTypeInOrdinaryLoopConditions(string type, int expected)
+    {
+        var authored = $$"""
+            module Lengths
+              func Count ({{type}}:values) → int
+                ! mut
+                var int:i = 0
+                while i < (values).Length
+                  set i i + 1
+                return i
+            """;
+        object input = type switch
+        {
+            "byte[]" => new byte[] { 1, 2, 3 },
+            "int[]" => new[] { 1, 2, 3 },
+            "int[,]" => new int[2, 3],
+            "string" => "Ωab",
+            _ => throw new ArgumentOutOfRangeException(nameof(type))
+        };
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var diagnostics = new DiagnosticBag();
+            new TypeChecking.TypeChecker(diagnostics).Check(Parse(source));
+            Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
+            var result = Compile(source);
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+            var method = CompileAssembly(result.GeneratedCode).GetTypes().SelectMany(owner => owner.GetMethods())
+                .Single(method => method.Name == "Count");
+            Assert.Equal(expected, method.Invoke(null, [input]));
+        }
+    }
+
+    [Theory]
+    [InlineData("byte[]", "Count")]
+    [InlineData("string", "length")]
+    [InlineData("int", "Length")]
+    public void NativeLength_DoesNotPermitUnmodeledMembersOrReceivers(string type, string member)
+    {
+        var source = $"module Lengths\n  func Count ({type}:values) → int\n    while (values).{member} > 0\n      return 1\n    return 0";
+        var diagnostics = new DiagnosticBag();
+        var module = Parse(source);
+        Assert.Contains(Assert.Single(module.Functions).Body, statement => statement is WhileStatementNode);
+        new TypeChecking.TypeChecker(diagnostics).Check(module);
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+        Assert.True(Compile(source).HasErrors);
+    }
+
+    [Theory]
+    [InlineData("byte[]")]
+    [InlineData("string")]
+    public void NativeLength_DoesNotBecomeABooleanOrAnUnknownType(string type)
+    {
+        var source = $"module Lengths\n  func Count ({type}:values) → int\n    while (values).Length\n      return 1\n    return 0";
+        var diagnostics = new DiagnosticBag();
+        var module = Parse(source);
+        Assert.Contains(Assert.Single(module.Functions).Body, statement => statement is WhileStatementNode);
+        new TypeChecking.TypeChecker(diagnostics).Check(module);
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+        Assert.True(Compile(source).HasErrors);
+    }
+
+    [Theory]
     [InlineData("let List<string>:lines = File.ReadAllLines(path)\n    return lines.Count", "int")]
     [InlineData("return File.ReadAllLines(path)", "List<string>")]
     [InlineData("let List<string>:lines = System.IO.File.ReadAllLines(path)\n    return lines.Count", "int")]

@@ -4884,6 +4884,10 @@ public sealed class TypeChecker
             return fieldDef.Type;
         }
 
+        if (field.FieldName == "Length"
+            && (targetType is ArrayType || targetType.Equals(PrimitiveType.String)))
+            return PrimitiveType.Int;
+
         // Same rule as the bool conditions: only complain when the receiver's type is actually
         // known. An unmodeled receiver — a `new` expression, an external call result — is the
         // checker's blind spot, not the program's error, and C# resolves the member itself.
