@@ -4,7 +4,7 @@ section: "benchmarking"
 order: 3
 ---
 
-> **Syntax and measurement:** Source illustrations use current ID-free headers. The published numerical results and archived output remain historical; these illustrations are not a remeasurement of those results.
+> **Syntax and measurement:** Code illustrations use current native syntax. The tag-based calculator rules and published numbers below describe archived source, not a remeasurement of these illustrations.
 
 **Category:** Comprehension
 **Historical dashboard result:** Calor wins (1.84x across 217 programs)
@@ -34,7 +34,10 @@ Traditional languages require parsing and inference. Calor makes these explicit.
 
 ## How It's Measured
 
-### Calor Clarity Factors
+### Archived Calor Clarity Factors
+
+These are the historical calculator's literal checks against its recorded corpus.
+The removed tags in this table are not current authoring instructions.
 
 | Factor | Points | Check |
 |:-------|:-------|:------|
@@ -49,7 +52,7 @@ Traditional languages require parsing and inference. Calor makes these explicit.
 | Indented body line (proportional) | up to 0.10 | Matches `^[ \t]+\S` |
 | Indent-form completeness | 0.05 | At least one indented body line per `§F{` opener |
 
-### C# Clarity Factors
+### Archived C# Clarity Factors
 
 | Factor | Points | Check |
 |:-------|:-------|:------|
@@ -67,20 +70,17 @@ Traditional languages require parsing and inference. Calor makes these explicit.
 
 ## Example Comparison
 
-### Calor (High Clarity)
+### Current Calor Illustration
 
 ```calor
-§M{Calculator}
-  §F{Divide:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §Q (!= b 0)
-    §S (>= result 0)
-    §R (/ a b)
+module Calculator
+  func Divide (int:a, int:b) → int
+    requires b != 0
+    => result >= 0
+    return a / b
 ```
 
-**Score calculation:**
+**Archived score calculation, not a score for the native illustration above:**
 - `§M{`: +0.15
 - `§F{`: +0.15
 - `§I{`: +0.10
@@ -93,7 +93,11 @@ Traditional languages require parsing and inference. Calor makes these explicit.
 
 **Total: 1.00**
 
-### C# (Lower Clarity)
+Current preconditions use `requires`; postconditions use `=>`. This preserves
+the original Divide contracts, including `result >= 0`. The precondition alone
+does not prove that postcondition: a negative quotient violates it.
+
+### Unchanged C# Comparison
 
 ```csharp
 namespace Calculator
@@ -124,6 +128,12 @@ namespace Calculator
 **Illustrative ratio: 0.95 / 0.65 = 1.46x.** This single example is not the
 aggregate historical result.
 
+The archived narrative reports a Calor total of 1.00 but uses 0.95 in this ratio.
+Those historical numbers are retained, not recalculated for current syntax.
+The implementations agree on valid integer quotients. Their failure behavior is
+not interchangeable: Calor's runtime contracts and C#'s conditional `Debug.Assert`
+do not establish the same postcondition-enforcement behavior.
+
 ---
 
 ## What Agents Can Extract
@@ -132,14 +142,14 @@ aggregate historical result.
 
 | Information | Extraction Method |
 |:------------|:------------------|
-| Function name | Parse `§F{name:vis}` |
-| Function ID | Parse `§F{name:vis}` |
-| Inputs | Find all `§I{type:name}` |
-| Output type | Parse `§O{type}` |
-| Side effects | Parse `§E{codes}` |
-| Preconditions | Find all `§Q condition` |
-| Postconditions | Find all `§S condition` |
-| Scope boundaries | `§F{id}` opener followed by indented body lines (terminated by dedent in indent form) |
+| Function name | Read `func Divide` |
+| Function ID | Query the project tools' `.calor/ids.json` sidecar; no ID is written in the declaration |
+| Inputs | Read the typed parameter list, such as `(int:a, int:b)` |
+| Output type | Read the signature after `→` |
+| Side effects | Read the `!` effect row, when declared |
+| Preconditions | Read `requires condition` |
+| Postconditions | Read `=> condition` |
+| Scope boundaries | An indented function body ends at dedent; no structural closer is written |
 
 ### From C# (Requires Inference)
 
@@ -164,7 +174,8 @@ aggregate historical result.
 Preconditions: b != 0
 Postconditions: result >= 0
 ```
-Direct extraction from `§Q` and `§S`.
+Direct extraction from `requires` and `=>`. These compatibility contracts do not
+choose a refinement-type or custom-message policy.
 
 **From C#:**
 ```
