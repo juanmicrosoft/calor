@@ -1,0 +1,5 @@
+module FluentValidation.Validators overflow unchecked
+  class NoopPropertyValidator<T,TProperty> pub abs
+    extends PropertyValidator<T,TProperty>
+    fn IsValid pub over (ValidationContext<T>:context, TProperty:value) -> bool
+      return true

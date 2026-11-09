@@ -1,0 +1,3 @@
+func Symmetric (int[,]:m, int:n) → bool
+  => !result || forall int:i in 0..n, int:j in 0..n : m[i, j] == m[j, i]
+  return false

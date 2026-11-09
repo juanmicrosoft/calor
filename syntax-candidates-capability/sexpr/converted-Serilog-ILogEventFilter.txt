@@ -1,0 +1,4 @@
+module Serilog.Core overflow unchecked
+  // Provides filtering of the log event stream.
+  interface ILogEventFilter
+    fn IsEnabled (LogEvent:logEvent) -> bool

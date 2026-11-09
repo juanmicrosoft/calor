@@ -1,0 +1,13 @@
+func Grade (int:code) → string
+  var string:r = ""
+  switch code
+    case 1
+      set r r + "a"
+      goto case 2
+    case 2
+      set r r + "b"
+      goto default
+    default
+      goto done
+  label done
+  return r

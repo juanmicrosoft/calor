@@ -1,0 +1,7 @@
+class Bag
+  field int[]:_items priv
+  this[int:i] → int
+    get
+      return _items[i]
+    set
+      set _items[i] value

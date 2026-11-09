@@ -1,0 +1,44 @@
+§M{m001:MapAfter}
+  §F{f001:Map:pub}<eff e> ([i32]:xs, Func<i32,i32>:f §E{e}) -> [i32]
+    §E{e, alloc, mut}
+    §B{n:i32} (len xs)
+    §B{~out:[i32]} §ARR{i32} n
+    §L{l1:i:0:(- n 1):1}
+      §SETIDX{out} i §C{f} §A §IDX xs i §/C
+    §R out
+
+  §F{f002:Double:pub} (i32:x) -> i32
+    §E{}
+    §R (* x INT:2)
+
+  §F{f003:Announce:pub} (i32:x) -> i32
+    §E{cw}
+    §P x
+    §R x
+
+  §F{f004:UsePure:pub} ([i32]:xs) -> [i32]
+    §E{alloc, mut}
+    §R §C{Map} §A xs §A Double §/C
+
+  §F{f005:UseImpure:pub} ([i32]:xs) -> [i32]
+    §E{alloc, mut, cw}
+    §R §C{Map} §A xs §A Announce §/C
+
+  §F{f006:DoubleAndReport} (i32:x) -> i32
+    §E{cw}
+    §B{d:i32} (* x INT:2)
+    §P d
+    §R d
+
+  §F{f007:MapAndReport:pub} ([i32]:xs) -> [i32]
+    §E{alloc, mut, cw}
+    §R §C{Map} §A xs §A DoubleAndReport §/C
+
+  §F{f008:Total:pub} ([i32]:xs) -> i32
+    §E{}
+    §B{n:i32} (len xs)
+    §B{~sum:i32} INT:0
+    §L{l2:i:0:(- n 1):1}
+      §B{v:i32} §IDX xs i
+      §ASSIGN sum (+ sum (* v INT:2))
+    §R sum

@@ -1,0 +1,6 @@
+func Evens (int:n) → IEnumerable<int>
+  for i from 0 to n step 1
+    if i < 0
+      yield break
+    if i % 2 == 0
+      yield return i

@@ -1,0 +1,4 @@
+module GeoLib.Shapes.Planar/Grid overflow unchecked
+  class Area stat
+    func Square (int:side) → int
+      return side * side

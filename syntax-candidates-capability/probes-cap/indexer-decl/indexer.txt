@@ -1,0 +1,7 @@
+class Bag
+  field int[]:_items priv
+  indexer int (int:i)
+    get
+      return _items[i]
+    set
+      set _items[i] value

@@ -1,0 +1,2 @@
+let Action<int>:f = (int:x) effects cw => Log(x)
+Use(f)

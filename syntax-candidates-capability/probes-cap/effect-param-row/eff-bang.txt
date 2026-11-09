@@ -1,0 +1,6 @@
+func RunTwice <eff e> (Func<int>:g ! e) → int
+  ! e
+  return g() + g()
+func Handle <eff e> (int:request, Func<int>:next ! e) → int
+  ! e
+  return RunTwice(next)

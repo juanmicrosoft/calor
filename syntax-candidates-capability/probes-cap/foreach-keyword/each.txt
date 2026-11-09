@@ -1,0 +1,7 @@
+func Total (int[]:xs, Dictionary<string,int>:d) → int
+  var int:n = 0
+  each x in xs
+    set n n + x
+  each k, v in d
+    set n n + v
+  return n

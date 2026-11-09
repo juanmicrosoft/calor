@@ -1,0 +1,4 @@
+module Grid Geo overflow unchecked
+  class Area stat
+    func Square (int:side) → int
+      return side * side

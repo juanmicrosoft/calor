@@ -1,0 +1,6 @@
+class Money
+  property long:Cents get
+  operator + (Money:a, Money:b) → Money
+    return new Money(a.Cents + b.Cents)
+  operator implicit (long:cents) → Money
+    return new Money(cents)

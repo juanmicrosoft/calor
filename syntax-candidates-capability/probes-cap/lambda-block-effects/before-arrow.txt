@@ -1,0 +1,5 @@
+let Func<int,int>:f =
+  (int:x) ! cw =>
+    Console.WriteLine(x)
+    return x + 1
+Use(f)

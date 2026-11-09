@@ -1,0 +1,3 @@
+func Contains (int[]:xs, int:t) → bool
+  => !result || exists int:i where 0 <= i && i < xs.Length : xs[i] == t
+  return false

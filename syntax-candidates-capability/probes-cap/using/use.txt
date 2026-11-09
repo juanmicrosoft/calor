@@ -1,0 +1,7 @@
+module Tools
+  use System.Text
+  use static System.Math
+  use Json = System.Text.Json
+  class Fmt stat
+    func Root (double:x) → string
+      return Sqrt(x).ToString()
