@@ -253,6 +253,36 @@ public sealed class NativeMetadataClosureTests
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.BindArrayToConcreteCollection);
     }
 
+    [Fact]
+    public void ByteListCalls_RetainExactMetadataOverloadsAndArrayResult()
+    {
+        const string source = """
+            module Codec
+              func Encode (List<byte>:bytes, byte:item) → byte[]
+                ! mut
+                bytes.Add(item)
+                return bytes.ToArray()
+              func Write (List<byte>:bytes, byte:item, string:path) → void
+                ! mut, fs:w
+                bytes.Add(item)
+                File.WriteAllBytes(path, bytes.ToArray())
+            """;
+        var result = Compile(source);
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        var method = CompileAssembly(result.GeneratedCode).GetTypes().SelectMany(type => type.GetMethods())
+            .Single(method => method.Name == "Encode");
+        var values = new List<byte> { 7 };
+        Assert.Equal(new byte[] { 7, 255 }, Assert.IsType<byte[]>(method.Invoke(null, [values, (byte)255])));
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        var encode = bound.Functions.Single(function => function.Symbol.Name == "Encode");
+        var call = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundReturnStatement>(encode.Body[1]).Expression);
+        var array = Assert.IsAssignableFrom<IArrayTypeSymbol>(call.ResolvedMetadataMethod!.ReturnType);
+        Assert.Equal(SpecialType.System_Byte, array.ElementType.SpecialType);
+        Assert.Equal("System.Collections.Generic.List<byte>", call.ResolvedMetadataMethod.ContainingType.ToDisplayString());
+    }
+
     private static CompilationResult Compile(string source) => Program.Compile(source, "native-metadata.calr",
         new CompilationOptions { EnableTypeChecking = true, EnforceEffects = true, StatusWriter = TextWriter.Null });
 

@@ -999,6 +999,7 @@ public static class TypeIdentity
         "STRING" => "System.String",
         "String" => "System.String",
         "char" or "CHAR" or "Char" => "System.Char",
+        "byte" or "u8" or "BYTE" or "Byte" => "System.Byte",
         "i32" => "System.Int32",
         "int" => "System.Int32",
         "INT" => "System.Int32",
