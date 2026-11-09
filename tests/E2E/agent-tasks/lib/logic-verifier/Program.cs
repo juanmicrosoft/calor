@@ -4190,12 +4190,19 @@ static Dictionary<string, CrossModuleFunctionTarget> NativeBenchmarkTargets(IEnu
     var targets = new Dictionary<string, CrossModuleFunctionTarget>(StringComparer.Ordinal);
     foreach (var module in modules)
     {
-        if (module.NamespaceScopes.Count != 0
-            || module.Functions.Any(function => function.NamespaceIdentity != null && function.NamespaceIdentity != module.Name))
+        var scope = module.NamespaceScopes.Count == 1 ? module.NamespaceScopes[0] : null;
+        if (module.NamespaceScopes.Count > 1
+            || scope != null && (scope.Kind != NamespaceScopeKind.Named || !scope.IsFileScoped
+                || scope.ParentScopeId != null || string.IsNullOrEmpty(scope.Id)
+                || scope.Name != module.Name || scope.FullName != module.Name)
+            || module.Functions.Any(function => scope == null
+                ? function.NamespaceIdentity != null && function.NamespaceIdentity != module.Name
+                    || function.NamespaceScopeId != null
+                : function.NamespaceIdentity != scope.FullName || function.NamespaceScopeId != scope.Id))
             throw new InvalidOperationException("Wrong native benchmark module namespace topology.");
         foreach (var function in module.Functions.Where(function => function.Visibility is Visibility.Public or Visibility.Internal))
         {
-            var target = new CrossModuleFunctionTarget(module.Name, module.Name, module.Name + "Module");
+            var target = new CrossModuleFunctionTarget(module.Name, scope?.FullName ?? module.Name, module.Name + "Module");
             if (!targets.TryAdd(function.Name, target)
                 || !targets.TryAdd(module.Name + "." + function.Name, target))
                 throw new InvalidOperationException("Wrong native benchmark ambiguous cross-module function identity.");
@@ -4219,6 +4226,19 @@ static (ModuleNode[] Modules, string[] Debug, string[] Off) CompileNativeBenchma
         return ast;
     }).ToArray();
     var targets = NativeBenchmarkTargets(parsed);
+    foreach (var module in parsed)
+        Console.WriteLine("Actual native namespace topology: " + JsonSerializer.Serialize(new
+        {
+            module.Name,
+            Scopes = module.NamespaceScopes.Select(scope => new
+            {
+                scope.Id, scope.Name, scope.FullName, scope.ParentScopeId, scope.IsFileScoped, Kind = scope.Kind.ToString()
+            }),
+            Functions = module.Functions.Select(function => new
+            {
+                function.Name, function.NamespaceIdentity, function.NamespaceScopeId
+            })
+        }));
     foreach (var file in files)
     {
         var path = Path.Combine(workspace, file);

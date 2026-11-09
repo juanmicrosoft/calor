@@ -761,7 +761,7 @@ def execute(task, category, files, expected, root=ROOT, deadline=None, language=
             EXECUTED["accepted"] += 1
         if language == "calor":
             for line in output.splitlines():
-                if line.startswith(("Actual native AST identities:", "Native benchmark selected proof floor passed:",
+                if line.startswith(("Actual native AST identities:", "Actual native namespace topology:", "Native benchmark selected proof floor passed:",
                                     "Actual selected native proof coverage", "Actual native cross-module diagnostic:")):
                     print(f"{task}/{category}: {line}")
         print(f"{task}/{category}: {verdicts[0]}")

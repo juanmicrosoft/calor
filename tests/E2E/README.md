@@ -2415,7 +2415,7 @@ all 129 prerequisites, agent evaluation, milestone acceptance or release readine
 
 The 40 original `refactoring-benchmark` entries invoke the selected-image
 supervised helper, not declaration greps. The controls implement **20 independent
-C# profiles**; **18 native Calor profiles have evidence only on explicit interim
+C# profiles**; **the complete 18-profile native control census has evidence only on explicit interim
 source `260f086936198c112b1cf0f4d4b053771809513a`**. Two original Calor
 requirements remain explicitly unadmitted: missing `v001` provenance and the
 retired `Option<i32>`/None signature. Default current-native controls and native
@@ -2437,19 +2437,22 @@ python3 tests/E2E/agent-tasks/test-refactoring-benchmark-verifiers.py --interim-
 python3 tests/E2E/agent-tasks/test-logic-old-release.py --refactoring-benchmark-native-interim
 ```
 
-Initial `contract-pre` and `extract-simple` probes on freshly source-built,
-manifest-verified parent source `e0ba25aae4e6e9a96a45d60c1db219ee1889054c`
-refused at identity reconciliation because the disposable authoring had omitted
-the original namespace. Current authoring now uses the supported
-`module Name Namespace` header to preserve the original actual CLR namespace;
-it does not rewrite persisted anchors, IDs or expected owners. Two fresh focused
-probes then synchronized successfully and retained every original module/function
-identity, including the requested new `f005` extraction. Their next refusal was
-the verifier's existing nonempty `NamespaceScopes` topology guard. Neither
-reached native compilation, proofs or CLR behavior, and both earn zero behavioral
-credit. Namespace targets and CLR ownership remain unadmitted behind that guard.
-The physical test-path literal IDs passed persisted-state validation; this was
-not a canonical-ID format rejection.
+Initial `contract-pre` and `extract-simple` probes on parent source
+`e0ba25aae4e6e9a96a45d60c1db219ee1889054c` refused because disposable authoring
+had omitted the original namespace. Current authoring uses the supported
+`module Name Namespace` header without rewriting persisted anchors, IDs or
+expected CLR owners. The verifier admits exactly one named, file-scoped
+namespace matching the unchanged original owner and requires every function's
+namespace identity and scope ID to match it. Other, additional, global, nested,
+block or unmapped scopes remain rejected; legacy interim topology stays separate.
+On a fresh manifest-verified source build, those two focused positives then
+passed real native compilation, exact persisted/AST identity checks, contract-on/
+off CLR behavior and supplying-path interventions: 200 case inputs, two
+successful interventions, seven invalid entries rejected by native preconditions
+and the original one-proof floor for `contract-pre`. This is evidence for only
+two positives, not the complete selected-root matrix or final-parent acceptance.
+The physical test-path literal IDs passed persisted-state validation; no
+canonical-ID format rejection or replacement identity was involved.
 Default native validation stops at the first unavailable canonical positive,
 without running adversaries or claiming the unchanged required census passed.
 
