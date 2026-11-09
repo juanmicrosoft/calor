@@ -204,26 +204,56 @@ public sealed class AgentDiagnosticTests : IDisposable
     [InlineData("WR", "WHERE")]
     [InlineData("ADD", "PUSH")]
     [InlineData("when", "WHEN")]
-    public void RemovedCanonicalAlias_IsAnErrorWithSafeReplacementNotAnAcceptedAlias(string marker, string canonical)
+    public void RemovedCanonicalAlias_IsAnErrorWithoutAnotherSigilReplacement(string marker, string canonical)
     {
         var diagnostics = new DiagnosticBag();
         var source = $"§{marker}";
         _ = new Lexer(source, diagnostics).TokenizeAllForParser();
         Assert.True(diagnostics.HasErrors);
         var result = DiagnosticFixes.Apply(source, source, "file.calr", diagnostics.DiagnosticsWithFixes, out var applied);
-        Assert.Equal($"§{canonical}", result);
-        Assert.Equal(1, applied);
+        Assert.Equal(source, result);
+        Assert.Equal(0, applied);
+        Assert.DoesNotContain(diagnostics.DiagnosticsWithFixes,
+            fix => fix.Fix?.Edits.Any(edit => edit.NewText == $"§{canonical}") == true);
     }
 
     [Theory]
-    [InlineData("∀", "forall")]
-    [InlineData("∃", "exists")]
-    public void RemovedQuantifier_CarriesAnExactSafeReplacement(string old, string canonical)
+    [InlineData("∀")]
+    [InlineData("∃")]
+    public void RemovedQuantifier_DoesNotRewriteOnlyItsPrefix(string old)
     {
         var diagnostics = new DiagnosticBag();
         _ = new Lexer(old, diagnostics).TokenizeAllForParser();
         Assert.True(diagnostics.HasErrors);
-        Assert.Equal(canonical, DiagnosticFixes.Apply(old, old, "file.calr", diagnostics.DiagnosticsWithFixes, out _));
+        Assert.Equal(old, DiagnosticFixes.Apply(old, old, "file.calr", diagnostics.DiagnosticsWithFixes, out var applied));
+        Assert.Equal(0, applied);
+        Assert.Empty(diagnostics.DiagnosticsWithFixes);
+    }
+
+    [Theory]
+    [InlineData("§/M")]
+    [InlineData("§FUNC")]
+    [InlineData("∀")]
+    [InlineData("∃")]
+    public void CliApply_RetiredSyntaxRemainsAnErrorAndPreservesEncodedBytes(string retired)
+    {
+        const string canonical = "module Test\r\n  func Value () → int\r\n    return 1\r\n";
+        Assert.False(Program.Compile(canonical).HasErrors);
+        var path = Path.Combine(_directory, "retired.calr");
+        File.WriteAllText(path, canonical + retired + "\r\n", new UnicodeEncoding(false, true));
+        var original = File.ReadAllBytes(path);
+        Assert.True(Program.Compile(File.ReadAllText(path)).HasErrors);
+
+        var (exit, stdout, _) = CliTestHarness.RunCli(_directory, "fix", path, "--apply", "--format", "json");
+
+        Assert.NotEqual(0, exit);
+        var result = JsonDocument.Parse(stdout).RootElement;
+        Assert.True(result.GetProperty("summary").GetProperty("errors").GetInt32() > 0);
+        Assert.Equal(0, result.GetProperty("data").GetProperty("changedFiles").GetInt32());
+        Assert.Equal(0, result.GetProperty("data").GetProperty("editsApplied").GetInt32());
+        Assert.Equal(original, File.ReadAllBytes(path));
+        Assert.Single(Directory.GetFiles(_directory));
+        Assert.False(Directory.Exists(Path.Combine(_directory, ".calor")));
     }
 
     [Fact]

@@ -435,13 +435,14 @@ public class LexerTests
     }
 
     [Theory]
-    [InlineData("∀", "forall")]
-    [InlineData("∃", "exists")]
-    public void Tokenize_RemovedUnicodeQuantifier_ReportsReplacement(string symbol, string replacement)
+    [InlineData("∀")]
+    [InlineData("∃")]
+    public void Tokenize_RemovedUnicodeQuantifier_RequiresFullContractMigration(string symbol)
     {
         var tokens = Tokenize(symbol, out var diagnostics);
         Assert.Equal(TokenKind.Error, tokens[0].Kind);
-        Assert.Contains(replacement, Assert.Single(diagnostics.Errors).Message);
+        Assert.Contains($"'{symbol}' is removed", Assert.Single(diagnostics.Errors).Message);
+        Assert.Empty(diagnostics.DiagnosticsWithFixes);
     }
 
     private static List<Token> Tokenize(string source, out DiagnosticBag diagnostics)

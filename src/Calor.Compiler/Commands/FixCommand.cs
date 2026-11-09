@@ -8,15 +8,16 @@ namespace Calor.Compiler.Commands;
 
 /// <summary>
 /// <c>calor fix</c> applies safe diagnostic patches, or explicit reversible
-/// source migrations (which can record a <c>migration.log.json</c>).
+/// archived section-tag migrations (which can record a <c>migration.log.json</c>).
+/// These migrations do not convert archived source to the current native grammar.
 ///
 /// Subcommands:
 /// <list type="bullet">
 ///   <item><description><c>--elide-call-closers</c>: elides <c>§/C</c> on
 ///   zero-arg and one-arg same-line calls.</description></item>
 ///   <item><description><c>--heal-closers</c>: deletes legacy structural
-///   closing tags (<c>§/F</c>, <c>§/M</c>, <c>§/L</c>, …) to rewrite a file
-///   into canonical indent-only form. Safe against closer text embedded in
+///   closing tags (<c>§/F</c>, <c>§/M</c>, <c>§/L</c>, …) from archived source.
+///   Safe against closer text embedded in
 ///   string literals or comments (see
 ///   <see cref="Analysis.LegacyCloserFormLint.ScanForHeal"/>).</description></item>
 /// </list>
@@ -36,11 +37,11 @@ public static class FixCommand
         var applyOption = new Option<bool>("--apply", "Apply deterministic safe diagnostic patches");
         var elideCallClosersOption = new Option<bool>(
             aliases: ["--elide-call-closers"],
-            description: "Elide §/C on zero-arg + one-arg same-line calls (v0.6.x)");
+            description: "Archived migration: elide §/C on zero-arg + one-arg same-line calls (v0.6.x); not current-grammar conversion");
 
         var healClosersOption = new Option<bool>(
             aliases: ["--heal-closers"],
-            description: "Delete legacy structural closers (§/F, §/M, …) -> indent-only form");
+            description: "Archived migration: delete structural closers (§/F, §/M, …); not current-grammar conversion");
 
         var revertOption = new Option<bool>(
             aliases: ["--revert"],

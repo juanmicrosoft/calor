@@ -521,8 +521,7 @@ public sealed class Lexer
             '→' => ScanSingle(TokenKind.Arrow),
             '-' => ScanMinusOrArrowOrNumber(),
             // Unicode quantifiers
-            '∀' => ScanRemovedQuantifier("forall"),
-            '∃' => ScanRemovedQuantifier("exists"),
+            '∀' or '∃' => ScanRemovedQuantifier(),
             '`' => ScanRetiredBacktickIdentifier(),
             '\'' => ScanCharLiteral(),
             '$' => ScanRetiredDollarString(),
@@ -688,17 +687,14 @@ public sealed class Lexer
     }
 
     /// <summary>
-    /// Rejects a removed Unicode quantifier with its canonical spelling.
+    /// Rejects a removed Unicode quantifier without rewriting its surrounding contract.
     /// </summary>
-    private Token ScanRemovedQuantifier(string keywordText)
+    private Token ScanRemovedQuantifier()
     {
         Advance();
         var span = CurrentSpan();
-        _diagnostics.ReportErrorWithFix(span, DiagnosticCode.InvalidLispExpression,
-            $"Removed quantifier '{CurrentText()}'. Use '{keywordText}' instead.",
-            new SuggestedFix($"Replace the quantifier with '{keywordText}'",
-                TextEdit.Replace(_diagnostics.CurrentFilePath ?? "", span.Line, span.Column,
-                    span.Line, span.Column + span.Length, keywordText), isSafeToApply: true));
+        _diagnostics.ReportError(span, DiagnosticCode.InvalidLispExpression,
+            $"Legacy quantifier '{CurrentText()}' is removed. Migrate the full quantified contract; replacing its prefix alone is not safe.");
         return MakeToken(TokenKind.Error);
     }
 
