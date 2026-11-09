@@ -59,6 +59,18 @@ public class LexerTests
     }
 
     [Theory]
+    [InlineData("{INT:42}")]
+    [InlineData("{STR:\"x\"}")]
+    [InlineData("x:INT:42")]
+    public void CanonicalCutover_BracesAndColonsCannotShieldTypedLiteralPrefixes(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(source, diagnostics).TokenizeAll();
+        Assert.Contains(tokens, token => token.Kind == TokenKind.Error);
+        Assert.Equal(DiagnosticCode.InvalidTypedLiteral, Assert.Single(diagnostics.Errors).Code);
+    }
+
+    [Theory]
     [InlineData("->")]
     [InlineData("`name`")]
     [InlineData("$\"text\"")]
