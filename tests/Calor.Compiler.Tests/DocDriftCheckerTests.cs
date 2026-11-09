@@ -131,6 +131,10 @@ public class DocDriftCheckerTests
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()" })]
     [InlineData("cli/init.mdx", 1, 0,
         new[] { "InitializedExample" }, new[] { "42" }, new[] { "GlobalModule.Answer()" })]
+    [InlineData("guides/dependent-types-tutorial.mdx", 4, 0,
+        new[] { "ServerContracts", "BankingContracts", "MissingFundsContract", "DivisionContracts" },
+        new[] { "10", "70", "70", "-2" },
+        new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()" })]
     [InlineData("structure-tags.mdx", 20, 2,
         new[] { "StructureModules", "BlockNamespace", "FunctionHeaders", "AsyncFunctions", "AsyncMethods",
             "AwaitExpressions", "LambdaExamples", "AsyncLambdas", "LocalCallables", "DelegateDefinitions",
@@ -422,6 +426,88 @@ public class DocDriftCheckerTests
             }
             """);
         Assert.Equal(expected, observed);
+    }
+
+    [Theory]
+    [InlineData("ServerContracts", "GlobalModule.ConfigureServer(0, \"localhost\", 10)", "!ContractViolationException", "10")]
+    [InlineData("ServerContracts", "GlobalModule.ConfigureServer(65536, \"localhost\", 10)", "!ContractViolationException", "10")]
+    [InlineData("ServerContracts", "GlobalModule.ConfigureServer(443, \"\", 10)", "!ContractViolationException", "10")]
+    [InlineData("ServerContracts", "GlobalModule.ConfigureServer(443, null!, 10)", "!ContractViolationException", "10")]
+    [InlineData("ServerContracts", "GlobalModule.ConfigureServer(443, \"localhost\", 0)", "!ContractViolationException", "0")]
+    [InlineData("BankingContracts", "GlobalModule.Transfer(3, 5)", "!ContractViolationException", "-2")]
+    [InlineData("MissingFundsContract", "GlobalModule.Transfer(3, 5)", "!ContractViolationException", "-2")]
+    [InlineData("DivisionContracts", "GlobalModule.Divide(1, 0)", "!ContractViolationException", "!DivideByZeroException")]
+    [InlineData("DivisionContracts", "GlobalModule.Divide(int.MinValue, -1)", "!ContractViolationException", "!OverflowException")]
+    public void PublicInputContractsTutorial_ObservesOriginalBoundaryCallsWithChecksEnabledAndOff(
+        string module, string expression, string enabled, string disabled)
+    {
+        var path = "website/content/guides/dependent-types-tutorial.mdx";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith($"module {module}\n", StringComparison.Ordinal)).Source;
+        foreach (var mode in new[] { ContractMode.Debug, ContractMode.Off })
+        {
+            var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = mode });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run() => {{expression}};
+                }
+                """);
+            Assert.Equal(mode == ContractMode.Debug ? enabled : disabled, observed);
+        }
+    }
+
+    [Theory]
+    [InlineData("BankingContracts", "Requires")]
+    [InlineData("MissingFundsContract", "Ensures")]
+    public void PublicInputContractsTutorial_IdentifiesActualFailedContractKind(string module, string expectedKind)
+    {
+        var path = "website/content/guides/dependent-types-tutorial.mdx";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith($"module {module}\n", StringComparison.Ordinal)).Source;
+        var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = ContractMode.Debug });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + """
+
+            public static class Probe
+            {
+                public static object? Run()
+                {
+                    try { return GlobalModule.Transfer(3, 5); }
+                    catch (Calor.Runtime.ContractViolationException failure) { return failure.Kind.ToString(); }
+                }
+            }
+            """);
+        Assert.Equal(expectedKind, observed);
+    }
+
+    [Theory]
+    [InlineData("BankingContracts", "proven", false)]
+    [InlineData("MissingFundsContract", "refuted", true)]
+    public async Task PublicInputContractsTutorial_VerifiesExactPublishedTransferSources(
+        string module, string expectedStatus, bool expectedError)
+    {
+        var path = "website/content/guides/dependent-types-tutorial.mdx";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith($"module {module}\n", StringComparison.Ordinal)).Source;
+        var arguments = JsonSerializer.SerializeToElement(new { source, timeout = 5000 });
+        var response = await new Calor.Compiler.Mcp.Tools.VerifyTool().ExecuteAsync(arguments);
+        var text = Assert.IsType<string>(Assert.Single(response.Content).Text);
+        Assert.Equal(expectedError, response.IsError);
+        using var document = JsonDocument.Parse(text);
+        Assert.Equal(!expectedError, document.RootElement.GetProperty("success").GetBoolean());
+        var function = document.RootElement.GetProperty("functions").EnumerateArray()
+            .Single(function => function.GetProperty("functionName").GetString() == "Transfer");
+        var postcondition = Assert.Single(function.GetProperty("contracts").EnumerateArray()
+            .Where(contract => contract.GetProperty("type").GetString() == "postcondition"));
+        Assert.Equal(expectedStatus, postcondition.GetProperty("status").GetString());
+        if (expectedError)
+            Assert.NotEmpty(postcondition.GetProperty("counterexample").GetProperty("bindings").EnumerateArray());
     }
 
     [Fact]
