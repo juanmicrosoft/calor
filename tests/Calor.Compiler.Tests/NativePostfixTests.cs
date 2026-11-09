@@ -21,13 +21,13 @@ public sealed class NativePostfixTests
     public void LegacyLoopHeader_NestedSiblingOperandsRetainCheckedRuntimeSemantics(int a, int b)
     {
         const string source = """
-            §M{Native}
-              §F{Probe:pub} (int:a, int:b) -> int
-                §E{}
-                §B{~count:int} 0
-                §L{i:0:(+ (- a 1) (- b 2)):1}
-                  §ASSIGN count (+ count 1)
-                §R count
+            module Native Native
+              func Probe (int:a, int:b) → int
+                !
+                var int:count = 0
+                for i from 0 to (a - 1) + (b - 2) step 1
+                  set count count + 1
+                return count
             """;
         var result = Program.Compile(source);
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
@@ -59,21 +59,21 @@ public sealed class NativePostfixTests
     {
         var source = Source($"\"${{{hole}}}\"", type: "string");
         var result = Program.Compile(source);
-        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0419");
         Assert.Equal(expected, Invoke(Compile(source, enforceEffects: false), "Probe"));
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0419");
     }
 
     [Fact]
     public void LegacyTypeArrayWitness_PreservesBothElementsThroughRuntimeAndSourceRoundTrip()
     {
         const string source = """
-            §M{Native}
-              §F{Probe:pub} () -> System.Type[]
-                §E{alloc}
-                §B{~_hoist000} §ARR{System.Type} (typeof Model1Validator) (typeof Model2Validator) §/ARR
-                §R _hoist000
-              §CL{Model1Validator:pub}
-              §CL{Model2Validator:pub}
+            module Native Native
+              func Probe () → System.Type[]
+                ! alloc
+                var _hoist000 = new System.Type[] { typeof(Model1Validator), typeof(Model2Validator) }
+                return _hoist000
+              class Model1Validator
+              class Model2Validator
             """;
         var array = Assert.IsType<ArrayCreationNode>(Assert.IsType<BindStatementNode>(
             Assert.Single(Parse(source).Functions).Body[0]).Initializer);
@@ -87,31 +87,31 @@ public sealed class NativePostfixTests
     }
 
     [Theory]
-    [InlineData("§ARR{int} (cast int 1) (cast int 2) §/ARR")]
-    [InlineData("§ARR{int} §A (cast int 1) (cast int 2) §/ARR")]
-    [InlineData("§ARR{int} §A (cast int 1) §A (cast int 2) §/ARR")]
-    [InlineData("§LIST{int} (cast int 1) (cast int 2) §/LIST")]
-    [InlineData("§HSET{int} (cast int 1) (cast int 2) §/HSET")]
-    [InlineData("§DICT{int:int} §KV (cast int 1) (cast int 10) §KV (cast int 2) (cast int 20) §/DICT")]
-    [InlineData("§ARR2D{int} §ROW (cast int 1) (cast int 2) §/ARR2D")]
-    [InlineData("§ARR{int} (Echo (1)) (Echo (2)) §/ARR")]
-    [InlineData("§ARR{int} §A (Echo (1)) (Echo (2)) §/ARR")]
-    [InlineData("§ARR{int} Echo(Echo (1)) (Echo (2)) §/ARR")]
-    [InlineData("§LIST{int} Echo(1) Echo(2) §/LIST")]
-    [InlineData("§HSET{int} (Echo (1)) (Echo (2)) §/HSET")]
-    [InlineData("§DICT{int:int} §KV (Echo (1)) (Echo (10)) §KV (Echo (2)) (Echo (20)) §/DICT")]
-    [InlineData("§ARR2D{int} §ROW (Echo (1)) (Echo (2)) §/ARR2D")]
+    [InlineData("new int[] { (int)1, (int)2 }")]
+    [InlineData("new int[] { ((int)1), (int)2 }")]
+    [InlineData("new int[] { ((int)1), ((int)2) }")]
+    [InlineData("new List<int> { (int)1, (int)2 }")]
+    [InlineData("new HashSet<int> { (int)1, (int)2 }")]
+    [InlineData("new Dictionary<int,int> { { (int)1, (int)10 }, { (int)2, (int)20 } }")]
+    [InlineData("new int[,] { { (int)1, (int)2 } }")]
+    [InlineData("new int[] { (Echo (1)), (Echo (2)) }")]
+    [InlineData("new int[] { Echo (1), (Echo (2)) }")]
+    [InlineData("new int[] { Echo(Echo (1)), (Echo (2)) }")]
+    [InlineData("new List<int> { Echo(1), Echo(2) }")]
+    [InlineData("new HashSet<int> { (Echo (1)), (Echo (2)) }")]
+    [InlineData("new Dictionary<int,int> { { (Echo (1)), (Echo (10)) }, { (Echo (2)), (Echo (20)) } }")]
+    [InlineData("new int[,] { { (Echo (1)), (Echo (2)) } }")]
     public void LegacyCollectionElements_KeepTheirBoundariesAndExplicitNativeCallDelimiters(string expression)
     {
         var source = $$"""
-            §M{Native}
-              §F{Echo:priv} (int:value) -> int
-                §E{}
-                §R value
-              §F{Probe:pub} () -> object
-                §E{alloc}
-                §B{values} {{expression}}
-                §R values
+            module Native Native
+              func Echo private (int:value) → int
+                !
+                return value
+              func Probe () → object
+                ! alloc
+                let values = {{expression}}
+                return values
             """;
         foreach (var candidate in new[] { source, Parse(source).Accept(new CalorEmitter()) })
         {
@@ -184,12 +184,21 @@ public sealed class NativePostfixTests
     [Fact]
     public void GenericCallLookahead_DoesNotJoinTheFollowingPhysicalLine()
     {
-        var body = Assert.Single(Parse("""
-            §M{Native}
-              §F{Probe:pub} () -> void
-                §B{selected} M<int>
+        const string source = """
+            module Native Native
+              func Probe () → void
+                let selected = M<int>
                 (f)
-            """).Functions).Body;
+            """;
+        var diagnostics = new DiagnosticBag();
+        var body = Assert.Single(Parse(source, diagnostics).Functions).Body;
+        var error = Assert.Single(diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.UnexpectedToken, error.Code);
+        Assert.Equal("A native expression statement must be an invocation or object creation.", error.Message);
+        Assert.Equal(4, error.Span.Line);
+        Assert.Equal(5, error.Span.Column);
+        Assert.Equal("(f)", source.Substring(error.Span.Start, error.Span.Length));
+        Assert.Equal(2, body.Count);
         Assert.Equal("M<int>", Assert.IsType<ReferenceNode>(
             Assert.IsType<BindStatementNode>(body[0]).Initializer).Name);
         Assert.IsType<ReferenceNode>(Assert.IsType<ExpressionStatementNode>(body[1]).Expression);
@@ -221,9 +230,9 @@ public sealed class NativePostfixTests
     }
 
     [Theory]
-    [InlineData("§ASSIGN x (+ 1 2)")]
-    [InlineData("§SETIDX{items} 0 (+ 1 2)")]
-    [InlineData("§PUT{map} \"x\" (+ 1 2)")]
+    [InlineData("set x (1 + 2)")]
+    [InlineData("set items[0] (1 + 2)")]
+    [InlineData("set map[\"x\"] (1 + 2)")]
     public void LegacyPositionalOperands_KeepTheirGroupedValue(string statement)
     {
         var body = Assert.Single(Parse(Source(statement, statement: true)).Functions).Body;
@@ -235,24 +244,37 @@ public sealed class NativePostfixTests
             _ => throw new InvalidOperationException()
         };
         Assert.IsType<BinaryOperationNode>(value);
-        Assert.IsType<BinaryOperationNode>(Expression("(+ x (+ 1 2))"));
+        Assert.IsType<BinaryOperationNode>(Expression("x + (1 + 2)"));
         Assert.IsType<CallExpressionNode>(Assert.IsType<BinaryOperationNode>(
-            Expression("(+ f() g())")).Left);
+            Expression("f() + g()")).Left);
     }
 
     [Fact]
     public void LegacyNestedOperands_KeepTheirOuterOperandBoundary()
     {
         var assignment = Assert.IsType<AssignmentStatementNode>(Assert.Single(
-            Assert.Single(Parse(Source("§ASSIGN §IDX items 0 (+ §IDX items 0 4)", statement: true)).Functions).Body));
+            Assert.Single(Parse(Source("set items[0] (items[0] + 4)", statement: true)).Functions).Body));
         Assert.IsType<IntLiteralNode>(Assert.IsType<ArrayAccessNode>(assignment.Target).Index);
         Assert.IsType<BinaryOperationNode>(assignment.Value);
         Assert.IsType<ArrayAccessNode>(Assert.IsType<BinaryOperationNode>(
-            Expression("(+ §IDX items 0 (+ 1 2))")).Left);
-        Assert.IsType<ArrayLengthNode>(Assert.IsType<BinaryOperationNode>(
-            Expression("(+ §LEN items (+ 1 2))")).Left);
+            Expression("items[0] + (1 + 2)")).Left);
+        var lengthSum = Assert.IsType<BinaryOperationNode>(Expression("(items).Length + (1 + 2)"));
+        var length = Assert.IsType<FieldAccessNode>(lengthSum.Left);
+        Assert.Equal("Length", length.FieldName);
+        Assert.Equal("items", Assert.IsType<ReferenceNode>(length.Target).Name);
+        var sibling = Assert.IsType<BinaryOperationNode>(lengthSum.Right);
+        Assert.Equal(BinaryOperator.Add, sibling.Operator);
+        Assert.Equal(1, Assert.IsType<IntLiteralNode>(sibling.Left).Value);
+        Assert.Equal(2, Assert.IsType<IntLiteralNode>(sibling.Right).Value);
+        var type = Compile("""
+            module Native Native
+              func Probe (int[]:items) → int
+                return (items).Length + (1 + 2)
+            """);
+        Assert.Equal(5, Invoke(type, "Probe", new[] { 10, 20 }));
+        Assert.Equal(3, Invoke(type, "Probe", Array.Empty<int>()));
         Assert.IsType<CallExpressionNode>(Assert.IsType<BinaryOperationNode>(
-            Expression("(+ f(g (1), items[h (2)]) 3)")).Left);
+            Expression("f(g (1), items[h (2)]) + 3")).Left);
     }
 
     [Theory]
@@ -261,7 +283,7 @@ public sealed class NativePostfixTests
     [InlineData("x?.Factory().M()")]
     public void NativeConditionalInvocation_PreservesThePostfixChain(string expression)
     {
-        var source = $"module Native\n  func Probe () → object\n    return {expression}\n";
+        var source = $"module Native Native\n  func Probe () → object\n    return {expression}\n";
         var diagnostics = new DiagnosticBag();
         var ast = Parse(source, diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
@@ -284,7 +306,7 @@ public sealed class NativePostfixTests
     public void NativeUnsupportedConditionalForms_RemainGated(string expression)
     {
         var diagnostics = new DiagnosticBag();
-        Parse($"module Native\n  func Probe () → object\n    return {expression}\n", diagnostics);
+        Parse($"module Native Native\n  func Probe () → object\n    return {expression}\n", diagnostics);
         Assert.True(diagnostics.HasErrors, expression);
         Assert.Contains(diagnostics, diagnostic => diagnostic.Message.Contains("not yet supported"));
     }
@@ -293,7 +315,7 @@ public sealed class NativePostfixTests
     public void NativeConditionalInvocation_BindsItsChildrenAndDoesNotLaunderEffects()
     {
         const string source = """
-            module Native
+            module Native Native
               func Step () → int
                 ! cw
                 System.Console.WriteLine(1)
@@ -322,7 +344,7 @@ public sealed class NativePostfixTests
     public void NativeConditionalInvocation_ChargesReceiverAndCoalescingRhsEffects(string expression)
     {
         var source = $$"""
-            module Native
+            module Native Native
               func Produce () → string?
                 ! cw
                 System.Console.WriteLine(1)
@@ -363,10 +385,10 @@ public sealed class NativePostfixTests
     {
         var diagnostics = new DiagnosticBag();
         var module = Parse("""
-            §M{Native}
-              §F{Probe:pub} () -> int
+            module Native Native
+              func Probe () → int
                 f(
-                §R 7
+                return 7
             """, diagnostics);
         Assert.True(diagnostics.HasErrors);
         Assert.Equal(7, Assert.IsType<IntLiteralNode>(Assert.IsType<ReturnStatementNode>(
@@ -377,16 +399,16 @@ public sealed class NativePostfixTests
     public void NativeMemberBinding_RetainsExactDeclarationsAndMetadata()
     {
         var (ast, bound, diagnostics) = Bind("""
-            §M{Native}
-              §F{Use:pub} (Holder:h) -> int
-                §R Get(h).Pick(value: 3)
-              §F{Get:pub} (Holder:h) -> Holder
-                §R h
-              §CL{Holder:pub}
-                §MT{Pick:pub} (int:value) -> int
-                  §R value
-                §MT{Pick:pub} (string:value) -> string
-                  §R value
+            module Native Native
+              func Use (Holder:h) → int
+                return Get(h).Pick(value: 3)
+              func Get (Holder:h) → Holder
+                return h
+              class Holder
+                func Pick (int:value) → int
+                  return value
+                func Pick (string:value) → string
+                  return value
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
@@ -394,19 +416,19 @@ public sealed class NativePostfixTests
             Assert.Single(use.Body)).Expression);
         Assert.Same(call.EvaluatedReceiver, call.Children[0]);
         Assert.Same(call.Arguments[0], call.Children[1]);
-        Assert.Same(bound.Functions.Single(function => function.Symbol.Name == "Holder.Pick"
+        Assert.Same(bound.Functions.Single(function => function.Symbol.Name == "Native.Holder.Pick"
             && function.Symbol.ReturnType == "int").Symbol, call.ResolvedSymbol);
         Assert.Contains($"Holder.{ast.Classes[0].Methods[0].Id}",
             CallGraphAnalysis.Build(ast).ResolveCallSites(ast.Functions[0].Id, "<expression-call>", call.Span));
 
         (_, bound, diagnostics) = Bind("""
-            §M{Native}
-              §F{Array:pub} (System.Globalization.CultureInfo:culture) -> string[]
-                §R culture.DateTimeFormat.GetAllDateTimePatterns()
-              §F{Generic:pub} (System.Collections.ArrayList:items) -> IEnumerable<int>
-                §R items.Cast<int>()
-              §F{Static:pub} (int:x) -> int
-                §R Math.Abs(x)
+            module Native Native
+              func Array (System.Globalization.CultureInfo:culture) → string[]
+                return culture.DateTimeFormat.GetAllDateTimePatterns()
+              func Generic (System.Collections.ArrayList:items) → IEnumerable<int>
+                return items.Cast<int>()
+              func Static (int:x) → int
+                return Math.Abs(x)
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var calls = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>().ToArray();
@@ -425,12 +447,12 @@ public sealed class NativePostfixTests
     public void NativeOverloadErrors_AreNotHidden(string expression)
     {
         var (_, _, diagnostics) = Bind($$"""
-            §M{Native}
-              §F{Use:pub} (Holder:h) -> int
-                §R {{expression}}
-              §CL{Holder:pub}
-                §MT{Pick:pub} (int:value) -> int
-                  §R value
+            module Native Native
+              func Use (Holder:h) → int
+                return {{expression}}
+              class Holder
+                func Pick (int:value) → int
+                  return value
             """);
         Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
     }
@@ -439,17 +461,17 @@ public sealed class NativePostfixTests
     public void NativeGenericAndStaticCalls_KeepNativeIdentityRatherThanBclAliases()
     {
         var source = """
-            §M{Native}
-              §F{Probe:pub} () -> int
-                §R Random.Echo<int>(value: 7)
-              §CL{Random:pub}
-                §MT{Echo<T>:pub:stat} (T:value) -> T
-                  §R value
+            module Native Native
+              func Probe () → int
+                return Random.Echo<int>(value: 7)
+              class Random
+                func Echo<T> static (T:value) → T
+                  return value
             """;
         var (_, bound, diagnostics) = Bind(source);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
-        Assert.Same(bound.Functions.Single(function => function.Symbol.Name == "Random.Echo").Symbol, call.ResolvedSymbol);
+        Assert.Same(bound.Functions.Single(function => function.Symbol.Name == "Native.Random.Echo").Symbol, call.ResolvedSymbol);
         Assert.Equal(["int"], call.TypeArguments);
         Assert.Null(call.ResolvedMetadataMethod);
         Assert.IsType<BoundTypeReferenceExpression>(call.EvaluatedReceiver);
@@ -458,17 +480,17 @@ public sealed class NativePostfixTests
     }
 
     [Theory]
-    [InlineData("  §F{Use:pub}<T> () -> int\n    §R T.Pick()")]
-    [InlineData("  §CL{Container:pub}<T>\n    §MT{Use:pub:stat} () -> int\n      §R T.Pick()")]
-    [InlineData("  §CL{Container:pub}\n    §MT{Use:pub:stat}<T> () -> int\n      §R T.Pick()")]
+    [InlineData("  func Use<T> () → int\n    return T.Pick()")]
+    [InlineData("  class Container<T>\n    func Use static () → int\n      return T.Pick()")]
+    [InlineData("  class Container\n    func Use<T> static () → int\n      return T.Pick()")]
     public void TypeParameterReceivers_DoNotBindAnUnrelatedSourceClass(string declaration)
     {
         var source = $$"""
-            §M{Native}
+            module Native Native
             {{declaration}}
-              §CL{T:pub}
-                §MT{Pick:pub:stat} () -> int
-                  §R 1
+              class T
+                func Pick static () → int
+                  return 1
             """;
         var (_, bound, diagnostics) = Bind(source);
         Assert.True(diagnostics.HasErrors);
@@ -486,25 +508,25 @@ public sealed class NativePostfixTests
     [InlineData(true)]
     public void LexicalValueReceiver_ShadowingAClassRetainsItsRealMethodIdentity(bool inherited)
     {
-        var ownerMember = inherited ? "§EXT{Parent}" : "§FLD{Holder:T:pub:stat}";
+        var ownerMember = inherited ? "extends Parent" : "field Holder:T public static";
         var (_, bound, diagnostics) = Bind($$"""
-            §M{Native}
-              §CL{Owner:pub}
+            module Native Native
+              class Owner
                 {{ownerMember}}
-                §MT{Use:pub:stat} () -> int
-                  §R T.Pick()
-              §CL{Parent:pub}
-                §FLD{Holder:T:pub:stat}
-              §CL{T:pub}
-                §MT{Pick:pub:stat} () -> int
-                  §R 1
-              §CL{Holder:pub}
-                §MT{Pick:pub} () -> int
-                  §R 2
+                func Use static () → int
+                  return T.Pick()
+              class Parent
+                field Holder:T public static
+              class T
+                func Pick static () → int
+                  return 1
+              class Holder
+                func Pick () → int
+                  return 2
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
-        Assert.Same(bound.Functions.Single(function => function.Symbol.Name == "Holder.Pick").Symbol,
+        Assert.Same(bound.Functions.Single(function => function.Symbol.Name == "Native.Holder.Pick").Symbol,
             call.ResolvedSymbol);
         Assert.IsType<BoundVariableExpression>(call.EvaluatedReceiver);
     }
@@ -513,9 +535,9 @@ public sealed class NativePostfixTests
     public void TypeParameterReceiver_DoesNotBindUnrelatedBclMetadata()
     {
         var source = """
-            §M{Native}
-              §F{Use:pub}<Math> () -> int
-                §R Math.Abs(-3)
+            module Native Native
+              func Use<Math> () → int
+                return Math.Abs(-3)
             """;
         var (_, bound, diagnostics) = Bind(source);
         Assert.True(diagnostics.HasErrors);
@@ -532,20 +554,20 @@ public sealed class NativePostfixTests
     public void NestedTypeReceiver_RetainsItsLexicalDeclarationIdentity()
     {
         var (_, bound, diagnostics) = Bind("""
-            §M{Native}
-              §CL{Owner:pub}
-                §MT{Use:pub:stat} () -> int
-                  §R T.Pick()
-                §CL{T:pub}
-                  §MT{Pick:pub:stat} () -> int
-                    §R 2
-              §CL{T:pub}
-                §MT{Pick:pub:stat} () -> int
-                  §R 1
+            module Native Native
+              class Owner
+                func Use static () → int
+                  return T.Pick()
+                class T
+                  func Pick static () → int
+                    return 2
+              class T
+                func Pick static () → int
+                  return 1
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
-        Assert.Same(bound.Functions.Single(function => function.Symbol.Name == "Owner.T.Pick").Symbol,
+        Assert.Same(bound.Functions.Single(function => function.Symbol.Name == "Native.Owner.T.Pick").Symbol,
             call.ResolvedSymbol);
         Assert.Equal(call.ResolvedSymbol!.ContainingTypeName,
             Assert.IsType<BoundTypeReferenceExpression>(call.EvaluatedReceiver).ResolvedType!.QualifiedName);
@@ -567,9 +589,9 @@ public sealed class NativePostfixTests
     public void NativeUnknownCalls_StillFailClosed()
     {
         var result = Program.Compile("""
-            §M{Native}
-              §F{Use:pub} (System.Random:random) -> void
-                §E{}
+            module Native Native
+              func Use (System.Random:random) → void
+                !
                 random.DoesNotExist()
             """, "native-postfix.calr", new CompilationOptions
             { EnableTypeChecking = true, EnforceEffects = true, StatusWriter = TextWriter.Null });
@@ -581,17 +603,16 @@ public sealed class NativePostfixTests
     public void NativeConditionalDelegate_StillInvalidatesCapturedFacts()
     {
         var (_, _, diagnostics) = Bind("""
-            §M{Native}
-              §F{Use:pub} (?string:input, bool:gate) -> int
-                §B{~value:?string} input
-                §B{later:Action} §LAM{}
-                  §ASSIGN value null
-                §/LAM
-                §IF value != null
+            module Native Native
+              func Use (string?:input, bool:gate) → int
+                var string?:value = input
+                let Action:later = () =>
+                  set value null
+                if value != null
                   (gate ? later : later)()
-                  §B{observed:string} value
-                  §R 1
-                §R 0
+                  let string:observed = value
+                  return 1
+                return 0
             """);
         Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == "Calor0272");
     }
@@ -601,7 +622,7 @@ public sealed class NativePostfixTests
     {
         var type = Compile(RuntimeSource("""
             GetLists(trace, items)[Index(trace)].Add(Number(trace, 3))
-            §R items[0].IndexOf(3)
+            return items[0].IndexOf(3)
             """));
         var trace = new List<int>();
         var items = new[] { new List<int>() };
@@ -618,7 +639,7 @@ public sealed class NativePostfixTests
     [InlineData("true ? GetLists(trace, items)[Index(trace)].Contains(Number(trace, 3)) : false", true, true)]
     public void NativeCalls_StayInsideLazyRegions(string expression, bool expected, bool evaluated)
     {
-        var type = Compile(RuntimeSource($"§R {expression}", "bool"));
+        var type = Compile(RuntimeSource($"return {expression}", "bool"));
         var trace = new List<int>();
         Assert.Equal(expected, Invoke(type, "Probe", trace, new[] { new List<int> { 3 } }));
         Assert.Equal(evaluated ? [1, 2, 3] : Array.Empty<int>(), trace);
@@ -630,7 +651,7 @@ public sealed class NativePostfixTests
     public void NativeExceptions_StopBeforeLaterOperands(string index)
     {
         var type = Compile(RuntimeSource(
-            $"GetLists(trace, items)[{index}].Add(Number(trace, 3))\n§R 0", zero: true));
+            $"GetLists(trace, items)[{index}].Add(Number(trace, 3))\nreturn 0", zero: true));
         var trace = new List<int>();
         var error = Assert.Throws<TargetInvocationException>(() =>
             Invoke(type, "Probe", trace, Array.Empty<List<int>>(), 0));
@@ -642,7 +663,7 @@ public sealed class NativePostfixTests
     public void NativeArgumentExceptions_StopBeforeLaterArguments()
     {
         var type = Compile(RuntimeSource(
-            "GetLists(trace, items)[0].Insert(Number(trace, 2) / zero, Number(trace, 3))\n§R 0", zero: true));
+            "GetLists(trace, items)[0].Insert(Number(trace, 2) / zero, Number(trace, 3))\nreturn 0", zero: true));
         var trace = new List<int>();
         var items = new[] { new List<int>() };
         var error = Assert.Throws<TargetInvocationException>(() => Invoke(type, "Probe", trace, items, 0));
@@ -657,7 +678,7 @@ public sealed class NativePostfixTests
     public void NativeCalls_StayInsideCoalescingFallbacks(string value, int expected, bool evaluated)
     {
         var type = Compile(RuntimeSource(
-            $"§B{{value:?int}} {value}\n§R value ?? GetLists(trace, items)[Index(trace)].IndexOf(Number(trace, 3))"));
+            $"let int?:value = {value}\nreturn value ?? GetLists(trace, items)[Index(trace)].IndexOf(Number(trace, 3))"));
         var trace = new List<int>();
         Assert.Equal(expected, Invoke(type, "Probe", trace, new[] { new List<int> { 3 } }));
         Assert.Equal(evaluated ? [1, 2, 3] : Array.Empty<int>(), trace);
@@ -669,10 +690,10 @@ public sealed class NativePostfixTests
     public void NativeConditionalDelegate_ExecutesOnlyTheSelectedTarget(bool gate, int expected)
     {
         var type = Compile("""
-            §M{Native}
-              §F{Probe:pub} (bool:gate, Func<int,int>:first §E{}, Func<int,int>:second §E{}) -> int
-                §E{}
-                §R (gate ? first : second)(7)
+            module Native Native
+              func Probe (bool:gate, Func<int,int>:first !, Func<int,int>:second !) → int
+                !
+                return (gate ? first : second)(7)
             """);
         var calls = new List<int>();
         Func<int, int> first = value => { calls.Add(1); return value + 1; };
@@ -688,16 +709,16 @@ public sealed class NativePostfixTests
     public void NativeNamesAndModifiers_RoundTripAndExecute(string modifier, int expected)
     {
         var source = $$"""
-            §M{Native}
-              §F{Probe:pub} (Holder:h) -> int
-                §E{mut}
-                §B{~value:int} 2
+            module Native Native
+              func Probe (Holder:h) → int
+                ! mut
+                var int:value = 2
                 h.Update(item: {{modifier}} value)
-                §R value
-              §CL{Holder:pub}
-                §MT{Update:pub} (int:item:{{modifier}}) -> void
-                  §E{mut}
-                  {{(modifier == "in" ? "§B{observed:int} item" : "§ASSIGN item 7")}}
+                return value
+              class Holder
+                func Update ({{modifier}} int:item) → void
+                  ! mut
+                  {{(modifier == "in" ? "let int:observed = item" : "set item 7")}}
             """;
         var ast = Parse(source);
         var roundTrip = ast.Accept(new CalorEmitter());
@@ -713,14 +734,14 @@ public sealed class NativePostfixTests
     public void NativeFactoryReturnRows_RemainEnforced(bool permitsWrite)
     {
         var result = Program.Compile($$"""
-            §M{Native}
-              §F{Use:pub} (Holder:h) -> int
-                §E{ {{(permitsWrite ? "cw" : "")}} }
-                §R h.Make()()
-              §CL{Holder:pub}
-                §MT{Make:pub} () -> Func<int> §E{cw}
-                  §E{}
-                  §R §LAM{} 0 §/LAM
+            module Native Native
+              func Use (Holder:h) → int
+                ! {{(permitsWrite ? "cw" : "")}}
+                return h.Make()()
+              class Holder
+                func Make () → Func<int> ! cw
+                  !
+                  return () => 0
             """, "native-postfix.calr", new CompilationOptions
             { EnableTypeChecking = true, EnforceEffects = true, StatusWriter = TextWriter.Null });
         Assert.Equal(!permitsWrite, result.HasErrors);
@@ -770,15 +791,15 @@ public sealed class NativePostfixTests
     public void NameofInterpolation_KeepsItsExistingIntrinsicRoute(string hole, string expected)
     {
         var source = $$"""
-            §M{Native}
-              §F{Probe:pub} (int:n) -> string
-                §R "${{{hole}}}"
+            module Native Native
+              func Probe (int:n) → string
+                return "${{{hole}}}"
             """;
         var interpolation = Assert.IsType<InterpolatedStringNode>(Assert.IsType<ReturnStatementNode>(
             Assert.Single(Assert.Single(Parse(source).Functions).Body)).Expression);
+        Assert.Equal(expected, Invoke(Compile(source), "Probe", 12));
         Assert.IsType<RawCSharpExpressionNode>(Assert.IsType<InterpolatedStringExpressionNode>(
             Assert.Single(interpolation.Parts)).Expression);
-        Assert.Equal(expected, Invoke(Compile(source), "Probe", 12));
     }
 
     [Theory]
@@ -791,24 +812,24 @@ public sealed class NativePostfixTests
     public void NativeCallInterpolation_UnsafeStringOperandsKeepTheirCSharpRuntimeValue(string hole, string expected)
     {
         var source = $$"""
-            §M{Native}
-              §F{Probe:pub} (int:x) -> string
-                §R "${{{hole}}}"
+            module Native Native
+              func Probe (int:x) → string
+                return "${{{hole}}}"
             """;
         var interpolation = Assert.IsType<InterpolatedStringNode>(Assert.IsType<ReturnStatementNode>(
             Assert.Single(Assert.Single(Parse(source).Functions).Body)).Expression);
+        Assert.Equal(expected, Invoke(Compile(source, enforceEffects: false), "Probe", 7));
         Assert.IsType<RawCSharpExpressionNode>(Assert.IsType<InterpolatedStringExpressionNode>(
             Assert.Single(interpolation.Parts)).Expression);
-        Assert.Equal(expected, Invoke(Compile(source, enforceEffects: false), "Probe", 7));
     }
 
     [Fact]
     public void NativeNamedCallInterpolation_HasExactMetadataAndRealOutput()
     {
         const string source = """
-            §M{Native}
-              §F{Probe:pub} (int:n) -> string
-                §R "v=${Math.Max(val1: n, val2: 3)}"
+            module Native Native
+              func Probe (int:n) → string
+                return "v=${Math.Max(val1: n, val2: 3)}"
             """;
         var (_, bound, diagnostics) = Bind(source);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
@@ -823,28 +844,28 @@ public sealed class NativePostfixTests
     }
 
     private static string RuntimeSource(string body, string type = "int", bool zero = false) => $$"""
-        §M{Native}
-          §F{Probe:pub} (List<int>:trace, List<int>[]:items{{(zero ? ", int:zero" : "")}}) -> {{type}}
-            §E{mut}
+        module Native Native
+          func Probe (List<int>:trace, List<int>[]:items{{(zero ? ", int:zero" : "")}}) → {{type}}
+            ! mut
         {{string.Join("\n", body.Split('\n').Select(line => "    " + line))}}
-          §F{GetLists:priv} (List<int>:trace, List<int>[]:items) -> List<int>[]
-            §E{mut}
+          func GetLists private (List<int>:trace, List<int>[]:items) → List<int>[]
+            ! mut
             trace.Add(1)
-            §R items
-          §F{Index:priv} (List<int>:trace) -> int
-            §E{mut}
+            return items
+          func Index private (List<int>:trace) → int
+            ! mut
             trace.Add(2)
-            §R 0
-          §F{Number:priv} (List<int>:trace, int:value) -> int
-            §E{mut}
+            return 0
+          func Number private (List<int>:trace, int:value) → int
+            ! mut
             trace.Add(value)
-            §R value
+            return value
         """;
 
     private static string Source(string expression, bool statement = false, string type = "int") => $$"""
-        §M{Native}
-          §F{Probe:pub} () -> {{type}}
-            {{(statement ? "" : "§R ")}}{{expression}}
+        module Native Native
+          func Probe () → {{type}}
+            {{(statement ? "" : "return ")}}{{expression}}
         """;
 
     private static string Slice(string expression, int start, TextSpan span) =>
