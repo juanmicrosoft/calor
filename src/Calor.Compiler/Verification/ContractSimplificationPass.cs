@@ -326,7 +326,11 @@ public sealed class ContractSimplificationPass
             simplifiedPreconditions,
             simplifiedPostconditions,
             method.Attributes,
-            method.CSharpAttributes));
+            method.CSharpAttributes)
+        {
+            IdentifierSpan = method.IdentifierSpan,
+            EffectParameters = method.EffectParameters
+        });
     }
 
     private IReadOnlyList<T> SimplifyContracts<T>(IReadOnlyList<T> contracts, Func<T, T> simplifier)

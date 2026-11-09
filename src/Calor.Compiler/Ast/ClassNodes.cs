@@ -161,6 +161,7 @@ public sealed class MethodSignatureNode : AstNode
     public string Id => ToolingId ?? LocalId;
     public string LocalId { get; }
     public string Name { get; }
+    public TextSpan IdentifierSpan { get; init; }
     public IReadOnlyList<TypeParameterNode> TypeParameters { get; }
 
     /// <summary>
@@ -243,6 +244,7 @@ public sealed class MethodSignatureNode : AstNode
     {
         LocalId = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = span;
         TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));
         Parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
         Output = output;

@@ -7,6 +7,7 @@ using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
+using Calor.Compiler.Verification;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
@@ -15,6 +16,354 @@ namespace Calor.Compiler.Tests;
 
 public sealed class NativePostfixTests
 {
+    [Theory]
+    [InlineData("", "", false)]
+    [InlineData("cw", "", true)]
+    [InlineData("cw", "cw", false)]
+    public void InterfaceReceiver_ChargesTheSelectedDeclarationContract(
+        string declared, string caller, bool forbidden)
+    {
+        var source = $$"""
+            module Native Native
+              interface IReader
+                func Read () → int
+                  ! {{declared}}
+              class Reader
+                implements IReader
+                func Read () → int
+                  !
+                  return 9
+              func Probe (IReader:value) → int
+                ! {{caller}}
+                return value.Read()
+            """;
+        var (ast, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        var symbol = Assert.IsType<FunctionSymbol>(call.ResolvedSymbol);
+        Assert.Equal("Native.IReader.Read", symbol.Name);
+        Assert.Equal(Assert.Single(ast.Interfaces[0].Methods).Span, symbol.DefinitionSpan);
+        Assert.Equal("Read", source.Substring(symbol.DeclarationSpan.Start, symbol.DeclarationSpan.Length));
+        Assert.Equal("Read", source.Substring(call.CalleeSpan.Start, call.CalleeSpan.Length));
+        Assert.Null(call.ResolvedMetadataMethod);
+        var result = Program.Compile(source);
+        Assert.Equal(forbidden, result.HasErrors);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.AssumedEffects);
+        if (forbidden)
+            Assert.All(result.Diagnostics.Errors, diagnostic => Assert.Equal(DiagnosticCode.ForbiddenEffect, diagnostic.Code));
+        else
+        {
+            var type = Compile(source);
+            Assert.Equal(9, Invoke(type, "Probe", Activator.CreateInstance(type.Assembly.GetType("Native.Reader")!)));
+        }
+    }
+
+    [Theory]
+    [InlineData("\"text\"", "", false, "ITextReader")]
+    [InlineData("1", "", true, "IIntReader")]
+    [InlineData("1", "cw", false, "IIntReader")]
+    public void InterfaceReceiver_InheritedOverloadsKeepTheirOwnRows(
+        string argument, string caller, bool forbidden, string selectedOwner)
+    {
+        var source = $$"""
+            module Native Native
+              interface IIntReader
+                func Read (int:x) → int
+                  ! cw
+              interface ITextReader
+                func Read (string:x) → int
+                  !
+              interface IReader
+                extends IIntReader
+                extends ITextReader
+              func Probe (IReader:value) → int
+                ! {{caller}}
+                return value.Read({{argument}})
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Equal("Native." + selectedOwner + ".Read", Assert.IsType<FunctionSymbol>(call.ResolvedSymbol).Name);
+        var result = Program.Compile(source);
+        Assert.Equal(forbidden, result.HasErrors);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        if (forbidden)
+            Assert.All(result.Diagnostics.Errors, diagnostic => Assert.Equal(DiagnosticCode.ForbiddenEffect, diagnostic.Code));
+    }
+
+    [Theory]
+    [InlineData("true", DiagnosticCode.NoMatchingOverload)]
+    [InlineData("missing", DiagnosticCode.UndefinedReference)]
+    public void InterfaceReceiver_InvalidArgumentsDoNotAcquireAContract(string argument, string code)
+    {
+        var source = $$"""
+            module Native Native
+              interface IReader
+                func Read (int:x) → int
+                  !
+              func Probe (IReader:value) → int
+                !
+                return value.Read({{argument}})
+            """;
+        var result = Program.Compile(source);
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == code);
+    }
+
+    [Fact]
+    public void InterfaceReceiver_ConflictingInheritedSignaturesRemainAmbiguous()
+    {
+        const string source = """
+            module Native Native
+              interface IQuiet
+                func Read () → int
+                  !
+              interface ILoud
+                func Read () → int
+                  ! cw
+              interface IReader
+                extends IQuiet
+                extends ILoud
+              func Probe (IReader:value) → int
+                !
+                return value.Read()
+            """;
+        var result = Program.Compile(source);
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.AmbiguousOverload);
+        var compilation = CSharpCompilation.Create("InterfaceAmbiguity",
+            [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble
+                + new CSharpEmitter().Emit(Parse(source)))],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.Contains(compilation.GetDiagnostics(), diagnostic => diagnostic.Id == "CS0121");
+    }
+
+    [Theory]
+    [InlineData("", true)]
+    [InlineData("cw", false)]
+    public void InterfaceReceiver_NestedSameNamedDeclarationsKeepTheirOwnIdentity(string caller, bool forbidden)
+    {
+        var source = $$"""
+            module Native Native
+              class Left
+                interface IReader
+                  func Read () → int
+                    ! cw
+              class Right
+                interface IReader
+                  func Read () → int
+                    !
+              func Probe (Left.IReader:left, Right.IReader:right) → int
+                ! {{caller}}
+                return left.Read() + right.Read()
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var calls = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>().ToArray();
+        Assert.Equal(["Native.Left.IReader.Read", "Native.Right.IReader.Read"],
+            calls.Select(call => Assert.IsType<FunctionSymbol>(call.ResolvedSymbol).Name));
+        Assert.NotEqual(calls[0].ResolvedSymbol!.Id, calls[1].ResolvedSymbol!.Id);
+        var result = Program.Compile(source);
+        Assert.Equal(forbidden, result.HasErrors);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.AssumedEffects);
+        if (forbidden)
+            Assert.All(result.Diagnostics.Errors, diagnostic => Assert.Equal(DiagnosticCode.ForbiddenEffect, diagnostic.Code));
+        else
+            Assert.True(GeneratedCSharpCompiler.Validate(result.GeneratedCode).CompilationSuccess);
+    }
+
+    [Theory]
+    [InlineData("Read")]
+    [InlineData("@Read")]
+    public void InterfaceReceiver_ConvertedSignaturesKeepTheOriginalIdentifierSpan(string identifier)
+    {
+        var source = $"public interface IReader {{ int {identifier}(); }}";
+        var result = new CSharpToCalorConverter(new ConversionOptions
+            { UserManifestRoot = global::Calor.Tests.Shared.HermeticCalorHome.EmptyManifestRoot }).Convert(source);
+        Assert.True(result.Success, string.Join("\n", result.Issues));
+        var signature = Assert.Single(Assert.Single(result.Ast!.Interfaces).Methods);
+        Assert.Equal(identifier, signature.Name);
+        Assert.Equal(identifier, source.Substring(signature.IdentifierSpan.Start, signature.IdentifierSpan.Length));
+    }
+
+    [Fact]
+    public void InterfaceReceiver_ContractSimplificationKeepsTheOriginalIdentifierSpan()
+    {
+        const string source = """
+            module Native Native
+              interface IReader
+                func Read () → int
+                  !
+                  requires 2 > 1
+            """;
+        var ast = Parse(source);
+        var signature = Assert.Single(Assert.Single(ast.Interfaces).Methods);
+        var diagnostics = new DiagnosticBag();
+        var simplified = new ContractSimplificationPass(diagnostics).Simplify(ast);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var rewritten = Assert.Single(Assert.Single(simplified.Interfaces).Methods);
+        Assert.NotSame(signature, rewritten);
+        Assert.Equal(signature.IdentifierSpan, rewritten.IdentifierSpan);
+        Assert.Equal("Read", source.Substring(rewritten.IdentifierSpan.Start, rewritten.IdentifierSpan.Length));
+    }
+
+    [Fact]
+    public void InterfaceReceiver_ConditionalPreservationDoesNotAcquireANativeContract()
+    {
+        const string original = """
+            public interface IReader
+            {
+                int Read();
+            #if EXTRA
+                int Read(int value);
+            #endif
+            }
+            """;
+        var converted = new CSharpToCalorConverter(new ConversionOptions
+            { UserManifestRoot = global::Calor.Tests.Shared.HermeticCalorHome.EmptyManifestRoot }).Convert(original);
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        var declaration = Assert.Single(converted.Ast!.Interfaces);
+        Assert.Single(declaration.Methods);
+        Assert.Single(declaration.PreprocessorBlocks);
+        var source = converted.CalorSource + """
+
+              func Probe (IReader:value) → int
+                !
+                return value.Read()
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Null(call.ResolvedSymbol);
+        var result = Program.Compile(source);
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
+    [Fact]
+    public void InterfaceReceiver_ImplementationCannotWidenTheContract()
+    {
+        const string source = """
+            module Native Native
+              interface IReader
+                func Read () → int
+                  !
+              class Reader
+                implements IReader
+                func Read () → int
+                  ! cw
+                  System.Console.Write("called")
+                  return 9
+              func Probe (IReader:value) → int
+                !
+                return value.Read()
+            """;
+        var result = Program.Compile(source);
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.InterfaceEffectVariance);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
+    [Fact]
+    public void InterfaceReceiver_NestedImplementationCannotWidenTheContract()
+    {
+        const string source = """
+            module Native Native
+              class Outer
+                interface IReader
+                  func Read () → int
+                    !
+              class Reader
+                implements Outer.IReader
+                func Read () → int
+                  ! cw
+                  System.Console.Write("called")
+                  return 9
+              func Probe (Outer.IReader:value) → int
+                !
+                return value.Read()
+            """;
+        var result = Program.Compile(source);
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.InterfaceEffectVariance);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
+    [Fact]
+    public void InterfaceReceiver_MethodTypeArgumentsAndNamedArgumentsRetainClrBehavior()
+    {
+        const string source = """
+            module Native Native
+              interface IReader
+                func Echo<T> (T:value) → T
+                  !
+                func Read (int:first, int:second = 4) → int
+                  !
+              class Reader
+                implements IReader
+                func Echo<T> (T:value) → T
+                  !
+                  return value
+                func Read (int:first, int:second = 4) → int
+                  !
+                  return first * 10 + second
+              func Probe (IReader:value) → int
+                !
+                return value.Echo<int>(9) + value.Read(second: 2, first: 3) + value.Read(1)
+            """;
+        var type = Compile(source);
+        Assert.Equal(55, Invoke(type, "Probe", Activator.CreateInstance(type.Assembly.GetType("Native.Reader")!)));
+    }
+
+    [Fact]
+    public void InterfaceReceiver_DiamondInheritanceRetainsOneDeclarationIdentity()
+    {
+        const string source = """
+            module Native Native
+              interface IReader
+                func Read () → int
+                  !
+              interface ILeft
+                extends IReader
+              interface IRight
+                extends IReader
+              interface IBoth
+                extends ILeft
+                extends IRight
+              func Probe (IBoth:value) → int
+                !
+                return value.Read()
+            """;
+        var result = Program.Compile(source);
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Equal("Native.IReader.Read", Assert.Single(call.ResolvedSymbols).Name);
+        Assert.True(GeneratedCSharpCompiler.Validate(result.GeneratedCode).CompilationSuccess);
+    }
+
+    [Fact]
+    public void InterfaceReceiver_ExternalNamesDoNotBorrowSourceContracts()
+    {
+        const string source = """
+            module Native Native
+              interface IDisposable
+                func Dispose () → void
+                  !
+              func Probe (System.IDisposable:value) → void
+                value.Dispose()
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Null(call.ResolvedSymbol);
+        Assert.Equal("System.IDisposable", call.ResolvedMetadataMethod!.ContainingType.ToDisplayString());
+    }
+
     [Theory]
     [InlineData("", "", false)]
     [InlineData("cw", "", true)]

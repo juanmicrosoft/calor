@@ -57,12 +57,11 @@ public class DocDriftCheckerTests
             "GlobalModule.Main()",
             "GlobalModule.Classify(15) + \":\" + GlobalModule.Classify(3) + \":\" + GlobalModule.Classify(5) + \":\" + GlobalModule.Classify(7)",
             "GlobalModule.CountEvens(6)", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Word(2)" })]
-    [InlineData("inheritance.mdx", 8, 1,
-        new[] { "ClassModifiers", "VirtualDispatch", "InterfaceInheritance", "SealedOverride", "BaseMethods",
+    [InlineData("inheritance.mdx", 8, 0,
+        new[] { "ClassModifiers", "VirtualDispatch", "InterfaceInheritance", "InterfaceDispatch", "SealedOverride", "BaseMethods",
             "BaseConstructors", "ShapeHierarchy" },
-        new[] { "59", "Woof!", "...:Rex:7", "42", "15", "Rex:Collie", "Circle with area 78.53975" },
-        new[] { "GlobalModule.Main()", "GlobalModule.Main()",
-            "((IPet)new Dog()).Name() == \"Rex\" && ((ITrainable)new Dog()).Train() == 7 ? GlobalModule.Main() : \"incorrect interface dispatch\"",
+        new[] { "59", "Woof!", "...:Rex:7", "9", "42", "15", "Rex:Collie", "Circle with area 78.53975" },
+        new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()",
             "GlobalModule.Main()",
             "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Demo()" })]
     public void PublicNativeReference_CompilesPositiveAndExactNegativeExamples(
@@ -98,40 +97,32 @@ public class DocDriftCheckerTests
         Assert.True(diagnostics.Count == 0, string.Join("\n", diagnostics));
     }
 
-    [Theory]
-    [InlineData("InterfaceDispatchLimit", 1, "GlobalModule.ReadThroughInterface(new Quiet())", "9")]
-    public void PublicInheritanceLimitations_RejectNativeEffectsSeparatelyFromClrBehavior(
-        string moduleName, int errorCount, string expression, string expected)
+    [Fact]
+    public void PublicInheritanceInterfaceCall_CompilesOriginalSourceWithoutPolicyOrRowChanges()
     {
-        const string relativePath = "website/content/syntax-reference/inheritance.mdx";
-        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), relativePath));
-        var programs = ExemplarCompileChecker.ExtractCompletePrograms(
-            content.Replace("```calor expect=Calor0410,Calor0411", "```calor", StringComparison.Ordinal));
-        var program = Assert.Single(programs.Where(program =>
-            program.Source.StartsWith("module " + moduleName + "\n", StringComparison.Ordinal)));
-        var rejected = Program.Compile(program.Source, relativePath);
-        Assert.True(rejected.HasErrors);
-        Assert.Equal(errorCount, rejected.Diagnostics.Errors.Count());
-        Assert.All(rejected.Diagnostics.Errors,
-            diagnostic => Assert.Equal(DiagnosticCode.ForbiddenEffect, diagnostic.Code));
-        Assert.Single(rejected.Diagnostics.Where(diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall));
-        Assert.DoesNotContain(rejected.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.AssumedEffects);
+        const string source = """
+            module InterfaceDispatchLimit
+              interface IQuiet
+                func Read () → int
+                  !
 
-        var clrOnly = Program.Compile(program.Source, relativePath,
-            new CompilationOptions { EnableTypeChecking = true, EnforceEffects = false, StatusWriter = TextWriter.Null });
-        Assert.False(clrOnly.HasErrors, string.Join("\n", clrOnly.Diagnostics));
-        var implementation = moduleName == "InterfaceDispatchLimit"
-            ? "public sealed class Quiet : IQuiet { public int Read() => 9; }"
-            : "";
-        var observed = InteropScope.RefOutImplementationTests.Run(clrOnly.GeneratedCode + $$"""
+              func ReadThroughInterface (IQuiet:value) → int
+                !
+                return value.Read()
+            """;
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic =>
+            diagnostic.Code is DiagnosticCode.UnknownExternalCall or DiagnosticCode.AssumedEffects);
+        var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + """
 
-            {{implementation}}
+            public sealed class Quiet : IQuiet { public int Read() => 9; }
             public static class Probe
             {
-                public static object? Run() => {{expression}};
+                public static object? Run() => GlobalModule.ReadThroughInterface(new Quiet());
             }
             """);
-        Assert.Equal(expected, observed);
+        Assert.Equal("9", observed);
     }
 
     [Theory]

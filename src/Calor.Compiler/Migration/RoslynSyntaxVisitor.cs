@@ -3882,7 +3882,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             output,
             effects: null,
             new AttributeCollection(),
-            csharpAttrs);
+            csharpAttrs)
+        {
+            IdentifierSpan = GetTextSpan(node.Identifier)
+        };
     }
 
     private MethodNode ConvertMethod(MethodDeclarationSyntax node)

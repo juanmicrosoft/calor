@@ -434,7 +434,7 @@ public sealed class CallGraphAnalysis
     }
 
     /// <summary>
-    /// Enumerates all interfaces in a module, including §PP-wrapped ones.
+    /// Enumerates all interfaces in a module, including nested and §PP-wrapped ones.
     /// </summary>
     public static IEnumerable<InterfaceDefinitionNode> EnumerateInterfaces(ModuleNode module)
     {
@@ -449,6 +449,18 @@ public sealed class CallGraphAnalysis
                     yield return iface;
                 branch = branch.ElseBranch;
             }
+        }
+        foreach (var cls in EnumerateClasses(module))
+            foreach (var iface in NestedInterfaces(cls))
+                yield return iface;
+
+        static IEnumerable<InterfaceDefinitionNode> NestedInterfaces(ClassDefinitionNode cls)
+        {
+            foreach (var iface in cls.NestedInterfaces)
+                yield return iface;
+            foreach (var nested in cls.NestedClasses)
+                foreach (var iface in NestedInterfaces(nested))
+                    yield return iface;
         }
     }
 
@@ -567,6 +579,23 @@ public sealed class CallGraphAnalysis
             AddUniqueName(functionNameToId, ambiguousFunctionNames, function.Name, function.Id);
             calleeToCallers[function.Id] = new List<string>();
             callerToCallees[function.Id] = new List<(string, TextSpan)>();
+        }
+
+        foreach (var declaration in EnumerateInterfaces(ast))
+        {
+            foreach (var method in declaration.Methods)
+            {
+                var wrapped = new FunctionNode(method.Span, $"{declaration.Name}.{method.Id}",
+                    $"{declaration.Name}.{method.Name}", Visibility.Public, method.TypeParameters,
+                    method.Parameters, method.Output, method.Effects, method.Preconditions,
+                    method.Postconditions, Array.Empty<StatementNode>(), method.Attributes)
+                {
+                    EffectParameters = method.EffectParameters
+                };
+                functions[wrapped.Id] = wrapped;
+                calleeToCallers[wrapped.Id] = [];
+                callerToCallees[wrapped.Id] = [];
+            }
         }
 
         // Index class methods and constructors (including §PP-wrapped members
@@ -808,6 +837,20 @@ public sealed class CallGraphAnalysis
                         .Take(2).ToArray();
                     if (declarations is [var declaration])
                         legacyIds.TryAdd(declaration.Id, $"{cls.Name}.{method.Id}");
+                }
+            }
+            foreach (var declaration in EnumerateInterfaces(ast))
+            {
+                var owners = typeDeclarations[(declaration.Span, declaration.IdentifierSpan)]
+                    .Where(symbol => symbol.Name == declaration.Name).Take(2).ToArray();
+                if (owners is not [var owner])
+                    continue;
+                foreach (var method in declaration.Methods)
+                {
+                    var symbols = callableDeclarations[(owner.QualifiedName, method.Span, method.IdentifierSpan)]
+                        .Take(2).ToArray();
+                    if (symbols is [var symbol])
+                        legacyIds.TryAdd(symbol.Id, $"{declaration.Name}.{method.Id}");
                 }
             }
             // 0.25 F3 (#847): a local body is indexed under its enclosing callable's id.

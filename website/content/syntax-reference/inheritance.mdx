@@ -86,8 +86,8 @@ one base class and implement multiple interfaces. Interface members declare
 signatures without bodies.
 
 The declarations below implement both interfaces and inherit `Animal.Speak`.
-The program calls the interface implementations through the concrete `Dog`
-type and returns `"...:Rex:7"`.
+The same object can be viewed through its base class and each interface.
+This program returns `"...:Rex:7"`.
 
 ```calor
 module InterfaceInheritance
@@ -116,26 +116,37 @@ module InterfaceInheritance
     ! alloc
     let Dog:dog = new Dog()
     let Animal:animal = dog
-    return "${animal.Speak()}:${dog.Name()}:${dog.Train()}"
+    let IPet:pet = dog
+    let ITrainable:trainee = dog
+    return "${animal.Speak()}:${pet.Name()}:${trainee.Train()}"
 ```
 
-### Current interface-call limitation
+### Calls through an interface
 
-The effect checker currently cannot connect this native interface call to its
-declared effect row. It reports `Calor0410` (an undeclared effect) and a
-`Calor0411` unknown-call warning for the pure call below. This is a compiler
-limitation, not an impure implementation. The concrete-class calls above do not
-establish support for this path.
+An interface call charges the selected declaration's effect row. An
+implementation may use fewer effects, but cannot add effects outside that row.
+Here `ReadThroughInterface` remains pure; `Main` declares allocation for creating
+the object and returns `9`.
 
-```calor expect=Calor0410,Calor0411
-module InterfaceDispatchLimit
+```calor
+module InterfaceDispatch
   interface IQuiet
     func Read () → int
       !
 
+  class Quiet
+    implements IQuiet
+    func Read () → int
+      !
+      return 9
+
   func ReadThroughInterface (IQuiet:value) → int
     !
     return value.Read()
+
+  func Main () → int
+    ! alloc
+    return ReadThroughInterface(new Quiet())
 ```
 
 ## Method modifiers

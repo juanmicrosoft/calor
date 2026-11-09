@@ -99,6 +99,7 @@ public sealed class Binder
     private readonly Dictionary<ClassDefinitionNode, TypeSymbol> _classSymbols = new();
     private readonly Dictionary<string, ClassDefinitionNode> _classesByQualifiedName = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<ClassDefinitionNode>> _classesBySimpleName = new(StringComparer.Ordinal);
+    private readonly Dictionary<SymbolId, (TypeSymbol Symbol, InterfaceDefinitionNode Declaration)> _interfacesBySymbolId = new();
     private readonly Dictionary<string, DelegateDefinitionNode> _delegateDefinitions = new(StringComparer.Ordinal);
     private readonly Dictionary<VariableSymbol, VariableSymbol> _flowNarrowingSources = new();
     private readonly Dictionary<VariableSymbol, CallableMutationSummary> _callableState =
@@ -959,6 +960,7 @@ public sealed class Binder
         _classSymbolIds.Clear();
         _classSymbols.Clear();
         _classesByQualifiedName.Clear();
+        _interfacesBySymbolId.Clear();
         _classesBySimpleName.Clear();
         _delegateDefinitions.Clear();
         _flowNarrowingSources.Clear();
@@ -1068,15 +1070,7 @@ public sealed class Binder
     {
         foreach (var @interface in module.Interfaces)
         {
-            RegisterTypeSymbol(
-                _moduleSymbolId,
-                "interface",
-                @interface.Id,
-                @interface.Name,
-                GetQualifiedTypeName(@interface),
-                Visibility.Public,
-                @interface.IdentifierSpan,
-                @interface.Span);
+            RegisterInterface(@interface, _moduleSymbolId, GetQualifiedTypeName(@interface));
         }
 
         foreach (var @enum in module.Enums)
@@ -1126,7 +1120,7 @@ public sealed class Binder
         }
     }
 
-    private void RegisterTypeSymbol(
+    private TypeSymbol RegisterTypeSymbol(
         SymbolId parentIdentity,
         string kind,
         string stableAstId,
@@ -1136,7 +1130,7 @@ public sealed class Binder
         Parsing.TextSpan declarationSpan,
         Parsing.TextSpan definitionSpan)
     {
-        TrackSymbol(new TypeSymbol(
+        var symbol = new TypeSymbol(
             CreateDeclarationId(parentIdentity, kind, stableAstId, qualifiedName),
             name,
             qualifiedName,
@@ -1148,8 +1142,30 @@ public sealed class Binder
             isDelegate: kind == "delegate")
         {
             IsReferenceType = kind is "interface" or "delegate"
-        });
+        };
+        TrackSymbol(symbol);
+        return symbol;
+    }
 
+    private void RegisterInterface(InterfaceDefinitionNode declaration, SymbolId parentIdentity, string qualifiedName)
+    {
+        var owner = RegisterTypeSymbol(parentIdentity, "interface", declaration.Id, declaration.Name,
+            qualifiedName, declaration.Visibility, declaration.IdentifierSpan, declaration.Span);
+        _interfacesBySymbolId.Add(owner.Id, (owner, declaration));
+        foreach (var method in declaration.Methods)
+        {
+            var lookupName = $"{qualifiedName}.{GetCallableLookupName(method.Name)}";
+            var symbol = CreateFunctionSymbol(
+                CreateDeclarationId(owner.Id, "interface-method", method.Id,
+                    CallableIdentityKey(method.Name, method.Parameters, method.TypeParameters)),
+                $"{qualifiedName}.{method.Name}", method.Output?.TypeName ?? "VOID",
+                GetCallableTypeParameters(method.Name, method.TypeParameters.Select(parameter => parameter.Name)),
+                method.Parameters, method.IdentifierSpan, Visibility.Public, qualifiedName, method.Span,
+                output: method.Output, effectParameters: method.EffectParameters);
+            _functionSymbols.Add(method, symbol);
+            if (!_scope.TryDeclareOverload(lookupName, symbol, out var duplicate))
+                ReportDuplicateSignature(method.Span, lookupName, symbol, duplicate);
+        }
     }
 
     private void RegisterClassTree(
@@ -1384,15 +1400,7 @@ public sealed class Binder
         }
         foreach (var nested in cls.NestedInterfaces)
         {
-            RegisterTypeSymbol(
-                classIdentity,
-                "interface",
-                nested.Id,
-                nested.Name,
-                $"{qualifiedClassName}.{nested.Name}",
-                Visibility.Public,
-                nested.IdentifierSpan,
-                nested.Span);
+            RegisterInterface(nested, classIdentity, $"{qualifiedClassName}.{nested.Name}");
         }
         foreach (var nested in cls.NestedEnums)
         {
@@ -6803,7 +6811,17 @@ public sealed class Binder
                             ? argumentModifiers[index]
                             : null))
             .ToArray();
-        var lookupNames = computedReceiver is null ? GetCallLookupNames(target)
+        var interfaceCandidates = GetInterfaceCallCandidates(computedReceiver, computedMethodName, out var opaqueInterface);
+        if (opaqueInterface)
+            return OverloadResolutionResult.Opaque();
+        if (interfaceCandidates is { Count: 0 })
+        {
+            _diagnostics.ReportError(span, DiagnosticCode.NoMatchingOverload,
+                $"Interface receiver has no method '{computedMethodName}'.");
+            return OverloadResolutionResult.NoMatch(interfaceCandidates);
+        }
+        var lookupNames = interfaceCandidates is not null ? ["<interface-call>"]
+            : computedReceiver is null ? GetCallLookupNames(target)
             : EnumerateHierarchyLookupNames(ResolveClass(computedReceiver.Type.DisplayString), computedMethodName!);
         var opaqueTarget = computedReceiver switch
         {
@@ -6823,7 +6841,8 @@ public sealed class Binder
                 typeArguments,
                 allowNullableStringCompatibility,
                 requireStatic,
-                requireInstance: computedReceiver is not null and not BoundTypeReferenceExpression);
+                requireInstance: computedReceiver is not null and not BoundTypeReferenceExpression,
+                candidateOverrides: interfaceCandidates);
             if (resolution.Kind == OverloadResolutionKind.NotFound)
                 continue;
 
@@ -6863,7 +6882,8 @@ public sealed class Binder
                 var previous = ResolveAccessibleOverload(
                     lookupName, argumentTypes, argumentNames, argumentModifiers, typeArguments,
                     requireStatic: requireStatic,
-                    requireInstance: computedReceiver is not null and not BoundTypeReferenceExpression);
+                    requireInstance: computedReceiver is not null and not BoundTypeReferenceExpression,
+                    candidateOverrides: interfaceCandidates);
                 if (previous.Kind is OverloadResolutionKind.NoMatch or OverloadResolutionKind.Ambiguous)
                     resolution = resolution.WithReplacedNativeOverloadError();
             }
@@ -6964,9 +6984,10 @@ public sealed class Binder
         IReadOnlyList<string>? typeArguments,
         bool allowNullableStringCompatibility = false,
         bool requireStatic = false,
-        bool requireInstance = false)
+        bool requireInstance = false,
+        IReadOnlyList<FunctionSymbol>? candidateOverrides = null)
     {
-        var candidates = _scope.GetOverloads(lookupName)
+        var candidates = (candidateOverrides ?? _scope.GetOverloads(lookupName))
             .ToArray();
         if (candidates.Length == 0)
             return OverloadResolutionResult.NotFound();
@@ -6980,10 +7001,19 @@ public sealed class Binder
             return OverloadResolutionResult.Inaccessible(candidates);
 
         var accessibleScope = new Scope();
+        var duplicates = new Dictionary<FunctionSymbol, List<FunctionSymbol>>();
         foreach (var candidate in accessibleCandidates)
-            accessibleScope.TryDeclareOverload(lookupName, candidate, out _);
+        {
+            if (!accessibleScope.TryDeclareOverload(lookupName, candidate, out var duplicate)
+                && candidateOverrides is not null && duplicate is not null)
+            {
+                if (!duplicates.TryGetValue(duplicate, out var alternatives))
+                    duplicates[duplicate] = alternatives = [duplicate];
+                alternatives.Add(candidate);
+            }
+        }
 
-        return accessibleScope.ResolveOverload(
+        var resolved = accessibleScope.ResolveOverload(
             lookupName,
             argumentTypes,
             argumentNames,
@@ -6992,6 +7022,51 @@ public sealed class Binder
             GetImplicitConversionCost,
             allowNullableStringCompatibility,
             IsBetterNullConversionTarget);
+        return resolved.Function is { } winner && duplicates.TryGetValue(winner, out var ambiguous)
+            ? OverloadResolutionResult.Ambiguous(ambiguous) : resolved;
+    }
+
+    private IReadOnlyList<FunctionSymbol>? GetInterfaceCallCandidates(
+        BoundExpression? receiver, string? methodName, out bool opaque)
+    {
+        opaque = false;
+        if (receiver?.Type is not BoundTypes.NominalBoundType { Declaration: { } identity }
+            || !_interfacesBySymbolId.TryGetValue(identity.Id, out var root))
+            return null;
+        var candidates = new List<FunctionSymbol>();
+        var pending = new Queue<(TypeSymbol Symbol, InterfaceDefinitionNode Declaration)>();
+        var visited = new HashSet<SymbolId>();
+        pending.Enqueue(root);
+        while (pending.TryDequeue(out var current))
+        {
+            if (!visited.Add(current.Symbol.Id))
+                continue;
+            if (current.Declaration.InteropBlocks.Count > 0 || current.Declaration.PreprocessorBlocks.Count > 0)
+            {
+                opaque = true;
+                return [];
+            }
+            var declared = current.Declaration.Methods.Where(method =>
+                GetCallableLookupName(method.Name) == methodName).ToArray();
+            if (declared.Length > 0)
+            {
+                candidates.AddRange(declared.Select(method => _functionSymbols[method]));
+                continue;
+            }
+            foreach (var parent in current.Declaration.BaseInterfaces)
+            {
+                var type = TryBuildReferenceType(parent, current.Symbol.QualifiedName,
+                    current.Declaration.NamespaceIdentity);
+                if (type?.Declaration is not { } parentIdentity
+                    || !_interfacesBySymbolId.TryGetValue(parentIdentity.Id, out var inherited))
+                {
+                    opaque = true;
+                    return [];
+                }
+                pending.Enqueue(inherited);
+            }
+        }
+        return candidates.DistinctBy(candidate => candidate.Id).ToArray();
     }
 
     private bool IsBetterNullConversionTarget(string candidateType, string otherType)

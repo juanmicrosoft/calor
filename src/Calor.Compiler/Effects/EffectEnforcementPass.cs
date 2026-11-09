@@ -206,7 +206,7 @@ public sealed class EffectEnforcementPass
     // call-site charging and declaration-local effect variance (D-W2.2).
     private Dictionary<string, ClassDefinitionNode> _classesByName = new(StringComparer.Ordinal);
     private Dictionary<string, InterfaceDefinitionNode> _interfacesByName = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, MethodNode> _abstractMethods = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, EffectsNode?> _declarationOnlyRows = new(StringComparer.Ordinal);
     private HashSet<string> _delegateTypeNames = new(StringComparer.Ordinal);
     private Dictionary<string, ClassDefinitionNode> _ownerClassByFunctionId = new(StringComparer.Ordinal);
     private Dictionary<string, ConstructorDeclaration> _constructorsByFunctionId = new(StringComparer.Ordinal);
@@ -266,12 +266,16 @@ public sealed class EffectEnforcementPass
         foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
             _classesByName[cls.Name] = cls;
         _interfacesByName = new Dictionary<string, InterfaceDefinitionNode>(StringComparer.Ordinal);
-        foreach (var iface in CallGraphAnalysis.EnumerateInterfaces(module))
-            _interfacesByName[iface.Name] = iface;
+        foreach (var group in CallGraphAnalysis.EnumerateInterfaces(module).GroupBy(iface => iface.Name, StringComparer.Ordinal))
+            if (group.Take(2).ToArray() is [var iface])
+                _interfacesByName[iface.Name] = iface;
         _delegateTypeNames = new HashSet<string>(
             CallGraphAnalysis.EnumerateDelegates(module).Select(d => d.Name), StringComparer.Ordinal);
         _ownerClassByFunctionId = new Dictionary<string, ClassDefinitionNode>(StringComparer.Ordinal);
-        _abstractMethods.Clear();
+        _declarationOnlyRows.Clear();
+        foreach (var declaration in CallGraphAnalysis.EnumerateInterfaces(module))
+            foreach (var method in declaration.Methods)
+                _declarationOnlyRows[$"{declaration.Name}.{method.Id}"] = method.Effects;
         _constructorsByFunctionId = new Dictionary<string, ConstructorDeclaration>(StringComparer.Ordinal);
         _implicitAccessorsByFunctionId = new Dictionary<string, ImplicitAccessorDeclaration>(StringComparer.Ordinal);
         foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
@@ -280,7 +284,7 @@ public sealed class EffectEnforcementPass
             {
                 _ownerClassByFunctionId[$"{cls.Name}.{method.Id}"] = cls;
                 if (method.IsAbstract)
-                    _abstractMethods[$"{cls.Name}.{method.Id}"] = method;
+                    _declarationOnlyRows[$"{cls.Name}.{method.Id}"] = method.Effects;
             }
             foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(cls))
             {
@@ -627,8 +631,8 @@ public sealed class EffectEnforcementPass
 
     private EffectSet InferEffects(FunctionNode function, HashSet<string> sccMembers)
     {
-        if (_abstractMethods.TryGetValue(function.Id, out var signature))
-            return GetDeclaredEffects(signature.Effects);
+        if (_declarationOnlyRows.TryGetValue(function.Id, out var row))
+            return GetDeclaredEffects(row);
         var assumptions = new List<string>();
         var context = new InferenceContext(
             _resolver, _computedEffects,

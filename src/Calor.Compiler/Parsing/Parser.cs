@@ -9912,6 +9912,7 @@ public sealed class Parser
         var span = startToken.Span.Union(endToken.Span);
         return WithDocumentation(new MethodSignatureNode(span, id, name, typeParameters, parameters, output, effects, preconditions, postconditions, attrs, csharpAttrs)
         {
+            IdentifierSpan = GetIdentifierSpan(attrs, "_pos0", name),
             EffectParameters = effectParameters,
         }, startToken);
     }
