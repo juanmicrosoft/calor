@@ -2437,16 +2437,19 @@ python3 tests/E2E/agent-tasks/test-refactoring-benchmark-verifiers.py --interim-
 python3 tests/E2E/agent-tasks/test-logic-old-release.py --refactoring-benchmark-native-interim
 ```
 
-Two actual original native positives, `contract-pre` and `extract-simple`, were
-probed on freshly source-built, manifest-verified parent source
-`e0ba25aae4e6e9a96a45d60c1db219ee1889054c`. Both refused at identity reconciliation:
-the archived module-container anchors for `ContractExamples.Sqrt/f001` and
-`ExtractExamples.Distance/f001` are ambiguous against the selected namespace
-anchors. The physical test-path literal IDs passed persisted-state validation;
-this was not a canonical-ID format rejection. Neither probe reached native
-compilation or CLR behavior, and both earn zero behavioral credit.
-Global/file-scoped namespace targets and CLR ownership remain unadmitted behind
-that gate; the verifier does not substitute the older module-name namespace.
+Initial `contract-pre` and `extract-simple` probes on freshly source-built,
+manifest-verified parent source `e0ba25aae4e6e9a96a45d60c1db219ee1889054c`
+refused at identity reconciliation because the disposable authoring had omitted
+the original namespace. Current authoring now uses the supported
+`module Name Namespace` header to preserve the original actual CLR namespace;
+it does not rewrite persisted anchors, IDs or expected owners. Two fresh focused
+probes then synchronized successfully and retained every original module/function
+identity, including the requested new `f005` extraction. Their next refusal was
+the verifier's existing nonempty `NamespaceScopes` topology guard. Neither
+reached native compilation, proofs or CLR behavior, and both earn zero behavioral
+credit. Namespace targets and CLR ownership remain unadmitted behind that guard.
+The physical test-path literal IDs passed persisted-state validation; this was
+not a canonical-ID format rejection.
 Default native validation stops at the first unavailable canonical positive,
 without running adversaries or claiming the unchanged required census passed.
 

@@ -71,6 +71,7 @@ def main():
         if sys.argv[1:] == ["--refactoring-benchmark-native-interim"]:
             benchmark = load("benchmark_controls", HERE / "test-refactoring-benchmark-verifiers.py")
             print(f"Explicit interim lane only: {benchmark.INTERIM_NATIVE_COMMIT}; not selected-root or final-parent evidence.")
+            benchmark.INTERIM_NATIVE_AUTHORING = True
             with benchmark.source_built_native(benchmark.INTERIM_NATIVE_COMMIT, deadline) as native_current:
                 benchmark.run_native_compatibility(old, native_current, deadline)
             return

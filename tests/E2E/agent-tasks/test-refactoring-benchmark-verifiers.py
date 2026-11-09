@@ -22,6 +22,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = Path(os.environ.get("CALOR_COMPILER_ROOT", str(HERE.parents[2]))).resolve()
 OLD = "d82f3ae95175ecd09581c6922701706be72b0ca9"
 INTERIM_NATIVE_COMMIT = "260f086936198c112b1cf0f4d4b053771809513a"
+INTERIM_NATIVE_AUTHORING = False
 
 
 def load(name, path):
@@ -323,7 +324,7 @@ def current_native_source(task, *, equivalent=False):
         add("Distance", "int:x, int:y", "int", "Abs(x * x + y * y)", post=["result >= 0"])
 
     def emit(module, members):
-        output = [f"module {module}"]
+        output = [f"module {module}" + ("" if INTERIM_NATIVE_AUTHORING else f" {module}")]
         for name, (parameters, result, expression, pre, post, effects, statements) in members.items():
             def condition(source):
                 comparison = re.fullmatch(r"(\w+) (>=|<=|>|<) (-?\w+)", source)
@@ -965,10 +966,26 @@ class BenchmarkTests(unittest.TestCase):
         self.assertEqual(verify.call_args.args[0:2], ("contract-pre", "native-canonical"))
         self.assertEqual(EXECUTED, before)
 
+    def test_native_authoring_retains_original_namespace_and_interim_body(self):
+        before = dict(EXECUTED)
+        for task in TASKS:
+            for equivalent in (False, True):
+                current = current_native_source(task, equivalent=equivalent)
+                with patch(__name__ + ".INTERIM_NATIVE_AUTHORING", True):
+                    interim = current_native_source(task, equivalent=equivalent)
+                self.assertEqual(current.keys(), interim.keys())
+                for file, text in current.items():
+                    header, body = text.split("\n", 1)
+                    keyword, name, namespace = header.split()
+                    self.assertEqual((keyword, namespace), ("module", name))
+                    self.assertEqual(interim[file], f"module {name}\n{body}")
+        self.assertEqual(EXECUTED, before)
+
 
 if __name__ == "__main__":
     if sys.argv[1:] == ["--interim-native"]:
         print(f"Explicit interim lane only: {INTERIM_NATIVE_COMMIT}; not selected-root or final-parent evidence.")
+        INTERIM_NATIVE_AUTHORING = True
         with source_built_native(INTERIM_NATIVE_COMMIT) as selected:
             BenchmarkTests.native_control_root = selected
             result = unittest.main(argv=[sys.argv[0], "BenchmarkTests.test_actual_current_native_controls"], exit=False).result
