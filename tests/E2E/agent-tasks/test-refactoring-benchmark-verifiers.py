@@ -2,6 +2,9 @@
 """Unchanged paired benchmark inputs; disposable independent compiler controls."""
 
 import importlib.util
+import hashlib
+from contextlib import contextmanager
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
@@ -9,13 +12,16 @@ import re
 import shutil
 import sys
 import tempfile
+import tarfile
 import time
+from threading import Lock
 import unittest
 from unittest.mock import patch
 
 HERE = Path(__file__).resolve().parent
 ROOT = Path(os.environ.get("CALOR_COMPILER_ROOT", str(HERE.parents[2]))).resolve()
 OLD = "d82f3ae95175ecd09581c6922701706be72b0ca9"
+NATIVE_DEPENDENCY = "260f086936198c112b1cf0f4d4b053771809513a"
 
 
 def load(name, path):
@@ -57,7 +63,10 @@ COUNTS = {
     "sig-addparam": 36, "sig-return": 7, "sig-reorder": 188,
     "move-module": 41, "move-deps": 41, "move-contracts": 288,
 }
+NATIVE_COUNTS = dict(COUNTS, **{"contract-pre": 10, "contract-bounds": 45, "extract-contracts": 60,
+                              "rename-contract": 55, "move-contracts": 271})
 EXECUTED = {"accepted": 0, "rejected": 0, "prerequisite": 0}
+CENSUS_LOCK = Lock()
 REJECTIONS = (
     "Benchmark input missing:", "Wrong benchmark selected method signature/owner:",
     "Benchmark requires exactly one selected method:", "Wrong benchmark contract documentation",
@@ -70,9 +79,15 @@ REJECTIONS = (
     "Benchmark renamed parameter must preserve the independent inner local.",
     "Benchmark renamed parameter discarded the supplying inner local.",
     "Unsupported finite benchmark executable surface.",
+    "Wrong native benchmark module identity.", "Wrong native benchmark original declaration identity:",
+    "Wrong native benchmark requested extraction identity:", "Wrong native benchmark module namespace topology.",
+    "Wrong native benchmark ambiguous cross-module function identity.",
+    "Wrong native benchmark effect declaration:", "Wrong native benchmark pure helper:",
 )
 NATIVE_BLOCKERS = (
     "Native benchmark literal-ID prerequisite refused: selected DeclarationIdentityStore.Sync requires canonical identities and rejects proven original m001/f001-style IDs. This is not a behavior rejection.",
+    "Native benchmark variable identity prerequisite refused:",
+    "Native benchmark signature prerequisite refused:",
 )
 
 
@@ -199,13 +214,13 @@ def native_source(task):
     return {str(path.relative_to(base)): path.read_text(encoding="utf-8") for path in base.rglob("*.calr")}
 
 
-def native_sidecar(task, files):
+def native_sidecar(task, files, deadline=None):
     category = task.split("-")[0]
     fixture = f"refactor-{'signature' if category == 'sig' else category}-calor"
     declarations = []
     for file in sorted(files):
         original = PROCESS.run(["git", "show", f"{OLD}:tests/E2E/agent-tasks/fixtures/{fixture}/{file}"],
-                               ROOT, time.monotonic() + 30)
+                               ROOT, min(time.monotonic() + 30, deadline if deadline is not None else float("inf")))
         module = re.search(r"(?m)^§M\{([^:}]+):([^}]+)\}", original)
         if not module:
             raise AssertionError("Missing authoritative archived module identity")
@@ -220,6 +235,353 @@ def native_sidecar(task, files):
                 for parameter in parameters.split(",") if parameter.strip()], output=output), separators=(",", ":"))
             declarations.append(dict(Id=identity, File=file, Container=container, Kind=1, Name=name, Signature=signature))
     return json.dumps(dict(Version=1, Files=sorted(files), Declarations=declarations), indent=2)
+
+
+def current_native_source(task, *, equivalent=False):
+    """Disposable native projections; original protected fixtures stay untouched."""
+    category = task.split("-")[0]
+    declarations = {}
+    def add(name, parameters, result, expression, pre=(), post=(), effects=None, statements=()):
+        declarations[name] = [parameters, result, expression, list(pre), list(post), effects, list(statements)]
+    if category == "contract":
+        module, filename = "ContractExamples", "Contract.calr"
+        add("Sqrt", "int:x", "int", "x")
+        add("Abs", "int:x", "int", "x < 0 ? -x : x")
+        add("GetElement", "int:index, int:length", "int", "index >= 0 && index < length ? index : -1")
+        add("PrintValue", "int:x", "void", None, effects="cw", statements=["Console.WriteLine(x)"])
+        if task == "contract-pre":
+            declarations["Sqrt"][3] = ["x >= 0"]
+        elif task == "contract-post":
+            declarations["Abs"][4] = ["result >= 0"]
+        elif task == "contract-bounds":
+            declarations["GetElement"][3] = ["index >= 0", "index < length", "length > 0"]
+    elif category == "extract":
+        module, filename = "ExtractExamples", "Extract.calr"
+        add("Distance", "int:x, int:y", "int", "x * x + y * y")
+        add("ProcessArray", "int:index, int:length", "int", "index >= 0 && index < length ? index : -1",
+            ["index >= 0", "index < length"], ["result >= 0"])
+        add("LogAndCompute", "int:a, int:b", "int", "a + b", effects="cw",
+            statements=['Console.WriteLine("Computing sum")'])
+        add("ComputeNested", "int:x, int:y, int:z", "int", "x * x + y * y + z * z")
+        if task == "extract-simple":
+            add("SumOfSquares", "int:a, int:b", "int", "a * a + b * b")
+            declarations["Distance"][2] = "SumOfSquares(x, y)"
+        elif task == "extract-contracts":
+            add("ValidateIndex", "int:index, int:length", "bool", "index >= 0 && index < length",
+                ["length >= 0"], ["result == (index >= 0 && index < length)"])
+            declarations["ProcessArray"][2] = "ValidateIndex(index, length) ? index : -1"
+        elif task == "extract-effects":
+            add("ComputeSum", "int:a, int:b", "int", "a + b")
+            declarations["LogAndCompute"][2] = "ComputeSum(a, b)"
+        else:
+            add("Square", "int:n", "int", "n * n", post=["result >= 0"])
+            declarations["ComputeNested"][2] = "Square(x) + Square(y) + Square(z)"
+    elif category == "inline":
+        module, filename = "InlineExamples", "Inline.calr"
+        add("Double", "int:x", "int", "x * 2")
+        add("Calculate", "int:a, int:b", "int", "Double(a) + Double(b)")
+        add("Clamp", "int:value, int:min, int:max", "int", "value < min ? min : (value > max ? max : value)",
+            ["min <= max"], ["result >= min", "result <= max"])
+        add("NormalizeScore", "int:score", "int", "Clamp(score, 0, 100)", post=["result >= 0", "result <= 100"])
+        add("Square", "int:n", "int", "n * n", post=["result >= 0"])
+        add("SumOfSquares", "int:x, int:y", "int", "Square(x) + Square(y)", post=["result >= 0"])
+        if task == "inline-simple":
+            declarations["Calculate"][2] = "a * 2 + b * 2"
+        elif task == "inline-multi":
+            declarations["SumOfSquares"][2] = "x * x + y * y"
+        else:
+            declarations["NormalizeScore"][2] = "score < 0 ? 0 : (score > 100 ? 100 : score)"
+    elif category == "rename":
+        module, filename = "RenameExamples", "Rename.calr"
+        add("Calculate", "int:val", "int", "val * 2", post=["result == val * 2"])
+        add("ValidatedOp", "int:num, int:max", "int", "num", ["num >= 0", "num <= max"], ["result <= max"])
+        add("OuterCalc", "int:x", "int", "x + inner", statements=["let int:inner = x * 2"])
+        if task == "rename-param":
+            declarations["Calculate"] = ["int:value", "int", "value * 2", [], ["result == value * 2"], None, []]
+        elif task == "rename-contract":
+            declarations["ValidatedOp"] = ["int:value, int:max", "int", "value", ["value >= 0", "value <= max"], ["result <= max"], None, []]
+        else:
+            declarations["OuterCalc"] = ["int:input", "int", "input + inner", [], [], None, ["let int:inner = input * 2"]]
+    elif category == "sig":
+        module, filename = "SignatureExamples", "Signature.calr"
+        add("Greet", "string:name", "string", "name")
+        add("TryParse", "string:input", "int", "0")
+        add("CreateRange", "int:start, int:end, int:step", "int", "(end - start) / step", ["start <= end", "step > 0"])
+        add("CountSteps", "int:max", "int", "CreateRange(0, max, 1)", ["max > 0"])
+        if task == "sig-addparam":
+            declarations["Greet"][0:3] = ["string:greeting, string:name", "string", "greeting + name"]
+        elif task == "sig-return":
+            declarations["TryParse"][1:3] = ["Option<int>", "§NN"]
+        else:
+            declarations["CreateRange"][0] = "int:step, int:start, int:end"
+            declarations["CountSteps"][2] = "CreateRange(1, 0, max)"
+    else:
+        module, filename = "MathModule", "src/Math.calr"
+        add("Abs", "int:x", "int", "x < 0 ? -x : x", post=["result >= 0"])
+        add("SafeDivide", "int:a, int:b", "int", "a / b", ["b != 0"], ["result == a / b"])
+        add("Distance", "int:x, int:y", "int", "Abs(x * x + y * y)", post=["result >= 0"])
+
+    def emit(module, members):
+        output = [f"module {module}"]
+        for name, (parameters, result, expression, pre, post, effects, statements) in members.items():
+            def condition(source):
+                comparison = re.fullmatch(r"(\w+) (>=|<=|>|<) (-?\w+)", source)
+                if equivalent and comparison:
+                    left, operator, right = comparison.groups()
+                    return f"{right} " + {">=": "<=", "<=": ">=", ">": "<", "<": ">"}[operator] + f" {left}"
+                return source
+            output.append(f"  func {name} ({parameters}) → {result}")
+            output += [f"    ! {effects}"] if effects else []
+            output += [f"    requires {condition(predicate)}" for predicate in pre]
+            output += [f"    => {condition(predicate)}" for predicate in post]
+            if equivalent and task == "contract-effect" and name == "PrintValue":
+                statements = ["let int:printed = x + 0", "Console.WriteLine(printed)"]
+            output += ["    " + statement for statement in statements]
+            if expression is not None:
+                if equivalent and name == TASKS[task][1]:
+                    output += [f"    let {result}:answer = ({expression})", "    return answer"]
+                else:
+                    output.append(f"    return ({expression})")
+        return re.sub(r"\bstep\b", "@step", "\n".join(output) + "\n")
+    if category == "move":
+        moved = "SafeDivide" if task == "move-contracts" else "Abs"
+        utility = {"Log": ["string:message", "void", None, [], [], "cw", ["Console.WriteLine(message)"]],
+                   moved: declarations.pop(moved)}
+        return {filename: emit(module, declarations), "src/Utils.calr": emit("UtilsModule", utility)}
+    return {filename: emit(module, declarations)}
+
+
+def current_native_sidecar(task, files, deadline=None):
+    category = task.split("-")[0]
+    originals = native_source(task)
+    document = json.loads(native_sidecar(task, originals, deadline))
+    if category == "move":
+        name = "SafeDivide" if task == "move-contracts" else "Abs"
+        moved = [entry for entry in document["Declarations"] if entry["Kind"] == 1 and entry["Name"] == name]
+        if len(moved) != 1 or moved[0]["File"] != "src/Math.calr" or moved[0]["Container"] != "MathModule":
+            raise AssertionError("Ambiguous archived move lineage")
+        moved[0].update(File="src/Utils.calr", Container="UtilsModule")
+    extra = {"extract-simple": ("SumOfSquares", "f005"), "extract-contracts": ("ValidateIndex", "f006"),
+             "extract-effects": ("ComputeSum", "f007"), "extract-nested": ("Square", "f008")}.get(task)
+    if extra:
+        name, identity = extra
+        filename = next(iter(files))
+        module = re.search(r"^module (\w+)", files[filename]).group(1)
+        parameters, result = re.search(rf"  func {name} \(([^)]*)\) → ([^\n]+)", files[filename]).groups()
+        signature = json.dumps(dict(arity=0, parameters=[
+            dict(type=parameter.strip().split(":")[0], modifier="None") for parameter in parameters.split(",")],
+            output=result), separators=(",", ":"))
+        document["Declarations"].append(dict(Id=identity, File=filename, Container=module, Kind=1,
+                                             Name=name, Signature=signature))
+    return json.dumps(document, indent=2)
+
+
+@contextmanager
+def source_built_native_current(deadline=None):
+    outer_deadline = deadline
+    deadline = min(deadline if deadline is not None else float("inf"), time.monotonic() + 600)
+    with tempfile.TemporaryDirectory(prefix="benchmark-native-current-") as temporary:
+        directory = Path(temporary)
+        archive, selected = directory / "source.tar", directory / "source"
+        selected.mkdir()
+        PROCESS.run(["git", "archive", "--format=tar", f"--output={archive}", NATIVE_DEPENDENCY], ROOT, deadline)
+        with tarfile.open(archive) as source:
+            source.extractall(selected, filter="data")
+        for relative in ("src/Calor.Compiler/z3", "src/Calor.Compiler/runtimes"):
+            shutil.copytree(ROOT / relative, selected / relative, dirs_exist_ok=True)
+        print(PROCESS.run([sys.executable, "scripts/verify-z3-assets.py"], selected, deadline), end="")
+        print(PROCESS.run(["dotnet", "restore", "src/Calor.Compiler/Calor.Compiler.csproj", "--locked-mode",
+                          "--source", str(Path.home() / ".nuget/packages"), "--disable-build-servers",
+                          "-p:UseSharedCompilation=false", "-nodeReuse:false", "-v", "quiet"], selected, deadline), end="")
+        print(PROCESS.run(["dotnet", "build", "src/Calor.Compiler/Calor.Compiler.csproj", "--no-restore",
+                          "-c", os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug"),
+                          "--disable-build-servers", "-p:UseSharedCompilation=false", "-nodeReuse:false",
+                          "-v", "quiet"], selected, deadline), end="")
+        print(f"Actual native current compiler source: {NATIVE_DEPENDENCY}")
+        image = selected / "src/Calor.Compiler/bin" / os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug") / "net10.0"
+        hashes = {name: hashlib.sha256((image / name).read_bytes()).hexdigest()
+                  for name in ("calor.dll", "Calor.Runtime.dll", "Microsoft.Z3.dll")}
+        print("Native selected source archive SHA256:", hashlib.sha256(archive.read_bytes()).hexdigest())
+        print("Native selected image SHA256:", json.dumps(hashes, sort_keys=True))
+        try:
+            yield selected
+        finally:
+            if hashes != {name: hashlib.sha256((image / name).read_bytes()).hexdigest() for name in hashes}:
+                raise AssertionError("Native selected compiler images changed during controls")
+            final_deadline = min(outer_deadline if outer_deadline is not None else float("inf"), time.monotonic() + 120)
+            print(PROCESS.run([sys.executable, "scripts/verify-z3-assets.py"], selected, final_deadline), end="")
+
+
+NATIVE_UNADMITTED = {"rename-shadow", "sig-return"}
+
+
+def native_span(text, name):
+    match = re.search(rf"(?m)^  func {re.escape(name)}(?: priv)? \([^\n]*\n", text)
+    if not match:
+        raise AssertionError(f"Missing native control declaration {name}")
+    following = re.search(r"(?m)^  func ", text[match.end():])
+    return match.start(), match.end() + following.start() if following else len(text)
+
+
+def native_replace(files, name, transform):
+    changed = dict(files)
+    matches = [filename for filename, text in files.items() if re.search(rf"(?m)^  func {re.escape(name)} \(", text)]
+    if len(matches) != 1:
+        raise AssertionError(f"Ambiguous native control edit {name}: {matches}")
+    filename = matches[0]
+    start, end = native_span(changed[filename], name)
+    before = changed[filename][start:end]
+    after = transform(before)
+    if after == before:
+        raise AssertionError(f"Empty native control edit {name}")
+    changed[filename] = changed[filename][:start] + after + changed[filename][end:]
+    return changed
+
+
+def native_controls(task):
+    if task in NATIVE_UNADMITTED:
+        raise AssertionError("Unadmitted task cannot supply genuine positive controls")
+    files = current_native_source(task)
+    name = TASKS[task][1]
+    yield "canonical", files, True, None
+    yield "equivalent", current_native_source(task, equivalent=True), True, None
+    yield "missing", {}, False, None
+    yield "wrong-selected-name", {file: re.sub(rf"\b{name}\b", "Other" + name, text)
+                                  for file, text in files.items()}, False, None
+    if task not in ("move-module", "move-deps"):
+        yield "wrong-selected-access", native_replace(files, name, lambda text: text.replace(f"func {name} ", f"func {name} priv ", 1)), False, None
+    header = next(re.search(rf"(?m)^  func {name} \(([^)]*)\)", text).group(1)
+                  for text in files.values() if re.search(rf"(?m)^  func {name} \(", text))
+    parameter = header.split(",")[0].split(":")[-1].lstrip("@")
+    yield "wrong-parameter-identity", native_replace(files, name, lambda text: re.sub(
+        rf"\b{re.escape(parameter)}\b", "wrongParameter", text)), False, None
+    yield "wrong-selected-identity", files, False, name
+    yield "wrong-module-identity", files, False, "module"
+    body = '    Console.WriteLine(0)\n' if task == "contract-effect" else '    return ("")\n' if task == "sig-addparam" else "    return (0)\n"
+    yield "wrong-independent-behavior", native_replace(files, name, lambda text: re.sub(r"(?m)^    (?:let |return |Console\.WriteLine)[\s\S]*", body, text)), False, None
+    selected_file = next(text for text in files.values() if re.search(rf"(?m)^  func {name} \(", text))
+    start, end = native_span(selected_file, name)
+    selected = selected_file[start:end]
+    if re.search(r"(?m)^    (?:requires |=> )", selected):
+        yield "missing-selected-contract", native_replace(files, name, lambda text: re.sub(r"(?m)^    (?:requires |=> )[^\n]*\n", "", text)), False, None
+        weaker = selected.replace(">= 0", ">= -1").replace("> 0", ">= 0").replace("!= 0", ">= 0")
+        if weaker != selected:
+            yield "weakened-selected-contract", native_replace(files, name, lambda _: weaker), False, None
+    if task.startswith("extract-"):
+        helper = {"extract-simple": "SumOfSquares", "extract-contracts": "ValidateIndex",
+                  "extract-effects": "ComputeSum", "extract-nested": "Square"}[task]
+        dead = {
+            "extract-simple": "    SumOfSquares(x, y)\n    return (x * x + y * y)\n",
+            "extract-contracts": "    ValidateIndex(index, length)\n    return (index >= 0 && index < length ? index : -1)\n",
+            "extract-effects": '    ComputeSum(a, b)\n    Console.WriteLine("Computing sum")\n    return (a + b)\n',
+            "extract-nested": "    Square(x)\n    Square(y)\n    Square(z)\n    return (x * x + y * y + z * z)\n",
+        }[task]
+        yield "dead-supplying-helper", native_replace(files, name, lambda text: re.sub(r"(?m)^    (?:return |Console\.WriteLine)[\s\S]*", dead, text)), False, None
+        yield "wrong-helper-behavior", native_replace(files, helper, lambda text: re.sub(
+            r"(?m)^    return [^\n]*", "    return (true)" if task == "extract-contracts" else "    return (0)", text)), False, None
+        if task == "extract-effects":
+            yield "impure-helper-row", native_replace(files, helper, lambda text: text.replace("\n", "\n    ! cw\n", 1)), False, None
+    if task.startswith("inline-"):
+        old = {"inline-simple": "Double(a) + Double(b)", "inline-multi": "Square(x) + Square(y)",
+               "inline-contracts": "Clamp(score, 0, 100)"}[task]
+        yield "not-inlined", native_replace(files, name, lambda text: re.sub(r"(?m)^    return [^\n]*", f"    return ({old})", text)), False, None
+        if task == "inline-simple":
+            yield "decoy-inlined-multiplications", native_replace(files, name, lambda text: re.sub(
+                r"(?m)^    return [^\n]*", "    let int:discardedA = a * 2\n    let int:discardedB = b * 2\n    return (a + a + b + b)", text)), False, None
+    if task == "sig-reorder":
+        yield "stale-callsite-order", native_replace(files, "CountSteps", lambda text: text.replace("CreateRange(1, 0, max)", "CreateRange(0, max, 1)")), False, None
+    if task.startswith("move-"):
+        filename = "src/Utils.calr"
+        start, end = native_span(files[filename], name)
+        duplicate = dict(files)
+        duplicate["src/Math.calr"] += files[filename][start:end]
+        yield "duplicated-moved-declaration", duplicate, False, None
+
+
+def archived_native_source(task, deadline=None):
+    category = task.split("-")[0]
+    fixture = f"refactor-{'signature' if category == 'sig' else category}-calor"
+    files = {file: PROCESS.run(["git", "show", f"{OLD}:tests/E2E/agent-tasks/fixtures/{fixture}/{file}"],
+                              ROOT, min(time.monotonic() + 30, deadline if deadline is not None else float("inf")))
+             for file in native_source(task)}
+    name = TASKS[task][1]
+    filename = next(file for file, text in files.items() if re.search(rf"§F\{{f\d+:{name}:pub\}}", text))
+    text = files[filename]
+
+    def span(source, target):
+        match = re.search(rf"(?m)^  §F\{{f\d+:{target}:pub\}}[^\n]*\n", source)
+        if not match:
+            raise AssertionError(f"Missing archived native declaration {target}")
+        following = re.search(r"(?m)^  §F", source[match.end():])
+        return match.start(), match.end() + following.start() if following else len(source)
+
+    start, end = span(text, name)
+    selected = text[start:end]
+    helper = ""
+    if task == "contract-pre":
+        selected = selected.replace("    §R", "    §Q (>= x 0)\n    §R", 1)
+    elif task == "contract-post":
+        selected = selected.replace("    §R", "    §S (>= result 0)\n    §R", 1)
+    elif task == "contract-bounds":
+        selected = selected.replace("    §R", "    §Q (>= index 0)\n    §Q (< index length)\n    §Q (> length 0)\n    §R", 1)
+    elif task == "contract-effect":
+        selected = selected.replace("    §P", "    §E{cw}\n    §P", 1)
+    elif task.startswith("extract-"):
+        calls = {
+            "extract-simple": "§C{SumOfSquares} §A x §A y §/C",
+            "extract-contracts": "(? §C{ValidateIndex} §A index §A length §/C index -1)",
+            "extract-effects": "§C{ComputeSum} §A a §A b §/C",
+            "extract-nested": "(+ (+ §C{Square} §A x §/C §C{Square} §A y §/C) §C{Square} §A z §/C)",
+        }
+        selected = re.sub(r"(?m)^    §R[^\n]*", "    §R " + calls[task], selected)
+        helper = {
+            "extract-simple": "  §F{f005:SumOfSquares:pub} (i32:a, i32:b) -> i32\n    §R (+ (* a a) (* b b))\n",
+            "extract-contracts": "  §F{f006:ValidateIndex:pub} (i32:index, i32:length) -> bool\n    §Q (>= length 0)\n    §S (== result (and (>= index 0) (< index length)))\n    §R (and (>= index 0) (< index length))\n",
+            "extract-effects": "  §F{f007:ComputeSum:pub} (i32:a, i32:b) -> i32\n    §R (+ a b)\n",
+            "extract-nested": "  §F{f008:Square:pub} (i32:n) -> i32\n    §S (>= result 0)\n    §R (* n n)\n",
+        }[task]
+    elif task.startswith("inline-"):
+        expression = {"inline-simple": "(+ (* a 2) (* b 2))",
+                      "inline-multi": "(+ (* x x) (* y y))",
+                      "inline-contracts": "(? (< score 0) 0 (? (> score 100) 100 score))"}[task]
+        selected = re.sub(r"(?m)^    §B[^\n]*\n", "", selected)
+        selected = re.sub(r"(?m)^    §R[^\n]*", "    §R " + expression, selected)
+    elif category == "rename":
+        old, new = ("val", "value") if task == "rename-param" else ("num", "value") if task == "rename-contract" else ("x", "input")
+        selected = re.sub(rf"\b{old}\b", new, selected)
+    elif task == "sig-addparam":
+        selected = selected.replace("(str:name)", "(str:greeting, str:name)").replace("§R name", "§R (+ greeting name)")
+    elif task == "sig-return":
+        selected = selected.replace("-> i32", "-> Option<i32>").replace("§R 0", "§R §NN")
+    elif task == "sig-reorder":
+        selected = selected.replace("(i32:start, i32:end, i32:step)", "(i32:step, i32:start, i32:end)")
+        text = text.replace("§C{CreateRange} §A 0 §A max §A 1", "§C{CreateRange} §A 1 §A 0 §A max")
+    else:
+        files[filename] = text[:start] + text[end:]
+        files["src/Utils.calr"] += "\n" + selected
+        return files
+    files[filename] = text[:start] + selected + text[end:] + helper
+    return files
+
+
+def archived_native_wrong_body(task, files):
+    name = TASKS[task][1]
+    changed = dict(files)
+    filename = next(file for file, text in files.items() if re.search(rf"§F\{{f\d+:{name}:pub\}}", text))
+    source = files[filename]
+    start = re.search(rf"(?m)^  §F\{{f\d+:{name}:pub\}}", source).start()
+    following = re.search(r"(?m)^  §F", source[start + 3:])
+    end = start + 3 + following.start() if following else len(source)
+    selected = source[start:end]
+    if task == "contract-effect":
+        selected = selected.replace("§A x §/C", "§A 0 §/C")
+    else:
+        value = '""' if task == "sig-addparam" else "§SM 1" if task == "sig-return" else "0"
+        selected = re.sub(r"(?m)^    §R[^\n]*", "    §R " + value, selected)
+    if selected == source[start:end]:
+        raise AssertionError("Empty archived negative edit")
+    changed[filename] = source[:start] + selected + source[end:]
+    return changed
 
 
 def controls(task):
@@ -330,7 +692,8 @@ def controls(task):
         yield "foreign-native-executable-surface", wrong, False
 
 
-def execute(task, category, files, expected, root=ROOT, deadline=None, language="csharp", environment=None, blocker=False):
+def execute(task, category, files, expected, root=ROOT, deadline=None, language="csharp", environment=None, blocker=False,
+            current_native=False, sidecar_change=None):
     definition = json.loads((HERE / "tasks/refactoring-benchmark" / f"refactor-{task}-{language}/task.json").read_text())
     maximum = definition["timeout"]
     deadline = min(time.monotonic() + maximum, deadline or float("inf"))
@@ -346,7 +709,17 @@ def execute(task, category, files, expected, root=ROOT, deadline=None, language=
         if language == "calor" and files:
             sidecar = workspace / ".calor/ids.json"
             sidecar.parent.mkdir()
-            sidecar.write_text(native_sidecar(task, files), encoding="utf-8")
+            content = current_native_sidecar(task, files, deadline) if current_native else native_sidecar(task, files, deadline)
+            if sidecar_change:
+                document = json.loads(content)
+                candidates = [entry for entry in document["Declarations"] if
+                              entry["Kind"] == 0] if sidecar_change == "module" else [
+                                  entry for entry in document["Declarations"] if entry["Name"] == sidecar_change]
+                if not candidates or sidecar_change != "module" and len(candidates) != 1:
+                    raise AssertionError("Ambiguous native identity control")
+                candidates[0]["Id"] = "m099" if sidecar_change == "module" else "f099"
+                content = json.dumps(document)
+            sidecar.write_text(content, encoding="utf-8")
         env = dict(os.environ, CALOR_COMPILER_ROOT=str(root))
         env.update(environment or {})
         env["CALOR_LOGIC_TIMEOUT_SECONDS"] = str(min(maximum, deadline - time.monotonic()))
@@ -361,12 +734,14 @@ def execute(task, category, files, expected, root=ROOT, deadline=None, language=
             if blocker:
                 if not any(marker in output for marker in NATIVE_BLOCKERS):
                     raise
-                EXECUTED["prerequisite"] += 1
+                with CENSUS_LOCK:
+                    EXECUTED["prerequisite"] += 1
                 print(f"{task}/{category}: native positive BLOCKED\n{output}")
                 return output
             if not any(marker in output for marker in REJECTIONS):
                 raise
-            EXECUTED["rejected"] += 1
+            with CENSUS_LOCK:
+                EXECUTED["rejected"] += 1
             print(f"{task}/{category}: rejected")
             return output
         if not expected:
@@ -377,9 +752,16 @@ def execute(task, category, files, expected, root=ROOT, deadline=None, language=
             raise AssertionError(f"Wrong unique benchmark verdict:\n{output}")
         if "runtime cases;" not in output or "successful source counterfactuals." not in output or "Limits:" not in output:
             raise AssertionError(f"Incomplete benchmark behavioral evidence:\n{output}")
-        if f"; {COUNTS[task]} runtime cases;" not in output or not re.search(r"; [1-9]\d* successful source counterfactuals\.", output):
+        counts = NATIVE_COUNTS if language == "calor" else COUNTS
+        if f"; {counts[task]} runtime cases;" not in output or not re.search(r"; [1-9]\d* successful source counterfactuals\.", output):
             raise AssertionError(f"Wrong exact benchmark runtime census or empty intervention evidence:\n{output}")
-        EXECUTED["accepted"] += 1
+        with CENSUS_LOCK:
+            EXECUTED["accepted"] += 1
+        if language == "calor":
+            for line in output.splitlines():
+                if line.startswith(("Actual native AST identities:", "Native benchmark selected proof floor passed:",
+                                    "Actual selected native proof coverage", "Actual native cross-module diagnostic:")):
+                    print(f"{task}/{category}: {line}")
         print(f"{task}/{category}: {verdicts[0]}")
         return output
 
@@ -399,7 +781,57 @@ def run_compatibility(old, current, deadline):
     print("Compatibility passed: 82 actual independent C# old/current benchmark entrypoints (40 accepted, 42 rejected). Calor identity admission is separate.")
 
 
+def run_native_compatibility(old, current, deadline):
+    before = dict(EXECUTED)
+    for arm, root in (("v0.29", old), ("interim-current", current)):
+        def verify(task):
+            if task == "rename-shadow" or arm == "interim-current" and task == "sig-return":
+                execute(task, f"{arm}-unadmitted-original-requirement",
+                        archived_native_source(task, deadline) if arm == "v0.29" else current_native_source(task),
+                        False, root, deadline, language="calor", current_native=arm != "v0.29", blocker=True)
+                return
+            files = archived_native_source(task, deadline) if arm == "v0.29" else current_native_source(task)
+            execute(task, f"{arm}-native-canonical", files, True, root, deadline,
+                    language="calor", current_native=arm != "v0.29")
+            wrong = archived_native_wrong_body(task, files) if arm == "v0.29" else next(
+                files for category, files, _, _ in native_controls(task) if category == "wrong-independent-behavior")
+            execute(task, f"{arm}-native-wrong-behavior", wrong, False, root, deadline,
+                    language="calor", current_native=arm != "v0.29")
+        # Arms stay sequential; each worker builds its own helper and uses the same absolute deadline.
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            for _ in workers.map(verify, TASKS):
+                pass
+    if EXECUTED != dict(accepted=before["accepted"] + 37, rejected=before["rejected"] + 37,
+                        prerequisite=before["prerequisite"] + 3):
+        raise AssertionError("Incomplete genuine native benchmark old/current compatibility census.")
+    print("Native compatibility passed: 77 actual entries (37 accepted, 37 substantive rejections, 3 prerequisite refusals); "
+          "archived exact Option/None admitted, current exact signature unadmitted; v001 unadmitted in both arms.")
+
+
 class BenchmarkTests(unittest.TestCase):
+    def test_actual_current_native_controls(self):
+        before = dict(EXECUTED)
+        expected = {"accepted": 0, "rejected": 0}
+        planned = [accepted for task in TASKS if task not in NATIVE_UNADMITTED
+                   for _, _, accepted, _ in native_controls(task)]
+        self.assertEqual((planned.count(True), planned.count(False)), (36, 164))
+        with source_built_native_current() as root:
+            for task in TASKS:
+                if task in NATIVE_UNADMITTED:
+                    execute(task, "unadmitted-original-requirement", current_native_source(task), False,
+                            root=root, language="calor", current_native=True, blocker=True)
+                    continue
+                for category, files, accepted, identity in native_controls(task):
+                    with self.subTest(task=task, category=category):
+                        execute(task, "native-" + category, files, accepted, root=root, language="calor",
+                                current_native=True, sidecar_change=identity)
+                    expected["accepted" if accepted else "rejected"] += 1
+        self.assertEqual(EXECUTED, dict(accepted=before["accepted"] + expected["accepted"],
+                                       rejected=before["rejected"] + expected["rejected"],
+                                       prerequisite=before["prerequisite"] + 2))
+        self.assertEqual(sum(expected.values()), len(planned))
+        print(f"Interim native {NATIVE_DEPENDENCY} census: {expected}; 18 profiles, 2 original requirements unadmitted.")
+
     def test_actual_selected_prerequisite_refusals(self):
         before = dict(EXECUTED)
         with tempfile.TemporaryDirectory(prefix="benchmark-selection-controls-") as temporary:
@@ -451,7 +883,7 @@ class BenchmarkTests(unittest.TestCase):
                 execute(task, "literal-original-identity", native_source(task), False, language="calor", blocker=True)
         self.assertEqual(EXECUTED, dict(accepted=before["accepted"], rejected=before["rejected"],
                                        prerequisite=before["prerequisite"] + 20))
-        print("Native census: 20 actual literal-ID prerequisite refusals; 0 admitted behavioral profiles.")
+        print("Baseline native census: 19 literal-ID refusals and 1 absent v001 lineage; 0 admitted behavioral profiles.")
 
     def test_actual_independent_csharp_controls(self):
         before = dict(EXECUTED)
@@ -486,6 +918,32 @@ class BenchmarkTests(unittest.TestCase):
             with self.subTest(failure=failure), patch.object(PROCESS, "run", side_effect=RuntimeError(failure)):
                 with self.assertRaises(RuntimeError):
                     execute("contract-post", "wrong-behavior", source("contract-post"), False)
+        self.assertEqual(EXECUTED, before)
+
+    def test_mock_native_asset_recheck_preserves_outer_deadline(self):
+        before = dict(EXECUTED)
+        for outer, expected in ((None, 1120), (2000, 1120), (1050, 1050)):
+            calls = []
+
+            def run(command, root, deadline):
+                calls.append((command, deadline))
+                if command[:2] == ["git", "archive"]:
+                    Path(next(value[9:] for value in command if value.startswith("--output="))).write_bytes(b"mock archive")
+                if command[:2] == ["dotnet", "build"]:
+                    image = root / "src/Calor.Compiler/bin" / os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug") / "net10.0"
+                    image.mkdir(parents=True)
+                    for name in ("calor.dll", "Calor.Runtime.dll", "Microsoft.Z3.dll"):
+                        (image / name).write_bytes(b"mock image")
+                return ""
+
+            with self.subTest(outer=outer), patch.object(PROCESS, "run", side_effect=run), \
+                    patch.object(tarfile, "open"), patch.object(shutil, "copytree"), \
+                    patch("builtins.print"), patch.object(time, "monotonic", return_value=100) as clock:
+                with source_built_native_current(outer):
+                    clock.return_value = 1000
+                self.assertEqual(calls[0][1], 700)
+                self.assertEqual(calls[-1][1], expected)
+                self.assertEqual(calls[-1][0], [sys.executable, "scripts/verify-z3-assets.py"])
         self.assertEqual(EXECUTED, before)
 
 

@@ -2413,15 +2413,20 @@ all 129 prerequisites, agent evaluation, milestone acceptance or release readine
 
 ### Paired refactoring benchmark prerequisites
 
-The 40 original `refactoring-benchmark` entries now invoke the selected-image
-supervised helper, not declaration greps. **Only the 20 C# behavioral profiles
-are implemented and admitted. The 20 Calor behavioral profiles remain
-unimplemented and unadmitted.** This is a bounded prerequisite unit, not Calor
+The 40 original `refactoring-benchmark` entries invoke the selected-image
+supervised helper, not declaration greps. The controls cover **20 independent
+C# profiles and 18 current-native Calor profiles**. Two original Calor
+requirements remain explicitly unadmitted: missing `v001` provenance and the
+retired `Option<i32>`/None signature. Native current controls source-build exact
+interim dependency `260f086936198c112b1cf0f4d4b053771809513a` in a disposable
+root; this does not assert parent integration. A frozen final parent source
+requires a complete rerun. This is a bounded prerequisite unit, not Calor
 0.30 milestone acceptance or a benchmark result.
 
 ```bash
 python3 tests/E2E/agent-tasks/test-refactoring-benchmark-verifiers.py
 python3 tests/E2E/agent-tasks/test-logic-old-release.py --refactoring-benchmark
+python3 tests/E2E/agent-tasks/test-logic-old-release.py --refactoring-benchmark-native
 ```
 
 The current suite requires **167 independent C# entrypoints**: 40 accepted
@@ -2455,49 +2460,75 @@ and the requested exceptions/module construction. Fields, constructors,
 properties, lambdas, local functions, attributed/extern/unsafe methods, raw/global executable surfaces and
 unmodeled external calls do not enter the runtime domain.
 
-The suite separately requires **20 actual native literal-ID prerequisite
-refusals** and **six selected-compiler/native/managed prerequisite refusals**.
-The 20 native task entrypoints share six original fixture projects; these are
-not 20 distinct native behaviors. Probes use actual disposable `tests/` paths,
-copy the unchanged matching active `.calr` inputs, and recover
-their unique original module/function identities from unchanged Git commit
-`d82f3ae95175ecd09581c6922701706be72b0ca9`. Those records are seeded in a
-disposable supported sidecar document and passed to the selected
-`DeclarationIdentityStore.Sync`. This is an actual API call, not an admission
-mock. At selected compiler source `6dc83658cf41a59d34830ae2a3533ba58341b331`,
-the store rejects `m001`/`f001`-style identities because its state
-validator requires `IdValidator.IsCanonicalId` and the production ID-kind
-encoding, even though `IdValidator.Validate(..., isTestPath: true)` accepts
-test IDs in a different validation surface. Replacing those IDs with newly
-generated canonical IDs would not preserve the original literal requirement.
-No such substitution is made. `v001` is additionally absent from both the
-released and earliest tracked `OuterCalc` fixtures, despite its prompt. The
-archived parser constructs `BindStatementNode` without an ID, and neither that
-node nor its `StatementNode`/`AstNode` bases supply an inherited ID.
-**These refusals contribute zero Calor behavioral acceptance or rejection
-credit.** No current-native benchmark edit, contract/effect proof or full
-archived-native behavioral compatibility is claimed.
+The native suite requires **200 actual controls**: 36 accepted canonical/
+equivalent edits and 164 substantive rejections across 18 profiles. Disposable
+current-native projections retain the archived task's behavior, names,
+signatures, contracts, effects and exact module/function identities. Supported
+sidecar documents are seeded with one-to-one declaration anchors recovered
+from unchanged Git commit `d82f3ae95175ecd09581c6922701706be72b0ca9`, then passed
+through actual `DeclarationIdentityStore.Sync`. Requested new helper IDs come
+from the original prompts; moved IDs retain their proven original identity at
+the requested new module anchor. No ID is replaced with an unrelated ULID.
+The interim dependency applies the existing physical-test-path and ID-kind
+policy to these documents; production canonical validation is unchanged.
 
-The subsequent identity dependency `260f086936198c112b1cf0f4d4b053771809513a`
-supports literal test IDs through the existing physical-test-path and kind
-policy; production canonical validation is unchanged. A separate disposable
-source-build capability probe compiled the unchanged archived Contract fixture
-and an exact current-native `m001`/`f001` anchor using supported `State`/`Sync`
-seeding. Actual `Program.Compile` and CLR execution retained both identities
-through an unambiguous `Sqrt` rename: 15 runtime cases across archive/current/
-current rename. Both source builds used their own verified manifests and copied
-image integrity checks. This removes the general format-capability objection,
-but does not implement the 19 remaining provenance-supported native behavioral
-profiles or invent the missing `v001`. The benchmark prerequisite tests above
-describe the selected `6dc83658` baseline, not this later dependency.
+Each admitted native input passes actual `Program.Compile`, native AST
+identity/contract/effect checks and independent CLR observations of both
+contract-off and contract-on emitted code. Raw interop cannot supply native
+constructs. Required proof floors come from the original flags and actual
+selected function IDs, with verification-result caching disabled. Only actual
+`Proven` results count. Additional unsupported postconditions are reported
+explicitly and keep their runtime guards; a minimum proof floor is not a claim
+that every contract is proven. Predicate comparison is a signed-32-bit
+abstraction; checked arithmetic's definedness is not a universal proof claim.
+Native inline controls additionally check intermediate checked-overflow
+exceptions. Invalid native entry-domain cases must throw actual
+`ContractViolationException` precondition failures, not ordinary exceptions.
+Native equivalents reverse comparison operands and use supplying locals, rather
+than merely changing whitespace.
+
+Cross-module controls use the public `CrossModuleFunctionModules` target map,
+defer only per-file generated-output validation, and compile all actual emitted
+trees together. They run the existing cross-module effect registry/pass without
+changing the original rows or unknown-call policy. Original undeclared-public
+row warnings remain visible. Bare calls may resolve unambiguously to the moved
+function; resolved CLR identities and successful supplying-path interventions,
+not the spelling of a qualified call, establish the caller relationship.
+
+The suite separately requires **two current-native original-requirement
+refusals**, **20 baseline native refusals**, and **six shared selected-compiler/
+native/managed refusals**. The baseline `6dc83658cf41a59d34830ae2a3533ba58341b331`
+still refuses 19 literal-ID sidecars; its twentieth entry refuses absent
+`v001` lineage. `v001` is absent from both released and earliest tracked
+`OuterCalc` fixtures, despite its prompt. The archived `BindStatementNode` and
+its bases have no ID slot. Neither Sync success nor an unchanged local name
+establishes that missing identity.
+
+The native `sig-return` prompt requires actual `Calor.Runtime.Option<i32>` and
+`§NN`, with retained `f002`; it does not request a postcondition. The archived
+positive checks the real runtime struct, exact CLR generic argument and
+`IsNone`, with a successful Some-vs-None supplying-return intervention.
+Current `Nullable<int>` is a different signature and is not substituted.
+Actual current `Program.Compile` rejection of the retired construct is retained.
+No nullable compatibility projection, invented postcondition, source-defined
+lookalike or restored builtin earns credit. Both current refusals contribute
+zero behavioral positive or negative entries.
 
 The archived mode retains the **600-second total deadline**, builds unchanged
 released source with locked dependencies from the local package cache, and
 verifies that archive's own managed/native manifest. It requires an identical
 82-entry independent C# matrix across the archived and current compiler/helper
 assets: 40 accepted original edits, 40 adversarial edits, and two actual
-foreign-native executable-surface refusals. It does not cover
-the full current adversarial matrix or unblock Calor identity admission.
+foreign-native executable-surface refusals. The separate native mode requires
+**77 actual entries**: 37 accepted native edits, 37 substantive rejections and
+three prerequisite refusals. The archived arm retains original grammar, IDs and
+the actual Option runtime; current controls select the disposable interim
+source build. `v001` remains unadmitted in both arms, and exact Option/None
+remains unadmitted only on current. Neither archived mode covers the full
+current adversarial matrix. Native compatibility runs two independent task
+controls at a time, with sequential archived/current arms. Every entry still
+builds its own helper in an isolated workspace; no helper/compiler result cache
+is reused. Both workers share the original absolute 600-second replay deadline.
 Original task deadlines are read unchanged from `task.json`: **120, 150 or
 180 seconds**, including helper build, execution, EOF and cleanup. Prior
 profiles retain their 120-second entry bounds. No deadline is enlarged,

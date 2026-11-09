@@ -24,8 +24,8 @@ def load(name, path):
 
 
 def main():
-    if sys.argv[1:] not in ([], ["--control-flow"], ["--remaining-control-flow"], ["--basic-syntax"], ["--contract-writing"], ["--native-prerequisite"], ["--enums"], ["--idioms"], ["--generics"], ["--strings"], ["--collections"], ["--scalar-patterns"], ["--oop"], ["--type-arithmetic"], ["--carriers"], ["--async-functions"], ["--effects-system"], ["--carrier-patterns"], ["--refactoring"], ["--lambdas-delegates"], ["--advanced-contracts"], ["--refactoring-benchmark"]):
-        raise RuntimeError("Usage: test-logic-old-release.py [--control-flow|--remaining-control-flow|--basic-syntax|--contract-writing|--native-prerequisite|--enums|--idioms|--generics|--strings|--collections|--scalar-patterns|--oop|--type-arithmetic|--carriers|--async-functions|--effects-system|--carrier-patterns|--refactoring|--lambdas-delegates|--advanced-contracts|--refactoring-benchmark]")
+    if sys.argv[1:] not in ([], ["--control-flow"], ["--remaining-control-flow"], ["--basic-syntax"], ["--contract-writing"], ["--native-prerequisite"], ["--enums"], ["--idioms"], ["--generics"], ["--strings"], ["--collections"], ["--scalar-patterns"], ["--oop"], ["--type-arithmetic"], ["--carriers"], ["--async-functions"], ["--effects-system"], ["--carrier-patterns"], ["--refactoring"], ["--lambdas-delegates"], ["--advanced-contracts"], ["--refactoring-benchmark"], ["--refactoring-benchmark-native"]):
+        raise RuntimeError("Usage: test-logic-old-release.py [--control-flow|--remaining-control-flow|--basic-syntax|--contract-writing|--native-prerequisite|--enums|--idioms|--generics|--strings|--collections|--scalar-patterns|--oop|--type-arithmetic|--carriers|--async-functions|--effects-system|--carrier-patterns|--refactoring|--lambdas-delegates|--advanced-contracts|--refactoring-benchmark|--refactoring-benchmark-native]")
     verifier = load("verify_logic", HERE / "lib/verify-logic.py")
     controls = load("logic_controls", HERE / "test-logic-verifiers.py")
     current = controls.COMPILER_ROOT
@@ -55,7 +55,7 @@ def main():
         print(verifier.run([sys.executable, "scripts/verify-z3-assets.py"], old, bootstrap_deadline()), end="")
         print(verifier.run([
             "dotnet", "restore", "src/Calor.Compiler/Calor.Compiler.csproj", "--locked-mode",
-            *(["--source", str(Path.home() / ".nuget/packages")] if sys.argv[1:] in (["--carrier-patterns"], ["--refactoring"], ["--lambdas-delegates"], ["--advanced-contracts"], ["--refactoring-benchmark"]) else []),
+            *(["--source", str(Path.home() / ".nuget/packages")] if sys.argv[1:] in (["--carrier-patterns"], ["--refactoring"], ["--lambdas-delegates"], ["--advanced-contracts"], ["--refactoring-benchmark"], ["--refactoring-benchmark-native"]) else []),
             "--disable-build-servers", "-p:UseSharedCompilation=false", "-nodeReuse:false", "-v", "quiet",
         ], old, bootstrap_deadline()), end="")
         print(verifier.run([
@@ -64,6 +64,11 @@ def main():
             "-nodeReuse:false", "--nologo", "-v", "quiet",
         ], old, bootstrap_deadline()), end="")
         print(f"Built actual v0.29.0 source from Git commit {OLD_COMMIT}.")
+        if sys.argv[1:] == ["--refactoring-benchmark-native"]:
+            benchmark = load("benchmark_controls", HERE / "test-refactoring-benchmark-verifiers.py")
+            with benchmark.source_built_native_current(deadline) as native_current:
+                benchmark.run_native_compatibility(old, native_current, deadline)
+            return
         if sys.argv[1:] == ["--refactoring-benchmark"]:
             benchmark = load("benchmark_controls", HERE / "test-refactoring-benchmark-verifiers.py")
             benchmark.run_compatibility(old, current, deadline)

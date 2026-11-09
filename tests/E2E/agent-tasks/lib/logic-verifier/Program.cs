@@ -11,6 +11,7 @@ using Calor.Compiler.Effects;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification.Z3;
+using Calor.Compiler.Verification.Z3.Cache;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -4123,18 +4124,21 @@ static void VerifyNativeBenchmarkPrerequisite(string task, string workspace)
     foreach (var file in files)
         if (!File.Exists(Path.Combine(workspace, file)))
             throw new InvalidOperationException($"Benchmark input missing: {file}");
+    var compiler = typeof(Calor.Compiler.Program).Assembly;
+    if (task == "rename-shadow")
+        throw new InvalidOperationException("Native benchmark variable identity prerequisite refused: the unchanged archived binding has no v001 identity to preserve.");
+    var storeType = compiler.GetType("Calor.Compiler.Ids.DeclarationIdentityStore");
+    if (storeType == null)
+        return;
     var sidecar = Path.Combine(workspace, ".calor", "ids.json");
     if (!File.Exists(sidecar))
         throw new InvalidOperationException("Native benchmark identity prerequisite missing: original persisted sidecar.");
     using var document = JsonDocument.Parse(File.ReadAllText(sidecar));
     var identities = document.RootElement.GetProperty("Declarations").EnumerateArray()
         .Select(declaration => declaration.GetProperty("Id").GetString()).ToArray();
-    if (!identities.Contains("f001") || identities.Any(identity => identity == null)
+    if (identities.Any(identity => identity == null)
         || identities.Distinct(StringComparer.Ordinal).Count() != identities.Length)
         throw new InvalidOperationException("Native benchmark original literal-ID lineage is missing or ambiguous.");
-    var compiler = typeof(Calor.Compiler.Program).Assembly;
-    var storeType = compiler.GetType("Calor.Compiler.Ids.DeclarationIdentityStore")
-        ?? throw new InvalidOperationException("Native benchmark sidecar prerequisite unavailable in selected archived compiler; current literal-ID admission remains blocked.");
     var canonical = compiler.GetType("Calor.Compiler.Ids.IdValidator")?.GetMethod("IsCanonicalId")
         ?? throw new InvalidOperationException("Native benchmark canonical identity API unavailable.");
     if (canonical.Invoke(null, ["f001"]) is not false)
@@ -4154,7 +4158,177 @@ static void VerifyNativeBenchmarkPrerequisite(string task, string workspace)
             "Native benchmark literal-ID prerequisite refused: selected DeclarationIdentityStore.Sync requires canonical identities and rejects proven original m001/f001-style IDs. This is not a behavior rejection.",
             error.InnerException);
     }
-    throw new InvalidOperationException("Native benchmark identity capability changed; full behavioral admission must be implemented before acceptance.");
+    catch (TargetInvocationException error) when (error.InnerException?.GetType().Name == "DeclarationIdentityParseException")
+    {
+        if (task == "sig-return")
+        {
+            var actual = Calor.Compiler.Program.Compile(File.ReadAllText(Path.Combine(workspace, files[0])),
+                Path.Combine(workspace, files[0]), new Calor.Compiler.CompilationOptions
+                {
+                    VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
+                });
+            if (!actual.HasErrors)
+                throw new InvalidOperationException("Native benchmark signature capability changed; exact Option/None admission requires revalidation.");
+            throw new InvalidOperationException($"Native benchmark signature prerequisite refused: original f002 requires Calor.Runtime.Option<int>/None, not Nullable<int>; actual selected Program.Compile rejected the requested native construct:\n{string.Join("\n", actual.Diagnostics)}");
+        }
+        var diagnostics = error.InnerException.GetType().GetProperty("Diagnostics")?.GetValue(error.InnerException) as DiagnosticBag
+            ?? throw new InvalidOperationException("Native benchmark parser diagnostic prerequisite unavailable.", error);
+        throw new InvalidOperationException($"Native benchmark source parse failed:\n{string.Join("\n", diagnostics)}", error.InnerException);
+    }
+}
+
+static Dictionary<string, CrossModuleFunctionTarget> NativeBenchmarkTargets(IEnumerable<ModuleNode> modules)
+{
+    var targets = new Dictionary<string, CrossModuleFunctionTarget>(StringComparer.Ordinal);
+    foreach (var module in modules)
+    {
+        if (module.NamespaceScopes.Count != 0
+            || module.Functions.Any(function => function.NamespaceIdentity != null && function.NamespaceIdentity != module.Name))
+            throw new InvalidOperationException("Wrong native benchmark module namespace topology.");
+        foreach (var function in module.Functions.Where(function => function.Visibility is Visibility.Public or Visibility.Internal))
+        {
+            var target = new CrossModuleFunctionTarget(module.Name, module.Name, module.Name + "Module");
+            if (!targets.TryAdd(function.Name, target)
+                || !targets.TryAdd(module.Name + "." + function.Name, target))
+                throw new InvalidOperationException("Wrong native benchmark ambiguous cross-module function identity.");
+        }
+    }
+    return targets;
+}
+
+static (ModuleNode[] Modules, string[] Debug, string[] Off) CompileNativeBenchmark(string task, string workspace, string[] files)
+{
+    VerifyNativeBenchmarkPrerequisite(task, workspace);
+    var modules = new List<ModuleNode>();
+    var debug = new List<string>();
+    var off = new List<string>();
+    var parsed = files.Select(file =>
+    {
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parser(new Lexer(File.ReadAllText(Path.Combine(workspace, file)), diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        if (diagnostics.HasErrors)
+            throw new InvalidOperationException($"Native benchmark source parse failed:\n{string.Join("\n", diagnostics)}");
+        return ast;
+    }).ToArray();
+    var targets = NativeBenchmarkTargets(parsed);
+    foreach (var file in files)
+    {
+        var path = Path.Combine(workspace, file);
+        var source = File.ReadAllText(path);
+        var settings = new Calor.Compiler.CompilationOptions
+        {
+            ContractMode = ContractMode.Debug,
+            CrossModuleFunctionModules = targets,
+            DeferGeneratedOutputValidation = files.Length > 1,
+            ElideProvenGuards = false,
+            VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
+        };
+        var compiled = Calor.Compiler.Program.Compile(source, path, settings);
+        if (compiled.HasErrors || compiled.Ast == null)
+            throw new InvalidOperationException($"Native benchmark compilation prerequisite failed:\n{string.Join("\n", compiled.Diagnostics)}");
+        RejectRawInterop(compiled.Ast, "native refactoring benchmark");
+        modules.Add(compiled.Ast);
+        debug.Add(compiled.GeneratedCode);
+        off.Add(new CSharpEmitter(ContractMode.Off) { LineDirectiveFilePath = path, CrossModuleFunctionModules = targets }.Emit(compiled.Ast));
+    }
+    if (files.Length > 1)
+    {
+        var inputs = modules.Select((module, index) => (module, Path.Combine(workspace, files[index]))).ToArray();
+        var registry = Calor.Compiler.Effects.CrossModuleEffectRegistry.Build(inputs);
+        var diagnostics = registry.BuildDiagnostics.Concat(
+            new Calor.Compiler.Effects.CrossModuleEffectEnforcementPass().Enforce(inputs, registry)).ToArray();
+        if (diagnostics.Any(diagnostic => diagnostic.Severity == Calor.Compiler.Diagnostics.DiagnosticSeverity.Error))
+            throw new InvalidOperationException($"Native benchmark cross-module effects prerequisite failed:\n{string.Join("\n", diagnostics.Select(diagnostic => diagnostic.ToString()))}");
+        foreach (var diagnostic in diagnostics)
+            Console.WriteLine($"Actual native cross-module diagnostic: {diagnostic}");
+    }
+    var category = task.Split('-')[0];
+    var original = category switch
+    {
+        "contract" => new[] { ("Sqrt", "f001"), ("Abs", "f002"), ("GetElement", "f003"), ("PrintValue", "f004") },
+        "extract" => new[] { ("Distance", "f001"), ("ProcessArray", "f002"), ("LogAndCompute", "f003"), ("ComputeNested", "f004") },
+        "inline" => new[] { ("Double", "f001"), ("Calculate", "f002"), ("Clamp", "f003"), ("NormalizeScore", "f004"), ("Square", "f005"), ("SumOfSquares", "f006") },
+        "rename" => new[] { ("Calculate", "f001"), ("ValidatedOp", "f002"), ("OuterCalc", "f003") },
+        "sig" => new[] { ("Greet", "f001"), ("TryParse", "f002"), ("CreateRange", "f003"), ("CountSteps", "f004") },
+        _ => new[] { ("Abs", "f001"), ("SafeDivide", "f002"), ("Distance", "f003"), ("Log", "f010") }
+    };
+    var names = category switch
+    {
+        "contract" => new[] { "ContractExamples" }, "extract" => new[] { "ExtractExamples" },
+        "inline" => new[] { "InlineExamples" }, "rename" => new[] { "RenameExamples" },
+        "sig" => new[] { "SignatureExamples" }, _ => new[] { "MathModule", "UtilsModule" }
+    };
+    if (!modules.Select(module => module.Name).SequenceEqual(names)
+        || !modules.Select(module => module.Id).SequenceEqual(names.Select((_, index) => $"m{index + 1:000}")))
+        throw new InvalidOperationException("Wrong native benchmark module identity.");
+    var functions = modules.SelectMany(module => module.Functions).ToArray();
+    foreach (var (name, id) in original)
+    {
+        var matches = functions.Where(function => function.Name == name).ToArray();
+        if (matches.Length == 0 && task == "inline-simple" && name == "Double")
+            continue;
+        if (matches.Length != 1 || matches[0].Id != id)
+            throw new InvalidOperationException($"Wrong native benchmark original declaration identity: {name}/{id}.");
+    }
+    var added = task switch
+    {
+        "extract-simple" => ("SumOfSquares", "f005"), "extract-contracts" => ("ValidateIndex", "f006"),
+        "extract-effects" => ("ComputeSum", "f007"), "extract-nested" => ("Square", "f008"), _ => ("", "")
+    };
+    if (added.Item1.Length != 0 && functions.SingleOrDefault(function => function.Name == added.Item1)?.Id != added.Item2)
+        throw new InvalidOperationException($"Wrong native benchmark requested extraction identity: {added.Item1}/{added.Item2}.");
+    Console.WriteLine($"Actual native AST identities: {string.Join("; ", modules.Select(module => $"{module.Id}/{module.Name}: {string.Join(", ", module.Functions.Select(function => $"{function.Id}/{function.Name}"))}"))}");
+    return (modules.ToArray(), debug.ToArray(), off.ToArray());
+}
+
+static string VerifyNativeBenchmarkProofs(string task, string workspace, string[] files, ModuleNode[] modules, string[] debug)
+{
+    var required = task switch
+    {
+        "contract-pre" or "extract-nested" or "inline-multi" or "move-contracts" or "sig-reorder" => 1,
+        "contract-bounds" or "extract-contracts" or "rename-contract" => 2,
+        _ => 0
+    };
+    if (required == 0)
+        return "";
+    var names = task switch
+    {
+        "contract-pre" => new[] { "Sqrt" }, "contract-bounds" => new[] { "GetElement" },
+        "extract-contracts" => new[] { "ProcessArray", "ValidateIndex" },
+        "extract-nested" => new[] { "Square" }, "inline-multi" => new[] { "SumOfSquares" },
+        "rename-contract" => new[] { "ValidatedOp" }, "sig-reorder" => new[] { "CreateRange", "CountSteps" },
+        _ => new[] { "SafeDivide" }
+    };
+    var results = new List<Calor.Compiler.Verification.Z3.ContractVerificationResult>();
+    for (var index = 0; index < modules.Length; index++)
+    {
+        var ids = modules[index].Functions.Where(function => names.Contains(function.Name)).Select(function => function.Id).ToHashSet();
+        if (ids.Count == 0)
+            continue;
+        var path = Path.Combine(workspace, files[index]);
+        var settings = new Calor.Compiler.CompilationOptions
+        {
+            ContractMode = ContractMode.Debug, VerifyContracts = true, ElideProvenGuards = false,
+            CrossModuleFunctionModules = NativeBenchmarkTargets(modules),
+            DeferGeneratedOutputValidation = files.Length > 1,
+            VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
+        };
+        var compiled = Calor.Compiler.Program.Compile(File.ReadAllText(path), path, settings);
+        if (compiled.HasErrors || compiled.Ast == null)
+            throw new InvalidOperationException($"Native benchmark proof compilation prerequisite failed:\n{string.Join("\n", compiled.Diagnostics)}");
+        if (!SyntaxFactory.AreEquivalent(CSharpSyntaxTree.ParseText(debug[index]).GetRoot(),
+                CSharpSyntaxTree.ParseText(compiled.GeneratedCode).GetRoot()))
+            throw new InvalidOperationException("Native benchmark selected source/proof emission changed.");
+        var scoped = settings.VerificationResults?.Functions.Where(function => ids.Contains(function.FunctionId)
+                && names.Contains(function.FunctionName))
+            .SelectMany(function => function.PreconditionResults.Concat(function.PostconditionResults)).ToArray()
+            ?? throw new InvalidOperationException("Native benchmark proof prerequisite missing: actual selected verification results.");
+        results.AddRange(scoped);
+    }
+    if (results.Count(result => result.Status == ContractVerificationStatus.Proven) < required)
+        throw new InvalidOperationException($"Native benchmark proof prerequisite UNKNOWN/refused: {required} selected proofs required; {string.Join("; ", results.Select(result => $"{result.Status}: {result.CounterexampleDescription}"))}");
+    Console.WriteLine($"Native benchmark selected proof floor passed: {results.Count(result => result.Status == ContractVerificationStatus.Proven)} actual scoped proofs; original floor {required}; result cache disabled.");
+    return string.Join("; ", results.Select(result => $"{result.Status}: {result.CounterexampleDescription}"));
 }
 
 static void VerifyRefactoringBenchmark(string profile, string workspace)
@@ -4163,11 +4337,6 @@ static void VerifyRefactoringBenchmark(string profile, string workspace)
     if (!native && !profile.EndsWith("-csharp", StringComparison.Ordinal))
         throw new InvalidOperationException("Unknown benchmark language.");
     var task = profile["bench-refactor-".Length..^(native ? "-calor".Length : "-csharp".Length)];
-    if (native)
-    {
-        VerifyNativeBenchmarkPrerequisite(task, workspace);
-        return;
-    }
     var category = task.Split('-')[0];
     var filename = category switch
     {
@@ -4187,8 +4356,10 @@ static void VerifyRefactoringBenchmark(string profile, string workspace)
         "move-module" or "move-deps" => "Abs", "move-contracts" => "SafeDivide",
         _ => throw new InvalidOperationException($"Unknown refactoring benchmark profile: {profile}")
     };
-    var files = category == "move" ? new[] { filename, "src/Utils.cs" } : new[] { filename };
-    var additionalFiles = Directory.EnumerateFiles(workspace, "*.cs", SearchOption.AllDirectories)
+    if (native)
+        filename = Path.ChangeExtension(filename, ".calr");
+    var files = category == "move" ? new[] { filename, native ? "src/Utils.calr" : "src/Utils.cs" } : new[] { filename };
+    var additionalFiles = Directory.EnumerateFiles(workspace, native ? "*.calr" : "*.cs", SearchOption.AllDirectories)
         .Select(path => Path.GetRelativePath(workspace, path).Replace(Path.DirectorySeparatorChar, '/'))
         .Where(file => !file.Split('/').SkipLast(1)
             .Any(directory => directory.Equals("bin", StringComparison.OrdinalIgnoreCase)
@@ -4196,13 +4367,14 @@ static void VerifyRefactoringBenchmark(string profile, string workspace)
         .Where(file => !files.Contains(file, StringComparer.Ordinal))
         .OrderBy(file => file, StringComparer.Ordinal).ToArray();
     files = files.Concat(additionalFiles).ToArray();
+    var nativeInput = native ? CompileNativeBenchmark(task, workspace, files) : default;
     var options = new CSharpParseOptions(LanguageVersion.Preview);
     var trees = files.Select(file =>
     {
         var path = Path.Combine(workspace, file);
         if (!File.Exists(path))
             throw new InvalidOperationException($"Benchmark input missing: {file}");
-        return CSharpSyntaxTree.ParseText(File.ReadAllText(path), options, path);
+        return CSharpSyntaxTree.ParseText(native ? nativeInput.Off[Array.IndexOf(files, file)] : File.ReadAllText(path), options, path);
     }).ToArray();
     var compilation = CSharpCompilation.Create("IndependentCSharpBenchmark",
         trees.Prepend(CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble, options)),
@@ -4226,7 +4398,8 @@ static void VerifyRefactoringBenchmark(string profile, string workspace)
             or PropertyDeclarationSyntax or EventDeclarationSyntax or LocalFunctionStatementSyntax
             or AnonymousFunctionExpressionSyntax or UnsafeStatementSyntax or DestructorDeclarationSyntax)))
         throw new InvalidOperationException("Unsupported finite benchmark executable surface.");
-    var owners = category == "move" ? new[] { "MoveExamples.MathModule", "MoveExamples.UtilsModule" }
+    var owners = native ? nativeInput.Modules.Select(module => $"{module.Name}.{module.Name}Module").ToArray()
+        : category == "move" ? new[] { "MoveExamples.MathModule", "MoveExamples.UtilsModule" }
         : new[] { category switch
         {
             "contract" => "ContractExamples.Calculator", "extract" => "ExtractExamples.Calculator",
@@ -4244,7 +4417,10 @@ static void VerifyRefactoringBenchmark(string profile, string workspace)
                 throw new InvalidOperationException("Unresolved benchmark invocation.");
             if (!symbol.ContainingAssembly.Equals(compilation.Assembly, SymbolEqualityComparer.Default)
                 && !(symbol.ContainingType.ToDisplayString() == "System.Console" && symbol.Name == "WriteLine")
-                && !(symbol.ContainingType.ToDisplayString() == "System.Math" && symbol.Name == "Abs"))
+                && !(symbol.ContainingType.ToDisplayString() == "System.Math" && symbol.Name == "Abs")
+                && !(native && task == "sig-return" && symbol.Name is "None" or "Some"
+                    && symbol.ContainingAssembly.Identity.ToString() == typeof(Calor.Runtime.ContractViolationException).Assembly.GetName().FullName
+                    && symbol.ContainingType.ToDisplayString() is "Calor.Runtime.Option" or "Calor.Runtime.Option<int>"))
                 throw new InvalidOperationException($"Unsupported finite benchmark invocation: {symbol}.");
         }
         foreach (var creation in tree.GetRoot().DescendantNodes().Where(node =>
@@ -4273,7 +4449,7 @@ static void VerifyRefactoringBenchmark(string profile, string workspace)
             || !symbol.Parameters.Select(parameter => parameter.Type.ToDisplayString()).SequenceEqual(expectedTypes)
             || symbol.Parameters.Any(parameter => parameter.RefKind != RefKind.None || parameter.IsOptional || parameter.IsParams)
             || symbol.ReturnType.ToDisplayString() != result || symbol.IsGenericMethod || symbol.IsAsync
-            || symbol.DeclaredAccessibility != (helper ? Accessibility.Private : Accessibility.Public)
+            || symbol.DeclaredAccessibility != (helper && !native ? Accessibility.Private : Accessibility.Public)
             || declaration.Body == null && declaration.ExpressionBody == null
             || moved && declaration.SyntaxTree != trees[1])
             throw new InvalidOperationException($"Wrong benchmark selected method signature/owner: {name}.");
@@ -4292,7 +4468,8 @@ static void VerifyRefactoringBenchmark(string profile, string workspace)
         "OuterCalc" => ["int:input"], "Greet" => ["string:greeting", "string:name"],
         "TryParse" => ["string:input"], _ => ["int:step", "int:start", "int:end"]
     };
-    var resultType = target == "PrintValue" ? "void" : target == "Greet" ? "string" : target == "TryParse" ? "int?" : "int";
+    var resultType = target == "PrintValue" ? "void" : target == "Greet" ? "string"
+        : target == "TryParse" ? native ? "Calor.Runtime.Option<int>" : "int?" : "int";
     var selected = Declaration(target, parameters, resultType, moved: category == "move");
     var required = new List<MethodDeclarationSyntax> { selected };
     var helperName = task switch
@@ -4320,8 +4497,20 @@ static void VerifyRefactoringBenchmark(string profile, string workspace)
     {
         var text = method.DescendantTrivia()
             .Where(trivia => trivia.IsKind(SyntaxKind.SingleLineCommentTrivia)).Select(trivia => trivia.ToString()[2..].Trim()).ToArray();
-        string[] Conditions(string label) => text.Where(line => line.StartsWith(label + ":", StringComparison.Ordinal))
-            .Select(line => line[(label.Length + 1)..].Trim().Replace(" (when valid)", "", StringComparison.Ordinal)).ToArray();
+        string[] Conditions(string label)
+        {
+            if (native)
+            {
+                var function = nativeInput.Modules.SelectMany(module => module.Functions)
+                    .Single(function => function.Name == method.Identifier.ValueText);
+                var emitter = new CSharpEmitter(ContractMode.Off);
+                return label == "Precondition"
+                    ? function.Preconditions.Select(contract => contract.Condition.Accept(emitter)).ToArray()
+                    : function.Postconditions.Select(contract => contract.Condition.Accept(emitter)).ToArray();
+            }
+            return text.Where(line => line.StartsWith(label + ":", StringComparison.Ordinal))
+                .Select(line => line[(label.Length + 1)..].Trim().Replace(" (when valid)", "", StringComparison.Ordinal)).ToArray();
+        }
         var names = method.ParameterList.Parameters.Select(parameter => parameter.Identifier.ValueText).Append("result").ToArray();
         var booleanResult = compilation.GetSemanticModel(method.SyntaxTree).GetDeclaredSymbol(method)?.ReturnType.SpecialType
             == SpecialType.System_Boolean;
@@ -4329,6 +4518,7 @@ static void VerifyRefactoringBenchmark(string profile, string workspace)
         BitVecExpr Value(ExpressionSyntax expression) => expression switch
         {
             ParenthesizedExpressionSyntax parenthesized => Value(parenthesized.Expression),
+            CheckedExpressionSyntax arithmetic when native => Value(arithmetic.Expression),
             IdentifierNameSyntax identifier when names.Contains(identifier.Identifier.ValueText) =>
                 context.MkBVConst(identifier.Identifier.ValueText, 32),
             LiteralExpressionSyntax literal when literal.Token.Value is int number => context.MkBV(number, 32),
@@ -4337,7 +4527,7 @@ static void VerifyRefactoringBenchmark(string profile, string workspace)
             BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.SubtractExpression) => context.MkBVSub(Value(binary.Left), Value(binary.Right)),
             BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.MultiplyExpression) => context.MkBVMul(Value(binary.Left), Value(binary.Right)),
             BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.DivideExpression) => context.MkBVSDiv(Value(binary.Left), Value(binary.Right)),
-            _ => throw new InvalidOperationException("Unsupported benchmark contract documentation expression.")
+            _ => throw new InvalidOperationException($"Unsupported benchmark contract documentation expression: {expression.Kind()}: {expression}.")
         };
         BoolExpr Predicate(ExpressionSyntax expression) => expression switch
         {
@@ -4385,6 +4575,40 @@ static void VerifyRefactoringBenchmark(string profile, string workspace)
     }
     void EffectComment(MethodDeclarationSyntax method, bool pure)
     {
+        if (native)
+        {
+            var function = nativeInput.Modules.SelectMany(module => module.Functions)
+                .Single(function => function.Name == method.Identifier.ValueText);
+            var effects = function.Effects?.Effects.Values.Where(value => !string.IsNullOrWhiteSpace(value)).ToArray() ?? [];
+            var console = function.Effects?.Effects.TryGetValue("io", out var io) == true
+                && io.Split(',').Select(value => value.Trim()).Contains("console_write");
+            if (pure ? effects.Length != 0 : !console || effects.Length != 1
+                    || function.Effects!.Effects.Count != 1 || function.Effects.Effects["io"] != "console_write")
+                throw new InvalidOperationException($"Wrong native benchmark effect declaration: {function.Name}.");
+            if (pure)
+            {
+                var pending = new Stack<MethodDeclarationSyntax>();
+                var visited = new HashSet<MethodDeclarationSyntax>();
+                pending.Push(method);
+                while (pending.TryPop(out var current))
+                {
+                    if (!visited.Add(current))
+                        continue;
+                    var semantic = compilation.GetSemanticModel(current.SyntaxTree);
+                    foreach (var call in current.DescendantNodes().OfType<InvocationExpressionSyntax>())
+                    {
+                        if (semantic.GetSymbolInfo(call).Symbol is not IMethodSymbol symbol)
+                            throw new InvalidOperationException("Native benchmark pure call identity unresolved.");
+                        if (symbol.ContainingType.ToDisplayString() == "System.Console")
+                            throw new InvalidOperationException("Wrong native benchmark pure helper: reachable console effect.");
+                        if (symbol.ContainingAssembly.Equals(compilation.Assembly, SymbolEqualityComparer.Default))
+                            pending.Push(methods.Single(candidate => SymbolEqualityComparer.Default.Equals(
+                                compilation.GetSemanticModel(candidate.SyntaxTree).GetDeclaredSymbol(candidate), symbol)));
+                    }
+                }
+            }
+            return;
+        }
         var comments = method.GetLeadingTrivia().Where(trivia => trivia.IsKind(SyntaxKind.SingleLineCommentTrivia))
             .Select(trivia => trivia.ToString()[2..].Trim()).Where(text => text.StartsWith("Effect:", StringComparison.Ordinal)).ToArray();
         var allowed = pure ? new[] { "Effect: None (pure function)", "Effect: None", "Effect: Pure" }
@@ -4418,6 +4642,8 @@ static void VerifyRefactoringBenchmark(string profile, string workspace)
             break;
         case "move-contracts": Comments(selected, ["b != 0"], ["result == a / b"]); break;
         case "sig-return":
+            if (native)
+                break;
             var nullableComments = selected.GetLeadingTrivia().Where(trivia => trivia.IsKind(SyntaxKind.SingleLineCommentTrivia))
                 .Select(trivia => trivia.ToString()[2..].Trim()).ToArray();
             if (!nullableComments.Contains("Postcondition: result is null for invalid input, or the parsed value"))
@@ -4458,6 +4684,8 @@ static void VerifyRefactoringBenchmark(string profile, string workspace)
         if (selected.DescendantNodes().OfType<BinaryExpressionSyntax>().Count(binary => binary.IsKind(SyntaxKind.MultiplyExpression)) < minimum)
             throw new InvalidOperationException("Required benchmark inlined multiplication missing.");
     }
+    var nativeProofCoverage = native
+        ? VerifyNativeBenchmarkProofs(task, workspace, files, nativeInput.Modules, nativeInput.Debug) : "";
     var cases = new List<(string Name, object[] Inputs, object? Expected, string Output, Type? Exception, string? Parameter)>();
     void Case(string name, object[] inputs, object? expected, string output = "", Type? exception = null, string? parameter = null) =>
         cases.Add((name, inputs, expected, output, exception, parameter));
@@ -4488,7 +4716,9 @@ static void VerifyRefactoringBenchmark(string profile, string workspace)
             else if (target == "LogAndCompute" && (long)x + y is >= int.MinValue and <= int.MaxValue)
                 Case(target, [x, y], x + y, "Computing sum\n");
             else if (target == "Calculate" && category == "inline" && 2L * (x + (long)y) is >= int.MinValue and <= int.MaxValue)
-                Case(target, [x, y], (int)(2L * (x + (long)y)));
+                Case(target, [x, y], (int)(2L * (x + (long)y)),
+                    exception: native && (2L * x is < int.MinValue or > int.MaxValue
+                        || 2L * y is < int.MinValue or > int.MaxValue) ? typeof(OverflowException) : null);
             else if (target == "GetElement")
                 Case(target, [x, y], x, exception: y <= 0 || x < 0 || x >= y ? typeof(ArgumentOutOfRangeException) : null,
                     parameter: y <= 0 ? "length" : x < 0 || x >= y ? "index" : null);
@@ -4539,6 +4769,21 @@ static void VerifyRefactoringBenchmark(string profile, string workspace)
                         Case(helperName, [a, b], task == "extract-contracts" ? a >= 0 && a < b
                             : task == "extract-effects" ? a + b : a * a + b * b);
     }
+    var nativeRejectedEntries = new List<(string Name, object[] Inputs)>();
+    if (native)
+    {
+        bool InExpectedEntryDomain(string name, object[] inputs) => name switch
+        {
+            "Sqrt" => task != "contract-pre" || (int)inputs[0] >= 0,
+            "GetElement" or "ProcessArray" => (int)inputs[0] >= 0 && (int)inputs[0] < (int)inputs[1],
+            "ValidatedOp" => (int)inputs[0] >= 0 && (int)inputs[0] <= (int)inputs[1],
+            "SafeDivide" => (int)inputs[1] != 0,
+            _ => true
+        };
+        nativeRejectedEntries.AddRange(cases.Where(test => !InExpectedEntryDomain(test.Name, test.Inputs))
+            .Select(test => (test.Name, test.Inputs)));
+        cases.RemoveAll(test => !InExpectedEntryDomain(test.Name, test.Inputs));
+    }
     bool Behavior(Assembly candidate, bool dependence = false)
     {
         var correct = true;
@@ -4580,16 +4825,50 @@ static void VerifyRefactoringBenchmark(string profile, string workspace)
                 throw new InvalidOperationException("Benchmark counterfactual threw; exceptions are not supplying-path evidence.", thrown);
             if (!dependence || test.Exception == null)
             {
-                correct &= test.Exception == null ? thrown == null && Equals(value, test.Expected)
+                var resultMatches = native && test.Name == "TryParse"
+                    ? value != null && method.ReturnType.Assembly == typeof(Calor.Runtime.ContractViolationException).Assembly
+                        && method.ReturnType.FullName?.StartsWith("Calor.Runtime.Option`1[", StringComparison.Ordinal) == true
+                        && method.ReturnType.GetGenericArguments().SequenceEqual(new[] { typeof(int) })
+                        && method.ReturnType.GetProperty("IsNone")?.GetValue(value) is true
+                    : Equals(value, test.Expected);
+                var observationMatches = test.Exception == null ? thrown == null && resultMatches
                     : thrown?.GetType() == test.Exception
                       && (test.Parameter == null || thrown is ArgumentOutOfRangeException range && range.ParamName == test.Parameter);
-                correct &= output.ToString().Replace("\r\n", "\n", StringComparison.Ordinal) == test.Output && errorOutput.ToString() == "";
+                observationMatches &= output.ToString().Replace("\r\n", "\n", StringComparison.Ordinal) == test.Output && errorOutput.ToString() == "";
+                if (!observationMatches && !dependence && correct)
+                    Console.WriteLine($"Benchmark observation mismatch: {test.Name}({string.Join(", ", test.Inputs)}); expected {test.Expected ?? "null"}/{test.Exception?.Name ?? "success"}, actual {value ?? "null"}/{thrown?.GetType().Name ?? "success"}.");
+                correct &= observationMatches;
             }
         }
         return correct;
     }
     if (cases.Count == 0 || !Behavior(assembly))
         throw new InvalidOperationException("Wrong independent benchmark runtime behavior, validation, or output.");
+    if (native)
+    {
+        var checkedCompilation = compilation.RemoveAllSyntaxTrees().AddSyntaxTrees(
+            CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble, options));
+        checkedCompilation = checkedCompilation.AddSyntaxTrees(nativeInput.Debug.Select(code => CSharpSyntaxTree.ParseText(code, options)));
+        var checkedAssembly = Emit(checkedCompilation);
+        if (!Behavior(checkedAssembly))
+            throw new InvalidOperationException("Wrong native benchmark contract-on runtime behavior.");
+        foreach (var test in nativeRejectedEntries)
+        {
+            var owner = Symbol(required.Single(method => method.Identifier.ValueText == test.Name)).ContainingType.ToDisplayString();
+            var method = checkedAssembly.GetType(owner)?.GetMethod(test.Name, BindingFlags.Public | BindingFlags.Static)
+                ?? throw new InvalidOperationException("Native benchmark contract-on selected method missing.");
+            try
+            {
+                _ = method.Invoke(null, test.Inputs);
+            }
+            catch (TargetInvocationException error) when (error.InnerException is Calor.Runtime.ContractViolationException violation
+                && violation.Kind == Calor.Runtime.ContractKind.Requires)
+            {
+                continue;
+            }
+            throw new InvalidOperationException("Native benchmark precondition did not reject an independently invalid entry.");
+        }
+    }
     var interventions = 0;
     foreach (var call in couplingCalls)
     {
@@ -4597,7 +4876,22 @@ static void VerifyRefactoringBenchmark(string profile, string workspace)
         var type = compilation.GetSemanticModel(tree).GetTypeInfo(call).Type;
         var replacement = type?.SpecialType == SpecialType.System_Boolean
             ? SyntaxFactory.ParseExpression($"!({call})") : SyntaxFactory.ParseExpression($"unchecked(({call}) + 1)");
-        var counter = tree.WithRootAndOptions(tree.GetRoot().ReplaceNode(call, replacement), tree.Options);
+        var root = tree.GetRoot();
+        SyntaxNode changed;
+        if (call.Parent is ExpressionStatementSyntax statement)
+        {
+            var name = "__calor_benchmark_discard";
+            while (root.DescendantTokens().Any(token => token.ValueText == name))
+                name += "_";
+            var discard = SyntaxFactory.LocalDeclarationStatement(
+                SyntaxFactory.VariableDeclaration(SyntaxFactory.IdentifierName("var"))
+                    .AddVariables(SyntaxFactory.VariableDeclarator(name)
+                        .WithInitializer(SyntaxFactory.EqualsValueClause(replacement))));
+            changed = root.ReplaceNode(statement, SyntaxFactory.Block(discard));
+        }
+        else
+            changed = root.ReplaceNode(call, replacement);
+        var counter = tree.WithRootAndOptions(changed, tree.Options);
         if (!Behavior(Emit(compilation.ReplaceSyntaxTree(tree, counter)), dependence: true))
             interventions++;
     }
@@ -4609,7 +4903,9 @@ static void VerifyRefactoringBenchmark(string profile, string workspace)
         {
             var tree = selected.SyntaxTree;
             var expression = resultType == "string" ? $"({statement.Expression}) + \"!\""
-                : resultType == "int?" ? "((int?)1)" : $"unchecked(({statement.Expression}) + 1)";
+                : resultType == "int?" ? "((int?)1)"
+                : native && task == "sig-return" ? "Calor.Runtime.Option.Some<int>(1)"
+                : $"unchecked(({statement.Expression}) + 1)";
             var counter = tree.WithRootAndOptions(tree.GetRoot().ReplaceNode(statement,
                 statement.WithExpression(SyntaxFactory.ParseExpression(expression))), tree.Options);
             if (!Behavior(Emit(compilation.ReplaceSyntaxTree(tree, counter)), dependence: true))
@@ -4619,7 +4915,9 @@ static void VerifyRefactoringBenchmark(string profile, string workspace)
         {
             var tree = selected.SyntaxTree;
             var expression = resultType == "string" ? $"({expressionBody}) + \"!\""
-                : resultType == "int?" ? "((int?)1)" : $"unchecked(({expressionBody}) + 1)";
+                : resultType == "int?" ? "((int?)1)"
+                : native && task == "sig-return" ? "Calor.Runtime.Option.Some<int>(1)"
+                : $"unchecked(({expressionBody}) + 1)";
             var counter = tree.WithRootAndOptions(tree.GetRoot().ReplaceNode(expressionBody,
                 SyntaxFactory.ParseExpression(expression)), tree.Options);
             if (!Behavior(Emit(compilation.ReplaceSyntaxTree(tree, counter)), dependence: true))
@@ -4673,8 +4971,17 @@ static void VerifyRefactoringBenchmark(string profile, string workspace)
             throw new InvalidOperationException("Benchmark renamed parameter discarded the supplying inner local.");
         interventions++;
     }
-    Console.WriteLine($"Verification passed: {profile}; independent C# compilation and selected Roslyn/CLR identities; {cases.Count} runtime cases; {interventions} successful source counterfactuals.");
-    Console.WriteLine("Limits: finite representable Int32 results and explicit validation cases; comments are symbol-scoped predicate-equivalence documentation, not runtime contracts; no universal body proof or overflow claim.");
+    var evidence = native
+        ? $"actual native Program.Compile, original declaration identities, scoped AST contracts/effects and contract-on/off CLR observations; {nativeRejectedEntries.Count} invalid entries rejected by native preconditions"
+        : "independent C# compilation and selected Roslyn/CLR identities";
+    if (native && task == "sig-return")
+        evidence += "; actual archived Calor.Runtime.Option<System.Int32> CLR identity and IsNone";
+    if (nativeProofCoverage.Length != 0)
+        Console.WriteLine($"Actual selected native proof coverage (only Proven counts toward the original floor; runtime guards retained): {nativeProofCoverage}");
+    Console.WriteLine($"Verification passed: {profile}; {evidence}; {cases.Count} runtime cases; {interventions} successful source counterfactuals.");
+    Console.WriteLine(native
+        ? "Limits: finite representable Int32 results and independently defined native entry domains; scoped AST predicate equivalence plus actual compiler proof floors where originally requested; runtime contracts remain enabled for checked observations; no universal body equivalence or overflow claim."
+        : "Limits: finite representable Int32 results and explicit validation cases; comments are symbol-scoped predicate-equivalence documentation, not runtime contracts; no universal body proof or overflow claim.");
 }
 
 static void VerifyRefactoring(string profile, string path)
