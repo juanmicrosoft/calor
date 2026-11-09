@@ -191,6 +191,30 @@ public sealed class NativeRecordTests
     }
 
     [Fact]
+    public void DerivedPositionalRecord_CannotHideForbiddenInheritedInitEffect()
+    {
+        const string source = """
+            §M{DerivedInit}
+              record Base:pub (int:X)
+                §PROP{X:int:pub}
+                  §GET
+                    §R 0
+                  §INIT
+                    §P "base init"
+              record Derived:pub (int:X) : Base(X)
+              §F{Copy:pub} (Derived:value) -> Derived
+                §E{alloc,mut}
+                §R §WITH value §SET{X} 1 §/WITH
+            """;
+        var refused = Compile(source);
+        Assert.Contains(refused.Diagnostics.Errors, error => error.Code == "Calor0423"
+            && error.Message.Contains("Base.X", StringComparison.Ordinal));
+        var declared = Compile(source.Replace("§E{alloc,mut}", "§E{alloc,mut,cw}", StringComparison.Ordinal));
+        Assert.Contains(declared.Diagnostics.Errors, error => error.Code == "Calor0423"
+            && error.Message.Contains("Base.X", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void RecordOperatorsAndConversions_ExecuteWithoutChangingValueSemantics()
     {
         const string declarations = """
