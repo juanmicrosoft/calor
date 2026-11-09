@@ -76,12 +76,18 @@ def run(command, cwd, deadline, env=None):
     try:
         # Reserve part of this same deadline for bounded termination and EOF cleanup.
         output, _ = process.communicate(timeout=max(0, deadline - time.monotonic() - min(0.5, timeout / 2)))
-    except subprocess.TimeoutExpired:
-        stop(process, deadline)
-        raise RuntimeError(f"Verifier timeout after {timeout}s: {command[0]}") from None
-    except BaseException:
-        stop(process, deadline)
-        raise
+    except BaseException as error:
+        failure = (RuntimeError(f"Verifier timeout after {timeout}s: {command[0]}")
+                   if isinstance(error, subprocess.TimeoutExpired) else error)
+        try:
+            stop(process, deadline)
+        except (OSError, RuntimeError) as cleanup_error:
+            message = f"Verifier cleanup failure while handling {type(failure).__name__}: {cleanup_error}"
+            failure.add_note(message)
+            print(message, file=sys.stderr)
+        if failure is error:
+            raise
+        raise failure from None
     if process.returncode:
         raise RuntimeError(f"Verifier command exited {process.returncode}:\n{output}")
     return output

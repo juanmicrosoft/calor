@@ -236,8 +236,9 @@ class TimeoutWrapperTests(unittest.TestCase):
             )
             started = time.monotonic()
             try:
-                with self.assertRaisesRegex(RuntimeError, "Verifier timeout"):
+                with self.assertRaisesRegex(RuntimeError, "Verifier timeout") as raised:
                     verifier.run([sys.executable, "-c", code, str(pid_file)], temporary, started + 1.5)
+                self.assertIn("Verifier cleanup EOF timeout", "\n".join(raised.exception.__notes__))
                 self.assertLess(time.monotonic() - started, 2.5)
                 self.assertTrue(pid_file.is_file(), "Escaped inherited-pipe child did not start.")
             finally:
@@ -280,6 +281,7 @@ except KeyboardInterrupt:
                 wrapper.send_signal(signal.SIGINT)
                 _, error = wrapper.communicate(timeout=3)
                 self.assertEqual(wrapper.returncode, 130, error)
+                self.assertIn("Verifier cleanup EOF timeout", error)
                 self.assertLess(time.monotonic() - started, 3)
                 with self.assertRaises(ProcessLookupError):
                     os.kill(int(child_file.read_text()), 0)
