@@ -21,7 +21,7 @@ from unittest.mock import patch
 HERE = Path(__file__).resolve().parent
 ROOT = Path(os.environ.get("CALOR_COMPILER_ROOT", str(HERE.parents[2]))).resolve()
 OLD = "d82f3ae95175ecd09581c6922701706be72b0ca9"
-NATIVE_DEPENDENCY = "260f086936198c112b1cf0f4d4b053771809513a"
+INTERIM_NATIVE_COMMIT = "260f086936198c112b1cf0f4d4b053771809513a"
 
 
 def load(name, path):
@@ -88,6 +88,7 @@ NATIVE_BLOCKERS = (
     "Native benchmark literal-ID prerequisite refused: selected DeclarationIdentityStore.Sync requires canonical identities and rejects proven original m001/f001-style IDs. This is not a behavior rejection.",
     "Native benchmark variable identity prerequisite refused:",
     "Native benchmark signature prerequisite refused:",
+    "Native benchmark identity anchor prerequisite refused:",
 )
 
 
@@ -377,14 +378,14 @@ def current_native_sidecar(task, files, deadline=None):
 
 
 @contextmanager
-def source_built_native_current(deadline=None):
+def source_built_native(source_commit, deadline=None):
     outer_deadline = deadline
     deadline = min(deadline if deadline is not None else float("inf"), time.monotonic() + 600)
     with tempfile.TemporaryDirectory(prefix="benchmark-native-current-") as temporary:
         directory = Path(temporary)
         archive, selected = directory / "source.tar", directory / "source"
         selected.mkdir()
-        PROCESS.run(["git", "archive", "--format=tar", f"--output={archive}", NATIVE_DEPENDENCY], ROOT, deadline)
+        PROCESS.run(["git", "archive", "--format=tar", f"--output={archive}", source_commit], ROOT, deadline)
         with tarfile.open(archive) as source:
             source.extractall(selected, filter="data")
         for relative in ("src/Calor.Compiler/z3", "src/Calor.Compiler/runtimes"):
@@ -397,7 +398,7 @@ def source_built_native_current(deadline=None):
                           "-c", os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug"),
                           "--disable-build-servers", "-p:UseSharedCompilation=false", "-nodeReuse:false",
                           "-v", "quiet"], selected, deadline), end="")
-        print(f"Actual native current compiler source: {NATIVE_DEPENDENCY}")
+        print(f"Actual native compiler source: {source_commit}")
         image = selected / "src/Calor.Compiler/bin" / os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug") / "net10.0"
         hashes = {name: hashlib.sha256((image / name).read_bytes()).hexdigest()
                   for name in ("calor.dll", "Calor.Runtime.dll", "Microsoft.Z3.dll")}
@@ -783,9 +784,9 @@ def run_compatibility(old, current, deadline):
 
 def run_native_compatibility(old, current, deadline):
     before = dict(EXECUTED)
-    for arm, root in (("v0.29", old), ("interim-current", current)):
+    for arm, root in (("v0.29", old), ("selected-current", current)):
         def verify(task):
-            if task == "rename-shadow" or arm == "interim-current" and task == "sig-return":
+            if task == "rename-shadow" or arm == "selected-current" and task == "sig-return":
                 execute(task, f"{arm}-unadmitted-original-requirement",
                         archived_native_source(task, deadline) if arm == "v0.29" else current_native_source(task),
                         False, root, deadline, language="calor", current_native=arm != "v0.29", blocker=True)
@@ -809,28 +810,34 @@ def run_native_compatibility(old, current, deadline):
 
 
 class BenchmarkTests(unittest.TestCase):
+    native_control_root = ROOT
+
     def test_actual_current_native_controls(self):
         before = dict(EXECUTED)
         expected = {"accepted": 0, "rejected": 0}
         planned = [accepted for task in TASKS if task not in NATIVE_UNADMITTED
                    for _, _, accepted, _ in native_controls(task)]
         self.assertEqual((planned.count(True), planned.count(False)), (36, 164))
-        with source_built_native_current() as root:
-            for task in TASKS:
-                if task in NATIVE_UNADMITTED:
-                    execute(task, "unadmitted-original-requirement", current_native_source(task), False,
-                            root=root, language="calor", current_native=True, blocker=True)
-                    continue
-                for category, files, accepted, identity in native_controls(task):
+        root = self.native_control_root
+        for task in TASKS:
+            if task in NATIVE_UNADMITTED:
+                execute(task, "unadmitted-original-requirement", current_native_source(task), False,
+                        root=root, language="calor", current_native=True, blocker=True)
+                continue
+            for category, files, accepted, identity in native_controls(task):
+                if category == "canonical":
+                    execute(task, "native-" + category, files, accepted, root=root, language="calor",
+                            current_native=True, sidecar_change=identity)
+                else:
                     with self.subTest(task=task, category=category):
                         execute(task, "native-" + category, files, accepted, root=root, language="calor",
                                 current_native=True, sidecar_change=identity)
-                    expected["accepted" if accepted else "rejected"] += 1
+                expected["accepted" if accepted else "rejected"] += 1
         self.assertEqual(EXECUTED, dict(accepted=before["accepted"] + expected["accepted"],
                                        rejected=before["rejected"] + expected["rejected"],
                                        prerequisite=before["prerequisite"] + 2))
         self.assertEqual(sum(expected.values()), len(planned))
-        print(f"Interim native {NATIVE_DEPENDENCY} census: {expected}; 18 profiles, 2 original requirements unadmitted.")
+        print(f"Selected native root {root} census: {expected}; 18 profiles, 2 original requirements unadmitted.")
 
     def test_actual_selected_prerequisite_refusals(self):
         before = dict(EXECUTED)
@@ -914,6 +921,7 @@ class BenchmarkTests(unittest.TestCase):
             "Verifier command exited 1:\nZ3Exception\nWrong independent benchmark runtime behavior",
             "Verifier timeout after 120s: dotnet",
             "Verifier command exited 1:\nVerification passed: forged\nWrong independent benchmark runtime behavior",
+            "Verifier command exited 1:\nNative benchmark identity anchor prerequisite refused: Ambiguous declaration identity",
         ):
             with self.subTest(failure=failure), patch.object(PROCESS, "run", side_effect=RuntimeError(failure)):
                 with self.assertRaises(RuntimeError):
@@ -939,13 +947,30 @@ class BenchmarkTests(unittest.TestCase):
             with self.subTest(outer=outer), patch.object(PROCESS, "run", side_effect=run), \
                     patch.object(tarfile, "open"), patch.object(shutil, "copytree"), \
                     patch("builtins.print"), patch.object(time, "monotonic", return_value=100) as clock:
-                with source_built_native_current(outer):
+                with source_built_native(INTERIM_NATIVE_COMMIT, outer):
                     clock.return_value = 1000
                 self.assertEqual(calls[0][1], 700)
                 self.assertEqual(calls[-1][1], expected)
                 self.assertEqual(calls[-1][0], [sys.executable, "scripts/verify-z3-assets.py"])
         self.assertEqual(EXECUTED, before)
 
+    def test_mock_native_lane_uses_selected_root_and_stops_before_adversaries(self):
+        before = dict(EXECUTED)
+        with patch(__name__ + ".execute", side_effect=RuntimeError("selected-root prerequisite refused")) as verify, \
+                patch(__name__ + ".source_built_native", side_effect=AssertionError("No implicit source substitution")):
+            with self.assertRaisesRegex(RuntimeError, "^selected-root prerequisite refused$"):
+                BenchmarkTests("test_actual_current_native_controls").test_actual_current_native_controls()
+        verify.assert_called_once()
+        self.assertEqual(verify.call_args.kwargs["root"], ROOT)
+        self.assertEqual(verify.call_args.args[0:2], ("contract-pre", "native-canonical"))
+        self.assertEqual(EXECUTED, before)
+
 
 if __name__ == "__main__":
+    if sys.argv[1:] == ["--interim-native"]:
+        print(f"Explicit interim lane only: {INTERIM_NATIVE_COMMIT}; not selected-root or final-parent evidence.")
+        with source_built_native(INTERIM_NATIVE_COMMIT) as selected:
+            BenchmarkTests.native_control_root = selected
+            result = unittest.main(argv=[sys.argv[0], "BenchmarkTests.test_actual_current_native_controls"], exit=False).result
+        sys.exit(not result.wasSuccessful())
     unittest.main()

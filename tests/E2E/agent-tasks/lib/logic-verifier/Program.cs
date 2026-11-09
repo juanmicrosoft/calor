@@ -4158,6 +4158,14 @@ static void VerifyNativeBenchmarkPrerequisite(string task, string workspace)
             "Native benchmark literal-ID prerequisite refused: selected DeclarationIdentityStore.Sync requires canonical identities and rejects proven original m001/f001-style IDs. This is not a behavior rejection.",
             error.InnerException);
     }
+    catch (TargetInvocationException error) when (error.InnerException is InvalidOperationException identity
+        && identity.Message.StartsWith("Ambiguous declaration identity for '", StringComparison.Ordinal)
+        && identity.Message.EndsWith("; use an explicit tooling relocation.", StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException(
+            $"Native benchmark identity anchor prerequisite refused: {error.InnerException.Message} This is not a behavior rejection.",
+            error.InnerException);
+    }
     catch (TargetInvocationException error) when (error.InnerException?.GetType().Name == "DeclarationIdentityParseException")
     {
         if (task == "sig-return")

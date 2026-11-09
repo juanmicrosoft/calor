@@ -2414,13 +2414,14 @@ all 129 prerequisites, agent evaluation, milestone acceptance or release readine
 ### Paired refactoring benchmark prerequisites
 
 The 40 original `refactoring-benchmark` entries invoke the selected-image
-supervised helper, not declaration greps. The controls cover **20 independent
-C# profiles and 18 current-native Calor profiles**. Two original Calor
+supervised helper, not declaration greps. The controls implement **20 independent
+C# profiles**; **18 native Calor profiles have evidence only on explicit interim
+source `260f086936198c112b1cf0f4d4b053771809513a`**. Two original Calor
 requirements remain explicitly unadmitted: missing `v001` provenance and the
-retired `Option<i32>`/None signature. Native current controls source-build exact
-interim dependency `260f086936198c112b1cf0f4d4b053771809513a` in a disposable
-root; this does not assert parent integration. A frozen final parent source
-requires a complete rerun. This is a bounded prerequisite unit, not Calor
+retired `Option<i32>`/None signature. Default current-native controls and native
+compatibility use the actual `CALOR_COMPILER_ROOT` selection, never an implicit
+interim source build. Interim evidence is not parent integration or selected-root
+admission. This is a bounded prerequisite unit, not Calor
 0.30 milestone acceptance or a benchmark result.
 
 ```bash
@@ -2428,6 +2429,26 @@ python3 tests/E2E/agent-tasks/test-refactoring-benchmark-verifiers.py
 python3 tests/E2E/agent-tasks/test-logic-old-release.py --refactoring-benchmark
 python3 tests/E2E/agent-tasks/test-logic-old-release.py --refactoring-benchmark-native
 ```
+
+Explicit reproduction of the immutable interim evidence is separate:
+
+```bash
+python3 tests/E2E/agent-tasks/test-refactoring-benchmark-verifiers.py --interim-native
+python3 tests/E2E/agent-tasks/test-logic-old-release.py --refactoring-benchmark-native-interim
+```
+
+Two actual original native positives, `contract-pre` and `extract-simple`, were
+probed on freshly source-built, manifest-verified parent source
+`e0ba25aae4e6e9a96a45d60c1db219ee1889054c`. Both refused at identity reconciliation:
+the archived module-container anchors for `ContractExamples.Sqrt/f001` and
+`ExtractExamples.Distance/f001` are ambiguous against the selected namespace
+anchors. The physical test-path literal IDs passed persisted-state validation;
+this was not a canonical-ID format rejection. Neither probe reached native
+compilation or CLR behavior, and both earn zero behavioral credit.
+Global/file-scoped namespace targets and CLR ownership remain unadmitted behind
+that gate; the verifier does not substitute the older module-name namespace.
+Default native validation stops at the first unavailable canonical positive,
+without running adversaries or claiming the unchanged required census passed.
 
 The current suite requires **167 independent C# entrypoints**: 40 accepted
 canonical/equivalent edits and 127 substantive rejections. They compile the
@@ -2460,7 +2481,7 @@ and the requested exceptions/module construction. Fields, constructors,
 properties, lambdas, local functions, attributed/extern/unsafe methods, raw/global executable surfaces and
 unmodeled external calls do not enter the runtime domain.
 
-The native suite requires **200 actual controls**: 36 accepted canonical/
+Native admission requires **200 actual controls**: 36 accepted canonical/
 equivalent edits and 164 substantive rejections across 18 profiles. Disposable
 current-native projections retain the archived task's behavior, names,
 signatures, contracts, effects and exact module/function identities. Supported
@@ -2522,8 +2543,9 @@ assets: 40 accepted original edits, 40 adversarial edits, and two actual
 foreign-native executable-surface refusals. The separate native mode requires
 **77 actual entries**: 37 accepted native edits, 37 substantive rejections and
 three prerequisite refusals. The archived arm retains original grammar, IDs and
-the actual Option runtime; current controls select the disposable interim
-source build. `v001` remains unadmitted in both arms, and exact Option/None
+the actual Option runtime; default current controls use the selected root.
+The 77-entry passing receipt applies only to the explicit interim source, not
+`e0ba25a` or a later parent. `v001` remains unadmitted in both arms, and exact Option/None
 remains unadmitted only on current. Neither archived mode covers the full
 current adversarial matrix. Native compatibility runs two independent task
 controls at a time, with sequential archived/current arms. Every entry still
