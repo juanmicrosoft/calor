@@ -51,6 +51,26 @@ public sealed class ProjectMigrator
     /// </summary>
     public async Task<MigrationReport> ExecuteAsync(MigrationPlan plan, bool dryRun = false, IProgress<MigrationProgress>? progress = null, CancellationToken cancellationToken = default)
     {
+        var generations = new System.Collections.Concurrent.ConcurrentDictionary<string, ConversionGeneration>(
+            BuildStateCache.GetPathComparer());
+        using var validationGate = new SemaphoreSlim(1, 1);
+        try
+        {
+            return await ExecuteCoreAsync(plan, dryRun, progress, generations, validationGate, cancellationToken);
+        }
+        finally
+        {
+            foreach (var generation in generations.Values)
+                generation.Dispose();
+        }
+    }
+
+    private async Task<MigrationReport> ExecuteCoreAsync(
+        MigrationPlan plan, bool dryRun, IProgress<MigrationProgress>? progress,
+        System.Collections.Concurrent.ConcurrentDictionary<string, ConversionGeneration> generations,
+        SemaphoreSlim validationGate,
+        CancellationToken cancellationToken)
+    {
         _manifestProjectDirectory = ResolveManifestProjectDirectory(plan);
         var projectFilePath = plan.ProjectFilePath
             ?? (File.Exists(plan.ProjectPath)
@@ -169,7 +189,7 @@ public sealed class ProjectMigrator
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var result = await ProcessEntryAsync(
-                        entry, plan.Direction, dryRun, crossModuleMap, cancellationToken);
+                        entry, plan.Direction, dryRun, crossModuleMap, generations, validationGate, cancellationToken);
 
                     var newCount = Interlocked.Increment(ref processedCount);
                     progress?.Report(new MigrationProgress
@@ -198,7 +218,7 @@ public sealed class ProjectMigrator
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var result = await ProcessEntryAsync(
-                    entry, plan.Direction, dryRun, crossModuleMap, cancellationToken);
+                    entry, plan.Direction, dryRun, crossModuleMap, generations, validationGate, cancellationToken);
                 reportBuilder.AddFileResult(result);
 
                 processedCount++;
@@ -241,6 +261,7 @@ public sealed class ProjectMigrator
                 report,
                 projectFilePath,
                 dryRun,
+                generations,
                 cancellationToken);
             RefreshSummary(report);
         }
@@ -367,6 +388,8 @@ public sealed class ProjectMigrator
         MigrationDirection direction,
         bool dryRun,
         IReadOnlyDictionary<string, CrossModuleFunctionTarget>? crossModuleMap,
+        System.Collections.Concurrent.ConcurrentDictionary<string, ConversionGeneration> generations,
+        SemaphoreSlim validationGate,
         CancellationToken cancellationToken = default)
     {
         var startTime = DateTime.UtcNow;
@@ -384,7 +407,7 @@ public sealed class ProjectMigrator
         {
             if (direction == MigrationDirection.CSharpToCalor)
             {
-                return await ProcessCSharpToCalorAsync(entry, dryRun, startTime, cts.Token);
+                return await ProcessCSharpToCalorAsync(entry, dryRun, startTime, generations, validationGate, cts.Token);
             }
             else
             {
@@ -431,6 +454,8 @@ public sealed class ProjectMigrator
         MigrationPlanEntry entry,
         bool dryRun,
         DateTime startTime,
+        System.Collections.Concurrent.ConcurrentDictionary<string, ConversionGeneration> generations,
+        SemaphoreSlim validationGate,
         CancellationToken cancellationToken)
     {
         var conversionOptions = new ConversionOptions
@@ -535,11 +560,21 @@ public sealed class ProjectMigrator
 
         var converter = new CSharpToCalorConverter(conversionOptions);
 
-        var result = await converter.ConvertFileAsync(entry.SourcePath, cancellationToken);
+        ConversionGeneration? generation = null;
+        if (_options.Fidelity == ConversionFidelity.Lossless)
+        {
+            generation = converter.CreateGeneration(entry.SourcePath, entry.OutputPath, dryRun);
+            if (!generations.TryAdd(Path.GetFullPath(entry.OutputPath), generation))
+            {
+                generation.Dispose();
+                throw new IOException($"Duplicate output generation: {entry.OutputPath}");
+            }
+        }
+        var result = generation != null
+            ? await generation.ConvertAsync(cancellationToken)
+            : await converter.ConvertFileAsync(entry.SourcePath, cancellationToken);
         if (selectionError != null && _options.Fidelity == ConversionFidelity.Lossless)
-            result = converter.PreserveOriginal(
-                await CSharpToCalorConverter.ReadSourceFileAsync(entry.SourcePath, cancellationToken),
-                entry.SourcePath, result, cancellationToken,
+            result = generation!.PreserveOriginal(cancellationToken,
                 [new ConversionIssue
                 {
                     Severity = ConversionIssueSeverity.Warning,
@@ -571,9 +606,8 @@ public sealed class ProjectMigrator
         if (result.Success &&
             result.CalorSource != null)
         {
-            var compileResult = Program.Compile(
+            var compileResult = await CompileStagedAsync(
                 result.CalorSource,
-                entry.OutputPath,
                 new CompilationOptions
                 {
                     EnforceEffects = false,
@@ -593,13 +627,11 @@ public sealed class ProjectMigrator
                 }).ToList();
                 if (_options.Fidelity == ConversionFidelity.Lossless)
                 {
-                    result = converter.PreserveOriginal(
-                        await CSharpToCalorConverter.ReadSourceFileAsync(entry.SourcePath, cancellationToken),
-                        entry.SourcePath, result, cancellationToken, failures);
+                    result = generation!.PreserveOriginal(cancellationToken, failures);
                     status = GetMigrationStatus(result);
                     issues = result.Issues.ToList();
-                    compileResult = Program.Compile(
-                        result.CalorSource!, entry.OutputPath,
+                    compileResult = await CompileStagedAsync(
+                        result.CalorSource!,
                         new CompilationOptions
                         {
                             DeferGeneratedOutputValidation = true,
@@ -645,7 +677,7 @@ public sealed class ProjectMigrator
                         DeferGeneratedOutputValidation = true,
                         CancellationToken = cancellationToken
                     };
-                    var compileResult = Program.Compile(result.CalorSource, entry.OutputPath, compileOptions);
+                    var compileResult = await CompileStagedAsync(result.CalorSource, compileOptions);
                     if (compileResult.HasErrors)
                     {
                         status = FileMigrationStatus.Failed;
@@ -706,6 +738,16 @@ public sealed class ProjectMigrator
             ConvertedSource = result.CalorSource,
             GeneratedCSharp = generatedCSharp
         };
+
+        async Task<CompilationResult> CompileStagedAsync(string source, CompilationOptions options)
+        {
+            if (_options.Fidelity != ConversionFidelity.Lossless)
+                return Program.Compile(source, entry.OutputPath, options);
+            // Unchanged registered outputs synchronize a shared identity store during compilation.
+            await validationGate.WaitAsync(cancellationToken);
+            try { return Program.Compile(source, entry.OutputPath, options); }
+            finally { validationGate.Release(); }
+        }
     }
 
     internal static FileMigrationStatus GetMigrationStatus(ConversionResult result)
@@ -719,6 +761,7 @@ public sealed class ProjectMigrator
         MigrationReport report,
         string? projectFilePath,
         bool dryRun,
+        IReadOnlyDictionary<string, ConversionGeneration> generations,
         CancellationToken cancellationToken)
     {
         var converted = report.FileResults
@@ -866,32 +909,14 @@ public sealed class ProjectMigrator
                         result.Losses.All(loss => loss.Feature != "whole-file-preservation")).ToList();
                 foreach (var result in candidates)
                 {
-                    var original = await CSharpToCalorConverter.ReadSourceFileAsync(result.SourcePath, cancellationToken);
-                    var attempted = new ConversionResult
-                    {
-                        Success = true,
-                        Context = new ConversionContext { Metadata = result.Metadata ?? new() }
-                    };
-                    var converter = new CSharpToCalorConverter(new ConversionOptions
-                    {
-                        ValidateRoundTripCSharp = false,
-                        ParseOptions = new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
-                            _options.LanguageVersion ?? Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview,
-                            _options.DocumentationMode,
-                            Path.GetExtension(result.SourcePath).Equals(".csx", StringComparison.OrdinalIgnoreCase)
-                                ? Microsoft.CodeAnalysis.SourceCodeKind.Script
-                                : Microsoft.CodeAnalysis.SourceCodeKind.Regular,
-                            result.Metadata?.DefinedSymbols ?? _options.DefinedSymbols),
-                        UserManifestRoot = ""
-                    });
-                    var preserved = converter.PreserveOriginal(
-                        original, result.SourcePath, attempted, cancellationToken,
-                        result.Issues.Concat(errors.Select(error => new ConversionIssue
+                    var generation = generations[Path.GetFullPath(result.OutputPath!)];
+                    var preserved = generation.PreserveOriginal(cancellationToken,
+                        errors.Select(error => new ConversionIssue
                         {
                             Severity = ConversionIssueSeverity.Error,
                             Feature = "roundtrip-csharp-validation",
                             Message = $"Project C# validation failed ({error.Id}): {error.GetMessage()}"
-                        })));
+                        }));
                     if (!preserved.Success)
                     {
                         result.Issues.AddRange(preserved.Issues);
@@ -905,24 +930,26 @@ public sealed class ProjectMigrator
                         continue;
                     }
                     result.ConvertedSource = preserved.CalorSource;
-                    result.GeneratedCSharp = original;
+                    result.GeneratedCSharp = preserved.Context.OriginalSource;
                     result.Losses = preserved.Losses;
                     result.Issues = preserved.Issues.ToList();
                     result.ConversionPaths = preserved.Paths;
                     result.Status = FileMigrationStatus.Partial;
                     if (_options.IncludeBenchmark)
-                        result.Metrics = BenchmarkIntegration.CalculateMetrics(original, preserved.CalorSource!);
+                        result.Metrics = BenchmarkIntegration.CalculateMetrics(preserved.Context.OriginalSource!, preserved.CalorSource!);
                 }
                 if (candidates.Count > 0)
                 {
-                    await FinalizeLosslessProjectAsync(report, projectFilePath, dryRun, cancellationToken);
+                    await FinalizeLosslessProjectAsync(report, projectFilePath, dryRun, generations, cancellationToken);
                     return;
                 }
             }
             foreach (var result in converted)
             {
                 var exact = string.Equals(result.GeneratedCSharp,
-                    await CSharpToCalorConverter.ReadSourceFileAsync(result.SourcePath, cancellationToken),
+                    _options.Fidelity == ConversionFidelity.Lossless
+                        ? generations[Path.GetFullPath(result.OutputPath!)].Result.Context.OriginalSource
+                        : await CSharpToCalorConverter.ReadSourceFileAsync(result.SourcePath, cancellationToken),
                     StringComparison.Ordinal);
                 if (!exact)
                 {
@@ -979,8 +1006,19 @@ public sealed class ProjectMigrator
             }
         var outputs = converted.Where(result => result.OutputPath != null && result.ConvertedSource != null).ToArray();
         if (outputs.Length == 0) return;
+        var receipts = new Dictionary<FileMigrationResult, ConversionReceipt>();
         try
         {
+            if (_options.Fidelity == ConversionFidelity.Lossless)
+                foreach (var result in outputs)
+                {
+                    if (!generations.TryGetValue(Path.GetFullPath(result.OutputPath!), out var generation))
+                        throw new IOException($"Missing original generation context: {result.SourcePath}");
+                    receipts.Add(result, await generation.PrepareReceiptAsync(result.ConvertedSource, cancellationToken));
+                }
+            foreach (var result in outputs.Where(receipts.ContainsKey))
+                await generations[Path.GetFullPath(result.OutputPath!)]
+                    .VerifyPreparedAsync(receipts[result], cancellationToken);
             var identityRoot = Incremental.BuildStateCache.ComputeCommonDirectory(
                 outputs.Select(result => new FileInfo(result.OutputPath!)).ToArray());
             var identityStore = new Ids.DeclarationIdentityStore(identityRoot);
@@ -989,12 +1027,16 @@ public sealed class ProjectMigrator
             foreach (var result in outputs)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var before = File.Exists(result.OutputPath!)
-                    ? await File.ReadAllTextAsync(result.OutputPath!, cancellationToken) : null;
+                var before = _options.Fidelity == ConversionFidelity.Lossless
+                    ? generations[Path.GetFullPath(result.OutputPath!)].Before
+                    : File.Exists(result.OutputPath!)
+                        ? await File.ReadAllTextAsync(result.OutputPath!, cancellationToken) : null;
                 identityChanges.Add(new(result.OutputPath!, before, result.ConvertedSource));
             }
             cancellationToken.ThrowIfCancellationRequested();
             identityStore.Apply(identityChanges);
+            foreach (var result in outputs.Where(receipts.ContainsKey))
+                result.OutputWritten = true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -1007,6 +1049,25 @@ public sealed class ProjectMigrator
                     Severity = ConversionIssueSeverity.Error,
                     Feature = "migration-write-failure",
                     Message = $"Identity-managed output write failed: {ex.Message}"
+                });
+            }
+            return;
+        }
+
+        foreach (var result in outputs.Where(receipts.ContainsKey))
+        {
+            try
+            {
+                await generations[Path.GetFullPath(result.OutputPath!)].FinalizeReceiptAsync(receipts[result]);
+            }
+            catch (IOException ex)
+            {
+                result.Status = FileMigrationStatus.Failed;
+                result.Issues.Add(new ConversionIssue
+                {
+                    Severity = ConversionIssueSeverity.Error,
+                    Feature = "migration-receipt-failure",
+                    Message = ex.Message
                 });
             }
         }

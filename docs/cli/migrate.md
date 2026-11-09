@@ -71,6 +71,31 @@ Loose directories can lack references: exact preserved sources are still written
 with failed compilation reported as `unverified`, not a passed build.
 Writing, native fraction, project compilation, and test execution are distinct results.
 
+### Safe refresh of generated Calor
+
+Lossless C# migration saves `<output>.conversion.json` beside each generated
+file. This receipt retains the original source, supplied sibling trees, parse
+options, reference aliases and observed input hashes. Whole-file preservation
+keeps the actual conversion context.
+
+Migration can refresh an unchanged generated file when its original C# changes.
+It refuses edited output and missing, corrupt or unassociated receipts; keep
+those files and choose a new destination. It also checks for changed inputs and
+generation bases before committing. Cooperating writers hold generation locks.
+Dry runs and cancellation or validation refusal before commit write neither
+output nor receipt.
+
+Calor outputs and declaration identities commit together, but receipts are
+separate writes. If a final receipt cannot be saved, migration reports an error
+and `outputWritten: true` for the committed file. Its output path and loss
+disposition remain available. Automatic refresh stays blocked for a mismatched
+pair; the error does not mean the output was unchanged.
+
+Receipts detect generation changes, not converter authenticity or native
+support. They do not capture the complete evaluated-project, generator or
+effect-manifest closure. Lossy partial-class merging and build/LSP/cache
+validation do not use these receipts yet.
+
 ---
 
 ## Options

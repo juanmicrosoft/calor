@@ -194,6 +194,7 @@ public sealed class MigrateTool : McpToolBase
             },
             Losses = f.Losses.Count > 0 ? f.Losses : null,
             ConversionPaths = f.ConversionPaths,
+            OutputWritten = f.OutputWritten,
             Errors = f.Issues
                 .Where(i => i.Severity == ConversionIssueSeverity.Error)
                 .Select(i => ConversionIssueEnvelope.Build(i, f.SourcePath))
@@ -437,6 +438,7 @@ public sealed class MigrateTool : McpToolBase
                 Score = existing?.Score,
                 Losses = f.Losses.Count > 0 ? f.Losses : null,
                 ConversionPaths = f.ConversionPaths,
+                OutputWritten = f.OutputWritten,
                 Errors = errors.Count > 0 ? errors : null,
                 Warnings = warnings.Count > 0 ? warnings : null
             };
@@ -486,6 +488,7 @@ public sealed class MigrateTool : McpToolBase
                         Errors = compileErrors,
                         Warnings = existing?.Warnings,
                         Losses = existing?.Losses,
+                        OutputWritten = existing?.OutputWritten ?? false,
                         ConversionPaths = existing?.ConversionPaths?.WithSuccess(false)
                     };
                 }
@@ -502,6 +505,7 @@ public sealed class MigrateTool : McpToolBase
                             Errors = existing.Errors,
                             Warnings = existing.Warnings,
                             Losses = existing.Losses,
+                            OutputWritten = existing.OutputWritten,
                             ConversionPaths = existing.ConversionPaths
                         };
                     }
@@ -517,6 +521,7 @@ public sealed class MigrateTool : McpToolBase
                     Status = "compile_error",
                     Score = existing?.Score,
                     Losses = existing?.Losses,
+                    OutputWritten = existing?.OutputWritten ?? false,
                     ConversionPaths = existing?.ConversionPaths?.WithSuccess(false),
                     Errors = [ConversionIssueEnvelope.Message(
                         DiagnosticCode.CliInternalError, "error", ex.Message, path)]
@@ -578,6 +583,7 @@ public sealed class MigrateTool : McpToolBase
                             Status = recompile.HasErrors ? "fix_incomplete" : "fixed",
                             Score = existing?.Score,
                             Losses = existing?.Losses,
+                            OutputWritten = existing?.OutputWritten ?? false,
                             ConversionPaths = existing?.ConversionPaths?.WithSuccess(!recompile.HasErrors),
                             Errors = recompile.HasErrors
                                 ? BuildCompileEnvelope(recompile, path, fixedFinal)
@@ -729,6 +735,10 @@ public sealed class MigrateTool : McpToolBase
 
     internal sealed class MigrateFileResult
     {
+        [JsonPropertyName("outputWritten")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public bool OutputWritten { get; init; }
+
         [JsonPropertyName("path")]
         public required string Path { get; init; }
 

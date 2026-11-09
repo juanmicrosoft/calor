@@ -302,6 +302,41 @@ public class MigrateToolTests
             var loss = Assert.Single(file.GetProperty("losses").EnumerateArray());
             Assert.Equal((int)ConversionLossKind.InteropPreserved, loss.GetProperty("kind").GetInt32());
             Assert.True(loss.GetProperty("line").GetInt32() > 0);
+            Assert.True(file.GetProperty("outputWritten").GetBoolean());
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Theory]
+    [InlineData("convert")]
+    [InlineData("full")]
+    public async Task ExecuteAsync_ReceiptFailureRetainsWrittenOutputAndLossDisposition(string phase)
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"calor-migrate-receipt-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        var output = Path.Combine(tempDir, "Interop.calr");
+        const string original = "public class Interop { ~Interop() { } }";
+        File.WriteAllText(Path.Combine(tempDir, "Interop.cs"), original);
+        Directory.CreateDirectory(output + ".conversion.json");
+        try
+        {
+            var args = JsonSerializer.SerializeToElement(new { projectPath = tempDir, phase });
+            var result = await _tool.ExecuteAsync(args);
+            using var json = JsonDocument.Parse(result.Content[0].Text!);
+            var file = Assert.Single(json.RootElement.GetProperty("perFile").EnumerateArray());
+            Assert.Contains(file.GetProperty("status").GetString(), new[] { "failed", "convert_failed" });
+            Assert.True(file.GetProperty("outputWritten").GetBoolean());
+            Assert.Equal("preserved", file.GetProperty("conversionPaths").GetProperty("outcome").GetString());
+            Assert.NotEmpty(file.GetProperty("losses").EnumerateArray());
+            Assert.Contains(file.GetProperty("errors").EnumerateArray(),
+                error => error.GetProperty("message").GetString()!.Contains("Output was written", StringComparison.Ordinal));
+            Assert.Contains("raw member:destructor:", File.ReadAllText(output));
+            Assert.Contains("~Interop() { }", File.ReadAllText(output));
+            Assert.Equal(original, File.ReadAllText(Path.Combine(tempDir, "Interop.cs")));
+            Assert.False(File.Exists(output + ".conversion.json"));
         }
         finally
         {

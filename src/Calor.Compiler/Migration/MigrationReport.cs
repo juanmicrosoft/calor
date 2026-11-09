@@ -58,6 +58,9 @@ public sealed class FileMigrationResult
     public required string SourcePath { get; init; }
     public required string? OutputPath { get; set; }
     public required FileMigrationStatus Status { get; set; }
+    /// <summary>Confirmed lossless batch output commit, including a later receipt failure.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool OutputWritten { get; internal set; }
     public TimeSpan Duration { get; init; }
     public List<ConversionIssue> Issues { get; set; } = new();
     public IReadOnlyList<ConversionLoss> Losses { get; set; } = Array.Empty<ConversionLoss>();
@@ -69,6 +72,7 @@ public sealed class FileMigrationResult
     public ConversionPathSummary? ConversionPaths
     {
         get => _conversionPaths is { Outcome: not "refused" } paths
+               && !OutputWritten
                && Status is FileMigrationStatus.Failed or FileMigrationStatus.TimedOut
             ? paths.WithSuccess(false)
             : _conversionPaths;
