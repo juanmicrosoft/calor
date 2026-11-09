@@ -41,12 +41,24 @@ public class DocDriftCheckerTests
     }
 
     [Theory]
-    [InlineData("calls.mdx", 3, 1, new[] { "CallExamples", "RefOutDemo" }, new[] { "9", "44" })]
-    [InlineData("binding.mdx", 8, 6, new[] { "BindingExamples", "ExplicitBindings" }, new[] { "150", "16" })]
+    [InlineData("calls.mdx", 3, 1, new[] { "CallExamples", "RefOutDemo" }, new[] { "9", "44" },
+        new[] { "GlobalModule.Main()", "GlobalModule.Main()" })]
+    [InlineData("binding.mdx", 8, 6, new[] { "BindingExamples", "ExplicitBindings" }, new[] { "150", "16" },
+        new[] { "GlobalModule.Main()", "GlobalModule.Main()" })]
     [InlineData("types.mdx", 6, 2, new[] { "ArrayTypes", "NullableFallback", "Division", "CollectionTypes" },
-        new[] { "6", "anonymous", "42", "51" })]
+        new[] { "6", "anonymous", "42", "51" },
+        new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()" })]
+    [InlineData("control-flow.mdx", 10, 0,
+        new[] { "RangeSnapshots", "ReevaluatedLoops", "WhileAndDo", "DictionaryIteration", "LoopExits", "FizzBuzz",
+            "Example", "EarlyReturn", "HttpStatus", "MatchBlocks" },
+        new[] { "33", "4", "31", "55", "5", "FizzBuzz:Fizz:Buzz:7", "3", "120", "Not Found:A:large positive", "two" },
+        new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()",
+            "GlobalModule.Main()",
+            "GlobalModule.Classify(15) + \":\" + GlobalModule.Classify(3) + \":\" + GlobalModule.Classify(5) + \":\" + GlobalModule.Classify(7)",
+            "GlobalModule.CountEvens(6)", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Word(2)" })]
     public void PublicNativeReference_CompilesPositiveAndExactNegativeExamples(
-        string page, int completeCount, int negativeCount, string[] moduleNames, string[] expectedResults)
+        string page, int completeCount, int negativeCount, string[] moduleNames, string[] expectedResults,
+        string[] expressions)
     {
         var relativePath = "website/content/syntax-reference/" + page;
         var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), relativePath));
@@ -58,6 +70,7 @@ public class DocDriftCheckerTests
         Assert.Equal(negativeCount, coverage.NegativePrograms);
         var programs = ExemplarCompileChecker.ExtractCompletePrograms(content);
         Assert.Equal(moduleNames.Length, expectedResults.Length);
+        Assert.Equal(moduleNames.Length, expressions.Length);
         Assert.Equal(moduleNames.Length, programs.Count);
         for (var index = 0; index < programs.Count; index++)
         {
@@ -65,11 +78,11 @@ public class DocDriftCheckerTests
             var compiled = Program.Compile(program.Source, relativePath);
             Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
             Assert.Equal(moduleNames[index], Assert.IsType<Ast.ModuleNode>(compiled.Ast).Name);
-            var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + """
+            var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
 
                 public static class Probe
                 {
-                    public static object? Run() => GlobalModule.Main();
+                    public static object? Run() => {{expressions[index]}};
                 }
                 """);
             Assert.Equal(expectedResults[index], observed);
