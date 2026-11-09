@@ -4,6 +4,7 @@ using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
@@ -107,6 +108,10 @@ public sealed class CanonicalControlFlowTests
             {
                 yield return (1, 10);
             }
+            """, nativeMethods: """
+              func Pairs private () → (int, int)
+                yield (1, 10)
+
             """);
 
     [Fact]
@@ -279,7 +284,13 @@ public sealed class CanonicalControlFlowTests
                 Trace += "A";
                 return new Resource();
             }
-            """, declarations: NativeDisposable(), effectCodes: "mut,alloc");
+            """, declarations: NativeDisposable(), effectCodes: "mut,alloc", nativeMethods: """
+              func Acquire private () → Resource
+                ! mut,alloc
+                set Instrumentation.Trace Instrumentation.Trace + "A"
+                return new Resource()
+
+            """);
 
     [Theory]
     [InlineData(true)]
@@ -307,11 +318,14 @@ public sealed class CanonicalControlFlowTests
     }
 
     private static string NativeDisposable()
-    {
-        const string payload = "Instrumentation.Trace += \"D\";";
-        return "  class Resource\n    implements System.IDisposable\n    func Dispose () → void\n" +
-            $"      ! mut\n      raw statement {Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
-    }
+        => """
+              class Resource
+                implements System.IDisposable
+                func Dispose () → void
+                  ! mut
+                  set Instrumentation.Trace Instrumentation.Trace + "D"
+
+            """;
 
     [Fact]
     public void Using_ReturnedNativeResourceStillChargesDisposeEffects()
@@ -473,7 +487,49 @@ public sealed class CanonicalControlFlowTests
             """;
         foreach (var program in new[] { source, new CalorEmitter().Emit(Parse(source)) })
         {
-            var type = Load(Compile(program).GeneratedCode);
+            Assert.Equal(new[]
+            {
+                "Changed += handler;", "Changed -= handler;",
+                "Source().Changed += MakeHandler();", "Source().Changed -= MakeHandler();"
+            }, new Lexer(program, new DiagnosticBag()).TokenizeAll()
+                .Where(token => token.Value is RawCSharpFrame)
+                .Select(token => ((RawCSharpFrame)token.Value!).Code));
+            AssertUnmarkedInteropRejected(program, 4);
+        }
+
+        const string original = """
+            public class Hub
+            {
+                public int Calls = 0;
+                public event System.Action Changed
+                {
+                    add { Calls = Calls + 1; }
+                    remove { Calls = Calls + 10; }
+                }
+                private void Handle() { return; }
+                private Hub Source() { return this; }
+                private System.Action MakeHandler() { return Handle; }
+                public int Probe()
+                {
+                    System.Action handler = Handle;
+                    Changed += handler;
+                    Changed -= handler;
+                    Source().Changed += MakeHandler();
+                    Source().Changed -= MakeHandler();
+                    return Calls;
+                }
+            }
+            """;
+        var originalType = Load(original);
+        Assert.Equal(22, originalType.GetMethod("Probe")!.Invoke(Activator.CreateInstance(originalType), null));
+        var conversion = new CSharpToCalorConverter().Convert(original);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.NotEmpty(conversion.Losses);
+        Assert.All(conversion.Losses, loss => Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind));
+        foreach (var program in new[] { conversion.CalorSource,
+            new CalorEmitter().Emit(Parse(conversion.CalorSource!)) })
+        {
+            var type = Load(Compile(program!).GeneratedCode);
             Assert.Equal(22, type.GetMethod("Probe")!.Invoke(Activator.CreateInstance(type), null));
         }
     }
@@ -1185,11 +1241,11 @@ public sealed class CanonicalControlFlowTests
     [Fact]
     public void Yield_DefersItsOperandAndExecutesFinallyOnEarlyDisposal()
     {
-        var instrumentation = EmitInstrumentation("""
+        var (instrumentation, _, _) = EmitInstrumentation("""
             public static string Trace = "";
             private static int Next() { Trace += "Y"; return 1; }
             private static void Release() { Trace += "F"; }
-            """, "mut");
+            """);
         var source = $"module Iterators\n{instrumentation}" + """
               func Probe () → int
                 ! mut
@@ -1244,10 +1300,17 @@ public sealed class CanonicalControlFlowTests
         Assert.Contains("// keep explanation", fixedSource);
         Assert.Contains("// keep inner comment", fixedSource);
         var tokens = new Lexer(fixedSource, new DiagnosticBag()).TokenizeAll();
-        Assert.Equal(payload, Assert.Single(tokens.Where(token => token.Value is RawCSharpFrame))
-            .Value is RawCSharpFrame frame ? frame.Code : null);
+        var rawToken = Assert.Single(tokens.Where(token => token.Value is RawCSharpFrame));
+        Assert.Equal(payload, Assert.IsType<RawCSharpFrame>(rawToken.Value).Code);
         _ = Parse(fixedSource);
-        var type = Load(Compile(fixedSource).GeneratedCode);
+        AssertUnmarkedInteropRejected(fixedSource, 1);
+
+        // The raw fixture is a byte-transport oracle, not admitted executable C#.
+        var comment = CSharpSyntaxTree.ParseText(payload);
+        Assert.Empty(comment.GetCompilationUnitRoot().Members);
+        Assert.DoesNotContain(comment.GetDiagnostics(), item => item.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        var nativeSource = fixedSource.Remove(rawToken.Span.Start, rawToken.Span.Length);
+        var type = Load(Compile(nativeSource).GeneratedCode);
         Assert.Equal(12, type.GetMethod("Probe")!.Invoke(null, [1]));
     }
 
@@ -1297,6 +1360,24 @@ public sealed class CanonicalControlFlowTests
                 }
                 finally { Trace += "D"; }
             }
+            """, nativeMethods: """
+              func Pairs private () → System.Collections.Generic.IEnumerable<(int, int)>
+                ! mut
+                set Instrumentation.Trace Instrumentation.Trace + "E"
+                return Enumerate()
+              func Enumerate private () → (int, int)
+                ! mut
+                set Instrumentation.Trace Instrumentation.Trace + "A"
+                try
+                  set Instrumentation.Trace Instrumentation.Trace + "B"
+                  yield (1, 10)
+                  set Instrumentation.Trace Instrumentation.Trace + "C"
+                  yield (2, 20)
+                  set Instrumentation.Trace Instrumentation.Trace + "X"
+                  yield (3, 30)
+                finally
+                  set Instrumentation.Trace Instrumentation.Trace + "D"
+
             """);
 
     [Fact]
@@ -1337,6 +1418,35 @@ public sealed class CanonicalControlFlowTests
                     value = this.value;
                 }
             }
+            """, declarations: """
+              class Pair sealed
+                field int:key private readonly
+                field int:value private readonly
+                ctor (int:key, int:value)
+                  set this.key key
+                  set this.value value
+                func Deconstruct (out int:key, out int:value) → void
+                  ! mut
+                  set Instrumentation.Trace Instrumentation.Trace + "D"
+                  set key this.key
+                  set value this.value
+
+            """, nativeMethods: """
+              func Pairs private () → System.Collections.Generic.IEnumerable<Pair>
+                ! mut,alloc
+                set Instrumentation.Trace Instrumentation.Trace + "E"
+                return Enumerate()
+              func Enumerate private () → Pair
+                ! mut,alloc
+                set Instrumentation.Trace Instrumentation.Trace + "A"
+                try
+                  set Instrumentation.Trace Instrumentation.Trace + "B"
+                  yield new Pair(1, 10)
+                  set Instrumentation.Trace Instrumentation.Trace + "C"
+                  yield new Pair(2, 20)
+                finally
+                  set Instrumentation.Trace Instrumentation.Trace + "F"
+
             """);
 
     [Fact]
@@ -1363,7 +1473,25 @@ public sealed class CanonicalControlFlowTests
                 try { Trace += "B"; yield return (1, 10); }
                 finally { Trace += "F"; }
             }
-            """, effectCodes: "mut,throw");
+            """, effectCodes: "mut,throw", nativeMethods: """
+              func Fail private () → void
+                ! mut,throw,alloc
+                set Instrumentation.Trace Instrumentation.Trace + "X"
+                throw new System.InvalidOperationException()
+              func Pairs private () → System.Collections.Generic.IEnumerable<(int, int)>
+                ! mut
+                set Instrumentation.Trace Instrumentation.Trace + "E"
+                return Enumerate()
+              func Enumerate private () → (int, int)
+                ! mut
+                set Instrumentation.Trace Instrumentation.Trace + "A"
+                try
+                  set Instrumentation.Trace Instrumentation.Trace + "B"
+                  yield (1, 10)
+                finally
+                  set Instrumentation.Trace Instrumentation.Trace + "F"
+
+            """);
 
     [Fact]
     public void CanonicalFor_RoundTripRetainsDistinctSemanticsAndHeaderSpans()
@@ -1440,24 +1568,64 @@ public sealed class CanonicalControlFlowTests
         return result;
     }
 
-    private static void AssertObservation(string body, string expected, string members = "",
-        string overflow = "checked", string types = "", string? effectCodes = null, string declarations = "")
+    private static void AssertUnmarkedInteropRejected(string source, int frames)
     {
-        var raw = EmitInstrumentation(members, effectCodes ?? "mut") +
-            (types.Length == 0 ? "" : $"  raw member {Encoding.UTF8.GetByteCount(types)}\n{types}\n");
-        effectCodes ??= members.Length == 0 ? null : "mut";
-        var effects = effectCodes == null ? "" : $"    ! {effectCodes}\n";
-        var source = $"module Migrated overflow {overflow}\n{raw}{declarations}  func Probe () → int\n{effects}" +
-            string.Join("\n", body.Split('\n').Select(line => "    " + line));
-        AssertObservationSource(source, expected);
-        var emitted = new CalorEmitter().Emit(Parse(source));
-        AssertObservationSource(emitted, expected);
+        var result = Program.Compile(source, "canonical-controls.calr", new CompilationOptions
+        {
+            EnableTypeChecking = true,
+            EnforceEffects = true,
+            StatusWriter = TextWriter.Null
+        });
+        Assert.True(result.HasErrors);
+        Assert.Equal(frames, result.Diagnostics.Errors.Count());
+        Assert.All(result.Diagnostics.Errors,
+            diagnostic => Assert.Equal(DiagnosticCode.InvalidCSharpInteropReason, diagnostic.Code));
     }
 
-    private static void AssertObservationSource(string source, string expected)
+    private static void AssertObservation(string body, string expected, string members = "",
+        string overflow = "checked", string types = "", string? effectCodes = null, string declarations = "",
+        string? nativeMethods = null)
+    {
+        var (support, helperEffects, originalMethods) = EmitInstrumentation(
+            members, nativeMethods == null ? types : "", nativeMethods);
+        effectCodes ??= members.Length == 0 ? null : "mut";
+        // Native instrumentation exposes effects that its old raw bodies hid.
+        var requiredEffects = (effectCodes?.Split(',') ?? []).Concat(helperEffects).Distinct().ToArray();
+        var effects = requiredEffects.Length == 0 ? "" : $"    ! {string.Join(",", requiredEffects)}\n";
+        var source = $"module Migrated overflow {overflow}\n{support}{declarations}  func Probe () → int\n{effects}" +
+            string.Join("\n", body.Split('\n').Select(line => "    " + line));
+        AssertObservationSource(source, expected, originalMethods, types);
+        var emitted = new CalorEmitter().Emit(Parse(source));
+        AssertObservationSource(emitted, expected, originalMethods, types);
+    }
+
+    private static void AssertObservationSource(string source, string expected,
+        MethodDeclarationSyntax[] originalMethods, string originalTypes)
     {
         var result = Compile(source);
-        var type = Load(result.GeneratedCode);
+        AssertGeneratedObservation(result.GeneratedCode, expected);
+        if (originalMethods.Length == 0)
+            return;
+        var originalByName = originalMethods.ToDictionary(method => method.Identifier.ValueText);
+        var generated = CSharpSyntaxTree.ParseText(result.GeneratedCode).GetRoot();
+        var helpers = generated.DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Where(method => originalByName.ContainsKey(method.Identifier.ValueText)).ToArray();
+        Assert.Equal(originalMethods.Length, helpers.Length);
+        // Hold the generated control body fixed while restoring the original C# helpers.
+        var original = generated.ReplaceNodes(helpers,
+            (method, _) => originalByName[method.Identifier.ValueText]);
+        var types = CSharpSyntaxTree.ParseText(originalTypes).GetRoot()
+            .DescendantNodes().OfType<ClassDeclarationSyntax>().ToDictionary(type => type.Identifier.ValueText);
+        var supportingTypes = original.DescendantNodes().OfType<ClassDeclarationSyntax>()
+            .Where(type => types.ContainsKey(type.Identifier.ValueText)).ToArray();
+        Assert.Equal(types.Count, supportingTypes.Length);
+        original = original.ReplaceNodes(supportingTypes, (type, _) => types[type.Identifier.ValueText]);
+        AssertGeneratedObservation(original.ToFullString(), expected);
+    }
+
+    private static void AssertGeneratedObservation(string code, string expected)
+    {
+        var type = Load(code);
         string observed;
         try
         {
@@ -1472,37 +1640,67 @@ public sealed class CanonicalControlFlowTests
         Assert.Equal(expected, observed + (string.IsNullOrEmpty(trace) ? "" : ":" + trace));
     }
 
-    private static string EmitInstrumentation(string members, string effectCodes)
+    private static (string Source, string[] Effects, MethodDeclarationSyntax[] OriginalMethods) EmitInstrumentation(
+        string members, string types = "", string? nativeMethods = null)
     {
+        if (members.Length == 0 && types.Length == 0)
+            return ("", [], []);
         var source = CSharpSyntaxTree.ParseText("class Helpers {\n" + members + "\n}")
             .GetRoot().DescendantNodes().OfType<ClassDeclarationSyntax>().Single();
-        var text = new StringBuilder();
+        Assert.All(source.Members.OfType<MethodDeclarationSyntax>(), method =>
+        {
+            Assert.Empty(method.AttributeLists);
+            Assert.Null(method.TypeParameterList);
+            Assert.DoesNotContain(method.Modifiers, modifier => modifier.IsKind(SyntaxKind.AsyncKeyword));
+        });
         var fields = source.Members.OfType<FieldDeclarationSyntax>().ToArray();
         var fieldNames = fields.SelectMany(field => field.Declaration.Variables)
             .Select(variable => variable.Identifier.Text).ToHashSet(StringComparer.Ordinal);
-        if (fields.Length != 0)
-        {
-            var declaration = "public static class Instrumentation {\n" +
-                string.Concat(fields.Select(field => field.ToFullString())) + "\n}";
-            text.AppendLine($"  raw member {Encoding.UTF8.GetByteCount(declaration)}");
-            text.Append(declaration).AppendLine();
-        }
+        var methods = new List<MethodDeclarationSyntax>();
         foreach (var method in source.Members.OfType<MethodDeclarationSyntax>())
         {
-            var parameters = string.Join(", ", method.ParameterList.Parameters
-                .Select(parameter => $"{parameter.Type}:{parameter.Identifier.Text}"));
-            text.AppendLine($"  func {method.Identifier.Text} private ({parameters}) → {method.ReturnType}");
-            text.AppendLine($"    ! {effectCodes}");
             var body = method.Body!;
             var qualified = body.ReplaceNodes(body.DescendantNodes().OfType<IdentifierNameSyntax>()
                 .Where(identifier => fieldNames.Contains(identifier.Identifier.Text)),
                 (identifier, _) => SyntaxFactory.ParseExpression("Instrumentation." + identifier.Identifier.Text)
                     .WithTriviaFrom(identifier));
-            var payload = string.Concat(qualified.Statements.Select(statement => statement.ToFullString()));
-            text.AppendLine($"    raw statement {Encoding.UTF8.GetByteCount(payload)}");
-            text.Append(payload).AppendLine();
+            methods.Add(method.WithBody(qualified).NormalizeWhitespace());
         }
-        return text.ToString();
+        var original = "public static class Instrumentation {\n" +
+            string.Concat(fields.Select(field => field.ToFullString())) + "\n}\n" +
+            (nativeMethods == null ? "public static class Helpers {\n" +
+                string.Join("\n", methods.Select(method => method.ToFullString())) + "\n}\n" : "") + types;
+        var conversion = new CSharpToCalorConverter().Convert(original);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Empty(conversion.Losses);
+        var converted = Assert.IsType<ModuleNode>(conversion.Ast);
+        var helpers = nativeMethods == null
+            ? Assert.Single(converted.Classes, type => type.Name == "Helpers") : null;
+        if (helpers != null)
+            Assert.Empty(helpers.InteropBlocks);
+        var functions = helpers == null ? Parse("module Supporting\n" + nativeMethods).Functions.ToArray()
+            : helpers.Methods.Select(method => new FunctionNode(
+                method.Span, method.Id, method.Name, method.Visibility, method.Parameters,
+                method.Output, method.Effects, method.Body, method.Attributes)).ToArray();
+        Assert.Equal(methods.Select(method => method.Identifier.ValueText).Order(),
+            functions.Select(function => function.Name).Order());
+        var supporting = converted.With(update =>
+        {
+            update.Classes = converted.Classes.Where(type => type != helpers).ToArray();
+            update.Functions = functions;
+            update.Items = converted.Items.Count == 0 ? []
+                : converted.Items.Where(item => item != helpers).Concat(functions).ToArray();
+        });
+        var emitted = new CalorEmitter().Emit(supporting);
+        Assert.StartsWith("module ", emitted);
+        Assert.DoesNotContain(new Lexer(emitted, new DiagnosticBag()).TokenizeAll(),
+            token => token.Value is RawCSharpFrame);
+        return (emitted[(emitted.IndexOf('\n') + 1)..], functions
+            .SelectMany(function => function.Effects?.Effects
+                .SelectMany(effect => effect.Value.Split(',')
+                    .Select(value => EffectCodes.ToCompact(effect.Key, value.Trim())))
+                ?? Enumerable.Empty<string>())
+            .Distinct().ToArray(), methods.ToArray());
     }
 
     private static Type Load(string code, IEnumerable<string>? preprocessorSymbols = null)
