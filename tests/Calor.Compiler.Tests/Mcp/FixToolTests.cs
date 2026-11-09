@@ -107,14 +107,14 @@ public class FixToolTests
     public async Task ExecuteAsync_DefaultRules_PreserveOverloadsAndRepeatedCalls()
     {
         const string source = """
-            §M{Names}
-              §F{Echo:pub} (i32:value) -> i32
-                §R value
-              §F{Echo:pub} (str:value) -> str
-                §R value
-              §F{Use:pub} () -> i32
-                §B{first:i32} §C{Echo} §A 1 §/C
-                §R §C{Echo} §A first §/C
+            module Names
+              func Echo (int:value) → int
+                return value
+              func Echo (string:value) → string
+                return value
+              func Use () → int
+                let int:first = Echo(1)
+                return Echo(first)
             """;
         var compiled = Program.Compile(source);
         Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));

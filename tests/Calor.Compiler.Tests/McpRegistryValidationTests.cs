@@ -84,7 +84,7 @@ public class McpRegistryValidationTests
     }
 
     [Fact]
-    public void TeachingTagCatalog_RetainsDelimiterContractWithoutSourceIds()
+    public void TeachingTagCatalog_UsesNativeFormsWithoutSourceIdsOrClosers()
     {
         using var catalog = JsonDocument.Parse(McpMessageHandler.GetTagCatalogJsonPublic());
         foreach (var tag in catalog.RootElement.GetProperty("tags").EnumerateArray())
@@ -92,10 +92,12 @@ public class McpRegistryValidationTests
             Assert.False(string.IsNullOrWhiteSpace(tag.GetProperty("open").GetString()));
             Assert.False(string.IsNullOrWhiteSpace(tag.GetProperty("close").GetString()));
             Assert.False(tag.TryGetProperty("idPrefix", out _));
+            Assert.DoesNotContain("§", tag.GetProperty("tag").GetString());
+            Assert.Equal("(none)", tag.GetProperty("close").GetString());
         }
-        var call = catalog.RootElement.GetProperty("tags").EnumerateArray()
-            .Single(tag => tag.GetProperty("tag").GetString() == "§C");
-        Assert.Equal("§/C", call.GetProperty("close").GetString());
+        var function = catalog.RootElement.GetProperty("tags").EnumerateArray()
+            .Single(tag => tag.GetProperty("tag").GetString() == "func");
+        Assert.Equal("func Name (type:param, ...) → returnType", function.GetProperty("open").GetString());
         using var identity = JsonDocument.Parse(McpMessageHandler.GetIdPrefixCatalogJsonPublic());
         Assert.Empty(identity.RootElement.GetProperty("prefixes").EnumerateArray());
     }

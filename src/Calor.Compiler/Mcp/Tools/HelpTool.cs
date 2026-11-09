@@ -151,7 +151,7 @@ public sealed class HelpTool : McpToolBase
             .Select((example, index) => (Example: example, Index: index,
                 ProgramId: bestMatch.Programs.ElementAtOrDefault(index),
                 Score: ExampleMatchScore(example.Calor, bestMatch.Programs.ElementAtOrDefault(index) ?? "", query)))
-            .Where(e => e.ProgramId != null && e.Example.Calor.StartsWith("§M{", StringComparison.Ordinal)
+            .Where(e => e.ProgramId != null && SelfCheck.ExemplarCompileChecker.StartsWithModule(e.Example.Calor.Split('\n'))
                 && e.Example.Calor.Contains('\n'))
             .ToList();
         var hasPreciseExample = candidates.Any(c => c.Score > 0);

@@ -73,8 +73,10 @@ public class HoverHandlerTests
             Assert.Equal(tag.Value.GetProperty("csharpEquivalent").GetString(), hover.CSharpEquivalent);
             Assert.False(string.IsNullOrWhiteSpace(hover.Name));
         }
-        Assert.Contains("§ASSIGN", provider.GetTagDocumentation("§ASSIGN")!.Syntax);
-        Assert.Contains("§ARR{type}", provider.GetTagDocumentation("§ARR")!.Syntax);
+        Assert.Contains("set target expression", provider.GetTagDocumentation("set")!.Syntax);
+        Assert.Contains("this[int:index]", provider.GetTagDocumentation("this")!.Syntax);
+        Assert.Null(provider.GetTagDocumentation("§ASSIGN"));
+        Assert.Null(provider.GetTagDocumentation("§ARR"));
         Assert.Null(provider.GetTagDocumentation("§D"));
     }
 

@@ -2,36 +2,38 @@
 
 # Current Calor language reference
 
-This reference describes the current compiler, not a final 0.30 grammar or a measured token budget.
-Write `.calr` files. Bodies are indented two spaces and structural blocks end at dedent.
-Source declarations carry no IDs; tooling keeps declaration identity in `.calor/ids.json`. Use tooling for renames.
-The current staged headers are `§M`, `§F`, `§B`, and the other documented tags; use their existing field order and inline signatures.
-Expressions use infix operators with C# precedence, postfix calls `target(arg)`, and indexing `items[index]`. Calls can chain and their callee can be an expression.
-Use C# type names, `T[]` arrays, `T?` nullable types, `null`, and exceptions for absence and failure.
-Do not handwrite raw C# passthrough. Conversion fallback capabilities belong in `calor_help action=features`.
-Arrays and collections are different: `File.ReadAllLines` returns `string[]`, not `List<string>`.
-Contracts evaluate in order: check for null before reading length or members. Express implication as `!condition || consequence`.
-Staged string and character built-ins retain their documented prefix forms; `(indexof text value :ordinal)` selects ordinal comparison. Do not invent extra arguments.
-Single quotes produce characters; double quotes produce strings. Plain strings interpolate `${expression}`; escape `\${0}` for literal placeholder text.
-Use `§ASSIGN` for updates, not increment/decrement or assignment expressions. Bind local helpers as lambdas, not nested `§F` declarations.
-Newlines end infix expressions. Parenthesize infix values in whitespace-separated legacy hosts such as collection entries.
-
-Query a specific feature with `calor_help` for detailed syntax and examples.
+Write .calr files. Bodies use two-space indentation and structural blocks end at dedent.
+Declarations use lowercase space-separated headers. Functions use func and →; public is the default.
+Types use C# names, T[] arrays and T? nullability. Binding and parameter types precede names.
+Use let for immutable bindings and var for mutable bindings; set performs updates.
+Expressions use infix operators with C# precedence and expression-valued postfix calls/indexing.
+Effects (!) and postconditions (=>) occur before the first body statement. result is the body result.
+Collection iteration uses each; counted loops use for, with distinct snapshot and reevaluated forms.
+Plain strings interpolate ${expression}; \${0} preserves literal placeholder text.
+Use declaration /// documentation. Tooling owns source identities; do not write declaration IDs.
+Do not handwrite raw C# passthrough; converters own byte-counted raw payloads.
+The optional namespace follows the module label: module FileLabel Contoso.Tools.
+Omitting the namespace means the global namespace; the module label is not a namespace.
+Token-count decisions do not by themselves establish semantics or a measured full-reference budget.
 
 ## Calor Language Overview
 
-Module and function bodies use indentation. Control flow uses indented branches and loops.
-Contracts and effects describe obligations and side effects. Async functions use `§AF` and `§AWAIT`.
-Expressions use infix operators with C# precedence, postfix calls, and indexing. Collections use ordinary .NET types.
-Types use C# names, `T[]` arrays and `T?` nullability. Literals include `42`, `"hello"`, `true`, and `18.00m`.
-Property and indexer declarations use `§PROP` and `§IXER`; staged headers keep their existing field order.
-Query a specific feature for complete examples; use `action=features` for conversion support.
+Module, class and function bodies use indentation and lowercase, space-separated headers.
+Functions use func, type:name parameters and → returnType; public visibility is the default.
+Types and members include class, record, interface, property and this[...] indexer declarations.
+Use let for immutable bindings, var for mutable bindings and set for updates.
+Control flow includes if/else if/else, while, each collection iteration and two distinct for modes.
+Contracts and authoritative effects describe obligations and side effects with requires, => and !.
+Async functions distinguish their body result from the callable Task or ValueTask carrier.
+Expressions use C# precedence, postfix calls and indexing. Collections use ordinary .NET types.
+Types use C# names, T[] arrays and T? nullability. Literals include 42, true, "hello" and 18.00m.
+Query a specific feature for complete examples; use action=features for conversion support.
 
 ## object instantiation
 
-Creates a new instance of a class. The class name goes in braces; constructor arguments use §A. Use §NEW{ClassName} §/NEW for zero-argument constructors.
+Creates a new instance with ordinary constructor-call syntax. Arguments are comma-separated; a zero-argument constructor still uses (). Preserve the selected constructor and left-to-right argument evaluation.
 
-Syntax: `§NEW{ClassName} §A arg1 §A arg2 §/NEW`
+Syntax: `new ClassName(arg1, arg2)`
 
 C# equivalents (fragments):
 
@@ -45,9 +47,9 @@ Complete example: [objects](#example-complete_objects).
 
 ## variable declaration
 
-Declares a variable binding. Use ~ prefix for mutable variables. Immutable by default. Give null an explicit existing nullable type, such as string?.
+let declares an immutable binding; var declares a mutable binding. Both infer an omitted type. Types precede names; var is mutability, not a type-inference keyword. Give null an accurate explicit nullable type. In a match case, var name binds the matched value instead of declaring a mutable binding.
 
-Syntax: `§B{name} value or §B{~name} value (mutable)`
+Syntax: `let type:name = expression; var type:name = expression`
 
 C# equivalents (fragments):
 
@@ -64,9 +66,9 @@ Complete example: [Nested array expressions](#example-nested_arrays).
 
 ## method definition
 
-Defines a method within a class. Supports visibility (pub/priv/prot) and modifiers such as virt/vr, over/ov, abs, stat/st, and seal.
+Declares a class method with the same function header as module functions. Preserve modifiers, visibility, contracts and authoritative effect rows; public is the default.
 
-Syntax: `§MT{name:vis[:modifiers]} (type:param, ...) -> returnType`
+Syntax: `func Name (type:param, ...) → returnType`
 
 C# equivalents (fragments):
 
@@ -80,9 +82,9 @@ Complete example: [Calculator](#example-task_28).
 
 ## function definition
 
-Defines a standalone function (not a class member). Use for top-level functions or static utility methods.
+Declares a function or class method. Visibility is public by default; explicitly private and protected declarations retain their intended visibility. Parameters put the type before the name; parameter modifiers precede the type. Class methods may carry virtual, override, abstract or static modifiers. Functions inside a named static module are implicitly static.
 
-Syntax: `§F{name:vis} (type:param, ...) -> returnType`
+Syntax: `func Name (type:param, ...) → returnType`
 
 C# equivalents (fragments):
 
@@ -95,9 +97,9 @@ Complete example: [Contracts](#example-primer_contracts).
 
 ## lambda expression
 
-Creates an anonymous function using name:type parameter pairs. It can capture variables from its enclosing scope. The closing delimiter carries no source ID. Bind local helpers as lambdas, not nested §F declarations. Automatic local-function conversion lowers noncapturing, non-generic direct same-point calls with ordinary parameters. Direct self-recursion also requires a complete proof of pure built-in scalar operations and captures only the initialized internal self binding; unsupported cases remain explicit converter preservation.
+Creates a lambda with expression or indented statement body. An explicit effect row follows the parameters: (int:x) ! cw => body; empty ! declares a pure row. Do not write brace bodies or structural closers. The parameter-list closing parenthesis, optional row and => belong on the same line. Target delegate types and higher-order effect requirements remain authoritative; an unannotated lambda is not automatically a proof of purity.
 
-Syntax: `§LAM{[static:][async:]name:type[:name:type...]} body §/LAM; zero parameters: §LAM{}`
+Syntax: `(type:name, ...) => expression; indented statements after =>`
 
 C# equivalents (fragments):
 
@@ -113,9 +115,9 @@ Complete example: [Expression-valued call target with an explicit pure delegate 
 
 ## property definition
 
-Defines a property with optional getter and setter. Auto-properties use accessor shorthand such as get,set, get,priset, or get,init. Full properties use indented §GET and §SET bodies.
+Declares a property with indented get, set or init accessors. Empty accessor bodies are auto-implemented; explicit bodies contain statements. Restricted accessor visibility follows its keyword, such as set private. Preserve defaults, modifiers and accessor effects.
 
-Syntax: `§PROP{name:type:vis[:modifiers...:accessors]} [= default]`
+Syntax: `property type:Name`
 
 C# equivalents (fragments):
 
@@ -131,9 +133,9 @@ Complete example: [Person](#example-task_32).
 
 ## indexer definition
 
-Defines an indexer on a class or interface. Full indexers use indented §I parameters and §GET/§SET/§INIT bodies. Compact auto-indexers use accessor shorthand and inline parameters.
+Declares an indexer with inline typed parameters and indented get/set accessors. Preserve key order, restricted accessor visibility, defaults, modifiers and full accessor bodies.
 
-Syntax: `§IXER{returnType:vis} with indented §I parameters and §GET/§SET bodies`
+Syntax: `this[int:index] → resultType`
 
 C# equivalents (fragments):
 
@@ -165,9 +167,9 @@ Complete example: [objects](#example-complete_objects).
 
 ## for loop
 
-For loop with an inclusive integer range. The body is indented under the loop header.
+One counted-loop keyword has two distinct semantics. The from/to/step header snapshots start, end and step once, in order, and includes the endpoint; omitted step is +1 and zero step throws. The =/semicolon form reevaluates its condition before each iteration and updates after the body or continue, not after break. Checked range overflow ends the snapshot range. Do not replace one form with the other.
 
-Syntax: `§L{var:from:to:step}`
+Syntax: `for i from start to end step stepValue; for i = start; condition; i = next`
 
 C# equivalents (fragments):
 
@@ -179,11 +181,15 @@ for (int i = 0; i < 100; i += 2) { ... }
 
 Complete example: [Loops](#example-primer_loops).
 
+Complete example: [Reevaluated counted-loop condition with a changing local bound](#example-complete_reevaluated_for).
+
+Complete example: [Collection allocation, loop mutation and count](#example-copilot_smoke).
+
 ## foreach loop
 
-Iterates a collection with an indented body.
+Iterates synchronously over a collection with an indented body. An explicit type precedes the item name. Two names deconstruct each element without tuple parentheses; collection evaluation remains once.
 
-Syntax: `§EACH{item:type} collection`
+Syntax: `each item in collection; each Type:item in collection; each key, value in collection`
 
 C# equivalents (fragments):
 
@@ -198,9 +204,9 @@ Complete example: [PrintDictionary](#example-task_16).
 
 ## while loop
 
-Executes body while condition is true.
+Evaluates the condition before each iteration and executes an indented body while true.
 
-Syntax: `§WH (condition)`
+Syntax: `while condition`
 
 C# equivalents (fragments):
 
@@ -213,9 +219,9 @@ Complete example: [Countdown](#example-task_12).
 
 ## if statement
 
-Conditional branching. §EI for else-if, §EL for else. Both are optional.
+Conditional branches have indented bodies. else if and else align with if. Only the selected branch runs.
 
-Syntax: `§IF (condition) body §EI (condition) body §EL body`
+Syntax: `if condition; else if condition; else`
 
 C# equivalents (fragments):
 
@@ -245,9 +251,9 @@ Complete example: [Abs](#example-task_4).
 
 ## return statement
 
-Returns a value from a function or method. Use bare §R for void returns.
+Returns a value or exits a void-result body. Async body results differ from their callable task carriers; preserve that distinction.
 
-Syntax: `§R expression or §R (void)`
+Syntax: `return expression; return`
 
 C# equivalents (fragments):
 
@@ -261,9 +267,9 @@ Complete example: [Abs](#example-task_4).
 
 ## class definition
 
-Defines a class. Supports modifiers such as abs, seal, partial, stat, struct, and readonly. Use §EXT for base class and §IMPL for interfaces.
+Declares a class, public by default. Its members have indented bodies. Preserve inheritance, implemented interfaces, generic constraints, visibility and supported modifiers.
 
-Syntax: `§CL{Name:vis[:modifiers]}`
+Syntax: `class Name`
 
 C# equivalents (fragments):
 
@@ -279,7 +285,7 @@ Complete example: [Class with Fields, Constructor + Operators](#example-complex_
 
 ## async method
 
-Defines an async function. Use §AF for standalone async functions, §AMT for async class methods.
+Declares an async function or class method using the async modifier.
 
 An async declaration with scalar output `T` is callable as `Task<T>`, but its body
 returns `T`. A `void` output produces `Task`. Explicit .NET `Task<T>` and
@@ -288,7 +294,7 @@ non-generic forms have a void body result. Postconditions describe the body
 result, not the task object. Ordinary synchronous task-returning declarations
 keep their declared return type.
 
-Syntax: `§AF{name:vis} (type:param, ...) -> returnType or §AMT{name:vis} (type:param, ...) -> returnType`
+Syntax: `func Name async (type:param, ...) → returnType`
 
 C# equivalents (fragments):
 
@@ -304,13 +310,13 @@ Complete example: [Async Method with Try/Catch](#example-complex_async).
 Awaits an asynchronous operation.
 
 Awaiting a .NET `Task<T>` or `ValueTask<T>` produces `T`. Awaiting a non-generic
-carrier produces no value and cannot initialize a binding. `§AWAIT` can also be
+carrier produces no value and cannot initialize a binding. `await` can also be
 used as a statement. A custom type named `MyTask<T>` or a source declaration
 named `Task<T>` is not automatically a .NET async carrier. Unsupported custom
 awaitables are diagnosed or checked by generated C# validation, never inferred
 from a name suffix.
 
-Syntax: `§AWAIT expression`
+Syntax: `await expression`
 
 C# equivalents (fragments):
 
@@ -323,9 +329,9 @@ Complete example: [Async Method with Try/Catch](#example-complex_async).
 
 ## try catch
 
-Exception handling. §TR for try block, §CA for catch (with optional type and variable), §FI for finally.
+Groups an indented try body with one or more catch clauses and/or finally cleanup. Catch types, binders and filters are optional; preserve exception selection, filter evaluation and cleanup on every exit.
 
-Syntax: `§TR body §CA{ExceptionType:varName} handler §FI cleanup`
+Syntax: `try; catch ExceptionType:name when condition; finally`
 
 C# equivalents (fragments):
 
@@ -339,9 +345,9 @@ Complete example: [Async Method with Try/Catch](#example-complex_async).
 
 ## throw statement
 
-Throws an exception. Use §RT to rethrow in a catch block.
+Throws an exception expression. Bare throw rethrows the current exception inside a catch handler, preserving its original stack rather than constructing or throwing a replacement.
 
-Syntax: `§TH expression or §RT (rethrow)`
+Syntax: `throw expression; throw`
 
 C# equivalents (fragments):
 
@@ -354,9 +360,9 @@ Complete example: [SafeDivide](#example-task_8).
 
 ## side effects
 
-Declares side effects a function may have. Common effects: cw (console write), db (database), net (network), fs:r/fs:w (file system), rand (random), time, and env. Unresolved external effects are not purity proofs; supply authoritative effect metadata rather than inventing an effect code.
+Declares authoritative effects in the function header-clause region before the first body statement. Empty ! is a declared pure row. Effect variables bind with <! e> and occur in rows as ! e. Parameter rows follow type:name; output rows follow the output type; binding rows precede =; lambda rows precede =>. Preserve these distinct positions. In expression position, ! is logical negation, not an effect row. An unknown external call or manifest charge is not a metadata-resolution or purity proof.
 
-Syntax: `§E{effect1,effect2,...}`
+Syntax: `! effect1,effect2,...`
 
 C# equivalents (fragments):
 
@@ -370,9 +376,9 @@ Complete example: [Effects](#example-primer_effects).
 
 ## precondition
 
-Declares a precondition that must be true when the function is called. Part of Design by Contract.
+Declares a condition that must hold when the function is called. The example retains the divisor guard. A custom-message spelling is not part of this native form; use explicit exceptions when a custom failure message is required.
 
-Syntax: `§Q (condition) or §Q{"message"} (condition)`
+Syntax: `requires condition`
 
 C# equivalents (fragments):
 
@@ -385,9 +391,9 @@ Complete example: [Contracts](#example-primer_contracts).
 
 ## postcondition
 
-Declares a postcondition that will be true when the function returns. Use result to refer to the return value.
+Declares a postcondition before the first body statement. result denotes the body return value, including async body results rather than task objects. In expression lambdas => is the lambda delimiter, not a postcondition.
 
-Syntax: `§S (condition) or §S{"message"} (condition)`
+Syntax: `=> condition`
 
 C# equivalents (fragments):
 
@@ -400,9 +406,9 @@ Complete example: [Contracts](#example-primer_contracts).
 
 ## module invariant
 
-Declares an invariant at module scope.
+Declares an invariant checked at the corresponding compilation-unit or type boundaries. Preserve the native contract AST and proof obligations, not an opaque runtime call.
 
-Syntax: `§IV (condition)`
+Syntax: `invariant condition`
 
 C# equivalents (fragments):
 
@@ -432,9 +438,9 @@ Complete example: [Expression-valued call target with an explicit pure delegate 
 
 ## field definition
 
-Defines a field in a class. Usually private, prefixed with underscore by convention.
+Declares a field with type before name, optional visibility and modifiers, and an optional initializer. Public is the default; preserve explicit private or protected visibility and readonly or static modifiers.
 
-Syntax: `§FLD{type:name:visibility}`
+Syntax: `field type:name private = expression`
 
 C# equivalents (fragments):
 
@@ -447,9 +453,9 @@ Complete example: [Person](#example-task_33).
 
 ## interface definition
 
-Defines an interface with method signatures.
+Declares an interface with indented func signatures. Preserve generic variance, inherited interfaces, effective visibility and method contracts. Explicit visibility follows the name and type parameters.
 
-Syntax: `§IFACE{Name:vis}`
+Syntax: `interface Name`
 
 C# equivalents (fragments):
 
@@ -461,9 +467,9 @@ Complete example: [interface](#example-complete_interface).
 
 ## enum definition
 
-Defines an enumeration. Enum values are indented under §EN and may use = for explicit values.
+Declares an enumeration with indented named members and optional explicit values. Preserve the underlying CLR type; omission defaults to int.
 
-Syntax: `§EN{Name:vis[:underlyingType]} values...`
+Syntax: `enum Name byte`
 
 C# equivalents (fragments):
 
@@ -476,9 +482,9 @@ Complete example: [Enum with Switch/Match](#example-complex_enum).
 
 ## constructor
 
-Defines a class constructor. Use §BASE with §A arguments to call a base constructor, or §THIS to chain constructors.
+Declares a constructor with an indented body. Explicit visibility precedes the parameter list. A base(args) or this(args) initializer is the first body clause; preserve ordered arguments and base versus same-type delegation.
 
-Syntax: `§CTOR{vis} (type:param, ...)`
+Syntax: `ctor (type:param, ...)`
 
 C# equivalents (fragments):
 
@@ -491,9 +497,9 @@ Complete example: [Person](#example-task_33).
 
 ## switch expression
 
-Pattern matching switch expression. §K introduces each case/pattern. Use _ for default.
+Matches an expression against ordered patterns. Expression arms use → followed by a result; statement arms have indented bodies. Preserve pattern guards and use return match when returning a match expression.
 
-Syntax: `§W expression with indented §K pattern → result cases; use in an expression context, such as §R §W`
+Syntax: `match expression with indented case pattern → result arms`
 
 C# equivalents (fragments):
 
@@ -522,9 +528,9 @@ Complete example: [TryDouble](#example-task_6).
 
 ## using statement
 
-Resource management with automatic disposal.
+At compilation-unit scope, imports a namespace or declares an alias. In a function body, using introduces a resource and an indented body that disposes it on exit, including exceptions. Preserve the distinction between imports and resource lifetime management.
 
-Syntax: `§USE{var:type} resourceExpression`
+Syntax: `using System.Text; using Text = System.Text; using type:name = resource`
 
 C# equivalents (fragments):
 
@@ -535,11 +541,15 @@ using var connection = new SqlConnection(connStr);
 
 Complete example: [using](#example-complete_using).
 
+Complete example: [Explicit file-scoped namespace, independent of the file label](#example-complete_namespace).
+
+Complete example: [Explicit block namespace with the same CLR type identity](#example-complete_block_namespace).
+
 ## generic type
 
-Generic type parameters and constraints.
+Declares a generic type. Put generic parameters immediately after the declaration name. Indented where clauses retain reference-type, value-type, constructor and interface constraints; generic arguments use ordinary C# type spellings.
 
-Syntax: `§CL{Repository:pub}<T> with indented §WHERE T : class`
+Syntax: `class Repository<T>`
 
 C# equivalents (fragments):
 
@@ -584,9 +594,9 @@ Complete example: [interpolation](#example-complete_interpolation).
 
 ## break and continue
 
-Loop control statements.
+break exits the nearest loop; continue proceeds to its next iteration. A C#-form counted loop still performs its update after continue.
 
-Syntax: `§BK for break, §CN for continue`
+Syntax: `break; continue`
 
 C# equivalents (fragments):
 
@@ -599,9 +609,9 @@ Complete example: [break continue](#example-complete_break_continue).
 
 ## record type
 
-Declares a C# record class. Positional parameters retain their constructor defaults and public init properties. Indent properties and methods beneath the header. C# supplies value equality, hashing, ToString, deconstruction and with/copy behavior. Derived positional records use `record D:pub (int:X, int:Y) : B(X)`. Record structs, partial or nested declarations and unrepresented member variants remain exact converter-owned C# fallback, not native records.
+Declares a C# record class. Positional parameters retain their constructor defaults and public init properties. Indent properties and methods beneath the header. C# supplies value equality, hashing, ToString, deconstruction and with/copy behavior. Derived positional records use `record D (int:X, int:Y) : B(X)`. Record structs, partial or nested declarations and unrepresented member variants remain exact converter-owned C# fallback, not native records.
 
-Syntax: `record Point:pub (int:X, int:Y)`
+Syntax: `record Point (int:X, int:Y)`
 
 C# equivalents (fragments):
 
@@ -613,9 +623,9 @@ Complete example: [Native record construction and copying](#example-complete_rec
 
 ## Array Creation/Initialization
 
-Creates a fixed-size array with a typed §ARR value literal. Elements are whitespace-separated; group infix elements explicitly. The documented bare closer remains part of this staged literal form.
+Creates a fixed-size array with a typed initializer or explicit dimensions. Initializer elements are comma-separated expressions. Multidimensional arrays retain their rank and ordered dimension evaluation; they are not jagged arrays or lists.
 
-Syntax: `§B{items} §ARR{type} elements §/ARR`
+Syntax: `new int[]{1, 2, 3}; new int[length]; new int[rows, columns]`
 
 C# equivalents (fragments):
 
@@ -629,9 +639,9 @@ Complete example: [Array values and indexed access](#example-complete_arrays).
 
 ## static class
 
-Defines a named module for static members. Its functions use §F; C# callers keep the original static class name. Static class declarations with §CL are rejected.
+Declares a named static container with a nested module. Its functions are implicitly static, so Counter.Read retains its CLR identity. The outer module labels the compilation unit; it is not the container. class Counter static is intentionally rejected. Non-static classes may still declare static members.
 
-Syntax: `§M{Name}`
+Syntax: `module Counter`
 
 C# equivalents (fragments):
 
@@ -639,13 +649,13 @@ C# equivalents (fragments):
 public static class StringHelper { }
 ```
 
-Complete example: [Contracts](#example-primer_contracts).
+Complete example: [Named static module with implicit static function](#example-complete_static_class).
 
 ## virtual method
 
-Defines a virtual method that can be overridden in derived classes. Use the 'virt' modifier (the compiler also accepts 'vr').
+Declares a virtual class method using virtual. Derived classes may override it.
 
-Syntax: `§MT{name:vis:virt} (type:param, ...) -> returnType`
+Syntax: `func Name virtual (type:param, ...) → returnType`
 
 C# equivalents (fragments):
 
@@ -658,9 +668,9 @@ Complete example: [inheritance](#example-complete_inheritance).
 
 ## override method
 
-Overrides a virtual method from a base class. Use the 'over' modifier (the compiler also accepts 'ov').
+Overrides a virtual or abstract base method using override. Preserve the inherited signature and contracts.
 
-Syntax: `§MT{name:vis:over} (type:param, ...) -> returnType`
+Syntax: `func Name override (type:param, ...) → returnType`
 
 C# equivalents (fragments):
 
@@ -673,9 +683,9 @@ Complete example: [inheritance](#example-complete_inheritance).
 
 ## abstract class
 
-Defines an abstract class that cannot be instantiated directly. Use 'abs' modifier.
+Declares an abstract class using abstract. It cannot be instantiated directly.
 
-Syntax: `§CL{Name:vis:abs}`
+Syntax: `class Name abstract`
 
 C# equivalents (fragments):
 
@@ -687,9 +697,9 @@ Complete example: [inheritance](#example-complete_inheritance).
 
 ## abstract method
 
-Defines an abstract method with no body that must be overridden. Use 'abs' modifier.
+Declares an abstract class method using abstract, without a body. Concrete derived classes must implement it.
 
-Syntax: `§MT{name:vis:abs} (type:param, ...) -> returnType`
+Syntax: `func Name abstract (type:param, ...) → returnType`
 
 C# equivalents (fragments):
 
@@ -701,9 +711,9 @@ Complete example: [inheritance](#example-complete_inheritance).
 
 ## sealed class
 
-Defines a sealed class that cannot be inherited from. Use 'seal' modifier.
+Declares a sealed class using sealed. It cannot be inherited from.
 
-Syntax: `§CL{Name:vis:seal}`
+Syntax: `class Name sealed`
 
 C# equivalents (fragments):
 
@@ -715,9 +725,9 @@ Complete example: [inheritance](#example-complete_inheritance).
 
 ## lock statement
 
-Locks an object while executing the indented body.
+Executes an indented body while holding the selected monitor. Preserve evaluate-once lock-object selection and monitor release on returns and exceptions.
 
-Syntax: `§SYNC (gate)`
+Syntax: `lock gate`
 
 C# equivalents (fragments):
 
@@ -745,9 +755,9 @@ Complete example: [documentation](#example-complete_documentation).
 
 ## obsolete attribute
 
-Marks code as deprecated with a reason.
+Attach a declaration documentation line with the deprecation version and optional replacement. For an exact Obsolete attribute message, use the ordinary attribute form.
 
-Syntax: `§DP{reason}`
+Syntax: `/// deprecated version [Replacement]`
 
 C# equivalents (fragments):
 
@@ -774,9 +784,9 @@ Complete example: [documentation](#example-complete_documentation).
 
 ## access modifiers
 
-Visibility modifiers are specified in the tag header. Use 'pub' for public, 'priv' for private, 'prot' for protected.
+Public visibility is the default. Write full-word visibility modifiers after the declaration name and generic parameters; compound visibility uses protected-internal or private-protected.
 
-Syntax: `pub (public), priv (private), prot (protected)`
+Syntax: `public (default), private, protected, internal, protected-internal, private-protected`
 
 C# equivalents (fragments):
 
@@ -790,25 +800,23 @@ Complete example: [documentation](#example-complete_documentation).
 
 ## event definition
 
-Defines an event. Simple form has no body. For custom add/remove accessors, use indented §EADD and §EREM blocks inside the event body.
+Declares an event, optionally with paired indented add and remove accessor bodies. Preserve the delegate type, visibility and supported modifiers. Named-module events are static; ordinary classes may explicitly declare a static event. Converter preservation of an unsupported event shape is not an authoring spelling. The complete example demonstrates declaration only. Native event subscription and unsubscription statements are not admitted yet; do not write retired section markers or invent +=/-= statements. Convert original C# when preservation is needed.
 
-Syntax: `§EVT{name:vis:delegateType}`
+Syntax: `event DelegateType:Name`
 
 C# equivalents (fragments):
 
 ```csharp
-public event EventHandler OnChanged;
-public event Action<int> ValueUpdated;
-public event EventHandler Click { add { _click += value; } remove { _click -= value; } }
+public event EventHandler OnDataReceived;
 ```
 
-Complete example: [EventPublisher](#example-task_23).
+Complete example: [Event declaration; subscription statements are not yet native](#example-task_23).
 
 ## operator overload
 
-Defines an operator overload using the supported arithmetic, comparison, equality or unary operators. Updates still use §ASSIGN; do not author increment/decrement or compound assignment expressions.
+Declares an operator overload or conversion with an indented body. Preserve operator token, parameter order, result type, effects and C# signature requirements. Conversion operators use implicit or explicit after op.
 
-Syntax: `§OP{operator:vis} (type:param, ...) -> returnType`
+Syntax: `op + (type:left, type:right) → resultType; op implicit (type:value) → resultType`
 
 C# equivalents (fragments):
 
@@ -852,9 +860,9 @@ Complete example: [DigitValue](#example-task_41).
 
 ## yield return
 
-Produces values lazily from an iterator method. §YIELD returns a value, §YBRK stops iteration.
+Yields a value from an iterator or ends iteration. Preserve lazy execution, suspension, iterator disposal and cleanup; do not materialize the sequence eagerly.
 
-Syntax: `§YIELD expression or §YBRK (yield break)`
+Syntax: `yield expression; yield break`
 
 C# equivalents (fragments):
 
@@ -868,9 +876,9 @@ Complete example: [Yield Iterator](#example-complex_yield).
 
 ## delegate definition
 
-Defines a delegate type (function signature). Use for callbacks, event handlers, and function references. §DEL can appear at the top level or nested inside §CL class bodies.
+Declares a delegate signature at compilation-unit or class scope. Parameters are inline; an optional indented ! row retains the delegate's effect contract. Preserve parameter modifiers and the result type.
 
-Syntax: `§DEL{name} with indented §I parameters and optional §O return type`
+Syntax: `delegate Name (type:param, ...) → returnType`
 
 C# equivalents (fragments):
 
@@ -884,9 +892,9 @@ Complete example: [MathOperation](#example-task_26).
 
 ## preprocessor directive
 
-Conditional compilation blocks use §PP for #if and §PPE for #else. Indented statement bodies end at dedent. Nested §PP blocks express #elif. Code inside is conditionally included based on defined symbols.
+Conditionally includes indented code. Chained pp clauses align with their opening pp. Conditions retain verbatim C# preprocessor text; preserve nested conditions and inactive branch contents under converter fidelity rules.
 
-Syntax: `§PP{CONDITION} indented body; §PPE indented alternative`
+Syntax: `pp CONDITION; pp elif CONDITION; pp else`
 
 C# equivalents (fragments):
 
@@ -905,9 +913,9 @@ Complete example: [preprocessor](#example-complete_preprocessor).
 
 ## struct definition
 
-Defines a value type (struct). Uses the 'struct' modifier on §CL. Supports readonly structs with the 'readonly' modifier.
+Declares a value type with the struct modifier. Preserve fields, properties, interfaces and value semantics rather than converting it to a reference class.
 
-Syntax: `§CL{Name:vis:struct}`
+Syntax: `class Name struct`
 
 C# equivalents (fragments):
 
@@ -920,9 +928,9 @@ Complete example: [struct](#example-complete_struct).
 
 ## generic type constraint
 
-Constrains generic type parameters. Supports class, struct, new(), interface, and base class constraints.
+Adds generic constraints before a declaration body. Preserve each reference/value-type, constructor, base-type and interface requirement, rather than treating a type parameter as an unconstrained object. Inside a quantified contract, where introduces its guard instead of a generic constraint.
 
-Syntax: `§WHERE T : constraint for generic constraints`
+Syntax: `where T : class, new()`
 
 C# equivalents (fragments):
 
@@ -936,9 +944,9 @@ Complete example: [Repository](#example-task_30).
 
 ## do-while loop
 
-Runs the indented body at least once; the matching closer carries the condition.
+Executes the body at least once. The trailing while condition is at the same indentation as do; there is no structural closer.
 
-Syntax: `§DO body §/DO (condition)`
+Syntax: `do indentedBody; while condition at the do indentation`
 
 C# equivalents (fragments):
 
@@ -952,7 +960,7 @@ Complete example: [DoWhileDemo](#example-task_13).
 
 Defines part of a class that can be split across multiple files. Uses the 'partial' modifier.
 
-Syntax: `§CL{Name:vis:partial}`
+Syntax: `class Name partial`
 
 C# equivalents (fragments):
 
@@ -964,9 +972,9 @@ Complete example: [partial](#example-complete_partial).
 
 ## unsafe block
 
-Marks a block for unsafe pointer operations. Required for pointer arithmetic, fixed statements, and stackalloc.
+Introduces an indented unsafe body. Preserve unsafe effects and compile with unsafe support; the keyword is not permission to bypass diagnostics.
 
-Syntax: `§UNSAFE`
+Syntax: `unsafe`
 
 C# equivalents (fragments):
 
@@ -978,9 +986,10 @@ Complete example: [unsafe](#example-complete_unsafe).
 
 ## null-coalescing assignment
 
-Use a null check and §ASSIGN for a conditional update. Assignment expressions, including ??=, are not authored expression forms.
+Use a null check and set for a conditional binding update. Assignment expressions, including ??=, are not authored expression forms.
 
-Syntax: `§IF (x == null) with indented §ASSIGN x fallback`
+Syntax: `if x == null
+  set x fallback`
 
 C# equivalents (fragments):
 
@@ -1026,9 +1035,9 @@ Complete example: [patterns](#example-complete_patterns).
 
 ## range expression
 
-C# range expressions (start..end) and index-from-end (^n) have native Calor forms. Use §RANGE for slicing and §^ for indexing from the end.
+Use ordinary half-open C# ranges and index-from-end expressions inside brackets. A slice creates a new array; it is not an alias for the original array.
 
-Syntax: `§IDX{array} §RANGE start end / §IDX{array} §^ n`
+Syntax: `array[start..end]; array[^offset]; array[start..]`
 
 C# equivalents (fragments):
 
@@ -1042,9 +1051,9 @@ Complete example: [array ranges](#example-complete_ranges).
 
 ## positional and property patterns
 
-During C# → Calor migration, positional patterns (tuple deconstruction) and property patterns stay inline. For hand-written Calor, decompose complex patterns into §IF/§EI chains with explicit comparisons.
+During C# → Calor migration, positional and property patterns retain converter fidelity. For handwritten decomposition, use if/else if with explicit comparisons.
 
-Syntax: `Supported in C# → Calor migration. Decompose to §IF chains for hand-written Calor.`
+Syntax: `Supported in C# → Calor migration; use if chains for handwritten decomposition.`
 
 C# equivalents (fragments):
 
@@ -1109,9 +1118,9 @@ Complete example: [objects](#example-complete_objects).
 
 ## goto case / goto default
 
-Jump to a specific case label or to the default case in a switch statement. For regular goto, use §GOTO{labelName}.
+Transfers control to a constant match case, the default arm, or a label written name:. Preserve the target and surrounding cleanup; goto case does not repeat the match selector's evaluation.
 
-Syntax: `§GOTO{CASE:expr} or §GOTO{DEFAULT}`
+Syntax: `goto case expression; goto default; goto label`
 
 C# equivalents (fragments):
 
@@ -1126,9 +1135,9 @@ Complete example: [goto](#example-complete_goto).
 
 ## string operations
 
-Staged prefix built-ins include (str value), (concat a b), (fmt "{0}" value), (len text), (contains text value), (starts text prefix), (ends text suffix), (equals left right), (isempty text), (upper text), (lower text), (trim text), (replace text old new) and (substr text start count). indexof accepts an optional start and count; use :ordinal for ordinal comparison. Do not invent extra arguments.
+String operations use ordinary C# property and method syntax. Preserve each selected overload's argument count and comparison mode. Length is text.Length; case conversion and trimming are methods. A one-character Substring is a string, while text[index] is a char. Do not invent extra arguments or replace ordinal comparison with culture-dependent behavior.
 
-Syntax: `(concat a b), (substr text start count), (indexof text value :ordinal)`
+Syntax: `string.Concat(a, b); text.Substring(start, count); text.IndexOf(value, StringComparison.Ordinal)`
 
 C# equivalents (fragments):
 
@@ -1144,9 +1153,9 @@ Complete example: [BuildGreeting](#example-task_38).
 
 ## character operations
 
-Single quotes produce char literals with C# escapes. Built-ins include char-at, char-code, char-from-code, char-upper, char-lower, is-letter, is-digit, is-whitespace, is-upper and is-lower. Character subtraction promotes to int.
+Characters use single-quoted literals, ordinary indexing, scalar casts and char methods. Character classification follows the corresponding .NET method, including its Unicode behavior. Do not confuse a char with a one-character string.
 
-Syntax: `(char-at text index), (char-code value), '0'`
+Syntax: `text[index]; (int)character; char.IsDigit(character); '0'`
 
 C# equivalents (fragments):
 
@@ -1178,9 +1187,9 @@ Complete example: [Files](#example-primer_files).
 
 ## variable assignment
 
-Declare a mutable binding with a ~-prefixed name; use §ASSIGN for all updates, including increments and compound arithmetic.
+Updates mutable bindings, fields or indexed storage. Indexed stores preserve left-to-right evaluate-once receiver, key and value evaluation, and dictionary updates are upserts rather than Add. Increment/decrement and compound assignment aliases are not separate expression forms. Inside a property or indexer, set declares a setter instead.
 
-Syntax: `§ASSIGN name expression`
+Syntax: `set target expression; set receiver[index] expression`
 
 C# equivalents (fragments):
 
@@ -1208,9 +1217,9 @@ Complete example: [TryDouble](#example-task_6).
 
 ## Infix expressions and precedence
 
-Use infix arithmetic, shifts, comparisons, equality, eager bitwise and short-circuit Boolean operators with C# precedence. Unary -, ! and ~ are supported. Calls and indexing bind tighter. Write implication as !p || q; use Math.Pow(a, b) for powers. Increment/decrement, assignment expressions, unary +, >>> and infix ** are not supported. Newlines end expressions; group infix operands in whitespace-separated staged hosts.
+Expressions use infix operators with C# precedence and postfix calls/indexing. Binary operators associate left; ?? and ?: associate right. Lazy Boolean, coalescing and conditional operands retain their evaluation regions. No legacy prefix operator or section-call delimiters are authored. Express implication as !p || q.
 
-Syntax: `a + b, a == b, p && q, !p, condition ? thenValue : elseValue`
+Syntax: `a + b; p && q; !p; condition ? yes : no; f(x); receiver[index]`
 
 C# equivalents (fragments):
 
@@ -1228,9 +1237,9 @@ Complete example: [Expression-valued call target with an explicit pure delegate 
 
 ## quantified contracts
 
-Staged quantifiers declare typed bound variables. Check array lengths against external bounds. The examples use bounded exists and its negation for finite runtime checking. Runtime forall certification still requires a legacy implication AST; an equivalent infix Boolean body is not yet certified. Express ordinary implication as !condition || consequence. Contracts are obligations, not a guarantee that every proof succeeds.
+Quantified contracts retain lexical binders and native proof semantics. Ranges are half-open: start <= i && i < end, and an empty range is vacuous for forall and false for exists. Use where for other guards; runtime checking still requires supported finite bounds. Express implication as !condition || consequence, not a special operator. Do not replace quantified proofs with unmodeled CLR calls.
 
-Syntax: `(forall ((i int)) body), (exists ((i int)) body); !condition || consequence`
+Syntax: `forall int:i in start..end : body; exists int:i in start..end : body; forall int:i where guard : body`
 
 C# equivalents (fragments):
 
@@ -1244,9 +1253,9 @@ Complete example: [HasNegative](#example-task_40).
 
 ## collection operations
 
-Ordinary List<T>, Dictionary<K,V> and HashSet<T> are distinct from arrays. Mutating heap collections requires mut; significant allocation requires alloc. §CNT reads count; §HAS tests membership. Use the complete examples for empty construction and iteration.
+Ordinary List<T>, Dictionary<K,V> and HashSet<T> are distinct from arrays. Mutating heap collections requires mut; significant allocation requires alloc. Count reads size and Contains tests membership. Dictionary indexed updates are upserts, not Add. Preserve source-generic receiver metadata and method overloads without casts or fake types.
 
-Syntax: `§PUSH{list} value; §PUT{dictionary} key value`
+Syntax: `items.Add(value); set counts[key] value; items.Count; items.Contains(value)`
 
 C# equivalents (fragments):
 
@@ -1266,9 +1275,9 @@ Complete example: [Collection allocation, loop mutation and count](#example-copi
 
 ## Staged section call
 
-Compatibility call lookup retained during integration. Author ordinary calls with postfix parentheses. A section call's manifest effect charge alone does not establish authoritative metadata resolution.
+Legacy section-call delimiters are retired. This migration lookup points to ordinary postfix calls, not a compatibility syntax. A manifest effect charge alone does not establish authoritative method metadata or a purity proof.
 
-Syntax: `§C{target<T>} §A arg §/C`
+Syntax: `target<T>(arg)`
 
 C# equivalents (fragments):
 
@@ -1276,19 +1285,79 @@ C# equivalents (fragments):
 System.Linq.Enumerable.ToArray<int>(filtered)
 ```
 
+## module definition
+
+At file scope, labels the compilation unit. The optional qualified namespace follows the label; omission means the global namespace. That label is neither a namespace nor a static class declaration. A trailing block records block-namespace origin rather than file-scoped origin. Inside the compilation unit, a nested module declares a named static container with implicitly static functions.
+
+Syntax: `module FileLabel Contoso.Tools`
+
+C# equivalents (fragments):
+
+```csharp
+namespace Contoso.Tools;
+```
+
+Complete example: [Explicit file-scoped namespace, independent of the file label](#example-complete_namespace).
+
+Complete example: [Explicit block namespace with the same CLR type identity](#example-complete_block_namespace).
+
+Complete example: [Named static module with implicit static function](#example-complete_static_class).
+
+## enum extension methods
+
+Enum extensions use an ordinary named static module, not a separate enum-extension container head. The receiver is the first parameter, with this before its type. Preserve the EnumNameExtensions CLR container and the extension method's static identity.
+
+Syntax: `module ModeExtensions; func IsActive (this Mode:value) → bool`
+
+C# equivalents (fragments):
+
+```csharp
+public static class ModeExtensions { public static bool IsActive(this Mode value) => value == Mode.Active; }
+```
+
+Complete example: [Enum extension functions in their named static container](#example-complete_enum_extensions).
+
+## introduction version metadata
+
+Records a declaration's introduction version in a documentation comment immediately before the declaration. Supply one valid version. This is structured API metadata, not a runtime version check.
+
+Syntax: `/// since 1.0.0`
+
+C# equivalents (fragments):
+
+```csharp
+// Available since version 1.0.0
+```
+
+Complete example: [documentation](#example-complete_documentation).
+
+## breaking change metadata
+
+Records a breaking change before a declaration. Supply a valid version and one C# string literal description; repeated lines retain multiple changes. Preserve the version and complete description rather than replacing them with an unstructured compatibility claim.
+
+Syntax: `/// breaking 2.0.0 "Description of the change"`
+
+C# equivalents (fragments):
+
+```csharp
+// Breaking change in version 2.0.0: Description of the change
+```
+
+Complete example: [documentation](#example-complete_documentation).
+
 ## Example complete_records
 
 Native record construction and copying
 
 ```calor
-§M{Records}
-  record Point:pub (int:X, int:Y = 2)
-  §F{Create:pub} () -> Point
-    §E{alloc,mut}
-    §R §NEW{Point} §A 1 §/NEW
-  §F{Shift:pub} (Point:point) -> Point
-    §E{alloc,mut}
-    §R §WITH point §SET{X} 3 §/WITH
+module Records
+  record Point (int:X, int:Y = 2)
+  func Create () → Point
+    ! alloc,mut
+    return new Point(1)
+  func Shift (Point:point) → Point
+    ! alloc,mut
+    return point with { X = 3 }
 ```
 
 ## Example copilot_smoke
@@ -1296,15 +1365,14 @@ Native record construction and copying
 Collection allocation, loop mutation and count
 
 ```calor
-§M{CopilotSmoke}
-  §F{Collect:pub} (int:n) -> int
-    §E{mut,alloc}
-    §LIST{items:int}
-    §/LIST
-    §L{i:1:n:1}
-      §PUSH{items} i
-    §B{count:int} §CNT{items}
-    §R count
+module CopilotSmoke
+  func Collect (int:n) → int
+    ! mut,alloc
+    let List<int>:items = new List<int>()
+    for i from 1 to n step 1
+      items.Add(i)
+    let int:count = items.Count
+    return count
 ```
 
 ## Example complete_arrays
@@ -1312,11 +1380,11 @@ Collection allocation, loop mutation and count
 Array values and indexed access
 
 ```calor
-§M{ArrayValues}
-  §F{First:pub} () -> int
-    §E{alloc}
-    §B{items} §ARR{int} 10 20 30 §/ARR
-    §R items[0]
+module ArrayValues
+  func First () → int
+    ! alloc
+    let items = new int[]{10, 20, 30}
+    return items[0]
 ```
 
 ## Example task_0
@@ -1324,11 +1392,11 @@ Array values and indexed access
 ReadInput
 
 ```calor
-§M{AgentReference0}
-  §F{ReadInput:pub} () -> string?
-    §E{cr}
-    §B{line} Console.ReadLine()
-    §R line
+module AgentReference0
+  func ReadInput () → string?
+    ! cr
+    let line = Console.ReadLine()
+    return line
 ```
 
 ## Example task_1
@@ -1336,9 +1404,9 @@ ReadInput
 PrintValue
 
 ```calor
-§M{AgentReference1}
-  §F{PrintValue:pub} (int:x) -> void
-    §E{cw}
+module AgentReference1
+  func PrintValue (int:x) → void
+    ! cw
     Console.WriteLine(x)
 ```
 
@@ -1347,11 +1415,11 @@ PrintValue
 ClampScore
 
 ```calor
-§M{AgentReference2}
-  §F{ClampScore:pub} (int:score) -> int
-    §E{}
-    §B{value:int} Math.Clamp(value: score, min: 0, max: 100)
-    §R value
+module AgentReference2
+  func ClampScore (int:score) → int
+    !
+    let int:value = Math.Clamp(value: score, min: 0, max: 100)
+    return value
 ```
 
 ## Example task_3
@@ -1359,10 +1427,10 @@ ClampScore
 SquareRoot
 
 ```calor
-§M{AgentReference3}
-  §F{SquareRoot:pub} (int:x) -> int
-    §Q (x >= 0)
-    §R x
+module AgentReference3
+  func SquareRoot (int:x) → int
+    requires (x >= 0)
+    return x
 ```
 
 ## Example task_4
@@ -1370,10 +1438,10 @@ SquareRoot
 Abs
 
 ```calor
-§M{AgentReference4}
-  §F{Abs:pub} (int:x) -> int
-    §S (result >= 0)
-    §R ((x < 0) ? (0 - x) : x)
+module AgentReference4
+  func Abs (int:x) → int
+    => (result >= 0)
+    return ((x < 0) ? (0 - x) : x)
 ```
 
 ## Example task_5
@@ -1381,9 +1449,9 @@ Abs
 PrintNumber
 
 ```calor
-§M{AgentReference5}
-  §F{PrintNumber:pub} (int:x) -> void
-    §E{cw}
+module AgentReference5
+  func PrintNumber (int:x) → void
+    ! cw
     Console.WriteLine(x)
 ```
 
@@ -1392,13 +1460,13 @@ PrintNumber
 TryDouble
 
 ```calor
-§M{AgentReference6}
-  §F{TryDouble:pub} (int:x) -> int?
-    §E{}
-    §IF (x > 0)
-      §R (x * 2)
-    §EL
-      §R null
+module AgentReference6
+  func TryDouble (int:x) → int?
+    !
+    if (x > 0)
+      return (x * 2)
+    else
+      return null
 ```
 
 ## Example task_7
@@ -1406,13 +1474,13 @@ TryDouble
 TryParseDigit
 
 ```calor
-§M{AgentReference7}
-  §F{TryParseDigit:pub} (char:c) -> int?
-    §E{}
-    §IF ((c >= '0') && (c <= '9'))
-      §R (c - '0')
-    §EL
-      §R null
+module AgentReference7
+  func TryParseDigit (char:c) → int?
+    !
+    if ((c >= '0') && (c <= '9'))
+      return (c - '0')
+    else
+      return null
 ```
 
 ## Example task_8
@@ -1420,13 +1488,13 @@ TryParseDigit
 SafeDivide
 
 ```calor
-§M{AgentReference8}
-  §F{SafeDivide:pub} (int:a, int:b) -> int
-    §E{alloc,throw}
-    §IF (b != 0)
-      §R (a / b)
-    §EL
-      §TH §NEW{ArgumentException} §A "Division by zero" §/NEW
+module AgentReference8
+  func SafeDivide (int:a, int:b) → int
+    ! alloc,throw
+    if b != 0
+      return a / b
+    else
+      throw new ArgumentException("Division by zero")
 ```
 
 ## Example task_9
@@ -1434,14 +1502,14 @@ SafeDivide
 Classify
 
 ```calor
-§M{AgentReference9}
-  §F{Classify:pub} (int:n) -> string
-    §IF (n < 0)
-      §R "negative"
-    §EI (n == 0)
-      §R "zero"
-    §EL
-      §R "positive"
+module AgentReference9
+  func Classify (int:n) → string
+    if (n < 0)
+      return "negative"
+    else if (n == 0)
+      return "zero"
+    else
+      return "positive"
 ```
 
 ## Example task_10
@@ -1449,12 +1517,12 @@ Classify
 Max
 
 ```calor
-§M{AgentReference10}
-  §F{Max:pub} (int:a, int:b) -> int
-    §IF (a >= b)
-      §R a
-    §EL
-      §R b
+module AgentReference10
+  func Max (int:a, int:b) → int
+    if (a >= b)
+      return a
+    else
+      return b
 ```
 
 ## Example task_11
@@ -1462,18 +1530,18 @@ Max
 GetGrade
 
 ```calor
-§M{AgentReference11}
-  §F{GetGrade:pub} (int:score) -> string
-    §B{~grade:string} "F"
-    §IF (score >= 90)
-      §ASSIGN grade "A"
-    §EI (score >= 80)
-      §ASSIGN grade "B"
-    §EI (score >= 70)
-      §ASSIGN grade "C"
-    §EL
-      §ASSIGN grade "F"
-    §R grade
+module AgentReference11
+  func GetGrade (int:score) → string
+    var string:grade = "F"
+    if (score >= 90)
+      set grade "A"
+    else if (score >= 80)
+      set grade "B"
+    else if (score >= 70)
+      set grade "C"
+    else
+      set grade "F"
+    return grade
 ```
 
 ## Example task_12
@@ -1481,13 +1549,13 @@ GetGrade
 Countdown
 
 ```calor
-§M{AgentReference12}
-  §F{Countdown:pub} () -> void
-    §E{cw}
-    §B{~count:int} 5
-    §WH (count > 0)
+module AgentReference12
+  func Countdown () → void
+    ! cw
+    var int:count = 5
+    while (count > 0)
       Console.WriteLine(count)
-      §ASSIGN count (count - 1)
+      set count (count - 1)
 ```
 
 ## Example task_13
@@ -1495,14 +1563,14 @@ Countdown
 DoWhileDemo
 
 ```calor
-§M{AgentReference13}
-  §F{DoWhileDemo:pub} () -> void
-    §E{cw}
-    §B{~x:int} 0
-    §DO
+module AgentReference13
+  func DoWhileDemo () → void
+    ! cw
+    var int:x = 0
+    do
       Console.WriteLine(x)
-      §ASSIGN x (x + 1)
-    §/DO (x < 3)
+      set x (x + 1)
+    while (x < 3)
 ```
 
 ## Example task_14
@@ -1510,17 +1578,17 @@ DoWhileDemo
 SumList
 
 ```calor
-§M{AgentReference14}
-  §F{SumList:pub} () -> int
-    §E{alloc,mut}
-    §B{nums:List<int>} §NEW{List<int>}
-    §PUSH{nums} 10
-    §PUSH{nums} 20
-    §PUSH{nums} 30
-    §B{~sum:int} 0
-    §EACH{n} nums
-      §ASSIGN sum (sum + n)
-    §R sum
+module AgentReference14
+  func SumList () → int
+    ! alloc,mut
+    let List<int>:nums = new List<int>()
+    nums.Add(10)
+    nums.Add(20)
+    nums.Add(30)
+    var int:sum = 0
+    each n in nums
+      set sum sum + n
+    return sum
 ```
 
 ## Example task_15
@@ -1528,14 +1596,14 @@ SumList
 GetListLength
 
 ```calor
-§M{AgentReference15}
-  §F{GetListLength:pub} (int:n) -> int
-    §E{alloc,mut}
-    §Q (n >= 0)
-    §B{nums:List<int>} §NEW{List<int>}
-    §L{i:1:n:1}
-      §PUSH{nums} i
-    §R §CNT{nums}
+module AgentReference15
+  func GetListLength (int:n) → int
+    ! alloc,mut
+    requires n >= 0
+    let List<int>:nums = new List<int>()
+    for i from 1 to n step 1
+      nums.Add(i)
+    return nums.Count
 ```
 
 ## Example task_16
@@ -1543,12 +1611,12 @@ GetListLength
 PrintDictionary
 
 ```calor
-§M{AgentReference16}
-  §F{PrintDictionary:pub} (Dictionary<string,int>:scores) -> void
-    §E{cw}
-    §EACHKV{k:v} scores
-      §P k
-      §P v
+module AgentReference16
+  func PrintDictionary (Dictionary<string,int>:scores) → void
+    ! cw
+    each k, v in scores
+      Console.WriteLine(k)
+      Console.WriteLine(v)
 ```
 
 ## Example task_17
@@ -1556,9 +1624,9 @@ PrintDictionary
 GetDataAsync
 
 ```calor
-§M{AgentReference17}
-  §AF{GetDataAsync:pub} () -> Task<int>
-    §R 42
+module AgentReference17
+  func GetDataAsync async () → Task<int>
+    return 42
 ```
 
 ## Example task_18
@@ -1566,13 +1634,13 @@ GetDataAsync
 GetStatus
 
 ```calor
-§M{AgentReference18}
-  §F{GetStatus:pub} (int:code) -> string
-    §R §W code
-      §K 200 → "OK"
-      §K 404 → "Not Found"
-      §K 500 → "Server Error"
-      §K _ → "Unknown"
+module AgentReference18
+  func GetStatus (int:code) → string
+    return match code
+      case 200 → "OK"
+      case 404 → "Not Found"
+      case 500 → "Server Error"
+      case _ → "Unknown"
 ```
 
 ## Example task_19
@@ -1580,17 +1648,17 @@ GetStatus
 DayName
 
 ```calor
-§M{AgentReference19}
-  §F{DayName:pub} (int:day) -> int
-    §R §W day
-      §K 1 → 100
-      §K 2 → 100
-      §K 3 → 100
-      §K 4 → 100
-      §K 5 → 100
-      §K 6 → 200
-      §K 7 → 200
-      §K _ → 0
+module AgentReference19
+  func DayName (int:day) → int
+    return match day
+      case 1 → 100
+      case 2 → 100
+      case 3 → 100
+      case 4 → 100
+      case 5 → 100
+      case 6 → 200
+      case 7 → 200
+      case _ → 0
 ```
 
 ## Example task_20
@@ -1598,13 +1666,13 @@ DayName
 GetGrade
 
 ```calor
-§M{AgentReference20}
-  §F{GetGrade:pub} (int:score) -> string
-    §R §W score
-      §K §PREL{gte} 90 → "A"
-      §K §PREL{gte} 80 → "B"
-      §K §PREL{gte} 70 → "C"
-      §K _ → "F"
+module AgentReference20
+  func GetGrade (int:score) → string
+    return match score
+      case >= 90 → "A"
+      case >= 80 → "B"
+      case >= 70 → "C"
+      case _ → "F"
 ```
 
 ## Example task_21
@@ -1612,13 +1680,13 @@ GetGrade
 Describe
 
 ```calor
-§M{AgentReference21}
-  §F{Describe:pub} (int:x) -> string
-    §R §W x
-      §K §VAR{n} §WHEN (n > 100) → "large"
-      §K §VAR{n} §WHEN (n < 0) → "negative"
-      §K 0 → "zero"
-      §K _ → "normal"
+module AgentReference21
+  func Describe (int:x) → string
+    return match x
+      case var n when (n > 100) → "large"
+      case var n when (n < 0) → "negative"
+      case 0 → "zero"
+      case _ → "normal"
 ```
 
 ## Example task_22
@@ -1626,33 +1694,30 @@ Describe
 IsSingleDigit
 
 ```calor
-§M{AgentReference22}
-  §F{IsSingleDigit:pub} (int:n) -> bool
-    §R §W n
-      §K 0 → true
-      §K 1 → true
-      §K 2 → true
-      §K 3 → true
-      §K 4 → true
-      §K 5 → true
-      §K 6 → true
-      §K 7 → true
-      §K 8 → true
-      §K 9 → true
-      §K _ → false
+module AgentReference22
+  func IsSingleDigit (int:n) → bool
+    return match n
+      case 0 → true
+      case 1 → true
+      case 2 → true
+      case 3 → true
+      case 4 → true
+      case 5 → true
+      case 6 → true
+      case 7 → true
+      case 8 → true
+      case 9 → true
+      case _ → false
 ```
 
 ## Example task_23
 
-EventPublisher
+Event declaration; subscription statements are not yet native
 
 ```calor
-§M{AgentReference23}
-  §CL{EventPublisher:pub}
-    §EVT{OnDataReceived:pub:EventHandler}
-    §MT{Subscribe:pub} (EventHandler:handler) -> void
-      §E{mut}
-      §SUB OnDataReceived handler
+module AgentReference23
+  class EventPublisher
+    event EventHandler:OnDataReceived
 ```
 
 ## Example task_24
@@ -1660,10 +1725,10 @@ EventPublisher
 ApplyDouble
 
 ```calor
-§M{AgentReference24}
-  §F{ApplyDouble:pub} (int:x) -> int
-    §B{doubler:Func<int,int>} (n) → (n * 2)
-    §R doubler(x)
+module AgentReference24
+  func ApplyDouble (int:x) → int
+    let Func<int,int>:doubler = (int:n) => (n * 2)
+    return doubler(x)
 ```
 
 ## Example task_25
@@ -1671,12 +1736,11 @@ ApplyDouble
 ApplyComplex
 
 ```calor
-§M{AgentReference25}
-  §F{ApplyComplex:pub} (int:x) -> int
-    §B{process:Func<int,int>} §LAM{n:int}
-    ((n > 0) ? (n * 2) : 0)
-    §/LAM
-    §R process(x)
+module AgentReference25
+  func ApplyComplex (int:x) → int
+    let Func<int,int>:process = (int:n) =>
+      return n > 0 ? n * 2 : 0
+    return process(x)
 ```
 
 ## Example task_26
@@ -1684,11 +1748,8 @@ ApplyComplex
 MathOperation
 
 ```calor
-§M{AgentReference26}
-  §DEL{MathOperation}
-    §I{int:x}
-    §I{int:y}
-    §O{int}
+module AgentReference26
+  delegate MathOperation (int:x, int:y) → int
 ```
 
 ## Example task_27
@@ -1696,13 +1757,13 @@ MathOperation
 Accumulate
 
 ```calor
-§M{AgentReference27}
-  §F{Accumulate:pub} (int:n) -> int
-    §B{~acc:int} 0          // Bind mutable variable acc = 0
-    §ASSIGN acc (acc + n)   // Assign acc = acc + n
-    §ASSIGN acc (acc + n)   // Assign again
-    §ASSIGN acc (acc + n)   // And again
-    §R acc
+module AgentReference27
+  func Accumulate (int:n) → int
+    var int:acc = 0          // Bind mutable variable acc = 0
+    set acc (acc + n)   // Assign acc = acc + n
+    set acc (acc + n)   // Assign again
+    set acc (acc + n)   // And again
+    return acc
 ```
 
 ## Example task_28
@@ -1710,10 +1771,10 @@ Accumulate
 Calculator
 
 ```calor
-§M{AgentReference28}
-  §CL{Calculator:pub}
-    §MT{Add:pub} (int:a, int:b) -> int
-      §R (a + b)
+module AgentReference28
+  class Calculator
+    func Add (int:a, int:b) → int
+      return (a + b)
 ```
 
 ## Example task_29
@@ -1721,14 +1782,14 @@ Calculator
 Container
 
 ```calor
-§M{AgentReference29}
-  §CL{Container:pub}<T>
-    §FLD{T:_value:priv}
-    §MT{Get:pub} () -> T
-      §R _value
-    §MT{HashSet:pub} (T:value) -> void
-      §E{mut}
-      §ASSIGN _value value
+module AgentReference29
+  class Container<T>
+    field T:_value private
+    func Get () → T
+      return _value
+    func HashSet (T:value) → void
+      ! mut
+      set _value value
 ```
 
 ## Example task_30
@@ -1736,13 +1797,13 @@ Container
 Repository
 
 ```calor
-§M{AgentReference30}
-  §CL{Repository:pub}<T>
-    §WHERE T : class
-    §FLD{List<T>:_items:priv}
-    §MT{Add:pub} (T:item) -> void
-      §E{mut}
-      §PUSH{_items} item
+module AgentReference30
+  class Repository<T>
+    where T : class
+    field List<T>:_items private
+    func Add (T:item) → void
+      ! mut
+      _items.Add(item)
 ```
 
 ## Example task_31
@@ -1750,14 +1811,14 @@ Repository
 Product
 
 ```calor
-§M{AgentReference31}
-  §CL{Product:pub}
-    §FLD{double:_price:priv}
-    §PROP{Price:double:pub}
-      §GET
-        §R _price
-      §SET
-        §ASSIGN _price value
+module AgentReference31
+  class Product
+    field double:_price private
+    property double:Price
+      get
+        return _price
+      set
+        set _price value
 ```
 
 ## Example task_32
@@ -1765,11 +1826,11 @@ Product
 Person
 
 ```calor
-§M{AgentReference32}
-  §CL{Person:pub}
-    §PROP{Name:string:pub}
-      §GET
-        §SET
+module AgentReference32
+  class Person
+    property string:Name
+      get
+      set
 ```
 
 ## Example task_33
@@ -1777,15 +1838,15 @@ Person
 Person
 
 ```calor
-§M{AgentReference33}
-  §CL{Person:pub}
-    §FLD{string:_name:priv}
-    §FLD{int:_age:priv}
-    §CTOR{pub} (string:name, int:age)
-      §ASSIGN _name name
-      §ASSIGN _age age
-    §MT{GetName:pub} () -> string
-      §R _name
+module AgentReference33
+  class Person
+    field string:_name private
+    field int:_age private
+    ctor (string:name, int:age)
+      set _name name
+      set _age age
+    func GetName () → string
+      return _name
 ```
 
 ## Example task_34
@@ -1793,12 +1854,12 @@ Person
 AbsoluteValue
 
 ```calor
-§M{AgentReference34}
-  §F{AbsoluteValue:pub} (int:x) -> int
-    §S (result >= 0)
-    §S (!((x >= 0)) || (result == x))
-    §S (!((x < 0)) || (result == (0 - x)))
-    §R ((x < 0) ? (0 - x) : x)
+module AgentReference34
+  func AbsoluteValue (int:x) → int
+    => (result >= 0)
+    => (!((x >= 0)) || (result == x))
+    => (!((x < 0)) || (result == (0 - x)))
+    return ((x < 0) ? (0 - x) : x)
 ```
 
 ## Example task_35
@@ -1806,9 +1867,9 @@ AbsoluteValue
 LogToFileAndConsole
 
 ```calor
-§M{AgentReference35}
-  §F{LogToFileAndConsole:pub} (string:path, string:message) -> void
-    §E{cw,fs:w}
+module AgentReference35
+  func LogToFileAndConsole (string:path, string:message) → void
+    ! cw,fs:w
     Console.WriteLine(message)
     File.AppendAllText(path, message)
 ```
@@ -1818,11 +1879,11 @@ LogToFileAndConsole
 GetFirstChar
 
 ```calor
-§M{AgentReference36}
-  §F{GetFirstChar:pub} (string:s) -> char
-    §E{}
-    §Q ((len s) > 0)
-    §R (char-at s 0)
+module AgentReference36
+  func GetFirstChar (string:s) → char
+    !
+    requires s.Length > 0
+    return s[0]
 ```
 
 ## Example task_37
@@ -1830,10 +1891,10 @@ GetFirstChar
 StringContains
 
 ```calor
-§M{AgentReference37}
-  §F{StringContains:pub} (string:s, string:sub) -> bool
-    §E{}
-    §R (contains s sub)
+module AgentReference37
+  func StringContains (string:s, string:sub) → bool
+    !
+    return s.Contains(sub)
 ```
 
 ## Example task_38
@@ -1841,14 +1902,14 @@ StringContains
 BuildGreeting
 
 ```calor
-§M{AgentReference38}
-  §F{BuildGreeting:pub} (string:name) -> string
-    §E{alloc,mut}
-    §B{sb:StringBuilder} (sb-new)
-    (sb-append sb "Hello, ")
-    (sb-append sb name)
-    (sb-append sb "!")
-    §R (sb-tostring sb)
+module AgentReference38
+  func BuildGreeting (string:name) → string
+    ! alloc,mut
+    let System.Text.StringBuilder:sb = new System.Text.StringBuilder()
+    sb.Append("Hello, ")
+    sb.Append(name)
+    sb.Append("!")
+    return sb.ToString()
 ```
 
 ## Example task_39
@@ -1856,15 +1917,15 @@ BuildGreeting
 AllPositive
 
 ```calor
-§M{AgentReference39}
-  §F{AllPositive:pub} (int[]:arr, int:n) -> bool
-    §Q (n == (len arr))
-    §S (!(result) || !(exists ((i int)) (((i >= 0) && (i < n)) && (arr[i] <= 0))))
-    §B{~allPos:bool} true
-    §L{i:0:((len arr) - 1):1}
-      §IF (arr[i] <= 0)
-        §ASSIGN allPos false
-    §R allPos
+module AgentReference39
+  func AllPositive (int[]:arr, int:n) → bool
+    requires n == arr.Length
+    => !result || !(exists int:i in 0..n : arr[i] <= 0)
+    var bool:allPos = true
+    for i from 0 to arr.Length - 1 step 1
+      if arr[i] <= 0
+        set allPos false
+    return allPos
 ```
 
 ## Example task_40
@@ -1872,14 +1933,14 @@ AllPositive
 HasNegative
 
 ```calor
-§M{AgentReference40}
-  §F{HasNegative:pub} (int[]:arr, int:n) -> bool
-    §Q (n == (len arr))
-    §S (result == (exists ((i int)) (((i >= 0) && (i < n)) && (arr[i] < 0))))
-    §L{i:0:((len arr) - 1):1}
-      §IF (arr[i] < 0)
-        §R true
-    §R false
+module AgentReference40
+  func HasNegative (int[]:arr, int:n) → bool
+    requires n == arr.Length
+    => result == (exists int:i in 0..n : arr[i] < 0)
+    for i from 0 to arr.Length - 1 step 1
+      if arr[i] < 0
+        return true
+    return false
 ```
 
 ## Example task_41
@@ -1887,11 +1948,11 @@ HasNegative
 DigitValue
 
 ```calor
-§M{AgentReference41}
-  §F{DigitValue:pub} (char:c) -> int
-    §E{}
-    §Q (is-digit c)
-    §R (c - '0')
+module AgentReference41
+  func DigitValue (char:c) → int
+    !
+    requires char.IsDigit(c)
+    return c - '0'
 ```
 
 ## Example task_42
@@ -1899,10 +1960,10 @@ DigitValue
 Offset
 
 ```calor
-§M{AgentReference42}
-  §F{Offset:pub} (char:c) -> int
-    §E{}
-    §R (c - '0')
+module AgentReference42
+  func Offset (char:c) → int
+    !
+    return (c - '0')
 ```
 
 ## Example primer_contracts
@@ -1910,15 +1971,15 @@ Offset
 Contracts
 
 ```calor
-§M{Contracts}
-  §F{Square:pub} (int:x) -> int
-    §Q (x >= 0)
-    §S (result >= 0)
-    §R (x * x)
+module Contracts
+  func Square (int:x) → int
+    requires x >= 0
+    => result >= 0
+    return x * x
 
-  §F{Divide:pub} (int:a, int:b) -> int
-    §Q{"divisor must not be zero"} (b != 0)
-    §R (a / b)
+  func Divide (int:a, int:b) → int
+    requires b != 0
+    return a / b
 ```
 
 ## Example primer_branching
@@ -1926,14 +1987,14 @@ Contracts
 Branching
 
 ```calor
-§M{Branching}
-  §F{Sign:pub} (int:x) -> int
-    §IF (x > 0)
-      §R 1
-    §EI (x < 0)
-      §R (-1)
-    §EL
-      §R 0
+module Branching
+  func Sign (int:x) → int
+    if (x > 0)
+      return 1
+    else if (x < 0)
+      return (-1)
+    else
+      return 0
 ```
 
 ## Example primer_files
@@ -1941,18 +2002,18 @@ Branching
 Files
 
 ```calor
-§M{Files}
-  §F{Append:pub} (string:path, string:key, string:value) -> void
-    §E{fs:w}
+module Files
+  func Append (string:path, string:key, string:value) → void
+    ! fs:w
     File.AppendAllText(path, (key + ("=" + (value + "\n"))))
 
-  §F{CountLines:pub} (string:path) -> int
-    §E{fs:r}
-    §B{ok:bool} File.Exists(path)
-    §IF (!ok)
-      §R 0
-    §B{lines:string[]} File.ReadAllLines(path)
-    §R (len lines)
+  func CountLines (string:path) → int
+    ! fs:r
+    let bool:ok = File.Exists(path)
+    if (!ok)
+      return 0
+    let string[]:lines = File.ReadAllLines(path)
+    return lines.Length
 ```
 
 ## Example primer_strings
@@ -1960,13 +2021,13 @@ Files
 Strings
 
 ```calor
-§M{Strings}
-  §F{FirstField:pub} (string:line) -> string
-    §E{}
-    §B{i:int} (indexof line "," :ordinal)
-    §IF (i < 0)
-      §R line
-    §R (substr line 0 i)
+module Strings
+  func FirstField (string:line) → string
+    !
+    let int:i = line.IndexOf(",", StringComparison.Ordinal)
+    if i < 0
+      return line
+    return line.Substring(0, i)
 ```
 
 ## Example primer_collections
@@ -1974,13 +2035,12 @@ Strings
 Collections
 
 ```calor
-§M{Collections}
-  §F{Tally:pub} (string:key) -> int
-    §E{mut,alloc}
-    §DICT{counts:string:int}
-    §/DICT
-    §PUT{counts} key 1
-    §R counts[key]
+module Collections
+  func Tally (string:key) → int
+    ! mut,alloc
+    let Dictionary<string,int>:counts = new Dictionary<string,int>()
+    set counts[key] 1
+    return counts[key]
 ```
 
 ## Example primer_effects
@@ -1988,9 +2048,9 @@ Collections
 Effects
 
 ```calor
-§M{Effects}
-  §F{Greet:pub} (string:name) -> void
-    §E{cw}
+module Effects
+  func Greet (string:name) → void
+    ! cw
     Console.WriteLine("Hello")
     Console.WriteLine(name)
 ```
@@ -2000,10 +2060,10 @@ Effects
 Loops
 
 ```calor
-§M{Loops}
-  §F{PrintOneToFive:pub} () -> void
-    §E{cw}
-    §L{i:1:5:1}
+module Loops
+  func PrintOneToFive () → void
+    ! cw
+    for i from 1 to 5 step 1
       Console.WriteLine(i)
 ```
 
@@ -2012,11 +2072,11 @@ Loops
 Bindings
 
 ```calor
-§M{Bindings}
-  §F{Demo:pub} () -> void
-    §E{cw}
-    §B{greeting:string} "Ada"
-    §B{~count:int} 0
+module Bindings
+  func Demo () → void
+    ! cw
+    let string:greeting = "Ada"
+    var int:count = 0
     Console.WriteLine(greeting)
     Console.WriteLine(count)
 ```
@@ -2026,10 +2086,10 @@ Bindings
 Classes
 
 ```calor
-§M{Classes}
-  §CL{Greeter:pub}
-    §MT{Greet:pub} () -> string
-      §R "hello"
+module Classes
+  class Greeter
+    func Greet () → string
+      return "hello"
 ```
 
 ## Example nested_arrays
@@ -2037,17 +2097,17 @@ Classes
 Nested array expressions
 
 ```calor
-§M{NestedArrayExpressions}
-  §F{SumPair:pub} (int[]:data) -> int
-    §E{}
-    §S (result == (data[0] + data[1]))
-    §B{~sum} 0
-    §ASSIGN sum (sum + data[0])
-    §R (sum + data[1])
+module NestedArrayExpressions
+  func SumPair (int[]:data) → int
+    !
+    => (result == (data[0] + data[1]))
+    var sum = 0
+    set sum (sum + data[0])
+    return (sum + data[1])
 
-  §F{MixFirst:pub} (int[]:data, int:hash) -> int
-    §E{}
-    §R (hash ^ data[0])
+  func MixFirst (int[]:data, int:hash) → int
+    !
+    return (hash ^ data[0])
 ```
 
 ## Example complex_class
@@ -2055,29 +2115,29 @@ Nested array expressions
 Class with Fields, Constructor + Operators
 
 ```calor
-§M{PointModule}
-  §CL{Point:pub}
-    §FLD{int:_x:priv}
-    §FLD{int:_y:priv}
+module PointModule
+  class Point
+    field int:_x private
+    field int:_y private
 
-    §CTOR{pub} (int:x, int:y)
-      §ASSIGN §THIS._x x
-      §ASSIGN §THIS._y y
+    ctor (int:x, int:y)
+      set this._x x
+      set this._y y
 
-    §MT{Equals:pub} (Point:other) -> bool
-      §IF (other == null)
-        §R false
-      §EL
-        §R true
+    func Equals (Point:other) → bool
+      if (other == null)
+        return false
+      else
+        return true
 
-    §OP{==:pub} (Point:left, Point:right) -> bool
-      §IF (left == null)
-        §R (right == null)
-      §EL
-        §R left.Equals(right)
+    op == (Point:left, Point:right) → bool
+      if (left == null)
+        return (right == null)
+      else
+        return left.Equals(right)
 
-    §OP{!=:pub} (Point:left, Point:right) -> bool
-      §R (!(left == right))
+    op != (Point:left, Point:right) → bool
+      return (!(left == right))
 ```
 
 ## Example complex_async
@@ -2085,17 +2145,16 @@ Class with Fields, Constructor + Operators
 Async Method with Try/Catch
 
 ```calor
-§M{ConvertedModule}
-  §U{System}
-  §U{System.Threading.Tasks}
-
-  §CL{DataService:pub}
-    §AMT{FetchAsync:pub} (string:url) -> string
-      §TR
-        §B{_} §AWAIT Task.Delay(100)
-        §R ("data from " + url)
-      §CA{Exception:ex}
-        §R ("error: " + ex.Message)
+module ConvertedModule
+  using System
+  using System.Threading.Tasks
+  class DataService
+    func FetchAsync async (string:url) → string
+      try
+        await Task.Delay(100)
+        return "data from " + url
+      catch Exception:ex
+        return "error: " + ex.Message
 ```
 
 ## Example complex_enum
@@ -2103,21 +2162,21 @@ Async Method with Try/Catch
 Enum with Switch/Match
 
 ```calor
-§M{ConvertedModule}
-  §EN{Status}
+module ConvertedModule
+  enum Status
     Pending
     Active
     Suspended
     Closed
 
-  §CL{StatusHelper:pub}
-    §MT{GetLabel:pub:stat} (Status:s) -> string
-      §R §W s
-        §K Status.Pending → "Pending Review"
-        §K Status.Active → "Active"
-        §K Status.Suspended → "Temporarily Suspended"
-        §K Status.Closed → "Closed"
-        §K _ → "Unknown"
+  class StatusHelper
+    func GetLabel static (Status:s) → string
+      return match s
+        case Status.Pending → "Pending Review"
+        case Status.Active → "Active"
+        case Status.Suspended → "Temporarily Suspended"
+        case Status.Closed → "Closed"
+        case _ → "Unknown"
 ```
 
 ## Example complex_yield
@@ -2125,13 +2184,13 @@ Enum with Switch/Match
 Yield Iterator
 
 ```calor
-§M{ConvertedModule}
-  §U{System.Collections.Generic}
+module ConvertedModule
+  using System.Collections.Generic
 
-  §CL{NumberGen:pub}
-    §MT{GetEvens:pub} (int:max) -> IEnumerable<int>
-      §L{i:0:max:2}
-        §YIELD i
+  class NumberGen
+    func GetEvens (int:max) → IEnumerable<int>
+      for i from 0 to max step 2
+        yield i
 ```
 
 ## Example complete_objects
@@ -2139,14 +2198,16 @@ Yield Iterator
 objects
 
 ```calor
-§M{Objects}
-  §CL{Person:pub}
-    §PROP{Name:string:pub:get,set}
-  §F{Create:pub} () -> Person
-    §E{alloc}
-    §R §NEW{Person} §/NEW
-  §F{ReadName:pub} (Person:person) -> string?
-    §R person?.Name
+module Objects
+  class Person
+    property string:Name
+      get
+      set
+  func Create () → Person
+    ! alloc
+    return new Person()
+  func ReadName (Person:person) → string?
+    return person?.Name
 ```
 
 ## Example complete_indexer
@@ -2154,12 +2215,11 @@ objects
 indexer
 
 ```calor
-§M{Indexers}
-  §CL{Numbers:pub}
-    §IXER{int:pub}
-      §I{int:index}
-      §GET
-        §R (index + 1)
+module Indexers
+  class Numbers
+    this[int:index] → int
+      get
+        return index + 1
 ```
 
 ## Example complete_invariant
@@ -2167,10 +2227,10 @@ indexer
 invariant
 
 ```calor
-§M{Invariants}
-  §IV (1 > 0)
-  §F{Read:pub} () -> int
-    §R 1
+module Invariants
+  invariant (1 > 0)
+  func Read () → int
+    return 1
 ```
 
 ## Example complete_interface
@@ -2178,13 +2238,13 @@ invariant
 interface
 
 ```calor
-§M{Interfaces}
-  §IFACE{ICounter}
-    §MT{Count:pub} () -> int
-  §CL{Counter:pub}
-    §IMPL{ICounter}
-    §MT{Count:pub} () -> int
-      §R 1
+module Interfaces
+  interface ICounter
+    func Count () → int
+  class Counter
+    implements ICounter
+    func Count () → int
+      return 1
 ```
 
 ## Example complete_using
@@ -2192,11 +2252,11 @@ interface
 using
 
 ```calor
-§M{Resources}
-  §F{Read:pub} (string:value) -> string
-    §E{alloc}
-    §USE{reader:System.IO.StringReader} §NEW{System.IO.StringReader} §A value §/NEW
-      §R reader.ReadToEnd()
+module Resources
+  func Read (string:value) → string
+    ! alloc
+    using System.IO.StringReader:reader = new System.IO.StringReader(value)
+      return reader.ReadToEnd()
 ```
 
 ## Example complete_linq
@@ -2204,13 +2264,13 @@ using
 linq
 
 ```calor
-§M{Queries}
-  §U{System.Linq}
-  §F{Positive:pub} (int[]:values) -> int[]
-    §E{alloc}
-    §B{predicate:Func<int,bool>} §E{} §LAM{x:int} §E{} (x > 0) §/LAM
-    §B{filtered:System.Collections.Generic.IEnumerable<int>} System.Linq.Enumerable.Where<int>(values, predicate)
-    §R System.Linq.Enumerable.ToArray<int>(filtered)
+module Queries
+  using System.Linq
+  func Positive (int[]:values) → int[]
+    ! alloc
+    let Func<int,bool>:predicate ! = (int:x) ! => x > 0
+    let System.Collections.Generic.IEnumerable<int>:filtered = System.Linq.Enumerable.Where<int>(values, predicate)
+    return System.Linq.Enumerable.ToArray<int>(filtered)
 ```
 
 ## Example complete_interpolation
@@ -2218,9 +2278,9 @@ linq
 interpolation
 
 ```calor
-§M{Interpolation}
-  §F{Greet:pub} (string:name) -> string
-    §R "Hello ${name}"
+module Interpolation
+  func Greet (string:name) → string
+    return "Hello ${name}"
 ```
 
 ## Example complete_break_continue
@@ -2228,16 +2288,16 @@ interpolation
 break continue
 
 ```calor
-§M{LoopControl}
-  §F{FirstPositive:pub} (int[]:values) -> int
-    §E{}
-    §B{~answer:int} 0
-    §EACH{value:int} values
-      §IF (value <= 0)
-        §CN
-      §ASSIGN answer value
-      §BK
-    §R answer
+module LoopControl
+  func FirstPositive (int[]:values) → int
+    !
+    var int:answer = 0
+    each int:value in values
+      if (value <= 0)
+        continue
+      set answer value
+      break
+    return answer
 ```
 
 ## Example complete_inheritance
@@ -2245,17 +2305,17 @@ break continue
 inheritance
 
 ```calor
-§M{Inheritance}
-  §CL{Base:pub:abs}
-    §MT{Read:pub:abs} () -> int
-    §MT{Label:pub:virt} () -> string
-      §R "base"
-  §CL{Derived:pub:seal}
-    §EXT{Base}
-    §MT{Read:pub:over} () -> int
-      §R 7
-    §MT{Label:pub:over} () -> string
-      §R "derived"
+module Inheritance
+  class Base abstract
+    func Read abstract () → int
+    func Label virtual () → string
+      return "base"
+  class Derived sealed
+    extends Base
+    func Read override () → int
+      return 7
+    func Label override () → string
+      return "derived"
 ```
 
 ## Example complete_sync
@@ -2263,10 +2323,10 @@ inheritance
 sync
 
 ```calor
-§M{Synchronization}
-  §F{Read:pub} (object:gate) -> int
-    §SYNC (gate)
-      §R 7
+module Synchronization
+  func Read (object:gate) → int
+    lock (gate)
+      return 7
 ```
 
 ## Example complete_documentation
@@ -2274,14 +2334,16 @@ sync
 documentation
 
 ```calor
-§M{Documentation}
+module Documentation
   // TODO: add another algorithm.
   // Complexity: O(1).
-  §F{Read:pub} () -> int
-    §DP{Use ReadCurrent instead}
-    §R 7
-  §F{ReadCurrent:priv} () -> int
-    §R 8
+  /// deprecated 1.0.0 ReadCurrent
+  func Read () → int
+    return 7
+  /// since 1.0.0
+  /// breaking 2.0.0 "Returns the current value instead of the cached value."
+  func ReadCurrent private () → int
+    return 8
 ```
 
 ## Example complete_decimal
@@ -2289,9 +2351,9 @@ documentation
 decimal
 
 ```calor
-§M{Decimals}
-  §F{Price:pub} () -> decimal
-    §R 18.00m
+module Decimals
+  func Price () → decimal
+    return 18.00m
 ```
 
 ## Example complete_preprocessor
@@ -2299,12 +2361,12 @@ decimal
 preprocessor
 
 ```calor
-§M{Preprocessor}
-  §F{Mode:pub} () -> string
-    §PP{DEBUG}
-      §R "debug"
-    §PPE
-      §R "release"
+module Preprocessor
+  func Mode () → string
+    pp DEBUG
+      return "debug"
+    pp else
+      return "release"
 ```
 
 ## Example complete_struct
@@ -2312,9 +2374,11 @@ preprocessor
 struct
 
 ```calor
-§M{Values}
-  §CL{Point:pub:struct}[@Serializable]
-    §PROP{X:int:pub:get,set}
+module Values
+  class Point struct [@Serializable]
+    property int:X
+      get
+      set
 ```
 
 ## Example complete_partial
@@ -2322,10 +2386,10 @@ struct
 partial
 
 ```calor
-§M{PartialTypes}
-  §CL{Counter:pub:partial}
-    §MT{Read:pub} () -> int
-      §R 1
+module PartialTypes
+  class Counter partial
+    func Read () → int
+      return 1
 ```
 
 ## Example complete_unsafe
@@ -2333,11 +2397,11 @@ partial
 unsafe
 
 ```calor
-§M{UnsafeCode}
-  §F{Size:pub} () -> int
-    §E{unsafe}
-    §UNSAFE
-      §R 4
+module UnsafeCode
+  func Size () → int
+    ! unsafe
+    unsafe
+      return 4
 ```
 
 ## Example complete_nullable
@@ -2345,12 +2409,12 @@ unsafe
 nullable
 
 ```calor
-§M{NullableValues}
-  §F{DefaultName:pub} (string?:name) -> string
-    §B{~value:string?} name
-    §IF (value == null)
-      §ASSIGN value "unknown"
-    §R (value ?? "unknown")
+module NullableValues
+  func DefaultName (string?:name) → string
+    var string?:value = name
+    if (value == null)
+      set value "unknown"
+    return (value ?? "unknown")
 ```
 
 ## Example complete_patterns
@@ -2358,9 +2422,9 @@ nullable
 patterns
 
 ```calor
-§M{Patterns}
-  §F{InRange:pub} (int:value) -> bool
-    §R ((value > 0) && (value < 100))
+module Patterns
+  func InRange (int:value) → bool
+    return ((value > 0) && (value < 100))
 ```
 
 ## Example complete_tuples
@@ -2368,9 +2432,9 @@ patterns
 tuples
 
 ```calor
-§M{Tuples}
-  §F{Pair:pub} (int:value) -> (int, string)
-    §R (value, "value")
+module Tuples
+  func Pair (int:value) → (int, string)
+    return (value, "value")
 ```
 
 ## Example complete_goto
@@ -2378,15 +2442,15 @@ tuples
 goto
 
 ```calor
-§M{Jumps}
-  §F{Normalize:pub} (int:value) -> int
-    §W value
-      §K 0
-        §GOTO{CASE:1}
-      §K 1
-        §R 1
-      §K _
-        §R 0
+module Jumps
+  func Normalize (int:value) → int
+    match value
+      case 0
+        goto case 1
+      case 1
+        return 1
+      case _
+        return 0
 ```
 
 ## Example complete_ranges
@@ -2394,9 +2458,9 @@ goto
 array ranges
 
 ```calor
-§M{ArrayRanges}
-  §F{FirstTwo:pub} (int[]:values) -> int[]
-    §R values[§RANGE 0 2]
+module ArrayRanges
+  func FirstTwo (int[]:values) → int[]
+    return values[0..2]
 ```
 
 ## Example complete_postfix
@@ -2404,12 +2468,83 @@ array ranges
 Expression-valued call target with an explicit pure delegate row
 
 ```calor
-§M{PostfixCalls}
-  §F{Apply:pub} (Holder:h) -> int
-    §E{}
-    §R h.Make()(41)
-  §CL{Holder:pub}
-    §MT{Make:pub} () -> Func<int,int> §E{}
-      §E{}
-      §R §LAM{x:int} §E{} (x + 1) §/LAM
+module PostfixCalls
+  func Apply (Holder:h) → int
+    !
+    return h.Make()(41)
+  class Holder
+    func Make () → Func<int,int> !
+      !
+      return (int:x) ! => x + 1
+```
+
+## Example complete_reevaluated_for
+
+Reevaluated counted-loop condition with a changing local bound
+
+```calor
+module ReevaluatedLoops
+  func Count () → int
+    !
+    var int:limit = 3
+    var int:count = 0
+    for i = 0; i < limit; i = i + 1
+      set count count + 1
+      if i == 0
+        set limit 4
+    return count
+```
+
+## Example complete_static_class
+
+Named static module with implicit static function
+
+```calor
+module StaticTypes
+  module Counter
+    func Read () → int
+      return 7
+  func Run () → int
+    return Counter.Read()
+```
+
+## Example complete_namespace
+
+Explicit file-scoped namespace, independent of the file label
+
+```calor
+module NamespaceFile Contoso.Tools
+  using Text = System.Text
+  class Box
+    field Text.StringBuilder?:Builder
+    func Read () → int
+      return 7
+```
+
+## Example complete_block_namespace
+
+Explicit block namespace with the same CLR type identity
+
+```calor
+module BlockFile Contoso.Tools block
+  using Text = System.Text
+  class Box
+    field Text.StringBuilder?:Builder
+    func Read () → int
+      return 7
+```
+
+## Example complete_enum_extensions
+
+Enum extension functions in their named static container
+
+```calor
+module EnumExtensionExample
+  enum Mode byte
+    Inactive = 0
+    Active = 1
+  module ModeExtensions
+    func IsActive (this Mode:value) → bool
+      !
+      return value == Mode.Active
 ```

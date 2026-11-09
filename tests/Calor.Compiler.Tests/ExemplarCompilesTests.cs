@@ -11,7 +11,7 @@ using Xunit;
 namespace Calor.Compiler.Tests;
 
 /// <summary>
-/// Makes the agent syntax exemplar's own promise — "every complete §M program
+/// Makes the agent syntax exemplar's own promise — "every complete module program
 /// compiles (the compiler's own tests prove it)" — literally true, and guards the
 /// E1a array-vs-list trap (#712). The exemplar is served to agents verbatim as
 /// <c>calor://primer</c>, so a type error in a copyable line ships straight into
@@ -77,9 +77,8 @@ public class ExemplarCompilesTests
         foreach (var program in source["programs"]!.AsArray())
         {
             var text = program!["calor"]!.GetValue<string>();
-            Assert.StartsWith("§M{", text);
-            Assert.DoesNotContain("§CSHARP", text);
-            Assert.DoesNotContain("§D{", text);
+            Assert.StartsWith("module ", text);
+            Assert.DoesNotContain("§", text);
             Assert.DoesNotContain("(inc ", text);
             Assert.DoesNotContain("(dec ", text);
         }
@@ -108,14 +107,14 @@ public class ExemplarCompilesTests
         foreach (var program in source["programs"]!.AsArray())
         {
             var text = program!["calor"]!.GetValue<string>();
-            Assert.StartsWith("§M{", text);
+            Assert.StartsWith("module ", text);
             Assert.DoesNotMatch(@"\((?:\+|-|\*|/|%|==|!=|<=|>=|<|>|&&|\|\||&|\||\^|<<|>>|\?\?|\?|->|!|~)\s", text);
             Assert.DoesNotMatch(@"\b(?:i32|i64|i16|i8|u8|u16|u32|u64|f32|f64|dec|str|Seq)\b", text);
             Assert.DoesNotMatch(@"\b(?:INT|LONG|UINT|ULONG|FLOAT|DOUBLE|DECIMAL|DEC|STR|BOOL):", text);
             Assert.DoesNotContain("§C{", text);
             if (program["id"]!.GetValue<string>() == "complete_linq")
             {
-                Assert.Contains("filtered:System.Collections.Generic.IEnumerable<int>", text);
+                Assert.Contains("System.Collections.Generic.IEnumerable<int>:filtered", text);
                 Assert.Contains("System.Linq.Enumerable.ToArray<int>(filtered)", text);
                 var result = Program.Compile(text);
                 Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
@@ -131,6 +130,35 @@ public class ExemplarCompilesTests
                 Assert.False(call.HasUnknownInferredType);
             }
         }
+    }
+
+    [Theory]
+    [InlineData("complete_records", "GlobalModule.Shift(GlobalModule.Create()).X", "3")]
+    [InlineData("copilot_smoke", "GlobalModule.Collect(3)", "3")]
+    [InlineData("complete_arrays", "GlobalModule.First()", "10")]
+    [InlineData("task_8", "GlobalModule.SafeDivide(84, 2)", "42")]
+    [InlineData("task_8", "GlobalModule.SafeDivide(1, 0)", "!ArgumentException")]
+    [InlineData("task_14", "GlobalModule.SumList()", "60")]
+    [InlineData("task_39", "GlobalModule.AllPositive(new int[] { 1, 2 }, 2)", "True")]
+    [InlineData("task_39", "GlobalModule.AllPositive(new int[] { 1, 0 }, 2)", "False")]
+    [InlineData("complete_linq", "GlobalModule.Positive(new int[] { -1, 2, 3 }).Length", "2")]
+    [InlineData("complete_ranges", "GlobalModule.FirstTwo(new int[] { 1, 2, 3 }).Length", "2")]
+    [InlineData("complete_reevaluated_for", "GlobalModule.Count()", "4")]
+    [InlineData("complete_enum_extensions", "ModeExtensions.IsActive(Mode.Active)", "True")]
+    [InlineData("task_23", "typeof(EventPublisher).GetEvent(\"OnDataReceived\").EventHandlerType.FullName", "System.EventHandler")]
+    public void NativeTeachingPrograms_RetainTheirActualClrObservations(string id, string expression, string expected)
+    {
+        var source = JsonNode.Parse(File.ReadAllText(Path.Combine(TeachingRoot(), ExemplarCompileChecker.TeachingSourcePath)))!;
+        var program = source["programs"]!.AsArray().Single(p => p!["id"]!.GetValue<string>() == id)!;
+        var compiled = Program.Compile(program["calor"]!.GetValue<string>(), id + ".calr.txt");
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+            public static class Probe
+            {
+                public static object? Run() => {{expression}};
+            }
+            """));
     }
 
     [Fact]
@@ -188,7 +216,7 @@ public class ExemplarCompilesTests
         // fall to 8 and the compile guard would stop covering that program).
         var programs = ExemplarCompileChecker.ExtractCompletePrograms(ExemplarContent());
         Assert.Equal(9, programs.Count);
-        Assert.All(programs, p => Assert.StartsWith("§M", p.Source.TrimStart()));
+        Assert.All(programs, p => Assert.StartsWith("module ", p.Source.TrimStart()));
     }
 
     [Fact]
@@ -200,11 +228,11 @@ public class ExemplarCompilesTests
         // yet see. Asserting the disjunction keeps the test robust if either
         // layer's coverage shifts, but today the Calor layer catches this case.
         const string calor =
-            "§M{Files}\n" +
-            "  §F{CountLines:pub} (str:path) -> i32\n" +
-            "    §E{fs:r}\n" +
-            "    §B{lines:List<str>} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §R (len lines)\n";
+            "module Files\n" +
+            "  func CountLines (string:path) → int\n" +
+            "    ! fs:r\n" +
+            "    let List<string>:lines = File.ReadAllLines(path)\n" +
+            "    return lines.Count\n";
 
         // #722: the binder now catches the binding-position case directly.
         var result = Program.Compile(calor, "mutation.calr");
@@ -220,10 +248,10 @@ public class ExemplarCompilesTests
         // List<str>-returning function that returns File.ReadAllLines (an array)
         // fails calor -i with Calor0254 rather than emitting broken C#.
         const string calor =
-            "§M{Files}\n" +
-            "  §F{Get:pub} (str:path) -> List<str>\n" +
-            "    §E{fs:r}\n" +
-            "    §R §C{File.ReadAllLines} §A path §/C\n";
+            "module Files\n" +
+            "  func Get (string:path) → List<string>\n" +
+            "    ! fs:r\n" +
+            "    return File.ReadAllLines(path)\n";
 
         var result = Program.Compile(calor, "return-mutation.calr");
         Assert.Contains(result.Diagnostics,
@@ -236,7 +264,7 @@ public class ExemplarCompilesTests
         // The same bug on a copyable fragment line (cannot be compiled standalone).
         var doc = new DocFile(
             ExemplarCompileChecker.RelativePath,
-            "## Calls\n\n```\n§B{lines:List<str>} §C{File.ReadAllLines} §A path §/C\n```\n");
+            "## Calls\n\n```\nlet List<string>:lines = File.ReadAllLines(path)\n```\n");
 
         var findings = new List<Diagnostic>();
         ExemplarCompileChecker.CheckArrayBindingTraps(doc, findings);
@@ -250,7 +278,7 @@ public class ExemplarCompilesTests
         // The correct idiom must NOT be flagged.
         var doc = new DocFile(
             ExemplarCompileChecker.RelativePath,
-            "```\n§B{lines:[str]} §C{File.ReadAllLines} §A path §/C\n```\n");
+            "```\nlet string[]:lines = File.ReadAllLines(path)\n```\n");
 
         var findings = new List<Diagnostic>();
         ExemplarCompileChecker.CheckArrayBindingTraps(doc, findings);
@@ -265,7 +293,7 @@ public class ExemplarCompilesTests
     public void PostfixArrayReturningBinding_PreservesFragmentTrapGuard(string type, bool rejected)
     {
         var doc = new DocFile(ExemplarCompileChecker.RelativePath,
-            $"```\n§B{{lines:{type}}} File.ReadAllLines(path)\n```\n");
+            $"```\nlet {type}:lines = File.ReadAllLines(path)\n```\n");
         var findings = new List<Diagnostic>();
         ExemplarCompileChecker.CheckArrayBindingTraps(doc, findings);
         Assert.Equal(rejected, findings.Any(f => f.Code == DiagnosticCode.DocDriftArrayBindingTrap));
@@ -279,7 +307,7 @@ public class ExemplarCompilesTests
         var doc = new DocFile(
             ExemplarCompileChecker.RelativePath,
             "## Common mistakes\n\n<!-- drift:ignore -->\n" +
-            "§B{lines:List<str>} §C{File.ReadAllLines} §A path §/C\n");
+            "let List<string>:lines = File.ReadAllLines(path)\n");
 
         var findings = new List<Diagnostic>();
         ExemplarCompileChecker.CheckArrayBindingTraps(doc, findings);

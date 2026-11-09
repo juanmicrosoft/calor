@@ -37,7 +37,7 @@ public class AgentDocsSyntaxGuardTests
         var root = FindRepoRoot() ?? throw new InvalidOperationException("Repository root not found.");
         var skills = File.ReadAllText(Path.Combine(root, Calor.Compiler.SelfCheck.ExemplarCompileChecker.TeachingReferencePath));
         var example = Assert.Single(Regex.Matches(skills,
-            @"```calor\s*\n(?<source>§M\{NestedArrayExpressions\}.*?)\n```",
+            @"```calor\s*\n(?<source>module NestedArrayExpressions\n.*?)\n```",
             RegexOptions.Singleline).Cast<Match>());
         var module = CompileTeachingModule(example.Groups["source"].Value, "NestedArrayExpressions");
         Assert.Equal(5, module.GetMethod("SumPair")!.Invoke(null, [new[] { 2, 3 }]));
@@ -50,7 +50,7 @@ public class AgentDocsSyntaxGuardTests
         var root = FindRepoRoot() ?? throw new InvalidOperationException("Repository root not found.");
         var reference = File.ReadAllText(Path.Combine(root, Calor.Compiler.SelfCheck.ExemplarCompileChecker.TeachingReferencePath));
         var example = Assert.Single(Regex.Matches(reference,
-            @"```calor\s*\n(?<source>§M\{PostfixCalls\}.*?)\n```",
+            @"```calor\s*\n(?<source>module PostfixCalls\n.*?)\n```",
             RegexOptions.Singleline).Cast<Match>());
         var module = CompileTeachingModule(example.Groups["source"].Value, "PostfixCalls");
         var holder = Activator.CreateInstance(Assert.Single(module.Assembly.GetTypes().Where(type => type.Name == "Holder")));
@@ -79,13 +79,13 @@ public class AgentDocsSyntaxGuardTests
             "Calor.Compiler", "Resources", "error-suggestions.json")));
         var pattern = Assert.Single(suggestions.RootElement.GetProperty("patterns").EnumerateArray()
             .Where(item => item.GetProperty("id").GetString() == "array-type-syntax"));
-        var source = "§M{ArrayTypeExamples}\n"
+        var source = "module ArrayTypeExamples\n"
             + string.Join("\n", pattern.GetProperty("correctExample").GetString()!.Split('\n')
                 .Select(line => "  " + line));
         var module = CompileTeachingModule(source, "ArrayTypeExamples");
         Assert.Equal(2, module.GetMethod("UseItems")!.Invoke(null, [new[] { 2, 3 }]));
         Assert.Equal(2, module.GetMethod("UseOtherItems")!.Invoke(null, [new[] { 2, 3 }]));
-        var unbalanced = Program.Compile(source.Replace("[i32]", "[i32", StringComparison.Ordinal),
+        var unbalanced = Program.Compile(source.Replace("int[]", "int[", StringComparison.Ordinal),
             "unbalanced-array-example.calr");
         Assert.True(unbalanced.HasErrors);
     }
@@ -94,6 +94,7 @@ public class AgentDocsSyntaxGuardTests
     {
         var result = Program.Compile(source, "teaching-example.calr");
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        Assert.Equal(moduleName, Assert.IsType<Ast.ModuleNode>(result.Ast).Name);
 
         var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
             "TeachingExample_" + Guid.NewGuid().ToString("N"),
@@ -105,7 +106,7 @@ public class AgentDocsSyntaxGuardTests
         var emitted = compilation.Emit(stream);
         Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
         var assembly = System.Reflection.Assembly.Load(stream.ToArray());
-        return Assert.Single(assembly.GetTypes().Where(type => type.Name == moduleName + "Module"));
+        return Assert.Single(assembly.GetTypes().Where(type => type.Name == "GlobalModule"));
     }
 
     private static readonly Regex FourFieldHeader =
@@ -114,11 +115,10 @@ public class AgentDocsSyntaxGuardTests
     private static readonly Regex BindEquals =
         new(@"§B\{[^}]*\}\s*=", RegexOptions.Compiled);
 
-    // A real module header is the marker alone on its line. Cheat-sheet / reference
-    // blocks write "§M{Name}   <prose describing the tag>", which must NOT be
-    // treated as compilable code.
+    // Exact single-space headers exclude padded cheat-sheet descriptions.
     private static readonly Regex ModuleHeaderLine =
-        new(@"^§M\{[^}]*\}\s*$", RegexOptions.Compiled);
+        new(@"^module @?[\p{L}_][\p{L}\p{N}_]*(?: @?[\p{L}_][\p{L}\p{N}_]*(?:\.@?[\p{L}_][\p{L}\p{N}_]*)*)?(?: block)?\s*$",
+            RegexOptions.Compiled);
 
     // JSON property names whose string values are CORRECT Calor examples that agents are
     // taught to imitate. Everything else (csharp, wrongExample, description, prose, …) is
@@ -222,6 +222,13 @@ public class AgentDocsSyntaxGuardTests
 
     [Theory]
     [MemberData(nameof(AllSurfaces))]
+    public void Surface_TeachesOnlyNativePositiveSyntax(string name, string positiveText)
+    {
+        Assert.False(positiveText.Contains('§'), name);
+    }
+
+    [Theory]
+    [MemberData(nameof(AllSurfaces))]
     public void Surface_TeachesNoStructuralClosers(string name, string positiveText)
     {
         var findings = LegacyCloserFormLint.Scan(positiveText, name);
@@ -314,7 +321,7 @@ public class AgentDocsSyntaxGuardTests
 
     /// <summary>
     /// Extracts every complete module from arbitrary text: a module begins at a
-    /// column-0 <c>§M{</c> line and includes every following blank or indented line,
+    /// column-0 <c>module Name</c> line and includes every following blank or indented line,
     /// ending at the next column-0 non-blank line. Fenced markdown code blocks keep the
     /// module at column 0, so this works for both markdown and raw JSON-field snippets.
     /// </summary>

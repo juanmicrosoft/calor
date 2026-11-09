@@ -45,7 +45,7 @@ public class SyntaxLookupToolTests
                 Assert.Contains(id, expected);
                 var source = example.GetProperty("calor").GetString()!;
                 Assert.Equal(programs[id], source);
-                Assert.StartsWith("§M{", source);
+                Assert.StartsWith("module ", source);
                 Assert.NotEqual(result.GetProperty("calorSyntax").GetString(), source);
                 if (compiledPrograms.Add(id))
                 {
@@ -95,7 +95,6 @@ public class SyntaxLookupToolTests
     }
 
     [Theory]
-    [InlineData("dictionary", "task_16")]
     [InlineData("indexof", "primer_strings")]
     [InlineData("postfix", "complete_postfix")]
     [InlineData("record", "complete_records")]
@@ -104,6 +103,15 @@ public class SyntaxLookupToolTests
         var result = await LookupAsync(query);
         var example = Assert.Single(result.GetProperty("examples").EnumerateArray());
         Assert.Equal(program, example.GetProperty("programId").GetString());
+    }
+
+    [Fact]
+    public async Task DictionaryQuery_ReturnsOnlyItsTwoRelevantNativePrograms()
+    {
+        var result = await LookupAsync("dictionary");
+        Assert.Equal(new[] { "task_16", "primer_collections" },
+            result.GetProperty("examples").EnumerateArray()
+                .Select(example => example.GetProperty("programId").GetString()).ToArray());
     }
 
     [Theory]
@@ -228,7 +236,7 @@ public class SyntaxLookupToolTests
         // Content is a list of McpContent items; the first item's Text contains the JSON
         var json = result.Content[0].Text ?? "";
         Assert.Contains("\"found\":true", json);
-        Assert.Contains("NEW", json); // §NEW will be escaped
+        Assert.Contains("new ClassName", json);
         Assert.Contains("examples", json);
     }
 
@@ -281,7 +289,7 @@ public class SyntaxLookupToolTests
         Assert.False(result.IsError);
         var json = result.Content[0].Text ?? "";
         Assert.Contains("\"found\":true", json);
-        Assert.Contains("IF", json);
+        Assert.Contains("if condition", json);
     }
 
     [Fact]
@@ -294,7 +302,8 @@ public class SyntaxLookupToolTests
         Assert.False(result.IsError);
         var json = result.Content[0].Text ?? "";
         Assert.Contains("\"found\":true", json);
-        Assert.Contains("TR", json);
+        Assert.Contains("try", json);
+        Assert.Contains("catch", json);
     }
 
     [Fact]
@@ -320,7 +329,8 @@ public class SyntaxLookupToolTests
         Assert.False(result.IsError);
         var json = result.Content[0].Text ?? "";
         Assert.Contains("\"found\":true", json);
-        Assert.Contains("LAM", json);
+        Assert.Contains("lambda expression", json);
+        Assert.Contains("func ApplyComplex", json);
     }
 
     [Fact]
@@ -333,7 +343,7 @@ public class SyntaxLookupToolTests
         Assert.False(result.IsError);
         var json = result.Content[0].Text ?? "";
         Assert.Contains("\"found\":true", json);
-        Assert.Contains("CL", json);
+        Assert.Contains("class Greeter", json);
     }
 
     [Fact]
@@ -346,7 +356,9 @@ public class SyntaxLookupToolTests
         Assert.False(result.IsError);
         var json = result.Content[0].Text ?? "";
         Assert.Contains("\"found\":true", json);
-        Assert.Contains("PROP", json);
+        Assert.Contains("property", json);
+        Assert.Contains("get", json);
+        Assert.Contains("set", json);
     }
 
     [Fact]
@@ -359,7 +371,7 @@ public class SyntaxLookupToolTests
         Assert.False(result.IsError);
         var json = result.Content[0].Text ?? "";
         Assert.Contains("\"found\":true", json);
-        Assert.Contains("CTOR", json);
+        Assert.Contains("ctor", json);
     }
 
     [Fact]
@@ -485,7 +497,7 @@ public class SyntaxLookupToolTests
         Assert.False(result.IsError);
         var json = result.Content[0].Text ?? "";
         Assert.Contains("\"found\":true", json);
-        Assert.Contains("IFACE", json);
+        Assert.Contains("interface ICounter", json);
     }
 
     [Fact]
@@ -498,7 +510,7 @@ public class SyntaxLookupToolTests
         Assert.False(result.IsError);
         var json = result.Content[0].Text ?? "";
         Assert.Contains("\"found\":true", json);
-        Assert.Contains("EN", json);
+        Assert.Contains("enum Status", json);
     }
 
     [Fact]
@@ -511,7 +523,7 @@ public class SyntaxLookupToolTests
         Assert.False(result.IsError);
         var json = result.Content[0].Text ?? "";
         Assert.Contains("\"found\":true", json);
-        Assert.Contains("USE", json);
+        Assert.Contains("using System.IO.StringReader:reader", json);
     }
 
     [Fact]
@@ -562,7 +574,7 @@ public class SyntaxLookupToolTests
         var json = result.Content[0].Text ?? "";
         Assert.Contains("\"found\":true", json);
         Assert.Contains("null", json.ToLower());
-        Assert.Contains("IF", json); // workaround uses §IF
+        Assert.Contains("if", json);
     }
 
     [Fact]
@@ -602,7 +614,7 @@ public class SyntaxLookupToolTests
         Assert.False(result.IsError);
         var json = result.Content[0].Text ?? "";
         Assert.Contains("\"found\":true", json);
-        Assert.Contains("RANGE", json);
+        Assert.Contains("start..end", json);
     }
 
     [Fact]
@@ -616,7 +628,7 @@ public class SyntaxLookupToolTests
         var json = result.Content[0].Text ?? "";
         Assert.Contains("\"found\":true", json);
         Assert.Contains("positional", json.ToLower());
-        Assert.Contains("IF", json); // workaround uses §IF decomposition
+        Assert.Contains("if", json);
     }
 
     [Fact]
@@ -723,7 +735,7 @@ public class SyntaxLookupToolTests
         Assert.False(result.IsError);
         var json = result.Content[0].Text ?? "";
         Assert.Contains("\"found\":true", json);
-        Assert.Contains("vr", json); // virtual modifier
+        Assert.Contains("virtual", json);
     }
 
     [Fact]
@@ -736,7 +748,7 @@ public class SyntaxLookupToolTests
         Assert.False(result.IsError);
         var json = result.Content[0].Text ?? "";
         Assert.Contains("\"found\":true", json);
-        Assert.Contains("ab", json); // abstract modifier
+        Assert.Contains("abstract", json);
     }
 
     [Fact]
@@ -761,7 +773,7 @@ public class SyntaxLookupToolTests
         Assert.False(result.IsError);
         var json = result.Content[0].Text ?? "";
         Assert.Contains("\"found\":true", json);
-        Assert.Contains("SYNC", json);
+        Assert.Contains("lock", json);
     }
 
     [Fact]

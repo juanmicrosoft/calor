@@ -1,543 +1,473 @@
 {
   "tags": [
     {
-      "open": "§NEW{ClassName} §A arg1 §A arg2 §/NEW",
-      "close": "§/NEW",
-      "tag": "§NEW",
-      "description": "Creates a new instance of a class. The class name goes in braces; constructor arguments use §A. Use §NEW{ClassName} §/NEW for zero-argument constructors.",
-      "csharpEquivalent": "var user = new User(\"John\", 25);\nvar list = new List<int>();\nreturn new Widget(value);"
-    },
-    {
-      "open": "§B{name} value or §B{~name} value (mutable)",
+      "open": "requires condition",
       "close": "(none)",
-      "tag": "§B",
-      "description": "Declares a variable binding. Use ~ prefix for mutable variables. Immutable by default. Give null an explicit existing nullable type, such as string?.",
-      "csharpEquivalent": "var count = 0;\nint mutableCount = 0; // needs to be modified later\nstring name = \"John\";\nstring? name = null;"
-    },
-    {
-      "open": "§F{name:vis} (type:param, ...) -> returnType",
-      "close": "(none)",
-      "tag": "§F",
-      "description": "Defines a standalone function (not a class member). Use for top-level functions or static utility methods.",
-      "csharpEquivalent": "public static int Add(int a, int b) { return a + b; }\nprivate void Log(string message) { Console.WriteLine(message); }"
-    },
-    {
-      "open": "§AF{name:vis} (type:param, ...) -> returnType or §AMT{name:vis} (type:param, ...) -> returnType",
-      "close": "(none)",
-      "tag": "§AF",
-      "description": "Defines an async function. Use §AF for standalone async functions, §AMT for async class methods.\n\nAn async declaration with scalar output `T` is callable as `Task<T>`, but its body\nreturns `T`. A `void` output produces `Task`. Explicit .NET `Task<T>` and\n`ValueTask<T>` outputs preserve that carrier and return `T` in the body; their\nnon-generic forms have a void body result. Postconditions describe the body\nresult, not the task object. Ordinary synchronous task-returning declarations\nkeep their declared return type.",
-      "csharpEquivalent": "public async Task<string> FetchDataAsync() { ... }\npublic async Task ProcessAsync() { await DoWork(); }"
-    },
-    {
-      "open": "§M{Name}",
-      "close": "(none)",
-      "tag": "§M",
-      "description": "Defines a named module for static members. Its functions use §F; C# callers keep the original static class name. Static class declarations with §CL are rejected.",
-      "csharpEquivalent": "public static class StringHelper { }"
-    },
-    {
-      "open": "§MT{name:vis[:modifiers]} (type:param, ...) -> returnType",
-      "close": "(none)",
-      "tag": "§MT",
-      "description": "Defines a method within a class. Supports visibility (pub/priv/prot) and modifiers such as virt/vr, over/ov, abs, stat/st, and seal.",
-      "csharpEquivalent": "public void Process(int value) { ... }\npublic virtual string GetName() { return _name; }\npublic override int Calculate(int x) { ... }"
-    },
-    {
-      "open": "§AMT{name:vis[:modifiers]} (type:param, ...) -> returnType",
-      "close": "(none)",
-      "tag": "§AMT",
-      "description": "Defines an async class method.",
-      "csharpEquivalent": "public async Task<T> Name(params) { body }"
-    },
-    {
-      "open": "Inline (type:name) parameters in function headers; indented §I{type:name} for delegates and full indexers",
-      "close": "(none)",
-      "tag": "§I",
-      "description": "Header parameter syntax. Modifiers: 'this' (extension method), 'ref', 'out', 'in', 'params'. Default values use =expr in the signature.",
-      "csharpEquivalent": "Type name, this Type name, ref Type name, params Type[] name, Type name = default"
-    },
-    {
-      "open": "Inline -> type in function headers; indented §O{type} for delegates",
-      "close": "(none)",
-      "tag": "§O",
-      "description": "Declares the return type of a function or method via the header arrow.",
-      "csharpEquivalent": "Return type declaration"
-    },
-    {
-      "open": "§R expression or §R (void)",
-      "close": "(none)",
-      "tag": "§R",
-      "description": "Returns a value from a function or method. Use bare §R for void returns.",
-      "csharpEquivalent": "return 42;\nreturn user.Name;\nreturn;"
-    },
-    {
-      "open": "§CL{Name:vis[:modifiers]}",
-      "close": "(none)",
-      "tag": "§CL",
-      "description": "Defines a class. Supports modifiers such as abs, seal, partial, stat, struct, and readonly. Use §EXT for base class and §IMPL for interfaces.",
-      "csharpEquivalent": "public class User { }\npublic class Admin : User, IAdmin { }\npublic abstract class BaseEntity { }"
-    },
-    {
-      "open": "§EXT{BaseClass}",
-      "close": "(none)",
-      "tag": "§EXT",
-      "description": "Specifies the base class for inheritance.",
-      "csharpEquivalent": ": BaseClass"
-    },
-    {
-      "open": "§IMPL{Interface}",
-      "close": "(none)",
-      "tag": "§IMPL",
-      "description": "Specifies an interface the class implements.",
-      "csharpEquivalent": ": IInterface"
-    },
-    {
-      "open": "§IFACE{Name:vis}",
-      "close": "(none)",
-      "tag": "§IFACE",
-      "description": "Defines an interface with method signatures.",
-      "csharpEquivalent": "public interface IRepository { void Save(Entity e); }"
-    },
-    {
-      "open": "§L{var:from:to:step}",
-      "close": "(none)",
-      "tag": "§L",
-      "description": "For loop with an inclusive integer range. The body is indented under the loop header.",
-      "csharpEquivalent": "for (int i = 0; i < 10; i++) { ... }\nfor (int i = 0; i <= 10; i++) { ... }\nfor (int i = 0; i < 100; i += 2) { ... }"
-    },
-    {
-      "open": "§WH (condition)",
-      "close": "(none)",
-      "tag": "§WH",
-      "description": "Executes body while condition is true.",
-      "csharpEquivalent": "while (count > 0) { count--; }\nwhile (true) { if (done) break; }"
-    },
-    {
-      "open": "§DO body §/DO (condition)",
-      "close": "§/DO (condition)",
-      "tag": "§DO",
-      "description": "Runs the indented body at least once; the matching closer carries the condition.",
-      "csharpEquivalent": "do { Process(); } while (HasMore());"
-    },
-    {
-      "open": "§IF (condition) body §EI (condition) body §EL body",
-      "close": "(none)",
-      "tag": "§IF",
-      "description": "Conditional branching. §EI for else-if, §EL for else. Both are optional.",
-      "csharpEquivalent": "if (x > 0) { return true; }\nif (x > 0) { a(); } else { b(); }\nif (x > 0) { } else if (x < 0) { } else { }"
-    },
-    {
-      "open": "§EI (condition)",
-      "close": "(none)",
-      "tag": "§EI",
-      "description": "Else-if branch in a conditional.",
-      "csharpEquivalent": "else if (condition) { body }"
-    },
-    {
-      "open": "§EL",
-      "close": "(none)",
-      "tag": "§EL",
-      "description": "Else branch in a conditional.",
-      "csharpEquivalent": "else { body }"
-    },
-    {
-      "open": "§AWAIT expression",
-      "close": "(none)",
-      "tag": "§AWAIT",
-      "description": "Awaits an asynchronous operation.\n\nAwaiting a .NET `Task<T>` or `ValueTask<T>` produces `T`. Awaiting a non-generic\ncarrier produces no value and cannot initialize a binding. `§AWAIT` can also be\nused as a statement. A custom type named `MyTask<T>` or a source declaration\nnamed `Task<T>` is not automatically a .NET async carrier. Unsupported custom\nawaitables are diagnosed or checked by generated C# validation, never inferred\nfrom a name suffix.",
-      "csharpEquivalent": "var result = await FetchAsync();\nawait Task.Delay(1000);"
-    },
-    {
-      "open": "§TR body §CA{ExceptionType:varName} handler §FI cleanup",
-      "close": "(none)",
-      "tag": "§TR",
-      "description": "Exception handling. §TR for try block, §CA for catch (with optional type and variable), §FI for finally.",
-      "csharpEquivalent": "try { x(); } catch { y(); }\ntry { } catch (Exception ex) { Log(ex); }\ntry { } finally { Cleanup(); }"
-    },
-    {
-      "open": "§CA{ExceptionType:varName} or §CA{Exception}",
-      "close": "(none)",
-      "tag": "§CA",
-      "description": "Catches exceptions. Type and variable name are optional.",
-      "csharpEquivalent": "catch (ExceptionType varName) { body }"
-    },
-    {
-      "open": "§FI",
-      "close": "(none)",
-      "tag": "§FI",
-      "description": "Finally block that always executes.",
-      "csharpEquivalent": "finally { body }"
-    },
-    {
-      "open": "§TH expression or §RT (rethrow)",
-      "close": "(none)",
-      "tag": "§TH",
-      "description": "Throws an exception. Use §RT to rethrow in a catch block.",
-      "csharpEquivalent": "throw new ArgumentException(\"Invalid\");\nthrow;"
-    },
-    {
-      "open": "§GOTO{CASE:expr} or §GOTO{DEFAULT}",
-      "close": "(none)",
-      "tag": "§GOTO",
-      "description": "Jump to a specific case label or to the default case in a switch statement. For regular goto, use §GOTO{labelName}.",
-      "csharpEquivalent": "goto case 1;\ngoto case \"hello\";\ngoto default;\ngoto myLabel;"
-    },
-    {
-      "open": "§E{effect1,effect2,...}",
-      "close": "(none)",
-      "tag": "§E",
-      "description": "Declares side effects a function may have. Common effects: cw (console write), db (database), net (network), fs:r/fs:w (file system), rand (random), time, and env. Unresolved external effects are not purity proofs; supply authoritative effect metadata rather than inventing an effect code.",
-      "csharpEquivalent": "// Method that writes to console\n// Method that reads file and writes console\n// Pure function (no effects)"
-    },
-    {
-      "open": "§Q (condition) or §Q{\"message\"} (condition)",
-      "close": "(none)",
-      "tag": "§Q",
-      "description": "Declares a precondition that must be true when the function is called. Part of Design by Contract.",
+      "tag": "requires",
+      "description": "Declares a condition that must hold when the function is called. The example retains the divisor guard. A custom-message spelling is not part of this native form; use explicit exceptions when a custom failure message is required.",
       "csharpEquivalent": "// Contract.Requires(value >= 0)\n// Guard.Against.Null(input)"
     },
     {
-      "open": "§S (condition) or §S{\"message\"} (condition)",
+      "open": "/// since 1.0.0",
       "close": "(none)",
-      "tag": "§S",
-      "description": "Declares a postcondition that will be true when the function returns. Use result to refer to the return value.",
-      "csharpEquivalent": "// Contract.Ensures(result >= 0)\n// Ensures non-empty result"
+      "tag": "/// since",
+      "description": "Records a declaration's introduction version in a documentation comment immediately before the declaration. Supply one valid version. This is structured API metadata, not a runtime version check.",
+      "csharpEquivalent": "// Available since version 1.0.0"
     },
     {
-      "open": "§PROP{name:type:vis[:modifiers...:accessors]} [= default]",
+      "open": "/// deprecated version [Replacement]",
       "close": "(none)",
-      "tag": "§PROP",
-      "description": "Defines a property with optional getter and setter. Auto-properties use accessor shorthand such as get,set, get,priset, or get,init. Full properties use indented §GET and §SET bodies.",
-      "csharpEquivalent": "public string Name { get; set; }\npublic int Count { get; private set; }\npublic int Value { get { return _value; } set { _value = value; } }"
-    },
-    {
-      "open": "§GET",
-      "close": "(none)",
-      "tag": "§GET",
-      "description": "Property getter.",
-      "csharpEquivalent": "get { body }"
-    },
-    {
-      "open": "§SET or §SET{visibility}",
-      "close": "(none)",
-      "tag": "§SET",
-      "description": "Property setter with optional visibility modifier.",
-      "csharpEquivalent": "set { body } or private set { body }"
-    },
-    {
-      "open": "§FLD{type:name:visibility}",
-      "close": "(none)",
-      "tag": "§FLD",
-      "description": "Defines a field in a class. Usually private, prefixed with underscore by convention.",
-      "csharpEquivalent": "private string _name;\nprivate readonly int _id;"
-    },
-    {
-      "open": "§CTOR{vis} (type:param, ...)",
-      "close": "(none)",
-      "tag": "§CTOR",
-      "description": "Defines a class constructor. Use §BASE with §A arguments to call a base constructor, or §THIS to chain constructors.",
-      "csharpEquivalent": "public User(string name) { _name = name; }\npublic Admin(string name) : base(name) { }"
-    },
-    {
-      "open": "§BASE §A arg1 §A arg2",
-      "close": "(none)",
-      "tag": "§BASE",
-      "description": "Calls the base class constructor.",
-      "csharpEquivalent": ": base(args)"
-    },
-    {
-      "open": "§THIS §A arg1 §A arg2",
-      "close": "(none)",
-      "tag": "§THIS",
-      "description": "Chains to another constructor in the same class.",
-      "csharpEquivalent": ": this(args)"
-    },
-    {
-      "open": "§EN{Name:vis[:underlyingType]} values...",
-      "close": "(none)",
-      "tag": "§EN",
-      "description": "Defines an enumeration. Enum values are indented under §EN and may use = for explicit values.",
-      "csharpEquivalent": "public enum Status { Active, Inactive, Pending }\npublic enum Priority : byte { Low = 0, High = 1 }"
-    },
-    {
-      "open": "§EVT{name:vis:delegateType}",
-      "close": "(none)",
-      "tag": "§EVT",
-      "description": "Defines an event. Simple form has no body. For custom add/remove accessors, use indented §EADD and §EREM blocks inside the event body.",
-      "csharpEquivalent": "public event EventHandler OnChanged;\npublic event Action<int> ValueUpdated;\npublic event EventHandler Click { add { _click += value; } remove { _click -= value; } }"
-    },
-    {
-      "open": "§EADD",
-      "close": "(none)",
-      "tag": "§EADD",
-      "description": "Custom add accessor body inside an event definition (§EVT). Contains statements executed when a handler is subscribed.",
-      "csharpEquivalent": "add { body }"
-    },
-    {
-      "open": "§EREM",
-      "close": "(none)",
-      "tag": "§EREM",
-      "description": "Custom remove accessor body inside an event definition (§EVT). Contains statements executed when a handler is unsubscribed.",
-      "csharpEquivalent": "remove { body }"
-    },
-    {
-      "open": "§LAM{[static:][async:]name:type[:name:type...]} body §/LAM; zero parameters: §LAM{}",
-      "close": "§/LAM",
-      "tag": "§LAM",
-      "description": "Creates an anonymous function using name:type parameter pairs. It can capture variables from its enclosing scope. The closing delimiter carries no source ID. Bind local helpers as lambdas, not nested §F declarations. Automatic local-function conversion lowers noncapturing, non-generic direct same-point calls with ordinary parameters. Direct self-recursion also requires a complete proof of pure built-in scalar operations and captures only the initialized internal self binding; unsupported cases remain explicit converter preservation.",
-      "csharpEquivalent": "x => x * 2\n(a, b) => a + b\nitems.Where(x => x > 5)"
-    },
-    {
-      "open": "§W expression with indented §K pattern → result cases; use in an expression context, such as §R §W",
-      "close": "(none)",
-      "tag": "§W",
-      "description": "Pattern matching switch expression. §K introduces each case/pattern. Use _ for default.",
-      "csharpEquivalent": "x switch { 1 => \"one\", 2 => \"two\", _ => \"other\" }\nshape switch { Circle c => c.Area(), Rectangle r => r.Width * r.Height }"
-    },
-    {
-      "open": "§K pattern → result",
-      "close": "(none)",
-      "tag": "§K",
-      "description": "A case in a switch expression. Use _ for default.",
-      "csharpEquivalent": "pattern => result"
-    },
-    {
-      "open": "§BK for break, §CN for continue",
-      "close": "(none)",
-      "tag": "§BK",
-      "description": "Loop control statements.",
-      "csharpEquivalent": "if (done) break;\nif (skip) continue;"
-    },
-    {
-      "open": "§CN",
-      "close": "(none)",
-      "tag": "§CN",
-      "description": "Continues to next loop iteration.",
-      "csharpEquivalent": "continue;"
-    },
-    {
-      "open": "§USE{var:type} resourceExpression",
-      "close": "(none)",
-      "tag": "§USE",
-      "description": "Resource management with automatic disposal.",
-      "csharpEquivalent": "using (var stream = File.OpenRead(path)) { ... }\nusing var connection = new SqlConnection(connStr);"
-    },
-    {
-      "open": "§WHERE T : constraint",
-      "close": "(none)",
-      "tag": "§WHERE",
-      "description": "Constraint on a generic type parameter.",
-      "csharpEquivalent": "where T : constraint"
-    },
-    {
-      "open": "left ?? fallback",
-      "close": "(none)",
-      "tag": "§??",
-      "description": "Legacy tag lookup retained; author infix null-coalescing: left ?? fallback.",
-      "csharpEquivalent": "expression ?? default"
-    },
-    {
-      "open": "target?.Member",
-      "close": "(none)",
-      "tag": "§?.",
-      "description": "Legacy tag lookup retained; author postfix null-conditional member access.",
-      "csharpEquivalent": "target?.Member"
-    },
-    {
-      "open": "Prefer inline string interpolation: \"literal ${expr} literal\"",
-      "close": "(none)",
-      "tag": "§INTERP",
-      "description": "Plain strings interpolate ${expression}, including numeric expressions. Escape \\${0} for literal placeholder text. The legacy section form uses separate literal and §EXP parts.",
-      "csharpEquivalent": "$\"literal{expr}literal\""
-    },
-    {
-      "open": "§C{target<T>} §A arg §/C",
-      "close": "§/C",
-      "tag": "§C",
-      "description": "Compatibility call lookup retained during integration. Author ordinary calls with postfix parentheses. A section call's manifest effect charge alone does not establish authoritative metadata resolution.",
-      "csharpEquivalent": "System.Linq.Enumerable.ToArray<int>(filtered)"
-    },
-    {
-      "open": "§U{namespace} or §U{alias:namespace}",
-      "close": "(none)",
-      "tag": "§U",
-      "description": "Imports a namespace or creates an alias. Must appear inside a module (§M{Name}) block.",
-      "csharpEquivalent": "using Namespace; or using Alias = Namespace;"
-    },
-    {
-      "open": "§B{items} §ARR{type} elements §/ARR",
-      "close": "§/ARR",
-      "tag": "§ARR",
-      "description": "Creates a fixed-size array with a typed §ARR value literal. Elements are whitespace-separated; group infix elements explicitly. The documented bare closer remains part of this staged literal form.",
-      "csharpEquivalent": "int[] numbers = { 5, 4, 1, 3 };\nvar items = new int[] { 1, 2, 3 };\nstring[] names = new[] { \"Alice\", \"Bob\" };"
-    },
-    {
-      "open": "§LIST{name:type} with indented values",
-      "close": "§/LIST (empty literal)",
-      "tag": "§LIST",
-      "description": "Creates a dynamic list.",
-      "csharpEquivalent": "new List<Type>() or new List<Type> { elements }"
-    },
-    {
-      "open": "§DICT{name:keyType:valueType} with indented §KV key value entries",
-      "close": "§/DICT (empty literal)",
-      "tag": "§DICT",
-      "description": "Creates a dictionary/map.",
-      "csharpEquivalent": "new Dictionary<TKey, TValue>()"
-    },
-    {
-      "open": "§P expression",
-      "close": "(none)",
-      "tag": "§P",
-      "description": "Prints to console with newline. Use §Pf for no newline.",
-      "csharpEquivalent": "Console.WriteLine(expression)"
-    },
-    {
-      "open": "§EACH{item} collection",
-      "close": "(none)",
-      "tag": "§EACH",
-      "description": "Iterates over each element in a collection. Type is inferred in §EACH{variable}; §EACH{variable:type} specifies it explicitly. An optional third field names the index.",
-      "csharpEquivalent": "foreach (var item in collection) { body }"
-    },
-    {
-      "open": "§IV (condition)",
-      "close": "(none)",
-      "tag": "§IV",
-      "description": "Declares an invariant at module scope.",
-      "csharpEquivalent": "// [ContractInvariantMethod] void Invariants() { Contract.Invariant(_count >= 0); }"
-    },
-    {
-      "open": "§PP{CONDITION} indented body; §PPE indented alternative",
-      "close": "(none)",
-      "tag": "§PP",
-      "description": "Conditional compilation blocks use §PP for #if and §PPE for #else. Indented statement bodies end at dedent. Nested §PP blocks express #elif. Code inside is conditionally included based on defined symbols.",
-      "csharpEquivalent": "#if DEBUG\n    Console.WriteLine(\"Debug mode\");\n#endif\n#if NET8_0_OR_GREATER\n    UseNewApi();\n#else\n    UseLegacyApi();\n#endif"
-    },
-    {
-      "open": "§ASSIGN name expression",
-      "close": "(none)",
-      "tag": "§ASSIGN",
-      "description": "Declare a mutable binding with a ~-prefixed name; use §ASSIGN for all updates, including increments and compound arithmetic.",
-      "csharpEquivalent": "name = expression;"
-    },
-    {
-      "open": "§IXER{returnType:vis} with indented §I parameters and §GET/§SET bodies",
-      "close": "(none)",
-      "tag": "§IXER",
-      "description": "Defines an indexer on a class or interface. Full indexers use indented §I parameters and §GET/§SET/§INIT bodies. Compact auto-indexers use accessor shorthand and inline parameters.",
-      "csharpEquivalent": "public int this[int index] { get; set; }\npublic string this[string key] { get; set; }\npublic int this[int row, int col] { get; set; }\npublic int this[int i] { get { return _data[i]; } set { _data[i] = value; } }"
-    },
-    {
-      "open": "§DEL{name} with indented §I parameters and optional §O return type",
-      "close": "(none)",
-      "tag": "§DEL",
-      "description": "Defines a delegate type (function signature). Use for callbacks, event handlers, and function references. §DEL can appear at the top level or nested inside §CL class bodies.",
-      "csharpEquivalent": "public delegate void EventCallback(string message);\npublic delegate int Transformer(int value);\npublic class MyClass { public delegate void Handler(int x); }"
-    },
-    {
-      "open": "§OP{operator:vis} (type:param, ...) -> returnType",
-      "close": "(none)",
-      "tag": "§OP",
-      "description": "Defines an operator overload using the supported arithmetic, comparison, equality or unary operators. Updates still use §ASSIGN; do not author increment/decrement or compound assignment expressions.",
-      "csharpEquivalent": "public static MyType operator+(MyType left, MyType right) { return new MyType(left.Value + right.Value); }\npublic static MyType operator-(MyType value) { return new MyType(-value.Value); }\npublic static implicit operator int(MyType value) { return value.Value; }\npublic static explicit operator MyType(int value) { return new MyType(value); }"
-    },
-    {
-      "open": "§RT",
-      "close": "(none)",
-      "tag": "§RT",
-      "description": "Rethrows the current exception in a catch block.",
-      "csharpEquivalent": "throw;"
-    },
-    {
-      "open": "§VAR{name}",
-      "close": "(none)",
-      "tag": "§VAR",
-      "description": "Captures a value into a variable in pattern matching.",
-      "csharpEquivalent": "var name"
-    },
-    {
-      "open": "§WHEN condition",
-      "close": "(none)",
-      "tag": "§WHEN",
-      "description": "Adds a guard condition to a pattern match case.",
-      "csharpEquivalent": "when condition"
-    },
-    {
-      "open": "§A expression",
-      "close": "(none)",
-      "tag": "§A",
-      "description": "Marks a constructor or staged section-call argument. Ordinary calls use comma-separated arguments inside parentheses.",
-      "csharpEquivalent": "Type name"
-    },
-    {
-      "open": "§EX{description} code",
-      "close": "(none)",
-      "tag": "§EX",
-      "description": "Inline example or test code in documentation.",
-      "csharpEquivalent": "// Example: description"
-    },
-    {
-      "open": "§SN{version}",
-      "close": "(none)",
-      "tag": "§SN",
-      "description": "Documents the version when a feature was introduced.",
-      "csharpEquivalent": "/// <since>version</since>"
-    },
-    {
-      "open": "§DP{reason}",
-      "close": "(none)",
-      "tag": "§DP",
-      "description": "Marks code as deprecated with a reason.",
+      "tag": "/// deprecated",
+      "description": "Attach a declaration documentation line with the deprecation version and optional replacement. For an exact Obsolete attribute message, use the ordinary attribute form.",
       "csharpEquivalent": "[Obsolete(\"Use NewMethod instead\")]"
     },
     {
-      "open": "§BR{description}",
+      "open": "/// breaking 2.0.0 \"Description of the change\"",
       "close": "(none)",
-      "tag": "§BR",
-      "description": "Documents a breaking change in the API.",
-      "csharpEquivalent": "// BREAKING CHANGE: description"
+      "tag": "/// breaking",
+      "description": "Records a breaking change before a declaration. Supply a valid version and one C# string literal description; repeated lines retain multiple changes. Preserve the version and complete description rather than replacing them with an unstructured compatibility claim.",
+      "csharpEquivalent": "// Breaking change in version 2.0.0: Description of the change"
     },
     {
-      "open": "§AS condition",
+      "open": "assume condition",
       "close": "(none)",
-      "tag": "§AS",
+      "tag": "assume",
       "description": "Documents an assumption that must be true at this point in the code.",
       "csharpEquivalent": "Debug.Assert(condition); // Assumption"
     },
     {
-      "open": "§SYNC (gate)",
+      "open": "start..end",
       "close": "(none)",
-      "tag": "§SYNC",
-      "description": "Locks an object while executing the indented body.",
-      "csharpEquivalent": "lock (_sync) { _count++; }"
-    },
-    {
-      "open": "§PT{property}",
-      "close": "(none)",
-      "tag": "§PT",
-      "description": "Defines a property-based test.",
-      "csharpEquivalent": "[Property] public bool TestName() { ... }"
-    },
-    {
-      "open": "§EEXT{EnumName} extensions",
-      "close": "(none)",
-      "tag": "§EEXT",
-      "description": "Defines extension methods for an enum type.",
-      "csharpEquivalent": "public static class EnumExtensions { ... }"
-    },
-    {
-      "open": "§RANGE start end",
-      "close": "(none)",
-      "tag": "§RANGE",
+      "tag": "..",
       "description": "Represents a range value (start..end) for array/span slicing.",
       "csharpEquivalent": "start..end"
     },
     {
-      "open": "§^ n",
+      "open": "^offset",
       "close": "(none)",
-      "tag": "§^",
+      "tag": "^",
       "description": "Indexes from the end of a collection. Equivalent to C#'s ^n operator.",
       "csharpEquivalent": "^n"
+    },
+    {
+      "open": "new ClassName(arg1, arg2)",
+      "close": "(none)",
+      "tag": "new",
+      "description": "Creates a new instance with ordinary constructor-call syntax. Arguments are comma-separated; a zero-argument constructor still uses (). Preserve the selected constructor and left-to-right argument evaluation.",
+      "csharpEquivalent": "var user = new User(\"John\", 25);\nvar list = new List<int>();\nreturn new Widget(value);"
+    },
+    {
+      "open": "let type:name = expression; var type:name = expression",
+      "close": "(none)",
+      "tag": "let",
+      "description": "let declares an immutable binding; var declares a mutable binding. Both infer an omitted type. Types precede names; var is mutability, not a type-inference keyword. Give null an accurate explicit nullable type. In a match case, var name binds the matched value instead of declaring a mutable binding.",
+      "csharpEquivalent": "var count = 0;\nint mutableCount = 0; // needs to be modified later\nstring name = \"John\";\nstring? name = null;"
+    },
+    {
+      "open": "let type:name = expression; var type:name = expression",
+      "close": "(none)",
+      "tag": "var",
+      "description": "let declares an immutable binding; var declares a mutable binding. Both infer an omitted type. Types precede names; var is mutability, not a type-inference keyword. Give null an accurate explicit nullable type. In a match case, var name binds the matched value instead of declaring a mutable binding.",
+      "csharpEquivalent": "var count = 0;\nint mutableCount = 0; // needs to be modified later\nstring name = \"John\";\nstring? name = null;"
+    },
+    {
+      "open": "func Name (type:param, ...) → returnType",
+      "close": "(none)",
+      "tag": "func",
+      "description": "Declares a function or class method. Visibility is public by default; explicitly private and protected declarations retain their intended visibility. Parameters put the type before the name; parameter modifiers precede the type. Class methods may carry virtual, override, abstract or static modifiers. Functions inside a named static module are implicitly static.",
+      "csharpEquivalent": "public static int Add(int a, int b) { return a + b; }\nprivate void Log(string message) { Console.WriteLine(message); }"
+    },
+    {
+      "open": "func Name async (type:param, ...) → returnType",
+      "close": "(none)",
+      "tag": "async",
+      "description": "Declares an async function or class method using the async modifier.\n\nAn async declaration with scalar output `T` is callable as `Task<T>`, but its body\nreturns `T`. A `void` output produces `Task`. Explicit .NET `Task<T>` and\n`ValueTask<T>` outputs preserve that carrier and return `T` in the body; their\nnon-generic forms have a void body result. Postconditions describe the body\nresult, not the task object. Ordinary synchronous task-returning declarations\nkeep their declared return type.",
+      "csharpEquivalent": "public async Task<string> FetchDataAsync() { ... }\npublic async Task ProcessAsync() { await DoWork(); }"
+    },
+    {
+      "open": "module FileLabel Contoso.Tools",
+      "close": "(none)",
+      "tag": "module",
+      "description": "At file scope, labels the compilation unit. The optional qualified namespace follows the label; omission means the global namespace. That label is neither a namespace nor a static class declaration. A trailing block records block-namespace origin rather than file-scoped origin. Inside the compilation unit, a nested module declares a named static container with implicitly static functions.",
+      "csharpEquivalent": "namespace Contoso.Tools;"
+    },
+    {
+      "open": "return expression; return",
+      "close": "(none)",
+      "tag": "return",
+      "description": "Returns a value or exits a void-result body. Async body results differ from their callable task carriers; preserve that distinction.",
+      "csharpEquivalent": "return 42;\nreturn user.Name;\nreturn;"
+    },
+    {
+      "open": "class Name",
+      "close": "(none)",
+      "tag": "class",
+      "description": "Declares a class, public by default. Its members have indented bodies. Preserve inheritance, implemented interfaces, generic constraints, visibility and supported modifiers.",
+      "csharpEquivalent": "public class User { }\npublic class Admin : User, IAdmin { }\npublic abstract class BaseEntity { }"
+    },
+    {
+      "open": "for i from start to end step stepValue; for i = start; condition; i = next",
+      "close": "(none)",
+      "tag": "for",
+      "description": "One counted-loop keyword has two distinct semantics. The from/to/step header snapshots start, end and step once, in order, and includes the endpoint; omitted step is +1 and zero step throws. The =/semicolon form reevaluates its condition before each iteration and updates after the body or continue, not after break. Checked range overflow ends the snapshot range. Do not replace one form with the other.",
+      "csharpEquivalent": "for (int i = 0; i < 10; i++) { ... }\nfor (int i = 0; i <= 10; i++) { ... }\nfor (int i = 0; i < 100; i += 2) { ... }"
+    },
+    {
+      "open": "each item in collection; each Type:item in collection; each key, value in collection",
+      "close": "(none)",
+      "tag": "each",
+      "description": "Iterates synchronously over a collection with an indented body. An explicit type precedes the item name. Two names deconstruct each element without tuple parentheses; collection evaluation remains once.",
+      "csharpEquivalent": "foreach (var item in items) { ... }\nforeach (var (key, value) in dictionary) { ... }"
+    },
+    {
+      "open": "while condition",
+      "close": "(none)",
+      "tag": "while",
+      "description": "Evaluates the condition before each iteration and executes an indented body while true.",
+      "csharpEquivalent": "while (count > 0) { count--; }\nwhile (true) { if (done) break; }"
+    },
+    {
+      "open": "do indentedBody; while condition at the do indentation",
+      "close": "(none)",
+      "tag": "do",
+      "description": "Executes the body at least once. The trailing while condition is at the same indentation as do; there is no structural closer.",
+      "csharpEquivalent": "do { Process(); } while (HasMore());"
+    },
+    {
+      "open": "if condition; else if condition; else",
+      "close": "(none)",
+      "tag": "if",
+      "description": "Conditional branches have indented bodies. else if and else align with if. Only the selected branch runs.",
+      "csharpEquivalent": "if (x > 0) { return true; }\nif (x > 0) { a(); } else { b(); }\nif (x > 0) { } else if (x < 0) { } else { }"
+    },
+    {
+      "open": "if condition; else if condition; else",
+      "close": "(none)",
+      "tag": "else",
+      "description": "Conditional branches have indented bodies. else if and else align with if. Only the selected branch runs.",
+      "csharpEquivalent": "if (x > 0) { return true; }\nif (x > 0) { a(); } else { b(); }\nif (x > 0) { } else if (x < 0) { } else { }"
+    },
+    {
+      "open": "await expression",
+      "close": "(none)",
+      "tag": "await",
+      "description": "Awaits an asynchronous operation.\n\nAwaiting a .NET `Task<T>` or `ValueTask<T>` produces `T`. Awaiting a non-generic\ncarrier produces no value and cannot initialize a binding. `await` can also be\nused as a statement. A custom type named `MyTask<T>` or a source declaration\nnamed `Task<T>` is not automatically a .NET async carrier. Unsupported custom\nawaitables are diagnosed or checked by generated C# validation, never inferred\nfrom a name suffix.",
+      "csharpEquivalent": "var result = await FetchAsync();\nawait Task.Delay(1000);"
+    },
+    {
+      "open": "! effect1,effect2,...",
+      "close": "(none)",
+      "tag": "!",
+      "description": "Declares authoritative effects in the function header-clause region before the first body statement. Empty ! is a declared pure row. Effect variables bind with <! e> and occur in rows as ! e. Parameter rows follow type:name; output rows follow the output type; binding rows precede =; lambda rows precede =>. Preserve these distinct positions. In expression position, ! is logical negation, not an effect row. An unknown external call or manifest charge is not a metadata-resolution or purity proof.",
+      "csharpEquivalent": "// Method that writes to console\n// Method that reads file and writes console\n// Pure function (no effects)"
+    },
+    {
+      "open": "=> condition",
+      "close": "(none)",
+      "tag": "=>",
+      "description": "Declares a postcondition before the first body statement. result denotes the body return value, including async body results rather than task objects. In expression lambdas => is the lambda delimiter, not a postcondition.",
+      "csharpEquivalent": "// Contract.Ensures(result >= 0)\n// Ensures non-empty result"
+    },
+    {
+      "open": "break; continue",
+      "close": "(none)",
+      "tag": "break",
+      "description": "break exits the nearest loop; continue proceeds to its next iteration. A C#-form counted loop still performs its update after continue.",
+      "csharpEquivalent": "if (done) break;\nif (skip) continue;"
+    },
+    {
+      "open": "break; continue",
+      "close": "(none)",
+      "tag": "continue",
+      "description": "break exits the nearest loop; continue proceeds to its next iteration. A C#-form counted loop still performs its update after continue.",
+      "csharpEquivalent": "if (done) break;\nif (skip) continue;"
+    },
+    {
+      "open": "set target expression; set receiver[index] expression",
+      "close": "(none)",
+      "tag": "set",
+      "description": "Updates mutable bindings, fields or indexed storage. Indexed stores preserve left-to-right evaluate-once receiver, key and value evaluation, and dictionary updates are upserts rather than Add. Increment/decrement and compound assignment aliases are not separate expression forms. Inside a property or indexer, set declares a setter instead.",
+      "csharpEquivalent": "name = expression;"
+    },
+    {
+      "open": "func Name (type:param, ...) → returnType",
+      "close": "(none)",
+      "tag": "→",
+      "description": "Separates a callable signature's parameters from its output type. Async callable carriers and body results are distinct; contracts describe the body result.",
+      "csharpEquivalent": "ReturnType Name(Type param)"
+    },
+    {
+      "open": "property type:Name",
+      "close": "(none)",
+      "tag": "property",
+      "description": "Declares a property with indented get, set or init accessors. Empty accessor bodies are auto-implemented; explicit bodies contain statements. Restricted accessor visibility follows its keyword, such as set private. Preserve defaults, modifiers and accessor effects.",
+      "csharpEquivalent": "public string Name { get; set; }\npublic int Count { get; private set; }\npublic int Value { get { return _value; } set { _value = value; } }"
+    },
+    {
+      "open": "field type:name private = expression",
+      "close": "(none)",
+      "tag": "field",
+      "description": "Declares a field with type before name, optional visibility and modifiers, and an optional initializer. Public is the default; preserve explicit private or protected visibility and readonly or static modifiers.",
+      "csharpEquivalent": "private string _name;\nprivate readonly int _id;"
+    },
+    {
+      "open": "ctor (type:param, ...)",
+      "close": "(none)",
+      "tag": "ctor",
+      "description": "Declares a constructor with an indented body. Explicit visibility precedes the parameter list. A base(args) or this(args) initializer is the first body clause; preserve ordered arguments and base versus same-type delegation.",
+      "csharpEquivalent": "public User(string name) { _name = name; }\npublic Admin(string name) : base(name) { }"
+    },
+    {
+      "open": "interface Name",
+      "close": "(none)",
+      "tag": "interface",
+      "description": "Declares an interface with indented func signatures. Preserve generic variance, inherited interfaces, effective visibility and method contracts. Explicit visibility follows the name and type parameters.",
+      "csharpEquivalent": "public interface IRepository { void Save(Entity e); }"
+    },
+    {
+      "open": "where T : class, new()",
+      "close": "(none)",
+      "tag": "where",
+      "description": "Adds generic constraints before a declaration body. Preserve each reference/value-type, constructor, base-type and interface requirement, rather than treating a type parameter as an unconstrained object. Inside a quantified contract, where introduces its guard instead of a generic constraint.",
+      "csharpEquivalent": "public class Repository<T> where T : class, IEntity { }\npublic T Create<T>() where T : new() { return new T(); }\npublic void Process<T>(T item) where T : struct { }"
+    },
+    {
+      "open": "using System.Text; using Text = System.Text; using type:name = resource",
+      "close": "(none)",
+      "tag": "using",
+      "description": "At compilation-unit scope, imports a namespace or declares an alias. In a function body, using introduces a resource and an indented body that disposes it on exit, including exceptions. Preserve the distinction between imports and resource lifetime management.",
+      "csharpEquivalent": "using (var stream = File.OpenRead(path)) { ... }\nusing var connection = new SqlConnection(connStr);"
+    },
+    {
+      "open": "try; catch ExceptionType:name when condition; finally",
+      "close": "(none)",
+      "tag": "try",
+      "description": "Groups an indented try body with one or more catch clauses and/or finally cleanup. Catch types, binders and filters are optional; preserve exception selection, filter evaluation and cleanup on every exit.",
+      "csharpEquivalent": "try { x(); } catch { y(); }\ntry { } catch (Exception ex) { Log(ex); }\ntry { } finally { Cleanup(); }"
+    },
+    {
+      "open": "throw expression; throw",
+      "close": "(none)",
+      "tag": "throw",
+      "description": "Throws an exception expression. Bare throw rethrows the current exception inside a catch handler, preserving its original stack rather than constructing or throwing a replacement.",
+      "csharpEquivalent": "throw new ArgumentException(\"Invalid\");\nthrow;"
+    },
+    {
+      "open": "match expression with indented case pattern → result arms",
+      "close": "(none)",
+      "tag": "match",
+      "description": "Matches an expression against ordered patterns. Expression arms use → followed by a result; statement arms have indented bodies. Preserve pattern guards and use return match when returning a match expression.",
+      "csharpEquivalent": "x switch { 1 => \"one\", 2 => \"two\", _ => \"other\" }\nshape switch { Circle c => c.Area(), Rectangle r => r.Width * r.Height }"
+    },
+    {
+      "open": "lock gate",
+      "close": "(none)",
+      "tag": "lock",
+      "description": "Executes an indented body while holding the selected monitor. Preserve evaluate-once lock-object selection and monitor release on returns and exceptions.",
+      "csharpEquivalent": "lock (_sync) { _count++; }"
+    },
+    {
+      "open": "unsafe",
+      "close": "(none)",
+      "tag": "unsafe",
+      "description": "Introduces an indented unsafe body. Preserve unsafe effects and compile with unsafe support; the keyword is not permission to bypass diagnostics.",
+      "csharpEquivalent": "unsafe { int* ptr = &value; *ptr = 42; }"
+    },
+    {
+      "open": "invariant condition",
+      "close": "(none)",
+      "tag": "invariant",
+      "description": "Declares an invariant checked at the corresponding compilation-unit or type boundaries. Preserve the native contract AST and proof obligations, not an opaque runtime call.",
+      "csharpEquivalent": "// [ContractInvariantMethod] void Invariants() { Contract.Invariant(_count >= 0); }"
+    },
+    {
+      "open": "op + (type:left, type:right) → resultType; op implicit (type:value) → resultType",
+      "close": "(none)",
+      "tag": "op",
+      "description": "Declares an operator overload or conversion with an indented body. Preserve operator token, parameter order, result type, effects and C# signature requirements. Conversion operators use implicit or explicit after op.",
+      "csharpEquivalent": "public static MyType operator+(MyType left, MyType right) { return new MyType(left.Value + right.Value); }\npublic static MyType operator-(MyType value) { return new MyType(-value.Value); }\npublic static implicit operator int(MyType value) { return value.Value; }\npublic static explicit operator MyType(int value) { return new MyType(value); }"
+    },
+    {
+      "open": "pp CONDITION; pp elif CONDITION; pp else",
+      "close": "(none)",
+      "tag": "pp",
+      "description": "Conditionally includes indented code. Chained pp clauses align with their opening pp. Conditions retain verbatim C# preprocessor text; preserve nested conditions and inactive branch contents under converter fidelity rules.",
+      "csharpEquivalent": "#if DEBUG\n    Console.WriteLine(\"Debug mode\");\n#endif\n#if NET8_0_OR_GREATER\n    UseNewApi();\n#else\n    UseLegacyApi();\n#endif"
+    },
+    {
+      "open": "yield expression; yield break",
+      "close": "(none)",
+      "tag": "yield",
+      "description": "Yields a value from an iterator or ends iteration. Preserve lazy execution, suspension, iterator disposal and cleanup; do not materialize the sequence eagerly.",
+      "csharpEquivalent": "yield return item;\nyield break;\npublic IEnumerable<int> GetNumbers() { for (int i = 0; i < 10; i++) yield return i; }"
+    },
+    {
+      "open": "extends BaseType",
+      "close": "(none)",
+      "tag": "extends",
+      "description": "Specifies a class's base type or inherited interfaces on an interface. Preserve generic arguments.",
+      "csharpEquivalent": ": BaseType"
+    },
+    {
+      "open": "implements IContract",
+      "close": "(none)",
+      "tag": "implements",
+      "description": "Specifies an interface implemented by a class or value type.",
+      "csharpEquivalent": ": IContract"
+    },
+    {
+      "open": "catch ExceptionType:name when condition",
+      "close": "(none)",
+      "tag": "catch",
+      "description": "Catches exceptions with optional type, binder and filter. Its indented body follows try.",
+      "csharpEquivalent": "catch (ExceptionType name) when (condition) { body }"
+    },
+    {
+      "open": "finally",
+      "close": "(none)",
+      "tag": "finally",
+      "description": "Runs the indented cleanup body on exit from try, including exceptions and returns.",
+      "csharpEquivalent": "finally { body }"
+    },
+    {
+      "open": "get",
+      "close": "(none)",
+      "tag": "get",
+      "description": "Declares a property or indexer getter. An empty body is auto-implemented; an indented body contains statements.",
+      "csharpEquivalent": "get; or get { body }"
+    },
+    {
+      "open": "init",
+      "close": "(none)",
+      "tag": "init",
+      "description": "Declares an initialization-only property accessor. Preserve its visibility and body.",
+      "csharpEquivalent": "init; or init { body }"
+    },
+    {
+      "open": "base(args); base.Member",
+      "close": "(none)",
+      "tag": "base",
+      "description": "As the first constructor clause, calls the base constructor. In expressions, selects a base member.",
+      "csharpEquivalent": ": base(args); base.Member"
+    },
+    {
+      "open": "this.Member; this(args); this[int:index] → Type; this Type:receiver",
+      "close": "(none)",
+      "tag": "this",
+      "description": "Selects the current instance, delegates to another constructor as its first clause, declares an indexer, or marks the first extension-method parameter. These contexts are distinct.",
+      "csharpEquivalent": "this.Member; : this(args); Type this[int index]; this Type receiver"
+    },
+    {
+      "open": "case pattern → result; case pattern with indented statements",
+      "close": "(none)",
+      "tag": "case",
+      "description": "Declares an ordered expression or statement match arm. Use _ for a default pattern; preserve guards.",
+      "csharpEquivalent": "case pattern: statements; pattern => result"
+    },
+    {
+      "open": "each item in source; in Type:value",
+      "close": "(none)",
+      "tag": "in",
+      "description": "Introduces a collection iteration source, or marks a readonly reference parameter in a signature.",
+      "csharpEquivalent": "foreach (var item in source); in Type value"
+    },
+    {
+      "open": "out Type:value",
+      "close": "(none)",
+      "tag": "out",
+      "description": "Declares an output parameter in a signature. At a call site, pass the output argument with out.",
+      "csharpEquivalent": "out Type value"
+    },
+    {
+      "open": "for i from start to end step delta",
+      "close": "(none)",
+      "tag": "from",
+      "description": "Starts a counted loop whose start, end and step are evaluated once, in order.",
+      "csharpEquivalent": "inclusive counted range"
+    },
+    {
+      "open": "for i from start to end step delta",
+      "close": "(none)",
+      "tag": "to",
+      "description": "Sets the inclusive endpoint of a snapshot counted loop. This is not a half-open slicing range.",
+      "csharpEquivalent": "inclusive counted range"
+    },
+    {
+      "open": "for i from start to end step delta",
+      "close": "(none)",
+      "tag": "step",
+      "description": "Sets the snapshot range increment. Omission means +1; zero throws, and checked overflow ends iteration.",
+      "csharpEquivalent": "checked counted-loop increment"
+    },
+    {
+      "open": "value ?? fallback",
+      "close": "(none)",
+      "tag": "??",
+      "description": "Evaluates the fallback only when the left operand is null.",
+      "csharpEquivalent": "value ?? fallback"
+    },
+    {
+      "open": "receiver?.Member",
+      "close": "(none)",
+      "tag": "?.",
+      "description": "Accesses the member only when the receiver is not null.",
+      "csharpEquivalent": "receiver?.Member"
+    },
+    {
+      "open": "goto case expression; goto default; goto label",
+      "close": "(none)",
+      "tag": "goto",
+      "description": "Transfers control to a constant match case, the default arm, or a label written name:. Preserve the target and surrounding cleanup; goto case does not repeat the match selector's evaluation.",
+      "csharpEquivalent": "goto case 1;\ngoto case \"hello\";\ngoto default;\ngoto myLabel;"
+    },
+    {
+      "open": "case var name when condition → result; catch Type:name when condition",
+      "close": "(none)",
+      "tag": "when",
+      "description": "Adds a pattern guard or an exception filter. Evaluate it only after the corresponding pattern or exception selection.",
+      "csharpEquivalent": "case var name when condition: statements; catch (Type name) when (condition)"
+    },
+    {
+      "open": "enum Name byte",
+      "close": "(none)",
+      "tag": "enum",
+      "description": "Declares an enumeration with indented named members and optional explicit values. Preserve the underlying CLR type; omission defaults to int.",
+      "csharpEquivalent": "public enum Status { Active, Inactive, Pending }\npublic enum Priority : byte { Low = 0, High = 1 }"
+    },
+    {
+      "open": "delegate Name (type:param, ...) → returnType",
+      "close": "(none)",
+      "tag": "delegate",
+      "description": "Declares a delegate signature at compilation-unit or class scope. Parameters are inline; an optional indented ! row retains the delegate's effect contract. Preserve parameter modifiers and the result type.",
+      "csharpEquivalent": "public delegate void EventCallback(string message);\npublic delegate int Transformer(int value);\npublic class MyClass { public delegate void Handler(int x); }"
+    },
+    {
+      "open": "event DelegateType:Name",
+      "close": "(none)",
+      "tag": "event",
+      "description": "Declares an event, optionally with paired indented add and remove accessor bodies. Preserve the delegate type, visibility and supported modifiers. Named-module events are static; ordinary classes may explicitly declare a static event. Converter preservation of an unsupported event shape is not an authoring spelling. The complete example demonstrates declaration only. Native event subscription and unsubscription statements are not admitted yet; do not write retired section markers or invent +=/-= statements. Convert original C# when preservation is needed.",
+      "csharpEquivalent": "public event EventHandler OnDataReceived;"
+    },
+    {
+      "open": "event Handler:Changed with an indented add body",
+      "close": "(none)",
+      "tag": "add",
+      "description": "Declares the custom event subscription accessor. Pair it with remove and preserve all statements.",
+      "csharpEquivalent": "add { body }"
+    },
+    {
+      "open": "event Handler:Changed with an indented remove body",
+      "close": "(none)",
+      "tag": "remove",
+      "description": "Declares the custom event unsubscription accessor. Pair it with add and preserve all statements.",
+      "csharpEquivalent": "remove { body }"
+    },
+    {
+      "open": "record Point (int:X, int:Y)",
+      "close": "(none)",
+      "tag": "record",
+      "description": "Declares a C# record class. Positional parameters retain their constructor defaults and public init properties. Indent properties and methods beneath the header. C# supplies value equality, hashing, ToString, deconstruction and with/copy behavior. Derived positional records use `record D (int:X, int:Y) : B(X)`. Record structs, partial or nested declarations and unrepresented member variants remain exact converter-owned C# fallback, not native records.",
+      "csharpEquivalent": "public record Point(int X, int Y);"
     }
   ],
   "closingTagRules": "Structural blocks end at dedent. Calls, block lambdas, do-while conditions and value literals use their documented delimiters."

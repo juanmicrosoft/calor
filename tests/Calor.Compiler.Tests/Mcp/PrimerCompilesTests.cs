@@ -9,7 +9,7 @@ namespace Calor.Compiler.Tests.Mcp;
 
 /// <summary>
 /// Semantic guard for the <c>calor://primer</c> MCP resource (v0.7 plan, item D1/D2):
-/// every complete <c>§M{...}</c> module taught in the primer must actually compile under
+/// every complete <c>module Name</c> program taught in the primer must actually compile under
 /// the same options the <c>calor_compile</c> MCP tool uses by default. This is the test
 /// that would have caught the closer-form / §RESULT "lies" no string assertion could.
 /// </summary>
@@ -17,17 +17,17 @@ public class PrimerCompilesTests
 {
     /// <summary>
     /// Extracts each complete module from the primer. A module begins at a column-0
-    /// <c>§M{</c> line and includes every following blank or indented line; it ends at
+    /// <c>module Name</c> line and includes every following blank or indented line; it ends at
     /// the next column-0 non-blank line (a section header or the next module). The
     /// "Common mistakes" snippets are intentionally indented under a column-0 header
-    /// (not a <c>§M{</c>), so they are never collected.
+    /// (not a module header), so they are never collected.
     /// </summary>
     public static IEnumerable<object[]> PrimerModules()
     {
         var all = McpResourceValidator.GetPrimer().Replace("\r\n", "\n").Split('\n');
 
-        // Scope to the "## Complete programs" section: the compact "Core tags" reference
-        // block above it lists tag stubs (e.g. `§M{id:Name}  Module`) that are teaching
+        // Scope to the "## Complete programs" section: the compact reference
+        // block above it lists syntax stubs that are teaching
         // templates, not compilable modules. Only the complete-programs section is the
         // "every one compiles" contract.
         var progStart = System.Array.FindIndex(all, l => l.StartsWith("## Complete programs", System.StringComparison.Ordinal));
@@ -39,7 +39,7 @@ public class PrimerCompilesTests
         var i = 0;
         while (i < lines.Length)
         {
-            if (!lines[i].StartsWith("§M{", System.StringComparison.Ordinal))
+            if (!lines[i].StartsWith("module ", System.StringComparison.Ordinal))
             {
                 i++;
                 continue;

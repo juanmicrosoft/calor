@@ -264,14 +264,12 @@ public class GitHubCopilotMcpTests : IDisposable
     // config, then compile against it.
     // ------------------------------------------------------------------
 
-    // Program built purely from the exemplar idioms shipped in
-    // copilot-instructions.md.template: inline §F signature, §E{mut,alloc} for
-    // a mutating body that allocates a list, the empty-list literal, §PUSH
-    // under a loop, §CNT, and §R.
+    // The smoke program exercises allocation, loop mutation and collection count
+    // from the same reference linked by the generated instructions.
     private static string ExemplarIdiomProgram =>
         Assert.Single(Calor.Compiler.SelfCheck.ExemplarCompileChecker.ExtractCompletePrograms(
             EmbeddedResourceHelper.ReadResource("Calor.Compiler.Resources.current-language-reference.md"))
-            .Where(program => program.Source.StartsWith("§M{CopilotSmoke}", StringComparison.Ordinal))).Source;
+            .Where(program => program.Source.StartsWith("module CopilotSmoke\n", StringComparison.Ordinal))).Source;
 
     [Fact]
     public async Task Smoke_GeneratedInstructions_CarryExemplarIdioms()
@@ -288,8 +286,8 @@ public class GitHubCopilotMcpTests : IDisposable
         Assert.Contains("calor://primer", content);
         var primer = Calor.Compiler.Mcp.McpMessageHandler.GetPrimerContentPublic();
         Assert.Contains("File.ReadAllLines(path)", primer);
-        Assert.Contains("§ASSIGN", primer);
-        Assert.Contains("returns `string[]`, not `List<string>`", primer);
+        Assert.Contains("set name expression", primer);
+        Assert.Contains("returns string[], not List<string>", primer);
     }
 
     [Fact]

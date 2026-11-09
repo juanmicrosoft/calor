@@ -77,7 +77,7 @@
           "why": "Get declared vs computed effects per function"
         },
         {
-          "action": "Add missing effects from the effectSummary.missing field to §E{...}"
+          "action": "Add missing effects from effectSummary.missing to the ! row before the first body statement."
         }
       ]
     },

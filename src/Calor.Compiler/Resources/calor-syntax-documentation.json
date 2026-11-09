@@ -14,8 +14,8 @@
         "instantiate",
         "object instantiation"
       ],
-      "calorSyntax": "§NEW{ClassName} §A arg1 §A arg2 §/NEW",
-      "description": "Creates a new instance of a class. The class name goes in braces; constructor arguments use §A. Use §NEW{ClassName} §/NEW for zero-argument constructors.",
+      "calorSyntax": "new ClassName(arg1, arg2)",
+      "description": "Creates a new instance with ordinary constructor-call syntax. Arguments are comma-separated; a zero-argument constructor still uses (). Preserve the selected constructor and left-to-right argument evaluation.",
       "programs": [
         "complete_objects"
       ],
@@ -23,7 +23,7 @@
       "examples": [
         {
           "csharp": "var user = new User(\"John\", 25);\nvar list = new List<int>();\nreturn new Widget(value);",
-          "calor": "§M{Objects}\n  §CL{Person:pub}\n    §PROP{Name:string:pub:get,set}\n  §F{Create:pub} () -> Person\n    §E{alloc}\n    §R §NEW{Person} §/NEW\n  §F{ReadName:pub} (Person:person) -> string?\n    §R person?.Name"
+          "calor": "module Objects\n  class Person\n    property string:Name\n      get\n      set\n  func Create () → Person\n    ! alloc\n    return new Person()\n  func ReadName (Person:person) → string?\n    return person?.Name"
         }
       ]
     },
@@ -40,8 +40,8 @@
         "assign",
         "variable declaration"
       ],
-      "calorSyntax": "§B{name} value or §B{~name} value (mutable)",
-      "description": "Declares a variable binding. Use ~ prefix for mutable variables. Immutable by default. Give null an explicit existing nullable type, such as string?.",
+      "calorSyntax": "let type:name = expression; var type:name = expression",
+      "description": "let declares an immutable binding; var declares a mutable binding. Both infer an omitted type. Types precede names; var is mutability, not a type-inference keyword. Give null an accurate explicit nullable type. In a match case, var name binds the matched value instead of declaring a mutable binding.",
       "programs": [
         "primer_bindings",
         "nested_arrays"
@@ -50,11 +50,11 @@
       "examples": [
         {
           "csharp": "var count = 0;\nint mutableCount = 0; // needs to be modified later\nstring name = \"John\";\nstring? name = null;",
-          "calor": "§M{Bindings}\n  §F{Demo:pub} () -> void\n    §E{cw}\n    §B{greeting:string} \"Ada\"\n    §B{~count:int} 0\n    Console.WriteLine(greeting)\n    Console.WriteLine(count)"
+          "calor": "module Bindings\n  func Demo () → void\n    ! cw\n    let string:greeting = \"Ada\"\n    var int:count = 0\n    Console.WriteLine(greeting)\n    Console.WriteLine(count)"
         },
         {
           "csharp": "var count = 0;\nint mutableCount = 0; // needs to be modified later\nstring name = \"John\";\nstring? name = null;",
-          "calor": "§M{NestedArrayExpressions}\n  §F{SumPair:pub} (int[]:data) -> int\n    §E{}\n    §S (result == (data[0] + data[1]))\n    §B{~sum} 0\n    §ASSIGN sum (sum + data[0])\n    §R (sum + data[1])\n\n  §F{MixFirst:pub} (int[]:data, int:hash) -> int\n    §E{}\n    §R (hash ^ data[0])"
+          "calor": "module NestedArrayExpressions\n  func SumPair (int[]:data) → int\n    !\n    => (result == (data[0] + data[1]))\n    var sum = 0\n    set sum (sum + data[0])\n    return (sum + data[1])\n\n  func MixFirst (int[]:data, int:hash) → int\n    !\n    return (hash ^ data[0])"
         }
       ]
     },
@@ -72,8 +72,8 @@
         "member method",
         "method definition"
       ],
-      "calorSyntax": "§MT{name:vis[:modifiers]} (type:param, ...) -> returnType",
-      "description": "Defines a method within a class. Supports visibility (pub/priv/prot) and modifiers such as virt/vr, over/ov, abs, stat/st, and seal.",
+      "calorSyntax": "func Name (type:param, ...) → returnType",
+      "description": "Declares a class method with the same function header as module functions. Preserve modifiers, visibility, contracts and authoritative effect rows; public is the default.",
       "programs": [
         "task_28"
       ],
@@ -81,7 +81,7 @@
       "examples": [
         {
           "csharp": "public void Process(int value) { ... }\npublic virtual string GetName() { return _name; }\npublic override int Calculate(int x) { ... }",
-          "calor": "§M{AgentReference28}\n  §CL{Calculator:pub}\n    §MT{Add:pub} (int:a, int:b) -> int\n      §R (a + b)"
+          "calor": "module AgentReference28\n  class Calculator\n    func Add (int:a, int:b) → int\n      return (a + b)"
         }
       ]
     },
@@ -95,10 +95,11 @@
         "standalone",
         "static method",
         "top-level",
-        "function definition"
+        "function definition",
+        "→"
       ],
-      "calorSyntax": "§F{name:vis} (type:param, ...) -> returnType",
-      "description": "Defines a standalone function (not a class member). Use for top-level functions or static utility methods.",
+      "calorSyntax": "func Name (type:param, ...) → returnType",
+      "description": "Declares a function or class method. Visibility is public by default; explicitly private and protected declarations retain their intended visibility. Parameters put the type before the name; parameter modifiers precede the type. Class methods may carry virtual, override, abstract or static modifiers. Functions inside a named static module are implicitly static.",
       "programs": [
         "primer_contracts"
       ],
@@ -106,7 +107,7 @@
       "examples": [
         {
           "csharp": "public static int Add(int a, int b) { return a + b; }\nprivate void Log(string message) { Console.WriteLine(message); }",
-          "calor": "§M{Contracts}\n  §F{Square:pub} (int:x) -> int\n    §Q (x >= 0)\n    §S (result >= 0)\n    §R (x * x)\n\n  §F{Divide:pub} (int:a, int:b) -> int\n    §Q{\"divisor must not be zero\"} (b != 0)\n    §R (a / b)"
+          "calor": "module Contracts\n  func Square (int:x) → int\n    requires x >= 0\n    => result >= 0\n    return x * x\n\n  func Divide (int:a, int:b) → int\n    requires b != 0\n    return a / b"
         }
       ]
     },
@@ -124,8 +125,8 @@
         "func",
         "lambda expression"
       ],
-      "calorSyntax": "§LAM{[static:][async:]name:type[:name:type...]} body §/LAM; zero parameters: §LAM{}",
-      "description": "Creates an anonymous function using name:type parameter pairs. It can capture variables from its enclosing scope. The closing delimiter carries no source ID. Bind local helpers as lambdas, not nested §F declarations. Automatic local-function conversion lowers noncapturing, non-generic direct same-point calls with ordinary parameters. Direct self-recursion also requires a complete proof of pure built-in scalar operations and captures only the initialized internal self binding; unsupported cases remain explicit converter preservation.",
+      "calorSyntax": "(type:name, ...) => expression; indented statements after =>",
+      "description": "Creates a lambda with expression or indented statement body. An explicit effect row follows the parameters: (int:x) ! cw => body; empty ! declares a pure row. Do not write brace bodies or structural closers. The parameter-list closing parenthesis, optional row and => belong on the same line. Target delegate types and higher-order effect requirements remain authoritative; an unannotated lambda is not automatically a proof of purity.",
       "programs": [
         "task_25",
         "complete_postfix"
@@ -134,11 +135,11 @@
       "examples": [
         {
           "csharp": "x => x * 2\n(a, b) => a + b\nitems.Where(x => x > 5)",
-          "calor": "§M{AgentReference25}\n  §F{ApplyComplex:pub} (int:x) -> int\n    §B{process:Func<int,int>} §LAM{n:int}\n    ((n > 0) ? (n * 2) : 0)\n    §/LAM\n    §R process(x)"
+          "calor": "module AgentReference25\n  func ApplyComplex (int:x) → int\n    let Func<int,int>:process = (int:n) =>\n      return n > 0 ? n * 2 : 0\n    return process(x)"
         },
         {
           "csharp": "x => x * 2\n(a, b) => a + b\nitems.Where(x => x > 5)",
-          "calor": "§M{PostfixCalls}\n  §F{Apply:pub} (Holder:h) -> int\n    §E{}\n    §R h.Make()(41)\n  §CL{Holder:pub}\n    §MT{Make:pub} () -> Func<int,int> §E{}\n      §E{}\n      §R §LAM{x:int} §E{} (x + 1) §/LAM"
+          "calor": "module PostfixCalls\n  func Apply (Holder:h) → int\n    !\n    return h.Make()(41)\n  class Holder\n    func Make () → Func<int,int> !\n      !\n      return (int:x) ! => x + 1"
         }
       ]
     },
@@ -155,8 +156,8 @@
         "prop",
         "property definition"
       ],
-      "calorSyntax": "§PROP{name:type:vis[:modifiers...:accessors]} [= default]",
-      "description": "Defines a property with optional getter and setter. Auto-properties use accessor shorthand such as get,set, get,priset, or get,init. Full properties use indented §GET and §SET bodies.",
+      "calorSyntax": "property type:Name",
+      "description": "Declares a property with indented get, set or init accessors. Empty accessor bodies are auto-implemented; explicit bodies contain statements. Restricted accessor visibility follows its keyword, such as set private. Preserve defaults, modifiers and accessor effects.",
       "programs": [
         "task_31",
         "task_32"
@@ -165,11 +166,11 @@
       "examples": [
         {
           "csharp": "public string Name { get; set; }\npublic int Count { get; private set; }\npublic int Value { get { return _value; } set { _value = value; } }",
-          "calor": "§M{AgentReference31}\n  §CL{Product:pub}\n    §FLD{double:_price:priv}\n    §PROP{Price:double:pub}\n      §GET\n        §R _price\n      §SET\n        §ASSIGN _price value"
+          "calor": "module AgentReference31\n  class Product\n    field double:_price private\n    property double:Price\n      get\n        return _price\n      set\n        set _price value"
         },
         {
           "csharp": "public string Name { get; set; }\npublic int Count { get; private set; }\npublic int Value { get { return _value; } set { _value = value; } }",
-          "calor": "§M{AgentReference32}\n  §CL{Person:pub}\n    §PROP{Name:string:pub}\n      §GET\n        §SET"
+          "calor": "module AgentReference32\n  class Person\n    property string:Name\n      get\n      set"
         }
       ]
     },
@@ -183,11 +184,10 @@
         "this[string",
         "bracket",
         "index",
-        "§IXER",
         "indexer definition"
       ],
-      "calorSyntax": "§IXER{returnType:vis} with indented §I parameters and §GET/§SET bodies",
-      "description": "Defines an indexer on a class or interface. Full indexers use indented §I parameters and §GET/§SET/§INIT bodies. Compact auto-indexers use accessor shorthand and inline parameters.",
+      "calorSyntax": "this[int:index] → resultType",
+      "description": "Declares an indexer with inline typed parameters and indented get/set accessors. Preserve key order, restricted accessor visibility, defaults, modifiers and full accessor bodies.",
       "programs": [
         "complete_indexer"
       ],
@@ -195,7 +195,7 @@
       "examples": [
         {
           "csharp": "public int this[int index] { get; set; }\npublic string this[string key] { get; set; }\npublic int this[int row, int col] { get; set; }\npublic int this[int i] { get { return _data[i]; } set { _data[i] = value; } }",
-          "calor": "§M{Indexers}\n  §CL{Numbers:pub}\n    §IXER{int:pub}\n      §I{int:index}\n      §GET\n        §R (index + 1)"
+          "calor": "module Indexers\n  class Numbers\n    this[int:index] → int\n      get\n        return index + 1"
         }
       ]
     },
@@ -221,11 +221,11 @@
       "examples": [
         {
           "csharp": "var items = Data.Products;\nvar items = Data.GetProducts();",
-          "calor": "§M{AgentReference31}\n  §CL{Product:pub}\n    §FLD{double:_price:priv}\n    §PROP{Price:double:pub}\n      §GET\n        §R _price\n      §SET\n        §ASSIGN _price value"
+          "calor": "module AgentReference31\n  class Product\n    field double:_price private\n    property double:Price\n      get\n        return _price\n      set\n        set _price value"
         },
         {
           "csharp": "var items = Data.Products;\nvar items = Data.GetProducts();",
-          "calor": "§M{Objects}\n  §CL{Person:pub}\n    §PROP{Name:string:pub:get,set}\n  §F{Create:pub} () -> Person\n    §E{alloc}\n    §R §NEW{Person} §/NEW\n  §F{ReadName:pub} (Person:person) -> string?\n    §R person?.Name"
+          "calor": "module Objects\n  class Person\n    property string:Name\n      get\n      set\n  func Create () → Person\n    ! alloc\n    return new Person()\n  func ReadName (Person:person) → string?\n    return person?.Name"
         }
       ]
     },
@@ -242,16 +242,26 @@
         "range",
         "for loop"
       ],
-      "calorSyntax": "§L{var:from:to:step}",
-      "description": "For loop with an inclusive integer range. The body is indented under the loop header.",
+      "calorSyntax": "for i from start to end step stepValue; for i = start; condition; i = next",
+      "description": "One counted-loop keyword has two distinct semantics. The from/to/step header snapshots start, end and step once, in order, and includes the endpoint; omitted step is +1 and zero step throws. The =/semicolon form reevaluates its condition before each iteration and updates after the body or continue, not after break. Checked range overflow ends the snapshot range. Do not replace one form with the other.",
       "programs": [
-        "primer_loops"
+        "primer_loops",
+        "complete_reevaluated_for",
+        "copilot_smoke"
       ],
       "csharpEquivalent": "for (int i = 0; i < 10; i++) { ... }\nfor (int i = 0; i <= 10; i++) { ... }\nfor (int i = 0; i < 100; i += 2) { ... }",
       "examples": [
         {
           "csharp": "for (int i = 0; i < 10; i++) { ... }\nfor (int i = 0; i <= 10; i++) { ... }\nfor (int i = 0; i < 100; i += 2) { ... }",
-          "calor": "§M{Loops}\n  §F{PrintOneToFive:pub} () -> void\n    §E{cw}\n    §L{i:1:5:1}\n      Console.WriteLine(i)"
+          "calor": "module Loops\n  func PrintOneToFive () → void\n    ! cw\n    for i from 1 to 5 step 1\n      Console.WriteLine(i)"
+        },
+        {
+          "csharp": "for (int i = 0; i < 10; i++) { ... }\nfor (int i = 0; i <= 10; i++) { ... }\nfor (int i = 0; i < 100; i += 2) { ... }",
+          "calor": "module ReevaluatedLoops\n  func Count () → int\n    !\n    var int:limit = 3\n    var int:count = 0\n    for i = 0; i < limit; i = i + 1\n      set count count + 1\n      if i == 0\n        set limit 4\n    return count"
+        },
+        {
+          "csharp": "for (int i = 0; i < 10; i++) { ... }\nfor (int i = 0; i <= 10; i++) { ... }\nfor (int i = 0; i < 100; i += 2) { ... }",
+          "calor": "module CopilotSmoke\n  func Collect (int:n) → int\n    ! mut,alloc\n    let List<int>:items = new List<int>()\n    for i from 1 to n step 1\n      items.Add(i)\n    let int:count = items.Count\n    return count"
         }
       ]
     },
@@ -266,10 +276,11 @@
         "enumerable",
         "items",
         "elements",
-        "foreach loop"
+        "foreach loop",
+        "each"
       ],
-      "calorSyntax": "§EACH{item:type} collection",
-      "description": "Iterates a collection with an indented body.",
+      "calorSyntax": "each item in collection; each Type:item in collection; each key, value in collection",
+      "description": "Iterates synchronously over a collection with an indented body. An explicit type precedes the item name. Two names deconstruct each element without tuple parentheses; collection evaluation remains once.",
       "programs": [
         "task_14",
         "task_16"
@@ -278,11 +289,11 @@
       "examples": [
         {
           "csharp": "foreach (var item in items) { ... }\nforeach (var (key, value) in dictionary) { ... }",
-          "calor": "§M{AgentReference14}\n  §F{SumList:pub} () -> int\n    §E{alloc,mut}\n    §B{nums:List<int>} §NEW{List<int>}\n    §PUSH{nums} 10\n    §PUSH{nums} 20\n    §PUSH{nums} 30\n    §B{~sum:int} 0\n    §EACH{n} nums\n      §ASSIGN sum (sum + n)\n    §R sum"
+          "calor": "module AgentReference14\n  func SumList () → int\n    ! alloc,mut\n    let List<int>:nums = new List<int>()\n    nums.Add(10)\n    nums.Add(20)\n    nums.Add(30)\n    var int:sum = 0\n    each n in nums\n      set sum sum + n\n    return sum"
         },
         {
           "csharp": "foreach (var item in items) { ... }\nforeach (var (key, value) in dictionary) { ... }",
-          "calor": "§M{AgentReference16}\n  §F{PrintDictionary:pub} (Dictionary<string,int>:scores) -> void\n    §E{cw}\n    §EACHKV{k:v} scores\n      §P k\n      §P v"
+          "calor": "module AgentReference16\n  func PrintDictionary (Dictionary<string,int>:scores) → void\n    ! cw\n    each k, v in scores\n      Console.WriteLine(k)\n      Console.WriteLine(v)"
         }
       ]
     },
@@ -297,8 +308,8 @@
         "until",
         "while loop"
       ],
-      "calorSyntax": "§WH (condition)",
-      "description": "Executes body while condition is true.",
+      "calorSyntax": "while condition",
+      "description": "Evaluates the condition before each iteration and executes an indented body while true.",
       "programs": [
         "task_12"
       ],
@@ -306,7 +317,7 @@
       "examples": [
         {
           "csharp": "while (count > 0) { count--; }\nwhile (true) { if (done) break; }",
-          "calor": "§M{AgentReference12}\n  §F{Countdown:pub} () -> void\n    §E{cw}\n    §B{~count:int} 5\n    §WH (count > 0)\n      Console.WriteLine(count)\n      §ASSIGN count (count - 1)"
+          "calor": "module AgentReference12\n  func Countdown () → void\n    ! cw\n    var int:count = 5\n    while (count > 0)\n      Console.WriteLine(count)\n      set count (count - 1)"
         }
       ]
     },
@@ -324,8 +335,8 @@
         "else if",
         "if statement"
       ],
-      "calorSyntax": "§IF (condition) body §EI (condition) body §EL body",
-      "description": "Conditional branching. §EI for else-if, §EL for else. Both are optional.",
+      "calorSyntax": "if condition; else if condition; else",
+      "description": "Conditional branches have indented bodies. else if and else align with if. Only the selected branch runs.",
       "programs": [
         "primer_branching"
       ],
@@ -333,7 +344,7 @@
       "examples": [
         {
           "csharp": "if (x > 0) { return true; }\nif (x > 0) { a(); } else { b(); }\nif (x > 0) { } else if (x < 0) { } else { }",
-          "calor": "§M{Branching}\n  §F{Sign:pub} (int:x) -> int\n    §IF (x > 0)\n      §R 1\n    §EI (x < 0)\n      §R (-1)\n    §EL\n      §R 0"
+          "calor": "module Branching\n  func Sign (int:x) → int\n    if (x > 0)\n      return 1\n    else if (x < 0)\n      return (-1)\n    else\n      return 0"
         }
       ]
     },
@@ -357,7 +368,7 @@
       "examples": [
         {
           "csharp": "var x = condition ? a : b;\nreturn count > 0 ? \"items\" : \"none\";\nvar label = isActive ? GetLabel() : \"default\";",
-          "calor": "§M{AgentReference4}\n  §F{Abs:pub} (int:x) -> int\n    §S (result >= 0)\n    §R ((x < 0) ? (0 - x) : x)"
+          "calor": "module AgentReference4\n  func Abs (int:x) → int\n    => (result >= 0)\n    return ((x < 0) ? (0 - x) : x)"
         }
       ]
     },
@@ -372,8 +383,8 @@
         "value",
         "return statement"
       ],
-      "calorSyntax": "§R expression or §R (void)",
-      "description": "Returns a value from a function or method. Use bare §R for void returns.",
+      "calorSyntax": "return expression; return",
+      "description": "Returns a value or exits a void-result body. Async body results differ from their callable task carriers; preserve that distinction.",
       "programs": [
         "task_4"
       ],
@@ -381,7 +392,7 @@
       "examples": [
         {
           "csharp": "return 42;\nreturn user.Name;\nreturn;",
-          "calor": "§M{AgentReference4}\n  §F{Abs:pub} (int:x) -> int\n    §S (result >= 0)\n    §R ((x < 0) ? (0 - x) : x)"
+          "calor": "module AgentReference4\n  func Abs (int:x) → int\n    => (result >= 0)\n    return ((x < 0) ? (0 - x) : x)"
         }
       ]
     },
@@ -399,8 +410,8 @@
         "sealed",
         "class definition"
       ],
-      "calorSyntax": "§CL{Name:vis[:modifiers]}",
-      "description": "Defines a class. Supports modifiers such as abs, seal, partial, stat, struct, and readonly. Use §EXT for base class and §IMPL for interfaces.",
+      "calorSyntax": "class Name",
+      "description": "Declares a class, public by default. Its members have indented bodies. Preserve inheritance, implemented interfaces, generic constraints, visibility and supported modifiers.",
       "programs": [
         "primer_classes",
         "complex_class"
@@ -409,11 +420,11 @@
       "examples": [
         {
           "csharp": "public class User { }\npublic class Admin : User, IAdmin { }\npublic abstract class BaseEntity { }",
-          "calor": "§M{Classes}\n  §CL{Greeter:pub}\n    §MT{Greet:pub} () -> string\n      §R \"hello\""
+          "calor": "module Classes\n  class Greeter\n    func Greet () → string\n      return \"hello\""
         },
         {
           "csharp": "public class User { }\npublic class Admin : User, IAdmin { }\npublic abstract class BaseEntity { }",
-          "calor": "§M{PointModule}\n  §CL{Point:pub}\n    §FLD{int:_x:priv}\n    §FLD{int:_y:priv}\n\n    §CTOR{pub} (int:x, int:y)\n      §ASSIGN §THIS._x x\n      §ASSIGN §THIS._y y\n\n    §MT{Equals:pub} (Point:other) -> bool\n      §IF (other == null)\n        §R false\n      §EL\n        §R true\n\n    §OP{==:pub} (Point:left, Point:right) -> bool\n      §IF (left == null)\n        §R (right == null)\n      §EL\n        §R left.Equals(right)\n\n    §OP{!=:pub} (Point:left, Point:right) -> bool\n      §R (!(left == right))"
+          "calor": "module PointModule\n  class Point\n    field int:_x private\n    field int:_y private\n\n    ctor (int:x, int:y)\n      set this._x x\n      set this._y y\n\n    func Equals (Point:other) → bool\n      if (other == null)\n        return false\n      else\n        return true\n\n    op == (Point:left, Point:right) → bool\n      if (left == null)\n        return (right == null)\n      else\n        return left.Equals(right)\n\n    op != (Point:left, Point:right) → bool\n      return (!(left == right))"
         }
       ]
     },
@@ -430,8 +441,8 @@
         "future",
         "async method"
       ],
-      "calorSyntax": "§AF{name:vis} (type:param, ...) -> returnType or §AMT{name:vis} (type:param, ...) -> returnType",
-      "description": "Defines an async function. Use §AF for standalone async functions, §AMT for async class methods.\n\nAn async declaration with scalar output `T` is callable as `Task<T>`, but its body\nreturns `T`. A `void` output produces `Task`. Explicit .NET `Task<T>` and\n`ValueTask<T>` outputs preserve that carrier and return `T` in the body; their\nnon-generic forms have a void body result. Postconditions describe the body\nresult, not the task object. Ordinary synchronous task-returning declarations\nkeep their declared return type.",
+      "calorSyntax": "func Name async (type:param, ...) → returnType",
+      "description": "Declares an async function or class method using the async modifier.\n\nAn async declaration with scalar output `T` is callable as `Task<T>`, but its body\nreturns `T`. A `void` output produces `Task`. Explicit .NET `Task<T>` and\n`ValueTask<T>` outputs preserve that carrier and return `T` in the body; their\nnon-generic forms have a void body result. Postconditions describe the body\nresult, not the task object. Ordinary synchronous task-returning declarations\nkeep their declared return type.",
       "programs": [
         "complex_async"
       ],
@@ -439,7 +450,7 @@
       "examples": [
         {
           "csharp": "public async Task<string> FetchDataAsync() { ... }\npublic async Task ProcessAsync() { await DoWork(); }",
-          "calor": "§M{ConvertedModule}\n  §U{System}\n  §U{System.Threading.Tasks}\n\n  §CL{DataService:pub}\n    §AMT{FetchAsync:pub} (string:url) -> string\n      §TR\n        §B{_} §AWAIT Task.Delay(100)\n        §R (\"data from \" + url)\n      §CA{Exception:ex}\n        §R (\"error: \" + ex.Message)"
+          "calor": "module ConvertedModule\n  using System\n  using System.Threading.Tasks\n  class DataService\n    func FetchAsync async (string:url) → string\n      try\n        await Task.Delay(100)\n        return \"data from \" + url\n      catch Exception:ex\n        return \"error: \" + ex.Message"
         }
       ]
     },
@@ -454,8 +465,8 @@
         "task",
         "await expression"
       ],
-      "calorSyntax": "§AWAIT expression",
-      "description": "Awaits an asynchronous operation.\n\nAwaiting a .NET `Task<T>` or `ValueTask<T>` produces `T`. Awaiting a non-generic\ncarrier produces no value and cannot initialize a binding. `§AWAIT` can also be\nused as a statement. A custom type named `MyTask<T>` or a source declaration\nnamed `Task<T>` is not automatically a .NET async carrier. Unsupported custom\nawaitables are diagnosed or checked by generated C# validation, never inferred\nfrom a name suffix.",
+      "calorSyntax": "await expression",
+      "description": "Awaits an asynchronous operation.\n\nAwaiting a .NET `Task<T>` or `ValueTask<T>` produces `T`. Awaiting a non-generic\ncarrier produces no value and cannot initialize a binding. `await` can also be\nused as a statement. A custom type named `MyTask<T>` or a source declaration\nnamed `Task<T>` is not automatically a .NET async carrier. Unsupported custom\nawaitables are diagnosed or checked by generated C# validation, never inferred\nfrom a name suffix.",
       "programs": [
         "complex_async"
       ],
@@ -463,7 +474,7 @@
       "examples": [
         {
           "csharp": "var result = await FetchAsync();\nawait Task.Delay(1000);",
-          "calor": "§M{ConvertedModule}\n  §U{System}\n  §U{System.Threading.Tasks}\n\n  §CL{DataService:pub}\n    §AMT{FetchAsync:pub} (string:url) -> string\n      §TR\n        §B{_} §AWAIT Task.Delay(100)\n        §R (\"data from \" + url)\n      §CA{Exception:ex}\n        §R (\"error: \" + ex.Message)"
+          "calor": "module ConvertedModule\n  using System\n  using System.Threading.Tasks\n  class DataService\n    func FetchAsync async (string:url) → string\n      try\n        await Task.Delay(100)\n        return \"data from \" + url\n      catch Exception:ex\n        return \"error: \" + ex.Message"
         }
       ]
     },
@@ -480,8 +491,8 @@
         "handle",
         "try catch"
       ],
-      "calorSyntax": "§TR body §CA{ExceptionType:varName} handler §FI cleanup",
-      "description": "Exception handling. §TR for try block, §CA for catch (with optional type and variable), §FI for finally.",
+      "calorSyntax": "try; catch ExceptionType:name when condition; finally",
+      "description": "Groups an indented try body with one or more catch clauses and/or finally cleanup. Catch types, binders and filters are optional; preserve exception selection, filter evaluation and cleanup on every exit.",
       "programs": [
         "complex_async"
       ],
@@ -489,7 +500,7 @@
       "examples": [
         {
           "csharp": "try { x(); } catch { y(); }\ntry { } catch (Exception ex) { Log(ex); }\ntry { } finally { Cleanup(); }",
-          "calor": "§M{ConvertedModule}\n  §U{System}\n  §U{System.Threading.Tasks}\n\n  §CL{DataService:pub}\n    §AMT{FetchAsync:pub} (string:url) -> string\n      §TR\n        §B{_} §AWAIT Task.Delay(100)\n        §R (\"data from \" + url)\n      §CA{Exception:ex}\n        §R (\"error: \" + ex.Message)"
+          "calor": "module ConvertedModule\n  using System\n  using System.Threading.Tasks\n  class DataService\n    func FetchAsync async (string:url) → string\n      try\n        await Task.Delay(100)\n        return \"data from \" + url\n      catch Exception:ex\n        return \"error: \" + ex.Message"
         }
       ]
     },
@@ -503,8 +514,8 @@
         "raise",
         "throw statement"
       ],
-      "calorSyntax": "§TH expression or §RT (rethrow)",
-      "description": "Throws an exception. Use §RT to rethrow in a catch block.",
+      "calorSyntax": "throw expression; throw",
+      "description": "Throws an exception expression. Bare throw rethrows the current exception inside a catch handler, preserving its original stack rather than constructing or throwing a replacement.",
       "programs": [
         "task_8"
       ],
@@ -512,7 +523,7 @@
       "examples": [
         {
           "csharp": "throw new ArgumentException(\"Invalid\");\nthrow;",
-          "calor": "§M{AgentReference8}\n  §F{SafeDivide:pub} (int:a, int:b) -> int\n    §E{alloc,throw}\n    §IF (b != 0)\n      §R (a / b)\n    §EL\n      §TH §NEW{ArgumentException} §A \"Division by zero\" §/NEW"
+          "calor": "module AgentReference8\n  func SafeDivide (int:a, int:b) → int\n    ! alloc,throw\n    if b != 0\n      return a / b\n    else\n      throw new ArgumentException(\"Division by zero\")"
         }
       ]
     },
@@ -529,10 +540,11 @@
         "file",
         "network",
         "database",
-        "effects annotation"
+        "effects annotation",
+        "!"
       ],
-      "calorSyntax": "§E{effect1,effect2,...}",
-      "description": "Declares side effects a function may have. Common effects: cw (console write), db (database), net (network), fs:r/fs:w (file system), rand (random), time, and env. Unresolved external effects are not purity proofs; supply authoritative effect metadata rather than inventing an effect code.",
+      "calorSyntax": "! effect1,effect2,...",
+      "description": "Declares authoritative effects in the function header-clause region before the first body statement. Empty ! is a declared pure row. Effect variables bind with <! e> and occur in rows as ! e. Parameter rows follow type:name; output rows follow the output type; binding rows precede =; lambda rows precede =>. Preserve these distinct positions. In expression position, ! is logical negation, not an effect row. An unknown external call or manifest charge is not a metadata-resolution or purity proof.",
       "programs": [
         "primer_effects"
       ],
@@ -540,7 +552,7 @@
       "examples": [
         {
           "csharp": "// Method that writes to console\n// Method that reads file and writes console\n// Pure function (no effects)",
-          "calor": "§M{Effects}\n  §F{Greet:pub} (string:name) -> void\n    §E{cw}\n    Console.WriteLine(\"Hello\")\n    Console.WriteLine(name)"
+          "calor": "module Effects\n  func Greet (string:name) → void\n    ! cw\n    Console.WriteLine(\"Hello\")\n    Console.WriteLine(name)"
         }
       ]
     },
@@ -558,8 +570,8 @@
         "assert",
         "precondition"
       ],
-      "calorSyntax": "§Q (condition) or §Q{\"message\"} (condition)",
-      "description": "Declares a precondition that must be true when the function is called. Part of Design by Contract.",
+      "calorSyntax": "requires condition",
+      "description": "Declares a condition that must hold when the function is called. The example retains the divisor guard. A custom-message spelling is not part of this native form; use explicit exceptions when a custom failure message is required.",
       "programs": [
         "primer_contracts"
       ],
@@ -567,7 +579,7 @@
       "examples": [
         {
           "csharp": "// Contract.Requires(value >= 0)\n// Guard.Against.Null(input)",
-          "calor": "§M{Contracts}\n  §F{Square:pub} (int:x) -> int\n    §Q (x >= 0)\n    §S (result >= 0)\n    §R (x * x)\n\n  §F{Divide:pub} (int:a, int:b) -> int\n    §Q{\"divisor must not be zero\"} (b != 0)\n    §R (a / b)"
+          "calor": "module Contracts\n  func Square (int:x) → int\n    requires x >= 0\n    => result >= 0\n    return x * x\n\n  func Divide (int:a, int:b) → int\n    requires b != 0\n    return a / b"
         }
       ]
     },
@@ -581,10 +593,11 @@
         "contract",
         "result",
         "guarantee",
-        "postcondition"
+        "postcondition",
+        "=>"
       ],
-      "calorSyntax": "§S (condition) or §S{\"message\"} (condition)",
-      "description": "Declares a postcondition that will be true when the function returns. Use result to refer to the return value.",
+      "calorSyntax": "=> condition",
+      "description": "Declares a postcondition before the first body statement. result denotes the body return value, including async body results rather than task objects. In expression lambdas => is the lambda delimiter, not a postcondition.",
       "programs": [
         "primer_contracts"
       ],
@@ -592,7 +605,7 @@
       "examples": [
         {
           "csharp": "// Contract.Ensures(result >= 0)\n// Ensures non-empty result",
-          "calor": "§M{Contracts}\n  §F{Square:pub} (int:x) -> int\n    §Q (x >= 0)\n    §S (result >= 0)\n    §R (x * x)\n\n  §F{Divide:pub} (int:a, int:b) -> int\n    §Q{\"divisor must not be zero\"} (b != 0)\n    §R (a / b)"
+          "calor": "module Contracts\n  func Square (int:x) → int\n    requires x >= 0\n    => result >= 0\n    return x * x\n\n  func Divide (int:a, int:b) → int\n    requires b != 0\n    return a / b"
         }
       ]
     },
@@ -607,8 +620,8 @@
         "class constraint",
         "invariant"
       ],
-      "calorSyntax": "§IV (condition)",
-      "description": "Declares an invariant at module scope.",
+      "calorSyntax": "invariant condition",
+      "description": "Declares an invariant checked at the corresponding compilation-unit or type boundaries. Preserve the native contract AST and proof obligations, not an opaque runtime call.",
       "programs": [
         "complete_invariant"
       ],
@@ -616,7 +629,7 @@
       "examples": [
         {
           "csharp": "// [ContractInvariantMethod] void Invariants() { Contract.Invariant(_count >= 0); }",
-          "calor": "§M{Invariants}\n  §IV (1 > 0)\n  §F{Read:pub} () -> int\n    §R 1"
+          "calor": "module Invariants\n  invariant (1 > 0)\n  func Read () → int\n    return 1"
         }
       ]
     },
@@ -641,11 +654,11 @@
       "examples": [
         {
           "csharp": "Console.WriteLine(\"Hello\");\nuser.Save();\nCalculate(x, y) // internal pure call",
-          "calor": "§M{Files}\n  §F{Append:pub} (string:path, string:key, string:value) -> void\n    §E{fs:w}\n    File.AppendAllText(path, (key + (\"=\" + (value + \"\\n\"))))\n\n  §F{CountLines:pub} (string:path) -> int\n    §E{fs:r}\n    §B{ok:bool} File.Exists(path)\n    §IF (!ok)\n      §R 0\n    §B{lines:string[]} File.ReadAllLines(path)\n    §R (len lines)"
+          "calor": "module Files\n  func Append (string:path, string:key, string:value) → void\n    ! fs:w\n    File.AppendAllText(path, (key + (\"=\" + (value + \"\\n\"))))\n\n  func CountLines (string:path) → int\n    ! fs:r\n    let bool:ok = File.Exists(path)\n    if (!ok)\n      return 0\n    let string[]:lines = File.ReadAllLines(path)\n    return lines.Length"
         },
         {
           "csharp": "Console.WriteLine(\"Hello\");\nuser.Save();\nCalculate(x, y) // internal pure call",
-          "calor": "§M{PostfixCalls}\n  §F{Apply:pub} (Holder:h) -> int\n    §E{}\n    §R h.Make()(41)\n  §CL{Holder:pub}\n    §MT{Make:pub} () -> Func<int,int> §E{}\n      §E{}\n      §R §LAM{x:int} §E{} (x + 1) §/LAM"
+          "calor": "module PostfixCalls\n  func Apply (Holder:h) → int\n    !\n    return h.Make()(41)\n  class Holder\n    func Make () → Func<int,int> !\n      !\n      return (int:x) ! => x + 1"
         }
       ]
     },
@@ -660,8 +673,8 @@
         "_",
         "field definition"
       ],
-      "calorSyntax": "§FLD{type:name:visibility}",
-      "description": "Defines a field in a class. Usually private, prefixed with underscore by convention.",
+      "calorSyntax": "field type:name private = expression",
+      "description": "Declares a field with type before name, optional visibility and modifiers, and an optional initializer. Public is the default; preserve explicit private or protected visibility and readonly or static modifiers.",
       "programs": [
         "task_33"
       ],
@@ -669,7 +682,7 @@
       "examples": [
         {
           "csharp": "private string _name;\nprivate readonly int _id;",
-          "calor": "§M{AgentReference33}\n  §CL{Person:pub}\n    §FLD{string:_name:priv}\n    §FLD{int:_age:priv}\n    §CTOR{pub} (string:name, int:age)\n      §ASSIGN _name name\n      §ASSIGN _age age\n    §MT{GetName:pub} () -> string\n      §R _name"
+          "calor": "module AgentReference33\n  class Person\n    field string:_name private\n    field int:_age private\n    ctor (string:name, int:age)\n      set _name name\n      set _age age\n    func GetName () → string\n      return _name"
         }
       ]
     },
@@ -683,8 +696,8 @@
         "implement",
         "interface definition"
       ],
-      "calorSyntax": "§IFACE{Name:vis}",
-      "description": "Defines an interface with method signatures.",
+      "calorSyntax": "interface Name",
+      "description": "Declares an interface with indented func signatures. Preserve generic variance, inherited interfaces, effective visibility and method contracts. Explicit visibility follows the name and type parameters.",
       "programs": [
         "complete_interface"
       ],
@@ -692,7 +705,7 @@
       "examples": [
         {
           "csharp": "public interface IRepository { void Save(Entity e); }",
-          "calor": "§M{Interfaces}\n  §IFACE{ICounter}\n    §MT{Count:pub} () -> int\n  §CL{Counter:pub}\n    §IMPL{ICounter}\n    §MT{Count:pub} () -> int\n      §R 1"
+          "calor": "module Interfaces\n  interface ICounter\n    func Count () → int\n  class Counter\n    implements ICounter\n    func Count () → int\n      return 1"
         }
       ]
     },
@@ -706,8 +719,8 @@
         "constants",
         "enum definition"
       ],
-      "calorSyntax": "§EN{Name:vis[:underlyingType]} values...",
-      "description": "Defines an enumeration. Enum values are indented under §EN and may use = for explicit values.",
+      "calorSyntax": "enum Name byte",
+      "description": "Declares an enumeration with indented named members and optional explicit values. Preserve the underlying CLR type; omission defaults to int.",
       "programs": [
         "complex_enum"
       ],
@@ -715,7 +728,7 @@
       "examples": [
         {
           "csharp": "public enum Status { Active, Inactive, Pending }\npublic enum Priority : byte { Low = 0, High = 1 }",
-          "calor": "§M{ConvertedModule}\n  §EN{Status}\n    Pending\n    Active\n    Suspended\n    Closed\n\n  §CL{StatusHelper:pub}\n    §MT{GetLabel:pub:stat} (Status:s) -> string\n      §R §W s\n        §K Status.Pending → \"Pending Review\"\n        §K Status.Active → \"Active\"\n        §K Status.Suspended → \"Temporarily Suspended\"\n        §K Status.Closed → \"Closed\"\n        §K _ → \"Unknown\""
+          "calor": "module ConvertedModule\n  enum Status\n    Pending\n    Active\n    Suspended\n    Closed\n\n  class StatusHelper\n    func GetLabel static (Status:s) → string\n      return match s\n        case Status.Pending → \"Pending Review\"\n        case Status.Active → \"Active\"\n        case Status.Suspended → \"Temporarily Suspended\"\n        case Status.Closed → \"Closed\"\n        case _ → \"Unknown\""
         }
       ]
     },
@@ -730,8 +743,8 @@
         "construct",
         "constructor"
       ],
-      "calorSyntax": "§CTOR{vis} (type:param, ...)",
-      "description": "Defines a class constructor. Use §BASE with §A arguments to call a base constructor, or §THIS to chain constructors.",
+      "calorSyntax": "ctor (type:param, ...)",
+      "description": "Declares a constructor with an indented body. Explicit visibility precedes the parameter list. A base(args) or this(args) initializer is the first body clause; preserve ordered arguments and base versus same-type delegation.",
       "programs": [
         "task_33"
       ],
@@ -739,7 +752,7 @@
       "examples": [
         {
           "csharp": "public User(string name) { _name = name; }\npublic Admin(string name) : base(name) { }",
-          "calor": "§M{AgentReference33}\n  §CL{Person:pub}\n    §FLD{string:_name:priv}\n    §FLD{int:_age:priv}\n    §CTOR{pub} (string:name, int:age)\n      §ASSIGN _name name\n      §ASSIGN _age age\n    §MT{GetName:pub} () -> string\n      §R _name"
+          "calor": "module AgentReference33\n  class Person\n    field string:_name private\n    field int:_age private\n    ctor (string:name, int:age)\n      set _name name\n      set _age age\n    func GetName () → string\n      return _name"
         }
       ]
     },
@@ -754,8 +767,8 @@
         "when",
         "switch expression"
       ],
-      "calorSyntax": "§W expression with indented §K pattern → result cases; use in an expression context, such as §R §W",
-      "description": "Pattern matching switch expression. §K introduces each case/pattern. Use _ for default.",
+      "calorSyntax": "match expression with indented case pattern → result arms",
+      "description": "Matches an expression against ordered patterns. Expression arms use → followed by a result; statement arms have indented bodies. Preserve pattern guards and use return match when returning a match expression.",
       "programs": [
         "complex_enum"
       ],
@@ -763,7 +776,7 @@
       "examples": [
         {
           "csharp": "x switch { 1 => \"one\", 2 => \"two\", _ => \"other\" }\nshape switch { Circle c => c.Area(), Rectangle r => r.Width * r.Height }",
-          "calor": "§M{ConvertedModule}\n  §EN{Status}\n    Pending\n    Active\n    Suspended\n    Closed\n\n  §CL{StatusHelper:pub}\n    §MT{GetLabel:pub:stat} (Status:s) -> string\n      §R §W s\n        §K Status.Pending → \"Pending Review\"\n        §K Status.Active → \"Active\"\n        §K Status.Suspended → \"Temporarily Suspended\"\n        §K Status.Closed → \"Closed\"\n        §K _ → \"Unknown\""
+          "calor": "module ConvertedModule\n  enum Status\n    Pending\n    Active\n    Suspended\n    Closed\n\n  class StatusHelper\n    func GetLabel static (Status:s) → string\n      return match s\n        case Status.Pending → \"Pending Review\"\n        case Status.Active → \"Active\"\n        case Status.Suspended → \"Temporarily Suspended\"\n        case Status.Closed → \"Closed\"\n        case _ → \"Unknown\""
         }
       ]
     },
@@ -790,7 +803,7 @@
       "examples": [
         {
           "csharp": "name ?? \"default\"\nuser?.Name\nGetValue() ?? fallback",
-          "calor": "§M{AgentReference6}\n  §F{TryDouble:pub} (int:x) -> int?\n    §E{}\n    §IF (x > 0)\n      §R (x * 2)\n    §EL\n      §R null"
+          "calor": "module AgentReference6\n  func TryDouble (int:x) → int?\n    !\n    if (x > 0)\n      return (x * 2)\n    else\n      return null"
         }
       ]
     },
@@ -803,18 +816,33 @@
         "resource",
         "cleanup",
         "idisposable",
-        "using statement"
+        "using statement",
+        "import",
+        "imports",
+        "using directive",
+        "namespace import",
+        "using alias"
       ],
-      "calorSyntax": "§USE{var:type} resourceExpression",
-      "description": "Resource management with automatic disposal.",
+      "calorSyntax": "using System.Text; using Text = System.Text; using type:name = resource",
+      "description": "At compilation-unit scope, imports a namespace or declares an alias. In a function body, using introduces a resource and an indented body that disposes it on exit, including exceptions. Preserve the distinction between imports and resource lifetime management.",
       "programs": [
-        "complete_using"
+        "complete_using",
+        "complete_namespace",
+        "complete_block_namespace"
       ],
       "csharpEquivalent": "using (var stream = File.OpenRead(path)) { ... }\nusing var connection = new SqlConnection(connStr);",
       "examples": [
         {
           "csharp": "using (var stream = File.OpenRead(path)) { ... }\nusing var connection = new SqlConnection(connStr);",
-          "calor": "§M{Resources}\n  §F{Read:pub} (string:value) -> string\n    §E{alloc}\n    §USE{reader:System.IO.StringReader} §NEW{System.IO.StringReader} §A value §/NEW\n      §R reader.ReadToEnd()"
+          "calor": "module Resources\n  func Read (string:value) → string\n    ! alloc\n    using System.IO.StringReader:reader = new System.IO.StringReader(value)\n      return reader.ReadToEnd()"
+        },
+        {
+          "csharp": "using (var stream = File.OpenRead(path)) { ... }\nusing var connection = new SqlConnection(connStr);",
+          "calor": "module NamespaceFile Contoso.Tools\n  using Text = System.Text\n  class Box\n    field Text.StringBuilder?:Builder\n    func Read () → int\n      return 7"
+        },
+        {
+          "csharp": "using (var stream = File.OpenRead(path)) { ... }\nusing var connection = new SqlConnection(connStr);",
+          "calor": "module BlockFile Contoso.Tools block\n  using Text = System.Text\n  class Box\n    field Text.StringBuilder?:Builder\n    func Read () → int\n      return 7"
         }
       ]
     },
@@ -830,8 +858,8 @@
         "where",
         "generic type"
       ],
-      "calorSyntax": "§CL{Repository:pub}<T> with indented §WHERE T : class",
-      "description": "Generic type parameters and constraints.",
+      "calorSyntax": "class Repository<T>",
+      "description": "Declares a generic type. Put generic parameters immediately after the declaration name. Indented where clauses retain reference-type, value-type, constructor and interface constraints; generic arguments use ordinary C# type spellings.",
       "programs": [
         "task_29"
       ],
@@ -839,7 +867,7 @@
       "examples": [
         {
           "csharp": "public class Repository<T> where T : class { }\npublic T Get<T>(int id) where T : new() { }",
-          "calor": "§M{AgentReference29}\n  §CL{Container:pub}<T>\n    §FLD{T:_value:priv}\n    §MT{Get:pub} () -> T\n      §R _value\n    §MT{HashSet:pub} (T:value) -> void\n      §E{mut}\n      §ASSIGN _value value"
+          "calor": "module AgentReference29\n  class Container<T>\n    field T:_value private\n    func Get () → T\n      return _value\n    func HashSet (T:value) → void\n      ! mut\n      set _value value"
         }
       ]
     },
@@ -864,7 +892,7 @@
       "examples": [
         {
           "csharp": "items.Where(x => x > 5).Select(x => x * 2)\nfrom item in items where item.Active select item.Name",
-          "calor": "§M{Queries}\n  §U{System.Linq}\n  §F{Positive:pub} (int[]:values) -> int[]\n    §E{alloc}\n    §B{predicate:Func<int,bool>} §E{} §LAM{x:int} §E{} (x > 0) §/LAM\n    §B{filtered:System.Collections.Generic.IEnumerable<int>} System.Linq.Enumerable.Where<int>(values, predicate)\n    §R System.Linq.Enumerable.ToArray<int>(filtered)"
+          "calor": "module Queries\n  using System.Linq\n  func Positive (int[]:values) → int[]\n    ! alloc\n    let Func<int,bool>:predicate ! = (int:x) ! => x > 0\n    let System.Collections.Generic.IEnumerable<int>:filtered = System.Linq.Enumerable.Where<int>(values, predicate)\n    return System.Linq.Enumerable.ToArray<int>(filtered)"
         }
       ]
     },
@@ -888,7 +916,7 @@
       "examples": [
         {
           "csharp": "$\"Hello, {name}!\"\n$\"Total: {price:C2}\"\n$\"{firstName} {lastName}\"\n$\"Result: {Calculate(x, y)} units\"",
-          "calor": "§M{Interpolation}\n  §F{Greet:pub} (string:name) -> string\n    §R \"Hello ${name}\""
+          "calor": "module Interpolation\n  func Greet (string:name) → string\n    return \"Hello ${name}\""
         }
       ]
     },
@@ -903,8 +931,8 @@
         "next",
         "break continue"
       ],
-      "calorSyntax": "§BK for break, §CN for continue",
-      "description": "Loop control statements.",
+      "calorSyntax": "break; continue",
+      "description": "break exits the nearest loop; continue proceeds to its next iteration. A C#-form counted loop still performs its update after continue.",
       "programs": [
         "complete_break_continue"
       ],
@@ -912,7 +940,7 @@
       "examples": [
         {
           "csharp": "if (done) break;\nif (skip) continue;",
-          "calor": "§M{LoopControl}\n  §F{FirstPositive:pub} (int[]:values) -> int\n    §E{}\n    §B{~answer:int} 0\n    §EACH{value:int} values\n      §IF (value <= 0)\n        §CN\n      §ASSIGN answer value\n      §BK\n    §R answer"
+          "calor": "module LoopControl\n  func FirstPositive (int[]:values) → int\n    !\n    var int:answer = 0\n    each int:value in values\n      if (value <= 0)\n        continue\n      set answer value\n      break\n    return answer"
         }
       ]
     },
@@ -926,8 +954,8 @@
         "value object",
         "record type"
       ],
-      "calorSyntax": "record Point:pub (int:X, int:Y)",
-      "description": "Declares a C# record class. Positional parameters retain their constructor defaults and public init properties. Indent properties and methods beneath the header. C# supplies value equality, hashing, ToString, deconstruction and with/copy behavior. Derived positional records use `record D:pub (int:X, int:Y) : B(X)`. Record structs, partial or nested declarations and unrepresented member variants remain exact converter-owned C# fallback, not native records.",
+      "calorSyntax": "record Point (int:X, int:Y)",
+      "description": "Declares a C# record class. Positional parameters retain their constructor defaults and public init properties. Indent properties and methods beneath the header. C# supplies value equality, hashing, ToString, deconstruction and with/copy behavior. Derived positional records use `record D (int:X, int:Y) : B(X)`. Record structs, partial or nested declarations and unrepresented member variants remain exact converter-owned C# fallback, not native records.",
       "programs": [
         "complete_records"
       ],
@@ -935,7 +963,7 @@
       "examples": [
         {
           "csharp": "public record Point(int X, int Y);",
-          "calor": "§M{Records}\n  record Point:pub (int:X, int:Y = 2)\n  §F{Create:pub} () -> Point\n    §E{alloc,mut}\n    §R §NEW{Point} §A 1 §/NEW\n  §F{Shift:pub} (Point:point) -> Point\n    §E{alloc,mut}\n    §R §WITH point §SET{X} 3 §/WITH"
+          "calor": "module Records\n  record Point (int:X, int:Y = 2)\n  func Create () → Point\n    ! alloc,mut\n    return new Point(1)\n  func Shift (Point:point) → Point\n    ! alloc,mut\n    return point with { X = 3 }"
         }
       ]
     },
@@ -952,8 +980,8 @@
         "string[]",
         "array creation"
       ],
-      "calorSyntax": "§B{items} §ARR{type} elements §/ARR",
-      "description": "Creates a fixed-size array with a typed §ARR value literal. Elements are whitespace-separated; group infix elements explicitly. The documented bare closer remains part of this staged literal form.",
+      "calorSyntax": "new int[]{1, 2, 3}; new int[length]; new int[rows, columns]",
+      "description": "Creates a fixed-size array with a typed initializer or explicit dimensions. Initializer elements are comma-separated expressions. Multidimensional arrays retain their rank and ordered dimension evaluation; they are not jagged arrays or lists.",
       "programs": [
         "complete_arrays"
       ],
@@ -961,7 +989,7 @@
       "examples": [
         {
           "csharp": "int[] numbers = { 5, 4, 1, 3 };\nvar items = new int[] { 1, 2, 3 };\nstring[] names = new[] { \"Alice\", \"Bob\" };",
-          "calor": "§M{ArrayValues}\n  §F{First:pub} () -> int\n    §E{alloc}\n    §B{items} §ARR{int} 10 20 30 §/ARR\n    §R items[0]"
+          "calor": "module ArrayValues\n  func First () → int\n    ! alloc\n    let items = new int[]{10, 20, 30}\n    return items[0]"
         }
       ]
     },
@@ -971,20 +999,21 @@
       "keywords": [
         "static",
         "static class",
+        "static module",
+        "named module",
         "utility",
-        "helper",
-        "static class"
+        "helper"
       ],
-      "calorSyntax": "§M{Name}",
-      "description": "Defines a named module for static members. Its functions use §F; C# callers keep the original static class name. Static class declarations with §CL are rejected.",
+      "calorSyntax": "module Counter",
+      "description": "Declares a named static container with a nested module. Its functions are implicitly static, so Counter.Read retains its CLR identity. The outer module labels the compilation unit; it is not the container. class Counter static is intentionally rejected. Non-static classes may still declare static members.",
       "programs": [
-        "primer_contracts"
+        "complete_static_class"
       ],
       "csharpEquivalent": "public static class StringHelper { }",
       "examples": [
         {
           "csharp": "public static class StringHelper { }",
-          "calor": "§M{Contracts}\n  §F{Square:pub} (int:x) -> int\n    §Q (x >= 0)\n    §S (result >= 0)\n    §R (x * x)\n\n  §F{Divide:pub} (int:a, int:b) -> int\n    §Q{\"divisor must not be zero\"} (b != 0)\n    §R (a / b)"
+          "calor": "module StaticTypes\n  module Counter\n    func Read () → int\n      return 7\n  func Run () → int\n    return Counter.Read()"
         }
       ]
     },
@@ -999,8 +1028,8 @@
         "overridable",
         "virtual method"
       ],
-      "calorSyntax": "§MT{name:vis:virt} (type:param, ...) -> returnType",
-      "description": "Defines a virtual method that can be overridden in derived classes. Use the 'virt' modifier (the compiler also accepts 'vr').",
+      "calorSyntax": "func Name virtual (type:param, ...) → returnType",
+      "description": "Declares a virtual class method using virtual. Derived classes may override it.",
       "programs": [
         "complete_inheritance"
       ],
@@ -1008,7 +1037,7 @@
       "examples": [
         {
           "csharp": "public virtual string GetName() { return _name; }\nprotected virtual void OnChanged() { }",
-          "calor": "§M{Inheritance}\n  §CL{Base:pub:abs}\n    §MT{Read:pub:abs} () -> int\n    §MT{Label:pub:virt} () -> string\n      §R \"base\"\n  §CL{Derived:pub:seal}\n    §EXT{Base}\n    §MT{Read:pub:over} () -> int\n      §R 7\n    §MT{Label:pub:over} () -> string\n      §R \"derived\""
+          "calor": "module Inheritance\n  class Base abstract\n    func Read abstract () → int\n    func Label virtual () → string\n      return \"base\"\n  class Derived sealed\n    extends Base\n    func Read override () → int\n      return 7\n    func Label override () → string\n      return \"derived\""
         }
       ]
     },
@@ -1023,8 +1052,8 @@
         "subclass",
         "override method"
       ],
-      "calorSyntax": "§MT{name:vis:over} (type:param, ...) -> returnType",
-      "description": "Overrides a virtual method from a base class. Use the 'over' modifier (the compiler also accepts 'ov').",
+      "calorSyntax": "func Name override (type:param, ...) → returnType",
+      "description": "Overrides a virtual or abstract base method using override. Preserve the inherited signature and contracts.",
       "programs": [
         "complete_inheritance"
       ],
@@ -1032,7 +1061,7 @@
       "examples": [
         {
           "csharp": "public override string ToString() { return _name; }\npublic override int GetHashCode() { return _id; }",
-          "calor": "§M{Inheritance}\n  §CL{Base:pub:abs}\n    §MT{Read:pub:abs} () -> int\n    §MT{Label:pub:virt} () -> string\n      §R \"base\"\n  §CL{Derived:pub:seal}\n    §EXT{Base}\n    §MT{Read:pub:over} () -> int\n      §R 7\n    §MT{Label:pub:over} () -> string\n      §R \"derived\""
+          "calor": "module Inheritance\n  class Base abstract\n    func Read abstract () → int\n    func Label virtual () → string\n      return \"base\"\n  class Derived sealed\n    extends Base\n    func Read override () → int\n      return 7\n    func Label override () → string\n      return \"derived\""
         }
       ]
     },
@@ -1046,8 +1075,8 @@
         "cannot instantiate",
         "abstract class"
       ],
-      "calorSyntax": "§CL{Name:vis:abs}",
-      "description": "Defines an abstract class that cannot be instantiated directly. Use 'abs' modifier.",
+      "calorSyntax": "class Name abstract",
+      "description": "Declares an abstract class using abstract. It cannot be instantiated directly.",
       "programs": [
         "complete_inheritance"
       ],
@@ -1055,7 +1084,7 @@
       "examples": [
         {
           "csharp": "public abstract class Shape { }",
-          "calor": "§M{Inheritance}\n  §CL{Base:pub:abs}\n    §MT{Read:pub:abs} () -> int\n    §MT{Label:pub:virt} () -> string\n      §R \"base\"\n  §CL{Derived:pub:seal}\n    §EXT{Base}\n    §MT{Read:pub:over} () -> int\n      §R 7\n    §MT{Label:pub:over} () -> string\n      §R \"derived\""
+          "calor": "module Inheritance\n  class Base abstract\n    func Read abstract () → int\n    func Label virtual () → string\n      return \"base\"\n  class Derived sealed\n    extends Base\n    func Read override () → int\n      return 7\n    func Label override () → string\n      return \"derived\""
         }
       ]
     },
@@ -1069,8 +1098,8 @@
         "pure virtual",
         "abstract method"
       ],
-      "calorSyntax": "§MT{name:vis:abs} (type:param, ...) -> returnType",
-      "description": "Defines an abstract method with no body that must be overridden. Use 'abs' modifier.",
+      "calorSyntax": "func Name abstract (type:param, ...) → returnType",
+      "description": "Declares an abstract class method using abstract, without a body. Concrete derived classes must implement it.",
       "programs": [
         "complete_inheritance"
       ],
@@ -1078,7 +1107,7 @@
       "examples": [
         {
           "csharp": "public abstract double GetArea();",
-          "calor": "§M{Inheritance}\n  §CL{Base:pub:abs}\n    §MT{Read:pub:abs} () -> int\n    §MT{Label:pub:virt} () -> string\n      §R \"base\"\n  §CL{Derived:pub:seal}\n    §EXT{Base}\n    §MT{Read:pub:over} () -> int\n      §R 7\n    §MT{Label:pub:over} () -> string\n      §R \"derived\""
+          "calor": "module Inheritance\n  class Base abstract\n    func Read abstract () → int\n    func Label virtual () → string\n      return \"base\"\n  class Derived sealed\n    extends Base\n    func Read override () → int\n      return 7\n    func Label override () → string\n      return \"derived\""
         }
       ]
     },
@@ -1092,8 +1121,8 @@
         "cannot derive",
         "sealed class"
       ],
-      "calorSyntax": "§CL{Name:vis:seal}",
-      "description": "Defines a sealed class that cannot be inherited from. Use 'seal' modifier.",
+      "calorSyntax": "class Name sealed",
+      "description": "Declares a sealed class using sealed. It cannot be inherited from.",
       "programs": [
         "complete_inheritance"
       ],
@@ -1101,7 +1130,7 @@
       "examples": [
         {
           "csharp": "public sealed class FinalClass { }",
-          "calor": "§M{Inheritance}\n  §CL{Base:pub:abs}\n    §MT{Read:pub:abs} () -> int\n    §MT{Label:pub:virt} () -> string\n      §R \"base\"\n  §CL{Derived:pub:seal}\n    §EXT{Base}\n    §MT{Read:pub:over} () -> int\n      §R 7\n    §MT{Label:pub:over} () -> string\n      §R \"derived\""
+          "calor": "module Inheritance\n  class Base abstract\n    func Read abstract () → int\n    func Label virtual () → string\n      return \"base\"\n  class Derived sealed\n    extends Base\n    func Read override () → int\n      return 7\n    func Label override () → string\n      return \"derived\""
         }
       ]
     },
@@ -1117,8 +1146,8 @@
         "thread-safe",
         "lock statement"
       ],
-      "calorSyntax": "§SYNC (gate)",
-      "description": "Locks an object while executing the indented body.",
+      "calorSyntax": "lock gate",
+      "description": "Executes an indented body while holding the selected monitor. Preserve evaluate-once lock-object selection and monitor release on returns and exceptions.",
       "programs": [
         "complete_sync"
       ],
@@ -1126,7 +1155,7 @@
       "examples": [
         {
           "csharp": "lock (_sync) { _count++; }",
-          "calor": "§M{Synchronization}\n  §F{Read:pub} (object:gate) -> int\n    §SYNC (gate)\n      §R 7"
+          "calor": "module Synchronization\n  func Read (object:gate) → int\n    lock (gate)\n      return 7"
         }
       ]
     },
@@ -1150,7 +1179,7 @@
       "examples": [
         {
           "csharp": "// TODO: Implement caching\n// FIXME: This breaks with null input\n// HACK: Temporary workaround for API bug",
-          "calor": "§M{Documentation}\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  §F{Read:pub} () -> int\n    §DP{Use ReadCurrent instead}\n    §R 7\n  §F{ReadCurrent:priv} () -> int\n    §R 8"
+          "calor": "module Documentation\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  /// deprecated 1.0.0 ReadCurrent\n  func Read () → int\n    return 7\n  /// since 1.0.0\n  /// breaking 2.0.0 \"Returns the current value instead of the cached value.\"\n  func ReadCurrent private () → int\n    return 8"
         }
       ]
     },
@@ -1165,8 +1194,8 @@
         "do not use",
         "deprecated annotation"
       ],
-      "calorSyntax": "§DP{reason}",
-      "description": "Marks code as deprecated with a reason.",
+      "calorSyntax": "/// deprecated version [Replacement]",
+      "description": "Attach a declaration documentation line with the deprecation version and optional replacement. For an exact Obsolete attribute message, use the ordinary attribute form.",
       "programs": [
         "complete_documentation"
       ],
@@ -1174,7 +1203,7 @@
       "examples": [
         {
           "csharp": "[Obsolete(\"Use NewMethod instead\")]",
-          "calor": "§M{Documentation}\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  §F{Read:pub} () -> int\n    §DP{Use ReadCurrent instead}\n    §R 7\n  §F{ReadCurrent:priv} () -> int\n    §R 8"
+          "calor": "module Documentation\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  /// deprecated 1.0.0 ReadCurrent\n  func Read () → int\n    return 7\n  /// since 1.0.0\n  /// breaking 2.0.0 \"Returns the current value instead of the cached value.\"\n  func ReadCurrent private () → int\n    return 8"
         }
       ]
     },
@@ -1199,7 +1228,7 @@
       "examples": [
         {
           "csharp": "// Complexity: O(n log n)\n// Complexity: O(1) - constant time",
-          "calor": "§M{Documentation}\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  §F{Read:pub} () -> int\n    §DP{Use ReadCurrent instead}\n    §R 7\n  §F{ReadCurrent:priv} () -> int\n    §R 8"
+          "calor": "module Documentation\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  /// deprecated 1.0.0 ReadCurrent\n  func Read () → int\n    return 7\n  /// since 1.0.0\n  /// breaking 2.0.0 \"Returns the current value instead of the cached value.\"\n  func ReadCurrent private () → int\n    return 8"
         }
       ]
     },
@@ -1216,8 +1245,8 @@
         "modifier",
         "visibility modifiers"
       ],
-      "calorSyntax": "pub (public), priv (private), prot (protected)",
-      "description": "Visibility modifiers are specified in the tag header. Use 'pub' for public, 'priv' for private, 'prot' for protected.",
+      "calorSyntax": "public (default), private, protected, internal, protected-internal, private-protected",
+      "description": "Public visibility is the default. Write full-word visibility modifiers after the declaration name and generic parameters; compound visibility uses protected-internal or private-protected.",
       "programs": [
         "complete_documentation"
       ],
@@ -1225,7 +1254,7 @@
       "examples": [
         {
           "csharp": "public void Method() { }\nprivate int _field;\nprotected virtual void OnChange() { }",
-          "calor": "§M{Documentation}\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  §F{Read:pub} () -> int\n    §DP{Use ReadCurrent instead}\n    §R 7\n  §F{ReadCurrent:priv} () -> int\n    §R 8"
+          "calor": "module Documentation\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  /// deprecated 1.0.0 ReadCurrent\n  func Read () → int\n    return 7\n  /// since 1.0.0\n  /// breaking 2.0.0 \"Returns the current value instead of the cached value.\"\n  func ReadCurrent private () → int\n    return 8"
         }
       ]
     },
@@ -1243,20 +1272,18 @@
         "add",
         "remove",
         "accessor",
-        "§EADD",
-        "§EREM",
         "event definition"
       ],
-      "calorSyntax": "§EVT{name:vis:delegateType}",
-      "description": "Defines an event. Simple form has no body. For custom add/remove accessors, use indented §EADD and §EREM blocks inside the event body.",
+      "calorSyntax": "event DelegateType:Name",
+      "description": "Declares an event, optionally with paired indented add and remove accessor bodies. Preserve the delegate type, visibility and supported modifiers. Named-module events are static; ordinary classes may explicitly declare a static event. Converter preservation of an unsupported event shape is not an authoring spelling. The complete example demonstrates declaration only. Native event subscription and unsubscription statements are not admitted yet; do not write retired section markers or invent +=/-= statements. Convert original C# when preservation is needed.",
       "programs": [
         "task_23"
       ],
-      "csharpEquivalent": "public event EventHandler OnChanged;\npublic event Action<int> ValueUpdated;\npublic event EventHandler Click { add { _click += value; } remove { _click -= value; } }",
+      "csharpEquivalent": "public event EventHandler OnDataReceived;",
       "examples": [
         {
-          "csharp": "public event EventHandler OnChanged;\npublic event Action<int> ValueUpdated;\npublic event EventHandler Click { add { _click += value; } remove { _click -= value; } }",
-          "calor": "§M{AgentReference23}\n  §CL{EventPublisher:pub}\n    §EVT{OnDataReceived:pub:EventHandler}\n    §MT{Subscribe:pub} (EventHandler:handler) -> void\n      §E{mut}\n      §SUB OnDataReceived handler"
+          "csharp": "public event EventHandler OnDataReceived;",
+          "calor": "module AgentReference23\n  class EventPublisher\n    event EventHandler:OnDataReceived"
         }
       ]
     },
@@ -1273,10 +1300,11 @@
         "implicit",
         "explicit",
         "conversion",
-        "operator overload"
+        "operator overload",
+        "op"
       ],
-      "calorSyntax": "§OP{operator:vis} (type:param, ...) -> returnType",
-      "description": "Defines an operator overload using the supported arithmetic, comparison, equality or unary operators. Updates still use §ASSIGN; do not author increment/decrement or compound assignment expressions.",
+      "calorSyntax": "op + (type:left, type:right) → resultType; op implicit (type:value) → resultType",
+      "description": "Declares an operator overload or conversion with an indented body. Preserve operator token, parameter order, result type, effects and C# signature requirements. Conversion operators use implicit or explicit after op.",
       "programs": [
         "complex_class"
       ],
@@ -1284,7 +1312,7 @@
       "examples": [
         {
           "csharp": "public static MyType operator+(MyType left, MyType right) { return new MyType(left.Value + right.Value); }\npublic static MyType operator-(MyType value) { return new MyType(-value.Value); }\npublic static implicit operator int(MyType value) { return value.Value; }\npublic static explicit operator MyType(int value) { return new MyType(value); }",
-          "calor": "§M{PointModule}\n  §CL{Point:pub}\n    §FLD{int:_x:priv}\n    §FLD{int:_y:priv}\n\n    §CTOR{pub} (int:x, int:y)\n      §ASSIGN §THIS._x x\n      §ASSIGN §THIS._y y\n\n    §MT{Equals:pub} (Point:other) -> bool\n      §IF (other == null)\n        §R false\n      §EL\n        §R true\n\n    §OP{==:pub} (Point:left, Point:right) -> bool\n      §IF (left == null)\n        §R (right == null)\n      §EL\n        §R left.Equals(right)\n\n    §OP{!=:pub} (Point:left, Point:right) -> bool\n      §R (!(left == right))"
+          "calor": "module PointModule\n  class Point\n    field int:_x private\n    field int:_y private\n\n    ctor (int:x, int:y)\n      set this._x x\n      set this._y y\n\n    func Equals (Point:other) → bool\n      if (other == null)\n        return false\n      else\n        return true\n\n    op == (Point:left, Point:right) → bool\n      if (left == null)\n        return (right == null)\n      else\n        return left.Equals(right)\n\n    op != (Point:left, Point:right) → bool\n      return (!(left == right))"
         }
       ]
     },
@@ -1309,7 +1337,7 @@
       "examples": [
         {
           "csharp": "decimal price = 18.0000m;\ndecimal total = 100m;",
-          "calor": "§M{Decimals}\n  §F{Price:pub} () -> decimal\n    §R 18.00m"
+          "calor": "module Decimals\n  func Price () → decimal\n    return 18.00m"
         }
       ]
     },
@@ -1331,7 +1359,7 @@
       "examples": [
         {
           "csharp": "char c = 'A';",
-          "calor": "§M{AgentReference41}\n  §F{DigitValue:pub} (char:c) -> int\n    §E{}\n    §Q (is-digit c)\n    §R (c - '0')"
+          "calor": "module AgentReference41\n  func DigitValue (char:c) → int\n    !\n    requires char.IsDigit(c)\n    return c - '0'"
         }
       ]
     },
@@ -1348,8 +1376,8 @@
         "lazy",
         "yield return"
       ],
-      "calorSyntax": "§YIELD expression or §YBRK (yield break)",
-      "description": "Produces values lazily from an iterator method. §YIELD returns a value, §YBRK stops iteration.",
+      "calorSyntax": "yield expression; yield break",
+      "description": "Yields a value from an iterator or ends iteration. Preserve lazy execution, suspension, iterator disposal and cleanup; do not materialize the sequence eagerly.",
       "programs": [
         "complex_yield"
       ],
@@ -1357,7 +1385,7 @@
       "examples": [
         {
           "csharp": "yield return item;\nyield break;\npublic IEnumerable<int> GetNumbers() { for (int i = 0; i < 10; i++) yield return i; }",
-          "calor": "§M{ConvertedModule}\n  §U{System.Collections.Generic}\n\n  §CL{NumberGen:pub}\n    §MT{GetEvens:pub} (int:max) -> IEnumerable<int>\n      §L{i:0:max:2}\n        §YIELD i"
+          "calor": "module ConvertedModule\n  using System.Collections.Generic\n\n  class NumberGen\n    func GetEvens (int:max) → IEnumerable<int>\n      for i from 0 to max step 2\n        yield i"
         }
       ]
     },
@@ -1375,8 +1403,8 @@
         "nested delegate",
         "delegate definition"
       ],
-      "calorSyntax": "§DEL{name} with indented §I parameters and optional §O return type",
-      "description": "Defines a delegate type (function signature). Use for callbacks, event handlers, and function references. §DEL can appear at the top level or nested inside §CL class bodies.",
+      "calorSyntax": "delegate Name (type:param, ...) → returnType",
+      "description": "Declares a delegate signature at compilation-unit or class scope. Parameters are inline; an optional indented ! row retains the delegate's effect contract. Preserve parameter modifiers and the result type.",
       "programs": [
         "task_26"
       ],
@@ -1384,7 +1412,7 @@
       "examples": [
         {
           "csharp": "public delegate void EventCallback(string message);\npublic delegate int Transformer(int value);\npublic class MyClass { public delegate void Handler(int x); }",
-          "calor": "§M{AgentReference26}\n  §DEL{MathOperation}\n    §I{int:x}\n    §I{int:y}\n    §O{int}"
+          "calor": "module AgentReference26\n  delegate MathOperation (int:x, int:y) → int"
         }
       ]
     },
@@ -1400,10 +1428,11 @@
         "conditional compilation",
         "DEBUG",
         "RELEASE",
-        "preprocessor directive"
+        "preprocessor directive",
+        "pp"
       ],
-      "calorSyntax": "§PP{CONDITION} indented body; §PPE indented alternative",
-      "description": "Conditional compilation blocks use §PP for #if and §PPE for #else. Indented statement bodies end at dedent. Nested §PP blocks express #elif. Code inside is conditionally included based on defined symbols.",
+      "calorSyntax": "pp CONDITION; pp elif CONDITION; pp else",
+      "description": "Conditionally includes indented code. Chained pp clauses align with their opening pp. Conditions retain verbatim C# preprocessor text; preserve nested conditions and inactive branch contents under converter fidelity rules.",
       "programs": [
         "complete_preprocessor"
       ],
@@ -1411,7 +1440,7 @@
       "examples": [
         {
           "csharp": "#if DEBUG\n    Console.WriteLine(\"Debug mode\");\n#endif\n#if NET8_0_OR_GREATER\n    UseNewApi();\n#else\n    UseLegacyApi();\n#endif",
-          "calor": "§M{Preprocessor}\n  §F{Mode:pub} () -> string\n    §PP{DEBUG}\n      §R \"debug\"\n    §PPE\n      §R \"release\""
+          "calor": "module Preprocessor\n  func Mode () → string\n    pp DEBUG\n      return \"debug\"\n    pp else\n      return \"release\""
         }
       ]
     },
@@ -1425,8 +1454,8 @@
         "readonly struct",
         "struct definition"
       ],
-      "calorSyntax": "§CL{Name:vis:struct}",
-      "description": "Defines a value type (struct). Uses the 'struct' modifier on §CL. Supports readonly structs with the 'readonly' modifier.",
+      "calorSyntax": "class Name struct",
+      "description": "Declares a value type with the struct modifier. Preserve fields, properties, interfaces and value semantics rather than converting it to a reference class.",
       "programs": [
         "complete_struct"
       ],
@@ -1434,7 +1463,7 @@
       "examples": [
         {
           "csharp": "public struct Point { public int X; public int Y; }\npublic readonly struct Vector2D { public readonly double X; public readonly double Y; }",
-          "calor": "§M{Values}\n  §CL{Point:pub:struct}[@Serializable]\n    §PROP{X:int:pub:get,set}"
+          "calor": "module Values\n  class Point struct [@Serializable]\n    property int:X\n      get\n      set"
         }
       ]
     },
@@ -1451,8 +1480,8 @@
         "struct constraint",
         "generic constraint"
       ],
-      "calorSyntax": "§WHERE T : constraint for generic constraints",
-      "description": "Constrains generic type parameters. Supports class, struct, new(), interface, and base class constraints.",
+      "calorSyntax": "where T : class, new()",
+      "description": "Adds generic constraints before a declaration body. Preserve each reference/value-type, constructor, base-type and interface requirement, rather than treating a type parameter as an unconstrained object. Inside a quantified contract, where introduces its guard instead of a generic constraint.",
       "programs": [
         "task_30"
       ],
@@ -1460,7 +1489,7 @@
       "examples": [
         {
           "csharp": "public class Repository<T> where T : class, IEntity { }\npublic T Create<T>() where T : new() { return new T(); }\npublic void Process<T>(T item) where T : struct { }",
-          "calor": "§M{AgentReference30}\n  §CL{Repository:pub}<T>\n    §WHERE T : class\n    §FLD{List<T>:_items:priv}\n    §MT{Add:pub} (T:item) -> void\n      §E{mut}\n      §PUSH{_items} item"
+          "calor": "module AgentReference30\n  class Repository<T>\n    where T : class\n    field List<T>:_items private\n    func Add (T:item) → void\n      ! mut\n      _items.Add(item)"
         }
       ]
     },
@@ -1476,8 +1505,8 @@
         "at least once",
         "do while loop"
       ],
-      "calorSyntax": "§DO body §/DO (condition)",
-      "description": "Runs the indented body at least once; the matching closer carries the condition.",
+      "calorSyntax": "do indentedBody; while condition at the do indentation",
+      "description": "Executes the body at least once. The trailing while condition is at the same indentation as do; there is no structural closer.",
       "programs": [
         "task_13"
       ],
@@ -1485,7 +1514,7 @@
       "examples": [
         {
           "csharp": "do { Process(); } while (HasMore());",
-          "calor": "§M{AgentReference13}\n  §F{DoWhileDemo:pub} () -> void\n    §E{cw}\n    §B{~x:int} 0\n    §DO\n      Console.WriteLine(x)\n      §ASSIGN x (x + 1)\n    §/DO (x < 3)"
+          "calor": "module AgentReference13\n  func DoWhileDemo () → void\n    ! cw\n    var int:x = 0\n    do\n      Console.WriteLine(x)\n      set x (x + 1)\n    while (x < 3)"
         }
       ]
     },
@@ -1499,7 +1528,7 @@
         "multiple files",
         "partial class"
       ],
-      "calorSyntax": "§CL{Name:vis:partial}",
+      "calorSyntax": "class Name partial",
       "description": "Defines part of a class that can be split across multiple files. Uses the 'partial' modifier.",
       "programs": [
         "complete_partial"
@@ -1508,7 +1537,7 @@
       "examples": [
         {
           "csharp": "public partial class UserService { public void Save() { } }",
-          "calor": "§M{PartialTypes}\n  §CL{Counter:pub:partial}\n    §MT{Read:pub} () -> int\n      §R 1"
+          "calor": "module PartialTypes\n  class Counter partial\n    func Read () → int\n      return 1"
         }
       ]
     },
@@ -1523,8 +1552,8 @@
         "unmanaged",
         "unsafe block"
       ],
-      "calorSyntax": "§UNSAFE",
-      "description": "Marks a block for unsafe pointer operations. Required for pointer arithmetic, fixed statements, and stackalloc.",
+      "calorSyntax": "unsafe",
+      "description": "Introduces an indented unsafe body. Preserve unsafe effects and compile with unsafe support; the keyword is not permission to bypass diagnostics.",
       "programs": [
         "complete_unsafe"
       ],
@@ -1532,7 +1561,7 @@
       "examples": [
         {
           "csharp": "unsafe { int* ptr = &value; *ptr = 42; }",
-          "calor": "§M{UnsafeCode}\n  §F{Size:pub} () -> int\n    §E{unsafe}\n    §UNSAFE\n      §R 4"
+          "calor": "module UnsafeCode\n  func Size () → int\n    ! unsafe\n    unsafe\n      return 4"
         }
       ]
     },
@@ -1546,8 +1575,8 @@
         "null assign",
         "null coalescing assignment"
       ],
-      "calorSyntax": "§IF (x == null) with indented §ASSIGN x fallback",
-      "description": "Use a null check and §ASSIGN for a conditional update. Assignment expressions, including ??=, are not authored expression forms.",
+      "calorSyntax": "if x == null\n  set x fallback",
+      "description": "Use a null check and set for a conditional binding update. Assignment expressions, including ??=, are not authored expression forms.",
       "programs": [
         "complete_nullable"
       ],
@@ -1555,7 +1584,7 @@
       "examples": [
         {
           "csharp": "x ??= GetDefault();\n_cache ??= new Dictionary<string, int>();",
-          "calor": "§M{NullableValues}\n  §F{DefaultName:pub} (string?:name) -> string\n    §B{~value:string?} name\n    §IF (value == null)\n      §ASSIGN value \"unknown\"\n    §R (value ?? \"unknown\")"
+          "calor": "module NullableValues\n  func DefaultName (string?:name) → string\n    var string?:value = name\n    if (value == null)\n      set value \"unknown\"\n    return (value ?? \"unknown\")"
         }
       ]
     },
@@ -1581,7 +1610,7 @@
       "examples": [
         {
           "csharp": "[Serializable]\npublic class Data { }\n[Obsolete(\"Use NewMethod\")]\npublic void OldMethod() { }",
-          "calor": "§M{Values}\n  §CL{Point:pub:struct}[@Serializable]\n    §PROP{X:int:pub:get,set}"
+          "calor": "module Values\n  class Point struct [@Serializable]\n    property int:X\n      get\n      set"
         }
       ]
     },
@@ -1608,7 +1637,7 @@
       "examples": [
         {
           "csharp": "if (x is > 0 and < 100)\nreturn x is < 0 or > 100;\nif (x is not < 0)",
-          "calor": "§M{Patterns}\n  §F{InRange:pub} (int:value) -> bool\n    §R ((value > 0) && (value < 100))"
+          "calor": "module Patterns\n  func InRange (int:value) → bool\n    return ((value > 0) && (value < 100))"
         }
       ]
     },
@@ -1627,8 +1656,8 @@
         "array slice",
         "range expression"
       ],
-      "calorSyntax": "§IDX{array} §RANGE start end / §IDX{array} §^ n",
-      "description": "C# range expressions (start..end) and index-from-end (^n) have native Calor forms. Use §RANGE for slicing and §^ for indexing from the end.",
+      "calorSyntax": "array[start..end]; array[^offset]; array[start..]",
+      "description": "Use ordinary half-open C# ranges and index-from-end expressions inside brackets. A slice creates a new array; it is not an alias for the original array.",
       "programs": [
         "complete_ranges"
       ],
@@ -1636,7 +1665,7 @@
       "examples": [
         {
           "csharp": "var slice = array[0..5];\nvar last = items[^1];\nvar tail = data[2..];",
-          "calor": "§M{ArrayRanges}\n  §F{FirstTwo:pub} (int[]:values) -> int[]\n    §R values[§RANGE 0 2]"
+          "calor": "module ArrayRanges\n  func FirstTwo (int[]:values) → int[]\n    return values[0..2]"
         }
       ]
     },
@@ -1653,8 +1682,8 @@
         "property",
         "positional property pattern"
       ],
-      "calorSyntax": "Supported in C# → Calor migration. Decompose to §IF chains for hand-written Calor.",
-      "description": "During C# → Calor migration, positional patterns (tuple deconstruction) and property patterns stay inline. For hand-written Calor, decompose complex patterns into §IF/§EI chains with explicit comparisons.",
+      "calorSyntax": "Supported in C# → Calor migration; use if chains for handwritten decomposition.",
+      "description": "During C# → Calor migration, positional and property patterns retain converter fidelity. For handwritten decomposition, use if/else if with explicit comparisons.",
       "programs": [
         "complete_patterns"
       ],
@@ -1662,7 +1691,7 @@
       "examples": [
         {
           "csharp": "(hour, minute) switch { (0, 0) => \"midnight\" }\nobj switch { { Length: > 0 } => true }",
-          "calor": "§M{Patterns}\n  §F{InRange:pub} (int:value) -> bool\n    §R ((value > 0) && (value < 100))"
+          "calor": "module Patterns\n  func InRange (int:value) → bool\n    return ((value > 0) && (value < 100))"
         }
       ]
     },
@@ -1707,7 +1736,7 @@
       "examples": [
         {
           "csharp": "(int, string) pair = (1, \"hello\");\n(int X, int Y) point = (10, 20);\nreturn (a + b, a - b);",
-          "calor": "§M{Tuples}\n  §F{Pair:pub} (int:value) -> (int, string)\n    §R (value, \"value\")"
+          "calor": "module Tuples\n  func Pair (int:value) → (int, string)\n    return (value, \"value\")"
         }
       ]
     },
@@ -1732,7 +1761,7 @@
       "examples": [
         {
           "csharp": "var result = value ?? \"default\";\nreturn name ?? \"Anonymous\";",
-          "calor": "§M{NullableValues}\n  §F{DefaultName:pub} (string?:name) -> string\n    §B{~value:string?} name\n    §IF (value == null)\n      §ASSIGN value \"unknown\"\n    §R (value ?? \"unknown\")"
+          "calor": "module NullableValues\n  func DefaultName (string?:name) → string\n    var string?:value = name\n    if (value == null)\n      set value \"unknown\"\n    return (value ?? \"unknown\")"
         }
       ]
     },
@@ -1757,7 +1786,7 @@
       "examples": [
         {
           "csharp": "var name = user?.Name;\nvar len = text?.Length;",
-          "calor": "§M{Objects}\n  §CL{Person:pub}\n    §PROP{Name:string:pub:get,set}\n  §F{Create:pub} () -> Person\n    §E{alloc}\n    §R §NEW{Person} §/NEW\n  §F{ReadName:pub} (Person:person) -> string?\n    §R person?.Name"
+          "calor": "module Objects\n  class Person\n    property string:Name\n      get\n      set\n  func Create () → Person\n    ! alloc\n    return new Person()\n  func ReadName (Person:person) → string?\n    return person?.Name"
         }
       ]
     },
@@ -1772,8 +1801,8 @@
         "switch fallthrough",
         "goto case"
       ],
-      "calorSyntax": "§GOTO{CASE:expr} or §GOTO{DEFAULT}",
-      "description": "Jump to a specific case label or to the default case in a switch statement. For regular goto, use §GOTO{labelName}.",
+      "calorSyntax": "goto case expression; goto default; goto label",
+      "description": "Transfers control to a constant match case, the default arm, or a label written name:. Preserve the target and surrounding cleanup; goto case does not repeat the match selector's evaluation.",
       "programs": [
         "complete_goto"
       ],
@@ -1781,7 +1810,7 @@
       "examples": [
         {
           "csharp": "goto case 1;\ngoto case \"hello\";\ngoto default;\ngoto myLabel;",
-          "calor": "§M{Jumps}\n  §F{Normalize:pub} (int:value) -> int\n    §W value\n      §K 0\n        §GOTO{CASE:1}\n      §K 1\n        §R 1\n      §K _\n        §R 0"
+          "calor": "module Jumps\n  func Normalize (int:value) → int\n    match value\n      case 0\n        goto case 1\n      case 1\n        return 1\n      case _\n        return 0"
         }
       ]
     },
@@ -1797,8 +1826,8 @@
         "trim",
         "indexof"
       ],
-      "calorSyntax": "(concat a b), (substr text start count), (indexof text value :ordinal)",
-      "description": "Staged prefix built-ins include (str value), (concat a b), (fmt \"{0}\" value), (len text), (contains text value), (starts text prefix), (ends text suffix), (equals left right), (isempty text), (upper text), (lower text), (trim text), (replace text old new) and (substr text start count). indexof accepts an optional start and count; use :ordinal for ordinal comparison. Do not invent extra arguments.",
+      "calorSyntax": "string.Concat(a, b); text.Substring(start, count); text.IndexOf(value, StringComparison.Ordinal)",
+      "description": "String operations use ordinary C# property and method syntax. Preserve each selected overload's argument count and comparison mode. Length is text.Length; case conversion and trimming are methods. A one-character Substring is a string, while text[index] is a char. Do not invent extra arguments or replace ordinal comparison with culture-dependent behavior.",
       "programs": [
         "primer_strings",
         "task_37",
@@ -1808,15 +1837,15 @@
       "examples": [
         {
           "csharp": "string.Concat(a, b); text.Substring(start, count); text.IndexOf(value, StringComparison.Ordinal);",
-          "calor": "§M{Strings}\n  §F{FirstField:pub} (string:line) -> string\n    §E{}\n    §B{i:int} (indexof line \",\" :ordinal)\n    §IF (i < 0)\n      §R line\n    §R (substr line 0 i)"
+          "calor": "module Strings\n  func FirstField (string:line) → string\n    !\n    let int:i = line.IndexOf(\",\", StringComparison.Ordinal)\n    if i < 0\n      return line\n    return line.Substring(0, i)"
         },
         {
           "csharp": "string.Concat(a, b); text.Substring(start, count); text.IndexOf(value, StringComparison.Ordinal);",
-          "calor": "§M{AgentReference37}\n  §F{StringContains:pub} (string:s, string:sub) -> bool\n    §E{}\n    §R (contains s sub)"
+          "calor": "module AgentReference37\n  func StringContains (string:s, string:sub) → bool\n    !\n    return s.Contains(sub)"
         },
         {
           "csharp": "string.Concat(a, b); text.Substring(start, count); text.IndexOf(value, StringComparison.Ordinal);",
-          "calor": "§M{AgentReference38}\n  §F{BuildGreeting:pub} (string:name) -> string\n    §E{alloc,mut}\n    §B{sb:StringBuilder} (sb-new)\n    (sb-append sb \"Hello, \")\n    (sb-append sb name)\n    (sb-append sb \"!\")\n    §R (sb-tostring sb)"
+          "calor": "module AgentReference38\n  func BuildGreeting (string:name) → string\n    ! alloc,mut\n    let System.Text.StringBuilder:sb = new System.Text.StringBuilder()\n    sb.Append(\"Hello, \")\n    sb.Append(name)\n    sb.Append(\"!\")\n    return sb.ToString()"
         }
       ]
     },
@@ -1830,8 +1859,8 @@
         "letter",
         "character literal"
       ],
-      "calorSyntax": "(char-at text index), (char-code value), '0'",
-      "description": "Single quotes produce char literals with C# escapes. Built-ins include char-at, char-code, char-from-code, char-upper, char-lower, is-letter, is-digit, is-whitespace, is-upper and is-lower. Character subtraction promotes to int.",
+      "calorSyntax": "text[index]; (int)character; char.IsDigit(character); '0'",
+      "description": "Characters use single-quoted literals, ordinary indexing, scalar casts and char methods. Character classification follows the corresponding .NET method, including its Unicode behavior. Do not confuse a char with a one-character string.",
       "programs": [
         "task_36",
         "task_41",
@@ -1841,15 +1870,15 @@
       "examples": [
         {
           "csharp": "text[index]; (int)value; char.IsDigit(value);",
-          "calor": "§M{AgentReference36}\n  §F{GetFirstChar:pub} (string:s) -> char\n    §E{}\n    §Q ((len s) > 0)\n    §R (char-at s 0)"
+          "calor": "module AgentReference36\n  func GetFirstChar (string:s) → char\n    !\n    requires s.Length > 0\n    return s[0]"
         },
         {
           "csharp": "text[index]; (int)value; char.IsDigit(value);",
-          "calor": "§M{AgentReference41}\n  §F{DigitValue:pub} (char:c) -> int\n    §E{}\n    §Q (is-digit c)\n    §R (c - '0')"
+          "calor": "module AgentReference41\n  func DigitValue (char:c) → int\n    !\n    requires char.IsDigit(c)\n    return c - '0'"
         },
         {
           "csharp": "text[index]; (int)value; char.IsDigit(value);",
-          "calor": "§M{AgentReference42}\n  §F{Offset:pub} (char:c) -> int\n    §E{}\n    §R (c - '0')"
+          "calor": "module AgentReference42\n  func Offset (char:c) → int\n    !\n    return (c - '0')"
         }
       ]
     },
@@ -1860,7 +1889,6 @@
         "array",
         "arrays",
         "index",
-        "§IDX",
         "nested",
         "length"
       ],
@@ -1874,11 +1902,11 @@
       "examples": [
         {
           "csharp": "array[index]",
-          "calor": "§M{NestedArrayExpressions}\n  §F{SumPair:pub} (int[]:data) -> int\n    §E{}\n    §S (result == (data[0] + data[1]))\n    §B{~sum} 0\n    §ASSIGN sum (sum + data[0])\n    §R (sum + data[1])\n\n  §F{MixFirst:pub} (int[]:data, int:hash) -> int\n    §E{}\n    §R (hash ^ data[0])"
+          "calor": "module NestedArrayExpressions\n  func SumPair (int[]:data) → int\n    !\n    => (result == (data[0] + data[1]))\n    var sum = 0\n    set sum (sum + data[0])\n    return (sum + data[1])\n\n  func MixFirst (int[]:data, int:hash) → int\n    !\n    return (hash ^ data[0])"
         },
         {
           "csharp": "array[index]",
-          "calor": "§M{Files}\n  §F{Append:pub} (string:path, string:key, string:value) -> void\n    §E{fs:w}\n    File.AppendAllText(path, (key + (\"=\" + (value + \"\\n\"))))\n\n  §F{CountLines:pub} (string:path) -> int\n    §E{fs:r}\n    §B{ok:bool} File.Exists(path)\n    §IF (!ok)\n      §R 0\n    §B{lines:string[]} File.ReadAllLines(path)\n    §R (len lines)"
+          "calor": "module Files\n  func Append (string:path, string:key, string:value) → void\n    ! fs:w\n    File.AppendAllText(path, (key + (\"=\" + (value + \"\\n\"))))\n\n  func CountLines (string:path) → int\n    ! fs:r\n    let bool:ok = File.Exists(path)\n    if (!ok)\n      return 0\n    let string[]:lines = File.ReadAllLines(path)\n    return lines.Length"
         }
       ]
     },
@@ -1889,12 +1917,12 @@
         "assignment",
         "update",
         "mutable",
-        "§ASSIGN",
         "increment",
-        "compound"
+        "compound",
+        "set"
       ],
-      "calorSyntax": "§ASSIGN name expression",
-      "description": "Declare a mutable binding with a ~-prefixed name; use §ASSIGN for all updates, including increments and compound arithmetic.",
+      "calorSyntax": "set target expression; set receiver[index] expression",
+      "description": "Updates mutable bindings, fields or indexed storage. Indexed stores preserve left-to-right evaluate-once receiver, key and value evaluation, and dictionary updates are upserts rather than Add. Increment/decrement and compound assignment aliases are not separate expression forms. Inside a property or indexer, set declares a setter instead.",
       "programs": [
         "task_27"
       ],
@@ -1902,7 +1930,7 @@
       "examples": [
         {
           "csharp": "name = expression;",
-          "calor": "§M{AgentReference27}\n  §F{Accumulate:pub} (int:n) -> int\n    §B{~acc:int} 0          // Bind mutable variable acc = 0\n    §ASSIGN acc (acc + n)   // Assign acc = acc + n\n    §ASSIGN acc (acc + n)   // Assign again\n    §ASSIGN acc (acc + n)   // And again\n    §R acc"
+          "calor": "module AgentReference27\n  func Accumulate (int:n) → int\n    var int:acc = 0          // Bind mutable variable acc = 0\n    set acc (acc + n)   // Assign acc = acc + n\n    set acc (acc + n)   // Assign again\n    set acc (acc + n)   // And again\n    return acc"
         }
       ]
     },
@@ -1928,11 +1956,11 @@
       "examples": [
         {
           "csharp": "int, long, short, byte, ushort, uint, ulong, float, double, decimal, string, bool, char, object, void, T?, T[]",
-          "calor": "§M{Bindings}\n  §F{Demo:pub} () -> void\n    §E{cw}\n    §B{greeting:string} \"Ada\"\n    §B{~count:int} 0\n    Console.WriteLine(greeting)\n    Console.WriteLine(count)"
+          "calor": "module Bindings\n  func Demo () → void\n    ! cw\n    let string:greeting = \"Ada\"\n    var int:count = 0\n    Console.WriteLine(greeting)\n    Console.WriteLine(count)"
         },
         {
           "csharp": "int, long, short, byte, ushort, uint, ulong, float, double, decimal, string, bool, char, object, void, T?, T[]",
-          "calor": "§M{AgentReference6}\n  §F{TryDouble:pub} (int:x) -> int?\n    §E{}\n    §IF (x > 0)\n      §R (x * 2)\n    §EL\n      §R null"
+          "calor": "module AgentReference6\n  func TryDouble (int:x) → int?\n    !\n    if (x > 0)\n      return (x * 2)\n    else\n      return null"
         }
       ]
     },
@@ -1962,8 +1990,8 @@
         "precedence",
         "computed call"
       ],
-      "calorSyntax": "a + b, a == b, p && q, !p, condition ? thenValue : elseValue",
-      "description": "Use infix arithmetic, shifts, comparisons, equality, eager bitwise and short-circuit Boolean operators with C# precedence. Unary -, ! and ~ are supported. Calls and indexing bind tighter. Write implication as !p || q; use Math.Pow(a, b) for powers. Increment/decrement, assignment expressions, unary +, >>> and infix ** are not supported. Newlines end expressions; group infix operands in whitespace-separated staged hosts.",
+      "calorSyntax": "a + b; p && q; !p; condition ? yes : no; f(x); receiver[index]",
+      "description": "Expressions use infix operators with C# precedence and postfix calls/indexing. Binary operators associate left; ?? and ?: associate right. Lazy Boolean, coalescing and conditional operands retain their evaluation regions. No legacy prefix operator or section-call delimiters are authored. Express implication as !p || q.",
       "programs": [
         "task_4",
         "task_10",
@@ -1974,19 +2002,19 @@
       "examples": [
         {
           "csharp": "a + b; a == b; p && q; !p; condition ? thenValue : elseValue",
-          "calor": "§M{AgentReference4}\n  §F{Abs:pub} (int:x) -> int\n    §S (result >= 0)\n    §R ((x < 0) ? (0 - x) : x)"
+          "calor": "module AgentReference4\n  func Abs (int:x) → int\n    => (result >= 0)\n    return ((x < 0) ? (0 - x) : x)"
         },
         {
           "csharp": "a + b; a == b; p && q; !p; condition ? thenValue : elseValue",
-          "calor": "§M{AgentReference10}\n  §F{Max:pub} (int:a, int:b) -> int\n    §IF (a >= b)\n      §R a\n    §EL\n      §R b"
+          "calor": "module AgentReference10\n  func Max (int:a, int:b) → int\n    if (a >= b)\n      return a\n    else\n      return b"
         },
         {
           "csharp": "a + b; a == b; p && q; !p; condition ? thenValue : elseValue",
-          "calor": "§M{NestedArrayExpressions}\n  §F{SumPair:pub} (int[]:data) -> int\n    §E{}\n    §S (result == (data[0] + data[1]))\n    §B{~sum} 0\n    §ASSIGN sum (sum + data[0])\n    §R (sum + data[1])\n\n  §F{MixFirst:pub} (int[]:data, int:hash) -> int\n    §E{}\n    §R (hash ^ data[0])"
+          "calor": "module NestedArrayExpressions\n  func SumPair (int[]:data) → int\n    !\n    => (result == (data[0] + data[1]))\n    var sum = 0\n    set sum (sum + data[0])\n    return (sum + data[1])\n\n  func MixFirst (int[]:data, int:hash) → int\n    !\n    return (hash ^ data[0])"
         },
         {
           "csharp": "a + b; a == b; p && q; !p; condition ? thenValue : elseValue",
-          "calor": "§M{PostfixCalls}\n  §F{Apply:pub} (Holder:h) -> int\n    §E{}\n    §R h.Make()(41)\n  §CL{Holder:pub}\n    §MT{Make:pub} () -> Func<int,int> §E{}\n      §E{}\n      §R §LAM{x:int} §E{} (x + 1) §/LAM"
+          "calor": "module PostfixCalls\n  func Apply (Holder:h) → int\n    !\n    return h.Make()(41)\n  class Holder\n    func Make () → Func<int,int> !\n      !\n      return (int:x) ! => x + 1"
         }
       ]
     },
@@ -2000,8 +2028,8 @@
         "contracts",
         "implication"
       ],
-      "calorSyntax": "(forall ((i int)) body), (exists ((i int)) body); !condition || consequence",
-      "description": "Staged quantifiers declare typed bound variables. Check array lengths against external bounds. The examples use bounded exists and its negation for finite runtime checking. Runtime forall certification still requires a legacy implication AST; an equivalent infix Boolean body is not yet certified. Express ordinary implication as !condition || consequence. Contracts are obligations, not a guarantee that every proof succeeds.",
+      "calorSyntax": "forall int:i in start..end : body; exists int:i in start..end : body; forall int:i where guard : body",
+      "description": "Quantified contracts retain lexical binders and native proof semantics. Ranges are half-open: start <= i && i < end, and an empty range is vacuous for forall and false for exists. Use where for other guards; runtime checking still requires supported finite bounds. Express implication as !condition || consequence, not a special operator. Do not replace quantified proofs with unmodeled CLR calls.",
       "programs": [
         "task_39",
         "task_40"
@@ -2010,11 +2038,11 @@
       "examples": [
         {
           "csharp": "// Universal/existential contracts with bounded ranges.",
-          "calor": "§M{AgentReference39}\n  §F{AllPositive:pub} (int[]:arr, int:n) -> bool\n    §Q (n == (len arr))\n    §S (!(result) || !(exists ((i int)) (((i >= 0) && (i < n)) && (arr[i] <= 0))))\n    §B{~allPos:bool} true\n    §L{i:0:((len arr) - 1):1}\n      §IF (arr[i] <= 0)\n        §ASSIGN allPos false\n    §R allPos"
+          "calor": "module AgentReference39\n  func AllPositive (int[]:arr, int:n) → bool\n    requires n == arr.Length\n    => !result || !(exists int:i in 0..n : arr[i] <= 0)\n    var bool:allPos = true\n    for i from 0 to arr.Length - 1 step 1\n      if arr[i] <= 0\n        set allPos false\n    return allPos"
         },
         {
           "csharp": "// Universal/existential contracts with bounded ranges.",
-          "calor": "§M{AgentReference40}\n  §F{HasNegative:pub} (int[]:arr, int:n) -> bool\n    §Q (n == (len arr))\n    §S (result == (exists ((i int)) (((i >= 0) && (i < n)) && (arr[i] < 0))))\n    §L{i:0:((len arr) - 1):1}\n      §IF (arr[i] < 0)\n        §R true\n    §R false"
+          "calor": "module AgentReference40\n  func HasNegative (int[]:arr, int:n) → bool\n    requires n == arr.Length\n    => result == (exists int:i in 0..n : arr[i] < 0)\n    for i from 0 to arr.Length - 1 step 1\n      if arr[i] < 0\n        return true\n    return false"
         }
       ]
     },
@@ -2026,11 +2054,13 @@
         "list",
         "dictionary",
         "hashset",
-        "§PUSH",
-        "§PUT"
+        "add",
+        "upsert",
+        "count",
+        "contains"
       ],
-      "calorSyntax": "§PUSH{list} value; §PUT{dictionary} key value",
-      "description": "Ordinary List<T>, Dictionary<K,V> and HashSet<T> are distinct from arrays. Mutating heap collections requires mut; significant allocation requires alloc. §CNT reads count; §HAS tests membership. Use the complete examples for empty construction and iteration.",
+      "calorSyntax": "items.Add(value); set counts[key] value; items.Count; items.Contains(value)",
+      "description": "Ordinary List<T>, Dictionary<K,V> and HashSet<T> are distinct from arrays. Mutating heap collections requires mut; significant allocation requires alloc. Count reads size and Contains tests membership. Dictionary indexed updates are upserts, not Add. Preserve source-generic receiver metadata and method overloads without casts or fake types.",
       "programs": [
         "task_14",
         "task_15",
@@ -2042,23 +2072,23 @@
       "examples": [
         {
           "csharp": "list.Add(value); dictionary[key] = value;",
-          "calor": "§M{AgentReference14}\n  §F{SumList:pub} () -> int\n    §E{alloc,mut}\n    §B{nums:List<int>} §NEW{List<int>}\n    §PUSH{nums} 10\n    §PUSH{nums} 20\n    §PUSH{nums} 30\n    §B{~sum:int} 0\n    §EACH{n} nums\n      §ASSIGN sum (sum + n)\n    §R sum"
+          "calor": "module AgentReference14\n  func SumList () → int\n    ! alloc,mut\n    let List<int>:nums = new List<int>()\n    nums.Add(10)\n    nums.Add(20)\n    nums.Add(30)\n    var int:sum = 0\n    each n in nums\n      set sum sum + n\n    return sum"
         },
         {
           "csharp": "list.Add(value); dictionary[key] = value;",
-          "calor": "§M{AgentReference15}\n  §F{GetListLength:pub} (int:n) -> int\n    §E{alloc,mut}\n    §Q (n >= 0)\n    §B{nums:List<int>} §NEW{List<int>}\n    §L{i:1:n:1}\n      §PUSH{nums} i\n    §R §CNT{nums}"
+          "calor": "module AgentReference15\n  func GetListLength (int:n) → int\n    ! alloc,mut\n    requires n >= 0\n    let List<int>:nums = new List<int>()\n    for i from 1 to n step 1\n      nums.Add(i)\n    return nums.Count"
         },
         {
           "csharp": "list.Add(value); dictionary[key] = value;",
-          "calor": "§M{AgentReference16}\n  §F{PrintDictionary:pub} (Dictionary<string,int>:scores) -> void\n    §E{cw}\n    §EACHKV{k:v} scores\n      §P k\n      §P v"
+          "calor": "module AgentReference16\n  func PrintDictionary (Dictionary<string,int>:scores) → void\n    ! cw\n    each k, v in scores\n      Console.WriteLine(k)\n      Console.WriteLine(v)"
         },
         {
           "csharp": "list.Add(value); dictionary[key] = value;",
-          "calor": "§M{Collections}\n  §F{Tally:pub} (string:key) -> int\n    §E{mut,alloc}\n    §DICT{counts:string:int}\n    §/DICT\n    §PUT{counts} key 1\n    §R counts[key]"
+          "calor": "module Collections\n  func Tally (string:key) → int\n    ! mut,alloc\n    let Dictionary<string,int>:counts = new Dictionary<string,int>()\n    set counts[key] 1\n    return counts[key]"
         },
         {
           "csharp": "list.Add(value); dictionary[key] = value;",
-          "calor": "§M{CopilotSmoke}\n  §F{Collect:pub} (int:n) -> int\n    §E{mut,alloc}\n    §LIST{items:int}\n    §/LIST\n    §L{i:1:n:1}\n      §PUSH{items} i\n    §B{count:int} §CNT{items}\n    §R count"
+          "calor": "module CopilotSmoke\n  func Collect (int:n) → int\n    ! mut,alloc\n    let List<int>:items = new List<int>()\n    for i from 1 to n step 1\n      items.Add(i)\n    let int:count = items.Count\n    return count"
         }
       ]
     },
@@ -2067,519 +2097,577 @@
       "csharpConstruct": "Staged section call",
       "keywords": [
         "section call",
-        "legacy call",
-        "§C"
+        "legacy call"
       ],
-      "calorSyntax": "§C{target<T>} §A arg §/C",
-      "description": "Compatibility call lookup retained during integration. Author ordinary calls with postfix parentheses. A section call's manifest effect charge alone does not establish authoritative metadata resolution.",
+      "calorSyntax": "target<T>(arg)",
+      "description": "Legacy section-call delimiters are retired. This migration lookup points to ordinary postfix calls, not a compatibility syntax. A manifest effect charge alone does not establish authoritative method metadata or a purity proof.",
       "csharpEquivalent": "System.Linq.Enumerable.ToArray<int>(filtered)",
       "programs": [],
       "lookupOnly": true,
       "examples": []
+    },
+    {
+      "id": "module_definition",
+      "csharpConstruct": "module definition",
+      "keywords": [
+        "module",
+        "namespace",
+        "global namespace",
+        "file namespace",
+        "block namespace"
+      ],
+      "calorSyntax": "module FileLabel Contoso.Tools",
+      "description": "At file scope, labels the compilation unit. The optional qualified namespace follows the label; omission means the global namespace. That label is neither a namespace nor a static class declaration. A trailing block records block-namespace origin rather than file-scoped origin. Inside the compilation unit, a nested module declares a named static container with implicitly static functions.",
+      "programs": [
+        "complete_namespace",
+        "complete_block_namespace",
+        "complete_static_class"
+      ],
+      "csharpEquivalent": "namespace Contoso.Tools;",
+      "examples": [
+        {
+          "csharp": "namespace Contoso.Tools;",
+          "calor": "module NamespaceFile Contoso.Tools\n  using Text = System.Text\n  class Box\n    field Text.StringBuilder?:Builder\n    func Read () → int\n      return 7"
+        },
+        {
+          "csharp": "namespace Contoso.Tools;",
+          "calor": "module BlockFile Contoso.Tools block\n  using Text = System.Text\n  class Box\n    field Text.StringBuilder?:Builder\n    func Read () → int\n      return 7"
+        },
+        {
+          "csharp": "namespace Contoso.Tools;",
+          "calor": "module StaticTypes\n  module Counter\n    func Read () → int\n      return 7\n  func Run () → int\n    return Counter.Read()"
+        }
+      ]
+    },
+    {
+      "id": "enum_extension",
+      "csharpConstruct": "enum extension methods",
+      "keywords": [
+        "enum extension",
+        "enum extensions",
+        "extension method"
+      ],
+      "calorSyntax": "module ModeExtensions; func IsActive (this Mode:value) → bool",
+      "description": "Enum extensions use an ordinary named static module, not a separate enum-extension container head. The receiver is the first parameter, with this before its type. Preserve the EnumNameExtensions CLR container and the extension method's static identity.",
+      "programs": [
+        "complete_enum_extensions"
+      ],
+      "csharpEquivalent": "public static class ModeExtensions { public static bool IsActive(this Mode value) => value == Mode.Active; }",
+      "examples": [
+        {
+          "csharp": "public static class ModeExtensions { public static bool IsActive(this Mode value) => value == Mode.Active; }",
+          "calor": "module EnumExtensionExample\n  enum Mode byte\n    Inactive = 0\n    Active = 1\n  module ModeExtensions\n    func IsActive (this Mode:value) → bool\n      !\n      return value == Mode.Active"
+        }
+      ]
+    },
+    {
+      "id": "since_annotation",
+      "csharpConstruct": "introduction version metadata",
+      "keywords": [
+        "since",
+        "introduction version",
+        "version metadata"
+      ],
+      "calorSyntax": "/// since 1.0.0",
+      "description": "Records a declaration's introduction version in a documentation comment immediately before the declaration. Supply one valid version. This is structured API metadata, not a runtime version check.",
+      "programs": [
+        "complete_documentation"
+      ],
+      "csharpEquivalent": "// Available since version 1.0.0",
+      "examples": [
+        {
+          "csharp": "// Available since version 1.0.0",
+          "calor": "module Documentation\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  /// deprecated 1.0.0 ReadCurrent\n  func Read () → int\n    return 7\n  /// since 1.0.0\n  /// breaking 2.0.0 \"Returns the current value instead of the cached value.\"\n  func ReadCurrent private () → int\n    return 8"
+        }
+      ]
+    },
+    {
+      "id": "breaking_change_annotation",
+      "csharpConstruct": "breaking change metadata",
+      "keywords": [
+        "breaking",
+        "breaking change",
+        "compatibility change"
+      ],
+      "calorSyntax": "/// breaking 2.0.0 \"Description of the change\"",
+      "description": "Records a breaking change before a declaration. Supply a valid version and one C# string literal description; repeated lines retain multiple changes. Preserve the version and complete description rather than replacing them with an unstructured compatibility claim.",
+      "programs": [
+        "complete_documentation"
+      ],
+      "csharpEquivalent": "// Breaking change in version 2.0.0: Description of the change",
+      "examples": [
+        {
+          "csharp": "// Breaking change in version 2.0.0: Description of the change",
+          "calor": "module Documentation\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  /// deprecated 1.0.0 ReadCurrent\n  func Read () → int\n    return 7\n  /// since 1.0.0\n  /// breaking 2.0.0 \"Returns the current value instead of the cached value.\"\n  func ReadCurrent private () → int\n    return 8"
+        }
+      ]
     }
   ],
   "tags": {
-    "§NEW": {
+    "requires": {
+      "name": "Precondition",
+      "syntax": "requires condition",
+      "description": "Declares a condition that must hold when the function is called. The example retains the divisor guard. A custom-message spelling is not part of this native form; use explicit exceptions when a custom failure message is required.",
+      "csharpEquivalent": "// Contract.Requires(value >= 0)\n// Guard.Against.Null(input)"
+    },
+    "/// since": {
+      "name": "Since",
+      "syntax": "/// since 1.0.0",
+      "description": "Records a declaration's introduction version in a documentation comment immediately before the declaration. Supply one valid version. This is structured API metadata, not a runtime version check.",
+      "csharpEquivalent": "// Available since version 1.0.0"
+    },
+    "/// deprecated": {
+      "name": "Deprecated",
+      "syntax": "/// deprecated version [Replacement]",
+      "description": "Attach a declaration documentation line with the deprecation version and optional replacement. For an exact Obsolete attribute message, use the ordinary attribute form.",
+      "csharpEquivalent": "[Obsolete(\"Use NewMethod instead\")]"
+    },
+    "/// breaking": {
+      "name": "Breaking Change",
+      "syntax": "/// breaking 2.0.0 \"Description of the change\"",
+      "description": "Records a breaking change before a declaration. Supply a valid version and one C# string literal description; repeated lines retain multiple changes. Preserve the version and complete description rather than replacing them with an unstructured compatibility claim.",
+      "csharpEquivalent": "// Breaking change in version 2.0.0: Description of the change"
+    },
+    "assume": {
+      "name": "Assume",
+      "syntax": "assume condition",
+      "description": "Documents an assumption that must be true at this point in the code.",
+      "csharpEquivalent": "Debug.Assert(condition); // Assumption"
+    },
+    "..": {
+      "name": "Range",
+      "syntax": "start..end",
+      "description": "Represents a range value (start..end) for array/span slicing.",
+      "csharpEquivalent": "start..end"
+    },
+    "^": {
+      "name": "Index From End",
+      "syntax": "^offset",
+      "description": "Indexes from the end of a collection. Equivalent to C#'s ^n operator.",
+      "csharpEquivalent": "^n"
+    },
+    "new": {
       "name": "New Instance",
-      "close": "§/NEW",
-      "syntax": "§NEW{ClassName} §A arg1 §A arg2 §/NEW",
-      "description": "Creates a new instance of a class. The class name goes in braces; constructor arguments use §A. Use §NEW{ClassName} §/NEW for zero-argument constructors.",
+      "examples": [
+        {
+          "name": "List",
+          "calor": "new List<int>()",
+          "description": "Creates a dynamic list."
+        },
+        {
+          "name": "Dictionary",
+          "calor": "new Dictionary<string,int>()",
+          "description": "Creates a dictionary."
+        }
+      ],
+      "syntax": "new ClassName(arg1, arg2)",
+      "description": "Creates a new instance with ordinary constructor-call syntax. Arguments are comma-separated; a zero-argument constructor still uses (). Preserve the selected constructor and left-to-right argument evaluation.",
       "csharpEquivalent": "var user = new User(\"John\", 25);\nvar list = new List<int>();\nreturn new Widget(value);"
     },
-    "§B": {
-      "name": "Binding",
-      "syntax": "§B{name} value or §B{~name} value (mutable)",
-      "description": "Declares a variable binding. Use ~ prefix for mutable variables. Immutable by default. Give null an explicit existing nullable type, such as string?.",
+    "let": {
+      "name": "Immutable Binding",
+      "syntax": "let type:name = expression; var type:name = expression",
+      "description": "let declares an immutable binding; var declares a mutable binding. Both infer an omitted type. Types precede names; var is mutability, not a type-inference keyword. Give null an accurate explicit nullable type. In a match case, var name binds the matched value instead of declaring a mutable binding.",
       "csharpEquivalent": "var count = 0;\nint mutableCount = 0; // needs to be modified later\nstring name = \"John\";\nstring? name = null;"
     },
-    "§F": {
-      "name": "Function",
-      "syntax": "§F{name:vis} (type:param, ...) -> returnType",
-      "description": "Defines a standalone function (not a class member). Use for top-level functions or static utility methods.",
-      "csharpEquivalent": "public static int Add(int a, int b) { return a + b; }\nprivate void Log(string message) { Console.WriteLine(message); }"
+    "var": {
+      "name": "Mutable Binding",
+      "syntax": "let type:name = expression; var type:name = expression",
+      "description": "let declares an immutable binding; var declares a mutable binding. Both infer an omitted type. Types precede names; var is mutability, not a type-inference keyword. Give null an accurate explicit nullable type. In a match case, var name binds the matched value instead of declaring a mutable binding.",
+      "csharpEquivalent": "var count = 0;\nint mutableCount = 0; // needs to be modified later\nstring name = \"John\";\nstring? name = null;"
     },
-    "§AF": {
-      "name": "Async Function",
-      "syntax": "§AF{name:vis} (type:param, ...) -> returnType or §AMT{name:vis} (type:param, ...) -> returnType",
-      "description": "Defines an async function. Use §AF for standalone async functions, §AMT for async class methods.\n\nAn async declaration with scalar output `T` is callable as `Task<T>`, but its body\nreturns `T`. A `void` output produces `Task`. Explicit .NET `Task<T>` and\n`ValueTask<T>` outputs preserve that carrier and return `T` in the body; their\nnon-generic forms have a void body result. Postconditions describe the body\nresult, not the task object. Ordinary synchronous task-returning declarations\nkeep their declared return type.",
-      "csharpEquivalent": "public async Task<string> FetchDataAsync() { ... }\npublic async Task ProcessAsync() { await DoWork(); }"
-    },
-    "§M": {
-      "name": "Module",
-      "syntax": "§M{Name}",
-      "description": "Defines a named module for static members. Its functions use §F; C# callers keep the original static class name. Static class declarations with §CL are rejected.",
-      "csharpEquivalent": "public static class StringHelper { }"
-    },
-    "§MT": {
-      "name": "Method",
-      "syntax": "§MT{name:vis[:modifiers]} (type:param, ...) -> returnType",
-      "description": "Defines a method within a class. Supports visibility (pub/priv/prot) and modifiers such as virt/vr, over/ov, abs, stat/st, and seal.",
-      "csharpEquivalent": "public void Process(int value) { ... }\npublic virtual string GetName() { return _name; }\npublic override int Calculate(int x) { ... }"
-    },
-    "§AMT": {
-      "name": "Async Method",
-      "syntax": "§AMT{name:vis[:modifiers]} (type:param, ...) -> returnType",
-      "description": "Defines an async class method.",
-      "csharpEquivalent": "public async Task<T> Name(params) { body }"
-    },
-    "§I": {
-      "name": "Input Parameter",
-      "syntax": "Inline (type:name) parameters in function headers; indented §I{type:name} for delegates and full indexers",
-      "description": "Header parameter syntax. Modifiers: 'this' (extension method), 'ref', 'out', 'in', 'params'. Default values use =expr in the signature.",
-      "csharpEquivalent": "Type name, this Type name, ref Type name, params Type[] name, Type name = default",
+    "func": {
+      "name": "Function or Method",
       "examples": [
         {
           "name": "Extension Method Parameter",
-          "calor": "string:value:this",
-          "description": "Marks this as an extension method parameter (C# 'this' modifier)"
+          "calor": "this string:value",
+          "description": "Marks the first parameter as the extension receiver."
         },
         {
           "name": "Params Array",
-          "calor": "object[]:args:params",
-          "description": "Params array parameter (C# 'params' keyword)"
+          "calor": "params object[]:args",
+          "description": "Declares a parameter array."
         },
         {
           "name": "Default Value",
           "calor": "int:count = 0",
-          "description": "Parameter with default value"
+          "description": "Declares a parameter with a default value."
         },
         {
           "name": "Ref Parameter",
-          "calor": "int:value:ref",
-          "description": "Ref parameter (C# 'ref' keyword)"
+          "calor": "ref int:value",
+          "description": "Passes a variable by reference."
         },
         {
           "name": "Out Parameter",
-          "calor": "int:result:out",
-          "description": "Out parameter (C# 'out' keyword)"
+          "calor": "out int:result",
+          "description": "Passes an output variable by reference."
         }
-      ]
+      ],
+      "syntax": "func Name (type:param, ...) → returnType",
+      "description": "Declares a function or class method. Visibility is public by default; explicitly private and protected declarations retain their intended visibility. Parameters put the type before the name; parameter modifiers precede the type. Class methods may carry virtual, override, abstract or static modifiers. Functions inside a named static module are implicitly static.",
+      "csharpEquivalent": "public static int Add(int a, int b) { return a + b; }\nprivate void Log(string message) { Console.WriteLine(message); }"
     },
-    "§O": {
-      "name": "Output Type",
-      "syntax": "Inline -> type in function headers; indented §O{type} for delegates",
-      "description": "Declares the return type of a function or method via the header arrow.",
-      "csharpEquivalent": "Return type declaration"
+    "async": {
+      "name": "Async Function or Method",
+      "syntax": "func Name async (type:param, ...) → returnType",
+      "description": "Declares an async function or class method using the async modifier.\n\nAn async declaration with scalar output `T` is callable as `Task<T>`, but its body\nreturns `T`. A `void` output produces `Task`. Explicit .NET `Task<T>` and\n`ValueTask<T>` outputs preserve that carrier and return `T` in the body; their\nnon-generic forms have a void body result. Postconditions describe the body\nresult, not the task object. Ordinary synchronous task-returning declarations\nkeep their declared return type.",
+      "csharpEquivalent": "public async Task<string> FetchDataAsync() { ... }\npublic async Task ProcessAsync() { await DoWork(); }"
     },
-    "§R": {
+    "module": {
+      "name": "Module and Namespace",
+      "syntax": "module FileLabel Contoso.Tools",
+      "description": "At file scope, labels the compilation unit. The optional qualified namespace follows the label; omission means the global namespace. That label is neither a namespace nor a static class declaration. A trailing block records block-namespace origin rather than file-scoped origin. Inside the compilation unit, a nested module declares a named static container with implicitly static functions.",
+      "csharpEquivalent": "namespace Contoso.Tools;"
+    },
+    "return": {
       "name": "Return",
-      "syntax": "§R expression or §R (void)",
-      "description": "Returns a value from a function or method. Use bare §R for void returns.",
+      "syntax": "return expression; return",
+      "description": "Returns a value or exits a void-result body. Async body results differ from their callable task carriers; preserve that distinction.",
       "csharpEquivalent": "return 42;\nreturn user.Name;\nreturn;"
     },
-    "§CL": {
+    "class": {
       "name": "Class",
-      "syntax": "§CL{Name:vis[:modifiers]}",
-      "description": "Defines a class. Supports modifiers such as abs, seal, partial, stat, struct, and readonly. Use §EXT for base class and §IMPL for interfaces.",
+      "syntax": "class Name",
+      "description": "Declares a class, public by default. Its members have indented bodies. Preserve inheritance, implemented interfaces, generic constraints, visibility and supported modifiers.",
       "csharpEquivalent": "public class User { }\npublic class Admin : User, IAdmin { }\npublic abstract class BaseEntity { }"
     },
-    "§EXT": {
-      "name": "Extends",
-      "syntax": "§EXT{BaseClass}",
-      "description": "Specifies the base class for inheritance.",
-      "csharpEquivalent": ": BaseClass"
-    },
-    "§IMPL": {
-      "name": "Implements",
-      "syntax": "§IMPL{Interface}",
-      "description": "Specifies an interface the class implements.",
-      "csharpEquivalent": ": IInterface"
-    },
-    "§IFACE": {
-      "name": "Interface",
-      "syntax": "§IFACE{Name:vis}",
-      "description": "Defines an interface with method signatures.",
-      "csharpEquivalent": "public interface IRepository { void Save(Entity e); }"
-    },
-    "§L": {
-      "name": "Loop",
-      "syntax": "§L{var:from:to:step}",
-      "description": "For loop with an inclusive integer range. The body is indented under the loop header.",
+    "for": {
+      "name": "Counted Loop",
+      "syntax": "for i from start to end step stepValue; for i = start; condition; i = next",
+      "description": "One counted-loop keyword has two distinct semantics. The from/to/step header snapshots start, end and step once, in order, and includes the endpoint; omitted step is +1 and zero step throws. The =/semicolon form reevaluates its condition before each iteration and updates after the body or continue, not after break. Checked range overflow ends the snapshot range. Do not replace one form with the other.",
       "csharpEquivalent": "for (int i = 0; i < 10; i++) { ... }\nfor (int i = 0; i <= 10; i++) { ... }\nfor (int i = 0; i < 100; i += 2) { ... }"
     },
-    "§WH": {
+    "each": {
+      "name": "Collection Iteration",
+      "syntax": "each item in collection; each Type:item in collection; each key, value in collection",
+      "description": "Iterates synchronously over a collection with an indented body. An explicit type precedes the item name. Two names deconstruct each element without tuple parentheses; collection evaluation remains once.",
+      "csharpEquivalent": "foreach (var item in items) { ... }\nforeach (var (key, value) in dictionary) { ... }"
+    },
+    "while": {
       "name": "While Loop",
-      "syntax": "§WH (condition)",
-      "description": "Executes body while condition is true.",
+      "syntax": "while condition",
+      "description": "Evaluates the condition before each iteration and executes an indented body while true.",
       "csharpEquivalent": "while (count > 0) { count--; }\nwhile (true) { if (done) break; }"
     },
-    "§DO": {
+    "do": {
       "name": "Do-While Loop",
-      "close": "§/DO (condition)",
-      "syntax": "§DO body §/DO (condition)",
-      "description": "Runs the indented body at least once; the matching closer carries the condition.",
+      "syntax": "do indentedBody; while condition at the do indentation",
+      "description": "Executes the body at least once. The trailing while condition is at the same indentation as do; there is no structural closer.",
       "csharpEquivalent": "do { Process(); } while (HasMore());"
     },
-    "§IF": {
+    "if": {
       "name": "If Statement",
-      "syntax": "§IF (condition) body §EI (condition) body §EL body",
-      "description": "Conditional branching. §EI for else-if, §EL for else. Both are optional.",
+      "syntax": "if condition; else if condition; else",
+      "description": "Conditional branches have indented bodies. else if and else align with if. Only the selected branch runs.",
       "csharpEquivalent": "if (x > 0) { return true; }\nif (x > 0) { a(); } else { b(); }\nif (x > 0) { } else if (x < 0) { } else { }"
     },
-    "§EI": {
-      "name": "Else If",
-      "syntax": "§EI (condition)",
-      "description": "Else-if branch in a conditional.",
-      "csharpEquivalent": "else if (condition) { body }"
+    "else": {
+      "name": "Alternative Branch",
+      "syntax": "if condition; else if condition; else",
+      "description": "Conditional branches have indented bodies. else if and else align with if. Only the selected branch runs.",
+      "csharpEquivalent": "if (x > 0) { return true; }\nif (x > 0) { a(); } else { b(); }\nif (x > 0) { } else if (x < 0) { } else { }"
     },
-    "§EL": {
-      "name": "Else",
-      "syntax": "§EL",
-      "description": "Else branch in a conditional.",
-      "csharpEquivalent": "else { body }"
-    },
-    "§AWAIT": {
+    "await": {
       "name": "Await",
-      "syntax": "§AWAIT expression",
-      "description": "Awaits an asynchronous operation.\n\nAwaiting a .NET `Task<T>` or `ValueTask<T>` produces `T`. Awaiting a non-generic\ncarrier produces no value and cannot initialize a binding. `§AWAIT` can also be\nused as a statement. A custom type named `MyTask<T>` or a source declaration\nnamed `Task<T>` is not automatically a .NET async carrier. Unsupported custom\nawaitables are diagnosed or checked by generated C# validation, never inferred\nfrom a name suffix.",
+      "syntax": "await expression",
+      "description": "Awaits an asynchronous operation.\n\nAwaiting a .NET `Task<T>` or `ValueTask<T>` produces `T`. Awaiting a non-generic\ncarrier produces no value and cannot initialize a binding. `await` can also be\nused as a statement. A custom type named `MyTask<T>` or a source declaration\nnamed `Task<T>` is not automatically a .NET async carrier. Unsupported custom\nawaitables are diagnosed or checked by generated C# validation, never inferred\nfrom a name suffix.",
       "csharpEquivalent": "var result = await FetchAsync();\nawait Task.Delay(1000);"
     },
-    "§TR": {
-      "name": "Try Block",
-      "syntax": "§TR body §CA{ExceptionType:varName} handler §FI cleanup",
-      "description": "Exception handling. §TR for try block, §CA for catch (with optional type and variable), §FI for finally.",
-      "csharpEquivalent": "try { x(); } catch { y(); }\ntry { } catch (Exception ex) { Log(ex); }\ntry { } finally { Cleanup(); }"
-    },
-    "§CA": {
-      "name": "Catch Block",
-      "syntax": "§CA{ExceptionType:varName} or §CA{Exception}",
-      "description": "Catches exceptions. Type and variable name are optional.",
-      "csharpEquivalent": "catch (ExceptionType varName) { body }"
-    },
-    "§FI": {
-      "name": "Finally Block",
-      "syntax": "§FI",
-      "description": "Finally block that always executes.",
-      "csharpEquivalent": "finally { body }"
-    },
-    "§TH": {
-      "name": "Throw",
-      "syntax": "§TH expression or §RT (rethrow)",
-      "description": "Throws an exception. Use §RT to rethrow in a catch block.",
-      "csharpEquivalent": "throw new ArgumentException(\"Invalid\");\nthrow;"
-    },
-    "§GOTO": {
-      "name": "Goto",
-      "syntax": "§GOTO{CASE:expr} or §GOTO{DEFAULT}",
-      "description": "Jump to a specific case label or to the default case in a switch statement. For regular goto, use §GOTO{labelName}.",
-      "csharpEquivalent": "goto case 1;\ngoto case \"hello\";\ngoto default;\ngoto myLabel;"
-    },
-    "§E": {
+    "!": {
       "name": "Effects",
-      "syntax": "§E{effect1,effect2,...}",
-      "description": "Declares side effects a function may have. Common effects: cw (console write), db (database), net (network), fs:r/fs:w (file system), rand (random), time, and env. Unresolved external effects are not purity proofs; supply authoritative effect metadata rather than inventing an effect code.",
+      "syntax": "! effect1,effect2,...",
+      "description": "Declares authoritative effects in the function header-clause region before the first body statement. Empty ! is a declared pure row. Effect variables bind with <! e> and occur in rows as ! e. Parameter rows follow type:name; output rows follow the output type; binding rows precede =; lambda rows precede =>. Preserve these distinct positions. In expression position, ! is logical negation, not an effect row. An unknown external call or manifest charge is not a metadata-resolution or purity proof.",
       "csharpEquivalent": "// Method that writes to console\n// Method that reads file and writes console\n// Pure function (no effects)"
     },
-    "§Q": {
-      "name": "Precondition",
-      "syntax": "§Q (condition) or §Q{\"message\"} (condition)",
-      "description": "Declares a precondition that must be true when the function is called. Part of Design by Contract.",
-      "csharpEquivalent": "// Contract.Requires(value >= 0)\n// Guard.Against.Null(input)"
-    },
-    "§S": {
-      "name": "Postcondition",
-      "syntax": "§S (condition) or §S{\"message\"} (condition)",
-      "description": "Declares a postcondition that will be true when the function returns. Use result to refer to the return value.",
+    "=>": {
+      "name": "Postcondition or Lambda",
+      "syntax": "=> condition",
+      "description": "Declares a postcondition before the first body statement. result denotes the body return value, including async body results rather than task objects. In expression lambdas => is the lambda delimiter, not a postcondition.",
       "csharpEquivalent": "// Contract.Ensures(result >= 0)\n// Ensures non-empty result"
     },
-    "§PROP": {
-      "name": "Property",
-      "syntax": "§PROP{name:type:vis[:modifiers...:accessors]} [= default]",
-      "description": "Defines a property with optional getter and setter. Auto-properties use accessor shorthand such as get,set, get,priset, or get,init. Full properties use indented §GET and §SET bodies.",
-      "csharpEquivalent": "public string Name { get; set; }\npublic int Count { get; private set; }\npublic int Value { get { return _value; } set { _value = value; } }"
-    },
-    "§GET": {
-      "name": "Getter",
-      "syntax": "§GET",
-      "description": "Property getter.",
-      "csharpEquivalent": "get { body }"
-    },
-    "§SET": {
-      "name": "Setter",
-      "syntax": "§SET or §SET{visibility}",
-      "description": "Property setter with optional visibility modifier.",
-      "csharpEquivalent": "set { body } or private set { body }"
-    },
-    "§FLD": {
-      "name": "Field",
-      "syntax": "§FLD{type:name:visibility}",
-      "description": "Defines a field in a class. Usually private, prefixed with underscore by convention.",
-      "csharpEquivalent": "private string _name;\nprivate readonly int _id;"
-    },
-    "§CTOR": {
-      "name": "Constructor",
-      "syntax": "§CTOR{vis} (type:param, ...)",
-      "description": "Defines a class constructor. Use §BASE with §A arguments to call a base constructor, or §THIS to chain constructors.",
-      "csharpEquivalent": "public User(string name) { _name = name; }\npublic Admin(string name) : base(name) { }"
-    },
-    "§BASE": {
-      "name": "Base Constructor",
-      "syntax": "§BASE §A arg1 §A arg2",
-      "description": "Calls the base class constructor.",
-      "csharpEquivalent": ": base(args)"
-    },
-    "§THIS": {
-      "name": "This Constructor",
-      "syntax": "§THIS §A arg1 §A arg2",
-      "description": "Chains to another constructor in the same class.",
-      "csharpEquivalent": ": this(args)"
-    },
-    "§EN": {
-      "name": "Enum",
-      "syntax": "§EN{Name:vis[:underlyingType]} values...",
-      "description": "Defines an enumeration. Enum values are indented under §EN and may use = for explicit values.",
-      "csharpEquivalent": "public enum Status { Active, Inactive, Pending }\npublic enum Priority : byte { Low = 0, High = 1 }"
-    },
-    "§EVT": {
-      "name": "Event",
-      "syntax": "§EVT{name:vis:delegateType}",
-      "description": "Defines an event. Simple form has no body. For custom add/remove accessors, use indented §EADD and §EREM blocks inside the event body.",
-      "csharpEquivalent": "public event EventHandler OnChanged;\npublic event Action<int> ValueUpdated;\npublic event EventHandler Click { add { _click += value; } remove { _click -= value; } }"
-    },
-    "§EADD": {
-      "name": "Event Add Accessor",
-      "syntax": "§EADD",
-      "description": "Custom add accessor body inside an event definition (§EVT). Contains statements executed when a handler is subscribed.",
-      "csharpEquivalent": "add { body }"
-    },
-    "§EREM": {
-      "name": "Event Remove Accessor",
-      "syntax": "§EREM",
-      "description": "Custom remove accessor body inside an event definition (§EVT). Contains statements executed when a handler is unsubscribed.",
-      "csharpEquivalent": "remove { body }"
-    },
-    "§LAM": {
-      "name": "Lambda",
-      "close": "§/LAM",
-      "syntax": "§LAM{[static:][async:]name:type[:name:type...]} body §/LAM; zero parameters: §LAM{}",
-      "description": "Creates an anonymous function using name:type parameter pairs. It can capture variables from its enclosing scope. The closing delimiter carries no source ID. Bind local helpers as lambdas, not nested §F declarations. Automatic local-function conversion lowers noncapturing, non-generic direct same-point calls with ordinary parameters. Direct self-recursion also requires a complete proof of pure built-in scalar operations and captures only the initialized internal self binding; unsupported cases remain explicit converter preservation.",
-      "csharpEquivalent": "x => x * 2\n(a, b) => a + b\nitems.Where(x => x > 5)"
-    },
-    "§W": {
-      "name": "Switch/Match",
-      "syntax": "§W expression with indented §K pattern → result cases; use in an expression context, such as §R §W",
-      "description": "Pattern matching switch expression. §K introduces each case/pattern. Use _ for default.",
-      "csharpEquivalent": "x switch { 1 => \"one\", 2 => \"two\", _ => \"other\" }\nshape switch { Circle c => c.Area(), Rectangle r => r.Width * r.Height }"
-    },
-    "§K": {
-      "name": "Case",
-      "syntax": "§K pattern → result",
-      "description": "A case in a switch expression. Use _ for default.",
-      "csharpEquivalent": "pattern => result"
-    },
-    "§BK": {
+    "break": {
       "name": "Break",
-      "syntax": "§BK for break, §CN for continue",
-      "description": "Loop control statements.",
+      "syntax": "break; continue",
+      "description": "break exits the nearest loop; continue proceeds to its next iteration. A C#-form counted loop still performs its update after continue.",
       "csharpEquivalent": "if (done) break;\nif (skip) continue;"
     },
-    "§CN": {
+    "continue": {
       "name": "Continue",
-      "syntax": "§CN",
-      "description": "Continues to next loop iteration.",
-      "csharpEquivalent": "continue;"
+      "syntax": "break; continue",
+      "description": "break exits the nearest loop; continue proceeds to its next iteration. A C#-form counted loop still performs its update after continue.",
+      "csharpEquivalent": "if (done) break;\nif (skip) continue;"
     },
-    "§USE": {
-      "name": "Using/Resource",
-      "syntax": "§USE{var:type} resourceExpression",
-      "description": "Resource management with automatic disposal.",
-      "csharpEquivalent": "using (var stream = File.OpenRead(path)) { ... }\nusing var connection = new SqlConnection(connStr);"
-    },
-    "§WHERE": {
-      "name": "Generic Constraint",
-      "syntax": "§WHERE T : constraint",
-      "description": "Constraint on a generic type parameter.",
-      "csharpEquivalent": "where T : constraint"
-    },
-    "§??": {
-      "name": "Null-Coalescing (Legacy)",
-      "syntax": "left ?? fallback",
-      "description": "Legacy tag lookup retained; author infix null-coalescing: left ?? fallback.",
-      "csharpEquivalent": "expression ?? default"
-    },
-    "§?.": {
-      "name": "Null-Conditional Access",
-      "syntax": "target?.Member",
-      "description": "Legacy tag lookup retained; author postfix null-conditional member access.",
-      "csharpEquivalent": "target?.Member"
-    },
-    "§INTERP": {
-      "name": "String Interpolation",
-      "syntax": "Prefer inline string interpolation: \"literal ${expr} literal\"",
-      "description": "Plain strings interpolate ${expression}, including numeric expressions. Escape \\${0} for literal placeholder text. The legacy section form uses separate literal and §EXP parts.",
-      "csharpEquivalent": "$\"literal{expr}literal\""
-    },
-    "§C": {
-      "name": "Call",
-      "close": "§/C",
-      "syntax": "§C{target<T>} §A arg §/C",
-      "description": "Compatibility call lookup retained during integration. Author ordinary calls with postfix parentheses. A section call's manifest effect charge alone does not establish authoritative metadata resolution.",
-      "csharpEquivalent": "System.Linq.Enumerable.ToArray<int>(filtered)"
-    },
-    "§U": {
-      "name": "Using Import",
-      "syntax": "§U{namespace} or §U{alias:namespace}",
-      "description": "Imports a namespace or creates an alias. Must appear inside a module (§M{Name}) block.",
-      "csharpEquivalent": "using Namespace; or using Alias = Namespace;"
-    },
-    "§ARR": {
-      "name": "Array",
-      "close": "§/ARR",
-      "syntax": "§B{items} §ARR{type} elements §/ARR",
-      "description": "Creates a fixed-size array with a typed §ARR value literal. Elements are whitespace-separated; group infix elements explicitly. The documented bare closer remains part of this staged literal form.",
-      "csharpEquivalent": "int[] numbers = { 5, 4, 1, 3 };\nvar items = new int[] { 1, 2, 3 };\nstring[] names = new[] { \"Alice\", \"Bob\" };"
-    },
-    "§LIST": {
-      "name": "List",
-      "syntax": "§LIST{name:type} with indented values",
-      "description": "Creates a dynamic list.",
-      "csharpEquivalent": "new List<Type>() or new List<Type> { elements }",
-      "close": "§/LIST (empty literal)"
-    },
-    "§DICT": {
-      "name": "Dictionary",
-      "syntax": "§DICT{name:keyType:valueType} with indented §KV key value entries",
-      "description": "Creates a dictionary/map.",
-      "csharpEquivalent": "new Dictionary<TKey, TValue>()",
-      "close": "§/DICT (empty literal)"
-    },
-    "§P": {
-      "name": "Print",
-      "syntax": "§P expression",
-      "description": "Prints to console with newline. Use §Pf for no newline.",
-      "csharpEquivalent": "Console.WriteLine(expression)"
-    },
-    "§EACH": {
-      "name": "Foreach",
-      "syntax": "§EACH{item} collection",
-      "description": "Iterates over each element in a collection. Type is inferred in §EACH{variable}; §EACH{variable:type} specifies it explicitly. An optional third field names the index.",
-      "csharpEquivalent": "foreach (var item in collection) { body }"
-    },
-    "§IV": {
-      "name": "Invariant",
-      "syntax": "§IV (condition)",
-      "description": "Declares an invariant at module scope.",
-      "csharpEquivalent": "// [ContractInvariantMethod] void Invariants() { Contract.Invariant(_count >= 0); }"
-    },
-    "§PP": {
-      "name": "preprocessor directive",
-      "syntax": "§PP{CONDITION} indented body; §PPE indented alternative",
-      "description": "Conditional compilation blocks use §PP for #if and §PPE for #else. Indented statement bodies end at dedent. Nested §PP blocks express #elif. Code inside is conditionally included based on defined symbols.",
-      "csharpEquivalent": "#if DEBUG\n    Console.WriteLine(\"Debug mode\");\n#endif\n#if NET8_0_OR_GREATER\n    UseNewApi();\n#else\n    UseLegacyApi();\n#endif"
-    },
-    "§ASSIGN": {
-      "name": "variable assignment",
-      "syntax": "§ASSIGN name expression",
-      "description": "Declare a mutable binding with a ~-prefixed name; use §ASSIGN for all updates, including increments and compound arithmetic.",
+    "set": {
+      "name": "Assignment or Setter",
+      "examples": [
+        {
+          "name": "Assignment",
+          "calor": "set count count + 1",
+          "description": "Updates mutable storage."
+        },
+        {
+          "name": "Restricted Setter",
+          "calor": "set private",
+          "description": "Restricts a property accessor's visibility."
+        }
+      ],
+      "syntax": "set target expression; set receiver[index] expression",
+      "description": "Updates mutable bindings, fields or indexed storage. Indexed stores preserve left-to-right evaluate-once receiver, key and value evaluation, and dictionary updates are upserts rather than Add. Increment/decrement and compound assignment aliases are not separate expression forms. Inside a property or indexer, set declares a setter instead.",
       "csharpEquivalent": "name = expression;"
     },
-    "§IXER": {
-      "name": "indexer definition",
-      "syntax": "§IXER{returnType:vis} with indented §I parameters and §GET/§SET bodies",
-      "description": "Defines an indexer on a class or interface. Full indexers use indented §I parameters and §GET/§SET/§INIT bodies. Compact auto-indexers use accessor shorthand and inline parameters.",
-      "csharpEquivalent": "public int this[int index] { get; set; }\npublic string this[string key] { get; set; }\npublic int this[int row, int col] { get; set; }\npublic int this[int i] { get { return _data[i]; } set { _data[i] = value; } }"
+    "→": {
+      "name": "Return Type",
+      "syntax": "func Name (type:param, ...) → returnType",
+      "description": "Separates a callable signature's parameters from its output type. Async callable carriers and body results are distinct; contracts describe the body result.",
+      "csharpEquivalent": "ReturnType Name(Type param)"
     },
-    "§DEL": {
-      "name": "delegate definition",
-      "syntax": "§DEL{name} with indented §I parameters and optional §O return type",
-      "description": "Defines a delegate type (function signature). Use for callbacks, event handlers, and function references. §DEL can appear at the top level or nested inside §CL class bodies.",
-      "csharpEquivalent": "public delegate void EventCallback(string message);\npublic delegate int Transformer(int value);\npublic class MyClass { public delegate void Handler(int x); }"
+    "property": {
+      "name": "Property",
+      "syntax": "property type:Name",
+      "description": "Declares a property with indented get, set or init accessors. Empty accessor bodies are auto-implemented; explicit bodies contain statements. Restricted accessor visibility follows its keyword, such as set private. Preserve defaults, modifiers and accessor effects.",
+      "csharpEquivalent": "public string Name { get; set; }\npublic int Count { get; private set; }\npublic int Value { get { return _value; } set { _value = value; } }"
     },
-    "§OP": {
-      "name": "operator overload",
-      "syntax": "§OP{operator:vis} (type:param, ...) -> returnType",
-      "description": "Defines an operator overload using the supported arithmetic, comparison, equality or unary operators. Updates still use §ASSIGN; do not author increment/decrement or compound assignment expressions.",
-      "csharpEquivalent": "public static MyType operator+(MyType left, MyType right) { return new MyType(left.Value + right.Value); }\npublic static MyType operator-(MyType value) { return new MyType(-value.Value); }\npublic static implicit operator int(MyType value) { return value.Value; }\npublic static explicit operator MyType(int value) { return new MyType(value); }"
+    "field": {
+      "name": "Field",
+      "syntax": "field type:name private = expression",
+      "description": "Declares a field with type before name, optional visibility and modifiers, and an optional initializer. Public is the default; preserve explicit private or protected visibility and readonly or static modifiers.",
+      "csharpEquivalent": "private string _name;\nprivate readonly int _id;"
     },
-    "§RT": {
-      "name": "Rethrow",
-      "syntax": "§RT",
-      "description": "Rethrows the current exception in a catch block.",
-      "csharpEquivalent": "throw;"
+    "ctor": {
+      "name": "Constructor",
+      "syntax": "ctor (type:param, ...)",
+      "description": "Declares a constructor with an indented body. Explicit visibility precedes the parameter list. A base(args) or this(args) initializer is the first body clause; preserve ordered arguments and base versus same-type delegation.",
+      "csharpEquivalent": "public User(string name) { _name = name; }\npublic Admin(string name) : base(name) { }"
     },
-    "§VAR": {
-      "name": "Variable Pattern",
-      "syntax": "§VAR{name}",
-      "description": "Captures a value into a variable in pattern matching.",
-      "csharpEquivalent": "var name"
+    "interface": {
+      "name": "Interface",
+      "syntax": "interface Name",
+      "description": "Declares an interface with indented func signatures. Preserve generic variance, inherited interfaces, effective visibility and method contracts. Explicit visibility follows the name and type parameters.",
+      "csharpEquivalent": "public interface IRepository { void Save(Entity e); }"
     },
-    "§WHEN": {
-      "name": "Guard Clause",
-      "syntax": "§WHEN condition",
-      "description": "Adds a guard condition to a pattern match case.",
-      "csharpEquivalent": "when condition"
+    "where": {
+      "name": "Generic Constraint",
+      "syntax": "where T : class, new()",
+      "description": "Adds generic constraints before a declaration body. Preserve each reference/value-type, constructor, base-type and interface requirement, rather than treating a type parameter as an unconstrained object. Inside a quantified contract, where introduces its guard instead of a generic constraint.",
+      "csharpEquivalent": "public class Repository<T> where T : class, IEntity { }\npublic T Create<T>() where T : new() { return new T(); }\npublic void Process<T>(T item) where T : struct { }"
     },
-    "§A": {
-      "name": "Argument",
-      "syntax": "§A expression",
-      "description": "Marks a constructor or staged section-call argument. Ordinary calls use comma-separated arguments inside parentheses.",
-      "csharpEquivalent": "Type name"
-    },
-    "§EX": {
-      "name": "Example",
-      "syntax": "§EX{description} code",
-      "description": "Inline example or test code in documentation.",
-      "csharpEquivalent": "// Example: description"
-    },
-    "§SN": {
-      "name": "Since",
-      "syntax": "§SN{version}",
-      "description": "Documents the version when a feature was introduced.",
-      "csharpEquivalent": "/// <since>version</since>"
-    },
-    "§DP": {
-      "name": "Deprecated",
-      "syntax": "§DP{reason}",
-      "description": "Marks code as deprecated with a reason.",
-      "csharpEquivalent": "[Obsolete(\"Use NewMethod instead\")]"
-    },
-    "§BR": {
-      "name": "Breaking Change",
-      "syntax": "§BR{description}",
-      "description": "Documents a breaking change in the API.",
-      "csharpEquivalent": "// BREAKING CHANGE: description"
-    },
-    "§AS": {
-      "name": "Assume",
-      "syntax": "§AS condition",
-      "description": "Documents an assumption that must be true at this point in the code.",
-      "csharpEquivalent": "Debug.Assert(condition); // Assumption"
-    },
-    "§SYNC": {
-      "name": "Synchronization Block",
-      "tags": [
-        "§SYNC",
-        "lock",
-        "synchronization",
-        "thread-safety"
+    "using": {
+      "name": "Import or Resource Lifetime",
+      "examples": [
+        {
+          "name": "Import",
+          "calor": "using System.Text",
+          "description": "Imports a namespace."
+        },
+        {
+          "name": "Alias",
+          "calor": "using Text = System.Text",
+          "description": "Declares a namespace alias."
+        }
       ],
-      "syntax": "§SYNC (gate)",
-      "description": "Locks an object while executing the indented body.",
+      "syntax": "using System.Text; using Text = System.Text; using type:name = resource",
+      "description": "At compilation-unit scope, imports a namespace or declares an alias. In a function body, using introduces a resource and an indented body that disposes it on exit, including exceptions. Preserve the distinction between imports and resource lifetime management.",
+      "csharpEquivalent": "using (var stream = File.OpenRead(path)) { ... }\nusing var connection = new SqlConnection(connStr);"
+    },
+    "try": {
+      "name": "Try",
+      "syntax": "try; catch ExceptionType:name when condition; finally",
+      "description": "Groups an indented try body with one or more catch clauses and/or finally cleanup. Catch types, binders and filters are optional; preserve exception selection, filter evaluation and cleanup on every exit.",
+      "csharpEquivalent": "try { x(); } catch { y(); }\ntry { } catch (Exception ex) { Log(ex); }\ntry { } finally { Cleanup(); }"
+    },
+    "throw": {
+      "name": "Throw or Rethrow",
+      "syntax": "throw expression; throw",
+      "description": "Throws an exception expression. Bare throw rethrows the current exception inside a catch handler, preserving its original stack rather than constructing or throwing a replacement.",
+      "csharpEquivalent": "throw new ArgumentException(\"Invalid\");\nthrow;"
+    },
+    "match": {
+      "name": "Match",
+      "syntax": "match expression with indented case pattern → result arms",
+      "description": "Matches an expression against ordered patterns. Expression arms use → followed by a result; statement arms have indented bodies. Preserve pattern guards and use return match when returning a match expression.",
+      "csharpEquivalent": "x switch { 1 => \"one\", 2 => \"two\", _ => \"other\" }\nshape switch { Circle c => c.Area(), Rectangle r => r.Width * r.Height }"
+    },
+    "lock": {
+      "name": "Lock",
+      "syntax": "lock gate",
+      "description": "Executes an indented body while holding the selected monitor. Preserve evaluate-once lock-object selection and monitor release on returns and exceptions.",
       "csharpEquivalent": "lock (_sync) { _count++; }"
     },
-    "§PT": {
-      "name": "Property Test",
-      "syntax": "§PT{property}",
-      "description": "Defines a property-based test.",
-      "csharpEquivalent": "[Property] public bool TestName() { ... }"
+    "unsafe": {
+      "name": "Unsafe Block",
+      "syntax": "unsafe",
+      "description": "Introduces an indented unsafe body. Preserve unsafe effects and compile with unsafe support; the keyword is not permission to bypass diagnostics.",
+      "csharpEquivalent": "unsafe { int* ptr = &value; *ptr = 42; }"
     },
-    "§EEXT": {
-      "name": "Enum Extension",
-      "syntax": "§EEXT{EnumName} extensions",
-      "description": "Defines extension methods for an enum type.",
-      "csharpEquivalent": "public static class EnumExtensions { ... }"
+    "invariant": {
+      "name": "Invariant",
+      "syntax": "invariant condition",
+      "description": "Declares an invariant checked at the corresponding compilation-unit or type boundaries. Preserve the native contract AST and proof obligations, not an opaque runtime call.",
+      "csharpEquivalent": "// [ContractInvariantMethod] void Invariants() { Contract.Invariant(_count >= 0); }"
     },
-    "§RANGE": {
-      "name": "Range",
-      "syntax": "§RANGE start end",
-      "description": "Represents a range value (start..end) for array/span slicing.",
-      "csharpEquivalent": "start..end"
+    "op": {
+      "name": "Operator Overload",
+      "syntax": "op + (type:left, type:right) → resultType; op implicit (type:value) → resultType",
+      "description": "Declares an operator overload or conversion with an indented body. Preserve operator token, parameter order, result type, effects and C# signature requirements. Conversion operators use implicit or explicit after op.",
+      "csharpEquivalent": "public static MyType operator+(MyType left, MyType right) { return new MyType(left.Value + right.Value); }\npublic static MyType operator-(MyType value) { return new MyType(-value.Value); }\npublic static implicit operator int(MyType value) { return value.Value; }\npublic static explicit operator MyType(int value) { return new MyType(value); }"
     },
-    "§^": {
-      "name": "Index From End",
-      "syntax": "§^ n",
-      "description": "Indexes from the end of a collection. Equivalent to C#'s ^n operator.",
-      "csharpEquivalent": "^n"
+    "pp": {
+      "name": "Conditional Compilation",
+      "syntax": "pp CONDITION; pp elif CONDITION; pp else",
+      "description": "Conditionally includes indented code. Chained pp clauses align with their opening pp. Conditions retain verbatim C# preprocessor text; preserve nested conditions and inactive branch contents under converter fidelity rules.",
+      "csharpEquivalent": "#if DEBUG\n    Console.WriteLine(\"Debug mode\");\n#endif\n#if NET8_0_OR_GREATER\n    UseNewApi();\n#else\n    UseLegacyApi();\n#endif"
+    },
+    "yield": {
+      "name": "Iterator Yield",
+      "syntax": "yield expression; yield break",
+      "description": "Yields a value from an iterator or ends iteration. Preserve lazy execution, suspension, iterator disposal and cleanup; do not materialize the sequence eagerly.",
+      "csharpEquivalent": "yield return item;\nyield break;\npublic IEnumerable<int> GetNumbers() { for (int i = 0; i < 10; i++) yield return i; }"
+    },
+    "extends": {
+      "name": "Base Type",
+      "syntax": "extends BaseType",
+      "description": "Specifies a class's base type or inherited interfaces on an interface. Preserve generic arguments.",
+      "csharpEquivalent": ": BaseType"
+    },
+    "implements": {
+      "name": "Implemented Interface",
+      "syntax": "implements IContract",
+      "description": "Specifies an interface implemented by a class or value type.",
+      "csharpEquivalent": ": IContract"
+    },
+    "catch": {
+      "name": "Catch Block",
+      "syntax": "catch ExceptionType:name when condition",
+      "description": "Catches exceptions with optional type, binder and filter. Its indented body follows try.",
+      "csharpEquivalent": "catch (ExceptionType name) when (condition) { body }"
+    },
+    "finally": {
+      "name": "Finally Block",
+      "syntax": "finally",
+      "description": "Runs the indented cleanup body on exit from try, including exceptions and returns.",
+      "csharpEquivalent": "finally { body }"
+    },
+    "get": {
+      "name": "Getter",
+      "syntax": "get",
+      "description": "Declares a property or indexer getter. An empty body is auto-implemented; an indented body contains statements.",
+      "csharpEquivalent": "get; or get { body }"
+    },
+    "init": {
+      "name": "Init Accessor",
+      "syntax": "init",
+      "description": "Declares an initialization-only property accessor. Preserve its visibility and body.",
+      "csharpEquivalent": "init; or init { body }"
+    },
+    "base": {
+      "name": "Base Constructor or Member",
+      "syntax": "base(args); base.Member",
+      "description": "As the first constructor clause, calls the base constructor. In expressions, selects a base member.",
+      "csharpEquivalent": ": base(args); base.Member"
+    },
+    "this": {
+      "name": "Receiver, Constructor, Indexer or Extension Parameter",
+      "syntax": "this.Member; this(args); this[int:index] → Type; this Type:receiver",
+      "description": "Selects the current instance, delegates to another constructor as its first clause, declares an indexer, or marks the first extension-method parameter. These contexts are distinct.",
+      "csharpEquivalent": "this.Member; : this(args); Type this[int index]; this Type receiver"
+    },
+    "case": {
+      "name": "Match Arm",
+      "syntax": "case pattern → result; case pattern with indented statements",
+      "description": "Declares an ordered expression or statement match arm. Use _ for a default pattern; preserve guards.",
+      "csharpEquivalent": "case pattern: statements; pattern => result"
+    },
+    "in": {
+      "name": "Iteration Source or Readonly Parameter",
+      "syntax": "each item in source; in Type:value",
+      "description": "Introduces a collection iteration source, or marks a readonly reference parameter in a signature.",
+      "csharpEquivalent": "foreach (var item in source); in Type value"
+    },
+    "out": {
+      "name": "Output Parameter",
+      "syntax": "out Type:value",
+      "description": "Declares an output parameter in a signature. At a call site, pass the output argument with out.",
+      "csharpEquivalent": "out Type value"
+    },
+    "from": {
+      "name": "Snapshot Range Start",
+      "syntax": "for i from start to end step delta",
+      "description": "Starts a counted loop whose start, end and step are evaluated once, in order.",
+      "csharpEquivalent": "inclusive counted range"
+    },
+    "to": {
+      "name": "Inclusive Snapshot Range End",
+      "syntax": "for i from start to end step delta",
+      "description": "Sets the inclusive endpoint of a snapshot counted loop. This is not a half-open slicing range.",
+      "csharpEquivalent": "inclusive counted range"
+    },
+    "step": {
+      "name": "Snapshot Range Step",
+      "syntax": "for i from start to end step delta",
+      "description": "Sets the snapshot range increment. Omission means +1; zero throws, and checked overflow ends iteration.",
+      "csharpEquivalent": "checked counted-loop increment"
+    },
+    "??": {
+      "name": "Null-Coalescing Expression",
+      "syntax": "value ?? fallback",
+      "description": "Evaluates the fallback only when the left operand is null.",
+      "csharpEquivalent": "value ?? fallback"
+    },
+    "?.": {
+      "name": "Null-Conditional Access",
+      "syntax": "receiver?.Member",
+      "description": "Accesses the member only when the receiver is not null.",
+      "csharpEquivalent": "receiver?.Member"
+    },
+    "goto": {
+      "name": "Goto",
+      "syntax": "goto case expression; goto default; goto label",
+      "description": "Transfers control to a constant match case, the default arm, or a label written name:. Preserve the target and surrounding cleanup; goto case does not repeat the match selector's evaluation.",
+      "csharpEquivalent": "goto case 1;\ngoto case \"hello\";\ngoto default;\ngoto myLabel;"
+    },
+    "when": {
+      "name": "Pattern Guard or Catch Filter",
+      "syntax": "case var name when condition → result; catch Type:name when condition",
+      "description": "Adds a pattern guard or an exception filter. Evaluate it only after the corresponding pattern or exception selection.",
+      "csharpEquivalent": "case var name when condition: statements; catch (Type name) when (condition)"
+    },
+    "enum": {
+      "name": "Enum",
+      "syntax": "enum Name byte",
+      "description": "Declares an enumeration with indented named members and optional explicit values. Preserve the underlying CLR type; omission defaults to int.",
+      "csharpEquivalent": "public enum Status { Active, Inactive, Pending }\npublic enum Priority : byte { Low = 0, High = 1 }"
+    },
+    "delegate": {
+      "name": "Delegate",
+      "syntax": "delegate Name (type:param, ...) → returnType",
+      "description": "Declares a delegate signature at compilation-unit or class scope. Parameters are inline; an optional indented ! row retains the delegate's effect contract. Preserve parameter modifiers and the result type.",
+      "csharpEquivalent": "public delegate void EventCallback(string message);\npublic delegate int Transformer(int value);\npublic class MyClass { public delegate void Handler(int x); }"
+    },
+    "event": {
+      "name": "Event",
+      "syntax": "event DelegateType:Name",
+      "description": "Declares an event, optionally with paired indented add and remove accessor bodies. Preserve the delegate type, visibility and supported modifiers. Named-module events are static; ordinary classes may explicitly declare a static event. Converter preservation of an unsupported event shape is not an authoring spelling. The complete example demonstrates declaration only. Native event subscription and unsubscription statements are not admitted yet; do not write retired section markers or invent +=/-= statements. Convert original C# when preservation is needed.",
+      "csharpEquivalent": "public event EventHandler OnDataReceived;"
+    },
+    "add": {
+      "name": "Event Add Accessor",
+      "syntax": "event Handler:Changed with an indented add body",
+      "description": "Declares the custom event subscription accessor. Pair it with remove and preserve all statements.",
+      "csharpEquivalent": "add { body }"
+    },
+    "remove": {
+      "name": "Event Remove Accessor",
+      "syntax": "event Handler:Changed with an indented remove body",
+      "description": "Declares the custom event unsubscription accessor. Pair it with add and preserve all statements.",
+      "csharpEquivalent": "remove { body }"
+    },
+    "record": {
+      "name": "Record",
+      "syntax": "record Point (int:X, int:Y)",
+      "description": "Declares a C# record class. Positional parameters retain their constructor defaults and public init properties. Indent properties and methods beneath the header. C# supplies value equality, hashing, ToString, deconstruction and with/copy behavior. Derived positional records use `record D (int:X, int:Y) : B(X)`. Record structs, partial or nested declarations and unrepresented member variants remain exact converter-owned C# fallback, not native records.",
+      "csharpEquivalent": "public record Point(int X, int Y);"
     }
   }
 }

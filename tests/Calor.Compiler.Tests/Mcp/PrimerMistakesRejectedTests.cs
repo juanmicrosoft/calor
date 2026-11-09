@@ -19,7 +19,7 @@ namespace Calor.Compiler.Tests.Mcp;
 /// cannot lie in the other direction (a "wrong" snippet that silently compiles would
 /// mis-teach the agent following Calor's own primer).
 ///
-/// The mistakes are fragments (a §S clause, an §IF header, a §F header, a closer line), so
+/// The mistakes are fragments (a postcondition, an if header, a retired header or closer), so
 /// each is rewritten into the smallest complete module where it would naturally appear, then
 /// checked for non-compilation at EITHER layer:
 ///   1. Calor itself reports an error (HasErrors), or
@@ -41,9 +41,9 @@ public class PrimerMistakesRejectedTests
     private static readonly Mistake[] Mistakes =
     {
         new("legacy-closers", "§/F §/M §/I §/L", TopLevel: false),
-        new("uppercase-result", "§S (§RESULT >= 0)", TopLevel: false),
-        new("if-missing-condition", "§IF", TopLevel: false),
-        new("if-condition-in-braces", "§IF{i1}{x > 0}", TopLevel: false),
+        new("uppercase-result", "=> RESULT >= 0", TopLevel: false),
+        new("if-missing-condition", "if", TopLevel: false),
+        new("if-condition-in-braces", "if {x > 0}", TopLevel: false),
         new("nonexistent-keywords", "§K   §ELSE", TopLevel: false),
         new("four-field-header", "§F{f1:Add:int:pub}", TopLevel: true),
     };
@@ -56,14 +56,16 @@ public class PrimerMistakesRejectedTests
     public void Mistake_DoesNotCompile(string name, string fragment, bool topLevel)
     {
         var module = topLevel
-            ? $"§M{{Probe}}\n{fragment}\n  §R INT:0\n"
-            : $"§M{{Probe}}\n§F{{Probe:pub}} (i32:x) -> i32\n  {fragment}\n  §R x\n";
+            ? $"module Probe\n  {fragment}\n    return 0\n"
+            : $"module Probe\n  func Probe (int:x) → int\n    {fragment}\n    return x\n";
 
         var result = Compile(module, "primer-mistake.calr");
 
         // Layer 1: rejected outright by Calor.
         if (result.Diagnostics.Any(d => d.IsError))
         {
+            var errorLine = name == "if-missing-condition" ? 4 : topLevel ? 2 : 3;
+            Assert.Contains(result.Diagnostics, d => d.IsError && d.Span.Line == errorLine);
             return;
         }
 
@@ -77,14 +79,14 @@ public class PrimerMistakesRejectedTests
             $"--- module ---\n{module}\n--- generated C# ---\n{result.GeneratedCode}");
     }
 
-    [Fact]
-    public void CorrectModule_CompilesAtBothLayers()
+    [Theory]
+    [InlineData("module Probe\n  func Add (int:a, int:b) → int\n    return a + b\n")]
+    [InlineData("module Probe\n  func Probe (int:x) → int\n    return x\n")]
+    [InlineData("module Probe\n  func Probe () → int\n    return 0\n")]
+    public void CorrectModule_CompilesAtBothLayers(string correct)
     {
         // Sanity for the two-layer check itself: a correct module must pass BOTH layers, so a
         // green above cannot be an artifact of RoslynErrors spuriously rejecting everything.
-        const string correct =
-            "§M{Probe}\n§F{Add:pub} (int:a, int:b) -> int\n  §R a + b\n";
-
         var result = Compile(correct, "primer-correct.calr");
 
         Assert.DoesNotContain(result.Diagnostics, d => d.IsError);

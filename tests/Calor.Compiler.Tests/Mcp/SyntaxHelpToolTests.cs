@@ -502,7 +502,7 @@ public class SyntaxHelpToolTests
             Assert.InRange(knownJson.GetProperty("examples").GetArrayLength(), 1, 2);
             Assert.DoesNotContain(new string('x', 100), known.Content[0].Text);
             Assert.All(knownJson.GetProperty("examples").EnumerateArray(),
-                e => Assert.StartsWith("§M{", e.GetProperty("calor").GetString()));
+                e => Assert.StartsWith("module ", e.GetProperty("calor").GetString()));
         }
         finally
         {
@@ -618,9 +618,8 @@ public class SyntaxHelpToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_StringsFeature_IncludesNullSafetyPattern()
+    public async Task ExecuteAsync_StringsFeature_IncludesCanonicalNativeStringExample()
     {
-        // The merged file includes the null-safety pattern documentation
         var args = JsonDocument.Parse("""
             {
                 "feature": "strings"
@@ -630,11 +629,14 @@ public class SyntaxHelpToolTests
         var result = await _tool.ExecuteAsync(args);
 
         Assert.False(result.IsError);
-        var text = result.Content[0].Text!;
-        // String operations should be present
-        Assert.True(
-            text.Contains("concat") || text.Contains("substr") || text.Contains("(str "),
-            "Expected string operation content in response");
+        using var json = JsonDocument.Parse(result.Content[0].Text!);
+        Assert.True(json.RootElement.GetProperty("found").GetBoolean());
+        Assert.Equal("string operations", json.RootElement.GetProperty("construct").GetString());
+        Assert.Contains("string.Concat(a, b)", json.RootElement.GetProperty("calorSyntax").GetString());
+        Assert.Contains("StringComparison.Ordinal", json.RootElement.GetProperty("calorSyntax").GetString());
+        var example = Assert.Single(json.RootElement.GetProperty("examples").EnumerateArray());
+        Assert.Equal("primer_strings", example.GetProperty("programId").GetString());
+        Assert.StartsWith("module ", example.GetProperty("calor").GetString());
     }
 
     [Fact]
