@@ -2,6 +2,7 @@ using System.Reflection;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3;
@@ -39,7 +40,7 @@ public class ContractInheritanceTests
         checker.Dispose();
         Assert.Equal(IntPtr.Zero, ReadNativeContextHandle(context));
 
-        var module = Parse("§M{Disposed}", out var diagnostics);
+        var module = Parse("module Disposed", out var diagnostics);
         Assert.False(diagnostics.HasErrors);
         Assert.Throws<ObjectDisposedException>(() => checker.Check(module));
         GC.KeepAlive(context);
@@ -100,12 +101,10 @@ public class ContractInheritanceTests
     public void Parser_ParsesInterfaceMethodWithPrecondition()
     {
         var source = @"
-§M{Test}
-  §IFACE{IValidator}
-      §MT{Validate}
-          §I{str:input}
-          §O{bool}
-          §Q (!= input null)
+module Test
+  interface IValidator
+    func Validate (string:input) → bool
+      requires input != null
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -126,12 +125,10 @@ public class ContractInheritanceTests
     public void Parser_ParsesInterfaceMethodWithPostcondition()
     {
         var source = @"
-§M{Test}
-  §IFACE{IRepository}
-      §MT{GetById}
-          §I{i32:id}
-          §O{str}
-          §S (!= result null)
+module Test
+  interface IRepository
+    func GetById (int:id) → string
+      => result != null
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -148,15 +145,12 @@ public class ContractInheritanceTests
     public void Parser_ParsesInterfaceMethodWithMultipleContracts()
     {
         var source = @"
-§M{Test}
-  §IFACE{ICalculator}
-      §MT{Divide}
-          §I{i32:a}
-          §I{i32:b}
-          §O{i32}
-          §Q (> a INT:0)
-          §Q (!= b INT:0)
-          §S (>= result INT:0)
+module Test
+  interface ICalculator
+    func Divide (int:a, int:b) → int
+      requires a > 0
+      requires b != 0
+      => result >= 0
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -176,19 +170,15 @@ public class ContractInheritanceTests
     public void ContractInheritanceChecker_InheritsContractsWhenImplementerHasNone()
     {
         var source = @"
-§M{Test}
-  §IFACE{IRepository}
-      §MT{GetById}
-          §I{i32:id}
-          §O{str}
-          §Q (> id INT:0)
-          §S (!= result null)
-  §CL{SqlRepository:pub}
-      §IMPL{IRepository}
-      §MT{GetById:pub}
-          §I{i32:id}
-          §O{str}
-          §R ""found""
+module Test
+  interface IRepository
+    func GetById (int:id) → string
+      requires id > 0
+      => result != null
+  class SqlRepository public
+    implements IRepository
+    func GetById public (int:id) → string
+      return ""found""
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -213,19 +203,15 @@ public class ContractInheritanceTests
     public void ContractInheritanceChecker_ValidWhenContractsMatch()
     {
         var source = @"
-§M{Test}
-  §IFACE{IRepository}
-      §MT{GetById}
-          §I{i32:id}
-          §O{str}
-          §Q (> id INT:0)
-  §CL{SqlRepository:pub}
-      §IMPL{IRepository}
-      §MT{GetById:pub}
-          §I{i32:id}
-          §O{str}
-          §Q (> id INT:0)
-          §R ""found""
+module Test
+  interface IRepository
+    func GetById (int:id) → string
+      requires id > 0
+  class SqlRepository public
+    implements IRepository
+    func GetById public (int:id) → string
+      requires id > 0
+      return ""found""
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -244,19 +230,15 @@ public class ContractInheritanceTests
     {
         // Weaker precondition (>= instead of >) is OK
         var source = @"
-§M{Test}
-  §IFACE{IRepository}
-      §MT{GetById}
-          §I{i32:id}
-          §O{str}
-          §Q (> id INT:0)
-  §CL{SqlRepository:pub}
-      §IMPL{IRepository}
-      §MT{GetById:pub}
-          §I{i32:id}
-          §O{str}
-          §Q (>= id INT:0)
-          §R ""found""
+module Test
+  interface IRepository
+    func GetById (int:id) → string
+      requires id > 0
+  class SqlRepository public
+    implements IRepository
+    func GetById public (int:id) → string
+      requires id >= 0
+      return ""found""
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -275,19 +257,15 @@ public class ContractInheritanceTests
     {
         // Stronger precondition (> instead of >=) is an LSP violation
         var source = @"
-§M{Test}
-  §IFACE{IRepository}
-      §MT{GetById}
-          §I{i32:id}
-          §O{str}
-          §Q (>= id INT:0)
-  §CL{SqlRepository:pub}
-      §IMPL{IRepository}
-      §MT{GetById:pub}
-          §I{i32:id}
-          §O{str}
-          §Q (> id INT:0)
-          §R ""found""
+module Test
+  interface IRepository
+    func GetById (int:id) → string
+      requires id >= 0
+  class SqlRepository public
+    implements IRepository
+    func GetById public (int:id) → string
+      requires id > 0
+      return ""found""
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -307,17 +285,15 @@ public class ContractInheritanceTests
     {
         // Weaker postcondition (>= instead of >) is an LSP violation
         var source = @"
-§M{Test}
-  §IFACE{IRepository}
-      §MT{GetCount}
-          §O{i32}
-          §S (> result INT:0)
-  §CL{SqlRepository:pub}
-      §IMPL{IRepository}
-      §MT{GetCount:pub}
-          §O{i32}
-          §S (>= result INT:0)
-          §R INT:1
+module Test
+  interface IRepository
+    func GetCount () → int
+      => result > 0
+  class SqlRepository public
+    implements IRepository
+    func GetCount public () → int
+      => result >= 0
+      return 1
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -336,17 +312,13 @@ public class ContractInheritanceTests
     public void ContractInheritanceChecker_NoContractsNoIssues()
     {
         var source = @"
-§M{Test}
-  §IFACE{IRepository}
-      §MT{GetById}
-          §I{i32:id}
-          §O{str}
-  §CL{SqlRepository:pub}
-      §IMPL{IRepository}
-      §MT{GetById:pub}
-          §I{i32:id}
-          §O{str}
-          §R ""found""
+module Test
+  interface IRepository
+    func GetById (int:id) → string
+  class SqlRepository public
+    implements IRepository
+    func GetById public (int:id) → string
+      return ""found""
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -369,18 +341,14 @@ public class ContractInheritanceTests
     public void Emitter_EmitsInheritedPrecondition()
     {
         var source = @"
-§M{Test}
-  §IFACE{IRepository}
-      §MT{GetById}
-          §I{i32:id}
-          §O{str}
-          §Q (> id INT:0)
-  §CL{SqlRepository:pub}
-      §IMPL{IRepository}
-      §MT{GetById:pub}
-          §I{i32:id}
-          §O{str}
-          §R ""found""
+module Test
+  interface IRepository
+    func GetById (int:id) → string
+      requires id > 0
+  class SqlRepository public
+    implements IRepository
+    func GetById public (int:id) → string
+      return ""found""
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -404,18 +372,14 @@ public class ContractInheritanceTests
     public void Emitter_EmitsInheritedPostcondition()
     {
         var source = @"
-§M{Test}
-  §IFACE{IRepository}
-      §MT{GetById}
-          §I{i32:id}
-          §O{str}
-          §S (!= result null)
-  §CL{SqlRepository:pub}
-      §IMPL{IRepository}
-      §MT{GetById:pub}
-          §I{i32:id}
-          §O{str}
-          §R ""found""
+module Test
+  interface IRepository
+    func GetById (int:id) → string
+      => result != null
+  class SqlRepository public
+    implements IRepository
+    func GetById public (int:id) → string
+      return ""found""
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -438,13 +402,11 @@ public class ContractInheritanceTests
     public void Emitter_EmitsInterfaceMethodContractsAsXmlComments()
     {
         var source = @"
-§M{Test}
-  §IFACE{IRepository}
-      §MT{GetById}
-          §I{i32:id}
-          §O{str}
-          §Q (> id INT:0)
-          §S (!= result null)
+module Test
+  interface IRepository
+    func GetById (int:id) → string
+      requires id > 0
+      => result != null
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -462,19 +424,15 @@ public class ContractInheritanceTests
     public void Emitter_DoesNotEmitInheritedWhenMethodHasOwnContracts()
     {
         var source = @"
-§M{Test}
-  §IFACE{IRepository}
-      §MT{GetById}
-          §I{i32:id}
-          §O{str}
-          §Q (> id INT:0)
-  §CL{SqlRepository:pub}
-      §IMPL{IRepository}
-      §MT{GetById:pub}
-          §I{i32:id}
-          §O{str}
-          §Q (> id INT:0)
-          §R ""found""
+module Test
+  interface IRepository
+    func GetById (int:id) → string
+      requires id > 0
+  class SqlRepository public
+    implements IRepository
+    func GetById public (int:id) → string
+      requires id > 0
+      return ""found""
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -501,23 +459,19 @@ public class ContractInheritanceTests
     public void ContractInheritanceChecker_HandlesMultipleInterfaces()
     {
         var source = @"
-§M{Test}
-  §IFACE{IReader}
-      §MT{Read}
-          §O{str}
-          §S (!= result null)
-  §IFACE{IWriter}
-      §MT{Write}
-          §I{str:data}
-          §Q (!= data null)
-  §CL{FileHandler:pub}
-      §IMPL{IReader}
-      §IMPL{IWriter}
-      §MT{Read:pub}
-          §O{str}
-          §R ""data""
-      §MT{Write:pub}
-          §I{str:data}
+module Test
+  interface IReader
+    func Read () → string
+      => result != null
+  interface IWriter
+    func Write (string:data) → void
+      requires data != null
+  class FileHandler public
+    implements IReader
+    implements IWriter
+    func Read public () → string
+      return ""data""
+    func Write public (string:data) → void
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -542,11 +496,11 @@ public class ContractInheritanceTests
     {
         // When interface is not in the module (external), no checking occurs
         var source = @"
-§M{Test}
-  §CL{MyClass:pub}
-      §IMPL{IExternalInterface}
-      §MT{DoSomething:pub}
-          §R ""done""
+module Test
+  class MyClass public
+    implements IExternalInterface
+    func DoSomething public () → void
+      return ""done""
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -565,18 +519,14 @@ public class ContractInheritanceTests
     public void Emitter_ContractModeOffSkipsInheritedContracts()
     {
         var source = @"
-§M{Test}
-  §IFACE{IRepository}
-      §MT{GetById}
-          §I{i32:id}
-          §O{str}
-          §Q (> id INT:0)
-  §CL{SqlRepository:pub}
-      §IMPL{IRepository}
-      §MT{GetById:pub}
-          §I{i32:id}
-          §O{str}
-          §R ""found""
+module Test
+  interface IRepository
+    func GetById (int:id) → string
+      requires id > 0
+  class SqlRepository public
+    implements IRepository
+    func GetById public (int:id) → string
+      return ""found""
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -606,20 +556,16 @@ public class ContractInheritanceTests
         // The second clause makes the complete implementation requirement stronger,
         // despite the first clause being individually weaker.
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Process}
-          §I{i32:x}
-          §O{i32}
-          §Q (>= x INT:0)
-  §CL{Service:pub}
-      §IMPL{IService}
-      §MT{Process:pub}
-          §I{i32:x}
-          §O{i32}
-          §Q (>= x INT:-10)
-          §Q (< x INT:1000)
-          §R x
+module Test
+  interface IService
+    func Process (int:x) → int
+      requires x >= 0
+  class Service public
+    implements IService
+    func Process public (int:x) → int
+      requires x >= -10
+      requires x < 1000
+      return x
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -647,20 +593,16 @@ public class ContractInheritanceTests
         // The second implementer postcondition (!= result 999) does NOT imply the interface postcondition.
         // With correct "at least one matching" semantics, this should be VALID.
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Process}
-          §I{i32:x}
-          §O{i32}
-          §S (> result INT:0)
-  §CL{Service:pub}
-      §IMPL{IService}
-      §MT{Process:pub}
-          §I{i32:x}
-          §O{i32}
-          §S (>= result INT:10)
-          §S (!= result INT:999)
-          §R (+ x INT:10)
+module Test
+  interface IService
+    func Process (int:x) → int
+      => result > 0
+  class Service public
+    implements IService
+    func Process public (int:x) → int
+      => result >= 10
+      => result != 999
+      return x + 10
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -691,20 +633,16 @@ public class ContractInheritanceTests
         // - (< x 1000) doesn't relate to the lower bound at all
         // This should report a violation because no implementer precondition is weaker-or-equal.
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Process}
-          §I{i32:x}
-          §O{i32}
-          §Q (>= x INT:0)
-  §CL{Service:pub}
-      §IMPL{IService}
-      §MT{Process:pub}
-          §I{i32:x}
-          §O{i32}
-          §Q (>= x INT:10)
-          §Q (< x INT:1000)
-          §R x
+module Test
+  interface IService
+    func Process (int:x) → int
+      requires x >= 0
+  class Service public
+    implements IService
+    func Process public (int:x) → int
+      requires x >= 10
+      requires x < 1000
+      return x
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -732,20 +670,16 @@ public class ContractInheritanceTests
         // - (!= result 0) doesn't guarantee >= 100 either
         // This should report a violation because no implementer postcondition implies the interface.
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Process}
-          §I{i32:x}
-          §O{i32}
-          §S (>= result INT:100)
-  §CL{Service:pub}
-      §IMPL{IService}
-      §MT{Process:pub}
-          §I{i32:x}
-          §O{i32}
-          §S (> result INT:0)
-          §S (!= result INT:0)
-          §R x
+module Test
+  interface IService
+    func Process (int:x) → int
+      => result >= 100
+  class Service public
+    implements IService
+    func Process public (int:x) → int
+      => result > 0
+      => result != 0
+      return x
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -767,22 +701,18 @@ public class ContractInheritanceTests
     {
         Skip.IfNot(Calor.Compiler.Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
-        // Interface: §Q (>= id 1)
-        // Implementer: §Q (>= id 0)  // weaker - accepts more values - VALID
+        // Interface: requires id >= 1
+        // Implementer: requires id >= 0  // weaker - accepts more values - VALID
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Process}
-          §I{i32:id}
-          §O{i32}
-          §Q (>= id INT:1)
-  §CL{ValidService:pub}
-      §IMPL{IService}
-      §MT{Process:pub}
-          §I{i32:id}
-          §O{i32}
-          §Q (>= id INT:0)
-          §R id
+module Test
+  interface IService
+    func Process (int:id) → int
+      requires id >= 1
+  class ValidService public
+    implements IService
+    func Process public (int:id) → int
+      requires id >= 0
+      return id
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -803,22 +733,18 @@ public class ContractInheritanceTests
     {
         Skip.IfNot(Calor.Compiler.Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
-        // Interface: §Q (>= id 0)
-        // Implementer: §Q (>= id 10)  // stronger - rejects valid inputs - VIOLATION
+        // Interface: requires id >= 0
+        // Implementer: requires id >= 10  // stronger - rejects valid inputs - VIOLATION
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Process}
-          §I{i32:id}
-          §O{i32}
-          §Q (>= id INT:0)
-  §CL{InvalidService:pub}
-      §IMPL{IService}
-      §MT{Process:pub}
-          §I{i32:id}
-          §O{i32}
-          §Q (>= id INT:10)
-          §R id
+module Test
+  interface IService
+    func Process (int:id) → int
+      requires id >= 0
+  class InvalidService public
+    implements IService
+    func Process public (int:id) → int
+      requires id >= 10
+      return id
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -838,22 +764,18 @@ public class ContractInheritanceTests
     {
         Skip.IfNot(Calor.Compiler.Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
-        // Interface: §Q (> x 0)
-        // Implementer: §Q (&& (> x 0) (< x 100))  // stronger - adds restriction - VIOLATION
+        // Interface: requires x > 0
+        // Implementer: requires x > 0 && x < 100  // stronger - adds restriction - VIOLATION
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Process}
-          §I{i32:x}
-          §O{i32}
-          §Q (> x INT:0)
-  §CL{InvalidService:pub}
-      §IMPL{IService}
-      §MT{Process:pub}
-          §I{i32:x}
-          §O{i32}
-          §Q (&& (> x INT:0) (< x INT:100))
-          §R x
+module Test
+  interface IService
+    func Process (int:x) → int
+      requires x > 0
+  class InvalidService public
+    implements IService
+    func Process public (int:x) → int
+      requires x > 0 && x < 100
+      return x
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -873,22 +795,18 @@ public class ContractInheritanceTests
     {
         Skip.IfNot(Calor.Compiler.Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
-        // Interface: §S (> result 0)
-        // Implementer: §S (>= result 10)  // stronger - guarantees more - VALID
+        // Interface: => result > 0
+        // Implementer: => result >= 10  // stronger - guarantees more - VALID
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Process}
-          §I{i32:value}
-          §O{i32}
-          §S (> result INT:0)
-  §CL{ValidService:pub}
-      §IMPL{IService}
-      §MT{Process:pub}
-          §I{i32:value}
-          §O{i32}
-          §S (>= result INT:10)
-          §R (+ value INT:10)
+module Test
+  interface IService
+    func Process (int:value) → int
+      => result > 0
+  class ValidService public
+    implements IService
+    func Process public (int:value) → int
+      => result >= 10
+      return value + 10
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -908,22 +826,18 @@ public class ContractInheritanceTests
     {
         Skip.IfNot(Calor.Compiler.Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
-        // Interface: §S (>= result 10)
-        // Implementer: §S (> result 0)  // weaker - guarantees less - VIOLATION
+        // Interface: => result >= 10
+        // Implementer: => result > 0  // weaker - guarantees less - VIOLATION
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Process}
-          §I{i32:value}
-          §O{i32}
-          §S (>= result INT:10)
-  §CL{InvalidService:pub}
-      §IMPL{IService}
-      §MT{Process:pub}
-          §I{i32:value}
-          §O{i32}
-          §S (> result INT:0)
-          §R (+ value INT:1)
+module Test
+  interface IService
+    func Process (int:value) → int
+      => result >= 10
+  class InvalidService public
+    implements IService
+    func Process public (int:value) → int
+      => result > 0
+      return value + 1
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -943,23 +857,19 @@ public class ContractInheritanceTests
     {
         Skip.IfNot(Calor.Compiler.Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
-        // Interface: §Q (> x 0)
-        // Implementer: §Q (>= x 1)  // equivalent for integers - VALID
+        // Interface: requires x > 0
+        // Implementer: requires x >= 1  // equivalent for integers - VALID
         // Z3 should prove that x >= 1 implies x > 0 for integers
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Process}
-          §I{i32:x}
-          §O{i32}
-          §Q (> x INT:0)
-  §CL{ValidService:pub}
-      §IMPL{IService}
-      §MT{Process:pub}
-          §I{i32:x}
-          §O{i32}
-          §Q (>= x INT:1)
-          §R x
+module Test
+  interface IService
+    func Process (int:x) → int
+      requires x > 0
+  class ValidService public
+    implements IService
+    func Process public (int:x) → int
+      requires x >= 1
+      return x
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -979,19 +889,15 @@ public class ContractInheritanceTests
     {
         // When Z3 is explicitly disabled, should fall back to heuristics
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Process}
-          §I{i32:id}
-          §O{i32}
-          §Q (> id INT:0)
-  §CL{Service:pub}
-      §IMPL{IService}
-      §MT{Process:pub}
-          §I{i32:id}
-          §O{i32}
-          §Q (> id INT:0)
-          §R id
+module Test
+  interface IService
+    func Process (int:id) → int
+      requires id > 0
+  class Service public
+    implements IService
+    func Process public (int:id) → int
+      requires id > 0
+      return id
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1014,18 +920,14 @@ public class ContractInheritanceTests
             Calor.Compiler.Verification.Z3.Z3ContextFactory.IsAvailable,
             "Z3 not available");
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Process}
-          §I{i32:x}
-          §O{i32}
-  §CL{Service:pub}
-      §IMPL{IService}
-      §MT{Process:pub}
-          §I{i32:x}
-          §O{i32}
-          §Q (> x INT:0)
-          §R x
+module Test
+  interface IService
+    func Process (int:x) → int
+  class Service public
+    implements IService
+    func Process public (int:x) → int
+      requires x > 0
+      return x
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1045,26 +947,18 @@ public class ContractInheritanceTests
     public void Overloads_KeepDistinctInheritedContracts()
     {
         var source = @"
-§M{Test}
-  §IFACE{IParser}
-      §MT{Parse}
-          §I{i32:value}
-          §O{i32}
-          §Q (> value INT:0)
-      §MT{Parse}
-          §I{str:value}
-          §O{str}
-          §Q (!= value null)
-  §CL{Parser:pub}
-      §IMPL{IParser}
-      §MT{Parse:pub}
-          §I{i32:value}
-          §O{i32}
-          §R value
-      §MT{Parse:pub}
-          §I{str:value}
-          §O{str}
-          §R value
+module Test
+  interface IParser
+    func Parse (int:value) → int
+      requires value > 0
+    func Parse (string:value) → string
+      requires value != null
+  class Parser public
+    implements IParser
+    func Parse public (int:value) → int
+      return value
+    func Parse public (string:value) → string
+      return value
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1088,24 +982,18 @@ public class ContractInheritanceTests
     public void MultipleInterfaces_CombineInheritedPreconditionsAsDisjunction()
     {
         var source = @"
-§M{Test}
-  §IFACE{IPositive}
-      §MT{Use}
-          §I{i32:value}
-          §O{i32}
-          §Q (> value INT:0)
-  §IFACE{INegative}
-      §MT{Use}
-          §I{i32:value}
-          §O{i32}
-          §Q (< value INT:0)
-  §CL{Service:pub}
-      §IMPL{IPositive}
-      §IMPL{INegative}
-      §MT{Use:pub}
-          §I{i32:value}
-          §O{i32}
-          §R value
+module Test
+  interface IPositive
+    func Use (int:value) → int
+      requires value > 0
+  interface INegative
+    func Use (int:value) → int
+      requires value < 0
+  class Service public
+    implements IPositive
+    implements INegative
+    func Use public (int:value) → int
+      return value
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1133,19 +1021,15 @@ public class ContractInheritanceTests
     public void BaseClassContracts_AreInheritedBySignature()
     {
         var source = @"
-§M{Test}
-  §CL{Base:pub}
-      §MT{Use:pub:virt}
-          §I{i32:value}
-          §O{i32}
-          §Q (> value INT:0)
-          §R value
-  §CL{Derived:pub}
-      §EXT{Base}
-      §MT{Use:pub:over}
-          §I{i32:value}
-          §O{i32}
-          §R value
+module Test
+  class Base public
+    func Use public virtual (int:value) → int
+      requires value > 0
+      return value
+  class Derived public
+    extends Base
+    func Use public override (int:value) → int
+      return value
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1167,18 +1051,14 @@ public class ContractInheritanceTests
     public void InheritedContracts_RebindParameterNamesPositionally()
     {
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Use}
-          §I{i32:x}
-          §O{i32}
-          §Q (> x INT:0)
-  §CL{Service:pub}
-      §IMPL{IService}
-      §MT{Use:pub}
-          §I{i32:value}
-          §O{i32}
-          §R value
+module Test
+  interface IService
+    func Use (int:x) → int
+      requires x > 0
+  class Service public
+    implements IService
+    func Use public (int:value) → int
+      return value
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1200,24 +1080,18 @@ public class ContractInheritanceTests
     public void IntermediateOverride_PreservesEffectiveInterfaceContract()
     {
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Use}
-          §I{i32:value}
-          §O{i32}
-          §Q (> value INT:0)
-  §CL{Base:pub}
-      §IMPL{IService}
-      §MT{Use:pub:virt}
-          §I{i32:value}
-          §O{i32}
-          §R value
-  §CL{Derived:pub}
-      §EXT{Base}
-      §MT{Use:pub:over}
-          §I{i32:value}
-          §O{i32}
-          §R value
+module Test
+  interface IService
+    func Use (int:value) → int
+      requires value > 0
+  class Base public
+    implements IService
+    func Use public virtual (int:value) → int
+      return value
+  class Derived public
+    extends Base
+    func Use public override (int:value) → int
+      return value
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1239,18 +1113,14 @@ public class ContractInheritanceTests
     public void GenericInterface_ResolvesClosedMethodSignature()
     {
         var source = @"
-§M{Test}
-  §IFACE{IRepository}<T>
-      §MT{Save}
-          §I{T:value}
-          §O{T}
-          §Q (!= value null)
-  §CL{IntRepository:pub}
-      §IMPL{IRepository<i32>}
-      §MT{Save:pub}
-          §I{i32:value}
-          §O{i32}
-          §R value
+module Test
+  interface IRepository<T>
+    func Save (T:value) → T
+      requires value != null
+  class IntRepository public
+    implements IRepository<int>
+    func Save public (int:value) → int
+      return value
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1274,19 +1144,15 @@ public class ContractInheritanceTests
     public void GenericBaseClass_ResolvesClosedMethodSignature()
     {
         var source = @"
-§M{Test}
-  §CL{Base:pub}<T>
-      §MT{Save:pub:virt}
-          §I{T:value}
-          §O{T}
-          §Q (!= value null)
-          §R value
-  §CL{IntRepository:pub}
-      §EXT{Base<i32>}
-      §MT{Save:pub:over}
-          §I{i32:value}
-          §O{i32}
-          §R value
+module Test
+  class Base<T> public
+    func Save public virtual (T:value) → T
+      requires value != null
+      return value
+  class IntRepository public
+    extends Base<int>
+    func Save public override (int:value) → int
+      return value
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1303,26 +1169,18 @@ public class ContractInheritanceTests
     public void ParameterModifiers_DisambiguateInheritedOverloads()
     {
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Touch}
-          §I{i32:value}
-          §O{i32}
-          §Q (> value INT:0)
-      §MT{Touch}
-          §I{i32:value:ref}
-          §O{i32}
-          §Q (>= value INT:0)
-  §CL{Service:pub}
-      §IMPL{IService}
-      §MT{Touch:pub}
-          §I{i32:value}
-          §O{i32}
-          §R value
-      §MT{Touch:pub}
-          §I{i32:value:ref}
-          §O{i32}
-          §R value
+module Test
+  interface IService
+    func Touch (int:value) → int
+      requires value > 0
+    func Touch (ref int:value) → int
+      requires value >= 0
+  class Service public
+    implements IService
+    func Touch public (int:value) → int
+      return value
+    func Touch public (ref int:value) → int
+      return value
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1339,21 +1197,15 @@ public class ContractInheritanceTests
     public void GenericMethodTypeParameters_MatchByPosition()
     {
         var source = @"
-§M{Test}
-  §IFACE{ITransformer}
-      §MT{Map}<T>
-          §I{T:item}
-          §I{i32:limit}
-          §O{T}
-          §Q (> limit INT:0)
-          §Q (is item T)
-  §CL{Transformer:pub}
-      §IMPL{ITransformer}
-      §MT{Map:pub}<U>
-          §I{U:item}
-          §I{i32:limit}
-          §O{U}
-          §R item
+module Test
+  interface ITransformer
+    func Map<T> (T:item, int:limit) → T
+      requires limit > 0
+      requires item is T
+  class Transformer public
+    implements ITransformer
+    func Map<U> public (U:item, int:limit) → U
+      return item
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1374,18 +1226,14 @@ public class ContractInheritanceTests
     public void InheritedContractCalls_RebindArgumentNames()
     {
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Use}
-          §I{i32:x}
-          §O{i32}
-          §Q (CALL IsValid x)
-  §CL{Service:pub}
-      §IMPL{IService}
-      §MT{Use:pub}
-          §I{i32:value}
-          §O{i32}
-          §R value
+module Test
+  interface IService
+    func Use (int:x) → int
+      requires IsValid(x)
+  class Service public
+    implements IService
+    func Use public (int:value) → int
+      return value
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1404,18 +1252,14 @@ public class ContractInheritanceTests
     public void NestedNullCoalesce_RebindsParameterNames()
     {
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Use}
-          §I{str:x}
-          §O{str}
-          §Q (!= (?? x STR:""fallback"") STR:""invalid"")
-  §CL{Service:pub}
-      §IMPL{IService}
-      §MT{Use:pub}
-          §I{str:value}
-          §O{str}
-          §R value
+module Test
+  interface IService
+    func Use (string:x) → string
+      requires (x ?? ""fallback"") != ""invalid""
+  class Service public
+    implements IService
+    func Use public (string:value) → string
+      return value
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1435,18 +1279,14 @@ public class ContractInheritanceTests
     public void InterpolatedString_RebindsHoleReferences()
     {
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Use}
-          §I{str:x}
-          §O{str}
-          §Q (!= §INTERP ""id:"" §EXP x §/INTERP STR:"""")
-  §CL{Service:pub}
-      §IMPL{IService}
-      §MT{Use:pub}
-          §I{str:value}
-          §O{str}
-          §R value
+module Test
+  interface IService
+    func Use (string:x) → string
+      requires ""id:${x}"" != """"
+  class Service public
+    implements IService
+    func Use public (string:value) → string
+      return value
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1469,18 +1309,14 @@ public class ContractInheritanceTests
     public void IsPatternBinding_AvoidsParameterCapture()
     {
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Use}
-          §I{object:x}
-          §O{bool}
-          §Q (&& (is x i32 value) (> value INT:0))
-  §CL{Service:pub}
-      §IMPL{IService}
-      §MT{Use:pub}
-          §I{object:value}
-          §O{bool}
-          §R true
+module Test
+  interface IService
+    func Use (object:x) → bool
+      requires x is int value && value > 0
+  class Service public
+    implements IService
+    func Use public (object:value) → bool
+      return true
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1504,24 +1340,18 @@ public class ContractInheritanceTests
     public void ClosedGenericBase_ComposesInheritedInterfaceSubstitutions()
     {
         var source = @"
-§M{Test}
-  §IFACE{IFoo}<T>
-      §MT{Use}
-          §I{T:x}
-          §O{T}
-          §Q (is x T)
-  §CL{Base:pub}<U>
-      §IMPL{IFoo<U>}
-      §MT{Use:pub:virt}
-          §I{U:x}
-          §O{U}
-          §R x
-  §CL{Derived:pub}
-      §EXT{Base<i32>}
-      §MT{Use:pub:over}
-          §I{i32:value}
-          §O{i32}
-          §R value
+module Test
+  interface IFoo<T>
+    func Use (T:x) → T
+      requires x is T
+  class Base<U> public
+    implements IFoo<U>
+    func Use public virtual (U:x) → U
+      return x
+  class Derived public
+    extends Base<int>
+    func Use public override (int:value) → int
+      return value
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1536,25 +1366,21 @@ public class ContractInheritanceTests
         var pattern = Assert.IsType<IsPatternNode>(
             Assert.Single(inherited!.Preconditions).Condition);
 
-        Assert.Equal("i32", pattern.TargetType);
+        Assert.Equal("int", pattern.TargetType);
     }
 
     [Fact]
     public void GenericCallTypeArguments_AreSubstituted()
     {
         var source = @"
-§M{Test}
-  §IFACE{IService}<T>
-      §MT{Use}
-          §I{T:x}
-          §O{T}
-          §Q §C{Check<T>} §A x §/C
-  §CL{IntService:pub}
-      §IMPL{IService<i32>}
-      §MT{Use:pub}
-          §I{i32:value}
-          §O{i32}
-          §R value
+module Test
+  interface IService<T>
+    func Use (T:x) → T
+      requires Check<T>(x)
+  class IntService public
+    implements IService<int>
+    func Use public (int:value) → int
+      return value
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1566,25 +1392,21 @@ public class ContractInheritanceTests
         var call = Assert.IsType<CallExpressionNode>(
             Assert.Single(inherited.Preconditions).Condition);
 
-        Assert.Equal("i32", Assert.Single(call.TypeArguments!));
+        Assert.Equal("int", Assert.Single(call.TypeArguments!));
     }
 
     [Fact]
     public void GenericConstructorTypeArguments_AreSubstituted()
     {
         var source = @"
-§M{Test}
-  §IFACE{IService}<T>
-      §MT{Use}
-          §I{T:x}
-          §O{T}
-          §Q (!= §NEW{Box<T>} §/NEW null)
-  §CL{IntService:pub}
-      §IMPL{IService<i32>}
-      §MT{Use:pub}
-          §I{i32:value}
-          §O{i32}
-          §R value
+module Test
+  interface IService<T>
+    func Use (T:x) → T
+      requires new Box<T>() != null
+  class IntService public
+    implements IService<int>
+    func Use public (int:value) → int
+      return value
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1597,29 +1419,42 @@ public class ContractInheritanceTests
             Assert.Single(inherited.Preconditions).Condition);
         var creation = Assert.IsType<NewExpressionNode>(comparison.Left);
 
-        Assert.Equal("i32", Assert.Single(creation.TypeArguments));
+        Assert.Equal("Box<int>", creation.TypeName);
+        Assert.Equal("new Box<int>()", creation.Accept(new CSharpEmitter()));
+        var probe = "public class Box<T> {} public static class Probe { public static string Run() { return ("
+            + creation.Accept(new CSharpEmitter()) + ").GetType().GenericTypeArguments[0].FullName!; } }";
+        Assert.Equal("System.Int32", InteropScope.RefOutImplementationTests.Run(probe));
     }
 
     [Fact]
     public void ExplicitInterfaceImplementation_InheritsContract()
     {
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Use}
-          §I{i32:value}
-          §O{i32}
-          §Q (> value INT:0)
-  §CL{Service:pub}
-      §IMPL{IService}
-      §MT{IService.Use:priv}
-          §I{i32:value}
-          §O{i32}
-          §R value
+module Test
+  interface IService
+    func Use (int:value) → int
+      requires value > 0
+  class Service public
+    implements IService
+    func Use private (int:value) → int
+      return value
 ";
 
         var module = Parse(source, out var parseDiags);
         Assert.False(parseDiags.HasErrors);
+        // Explicit-interface spelling is not admitted native syntax; preserve this checker-only AST witness.
+        var type = Assert.Single(module.Classes);
+        var method = Assert.Single(type.Methods);
+        var explicitMethod = new MethodNode(method.Span, method.LocalId, "IService.Use", method.Visibility,
+            method.Modifiers, method.TypeParameters, method.Parameters, method.Output, method.Effects,
+            method.Preconditions, method.Postconditions, method.Body, method.Attributes);
+        var explicitType = new ClassDefinitionNode(type.Span, type.LocalId, type.Name,
+            type.IsAbstract, type.IsSealed, type.IsPartial, type.IsStatic, type.BaseClass,
+            type.ImplementedInterfaces, type.TypeParameters, type.Fields, type.Properties, type.Constructors,
+            [explicitMethod], type.Events, type.OperatorOverloads, type.Attributes, type.CSharpAttributes,
+            visibility: type.Visibility);
+        module = new ModuleNode(module.Span, module.Id, module.Name, module.Usings, module.Interfaces,
+            [explicitType], module.Functions, module.Attributes);
         var checkDiags = new DiagnosticBag();
         using var checker = new ContractInheritanceChecker(checkDiags);
 
@@ -1635,18 +1470,14 @@ public class ContractInheritanceTests
     public void QuantifierRebinding_AvoidsCapturingImplementationParameter()
     {
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Use}
-          §I{i32:limit}
-          §O{i32}
-          §Q (exists ((i i32)) (&& (>= i INT:0) (< i limit)))
-  §CL{Service:pub}
-      §IMPL{IService}
-      §MT{Use:pub}
-          §I{i32:i}
-          §O{i32}
-          §R i
+module Test
+  interface IService
+    func Use (int:limit) → int
+      requires exists int:i where i >= 0 : i < limit
+  class Service public
+    implements IService
+    func Use public (int:i) → int
+      return i
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1671,20 +1502,16 @@ public class ContractInheritanceTests
     public void InterfaceImplementedOnlyByBaseMethod_FailsClosed()
     {
         var source = @"
-§M{Test}
-  §IFACE{IService}
-      §MT{Use}
-          §I{i32:value}
-          §O{i32}
-          §Q (> value INT:0)
-  §CL{Base:pub}
-      §MT{Use:pub:virt}
-          §I{i32:value}
-          §O{i32}
-          §R value
-  §CL{Derived:pub}
-      §EXT{Base}
-      §IMPL{IService}
+module Test
+  interface IService
+    func Use (int:value) → int
+      requires value > 0
+  class Base public
+    func Use public virtual (int:value) → int
+      return value
+  class Derived public
+    extends Base
+    implements IService
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1704,26 +1531,20 @@ public class ContractInheritanceTests
     public void DisjointSourcePostconditions_AreQualifiedByTheirPreconditions()
     {
         var source = @"
-§M{Test}
-  §IFACE{IPositive}
-      §MT{Use}
-          §I{i32:value}
-          §O{i32}
-          §Q (> value INT:0)
-          §S (> result INT:0)
-  §IFACE{INegative}
-      §MT{Use}
-          §I{i32:value}
-          §O{i32}
-          §Q (< value INT:0)
-          §S (< result INT:0)
-  §CL{Service:pub}
-      §IMPL{IPositive}
-      §IMPL{INegative}
-      §MT{Use:pub}
-          §I{i32:value}
-          §O{i32}
-          §R value
+module Test
+  interface IPositive
+    func Use (int:value) → int
+      requires value > 0
+      => result > 0
+  interface INegative
+    func Use (int:value) → int
+      requires value < 0
+      => result < 0
+  class Service public
+    implements IPositive
+    implements INegative
+    func Use public (int:value) → int
+      return value
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1746,21 +1567,18 @@ public class ContractInheritanceTests
             Calor.Compiler.Verification.Z3.Z3ContextFactory.IsAvailable,
             "Z3 not available");
         var source = @"
-§M{Test}
-  §IFACE{IPositive}
-      §MT{Get}
-          §O{i32}
-          §S (> result INT:0)
-  §IFACE{INegative}
-      §MT{Get}
-          §O{i32}
-          §S (< result INT:0)
-  §CL{Service:pub}
-      §IMPL{IPositive}
-      §IMPL{INegative}
-      §MT{Get:pub}
-          §O{i32}
-          §R INT:1
+module Test
+  interface IPositive
+    func Get () → int
+      => result > 0
+  interface INegative
+    func Get () → int
+      => result < 0
+  class Service public
+    implements IPositive
+    implements INegative
+    func Get public () → int
+      return 1
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1778,4 +1596,53 @@ public class ContractInheritanceTests
     }
 
     #endregion
+
+    [Theory]
+    [InlineData(0, "Requires", false)]
+    [InlineData(0, "Requires", true)]
+    [InlineData(1, "Ensures", false)]
+    [InlineData(1, "Ensures", true)]
+    [InlineData(2, "1", false)]
+    [InlineData(2, "1", true)]
+    public void NativeInheritedContracts_ExecuteReboundGuardsOnTheClr(int value, string expected, bool roundtrip)
+    {
+        const string source = """
+            module Inheritance
+              interface IService
+                func Use (int:x) → int
+                  requires x > 0
+                  => result > 0
+              class Service public
+                implements IService
+                func Use public (int:value) → int
+                  return value - 1
+            """;
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        if (roundtrip)
+        {
+            module = Parse(new CalorEmitter().Emit(module), out diagnostics);
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        }
+        var checkDiagnostics = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiagnostics);
+        var inherited = checker.Check(module);
+        Assert.False(inherited.HasViolations, string.Join("\n", checkDiagnostics));
+        var contracts = Assert.Single(inherited.InheritedContracts).Value;
+        Assert.Single(contracts.Preconditions);
+        Assert.Single(contracts.Postconditions);
+        var generated = new CSharpEmitter(ContractMode.Debug, null, inherited).Emit(module);
+        var probe = $$"""
+
+            public static class Probe
+            {
+                public static string Run()
+                {
+                    try { return ((IService)new Service()).Use({{value}}).ToString(); }
+                    catch (Calor.Runtime.ContractViolationException error) { return error.Kind.ToString(); }
+                }
+            }
+            """;
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(generated + probe));
+    }
 }
