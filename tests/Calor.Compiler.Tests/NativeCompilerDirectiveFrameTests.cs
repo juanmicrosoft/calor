@@ -254,6 +254,67 @@ public sealed class NativeCompilerDirectiveFrameTests
     }
 
     [Fact]
+    public void ConditionalDirectiveOnlyBranch_RetainsOriginalBytesOrderAndCompilerState()
+    {
+        const string csharp = """
+            public class DirectiveHost { }
+            #if FEATURE
+            #warning MUST_SURVIVE
+            #else
+            #pragma warning disable CS0168
+            #endif
+            """;
+        var root = CSharpSyntaxTree.ParseText(csharp).GetCompilationUnitRoot();
+        var original = new RoslynSyntaxVisitor(new ConversionContext()).Convert(root, "ConditionalDirectiveOnly");
+        var native = new CalorEmitter().Emit(original);
+        var (module, diagnostics) = Parse(native);
+        Assert.False(diagnostics.HasErrors, native + "\n" + string.Join("\n", diagnostics));
+        var type = Assert.Single(module.Classes);
+        var conditional = Assert.Single(module.TypePreprocessorBlocks);
+        Assert.NotNull(conditional.NamespaceScopeId);
+        Assert.Equal(type.NamespaceScopeId, conditional.NamespaceScopeId);
+        Assert.Equal(type.NamespaceIdentity, conditional.NamespaceIdentity);
+        Assert.Equal("FEATURE", conditional.Condition);
+        Assert.Equal("#warning MUST_SURVIVE",
+            Assert.IsType<CompilerDirectiveNode>(Assert.Single(conditional.Items)).Code);
+        var otherwise = Assert.IsType<TypePreprocessorBlockNode>(conditional.ElseBranch);
+        Assert.Equal("#pragma warning disable CS0168",
+            Assert.IsType<CompilerDirectiveNode>(Assert.Single(otherwise.Items)).Code);
+        var compiled = Program.Compile(native);
+        Assert.False(compiled.HasErrors, native + "\n" + string.Join("\n", compiled.Diagnostics));
+        var generated = new CSharpEmitter().Emit(module);
+        var validation = GeneratedCSharpCompiler.Validate(generated);
+        Assert.True(validation.CompilationSuccess,
+            native + "\n" + generated + "\n" + string.Join("\n", validation.FormattedCompilationErrors));
+        var positions = new[] { "class DirectiveHost", "#if FEATURE", "#warning MUST_SURVIVE",
+            "#else", "#pragma warning disable CS0168", "#endif" }
+            .Select(text => generated.IndexOf(text, StringComparison.Ordinal)).ToArray();
+        Assert.All(positions, position => Assert.True(position >= 0, generated));
+        Assert.Equal(positions.OrderBy(position => position), positions);
+
+        foreach (var enabled in new[] { false, true })
+        {
+            var tree = CSharpSyntaxTree.ParseText(generated
+                + "\npublic class WarningProbe { public void Probe() { int unused; } }",
+                new CSharpParseOptions(preprocessorSymbols: enabled ? ["FEATURE"] : []));
+            var compilation = CSharpCompilation.Create("ConditionalDirectiveState",
+                [tree], GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var compilerDiagnostics = compilation.GetDiagnostics();
+            Assert.DoesNotContain(compilerDiagnostics,
+                diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+            Assert.Equal(enabled, compilerDiagnostics.Any(diagnostic =>
+                diagnostic.Id == "CS1030" && diagnostic.GetMessage().Contains("MUST_SURVIVE", StringComparison.Ordinal)));
+            Assert.Equal(enabled, compilerDiagnostics.Any(diagnostic => diagnostic.Id == "CS0168"));
+        }
+
+        var conversion = new CSharpToCalorConverter().Convert(csharp, "ConditionalDirectiveOnly.cs");
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues.Select(issue => issue.Message)));
+        Assert.DoesNotContain(conversion.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
+        Assert.Empty(conversion.Ast!.InteropBlocks);
+    }
+
+    [Fact]
     public void DirectiveEmitter_RejectsFabricatedExecutableOrMismatchedDirectiveAst()
     {
         Assert.Throws<InvalidOperationException>(() => new CompilerDirectiveNode(default,

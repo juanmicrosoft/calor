@@ -1326,7 +1326,7 @@ public sealed class Parser
 
         if (namespaceScopes.Count > 0)
         {
-            foreach (var declaration in interfaces.Cast<AstNode>()
+            var namespaceDeclarations = interfaces.Cast<AstNode>()
                          .Concat(classes)
                          .Concat(enums)
                          .Concat(enumExtensions)
@@ -1337,7 +1337,14 @@ public sealed class Parser
                          .Concat(indexedTypes)
                          .Concat(typePreprocessorBlocks.Where(
                              ContainsNamespaceScopedDeclarations))
-                         .Where(item =>
+                         .ToList();
+            var firstDeclarationStart = namespaceDeclarations.Select(item => item.Span.Start)
+                .DefaultIfEmpty(int.MaxValue).Min();
+            // Leading directive-only blocks belong to the compilation-unit preamble;
+            // trailing ones need the enclosing scope to retain their source position.
+            namespaceDeclarations.AddRange(typePreprocessorBlocks.Where(block =>
+                IsCompilerDirectivePrefix(block) && block.Span.Start > firstDeclarationStart));
+            foreach (var declaration in namespaceDeclarations.Where(item =>
                              item.NamespaceIdentity == null
                              && item.NamespaceScopeId == null))
             {
