@@ -966,6 +966,74 @@ public class DocDriftCheckerTests
         }
     }
 
+    [Fact]
+    public void MarkdownNormalForm_ExecutesNativeIllustrationsWithoutClaimingAnIrBackend()
+    {
+        const string path = "docs/semantics/normal-form.md";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path));
+        Assert.DoesNotContain("§", content);
+        Assert.Contains("Status: unintegrated design", content);
+        var coverage = new WebsiteExampleChecker.Coverage();
+        Assert.Empty(WebsiteExampleChecker.Check([new DocFile(path, content)], coverage));
+        Assert.Equal(7, coverage.CompletePrograms);
+        Assert.Equal(0, coverage.NegativePrograms);
+        var programs = ExemplarCompileChecker.ExtractCompletePrograms(content);
+        var expectations = new (string Module, string Expression, string Expected)[]
+        {
+            ("NormalBinary", "GlobalModule.Value(2, 3, 4)", "10"),
+            ("NormalCalls", "GlobalModule.Main()", "123"),
+            ("NormalAnd", "GlobalModule.Both(false, true) + \":\" + GlobalModule.Both(true, true)", "False:True"),
+            ("NormalOr", "GlobalModule.Either(true, false) + \":\" + GlobalModule.Either(false, false)", "True:False"),
+            ("NormalRequires", "GlobalModule.Positive(1)", "1"),
+            ("NormalEnsures", "GlobalModule.Positive(1)", "1"),
+            ("NormalSum", "GlobalModule.SumIfPositive(2, 3)", "5")
+        };
+        Assert.Equal(expectations.Length, programs.Count);
+        for (var index = 0; index < programs.Count; index++)
+        {
+            var compiled = Program.Compile(programs[index].Source, path);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Assert.Equal(expectations[index].Module, Assert.IsType<Ast.ModuleNode>(compiled.Ast).Name);
+            var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run() => {{expectations[index].Expression}};
+                }
+                """);
+            Assert.Equal(expectations[index].Expected, observed);
+            if (expectations[index].Module == "NormalCalls")
+                Assert.Equal("123", Observe(compiled.GeneratedCode, "GlobalModule.Main()"));
+        }
+    }
+
+    [Theory]
+    [InlineData("NormalRequires", "GlobalModule.Positive(0)", "!ContractViolationException", "0")]
+    [InlineData("NormalEnsures", "GlobalModule.Positive(0)", "!ContractViolationException", "0")]
+    [InlineData("NormalSum", "GlobalModule.SumIfPositive(0, 3)", "!ContractViolationException", "3")]
+    [InlineData("NormalSum", "GlobalModule.SumIfPositive(int.MaxValue, 1)", "!OverflowException", "!OverflowException")]
+    public void MarkdownNormalForm_RetainsProductionGuardsAndCheckedArithmetic(
+        string module, string expression, string enabled, string disabled)
+    {
+        const string path = "docs/semantics/normal-form.md";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith("module " + module + "\n", StringComparison.Ordinal)).Source;
+        foreach (var mode in new[] { ContractMode.Debug, ContractMode.Release, ContractMode.Off })
+        {
+            var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = mode });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run() => {{expression}};
+                }
+                """);
+            Assert.Equal(mode == ContractMode.Off ? disabled : enabled, observed);
+        }
+    }
+
     [Theory]
     [InlineData("FunctionCallBoundary", "Identity")]
     [InlineData("FloatingProofBoundary", "Square")]
