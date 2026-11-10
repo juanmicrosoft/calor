@@ -12,9 +12,9 @@ public class PatternCheckerTests
     private static DiagnosticBag Check(string cases)
     {
         var source = """
-            §M{Test}
-              §F{Test:pub} (bool:x) -> i32
-                §W x
+            module Test
+              func Test public (bool:x) → int
+                match x
             """ + "\n" + cases;
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
@@ -28,7 +28,7 @@ public class PatternCheckerTests
     [Fact]
     public void Check_BoolExhaustive_NoWarning()
     {
-        var diagnostics = Check("      §K true\n        §R 1\n      §K false\n        §R 0");
+        var diagnostics = Check("      case true\n        return 1\n      case false\n        return 0");
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NonExhaustiveMatch);
     }
 
@@ -37,7 +37,7 @@ public class PatternCheckerTests
     [InlineData("true", "false")]
     public void Check_BoolMissingBranch_ReportsNonExhaustiveError(string covered, string missing)
     {
-        var diagnostics = Check($"      §K {covered}\n        §R 0");
+        var diagnostics = Check($"      case {covered}\n        return 0");
         var diagnostic = Assert.Single(diagnostics.Where(d => d.Code == DiagnosticCode.NonExhaustiveMatch));
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Contains(missing, diagnostic.Message);
@@ -48,21 +48,21 @@ public class PatternCheckerTests
     [InlineData("y")]
     public void Check_CatchAllMakesExhaustive(string pattern)
     {
-        var diagnostics = Check($"      §K {pattern}\n        §R 0");
+        var diagnostics = Check($"      case {pattern}\n        return 0");
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NonExhaustiveMatch);
     }
 
     [Fact]
     public void Check_PatternAfterWildcard_ReportsUnreachable()
     {
-        var diagnostics = Check("      §K _\n        §R 0\n      §K true\n        §R 1");
+        var diagnostics = Check("      case _\n        return 0\n      case true\n        return 1");
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.UnreachablePattern);
     }
 
     [Fact]
     public void Check_DuplicateLiteralPattern_ReportsDuplicate()
     {
-        var diagnostics = Check("      §K true\n        §R 1\n      §K true\n        §R 2\n      §K _\n        §R 0");
+        var diagnostics = Check("      case true\n        return 1\n      case true\n        return 2\n      case _\n        return 0");
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.DuplicatePattern);
     }
 
@@ -74,11 +74,11 @@ public class PatternCheckerTests
     public void RemovedPatterns_AreRejectedBeforeExhaustivenessAnalysis(string pattern)
     {
         var source = $$"""
-            §M{RemovedPatterns}
-              §F{Probe:pub} (object:value) -> i32
-                §R §W value
-                  §K {{pattern}} → 1
-                  §K _ → 0
+            module RemovedPatterns
+              func Probe public (object:value) → int
+                return match value
+                  case {{pattern}} → 1
+                  case _ → 0
             """;
         var diagnostics = new DiagnosticBag();
         new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
