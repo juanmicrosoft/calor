@@ -322,65 +322,64 @@ public sealed class CallableMutationFlowTests
     public void LoopCallableFlow_JoinsZeroAndRepeatedExecutions(
         string kind, string scenario, string modifier, bool array)
     {
-        var nullableType = array ? "?[str]" : "?str";
-        var nonNullableType = array ? "[str]" : "str";
+        var nullableType = array ? "string[]?" : "string?";
+        var nonNullableType = array ? "string[]" : "string";
         var header = kind switch
         {
-            "while" => scenario == "zero" ? "§WH false" : "§WH flag",
-            "for" => scenario == "zero" ? "§L{i:1:0:1}" : "§L{i:1:2:1}",
-            "foreach" => scenario == "zero" ? "§EACH{i} \"\"" : "§EACH{i} \"xx\"",
-            "do" => "§DO",
+            "while" => scenario == "zero" ? "while false" : "while flag",
+            "for" => scenario == "zero" ? "for i from 1 to 0 step 1" : "for i from 1 to 2 step 1",
+            "foreach" => scenario == "zero" ? "each i in \"\"" : "each i in \"xx\"",
+            "do" => "do",
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
-        var setup = scenario == "zero" ? "§B{~later:Action} mutator" : "§B{~later:Action} noopAction";
+        var setup = scenario == "zero" ? "var Action:later = mutator" : "var Action:later = noopAction";
         var body = scenario switch
         {
-            "zero" => "§ASSIGN later noopAction",
+            "zero" => "set later noopAction",
             "backedge" => """
-                §C{later} §/C
-                §C{Take} §A value §/C
-                §ASSIGN later mutator
+                later()
+                Take(value)
+                set later mutator
                 """,
             "alias-backedge" => """
-                §B{alias:Action} later
-                §C{alias} §/C
-                §C{Take} §A value §/C
-                §ASSIGN later mutator
+                let Action:alias = later
+                alias()
+                Take(value)
+                set later mutator
                 """,
             "reguard" => """
-                §C{later} §/C
-                §IF (!= value null)
-                  §C{Take} §A value §/C
-                §ASSIGN later mutator
+                later()
+                if value != null
+                  Take(value)
+                set later mutator
                 """,
             "unused" => """
-                §B{unused:Action} §LAM{}
-                  §ASSIGN later mutator
-                §/LAM
-                §C{later} §/C
-                §C{Take} §A value §/C
+                let Action:unused = () =>
+                  set later mutator
+                later()
+                Take(value)
                 """,
             _ => throw new ArgumentOutOfRangeException(nameof(scenario))
         };
         var after = scenario == "zero"
-            ? "§C{later} §/C\n§C{Take} §A value §/C"
+            ? "later()\nTake(value)"
             : "";
         var source = $$"""
-            §M{CallableLoops}
-              §F{Noop:pub} () -> void
-                §E{}
-              §F{Mutate:pub} ({{nullableType}}:value:{{modifier}}) -> void
-                §ASSIGN value null
-              §F{Take:pub} ({{nonNullableType}}:value) -> void
-                §E{}
-              §F{Probe:pub} ({{nullableType}}:value, bool:flag) -> void
-                §IF (!= value null)
-                  §B{noopAction:Action} §LAM{} §C{Noop} §/C §/LAM
-                  §B{mutator:Action} §LAM{} §C{Mutate} §A{ {{modifier}} } value §/C §/LAM
+            module CallableLoops
+              func Noop public () → void
+                !
+              func Mutate public ({{modifier}} {{nullableType}}:value) → void
+                set value null
+              func Take public ({{nonNullableType}}:value) → void
+                !
+              func Probe public ({{nullableType}}:value, bool:flag) → void
+                if value != null
+                  let Action:noopAction = () => Noop()
+                  let Action:mutator = () => Mutate({{modifier}} value)
                   {{setup}}
                   {{header}}
             {{Indent(body, 8)}}
-            {{(kind == "do" ? "      flag" : "")}}
+            {{(kind == "do" ? "      while flag" : "")}}
             {{Indent(after, 6)}}
             """;
         var diagnostics = new DiagnosticBag();
