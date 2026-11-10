@@ -2373,12 +2373,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
     /// lost; a block lambda bound to an untyped temp, which loses its delegate type) and,
     /// unless <paramref name="allowMultiline"/>, one line (a §ROW holds no block).
     /// </summary>
-    internal static bool WritesInPlace(ExpressionNode element, bool allowMultiline)
+    internal static bool WritesInPlace(ExpressionNode element)
     {
         var probe = new CalorEmitter { _memberBodyDepth = 1 };
         var value = probe.RenderInPlace([element])[0];
         return probe._builder.Length == 0 && probe._pendingHoistedLines.Count == 0
-            && (allowMultiline || !value.Contains('\n'));
+            && !value.Contains('\n');
     }
 
     internal static bool HoistsInExpression(ExpressionNode expression)

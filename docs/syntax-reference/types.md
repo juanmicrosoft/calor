@@ -133,6 +133,9 @@ array. Omit the sizes with `new int[,,]` to infer them from the braces.
 Written sizes, empty braces and row boundaries are preserved; mismatched
 sizes or ragged rows are rejected rather than padded, flattened or resized.
 Initializer expressions still require their own effects in addition to `alloc`.
+Array elements must fit inline. When migrating C#, a block-bodied lambda element
+is preserved as C# with an `array-element-block` report instead of emitting an
+invalid native initializer.
 
 Reading a source static array field through its type retains the declared rank,
 including inherited fields. Effect checking accounts for all static field and

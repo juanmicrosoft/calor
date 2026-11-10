@@ -2739,6 +2739,19 @@ public class ArrayExpressionConversionTests
         var compilation = Program.Compile(calor, "block.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
         Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors) + "\n" + calor);
+        Assert.Single(losses);
+        var owner = Assert.Single(compilation.Ast!.Classes, type => type.Name == "W");
+        Assert.Empty(owner.InteropBlocks);
+        var lambda = Assert.Single(owner.Methods, method => method.Name == "Lambda");
+        var preserved = Assert.Single(lambda.Body.OfType<Calor.Compiler.Ast.RawCSharpNode>());
+        var originalMethod = Assert.Single(CSharpSyntaxTree.ParseText(BlockElements).GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>(),
+            method => method.Identifier.ValueText == "Lambda");
+        Assert.Equal(originalMethod.Body!.Statements[0].ToString(), preserved.CSharpCode.Trim());
+        Assert.Equal(new[] { "Lambda", "Witness", "List1D", "ListRect" },
+            owner.Methods.Select(method => method.Name));
+        Assert.All(owner.Methods.Where(method => method.Name != "Lambda"),
+            method => Assert.Empty(method.Body.OfType<Calor.Compiler.Ast.RawCSharpNode>()));
         Assert.Equal(Run(BlockElements), Run(compilation.GeneratedCode));
     }
 

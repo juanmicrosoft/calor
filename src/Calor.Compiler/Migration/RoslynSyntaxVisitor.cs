@@ -11890,7 +11890,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             if (element is ExpressionElementSyntax exprElement)
             {
-                var converted = ConvertArrayElement(exprElement.Expression, rectangular: false);
+                var converted = ConvertArrayElement(exprElement.Expression);
                 initializer.Add(converted);
 
                 // Try to infer element type from first element
@@ -15638,7 +15638,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (arrayCreation.Initializer != null)
         {
             initializer = arrayCreation.Initializer.Expressions
-                .Select(element => ConvertArrayElement(element, rectangular: false))
+                .Select(ConvertArrayElement)
                 .ToList();
         }
 
@@ -15665,7 +15665,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         var id = _context.GenerateId("arr");
         var initializer = implicitArray.Initializer.Expressions
-            .Select(element => ConvertArrayElement(element, rectangular: false))
+            .Select(ConvertArrayElement)
             .ToList();
 
         // Try declared type first, fall back to inferring from first element
@@ -15707,7 +15707,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
                 var id = _context.GenerateId("arr");
                 var initializer = initExpr.Expressions
-                    .Select(element => ConvertArrayElement(element, rectangular: false))
+                    .Select(ConvertArrayElement)
                     .ToList();
                 var elementType = TryGetDeclaredArrayElementType(initExpr) ?? InferElementType(initializer);
                 return new ArrayCreationNode(GetTextSpan(initExpr), id, id, elementType,
@@ -15983,13 +15983,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     }
 
     /// <summary>
-    /// #1132: an array element, converted in place. One the emitter cannot write in place
-    /// (a collection block; a multi-line element in a §ROW) preserves its statement as C#.
+    /// Converts an array element in place. An element that needs statements or a
+    /// multiline body cannot stay inside an inline initializer and preserves its statement as C#.
     /// </summary>
-    private ExpressionNode ConvertArrayElement(ExpressionSyntax element, bool rectangular)
+    private ExpressionNode ConvertArrayElement(ExpressionSyntax element)
     {
         var node = ConvertInPlace(element, always: true);
-        return CalorEmitter.WritesInPlace(node, allowMultiline: !rectangular)
+        return CalorEmitter.WritesInPlace(node)
             ? node
             : throw EscalateExpression(element, "array-element-block");
     }
@@ -16853,7 +16853,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 {
                     if (init.Expressions.Any(element => element is InitializerExpressionSyntax))
                         throw new NotSupportedException("Multi-dimensional array initializer has excess nesting");
-                    initializer.Add(init.Expressions.Select(element => ConvertArrayElement(element, rectangular: true)).ToList());
+                    initializer.Add(init.Expressions.Select(ConvertArrayElement).ToList());
                     return;
                 }
                 foreach (var inner in init.Expressions)
