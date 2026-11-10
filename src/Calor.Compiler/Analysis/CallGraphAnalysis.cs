@@ -42,12 +42,20 @@ public sealed class ResolvedSymbolCallGraph
 /// </summary>
 public sealed class CallGraphAnalysis
 {
+    internal sealed record SourceCallSelection(
+        AstNode Declaration,
+        string ReturnType,
+        IReadOnlyList<ResolvedArgumentMapping> Arguments,
+        bool UsesUserDefinedConversion);
+
     internal sealed class OperatorBindings
     {
         internal Dictionary<AstNode, HashSet<string>> SourceCalls { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<AstNode, HashSet<EffectResolverKey>> ExternalCalls { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<ExpressionNode, string> ResultTypes { get; } = new(ReferenceEqualityComparer.Instance);
         internal List<string> Failures { get; } = [];
+        internal Dictionary<TextSpan, SourceCallSelection> SelectedCalls { get; } = [];
+        internal HashSet<TextSpan> AmbiguousCalls { get; } = [];
     }
 
     private OperatorBindings _operatorBindings = new();
@@ -63,22 +71,70 @@ public sealed class CallGraphAnalysis
         var types = bindings.ResultTypes;
         var bindingFailures = bindings.Failures;
         var calls = bindings.SourceCalls;
-        var conflictingTypes = new HashSet<ExpressionNode>(ReferenceEqualityComparer.Instance);
         var operators = EnumerateClasses(module)
             .SelectMany(owner => EnumerateOperators(owner).Select(op => (Node: op, Id: $"{owner.Name}.{op.Id}")))
             .ToArray();
         if (operators.Length == 0)
             return bindings;
 
+        var conflictingTypes = new HashSet<ExpressionNode>(ReferenceEqualityComparer.Instance);
+        var conflictingCalls = new HashSet<TextSpan>();
+        var argumentOwners = new Dictionary<AstNode, (TextSpan Call, int Index)>(ReferenceEqualityComparer.Instance);
+        var ambiguousArguments = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+        var sourceArgumentCounts = new Dictionary<TextSpan, int>();
+        var visited = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+        var nodes = new Stack<AstNode>();
+        nodes.Push(module);
+        while (nodes.TryPop(out var node))
+        {
+            if (!visited.Add(node))
+                continue;
+            foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+                nodes.Push(child);
+            if (node is LocalFunctionStatementNode local)
+                nodes.Push(local.Function);
+            IReadOnlyList<ExpressionNode>? arguments = node switch
+            {
+                CallExpressionNode call => call.Arguments,
+                ExpressionCallNode call => call.Arguments,
+                CallStatementNode call => call.Arguments,
+                NewExpressionNode creation => creation.Arguments,
+                ConstructorInitializerNode initializer => initializer.Arguments,
+                _ => null
+            };
+            if (arguments is null)
+                continue;
+            sourceArgumentCounts[node.Span] = arguments.Count;
+            for (var index = 0; index < arguments.Count; index++)
+            {
+                var argument = arguments[index];
+                var owner = (node.Span, index);
+                if (ambiguousArguments.Contains(argument))
+                    continue;
+                if (argumentOwners.TryGetValue(argument, out var previous) && previous != owner)
+                {
+                    argumentOwners.Remove(argument);
+                    ambiguousArguments.Add(argument);
+                }
+                else
+                    argumentOwners[argument] = owner;
+            }
+        }
         // Bind the emitted expressions, not operator names or approximate operand
         // types. This also sees implicit receiving conversions and lifted operators.
         var markerIdentity = Guid.NewGuid().ToString("N");
         var expressionPrefix = $"calor-expression-{markerIdentity}:";
         var expressionEndPrefix = $"calor-expression-end-{markerIdentity}:";
-        var operatorPrefix = $"calor-operator-{markerIdentity}:";
+        var callablePrefix = $"calor-callable-{markerIdentity}:";
         var expressions = new List<AstNode>();
         var operatorIds = operators.ToDictionary(pair => pair.Node, pair => pair.Id);
-        var emittedOperators = new List<string>();
+        var emittedCallables = new List<AstNode>();
+        string CallableOrigin(AstNode declaration)
+        {
+            var index = emittedCallables.Count;
+            emittedCallables.Add(declaration);
+            return $"/*{callablePrefix}{index}*/";
+        }
         var emitter = new CSharpEmitter
         {
             AnnotateSource = (expression, text) =>
@@ -87,12 +143,7 @@ public sealed class CallGraphAnalysis
                 expressions.Add(expression);
                 return $"/*{expressionPrefix}{index}*/{text}/*{expressionEndPrefix}{index}*/";
             },
-            OperatorOrigin = op =>
-            {
-                var index = emittedOperators.Count;
-                emittedOperators.Add(operatorIds[op]);
-                return $"/*{operatorPrefix}{index}*/";
-            }
+            CallableOrigin = CallableOrigin
         };
         var source = emitter.Emit(module);
         var options = new CSharpParseOptions(LanguageVersion.Preview);
@@ -131,14 +182,15 @@ public sealed class CallGraphAnalysis
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true));
             var model = compilation.GetSemanticModel(tree);
             var root = tree.GetRoot();
-            var methods = new Dictionary<ISymbol, string>(SymbolEqualityComparer.Default);
-            foreach (var declaration in root.DescendantNodes().OfType<BaseMethodDeclarationSyntax>())
+            var methods = new Dictionary<ISymbol, AstNode>(SymbolEqualityComparer.Default);
+            foreach (var declaration in root.DescendantNodes().Where(node =>
+                         node is BaseMethodDeclarationSyntax or LocalFunctionStatementSyntax))
             {
                 foreach (var trivia in declaration.GetLeadingTrivia())
                 {
-                    if (TryReadMarker(trivia, operatorPrefix, out var index)
+                    if (TryReadMarker(trivia, callablePrefix, out var index)
                         && model.GetDeclaredSymbol(declaration) is { } method)
-                        methods[method] = emittedOperators[index];
+                        methods[method] = emittedCallables[index];
                 }
             }
 
@@ -152,6 +204,7 @@ public sealed class CallGraphAnalysis
                     ranges.Add((starts[endIndex], trivia.SpanStart, expressions[endIndex]));
             }
             ranges.Sort((left, right) => (left.End - left.Start).CompareTo(right.End - right.Start));
+            var selectedInTree = new HashSet<TextSpan>();
 
             foreach (var declaration in root.DescendantNodes().Where(node =>
                          node is BaseMethodDeclarationSyntax or AccessorDeclarationSyntax
@@ -165,6 +218,10 @@ public sealed class CallGraphAnalysis
                 {
                     foreach (var child in operation.ChildOperations)
                         pending.Push(child);
+                    if (operation is IInvocationOperation invocation)
+                        AddCall(invocation, invocation.TargetMethod, invocation.Arguments);
+                    else if (operation is IObjectCreationOperation { Constructor: { } constructor } creation)
+                        AddCall(creation, constructor, creation.Arguments);
                     var method = operation switch
                     {
                         IConversionOperation conversion => conversion.OperatorMethod,
@@ -196,6 +253,140 @@ public sealed class CallGraphAnalysis
                     }
                 }
             }
+            foreach (var syntax in root.DescendantNodes().Where(node =>
+                         node is InvocationExpressionSyntax or ObjectCreationExpressionSyntax))
+            {
+                var candidates = model.GetSymbolInfo(syntax).CandidateSymbols.OfType<IMethodSymbol>();
+                if (!candidates.Any(candidate => methods.ContainsKey(candidate.OriginalDefinition))
+                    || !model.GetDiagnostics(syntax.Span).Any(diagnostic => diagnostic.Id == "CS0121"))
+                    continue;
+                var arguments = syntax switch
+                {
+                    InvocationExpressionSyntax invocation => invocation.ArgumentList.Arguments,
+                    ObjectCreationExpressionSyntax creation => creation.ArgumentList?.Arguments ?? default,
+                    _ => default
+                };
+                var sites = arguments.Select(argument => SyntaxOrigin(argument.Expression))
+                    .OfType<AstNode>().Where(argumentOwners.ContainsKey)
+                    .Select(argument => argumentOwners[argument].Call).Distinct().ToArray();
+                if (sites.Length == 1)
+                    bindings.AmbiguousCalls.Add(sites[0]);
+            }
+
+            foreach (var site in ranges.Select(range => range.Node)
+                         .Where(argumentOwners.ContainsKey)
+                         .Select(node => argumentOwners[node].Call).Distinct()
+                         .Where(site => !selectedInTree.Contains(site)))
+            {
+                conflictingCalls.Add(site);
+                if (bindings.SelectedCalls.TryGetValue(site, out var previous) && previous.UsesUserDefinedConversion)
+                    bindingFailures.Add("An implicit-conversion source call could not be bound in every active preprocessor configuration.");
+                bindings.SelectedCalls.Remove(site);
+            }
+
+            AstNode? SyntaxOrigin(SyntaxNode syntax) =>
+                ranges.FirstOrDefault(range => range.Start <= syntax.SpanStart
+                    && range.End >= syntax.Span.End).Node;
+
+            AstNode? Origin(IOperation operation) => SyntaxOrigin(operation.Syntax);
+
+            void AddCall(IOperation operation, IMethodSymbol method,
+                System.Collections.Immutable.ImmutableArray<IArgumentOperation> arguments)
+            {
+                var usesReceivingConversion = arguments.Any(argument => HasReceivingConversion(argument.Value));
+                if (!methods.TryGetValue(method.OriginalDefinition, out var declaration))
+                {
+                    if (usesReceivingConversion && method.MethodKind is MethodKind.Ordinary or MethodKind.Constructor
+                        && method.Locations.Any(location => location.IsInSource))
+                        bindingFailures.Add($"The selected source call '{method}' has no Calor declaration origin for its implicit argument conversion.");
+                    return;
+                }
+                if (model.GetDiagnostics(operation.Syntax.Span).Any(diagnostic =>
+                        diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+                    return;
+                TextSpan? site = null;
+                var mappings = new List<ResolvedArgumentMapping>();
+                var usesUserConversion = false;
+                foreach (var argument in arguments)
+                {
+                    if (argument.Parameter is null)
+                    {
+                        if (usesReceivingConversion)
+                            bindingFailures.Add($"The selected source call '{method}' has no resolved parameter for its implicit conversion.");
+                        return;
+                    }
+                    var expanded = argument.ArgumentKind == ArgumentKind.ParamArray;
+                    var values = expanded && argument.Value is IArrayCreationOperation { IsImplicit: true, Initializer: { } initializer }
+                        ? initializer.ElementValues : [argument.Value];
+                    foreach (var value in values)
+                    {
+                        if (Origin(value) is not { } origin || !argumentOwners.TryGetValue(origin, out var owner))
+                        {
+                            if (argument.ArgumentKind == ArgumentKind.DefaultValue)
+                                continue;
+                            if (usesReceivingConversion)
+                                bindingFailures.Add($"The selected source call '{method}' has no unique Calor argument origin for its implicit conversion.");
+                            return;
+                        }
+                        if (site is { } previous && previous != owner.Call)
+                        {
+                            if (usesReceivingConversion)
+                                bindingFailures.Add($"The selected source call '{method}' has inconsistent Calor argument owners for its implicit conversion.");
+                            return;
+                        }
+                        site = owner.Call;
+                        var parameterType = expanded && argument.Parameter.Type is IArrayTypeSymbol array
+                            ? array.ElementType : argument.Parameter.Type;
+                        mappings.Add(new ResolvedArgumentMapping(owner.Index, argument.Parameter.Ordinal,
+                            Binding.Metadata.MetadataBinderResult.ToBoundType(parameterType).DisplayString, expanded));
+                        for (var converted = value as IConversionOperation; converted is not null;
+                             converted = converted.Operand as IConversionOperation)
+                            usesUserConversion |= converted.IsImplicit && converted.OperatorMethod is not null;
+                    }
+                }
+                if (site is not { } callSite)
+                {
+                    if (usesReceivingConversion)
+                        bindingFailures.Add($"The selected source call '{method}' has no Calor call origin for its implicit conversion.");
+                    return;
+                }
+                if (usesReceivingConversion && (conflictingCalls.Contains(callSite)
+                    || mappings.Select(mapping => mapping.ArgumentIndex).Distinct().Count() != sourceArgumentCounts[callSite]))
+                {
+                    bindingFailures.Add($"The selected source call '{method}' has no complete, configuration-consistent implicit-conversion argument map.");
+                    return;
+                }
+                if (conflictingCalls.Contains(callSite))
+                    return;
+                var selection = new SourceCallSelection(declaration,
+                    Binding.Metadata.MetadataBinderResult.ToBoundType(method.ReturnType).DisplayString,
+                    mappings.OrderBy(mapping => mapping.ArgumentIndex).ToArray(), usesUserConversion);
+                selectedInTree.Add(callSite);
+                if (bindings.SelectedCalls.TryGetValue(callSite, out var existing)
+                    && (!ReferenceEquals(existing.Declaration, selection.Declaration)
+                        || existing.ReturnType != selection.ReturnType
+                        || !existing.Arguments.SequenceEqual(selection.Arguments)))
+                {
+                    if (usesUserConversion || existing.UsesUserDefinedConversion)
+                        bindingFailures.Add($"The selected source call '{method}' has conflicting implicit-conversion callable identities across preprocessor configurations.");
+                    conflictingCalls.Add(callSite);
+                    bindings.SelectedCalls.Remove(callSite);
+                }
+                else
+                    bindings.SelectedCalls[callSite] = selection with
+                    {
+                        UsesUserDefinedConversion = usesUserConversion || existing?.UsesUserDefinedConversion == true
+                    };
+            }
+
+            static bool HasReceivingConversion(IOperation value) => value switch
+            {
+                IConversionOperation conversion => conversion.IsImplicit && conversion.OperatorMethod is not null
+                    || HasReceivingConversion(conversion.Operand),
+                IArrayCreationOperation { IsImplicit: true, Initializer: { } initializer } =>
+                    initializer.ElementValues.Any(HasReceivingConversion),
+                _ => false
+            };
 
             void AddMethod(IOperation operation, IMethodSymbol? method)
             {
@@ -209,7 +400,8 @@ public sealed class CallGraphAnalysis
                     bindingFailures.Add($"A selected source operator '{method}' has no Calor expression origin.");
                     return;
                 }
-                if (methods.TryGetValue(method.OriginalDefinition, out var callee))
+                if (methods.TryGetValue(method.OriginalDefinition, out var declaration)
+                    && declaration is OperatorOverloadNode op && operatorIds.TryGetValue(op, out var callee))
                 {
                     if (!calls.TryGetValue(origin, out var targets))
                         calls[origin] = targets = new HashSet<string>(StringComparer.Ordinal);
@@ -294,25 +486,34 @@ public sealed class CallGraphAnalysis
     public sealed class BoundValueIndex
     {
         internal Dictionary<(string CallerId, int Start, int End), BoundCallExpression>
-            ComputedMemberCalls { get; } = new();
+            ComputedMemberCalls
+        { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), IReadOnlyList<string>>
-            ConstructorCalls { get; } = new();
+            ConstructorCalls
+        { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), Microsoft.CodeAnalysis.ITypeSymbol>
-            MetadataValueTypes { get; } = new();
+            MetadataValueTypes
+        { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), Binding.BoundTypes.NominalBoundType>
-            MetadataMemberReceiverTypes { get; } = new();
+            MetadataMemberReceiverTypes
+        { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), Microsoft.CodeAnalysis.IFieldSymbol>
-            MetadataEnumConstants { get; } = new();
+            MetadataEnumConstants
+        { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), VariableSymbol>
-            SourceEnumConstants { get; } = new();
+            SourceEnumConstants
+        { get; } = new();
         internal HashSet<(string CallerId, int Start, int End)> UnresolvedArgumentCalls { get; } = new();
         internal HashSet<(string CallerId, int Start, int End)> TupleElementReads { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), BoundFieldAccessExpression>
-            AnonymousPropertyReads { get; } = new();
+            AnonymousPropertyReads
+        { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), BoundFieldAccessExpression>
-            SourceStaticFieldAccesses { get; } = new();
+            SourceStaticFieldAccesses
+        { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), Binding.BoundTypes.ArrayBoundType>
-            ArrayTypes { get; } = new();
+            ArrayTypes
+        { get; } = new();
         /// <summary>(callerId, reference start, reference end) → the resolved
         /// variable's <c>DeclarationSpan</c>.</summary>
         public Dictionary<(string CallerId, int Start, int End), TextSpan> Declarations { get; } = new();
@@ -322,7 +523,8 @@ public sealed class CallGraphAnalysis
         /// <summary>callerId → the locals with a declared <c>FunctionBoundType</c>,
         /// by name and declaration start.</summary>
         public Dictionary<string, List<(string Name, int DeclarationStart, Binding.BoundTypes.FunctionBoundType Type)>>
-            Locals { get; } = new(StringComparer.Ordinal);
+            Locals
+        { get; } = new(StringComparer.Ordinal);
 
         /// <summary>0.25 F3 (#847): local-function calls, keyed by the enclosing callable.</summary>
         public HashSet<(string CallerId, int Start, int End)> LocalFunctionCalls { get; } = new();
@@ -1246,7 +1448,7 @@ public sealed class CallGraphAnalysis
                         {
                             Target: BoundTypeReferenceExpression,
                             ResolvedMetadataMember: Microsoft.CodeAnalysis.IFieldSymbol
-                                { IsConst: true, Type.TypeKind: Microsoft.CodeAnalysis.TypeKind.Enum } constant
+                            { IsConst: true, Type.TypeKind: Microsoft.CodeAnalysis.TypeKind.Enum } constant
                         })
                         boundValues.MetadataEnumConstants.TryAdd((callerId, node.Span.Start, node.Span.End), constant);
                     if (node is BoundFieldAccessExpression

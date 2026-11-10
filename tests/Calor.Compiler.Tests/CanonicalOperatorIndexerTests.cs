@@ -119,6 +119,16 @@ public sealed class CanonicalOperatorIndexerTests
     [InlineData("return new int[] { value }[0]")]
     [InlineData("return true ? value : 0")]
     [InlineData("return new Receiver() { Value = value }.Value")]
+    [InlineData("return Take(value)")]
+    [InlineData("return Take(value: value)")]
+    [InlineData("return new Receiver(value).Value")]
+    [InlineData("return Identity<int>(value)")]
+    [InlineData("return TakeMany(value, value)")]
+    [InlineData("return TakeOptional(value)")]
+    [InlineData("return TakeNamed(other: 0, value: value)")]
+    [InlineData("Take(value)\n    return 7")]
+    [InlineData("return new Receiver(0).Take(value)")]
+    [InlineData("let IReceiver:receiver = new Receiver(0)\n    return receiver.Take(value)")]
     public void OperatorRows_ChargeImplicitReceivingConversions(string body)
     {
         foreach (var row in new[] { "!", "! cw" })
@@ -130,19 +140,46 @@ public sealed class CanonicalOperatorIndexerTests
                       ! cw
                       System.Console.WriteLine("operator")
                       return 7
+                  interface IReceiver
+                    func Take (int:value) → int
+                      !
                   class Receiver
+                    implements IReceiver
                     field int:Value public
                     ctor ()
                     ctor (int:value)
                       set this.Value value
+                    func Take public (int:value) → int
+                      !
+                      return value
                   func Take public (int:value) → int
                     !
                     return value
+                  func Identity<T> public (T:value) → T
+                    !
+                    return value
+                  func TakeMany public (params int[]:values) → int
+                    !
+                    return values[0]
+                  func TakeOptional public (int:value, int:other = 0) → int
+                    !
+                    return value + other
+                  func TakeNamed public (int:value, int:other) → int
+                    !
+                    return value + other
                   func Run public (Box:value) → int
                     {{(row == "!" ? "! alloc, mut" : "! cw, alloc, mut")}}
                     {{body}}
                 """;
             var compiled = Program.Compile(source);
+            if (body.StartsWith("return Take(", StringComparison.Ordinal))
+            {
+                var proof = CallGraphAnalysis.ResolveOperatorCalls(Parse(source));
+                Assert.True(proof.SelectedCalls.Values.Any(call => call.UsesUserDefinedConversion),
+                    string.Join("\n", proof.SelectedCalls.Select(pair =>
+                        $"{pair.Key}: {pair.Value.Declaration.GetType().Name}, conversion={pair.Value.UsesUserDefinedConversion}"))
+                    + string.Join("\n", proof.Failures));
+            }
             Assert.True((row == "!") == compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
             if (row == "!")
                 Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
@@ -197,6 +234,236 @@ public sealed class CanonicalOperatorIndexerTests
                 source.Replace("    !\n    return", "    ! cw\n    return", StringComparison.Ordinal));
             Assert.False(accepted.HasErrors, string.Join("\n", accepted.Diagnostics));
         }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OperatorRows_ReceivingConversionSelectsTheCallableBeforeChargingEffects(bool constructor)
+    {
+        var source = $$"""
+                module SelectedReceivingConversion
+                  class Box
+                    op implicit (Box:value) → int
+                      ! cw
+                      System.Console.WriteLine("conversion")
+                      return 7
+                  class Receiver
+                    field int:Value public
+                    ctor (int:value)
+                      set this.Value value
+                    ctor (object:value)
+                      set this.Value 99
+                  func Take public (int:value) → int
+                    !
+                    return value
+                  func Take public (object:value) → int
+                    !
+                    return 99
+                  func Run public (Box:value) → int
+                    ! cw, alloc, mut
+                    return {{(constructor ? "new Receiver(value).Value" : "Take(value)")}}
+                """;
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Equal(7, Execute(compiled.GeneratedCode, assembly =>
+        {
+            var box = Activator.CreateInstance(assembly.GetType("Box", throwOnError: true)!);
+            return Convert.ToInt64(Assert.Single(assembly.GetTypes(), type => type.GetMethod("Run") != null)
+                .GetMethod("Run")!.Invoke(null, [box]));
+        }));
+        var denied = Program.Compile(source.Replace("! cw, alloc, mut", "! alloc, mut", StringComparison.Ordinal));
+        Assert.Contains(denied.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("Run", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("explicit", "value")]
+    [InlineData("implicit", "ref value")]
+    public void OperatorRows_InvalidArgumentConversionsRemainRejected(string kind, string argument)
+    {
+        var source = $$"""
+                module InvalidArgumentConversion
+                  class Box
+                    op {{kind}} (Box:value) → int
+                      !
+                      return 7
+                  func Take public ({{(argument.StartsWith("ref", StringComparison.Ordinal) ? "ref " : "")}}int:value) → int
+                    !
+                    return value
+                  func Run public (Box:value) → int
+                    !
+                    return Take({{argument}})
+                """;
+        var compiled = Program.Compile(source);
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+    }
+
+    [Fact]
+    public void OperatorRows_AmbiguousReceivingConversionsDoNotFallBackToObject()
+    {
+        var compiled = Program.Compile("""
+                module AmbiguousArgumentConversion
+                  class Box
+                    op implicit (Box:value) → int
+                      !
+                      return 7
+                    op implicit (Box:value) → string
+                      !
+                      return "seven"
+                  func Take public (int:value) → int
+                    !
+                    return value
+                  func Take public (string:value) → int
+                    !
+                    return 8
+                  func Take public (object:value) → int
+                    !
+                    return 99
+                  func Run public (Box:value) → int
+                    !
+                    return Take(value)
+                """);
+        Assert.True(compiled.HasErrors, compiled.GeneratedCode);
+        Assert.Contains(compiled.Diagnostics, diagnostic =>
+            diagnostic.Code is DiagnosticCode.AmbiguousOverload or DiagnosticCode.NoMatchingOverload);
+    }
+
+    [Fact]
+    public void OperatorRows_SdkLocalFunctionsKeepReceivingConversionsAndCallerCharges()
+    {
+        const string source = """
+            module LocalReceivingConversion
+              class Box
+                op implicit (Box:value) → int
+                  ! cw
+                  System.Console.WriteLine("conversion")
+                  return 7
+              func Take (int:value) → int
+                !
+                return value
+              func Run public (Box:value) → int
+                ! alloc, mut
+                System.GC.KeepAlive(value)
+                return Take(value)
+            """;
+        foreach (var candidate in new[] { source,
+                     source.Replace("! alloc, mut", "! alloc, mut, cw", StringComparison.Ordinal) })
+        {
+            var parsed = Parse(candidate);
+            var take = Assert.Single(parsed.Functions, function => function.Name == "Take");
+            var run = Assert.Single(parsed.Functions, function => function.Name == "Run");
+            var moved = parsed.With(module =>
+            {
+                module.Functions = [run];
+                module.Items = parsed.Items.Where(item => !ReferenceEquals(item, take)).ToArray();
+            });
+            var module = ReplaceRunBody(moved,
+            [
+                new LocalFunctionStatementNode(run.Body[0].Span, take),
+                run.Body[1]
+            ]);
+            var diagnostics = new DiagnosticBag();
+            new Calor.Compiler.Binding.Binder(diagnostics).Bind(module);
+            new EffectEnforcementPass(diagnostics).Enforce(module);
+            if (candidate == source)
+                Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                    && diagnostic.Message.Contains("Run", StringComparison.Ordinal));
+            else
+            {
+                Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+                Assert.Equal(7, Execute(new Calor.Compiler.CodeGen.CSharpEmitter().Emit(module), assembly =>
+                {
+                    var box = Activator.CreateInstance(assembly.GetType("Box", throwOnError: true)!);
+                    return Convert.ToInt64(Assert.Single(assembly.GetTypes(), type => type.GetMethod("Run") != null)
+                        .GetMethod("Run")!.Invoke(null, [box]));
+                }));
+            }
+        }
+    }
+
+    [Fact]
+    public void OperatorRows_UnprovenArgumentOriginsAreNotPurityEvidence()
+    {
+        var parsed = Parse("""
+            module SharedArgumentOrigin
+              class Box
+                op implicit (Box:value) → int
+                  !
+                  return 7
+              func Take (int:value) → int
+                ! cw
+                System.Console.WriteLine("callee")
+                return value
+              func Take (object:value) → int
+                !
+                return 99
+              func Run public (Box:value) → int
+                !
+                Take(value)
+                return Take(value)
+            """);
+        var run = Assert.Single(parsed.Functions, function => function.Name == "Run");
+        var first = Assert.IsType<ExpressionStatementNode>(run.Body[0]);
+        var firstCall = Assert.IsType<CallExpressionNode>(first.Expression);
+        var returned = Assert.IsType<ReturnStatementNode>(run.Body[1]);
+        var secondCall = Assert.IsType<CallExpressionNode>(returned.Expression);
+        var sharedCall = secondCall.CopyMetadataTo(new CallExpressionNode(secondCall.Span,
+            secondCall.Target, firstCall.Arguments, secondCall.ArgumentNames, secondCall.ArgumentModifiers,
+            secondCall.TypeArguments, secondCall.CalleeSpan, secondCall.ReceiverSpan));
+        var module = parsed.With(update =>
+        {
+            var replacement = run.CopyMetadataTo(new FunctionNode(run.Span, run.Id, run.Name, run.Visibility,
+                run.Parameters, run.Output, run.Effects, run.Preconditions, run.Postconditions,
+                [first, new ReturnStatementNode(returned.Span, sharedCall)], run.Attributes));
+            update.Functions = parsed.Functions.Select(function => ReferenceEquals(function, run) ? replacement : function).ToArray();
+            update.Items = parsed.Items.Select(item => ReferenceEquals(item, run) ? replacement : item).ToArray();
+        });
+        var diagnostics = new DiagnosticBag();
+        new Calor.Compiler.Binding.Binder(diagnostics).Bind(module);
+        new EffectEnforcementPass(diagnostics).Enforce(module);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("no unique Calor argument origin", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OperatorRows_ConstructorChainingUsesTheSelectedReceivingConversion(bool effectful)
+    {
+        var compiled = Program.Compile($$"""
+            module ChainedReceivingConversion
+              class Box
+                op implicit (Box:value) → int
+                  {{(effectful ? "! cw" : "!")}}
+                  {{(effectful ? "System.Console.WriteLine(\"conversion\")" : "")}}
+                  return 7
+              class Base
+                field int:Value public
+                ctor (int:value)
+                  set this.Value value
+              class Derived
+                extends Base
+                ctor (Box:value)
+                  base(value)
+              func Run public (Box:value) → int
+                ! alloc, mut
+                return new Derived(value).Value
+            """);
+        if (effectful)
+        {
+            Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ConstructorEffectContractUnavailable);
+            Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("Run", StringComparison.Ordinal));
+            return;
+        }
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Equal(7, Execute(compiled.GeneratedCode, assembly =>
+        {
+            var box = Activator.CreateInstance(assembly.GetType("Box", throwOnError: true)!);
+            return Convert.ToInt64(Assert.Single(assembly.GetTypes(), type => type.GetMethod("Run") != null)
+                .GetMethod("Run")!.Invoke(null, [box]));
+        }));
     }
 
     [Theory]

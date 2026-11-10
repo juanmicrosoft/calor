@@ -181,6 +181,9 @@ public sealed class Binder
     private readonly Dictionary<(string? Scope, string? Namespace, string Name, int Arity),
         (bool Handled, Microsoft.CodeAnalysis.INamedTypeSymbol? Type)> _scopedMetadataTypes = new();
     private ModuleNode? _asyncTypeModule;
+    private Analysis.CallGraphAnalysis.OperatorBindings? _sourceCallConversions;
+    // The annotated C# binding image disables this to prevent recursive rebinding.
+    internal bool ResolveSourceCallConversions { get; init; } = true;
 
     /// <summary>
     /// v0.14 §S4 (nullability workstream / issue #875) — declared return
@@ -1001,6 +1004,7 @@ public sealed class Binder
         _metadataNamespaceScopes = module.NamespaceScopes.ToDictionary(scope => scope.Id, StringComparer.Ordinal);
         _scopedMetadataTypes.Clear();
         _asyncTypeModule = module;
+        _sourceCallConversions = null;
         _scope = new Scope();
         _functionSymbols.Clear();
         _boundAwaits.Clear();
@@ -2254,6 +2258,7 @@ public sealed class Binder
                 output: function.Output,
                 isAsync: function.IsAsync);
             _localFunctionSymbols.Add(symbol);
+            _functionSymbols[function] = symbol;
             if (!scope.TryDeclareOverload(function.Name, symbol, out var duplicate))
                 ReportDuplicateSignature(function.Span, function.Name, symbol, duplicate);
             locals.Add((function, symbol));
@@ -7407,7 +7412,8 @@ public sealed class Binder
                 requireStatic,
                 requireInstance: computedReceiver is not null and not BoundTypeReferenceExpression,
                 candidateOverrides: interfaceCandidates,
-                arguments: arguments);
+                arguments: arguments,
+                callSpan: span);
             if (resolution.Kind == OverloadResolutionKind.NotFound)
                 continue;
 
@@ -7567,7 +7573,8 @@ public sealed class Binder
         bool requireStatic = false,
         bool requireInstance = false,
         IReadOnlyList<FunctionSymbol>? candidateOverrides = null,
-        IReadOnlyList<BoundExpression>? arguments = null)
+        IReadOnlyList<BoundExpression>? arguments = null,
+        TextSpan? callSpan = null)
     {
         var candidates = (candidateOverrides ?? _scope.GetOverloads(lookupName))
             .ToArray();
@@ -7581,6 +7588,20 @@ public sealed class Binder
             .ToArray();
         if (accessibleCandidates.Length == 0)
             return OverloadResolutionResult.Inaccessible(candidates);
+
+        if (ResolveSourceCallConversions && _asyncTypeModule is not null && callSpan is { } site)
+        {
+            _sourceCallConversions ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(_asyncTypeModule);
+            if (_sourceCallConversions.AmbiguousCalls.Contains(site))
+                return OverloadResolutionResult.Ambiguous(accessibleCandidates);
+            if (_sourceCallConversions.SelectedCalls.TryGetValue(site, out var selected)
+                && selected.UsesUserDefinedConversion
+                && selected.Arguments.Count == argumentTypes.Count
+                && _functionSymbols.TryGetValue(selected.Declaration, out var selectedFunction)
+                && accessibleCandidates.Contains(selectedFunction))
+                return OverloadResolutionResult.Resolved(
+                    selectedFunction, selected.ReturnType, selected.Arguments);
+        }
 
         var accessibleScope = new Scope();
         var duplicates = new Dictionary<FunctionSymbol, List<FunctionSymbol>>();

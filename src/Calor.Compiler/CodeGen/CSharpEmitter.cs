@@ -758,7 +758,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
     public string? LineDirectiveFilePath { get; set; }
 
     internal Func<AstNode, string, string>? AnnotateSource { get; init; }
-    internal Func<OperatorOverloadNode, string>? OperatorOrigin { get; init; }
+    internal Func<AstNode, string>? CallableOrigin { get; init; }
 
     string IAstResultObserver<string>.Observe(AstNode node, string result) =>
         node is ExpressionNode or StatementNode && result.Length > 0 && AnnotateSource is { } annotate
@@ -2951,6 +2951,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
 
     public string Visit(FunctionNode node)
     {
+        if (CallableOrigin is { } origin)
+            AppendLine(origin(node));
         // Track current function ID for contract emission
         _currentFunctionId = node.Id;
 
@@ -3138,6 +3140,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
     public string Visit(LocalFunctionStatementNode node)
     {
         var function = node.Function;
+        if (CallableOrigin is { } origin)
+            AppendLine(origin(function));
         var savedCaptured = _capturedParameterNames.ToArray();
         var saved = (_currentFunctionId, _currentPostconditionIndex, _currentInlineReturnRefinement,
             _currentYieldRefinement, _inlineReturnGuardCounter, _currentReturnLowering, _parameterTypes,
@@ -5823,6 +5827,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
 
     public string Visit(MethodSignatureNode node)
     {
+        if (CallableOrigin is { } origin)
+            AppendLine(origin(node));
         EnsureDefaultConstraintsLegal(
             node.TypeParameters,
             isLegal: false,
@@ -6193,6 +6199,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
 
     public string Visit(MethodNode node)
     {
+        if (CallableOrigin is { } origin)
+            AppendLine(origin(node));
         // #879: the postcondition-elision key is a mutable cursor
         // (_currentFunctionId, _currentPostconditionIndex) that every emission path
         // visiting contracts MUST maintain. Before this was set here, class-method
@@ -6872,6 +6880,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
 
     public string Visit(ConstructorNode node)
     {
+        if (CallableOrigin is { } origin)
+            AppendLine(origin(node));
         // #879: constructors are never verified, so their own id is the honest cursor
         // key — the results lookup misses (guard kept) and violations report this
         // constructor, not whatever method the cursor last pointed at.
@@ -6982,7 +6992,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
 
         ResetDeclScopes(node.Parameters, node);
 
-        if (OperatorOrigin is { } origin)
+        if (CallableOrigin is { } origin)
             AppendLine(origin(node));
         EmitCSharpAttributes(node.CSharpAttributes);
 
@@ -9103,7 +9113,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
         {
             var binder = new Binder(new Diagnostics.DiagnosticBag())
             {
-                CrossModuleFunctionModules = CrossModuleFunctionModules
+                CrossModuleFunctionModules = CrossModuleFunctionModules,
+                ResolveSourceCallConversions = AnnotateSource is null
             };
             binder.Bind(_asyncTypeModule);
             _boundSourceExtensionCallTargets = binder.SourceExtensionCallTargets;
@@ -9128,7 +9139,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
             {
                 var binder = new Binder(new Diagnostics.DiagnosticBag())
                 {
-                    CrossModuleFunctionModules = CrossModuleFunctionModules
+                    CrossModuleFunctionModules = CrossModuleFunctionModules,
+                    ResolveSourceCallConversions = AnnotateSource is null
                 };
                 binder.Bind(_asyncTypeModule);
                 _boundCrossModuleCallTargets = binder.CrossModuleCallTargets;
