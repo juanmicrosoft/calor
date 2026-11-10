@@ -103,8 +103,17 @@ enforcement.
 Structural field/property reads emit a spaced member separator, including
 verbatim value receivers such as `@int . Length`. Re-emission must retain a real
 member node rather than fuse it into a dotted identifier. Native class properties
-bind through their accessible non-static declarations, including their declared
-type and generic substitution; struct storage-path handling stays separate.
+bind through their accessible non-static declarations and readable getters,
+including their declared type and generic substitution. Getter visibility is
+checked in the selected property's declaring type before its scalar type can
+select a constructor. Foreign setter-only, private-getter, private-property, and
+static-through-instance reads retain no such authority. All conditional
+alternatives must be readable; filtering out an unreadable branch cannot grant
+authority to the remaining branch. Public get-only and
+generic getters remain usable, including a public getter with a private setter.
+The generic getter control proves binding and independently compiled emitted C#,
+not the separate closed-generic getter effect-closure boundary.
+Struct storage-path handling and existing `this`/`base` policies stay separate.
 The fixed Money converter control requires native operator/property conversion
 with zero interop, substitution, or drop, and preserves its original C# runtime
 oracle after a second native round trip.

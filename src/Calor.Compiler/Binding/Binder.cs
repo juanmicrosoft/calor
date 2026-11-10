@@ -4250,10 +4250,7 @@ public sealed class Binder
             _ when isPatternMember => ResolveAccessibleMembers(
                 ResolveClass(target.Type.DisplayString), fieldAccess.FieldName),
             _ when ResolveClass(target.Type.DisplayString) is { IsStruct: false } instanceOwner =>
-                ResolveAccessibleMembers(instanceOwner, fieldAccess.FieldName)
-                    .OfType<VariableSymbol>()
-                    .Where(member => member.IsProperty && !member.IsStatic)
-                    .Cast<Symbol>().ToArray(),
+                ResolveReadableInstanceProperties(instanceOwner, fieldAccess.FieldName),
             _ => ResolveStructFieldPath(target.Type.DisplayString, fieldAccess.FieldName),
         };
         if (_asyncTypeModule != null
@@ -8267,18 +8264,39 @@ public sealed class Binder
         return Array.Empty<Symbol>();
     }
 
-    private bool IsMemberAccessible(VariableSymbol member)
+    private IReadOnlyList<Symbol> ResolveReadableInstanceProperties(ClassDefinitionNode owner, string memberName)
     {
-        if (member.DeclaringTypeName == null)
-            return true;
+        var members = ResolveAccessibleMembers(owner, memberName);
+        return members.All(member => member is VariableSymbol { IsProperty: true, IsStatic: false } property
+                && HasAccessiblePropertyGetter(property))
+            ? members : Array.Empty<Symbol>();
+    }
 
-        return member.Visibility switch
+    private bool HasAccessiblePropertyGetter(VariableSymbol member)
+    {
+        if (member.DeclaringTypeName == null
+            || !_classesByQualifiedName.TryGetValue(member.DeclaringTypeName, out var owner))
+            return false;
+
+        var declarations = EnumerateProperties(owner)
+            .Where(property => property.Name == member.Name && property.IdentifierSpan == member.DeclarationSpan)
+            .ToArray();
+        return declarations is [{ Getter: { } getter } property]
+            && IsMemberAccessible(getter.Visibility ?? property.Visibility, member.DeclaringTypeName);
+    }
+
+    private bool IsMemberAccessible(VariableSymbol member) =>
+        member.DeclaringTypeName == null || IsMemberAccessible(member.Visibility, member.DeclaringTypeName);
+
+    private bool IsMemberAccessible(Visibility visibility, string declaringTypeName)
+    {
+        return visibility switch
         {
             Visibility.Private =>
-                IsWithinDeclaringType(member.DeclaringTypeName),
+                IsWithinDeclaringType(declaringTypeName),
             Visibility.Protected or Visibility.PrivateProtected =>
                 _currentClass != null
-                && IsSameOrDerivedClass(_currentClass, member.DeclaringTypeName),
+                && IsSameOrDerivedClass(_currentClass, declaringTypeName),
             Visibility.Internal or Visibility.ProtectedInternal => true,
             Visibility.Public => true,
             _ => false,

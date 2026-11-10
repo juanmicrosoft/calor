@@ -1171,6 +1171,135 @@ public sealed class CanonicalOperatorIndexerTests
     }
 
     [Theory]
+    [InlineData("setter-only", "CS0154")]
+    [InlineData("private-getter", "CS0271")]
+    [InlineData("private-property", "CS0122")]
+    [InlineData("static-property", "CS0176")]
+    [InlineData("conditional-private-getter", "CS0271")]
+    [InlineData("get-only", null)]
+    [InlineData("generic-get-only", null)]
+    [InlineData("private-setter", null)]
+    public void ForeignPropertyRead_RequiresAnAccessibleGetterForConstructorAuthority(
+        string kind, string? expectedCSharpError)
+    {
+        var (declaration, ownerType, csharpDeclaration) = kind switch
+        {
+            "setter-only" => (
+                "class Owner\n    property long:Value public\n      set\n        return",
+                "Owner", "class Owner { public long Value { set { } } }"),
+            "private-getter" => (
+                "class Owner\n    property long:Value public\n      get private\n        return 7\n      set\n        return",
+                "Owner", "class Owner { public long Value { private get { return 7; } set { } } }"),
+            "private-property" => (
+                "class Owner\n    property long:Value private\n      get\n        return 7",
+                "Owner", "class Owner { private long Value { get { return 7; } } }"),
+            "static-property" => (
+                "class Owner\n    property long:Value public static\n      get\n        return 7",
+                "Owner", "class Owner { public static long Value { get { return 7; } } }"),
+            "conditional-private-getter" => (
+                "class Owner\n    pp READABLE\n      property long:Value public\n        get\n          return 7\n    pp else\n      property long:Value public\n        get private\n          return 7\n        set\n          return",
+                "Owner", "class Owner {\n#if READABLE\npublic long Value { get { return 7; } }\n#else\npublic long Value { private get { return 7; } set { } }\n#endif\n}"),
+            "get-only" => (
+                "class Owner\n    property long:Value public\n      get\n        return 7",
+                "Owner", "class Owner { public long Value { get { return 7; } } }"),
+            "generic-get-only" => (
+                "class Owner<T>\n    property T:Value public\n      get\n    ctor (T:value)\n      set Value value",
+                "Owner<long>", "class Owner<T> { public T Value { get; } public Owner(T value) { Value = value; } }"),
+            "private-setter" => (
+                "class Owner\n    property long:Value public\n      get\n        return 7\n      set private\n        return",
+                "Owner", "class Owner { public long Value { get { return 7; } private set { } } }"),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+        var source = $$"""
+            module PropertyReadAuthority
+              {{declaration}}
+              class Sink
+                property long:Observed public
+                  get
+                ctor (long:value)
+                  set Observed value
+              func Read public ({{ownerType}}:owner) → Sink
+                ! alloc
+                return new Sink(owner . Value)
+            """;
+        var oracle = $$"""
+            public {{csharpDeclaration}}
+            public class Sink { public long Observed { get; } public Sink(long value) { Observed = value; } }
+            public static class Reader { public static Sink Read({{ownerType}} owner) { return new Sink(owner.Value); } }
+            """;
+        var oracleCompilation = CSharpCompilation.Create("PropertyReadOracle",
+            [CSharpSyntaxTree.ParseText(oracle)],
+            ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
+                .Select(path => MetadataReference.CreateFromFile(path)),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var oracleErrors = oracleCompilation.GetDiagnostics()
+            .Where(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).ToArray();
+        if (expectedCSharpError != null)
+            Assert.Equal(expectedCSharpError, Assert.Single(oracleErrors).Id);
+        else
+            Assert.Empty(oracleErrors);
+
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var module = Parse(candidate);
+            var creationNode = Assert.IsType<NewExpressionNode>(
+                Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions).Body[0]).Expression);
+            var memberNode = Assert.IsType<FieldAccessNode>(Assert.Single(creationNode.Arguments));
+            Assert.Equal("owner", Assert.IsType<ReferenceNode>(memberNode.Target).Name);
+            var diagnostics = new DiagnosticBag();
+            var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(module);
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+            var creation = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundNewExpression>());
+            var member = Assert.IsType<BoundFieldAccessExpression>(Assert.Single(creation.Arguments));
+            var receiver = Assert.IsType<BoundVariableExpression>(member.Target);
+            var read = Assert.Single(bound.Functions.Where(function => function.Symbol.Name == "Read"));
+            Assert.Same(Assert.Single(read.Symbol.Parameters), receiver.Variable);
+            Assert.Equal("Value", member.FieldName);
+            if (expectedCSharpError != null)
+            {
+                Assert.Equal("OBJECT", member.Type.DisplayString);
+                Assert.Empty(member.ResolvedFields);
+                Assert.Null(member.ResolvedField);
+                Assert.Empty(creation.ResolvedConstructors);
+                Assert.Null(creation.ResolvedConstructor);
+                var compiled = Program.Compile(candidate);
+                Assert.True(compiled.HasErrors);
+                var error = Assert.Single(compiled.Diagnostics.Where(diagnostic => diagnostic.IsError));
+                Assert.Equal(DiagnosticCode.CodeGenCompilationError, error.Code);
+                Assert.Contains($"({expectedCSharpError})", error.Message);
+            }
+            else
+            {
+                Assert.Equal("LONG", member.Type.DisplayString);
+                Assert.True(Assert.Single(member.ResolvedFields).IsProperty);
+                Assert.Same(Assert.Single(creation.ResolvedConstructors), creation.ResolvedConstructor);
+                Assert.Equal("LONG", TypeIdentity.Canonicalize(
+                    Assert.Single(creation.ResolvedConstructor!.Parameters).TypeName));
+                var generated = new CSharpEmitter().Emit(module);
+                Assert.Equal(7, Execute(oracle, ReadProperty));
+                Assert.Equal(Execute(oracle, ReadProperty), Execute(generated, ReadProperty));
+                // This generic control proves binding and emission, not closed-generic getter effect closure.
+                if (kind != "generic-get-only")
+                {
+                    var compiled = Program.Compile(candidate);
+                    Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+                    Assert.Equal(7, Execute(compiled.GeneratedCode, ReadProperty));
+                }
+            }
+        }
+
+        long ReadProperty(Assembly assembly)
+        {
+            var owner = kind == "generic-get-only"
+                ? Activator.CreateInstance(assembly.GetType("Owner`1", throwOnError: true)!.MakeGenericType(typeof(long)), 7L)
+                : Activator.CreateInstance(assembly.GetType("Owner", throwOnError: true)!);
+            var read = assembly.GetTypes().SelectMany(type => type.GetMethods()).Single(method => method.Name == "Read");
+            var sink = read.Invoke(null, [owner])!;
+            return (long)sink.GetType().GetProperty("Observed")!.GetValue(sink)!;
+        }
+    }
+
+    [Theory]
     [InlineData("this(int:i) → int")]
     [InlineData("this[int:i]")]
     [InlineData("this[] → int")]
