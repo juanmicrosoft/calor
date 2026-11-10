@@ -215,6 +215,23 @@ boundary.
 
 ---
 
+## Static initialization
+
+Reading a native static field charges initialization of its entire declaring
+type, including sibling field and property initializers and its static
+constructor. A direct, zero-argument CLR `System.Object()` initializer can use
+the existing constructor effect contract after successful C# projection and
+selection of that exact CLR constructor. This bounded proof requires an
+error-free projection with no preprocessor condition symbols.
+Allocation still requires `alloc`;
+the constructor's Pure contract does not make allocation pure.
+
+This is not general initializer binding. Other nonprimitive initializers,
+unproved operations, failed projections, partial or conditional owners, and
+opaque members that may initialize the type remain Unknown. A source type
+named `Object` does not gain CLR constructor authority. This initializer proof
+does not expand operation analysis of generated method bodies.
+
 ## Effect Codes
 
 Metadata property reads charge the getter's effect row whether the receiver is
