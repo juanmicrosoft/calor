@@ -82,10 +82,10 @@ public class BclLoweringPrerequisiteTests
         var known = Assert.IsType<BindStatementNode>(module.Functions[0].Body[0]).Initializer!;
         var unknown = Assert.IsType<BindStatementNode>(module.Functions[1].Body[0]).Initializer!;
         var array = Assert.IsType<Calor.Compiler.Binding.BoundTypes.ArrayBoundType>(
-            graph.MetadataArrayReceiverType(module.Functions[0].Id, known.Span));
+            graph.BoundArrayReceiverType(module.Functions[0].Id, known.Span));
         Assert.Equal("System.Type", array.ElementType.DisplayString);
-        Assert.Null(graph.MetadataArrayReceiverType(module.Functions[1].Id, known.Span));
-        Assert.Null(graph.MetadataArrayReceiverType(module.Functions[1].Id, unknown.Span));
+        Assert.Null(graph.BoundArrayReceiverType(module.Functions[1].Id, known.Span));
+        Assert.Null(graph.BoundArrayReceiverType(module.Functions[1].Id, unknown.Span));
         var compiled = Program.Compile(source, "scoped-arrays.calr",
             new CompilationOptions { UnknownCallPolicy = UnknownCallPolicy.Strict, StatusWriter = TextWriter.Null });
         Assert.Single(compiled.Diagnostics.Where(diagnostic =>
@@ -141,7 +141,7 @@ public class BclLoweringPrerequisiteTests
         Assert.False(diagnostics.HasErrors);
         var initializer = Assert.IsType<BindStatementNode>(module.Functions[0].Body[0]).Initializer!;
         var graph = CallGraphAnalysis.Build(module);
-        Assert.Null(graph.MetadataArrayReceiverType(module.Functions[0].Id, initializer.Span));
+        Assert.Null(graph.BoundArrayReceiverType(module.Functions[0].Id, initializer.Span));
         var compiled = Program.Compile(source, "type-array-call.calr",
             new CompilationOptions { UnknownCallPolicy = UnknownCallPolicy.Strict, StatusWriter = TextWriter.Null });
         Assert.Contains(compiled.Diagnostics, diagnostic =>
@@ -211,7 +211,7 @@ public class BclLoweringPrerequisiteTests
         var graph = CallGraphAnalysis.Build(converted.Ast);
         var callerId = $"Sample.{method.Id}";
         Assert.NotEmpty(graph.BoundValueTypes(callerId));
-        Assert.Null(graph.MetadataArrayReceiverType(callerId, width.Target.Span));
+        Assert.Null(graph.BoundArrayReceiverType(callerId, width.Target.Span));
         var runtime = TestHarness.Execute(converted.CalorSource!, "Run");
         Assert.Null(runtime.Exception);
         Assert.Equal(124, runtime.ReturnValue);

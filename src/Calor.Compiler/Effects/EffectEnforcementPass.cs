@@ -5588,7 +5588,7 @@ public sealed class EffectEnforcementPass
                 return effects;
             var targetType = InferExpressionType(target);
             if (memberName == "Length"
-                && InferMetadataArrayLength(target.Span, span) is { } arrayEffects)
+                && InferBoundArrayLength(target.Span, span) is { } arrayEffects)
                 return effects.Union(arrayEffects);
             var shortType = StripGenericArguments(targetType);
             if (shortType != null && _context.ClassesByName.TryGetValue(shortType, out var cls))
@@ -5707,7 +5707,7 @@ public sealed class EffectEnforcementPass
                 : ResolveLocalValueType(receiver);
             receiverType ??= _context.ClassesByName.ContainsKey(receiver) ? receiver : null;
             if (member == "Length"
-                && InferMetadataArrayLength(new TextSpan(
+                && InferBoundArrayLength(new TextSpan(
                     reference.Span.Start, receiver.Length, reference.Span.Line, reference.Span.Column),
                     reference.Span) is { } arrayEffects)
                 return arrayEffects;
@@ -5752,9 +5752,9 @@ public sealed class EffectEnforcementPass
                 ? InferFromReference(reference, chargeMethodGroup: false)
                 : InferFromExpression(expression);
 
-        private EffectSet? InferMetadataArrayLength(TextSpan receiver, TextSpan diagnostic)
+        private EffectSet? InferBoundArrayLength(TextSpan receiver, TextSpan diagnostic)
         {
-            if (_context.CallGraph.MetadataArrayReceiverType(_context.CurrentFunctionId, receiver) is not { } array)
+            if (_context.CallGraph.BoundArrayReceiverType(_context.CurrentFunctionId, receiver) is not { } array)
                 return null;
             var resolution = _context.Resolver.Resolve(EffectResolverKey.FromBoundReceiver(
                 array, "Length", null, EffectMemberKind.Getter));

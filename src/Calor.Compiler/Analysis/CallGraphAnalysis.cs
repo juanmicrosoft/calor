@@ -94,8 +94,8 @@ public sealed class CallGraphAnalysis
             SourceEnumConstants { get; } = new();
         internal HashSet<(string CallerId, int Start, int End)> UnresolvedArgumentCalls { get; } = new();
         internal HashSet<(string CallerId, int Start, int End)> TupleElementReads { get; } = new();
-        internal Dictionary<(string CallerId, int Start, int End), Microsoft.CodeAnalysis.IArrayTypeSymbol>
-            MetadataArrayTypes { get; } = new();
+        internal Dictionary<(string CallerId, int Start, int End), Binding.BoundTypes.ArrayBoundType>
+            ArrayTypes { get; } = new();
         /// <summary>(callerId, reference start, reference end) → the resolved
         /// variable's <c>DeclarationSpan</c>.</summary>
         public Dictionary<(string CallerId, int Start, int End), TextSpan> Declarations { get; } = new();
@@ -164,12 +164,8 @@ public sealed class CallGraphAnalysis
     public VariableSymbol? BoundVariable(string callerId, TextSpan reference) =>
         _boundValues.Variables.GetValueOrDefault((callerId, reference.Start, reference.End));
 
-    internal Binding.BoundTypes.ArrayBoundType? MetadataArrayReceiverType(string callerId, TextSpan expression)
-    {
-        var type = _boundValues.MetadataArrayTypes.GetValueOrDefault((callerId, expression.Start, expression.End));
-        return type is null ? null
-            : Binding.Metadata.MetadataBinderResult.ToBoundType(type) as Binding.BoundTypes.ArrayBoundType;
-    }
+    internal Binding.BoundTypes.ArrayBoundType? BoundArrayReceiverType(string callerId, TextSpan expression) =>
+        _boundValues.ArrayTypes.GetValueOrDefault((callerId, expression.Start, expression.End));
 
     /// <summary>The declared <c>FunctionBoundType</c> of the LOCAL named
     /// <paramref name="name"/> whose declaration lies inside
@@ -993,10 +989,15 @@ public sealed class CallGraphAnalysis
                         { Type: Binding.BoundTypes.NominalBoundType { RoslynSymbol: { } metadataValueType } })
                         boundValues.MetadataValueTypes.TryAdd(
                             (callerId, node.Span.Start, node.Span.End), metadataValueType);
-                    if (node is BoundExpression expressionWithMetadata
-                        && expressionWithMetadata.MetadataArrayResultType is { } metadataArray)
-                        boundValues.MetadataArrayTypes.TryAdd(
-                            (callerId, node.Span.Start, node.Span.End), metadataArray);
+                    if (node is BoundExpression arrayExpression)
+                    {
+                        var arrayType = arrayExpression.MetadataArrayResultType is { } metadataArray
+                            ? Binding.Metadata.MetadataBinderResult.ToBoundType(metadataArray) as Binding.BoundTypes.ArrayBoundType
+                            : arrayExpression.MethodInputArrayType;
+                        if (arrayType is not null)
+                            boundValues.ArrayTypes.TryAdd(
+                                (callerId, node.Span.Start, node.Span.End), arrayType);
+                    }
                     string? target = null;
                     IReadOnlyList<FunctionSymbol>? callees = null;
                     VariableSymbol? receiver = null;

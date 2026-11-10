@@ -186,6 +186,11 @@ fully qualified, imported, or aliased. Reading
 `System.Environment.CurrentDirectory`, for example, requires `env:r`; spelling
 the type's full name does not make the read pure.
 
+An array's `.Length` read is pure when the binder has established an array
+receiver, including an inferred local or its alias. Creating the array still
+requires `alloc`. Other getters named `Length` keep their own effect rows:
+`System.IO.FileInfo.Length`, for example, requires `fs:r`.
+
 | Code | Effect | Description | C# Examples |
 |:-----|:-------|:------------|:------------|
 | `cw` | Console write | Output to console | `Console.WriteLine()` |

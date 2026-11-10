@@ -16,6 +16,83 @@ namespace Calor.Compiler.Tests;
 public sealed class NativeMetadataClosureTests
 {
     [Theory]
+    [InlineData("new int[3]", 3)]
+    [InlineData("new int[] { 1, 2 }", 2)]
+    [InlineData("new int[2, 3]", 6)]
+    [InlineData("new int[,] { { 1, 2 }, { 3, 4 } }", 4)]
+    [InlineData("new int[2, 1, 3]", 6)]
+    [InlineData("new int[][] { new int[0], new int[1] }", 2)]
+    [InlineData("new string[2]", 2)]
+    [InlineData("new string[] { \"a\", null }", 2)]
+    public void NativeAllocatedArrayLength_UsesItsBoundShape(string allocation, int expected)
+    {
+        foreach (var receiver in new[] { "values", "(values)", "copy" })
+        {
+            var source = $$"""
+                module AllocatedArrayLength
+                  func Probe public () → int
+                    ! alloc
+                    try
+                      let values = {{allocation}}
+                      let copy = values
+                      return {{receiver}}.Length
+                    catch System.Exception:error
+                      return -1
+                """;
+            foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+            {
+                var result = Compile(candidate);
+                Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+                var assembly = CompileAssembly(result.GeneratedCode);
+                var method = assembly.GetTypes().SelectMany(type => type.GetMethods())
+                    .Single(method => method.Name == "Probe");
+                Assert.Equal(expected, method.Invoke(null, null));
+                var pure = Compile(candidate.Replace("! alloc", "!", StringComparison.Ordinal));
+                Assert.Contains(pure.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("@int")]
+    [InlineData("@value")]
+    public void NativeAllocatedArrayLength_RetainsVerbatimReceiverIdentity(string name)
+    {
+        var source = $$"""
+            module VerbatimArrayLength
+              func Probe public () → int
+                ! alloc
+                let {{name}} = new int[3]
+                return {{name}}.Length
+            """;
+        var result = Compile(source);
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        var assembly = CompileAssembly(result.GeneratedCode);
+        Assert.Equal(3, assembly.GetTypes().SelectMany(type => type.GetMethods())
+            .Single(method => method.Name == "Probe").Invoke(null, null));
+    }
+
+    [Theory]
+    [InlineData("value.Length")]
+    [InlineData("(value).Length")]
+    public void NativeArrayLengthFacts_DoNotCertifyMetadataPropertyGetters(string access)
+    {
+        var source = $$"""
+            module MetadataLengthGetter
+              func Probe public (System.IO.FileInfo:value) → long
+                !
+                return {{access}}
+            """;
+        var rejected = Compile(source);
+        Assert.Contains(rejected.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("Probe")
+            && diagnostic.Message.Contains("fs:r"));
+        var accepted = Compile(source.Replace("    !\n", "    ! fs:r\n", StringComparison.Ordinal));
+        Assert.False(accepted.HasErrors, string.Join("\n", accepted.Diagnostics));
+    }
+
+    [Theory]
     [InlineData("string", "string.Concat(\"a\", \"b\")", "ab")]
     [InlineData("int", "int.MaxValue", "2147483647")]
     [InlineData("long", "long.MaxValue", "9223372036854775807")]
