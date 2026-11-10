@@ -46,7 +46,8 @@ public sealed class CallGraphAnalysis
         AstNode Declaration,
         string ReturnType,
         IReadOnlyList<ResolvedArgumentMapping> Arguments,
-        bool UsesUserDefinedConversion);
+        bool UsesUserDefinedConversion,
+        bool IncludesExtensionReceiver);
 
     internal sealed class OperatorBindings
     {
@@ -105,20 +106,23 @@ public sealed class CallGraphAnalysis
             if (arguments is null)
                 continue;
             sourceArgumentCounts[node.Span] = arguments.Count;
+            // Only a selected extension call expands this receiver into argument zero.
+            if (node is ExpressionCallNode { TargetExpression: FieldAccessNode member })
+                RegisterArgument(member.Target, (node.Span, -1));
             for (var index = 0; index < arguments.Count; index++)
+                RegisterArgument(arguments[index], (node.Span, index));
+        }
+        void RegisterArgument(AstNode argument, (TextSpan Call, int Index) owner)
+        {
+            if (ambiguousArguments.Contains(argument))
+                return;
+            if (argumentOwners.TryGetValue(argument, out var previous) && previous != owner)
             {
-                var argument = arguments[index];
-                var owner = (node.Span, index);
-                if (ambiguousArguments.Contains(argument))
-                    continue;
-                if (argumentOwners.TryGetValue(argument, out var previous) && previous != owner)
-                {
-                    argumentOwners.Remove(argument);
-                    ambiguousArguments.Add(argument);
-                }
-                else
-                    argumentOwners[argument] = owner;
+                argumentOwners.Remove(argument);
+                ambiguousArguments.Add(argument);
             }
+            else
+                argumentOwners[argument] = owner;
         }
         // Bind the emitted expressions, not operator names or approximate operand
         // types. This also sees implicit receiving conversions and lifted operators.
@@ -307,6 +311,7 @@ public sealed class CallGraphAnalysis
                 TextSpan? site = null;
                 var mappings = new List<ResolvedArgumentMapping>();
                 var usesUserConversion = false;
+                var includesReceiver = false;
                 foreach (var argument in arguments)
                 {
                     if (argument.Parameter is null)
@@ -335,6 +340,16 @@ public sealed class CallGraphAnalysis
                             return;
                         }
                         site = owner.Call;
+                        if (owner.Index < 0)
+                        {
+                            if (!method.IsExtensionMethod || argument.Parameter.Ordinal != 0)
+                            {
+                                if (usesReceivingConversion)
+                                    bindingFailures.Add($"The selected source call '{method}' has an invalid Calor extension receiver origin.");
+                                return;
+                            }
+                            includesReceiver = true;
+                        }
                         var parameterType = expanded && argument.Parameter.Type is IArrayTypeSymbol array
                             ? array.ElementType : argument.Parameter.Type;
                         mappings.Add(new ResolvedArgumentMapping(owner.Index, argument.Parameter.Ordinal,
@@ -351,7 +366,8 @@ public sealed class CallGraphAnalysis
                     return;
                 }
                 if (usesReceivingConversion && (conflictingCalls.Contains(callSite)
-                    || mappings.Select(mapping => mapping.ArgumentIndex).Distinct().Count() != sourceArgumentCounts[callSite]))
+                    || mappings.Select(mapping => mapping.ArgumentIndex).Distinct().Count()
+                        != sourceArgumentCounts[callSite] + (includesReceiver ? 1 : 0)))
                 {
                     bindingFailures.Add($"The selected source call '{method}' has no complete, configuration-consistent implicit-conversion argument map.");
                     return;
@@ -360,11 +376,15 @@ public sealed class CallGraphAnalysis
                     return;
                 var selection = new SourceCallSelection(declaration,
                     Binding.Metadata.MetadataBinderResult.ToBoundType(method.ReturnType).DisplayString,
-                    mappings.OrderBy(mapping => mapping.ArgumentIndex).ToArray(), usesUserConversion);
+                    mappings.OrderBy(mapping => mapping.ArgumentIndex)
+                        .Select(mapping => includesReceiver
+                            ? mapping with { ArgumentIndex = mapping.ArgumentIndex + 1 } : mapping).ToArray(),
+                    usesUserConversion, includesReceiver);
                 selectedInTree.Add(callSite);
                 if (bindings.SelectedCalls.TryGetValue(callSite, out var existing)
                     && (!ReferenceEquals(existing.Declaration, selection.Declaration)
                         || existing.ReturnType != selection.ReturnType
+                        || existing.IncludesExtensionReceiver != selection.IncludesExtensionReceiver
                         || !existing.Arguments.SequenceEqual(selection.Arguments)))
                 {
                     if (usesUserConversion || existing.UsesUserDefinedConversion)

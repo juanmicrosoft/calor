@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.Loader;
 using Calor.Compiler.Analysis;
+using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
@@ -297,6 +298,162 @@ public sealed class CanonicalOperatorIndexerTests
                 """;
         var compiled = Program.Compile(source);
         Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+    }
+
+    [Theory]
+    [InlineData("color.Take(value)", "0,1")]
+    [InlineData("color.Take(value: value)", "0,1")]
+    [InlineData("color.TakeOptional(value)", "0,1")]
+    [InlineData("color.TakeNamed(other: 0, value: value)", "0,2,1")]
+    [InlineData("color.TakeMany(value, value)", "0,1,1")]
+    [InlineData("color.TakeGeneric<int>(other: 0, value: value)", "0,2,1")]
+    public void OperatorRows_EnumExtensionReceivingConversionsRetainReceiverAndCallerCharges(
+        string call, string parameterOrder)
+    {
+        var source = $$"""
+            module ExtensionReceivingConversion
+              enum Color
+                Red
+              class Box
+                op implicit (Box:value) → int
+                  ! cw
+                  System.Console.WriteLine("conversion")
+                  return 7
+              module ColorExtensions
+                func Take public (this Color:color, int:value) → int
+                  !
+                  return value
+                func Take public (this Color:color, object:value) → int
+                  !
+                  return 99
+                func TakeOptional public (this Color:color, int:value, int:other = 0) → int
+                  !
+                  return value + other
+                func TakeNamed public (this Color:color, int:value, int:other) → int
+                  !
+                  return value + other
+                func TakeMany public (this Color:color, params int[]:values) → int
+                  !
+                  return values[0]
+                func TakeGeneric<T> public (this Color:color, int:value, T:other) → int
+                  !
+                  return value
+              func Run public (Color:color, Box:value) → int
+                ! cw, alloc
+                return {{call}}
+            """;
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var diagnostics = new DiagnosticBag();
+        var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(Parse(source));
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var selectedCall = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(
+            bound.Functions.Single(function => function.Symbol.Name == "Run")).OfType<BoundCallExpression>());
+        Assert.True(selectedCall.IsSourceExtensionCall);
+        Assert.Equal(parameterOrder, string.Join(",",
+            Assert.Single(selectedCall.SelectedOverloadMatches).Arguments.Select(argument => argument.ParameterIndex)));
+        Assert.Equal(7, Execute(compiled.GeneratedCode, assembly =>
+        {
+            var box = Activator.CreateInstance(assembly.GetType("Box", throwOnError: true)!);
+            var color = Enum.ToObject(assembly.GetType("Color", throwOnError: true)!, 0);
+            return Convert.ToInt64(Assert.Single(assembly.GetTypes(), type => type.GetMethod("Run") != null)
+                .GetMethod("Run")!.Invoke(null, [color, box]));
+        }));
+        var denied = Program.Compile(source.Replace("! cw, alloc", "! alloc", StringComparison.Ordinal));
+        Assert.Contains(denied.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("Run", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("explicit", "value")]
+    [InlineData("implicit", "ref value")]
+    public void OperatorRows_EnumExtensionInvalidReceivingConversionsRemainRejected(string kind, string argument)
+    {
+        var compiled = Program.Compile($$"""
+            module InvalidExtensionConversion
+              enum Color
+                Red
+              class Box
+                op {{kind}} (Box:value) → int
+                  !
+                  return 7
+              module Extensions
+                func Take (this Color:color, {{(argument.StartsWith("ref", StringComparison.Ordinal) ? "ref " : "")}}int:value) → int
+                  !
+                  return value
+              func Run public (Color:color, Box:value) → int
+                !
+                return color.Take({{argument}})
+            """);
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+    }
+
+    [Fact]
+    public void OperatorRows_AmbiguousEnumExtensionConversionsDoNotFallBackToObject()
+    {
+        var compiled = Program.Compile("""
+            module AmbiguousExtensionConversion
+              enum Color
+                Red
+              class Box
+                op implicit (Box:value) → int
+                  !
+                  return 7
+                op implicit (Box:value) → string
+                  !
+                  return "seven"
+              module Extensions
+                func Take (this Color:color, int:value) → int
+                  !
+                  return value
+                func Take (this Color:color, string:value) → int
+                  !
+                  return 8
+                func Take (this Color:color, object:value) → int
+                  !
+                  return 99
+              func Run public (Color:color, Box:value) → int
+                !
+                return color.Take(value)
+            """);
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.AmbiguousOverload);
+    }
+
+    [Fact]
+    public void OperatorRows_EnumExtensionReceivingConversionsChargeTheSelectedCallee()
+    {
+        const string source = """
+            module EffectfulExtensionConversion
+              enum Color
+                Red
+              class Box
+                op implicit (Box:value) → int
+                  !
+                  return 7
+              module Extensions
+                func Take (this Color:color, int:value) → int
+                  ! cw
+                  System.Console.WriteLine("callee")
+                  return value
+                func Take (this Color:color, object:value) → int
+                  !
+                  return 99
+              func Run public (Color:color, Box:value) → int
+                !
+                return color.Take(value)
+            """;
+        var denied = Program.Compile(source);
+        Assert.Contains(denied.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("Run", StringComparison.Ordinal));
+        var compiled = Program.Compile(source.Replace("    !\n    return color", "    ! cw\n    return color", StringComparison.Ordinal));
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Equal(7, Execute(compiled.GeneratedCode, assembly =>
+        {
+            var box = Activator.CreateInstance(assembly.GetType("Box", throwOnError: true)!);
+            var color = Enum.ToObject(assembly.GetType("Color", throwOnError: true)!, 0);
+            return Convert.ToInt64(Assert.Single(assembly.GetTypes(), type => type.GetMethod("Run") != null)
+                .GetMethod("Run")!.Invoke(null, [color, box]));
+        }));
     }
 
     [Fact]

@@ -7026,7 +7026,7 @@ public sealed class Binder
         var resolution = ResolveAccessibleOverload(methodName, argumentTypes,
             argumentNames, argumentModifiers, GetOverloadTypeArguments(call.TypeArguments),
             allowNullableStringCompatibility: true, requireStatic: true, candidateOverrides: candidates,
-            arguments: arguments);
+            arguments: arguments, callSpan: call.Span, includesExtensionReceiver: true);
         if (resolution.Kind == OverloadResolutionKind.NoMatch)
             _diagnostics.ReportError(call.Span, DiagnosticCode.NoMatchingOverload,
                 $"No source extension overload '{methodName}' matches {FormatCallSignature(argumentTypes, argumentModifiers, call.TypeArguments)}.");
@@ -7574,7 +7574,8 @@ public sealed class Binder
         bool requireInstance = false,
         IReadOnlyList<FunctionSymbol>? candidateOverrides = null,
         IReadOnlyList<BoundExpression>? arguments = null,
-        TextSpan? callSpan = null)
+        TextSpan? callSpan = null,
+        bool includesExtensionReceiver = false)
     {
         var candidates = (candidateOverrides ?? _scope.GetOverloads(lookupName))
             .ToArray();
@@ -7596,6 +7597,7 @@ public sealed class Binder
                 return OverloadResolutionResult.Ambiguous(accessibleCandidates);
             if (_sourceCallConversions.SelectedCalls.TryGetValue(site, out var selected)
                 && selected.UsesUserDefinedConversion
+                && selected.IncludesExtensionReceiver == includesExtensionReceiver
                 && selected.Arguments.Count == argumentTypes.Count
                 && _functionSymbols.TryGetValue(selected.Declaration, out var selectedFunction)
                 && accessibleCandidates.Contains(selectedFunction))
