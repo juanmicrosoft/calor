@@ -93,19 +93,19 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     }
 
     [Theory]
-    [InlineData("§B{copy:Exception} ex")]
-    [InlineData("§R ex")]
-    [InlineData("§R §C{Take} §A ex §/C")]
+    [InlineData("let Exception:copy = ex")]
+    [InlineData("return ex")]
+    [InlineData("return Take(ex)")]
     public void CatchVariables_AreKnownNonNullAcrossReceivingBoundaries(string statement)
     {
         var source = $$"""
-            §M{CatchNullability}
-              §F{Take:pub} (Exception:value) -> Exception
-                §R value
-              §F{Probe:pub} () -> Exception
-                §TR
-                  §P "try"
-                §CA{Exception:ex}
+            module CatchNullability
+              func Take public (Exception:value) → Exception
+                return value
+              func Probe public () → Exception
+                try
+                  System.Console.WriteLine("try")
+                catch Exception:ex
                   {{statement}}
             """;
         var (_, diagnostics) = Bind(source);
@@ -116,17 +116,17 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     }
 
     [Theory]
-    [InlineData("§B{copy:System.IO.MemoryStream} stream")]
-    [InlineData("§R stream")]
-    [InlineData("§R §C{TakeStream} §A stream §/C")]
+    [InlineData("let System.IO.MemoryStream:copy = stream")]
+    [InlineData("return stream")]
+    [InlineData("return TakeStream(stream)")]
     public void InferredUsingResources_PreserveNonNullInitializerIdentity(string statement)
     {
         var source = $$"""
-            §M{UsingNullability}
-              §F{TakeStream:pub} (System.IO.MemoryStream:value) -> System.IO.MemoryStream
-                §R value
-              §F{Probe:pub} () -> System.IO.MemoryStream
-                §USE{stream} §NEW{System.IO.MemoryStream}
+            module UsingNullability
+              func TakeStream public (System.IO.MemoryStream:value) → System.IO.MemoryStream
+                return value
+              func Probe public () → System.IO.MemoryStream
+                using stream = new System.IO.MemoryStream()
                   {{statement}}
             """;
         var (_, diagnostics) = Bind(source);
@@ -137,15 +137,15 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     }
 
     [Theory]
-    [InlineData("(?? other §THIS)")]
-    [InlineData("(? flag §TH §THIS §TH other)")]
+    [InlineData("other ?? this")]
+    [InlineData("flag ? throw this : throw other")]
     public void ThisExpression_IsKnownNonNullThroughReferenceJoins(string expression)
     {
         var source = $$"""
-            §M{ThisNullability}
-              §CL{Foo:pub}
-                §MT{Probe:pub} (?Foo:other, bool:flag) -> Foo
-                  §R {{expression}}
+            module ThisNullability
+              class Foo public
+                func Probe public (Foo?:other, bool:flag) → Foo
+                  return {{expression}}
             """;
         var (_, diagnostics) = Bind(source);
         Assert.DoesNotContain(diagnostics, d =>
@@ -165,10 +165,10 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     public void ExplicitNullableUsingResource_RemainsNullable()
     {
         const string source = """
-            §M{NullableUsing}
-              §F{Probe:pub} (?System.IO.MemoryStream:input) -> void
-                §USE{stream:?System.IO.MemoryStream} input
-                  §B{copy:System.IO.MemoryStream} stream
+            module NullableUsing
+              func Probe public (System.IO.MemoryStream?:input) → void
+                using System.IO.MemoryStream?:stream = input
+                  let System.IO.MemoryStream:copy = stream
             """;
         var (_, diagnostics) = Bind(source);
         Assert.Contains(diagnostics, d =>
@@ -176,14 +176,58 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
             && BindingDiagnosticPolicy.IsCompilationError(d));
     }
 
+    [Theory]
+    [InlineData("Resource?")]
+    [InlineData("System.IDisposable?")]
+    [InlineData("System.IO.MemoryStream?")]
+    public void NullableUsingHeader_PreservesTypeNameAndBodyAcrossNativeReparse(string typeName)
+    {
+        var source = $$"""
+            module NullableResourceHeader
+              class Resource public
+              func Probe public ({{typeName}}:input) → void
+                using {{typeName}}:stream = input
+                  let copy = stream
+            """;
+        var parsed = Parse(source, new DiagnosticBag());
+        foreach (var module in new[] { parsed, Parse(new Calor.Compiler.Migration.CalorEmitter().Emit(parsed), new DiagnosticBag()) })
+        {
+            var resource = Assert.IsType<UsingStatementNode>(Assert.Single(module.Functions.Single().Body));
+            Assert.Equal(typeName, resource.VariableType);
+            Assert.Equal("stream", resource.VariableName);
+            Assert.Equal("input", Assert.IsType<ReferenceNode>(resource.Resource).Name);
+            var copy = Assert.IsType<BindStatementNode>(Assert.Single(resource.Body));
+            Assert.Equal("stream", Assert.IsType<ReferenceNode>(copy.Initializer).Name);
+        }
+    }
+
+    [Theory]
+    [InlineData("flag ? first : second")]
+    [InlineData("first ?? second")]
+    public void UsingResourceExpressions_AreNotMisreadAsNullableDeclarationHeaders(string expression)
+    {
+        var source = $$"""
+            module ResourceExpressions
+              func Probe public (bool:flag, System.IDisposable:first, System.IDisposable:second) → void
+                using {{expression}}
+                  let copy = first
+            """;
+        var parsed = Parse(source, new DiagnosticBag());
+        var resource = Assert.IsType<UsingStatementNode>(Assert.Single(parsed.Functions.Single().Body));
+        Assert.Null(resource.VariableType);
+        Assert.Null(resource.VariableName);
+        Assert.Equal(expression, source.Substring(resource.Resource.Span.Start, resource.Resource.Span.Length));
+        Assert.Single(resource.Body);
+    }
+
     [Fact]
     public void ExplicitNonNullableUsingResource_RejectsNullableInitializer()
     {
         const string source = """
-            §M{NullableUsingInitializer}
-              §F{Probe:pub} (?System.IO.MemoryStream:input) -> void
-                §USE{stream:System.IO.MemoryStream} input
-                  §B{copy:?System.IO.MemoryStream} stream
+            module NullableUsingInitializer
+              func Probe public (System.IO.MemoryStream?:input) → void
+                using System.IO.MemoryStream:stream = input
+                  let System.IO.MemoryStream?:copy = stream
             """;
         var (_, diagnostics) = Bind(source);
         Assert.Contains(diagnostics, d =>
@@ -195,12 +239,12 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     public void InferredNullableUsingResource_RetainsNativeTypeForArgumentValidation()
     {
         const string source = """
-            §M{InferredNullableUsing}
-              §F{Take:pub} (System.IO.MemoryStream:value) -> System.IO.MemoryStream
-                §R value
-              §F{Probe:pub} (?System.IO.MemoryStream:input) -> System.IO.MemoryStream
-                §USE{stream} input
-                  §R §C{Take} §A stream §/C
+            module InferredNullableUsing
+              func Take public (System.IO.MemoryStream:value) → System.IO.MemoryStream
+                return value
+              func Probe public (System.IO.MemoryStream?:input) → System.IO.MemoryStream
+                using stream = input
+                  return Take(stream)
             """;
         var (_, diagnostics) = Bind(source);
         Assert.Contains(diagnostics, d =>
@@ -259,16 +303,16 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
         string receivingType, bool expected, string callerClassName)
     {
         const string sourceA = """
-            §M{Namespaces}
-              §CL{Foo:pub}
-                §MT{Get:pub:static} () -> ?Foo
-                  §R §NEW{Foo}
+            module Namespaces A
+              class Foo public
+                func Get public static () → Foo?
+                  return new Foo()
             """;
         var sourceB = $$"""
-            §M{Namespaces}
-              §CL{{{callerClassName}}:pub}
-                §MT{Probe:pub:static} () -> void
-                  §B{value:{{receivingType}}} §C{A.Foo.Get} §/C
+            module Namespaces B
+              class {{callerClassName}} public
+                func Probe public static () → void
+                  let {{receivingType}}:value = A.Foo.Get()
             """;
         var diagnostics = new DiagnosticBag();
         var parsedA = new Parser(new Lexer(sourceA, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
@@ -278,8 +322,12 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
         var classB = Assert.Single(parsedB.Classes);
         Assert.Equal("Foo", classA.Name);
         Assert.Equal(callerClassName, classB.Name);
-        classA.NamespaceIdentity = "A";
-        classB.NamespaceIdentity = "B";
+        Assert.Equal("A", classA.NamespaceIdentity);
+        Assert.Equal("B", classB.NamespaceIdentity);
+        classA.NamespaceScopeId = null;
+        classB.NamespaceScopeId = null;
+        classA.Methods.Single().NamespaceScopeId = null;
+        classB.Methods.Single().NamespaceScopeId = null;
         var parsed = new ModuleNode(parsedA.Span, parsedA.Id, parsedA.Name,
             parsedA.Usings, parsedA.Interfaces, [classA, classB], parsedA.Functions, parsedA.Attributes);
         var bound = new Binder(diagnostics).Bind(parsed);
@@ -289,16 +337,16 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
             + $"diagnostics: {string.Join("; ", diagnostics.Select(d => $"{d.Code}: {d.Message}"))}");
         var returned = Assert.IsType<NominalBoundType>(producer.Type);
         Assert.Equal("A.Foo", returned.Declaration?.QualifiedName);
-        Assert.Equal("?Foo", returned.DisplayString);
+        Assert.Equal("Foo?", returned.DisplayString);
         Assert.Equal(expected, diagnostics.Any(d => d.Code == DiagnosticCode.NullableToNonNullableBinding));
     }
 
     [Theory]
-    [InlineData("?Foo", "binding", DiagnosticCode.NullableToNonNullableBinding)]
+    [InlineData("global::Foo?", "binding", DiagnosticCode.NullableToNonNullableBinding)]
     [InlineData("Foo?", "binding", DiagnosticCode.NullableToNonNullableBinding)]
-    [InlineData("?Foo", "return", DiagnosticCode.NullableReturnFromNonNullable)]
+    [InlineData("global::Foo?", "return", DiagnosticCode.NullableReturnFromNonNullable)]
     [InlineData("Foo?", "return", DiagnosticCode.NullableReturnFromNonNullable)]
-    [InlineData("?Foo", "argument", DiagnosticCode.NullableArgumentToNonNullableParameter)]
+    [InlineData("global::Foo?", "argument", DiagnosticCode.NullableArgumentToNonNullableParameter)]
     [InlineData("Foo?", "argument", DiagnosticCode.NullableArgumentToNonNullableParameter)]
     public void NativeNullableReturn_ReachesResolvedConsumer(
         string typeName, string boundary, string expectedCode)
@@ -338,8 +386,8 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     [Fact]
     public void NativeInstanceReturn_ReachesConsumer()
     {
-        var source = NativeSource("?Foo", "binding")
-            .Replace(":pub:static", ":pub", StringComparison.Ordinal)
+        var source = NativeSource("Foo?", "binding")
+            .Replace("public static", "public", StringComparison.Ordinal)
             .Replace("Foo.Get", "this.Get", StringComparison.Ordinal);
         var (module, diagnostics) = Bind(source);
         var call = GetProducerCall(module, "binding");
@@ -353,7 +401,7 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     [InlineData("return", DiagnosticCode.NullableReturnFromNonNullable)]
     public void ExpandedNativeReturn_PreservesDisplayAndReachesConsumer(string boundary, string code)
     {
-        var (module, diagnostics) = Bind(ExpandedNativeSource(boundary));
+        var (module, diagnostics) = Bind(ExpandedNativeModule(boundary));
         var producer = GetProducerCall(module, boundary);
         Assert.NotNull(producer.ResolvedSymbol);
         var type = Assert.IsType<NominalBoundType>(producer.Type);
@@ -366,7 +414,7 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     [Fact]
     public void ExpandedNativeArgument_KeepsExistingApplicabilityRejection()
     {
-        var (module, diagnostics) = Bind(ExpandedNativeSource("argument"));
+        var (module, diagnostics) = Bind(ExpandedNativeModule("argument"));
         var probe = Assert.Single(module.Functions.Where(f => f.Symbol.Name.EndsWith(".Probe", StringComparison.Ordinal)));
         var call = Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(Assert.Single(probe.Body)).Expression);
         Assert.Null(call.ResolvedSymbol);
@@ -380,10 +428,10 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     public void InferredObjectFallback_DoesNotGainResolvedReferenceIdentity()
     {
         const string source = """
-            §M{Unknown}
-              §F{Probe:pub} () -> void
-                §B{value} §C{Missing} §/C
-                §B{copy} value
+            module Unknown
+              func Probe public () → void
+                let value = Missing()
+                let copy = value
             """;
         var (module, _) = Bind(source);
         var copy = Assert.IsType<BoundBindStatement>(Assert.Single(module.Functions).Body[1]);
@@ -396,15 +444,15 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     }
 
     [Theory]
-    [InlineData("Directory.GetParent")]
-    [InlineData("directory.CreateSubdirectory")]
+    [InlineData("Directory.NotARealMethod")]
+    [InlineData("directory.NotARealMethod")]
     public void UnsupportedBclReceiver_IsNotRelabeledResolved(string target)
     {
         var source = $$"""
-            §M{UnsupportedReceiver}
-              §U{System.IO}
-              §F{Probe:pub} (System.IO.DirectoryInfo:directory) -> void
-                §B{value:System.IO.DirectoryInfo} §C{ {{target}} } §A STR:"/" §/C
+            module UnsupportedReceiver
+              using System.IO
+              func Probe public (System.IO.DirectoryInfo:directory) → void
+                let System.IO.DirectoryInfo:value = {{target}}("/")
             """;
         var (module, diagnostics) = Bind(source);
         var call = GetProducerCall(module, "binding");
@@ -413,18 +461,46 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
         Assert.Null(type.RoslynSymbol);
         Assert.Null(type.Declaration);
         Assert.False(type.IsKnownReferenceType);
+        Assert.Null(call.ResolvedMetadataMethod);
+        Assert.True(call.HasUnknownInferredType);
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NullableToNonNullableBinding);
     }
 
     [Theory]
-    [InlineData("?Foo")]
+    [InlineData("Directory.GetParent", true)]
+    [InlineData("directory.CreateSubdirectory", false)]
+    public void SupportedBclReceivers_KeepResolvedReturnIdentity(string target, bool nullable)
+    {
+        var source = $$"""
+            module SupportedReceiver
+              using System.IO
+              func Probe public (System.IO.DirectoryInfo:directory) → void
+                let System.IO.DirectoryInfo:value = {{target}}("/")
+            """;
+        var (module, diagnostics) = Bind(source);
+        var call = GetProducerCall(module, "binding");
+        var type = Assert.IsType<NominalBoundType>(call.Type);
+        Assert.NotNull(type.RoslynSymbol);
+        Assert.Equal("System.IO.DirectoryInfo", type.RoslynSymbol.ToDisplayString().TrimEnd('?'));
+        Assert.True(type.IsKnownReferenceType);
+        Assert.Equal(nullable ? NullableAnnotation.Annotated : NullableAnnotation.NotAnnotated,
+            type.NullableAnnotation);
+        var method = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.IMethodSymbol>(call.ResolvedMetadataMethod);
+        Assert.Equal(target[(target.LastIndexOf('.') + 1)..], method.Name);
+        Assert.True(Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(
+            type.RoslynSymbol, method.ReturnType));
+        Assert.Equal(nullable, diagnostics.Any(d => d.Code == DiagnosticCode.NullableToNonNullableBinding));
+    }
+
+    [Theory]
+    [InlineData("Foo?")]
     [InlineData("Foo")]
     public void ProductionNominalRouting_ActivatesOnlyForPossiblyNullSource(string sourceType)
     {
         var source = NativeSource(sourceType, "return");
         var result = Program.Compile(source, "nominal-identity.calr");
         var (_, raw) = Bind(source);
-        var shouldReject = sourceType == "?Foo";
+        var shouldReject = sourceType.EndsWith('?');
         Assert.Equal(shouldReject,
             raw.Any(d => d.Code == DiagnosticCode.NullableReturnFromNonNullable));
         Assert.Equal(shouldReject, result.HasErrors);
@@ -443,13 +519,13 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     public void BclNominalReturn_ReachesConsumerWithActualResolvedSymbol(
         string method, string boundary, bool nullable)
     {
-        var call = $"§C{{System.IO.Directory.{method}}} §A STR:\"/\" §/C";
+        var call = $"System.IO.Directory.{method}(\"/\")";
         var body = boundary == "binding"
-            ? $"§B{{value:System.IO.DirectoryInfo}} {call}"
-            : $"§R {call}";
+            ? $"let System.IO.DirectoryInfo:value = {call}"
+            : $"return {call}";
         var source = $$"""
-            §M{NominalMetadata}
-              §F{Probe:pub} () -> {{(boundary == "binding" ? "void" : "System.IO.DirectoryInfo")}}
+            module NominalMetadata
+              func Probe public () → {{(boundary == "binding" ? "void" : "System.IO.DirectoryInfo")}}
                 {{body}}
             """;
         var (module, diagnostics) = Bind(source, out var binder);
@@ -488,9 +564,9 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     public void NullableBclNominalReturn_ReachesResolvedBclParameter()
     {
         const string source = """
-            §M{NominalBclArgument}
-              §F{Probe:pub} () -> void
-                §B{permissions:System.Security.AccessControl.DirectorySecurity} §C{System.IO.FileSystemAclExtensions.GetAccessControl} §A §C{System.IO.Directory.GetParent} §A STR:"/" §/C §/C
+            module NominalBclArgument
+              func Probe public () → void
+                let System.Security.AccessControl.DirectorySecurity:permissions = System.IO.FileSystemAclExtensions.GetAccessControl(System.IO.Directory.GetParent("/"))
             """;
         var (module, diagnostics) = Bind(source);
         var consumer = GetProducerCall(module, "binding");
@@ -507,51 +583,71 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
 
     private static string NativeSource(string sourceType, string boundary)
     {
-        var call = "§C{Foo.Get} §A input §/C";
+        var call = "Foo.Get(input)";
         var body = boundary switch
         {
-            "binding" => $"§B{{value:Foo}} {call}",
-            "return" => $"§R {call}",
-            "argument" => $"§R §C{{Foo.Consume}} §A {call} §/C",
+            "binding" => $"let Foo:value = {call}",
+            "return" => $"return {call}",
+            "argument" => $"return Foo.Consume({call})",
             _ => throw new ArgumentOutOfRangeException(nameof(boundary))
         };
         var output = boundary switch
         {
             "binding" => "void",
             "return" => "Foo",
-            _ => "i32"
+            _ => "int"
         };
         return $$"""
-            §M{NominalNative}
-              §CL{Foo:pub}
-                §MT{Get:pub:static} ({{sourceType}}:input) -> {{sourceType}}
-                  §R input
-                §MT{Consume:pub:static} (Foo:input) -> i32
-                  §R 0
-                §MT{Probe:pub:static} ({{sourceType}}:input) -> {{output}}
+            module NominalNative
+              class Foo public
+                func Get public static ({{sourceType}}:input) → {{sourceType}}
+                  !
+                  return input
+                func Consume public static (Foo:input) → int
+                  !
+                  return 0
+                func Probe public static ({{sourceType}}:input) → {{output}}
+                  !
                   {{body}}
             """;
     }
 
-    private static string ExpandedNativeSource(string boundary)
+    private static ModuleNode ExpandedNativeModule(string boundary)
     {
         var body = boundary switch
         {
-            "binding" => "§B{value:Foo} §C{Foo.Get} §/C",
-            "return" => "§R §C{Foo.Get} §/C",
-            _ => "§R §C{Foo.Consume} §A §C{Foo.Get} §/C §/C"
+            "binding" => "let Foo:value = Foo.Get()",
+            "return" => "return Foo.Get()",
+            _ => "return Foo.Consume(Foo.Get())"
         };
-        return $$"""
-            §M{ExpandedNative}
-              §CL{Foo:pub}
-                §MT{Get:pub:static}
-                  §O{?Foo}
-                  §R §NEW{Foo}
-                §MT{Consume:pub:static} (Foo:value) -> i32
-                  §R 0
-                §MT{Probe:pub:static} () -> {{(boundary == "binding" ? "void" : boundary == "return" ? "Foo" : "i32")}}
+        var source = $$"""
+            module ExpandedNative
+              class Foo public
+                func Get public static () → Foo?
+                  return new Foo()
+                func Consume public static (Foo:value) → int
+                  return 0
+                func Probe public static () → {{(boundary == "binding" ? "void" : boundary == "return" ? "Foo" : "int")}}
                   {{body}}
             """;
+        var module = Parse(source, new DiagnosticBag());
+        var original = Assert.Single(module.Classes);
+        var getter = original.Methods.Single(method => method.Name == "Get");
+        // Expanded spellings remain internal AST compatibility cases, not active source syntax.
+        var expanded = getter.CopyMetadataTo(new MethodNode(
+            getter.Span, getter.LocalId, getter.Name, getter.Visibility, getter.Modifiers,
+            getter.TypeParameters, getter.Parameters, new OutputNode(getter.Output!.Span, "NULLABLE[inner=Foo]"),
+            getter.Effects, getter.Preconditions, getter.Postconditions, getter.Body, getter.Attributes));
+        var replacement = original.CopyMetadataTo(new ClassDefinitionNode(
+            original.Span, original.LocalId, original.Name, original.IsAbstract, original.IsSealed,
+            original.BaseClass, original.ImplementedInterfaces, original.TypeParameters, original.Fields,
+            original.Methods.Select(method => method == getter ? expanded : method).ToArray(),
+            original.Attributes));
+        return module.With(update =>
+        {
+            update.Classes = [replacement];
+            update.Items = [replacement];
+        });
     }
 
     private static BoundCallExpression GetProducerCall(BoundModule module, string boundary)
@@ -575,14 +671,26 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
 
     private static (BoundModule Module, DiagnosticBag Diagnostics) Bind(string source) => Bind(source, out _);
 
+    private static (BoundModule Module, DiagnosticBag Diagnostics) Bind(ModuleNode module)
+    {
+        var diagnostics = new DiagnosticBag();
+        return (new Binder(diagnostics).Bind(module), diagnostics);
+    }
+
     private static (BoundModule Module, DiagnosticBag Diagnostics) Bind(string source, out Binder binder)
     {
         var diagnostics = new DiagnosticBag();
+        var module = Parse(source, diagnostics);
+        binder = new Binder(diagnostics);
+        return (binder.Bind(module), diagnostics);
+    }
+
+    private static ModuleNode Parse(string source, DiagnosticBag diagnostics)
+    {
         var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
         var module = new Parser(tokens, diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
-        binder = new Binder(diagnostics);
-        return (binder.Bind(module), diagnostics);
+        return module;
     }
 
     private static CSharpCompilation IdentityCompilation()

@@ -531,6 +531,8 @@ Complete example: [TryDouble](#example-task_6).
 
 At compilation-unit scope, imports a namespace or declares an alias. In a function body, using introduces a resource and an indented body that disposes it on exit, including exceptions. Preserve the distinction between imports and resource lifetime management.
 
+Typed resource headers preserve nullable annotations: `using System.IDisposable?:handle = input` keeps `handle` nullable inside the body.
+
 Generated C# already imports `System`, so names such as `StringComparison` do not need an explicit `using System`. Source declarations, parameters, type parameters and aliases still participate in name lookup; the import does not override them.
 
 Syntax: `using System.Text; using Text = System.Text; using type:name = resource`

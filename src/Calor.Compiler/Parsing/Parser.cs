@@ -12742,9 +12742,11 @@ public sealed class Parser
             variableSpan = binder.Span;
             Advance();
         }
-        else if (Check(TokenKind.Identifier) && Peek(1).Kind == TokenKind.Colon)
+        else if (Check(TokenKind.Identifier)
+            && (Peek(1).Kind == TokenKind.Colon
+                || Peek(1).Kind == TokenKind.Question && Peek(2).Kind == TokenKind.Colon))
         {
-            variableType = ParseValue();
+            variableType = ReadInlineTypeToken();
             Expect(TokenKind.Colon);
             var binder = Expect(TokenKind.Identifier);
             variableName = binder.Text;
