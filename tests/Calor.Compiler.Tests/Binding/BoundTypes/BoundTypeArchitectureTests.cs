@@ -238,15 +238,8 @@ public class BoundTypeArchitectureTests
                 foreach (var candidate in new[] { source, emitted })
                 {
                     var compiled = Program.Compile(candidate, relative);
-                    if (relative == "samples/Generics/generics.calr")
-                    {
-                        var unsupported = Assert.Single(compiled.Diagnostics.Errors);
-                        Assert.Equal(DiagnosticCode.TypeMismatch, unsupported.Code);
-                        Assert.Equal("Cannot access field on non-record type List<T>", unsupported.Message);
-                    }
-                    else
-                        Assert.False(compiled.HasErrors, $"{relative}:\n{string.Join("\n", compiled.Diagnostics)}");
-                    LoadAssembly(new CSharpEmitter().Emit(Parse(candidate)));
+                    Assert.False(compiled.HasErrors, $"{relative}:\n{string.Join("\n", compiled.Diagnostics)}");
+                    LoadAssembly(compiled.GeneratedCode);
                 }
             }
             if (relative == "samples/Contracts/contracts.calr")

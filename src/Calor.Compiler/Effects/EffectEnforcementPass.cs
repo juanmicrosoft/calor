@@ -5638,9 +5638,11 @@ public sealed class EffectEnforcementPass
         }
 
         private EffectSet InferFromFieldAccess(FieldAccessNode field)
-            => InferFromMemberAccess(field.Target, field.FieldName, field.Span);
+            => InferFromMemberAccess(field.Target, field.FieldName, field.Span,
+                _context.CallGraph.SelectedMetadataGetter(field));
 
-        private EffectSet InferFromMemberAccess(ExpressionNode target, string memberName, TextSpan span)
+        private EffectSet InferFromMemberAccess(ExpressionNode target, string memberName, TextSpan span,
+            CallGraphAnalysis.MetadataGetterSelection? selectedGetter = null)
         {
             if (_context.CallGraph.IsResolvedEnumConstant(_context.CurrentFunctionId, span))
                 return EffectSet.Empty;
@@ -5673,7 +5675,11 @@ public sealed class EffectEnforcementPass
 
             var manifestType = MapShortTypeNameToFullName(targetType);
             var metadata = _context.CallGraph.MetadataMemberReceiverType(_context.CurrentFunctionId, span);
-            var resolution = _context.Resolver.Resolve(metadata is not null
+            var resolution = _context.Resolver.Resolve(selectedGetter is not null
+                ? EffectResolverKey.FromBoundReceiver(
+                    Binding.Metadata.MetadataBinderResult.ToNominalBoundType(selectedGetter.ReceiverType),
+                    selectedGetter.Property.Name, null, EffectMemberKind.Getter)
+                : metadata is not null
                 ? EffectResolverKey.FromBoundReceiver(metadata, memberName, null, EffectMemberKind.Getter)
                 : ResolverKey(GetReferencePath(target), manifestType, memberName, null, EffectMemberKind.Getter));
             return resolution.Status == EffectResolutionStatus.Unknown

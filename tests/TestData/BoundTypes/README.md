@@ -49,11 +49,27 @@ become ordinary .NET creation, calls, and indexing instead of specialized opaque
 statements. Native spellings such as `int`, `string`, `string?`, and
 `IReadOnlyList<T>` replace retired spellings. Generic class names retain arity.
 Structural `.Count` reads remove two original dotted-name binding errors, but
-their bound result remains honestly `OBJECT`; the separate AST checker still
-rejects `GetCount<T>` with exactly `Calor0202`, "Cannot access field on non-record
-type List<T>". That limitation is pinned, and the generated C# independently
-compiles. The other ten sample mirrors compile through the ordinary compiler,
-before and after native emission. Two non-scalar `ProcessStartInfo.ArgumentList`
+their bound result remains honestly `OBJECT`, with no selected bound metadata
+member. The separate AST checker now uses an annotated C# projection to select
+the actual metadata property and its scalar result type. `GetCount<T>` no longer
+fails with `Calor0202`; this is typing evidence, not bound-result or getter-effect
+authority.
+
+A separate selected-getter identity proof carries the actual metadata property
+and constructed CLR receiver into the existing effect-key path. It selects the
+existing ``System.Collections.Generic.List`1`` catalog contract; it does not
+supply an effect row or add a permission. Opaque receivers, source getters,
+invalid or ambiguous selections, and configuration-dependent identities cannot
+borrow this proof. A selected scalar getter with no catalog contract still fails
+strict enforcement with `Calor0411` and `Calor0410`.
+
+All eleven sample mirrors now compile through default `Program.Compile`, with
+type checking and effect enforcement enabled, before and after native emission.
+Independent C# compilation and execution of the generic sample and focused
+function verify empty and nonempty `List<int>` and `List<string>` counts.
+Explicit pure-row controls also pass strict enforcement using the existing
+List contract; source lookalikes and effectful receivers retain their negative
+controls. Two non-scalar `ProcessStartInfo.ArgumentList`
 reads retain their informational `Calor0270` diagnostics; they are not claimed
 as supported scalar metadata reads.
 

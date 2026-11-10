@@ -4996,6 +4996,14 @@ public sealed class TypeChecker
             _module, targetType.SurfaceName, field.FieldName, out var nativeMember))
             return ResolveTypeName(nativeMember, field.Span);
 
+        if (_module != null && targetType is GenericInstanceType { NativeDeclaration: null })
+        {
+            _sourceBindings ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(
+                _module, _diagnostics, ProjectionContractMode);
+            if (_sourceBindings.MetadataMemberTypes.TryGetValue(field, out var selected))
+                return ResolveTypeName(selected.ResultType.ToDisplayString(), field.Span);
+        }
+
         // Same rule as the bool conditions: only complain when the receiver's type is actually
         // known. An unmodeled receiver — a `new` expression, an external call result — is the
         // checker's blind spot, not the program's error, and C# resolves the member itself.

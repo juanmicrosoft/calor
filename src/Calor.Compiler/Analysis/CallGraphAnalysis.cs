@@ -51,6 +51,12 @@ public sealed class CallGraphAnalysis
         bool UsesAnonymousFunctionConversion,
         bool IncludesExtensionReceiver);
 
+    internal sealed record MetadataMemberTypeSelection(
+        ISymbol Member, INamedTypeSymbol ReceiverType, ITypeSymbol ResultType);
+
+    internal sealed record MetadataGetterSelection(
+        IPropertySymbol Property, INamedTypeSymbol ReceiverType);
+
     internal sealed class OperatorBindings
     {
         internal Dictionary<AstNode, HashSet<string>> SourceCalls { get; } = new(ReferenceEqualityComparer.Instance);
@@ -62,6 +68,9 @@ public sealed class CallGraphAnalysis
         internal Dictionary<ParameterNode, ITypeSymbol> ParameterTypes { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<LambdaExpressionNode, INamedTypeSymbol> LambdaTargets { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<ExpressionNode, EffectResolverKey> StaticInitializerConstructors { get; } = new(ReferenceEqualityComparer.Instance);
+        // Typing evidence only: neither bound-member identity nor getter-effect permission.
+        internal Dictionary<FieldAccessNode, MetadataMemberTypeSelection> MetadataMemberTypes { get; } = new(ReferenceEqualityComparer.Instance);
+        internal Dictionary<FieldAccessNode, MetadataGetterSelection> MetadataGetters { get; } = new(ReferenceEqualityComparer.Instance);
     }
 
     private OperatorBindings _operatorBindings = new();
@@ -72,6 +81,8 @@ public sealed class CallGraphAnalysis
         _operatorBindings.ExternalCalls.TryGetValue(node, out var calls) ? calls : Array.Empty<EffectResolverKey>();
     internal EffectResolverKey? StaticInitializerConstructor(ExpressionNode initializer) =>
         _operatorBindings.StaticInitializerConstructors.GetValueOrDefault(initializer);
+    internal MetadataGetterSelection? SelectedMetadataGetter(FieldAccessNode field) =>
+        _operatorBindings.MetadataGetters.GetValueOrDefault(field);
 
     internal static OperatorBindings ResolveOperatorCalls(ModuleNode module, DiagnosticBag? diagnostics = null,
         ContractMode contractMode = ContractMode.Debug)
@@ -94,6 +105,8 @@ public sealed class CallGraphAnalysis
         var conflictingParameters = new HashSet<ParameterNode>(ReferenceEqualityComparer.Instance);
         var conflictingLambdas = new HashSet<LambdaExpressionNode>(ReferenceEqualityComparer.Instance);
         var conflictingCalls = new HashSet<TextSpan>();
+        var conflictingMembers = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
+        var conflictingGetters = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
         var argumentOwners = new Dictionary<AstNode, (TextSpan Call, int Index)>(ReferenceEqualityComparer.Instance);
         var ambiguousArguments = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
         var sourceArgumentCounts = new Dictionary<TextSpan, int>();
@@ -127,7 +140,8 @@ public sealed class CallGraphAnalysis
                 RegisterArgument(arguments[index], (node.Span, index));
         }
         var bindExpressions = operators.Length > 0 || visited.OfType<LambdaExpressionNode>().Any();
-        if (!bindExpressions && initializerCreations.Count == 0 && !visited.OfType<ParameterNode>().Any())
+        var bindMemberTypes = visited.OfType<FieldAccessNode>().Any();
+        if (!bindExpressions && !bindMemberTypes && initializerCreations.Count == 0 && !visited.OfType<ParameterNode>().Any())
             return bindings;
 
         void RegisterArgument(AstNode argument, (TextSpan Call, int Index) owner)
@@ -288,10 +302,14 @@ public sealed class CallGraphAnalysis
                         constructor.MetadataName, [], EffectMemberKind.Constructor);
                 }
             }
-            if (!bindExpressions)
+            if (!bindExpressions && !bindMemberTypes)
                 return;
 
+            var validMemberContext = bindMemberTypes && !compilation.GetDiagnostics().Any(diagnostic =>
+                diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
             var selectedInTree = new HashSet<TextSpan>();
+            var selectedMembersInTree = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
+            var selectedGettersInTree = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
 
             foreach (var declaration in root.DescendantNodes().Where(node =>
                          node is BaseMethodDeclarationSyntax or AccessorDeclarationSyntax
@@ -309,6 +327,10 @@ public sealed class CallGraphAnalysis
                         continue;
                     foreach (var child in operation.ChildOperations)
                         pending.Push(child);
+                    if (validMemberContext)
+                        AddMetadataMemberType(operation);
+                    if (!bindExpressions)
+                        continue;
                     if (operation is IInvocationOperation invocation)
                         AddCall(invocation, invocation.TargetMethod, invocation.Arguments);
                     else if (operation is IObjectCreationOperation { Constructor: { } constructor } creation)
@@ -362,6 +384,21 @@ public sealed class CallGraphAnalysis
                     }
                 }
             }
+            foreach (var member in ranges.Select(range => range.Node).OfType<FieldAccessNode>()
+                         .Where(member => !selectedMembersInTree.Contains(member)))
+            {
+                conflictingMembers.Add(member);
+                bindings.MetadataMemberTypes.Remove(member);
+            }
+            foreach (var member in ranges.Select(range => range.Node).OfType<FieldAccessNode>()
+                         .Where(member => !selectedGettersInTree.Contains(member)))
+            {
+                conflictingGetters.Add(member);
+                bindings.MetadataGetters.Remove(member);
+            }
+            if (!bindExpressions)
+                return;
+
             foreach (var syntax in root.DescendantNodes().Where(node =>
                          node is InvocationExpressionSyntax or ObjectCreationExpressionSyntax))
             {
@@ -399,6 +436,84 @@ public sealed class CallGraphAnalysis
                     && range.End >= syntax.Span.End).Node;
 
             AstNode? Origin(IOperation operation) => SyntaxOrigin(operation.Syntax);
+
+            void AddMetadataMemberType(IOperation operation)
+            {
+                var (member, instance, result) = operation switch
+                {
+                    IPropertyReferenceOperation { Property: { IsStatic: false, IsIndexer: false,
+                        ReturnsByRef: false, ReturnsByRefReadonly: false,
+                        GetMethod.DeclaredAccessibility: Accessibility.Public } property } read
+                        => ((ISymbol)property, read.Instance, property.Type),
+                    IFieldReferenceOperation { Field.IsStatic: false } read
+                        => ((ISymbol)read.Field, read.Instance, read.Field.Type),
+                    _ => (null, null, null)
+                };
+                if (member is null || result is null
+                    || Origin(operation) is not FieldAccessNode origin
+                    || origin.FieldName != member.Name
+                    || conflictingMembers.Contains(origin)
+                    || member.DeclaredAccessibility != Accessibility.Public
+                    || member.Locations.Any(location => location.IsInSource)
+                    || instance?.Type is not INamedTypeSymbol { IsGenericType: true } receiver
+                    || receiver.Locations.Any(location => location.IsInSource)
+                    || HasErrorType(receiver)
+                    || result.SpecialType is not (SpecialType.System_Boolean or SpecialType.System_Char
+                        or SpecialType.System_SByte or SpecialType.System_Byte
+                        or SpecialType.System_Int16 or SpecialType.System_UInt16
+                        or SpecialType.System_Int32 or SpecialType.System_UInt32
+                        or SpecialType.System_Int64 or SpecialType.System_UInt64
+                        or SpecialType.System_Single or SpecialType.System_Double
+                        or SpecialType.System_Decimal or SpecialType.System_String)
+                    || model.GetDiagnostics(operation.Syntax.Span).Any(diagnostic =>
+                        diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+                    return;
+                var receiverOperations = new Stack<IOperation>();
+                receiverOperations.Push(instance);
+                var getterReceiverSafe = true;
+                while (receiverOperations.TryPop(out var part))
+                {
+                    if (part.Kind == OperationKind.Invalid || part.Type is { } type && HasErrorType(type)
+                        || Origin(part) is CSharpInteropBlockNode or RawCSharpNode or RawCSharpExpressionNode
+                        || part is IInvocationOperation call
+                            && call.TargetMethod.Locations.Any(location => location.IsInSource)
+                            && !methods.ContainsKey(call.TargetMethod.OriginalDefinition))
+                        return;
+                    if (part is IConversionOperation { OperatorMethod: not null }
+                        || part is IPropertyReferenceOperation sourceProperty
+                            && sourceProperty.Property.Locations.Any(location => location.IsInSource)
+                        || part is IFieldReferenceOperation { Field.IsStatic: true } sourceField
+                            && sourceField.Field.Locations.Any(location => location.IsInSource))
+                        getterReceiverSafe = false;
+                    foreach (var child in part.ChildOperations)
+                        receiverOperations.Push(child);
+                }
+                var selection = new MetadataMemberTypeSelection(member, receiver, result);
+                selectedMembersInTree.Add(origin);
+                if (bindings.MetadataMemberTypes.TryGetValue(origin, out var previous)
+                    && (previous.Member.Kind != member.Kind || previous.Member.MetadataName != member.MetadataName
+                        || !SameType(previous.Member.ContainingType, member.ContainingType)
+                        || !SameType(previous.ReceiverType, receiver) || !SameType(previous.ResultType, result)))
+                {
+                    conflictingMembers.Add(origin);
+                    bindings.MetadataMemberTypes.Remove(origin);
+                    return;
+                }
+                else
+                    bindings.MetadataMemberTypes[origin] = selection;
+                // This independent identity proof only selects the normal catalog key.
+                // It never supplies an effect row, and cannot borrow an opaque getter's receiver.
+                if (getterReceiverSafe && member is IPropertySymbol propertyMember
+                    && !conflictingGetters.Contains(origin))
+                {
+                    selectedGettersInTree.Add(origin);
+                    bindings.MetadataGetters[origin] = new MetadataGetterSelection(propertyMember, receiver);
+                }
+            }
+
+            static bool HasErrorType(ITypeSymbol type) => type.TypeKind == TypeKind.Error
+                || type is INamedTypeSymbol named && named.TypeArguments.Any(HasErrorType)
+                || type is IArrayTypeSymbol array && HasErrorType(array.ElementType);
 
             void AddCall(IOperation operation, IMethodSymbol method,
                 System.Collections.Immutable.ImmutableArray<IArgumentOperation> arguments)
