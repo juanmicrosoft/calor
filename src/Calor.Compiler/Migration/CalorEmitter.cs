@@ -2693,48 +2693,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(SetCreationNode node)
     {
-        var elementType = TypeMapper.ToSurfaceType(node.ElementType);
-        if (_inlineCollections > 0 || node.RenderInline)
-            return RenderInlineCollection($"§HSET{{{elementType}}}", $"§/HSET",
-                RenderInlineCollectionItems(node.Elements));
-
-        // Pre-evaluate elements to flush hoisted bindings before the §HSET block.
-        // AcceptInInlineSibling: each element line is parsed as a sibling expression
-        // and a one-arg closer-less §C would absorb the next sibling (v0.6.3 RFC §3.2 B).
-        var evaluatedElements = new List<string>();
-        var allHoisted = new List<string>();
-        foreach (var element in node.Elements)
-        {
-            // #1595: a nested collection element is written inline, on its element line.
-            var val = AcceptCollectionElement(element);
-            // #903: a multi-line element (an object initializer) cannot sit on an
-            // element line; hoist it so the block lands at the enclosing indent.
-            if (val.Contains('\n'))
-                val = HoistToTempVar(val);
-            if (_pendingHoistedLines.Count > 0)
-            {
-                allHoisted.AddRange(_pendingHoistedLines);
-                _pendingHoistedLines.Clear();
-            }
-            evaluatedElements.Add(val);
-        }
-
-        foreach (var hoisted in allHoisted)
-        {
-            AppendLine(hoisted);
-        }
-
-        AppendLine($"§HSET{{{node.Name}:{elementType}}}");
-        Indent();
-
-        foreach (var val in evaluatedElements)
-        {
-            AppendLine(val);
-        }
-
-        Dedent();
-        EmitBlockEnd($"§/HSET");
-        return "";
+        return Visit(new NewExpressionNode(node.Span, "System.Collections.Generic.HashSet",
+            [node.ElementType], [], [],
+            collectionInitializers: node.Elements.Select(element =>
+                new CallExpressionNode(element.Span, "Add", [element])).ToArray()));
     }
 
     public string Visit(CollectionPushNode node)

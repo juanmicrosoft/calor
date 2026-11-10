@@ -12876,7 +12876,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             if (type is not ("bool" or "string" or "object" or "string?" or "object?"
                 or "sbyte" or "byte" or "short" or "ushort" or "int" or "uint"
                 or "long" or "ulong" or "nint" or "nuint" or "char" or "float" or "double" or "decimal"))
+            {
+                // A resolved reference local can use null without default(T)'s primitive-only grammar.
+                if (_semanticModel?.GetTypeInfo(local.Declaration.Type).Type is
+                    { IsReferenceType: true, TypeKind: not (TypeKind.Error or TypeKind.Dynamic) })
+                    return new ReferenceNode(span, "null");
                 throw EscalateExpression(local, "default-expression", preserveMember: true);
+            }
         }
         return new ReferenceNode(span, "default");
     }

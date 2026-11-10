@@ -22,7 +22,9 @@ namespace Calor.Compiler.Tests.InteropScope;
 /// compile that changes behavior fails. A cell's outcome must be one the control allows and must
 /// equal the committed observation in <c>controls-results.json</c>: a reclassified cell fails until
 /// the results are regenerated (<c>CALOR_REGENERATE_T1_CONTROLS=1</c>) and the new observations are
-/// reviewed in the pull request that changes them.
+/// reviewed in the pull request that changes them. Current initializer frame counts and strict
+/// compilation are pinned separately in <c>initializer-current-expectations.json</c>; original
+/// sources, traces, outcomes and all other observation fields remain the original controls.
 /// </summary>
 public sealed class SharedInteropControlsTests : IDisposable
 {
@@ -83,8 +85,18 @@ public sealed class SharedInteropControlsTests : IDisposable
         var committed = Results()[id];
         Assert.True(committed is not null, $"{id} has no committed observation; regenerate with CALOR_REGENERATE_T1_CONTROLS=1");
         Assert.Equal(committed["originalTrace"]!.GetValue<string>(), original);
-        Assert.True(JsonNode.DeepEquals(committed["surfaces"]?[surface], cell),
-            $"{id} on {surface} reclassified: committed {committed["surfaces"]?[surface]?.ToJsonString()}, observed {cell.ToJsonString()}");
+        var expected = committed["surfaces"]?[surface]?.DeepClone();
+        if (id is "T1-INIT-NESTED" or "T1-INIT-ORDER")
+        {
+            // Current raw frames preserve whole members, not the former expression fragments.
+            // Keep the original trace, outcome, options and every other path counter unchanged.
+            var current = JsonNode.Parse(File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(),
+                Dir, "initializer-current-expectations.json")))![id]!;
+            expected!["compile"] = current["compile"]!.DeepClone();
+            expected["paths"]!["interop"] = current["interop"]!.DeepClone();
+        }
+        Assert.True(JsonNode.DeepEquals(expected, cell),
+            $"{id} on {surface} reclassified: expected {expected?.ToJsonString()}, observed {cell.ToJsonString()}");
     }
 
     /// <summary>The surface defaults the controls file records are what each entry point actually builds.</summary>

@@ -21,6 +21,186 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class InitializerConversionTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HashSetInitializers_StayNative_AndPreserveDuplicateAndExceptionOrder(bool throws)
+    {
+        var source = $$"""
+            using System;
+            using System.Collections.Generic;
+            public class Holder
+            {
+                public HashSet<int> Field = new HashSet<int> { Probe.Next(1), Probe.Next(1) };
+                public HashSet<int> Property { get; } = new HashSet<int> { Probe.Next(2) };
+                public List<HashSet<int>> Nested = new List<HashSet<int>> { new HashSet<int> { 3, 3 } };
+            }
+            public static class Probe
+            {
+                public static string Log = "";
+                public static int Next(int value)
+                {
+                    Log += value;
+                    if (value == 4 && {{throws.ToString().ToLowerInvariant()}})
+                        throw new InvalidOperationException();
+                    return value;
+                }
+                public static string Run()
+                {
+                    var holder = new Holder();
+                    try
+                    {
+                        var local = new HashSet<int> { Next(4), Next(4), Next(5) };
+                        return Log + ":" + holder.Field.Count + holder.Property.Count
+                            + holder.Nested[0].Count + ":" + local.Count;
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        return Log + ":throw";
+                    }
+                }
+            }
+            """;
+        var result = Convert(source);
+        Assert.True(result.Success, result.CalorSource);
+        Assert.Empty(result.Context.Losses);
+        Assert.Contains("new System.Collections.Generic.HashSet<int>() {", result.CalorSource, StringComparison.Ordinal);
+        var generated = Compile(result.CalorSource!, enforceEffects: false);
+        Assert.False(generated.HasErrors, string.Join("\n", generated.Diagnostics.Errors));
+        var expected = throws ? "1124:throw" : "112445:111:2";
+        Assert.Equal(expected, Run(source));
+        Assert.Equal(expected, Run(generated.GeneratedCode));
+    }
+
+    [Fact]
+    public void UninitializedSourceReferenceLocal_StaysNative_WithoutCreatingAnInstanceEarly()
+    {
+        const string source = """
+            public class Value
+            {
+                public int N;
+                public Value() { Probe.Log += "ctor;"; }
+            }
+            public static class Probe
+            {
+                public static string Log = "";
+                public static string Run()
+                {
+                    Value assigned;
+                    Log += "before;";
+                    assigned = new Value { N = 7 };
+                    return Log + assigned.N;
+                }
+            }
+            """;
+        var result = Convert(source);
+        Assert.True(result.Success, result.CalorSource);
+        Assert.Empty(result.Context.Losses);
+        var generated = Compile(result.CalorSource!, enforceEffects: true);
+        Assert.False(generated.HasErrors, string.Join("\n", generated.Diagnostics.Errors));
+        Assert.Equal("before;ctor;7", Run(source));
+        Assert.Equal(Run(source), Run(generated.GeneratedCode));
+    }
+
+    [Theory]
+    [InlineData("public struct Value { public int N; public Value() { N = 9; Probe.Log += \"ctor;\"; } }")]
+    [InlineData("public class Value { public int N; } public class Base { protected int @default = 3; }")]
+    public void UnsupportedOrCollidingLocalDefault_RemainsPreserved(string declaration)
+    {
+        var baseType = declaration.Contains("class Base", StringComparison.Ordinal) ? " : Base" : "";
+        var source = $$"""
+            {{declaration}}
+            public class Probe{{baseType}}
+            {
+                public static string Log = "";
+                public static string Run()
+                {
+                    Value assigned;
+                    Log += "before;";
+                    assigned = new Value { N = 7 };
+                    return Log + assigned.N;
+                }
+            }
+            """;
+        var result = Convert(source);
+        Assert.True(result.Success, result.CalorSource);
+        Assert.Contains(result.Context.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
+        var generated = Compile(result.CalorSource!, enforceEffects: false);
+        Assert.False(generated.HasErrors, string.Join("\n", generated.Diagnostics.Errors));
+        Assert.Equal(Run(source), Run(generated.GeneratedCode));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SourceFieldInitializer_InNoHeaderOperator_HasOnlyIntrinsicEffects(bool inherited)
+    {
+        var source = $$"""
+            module InitializerEffects
+              class Storage
+                field int:Value
+              class Box
+                {{(inherited ? "extends Storage" : "field int:Value")}}
+              class Source
+                op implicit (Source:value) → Box
+                  return new Box() { Value = 7 }
+            """;
+        var generated = Compile(source, enforceEffects: true);
+        Assert.False(generated.HasErrors, string.Join("\n", generated.Diagnostics.Errors));
+        Assert.DoesNotContain(generated.Diagnostics, diagnostic => diagnostic.Code == "Calor0411"
+            && diagnostic.Message.Contains("set_Value", StringComparison.Ordinal));
+        Assert.Equal("7", Run(generated.GeneratedCode + """
+
+            public static class Probe
+            {
+                public static string Run() =>
+                    ((Box)new Source()).Value.ToString();
+            }
+            """));
+    }
+
+    [Theory]
+    [InlineData("field int:Other")]
+    [InlineData("property int:Value\n      get\n      set\n        System.Console.WriteLine(value)")]
+    [InlineData("property int:Value\n      get\n      set\n        Missing.External(value)")]
+    public void SourcePropertyInitializer_InNoHeaderOperator_StillRejectsEffectfulOrUnknownSetter(string member)
+    {
+        var source = $$"""
+            module InitializerEffects
+              class Box
+                {{member}}
+              class Source
+                op implicit (Source:value) → Box
+                  return new Box() { Value = 7 }
+            """;
+        var generated = Compile(source, enforceEffects: true);
+        Assert.Contains(generated.Diagnostics.Errors, diagnostic => diagnostic.Code == "Calor0423");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SourceFieldInitializer_StillChargesItsValueAndConstructor(bool constructorEffect)
+    {
+        var source = $$"""
+            module InitializerEffects
+              class Box
+                field int:Value
+                ctor ()
+                  {{(constructorEffect ? "System.Console.WriteLine(1)" : "let value = 0")}}
+              module Effects
+                func Next () → int
+                  ! cw
+                  System.Console.WriteLine(2)
+                  return 7
+              class Source
+                op implicit (Source:value) → Box
+                  return new Box() { Value = {{(constructorEffect ? "7" : "Effects.Next()")}} }
+            """;
+        var generated = Compile(source, enforceEffects: true);
+        Assert.Contains(generated.Diagnostics.Errors, diagnostic => diagnostic.Code == "Calor0423");
+    }
+
     // ---- #1595: parser -----------------------------------------------------------------------
 
     [Theory]
@@ -76,12 +256,11 @@ public class InitializerConversionTests
         Assert.True(result.Success, string.Join("\n", result.Issues.Where(i => i.Severity == ConversionIssueSeverity.Error).Select(i => i.ToString())) + "\n" + result.CalorSource);
         Assert.Empty(result.Context.Losses);
         var calor = result.CalorSource!;
-        Assert.DoesNotContain("§CS{", calor, StringComparison.Ordinal);
-        Assert.Contains("§LIST{int} 1 §/LIST", calor, StringComparison.Ordinal);
-        Assert.Contains("= §NEW{StringBuilder} Capacity = 64 §/NEW", calor, StringComparison.Ordinal);
-        Assert.DoesNotContain("§A 5", calor, StringComparison.Ordinal);
+        Assert.DoesNotContain("raw ", calor, StringComparison.Ordinal);
+        Assert.Contains("new System.Collections.Generic.List<int>() { 1 }", calor, StringComparison.Ordinal);
+        Assert.Contains("= new StringBuilder() { Capacity = 64 }", calor, StringComparison.Ordinal);
         var csharp = Compile(calor, enforceEffects: false).GeneratedCode;
-        Assert.Contains("new List<int>() { 5 }", csharp, StringComparison.Ordinal);
+        Assert.Contains("new System.Collections.Generic.List<int>() { 5 }", csharp, StringComparison.Ordinal);
         Assert.Contains("Capacity = 64", csharp, StringComparison.Ordinal);
         Assert.Contains("class Other", csharp, StringComparison.Ordinal);
         Assert.Contains("After", csharp, StringComparison.Ordinal);

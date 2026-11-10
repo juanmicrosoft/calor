@@ -6469,21 +6469,30 @@ public sealed class EffectEnforcementPass
             var shortType = StripGenericArguments(typeName);
             if (shortType != null && _context.ClassesByName.TryGetValue(shortType, out var cls))
             {
-                var resolved = FindClassProperty(cls, initializer.PropertyName);
-                var property = resolved?.Property;
-                var accessor = property?.Initer ?? property?.Setter;
-                if (property == null || accessor == null)
+                var visited = new HashSet<string>(StringComparer.Ordinal);
+                for (var current = cls; current != null && visited.Add(current.Name);
+                    current = ResolveBaseClass(current))
                 {
-                    return UnknownResolvedOperation(
-                        $"{cls.Name}.set_{initializer.PropertyName}",
-                        initializer.Value.Span);
+                    var property = CallGraphAnalysis.EnumerateProperties(current)
+                        .FirstOrDefault(candidate =>
+                            candidate.Name.Equals(initializer.PropertyName, StringComparison.Ordinal));
+                    if (property != null)
+                    {
+                        var accessor = property.Initer ?? property.Setter;
+                        if (accessor == null)
+                            break;
+                        var id = CallGraphAnalysis.GetPropertyAccessorFunctionId(
+                            current.Name, property, accessor);
+                        return InferFromInternalFunctions([id]);
+                    }
+                    // Field assignment has no setter body; its mutation is charged by the creation.
+                    if (current.Fields.Any(field =>
+                        field.Name.Equals(initializer.PropertyName, StringComparison.Ordinal)))
+                        return EffectSet.Empty;
                 }
-
-                var id = CallGraphAnalysis.GetPropertyAccessorFunctionId(
-                    resolved!.Value.OwnerName,
-                    property,
-                    accessor);
-                return InferFromInternalFunctions([id]);
+                return UnknownResolvedOperation(
+                    $"{cls.Name}.set_{initializer.PropertyName}",
+                    initializer.Value.Span);
             }
 
             var manifestType = MapShortTypeNameToFullName(typeName);

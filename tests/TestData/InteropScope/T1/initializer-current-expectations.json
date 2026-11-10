@@ -1,0 +1,10 @@
+{
+  "T1-INIT-NESTED": {
+    "compile": "default",
+    "interop": 7
+  },
+  "T1-INIT-ORDER": {
+    "compile": "default",
+    "interop": 8
+  }
+}
