@@ -5651,7 +5651,8 @@ public sealed class EffectEnforcementPass
             // A read may initialize the entire declaring type, not just this field.
             // Until initializers have bound callable identities, only self-contained
             // primitive expressions can prove that no hidden invocation is omitted.
-            if (owner.IsPartial || owner.InteropBlocks.Count != 0 || owner.PreprocessorBlocks.Count != 0)
+            if (owner.IsPartial || owner.InteropBlocks.Any(CallGraphAnalysis.PreservedMemberMayInitializeType)
+                || owner.PreprocessorBlocks.Count != 0)
                 return UnknownResolvedOperation($"{owner.Name}..cctor", span);
             var initializers = owner.Fields.Where(field => field.IsStatic && field.DefaultValue != null)
                 .Select(field => (field.TypeName, Value: field.DefaultValue!))

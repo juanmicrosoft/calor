@@ -461,6 +461,20 @@ public sealed class CallGraphAnalysis
                 System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out index);
     }
 
+    internal static bool PreservedMemberMayInitializeType(CSharpInteropBlockNode block)
+    {
+        var root = CSharpSyntaxTree.ParseText(
+            $"class __CalorInitializationHost\n{{\n{block.CSharpCode}\n}}",
+            new CSharpParseOptions(LanguageVersion.Preview)).GetCompilationUnitRoot();
+        if (root.ContainsDiagnostics || root.ContainsDirectives
+            || root.Members.Count != 1 || root.Members[0] is not ClassDeclarationSyntax owner)
+            return true;
+
+        // A method body runs on invocation, not on declaring-type initialization.
+        // Attributes may designate a module initializer; other member kinds stay opaque.
+        return owner.Members.Any(member => member is not MethodDeclarationSyntax { AttributeLists.Count: 0 });
+    }
+
     private readonly record struct AstCallKey(
         string CallerId,
         string Target,

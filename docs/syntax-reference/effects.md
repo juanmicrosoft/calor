@@ -186,6 +186,11 @@ fully qualified, imported, or aliased. Reading
 `System.Environment.CurrentDirectory`, for example, requires `env:r`; spelling
 the type's full name does not make the read pure.
 
+Static field access also accounts for declaring-type initialization. A
+preserved ordinary method alone does not run during that initialization;
+calling it still requires its own effect proof. Preserved initializers,
+attributed methods, and unproven member shapes remain unknown boundaries.
+
 An array's `.Length` read is pure when the binder has established an array
 receiver, including an inferred local or its alias. Creating the array still
 requires `alloc`. Other getters named `Length` keep their own effect rows:

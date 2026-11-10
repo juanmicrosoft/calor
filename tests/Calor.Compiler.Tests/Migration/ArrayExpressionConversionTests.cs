@@ -2,6 +2,8 @@ using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Calor.Compiler.Analysis;
+using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Binding.BoundTypes;
@@ -10,6 +12,7 @@ using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Migration.Project;
+using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -2414,6 +2417,55 @@ public class ArrayExpressionConversionTests
             && error.Message.Contains("Holder..cctor", StringComparison.Ordinal));
         Assert.Contains(result.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
             && error.Message.Contains("'unknown'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SourceStaticFields_PreservedMethodDoesNotInventTypeInitialization()
+    {
+        const string source = """
+            public static class Holder
+            {
+                public static int Value = 9;
+                public static ref int Escape(ref int value) => ref value;
+            }
+            public static class Probe
+            {
+                public static string Run() => "" + Holder.Value;
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join(Environment.NewLine, conversion.Issues));
+        Assert.Contains(conversion.Ast!.Classes.Single(owner => owner.Name == "Holder").InteropBlocks,
+            block => block.CSharpCode.Contains("Escape", StringComparison.Ordinal));
+        var result = Program.Compile(conversion.CalorSource!, "preserved-method-initialization.calr");
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+        Assert.Equal("9", Run(source));
+        Assert.Equal("9", Run(result.GeneratedCode));
+
+        var invoked = Program.Compile(conversion.CalorSource + """
+
+              func Invoke (ref int:value) → int
+                ! mut
+                return Holder.Escape(ref value)
+            """, "preserved-method-invocation.calr");
+        Assert.Contains(invoked.Diagnostics, error => error.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.Contains(invoked.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
+            && error.Message.Contains("'unknown'", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("public static int Value = Unknown();")]
+    [InlineData("static Holder() { Unknown(); }")]
+    [InlineData("public static int Value { get; } = Unknown();")]
+    [InlineData("public static void Read() {} public static int Value = Unknown();")]
+    [InlineData("[System.Runtime.CompilerServices.ModuleInitializer] public static void Start() {}")]
+    [InlineData("#if HIDDEN\npublic static int Value = Unknown();\n#endif\npublic static void Read() {}")]
+    [InlineData("public static void Read(")]
+    [InlineData("}\nclass Other { public static int Value = Unknown(); }\nclass Tail {")]
+    public void SourceStaticFields_UnprovenPreservedMembersRemainInitializationBoundaries(string payload)
+    {
+        var block = new CSharpInteropBlockNode(TextSpan.Empty, payload, memberKind: InteropMemberKind.Method);
+        Assert.True(CallGraphAnalysis.PreservedMemberMayInitializeType(block));
     }
 
     [Theory]
