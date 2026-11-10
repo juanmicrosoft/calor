@@ -802,6 +802,73 @@ public class DocDriftCheckerTests
         }
     }
 
+    [Fact]
+    public void MarkdownCoreSemantics_CompilesNativeProgramsAndExactReadOnlyNegative()
+    {
+        const string path = "docs/semantics/core.md";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path));
+        Assert.DoesNotContain("§", content);
+        var coverage = new WebsiteExampleChecker.Coverage();
+        Assert.Empty(WebsiteExampleChecker.Check([new DocFile(path, content)], coverage));
+        Assert.Equal(10, coverage.CompletePrograms);
+        Assert.Equal(1, coverage.NegativePrograms);
+        var programs = ExemplarCompileChecker.ExtractCompletePrograms(content);
+        Assert.Equal(9, programs.Count);
+        var expectations = new (string Module, string Expression, string Expected)[]
+        {
+            ("CoreScopes", "GlobalModule.Read(true) + \":\" + GlobalModule.Read(false)", "2:1"),
+            ("CoreNestedReturn", "GlobalModule.Read(true) + \":\" + GlobalModule.Read(false)", "42:7"),
+            ("CoreOverflow", "GlobalModule.Increment(41)", "42"),
+            ("CoreConversions", "GlobalModule.Value()", "45"),
+            ("CoreRequires", "GlobalModule.Positive(1)", "1"),
+            ("CoreEnsures", "GlobalModule.Positive(1)", "1"),
+            ("CoreMatch", "GlobalModule.Describe(101) + \":\" + GlobalModule.Describe(0) + \":\" + GlobalModule.Describe(-1)",
+                "large:zero:other"),
+            ("CoreMutable", "GlobalModule.Value()", "43"),
+            ("CoreConfiguredAwait", "GlobalModule.Read().GetAwaiter().GetResult()", "42")
+        };
+        for (var index = 0; index < programs.Count; index++)
+        {
+            var compiled = Program.Compile(programs[index].Source, path);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Assert.Equal(expectations[index].Module, Assert.IsType<Ast.ModuleNode>(compiled.Ast).Name);
+            var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run() => {{expectations[index].Expression}};
+                }
+                """);
+            Assert.Equal(expectations[index].Expected, observed);
+        }
+    }
+
+    [Theory]
+    [InlineData("CoreOverflow", "GlobalModule.Increment(int.MaxValue)", "!OverflowException", "!OverflowException")]
+    [InlineData("CoreRequires", "GlobalModule.Positive(0)", "!ContractViolationException", "0")]
+    [InlineData("CoreEnsures", "GlobalModule.Positive(0)", "!ContractViolationException", "0")]
+    public void MarkdownCoreSemantics_RetainsArithmeticAndContractModeBoundaries(
+        string module, string expression, string enabled, string disabled)
+    {
+        const string path = "docs/semantics/core.md";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith("module " + module + "\n", StringComparison.Ordinal)).Source;
+        foreach (var mode in new[] { ContractMode.Debug, ContractMode.Release, ContractMode.Off })
+        {
+            var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = mode });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run() => {{expression}};
+                }
+                """);
+            Assert.Equal(mode == ContractMode.Off ? disabled : enabled, observed);
+        }
+    }
+
     [Theory]
     [InlineData("FunctionCallBoundary", "Identity")]
     [InlineData("FloatingProofBoundary", "Square")]
