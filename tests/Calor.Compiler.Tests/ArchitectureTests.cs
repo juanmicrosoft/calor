@@ -549,6 +549,11 @@ public class ArchitectureTests
             ["Analysis/CallGraphAnalysis.cs:ResolveBoundCallSites"] =
                 ("Universal DescendantsAndSelf traversal; unresolved/incompatible sites remain explicit.",
                     "boundCallSites.Add"),
+            ["Analysis/CallGraphAnalysis.cs:ReceiverPath"] =
+                ("Name-keyed receiver identity classifier, not traversal; only variables and " +
+                    "field paths rooted in a recognized receiver have names. Computed or unsupported " +
+                    "receivers explicitly return null instead of borrowing an identity from a child.",
+                    "_ => null"),
             ["Effects/ExternalCallCollector.cs:IndexBoundCallReceivers"] =
                 ("Universal ChildNodes traversal; unresolved receivers remain explicit raw calls.",
                     "_boundReceiverTypes"),

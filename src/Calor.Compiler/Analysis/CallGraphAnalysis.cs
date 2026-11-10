@@ -1611,6 +1611,8 @@ public sealed class CallGraphAnalysis
 
         // Native member calls carry an evaluated receiver, not a dotted target.
         // Only named receiver paths can feed this name-keyed side channel.
+        // This is an identity classifier, not traversal: computed receivers cannot
+        // borrow a name from their children, and unsupported forms return no path.
         static string? ReceiverPath(BoundExpression receiver) => receiver switch
         {
             BoundVariableExpression variable => variable.Variable.Name,
