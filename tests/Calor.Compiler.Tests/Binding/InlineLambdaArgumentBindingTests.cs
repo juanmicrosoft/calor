@@ -577,6 +577,98 @@ public sealed class InlineLambdaArgumentBindingTests
             diagnostic.Code == DiagnosticCode.EffectRowMismatch));
     }
 
+    [Theory]
+    [InlineData("Action", false, false)]
+    [InlineData("Action", false, true)]
+    [InlineData("Action", true, false)]
+    [InlineData("Action", true, true)]
+    [InlineData("System.Action", false, false)]
+    [InlineData("System.Action", false, true)]
+    [InlineData("System.Action", true, false)]
+    [InlineData("System.Action", true, true)]
+    [InlineData("Callback", false, false)]
+    [InlineData("Callback", false, true)]
+    [InlineData("Callback", true, false)]
+    [InlineData("Callback", true, true)]
+    public void UnsupportedBodyLowering_DoesNotThrowDuringSignatureProjection(
+        string callbackType, bool contract, bool unrelatedLambda)
+    {
+        const string predicate = "forall int:i in 0..n, int:j in 0..n : matrix[i,j] == matrix[j,i]";
+        var source = $$"""
+            module QuantifiedCallbacks
+              using Callback = System.Action
+              func Check<T> ({{callbackType}}:callback !, T[,]:matrix, int:n) → bool
+                !
+                {{(contract ? "requires " + predicate : "")}}
+                callback()
+                return {{(contract ? "true" : predicate)}}
+              {{UnrelatedLambda(unrelatedLambda)}}
+            """;
+        var ast = Parse(source);
+        var compiled = Program.Compile(source);
+        Assert.True(compiled.HasErrors);
+        Assert.Contains(compiled.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
+        if (contract)
+        {
+            var disabled = Program.Compile(source, "quantified-callback.calr", new CompilationOptions
+            {
+                ContractMode = ContractMode.Off,
+                EnableTypeChecking = true
+            });
+            Assert.False(disabled.HasErrors, string.Join("\n", disabled.Diagnostics));
+            var graph = CallGraphAnalysis.Build(ast, null, projectionContractMode: ContractMode.Off);
+            Assert.Empty(graph.OperatorBindingFailures);
+            var check = Assert.Single(ast.Functions, function => function.Name == "Check");
+            Assert.True(graph.DeclaredFunctionTypes(check.Id).TryGetValue("callback", out var callback));
+            Assert.False(callback.Row.IsUnknown);
+            Assert.Empty(callback.ParameterTypes);
+            using var metadata = MetadataContext.Create();
+            var generated = metadata.HostCompilationForBinder.AddSyntaxTrees(
+                CSharpSyntaxTree.ParseText(disabled.GeneratedCode));
+            using var stream = new MemoryStream();
+            var emitted = generated.Emit(stream);
+            Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+        }
+
+        var typeDiagnostics = new DiagnosticBag();
+        new TypeChecker(typeDiagnostics).Check(ast);
+        Assert.Contains(typeDiagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
+
+        Assert.Contains(CallGraphAnalysis.Build(ast).OperatorBindingFailures,
+            failure => failure.Contains(DiagnosticCode.QuantifierRuntimeLoweringUnsupported, StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(false, DiagnosticCode.EffectRowUnknown)]
+    [InlineData(true, DiagnosticCode.EffectRowMismatch)]
+    public void DisabledRuntimeContracts_RetainStrictCallbackRows(bool receiving, string expectedCode)
+    {
+        var source = receiving ? """
+            module CallbackNarrowing
+              func Ignore (System.Action:callback !) → void
+                !
+              func Run () → void
+                ! cw
+                let System.Action:callback ! cw = () ! cw =>
+                  System.Console.WriteLine("effect")
+                Ignore(callback)
+            """ : """
+            module UnknownCallback
+              func Run (System.Action:callback) → void
+                !
+                callback()
+            """;
+        var compiled = Program.Compile(source, "contract-off-callback.calr", new CompilationOptions
+        {
+            ContractMode = ContractMode.Off,
+            EnableTypeChecking = true
+        });
+        Assert.True(compiled.HasErrors);
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == expectedCode);
+    }
+
     private static string UnrelatedLambda(bool include) => include ? """
         func Unrelated private () → void
             !

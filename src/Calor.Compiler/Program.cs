@@ -839,7 +839,10 @@ public class Program
         phaseSw.Restart();
         var bindingDiagnostics = new DiagnosticBag();
         bindingDiagnostics.SetFilePath(filePath);
-        var binder = new Binder(bindingDiagnostics, filePath);
+        var binder = new Binder(bindingDiagnostics, filePath)
+        {
+            ProjectionContractMode = options.ContractMode
+        };
         binder.Bind(ast);
         phaseSw.Stop();
         var semanticBindingMilliseconds = phaseSw.ElapsedMilliseconds;
@@ -849,7 +852,10 @@ public class Program
         {
             phaseSw.Restart();
             var typeChecker = new TypeChecking.TypeChecker(
-                diagnostics, binder.BoundAwaits, binder.BoundSourceEnumConstants);
+                diagnostics, binder.BoundAwaits, binder.BoundSourceEnumConstants)
+            {
+                ProjectionContractMode = options.ContractMode
+            };
             typeChecker.Check(ast);
             phaseSw.Stop();
             telemetry?.TrackPhase("TypeChecker", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
@@ -975,7 +981,8 @@ public class Program
                 crossModuleFunctionNames: options.CrossModuleFunctionModules?.Keys)
             {
                 CrossModuleTypes = options.CrossModuleTypes,
-                CrossModuleFunctionModules = options.CrossModuleFunctionModules
+                CrossModuleFunctionModules = options.CrossModuleFunctionModules,
+                ProjectionContractMode = options.ContractMode
             };
             enforcementPass.Enforce(ast, inheritanceResult);
             phaseSw.Stop();

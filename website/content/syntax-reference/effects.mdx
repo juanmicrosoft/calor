@@ -106,6 +106,11 @@ to a Pure callback parameter still requires a Pure row, including for named
 arguments and overloaded source functions. Existing delegate values use the
 same signature and row checks as inline lambdas.
 
+If the temporary C# used for binding cannot lower an expression, compilation
+reports the lowering diagnostic instead of throwing or treating partial output
+as a signature or effect proof. It uses the selected runtime contract mode;
+turning runtime contracts off does not disable callback signature or row checks.
+
 ### Where a row can appear
 
 ```calor

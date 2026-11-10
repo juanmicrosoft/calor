@@ -15,6 +15,7 @@ public sealed class TypeChecker
     private readonly IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? _boundSourceEnumConstants;
     private ModuleNode? _module;
     private Analysis.CallGraphAnalysis.OperatorBindings? _sourceBindings;
+    internal ContractMode ProjectionContractMode { get; init; } = ContractMode.Debug;
     private readonly Dictionary<IsPatternNode, CalorType> _patternBindingTypes = new();
     private readonly Dictionary<MatchStatementNode, CalorType> _matchTargetTypes = new();
     private readonly HashSet<string> _moduleDeclaredValueTypes = new(StringComparer.OrdinalIgnoreCase);
@@ -4840,7 +4841,8 @@ public sealed class TypeChecker
 
         if (_module is not null)
         {
-            _sourceBindings ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(_module);
+            _sourceBindings ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(
+                _module, _diagnostics, ProjectionContractMode);
             if (_sourceBindings.ResultTypes.TryGetValue(binOp, out var operatorResult))
                 return ResolveTypeName(operatorResult, binOp.Span);
         }
@@ -5144,7 +5146,8 @@ public sealed class TypeChecker
     {
         if (_module is not null)
         {
-            _sourceBindings ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(_module);
+            _sourceBindings ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(
+                _module, _diagnostics, ProjectionContractMode);
             if (_sourceBindings.ParameterTypes.TryGetValue(parameter, out var type))
             {
                 if (type is Microsoft.CodeAnalysis.INamedTypeSymbol { DelegateInvokeMethod: { } invoke } named)

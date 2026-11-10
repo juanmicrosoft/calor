@@ -184,6 +184,7 @@ public sealed class Binder
     private Analysis.CallGraphAnalysis.OperatorBindings? _sourceCallConversions;
     // The annotated C# binding image disables this to prevent recursive rebinding.
     internal bool ResolveSourceCallConversions { get; init; } = true;
+    internal ContractMode ProjectionContractMode { get; init; } = ContractMode.Debug;
 
     /// <summary>
     /// v0.14 §S4 (nullability workstream / issue #875) — declared return
@@ -5627,7 +5628,8 @@ public sealed class Binder
     {
         if (targetType is null && ResolveSourceCallConversions && _asyncTypeModule is not null)
         {
-            _sourceCallConversions ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(_asyncTypeModule);
+            _sourceCallConversions ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(
+                _asyncTypeModule, _diagnostics, ProjectionContractMode);
             if (_sourceCallConversions.LambdaTargets.TryGetValue(lambda, out var target)
                 && target.DelegateInvokeMethod is { } invoke)
                 targetType = new BoundTypes.FunctionBoundType(
@@ -7655,7 +7657,8 @@ public sealed class Binder
 
         if (ResolveSourceCallConversions && _asyncTypeModule is not null && callSpan is { } site)
         {
-            _sourceCallConversions ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(_asyncTypeModule);
+            _sourceCallConversions ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(
+                _asyncTypeModule, _diagnostics, ProjectionContractMode);
             if (_sourceCallConversions.AmbiguousCalls.Contains(site))
                 return OverloadResolutionResult.Ambiguous(accessibleCandidates);
             if (_sourceCallConversions.SelectedCalls.TryGetValue(site, out var selected)
@@ -10475,7 +10478,8 @@ public sealed class Binder
     {
         if (ResolveSourceCallConversions && _asyncTypeModule is not null)
         {
-            _sourceCallConversions ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(_asyncTypeModule);
+            _sourceCallConversions ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(
+                _asyncTypeModule, _diagnostics, ProjectionContractMode);
             if (_sourceCallConversions.ParameterTypes.TryGetValue(parameter, out var type))
                 return type is Microsoft.CodeAnalysis.INamedTypeSymbol { DelegateInvokeMethod: { } invoke }
                     ? new BoundTypes.FunctionBoundType(

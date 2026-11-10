@@ -1,6 +1,7 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.CodeGen;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
@@ -69,7 +70,8 @@ public sealed class CallGraphAnalysis
     internal IReadOnlyCollection<EffectResolverKey> ExternalOperatorCalls(AstNode node) =>
         _operatorBindings.ExternalCalls.TryGetValue(node, out var calls) ? calls : Array.Empty<EffectResolverKey>();
 
-    internal static OperatorBindings ResolveOperatorCalls(ModuleNode module)
+    internal static OperatorBindings ResolveOperatorCalls(ModuleNode module, DiagnosticBag? diagnostics = null,
+        ContractMode contractMode = ContractMode.Debug)
     {
         var bindings = new OperatorBindings();
         var types = bindings.ResultTypes;
@@ -145,7 +147,8 @@ public sealed class CallGraphAnalysis
             emittedCallables.Add(declaration);
             return $"/*{callablePrefix}{index}*/";
         }
-        var emitter = new CSharpEmitter
+        var emissionDiagnostics = new DiagnosticBag();
+        var emitter = new CSharpEmitter(contractMode, null, null, diagnostics: emissionDiagnostics)
         {
             AnnotateSource = (expression, text) =>
             {
@@ -156,6 +159,14 @@ public sealed class CallGraphAnalysis
             CallableOrigin = CallableOrigin
         };
         var source = emitter.Emit(module);
+        foreach (var diagnostic in emissionDiagnostics)
+            diagnostics?.Add(diagnostic);
+        if (emissionDiagnostics.HasErrors)
+        {
+            bindingFailures.AddRange(emissionDiagnostics.Errors.Select(diagnostic =>
+                $"{diagnostic.Code}: {diagnostic.Message}"));
+            return bindings;
+        }
         var options = new CSharpParseOptions(LanguageVersion.Preview);
         var initial = CSharpSyntaxTree.ParseText(source, options);
         var symbols = initial.GetRoot().DescendantTrivia(descendIntoTrivia: true)
@@ -1146,7 +1157,8 @@ public sealed class CallGraphAnalysis
 
     internal static CallGraphAnalysis Build(ModuleNode ast,
         IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions,
-        Verification.ModuleInheritanceResult? contractInheritance = null)
+        Verification.ModuleInheritanceResult? contractInheritance = null,
+        ContractMode projectionContractMode = ContractMode.Debug)
     {
         if (contractInheritance is null)
         {
@@ -1276,7 +1288,7 @@ public sealed class CallGraphAnalysis
 
         var (resolvedCallIds, boundCallSites, boundResolutionComplete, boundValueTypes,
              declaredFunctionTypes, declaredReturnTypes, declaredFieldTypes, boundValues) =
-            ResolveBoundCallSites(ast, functions, crossModuleFunctions, contractInheritance);
+            ResolveBoundCallSites(ast, functions, crossModuleFunctions, contractInheritance, projectionContractMode);
 
         // Build call edges
         var unresolvedCalls = new List<AstUnresolvedCallSite>();
@@ -1326,7 +1338,7 @@ public sealed class CallGraphAnalysis
             }
         }
 
-        var operatorBindings = ResolveOperatorCalls(ast);
+        var operatorBindings = ResolveOperatorCalls(ast, contractMode: projectionContractMode);
         var operatorCalls = operatorBindings.SourceCalls;
         foreach (var function in functions.Values)
         {
@@ -1394,7 +1406,8 @@ public sealed class CallGraphAnalysis
             ModuleNode ast,
             IReadOnlyDictionary<string, FunctionNode> functions,
             IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions,
-            Verification.ModuleInheritanceResult contractInheritance)
+            Verification.ModuleInheritanceResult contractInheritance,
+            ContractMode projectionContractMode)
     {
         var resolved = new Dictionary<AstCallKey, IReadOnlyList<string>>();
         var boundCallSites = new HashSet<AstCallKey>();
@@ -1462,7 +1475,8 @@ public sealed class CallGraphAnalysis
             var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
             var boundModule = new Binder(diagnostics)
             {
-                CrossModuleFunctionModules = crossModuleFunctions
+                CrossModuleFunctionModules = crossModuleFunctions,
+                ProjectionContractMode = projectionContractMode
             }.Bind(ast, contractInheritance);
             boundValues.Complete = true;
             var incompatibleCallSpans = diagnostics

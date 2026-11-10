@@ -21,6 +21,7 @@ public sealed class EffectEnforcementPass
     private readonly bool _strictEffects;
     private readonly HashSet<string> _crossModuleFunctionNames;
     internal CrossModuleTypeRegistry? CrossModuleTypes { get; init; }
+    internal ContractMode ProjectionContractMode { get; init; } = ContractMode.Debug;
     private CrossModuleTypeRegistry _varianceTypes = null!;
     private ModuleNode _varianceModule = null!;
 
@@ -264,7 +265,8 @@ public sealed class EffectEnforcementPass
         }
 
         // Phase 1: Build function map and call graph (includes functions and methods)
-        _callGraphAnalysis = CallGraphAnalysis.Build(module, CrossModuleFunctionModules, contractInheritance);
+        _callGraphAnalysis = CallGraphAnalysis.Build(
+            module, CrossModuleFunctionModules, contractInheritance, ProjectionContractMode);
         foreach (var failure in _callGraphAnalysis.OperatorBindingFailures)
             _diagnostics.Report(module.Span, DiagnosticCode.ForbiddenEffect, failure, DiagnosticSeverity.Error);
 

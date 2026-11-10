@@ -211,6 +211,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
     private readonly Diagnostics.DiagnosticBag _standaloneDiagnostics = new();
     private string _overflowContext = "checked";
 
+    private ContractMode ProjectionContractMode => _contractMode switch
+    {
+        EmitContractMode.Off => ContractMode.Off,
+        EmitContractMode.Release => ContractMode.Release,
+        _ => ContractMode.Debug
+    };
+
     public Diagnostics.DiagnosticBag EmissionDiagnostics
         => _diagnostics ?? _standaloneDiagnostics;
 
@@ -9114,7 +9121,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
             var binder = new Binder(new Diagnostics.DiagnosticBag())
             {
                 CrossModuleFunctionModules = CrossModuleFunctionModules,
-                ResolveSourceCallConversions = AnnotateSource is null
+                ResolveSourceCallConversions = AnnotateSource is null,
+                ProjectionContractMode = ProjectionContractMode
             };
             binder.Bind(_asyncTypeModule);
             _boundSourceExtensionCallTargets = binder.SourceExtensionCallTargets;
@@ -9140,7 +9148,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
                 var binder = new Binder(new Diagnostics.DiagnosticBag())
                 {
                     CrossModuleFunctionModules = CrossModuleFunctionModules,
-                    ResolveSourceCallConversions = AnnotateSource is null
+                    ResolveSourceCallConversions = AnnotateSource is null,
+                    ProjectionContractMode = ProjectionContractMode
                 };
                 binder.Bind(_asyncTypeModule);
                 _boundCrossModuleCallTargets = binder.CrossModuleCallTargets;
