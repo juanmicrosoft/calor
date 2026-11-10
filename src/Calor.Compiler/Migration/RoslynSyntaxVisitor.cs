@@ -12449,35 +12449,31 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.RecordFeatureUsage("default-expression");
         _context.IncrementConverted();
         // #1528: dispatch on the resolved type, not its spelling (`using Single = System.Int32;`).
-        var typeName = _semanticModel?.GetTypeInfo(defaultExpr.Type).Type?.SpecialType switch
-        {
-            null => defaultExpr.Type.ToString(),
-            SpecialType.System_Int32 => "int",
-            SpecialType.System_Int64 => "long",
-            SpecialType.System_Int16 => "short",
-            SpecialType.System_Byte => "byte",
-            SpecialType.System_Double => "double",
-            SpecialType.System_Single => "float",
-            SpecialType.System_Decimal => "decimal",
-            SpecialType.System_Boolean => "bool",
-            SpecialType.System_String => "string",
-            _ => ""
-        };
-        return typeName switch
-        {
-            "int" or "Int32" => new IntLiteralNode(GetTextSpan(defaultExpr), 0),
-            "long" or "Int64" => new IntLiteralNode(GetTextSpan(defaultExpr), 0) { IsLong = true },
-            "short" or "byte" => new TypeOperationNode(GetTextSpan(defaultExpr), TypeOp.Cast,
-                new IntLiteralNode(GetTextSpan(defaultExpr), 0), TypeMapper.CSharpToCalor(typeName)),
-            // #1528: keep the literal's width; a plain 0.0 is a double.
-            "double" or "Double" => new FloatLiteralNode(GetTextSpan(defaultExpr), 0.0),
-            "float" or "Single" => new FloatLiteralNode(GetTextSpan(defaultExpr), 0.0) { IsSingle = true },
-            "decimal" or "Decimal" => new DecimalLiteralNode(GetTextSpan(defaultExpr), 0m),
-            "bool" or "Boolean" => new BoolLiteralNode(GetTextSpan(defaultExpr), false),
-            "string" or "String" => new ReferenceNode(GetTextSpan(defaultExpr), "null"),
-            _ => DefaultValue(defaultExpr, GetTextSpan(defaultExpr))
-        };
+        var type = _semanticModel?.GetTypeInfo(defaultExpr.Type).Type;
+        var typeName = type == null ? defaultExpr.Type.ToString()
+            : type.SpecialType == SpecialType.None ? ""
+            : type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+        return PrimitiveDefaultValue(typeName, GetTextSpan(defaultExpr))
+            ?? DefaultValue(defaultExpr, GetTextSpan(defaultExpr));
     }
+
+    private static ExpressionNode? PrimitiveDefaultValue(string typeName, TextSpan span)
+        => typeName switch
+        {
+            "int" or "Int32" => new IntLiteralNode(span, 0),
+            "long" or "Int64" => new IntLiteralNode(span, 0) { IsLong = true },
+            "sbyte" or "byte" or "short" or "ushort" or "uint" or "ulong" or "nint" or "nuint" or "char" =>
+                new TypeOperationNode(span, TypeOp.Cast, new IntLiteralNode(span, 0), typeName),
+            "IntPtr" => new TypeOperationNode(span, TypeOp.Cast, new IntLiteralNode(span, 0), "nint"),
+            "UIntPtr" => new TypeOperationNode(span, TypeOp.Cast, new IntLiteralNode(span, 0), "nuint"),
+            // #1528: keep the literal's width; a plain 0.0 is a double.
+            "double" or "Double" => new FloatLiteralNode(span, 0.0),
+            "float" or "Single" => new FloatLiteralNode(span, 0.0) { IsSingle = true },
+            "decimal" or "Decimal" => new DecimalLiteralNode(span, 0m),
+            "bool" or "Boolean" => new BoolLiteralNode(span, false),
+            "string" or "String" => new ReferenceNode(span, "null"),
+            _ => null
+        };
 
     private ExpressionNode ConvertTupleExpression(TupleExpressionSyntax tuple)
     {
@@ -12859,17 +12855,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 || Parsing.AttributeHelper.ExpandType(named.Name) != named.Name);
 
     /// <summary>
-    /// #1574 item 2: Calor's `default` is also how a member named <c>@default</c> is written, and the
-    /// C# emitter writes it as <c>@default</c> when such a member exists. A converted <c>default</c>
-    /// (an uninitialized local, a default literal or <c>default(T)</c>) is therefore emitted only when
-    /// no symbol named <c>default</c> is visible at <paramref name="at"/> or declared, at any
-    /// accessibility, in a containing type or its base types (#1573); otherwise the statement is
-    /// kept as C#.
+    /// Resolve primitive literal defaults from their contextual type. Keep the existing
+    /// conservative C# preservation boundary when a member named <c>@default</c> is visible
+    /// or declared in a containing or base type (#1573/#1574), rather than binding to that name.
     /// </summary>
-    private ReferenceNode DefaultValue(SyntaxNode at, TextSpan span)
+    private ExpressionNode DefaultValue(SyntaxNode at, TextSpan span)
     {
         if (DefaultNameCollides(at))
             throw EscalateExpression(at, "default-member-collision");
+        if (at is LiteralExpressionSyntax literal && literal.IsKind(SyntaxKind.DefaultLiteralExpression)
+            && _semanticModel?.GetTypeInfo(literal).ConvertedType is
+                { IsValueType: true, SpecialType: not SpecialType.None } convertedType
+            && PrimitiveDefaultValue(convertedType.ToDisplayString(
+                SymbolDisplayFormat.MinimallyQualifiedFormat), span) is { } primitive)
+            return primitive;
         if (at is LocalDeclarationStatementSyntax local)
         {
             var type = TypeMapper.ToSurfaceType(MapDeclarationType(local.Declaration.Type));

@@ -229,8 +229,9 @@ public class ConverterImprovementTests
         var cls = Assert.Single(result.Ast!.Classes);
         var method = Assert.Single(cls.Methods);
         var ret = Assert.IsType<ReturnStatementNode>(method.Body[0]);
-        var refNode = Assert.IsType<ReferenceNode>(ret.Expression);
-        Assert.Equal("default", refNode.Name);
+        var zero = Assert.IsType<IntLiteralNode>(ret.Expression);
+        Assert.Equal(0, zero.Value);
+        Assert.Empty(result.Losses);
     }
 
     [Fact]

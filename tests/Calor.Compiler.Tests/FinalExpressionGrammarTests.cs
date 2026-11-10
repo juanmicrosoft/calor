@@ -94,6 +94,116 @@ public sealed class FinalExpressionGrammarTests
     }
 
     [Theory]
+    [InlineData("sbyte", typeof(sbyte))]
+    [InlineData("byte", typeof(byte))]
+    [InlineData("short", typeof(short))]
+    [InlineData("ushort", typeof(ushort))]
+    [InlineData("int", typeof(int))]
+    [InlineData("uint", typeof(uint))]
+    [InlineData("long", typeof(long))]
+    [InlineData("ulong", typeof(ulong))]
+    [InlineData("nint", typeof(nint))]
+    [InlineData("nuint", typeof(nuint))]
+    [InlineData("char", typeof(char))]
+    [InlineData("float", typeof(float))]
+    [InlineData("double", typeof(double))]
+    [InlineData("decimal", typeof(decimal))]
+    [InlineData("bool", typeof(bool))]
+    public void ConvertedPrimitiveDefaultLiterals_RetainClrValueWidthAndOverload(string spelling, Type expectedType)
+    {
+        var source = $$"""
+            public static class Probe
+            {
+                public static {{spelling}} Read() => default;
+                private static string Select({{spelling}} value) => "typed";
+                private static string Select(object value) => "object";
+                public static string Run() => Select(default);
+            }
+            """;
+        var converted = new CSharpToCalorConverter().Convert(source);
+        Assert.True(converted.Success, string.Join(Environment.NewLine, converted.Issues));
+        Assert.Empty(converted.Losses);
+        RawFrameAssertions.AssertFramed(converted.CalorSource!, present: false);
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(converted.CalorSource!, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+        var generated = new List<string> { source };
+        foreach (var calor in new[] { converted.CalorSource!, new CalorEmitter().Emit(module) })
+        {
+            var compiled = Program.Compile(calor, "contextual-default.calr",
+                new CompilationOptions { StatusWriter = TextWriter.Null });
+            Assert.False(compiled.HasErrors, string.Join(Environment.NewLine, compiled.Diagnostics.Errors));
+            generated.Add(compiled.GeneratedCode);
+        }
+        foreach (var csharp in generated)
+        {
+            var compilation = CSharpCompilation.Create("ContextualDefault_" + Guid.NewGuid().ToString("N"),
+                [CSharpSyntaxTree.ParseText(csharp)], GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var emitted = compilation.Emit(stream);
+            Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+            var probe = Assembly.Load(stream.ToArray()).GetType("Probe")!;
+            var read = probe.GetMethod("Read")!;
+            Assert.Equal(expectedType, read.ReturnType);
+            Assert.Equal(Activator.CreateInstance(expectedType), read.Invoke(null, null));
+            Assert.Equal("typed", probe.GetMethod("Run")!.Invoke(null, null));
+        }
+    }
+
+    [Theory]
+    [InlineData("value")]
+    [InlineData("enum")]
+    [InlineData("generic")]
+    [InlineData("collision")]
+    public void ConvertedDefaultLiterals_KeepUnsupportedTypesAndCollisionsPreserved(string kind)
+    {
+        var declaration = kind switch
+        {
+            "value" => "public struct Value { public int N; public Value() { N = 9; } }",
+            "enum" => "public enum Value { One = 1 }",
+            "collision" => "public class Base { protected int @default = 3; }",
+            _ => ""
+        };
+        var type = kind is "value" or "enum" ? "Value" : kind == "generic" ? "T" : "int";
+        var parameters = kind == "generic" ? "<T>" : "";
+        var baseType = kind == "collision" ? " : Base" : "";
+        var observation = kind switch
+        {
+            "value" => "Read().N",
+            "enum" => "(int)Read()",
+            "generic" => "Read<int>()",
+            _ => "Read()"
+        };
+        var source = $$"""
+            {{declaration}}
+            public class Probe{{baseType}}
+            {
+                public static {{type}} Read{{parameters}}() => default;
+                public static int Run() => {{observation}};
+            }
+            """;
+        var converted = new CSharpToCalorConverter().Convert(source);
+        Assert.True(converted.Success, string.Join(Environment.NewLine, converted.Issues));
+        Assert.Contains(converted.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
+        RawFrameAssertions.AssertFramed(converted.CalorSource!, present: true);
+        var compiled = Program.Compile(converted.CalorSource!, "preserved-default.calr",
+            new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
+        Assert.False(compiled.HasErrors, string.Join(Environment.NewLine, compiled.Diagnostics.Errors));
+        foreach (var csharp in new[] { source, compiled.GeneratedCode })
+        {
+            var compilation = CSharpCompilation.Create("PreservedDefault_" + Guid.NewGuid().ToString("N"),
+                [CSharpSyntaxTree.ParseText(csharp)], GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var emitted = compilation.Emit(stream);
+            Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+            var run = Assembly.Load(stream.ToArray()).GetType("Probe")!.GetMethod("Run")!;
+            Assert.Equal(0, run.Invoke(null, null));
+        }
+    }
+
+    [Theory]
     [InlineData("default(T)")]
     [InlineData("default(int?)")]
     [InlineData("default(System.Int32)")]

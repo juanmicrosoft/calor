@@ -61,6 +61,11 @@ its initialization order and exception behavior to the CLR.
 
 ### Numeric and character literals
 
+C# migration resolves a primitive `default` literal from its contextual type
+and emits the corresponding zero or `false`, retaining its numeric width and
+overload selection. In authored native code, use `default(int)` or another
+supported primitive type rather than a bare `default` identifier.
+
 Integer literals accept decimal or hexadecimal digits and `_` separators.
 Use `L`, `U`, or `UL` to request signed 64-bit, unsigned 32-bit or unsigned
 64-bit values. A signed `L` literal never becomes unsigned to accommodate a
