@@ -528,7 +528,7 @@ public sealed class Binder
                         .ToDictionary(parameter => parameter.Name, StringComparer.Ordinal);
             _metadataTypeParameterScopes.Add(_declarationContext, symbols);
         }
-        return symbols.GetValueOrDefault(name);
+        return symbols.GetValueOrDefault(name.TrimStart('@'));
     }
 
     private Metadata.MetadataBinderResult? TryResolveInstanceArrayCall(
@@ -5956,6 +5956,7 @@ public sealed class Binder
             && string.Equals(existing.TypeName, typeName, StringComparison.OrdinalIgnoreCase))
             return;
 
+        var inferredReferenceType = isTypeInferred ? GetInferredReferenceType(inferredValue) : null;
         var symbol = binding ?? CreateLocalVariable(
             name,
             typeName,
@@ -5964,9 +5965,12 @@ public sealed class Binder
             ParameterModifier.None,
             span,
             "pattern",
-            nullableAnnotation: nullableAnnotation,
+            nullableAnnotation: isTypeInferred
+                ? inferredReferenceType?.NullableAnnotation
+                    ?? InferAnnotationForStringBinding(null, typeName, inferredValue)
+                : nullableAnnotation,
             isTypeInferred: isTypeInferred,
-            inferredReferenceType: isTypeInferred ? GetInferredReferenceType(inferredValue) : null,
+            inferredReferenceType: inferredReferenceType,
             hasUnknownInferredType: isTypeInferred && (inferredValue is null
                 || inferredValue.HasUnknownInferredType
                 || inferredValue.Type is BoundTypes.UnresolvedBoundType
@@ -6198,6 +6202,9 @@ public sealed class Binder
                 receiver = new BoundVariableExpression(unresolved.Span, unresolved.Variable,
                     typeOverride: new BoundTypes.UnresolvedBoundType(
                         $"Undefined receiver '{sourceReceiver}'", reported: true));
+            else if (receiver is BoundVariableExpression { HasUnknownInferredType: true } inferred
+                && sourceTarget is not null)
+                receiver = BuildCallReceiver(sourceTarget, member.Target.Span, inferred.Variable, null, null);
             return BindCallExpression(new CallExpressionNode(call.Span,
                 "<expression-call>", call.Arguments, call.ArgumentNames, call.ArgumentModifiers,
                 call.TypeArguments, member.FieldNameSpan, member.Target.Span), receiver, member.FieldName);
@@ -8036,7 +8043,7 @@ public sealed class Binder
                      _currentMemberTypeParameters ?? Array.Empty<TypeParameterNode>(),
                      _currentClass?.TypeParameters ?? Array.Empty<TypeParameterNode>()))
         {
-            if (!string.Equals(parameter.Name, name, StringComparison.Ordinal))
+            if (!string.Equals(parameter.Name, name.TrimStart('@'), StringComparison.Ordinal))
                 continue;
             return parameter.Constraints
                 .Where(constraint => constraint.Kind is TypeConstraintKind.Interface
@@ -8090,6 +8097,11 @@ public sealed class Binder
             return false;
 
         if (GetTypeParameterConstraints(head) != null)
+            return false;
+
+        if (TryBuildReferenceType(head, _currentClassName, _currentNamespaceIdentity,
+                _currentMemberTypeParameters?.Select(parameter => parameter.Name))
+            is { RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_Object })
             return false;
 
         return ResolveClass(head) == null

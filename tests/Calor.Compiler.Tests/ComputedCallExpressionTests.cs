@@ -66,14 +66,14 @@ public sealed class ComputedCallExpressionTests
     {
         var (_, bound, _) = Bind("""
             module GenericCharIndex
-              func Test<String> (String:text) → string
+              func Test<@String> (@String:text) → string
                 return text[0].ToString()
             """);
         var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
         Assert.Null(call.ResolvedMetadataMethod);
         Assert.True(Program.Compile("""
             module GenericCharIndex
-              func Test<String> (String:text) → string
+              func Test<@String> (@String:text) → string
                 return text[0].ToString()
             """).HasErrors);
     }
@@ -98,13 +98,13 @@ public sealed class ComputedCallExpressionTests
     public void IndexedDeclaredField_PreservesExecutableCSharp()
     {
         var (ast, _, diagnostics) = Bind("""
-            §M{Probe}
-              §CL{Chain:pub}
-                §FLD{List<string>:_memberNames:priv:readonly} = §NEW{List<string>} §A 2 §/NEW
-                §MT{Run:pub} () -> str
-                  §C{_memberNames.Add} §A "root" §/C
-                  §B{last:str} §IDX{_memberNames} 0
-                  §R §IDX{_memberNames} 0
+            module Probe Probe
+              class Chain public
+                field List<string>:_memberNames private readonly = new List<string>(2)
+                func Run public () → string
+                  _memberNames.Add("root")
+                  let string:last = _memberNames[0]
+                  return _memberNames[0]
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         const string original = """
@@ -143,14 +143,14 @@ public sealed class ComputedCallExpressionTests
     public void IndexedDeclaredField_PreservesStringPayloadNullability(bool nullable, bool throughThis)
     {
         var element = nullable ? "string?" : "string";
-        var receiver = throughThis ? "§THIS._memberNames" : "_memberNames";
+        var receiver = throughThis ? "this._memberNames" : "_memberNames";
         var (_, bound, diagnostics) = Bind($$"""
-            §M{Test}
-              §CL{Chain:pub}
-                §FLD{List<{{element}}>:_memberNames:priv:readonly} = §NEW{List<{{element}}>} §A 2 §/NEW
-                §MT{Last:pub} () -> str
-                  §B{last:str} §IDX {{receiver}} 0
-                  §R §IDX {{receiver}} 0
+            module Test
+              class Chain public
+                field List<{{element}}>:_memberNames private readonly = new List<{{element}}>(2)
+                func Last public () → string
+                  let string:last = {{receiver}}[0]
+                  return {{receiver}}[0]
             """);
         Assert.Equal(nullable, diagnostics.Errors.Any(diagnostic =>
             diagnostic.Code == DiagnosticCode.NullableToNonNullableBinding));
@@ -170,20 +170,20 @@ public sealed class ComputedCallExpressionTests
     [Theory]
     [InlineData("items", false)]
     [InlineData("items", true)]
-    [InlineData("§C{Make} §/C", false)]
-    [InlineData("§C{Make} §/C", true)]
+    [InlineData("Make()", false)]
+    [InlineData("Make()", true)]
     public void IndexedInferredCollection_PreservesKnownStringPayload(string initializer, bool nullable)
     {
         var element = nullable ? "string?" : "string";
         var (_, bound, diagnostics) = Bind($$"""
-            §M{Test}
-              §F{Use:pub} (List<{{element}}>:items) -> str
-                §B{source} {{initializer}}
-                §B{value} §IDX{source} 0
-                §B{copy:str} value
-                §R value
-              §F{Make:pub} () -> List<{{element}}>
-                §R §NEW{List<{{element}}>} §/NEW
+            module Test
+              func Use public (List<{{element}}>:items) → string
+                let source = {{initializer}}
+                let value = source[0]
+                let string:copy = value
+                return value
+              func Make public () → List<{{element}}>
+                return new List<{{element}}>()
             """);
         Assert.Equal(nullable, diagnostics.Errors.Any(diagnostic =>
             diagnostic.Code == DiagnosticCode.NullableToNonNullableBinding));
@@ -202,12 +202,12 @@ public sealed class ComputedCallExpressionTests
     public void IndexedDeclaredReference_PreservesPayloadIdentityAndNullability(bool nullable)
     {
         var (_, bound, diagnostics) = Bind($$"""
-            §M{Test}
-              §F{Use:pub} (List<{{(nullable ? "?Widget" : "Widget")}}>:items) -> Widget
-                §B{value} §IDX{items} 0
-                §B{copy:Widget} value
-                §R value
-              §CL{Widget:pub}
+            module Test
+              func Use public (List<{{(nullable ? "Widget?" : "Widget")}}>:items) → Widget
+                let value = items[0]
+                let Widget:copy = value
+                return value
+              class Widget public
             """);
         Assert.Equal(nullable, diagnostics.Errors.Any(diagnostic =>
             diagnostic.Code == DiagnosticCode.NullableToNonNullableBinding));
@@ -222,40 +222,40 @@ public sealed class ComputedCallExpressionTests
     }
 
     [Theory]
-    [InlineData("(§C{External.Make} §/C).Value", false)]
-    [InlineData("(§IDX §C{External.GetFields} §/C 0).Value", false)]
-    [InlineData("§AWAIT §C{External.MakeAsync} §/C", false)]
-    [InlineData("§AWAIT input", false)]
-    [InlineData("(?? §C{External.Make} §/C input)", false)]
-    [InlineData("(?? §C{External.Make} §/C null)", false)]
-    [InlineData("(?? null §C{External.Make} §/C)", false)]
-    [InlineData("(§NEW{Holder} §/NEW).Value", true)]
-    [InlineData("(cast Holder §C{External.Make} §/C).Value", true)]
-    [InlineData("§AWAIT task", true)]
-    [InlineData("§AWAIT valueTask", true)]
-    [InlineData("§AWAIT (cast Task<object> §C{External.Make} §/C)", true)]
-    [InlineData("(?? null input)", true)]
-    [InlineData("(?? input null)", true)]
-    [InlineData("(?? null (cast object §C{External.Make} §/C))", true)]
+    [InlineData("External.Make().Value", false)]
+    [InlineData("External.GetFields()[0].Value", false)]
+    [InlineData("await External.MakeAsync()", false)]
+    [InlineData("await input", false)]
+    [InlineData("External.Make() ?? input", false)]
+    [InlineData("External.Make() ?? null", false)]
+    [InlineData("null ?? External.Make()", false)]
+    [InlineData("new Holder().Value", true)]
+    [InlineData("((Holder)External.Make()).Value", true)]
+    [InlineData("await task", true)]
+    [InlineData("await valueTask", true)]
+    [InlineData("await (Task<object>)External.Make()", true)]
+    [InlineData("null ?? input", true)]
+    [InlineData("input ?? null", true)]
+    [InlineData("null ?? (object)External.Make()", true)]
     public void WrapperResultInference_RetainsOnlyEstablishedAuthority(string initializer, bool knownResult)
     {
         var (ast, bound, diagnostics) = Bind($$"""
-            §M{Test}
-              §F{Use:pub} (object:input, Task<object>:task, ValueTask<object>:valueTask) -> void
-                §E{}
-                §B{value} {{initializer}}
-                §B{alias} value
-                §C{alias.ToString} §/C
-                §C{Pick} §A alias §/C
-              §F{Pick:pub} (object:item) -> void
-                §E{}
-              §CL{Holder:pub:struct}
-                §FLD{object:Value:pub}
+            module Test
+              func Use public (object:input, Task<object>:task, ValueTask<object>:valueTask, External:External) → void
+                !
+                let value = {{initializer}}
+                let alias = value
+                alias.ToString()
+                Pick(alias)
+              func Pick public (object:item) → void
+                !
+              class Holder public struct
+                field object:Value public
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
-        var calls = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallStatement>().ToArray();
-        var receiverCall = calls.Single(call => call.Target == "alias.ToString");
+        var calls = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>().ToArray();
+        var receiverCall = MemberCall(use, "alias", "ToString");
         var pick = calls.Single(call => call.Target == "Pick");
         Assert.Equal(!knownResult, Assert.Single(pick.Arguments).HasUnknownInferredType);
         if (knownResult)
@@ -296,32 +296,31 @@ public sealed class ComputedCallExpressionTests
         string family, bool sourceDeclared, bool hasIndexer, bool bclQualified)
     {
         var typeName = (bclQualified ? "System.Collections.Generic." : sourceDeclared ? "" : "Foreign.")
-            + family + (family == "List" ? "<object>" : "<str,object>");
+            + family + (family == "List" ? "<object>" : "<string,object>");
         var index = family == "List" ? "0" : "\"key\"";
         var declaration = sourceDeclared
-            ? $"  §CL{{{family}:pub}}<{(family == "List" ? "T" : "K,V")}>\n"
+            ? $"  class {family}<{(family == "List" ? "T" : "K,V")}> public\n"
                 + (hasIndexer ? $$"""
-                        §IXER{i32:pub}
-                          §I{{{(family == "List" ? "i32" : "str")}}:index}
-                          §GET
-                            §R 1
+                        this[{{(family == "List" ? "int" : "string")}}:index] → int public
+                          get
+                            return 1
                     """ : "")
             : "";
         var (ast, bound, diagnostics) = Bind($$"""
-            §M{Test}
-              §F{Use:pub} ({{typeName}}:items) -> void
-                §E{}
-                §B{element} §IDX{items} {{index}}
-                §C{element.ToString} §/C
-                §C{Pick} §A element §/C
-              §F{Pick:pub} (object:item) -> void
-                §E{}
+            module Test
+              func Use public ({{typeName}}:items) → void
+                !
+                let element = items[{{index}}]
+                element.ToString()
+                Pick(element)
+              func Pick public (object:item) → void
+                !
             {{declaration}}
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
-        var calls = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallStatement>().ToArray();
-        var receiverCall = calls.Single(call => call.Target == "element.ToString");
+        var calls = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>().ToArray();
+        var receiverCall = MemberCall(use, "element", "ToString");
         var pick = calls.Single(call => call.Target == "Pick");
         if (bclQualified)
         {
@@ -346,23 +345,23 @@ public sealed class ComputedCallExpressionTests
     }
 
     [Theory]
-    [InlineData(false, "[object]", "object", false)]
+    [InlineData(false, "object[]", "object", false)]
     [InlineData(false, "List<object>", "object", false)]
-    [InlineData(true, "[object]", "object", false)]
+    [InlineData(true, "object[]", "object", false)]
     [InlineData(true, "List<object>", "object", false)]
     [InlineData(true, "System.Collections.Generic.List<object>", "object", false)]
     [InlineData(true, "IList<object>", "object", false)]
     [InlineData(true, "System.Collections.Generic.IList<object>", "object", false)]
     [InlineData(true, "IReadOnlyList<object>", "object", false)]
     [InlineData(true, "System.Collections.Generic.IReadOnlyList<object>", "object", false)]
-    [InlineData(true, "Dictionary<str,object>", "object", false)]
-    [InlineData(true, "System.Collections.Generic.Dictionary<str,object>", "object", false)]
-    [InlineData(true, "IDictionary<str,object>", "object", false)]
-    [InlineData(true, "System.Collections.Generic.IDictionary<str,object>", "object", false)]
-    [InlineData(true, "IReadOnlyDictionary<str,object>", "object", false)]
-    [InlineData(true, "System.Collections.Generic.IReadOnlyDictionary<str,object>", "object", false)]
-    [InlineData(true, "[i32]", "i32", false)]
-    [InlineData(true, "List<i32>", "i32", false)]
+    [InlineData(true, "Dictionary<string,object>", "object", false)]
+    [InlineData(true, "System.Collections.Generic.Dictionary<string,object>", "object", false)]
+    [InlineData(true, "IDictionary<string,object>", "object", false)]
+    [InlineData(true, "System.Collections.Generic.IDictionary<string,object>", "object", false)]
+    [InlineData(true, "IReadOnlyDictionary<string,object>", "object", false)]
+    [InlineData(true, "System.Collections.Generic.IReadOnlyDictionary<string,object>", "object", false)]
+    [InlineData(true, "int[]", "int", false)]
+    [InlineData(true, "List<int>", "int", false)]
     [InlineData(true, "object", "object", false)]
     [InlineData(true, "UnresolvedCollection<object>", "object", false)]
     [InlineData(true, "IEnumerable<object>", "object", false)]
@@ -374,21 +373,21 @@ public sealed class ComputedCallExpressionTests
     {
         var index = collectionType.Contains("Dictionary", StringComparison.Ordinal) ? "\"key\"" : "0";
         var (ast, bound, diagnostics) = Bind($$"""
-            §M{Test}
-              §F{Use:pub} ({{collectionType}}:items) -> void
-                §E{}
-                §B{source} {{(known ? "items" : "§C{External.GetFields} §/C")}}
-                §B{element} {{(multiDimensional ? "§IDX2D source 0 0" : $"§IDX{{source}} {index}")}}
-                §B{alias} element
-                §C{alias.ToString} §/C
-                §C{Pick} §A alias §/C
-              §F{Pick:pub} ({{elementType}}:item) -> void
-                §E{}
+            module Test
+              func Use public ({{collectionType}}:items, External:External) → void
+                !
+                let source = {{(known ? "items" : "External.GetFields()")}}
+                let element = source[{{(multiDimensional ? "0, 0" : index)}}]
+                let alias = element
+                alias.ToString()
+                Pick(alias)
+              func Pick public ({{elementType}}:item) → void
+                !
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
-        var calls = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallStatement>().ToArray();
-        var receiverCall = calls.Single(call => call.Target == "alias.ToString");
+        var calls = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>().ToArray();
+        var receiverCall = MemberCall(use, "alias", "ToString");
         var pick = calls.Single(call => call.Target == "Pick");
         if (known && collectionType is not ("object" or "UnresolvedCollection<object>" or "IEnumerable<object>"))
         {
@@ -429,32 +428,31 @@ public sealed class ComputedCallExpressionTests
     public void OpaqueExpressionInference_DoesNotAcquireObjectAuthority(string kind, bool explicitType)
     {
         const string rawCode = "(new object())";
-        var diagnostics = new DiagnosticBag();
-        var ast = new Parser(new Lexer($$"""
-            §M{Test}
-              §F{Use:pub} () -> void
-                §E{}
-                §B{value{{(explicitType ? ":object" : "")}}} {{(kind == "native" ? "§NEW{object} §/NEW" : $"§CS{{{rawCode}}}")}}
-                §B{alias} value
-                §C{alias.ToString} §/C
-                §C{Pick} §A alias §/C
-                §B{text} §C{System.Convert.ToString} §A alias §/C
-              §F{Pick:pub} (object:item) -> void
-                §E{}
-            """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
-        if (kind == "fallback")
+        var ast = Parse($$"""
+            module Test
+              func Use public () → void
+                !
+                let {{(explicitType ? "object:" : "")}}value = new object()
+                let alias = value
+                alias.ToString()
+                Pick(alias)
+                let text = System.Convert.ToString(alias)
+              func Pick public (object:item) → void
+                !
+            """);
+        if (kind != "native")
         {
             var use = ast.Functions[0];
             var body = use.Body.Select(statement =>
-                statement is BindStatementNode { Initializer: RawCSharpExpressionNode raw } binding
-                    ? new BindStatementNode(binding.Span, binding.Name, binding.TypeName, binding.IsMutable,
-                        new FallbackExpressionNode(raw.Span, raw.CSharpCode, "opaque-test"),
-                        binding.Attributes, binding.IdentifierSpan, binding.TypeNameSpan)
+                statement is BindStatementNode { Name: "value", Initializer: { } initializer } binding
+                    ? binding.CopyMetadataTo(new BindStatementNode(binding.Span, binding.Name, binding.TypeName, binding.IsMutable,
+                        kind == "raw" ? new RawCSharpExpressionNode(initializer.Span, rawCode)
+                            : new FallbackExpressionNode(initializer.Span, rawCode, "opaque-test"),
+                        binding.Attributes, binding.IdentifierSpan, binding.TypeNameSpan))
                     : statement).ToArray();
-            ast = new ModuleNode(ast.Span, ast.Id, ast.Name, [],
-                [new FunctionNode(use.Span, use.Id, use.Name, use.Visibility, use.Parameters,
-                    use.Output, use.Effects, body, use.Attributes), ast.Functions[1]], ast.Attributes);
+            ast = WithBody(ast, use, body);
         }
+        var diagnostics = new DiagnosticBag();
         var bound = new Binder(diagnostics).Bind(ast);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         if (kind != "native")
@@ -464,11 +462,11 @@ public sealed class ComputedCallExpressionTests
             Assert.True(interop.HasUnknownInferredType);
         }
         var useBound = bound.Functions.Single(function => function.Symbol.Name == "Use");
-        var calls = BoundNodeHelpers.DescendantsAndSelf(useBound).OfType<BoundCallStatement>().ToArray();
-        var receiverCall = calls.Single(call => call.Target == "alias.ToString");
+        var calls = BoundNodeHelpers.DescendantsAndSelf(useBound).OfType<BoundCallExpression>().ToArray();
+        var receiverCall = MemberCall(useBound, "alias", "ToString");
         var pick = calls.Single(call => call.Target == "Pick");
         var metadataCall = BoundNodeHelpers.DescendantsAndSelf(useBound).OfType<BoundCallExpression>()
-            .Single(call => call.Target == "System.Convert.ToString");
+            .Single(call => call.ResolvedTypeName == "System.Convert" && call.ResolvedMethodName == "ToString");
         if (explicitType || kind == "native")
         {
             Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.SignatureUnresolved);
@@ -501,15 +499,37 @@ public sealed class ComputedCallExpressionTests
     public void OpaqueExpressionInference_PreservesExecutableCSharp()
     {
         const string rawCode = "(new Witness { Value = 7 })";
-        var (ast, bound, diagnostics) = Bind($$"""
-            §M{Probe}
-              §CL{Runner:pub}
-                §MT{Run:pub:static} () -> i32
-                  §B{validator} §CS{{{rawCode}}}
-                  §R §C{Pick} §A validator §/C
-                §MT{Pick:priv:static} (Witness:validator) -> i32
-                  §R validator.Value
+        var ast = Parse("""
+            module Probe Probe
+              class Runner public
+                func Run public static () → int
+                  let validator = new Witness()
+                  return Pick(validator)
+                func Pick private static (Witness:validator) → int
+                  return validator.Value
             """);
+        var runner = Assert.Single(ast.Classes);
+        var run = runner.Methods[0];
+        var binding = Assert.IsType<BindStatementNode>(run.Body[0]);
+        var opaqueBinding = binding.CopyMetadataTo(new BindStatementNode(binding.Span, binding.Name, binding.TypeName,
+            binding.IsMutable, new RawCSharpExpressionNode(binding.Initializer!.Span, rawCode),
+            binding.Attributes, binding.IdentifierSpan, binding.TypeNameSpan));
+        var opaqueRun = run.CopyMetadataTo(new MethodNode(run.Span, run.Id, run.Name, run.Visibility, run.Modifiers,
+            run.TypeParameters, run.Parameters, run.Output, run.Effects, run.Preconditions, run.Postconditions,
+            [opaqueBinding, run.Body[1]], run.Attributes, run.CSharpAttributes, identifierSpan: run.IdentifierSpan));
+        var opaqueRunner = runner.CopyMetadataTo(new ClassDefinitionNode(runner.Span, runner.Id, runner.Name,
+            runner.IsAbstract, runner.IsSealed, runner.IsPartial, runner.IsStatic, runner.BaseClass,
+            runner.ImplementedInterfaces, runner.TypeParameters, runner.Fields, runner.Properties, runner.Constructors,
+            [opaqueRun, runner.Methods[1]], runner.Events, runner.OperatorOverloads, runner.Attributes,
+            runner.CSharpAttributes, visibility: runner.Visibility, identifierSpan: runner.IdentifierSpan,
+            items: [opaqueRun, runner.Methods[1]]));
+        ast = ast.With(module =>
+        {
+            module.Classes = [opaqueRunner];
+            module.Items = ast.Items.Select(item => ReferenceEquals(item, runner) ? opaqueRunner : item).ToArray();
+        });
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(ast);
         Assert.DoesNotContain(diagnostics.Errors, diagnostic =>
             diagnostic.Code == DiagnosticCode.NoMatchingOverload);
         var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
@@ -548,31 +568,30 @@ public sealed class ComputedCallExpressionTests
     }
 
     [Theory]
-    [InlineData(false, false, "[object]")]
-    [InlineData(false, true, "[object]")]
-    [InlineData(true, false, "[object]")]
-    [InlineData(true, true, "[object]")]
+    [InlineData(false, false, "object[]")]
+    [InlineData(false, true, "object[]")]
+    [InlineData(true, false, "object[]")]
+    [InlineData(true, true, "object[]")]
     [InlineData(true, false, "IEnumerable<object>")]
     [InlineData(true, false, "List<object>")]
     public void ForeachElementInference_DistinguishesUnknownFromActualObject(
         bool known, bool explicitType, string collectionType)
     {
         var (ast, bound, diagnostics) = Bind($$"""
-            §M{Test}
-              §F{Use:pub} ({{collectionType}}:items) -> void
-                §E{}
-                §B{source} {{(known ? "items" : "§C{External.GetTypes} §/C")}}
-                §EACH{value{{(explicitType ? ":object" : "")}}} source
-                  §C{value.ToString} §/C
-                  §C{Pick} §A value §/C
-              §F{Pick:pub} (object:item) -> void
-                §E{}
+            module Test
+              func Use public ({{collectionType}}:items, External:External) → void
+                !
+                let source = {{(known ? "items" : "External.GetTypes()")}}
+                each {{(explicitType ? "object:" : "")}}value in source
+                  value.ToString()
+                  Pick(value)
+              func Pick public (object:item) → void
+                !
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
-        var receiverCall = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallStatement>()
-            .Single(call => call.Target == "value.ToString");
-        var pick = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallStatement>()
+        var receiverCall = MemberCall(use, "value", "ToString");
+        var pick = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>()
             .Single(call => call.Target == "Pick");
         if (known || explicitType)
         {
@@ -601,36 +620,43 @@ public sealed class ComputedCallExpressionTests
     [Fact]
     public void NestedUnknownForeachElements_RetainEveryReceiverWarningAndRejectAuthority()
     {
-        var (ast, bound, diagnostics) = Bind("""
-            §M{Test}
-              §F{Use:pub} (System.Reflection.Assembly:assembly) -> void
-                §E{}
-                §EACH{type} §C{assembly.GetTypes} §/C
-                  §C{type.GetInterfaces} §/C
-                  §C{type.GetGenericArguments} §/C
-                  §EACH{interface} §C{type.GetInterfaces} §/C
-                    §C{interface.GetGenericArguments} §/C
-                    §C{Pick} §A interface §/C
-              §F{Pick:pub} (object:item) -> void
-                §E{}
+        var ast = Parse("""
+            module Test
+              func Use public (System.Reflection.Assembly:assembly) → void
+                !
+                each type in assembly.GetTypes()
+                  type.GetInterfaces()
+                  type.GetGenericArguments()
+                  each @interface in type.GetInterfaces()
+                    @interface.GetGenericArguments()
+                    Pick(@interface)
+              func Pick public (object:item) → void
+                !
             """);
+        var function = ast.Functions[0];
+        var loop = Assert.IsType<ForeachStatementNode>(Assert.Single(function.Body));
+        var nativeProducer = Assert.IsType<ExpressionCallNode>(loop.Collection);
+        var member = Assert.IsType<FieldAccessNode>(nativeProducer.TargetExpression);
+        // The named-call SDK boundary deliberately has no Type[] result authority.
+        var namedProducer = new CallExpressionNode(nativeProducer.Span, "assembly.GetTypes", [], null, null, null,
+            calleeSpan: member.FieldNameSpan, receiverSpan: member.Target.Span);
+        var sdkLoop = loop.CopyMetadataTo(new ForeachStatementNode(loop.Span, loop.Id, loop.VariableName,
+            loop.VariableType, namedProducer, loop.Body, loop.Attributes, loop.IndexVariableName,
+            loop.VariableSpan, loop.IndexVariableSpan, loop.VariableTypeSpan));
+        ast = WithBody(ast, function, [sdkLoop]);
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(ast);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
-        var calls = BoundNodeHelpers.DescendantsAndSelf(use)
-            .Where(node => node is BoundCallExpression or BoundCallStatement).ToArray();
-        var receivers = calls.Select(node => node switch
-            {
-                BoundCallExpression call => call.Receiver,
-                BoundCallStatement call => call.Receiver,
-                _ => null
-            })
+        var calls = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>().ToArray();
+        var receivers = calls.Select(call => call.Receiver)
             .Where(receiver => receiver?.Type is Calor.Compiler.Binding.BoundTypes.UnresolvedBoundType)
             .ToArray();
         Assert.Equal(4, receivers.Length);
         Assert.Equal(receivers.Select(receiver => receiver!.Span.Start).Order(),
             diagnostics.Where(diagnostic => diagnostic.Code == DiagnosticCode.SignatureUnresolved)
                 .Select(diagnostic => diagnostic.Span.Start).Order());
-        var pick = calls.OfType<BoundCallStatement>().Single(call => call.Target == "Pick");
+        var pick = calls.Single(call => call.Target == "Pick");
         Assert.Null(pick.ResolvedSymbol);
         Assert.Empty(pick.SelectedOverloadMatches);
         Assert.Empty(CallGraphAnalysis.BuildResolved(bound).ForwardGraph[use.SymbolId]);
@@ -639,30 +665,200 @@ public sealed class ComputedCallExpressionTests
             "Pick", pick.Span));
     }
 
+    [Fact]
+    public void NativeReflectionForeach_RetainsActualMetadataArrayIdentity()
+    {
+        var (ast, bound, diagnostics) = Bind("""
+            module Test
+              func Use public (System.Reflection.Assembly:assembly) → void
+                !
+                each type in assembly.GetTypes()
+                  type.GetInterfaces()
+                  type.GetGenericArguments()
+                  each @interface in type.GetInterfaces()
+                    @interface.GetGenericArguments()
+                    Pick(@interface)
+              func Pick public (object:item) → void
+                !
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.SignatureUnresolved);
+        var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
+        var producer = MemberCall(use, "assembly", "GetTypes");
+        var method = Assert.IsAssignableFrom<IMethodSymbol>(producer.ResolvedMetadataMethod);
+        Assert.Equal("System.Reflection.Assembly", method.ContainingType.ToDisplayString());
+        var array = Assert.IsAssignableFrom<IArrayTypeSymbol>(method.ReturnType);
+        Assert.Equal("System.Type", array.ElementType.ToDisplayString());
+        Assert.Same(array, producer.MetadataArrayResultType);
+        foreach (var loop in BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundForeachStatement>())
+        {
+            Assert.False(loop.LoopVariable.HasUnknownInferredType);
+            Assert.Equal("System.Type", loop.LoopVariable.InferredReferenceType!.RoslynSymbol!.ToDisplayString());
+        }
+        var pick = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>(),
+            call => call.Target == "Pick");
+        Assert.NotNull(pick.ResolvedSymbol);
+        Assert.Single(pick.SelectedOverloadMatches);
+        Assert.False(pick.HasUnresolvedArguments);
+        Assert.Contains(CallGraphAnalysis.BuildResolved(bound).ForwardGraph[use.SymbolId],
+            site => site.Callee == pick.ResolvedSymbolId);
+        Assert.Contains(ast.Functions[1].Id,
+            CallGraphAnalysis.Build(ast).ResolveCallSites(ast.Functions[0].Id, "Pick", pick.Span));
+    }
+
     [Theory]
-    [InlineData("§VAR{captured}", false)]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void NativeUnknownReceiver_RetainsPerSiteDiagnosticsWithoutMetadataAuthority(bool explicitType, bool synthesized)
+    {
+        var name = synthesized ? "_generated001" : "value";
+        var (ast, bound, diagnostics) = Bind($$"""
+            module Test
+              func Use (External:External) → void
+                !
+                let {{(explicitType ? "object:" : "")}}{{name}} = External.Make()
+                {{name}}.ToString()
+                {{name}}.ToString()
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var calls = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
+            .Where(call => call.ResolvedMethodName == "ToString").ToArray();
+        Assert.Equal(2, calls.Length);
+        var warnings = diagnostics.Where(diagnostic => diagnostic.Code == DiagnosticCode.SignatureUnresolved).ToArray();
+        Assert.Equal(explicitType || synthesized ? 0 : 2, warnings.Length);
+        if (!explicitType && !synthesized)
+            Assert.Equal(calls.Select(call => call.ReceiverSpan!.Value).OrderBy(span => span.Start),
+                warnings.Select(diagnostic => diagnostic.Span).OrderBy(span => span.Start));
+        foreach (var call in calls)
+        {
+            if (explicitType)
+            {
+                Assert.IsNotType<BoundTypes.UnresolvedBoundType>(call.Receiver!.Type);
+                Assert.Equal(SpecialType.System_Object, call.ResolvedMetadataMethod!.ContainingType.SpecialType);
+            }
+            else
+            {
+                Assert.IsType<BoundTypes.UnresolvedBoundType>(call.Receiver!.Type);
+                Assert.Null(call.ResolvedMetadataMethod);
+            }
+        }
+        var loader = new ManifestLoader(loadUserLevelManifests: false);
+        Assert.NotNull(loader.LoadFromJson("""{"mappings":[{"type":"System.Object","methods":{"ToString":[]}}]}"""));
+        new EffectEnforcementPass(diagnostics, policy: UnknownCallPolicy.Strict, strictEffects: true,
+            resolver: new EffectResolver(loader)).Enforce(ast);
+        foreach (var call in calls)
+            Assert.Equal(!explicitType, diagnostics.Errors.Any(diagnostic =>
+                diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Span == call.Span));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NativeEscapedStringTypeParameter_DoesNotBorrowIndexerMetadataOnEitherDeclaration(bool classParameter)
+    {
+        var (ast, bound, diagnostics) = Bind(classParameter ? """
+            module Test
+              class Holder<@String>
+                func Use (@String:text) → string
+                  return text[0].ToString()
+            """ : """
+            module Test
+              func Use<@String> (@String:text) → string
+                return text[0].ToString()
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var access = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundArrayAccess>());
+        Assert.True(access.HasUnknownInferredType);
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Null(call.ResolvedMetadataMethod);
+        Assert.Null(call.ResolvedSymbol);
+        new EffectEnforcementPass(diagnostics, policy: UnknownCallPolicy.Strict, strictEffects: true).Enforce(ast);
+        Assert.Contains(diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Span == call.Span);
+    }
+
+    [Theory]
+    [InlineData("object", false)]
+    [InlineData("object?", true)]
+    [InlineData("string", false)]
+    [InlineData("string?", true)]
+    [InlineData("Widget", false)]
+    [InlineData("Widget?", true)]
+    public void NativeMatchCapture_PreservesEstablishedReferenceAnnotation(string type, bool nullable)
+    {
+        foreach (var pattern in new[] { "captured", "var captured" })
+        {
+            var (_, bound, diagnostics) = Bind($$"""
+                module Test
+                  func Use ({{type}}:source) → int
+                    match source
+                      case {{pattern}}
+                        return Pick(captured)
+                  func Pick ({{type.TrimEnd('?')}}:item) → int
+                    return 2
+                  class Widget
+                """);
+            var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+            Assert.NotNull(call.ResolvedSymbol);
+            var argument = Assert.IsType<BoundVariableExpression>(Assert.Single(call.Arguments));
+            Assert.False(argument.HasUnknownInferredType);
+            Assert.Equal(nullable ? BoundTypes.NullableAnnotation.Annotated : BoundTypes.NullableAnnotation.NotAnnotated,
+                Assert.IsType<BoundTypes.NominalBoundType>(argument.Type).NullableAnnotation);
+            Assert.Equal(nullable, diagnostics.Errors.Any(diagnostic =>
+                diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+            Assert.Equal(nullable ? 1 : 0, diagnostics.Errors.Count());
+        }
+    }
+
+    [Theory]
+    [InlineData("System.Object")]
+    [InlineData("global::System.Object")]
+    public void NativeQualifiedObject_IsKnownForOverloadMismatch(string type)
+    {
+        foreach (var parameter in new[] { "object", "int" })
+        {
+            var (_, bound, diagnostics) = Bind($$"""
+                module Test
+                  func Use ({{type}}:value) → int
+                    return Pick(value)
+                  func Pick ({{parameter}}:value) → int
+                    return 2
+                """);
+            var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+            Assert.False(call.HasUnresolvedArguments);
+            Assert.False(Assert.Single(call.Arguments).HasUnknownInferredType);
+            Assert.Equal(parameter == "object", call.ResolvedSymbol is not null);
+            Assert.Equal(parameter == "int", diagnostics.Errors.Any(diagnostic =>
+                diagnostic.Code == DiagnosticCode.NoMatchingOverload));
+            Assert.Equal(parameter == "int" ? 1 : 0, diagnostics.Errors.Count());
+        }
+    }
+
+    [Theory]
+    [InlineData("var captured", false)]
     [InlineData("captured", false)]
-    [InlineData("§PPROP{} §PMATCH{Item} §VAR{captured}", false)]
-    [InlineData("§PTYPE{object:captured}", true)]
+    [InlineData("{ Item: var captured }", false)]
+    [InlineData("object captured", true)]
     public void MatchCapture_UnknownRecoveryDoesNotAcquireObjectAuthority(string pattern, bool explicitType)
     {
         var (ast, bound, diagnostics) = Bind($$"""
-            §M{Test}
-              §F{Use:pub} () -> i32
-                §E{}
-                §B{source} §C{External.Make} §/C
-                §W source
-                  §K {{pattern}}
-                    §C{captured.ToString} §/C
-                    §R §C{Pick} §A captured §/C
-              §F{Pick:pub} (object:item) -> i32
-                §E{}
-                §R 2
+            module Test
+              func Use public (External:External) → int
+                !
+                let source = External.Make()
+                match source
+                  case {{pattern}}
+                    captured.ToString()
+                    return Pick(captured)
+              func Pick public (object:item) → int
+                !
+                return 2
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
-        var receiverCall = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallStatement>()
-            .Single(call => call.Target == "captured.ToString");
+        var receiverCall = MemberCall(use, "captured", "ToString");
         var pick = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>()
             .Single(call => call.Target == "Pick");
         if (explicitType)
@@ -690,21 +886,21 @@ public sealed class ComputedCallExpressionTests
     }
 
     [Theory]
-    [InlineData("§VAR{captured}", "object")]
+    [InlineData("var captured", "object")]
     [InlineData("captured", "object")]
-    [InlineData("§VAR{captured}", "i32")]
-    [InlineData("captured", "i32")]
+    [InlineData("var captured", "int")]
+    [InlineData("captured", "int")]
     public void MatchCapture_KnownMatchedTypeRetainsItsAuthority(string pattern, string type)
     {
         var (_, bound, diagnostics) = Bind($$"""
-            §M{Test}
-              §F{Use:pub} ({{type}}:source) -> i32
-                §W source
-                  §K {{pattern}}
-                    §C{captured.ToString} §/C
-                    §R §C{Pick} §A captured §/C
-              §F{Pick:pub} ({{type}}:item) -> i32
-                §R 2
+            module Test
+              func Use public ({{type}}:source) → int
+                match source
+                  case {{pattern}}
+                    captured.ToString()
+                    return Pick(captured)
+              func Pick public ({{type}}:item) → int
+                return 2
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         Assert.DoesNotContain(diagnostics, diagnostic =>
@@ -725,13 +921,13 @@ public sealed class ComputedCallExpressionTests
     public void MatchExpressionCapture_RetainsMatchedValueAuthority(bool known)
     {
         var (ast, bound, diagnostics) = Bind($$"""
-            §M{Test}
-              §F{Use:pub} (object:input) -> i32
-                §B{source} {{(known ? "input" : "§C{External.Make} §/C")}}
-                §R §W source
-                  §K §VAR{captured} → §C{Pick} §A captured §/C
-              §F{Pick:pub} (object:item) -> i32
-                §R 2
+            module Test
+              func Use public (object:input, External:External) → int
+                let source = {{(known ? "input" : "External.Make()")}}
+                return match source
+                  case var captured → Pick(captured)
+              func Pick public (object:item) → int
+                return 2
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
@@ -756,15 +952,15 @@ public sealed class ComputedCallExpressionTests
     public void MatchCaptureResult_DoesNotRecoverUnknownAuthority(bool known, bool returnCapture)
     {
         var (_, bound, diagnostics) = Bind($$"""
-            §M{Test}
-              §F{Use:pub} (object:input) -> i32
-                §B{source} {{(known ? "input" : "§C{External.Make} §/C")}}
-                §B{projected} §W source
-                  §K §VAR{captured} → {{(returnCapture ? "captured" : "input")}}
-                §B{alias} projected
-                §R §C{Pick} §A alias §/C
-              §F{Pick:pub} (object:item) -> i32
-                §R 2
+            module Test
+              func Use public (object:input, External:External) → int
+                let source = {{(known ? "input" : "External.Make()")}}
+                let projected = match source
+                  case var captured → {{(returnCapture ? "captured" : "input")}}
+                let alias = projected
+                return Pick(alias)
+              func Pick public (object:item) → int
+                return 2
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
@@ -780,15 +976,15 @@ public sealed class ComputedCallExpressionTests
     public void UnknownInferredArgument_DoesNotRejectOrSelectNativeOverload(string parameterType)
     {
         var (ast, bound, diagnostics) = Bind($$"""
-            §M{Test}
-              §F{Use:pub} () -> i32
-                §E{}
-                §B{details} §C{External.Make} §/C
-                §B{alias} details
-                §R §C{Pick} §A alias §/C
-              §F{Pick:pub} ({{parameterType}}:value) -> i32
-                §E{}
-                §R 2
+            module Test
+              func Use public (External:External) → int
+                !
+                let details = External.Make()
+                let alias = details
+                return Pick(alias)
+              func Pick public ({{parameterType}}:value) → int
+                !
+                return 2
             """);
         Assert.DoesNotContain(diagnostics.Errors, diagnostic =>
             diagnostic.Code == DiagnosticCode.NoMatchingOverload);
@@ -811,27 +1007,27 @@ public sealed class ComputedCallExpressionTests
     }
 
     [Theory]
-    [InlineData("§B{value:OBJECT} §C{External.Make} §/C")]
-    [InlineData("§B{value:object} §C{External.Make} §/C")]
-    [InlineData("§B{value} §NEW{object} §/NEW")]
-    [InlineData("§B{value} §C{Make} §/C")]
-    [InlineData("§B{value} §C{make} §/C")]
-    [InlineData("§B{value} §C make §/C")]
-    [InlineData("§B{value} §C{System.Runtime.CompilerServices.RuntimeHelpers.GetObjectValue} §A §NEW{object} §/NEW §/C")]
+    [InlineData("let System.Object:value = External.Make()")]
+    [InlineData("let object:value = External.Make()")]
+    [InlineData("let value = new object()")]
+    [InlineData("let value = Make()")]
+    [InlineData("let value = make()")]
+    [InlineData("let value = (make)()")]
+    [InlineData("let value = System.Runtime.CompilerServices.RuntimeHelpers.GetObjectValue(new object())")]
     public void ActualObjectArgument_RetainsNativeSelectionAndMismatch(string binding)
     {
-        foreach (var parameter in new[] { "object", "i32" })
+        foreach (var parameter in new[] { "object", "int" })
         {
             var (_, bound, diagnostics) = Bind($$"""
-                §M{Test}
-                  §F{Use:pub} (Func<object>:make) -> i32
+                module Test
+                  func Use public (Func<object>:make, External:External) → int
                     {{binding}}
-                    §B{alias} value
-                    §R §C{Pick} §A alias §/C
-                  §F{Make:pub} () -> object
-                    §R §NEW{object} §/NEW
-                  §F{Pick:pub} ({{parameter}}:value) -> i32
-                    §R 2
+                    let alias = value
+                    return Pick(alias)
+                  func Make public () → object
+                    return new object()
+                  func Pick public ({{parameter}}:value) → int
+                    return 2
                 """);
             var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
             var pick = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>()
@@ -861,17 +1057,17 @@ public sealed class ComputedCallExpressionTests
     [InlineData(true, true)]
     public void MutableInferredTypeAuthority_IsStaticAcrossReassignmentsAndJoins(bool unknown, bool branch)
     {
-        var initializer = unknown ? "§C{External.Make} §/C" : "§NEW{object} §/NEW";
-        var replacement = unknown ? "§NEW{object} §/NEW" : "§C{External.Make} §/C";
+        var initializer = unknown ? "External.Make()" : "new object()";
+        var replacement = unknown ? "new object()" : "External.Make()";
         var (_, bound, diagnostics) = Bind($$"""
-            §M{Test}
-              §F{Use:pub} (bool:gate) -> i32
-                §B{~value} {{initializer}}
-                {{(branch ? "§IF gate\n      §ASSIGN value " : "§B{~value} ")}}{{replacement}}
-                §B{alias} value
-                §R §C{Pick} §A alias §/C
-              §F{Pick:pub} (object:value) -> i32
-                §R 2
+            module Test
+              func Use public (bool:gate, External:External) → int
+                var value = {{initializer}}
+                {{(branch ? "if gate\n      set value " : "var value = ")}}{{replacement}}
+                let alias = value
+                return Pick(alias)
+              func Pick public (object:value) → int
+                return 2
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var pick = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
@@ -887,19 +1083,19 @@ public sealed class ComputedCallExpressionTests
     {
         var binding = preprocessor
             ? """
-                §PP{FEATURE}
-                  §B{value} §NEW{object} §/NEW
-                §PPE
-                  §B{value} §C{External.Make} §/C
+                pp FEATURE
+                  let value = new object()
+                pp else
+                  let value = External.Make()
                 """
-            : "§B{value} (? gate §NEW{object} §/NEW §C{External.Make} §/C)";
+            : "let value = gate ? new object() : External.Make()";
         var (_, bound, diagnostics) = Bind($$"""
-            §M{Test}
-              §F{Use:pub} (bool:gate) -> i32
+            module Test
+              func Use public (bool:gate, External:External) → int
                 {{binding.Replace("\n", "\n    ", StringComparison.Ordinal)}}
-                §R §C{Pick} §A value §/C
-              §F{Pick:pub} (object:item) -> i32
-                §R 2
+                return Pick(value)
+              func Pick public (object:item) → int
+                return 2
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var pick = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
@@ -915,32 +1111,35 @@ public sealed class ComputedCallExpressionTests
     public void UnknownArgument_BlocksNativeAndMetadataFallback(bool statement)
     {
         var (ast, bound, diagnostics) = Bind($$"""
-            §M{Test}
-              §F{Use:pub} () -> i32
-                §E{}
-                §B{value} §C{External.Make} §/C
-                §B{text} §C{System.Convert.ToString} §A value §/C
-                {{(statement ? "" : "§B{result} ")}}§C{Pick} §A value §/C
-                §R 0
-              §F{Pick:pub} (object:item) -> i32
-                §E{}
-                §R 2
+            module Test
+              func Use public (External:External) → int
+                !
+                let value = External.Make()
+                let text = System.Convert.ToString(value)
+                {{(statement ? "" : "let result = ")}}Pick(value)
+                return 0
+              func Pick public (object:item) → int
+                !
+                return 2
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
         var metadata = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>()
-            .Single(call => call.Target == "System.Convert.ToString");
+            .Single(call => call.ResolvedTypeName == "System.Convert" && call.ResolvedMethodName == "ToString");
         Assert.True(metadata.HasUnknownInferredType);
         Assert.Null(metadata.ResolvedMetadataMethod);
         Assert.Null(metadata.ArgumentParameterIndices);
         var expression = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>()
-            .SingleOrDefault(call => call.Target == "Pick");
-        var callStatement = use.Body.OfType<BoundCallStatement>().SingleOrDefault(call => call.Target == "Pick");
-        Assert.Empty(expression?.ResolvedSymbols ?? callStatement!.ResolvedSymbols);
-        Assert.Empty(expression?.SelectedOverloadMatches ?? callStatement!.SelectedOverloadMatches);
+            .Single(call => call.Target == "Pick");
+        if (statement)
+            Assert.Same(expression, Assert.Single(use.Body.OfType<BoundExpressionStatement>()).Expression);
+        else
+            Assert.Same(expression, use.Body.OfType<BoundBindStatement>().Single(binding => binding.Variable.Name == "result").Initializer);
+        Assert.Empty(expression.ResolvedSymbols);
+        Assert.Empty(expression.SelectedOverloadMatches);
         var graph = CallGraphAnalysis.BuildResolved(bound);
         Assert.Empty(graph.ForwardGraph[use.SymbolId]);
-        var span = expression?.Span ?? callStatement!.Span;
+        var span = expression.Span;
         var astGraph = CallGraphAnalysis.Build(ast);
         Assert.Empty(astGraph.ResolveCallSites(ast.Functions[0].Id, "Pick", span));
         new EffectEnforcementPass(diagnostics, policy: UnknownCallPolicy.Strict, strictEffects: true).Enforce(ast);
@@ -956,11 +1155,11 @@ public sealed class ComputedCallExpressionTests
     public void UnknownArgument_DoesNotEraseADeclaredDelegateInvocationRow(bool unknown)
     {
         var (ast, bound, diagnostics) = Bind($$"""
-            §M{Test}
-              §F{Use:pub} (Func<object,i32>:make §E{cw}, object:seed) -> i32
-                §E{}
-                §B{value} {{(unknown ? "§C{External.Make} §/C" : "seed")}}
-                §R §C{make} §A value §/C
+            module Test
+              func Use public (Func<object,int>:make ! cw, object:seed, External:External) → int
+                !
+                let value = {{(unknown ? "External.Make()" : "seed")}}
+                return make(value)
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var call = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
@@ -985,7 +1184,19 @@ public sealed class ComputedCallExpressionTests
         var isolatedDiagnostics = new DiagnosticBag();
         var isolated = new EffectEnforcementPass(isolatedDiagnostics,
             policy: UnknownCallPolicy.Strict, strictEffects: true, resolver: new EffectResolver(loader));
-        isolated.Enforce(ast);
+        var use = ast.Functions.Single();
+        var body = use.Body.Select(statement =>
+        {
+            if (!unknown || statement is not BindStatementNode { Name: "value", Initializer: ExpressionCallNode producer } binding)
+                return statement;
+            var member = Assert.IsType<FieldAccessNode>(producer.TargetExpression);
+            return binding.CopyMetadataTo(new BindStatementNode(binding.Span, binding.Name, binding.TypeName, binding.IsMutable,
+                new CallExpressionNode(producer.Span, "External.Make", [], null, null, null,
+                    calleeSpan: member.FieldNameSpan, receiverSpan: member.Target.Span),
+                binding.Attributes, binding.IdentifierSpan, binding.TypeNameSpan));
+        }).ToArray();
+        var isolatedAst = WithBody(ast, use, body);
+        isolated.Enforce(isolatedAst);
         var isolatedFact = isolated.DeclarationFacts[ast.Functions.Single().Id];
         Assert.False(isolatedFact.InferredRow.IsUnknown);
         Assert.Equal(["cw"], isolatedFact.Forbidden);
@@ -994,6 +1205,42 @@ public sealed class ComputedCallExpressionTests
         Assert.Contains("uses effect 'cw'", forbidden.Message, StringComparison.Ordinal);
         Assert.Contains("charged by invoking 'make' (row: cw)", forbidden.Message, StringComparison.Ordinal);
         Assert.Equal(unknown, Assert.IsType<BoundVariableExpression>(Assert.Single(call.Arguments)).HasUnknownInferredType);
+    }
+
+    [Fact]
+    public void NativeUnselectedComputedMember_DoesNotBorrowNamedCallManifestAuthority()
+    {
+        var (ast, bound, diagnostics) = Bind("""
+            module Test
+              func Use (External:External) → int
+                !
+                let value = External.Make()
+                return Pick(value)
+              func Pick (object:item) → int
+                !
+                return 2
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
+        var producer = MemberCall(use, "External", "Make");
+        Assert.Null(producer.ResolvedMetadataMethod);
+        Assert.Null(producer.ResolvedSymbol);
+        Assert.True(producer.HasUnknownInferredType);
+        var pick = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>(),
+            call => call.Target == "Pick");
+        Assert.Null(pick.ResolvedSymbol);
+        Assert.Empty(pick.SelectedOverloadMatches);
+        Assert.True(pick.HasUnresolvedArguments);
+        var loader = new ManifestLoader(loadUserLevelManifests: false);
+        Assert.NotNull(loader.LoadFromJson("""{"mappings":[{"type":"External","methods":{"Make":[]}}]}"""));
+        var enforcement = new EffectEnforcementPass(diagnostics, policy: UnknownCallPolicy.Strict, strictEffects: true,
+            resolver: new EffectResolver(loader));
+        enforcement.Enforce(ast);
+        Assert.True(enforcement.DeclarationFacts[ast.Functions[0].Id].InferredRow.IsUnknown);
+        foreach (var span in new[] { producer.Span, pick.Span })
+            Assert.Contains(diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Span == span);
+        Assert.Empty(CallGraphAnalysis.BuildResolved(bound).ForwardGraph[use.SymbolId]);
     }
 
     [Fact]
@@ -1026,16 +1273,16 @@ public sealed class ComputedCallExpressionTests
             }
             """;
         var (ast, bound, diagnostics) = Bind("""
-            §M{Probe}
-              §U{System.Linq}
-              §U{System.Collections.Generic}
-              §CL{Orderer:pub}
-                §MT{Run:pub:static} ([Handler]:handlers) -> i32
-                  §B{handlerObjectsDetails} §C §C{handlers.Select} §A §LAM{s:Handler} §NEW{ObjectDetails} §A s §/NEW §/LAM §/C.ToList §/C
-                  §B{uniqueHandlers} §C §C{RemoveOverridden} §A handlerObjectsDetails §/C.ToArray §/C
-                  §R uniqueHandlers.Length
-                §MT{RemoveOverridden:pri:static} (IList<ObjectDetails>:details) -> IEnumerable<ObjectDetails>
-                  §R details
+            module Probe Probe
+              using System.Linq
+              using System.Collections.Generic
+              class Orderer public
+                func Run public static (Handler[]:handlers) → int
+                  let handlerObjectsDetails = handlers.Select((Handler:s) => new ObjectDetails(s)).ToList()
+                  let uniqueHandlers = RemoveOverridden(handlerObjectsDetails).ToArray()
+                  return uniqueHandlers.Length
+                func RemoveOverridden private static (IList<ObjectDetails>:details) → IEnumerable<ObjectDetails>
+                  return details
             """);
         Assert.DoesNotContain(diagnostics.Errors, diagnostic =>
             diagnostic.Code == DiagnosticCode.NoMatchingOverload);
@@ -1068,16 +1315,16 @@ public sealed class ComputedCallExpressionTests
     public void ComputedMembers_RetainOverloadIdentityAndOrderedReceiverChildren()
     {
         var (ast, bound, diagnostics) = Bind("""
-            §M{Test}
-              §F{Use:pub} (Holder:h) -> i32
-                §R §C §C{Get} §A h §/C.Pick §A INT:3 §/C
-              §F{Get:pub} (Holder:h) -> Holder
-                §R h
-              §CL{Holder:pub}
-                §MT{Pick:pub} (i32:value) -> i32
-                  §R value
-                §MT{Pick:pub} (str:value) -> str
-                  §R value
+            module Test
+              func Use public (Holder:h) → int
+                return Get(h).Pick(3)
+              func Get public (Holder:h) → Holder
+                return h
+              class Holder public
+                func Pick public (int:value) → int
+                  return value
+                func Pick public (string:value) → string
+                  return value
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
@@ -1088,7 +1335,7 @@ public sealed class ComputedCallExpressionTests
         Assert.Same(inner, outer.Children[0]);
         Assert.Same(outer.Arguments[0], outer.Children[1]);
         Assert.Same(bound.Functions.Single(function =>
-            function.Symbol.Name == "Holder.Pick" && function.Symbol.ReturnType == "i32").Symbol, outer.ResolvedSymbol);
+            function.Symbol.Name == "Holder.Pick" && function.Symbol.ReturnType == "int").Symbol, outer.ResolvedSymbol);
         Assert.Equal(2, CallGraphAnalysis.BuildResolved(bound).ForwardGraph[use.SymbolId].Count);
         Assert.Contains($"Holder.{ast.Classes[0].Methods[0].Id}",
             CallGraphAnalysis.Build(ast).ResolveCallSites(ast.Functions[0].Id, "<expression-call>", outer.Span));
@@ -1098,14 +1345,14 @@ public sealed class ComputedCallExpressionTests
     public void ComputedMember_InvalidArgumentStillReportsNativeOverloadError()
     {
         var (_, _, diagnostics) = Bind("""
-            §M{Test}
-              §F{Use:pub} (Holder:h) -> i32
-                §R §C §C{Get} §A h §/C.Pick §A BOOL:true §/C
-              §F{Get:pub} (Holder:h) -> Holder
-                §R h
-              §CL{Holder:pub}
-                §MT{Pick:pub} (i32:value) -> i32
-                  §R value
+            module Test
+              func Use public (Holder:h) → int
+                return Get(h).Pick(true)
+              func Get public (Holder:h) → Holder
+                return h
+              class Holder public
+                func Pick public (int:value) → int
+                  return value
             """);
         Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
     }
@@ -1114,9 +1361,9 @@ public sealed class ComputedCallExpressionTests
     public void ComputedMetadataArrayCall_RetainsExactSelectedMethodAndArrayResult()
     {
         var (_, bound, diagnostics) = Bind("""
-            §M{Test}
-              §F{Use:pub} () -> [str]
-                §R §C §NEW{System.Globalization.CultureInfo} §A "en-US" §/NEW.DateTimeFormat.GetAllDateTimePatterns §/C
+            module Test
+              func Use public () → string[]
+                return new System.Globalization.CultureInfo("en-US").DateTimeFormat.GetAllDateTimePatterns()
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var call = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>().Single();
@@ -1170,9 +1417,9 @@ public sealed class ComputedCallExpressionTests
     public void ComputedMetadataReceiver_UsesExactSelectedParametersAndIsCollected()
     {
         var (ast, bound, diagnostics) = Bind("""
-            §M{Test}
-              §F{Use:pub} () -> bool
-                §R §C §NEW{object} §/NEW.Equals §A INT:3 §/C
+            module Test
+              func Use public () → bool
+                return new object().Equals(3)
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var call = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>().Single();
@@ -1187,11 +1434,11 @@ public sealed class ComputedCallExpressionTests
     public void ComputedReceiver_TypeParameterDoesNotAcquireBclMetadata()
     {
         var (_, bound, diagnostics) = Bind("""
-            §M{Test}
-              §F{Use:pub}<Random> (Random:value) -> i32
-                §R §C §C{Get<Random>} §A value §/C.Next §/C
-              §F{Get:pub}<T> (T:value) -> T
-                §R value
+            module Test
+              func Use<Random> public (Random:value) → int
+                return Get<Random>(value).Next()
+              func Get<T> public (T:value) → T
+                return value
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var call = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
@@ -1204,29 +1451,29 @@ public sealed class ComputedCallExpressionTests
     public void ComputedMemberArguments_AreStillTypeCheckedWhenTheMemberIsExternal()
     {
         var result = Program.Compile("""
-            §M{Test}
-              §F{Use:pub} () -> object
-                §R §C §NEW{object} §/NEW.Equals §A (?? INT:1 INT:2) §/C
+            module Test
+              func Use public () → object
+                return new object().Equals(1 ?? 2)
             """, "computed.calr", new CompilationOptions { EnableTypeChecking = true, EnforceEffects = false, StatusWriter = TextWriter.Null });
         Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Message.Contains("Null-coalescing requires", StringComparison.Ordinal));
     }
 
     [Theory]
-    [InlineData("§E{alloc,cw}", false)]
-    [InlineData("§E{alloc}", true)]
+    [InlineData("! alloc,cw", false)]
+    [InlineData("! alloc", true)]
     public void ComputedInternalMethod_ChargesItsSelectedEffects(string effects, bool error)
     {
         var result = Program.Compile($$"""
-            §M{Test}
-              §F{Use:pub} () -> void
+            module Test
+              func Use public () → void
                 {{effects}}
-                §C §NEW{Holder} §/NEW.Loud §/C
-              §CL{Holder:pub}
-                §CTOR{pub} ()
-                  §B{unused:i32} INT:0
-                §MT{Loud:pub} () -> void
-                  §E{cw}
-                  §P "loud"
+                new Holder().Loud()
+              class Holder public
+                ctor public ()
+                  let int:unused = 0
+                func Loud public () → void
+                  ! cw
+                  Console.WriteLine("loud")
             """, "computed.calr", new CompilationOptions { EnforceEffects = true, StatusWriter = TextWriter.Null });
         Assert.Equal(error, result.HasErrors);
         if (error)
@@ -1236,20 +1483,19 @@ public sealed class ComputedCallExpressionTests
     [Fact]
     public void ComputedDelegateTarget_InvalidatesCapturedMutationFacts()
     {
-        foreach (var target in new[] { "later", "(? gate later later)" })
+        foreach (var target in new[] { "later", "(gate ? later : later)" })
         {
             var (_, _, diagnostics) = Bind($$"""
-                §M{Test}
-                  §F{Use:pub} (?str:input, bool:gate) -> i32
-                    §B{~value:?str} input
-                    §B{later:Action} §LAM{}
-                      §ASSIGN value null
-                    §/LAM
-                    §IF (!= value null)
-                      §C {{target}} §/C
-                      §B{str:observed} value
-                      §R INT:1
-                    §R INT:0
+                module Test
+                  func Use public (string?:input, bool:gate) → int
+                    var string?:value = input
+                    let Action:later = () =>
+                      set value null
+                    if value != null
+                      {{target}}()
+                      let string:observed = value
+                      return 1
+                    return 0
                 """);
             Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == "Calor0272");
         }
@@ -1262,16 +1508,16 @@ public sealed class ComputedCallExpressionTests
         foreach (var permitsWrite in new[] { false, true })
         {
             var result = Program.Compile($$"""
-                §M{Test}
-                  §F{Use:pub} () -> i32
-                    §E{alloc{{(permitsWrite ? ",cw" : "")}}}
-                    {{(binding ? "§B{handler} §C §NEW{Holder} §/NEW.Make §/C\n    §R §C{handler} §/C" : "§R §C §C §NEW{Holder} §/NEW.Make §/C §/C")}}
-                  §CL{Holder:pub}
-                    §CTOR{pub} ()
-                      §B{unused:i32} INT:0
-                    §MT{Make:pub} () -> Func<i32> §E{cw}
-                      §E{}
-                      §R §LAM{} INT:0 §/LAM
+                module Test
+                  func Use public () → int
+                    ! alloc{{(permitsWrite ? ",cw" : "")}}
+                    {{(binding ? "let handler = new Holder().Make()\n    return handler()" : "return new Holder().Make()()")}}
+                  class Holder public
+                    ctor public ()
+                      let int:unused = 0
+                    func Make public () → Func<int> ! cw
+                      !
+                      return () => 0
                 """, "computed.calr", new CompilationOptions { EnforceEffects = true, StatusWriter = TextWriter.Null });
             Assert.True(result.HasErrors == !permitsWrite,
                 $"binding={binding}, permitsWrite={permitsWrite}: {string.Join("\n", result.Diagnostics)}");
@@ -1285,10 +1531,10 @@ public sealed class ComputedCallExpressionTests
     public void UnknownComputedMember_DoesNotBecomePure()
     {
         var result = Program.Compile("""
-            §M{Test}
-              §F{Use:pub} () -> void
-                §E{alloc}
-                §C §NEW{System.Random} §/NEW.DoesNotExist §/C
+            module Test
+              func Use public () → void
+                ! alloc
+                new System.Random().DoesNotExist()
             """, "computed.calr", new CompilationOptions { EnforceEffects = true, StatusWriter = TextWriter.Null });
         Assert.True(result.HasErrors);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
@@ -1313,7 +1559,36 @@ public sealed class ComputedCallExpressionTests
     private static (ModuleNode Ast, BoundModule Bound, DiagnosticBag Diagnostics) Bind(string source)
     {
         var diagnostics = new DiagnosticBag();
-        var ast = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var ast = Parse(source);
         return (ast, new Binder(diagnostics).Bind(ast), diagnostics);
+    }
+
+    private static ModuleNode Parse(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        return ast;
+    }
+
+    private static BoundCallExpression MemberCall(BoundNode root, string receiver, string member)
+    {
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(root).OfType<BoundCallExpression>(),
+            call => call.ResolvedMethodName == member
+                && call.Receiver is BoundVariableExpression variable && variable.Variable.Name == receiver);
+        Assert.Equal("<expression-call>", call.Target);
+        Assert.Same(call.Receiver, call.EvaluatedReceiver);
+        return call;
+    }
+
+    private static ModuleNode WithBody(ModuleNode ast, FunctionNode function, IReadOnlyList<StatementNode> body)
+    {
+        var replacement = function.CopyMetadataTo(new FunctionNode(function.Span, function.Id, function.Name,
+            function.Visibility, function.Parameters, function.Output, function.Effects, body, function.Attributes));
+        return ast.With(module =>
+        {
+            module.Functions = ast.Functions.Select(item => ReferenceEquals(item, function) ? replacement : item).ToArray();
+            module.Items = ast.Items.Select(item => ReferenceEquals(item, function) ? replacement : item).ToArray();
+        });
     }
 }
