@@ -1,6 +1,7 @@
-§M{ReturnMapped}
-  §F{Double:pub} (i32:x) -> i32
-    §R (* x 2)
+module ReturnMapped ReturnMapped
+  module ReturnMappedModule
+    func Double public (int:x) → int
+      return x * 2
 
-  §F{Process:pub} (i32:n) -> i32
-    §R §C{Double} n
+    func Process public (int:n) → int
+      return Double(n)

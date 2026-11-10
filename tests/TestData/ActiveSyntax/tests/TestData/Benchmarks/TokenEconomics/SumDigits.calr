@@ -1,28 +1,28 @@
-§M{SumDigits}
-  §F{LastDigit:pub} (i32:n) -> i32
-    §S (>= result 0)
-    §B{r} (% n 10)
-    §IF (< r 0)
-      §R (- 0 r)
-    §EL
-      §R r
+module SumDigits SumDigits
+  module SumDigitsModule
+    func LastDigit public (int:n) → int
+      => result >= 0
+      let r = n % 10
+      if r < 0
+        return 0 - r
+      else
+        return r
 
-  §F{RemoveLastDigit:pub} (i32:n) -> i32
-    §R (/ n 10)
+    func RemoveLastDigit public (int:n) → int
+      return n / 10
 
-  §F{SumDigitsPositive:pub} (i32:n) -> i32
-    §Q (>= n 0)
-    §S (>= result 0)
-    §IF (== n 0)
-      §R 0
-    §B{digit} §C{LastDigit} n
-    §B{remaining} §C{SumDigitsPositive} (/ n 10)
-    §R (+ digit remaining)
+    func SumDigitsPositive public (int:n) → int
+      requires n >= 0
+      => result >= 0
+      if n == 0
+        return 0
+      let digit = LastDigit(n)
+      let remaining = SumDigitsPositive(n / 10)
+      return digit + remaining
 
-  §F{SumDigits:pub} (i32:n) -> i32
-    §S (>= result 0)
-    §IF (< n 0)
-      §B{posN} (- 0 n)
-      §R §C{SumDigitsPositive} posN
-    §R §C{SumDigitsPositive} n
-
+    func SumDigits public (int:n) → int
+      => result >= 0
+      if n < 0
+        let posN = 0 - n
+        return SumDigitsPositive(posN)
+      return SumDigitsPositive(n)

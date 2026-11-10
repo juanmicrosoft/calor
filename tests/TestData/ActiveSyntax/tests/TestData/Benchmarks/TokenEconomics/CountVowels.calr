@@ -1,15 +1,15 @@
-§M{StringAnalysis}
-  §F{IsVowel:pub} (str:ch) -> bool
-    §IF (== ch "a")
-      §R true
-    §EI (== ch "e")
-      §R true
-    §EI (== ch "i")
-      §R true
-    §EI (== ch "o")
-      §R true
-    §EI (== ch "u")
-      §R true
-    §EL
-      §R false
-
+module StringAnalysis StringAnalysis
+  module StringAnalysisModule
+    func IsVowel public (string:ch) → bool
+      if ch == "a"
+        return true
+      else if ch == "e"
+        return true
+      else if ch == "i"
+        return true
+      else if ch == "o"
+        return true
+      else if ch == "u"
+        return true
+      else
+        return false

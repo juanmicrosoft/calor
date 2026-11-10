@@ -1,7 +1,7 @@
-§M{Contains}
-  §F{Matches:pub} (i32:value, i32:target) -> bool
-    §R (== value target)
+module Contains Contains
+  module ContainsModule
+    func Matches public (int:value, int:target) → bool
+      return value == target
 
-  §F{IsInRange:pub} (i32:index, i32:length) -> bool
-    §R (&& (>= index 0) (< index length))
-
+    func IsInRange public (int:index, int:length) → bool
+      return index >= 0 && index < length

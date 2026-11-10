@@ -1,4 +1,4 @@
-§M{IsEven}
-  §F{IsEven:pub} (i32:n) -> bool
-    §R (== (% n 2) 0)
-
+module IsEven IsEven
+  module IsEvenModule
+    func IsEven public (int:n) → bool
+      return n % 2 == 0

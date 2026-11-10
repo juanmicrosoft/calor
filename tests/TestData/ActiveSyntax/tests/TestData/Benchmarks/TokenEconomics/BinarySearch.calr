@@ -1,11 +1,11 @@
-§M{Search}
-  §F{Find:pub} (i32:target, i32:val1, i32:val2, i32:val3) -> i32
-    §IF (== val1 target)
-      §R 0
-    §EI (== val2 target)
-      §R 1
-    §EI (== val3 target)
-      §R 2
-    §EL
-      §R -1
-
+module Search Search
+  module SearchModule
+    func Find public (int:target, int:val1, int:val2, int:val3) → int
+      if val1 == target
+        return 0
+      else if val2 == target
+        return 1
+      else if val3 == target
+        return 2
+      else
+        return -1

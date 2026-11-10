@@ -1,16 +1,16 @@
-§M{PrimeCheck}
-  §F{IsPrime:pub} (i32:n) -> bool
-    §Q (> n 0)
-    §IF (<= n 1)
-      §R false
-    §IF (<= n 3)
-      §R true
-    §IF (== (% n 2) 0)
-      §R false
-    §L{i:3:1000:2}
-      §IF (> (* i i) n)
-        §R true
-      §IF (== (% n i) 0)
-        §R false
-    §R true
-
+module PrimeCheck PrimeCheck
+  module PrimeCheckModule
+    func IsPrime public (int:n) → bool
+      requires n > 0
+      if n <= 1
+        return false
+      if n <= 3
+        return true
+      if n % 2 == 0
+        return false
+      for i from 3 to 1000 step 2
+        if i * i > n
+          return true
+        if n % i == 0
+          return false
+      return true

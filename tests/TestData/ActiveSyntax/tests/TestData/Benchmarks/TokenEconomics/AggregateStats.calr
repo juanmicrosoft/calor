@@ -1,4 +1,5 @@
-§M{AggregateStats}
-  §F{Mean3:pub} (i32:a, i32:b, i32:c) -> i32
-    §B{sum} (+ (+ a b) c)
-    §R (/ sum 3)
+module AggregateStats AggregateStats
+  module AggregateStatsModule
+    func Mean3 public (int:a, int:b, int:c) → int
+      let sum = (a + b) + c
+      return sum / 3

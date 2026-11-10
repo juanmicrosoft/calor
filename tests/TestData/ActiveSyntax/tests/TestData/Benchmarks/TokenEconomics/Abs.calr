@@ -1,8 +1,8 @@
-§M{AbsModule}
-  §F{Abs:pub} (i32:x) -> i32
-    §S (>= result 0)
-    §IF (>= x 0)
-      §R x
-    §EL
-      §R (- 0 x)
-
+module AbsModule AbsModule
+  module AbsModuleModule
+    func Abs public (int:x) → int
+      => result >= 0
+      if x >= 0
+        return x
+      else
+        return 0 - x

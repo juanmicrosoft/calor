@@ -1,19 +1,18 @@
-§M{ArrayOps}
-  §F{Max:pub} (i32:a, i32:b) -> i32
-    §IF (> a b)
-      §R a
-    §EL
-      §R b
+module ArrayOps ArrayOps
+  module ArrayOpsModule
+    func Max public (int:a, int:b) → int
+      if a > b
+        return a
+      else
+        return b
 
-  §F{Max3:pub} (i32:a, i32:b, i32:c) -> i32
-    §IF (> a b)
-      §IF (> a c)
-        §R a
-      §EL
-        §R c
-    §EL
-      §IF (> b c)
-        §R b
-      §EL
-        §R c
-
+    func Max3 public (int:a, int:b, int:c) → int
+      if a > b
+        if a > c
+          return a
+        else
+          return c
+      else if b > c
+        return b
+      else
+        return c

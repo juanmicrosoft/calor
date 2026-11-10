@@ -1,7 +1,8 @@
-§M{FormatHeader}
-  §F{Format:pub} (str:title) -> str
-    §R title
+module FormatHeader FormatHeader
+  module FormatHeaderModule
+    func Format public (string:title) → string
+      return title
 
-  §F{Render:pub} (str:title) -> str
-    §B{header} §C{Format} title
-    §R header
+    func Render public (string:title) → string
+      let header = Format(title)
+      return header

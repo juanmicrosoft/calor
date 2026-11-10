@@ -1,5 +1,6 @@
-§M{TemperatureRange}
-  §F{RangeKelvin:pub} (f32:cMin, f32:cMax) -> f32
-    §B{kMin} (+ cMin 273.15)
-    §B{kMax} (+ cMax 273.15)
-    §R (- kMax kMin)
+module TemperatureRange TemperatureRange
+  module TemperatureRangeModule
+    func RangeKelvin public (float:cMin, float:cMax) → float
+      let kMin = cMin + 273.15
+      let kMax = cMax + 273.15
+      return kMax - kMin

@@ -1,13 +1,13 @@
-§M{FizzBuzz}
-  §F{Run:pub} () -> void
-    §E{cw}
-    §L{i:1:100:1}
-      §IF (== (% i 15) 0)
-        §P "FizzBuzz"
-      §EI (== (% i 3) 0)
-        §P "Fizz"
-      §EI (== (% i 5) 0)
-        §P "Buzz"
-      §EL
-        §P i
-
+module FizzBuzz FizzBuzz
+  module FizzBuzzModule
+    func Run public () → void
+      ! cw
+      for i from 1 to 100 step 1
+        if i % 15 == 0
+          System.Console.WriteLine("FizzBuzz")
+        else if i % 3 == 0
+          System.Console.WriteLine("Fizz")
+        else if i % 5 == 0
+          System.Console.WriteLine("Buzz")
+        else
+          System.Console.WriteLine(i)

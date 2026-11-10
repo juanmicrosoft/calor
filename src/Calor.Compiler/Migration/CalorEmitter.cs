@@ -3162,6 +3162,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var name = node.Name.Replace("@", "");
         if (node.IsNullLiteral)
             return name;
+        if (node.IsVerbatim)
+            return $"@{name}";
+        if (TypeMapper.IsPrimitiveType(name) && TypeMapper.ToSurfaceType(name) == name)
+            return name;
         return EscapeCalorIdentifier(name.Contains('<') ? AttributeHelper.ToSurfaceSpelling(name) : name);
     }
 

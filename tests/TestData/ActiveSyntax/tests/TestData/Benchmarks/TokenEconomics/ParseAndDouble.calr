@@ -1,7 +1,8 @@
-§M{ParseAndDouble}
-  §F{Parse:pub} (str:s) -> i32
-    §R 42
+module ParseAndDouble ParseAndDouble
+  module ParseAndDoubleModule
+    func Parse public (string:s) → int
+      return 42
 
-  §F{Compute:pub} (str:input) -> i32
-    §B{n} §C{Parse} input
-    §R (* n 2)
+    func Compute public (string:input) → int
+      let n = Parse(input)
+      return n * 2

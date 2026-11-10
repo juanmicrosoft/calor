@@ -1,12 +1,12 @@
-§M{CountOccurrences}
-  §F{CountOccurrences:pub} (i32:length, i32:matchCount) -> i32
-    §S (>= result 0)
-    §S (<= result length)
-    §R matchCount
+module CountOccurrences CountOccurrences
+  module CountOccurrencesModule
+    func CountOccurrences public (int:length, int:matchCount) → int
+      => result >= 0
+      => result <= length
+      return matchCount
 
-  §F{IncrementIf:pub} (i32:count, bool:matches) -> i32
-    §IF matches
-      §R (+ count 1)
-    §EL
-      §R count
-
+    func IncrementIf public (int:count, bool:matches) → int
+      if matches
+        return count + 1
+      else
+        return count

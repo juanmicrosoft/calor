@@ -1,11 +1,11 @@
-§M{Capitalize}
-  §F{ShouldCapitalize:pub} (i32:charCode) -> bool
-    §R (&& (>= charCode 97) (<= charCode 122))
+module Capitalize Capitalize
+  module CapitalizeModule
+    func ShouldCapitalize public (int:charCode) → bool
+      return charCode >= 97 && charCode <= 122
 
-  §F{ToUpper:pub} (i32:charCode) -> i32
-    §Q (&& (>= charCode 97) (<= charCode 122))
-    §R (- charCode 32)
+    func ToUpper public (int:charCode) → int
+      requires charCode >= 97 && charCode <= 122
+      return charCode - 32
 
-  §F{IsEmpty:pub} (i32:length) -> bool
-    §R (== length 0)
-
+    func IsEmpty public (int:length) → bool
+      return length == 0

@@ -1,10 +1,10 @@
-§M{IsAlpha}
-  §F{IsUpper:pub} (i32:charCode) -> bool
-    §R (&& (>= charCode 65) (<= charCode 90))
+module IsAlpha IsAlpha
+  module IsAlphaModule
+    func IsUpper public (int:charCode) → bool
+      return charCode >= 65 && charCode <= 90
 
-  §F{IsLower:pub} (i32:charCode) -> bool
-    §R (&& (>= charCode 97) (<= charCode 122))
+    func IsLower public (int:charCode) → bool
+      return charCode >= 97 && charCode <= 122
 
-  §F{IsAlpha:pub} (i32:charCode) -> bool
-    §R (|| (&& (>= charCode 65) (<= charCode 90)) (&& (>= charCode 97) (<= charCode 122)))
-
+    func IsAlpha public (int:charCode) → bool
+      return (charCode >= 65 && charCode <= 90) || (charCode >= 97 && charCode <= 122)

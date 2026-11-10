@@ -1,15 +1,15 @@
-§M{Fibonacci}
-  §F{Calculate:pub} (i32:n) -> i32
-    §IF (<= n 1)
-      §R n
-    §EL
-      §B{~a} 0
-      §B{~b} 1
-      §B{~i} 2
-      §WH (<= i n)
-        §B{temp} (+ a b)
-        §B{~a} b
-        §B{~b} temp
-        §B{~i} (+ i 1)
-      §R b
-
+module Fibonacci Fibonacci
+  module FibonacciModule
+    func Calculate public (int:n) → int
+      if n <= 1
+        return n
+      else
+        var a = 0
+        var b = 1
+        var i = 2
+        while i <= n
+          let temp = a + b
+          var a = b
+          var b = temp
+          var i = i + 1
+        return b

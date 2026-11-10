@@ -1,6 +1,7 @@
-§M{NamedConfig}
-  §F{Build:pub} (i32:port, str:host) -> i32
-    §R port
+module NamedConfig NamedConfig
+  module NamedConfigModule
+    func Build public (int:port, string:host) → int
+      return port
 
-  §F{Run:pub} () -> i32
-    §R §C{Build} §A[port] INT:8080 §A[host] STR:"localhost" §/C
+    func Run public () → int
+      return Build(port: 8080, host: "localhost")

@@ -1,4 +1,4 @@
-§M{IsOdd}
-  §F{IsOdd:pub} (i32:n) -> bool
-    §R (!= (% n 2) 0)
-
+module IsOdd IsOdd
+  module IsOddModule
+    func IsOdd public (int:n) → bool
+      return n % 2 != 0

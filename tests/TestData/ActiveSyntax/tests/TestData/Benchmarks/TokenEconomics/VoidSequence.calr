@@ -1,14 +1,15 @@
-§M{VoidSequence}
-  §F{Initialize:pub} () -> void
-    §R
+module VoidSequence VoidSequence
+  module VoidSequenceModule
+    func Initialize public () → void
+      return
 
-  §F{Process:pub} () -> void
-    §R
+    func Process public () → void
+      return
 
-  §F{Shutdown:pub} () -> void
-    §R
+    func Shutdown public () → void
+      return
 
-  §F{Execute:pub} () -> void
-    §C{Initialize}
-    §C{Process}
-    §C{Shutdown}
+    func Execute public () → void
+      Initialize()
+      Process()
+      Shutdown()

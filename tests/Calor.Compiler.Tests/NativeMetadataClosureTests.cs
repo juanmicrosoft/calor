@@ -15,6 +15,116 @@ namespace Calor.Compiler.Tests;
 
 public sealed class NativeMetadataClosureTests
 {
+    [Theory]
+    [InlineData("string", "string.Concat(\"a\", \"b\")", "ab")]
+    [InlineData("int", "int.MaxValue", "2147483647")]
+    [InlineData("long", "long.MaxValue", "9223372036854775807")]
+    [InlineData("short", "short.MinValue", "-32768")]
+    [InlineData("sbyte", "sbyte.MinValue", "-128")]
+    [InlineData("byte", "byte.MaxValue", "255")]
+    [InlineData("ushort", "ushort.MaxValue", "65535")]
+    [InlineData("uint", "uint.MaxValue", "4294967295")]
+    [InlineData("ulong", "ulong.MaxValue", "18446744073709551615")]
+    [InlineData("float", "float.IsNaN(float.NaN)", "True")]
+    [InlineData("double", "double.IsNaN(double.NaN)", "True")]
+    [InlineData("decimal", "decimal.One", "1")]
+    [InlineData("bool", "bool.Parse(\"true\")", "True")]
+    [InlineData("char", "char.IsUpper('A')", "True")]
+    public void NativePrimitiveStaticReceiver_RoundTripsWithoutBecomingAVerbatimVariable(
+        string alias, string expression, string expected)
+    {
+        var source = $$"""
+            module PrimitiveStaticReceiver
+              func Probe public () → object
+                return {{expression}}
+            """;
+        var reemitted = new CalorEmitter().Emit(Parse(source));
+        Assert.DoesNotContain("@" + alias + ".", reemitted);
+        var converted = ConvertPrimitiveReceiver($$"""
+            public static class PrimitiveStaticReceiver
+            {
+                public static object Probe() => {{expression}};
+            }
+            """);
+        foreach (var candidate in new[] { source, reemitted, converted })
+        {
+            var assembly = CompileAssembly(new CSharpEmitter().Emit(Parse(candidate)));
+            var result = assembly.GetTypes().SelectMany(type => type.GetMethods())
+                .Single(method => method.Name == "Probe").Invoke(null, null);
+            Assert.Equal(expected, Convert.ToString(result, System.Globalization.CultureInfo.InvariantCulture));
+        }
+    }
+
+    [Theory]
+    [InlineData("string")]
+    [InlineData("int")]
+    [InlineData("long")]
+    [InlineData("short")]
+    [InlineData("sbyte")]
+    [InlineData("byte")]
+    [InlineData("ushort")]
+    [InlineData("uint")]
+    [InlineData("ulong")]
+    [InlineData("float")]
+    [InlineData("double")]
+    [InlineData("decimal")]
+    [InlineData("bool")]
+    [InlineData("char")]
+    public void NativePrimitiveNamedVerbatimParameter_RetainsItsValueReceiver(string alias)
+    {
+        var source = $$"""
+            module VerbatimPrimitiveReceiver
+              func Probe public (string:@{{alias}}) → int
+                return @{{alias}}.Length
+            """;
+        var reemitted = new CalorEmitter().Emit(Parse(source));
+        Assert.Contains("@" + alias + ".Length", reemitted);
+        var converted = ConvertPrimitiveReceiver($$"""
+            public static class VerbatimPrimitiveReceiver
+            {
+                public static int Probe(string @{{alias}}) => @{{alias}}.Length;
+            }
+            """);
+        foreach (var candidate in new[] { source, reemitted, converted })
+        {
+            var assembly = CompileAssembly(new CSharpEmitter().Emit(Parse(candidate)));
+            var method = assembly.GetTypes().SelectMany(type => type.GetMethods()).Single(method => method.Name == "Probe");
+            Assert.Equal(3, method.Invoke(null, ["abc"]));
+        }
+    }
+
+    private static string ConvertPrimitiveReceiver(string source)
+    {
+        var result = new CSharpToCalorConverter().Convert(source);
+        Assert.True(result.Success, string.Join("\n", result.Issues));
+        Assert.Equal(0, result.InteropPreservationCount);
+        Assert.Equal(0, result.LossySubstitutionCount);
+        Assert.Equal(0, result.DropCount);
+        return Assert.IsType<string>(result.CalorSource);
+    }
+
+    [Theory]
+    [InlineData("i32")]
+    [InlineData("i64")]
+    [InlineData("u32")]
+    [InlineData("f32")]
+    [InlineData("str")]
+    public void NativeOrdinaryParameterNamedLikeARetiredTypeAlias_IsNotReinterpretedAsAType(string name)
+    {
+        var source = $$"""
+            module OrdinaryTypeLikeReceiver
+              func Probe public (string:{{name}}) → int
+                return {{name}}.Length
+            """;
+        var reemitted = new CalorEmitter().Emit(Parse(source));
+        foreach (var candidate in new[] { source, reemitted })
+        {
+            var assembly = CompileAssembly(new CSharpEmitter().Emit(Parse(candidate)));
+            var method = assembly.GetTypes().SelectMany(type => type.GetMethods()).Single(method => method.Name == "Probe");
+            Assert.Equal(3, method.Invoke(null, ["abc"]));
+        }
+    }
+
     [Fact]
     public void NativeDelegateInvoke_PreservesCapturedMutationAndReturnValuesAtRuntime()
     {

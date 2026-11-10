@@ -1,12 +1,12 @@
-§M{TruncateString}
-  §F{NeedsTruncation:pub} (i32:strLen, i32:maxLen) -> bool
-    §Q (> maxLen 0)
-    §R (> strLen maxLen)
+module TruncateString TruncateString
+  module TruncateStringModule
+    func NeedsTruncation public (int:strLen, int:maxLen) → bool
+      requires maxLen > 0
+      return strLen > maxLen
 
-  §F{TruncatedLength:pub} (i32:strLen, i32:maxLen) -> i32
-    §Q (> maxLen 0)
-    §IF (> strLen maxLen)
-      §R maxLen
-    §EL
-      §R strLen
-
+    func TruncatedLength public (int:strLen, int:maxLen) → int
+      requires maxLen > 0
+      if strLen > maxLen
+        return maxLen
+      else
+        return strLen
