@@ -41,12 +41,12 @@ assuming names from pre-consolidation documentation.
 | `calor_structure` | Outline, call graph, and change-impact analysis |
 | `calor_query` | Ask the project index who calls a declaration, what it calls, what a change to it (or to its effects) could break, and what it declares versus what it really does — the same answer [`calor query`](/docs/cli/query/) gives, from the same index |
 | `calor_edit_preview` | Classify a proposed edit as safe, warning-bearing, or breaking |
-| `calor_format` | Format source or check/assign declaration IDs |
+| `calor_format` | Format source; `ids` returns project-aware identity guidance, not assignment |
 | `calor_session_open` | Parse a project and return a session for cross-file checks |
 | `calor_session_close` | Release an open project session |
 | `calor_file_write` | Heal, check, and atomically apply a confined `.calr` write |
 | `calor_refine` | Refinement obligations, bounds, guards, fixes, and type suggestions |
-| `calor_fix` | Return type-context fixes for `NEW{object}` placeholders |
+| `calor_fix` | Return compiler-authorized safe diagnostic patches and freshly checked source without writing |
 | `calor_migrate` | Run the project migration pipeline; this tool can write files |
 | `calor_self_test` | Check the compiler against embedded golden files |
 
@@ -84,9 +84,67 @@ The `features`, `error`, and `example` actions are unchanged.
 
 The two-example limit is not a measured model-token budget.
 
-`calor_fix` never renames declarations or call targets. The former `id_conflicts`
-source rule is rejected: durable declaration identities live in `.calor/ids.json`.
-Migration's fix phases follow the same rule.
+## Action selectors
+
+| Tool | Selector | Values |
+|:-----|:---------|:-------|
+| `calor_check` | `action` | `diagnose`, `lint`, `typecheck`, `validate`, `loop` |
+| `calor_analyze` | `action` | `security`, `assess`, `minimize` |
+| `calor_navigate` | `action` | `definition`, `references`, `find`, `info`, `scope` |
+| `calor_structure` | `action` | `outline`, `callgraph`, `impact` |
+| `calor_format` | `action` | `format`, `ids` |
+| `calor_refine` | `action` | `obligations`, `bounds`, `diagnose`, `guards`, `fixes`, `types` |
+| `calor_convert` | `mode` | `convert`, `validate`, `roundtrip`, `assess` |
+| `calor_batch` | `action` | `convert`, `analyze`, `compile` |
+| `calor_batch` | `mode` | `standard`, `interop` (conversion only) |
+| `calor_help` | `action` | `syntax`, `features`, `error`, `example` |
+| `calor_migrate` | `phase` | `assess`, `convert`, `compile`, `fix`, `full` |
+| `calor_query` | `facet` | `callers`, `callees`, `impact`, `effects` |
+| `calor_file_write` | `action` | `write`, `rename`, `move` |
+
+`calor_analyze action=minimize` reports possible native constructs using syntax
+templates from the current teaching reference. `calorEquivalent` is not a
+replacement patch or a proof of convertibility. Preserve modifiers, constructor
+selection, effects and metadata; convert the original C# and check the result.
+Unsupported shapes may still need converter-owned C# preservation.
+
+## Safe diagnostic repair
+
+```json
+{"name":"calor_fix","arguments":{"source":"module Calc\n    func Add (int:x, int:y) → int\n        return x + y\n","errors":["safe_diagnostics"]}}
+```
+
+`calor_fix` uses the same deterministic safe-patch machinery as
+`calor_check action=diagnose` with `apply: true` and
+`calor_compile options.autoFix`. It returns `fixedSource`, `wasModified`,
+`fixCount` (individual edits), final `diagnostics` and optional `fixes`
+(diagnostic-description strings). `success` and `isError` describe the freshly
+checked source, including unresolved errors when no safe patch exists.
+`filePath` supplies source context or reads a file when `source` is absent.
+The tool never writes the result.
+
+Only compiler-authorized safe patches are applied, in at most three batches
+with a fresh compilation after each. Strings, comments and counted raw C#
+payloads are not searched and rewritten as syntax. Guessed constructor types,
+fuzzy names, effect changes and ambiguous indentation are not automatic repairs.
+Valid `new object()` constructors remain unchanged. The `new_object` rule is
+retired and rejected.
+
+`calor_fix` never renames declarations or call targets, or changes sidecar IDs.
+The former `id_conflicts` rule is rejected: durable identities live in
+`.calor/ids.json`. `calor_format action=ids` returns an error directing callers
+to `calor ids sync PROJECT --register FILE` and `calor ids check FILE`.
+
+Both migration fix paths use the shared safe patches under their existing
+migration compilation policy. They write only a successfully compiled candidate.
+Unresolved errors remain failures even when no patch exists; failed candidates
+leave files unchanged and report zero persisted fixes. A per-file fix does not
+prove project-wide compilation or contracts.
+
+`calor_refine action=bounds` covers only supported indexed sites. Its
+`safe: true` is not proof of complete coverage: empty sites or failed compilation
+can still produce that value. Check compilation, site coverage and per-site
+outcomes separately; unknown and unsupported results remain unproven.
 
 ## Build, Test, and Verify in One Call
 

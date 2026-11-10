@@ -242,7 +242,7 @@ public class MigrateToolTests
             var json = JsonDocument.Parse(result.Content[0].Text!).RootElement;
             var file = Assert.Single(json.GetProperty("perFile").EnumerateArray());
             Assert.Equal("fix_incomplete", file.GetProperty("status").GetString());
-            Assert.True(file.GetProperty("fixesApplied").GetInt32() > 0);
+            Assert.Equal(0, file.GetProperty("fixesApplied").GetInt32());
             Assert.Equal(source, await File.ReadAllTextAsync(path));
         }
         finally

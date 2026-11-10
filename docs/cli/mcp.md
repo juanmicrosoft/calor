@@ -8,988 +8,219 @@ permalink: /cli/mcp/
 
 # calor mcp
 
-Start the Calor MCP (Model Context Protocol) server for AI coding agents.
+Start the Model Context Protocol server for coding agents.
 
 ```bash
-calor mcp [options]
+calor mcp --stdio --root /absolute/project/path
 ```
 
----
+The server communicates over stdio. Pin `--root` in harnesses and CI: it confines
+project sessions, file writes and project-index queries. Without it, write
+confinement falls back to the server's working directory. It does **not** sandbox
+test execution.
 
-## Overview
+## Options
 
-The `mcp` command starts an MCP server that exposes Calor compiler capabilities as tools for AI coding agents like Claude. This enables agents to:
+| Option | Default | Description |
+|:-------|:--------|:------------|
+| `--stdio` | `true` | Communicate over standard input/output |
+| `--verbose`, `-v` | `false` | Write debug logs to stderr |
+| `--root` | Working directory | Root for project sessions, writes and index queries |
 
-- **Compile** Calor code to C# directly
-- **Verify** contracts and refinement type obligations using Z3 SMT solver
-- **Analyze** code for security vulnerabilities and bugs
-- **Convert** C# code to Calor
-- **Navigate** code with goto-definition, find-references, and symbol search
-- **Get syntax help** for Calor features
-- **Lint** and **format** code for agent-optimal compliance
-- **Diagnose** code with machine-readable diagnostics
-- **Preview edits** and analyze impact before committing changes
-- **Assess** C# code for Calor migration potential
+## Available tools
 
-The server communicates over stdio using the [Model Context Protocol](https://modelcontextprotocol.io/) specification.
+The server registers **19 tools**. Discover their current input schemas with
+`tools/list`; the names below are registered tools, not historical aliases.
 
-For one build/test/contract call, use the existing tool:
+| Tool | Purpose and selectors |
+|:-----|:----------------------|
+| `calor_compile` | Compile Calor to C#; optional verification, analysis and safe diagnostic fixes |
+| `calor_verify` | Verify contracts with Z3; preserve each reported proof status |
+| `calor_check` | `action`: `diagnose`, `lint`, `typecheck`, `validate`, `loop` |
+| `calor_analyze` | `action`: `security`, `assess`, `minimize` |
+| `calor_convert` | `mode`: `convert`, `validate`, `roundtrip`, `assess` |
+| `calor_batch` | `action`: `convert`, `analyze`, `compile`; conversion `mode`: `standard`, `interop` |
+| `calor_help` | `action`: `syntax`, `features`, `error`, `example` |
+| `calor_navigate` | `action`: `definition`, `references`, `find`, `info`, `scope` |
+| `calor_structure` | `action`: `outline`, `callgraph`, `impact` |
+| `calor_query` | Project-index `facet`: `callers`, `callees`, `impact`, `effects` |
+| `calor_edit_preview` | Preview an edit with compile, contract, effect and reference checks |
+| `calor_format` | `action`: `format`, `ids`; `ids` returns project-aware identity guidance, not assignment |
+| `calor_session_open` | Open a project session for cross-file checks |
+| `calor_session_close` | Release a project session |
+| `calor_file_write` | Confined, checked operations; `action`: `write`, `rename`, `move` |
+| `calor_refine` | `action`: `obligations`, `bounds`, `diagnose`, `guards`, `fixes`, `types` |
+| `calor_fix` | Return source repaired by compiler-authorized safe diagnostic patches; never writes |
+| `calor_migrate` | Project pipeline; `phase`: `assess`, `convert`, `compile`, `fix`, `full`; can write files |
+| `calor_self_test` | Run compiler self-tests against embedded golden files |
+
+Older one-purpose tool names are not aliases. For example, use
+`calor_check action=typecheck`, `calor_navigate action=definition`, or
+`calor_help action=syntax`, not the former standalone tools.
+
+## Compile, diagnose and repair
+
+Requests use current native Calor: lowercase declarations, ordinary constructor
+calls, infix expressions and indentation. Declaration IDs belong in
+`.calor/ids.json`, not source.
+
+```json
+{"name":"calor_compile","arguments":{"source":"module Calc\n  func Add (int:x, int:y) → int\n    return x + y\n"}}
+```
+
+```json
+{"name":"calor_check","arguments":{"action":"diagnose","source":"module Calc\n  func Add (int:x, int:y) → int\n    return x + y\n","apply":true}}
+```
+
+`diagnose` returns `success`, counts, shared diagnostic entries and optional
+common-mistake hints. With `apply: true`, it also returns `fixedSource` and
+`fixesApplied`. All diagnostics and `isError` describe the freshly checked source.
+`calor_compile options.autoFix` and `calor_fix` use the same safe-patch machinery.
+
+```json
+{"name":"calor_fix","arguments":{"source":"module Calc\n    func Add (int:x, int:y) → int\n        return x + y\n","errors":["safe_diagnostics"]}}
+```
+
+`calor_fix` returns `success`, `fixedSource`, `wasModified`, `fixCount`,
+`diagnostics`, and, when patches were applied, `fixes` as diagnostic-description
+strings. `fixCount` counts edits, not descriptions. Up to three patch batches
+are applied, with a fresh compilation after each. `filePath` supplies diagnostic
+source context or reads a file when `source` is absent; the tool never saves it.
+If errors remain, `success` is false and `isError` is true even when no fix exists.
+
+Only patches marked `isSafeToApply` by the compiler are applied. Invalid spans,
+overlapping edits and cross-file patches fail explicitly. Guessed constructor
+types, fuzzy names, effect-contract changes and ambiguous indentation are not
+automatic repairs. Strings, comments and counted raw C# payloads are not searched
+and rewritten as source syntax. Valid `new object()` calls remain unchanged.
+
+The `new_object` rule is retired and rejected. The `id_conflicts` rule is also
+rejected: these tools never rename declarations or call targets, or alter
+sidecar identities. For persisted identities, use
+`calor ids sync PROJECT --register FILE` and `calor ids check FILE`.
+`calor_format action=ids` returns this guidance as an error, not a passed check.
+
+Migration's standalone `fix` phase and the `full` pipeline use the same
+compiler-authorized patches with their existing migration compilation policy.
+They write only when the repaired file compiles. Unresolved errors are reported
+as failures, including when no safe patch exists; failed candidates leave the
+file unchanged and report zero persisted fixes. A successful per-file fix is
+not a project-wide build or contract proof.
+
+## Build, test and verify in one call
 
 ```json
 {"name":"calor_check","arguments":{"action":"loop","path":"/absolute/source/directory","timeoutSeconds":600,"verificationTimeoutMs":5000}}
 ```
 
-This returns the same failure-only result as `calor check --format json`
-([validation semantics](/calor/cli/#single-call-validation)). `source` is not
-required for `loop`; the other actions still require it. `loop` does not apply
-fixes. It executes arbitrary tests, so `calor_check` no longer advertises
-read-only or idempotent annotations. Tool and schema inspection never executes
-tests. Use only trusted inputs; `--root` does not sandbox test execution.
+`loop` requires `path`, not `source`. It returns the same failure-only result as
+[`calor check`](/calor/cli/#single-call-validation), without applying fixes.
+Missing tests and non-proven contracts are not success.
 
----
+**Use trusted inputs.** This action executes arbitrary tests with your
+permissions and may restore NuGet packages. `calor_check` advertises neither
+read-only nor idempotent behavior. Listing tools or inspecting schemas does not
+execute tests. `--root` does not sandbox them.
 
-## Options
-
-| Option | Short | Default | Description |
-|:-------|:------|:--------|:------------|
-| `--stdio` | | `true` | Use standard input/output for communication |
-| `--verbose` | `-v` | `false` | Enable verbose output to stderr for debugging |
-
----
-
-## Available Tools
-
-The MCP server exposes **19 tools**. The names catalogued below predate the
-action-based consolidation (several one-purpose tools were folded into
-`calor_check`, `calor_analyze`, `calor_navigate`, `calor_structure` and
-`calor_convert`); the live surface, including the v0.16 `calor_query` tool over
-the project index, is the table in
-[the MCP reference](/calor/cli/mcp/). Clients should discover the tool list
-rather than assume names from this page.
-
-### Compilation & Verification
-
-| Tool | Description |
-|:-----|:------------|
-| `calor_compile` | Compile Calor source to C# |
-| `calor_verify` | Verify contracts with Z3 SMT solver |
-| `calor_verify_contracts` | Verify contracts (alias with improved discoverability) |
-| `calor_typecheck` | Type check source code, returns categorized errors |
-| `calor_diagnose` | Get machine-readable diagnostics with fix suggestions |
-| `calor_validate_snippet` | Validate code fragments in isolation with context |
-| `calor_compile_check_compat` | Verify generated C# is API-compatible with original |
-
-### Code Navigation (LSP-style)
-
-| Tool | Description |
-|:-----|:------------|
-| `calor_goto_definition` | Find definition of symbol at position |
-| `calor_find_references` | Find all usages of a symbol |
-| `calor_symbol_info` | Get type, contracts, and signature for a symbol |
-| `calor_document_outline` | Get hierarchical structure of a file |
-| `calor_find_symbol` | Search symbols by name across files |
-| `calor_scope_info` | Get everything in scope at a given position |
-
-### Analysis & Migration
-
-| Tool | Description |
-|:-----|:------------|
-| `calor_analyze` | Advanced verification (dataflow, taint, bug patterns) |
-| `calor_assess` | Score C# files for migration potential |
-| `calor_analyze_convertibility` | Analyze C# code for Calor conversion likelihood |
-| `calor_convert` | Convert between C# and Calor |
-| `calor_convert_validated` | Full validated conversion pipeline (convert → fix → diagnose → compat) |
-| `calor_impact_analysis` | Compute what would be affected by changing a symbol |
-| `calor_call_graph` | Get callers/callees with effect annotations |
-| `calor_edit_preview` | Preview effects of an edit before committing |
-
-### Refinement Types & Obligations
-
-| Tool | Description |
-|:-----|:------------|
-| `calor_obligations` | Generate and verify refinement type obligations |
-| `calor_suggest_fixes` | Suggest ranked fix strategies for failed obligations |
-| `calor_discover_guards` | Discover Z3-validated guards for failed obligations |
-| `calor_suggest_types` | Analyze parameter usage and suggest refinement types |
-| `calor_diagnose_refinement` | All-in-one repair tool with ranked patches |
-| `calor_bounds_check` | Verify index access safety on indexed types using Z3 |
-
-### Code Quality
-
-| Tool | Description |
-|:-----|:------------|
-| `calor_lint` | Check agent-optimized format issues |
-| `calor_format` | Format source to canonical style |
-
-### Syntax & Help
-
-| Tool | Description |
-|:-----|:------------|
-| `calor_syntax_help` | Get syntax documentation for a feature |
-| `calor_syntax_lookup` | Look up Calor syntax for a C# construct |
-| `calor_explain_error` | Explain an error code or message with fix patterns |
-| `calor_ids` | Check/assign declaration IDs |
-| `calor_self_test` | Run compiler self-test against golden files |
-
----
-
-## Tool Details
-
-### calor_compile
-
-Compile Calor source code to C#.
-
-**Input Schema:**
-```json
-{
-  "source": "string (required) - Calor source code",
-  "filePath": "string - File path for diagnostics",
-  "options": {
-    "verify": "boolean - Run Z3 contract verification",
-    "analyze": "boolean - Run security/bug analysis",
-    "contractMode": "string - off|debug|release"
-  }
-}
-```
-
-**Output:** Generated C# code and diagnostics array.
-
-### calor_verify
-
-Verify Calor contracts using Z3 SMT solver.
-
-**Input Schema:**
-```json
-{
-  "source": "string (required) - Calor source code",
-  "timeout": "integer - Z3 timeout in milliseconds (default: 5000)"
-}
-```
-
-**Output:** Verification summary with per-function results and counterexamples for failed contracts.
-
-### calor_verify_contracts
-
-Verify Calor contracts using Z3 SMT solver. Alias for `calor_verify` with improved discoverability.
-
-**Input Schema:**
-```json
-{
-  "source": "string (required) - Calor source code to verify",
-  "timeout": "integer - Z3 solver timeout per contract in milliseconds (default: 5000)"
-}
-```
-
-**Output:** Verification results with counterexamples for failed contracts.
-
-### calor_typecheck
-
-Type check Calor source code. Returns type errors with precise locations and categories.
-
-**Input Schema:**
-```json
-{
-  "source": "string (required) - Calor source code to type check",
-  "filePath": "string - Optional file path for diagnostic messages"
-}
-```
-
-**Output:**
-```json
-{
-  "success": false,
-  "errorCount": 1,
-  "warningCount": 0,
-  "typeErrors": [
-    {
-      "code": "Calor0200",
-      "message": "Type mismatch: expected i32, got str",
-      "severity": "error",
-      "location": { "file": "mcp-typecheck.calr", "line": 5, "column": 10, "length": 3 },
-      "declarationId": "f001"
-    }
-  ],
-  "categories": ["type_mismatch"]
-}
-```
-
-`typeErrors[]` entries are [envelope schema v1.1](/calor/cli/envelope-schema/)
-diagnostic entries; `categories[i]` categorizes `typeErrors[i]`.
-
-**Error Categories:** `type_mismatch`, `undefined_reference`, `duplicate_definition`, `invalid_reference`, `other`
-
-### calor_analyze
-
-Analyze Calor code for security vulnerabilities and bug patterns.
-
-**Input Schema:**
-```json
-{
-  "source": "string (required) - Calor source code",
-  "options": {
-    "enableDataflow": "boolean - Enable dataflow analysis (default: true)",
-    "enableBugPatterns": "boolean - Enable bug pattern detection (default: true)",
-    "enableTaintAnalysis": "boolean - Enable taint analysis (default: true)"
-  }
-}
-```
-
-**Output:** Security vulnerabilities, bug patterns, and dataflow issues.
-
-### calor_check (`action: "diagnose"`)
-
-Get machine-readable diagnostics from Calor source code. Includes suggestions and fix information for errors when available.
-
-Section-marker suggestions use the current lexer vocabulary. They do not
-recommend removed record or Option/Result constructors, or structural closing
-tags. Calls, block lambdas, and raw C# blocks retain their required delimiters.
-
-**Input Schema:**
-```json
-{
-  "source": "string (required) - Calor source code to diagnose",
-  "action": "diagnose",
-  "apply": "boolean - Apply deterministic safe patches and return freshly checked source (default: false)",
-  "options": {
-    "strictApi": "boolean - Enable strict API checking (default: false)",
-    "requireDocs": "boolean - Require documentation on public functions (default: false)"
-  }
-}
-```
-
-**Output:**
-```json
-{
-  "success": true,
-  "errorCount": 1,
-  "warningCount": 0,
-  "diagnostics": [
-    {
-      "code": "Calor0106",
-      "message": "Unknown operator 'cotains'. Did you mean 'contains'?",
-      "severity": "error",
-      "location": { "file": "mcp-input.calr", "line": 1, "column": 40, "length": 7 },
-      "declarationId": "f001",
-      "suggestion": "Replace 'cotains' with 'contains'",
-      "fix": {
-        "description": "Replace 'cotains' with 'contains'",
-        "edits": [
-          {
-            "filePath": "mcp-input.calr",
-            "startLine": 1,
-            "startColumn": 40,
-            "endLine": 1,
-            "endColumn": 47,
-            "newText": "contains"
-          }
-        ]
-      }
-    }
-  ]
-}
-```
-
-`diagnostics[]` entries are [envelope schema v1.1](/calor/cli/envelope-schema/)
-diagnostic entries. Diagnostics with no compiler-provided suggestion may be
-accompanied by a sibling `hints[]` array of common-mistake guidance, keyed by
-`(line, column, code)`:
+## Analysis and migration
 
 ```json
-{
-  "hints": [
-    {
-      "line": 1,
-      "column": 33,
-      "code": "Calor0200",
-      "commonMistake": {
-        "id": "missing-operators",
-        "title": "Using an undefined function",
-        "suggestion": "…",
-        "correctExample": "…"
-      }
-    }
-  ]
-}
+{"name":"calor_analyze","arguments":{"action":"assess","source":"public class Counter { public int Next(int x) => x + 1; }"}}
 ```
 
-With `"apply": true` the response additionally contains:
+`assess` scores C# migration potential; it does not prove a conversion is correct.
+`security` analyzes Calor for bug patterns, dataflow and taint issues.
+`minimize` accepts Calor `source` containing converter-owned C# frames, a
+`filePath`, or raw `csharpCode`. It reports possible native constructs.
+Its `calorEquivalent` values are current syntax templates from the shared teaching
+reference, not literal replacement patches. Preserve modifiers, constructor
+selection, effects and metadata; convert the original C# and check the result.
+Unsupported shapes may still require exact converter-owned C# preservation.
+
+`calor_convert` converts C# to Calor. Use `mode=validate` for conversion followed
+by validation, `mode=roundtrip` for round-trip checking, or `mode=assess` for
+convertibility scoring. `conversionMode` is a separate `standard`/`interop`
+selector. These are not retired standalone tool names.
+
+Conversion results distinguish `interop`, `rescue`, `passthrough`, `lossy` and
+`dropped` paths. Read each path's outcome and diagnostics rather than treating
+written output as a passed build. `calor_convert` does not rescue round-trip
+failures by default; `passthroughOnError` opts into preservation.
+`calor_batch` and `calor_migrate` do not rescue project round-trip failures.
+See the [conversion reference](/calor/cli/convert/) for result fields and defaults.
+
+## Proof and bounds limitations
+
+Verification distinguishes `proven`, `refuted`, `assumed`, `unknown`, `timeout`,
+`unsupported` and `unavailable`. Only `proven` is proof. Missing metadata or
+source context must not be interpreted as purity or safety.
+
+`calor_refine action=bounds` currently checks only its supported indexed sites.
+Its `safe: true` field is **not** proof that every array access is safe: an empty
+site set or failed compilation can still return that value. Check compilation,
+site coverage and per-site outcomes separately. Unknown or unsupported cases
+remain unproven.
+
+## Examples-first help and resources
 
 ```json
-{
-  "fixedSource": "string - the source after applying safe diagnostic patches",
-  "fixesApplied": 2
-}
+{"name":"calor_help","arguments":{"query":"dictionary"}}
 ```
 
-`success`, counts, diagnostic coordinates and `isError` always describe
-`fixedSource`, including after targeted patches that need no source-level heal.
-`fixesApplied` counts individual edits. Up to three patch batches are applied,
-with a fresh diagnosis after each.
-
-Only patches marked `fix.isSafeToApply: true` are applied. Fuzzy name or operator
-matches, guessed types, effect-contract changes and ambiguous indentation remain
-suggestions with their original fix payloads. Invalid spans, overlapping edits
-and cross-file patches fail explicitly instead of being skipped. `apply` no
-longer invokes the heuristic source healer implicitly; use explicit
-`calor format --heal` when you intend to review control-flow guesses.
-MCP `calor_compile` uses the same safe-patch path for `options.autoFix`.
-
-**Fix-Supported Diagnostics:**
-- Typos in operators (e.g., "cotains" → "contains")
-- Mismatched closing tag IDs
-- Undefined variables with similar names in scope
-- C# constructs with Calor alternatives (e.g., "nameof" → use string literal)
-- Indentation issues: tabs (`Calor0008`), non-standard widths (`Calor0009`), mixed/misaligned dedents (`Calor0099`), misaligned native `else` clauses (`Calor0117`)
-- Forbidden structural closers (`Calor0830`)
-
-### calor_validate_snippet
-
-Validate Calor code fragments in isolation with optional context. Useful for incremental validation during code generation.
-
-**Input Schema:**
-```json
-{
-  "snippet": "string (required) - The Calor code fragment to validate",
-  "context": {
-    "location": "string - Where snippet appears: expression|statement|function_body|module_body (default: statement)",
-    "returnType": "string - Expected return type for containing function",
-    "parameters": "array - Variables in scope, each with 'name' and 'type'",
-    "surroundingCode": "string - Code that precedes the snippet"
-  },
-  "options": {
-    "lexerOnly": "boolean - Stop after token validation only (default: false)",
-    "showTokens": "boolean - Include token stream in output (default: false)"
-  }
-}
-```
-
-**Output:** Validation results with diagnostics. When `lexerOnly` is true, only token-level errors are reported.
-
-### calor_compile_check_compat
-
-Verify generated C# is API-compatible with original. Checks namespace preservation, enum values, and attribute emission.
-
-**Input Schema:**
-```json
-{
-  "source": "string (required) - Calor source code to compile and check",
-  "expectedNamespace": "string - Expected namespace in generated code",
-  "expectedPatterns": "array of strings - Patterns that must appear in generated code",
-  "forbiddenPatterns": "array of strings - Patterns that must NOT appear in generated code"
-}
-```
-
-**Output:** Compatibility verdict with matched/unmatched patterns.
-
-### calor_convert
-
-Convert C# source code to Calor.
-
-**Input Schema:**
-```json
-{
-  "source": "string (required) - C# source code to convert",
-  "moduleName": "string - Module name for output"
-}
-```
-
-**Output:** Generated Calor code and conversion statistics. `issues[]` are envelope schema v1.1 diagnostic entries (`Calor1343`, feature name prefixed) — see [Envelope Schema](/calor/cli/envelope-schema/).
-
-### calor_convert_validated
-
-Full validated conversion pipeline: convert C# to Calor, auto-fix parse errors, run diagnostics, and verify generated C# compatibility — all in one call.
-
-**Input Schema:**
-```json
-{
-  "source": "string (required) - C# source code to convert to Calor",
-  "moduleName": "string - Module name for the generated Calor code",
-  "mode": "string - Conversion mode: 'standard' (default) or 'interop'",
-  "expectedNamespace": "string - Expected namespace in generated C# (for compat check)",
-  "expectedPatterns": "array of strings - Patterns that must appear in generated C#",
-  "forbiddenPatterns": "array of strings - Patterns that must NOT appear in generated C#"
-}
-```
-
-**Output:** Stage-by-stage results (convert, fix, diagnose, compat) with the final Calor code and any issues found at each stage. `conversionIssues[]` and `diagnostics[]` are envelope schema v1.1 diagnostic entries (compile diagnostics carry `declarationId`).
-
-### calor_analyze_convertibility
-
-Analyze how likely C# code is to successfully convert to Calor. Combines static analysis of unsupported constructs with an actual conversion attempt to produce a practical score (0–100) with blocker details.
-
-**Input Schema:**
-```json
-{
-  "source": "string (required) - C# source code to analyze",
-  "options": {
-    "quick": "boolean - Stage 1 only: static analysis without conversion attempt (default: false)"
-  }
-}
-```
-
-**Output:** Convertibility score, blocker list, and conversion attempt results (unless `quick` mode).
-
-### calor_assess
-
-Assess C# source code for Calor migration potential. Returns scores across 8 dimensions plus detection of unsupported C# constructs.
-
-**Input Schema:**
-```json
-{
-  "source": "string - C# source code to assess (single file mode)",
-  "files": "array - Multiple C# files to assess (multi-file mode), each with 'path' and 'source'",
-  "options": {
-    "threshold": "integer - Minimum score (0-100) to include in results (default: 0)"
-  }
-}
-```
-
-**Scoring Dimensions:**
-- **ContractPotential** (18%): Argument validation, assertions -> contracts
-- **EffectPotential** (13%): I/O, network, database calls -> effect declarations
-- **NullSafetyPotential** (18%): Nullable types, null checks -> nullable-boundary checks
-- **ErrorHandlingPotential** (18%): Try/catch, throw -> native exceptions with declared effects
-- **PatternMatchPotential** (8%): Switch statements -> exhaustiveness checking
-- **ApiComplexityPotential** (13%): Undocumented public APIs
-- **AsyncPotential** (6%): async/await, Task&lt;T&gt; returns
-- **LinqPotential** (6%): LINQ method usage
-
-**Output:** Summary with average score and priority breakdown, plus per-file details including scores, dimensions, and unsupported constructs.
-
-### calor_goto_definition
-
-Find the definition of a symbol at a given position. Provide either `source` for inline code or `filePath` to read from file.
-
-**Input Schema:**
-```json
-{
-  "source": "string - Calor source code (use this OR filePath)",
-  "filePath": "string - Path to a .calr file (use this OR source)",
-  "line": "integer (required) - Line number (1-based)",
-  "column": "integer (required) - Column number (1-based)"
-}
-```
-
-**Output:** Definition location with file path, line, column, symbol name, kind, and source preview. On parse failure, `errors[]` are envelope schema v1.1 diagnostic entries.
-
-### calor_find_references
-
-Find all references to a symbol. Supports lookup by position, symbol ID, or symbol name.
-
-**Input Schema:**
-```json
-{
-  "source": "string - Calor source code (use this OR filePath)",
-  "filePath": "string - Path to a .calr file (use this OR source)",
-  "symbolId": "string - Calor unique ID (e.g., 'f001')",
-  "symbolName": "string - Name of the symbol to find",
-  "line": "integer - Line number (1-based)",
-  "column": "integer - Column number (1-based)",
-  "includeDefinition": "boolean - Include definition location in results (default: true)",
-  "groupByKind": "boolean - Group results by kind (default: false)"
-}
-```
-
-**Output:** List of references with line, column, kind (definition, call_site, type_usage, reference), and context preview.
-
-### calor_symbol_info
-
-Get type information, contracts, and documentation for a symbol at a given position.
-
-**Input Schema:**
-```json
-{
-  "source": "string - Calor source code (use this OR filePath)",
-  "filePath": "string - Path to a .calr file (use this OR source)",
-  "line": "integer (required) - Line number (1-based)",
-  "column": "integer (required) - Column number (1-based)"
-}
-```
-
-**Output:** Structured information including type, kind, contracts (preconditions/postconditions), effects, and a formatted signature.
-
-### calor_document_outline
-
-Get a structured outline of all symbols in a Calor source file. Returns a hierarchical tree of modules, classes, functions, methods, fields, etc.
-
-**Input Schema:**
-```json
-{
-  "source": "string - Calor source code (use this OR filePath)",
-  "filePath": "string - Path to a .calr file (use this OR source)",
-  "includeDetails": "boolean - Include parameter types and contracts (default: true)"
-}
-```
-
-**Output:** Hierarchical symbol tree with name, kind, line, detail, and children. Includes summary counts by symbol type. On parse failure, `errors[]` are envelope schema v1.1 diagnostic entries.
-
-### calor_find_symbol
-
-Search for symbols by name in Calor source files. Can search in inline source, a single file, or a directory of .calr files.
-
-**Input Schema:**
-```json
-{
-  "query": "string (required) - Symbol name (case-insensitive partial match)",
-  "source": "string - Calor source code to search in",
-  "filePath": "string - Path to a .calr file to search in",
-  "directory": "string - Directory to search for .calr files (recursive)",
-  "kind": "string - Filter by kind: function|class|interface|enum|method|field|property",
-  "limit": "integer - Maximum results (default: 50)"
-}
-```
-
-**Output:** Matching symbols with name, kind, location, and file path.
-
-### calor_scope_info
-
-Get everything in scope at a given position. Returns enclosing function/class/module, local variables, parameters, available functions, active contracts, and valid insertion points.
-
-**Input Schema:**
-```json
-{
-  "source": "string - Calor source code (use this OR filePath)",
-  "filePath": "string - Path to a .calr file (use this OR source)",
-  "line": "integer (required) - Line number (1-based)",
-  "column": "integer (required) - Column number (1-based)",
-  "includeTypes": "boolean - Include type information for variables (default: true)",
-  "includeContracts": "boolean - Include active contracts in scope (default: true)"
-}
-```
-
-**Output:** Enclosing context, variables in scope with types, available functions, active contracts, and valid insertion points.
-
-### calor_impact_analysis
-
-Compute what would be affected by changing a symbol. Returns direct and transitive impacts through call chains, contract dependencies, and effect chain implications.
-
-**Input Schema:**
-```json
-{
-  "source": "string - Calor source code (use this OR filePath)",
-  "filePath": "string - Path to a .calr file (use this OR source)",
-  "symbolId": "string - Calor unique ID (e.g., 'f001')",
-  "line": "integer - Line number (1-based)",
-  "column": "integer - Column number (1-based)",
-  "changeType": "string - Type of change: signature|type|rename|delete|contract (default: signature)",
-  "depth": "integer - Maximum depth for transitive analysis (1-5, default: 3)"
-}
-```
-
-**Output:** Direct and transitive impact lists with affected symbols, impact type, and severity.
-
-### calor_call_graph
-
-Get callers and/or callees of a function with effect annotations. Detects recursive cycles via strongly connected components.
-
-**Input Schema:**
-```json
-{
-  "source": "string - Calor source code (use this OR filePath)",
-  "filePath": "string - Path to a .calr file (use this OR source)",
-  "symbolId": "string - Calor unique ID (e.g., 'f001')",
-  "line": "integer - Line number (1-based)",
-  "column": "integer - Column number (1-based)",
-  "direction": "string - Which direction: callers|callees|both (default: both)",
-  "depth": "integer - Maximum traversal depth (1-5, default: 1)",
-  "includeEffects": "boolean - Include effect annotations (default: true)"
-}
-```
-
-**Output:** Call graph nodes with function ID, name, effects, and edges. Includes cycle detection for recursive functions.
-
-### calor_edit_preview
-
-Preview the effects of an edit before committing it. Given original and modified Calor source, reports compilation errors, contract violations, effect inconsistencies, and dangling references.
-
-**Input Schema:**
-```json
-{
-  "originalSource": "string (required) - Original Calor source code before the edit",
-  "modifiedSource": "string (required) - Modified Calor source code after the edit",
-  "checks": "array of strings - Which checks to run: compile|contracts|effects|references (default: all)"
-}
-```
-
-**Output:** Verdict (`safe`, `safe_with_warnings`, or `breaking`) with details of any issues found.
-
-### calor_obligations
-
-Generate and verify refinement type obligations using Z3.
-
-**Input Schema:**
-```json
-{
-  "source": "string (required) - Calor source code",
-  "timeout": "integer - Z3 solver timeout in milliseconds (default: 5000)",
-  "function_id": "string - Filter to specific function"
-}
-```
-
-**Output:** Summary with counts by status (discharged, failed, timeout, boundary), plus per-obligation details including kind, status, counterexample (for failed), and suggested fix.
-
-### calor_suggest_fixes
-
-Suggest ranked fix strategies for failed obligations.
-
-**Input Schema:**
-```json
-{
-  "source": "string (required) - Calor source code",
-  "obligation_id": "string - Filter to specific obligation"
-}
-```
-
-**Output:** Array of fixes, each with strategy (add_precondition, add_guard, refine_parameter, etc.), confidence level, and a Calor code template.
-
-### calor_discover_guards
-
-Discover guards that would discharge failed obligations, validated by Z3.
-
-**Input Schema:**
-```json
-{
-  "source": "string (required) - Calor source code",
-  "obligation_id": "string - Specific obligation to target"
-}
-```
-
-**Output:** Array of guards ranked by confidence, each with the Calor expression, insertion kind (precondition, if_guard, assert), and whether Z3 validated it.
-
-### calor_suggest_types
-
-Analyze parameter usage patterns and suggest refinement types.
-
-**Input Schema:**
-```json
-{
-  "source": "string (required) - Calor source code",
-  "function_id": "string - Filter to specific function"
-}
-```
-
-**Output:** Array of suggestions with parameter name, detected usage pattern (used_as_divisor, used_as_index, compared_geq_zero), suggested predicate, confidence, and ready-to-use Calor syntax.
-
-### calor_diagnose_refinement
-
-All-in-one repair tool — combines obligations, guards, and type suggestions into ranked patches.
-
-**Input Schema:**
-```json
-{
-  "source": "string (required) - Calor source code",
-  "policy": "string - Obligation policy: 'default', 'strict', or 'permissive' (default: 'default')"
-}
-```
-
-**Output:** Obligation summary, plus an array of patches. Each patch includes the obligation it addresses, the policy action, patch kind (precondition, if_guard, refine_parameter), Calor code to insert, confidence, and which obligation IDs it discharges.
-
-### calor_bounds_check
-
-The current action is `calor_refine` with `action: "bounds"`, not the retired
-`calor_bounds_check` tool. It reports generated index-bound obligations.
-Native source uses ordinary arrays and explicit contracts, not indexed-type
-declarations. An empty obligation list or `safe: true` is not proof that all
-array accesses were checked: inspect actual sites, statuses and compilation
-diagnostics before claiming coverage.
-
-**Input Schema:**
-```json
-{
-  "action": "bounds",
-  "source": "string (required) - native Calor source with array accesses and explicit contracts",
-  "function_id": "string - Optional: filter results to a specific function ID"
-}
-```
-
-**Output:**
-```json
-{
-  "safe": true,
-  "total_access_sites": 1,
-  "discharged": 1,
-  "failed": 0,
-  "access_sites": [
-    {
-      "obligation_id": "obl_0",
-      "function_id": "f001",
-      "array_name": "items",
-      "status": "Discharged",
-      "description": "Index access on 'items' must be within bounds [0, n)"
-    }
-  ]
-}
-```
-
-### calor_lint
-
-Check Calor source code for agent-optimal format compliance.
-
-**Input Schema:**
-```json
-{
-  "source": "string (required) - Calor source code to lint",
-  "fix": "boolean - Return auto-fixed code in the response (default: false)"
-}
-```
-
-**Output:** Parse success status, lint issues with line numbers and messages, and optionally the fixed code.
-
-### calor_format
-
-Format Calor source code to canonical style.
-
-**Input Schema:**
-```json
-{
-  "source": "string (required) - Calor source code to format"
-}
-```
-
-**Output:** Formatted code and whether it changed from the original. On parse failure, `errors[]` are envelope schema v1.1 diagnostic entries built from the real parser diagnostics.
-
-### calor_syntax_help
-
-Get syntax documentation for a specific Calor feature.
-
-**Input Schema:**
-```json
-{
-  "feature": "string (required) - Feature name (e.g., 'async', 'contracts', 'effects', 'loops', 'collections')"
-}
-```
-
-**Output:** Relevant syntax documentation and examples.
-
-### calor_syntax_lookup
-
-Look up Calor syntax for a C# construct. Supports fuzzy matching.
-
-**Input Schema:**
-```json
-{
-  "query": "string (required) - C# construct to look up (e.g., 'object instantiation', 'for loop', 'async method', 'try catch')"
-}
-```
-
-**Output:** Matching Calor syntax with examples.
-
-### calor_explain_error
-
-Explain a Calor error code or message. Returns the relevant common mistake pattern with the correct fix.
-
-**Input Schema:**
-```json
-{
-  "error": "string (required) - Error code (e.g., 'CALOR0042') or error message text"
-}
-```
-
-**Output:** Common mistake pattern match with description, correct syntax example, and fix instructions.
-
-### calor_ids
-
-Manage Calor declaration IDs. Check for missing, duplicate, or invalid IDs and optionally assign new ones.
-
-**Input Schema:**
-```json
-{
-  "source": "string (required) - Calor source code to check/process",
-  "action": "string - 'check' validates IDs, 'assign' adds missing IDs (default: 'check')",
-  "options": {
-    "allowTestIds": "boolean - Allow test IDs (f001, m001) without flagging (default: false)",
-    "fixDuplicates": "boolean - When assigning, also fix duplicate IDs (default: false)"
-  }
-}
-```
-
-**Output:** For 'check': envelope schema v1.1 diagnostic entries (`Calor0800`-band, with `declarationId`) plus `totalIds`/`issueCount` summary counts. For 'assign': Modified code and list of assignments.
-
-### calor_self_test
-
-Run compiler self-test: compiles embedded reference .calr files and diffs output against golden .cs files.
-
-**Input Schema:**
-```json
-{
-  "scenario": "string - Run only a specific scenario by name (e.g., '01_hello_world')"
-}
-```
-
-**Output:** Test results with pass/fail per scenario and diff output for failures.
-
----
-
-## Configuration
-
-### Claude Desktop
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "calor": {
-      "command": "calor",
-      "args": ["mcp", "--stdio"]
-    }
-  }
-}
-```
-
-### Claude Code (via calor init)
-
-When you run `calor init --ai claude`, the MCP server is automatically configured in `.claude/settings.json`:
-
-```json
-{
-  "mcpServers": {
-    "calor-lsp": {
-      "command": "calor",
-      "args": ["lsp"]
-    },
-    "calor": {
-      "command": "calor",
-      "args": ["mcp", "--stdio"]
-    }
-  }
-}
-```
-
-This configures two servers:
-- **calor-lsp**: Language server for IDE features (diagnostics, hover, go-to-definition)
-- **calor**: MCP server with all 19 tools
-
-### Gemini CLI (via calor init)
-
-When you run `calor init --ai gemini`, the MCP server is automatically configured in `.gemini/settings.json` alongside hooks:
-
-```json
-{
-  "mcpServers": {
-    "calor": {
-      "command": "calor",
-      "args": ["mcp", "--stdio"]
-    }
-  },
-  "hooks": {
-    "BeforeTool": [
-      {
-        "matcher": "write_file|replace",
-        "hooks": [
-          {
-            "name": "calor-validate-write",
-            "type": "command",
-            "command": "calor hook validate-write --format gemini $TOOL_INPUT"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-Note: Unlike Claude Code, Gemini CLI's MCP config does not require a `type` field, and configuration is project-level (`.gemini/settings.json`) rather than user-level.
-
-### VS Code
-
-Add to `.vscode/mcp.json`:
-
-```json
-{
-  "servers": {
-    "calor": {
-      "command": "calor",
-      "args": ["mcp", "--stdio"]
-    }
-  }
-}
-```
-
----
-
-## Manual Testing
-
-Test the server with a direct request:
-
-```bash
-echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' | \
-  { msg=$(cat); len=${#msg}; printf "Content-Length: %d\r\n\r\n%s" "$len" "$msg"; } | \
-  calor mcp --stdio
-```
-
----
-
-## Protocol Details
-
-The server implements [MCP 2024-11-05](https://spec.modelcontextprotocol.io/) with:
-
-- **Transport**: stdio with Content-Length headers
-- **Methods**: `initialize`, `initialized`, `tools/list`, `tools/call`,
-  `resources/list`, `resources/read`, `prompts/list`, `prompts/get`, `ping`
-- **Capabilities**: `tools`, `resources`, `prompts` (listChanged: false)
-
-### Generated teaching resources
-
-`src/Calor.Compiler/Resources/Teaching/reference.json` authors the current
-constructs, C# equivalents, prose and complete examples. Run
-`calor self-check docs --teaching-only --fix` to regenerate the teaching outputs.
-Run without `--fix` to reject stale or missing output.
+`syntax` is the default action; `feature` aliases `query`. The result contains
+at most two closest complete programs from the canonical teaching reference,
+with `programId`, exact `calor` source and C# context. `construct`, `calorSyntax`
+and `description` retain syntax guidance and caveats. Lookup does not execute
+code. The two-example bound is not a measured token budget.
+
+Unknown topics and known topics without a canonical executable example return
+`found: false` and an empty `examples` array. Use `action=features` for conversion
+capabilities; preserved C# is not native authoring syntax.
+`query=overview` and `query=reference` return prose in `sections`.
 
 | Resource | Content |
 |:---------|:--------|
 | `calor://reference` | Complete generated current-language reference |
 | `calor://primer` | Fixed subset of complete examples and common mistakes |
 | `calor://syntax-reference` | Syntax lookup and LSP hover metadata |
-| `calor://tags` | Documented tags with syntax and delimiter guidance |
+| `calor://tags` | Current construct syntax and delimiter guidance |
 | `calor://type-mappings` | C# and Calor type mappings |
 | `calor://effects` | Effect-code examples |
-| `calor://id-prefixes` | Tooling-owned identity guidance; the legacy URI remains, but source ID prefixes are retired |
+| `calor://id-prefixes` | Tooling-owned identity guidance; source ID prefixes are retired |
 | `calor://workflows` | Agent editing workflows |
 
-`calor_help` defaults to `action=syntax`. `query` and `feature` are aliases for
-the same examples-first lookup:
+`src/Calor.Compiler/Resources/Teaching/reference.json` authors the generated
+teaching resources. `calor self-check docs --teaching-only --fix` regenerates
+them; without `--fix`, it rejects stale output.
+`CALOR_REFERENCE_FILE` overrides only explicit full-reference requests.
+It cannot inject examples into normal topic lookup.
+
+## Client configuration
+
+Configure an MCP client to launch the tool over stdio. For example, a Claude
+Desktop configuration can contain:
 
 ```json
-{"name":"calor_help","arguments":{"query":"dictionary"}}
+{
+  "mcpServers": {
+    "calor": {
+      "command": "calor",
+      "args": ["mcp", "--stdio", "--root", "/absolute/project/path"]
+    }
+  }
+}
 ```
 
-The result contains at most two complete programs from the canonical reference,
-with `programId`, byte-identical `calor` source, and the existing C# context.
-`construct`, `calorSyntax` and `description` retain syntax guidance and caveats.
-Programs are ranked within the matching topic; precise matches are not padded
-with an unrelated second example. Equal construct scores use ordinal construct
-IDs; equal example scores retain canonical order. The generated examples are
-compiler-checked by the teaching-resource and help tests; lookup does not compile
-or execute code.
+For VS Code, use the same entry under `servers` in `.vscode/mcp.json`.
+`calor init --ai claude` and `calor init --ai gemini` generate their respective
+client configuration.
 
-Unknown topics return `found: false`, an empty `examples` array and guidance.
-A known topic without a canonical executable program also returns
-`found: false`, retaining its description rather than substituting a program.
-Use `action=features` for conversion capability rather than treating converter
-preservation as native authoring syntax. The `error`, `features` and `example`
-actions retain their existing behavior.
+## Protocol
 
-`query: "overview"` (or `feature: "overview"`) still returns the concise overview
-in `sections`. `query: "reference"` returns the full Markdown reference;
-`calor://reference` remains available as a resource. Ordinary `feature` requests
-now return `examples`, not prose `sections`. The two-example bound is not a
-measured token budget.
-Initialization templates and MCP server instructions share the same authored source.
-
----
-
-## Environment Variables
-
-| Variable | Description |
-|:---------|:------------|
-| `CALOR_REFERENCE_FILE` | Explicit Markdown override for `calor_help query=reference` (or `feature=reference`); unreadable overrides return an error. It does not replace compiler-checked examples in normal topic lookup. |
-
----
-
-## See Also
-
-- [calor init](/calor/cli/init/) - Initialize project with MCP server configuration
-- [Claude Integration](/calor/getting-started/claude-integration/) - Using Calor with Claude Code
-- [Gemini Integration](/calor/getting-started/gemini-integration/) - Using Calor with Google Gemini CLI
-- [Model Context Protocol](https://modelcontextprotocol.io/) - MCP specification
+The server implements MCP `2025-03-26` over stdio with newline-delimited JSON
+(one JSON-RPC message per line), not Content-Length headers.
+It supports initialization, tool discovery/calls, resource discovery/reads,
+prompt discovery/reads and ping. Tool calls use their registered input schemas;
+diagnostic-producing results embed shared
+[diagnostic envelope entries](/calor/cli/envelope-schema/) inside tool-specific
+result objects. An MCP result is not automatically a CLI command envelope.

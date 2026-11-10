@@ -19,7 +19,8 @@ public class FixToolTests
     public void Description_ContainsFixInfo()
     {
         Assert.Contains("fix", _tool.Description, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("NEW{object}", _tool.Description);
+        Assert.DoesNotContain("NEW{object}", _tool.Description);
+        Assert.Contains("safe diagnostic", _tool.Description);
     }
 
     [Fact]
@@ -37,56 +38,49 @@ public class FixToolTests
     // ── FixNewObject ────────────────────────────────────────────────
 
     [Fact]
-    public void FixNewObject_ReplacesFromBindingType()
+    public async Task FixNewObject_ReplacesFromBindingType()
     {
         var source = "§B{result:List<int>} §NEW{object}§/NEW{object}";
-        var (result, fixes) = FixTool.FixNewObject(source);
-
-        Assert.Contains("§NEW{List<int>}", result);
-        Assert.Contains("§/NEW{List<int>}", result);
-        Assert.DoesNotContain("§NEW{object}", result);
-        Assert.Single(fixes);
-        Assert.Equal("new_object", fixes[0].Rule);
+        await AssertRetiredConstructorUnchanged(source);
     }
 
     [Fact]
-    public void FixNewObject_ReplacesFromThrowContext()
+    public async Task FixNewObject_ReplacesFromThrowContext()
     {
         var source = "§TH §NEW{object} §A \"bad input\" §/NEW";
-        var (result, fixes) = FixTool.FixNewObject(source);
-
-        Assert.Contains("§NEW{Exception}", result);
-        Assert.Single(fixes);
+        await AssertRetiredConstructorUnchanged(source);
     }
 
     [Fact]
-    public void FixNewObject_ReplacesFromReturnType()
+    public async Task FixNewObject_ReplacesFromReturnType()
     {
         var source = "§O{StringBuilder}\n§R §NEW{object}§/NEW";
-        var (result, fixes) = FixTool.FixNewObject(source);
-
-        Assert.Contains("§NEW{StringBuilder}", result);
-        Assert.Single(fixes);
+        await AssertRetiredConstructorUnchanged(source);
     }
 
     [Fact]
-    public void FixNewObject_ReplacesFromFieldType()
+    public async Task FixNewObject_ReplacesFromFieldType()
     {
         var source = "§FLD{Dictionary<string,int>:_cache:priv}\n  §NEW{object}§/NEW";
-        var (result, fixes) = FixTool.FixNewObject(source);
-
-        Assert.Contains("§NEW{Dictionary<string,int>}", result);
-        Assert.Single(fixes);
+        await AssertRetiredConstructorUnchanged(source);
     }
 
     [Fact]
-    public void FixNewObject_LeavesUnresolvable()
+    public async Task FixNewObject_LeavesUnresolvable()
     {
         var source = "§B{x} §NEW{object}§/NEW";
-        var (result, fixes) = FixTool.FixNewObject(source);
+        await AssertRetiredConstructorUnchanged(source);
+    }
 
-        Assert.Contains("§NEW{object}", result);
-        Assert.Empty(fixes);
+    private async Task AssertRetiredConstructorUnchanged(string source)
+    {
+        var result = await _tool.ExecuteAsync(JsonSerializer.SerializeToElement(new { source }));
+        Assert.True(result.IsError);
+        var output = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+        Assert.False(output.GetProperty("success").GetBoolean());
+        Assert.Equal(source, output.GetProperty("fixedSource").GetString());
+        Assert.Equal(0, output.GetProperty("fixCount").GetInt32());
+        Assert.NotEmpty(output.GetProperty("diagnostics").EnumerateArray());
     }
 
     [Theory]
@@ -96,7 +90,7 @@ public class FixToolTests
     {
         var source = "§F{Foo:pub}\n§R 1\n\n§F{Bar:pub}\n§R 2\n";
         var result = await _tool.ExecuteAsync(JsonSerializer.SerializeToElement(
-            new { source, errors = new[] { "new_object", rule } }));
+            new { source, errors = new[] { "safe_diagnostics", rule } }));
 
         Assert.True(result.IsError);
         Assert.Contains(".calor/ids.json", result.Content[0].Text!);
@@ -160,11 +154,11 @@ public class FixToolTests
 
         var result = await _tool.ExecuteAsync(args);
 
-        Assert.False(result.IsError);
+        Assert.True(result.IsError);
         var text = result.Content[0].Text!;
-        Assert.Contains("fixedSource", text);
-        Assert.Contains("NEW{Exception}", text);
-        Assert.Contains("\"wasModified\":true", text);
+        Assert.Contains("retired", text);
+        Assert.DoesNotContain("NEW{Exception}", text);
+        Assert.DoesNotContain("fixedSource", text);
     }
 
     [Fact]
@@ -178,9 +172,10 @@ public class FixToolTests
 
         var result = await _tool.ExecuteAsync(args);
 
-        Assert.False(result.IsError);
+        Assert.True(result.IsError);
         var text = result.Content[0].Text!;
-        Assert.Contains("\"success\":true", text);
+        Assert.Contains("\"success\":false", text);
+        Assert.Contains("\"wasModified\":false", text);
     }
 
     [Fact]
@@ -188,7 +183,7 @@ public class FixToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "source": "§M{Test}\n§F{Foo:pub}\n§O{void}\n\n"
+                "source": "module Test\n  func Foo () → void\n    return\n"
             }
             """).RootElement;
 

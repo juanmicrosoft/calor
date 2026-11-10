@@ -48,12 +48,12 @@ public sealed class MigrateTool : McpToolBase
                 },
                 "autoFix": {
                     "type": "boolean",
-                    "description": "Whether to auto-fix common errors after conversion (default: true)",
+                    "description": "Whether to apply compiler-authorized safe diagnostic patches after conversion (default: true). Never guesses constructor types.",
                     "default": true
                 },
                 "explicitCallClosers": {
                     "type": "boolean",
-                    "description": "Emit explicit §/C for every §C call (v0.6.0-compatible output); disables zero-arg §/C elision (default: false — v0.6.1 default elides zero-arg §/C)",
+                    "description": "Compatibility option; current native calls use parentheses, not section-marker closers.",
                     "default": false
                 },
                 "fidelity": {
@@ -302,37 +302,31 @@ public sealed class MigrateTool : McpToolBase
             try
             {
                 var source = await File.ReadAllTextAsync(path, ct);
-                var (fixedFinal, fixes) = FixTool.FixNewObject(source);
-                var totalFixes = fixes.Count;
+                var fixedFinal = DiagnosticFixes.Repair(source, path,
+                    new CompilationOptions
+                    {
+                        ContractMode = ContractMode.Off,
+                        UnknownCallPolicy = UnknownCallPolicy.Permissive,
+                        VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
+                        CancellationToken = ct
+                    }, out var validation, out var totalFixes);
+
+                if (validation.HasErrors)
+                {
+                    perFile.Add(new MigrateFileResult
+                    {
+                        Path = Path.GetRelativePath(directory, path),
+                        Status = "fix_incomplete",
+                        Errors = BuildCompileEnvelope(validation, path, fixedFinal)
+                            .Where(entry => entry.Severity == "error")
+                            .ToList(),
+                        FixesApplied = 0
+                    });
+                    continue;
+                }
 
                 if (totalFixes > 0)
-                {
-                    var validation = Program.Compile(
-                        fixedFinal,
-                        path,
-                        new CompilationOptions
-                        {
-                            ContractMode = ContractMode.Off,
-                            UnknownCallPolicy = UnknownCallPolicy.Permissive,
-                            VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
-                            CancellationToken = ct
-                        });
-                    if (validation.HasErrors)
-                    {
-                        perFile.Add(new MigrateFileResult
-                        {
-                            Path = Path.GetRelativePath(directory, path),
-                            Status = "fix_incomplete",
-                            Errors = BuildCompileEnvelope(validation, path, fixedFinal)
-                                .Where(entry => entry.Severity == "error")
-                                .ToList(),
-                            FixesApplied = totalFixes
-                        });
-                        continue;
-                    }
-
                     await ConversionFileWriter.WriteAtomicAsync(path, fixedFinal, cancellationToken: ct);
-                }
 
                 perFile.Add(new MigrateFileResult
                 {
@@ -550,19 +544,17 @@ public sealed class MigrateTool : McpToolBase
                 try
                 {
                     var source = await File.ReadAllTextAsync(path, ct);
-                    var (fixedFinal, fixes) = FixTool.FixNewObject(source);
-                    var totalFixes = fixes.Count;
-
-                    if (totalFixes > 0)
-                    {
-                        var compileOptions = new CompilationOptions
+                    var fixedFinal = DiagnosticFixes.Repair(source, path,
+                        new CompilationOptions
                         {
                             ContractMode = ContractMode.Off,
                             UnknownCallPolicy = UnknownCallPolicy.Permissive,
                             VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
                             CancellationToken = ct
-                        };
-                        var recompile = Program.Compile(fixedFinal, path, compileOptions);
+                        }, out var recompile, out var totalFixes);
+
+                    if (totalFixes > 0)
+                    {
                         if (!recompile.HasErrors)
                         {
                             await ConversionFileWriter.WriteAtomicAsync(
@@ -590,13 +582,28 @@ public sealed class MigrateTool : McpToolBase
                                     .Where(e => e.Severity == "error")
                                     .ToList()
                                 : null,
-                            FixesApplied = totalFixes
+                            FixesApplied = recompile.HasErrors ? 0 : totalFixes
                         };
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Leave status as-is on fix failure
+                    var relativePath = Path.GetRelativePath(directory, path);
+                    var sourceKey = allPerFile.Keys
+                        .FirstOrDefault(k => Path.ChangeExtension(k, ".calr") == relativePath);
+                    var key = sourceKey ?? relativePath;
+                    var existing = allPerFile[key];
+                    allPerFile[key] = new MigrateFileResult
+                    {
+                        Path = existing.Path,
+                        Status = "fix_incomplete",
+                        Score = existing.Score,
+                        Losses = existing.Losses,
+                        OutputWritten = existing.OutputWritten,
+                        ConversionPaths = existing.ConversionPaths?.WithSuccess(false),
+                        Errors = [ConversionIssueEnvelope.Message(
+                            DiagnosticCode.CliInternalError, "error", $"Fix failed: {ex.Message}", path)]
+                    };
                 }
             }
         }

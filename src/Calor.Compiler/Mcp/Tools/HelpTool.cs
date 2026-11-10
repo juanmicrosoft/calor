@@ -116,6 +116,10 @@ public sealed class HelpTool : McpToolBase
 
     #region SyntaxLookup (fuzzy C# → Calor mapping)
 
+    internal static string GetSyntaxTemplate(string constructId) =>
+        SyntaxDoc.Value?.Constructs.Single(c => c.Id == constructId).CalorSyntax
+        ?? throw new InvalidOperationException("Syntax documentation not available");
+
     private Task<McpToolResult> HandleSyntaxLookup(string query)
     {
         var doc = SyntaxDoc.Value;
