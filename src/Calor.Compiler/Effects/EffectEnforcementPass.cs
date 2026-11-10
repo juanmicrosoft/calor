@@ -826,7 +826,8 @@ public sealed class EffectEnforcementPass
                         .OrderBy(span => span.Start).FirstOrDefault();
                     var insertLine = firstContent.Line > function.Span.Line
                         ? firstContent.Line : function.Span.Line + 1;
-                    var indentation = new string(' ', function.Span.Column + 1);
+                    var indentation = new string(' ', firstContent.Line > function.Span.Line
+                        ? firstContent.Column - 1 : function.Span.Column + 1);
 
                     fix = new SuggestedFix(
                         $"Add effect declaration ! {missingEffects}",

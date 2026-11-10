@@ -85,21 +85,24 @@ public sealed class NativeEffectSuggestionTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void MissingNestedRow_IsInsertedInsideTheMethodBeforeContracts(bool nested)
+    [InlineData(false, 2)]
+    [InlineData(true, 2)]
+    [InlineData(false, 4)]
+    [InlineData(true, 4)]
+    public void MissingNestedRow_IsInsertedInsideTheMethodBeforeContracts(bool nested, int indentation)
     {
-        var owner = nested ? "  class Box\n" : "";
-        var indent = nested ? "    " : "  ";
+        var unit = new string(' ', indentation);
+        var owner = nested ? unit + "class Box\n" : "";
+        var indent = nested ? unit + unit : unit;
         var source = $"module Native\n{owner}{indent}func Echo public (int:value) → int\n"
-            + $"{indent}  requires value >= 0\n"
-            + $"{indent}  System.Console.Write(value)\n"
-            + $"{indent}  return value\n";
+            + $"{indent}{unit}requires value >= 0\n"
+            + $"{indent}{unit}System.Console.Write(value)\n"
+            + $"{indent}{unit}return value\n";
         var compiled = Program.Compile(source, "native.calr");
         var diagnostic = Assert.Single(compiled.Diagnostics.DiagnosticsWithFixes,
             diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
         var edit = Assert.Single(diagnostic.Fix.Edits);
-        Assert.Equal(indent + "  ! cw\n", edit.NewText);
+        Assert.Equal(indent + unit + "! cw\n", edit.NewText);
         var authorized = new DiagnosticWithFix(diagnostic.Code, diagnostic.Message, diagnostic.Span,
             new SuggestedFix(diagnostic.Fix.Description, edit, isSafeToApply: true));
         var amended = DiagnosticFixes.Apply(source, source, "native.calr", [authorized], out _);
