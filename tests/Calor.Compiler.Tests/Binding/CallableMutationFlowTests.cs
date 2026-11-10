@@ -62,7 +62,7 @@ public sealed class CallableMutationFlowTests
                 let bool:result = wrapper()
                 """,
             "late-target" => $$"""
-                var Action:later = Noop
+                var Action:later ! mut = Noop
                 let Action:wrapper = () => later()
                 set later {{mutator}}
                 wrapper()
@@ -82,12 +82,12 @@ public sealed class CallableMutationFlowTests
                   wrapper()
                 """,
             "mutable-rebind" => $$"""
-                var Action:later = Noop
+                var Action:later ! mut = Noop
                 var later = {{mutator}}
                 later()
                 """,
             "deferred-setter" => $$"""
-                var Action:later = Noop
+                var Action:later ! mut = Noop
                 let Action:mutator = {{mutator}}
                 let Action:setter = () =>
                   set later mutator
@@ -95,7 +95,7 @@ public sealed class CallableMutationFlowTests
                 later()
                 """,
             "nested-deferred-setter" => $$"""
-                var Action:later = Noop
+                var Action:later ! mut = Noop
                 let Action:mutator = {{mutator}}
                 let Action:setter = () =>
                   set later mutator
@@ -104,7 +104,7 @@ public sealed class CallableMutationFlowTests
                 later()
                 """,
             "deferred-rebind" => $$"""
-                var Action:later = Noop
+                var Action:later ! mut = Noop
                 let Action:mutator = {{mutator}}
                 let Action:setter = () =>
                   var later = mutator
@@ -112,8 +112,8 @@ public sealed class CallableMutationFlowTests
                 later()
                 """,
             "late-write-source" => $$"""
-                var Action:later = Noop
-                var Action:mutator = Noop
+                var Action:later ! mut = Noop
+                var Action:mutator ! mut = Noop
                 let Action:setter = () =>
                   set later mutator
                 set mutator {{mutator}}
@@ -121,8 +121,8 @@ public sealed class CallableMutationFlowTests
                 later()
                 """,
             "write-source-fixed-point" => $$"""
-                var Action:later = Noop
-                var Action:source = Noop
+                var Action:later ! mut = Noop
+                var Action:source ! mut = Noop
                 let Action:mutator = {{mutator}}
                 let Action:setter = () =>
                   set source mutator
@@ -133,7 +133,7 @@ public sealed class CallableMutationFlowTests
                 later()
                 """,
             "setter-does-not-invoke-value" => $$"""
-                var Action:later = Noop
+                var Action:later ! mut = Noop
                 let Action:mutator = {{mutator}}
                 let Action:setter = () =>
                   set later mutator
@@ -146,7 +146,7 @@ public sealed class CallableMutationFlowTests
                 """,
             "alias-assignment" => $$"""
                 let Action:later = {{mutator}}
-                var Action:alias = Noop
+                var Action:alias ! mut = Noop
                 set alias later
                 alias()
                 """,
@@ -191,7 +191,7 @@ public sealed class CallableMutationFlowTests
                 first()
                 """,
             "uninvoked-setter" => $$"""
-                var Action:later = Noop
+                var Action:later ! mut = Noop
                 let Action:mutator = {{mutator}}
                 let Action:setter = () =>
                   set later mutator
@@ -207,8 +207,8 @@ public sealed class CallableMutationFlowTests
                 later()
                 """,
             "alias-is-value-copy" => $$"""
-                var Action:later = Noop
-                let Action:alias ! = later
+                var Action:later ! mut = Noop
+                let Action:alias ! mut = later
                 set later {{mutator}}
                 alias()
                 """,
@@ -227,19 +227,47 @@ public sealed class CallableMutationFlowTests
               func Noop public () → void
                 !
               func Mutate public ({{modifier}} {{nullableType}}:value) → void
+                ! mut
                 set value null
               func NoopBool public () → bool
                 return true
               func MutateBool public ({{modifier}} {{nullableType}}:value) → bool
+                ! mut
                 set value null
                 return true
               func Take public ({{nonNullableType}}:value) → void
                 !
               func Probe public ({{nullableType}}:value, bool:flag) → void
+                ! mut
                 if value != null
             {{Indent(body, 6)}}
                   Take(value)
             """;
+        if (scenario == "alias-is-value-copy")
+        {
+            // Pin the original pure-row fixture's rejection alongside the legal value-copy control.
+            var originalPureAlias = source
+                .Replace("var Action:later ! mut = Noop", "var Action:later = Noop", StringComparison.Ordinal)
+                .Replace("let Action:alias ! mut = later", "let Action:alias ! = later", StringComparison.Ordinal);
+            var narrowedAlias = source.Replace(
+                "let Action:alias ! mut = later", "let Action:alias ! = later", StringComparison.Ordinal);
+            foreach (var (invalidSource, destination) in new[]
+            {
+                (originalPureAlias, "'later'"),
+                (narrowedAlias, "binding 'alias'")
+            })
+            {
+                var invalid = Program.Compile(invalidSource, "callable-mutation-flow.calr", new CompilationOptions());
+                Assert.True(invalid.HasErrors);
+                Assert.Empty(invalid.GeneratedCode);
+                var mismatch = Assert.Single(invalid.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+                Assert.Equal("Calor0424", mismatch.Code);
+                Assert.Contains(destination, mismatch.Message);
+                Assert.Contains("declared row: [pure]", mismatch.Message);
+                Assert.Contains("Extra effect(s): mut", mismatch.Message);
+                Assert.DoesNotContain(invalid.Diagnostics, d => d.Code is "Calor0425" or "Calor0411");
+            }
+        }
         var result = Program.Compile(source, "callable-mutation-flow.calr");
         Assert.DoesNotContain(result.Diagnostics, diagnostic =>
             diagnostic.Severity == DiagnosticSeverity.Error
@@ -493,14 +521,16 @@ public sealed class CallableMutationFlowTests
               func Noop public () → void
                 !
               func Mutate public ({{modifier}} {{nullableType}}:value) → void
+                ! mut
                 set value null
               func Take public ({{requiredType}}:value) → void
                 !
               func Probe public ({{nullableType}}:value, bool:flag) → void
+                ! mut
                 if value != null
                   let Action:noopAction = () => Noop()
                   let Action:mutator = () => Mutate({{modifier}} value)
-                  var Action:later = noopAction
+                  var Action:later ! mut = noopAction
                   let Func<bool>:setter = () =>
                     set later mutator
                     return false
@@ -833,14 +863,15 @@ public sealed class CallableMutationFlowTests
                     if flag
                       throw new Exception()
                   func Mutate public ({{modifier}} {{requiredType}}?:value) → void
+                    ! mut
                     set value null
                   func Take public ({{requiredType}}:value) → void
                     !
                   func Probe public ({{requiredType}}?:value, bool:flag, string?:text) → void
-                    ! throw, alloc
+                    ! mut, throw, alloc
                     let Action:noopAction = () => Noop()
                     let Action:mutator = () => Mutate({{modifier}} value)
-                    var Action:later = {{(initialNoop ? "noopAction" : "mutator")}}
+                    var Action:later ! mut = {{(initialNoop ? "noopAction" : "mutator")}}
                     let Func<bool>:resetter = () =>
                       set later noopAction
                       return false
@@ -1056,6 +1087,7 @@ public sealed class CallableMutationFlowTests
                 func Noop public () → void
                   !
                 func Mutate public ({{modifier}} {{type}}?:target) → void
+                  ! mut
                   set target null
                 func Take public ({{type}}:target) → void
                   !
