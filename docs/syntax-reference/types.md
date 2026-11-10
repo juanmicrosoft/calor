@@ -81,6 +81,11 @@ produces an `int`.
 
 ## Arrays
 
+Sized jagged creation uses the allocated rank first: `new int[2][]` allocates
+two slots for inner `int[]` arrays, initially null. `new int[2, 3][]`
+allocates a rectangular array of inner-array slots. Trailing ranks do not
+allocate the inner arrays; creating the outer array still requires `alloc`.
+
 Use `T[]` for a one-dimensional array, `T[,]` for a two-dimensional array,
 and `T[][]` for an array of arrays. Array rank and element type are part of
 the type. An array is not a `List<T>`: for example, `File.ReadAllLines`

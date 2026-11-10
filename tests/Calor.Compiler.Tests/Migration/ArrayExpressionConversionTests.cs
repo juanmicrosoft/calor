@@ -342,7 +342,7 @@ public class ArrayExpressionConversionTests
         var calor = await ConvertNativeWithRealCliAsync(source, surface);
         Assert.DoesNotContain("§CS", calor);
         Assert.DoesNotMatch(@"\((?:inc|pre-inc|dec|pre-dec|post-inc|post-dec)\s", calor);
-        Assert.Contains("§ASSIGN", calor);
+        Assert.Matches(@"(?m)^\s*set ", calor);
         var compilation = Program.Compile(calor, "eager-array.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compilation.HasErrors,
@@ -1633,6 +1633,68 @@ public class ArrayExpressionConversionTests
         Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
         Assert.Equal("2,3,1,4,0,Guid[]", Run(source));
         Assert.Equal(Run(source), Run(compilation.GeneratedCode));
+    }
+
+    [Theory]
+    [InlineData("new int[2][]")]
+    [InlineData("new int[0][]")]
+    [InlineData("new int[2, 3][]")]
+    [InlineData("new int[2][,]")]
+    [InlineData("new int[2][][,]")]
+    [InlineData("new string?[2][]")]
+    [InlineData("new System.DateTime[2][]")]
+    [InlineData("new int[2][] { new int[] { 1 }, new int[] { 2, 3 } }")]
+    public void SizedJaggedArrays_RetainTheirClrShapeAndAllocationCharge(string expression)
+    {
+        const string observation = """
+            var value = (System.Array)P.Make();
+            string elements = "";
+            foreach (var element in value)
+                elements += element is System.Array inner ? inner.GetType() + ":" + inner.Length + ";" : "null;";
+            return value.GetType() + "|" + value.GetType().GetElementType() + "|" + value.Rank + "|" + value.Length + "|" + elements;
+            """;
+        var caller = "public static class Probe { public static string Run() { " + observation + " } }";
+        var expected = Run("public static class P { public static object Make() => " + expression + "; }", caller);
+        var source = $$"""
+            module SizedJaggedArray
+              module P
+                func Make public () → object
+                  ! alloc
+                  return {{expression}}
+            """;
+        var diagnostics = new DiagnosticBag();
+        var module = new Parsing.Parser(
+            new Parsing.Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+        foreach (var calor in new[] { source, new CalorEmitter().Emit(module) })
+        {
+            var result = Program.Compile(calor, "sized-jagged.calr",
+                new CompilationOptions { StatusWriter = TextWriter.Null });
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+            Assert.Equal(expected, Run(result.GeneratedCode, caller));
+            var pure = Program.Compile(calor.Replace("! alloc", "!", StringComparison.Ordinal), "pure-sized-jagged.calr",
+                new CompilationOptions { StatusWriter = TextWriter.Null });
+            Assert.Contains(pure.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
+                && error.Message.Contains("'alloc'", StringComparison.Ordinal));
+        }
+    }
+
+    [Theory]
+    [InlineData("new int[2][,")]
+    [InlineData("new int[2][, 3]")]
+    [InlineData("new int[2][]?")]
+    public void SizedJaggedArrays_RejectMalformedTrailingRanks(string expression)
+    {
+        var source = $$"""
+            module InvalidSizedJaggedArray
+              module P
+                func Make public () → object
+                  ! alloc
+                  return {{expression}}
+            """;
+        var diagnostics = new DiagnosticBag();
+        new Parsing.Parser(new Parsing.Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.True(diagnostics.HasErrors);
     }
 
     [Fact]

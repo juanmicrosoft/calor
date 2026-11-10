@@ -10868,7 +10868,9 @@ public sealed class Parser
                     break;
             }
             Expect(TokenKind.CloseBracket);
-            return ParseNativeArrayCreation(start, type, typeSpan, Math.Max(1, sizes.Count), sizes);
+            var elementType = new System.Text.StringBuilder(type);
+            ReadInlineTypeSuffixes(elementType, allowNullable: false);
+            return ParseNativeArrayCreation(start, elementType.ToString(), typeSpan, Math.Max(1, sizes.Count), sizes);
         }
         var arguments = new List<ExpressionNode>();
         var names = new List<string?>();
@@ -15512,9 +15514,9 @@ public sealed class Parser
         return sb.ToString();
     }
 
-    private void ReadInlineTypeSuffixes(System.Text.StringBuilder sb)
+    private void ReadInlineTypeSuffixes(System.Text.StringBuilder sb, bool allowNullable = true)
     {
-        while (Check(TokenKind.OpenBracket) || Check(TokenKind.Question))
+        while (Check(TokenKind.OpenBracket) || (allowNullable && Check(TokenKind.Question)))
         {
             if (Match(TokenKind.Question))
             {
@@ -15535,11 +15537,8 @@ public sealed class Parser
                     sb.Append(',');
                     Advance();
                 }
-                if (Check(TokenKind.CloseBracket))
-                {
-                    sb.Append(']');
-                    Advance();
-                }
+                Expect(TokenKind.CloseBracket);
+                sb.Append(']');
             }
             else break;
         }
