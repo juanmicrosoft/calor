@@ -394,6 +394,69 @@ public class ArrayExpressionConversionTests
         return calor;
     }
 
+    [Fact]
+    public void StaticAndInstanceConstructors_StayNativeAndRetainInitializationTiming()
+    {
+        const string source = """
+            public class Gate
+            {
+                public static int Value;
+                static Gate() { Probe.Hits = Probe.Hits + 1; }
+                public Gate(int value) { Value = value; }
+            }
+            public static class Probe
+            {
+                public static int Hits;
+                public static string Run()
+                {
+                    int before = Hits;
+                    int value = Gate.Value;
+                    int after = Hits;
+                    var gate = new Gate(7);
+                    return before + "|" + after + "|" + value + "|" + Hits + "|" + Gate.Value;
+                }
+            }
+            """;
+        const string expected = "0|1|0|1|7";
+        Assert.Equal(expected, Run(source));
+        var result = new CSharpToCalorConverter().Convert(source);
+        Assert.True(result.Success, string.Join(Environment.NewLine, result.Issues));
+        Assert.Empty(result.Losses);
+        RawFrameAssertions.AssertFramed(result.CalorSource!, present: false);
+        var diagnostics = new DiagnosticBag();
+        var module = new Parsing.Parser(
+            new Parsing.Lexer(result.CalorSource!, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+        var constructors = Assert.Single(module.Classes, cls => cls.Name == "Gate").Constructors;
+        Assert.Equal(2, constructors.Count);
+        Assert.Single(constructors, constructor => constructor.IsStatic);
+        Assert.Single(constructors, constructor => !constructor.IsStatic);
+        foreach (var calor in new[] { result.CalorSource!, new CalorEmitter().Emit(module) })
+        {
+            var compiled = Program.Compile(calor, "static-and-instance.calr",
+                new CompilationOptions { StatusWriter = TextWriter.Null });
+            Assert.False(compiled.HasErrors, string.Join(Environment.NewLine, compiled.Diagnostics.Errors));
+            Assert.Equal(expected, Run(compiled.GeneratedCode));
+        }
+    }
+
+    [Theory]
+    [InlineData("static")]
+    [InlineData("public stat")]
+    [InlineData("stat private")]
+    public void StaticConstructorHeaders_RejectNoncanonicalOrVisibilityModifiers(string modifiers)
+    {
+        var source = $$"""
+            module StaticConstructorHeader
+              class Value
+                ctor {{modifiers}} ()
+                  let int:value = 1
+            """;
+        var result = Program.Compile(source, "static-constructor-header.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Contains(result.Diagnostics.Errors, error => error.Code == DiagnosticCode.InvalidModifier);
+    }
+
     public static IEnumerable<object[]> EagerArrayAddressArguments()
     {
         foreach (var modifier in new[] { "ref", "in" })
@@ -475,6 +538,7 @@ public class ArrayExpressionConversionTests
         const string expected = "11:10|1:2|5:0:11|5:0:11|3:f";
         Assert.Equal(expected, Run(source));
         var calor = await ConvertNativeWithRealCliAsync(source, surface);
+        Assert.Equal(3, Regex.Matches(calor, @"(?m)^\s*ctor stat \(\)").Count);
         Assert.DoesNotContain("§CS", calor);
         RawFrameAssertions.AssertFramed(calor, Calor.Compiler.Parsing.TokenKind.RawCSharp, present: false);
         var compilation = Program.Compile(calor, "eager-binary-order.calr",

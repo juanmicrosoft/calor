@@ -12317,10 +12317,12 @@ public sealed class Parser
         {
             var temporary = new AttributeCollection();
             ConsumeCanonicalDeclarationModifiers(startToken, temporary);
-            if (temporary["_pos2"] is { } modifiers && modifiers != "static")
+            var modifiers = temporary["_pos2"];
+            if ((modifiers != null && modifiers != "stat")
+                || (modifiers == "stat" && temporary["_pos1"] != null))
                 _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
-                    "A constructor accepts a visibility or the static modifier.");
-            attrs.Add("_pos0", temporary["_pos2"] == "static" ? "static" : temporary["_pos1"] ?? "public");
+                    "A constructor accepts a visibility or the stat modifier, not both.");
+            attrs.Add("_pos0", modifiers == "stat" ? "stat" : temporary["_pos1"] ?? "public");
         }
         else attrs = ParseAttributes();
         ValidateIdentityFreeHeader(startToken, attrs, 1);

@@ -1388,7 +1388,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ConstructorNode node)
     {
         EmitDocComment(node);
-        var visibility = node.IsStatic ? " static"
+        var visibility = node.IsStatic ? " stat"
             : node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 

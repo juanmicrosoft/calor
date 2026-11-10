@@ -55,6 +55,10 @@ arguments evaluate in source order even when their names reorder the
 parameters. Records use the same construction syntax. The selected constructor
 must actually exist in the source or referenced assembly.
 
+Inside a class, `ctor stat ()` declares its static constructor. It has no
+visibility or parameters. Conversion preserves the constructor and leaves
+its initialization order and exception behavior to the CLR.
+
 ### Numeric and character literals
 
 Integer literals accept decimal or hexadecimal digits and `_` separators.
