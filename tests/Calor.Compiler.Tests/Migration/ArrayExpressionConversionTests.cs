@@ -2410,13 +2410,36 @@ public class ArrayExpressionConversionTests
                 !
                 return Holder.Value
             """;
+        var parseDiagnostics = new DiagnosticBag();
+        _ = new Parser(new Lexer(source, parseDiagnostics).TokenizeAllForParser(), parseDiagnostics).Parse();
+        Assert.False(parseDiagnostics.HasErrors, string.Join(Environment.NewLine, parseDiagnostics.Errors));
         var result = Program.Compile(source, "unbound-static-initializer.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.True(result.HasErrors);
-        Assert.Contains(result.Diagnostics, error => error.Code == DiagnosticCode.UnknownExternalCall
-            && error.Message.Contains("Holder..cctor", StringComparison.Ordinal));
-        Assert.Contains(result.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
-            && error.Message.Contains("'unknown'", StringComparison.Ordinal));
+        if (other == "field object:Other public static = new object()")
+        {
+            var error = Assert.Single(result.Diagnostics.Errors);
+            Assert.Equal(DiagnosticCode.ForbiddenEffect, error.Code);
+            Assert.Equal("Function 'Read' uses effect 'alloc' but does not declare it", error.Message);
+            Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                || diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            var allowedSource = source.Replace("    !\n", "    ! alloc\n", StringComparison.Ordinal);
+            var allowedDiagnostics = new DiagnosticBag();
+            _ = new Parser(new Lexer(allowedSource, allowedDiagnostics).TokenizeAllForParser(), allowedDiagnostics).Parse();
+            Assert.False(allowedDiagnostics.HasErrors, string.Join(Environment.NewLine, allowedDiagnostics.Errors));
+            var allowed = Program.Compile(allowedSource, "bound-object-initializer.calr",
+                new CompilationOptions { StatusWriter = TextWriter.Null });
+            Assert.False(allowed.HasErrors, string.Join(Environment.NewLine, allowed.Diagnostics.Errors));
+            Assert.Equal("9", Run(allowed.GeneratedCode,
+                "public static class Probe { public static string Run() => GlobalModule.Read().ToString(); }"));
+        }
+        else
+        {
+            Assert.Contains(result.Diagnostics, error => error.Code == DiagnosticCode.UnknownExternalCall
+                && error.Message.Contains("Holder..cctor", StringComparison.Ordinal));
+            Assert.Contains(result.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
+                && error.Message.Contains("'unknown'", StringComparison.Ordinal));
+        }
     }
 
     [Fact]

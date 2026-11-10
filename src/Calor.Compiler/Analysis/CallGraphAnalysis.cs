@@ -61,6 +61,7 @@ public sealed class CallGraphAnalysis
         internal HashSet<TextSpan> AmbiguousCalls { get; } = [];
         internal Dictionary<ParameterNode, ITypeSymbol> ParameterTypes { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<LambdaExpressionNode, INamedTypeSymbol> LambdaTargets { get; } = new(ReferenceEqualityComparer.Instance);
+        internal Dictionary<ExpressionNode, EffectResolverKey> StaticInitializerConstructors { get; } = new(ReferenceEqualityComparer.Instance);
     }
 
     private OperatorBindings _operatorBindings = new();
@@ -69,6 +70,8 @@ public sealed class CallGraphAnalysis
         _operatorBindings.SourceCalls.TryGetValue(expression, out var calls) ? calls : Array.Empty<string>();
     internal IReadOnlyCollection<EffectResolverKey> ExternalOperatorCalls(AstNode node) =>
         _operatorBindings.ExternalCalls.TryGetValue(node, out var calls) ? calls : Array.Empty<EffectResolverKey>();
+    internal EffectResolverKey? StaticInitializerConstructor(ExpressionNode initializer) =>
+        _operatorBindings.StaticInitializerConstructors.GetValueOrDefault(initializer);
 
     internal static OperatorBindings ResolveOperatorCalls(ModuleNode module, DiagnosticBag? diagnostics = null,
         ContractMode contractMode = ContractMode.Debug)
@@ -80,6 +83,13 @@ public sealed class CallGraphAnalysis
         var operators = EnumerateClasses(module)
             .SelectMany(owner => EnumerateOperators(owner).Select(op => (Node: op, Id: $"{owner.Name}.{op.Id}")))
             .ToArray();
+        var initializerCreations = EnumerateClasses(module)
+            .SelectMany(owner => owner.Fields.Where(field => field.IsStatic).Select(field => field.DefaultValue)
+                .Concat(owner.Properties.Where(property => property.IsStatic).Select(property => property.DefaultValue)))
+            .OfType<NewExpressionNode>()
+            .Where(creation => creation.Arguments.Count == 0
+                && creation.Initializers.Count == 0 && creation.CollectionInitializers.Count == 0)
+            .ToHashSet(ReferenceEqualityComparer.Instance);
         var conflictingTypes = new HashSet<ExpressionNode>(ReferenceEqualityComparer.Instance);
         var conflictingParameters = new HashSet<ParameterNode>(ReferenceEqualityComparer.Instance);
         var conflictingLambdas = new HashSet<LambdaExpressionNode>(ReferenceEqualityComparer.Instance);
@@ -117,7 +127,7 @@ public sealed class CallGraphAnalysis
                 RegisterArgument(arguments[index], (node.Span, index));
         }
         var bindExpressions = operators.Length > 0 || visited.OfType<LambdaExpressionNode>().Any();
-        if (!bindExpressions && !visited.OfType<ParameterNode>().Any())
+        if (!bindExpressions && initializerCreations.Count == 0 && !visited.OfType<ParameterNode>().Any())
             return bindings;
 
         void RegisterArgument(AstNode argument, (TextSpan Call, int Index) owner)
@@ -241,9 +251,6 @@ public sealed class CallGraphAnalysis
                 }
             }
 
-            if (!bindExpressions)
-                return;
-
             var starts = new Dictionary<int, int>();
             var ranges = new List<(int Start, int End, AstNode Node)>();
             foreach (var trivia in root.DescendantTrivia())
@@ -254,6 +261,36 @@ public sealed class CallGraphAnalysis
                     ranges.Add((starts[endIndex], trivia.SpanStart, expressions[endIndex]));
             }
             ranges.Sort((left, right) => (left.End - left.Start).CompareTo(right.End - right.Start));
+            // This narrow initializer proof is independent of the header-only
+            // signature projection gate. No other generated operations gain authority.
+            if (initializerCreations.Count > 0 && symbols.Length == 0
+                && !compilation.GetDiagnostics().Any(diagnostic =>
+                    diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+            {
+                var objectConstructor = compilation.GetSpecialType(SpecialType.System_Object)
+                    .InstanceConstructors.SingleOrDefault(constructor => constructor.Parameters.Length == 0);
+                foreach (var clause in root.DescendantNodes().OfType<EqualsValueClauseSyntax>())
+                {
+                    var value = model.GetOperation(clause) switch
+                    {
+                        IFieldInitializerOperation field => field.Value,
+                        IPropertyInitializerOperation property => property.Value,
+                        _ => null
+                    };
+                    if (value is not IObjectCreationOperation { Constructor: { } constructor, Initializer: null } creation
+                        || creation.Arguments.Length != 0
+                        || !SymbolEqualityComparer.Default.Equals(constructor, objectConstructor)
+                        || SyntaxOrigin(creation.Syntax) is not NewExpressionNode origin
+                        || !initializerCreations.Contains(origin))
+                        continue;
+                    bindings.StaticInitializerConstructors[origin] = EffectResolverKey.FromBoundReceiver(
+                        Binding.Metadata.MetadataBinderResult.ToNominalBoundType(constructor.ContainingType),
+                        constructor.MetadataName, [], EffectMemberKind.Constructor);
+                }
+            }
+            if (!bindExpressions)
+                return;
+
             var selectedInTree = new HashSet<TextSpan>();
 
             foreach (var declaration in root.DescendantNodes().Where(node =>

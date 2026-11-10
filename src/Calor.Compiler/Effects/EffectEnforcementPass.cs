@@ -5689,8 +5689,8 @@ public sealed class EffectEnforcementPass
                 && ReferenceEquals(current.Owner, owner))
                 return EffectSet.Empty;
             // A read may initialize the entire declaring type, not just this field.
-            // Until initializers have bound callable identities, only self-contained
-            // primitive expressions can prove that no hidden invocation is omitted.
+            // Only self-contained primitives or an explicitly bound constructor
+            // with contract authority can prove that no hidden invocation is omitted.
             if (owner.IsPartial || owner.InteropBlocks.Any(CallGraphAnalysis.PreservedMemberMayInitializeType)
                 || owner.PreprocessorBlocks.Count != 0)
                 return UnknownResolvedOperation($"{owner.Name}..cctor", span);
@@ -5698,11 +5698,18 @@ public sealed class EffectEnforcementPass
                 .Select(field => (field.TypeName, Value: field.DefaultValue!))
                 .Concat(owner.Properties.Where(property => property.IsStatic && property.DefaultValue != null)
                     .Select(property => (property.TypeName, Value: property.DefaultValue!))).ToArray();
-            if (initializers.Any(initializer => !IsIntrinsicInitializerType(initializer.TypeName)
-                    || !IsIntrinsicInitializer(initializer.Value)))
-                return UnknownResolvedOperation($"{owner.Name}..cctor", span);
-            return InferFromMany(initializers.Select(initializer => initializer.Value).ToArray())
-                .Union(InferFromInternalFunctions(owner.Constructors.Where(constructor => constructor.IsStatic)
+            var effects = EffectSet.Empty;
+            foreach (var initializer in initializers)
+            {
+                if (IsIntrinsicInitializerType(initializer.TypeName) && IsIntrinsicInitializer(initializer.Value))
+                    effects = effects.Union(InferFromExpression(initializer.Value));
+                else if (_context.CallGraph.StaticInitializerConstructor(initializer.Value) is { } constructor
+                    && _context.Resolver.Resolve(constructor) is { Status: not EffectResolutionStatus.Unknown } resolution)
+                    effects = effects.Union(EffectSet.From("alloc")).Union(resolution.Effects);
+                else
+                    return UnknownResolvedOperation($"{owner.Name}..cctor", span);
+            }
+            return effects.Union(InferFromInternalFunctions(owner.Constructors.Where(constructor => constructor.IsStatic)
                     .Select(constructor => $"{owner.Name}.{constructor.Id}").ToArray()));
         }
 

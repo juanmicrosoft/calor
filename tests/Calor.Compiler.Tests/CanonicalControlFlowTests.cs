@@ -1,10 +1,12 @@
 using System.Reflection;
 using System.Text;
+using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
+using Calor.Compiler.Effects.Manifests;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
@@ -390,6 +392,213 @@ public sealed class CanonicalControlFlowTests
             public static object GateValue = new object();
             private static object Gate() { Trace += "G"; return GateValue; }
             """);
+
+    [Theory]
+    [InlineData("object")]
+    [InlineData("System.Object")]
+    [InlineData("Root")]
+    public void StaticObjectInitializer_UsesTheSelectedClrConstructorContract(string spelling)
+    {
+        var source = $$"""
+            module Initializers
+              using Root = System.Object
+              class Holder
+                field int:Value public static = 9
+                field {{spelling}}:Gate public static = new {{spelling}}()
+              func Probe () → int
+                ! alloc
+                return Holder.Value
+            """;
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var parsed = Parse(candidate);
+            var creation = Assert.IsType<NewExpressionNode>(parsed.Classes.Single().Fields[1].DefaultValue);
+            var bindings = CallGraphAnalysis.ResolveOperatorCalls(parsed);
+            var key = Assert.Single(bindings.StaticInitializerConstructors);
+            Assert.Same(creation, key.Key);
+            Assert.False(key.Value.FromStringFallback);
+            Assert.Equal(EffectMemberKind.Constructor, key.Value.Kind);
+            Assert.Equal("System.Object", key.Value.DeclaringType);
+            Assert.Empty(key.Value.ParameterTypes!);
+            var resolution = new EffectResolver(new ManifestLoader(loadUserLevelManifests: false))
+                .Resolve(key.Value);
+            Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
+            Assert.True(resolution.Effects.IsEmpty);
+
+            var tree = CSharpSyntaxTree.ParseText(new CSharpEmitter().Emit(parsed));
+            var projection = CSharpCompilation.Create("InitializerAuthority", [tree],
+                GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            Assert.DoesNotContain(projection.GetDiagnostics(),
+                diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+            var selected = Assert.IsAssignableFrom<IMethodSymbol>(projection.GetSemanticModel(tree).GetSymbolInfo(
+                tree.GetRoot().DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Single()).Symbol);
+            var clrConstructor = Assert.Single(projection.GetSpecialType(SpecialType.System_Object).InstanceConstructors,
+                constructor => constructor.Parameters.Length == 0);
+            Assert.True(SymbolEqualityComparer.Default.Equals(selected, clrConstructor));
+
+            Assert.Equal(9, Load(Compile(candidate).GeneratedCode).GetMethod("Probe")!.Invoke(null, null));
+            AssertMissingEffect(candidate.Replace("! alloc", "!", StringComparison.Ordinal), "Probe", "alloc");
+        }
+    }
+
+    [Fact]
+    public void StaticObjectInitializer_ChargesSiblingAutoPropertyAllocation()
+    {
+        const string source = """
+            module Initializers
+              class Holder
+                field int:Value public static = 9
+                property object:Gate static = new object()
+                  get public
+              func Probe () → int
+                ! alloc
+                return Holder.Value
+            """;
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var parsed = Parse(candidate);
+            Assert.Same(parsed.Classes.Single().Properties.Single().DefaultValue,
+                Assert.Single(CallGraphAnalysis.ResolveOperatorCalls(parsed).StaticInitializerConstructors).Key);
+            Assert.Equal(9, Load(Compile(candidate).GeneratedCode).GetMethod("Probe")!.Invoke(null, null));
+            AssertMissingEffect(candidate.Replace("! alloc", "!", StringComparison.Ordinal), "Probe", "alloc");
+        }
+    }
+
+    [Theory]
+    [InlineData("field string:Other public static = System.Environment.CurrentDirectory")]
+    [InlineData("property string:Other static = System.Environment.CurrentDirectory\n      get public")]
+    [InlineData("field object:Other public static = Make()")]
+    [InlineData("field System.Random:Other public static = new System.Random()")]
+    public void StaticObjectInitializer_DoesNotHideUnprovedSiblingOperations(string other)
+    {
+        var source = $$"""
+            module Initializers
+              class Holder
+                field int:Value public static = 9
+                field object:Gate public static = new object()
+                {{other}}
+                func Make public static () → object
+                  ! alloc
+                  return new object()
+              func Probe () → int
+                ! alloc
+                return Holder.Value
+            """;
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+            AssertInitializationUnknown(candidate);
+    }
+
+    [Theory]
+    [InlineData("partial")]
+    [InlineData("conditional")]
+    [InlineData("opaque")]
+    public void StaticObjectInitializer_UnprovedOwnersRemainInitializationBoundaries(string boundary)
+    {
+        const string payload = "public static object Extra = new object();";
+        var member = boundary switch
+        {
+            "conditional" => "    pp HIDDEN\n      field int:Extra public static = 1\n",
+            "opaque" => $"    raw member {Encoding.UTF8.GetByteCount(payload)}\n{payload}\n",
+            _ => ""
+        };
+        var source = $"module Initializers\n  class Holder{(boundary == "partial" ? " partial" : "")}\n" +
+            "    field int:Value public static = 9\n    field object:Gate public static = new object()\n" +
+            member + "  func Probe () → int\n    ! alloc\n    return Holder.Value\n";
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var parsed = Parse(candidate);
+            var diagnostics = new DiagnosticBag();
+            new EffectEnforcementPass(diagnostics).Enforce(parsed);
+            AssertUnknownInitialization(diagnostics);
+            Assert.True(Program.Compile(candidate).HasErrors);
+        }
+    }
+
+    [Theory]
+    [InlineData("Foreign.Object")]
+    [InlineData("Local")]
+    public void StaticObjectInitializer_LookalikeAndAliasedSourceConstructorsAreNotClrAuthority(string spelling)
+    {
+        var source = $$"""
+            module Initializers Foreign
+              using Local = Foreign.Object
+              class Object
+                field int:Calls public static = 0
+                ctor ()
+                  set Calls Calls + 1
+              class Holder
+                field int:Value public static = 9
+                field {{spelling}}:Gate public static = new {{spelling}}()
+              func Probe () → int
+                ! alloc,mut
+                return Holder.Value
+            """;
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var parsed = Parse(candidate);
+            Assert.Empty(CallGraphAnalysis.ResolveOperatorCalls(parsed).StaticInitializerConstructors);
+            AssertInitializationUnknown(candidate);
+            var type = Load(new CSharpEmitter().Emit(parsed));
+            Assert.Equal(9, type.GetMethod("Probe")!.Invoke(null, null));
+            Assert.Equal(1, type.Assembly.GetType("Foreign.Object")!.GetField("Calls")!.GetValue(null));
+        }
+    }
+
+    [Theory]
+    [InlineData("field string:Broken public static = new object()")]
+    [InlineData("field object:Broken public static = new object(1)")]
+    public void StaticObjectInitializer_FailedProjectionProvidesNoConstructorAuthority(string broken)
+    {
+        var source = $$"""
+            module Initializers
+              class Holder
+                field int:Value public static = 9
+                field object:Gate public static = new object()
+                {{broken}}
+              func Probe () → int
+                ! alloc
+                return Holder.Value
+            """;
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var parsed = Parse(candidate);
+            Assert.Empty(CallGraphAnalysis.ResolveOperatorCalls(parsed).StaticInitializerConstructors);
+            var diagnostics = new DiagnosticBag();
+            new EffectEnforcementPass(diagnostics).Enforce(parsed);
+            AssertUnknownInitialization(diagnostics);
+            Assert.True(Program.Compile(candidate).HasErrors);
+        }
+    }
+
+    [Fact]
+    public void StaticObjectInitializer_ChargesStaticConstructorAndInitializesOnce()
+    {
+        const string source = """
+            module Initializers
+              class Holder
+                field int:Calls public static = 0
+                field object:Gate public static = new object()
+                ctor stat ()
+                  set Calls Calls + 1
+              func Probe () → int
+                ! alloc,mut
+                var int:n = 0
+                lock Holder.Gate
+                  set n n + 1
+                lock Holder.Gate
+                  set n n + 1
+                return n + Holder.Calls
+            """;
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+            Assert.Equal(3, Load(Compile(candidate).GeneratedCode).GetMethod("Probe")!.Invoke(null, null));
+        foreach (var (row, effect) in new[] { ("! alloc", "mut"), ("! mut", "alloc") })
+        {
+            var missing = source.Replace("! alloc,mut", row, StringComparison.Ordinal);
+            foreach (var candidate in new[] { missing, new CalorEmitter().Emit(Parse(missing)) })
+                AssertMissingEffect(candidate, "Probe", effect);
+        }
+    }
 
     [Fact]
     public void UnsafeFixed_RetainsTheNativeFixedBlock()
@@ -1320,6 +1529,7 @@ public sealed class CanonicalControlFlowTests
         var result = Compile("""
             module Migrated
               func Assign (out int:result) → void
+                ! mut
                 var int:i = 0
                 do
                   set result i
@@ -1330,6 +1540,39 @@ public sealed class CanonicalControlFlowTests
         object?[] arguments = [null];
         type.GetMethod("Assign")!.Invoke(null, arguments);
         Assert.Equal(1, arguments[0]);
+    }
+
+    [Fact]
+    public void NativeDo_OutParameterStillRequiresMutation()
+    {
+        const string source = """
+            module Migrated
+              func Assign (out int:result) → void
+                var int:i = 0
+                do
+                  set result i
+                  set i i + 1
+                while i < 2
+            """;
+        var parsed = Parse(source);
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(parsed) })
+        {
+            _ = Parse(candidate);
+            var result = Program.Compile(candidate, "out-mutation.calr", new CompilationOptions
+            {
+                EnableTypeChecking = true,
+                EnforceEffects = true,
+                StatusWriter = TextWriter.Null
+            });
+            Assert.True(result.HasErrors);
+            Assert.Contains(result.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
+                && error.Message.Contains("'Assign'", StringComparison.Ordinal)
+                && error.Message.Contains("'mut'", StringComparison.Ordinal));
+            var type = Load(new CSharpEmitter().Emit(Parse(candidate)));
+            object?[] arguments = [null];
+            type.GetMethod("Assign")!.Invoke(null, arguments);
+            Assert.Equal(1, arguments[0]);
+        }
     }
 
     [Fact]
@@ -1558,6 +1801,7 @@ public sealed class CanonicalControlFlowTests
 
     private static CompilationResult Compile(string source)
     {
+        _ = Parse(source);
         var result = Program.Compile(source, "canonical-controls.calr", new CompilationOptions
         {
             EnableTypeChecking = true,
@@ -1566,6 +1810,45 @@ public sealed class CanonicalControlFlowTests
         });
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors) + "\n" + source);
         return result;
+    }
+
+    private static void AssertMissingEffect(string source, string caller, string effect)
+    {
+        _ = Parse(source);
+        var result = Program.Compile(source, "missing-initializer-effect.calr", new CompilationOptions
+        {
+            EnableTypeChecking = true,
+            EnforceEffects = true,
+            StatusWriter = TextWriter.Null
+        });
+        Assert.True(result.HasErrors);
+        Assert.Equal($"Function '{caller}' uses effect '{effect}' but does not declare it",
+            Assert.Single(result.Diagnostics.Errors).Message);
+        Assert.Equal(DiagnosticCode.ForbiddenEffect, result.Diagnostics.Errors.Single().Code);
+        Assert.DoesNotContain(result.Diagnostics, error => error.Code == DiagnosticCode.UnknownExternalCall
+            || error.Message.Contains("'unknown'", StringComparison.Ordinal));
+    }
+
+    private static void AssertInitializationUnknown(string source)
+    {
+        _ = Parse(source);
+        var result = Program.Compile(source, "unproved-initializer.calr", new CompilationOptions
+        {
+            EnableTypeChecking = true,
+            EnforceEffects = true,
+            StatusWriter = TextWriter.Null
+        });
+        Assert.True(result.HasErrors);
+        AssertUnknownInitialization(result.Diagnostics);
+    }
+
+    private static void AssertUnknownInitialization(DiagnosticBag diagnostics)
+    {
+        Assert.Contains(diagnostics, error => error.Code == DiagnosticCode.UnknownExternalCall
+            && error.Message.Contains("Holder..cctor", StringComparison.Ordinal));
+        Assert.Contains(diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
+            && error.Message.Contains("'Probe'", StringComparison.Ordinal)
+            && error.Message.Contains("'unknown'", StringComparison.Ordinal));
     }
 
     private static void AssertUnmarkedInteropRejected(string source, int frames)
