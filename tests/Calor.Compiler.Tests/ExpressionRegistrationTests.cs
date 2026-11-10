@@ -1,6 +1,7 @@
 using System.Reflection;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Xunit;
 
@@ -277,6 +278,38 @@ public class ExpressionRegistrationTests
         AssertSubject(TokenKind.Caret, ExtractExpression(module, context), internalCoverage: false);
     }
 
+    [Theory]
+    [InlineData("(value) ?? 0", "coalesce(value,0)")]
+    [InlineData("(@value) ?? 0", "coalesce(@value,0)")]
+    [InlineData("(values.Count) ?? 0", "coalesce(values.Count,0)")]
+    public void NativeGroupedCoalesce_ParsesAndReparsesInEveryExpressionContext(string source, string expected)
+    {
+        foreach (var context in Enum.GetValues<ExpressionContext>())
+        {
+            foreach (var module in ParseAndReparseNative(ExpressionSource(source, context)))
+                Assert.Equal(expected, ExpressionShape(ExtractExpression(module, context)));
+        }
+    }
+
+    [Theory]
+    [InlineData("(int)value", "cast<int>(value)")]
+    [InlineData("(Widget)value", "cast<Widget>(value)")]
+    [InlineData("(int?)value", "cast<int?>(value)")]
+    [InlineData("(int)(value ?? 0)", "cast<int>(coalesce(value,0))")]
+    [InlineData("(int)(value) ?? 0", "coalesce(cast<int>(value),0)")]
+    [InlineData("(int)-value", "cast<int>(Negate(value))")]
+    [InlineData("(int)value + 1", "Add(cast<int>(value),1)")]
+    [InlineData("(int)(value + 1)", "cast<int>(Add(value,1))")]
+    [InlineData("(System.Collections.Generic.List<int>)value", "cast<System.Collections.Generic.List<int>>(value)")]
+    public void NativeCast_ParsesAndReparsesWithoutChangingPrecedence(string source, string expected)
+    {
+        foreach (var context in Enum.GetValues<ExpressionContext>())
+        {
+            foreach (var module in ParseAndReparseNative(ExpressionSource(source, context)))
+                Assert.Equal(expected, ExpressionShape(ExtractExpression(module, context)));
+        }
+    }
+
     private static IReadOnlyList<Token> GetExpressionTokens(TokenKind kind, string source)
     {
         Assert.Equal(Cases[kind].Source, source);
@@ -354,15 +387,15 @@ public class ExpressionRegistrationTests
         ExpressionContext.Return => "return " + expression,
         ExpressionContext.Binding => "let x = " + expression,
         ExpressionContext.CallArgument => "Sink(" + expression + ")",
-        ExpressionContext.Nested => "return null ?? (" + expression + ")",
+        ExpressionContext.Nested => "return (" + expression + ") ?? 0",
         _ => throw new ArgumentOutOfRangeException(nameof(context), context, null),
     });
 
     private static ExpressionNode ExtractNested(ExpressionNode expression)
     {
         var coalesce = Assert.IsType<NullCoalesceNode>(expression);
-        AssertReference(coalesce.Left, "null");
-        return coalesce.Right;
+        AssertInteger(coalesce.Right, 0);
+        return coalesce.Left;
     }
 
     private static ModuleNode ParseNative(string source)
@@ -374,6 +407,27 @@ public class ExpressionRegistrationTests
         Assert.False(diagnostics.HasErrors, source + "\n" + string.Join("\n", diagnostics));
         return module;
     }
+
+    private static IEnumerable<ModuleNode> ParseAndReparseNative(string source)
+    {
+        var module = ParseNative(source);
+        yield return module;
+        var emitted = new CalorEmitter().Emit(module);
+        Assert.DoesNotContain("§", emitted);
+        yield return ParseNative(emitted);
+    }
+
+    private static string ExpressionShape(ExpressionNode expression) => expression switch
+    {
+        TypeOperationNode { Operation: TypeOp.Cast } cast =>
+            $"cast<{cast.TargetType}>({ExpressionShape(cast.Operand)})",
+        NullCoalesceNode coalesce => $"coalesce({ExpressionShape(coalesce.Left)},{ExpressionShape(coalesce.Right)})",
+        BinaryOperationNode binary => $"{binary.Operator}({ExpressionShape(binary.Left)},{ExpressionShape(binary.Right)})",
+        UnaryOperationNode unary => $"{unary.Operator}({ExpressionShape(unary.Operand)})",
+        ReferenceNode reference => (reference.IsVerbatim ? "@" : "") + reference.Name,
+        IntLiteralNode integer => integer.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        _ => throw new InvalidOperationException($"Unexpected grouping/cast node: {expression.GetType().Name}"),
+    };
 
     private static void AssertRetiredSourceRejected(string expression, ExpressionContext context)
     {

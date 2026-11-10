@@ -3835,7 +3835,8 @@ public sealed class Parser
         if (close + 1 >= _tokens.Count)
             return false;
         var following = _tokens[close + 1];
-        if (following.Kind is TokenKind.FatArrow or TokenKind.NullConditional
+        // Retained prefix dispatch does not make native ?? a valid cast operand.
+        if (following.Kind is TokenKind.FatArrow or TokenKind.NullConditional or TokenKind.NullCoalesce
             || following.Span.Line != TokenEndLine(_tokens[close]))
             return false;
         // Type operators inside grouping must not fuse into a named cast type.
