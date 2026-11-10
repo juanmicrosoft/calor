@@ -1,11 +1,16 @@
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Text;
+using Calor.Compiler.Analysis;
+using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
+using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Verification.Z3.Cache;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -17,7 +22,8 @@ namespace Calor.Compiler.Tests;
 /// T1-INIT-* controls in <c>tests/TestData/InteropScope/T1/controls.json</c>
 /// (<see cref="InteropScope.SharedInteropControlsTests"/>); this class holds the parser rule, the
 /// per-shape conversion decisions, and the negative controls that prove the run-and-compare
-/// check catches the old miscompilations.
+/// check catches the old miscompilations. Historical method names remain stable even when
+/// their current representation is counted member, type or whole-unit interop.
 /// </summary>
 public class InitializerConversionTests
 {
@@ -64,7 +70,7 @@ public class InitializerConversionTests
         var result = Convert(source);
         Assert.True(result.Success, result.CalorSource);
         Assert.Empty(result.Context.Losses);
-        Assert.Contains("new System.Collections.Generic.HashSet<int>() {", result.CalorSource, StringComparison.Ordinal);
+        AssertShape(result, 107, 7, 0, 6);
         var generated = Compile(result.CalorSource!, enforceEffects: false);
         Assert.False(generated.HasErrors, string.Join("\n", generated.Diagnostics.Errors));
         var expected = throws ? "1124:throw" : "112445:111:2";
@@ -96,6 +102,7 @@ public class InitializerConversionTests
         var result = Convert(source);
         Assert.True(result.Success, result.CalorSource);
         Assert.Empty(result.Context.Losses);
+        AssertShape(result, 31, 1, 0, 4);
         var generated = Compile(result.CalorSource!, enforceEffects: true);
         Assert.False(generated.HasErrors, string.Join("\n", generated.Diagnostics.Errors));
         Assert.Equal("before;ctor;7", Run(source));
@@ -124,7 +131,30 @@ public class InitializerConversionTests
             """;
         var result = Convert(source);
         Assert.True(result.Success, result.CalorSource);
-        Assert.Contains(result.Context.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
+        if (baseType.Length == 0)
+        {
+            AssertOriginalPayloads(AssertShape(result, 16, 0, 0, 3, "default-expression"), source);
+        }
+        else
+        {
+            var nodes = AllNodes(ParseCalor(result.CalorSource!)).ToArray();
+            Assert.Equal(27, nodes.Length);
+            Assert.Equal(4, nodes.Count(node => node is MethodNode or ClassFieldNode));
+            Assert.Single(nodes.OfType<NewExpressionNode>());
+            Assert.Empty(nodes.OfType<LambdaExpressionNode>());
+            Assert.Empty(nodes.OfType<CSharpInteropBlockNode>());
+            Assert.Empty(nodes.OfType<RawCSharpExpressionNode>());
+            var original = Assert.Single(CSharpSyntaxTree.ParseText(source).GetRoot()
+                .DescendantNodes().OfType<LocalDeclarationStatementSyntax>());
+            Assert.Equal(Encoding.UTF8.GetBytes(original.ToFullString()),
+                Encoding.UTF8.GetBytes(Assert.Single(nodes.OfType<RawCSharpNode>()).CSharpCode));
+            var loss = Assert.Single(result.Context.Losses);
+            Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+            Assert.Equal("default-member-collision", loss.Feature);
+            Assert.Equal("Statement preserved as raw C#: Value assigned;", loss.Description);
+            Assert.Equal("interop", loss.Path);
+            Assert.Null(loss.Trigger);
+        }
         var generated = Compile(result.CalorSource!, enforceEffects: false);
         Assert.False(generated.HasErrors, string.Join("\n", generated.Diagnostics.Errors));
         Assert.Equal(Run(source), Run(generated.GeneratedCode));
@@ -204,34 +234,47 @@ public class InitializerConversionTests
     // ---- #1595: parser -----------------------------------------------------------------------
 
     [Theory]
-    [InlineData("§LIST{xs:i32}\n        1", "§LIST")]
-    [InlineData("§DICT{d:str:i32}\n        §KV \"a\" 1", "§DICT")]
-    [InlineData("§HSET{s:i32}\n        1", "§HSET")]
+    [InlineData("let List<int>:xs = new List<int>() { 1 }", "let")]
+    [InlineData("let Dictionary<string,int>:d = new Dictionary<string,int>() { { \"a\", 1 } }", "let")]
+    [InlineData("let HashSet<int>:s = new HashSet<int>() { 1 }", "let")]
+    [InlineData("var List<int>:xs = new List<int>() { 1 }", "var")]
+    [InlineData("var Dictionary<string,int>:d = new Dictionary<string,int>() { { \"a\", 1 } }", "var")]
+    [InlineData("var HashSet<int>:s = new HashSet<int>() { 1 }", "var")]
     public void ClassLevelCollectionBlock_IsAHardError_AndLaterMembersSurvive(string block, string tag)
     {
         var source = $$"""
-            §M{Repro}
-              §CL{Holder:pub}
-                §FLD{i32:Before:pub} = 1
-                {{block.Replace("\n        ", "\n      ", StringComparison.Ordinal)}}
-                §FLD{i32:After:pub} = 2
-                §MT{Get:pub} () -> i32
-                  §R After
-              §CL{Other:pub}
-                §FLD{i32:Y:pub} = 3
+            module Repro
+              class Holder
+                field int:Before = 1
+                {{block}}
+                field int:After = 2
+                func Get () → int
+                  return After
+              class Other
+                field int:Y = 3
             """;
         var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
         var tokens = new Calor.Compiler.Parsing.Lexer(source, diagnostics).TokenizeAllForParser();
         var module = new Calor.Compiler.Parsing.Parser(tokens, diagnostics).Parse();
         var error = Assert.Single(diagnostics.Errors);
         Assert.Equal("Calor0100", error.Code);
-        Assert.Contains(tag + " is a statement", error.Message, StringComparison.Ordinal);
+        Assert.Equal($"'{tag}' is a local binding and cannot appear in a class body; " +
+            "declare a field or property with an inline initializer instead.", error.Message);
+        Assert.Equal(4, error.Span.Line);
         // The parser keeps reading the class after the block: every later member and type is in the AST.
         var classes = module.Classes;
         var holder = Assert.Single(classes, c => c.Name == "Holder");
-        Assert.Contains(holder.Fields, f => f.Name == "After");
-        Assert.Contains(holder.Methods, m => m.Name == "Get");
-        Assert.Contains(classes, c => c.Name == "Other");
+        Assert.Equal(new[] { "Holder", "Other" }, classes.Select(c => c.Name));
+        Assert.Equal(new[] { "Before", "After" }, holder.Fields.Select(f => f.Name));
+        var method = Assert.Single(holder.Methods);
+        Assert.Equal("Get", method.Name);
+        Assert.Equal("After", Assert.IsType<ReferenceNode>(
+            Assert.IsType<ReturnStatementNode>(Assert.Single(method.Body)).Expression).Name);
+        Assert.Equal("Y", Assert.Single(classes[1].Fields).Name);
+        Assert.Empty(AllNodes(module).OfType<BindStatementNode>());
+        var compiled = Compile(source, enforceEffects: false, expectParseSuccess: false);
+        Assert.True(compiled.HasErrors);
+        Assert.Equal("Calor0100", Assert.Single(compiled.Diagnostics.Errors).Code);
     }
 
     // ---- Converter decisions -----------------------------------------------------------------
@@ -256,9 +299,17 @@ public class InitializerConversionTests
         Assert.True(result.Success, string.Join("\n", result.Issues.Where(i => i.Severity == ConversionIssueSeverity.Error).Select(i => i.ToString())) + "\n" + result.CalorSource);
         Assert.Empty(result.Context.Losses);
         var calor = result.CalorSource!;
-        Assert.DoesNotContain("raw ", calor, StringComparison.Ordinal);
-        Assert.Contains("new System.Collections.Generic.List<int>() { 1 }", calor, StringComparison.Ordinal);
-        Assert.Contains("= new StringBuilder() { Capacity = 64 }", calor, StringComparison.Ordinal);
+        var parsed = AssertShape(result, 38, 4, 0, 7);
+        var holder = Assert.Single(parsed.Classes, type => type.Name == "Holder");
+        var nested = Assert.IsType<NewExpressionNode>(
+            Assert.Single(holder.Fields, field => field.Name == "X").DefaultValue);
+        Assert.Equal(1, Assert.IsType<IntLiteralNode>(Assert.Single(
+            Assert.IsType<NewExpressionNode>(Assert.Single(nested.CollectionInitializers).Arguments[0])
+                .CollectionInitializers).Arguments[0]).Value);
+        var sb = Assert.IsType<NewExpressionNode>(Assert.Single(holder.Properties).DefaultValue);
+        var capacity = Assert.Single(sb.Initializers);
+        Assert.Equal("Capacity", capacity.PropertyName);
+        Assert.Equal(64, Assert.IsType<IntLiteralNode>(capacity.Value).Value);
         var csharp = Compile(calor, enforceEffects: false).GeneratedCode;
         Assert.Contains("new System.Collections.Generic.List<int>() { 5 }", csharp, StringComparison.Ordinal);
         Assert.Contains("Capacity = 64", csharp, StringComparison.Ordinal);
@@ -294,10 +345,17 @@ public class InitializerConversionTests
     {
         var result = Convert(ShapeSource(member));
         Assert.True(result.Success, string.Join("\n", result.Issues.Where(i => i.Severity == ConversionIssueSeverity.Error).Select(i => i.ToString())) + "\n" + result.CalorSource);
-        Assert.Contains(result.Context.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved
-            && (loss.Feature == "initializer-interop" && loss.Description.Contains(reason, StringComparison.Ordinal)
-                || loss.Feature == reason));
-        Assert.Contains("§CS{", result.CalorSource!, StringComparison.Ordinal);
+        var feature = reason is "dictionary-initializer" or "conditional-expression-hoisting"
+            ? reason : "initializer-interop";
+        var parsed = AssertShape(result, 80, 3, 0, 14, "explicit-interface", feature);
+        AssertOriginalPayloads(parsed, ShapeSource(member));
+        var holder = Assert.Single(parsed.Classes, type => type.Name == "Holder");
+        var preserved = Assert.Single(holder.InteropBlocks);
+        Assert.Equal(member, preserved.CSharpCode.Trim());
+        Assert.Equal(member.StartsWith("public int M()", StringComparison.Ordinal)
+            ? InteropMemberKind.Method : InteropMemberKind.Field, preserved.MemberKind);
+        Assert.Equal(feature, preserved.FeatureName);
+        Assert.Equal(new[] { "Next", "Take", "Take2" }, holder.Methods.Select(method => method.Name));
     }
 
     [Theory]
@@ -313,8 +371,22 @@ public class InitializerConversionTests
     {
         var result = Convert(ShapeSource(member));
         Assert.True(result.Success, string.Join("\n", result.Issues.Where(i => i.Severity == ConversionIssueSeverity.Error).Select(i => i.ToString())) + "\n" + result.CalorSource);
-        Assert.DoesNotContain(result.Context.Losses, loss => loss.Feature is "initializer-interop" or "dictionary-initializer");
-        Assert.DoesNotContain("§CS{", result.CalorSource!, StringComparison.Ordinal);
+        var shape = member switch
+        {
+            "public Outer O = new Outer { V = 3, W = -V0 };" => (85, 4, 15),
+            "public HashSet<string> H = new HashSet<string> { \"a\", \"a\" };" => (87, 4, 15),
+            "public static List<List<int>> L = new List<List<int>> { new List<int> { 1 }, new List<int>() };" => (94, 6, 15),
+            "public int M() { var o = new Outer { V = Next(), W = Next() }; return o.V; }" => (89, 4, 15),
+            "public int M() { var l = new List<int> { Next(), Next() }; return l[1]; }" => (94, 4, 15),
+            "public Outer O = new Outer { V = Next() };" => (83, 4, 15),
+            "public int M() { return Take(Next(), new Outer { V = Next() }); }" => (92, 4, 15),
+            "public List<int> L = new List<int> { Next(), Take(Next(), null) };" => (89, 4, 15),
+            _ => throw new InvalidOperationException(member)
+        };
+        // The shared Bag scaffold alone retains its explicit-interface member.
+        var parsed = AssertShape(result, shape.Item1, shape.Item2, 0, shape.Item3, "explicit-interface");
+        AssertOriginalPayloads(parsed, ShapeSource(member));
+        Assert.Empty(Assert.Single(parsed.Classes, type => type.Name == "Holder").InteropBlocks);
     }
 
     private static string ShapeSource(string member) => $$"""
@@ -401,7 +473,7 @@ public class InitializerConversionTests
                 public static string Run() => new Counter().Go().ToString();
             }
             """, true },
-        // The delegate snapshot preserves the receiver read before the inert creation.
+        // The copied fixture now preserves Publisher after the retired subscription fails parsing.
         { "scorecard-092-delegate-this-argument", """
             using System;
             public class CustomEventArgs : EventArgs { public string Message { get; set; } }
@@ -429,7 +501,7 @@ public class InitializerConversionTests
                     return publisher.Log;
                 }
             }
-            """, false },
+            """, true },
         // `(this)` is `this` after its parentheses are stripped: the struct would be copied late.
         { "parenthesized-this", """
             public class X { public int V; }
@@ -510,8 +582,89 @@ public class InitializerConversionTests
             .Where(i => i.Severity == ConversionIssueSeverity.Error).Select(i => i.ToString())) + "\n" + result.CalorSource);
         // The event member is preserved through member escalation, which records its own feature.
         Assert.Equal(expectsLoss, result.Context.Losses.Any(loss => loss.Kind == ConversionLossKind.InteropPreserved));
+        var shape = name switch
+        {
+            "ref-receiver" => (42, 2, 0, 5),
+            "index-conversion" => (18, 1, 0, 2),
+            "struct-this" or "parenthesized-this" => (35, 1, 0, 5),
+            "scorecard-092-delegate-this-argument" => (26, 1, 0, 2),
+            "struct-local-mutated-by-call" => (28, 0, 0, 5),
+            "constructor-replaces-receiver" => (36, 0, 2, 5),
+            "event-then-property" => (50, 2, 0, 7),
+            _ => throw new InvalidOperationException(name)
+        };
+        var parsed = AssertShape(result, shape.Item1, shape.Item2, shape.Item3, shape.Item4,
+            name == "scorecard-092-delegate-this-argument" ? "post-validation-fallback" : "initializer-interop");
+        AssertOriginalPayloads(parsed, source);
+        if (name == "scorecard-092-delegate-this-argument")
+        {
+            var block = Assert.Single(parsed.InteropBlocks);
+            Assert.Equal(InteropMemberKind.Other, block.MemberKind);
+            Assert.Equal("Converted Calor for 'global::Publisher' did not parse or did not survive the C# round trip; original C# preserved (#717).", block.Reason);
+            Assert.DoesNotContain(parsed.Classes, type => type.Name == "Publisher");
+            Assert.Equal("parse-failure", Assert.Single(result.Context.Losses).Trigger);
+        }
         var generated = Compile(result.CalorSource!, enforceEffects: false);
         Assert.False(generated.HasErrors, name + ": " + string.Join("\n", generated.Diagnostics.Errors.Select(e => e.Message)));
+        Assert.Equal(Run(source), Run(generated.GeneratedCode));
+    }
+
+    [Fact]
+    public void NativeDelegateSnapshot_WithThisAndInitializer_PreservesTheCapturedReceiver()
+    {
+        const string source = """
+            using System;
+            public class Notice
+            {
+                public string Text;
+                public Notice() { Probe.Sink = (sender, notice) => Probe.Log += "second:" + notice.Text + ";"; }
+            }
+            public class Publisher
+            {
+                public void Send(string message)
+                {
+                    var receiver = Probe.Sink;
+                    var notice = new Notice { Text = message };
+                    receiver(this, notice);
+                }
+            }
+            public static class Probe
+            {
+                public static string Log = "";
+                public static Publisher Publisher = new Publisher();
+                public static Action<object, Notice> Sink = (sender, notice) =>
+                    Log += (object.ReferenceEquals(sender, Publisher) ? "same:" : "wrong:") + notice.Text + ";";
+                public static string Run()
+                {
+                    Publisher.Send("hi");
+                    Publisher.Send("there");
+                    return Log;
+                }
+            }
+            """;
+        var result = Convert(source);
+        Assert.True(result.Success, result.CalorSource);
+        var parsed = AssertShape(result, 74, 2, 2, 7);
+        var send = Assert.Single(Assert.Single(parsed.Classes, type => type.Name == "Publisher").Methods);
+        Assert.Equal(3, send.Body.Count);
+        var receiver = Assert.IsType<BindStatementNode>(send.Body[0]);
+        Assert.Equal("receiver", receiver.Name);
+        Assert.Equal("Probe.Sink", Assert.IsType<ReferenceNode>(receiver.Initializer).Name);
+        var notice = Assert.IsType<BindStatementNode>(send.Body[1]);
+        Assert.Equal("notice", notice.Name);
+        Assert.Equal("Text", Assert.Single(Assert.IsType<NewExpressionNode>(notice.Initializer).Initializers).PropertyName);
+        var call = Assert.IsType<CallExpressionNode>(Assert.IsType<ExpressionStatementNode>(send.Body[2]).Expression);
+        Assert.Equal("receiver", call.Target);
+        Assert.IsType<ThisExpressionNode>(call.Arguments[0]);
+        Assert.Equal("notice", Assert.IsType<ReferenceNode>(call.Arguments[1]).Name);
+        var strict = Compile(result.CalorSource!, enforceEffects: true);
+        Assert.Equal(new[] { "Calor0410", "Calor0410", "Calor0422" },
+            strict.Diagnostics.Errors.Select(error => error.Code).OrderBy(code => code, StringComparer.Ordinal));
+        Assert.All(strict.Diagnostics.Errors, error =>
+            Assert.Contains("'unknown'", error.Message, StringComparison.Ordinal));
+        var generated = Compile(result.CalorSource!, enforceEffects: false);
+        Assert.False(generated.HasErrors, string.Join("\n", generated.Diagnostics.Errors));
+        Assert.Equal("same:hi;second:there;", Run(source));
         Assert.Equal(Run(source), Run(generated.GeneratedCode));
     }
 
@@ -579,9 +732,11 @@ public class InitializerConversionTests
         var loss = Assert.Single(result.Context.Losses,
             loss => loss.Feature == "conditional-expression-hoisting");
         Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
-        Assert.Contains("new Outer { V = f() }", loss.Description, StringComparison.Ordinal);
-        Assert.Contains("§CS{(new Outer { V = f() })}", result.CalorSource!, StringComparison.Ordinal);
-        Assert.DoesNotContain("§CS{(o.Items.Add", result.CalorSource!, StringComparison.Ordinal);
+        var parsed = AssertShape(result, 46, 2, 0, 6, "conditional-expression-hoisting");
+        AssertOriginalPayloads(parsed, source);
+        var probe = Assert.Single(parsed.Classes, type => type.Name == "Probe");
+        Assert.Equal("Take", Assert.Single(probe.Methods).Name);
+        Assert.Equal(InteropMemberKind.Method, Assert.Single(probe.InteropBlocks).MemberKind);
         var generated = Compile(result.CalorSource!, enforceEffects: false);
         Assert.False(generated.HasErrors,
             string.Join("\n", generated.Diagnostics.Errors.Select(error => error.Message)));
@@ -639,7 +794,7 @@ public class InitializerConversionTests
     [MemberData(nameof(InertEventMutations))]
     public void EventArgument_RunningUserCode_IsPreserved(string name, string declarations, string value)
     {
-        var result = Convert($$"""
+        var source = $$"""
             namespace System
             {
             {{declarations}}
@@ -655,10 +810,30 @@ public class InitializerConversionTests
                 private static void Empty() { }
             }
             }
-            """);
+            """;
+        var result = Convert(source);
         Assert.True(result.Success, name + ": " + result.CalorSource);
-        Assert.Contains(result.Context.Losses, loss => loss.Feature == "initializer-interop"
-            && loss.Description.Contains("initializer-position", StringComparison.Ordinal));
+        var shape = name switch
+        {
+            "literal-user-conversion" => (35, 1, 6, new[] { "initializer-interop" }),
+            "instance-event-initializer" => (23, 0, 5, new[] { "initializer-interop", "initializer-interop" }),
+            "partial-property-definition" => (23, 0, 5, new[] { "partial-property", "partial-property", "initializer-interop" }),
+            "finalizer" => (23, 0, 5, new[] { "destructor", "initializer-interop" }),
+            "eventargs-symbol-spoof" => (29, 0, 6, new[] { "initializer-interop" }),
+            "static-constructor" => (28, 0, 6, new[] { "initializer-interop" }),
+            "static-field-initializer" => (23, 0, 5, new[] { "field", "initializer-interop" }),
+            "recursive-initializer" => (25, 1, 6, new[] { "initializer-interop" }),
+            "expanding-generic-initializer" => (29, 1, 6, new[] { "initializer-interop" }),
+            _ => throw new InvalidOperationException(name)
+        };
+        var parsed = AssertShape(result, shape.Item1, shape.Item2, 0, shape.Item3, shape.Item4);
+        AssertOriginalPayloads(parsed, source);
+        var publisher = Assert.Single(parsed.Classes, type => type.Name == "Publisher");
+        Assert.Empty(publisher.Methods);
+        var send = Assert.Single(publisher.InteropBlocks);
+        Assert.Equal(InteropMemberKind.Method, send.MemberKind);
+        Assert.Equal("initializer-interop", send.FeatureName);
+        Assert.Equal($"Unsupported Method: public void Send() {{ Sent(this, new Notice {{ Value = {value} }}); }}", send.Reason);
     }
 
     [Fact]
@@ -667,13 +842,34 @@ public class InitializerConversionTests
         var source = TestDataLoader.LoadTestFile("Level5_Advanced/092_Events.cs");
         var result = Convert(source);
         Assert.True(result.Success, result.CalorSource);
-        Assert.Empty(result.Context.Losses);
+        // The frozen namespaced scorecard is a whole-unit preservation, not the copied fixture above.
+        var parsed = AssertShape(result, 2, 0, 0, 0, "namespace-topology");
+        AssertOriginalPayloads(parsed, source);
+        var block = Assert.Single(parsed.InteropBlocks);
+        Assert.True(block.IsCompilationUnitPassthrough);
+        Assert.Equal(InteropMemberKind.Other, block.MemberKind);
+        Assert.Equal("Multiple lexical namespace scopes are preserved as one whole-file interop boundary.", block.Reason);
+        Assert.Equal("Whole C# file preserved because lossless conversion does not split multi-namespace topology.",
+            Assert.Single(result.Context.Losses).Description);
         var generated = Compile(result.CalorSource!, enforceEffects: false);
         Assert.False(generated.HasErrors, string.Join("\n", generated.Diagnostics.Errors.Select(error => error.Message)));
-        var code = generated.GeneratedCode;
-        var snapshot = code.IndexOf("= MessageSent;", StringComparison.Ordinal);
-        var creation = code.IndexOf("new CustomEventArgs()", StringComparison.Ordinal);
-        Assert.True(snapshot >= 0 && creation > snapshot, code);
+        const string caller = """
+            public static class Probe
+            {
+                public static string Run()
+                {
+                    var publisher = new Events.Publisher();
+                    var log = "";
+                    publisher.MessageSent += (sender, notice) =>
+                        log += object.ReferenceEquals(sender, publisher) + ":" + notice.Message + ";";
+                    publisher.Send("hi");
+                    publisher.Send("there");
+                    return log;
+                }
+            }
+            """;
+        Assert.Equal("True:hi;True:there;", Run(source + caller));
+        Assert.Equal(Run(source + caller), Run(generated.GeneratedCode + caller));
     }
 
     // ---- Negative controls -------------------------------------------------------------------
@@ -698,30 +894,32 @@ public class InitializerConversionTests
         """;
 
     /// <summary>
-    /// The Calor the converter produced for the repro before the fix (#1541, #1524). It compiles,
+    /// An active-syntax reproduction of the pre-fix semantics (#1541, #1524). It compiles,
     /// so only running it shows the change: the run-and-compare check must report a difference.
     /// </summary>
     [Fact]
     public void NegativeControl_PreFixConversion_RunsDifferently()
     {
         const string preFix = """
-            §M{Repro:overflow=unchecked}
-              §U{System.Collections.Generic}
-              §U{System.Text}
-              §NS{_global:global}
-                §CL{Holder:pub}
-                  §FLD{List<i32>:Xs:pub} = §NEW{List<i32>} §A 5 §/NEW
-                  §PROP{Sb:StringBuilder:pub:get,set} = (sb-new)
-                  §FLD{i32:After:pub} = 2
-                §M{Probe:pub}
-                  §MT{Run:pub:stat} () -> str
-                    §B{h} §NEW{Holder} §/NEW
-                    §R (+ (+ (+ (+ (+ (+ h.Xs.Count ":") (join "," h.Xs)) "|") h.Sb.Capacity) "|") h.After)
+            module Repro overflow unchecked
+              using System.Collections.Generic
+              using System.Text
+              class Holder
+                field List<int>:Xs = new List<int>(5)
+                property StringBuilder:Sb = new StringBuilder()
+                  get public
+                  set public
+                field int:After = 2
+              module Probe
+                func Run () → string
+                  let h = new Holder()
+                  return h.Xs.Count + ":" + string.Join(",", h.Xs) + "|" + h.Sb.Capacity + "|" + h.After
             """;
         var original = Run(ReproProbe);
         Assert.Equal("1:5|64|2", original);
         var generated = Compile(preFix, enforceEffects: false);
         Assert.False(generated.HasErrors, string.Join("\n", generated.Diagnostics.Errors.Select(e => e.Message)));
+        Assert.Equal("0:|16|2", Run(generated.GeneratedCode));
         Assert.NotEqual(original, Run(generated.GeneratedCode));
     }
 
@@ -731,31 +929,32 @@ public class InitializerConversionTests
     {
         var result = Convert(ReproProbe);
         Assert.True(result.Success, string.Join("\n", result.Issues.Where(i => i.Severity == ConversionIssueSeverity.Error).Select(i => i.ToString())) + "\n" + result.CalorSource);
+        AssertShape(result, 43, 3, 0, 4);
         var generated = Compile(result.CalorSource!, enforceEffects: false);
         Assert.False(generated.HasErrors, string.Join("\n", generated.Diagnostics.Errors.Select(e => e.Message)));
         Assert.Equal(Run(ReproProbe), Run(generated.GeneratedCode));
     }
 
-    /// <summary>The pre-fix #1595 shape (a §LIST hoisted into the class body) no longer compiles silently.</summary>
+    /// <summary>The pre-fix #1595 shape (a local collection hoisted into the class body) cannot compile silently.</summary>
     [Fact]
     public void NegativeControl_PreFixClassLevelHoist_FailsLoudly()
     {
         const string preFix = """
-            §M{g:overflow=unchecked}
-              §U{System.Collections.Generic}
-              §NS{ns_global:_global:global}
-                §CL{Holder:pub}
-                  §FLD{i32:Before:pub} = 1
-                  §LIST{list003:i32}
-                    1
-                  §FLD{List<List<i32>>:X:pub} = §NEW{List<List<i32>>} §A  §/NEW
-                  §FLD{i32:After:pub} = 2
-                §CL{Other:pub}
-                  §FLD{i32:Y:pub} = 3
+            module g overflow unchecked
+              using System.Collections.Generic
+              class Holder
+                field int:Before = 1
+                let List<int>:list003 = new List<int>() { 1 }
+                field List<List<int>>:X = new List<List<int>>()
+                field int:After = 2
+              class Other
+                field int:Y = 3
             """;
-        var result = Compile(preFix, enforceEffects: false);
+        var result = Compile(preFix, enforceEffects: false, expectParseSuccess: false);
         Assert.True(result.HasErrors);
-        Assert.Contains(result.Diagnostics.Errors, e => e.Code == "Calor0100" && e.Message.Contains("§LIST", StringComparison.Ordinal));
+        var error = Assert.Single(result.Diagnostics.Errors);
+        Assert.Equal("Calor0100", error.Code);
+        Assert.Contains("'let' is a local binding", error.Message, StringComparison.Ordinal);
     }
 
     // ---- Helpers -----------------------------------------------------------------------------
@@ -766,8 +965,10 @@ public class InitializerConversionTests
             UserManifestRoot = global::Calor.Tests.Shared.HermeticCalorHome.EmptyManifestRoot,
         }).Convert(source);
 
-    private static CompilationResult Compile(string calor, bool enforceEffects)
+    private static CompilationResult Compile(string calor, bool enforceEffects, bool expectParseSuccess = true)
     {
+        if (expectParseSuccess)
+            ParseCalor(calor);
         var resolver = new Effects.EffectResolver(new Effects.Manifests.ManifestLoader(loadUserLevelManifests: false));
         resolver.Initialize(projectDirectory: null, solutionDirectory: null);
         using var context = new CompilationContext { SharedEffectResolver = resolver };
@@ -778,6 +979,74 @@ public class InitializerConversionTests
             VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
             Context = context,
         });
+    }
+
+    private static ModuleNode ParseCalor(string calor)
+    {
+        var parsed = CalorSourceHelper.Parse(calor, "initializer-shape.calr");
+        Assert.True(parsed.IsSuccess, string.Join("\n", parsed.Errors) + "\n" + calor);
+        return parsed.Ast!;
+    }
+
+    private static ModuleNode AssertShape(ConversionResult result, int nodes, int creations, int lambdas,
+        int members, params string[] features)
+    {
+        var module = ParseCalor(result.CalorSource!);
+        var all = AllNodes(module).ToArray();
+        Assert.Equal(nodes, all.Length);
+        Assert.Equal(creations, all.OfType<NewExpressionNode>().Count());
+        Assert.Equal(lambdas, all.OfType<LambdaExpressionNode>().Count());
+        Assert.Equal(members, all.Count(node => node is MethodNode or ClassFieldNode or PropertyNode
+            or ConstructorNode or EventDefinitionNode or OperatorOverloadNode));
+        Assert.Equal(features.Length, all.OfType<CSharpInteropBlockNode>().Count());
+        Assert.Equal(features, result.Context.Losses.Select(loss => loss.Feature));
+        Assert.All(result.Context.Losses, loss =>
+        {
+            Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+            Assert.Equal(loss.Feature == "post-validation-fallback" ? "rescue" : "interop", loss.Path);
+            Assert.Equal(loss.Feature == "post-validation-fallback" ? "parse-failure" : null, loss.Trigger);
+        });
+        Assert.DoesNotContain(all, node => node is RawCSharpNode or RawCSharpExpressionNode or FallbackExpressionNode);
+        return module;
+    }
+
+    private static void AssertOriginalPayloads(ModuleNode module, string source)
+    {
+        var originalMembers = CSharpSyntaxTree.ParseText(source).GetRoot()
+            .DescendantNodes().OfType<MemberDeclarationSyntax>().ToArray();
+        foreach (var block in AllNodes(module).OfType<CSharpInteropBlockNode>())
+        {
+            var expected = source;
+            if (!block.IsCompilationUnitPassthrough)
+            {
+                var original = Assert.Single(originalMembers, member =>
+                    (block.FeatureName == "post-validation-fallback" ? member.ToString() : member.ToFullString())
+                        == block.CSharpCode);
+                expected = block.FeatureName == "post-validation-fallback" ? original.ToString() : original.ToFullString();
+                if (block.FeatureName != "post-validation-fallback")
+                {
+                    var text = original.ToString();
+                    Assert.Equal($"Unsupported {block.MemberKind}: {(text.Length > 80 ? text[..77] + "..." : text)}",
+                        block.Reason);
+                }
+            }
+            Assert.Equal(Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(block.CSharpCode));
+        }
+    }
+
+    private static IEnumerable<AstNode> AllNodes(AstNode root)
+    {
+        var seen = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+        var pending = new Stack<AstNode>();
+        pending.Push(root);
+        while (pending.TryPop(out var node))
+        {
+            if (!seen.Add(node))
+                continue;
+            yield return node;
+            foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+                pending.Push(child);
+        }
     }
 
     private static string Run(string csharp)

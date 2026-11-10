@@ -10332,6 +10332,14 @@ public sealed class Parser
                 nestedDelegates.Add(node);
                 classItems.Add(node);
             }
+            else if (Check(TokenKind.Let) || Check(TokenKind.Var))
+            {
+                var bindingToken = Current;
+                _ = ParseBindStatement();
+                _diagnostics.ReportError(bindingToken.Span, DiagnosticCode.UnexpectedToken,
+                    $"'{bindingToken.Text}' is a local binding and cannot appear in a class body; " +
+                    "declare a field or property with an inline initializer instead.");
+            }
             else if (Check(TokenKind.List) || Check(TokenKind.Dict) || Check(TokenKind.HashSet))
             {
                 // #1595: a collection block is a statement (it declares a local). It used to be

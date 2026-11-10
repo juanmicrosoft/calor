@@ -151,6 +151,17 @@ ladder. If generated Calor or C# validation fails, it keeps the original C# at a
 sound boundary, without a generated preamble for whole-file passthrough. Reports
 retain each reason and distinguish writing from native conversion, compilation,
 and tests. Missing, malformed, unreadable inputs and failed writes remain errors.
+
+Object and collection initializers convert natively only at positions where their
+evaluation order is preserved. An unsupported position, such as the receiver in
+`new Box { Value = 2 }.Value`, preserves the complete containing member, not an
+opaque expression inside a native method. The reported interop feature and raw
+payload identify that boundary. Initializers inside a preserved type or whole
+file are not native. A preserved callback body grants no native effect contract.
+
+Local collection bindings (`let` or `var`) are not class members. They produce
+`Calor0100`; the parser consumes the invalid binding and retains later fields,
+methods and types for diagnostics. Use a `field` or `property` initializer instead.
 The destructive `--lossy` and `--select-active-preprocessor-branch-lossy` flags
 are no longer available.
 

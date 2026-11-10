@@ -209,6 +209,17 @@ or C# validation escalates preservation rather than discarding a buildable input
 Whole-file passthrough reproduces the original C# without a generated preamble.
 Reports retain the reasons for escalation and never count passthrough as native.
 
+Object and collection initializers convert natively only at positions where their
+evaluation order is preserved. An unsupported position, such as the receiver in
+`new Box { Value = 2 }.Value`, preserves the complete containing member, not an
+opaque expression inside a native method. The reported interop feature and raw
+payload identify that boundary. Initializers inside a preserved type or whole
+file are not native. A preserved callback body grants no native effect contract.
+
+Local collection bindings (`let` or `var`) are not class members. They produce
+`Calor0100`; the parser consumes the invalid binding and retains later fields,
+methods and types for diagnostics. Use a `field` or `property` initializer instead.
+
 Writing and building are separate outcomes. Exact original C# can be written
 when a standalone file lacks its project references; that result is
 `unverified`, with `roundTrip: "failed"` and exit `2`, not a passed build.
