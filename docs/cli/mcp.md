@@ -339,7 +339,7 @@ MCP `calor_compile` uses the same safe-patch path for `options.autoFix`.
 - Mismatched closing tag IDs
 - Undefined variables with similar names in scope
 - C# constructs with Calor alternatives (e.g., "nameof" → use string literal)
-- Indentation issues: tabs (`Calor0008`), non-standard widths (`Calor0009`), mixed/misaligned dedents (`Calor0099`), misaligned `§EI`/`§EL` clauses (`Calor0117`)
+- Indentation issues: tabs (`Calor0008`), non-standard widths (`Calor0009`), mixed/misaligned dedents (`Calor0099`), misaligned native `else` clauses (`Calor0117`)
 - Forbidden structural closers (`Calor0830`)
 
 ### calor_validate_snippet
@@ -686,12 +686,18 @@ All-in-one repair tool — combines obligations, guards, and type suggestions in
 
 ### calor_bounds_check
 
-Analyze index access sites on indexed types (`§ITYPE`) and verify bounds safety using Z3.
+The current action is `calor_refine` with `action: "bounds"`, not the retired
+`calor_bounds_check` tool. It reports generated index-bound obligations.
+Native source uses ordinary arrays and explicit contracts, not indexed-type
+declarations. An empty obligation list or `safe: true` is not proof that all
+array accesses were checked: inspect actual sites, statuses and compilation
+diagnostics before claiming coverage.
 
 **Input Schema:**
 ```json
 {
-  "source": "string (required) - Calor source code containing §ITYPE definitions and array accesses",
+  "action": "bounds",
+  "source": "string (required) - native Calor source with array accesses and explicit contracts",
   "function_id": "string - Optional: filter results to a specific function ID"
 }
 ```

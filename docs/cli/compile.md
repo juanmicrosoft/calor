@@ -53,7 +53,7 @@ calor -v -i MyModule.calr -o MyModule.g.cs
 | `--no-cache` | | No | Disable caching (verification results and incremental builds; overrides `--cache`) |
 | `--clear-cache` | | No | Clear caches before compiling (verification cache and `.calor-build-state.json`) |
 | `--contract-mode` | | No | Contract enforcement mode: off, debug, release (default: debug) |
-| `--strict-api` | | No | Require `§BR` breaking-change markers for public API changes |
+| `--strict-api` | | No | Require constrained `/// breaking version "description"` metadata for public API changes |
 | `--require-docs` | | No | Require documentation on public functions |
 | `--enforce-effects` | | No | Enforce effect declarations (default: true) |
 | `--no-enforce-effects` | | No | Disable effect enforcement (opt out of the v0.11 default-on behavior) |
@@ -172,8 +172,8 @@ When compilation fails, errors are reported with file location:
 Error in Calculator.calr:12:5
   Undefined variable 'x' in expression
 
-  §R (+ x 1)
-       ^
+  return x + 1
+         ^
 
 Compilation failed with 1 error
 ```

@@ -93,7 +93,7 @@ calor convert MyService.cs --benchmark
 | `--reference` | — | — | Metadata reference path, optionally `path=alias1,alias2` for extern aliases. |
 | `--validate` | — | — | Compatibility flag. Generated Calor validation is now mandatory in every mode. |
 | `--passthrough` | — | `false` | Preserve unconvertible members as raw C# interop blocks. Lossless mode already preserves unsupported descendants at the nearest complete boundary. |
-| `--explicit-call-closers` | — | `false` | Emit explicit `§/C` for every `§C` call (v0.6.0-compatible output). Use when regenerating `.calr` files intended to parse on v0.6.0 toolchains. By default v0.6.1 elides `§/C` for zero-arg calls. |
+| `--explicit-call-closers` | — | `false` | Legacy compatibility option; current native calls use parentheses and never emit closing tags. |
 | `--format` | — | `text` | Output format: `text` or `json` (envelope document on stdout) — see [JSON Output](#json-output---format-json). No `-f` short alias |
 
 ---
@@ -107,7 +107,7 @@ timeout, crash). Exit codes are unchanged.
 
 ```json
 {
-  "version": "1.1",
+  "version": "2.0",
   "command": "convert",
   "diagnostics": [
     { "code": "Calor1343", "message": "[local-functions] Local functions are not supported…",
@@ -136,7 +136,7 @@ timeout, crash). Exit codes are unchanged.
   their own codes.
 - `data.direction` — `csharp-to-calor` | `calor-to-csharp`.
 - `data.lossCount` / `data.losses[]` — C# → Calor structured semantic-loss
-  accounting: every §CSHARP interop preservation, TODO fallback, dropped
+  accounting: every converter-owned C# interop preservation, TODO fallback, dropped
   construct, and stripped preprocessor directive, each with
   `kind`, `feature`, `file`, `line`, and `description`. `lossCount: 0` means
   the output is fully native Calor. Interop preservation is lossless but not
@@ -157,8 +157,8 @@ If `--output` is not specified:
 
 ## C# to Calor Conversion
 
-C# static classes convert to **named modules**, using the existing `§M`
-declaration and `§F`/`§AF` function tags. Their C# names are unchanged: a module
+C# static classes convert to **named modules**, using a nested `module`
+declaration and `func` members. Their C# names are unchanged: a module
 converted from `Example.Utilities` still emits `Example.Utilities`, not a new
 wrapper type. Nested modules retain their containing type. Static fields,
 properties, constructors, attributes, generic parameters and constraints retain
@@ -170,19 +170,19 @@ including by-reference extension receivers, static events, unsafe type declarati
 attributes on generic type parameters, remain explicitly reported C#
 interop rather than losing part of their signature. Modules and classes cannot
 share a name and generic arity in the same namespace or containing type
-(`Calor0201`). A static `§CL` declaration is rejected with `Calor0107`: replace
-the container with a named `§M` and write its functions with `§F`. Ordinary
-non-static classes may still declare static members. This uses the existing
-module spelling; it does not select a new namespace-header spelling.
+(`Calor0201`). Native static containers use named modules, not a static class
+modifier. Ordinary non-static classes may still declare static members.
+The first `module` labels the file and carries its optional namespace; it is
+not itself the static container.
 
 When converting C# to Calor, the converter:
 
 1. Parses the C# source code
 2. Identifies supported constructs (classes, methods, properties, etc.)
 3. Maps C# patterns to Calor equivalents
-4. Generates unique IDs for all structural elements
+4. Maintains declaration identity in the project `.calor/ids.json` sidecar
 5. Adds effect declarations based on detected side effects
-6. Suggests contracts based on validation patterns
+6. Reports conversion issues and preservation paths for review
 
 The contract is **lossless**: try native conversion, then preserve unsupported
 code at a complete member, type, or whole-file boundary. Failed generated-Calor
@@ -200,7 +200,7 @@ missing, unreadable inputs and write failures remain errors. The destructive
 ### Conditional compilation and compiler directives
 
 C# → Calor conversion preserves conditional compilation by default. Every
-`#if`/`#elif`/`#else` branch is represented as explicit `§PP` AST, including
+`#if`/`#elif`/`#else` branch is represented by native `pp` branches, including
 conditional usings, declarations and partial types, class/struct members, and
 method statements. Conversion API callers can supply `CSharpParseOptions`,
 additional defined symbols, and a configuration name; these are recorded in
@@ -236,27 +236,28 @@ missing `#r` or `#load` targets are errors rather than silently accepted.
 
 | C# Construct | Calor Equivalent |
 |:-------------|:----------------|
-| `namespace` | `§M{Name}` module |
-| `class` | `§CL{Name:vis}` class |
-| `method` | `§F{Name:vis}` function |
-| `property` | `§PROP{Name:vis:type}` property |
-| `field` | `§FLD{id:type:name}` field |
-| `if/else if/else` | `§IF` / `§EI` / `§EL` branches (end at dedent) |
-| `for` loop | `§L{var:from:to:step}` |
-| `while` loop | `§WH` |
-| `try/catch` | Native exception handling with `§TR` / `§CA` |
+| One supported namespace scope | Optional namespace after the file's `module` label |
+| Static class | Nested named `module` |
+| `class` | `class Name` with native visibility/modifiers |
+| `method` | `func Name (Type:parameter) → ReturnType` |
+| `property` | `property Type:Name` with indented accessors |
+| `field` | `field Type:name` |
+| `if/else if/else` | Native indented branches (end at dedent) |
+| `for` loop | Reevaluated `for i = start; condition; i = next`; inclusive snapshot ranges are a separate form |
+| `while` loop | `while condition` |
+| `try/catch` | Native `try` / `catch Type:name` |
 | `?.`, `??` | Nullable references and null-conditional / null-coalescing expressions |
 
 ### Conversion Warnings
 
-The converter reports patterns it can't perfectly translate:
+The converter reports preserved constructs and actual validation failures.
+It does not replace asynchronous execution with synchronous execution.
+For example, an iterator accessor retains its original C# member and is
+reported as preservation rather than native iterator-accessor support:
 
 ```
 Converting MyService.cs → MyService.calr
-  Warning: Complex LINQ query at line 42 - manual review recommended
-  Warning: Async method at line 78 - converted to sync equivalent
-
-Conversion complete with 2 warnings
+  [iterator-accessor] Original C# accessor preserved
 ```
 
 ---
@@ -272,8 +273,8 @@ calor convert Calculator.calr
 Output includes:
 - Proper C# namespaces and class structures
 - Contract enforcement via runtime checks (optional)
-- Effect documentation via XML comments
-- Generated file header with timestamp
+- Ordinary CLR calls after compile-time effect checks
+- A generated-file marker (not a timestamp or semantics-version attestation)
 
 ---
 
@@ -285,7 +286,7 @@ Use `--benchmark` to see how the Calor version compares to C#:
 calor convert PaymentService.cs --benchmark
 ```
 
-Output:
+Illustrative counts, not a current measured score:
 ```
 Converting PaymentService.cs → PaymentService.calr
 
@@ -311,7 +312,7 @@ Use `--verbose` to see detailed conversion progress:
 calor convert MyService.cs --verbose
 ```
 
-Output:
+Illustrative progress, not an exact CLI transcript:
 ```
 Converting MyService.cs → MyService.calr
 
@@ -322,7 +323,7 @@ Converting constructs:
   [OK] Class: MyService → c001
   [OK] Method: ProcessOrder → f001
   [OK] Method: ValidateInput → f002
-  [WARN] Method: FetchDataAsync → f003 (async converted to sync)
+  [OK] Method: FetchDataAsync → f003 (async behavior retained)
   [OK] Property: IsEnabled → y001
   ...
 
@@ -331,8 +332,8 @@ Detecting effects:
   f002: (pure)
   f003: net (HTTP call detected)
 
-Generating contracts:
-  f002: Added §Q (!= input null) from null check at line 24
+Reviewing contracts:
+  Keep validation behavior; add requires input != null only after checking the API contract.
 
 Writing output: MyService.calr
 Conversion complete with 1 warning
@@ -373,7 +374,7 @@ After conversion, use Claude to refine the Calor:
 Review the converted file src/Services/UserService.calr and:
 1. Add appropriate contracts based on the business logic
 2. Verify effect declarations are complete
-3. Improve naming of generated IDs if needed
+3. Use identity-aware tools for declaration renames; retain the sidecar
 ```
 
 ---
@@ -423,10 +424,11 @@ rm MyService.cs
 The converter may not perfectly handle:
 
 - **Complex LINQ expressions** - May need manual adjustment
-- **Async/await patterns** - Converted to synchronous equivalents
-- **Dynamic types** - Not supported in Calor
-- **Unsafe code** - Not supported in Calor
-- **Preprocessor directives** - Ignored during conversion
+- **Async/await patterns** - Preserve their carrier and scheduling behavior;
+  unsupported shapes remain C# rather than becoming synchronous
+- **Dynamic and unsafe code** - Check the feature registry and actual conversion
+  report; a native node does not prove complete analysis or effect coverage
+- **Preprocessor directives** - Retain branches and directive scope as described above
 
 Review the warnings and manually adjust as needed.
 

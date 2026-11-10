@@ -77,7 +77,7 @@ no streaming form). Human-oriented status stays on stderr, as above.
 
 ```json
 {
-  "version": "1.1",
+  "version": "2.0",
   "diagnostics": [
     {
       "code": "Calor0250",
@@ -178,7 +178,7 @@ pipeline) so they can flow through the structured formats:
 | `Calor1310` | Compile: `--input` file not found |
 | `Calor1311` | Compile: invalid argument combination (e.g. `--output` with multiple inputs) |
 | `Calor1312` | Compile: unhandled internal error |
-| `Calor1320` | Docs drift (`calor self-check docs`): documented §-keyword does not exist in the lexer |
+| `Calor1320` | Docs drift (`calor self-check docs`): a documented keyword does not exist in the lexer |
 | `Calor1321` | Docs drift: cited diagnostic code is not defined in the compiler |
 | `Calor1322` | Docs drift: documented diagnostic band contains no implemented codes |
 | `Calor1323` | Docs drift: documented effect code is unknown to the effect registry |
@@ -186,10 +186,10 @@ pipeline) so they can flow through the structured formats:
 | `Calor1325` | Docs drift: hardcoded compiler package version or stale normative semantics-version claim |
 | `Calor1326` | Docs drift: a file or doc section the self-check needs is missing |
 | `Calor1327` | Docs drift: CLI diagnostic code missing from this table |
-| `Calor1328` | Docs drift: fenced ```` ```calor ```` example (complete program starting with `§M`) no longer parses |
+| `Calor1328` | Docs drift: fenced ```` ```calor ```` example (complete program starting with `module`) no longer parses |
 | `Calor1329` | Docs drift: a generated mirror doc (AGENTS.md) is out of sync with its single source (CLAUDE.md) |
-| `Calor1330` | Docs drift: a complete `§M` program in the agent syntax exemplar no longer compiles to C# (Roslyn-semantic-checked, so type errors are caught) |
-| `Calor1331` | Docs drift: the exemplar binds an array-returning BCL call (e.g. `File.ReadAllLines`) to a generic collection type instead of the array form `[T]` |
+| `Calor1330` | Docs drift: a complete `module` program in the agent syntax exemplar no longer compiles to C# (Roslyn-semantic-checked, so type errors are caught) |
+| `Calor1331` | Docs drift: the exemplar binds an array-returning BCL call (e.g. `File.ReadAllLines`) to a generic collection type instead of `T[]` |
 | `Calor1332` | Docs drift: a complete website example does not compile, or a negative example (`expect=`) reports a different set of codes |
 | `Calor1333` | Docs drift: a website `output` fence does not match the example's actual diagnostics, or an output-shaped fence is labelled neither `output` nor `illustrative` |
 | `Calor1334` | Docs drift: a malformed or misplaced website fence annotation, or a negative example whose code or location is not what its prose states |
@@ -197,7 +197,7 @@ pipeline) so they can flow through the structured formats:
 | `Calor1341` | Format: input file is not a `.calr` file (skipped) |
 | `Calor1342` | Format: unexpected error while processing a file |
 | `Calor1343` | Convert: conversion issue (severity mirrors the issue; message prefixed with the feature name, e.g. `[local-functions] …`) |
-| `Calor1344` | Convert: `--validate` found a parse error in the generated output (warning — the output was still written) |
+| `Calor1344` | Convert: mandatory generated-output validation failed (error — the destination remains unchanged) |
 | `Calor1345` | Convert: command-level failure — input not found, unknown file type, timeout, or crash |
 | `Calor1346` | Reserved legacy diagnostic from the temporary #760 formatter containment; safe validated writes no longer emit it |
 | `Calor1347` | Format/Lint fix: parseable input was conservatively left byte-identical because semantic or generated-C# validation was not green |

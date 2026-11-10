@@ -8,12 +8,22 @@ This document specifies the semantics of inheritance, abstract classes, and poly
 
 Classes can have the following modifiers that affect their inheritance behavior:
 
-### 1.1 Abstract Classes (`abs`)
+### 1.1 Abstract Classes (`abstract`)
 
 ```calor
-§CL{Shape:abs}
-  §MT{Area:pub:abs}
-    §O{double}
+module AbstractShapes
+  class Shape abstract
+    func Area abstract () → double
+      !
+  class Circle
+    extends Shape
+    func Area override () → double
+      !
+      return 3.14159 * 5.0 * 5.0
+  func Main () → double
+    ! alloc
+    let Shape:value = new Circle()
+    return value.Area()
 ```
 
 **Semantics:**
@@ -30,10 +40,16 @@ public abstract class Shape
 }
 ```
 
-### 1.2 Sealed Classes (`seal`)
+### 1.2 Sealed Classes (`sealed`)
 
 ```calor
-§CL{FinalClass:seal}
+module SealedClasses
+  class FinalClass sealed
+    func Read () → int
+      return 42
+  func Main () → int
+    ! alloc
+    return new FinalClass().Read()
 ```
 
 **Semantics:**
@@ -46,20 +62,29 @@ public abstract class Shape
 public sealed class FinalClass { }
 ```
 
-### 1.3 Static Classes (`stat`)
+### 1.3 Static Containers and Methods
 
-> **Note:** Static class modifier is not fully implemented in the parser. Use static methods within regular classes instead.
+Use a nested named `module` for a static container. The first module labels
+the file; it does not introduce that container. A regular class can instead
+declare individual static methods.
 
 ```calor
-§CL{Utilities:pub}
-  §MT{Helper:pub:stat}
-    §O{void}
+module StaticUtilities
+  module Utilities
+    func Helper () → int
+      return 21
+  class Service
+    func Helper static () → int
+      return 21
+  func Main () → int
+    !
+    return Utilities.Helper() + Service.Helper()
 ```
 
 **Semantics:**
 - Static methods belong to the class, not instances
-- All members should be static in utility classes
-- Cannot be inherited from or inherit from other classes
+- Named modules emit static containers and cannot participate in inheritance
+- A regular class containing a static method is still a regular class
 
 **Generated C#:**
 ```csharp
@@ -71,10 +96,17 @@ public class Utilities
 
 ### 1.4 Partial Classes (`partial`)
 
-> **Note:** Partial class modifier is not fully implemented in the parser.
+The native parser retains the partial modifier. Combining declarations still
+requires the ordinary C# rules and compatible compilation context.
 
 ```calor
-§CL{DataService:partial}
+module PartialService
+  class DataService partial
+    func Read () → int
+      return 42
+  func Main () → int
+    ! alloc
+    return new DataService().Read()
 ```
 
 **Semantics:**
@@ -91,28 +123,28 @@ public partial class DataService { }
 
 ## 2. Inheritance Declaration
 
-### 2.1 Base Class (`§EXT`)
+### 2.1 Base Class (`extends`)
 
-```calor
-§CL{Circle:pub}
-  §EXT{Shape}
+```calor-fragment
+class Circle
+  extends Shape
   // ...
 ```
 
 **Semantics:**
 - Specifies single inheritance from a base class
-- Only one `§EXT` declaration is allowed per class
+- A class has one base class
 - Derived class inherits all accessible members from base
 - Base class must be accessible and not sealed
 
-**Syntax:** `§EXT{BaseClassName}`
+**Syntax:** `extends BaseClassName`
 
-### 2.2 Interface Implementation (`§IMPL`)
+### 2.2 Interface Implementation (`implements`)
 
-```calor
-§CL{GameObject:pub}
-  §IMPL{IMovable}
-  §IMPL{IDrawable}
+```calor-fragment
+class GameObject
+  implements IMovable
+  implements IDrawable
   // ...
 ```
 
@@ -122,16 +154,36 @@ public partial class DataService { }
 - Interface members must be implemented publicly
 - Explicit interface implementation is supported
 
-**Syntax:** `§IMPL{InterfaceName}`
+**Syntax:** `implements InterfaceName`
 
 ### 2.3 Combined Inheritance
 
 ```calor
-§CL{Dog:pub}
-  §EXT{Animal}
-  §IMPL{IPet}
-  §IMPL{ITrainable}
-  // ...
+module CombinedInheritance
+  interface IPet
+    func Name () → string
+      !
+  interface ITrainable
+    func Train () → int
+      !
+  class Animal
+    func Speak virtual () → string
+      return "..."
+  class Dog
+    extends Animal
+    implements IPet
+    implements ITrainable
+    func Name () → string
+      return "Rex"
+    func Train () → int
+      return 7
+  func Main () → string
+    ! alloc
+    let Dog:dog = new Dog()
+    let Animal:animal = dog
+    let IPet:pet = dog
+    let ITrainable:trainee = dog
+    return "${animal.Speak()}:${pet.Name()}:${trainee.Train()}"
 ```
 
 **Generated C#:**
@@ -143,12 +195,11 @@ public class Dog : Animal, IPet, ITrainable { ... }
 
 ## 3. Method Modifiers
 
-### 3.1 Virtual Methods (`virt`)
+### 3.1 Virtual Methods (`virtual`)
 
-```calor
-§MT{Speak:pub:virt}
-  §O{str}
-  §R "..."
+```calor-fragment
+func Speak virtual () → string
+  return "..."
 ```
 
 **Semantics:**
@@ -164,12 +215,21 @@ public virtual string Speak()
 }
 ```
 
-### 3.2 Override Methods (`over`)
+### 3.2 Override Methods (`override`)
 
 ```calor
-§MT{Speak:pub:over}
-  §O{str}
-  §R "Woof!"
+module MethodDispatch
+  class Animal
+    func Speak virtual () → string
+      return "..."
+  class Dog
+    extends Animal
+    func Speak override () → string
+      return "Woof!"
+  func Main () → string
+    ! alloc
+    let Animal:animal = new Dog()
+    return animal.Speak()
 ```
 
 **Semantics:**
@@ -185,11 +245,11 @@ public override string Speak()
 }
 ```
 
-### 3.3 Abstract Methods (`abs`)
+### 3.3 Abstract Methods (`abstract`)
 
-```calor
-§MT{Area:pub:abs}
-  §O{double}
+```calor-fragment
+func Area abstract () → double
+  !
 ```
 
 **Semantics:**
@@ -203,12 +263,23 @@ public override string Speak()
 public abstract double Area();
 ```
 
-### 3.4 Sealed Override (`seal over`)
+### 3.4 Sealed Override (`sealed override`)
 
 ```calor
-§MT{Compute:pub:seal over}
-  §O{i32}
-  §R 42
+module SealedOverrides
+  class Base
+    func Compute virtual () → int
+      return 1
+  class Derived
+    extends Base
+    func Compute sealed override () → int
+      return 42
+  class Final
+    extends Derived
+  func Main () → int
+    ! alloc
+    let Base:value = new Final()
+    return value.Compute()
 ```
 
 **Semantics:**
@@ -224,12 +295,12 @@ public override sealed int Compute()
 }
 ```
 
-### 3.5 Static Methods (`stat`)
+### 3.5 Static Methods (`static`)
 
-```calor
-§MT{Create:pub:stat}
-  §O{MyClass}
-  §R §NEW{MyClass}
+```calor-fragment
+func Create static () → MyClass
+  ! alloc
+  return new MyClass()
 ```
 
 **Semantics:**
@@ -246,12 +317,22 @@ public override sealed int Compute()
 To call a base class method, use `base.MethodName` as the call target:
 
 ```calor
-§MT{GetValue:pub:over}
-  §O{i32}
-  §R (+ §C{base.GetValue} §/C 5)
+module BaseMethods
+  class Base
+    func GetValue virtual () → int
+      return 10
+  class Derived
+    extends Base
+    func GetValue override () → int
+      return base.GetValue() + 5
+  func Main () → int
+    ! alloc
+    let Base:value = new Derived()
+    return value.GetValue()
 ```
 
-> **Important:** Use lowercase `base.Method` inside `§C{...}`, not `§BASE.Method`. The `§BASE` token is only used for constructor initializers.
+Use ordinary `base.Method(arguments)` and `this.Method(arguments)` calls.
+The separate `base(arguments)` clause is a constructor initializer.
 
 **Semantics:**
 - Accesses base class implementation
@@ -269,11 +350,24 @@ public override int GetValue()
 ### 4.2 Constructor Base Initializer
 
 ```calor
-§CTOR{pub}
-  §I{str:name}
-  §I{str:breed}
-  §BASE §A name §/BASE
-  §ASSIGN §THIS._breed breed
+module BaseConstructors
+  class Animal
+    field string:_name protected
+    ctor protected (string:name)
+      set this._name name
+    func GetName () → string
+      return this._name
+  class Dog
+    extends Animal
+    field string:_breed private
+    ctor public (string:name, string:breed)
+      base(name)
+      set this._breed breed
+    func Describe () → string
+      return "${this.GetName()}:${this._breed}"
+  func Main () → string
+    ! alloc, mut
+    return new Dog("Rex", "Collie").Describe()
 ```
 
 **Semantics:**
@@ -296,22 +390,26 @@ public Dog(string name, string breed)
 
 ### 5.1 Precondition Weakening
 
-Derived classes may **weaken** (but not strengthen) preconditions:
+The substitution rule is that derived methods may **weaken**, but not
+strengthen, their inherited preconditions:
 
 ```calor
-// Base class
-§MT{Process:pub:virt}
-  §I{i32:value}
-  §O{i32}
-  §Q (> value 0)      // Requires positive
-  §R (* value 2)
-
-// Derived class - OK: accepts wider range
-§MT{Process:pub:over}
-  §I{i32:value}
-  §O{i32}
-  §Q (>= value 0)     // Also accepts zero
-  §R (* value 2)
+module WeakerPreconditions
+  class Base
+    func Process virtual (int:value) → int
+      !
+      requires value > 0
+      return value * 2
+  class Derived
+    extends Base
+    func Process override (int:value) → int
+      !
+      requires value >= 0
+      return value * 2
+  func Main () → int
+    ! alloc
+    let Base:value = new Derived()
+    return value.Process(2)
 ```
 
 ### 5.2 Postcondition Strengthening
@@ -319,26 +417,40 @@ Derived classes may **weaken** (but not strengthen) preconditions:
 Derived classes may **strengthen** (but not weaken) postconditions:
 
 ```calor
-// Base class
-§MT{GetValue:pub:virt}
-  §O{i32}
-  §S (>= result 0)     // Ensures non-negative
-  §R 10
-
-// Derived class - OK: guarantees stronger condition
-§MT{GetValue:pub:over}
-  §O{i32}
-  §S (> result 0)      // Ensures strictly positive
-  §R 42
+module StrongerPostconditions
+  class Base
+    func GetValue virtual () → int
+      !
+      => result >= 0
+      return 10
+  class Derived
+    extends Base
+    func GetValue override () → int
+      !
+      => result > 0
+      return 42
+  func Main () → int
+    ! alloc
+    let Base:value = new Derived()
+    return value.GetValue()
 ```
 
 ### 5.3 Liskov Substitution Principle
 
-These rules ensure that objects of derived classes can substitute for objects of base classes without breaking correctness:
+These are substitution obligations, not a proof of every object lifecycle:
 
 1. **Preconditions**: Cannot demand more than base class
 2. **Postconditions**: Cannot promise less than base class
 3. **Invariants**: Must maintain all base class invariants
+
+The contract-inheritance checker resolves supported source relationships and
+checks the corresponding implications. Unsupported or assumption-dependent
+verification is not established validity. Supported effective inherited
+conditions participate in runtime checking and effect accounting. An
+implementation with no own conditions can still execute inherited guards.
+This does not make arbitrary source predicates statically provable.
+Module invariants currently emit diagnostic comments, not automatic checks
+at every method entry and exit.
 
 ---
 
@@ -348,29 +460,29 @@ These rules ensure that objects of derived classes can substitute for objects of
 
 | Modifier | Syntax | Inherited Access |
 |----------|--------|------------------|
-| Public | `pub` | Accessible everywhere |
-| Protected internal | `prot-int` | Accessible in derived classes or the same assembly |
-| Internal | `int` | Accessible in same assembly |
-| Protected | `prot` | Accessible in derived classes |
-| Private protected | `priv-prot` | Accessible in derived classes in the same assembly |
-| Private | `pri` | Not accessible in derived classes |
+| Public | `public` | Accessible everywhere |
+| Protected internal | `protected internal` | Accessible in derived classes or the same assembly |
+| Internal | `internal` | Accessible in same assembly |
+| Protected | `protected` | Accessible in derived classes |
+| Private protected | `private protected` | Accessible in derived classes in the same assembly |
+| Private | `private` | Not accessible in derived classes |
 
 ### 6.2 Method Visibility Rules
 
 **Overriding:**
-- Override cannot reduce visibility
+- Overrides must obey C# accessibility rules; they cannot arbitrarily change visibility
 - `public` in base → must be `public` in derived
-- `protected` in base → can be `protected` or `public` in derived
+- `protected` in base → `protected` in derived, not `public`
 
 **Example:**
-```calor
+```calor-fragment
 // Base class
-§MT{Method:prot:virt}
-  §O{void}
+func Method protected virtual () → void
+  return
 
-// Derived - OK: increasing visibility
-§MT{Method:pub:over}
-  §O{void}
+// Derived - same accessibility
+func Method protected override () → void
+  return
 ```
 
 ---
@@ -387,13 +499,18 @@ These rules ensure that objects of derived classes can substitute for objects of
 Return types support covariance:
 
 ```calor
-// Base class returns Animal
-§MT{Clone:pub:virt}
-  §O{Animal}
-
-// Derived can return Dog (more specific)
-§MT{Clone:pub:over}
-  §O{Dog}
+module CovariantReturns
+  class Animal
+    func Clone virtual () → Animal
+      return this
+  class Dog
+    extends Animal
+    func Clone override () → Dog
+      return this
+  func Main () → bool
+    ! alloc
+    let Animal:animal = new Dog()
+    return animal.Clone() is Dog
 ```
 
 ---
@@ -402,38 +519,29 @@ Return types support covariance:
 
 ### 8.1 Class Modifiers
 
-- **Static class modifier (`stat`)**: Not fully implemented in the parser. The `isStatic` flag is always `false`. Use static methods within regular classes as a workaround.
-
-- **Partial class modifier (`partial`)**: Not fully implemented in the parser. The `isPartial` flag is always `false`.
+- **Static containers**: Use named modules, not a static class modifier.
+- **Partial classes**: Supported syntax does not supply missing source files or
+  make independently compiled declarations one assembly.
 
 ### 8.2 Type Mapping
 
-- **`f64` type**: Due to internal type expansion, `f64` may not correctly map to `double`. Use `double` directly for reliable results.
-
-- **`f32` type**: Similarly, use `float` directly instead of `f32`.
+Use C# type spellings, including `double` and `float`. Historical internal
+aliases are not current source guidance.
 
 ### 8.3 Method Call Syntax
 
-- **Base/This in call targets**: The `§BASE` and `§THIS` tokens cannot be used inside `§C{...}` call targets. Use lowercase `base.Method` and `this.Method` instead:
-  ```calor
-  // Correct:
-  §C{base.GetValue} §/C
-  §C{this.Process} §A data §/C
-
-  // Incorrect (will not parse):
-  §C{§BASE.GetValue} §/C
-  §C{§THIS.Process} §A data §/C
+- **Base/this calls**: Use ordinary native postfix syntax:
+  ```calor-fragment
+  base.GetValue()
+  this.Process(data)
   ```
 
 ### 8.4 Modifier Syntax
 
-- **Multiple modifiers**: When combining modifiers (e.g., `seal` and `over`), use space separation in the modifiers field, not colon separation:
-  ```calor
-  // Correct:
-  §MT{Method:pub:seal over}
-
-  // Incorrect:
-  §MT{Method:pub:seal:over}
+- **Multiple modifiers**: Separate full keywords by spaces before the signature:
+  ```calor-fragment
+  func Method public sealed override () → int
+    return 42
   ```
 
 ---
@@ -441,6 +549,7 @@ Return types support covariance:
 ## References
 
 - AST Definitions: `src/Calor.Compiler/Ast/ClassNodes.cs`
-- Parser Implementation: `src/Calor.Compiler/Parsing/Parser.cs:3799-4211`
-- Code Generation: `src/Calor.Compiler/CodeGen/CSharpEmitter.cs:1473-1643`
+- Parser Implementation: `src/Calor.Compiler/Parsing/Parser.cs`
+- Code Generation: `src/Calor.Compiler/CodeGen/CSharpEmitter.cs`
+- Contract inheritance: `src/Calor.Compiler/Verification/ContractInheritanceChecker.cs`
 - Test Suite: `tests/Calor.Compiler.Tests/InheritanceTests.cs`

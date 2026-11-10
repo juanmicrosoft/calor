@@ -114,7 +114,7 @@ validation do not use these receipts yet.
 | `--language-version` | — | Project value | Override the C# language version. |
 | `--documentation-mode` | — | `parse` | Roslyn documentation mode: `none`, `parse`, or `diagnose`. |
 | `--feature` | — | — | Roslyn parse feature in `key=value` form. |
-| `--explicit-call-closers` | — | `false` | Emit explicit `§/C` for every `§C` call (v0.6.0-compatible output). Use when regenerating `.calr` files intended to parse on v0.6.0 toolchains. By default v0.6.1 elides `§/C` for zero-arg calls. |
+| `--explicit-call-closers` | — | `false` | Legacy compatibility option; current native calls use parentheses and never emit closing tags. |
 
 ### Direction Values
 

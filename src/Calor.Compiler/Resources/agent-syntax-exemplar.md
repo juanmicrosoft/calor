@@ -180,16 +180,15 @@ module Classes
 ## Common mistakes (these do NOT compile — shown so you avoid them)
 
 ```
-<!-- drift:ignore -->
-§/F §/M §/I §/L       removed; blocks end at dedent
 => RESULT >= 0       wrong; the return value is lowercase: => result >= 0
 if                   wrong; if needs a condition, such as if x > 0
 if {x > 0}           wrong; braces do not surround conditions
-<!-- drift:ignore -->
-§K   §ELSE           no such current keywords; use else or else if
-§F{f1:Add:int:pub}    wrong; source IDs and section headers are retired. Use:
-                     func Add (int:a, int:b) → int
 ```
+
+Blocks end at dedent; structural closing tags and section headers are retired.
+Write `else` or `else if` for a branch. Declaration IDs belong in the project
+`.calor/ids.json` sidecar, never in the source signature. Use an ordinary header:
+`func Add (int:a, int:b) → int`.
 
 Effects: `! cw` declares console write. Declare effects on functions that perform I/O.
 See `calor://effects` for the full effect catalog.

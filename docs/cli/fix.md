@@ -33,7 +33,7 @@ Select exactly one operation; they cannot be combined with `--apply`:
 | Flag | Operation |
 |:-----|:----------|
 | `--heal-closers` | Remove legacy structural closers so blocks end by dedenting. |
-| `--elide-call-closers` | Elide optional `§/C` on supported same-line calls. |
+| `--elide-call-closers` | Archived call-closer elision; retired source is rejected by today's compiler. |
 
 These modes describe archived section-tag syntax, not native-source conversion.
 `--heal-closers` removes only structural closing tags; the remaining archived

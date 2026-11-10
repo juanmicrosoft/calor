@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.SelfCheck;
 using Xunit;
@@ -17,9 +18,15 @@ public class AgentTaskReferenceTests
         var path = Path.Combine(directory.FullName, AgentTaskReferencePath);
         var content = File.ReadAllText(path);
         var programs = ExtractAgentTaskPrograms(content);
-        Assert.Equal(82, programs.Count);
+        using var authored = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(directory.FullName, TeachingSourcePath)));
+        var authoredSources = authored.RootElement.GetProperty("programs").EnumerateArray()
+            .Select(program => program.GetProperty("calor").GetString()!.TrimEnd()).ToArray();
+        Assert.Equal(87, authoredSources.Length);
+        Assert.Equal(authoredSources, programs.Select(program => program.Source));
+        Assert.All(programs, program => Assert.False(program.Wrapped));
         foreach (var name in new[] { "TryDouble", "SafeDivide", "HasNegative", "DigitValue", "Offset", "ClampScore" })
-            Assert.Contains(programs, program => program.Source.Contains($"{{{name}:", StringComparison.Ordinal));
+            Assert.Contains(programs, program => program.Source.Contains($"func {name} ", StringComparison.Ordinal));
         var diagnostics = CheckAgentTaskReference(new(path, content));
         Assert.True(diagnostics.Count == 0, string.Join(Environment.NewLine, diagnostics));
     }
@@ -29,17 +36,19 @@ public class AgentTaskReferenceTests
     {
         var source = Wrap("""
             ```
-            §F{Value:pub} () -> i32
-              §R 1
+            func Value () → int
+              !
+              return 1
             ```
             ```calor
-            §M{Complete}
-              §F{Value:pub} () -> i32
-                §R 2
+            module Complete
+              func Value () → int
+                !
+                return 2
             ```
             ```calor-fragment
-            §F{Name:pub}
-              §R ...
+            func Name () → int
+              return ...
             ```
             """);
         Assert.Equal(2, ExtractAgentTaskPrograms(source).Count);
@@ -48,7 +57,7 @@ public class AgentTaskReferenceTests
 
     [Theory]
     [InlineData("no examples")]
-    [InlineData("```calor\n§M{Empty}")]
+    [InlineData("```calor\nmodule Empty")]
     public void MissingReferenceOrExamples_FailsClosed(string source)
     {
         Assert.Contains(CheckAgentTaskReference(new("helpers.sh", source)),
@@ -60,8 +69,9 @@ public class AgentTaskReferenceTests
     {
         var source = Wrap("""
             ```
-            §F{Wrong:pub} () -> i32
-              §R "wrong"
+            func Wrong () → int
+              !
+              return "wrong"
             ```
             """);
         Assert.Contains(CheckAgentTaskReference(new("helpers.sh", source)),
@@ -69,9 +79,9 @@ public class AgentTaskReferenceTests
     }
 
     [Theory]
-    [InlineData("```\n§M{Empty}")]
-    [InlineData("```calor\n§M{Empty}\n```csharp")]
-    [InlineData("```calorr\n§M{Empty}\n```")]
+    [InlineData("```\nmodule Empty")]
+    [InlineData("```calor\nmodule Empty\n```csharp")]
+    [InlineData("```calorr\nmodule Empty\n```")]
     public void MalformedFences_CannotSilentlySkipExamples(string reference)
     {
         Assert.Contains(CheckAgentTaskReference(new("helpers.sh", Wrap(reference))),
@@ -85,15 +95,22 @@ public class AgentTaskReferenceTests
             ```calor
 
             // A complete module still needs semantic checking.
-            §M{Wrong}
-              §F{Value:pub} () -> i32
-                §R "wrong"
+            module Wrong
+              func Value () → int
+                return "wrong"
             ```
             """);
         var program = Assert.Single(ExtractAgentTaskPrograms(source));
         Assert.False(program.Wrapped);
-        Assert.Equal(4, program.FirstContentLine);
-        Assert.NotEmpty(CheckAgentTaskReference(new("helpers.sh", source)));
+        Assert.Equal(2, program.FirstContentLine);
+        Assert.StartsWith("\n// A complete module", program.Source);
+        var diagnostics = CheckAgentTaskReference(new("helpers.sh", source));
+        Assert.NotEmpty(diagnostics);
+        Assert.All(diagnostics, diagnostic =>
+        {
+            Assert.Equal(DiagnosticCode.DocDriftExampleCompileError, diagnostic.Code);
+            Assert.Equal(6, diagnostic.Span.Line);
+        });
     }
 
     [Fact]
@@ -101,9 +118,10 @@ public class AgentTaskReferenceTests
     {
         var source = Wrap("""
             ```calor
-            §M{Complete}
-              §F{Value:pub} () -> i32
-                §R 2
+            module Complete
+              func Value () → int
+                !
+                return 2
             ```
             """).Replace("\n", "\r\n", StringComparison.Ordinal);
         Assert.Single(ExtractAgentTaskPrograms(source));

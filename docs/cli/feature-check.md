@@ -31,7 +31,7 @@ calor feature-check iterator-accessor
 ```
 
 Output is wrapped in the [envelope schema 2.0](/calor/cli/envelope-schema/);
-the feature payload lives under `data` (0.25 output, `§` shown unescaped):
+the feature payload lives under `data`:
 
 ```json
 {
@@ -44,8 +44,8 @@ the feature payload lives under `data` (0.25 output, `§` shown unescaped):
     "found": true,
     "supported": false,
     "supportLevel": "notsupported",
-    "description": "A property or indexer whose accessor uses yield return/yield break is preserved verbatim as a §CSHARP interop block; Calor has no iterator accessors (Calor0209)",
-    "alternative": "Move the iterator body into a method (§MT with §YIELD) and have the accessor return its result, or keep the member as a §CSHARP interop block"
+    "description": "A property or indexer whose accessor uses yield return/yield break is preserved verbatim as converter-owned C# interop; Calor has no iterator accessors (Calor0209)",
+    "alternative": "Move the iterator body into a method and have the accessor return its result, or let the converter preserve the original C# member"
   }
 }
 ```
@@ -105,20 +105,21 @@ The registry in `src/Calor.Compiler/Migration/FeatureSupport.cs` is the source o
 run `calor feature-check --list` (optionally with `--level`) for the current level and
 description of every feature. This page does not copy the full list, because a copy drifts.
 
-The interop features the 0.25 converter changes, as the registry reports them:
+Selected current registry entries and their boundaries:
 
 | Feature | Level | Notes |
 |---------|-------|-------|
-| `ref-parameter`, `out-parameter`, `out-var` | Partial | By-reference arguments convert natively (`§A{ref}`, `§A{out}`, `out _`). Ref locals, ref returns, method-generic `out T`, and `out var` outside an expression statement, local declaration, `return` or `if` condition stay C#. `[NotNullWhen]` is copied but inert |
+| `ref-parameter`, `out-parameter`, `out-var` | Partial | Supported by-reference arguments use `ref value`, `out value`, and `out _`. Ref locals, ref returns, method-generic `out T`, and `out var` outside supported statement contexts stay C#. `[NotNullWhen]` is copied but inert |
 | `in-parameter` | Full | Call sites that omit `in`, or pass an operand that runs code, keep their statement as C# |
 | `string-interpolation` | Partial | Not `Full`: `[InterpolatedStringHandler]` targets and hole-free `FormattableString` targets have no Calor form and stay C# |
-| `local-function` | Partial | A bounded slice of non-capturing local functions becomes a nested `§F`; any other keeps its member as `§CSHARP` |
-| `iterator-accessor`, `partial-property` | NotSupported | The member stays `§CSHARP`; iterator *methods* (`yield-return`) are Full |
+| `local-function` | Partial | A bounded non-capturing, non-generic slice becomes a typed lambda binding at its original declaration point. Forward/mutual calls, captures, unsupported recursive bodies and unsupported signatures preserve the containing C# member |
+| `iterator-accessor`, `partial-property` | NotSupported | The original C# member is preserved; iterator *methods* (`yield-return`) have native syntax |
 | `string-interpolation-handler` | NotSupported | Keep the call as C#, or pass an already formatted string to a `string` overload |
 | `array-element-block` | NotSupported | A collection-initializer element, or a multi-line element in a rectangular array row, keeps its statement as C# |
 
-One registry entry does not match 0.25 behavior: `yield-return` (methods only). The
-website's `calor feature-check` page lists it as a known gap.
+A registry level describes conversion support, not whole-program acceptance or
+an effect/proof guarantee. Validate the output with its original references,
+parse options and runtime oracles. Preserved C# is not native coverage.
 
 ## Use in AI Agents
 
@@ -131,7 +132,7 @@ Before attempting to convert C# code to Calor, agents should:
 
 2. If unsupported, use the `alternative` field to rewrite the code first:
    ```json
-   {"alternative": "Move the iterator body into a method (§MT with §YIELD) and have the accessor return its result, or keep the member as a §CSHARP interop block"}
+   {"alternative": "Move the iterator body into a method and have the accessor return its result, or let the converter preserve the original C# member"}
    ```
 
 3. For bulk checking, use `--list` to get all unsupported features upfront.
