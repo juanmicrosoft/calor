@@ -17,16 +17,16 @@ namespace Calor.Compiler.Tests;
 public class BinderDispatchCompletenessTests
 {
     [Theory]
-    [InlineData("§B{factory:Func<Task<i32>>} §LAM{async} 42 §/LAM", 2)]
-    [InlineData("§B{factory:Func<ValueTask<i32>>} §LAM{async} 42 §/LAM", 2)]
-    [InlineData("§B{factory} §LAM{async} 42 §/LAM", 2)]
-    [InlineData("§B{factory:Func<i32>} §LAM 42 §/LAM", 2)]
-    [InlineData("§B{factory:Func<Task<i32>>} §LAM{async} (+ 40 2) §/LAM", 4)]
+    [InlineData("let Func<Task<int>>:factory = async () => 42", 2)]
+    [InlineData("let Func<ValueTask<int>>:factory = async () => 42", 2)]
+    [InlineData("let factory = async () => 42", 2)]
+    [InlineData("let Func<int>:factory = () => 42", 2)]
+    [InlineData("let Func<Task<int>>:factory = async () => 40 + 2", 4)]
     public void ContextualLambdaBinding_CountsEachNativeExpressionOnce(string statement, int expectedCount)
     {
         AssertExpressionCount($$"""
-            §M{LambdaAccounting}
-              §F{Probe:pub} () -> void
+            module LambdaAccounting
+              func Probe () → void
                 {{statement}}
             """, expectedCount);
     }
@@ -37,9 +37,9 @@ public class BinderDispatchCompletenessTests
     public void ContextualLambdaReturn_CountsEachNativeExpressionOnce(string carrier, int expectedCount)
     {
         AssertExpressionCount($$"""
-            §M{LambdaReturnAccounting}
-              §F{Probe:pub} () -> Func<{{carrier}}<i32>>
-                §R §LAM{async} 42 §/LAM
+            module LambdaReturnAccounting
+              func Probe () → Func<{{carrier}}<int>>
+                return async () => 42
             """, expectedCount);
     }
 
@@ -47,14 +47,14 @@ public class BinderDispatchCompletenessTests
     public void AsyncOverloadCandidates_DoNotDuplicateLambdaAccounting()
     {
         AssertExpressionCount("""
-            §M{CandidateAccounting}
-              §AF{Choose:pub} (i32:value) -> i32
-                §R value
-              §AF{Choose:pub} (str:value) -> i32
-                §R 0
-              §AF{Consume:pub} () -> i32
-                §B{factory:Func<Task<i32>>} §LAM{async} 42 §/LAM
-                §R §AWAIT §C{Choose} §A 42 §/C
+            module CandidateAccounting
+              func Choose async (int:value) → Task<int>
+                return value
+              func Choose async (string:value) → Task<int>
+                return 0
+              func Consume async () → Task<int>
+                let Func<Task<int>>:factory = async () => 42
+                return await Choose(42)
             """, 7);
     }
 
@@ -62,14 +62,14 @@ public class BinderDispatchCompletenessTests
     public void GenericAsyncMethodGroup_CountsDispatchWithoutRebindingLambda()
     {
         AssertExpressionCount("""
-            §M{MethodGroupAccounting}
-              §AF{Identity:pub}<T> (T:value) -> T
-                §R value
-              §AF{Consume:pub} () -> i32
-                §B{local:Func<ValueTask<i32>>} §LAM{async} 42 §/LAM
-                §B{factory:Func<i32,Task<i32>>} Identity
-                §B{pending:Task<i32>} §C{factory} §A 42 §/C
-                §R §AWAIT pending
+            module MethodGroupAccounting
+              func Identity<T> async (T:value) → Task<T>
+                return value
+              func Consume async () → Task<int>
+                let Func<ValueTask<int>>:local = async () => 42
+                let Func<int, Task<int>>:factory = Identity
+                let Task<int>:pending = factory(42)
+                return await pending
             """, 8, "'Identity' is a function, not a variable. Did you mean to call it?");
     }
 

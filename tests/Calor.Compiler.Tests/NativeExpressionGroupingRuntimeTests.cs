@@ -9,34 +9,36 @@ namespace Calor.Compiler.Tests;
 public class NativeExpressionGroupingRuntimeTests
 {
     [Theory]
-    [InlineData("(upper (+ a b))", "str", "a", "b", "AB")]
-    [InlineData("(lower (+ a b))", "str", "A", "B", "ab")]
-    [InlineData("(len (+ a b))", "i32", "a", "b", 2)]
-    [InlineData("(char-at (+ a b) INT:1)", "char", "a", "b", 'b')]
+    [InlineData("(a + b).ToUpper()", "string", "a", "b", "AB")]
+    [InlineData("(a + b).ToLower()", "string", "A", "B", "ab")]
+    [InlineData("(a + b).Length", "int", "a", "b", 2)]
+    [InlineData("(a + b)[1]", "char", "a", "b", 'b')]
     public void InstanceReceivers_UseCompleteChildExpression(
         string expression, string returnType, string a, string b, object expected)
     {
         var type = Compile($$"""
-            §M{Grouping}
-              §F{Probe:pub} (str:a, str:b) -> {{returnType}}
-                §E{}
-                §R {{expression}}
+            module Grouping Grouping
+              module GroupingModule
+                func Probe (string:a, string:b) → {{returnType}}
+                  !
+                  return {{expression}}
             """);
         Assert.Equal(expected, Invoke(type, "Probe", a, b));
     }
 
     [Theory]
-    [InlineData("(+ (?? x INT:1) INT:2)", 7, 3)]
-    [InlineData("(* INT:2 (?? x INT:1))", 10, 2)]
-    [InlineData("(- INT:20 (+ (?? x INT:1) INT:2))", 13, 17)]
-    [InlineData("(cast i32 (+ (cast f64 (?? x INT:1)) FLOAT:0.75))", 5, 1)]
+    [InlineData("(x ?? 1) + 2", 7, 3)]
+    [InlineData("2 * (x ?? 1)", 10, 2)]
+    [InlineData("20 - ((x ?? 1) + 2)", 13, 17)]
+    [InlineData("(int)((double)(x ?? 1) + 0.75)", 5, 1)]
     public void CoalescingArithmeticAndCasts_PreserveComposition(string expression, int present, int absent)
     {
         var type = Compile($$"""
-            §M{Grouping}
-              §F{Probe:pub} (?i32:x) -> i32
-                §E{}
-                §R {{expression}}
+            module Grouping Grouping
+              module GroupingModule
+                func Probe (int?:x) → int
+                  !
+                  return {{expression}}
             """);
         Assert.Equal(present, Invoke(type, "Probe", 5));
         Assert.Equal(absent, Invoke(type, "Probe", new object?[] { null }));
@@ -46,19 +48,20 @@ public class NativeExpressionGroupingRuntimeTests
     public void CastAndUnaryComposition_PreserveCompleteOperands()
     {
         var type = Compile("""
-            §M{Grouping}
-              §F{CastSum:pub} (f64:x, f64:y) -> i32
-                §E{}
-                §R (cast i32 (+ x y))
-              §F{NegatedSum:pub} (f64:x, f64:y) -> i32
-                §E{}
-                §R (- (cast i32 (+ x y)))
-              §F{Character:pub} (i32:x, i32:y) -> char
-                §E{}
-                §R (char-from-code (+ x y))
-              §F{Code:pub} (str:a, str:b) -> i32
-                §E{}
-                §R (char-code (char-at (+ a b) INT:1))
+            module Grouping Grouping
+              module GroupingModule
+                func CastSum (double:x, double:y) → int
+                  !
+                  return (int)(x + y)
+                func NegatedSum (double:x, double:y) → int
+                  !
+                  return -(int)(x + y)
+                func Character (int:x, int:y) → char
+                  !
+                  return (char)(x + y)
+                func Code (string:a, string:b) → int
+                  !
+                  return (int)(a + b)[1]
             """);
         foreach (var (x, y) in new[] { (1.75, 2.75), (-1.75, -2.75), (1.25, -2.75) })
         {
@@ -74,21 +77,22 @@ public class NativeExpressionGroupingRuntimeTests
     {
         var cases = new (string Pattern, Func<int, bool> Oracle)[]
         {
-            ("(not (and §PREL{gte} 0 §PREL{lte} 10))", x => !(x >= 0 && x <= 10)),
-            ("(not (or §PREL{lt} 0 §PREL{gt} 10))", x => !(x < 0 || x > 10)),
-            ("(and (or §PREL{lt} 0 §PREL{gt} 10) §PREL{lt} 20)", x => (x < 0 || x > 10) && x < 20),
-            ("(or §PREL{lt} 0 (and §PREL{gte} 10 (not §PREL{gt} 20)))", x => x < 0 || x >= 10 && !(x > 20)),
-            ("(not (not (or §PREL{lt} 0 §PREL{gt} 10)))", x => !!(x < 0 || x > 10))
+            ("(not (and >= 0 <= 10))", x => !(x >= 0 && x <= 10)),
+            ("(not (or < 0 > 10))", x => !(x < 0 || x > 10)),
+            ("(and (or < 0 > 10) < 20)", x => (x < 0 || x > 10) && x < 20),
+            ("(or < 0 (and >= 10 (not > 20)))", x => x < 0 || x >= 10 && !(x > 20)),
+            ("(not (not (or < 0 > 10)))", x => !!(x < 0 || x > 10))
         };
         foreach (var (pattern, oracle) in cases)
         {
             var type = Compile($$"""
-                §M{Grouping}
-                  §F{Probe:pub} (i32:x) -> bool
-                    §E{}
-                    §R §W x
-                      §K {{pattern}} → BOOL:true
-                      §K _ → BOOL:false
+                module Grouping Grouping
+                  module GroupingModule
+                    func Probe (int:x) → bool
+                      !
+                      return match x
+                        case {{pattern}} → true
+                        case _ → false
                 """);
             foreach (var input in Enumerable.Range(-12, 45))
                 Assert.Equal(oracle(input), Invoke(type, "Probe", input));
@@ -99,21 +103,22 @@ public class NativeExpressionGroupingRuntimeTests
     public void GroupedReceiversAndCoalescing_EvaluateChildrenOnceInOrder()
     {
         var type = Compile("""
-            §M{Grouping}
-              §F{RecordText:priv} (List<str>:trace, str:value) -> str
-                §E{mut}
-                §C{trace.Add} §A value §/C
-                §R value
-              §F{RecordNumber:priv} (List<i32>:trace, i32:value) -> i32
-                §E{mut}
-                §C{trace.Add} §A value §/C
-                §R value
-              §F{Text:pub} (List<str>:trace) -> str
-                §E{mut}
-                §R (upper (+ §C{RecordText} §A trace §A "a" §/C §C{RecordText} §A trace §A "b" §/C))
-              §F{Number:pub} (?i32:value, List<i32>:trace) -> i32
-                §E{mut}
-                §R (+ (?? value §C{RecordNumber} §A trace §A INT:1 §/C) §C{RecordNumber} §A trace §A INT:2 §/C)
+            module Grouping Grouping
+              module GroupingModule
+                func RecordText private (List<string>:trace, string:value) → string
+                  ! mut
+                  trace.Add(value)
+                  return value
+                func RecordNumber private (List<int>:trace, int:value) → int
+                  ! mut
+                  trace.Add(value)
+                  return value
+                func Text (List<string>:trace) → string
+                  ! mut
+                  return (RecordText(trace, "a") + RecordText(trace, "b")).ToUpper()
+                func Number (int?:value, List<int>:trace) → int
+                  ! mut
+                  return (value ?? RecordNumber(trace, 1)) + RecordNumber(trace, 2)
             """);
         var textTrace = new List<string>();
         Assert.Equal("AB", Invoke(type, "Text", textTrace));
@@ -128,13 +133,14 @@ public class NativeExpressionGroupingRuntimeTests
 
     [Theory]
     [InlineData("")]
-    [InlineData("{false}")]
+    [InlineData(".ConfigureAwait(false)")]
     public async Task AwaitCoalescedTask_AwaitsSelectedReceiver(string configuration)
     {
         var type = Compile($$"""
-            §M{Grouping}
-              §AF{Probe:pub} (Task<i32>:first, Task<i32>:second) -> i32
-                §R §AWAIT{{configuration}} (?? first second)
+            module Grouping Grouping
+              module GroupingModule
+                func Probe async (Task<int>:first, Task<int>:second) → Task<int>
+                  return await (first ?? second){{configuration}}
             """);
         foreach (var first in new[] { Task.FromResult(5), null })
         {
