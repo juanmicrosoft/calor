@@ -5,6 +5,7 @@ using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.CodeGen;
+using Calor.Compiler.Ids;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
@@ -234,6 +235,8 @@ public class ArchitectureTests
         Assert.Equal(aggregateProperties, updateProperties);
 
         var original = EmptyModule("Original");
+        original.ToolingId = "m-original";
+        original.ToolingIdAllocationKind = IdKind.Module;
         original.NamespaceIdentity = "Example";
         original.NamespaceScopeId = "scope";
         original.FullyQualifiedSymbolIdentity = "Example.Original";
@@ -251,6 +254,7 @@ public class ArchitectureTests
         Assert.Equal(original.NamespaceScopeId, copy.NamespaceScopeId);
         Assert.Equal(original.FullyQualifiedSymbolIdentity, copy.FullyQualifiedSymbolIdentity);
         Assert.Equal(original.DocComment, copy.DocComment);
+        Assert.Equal(original.ToolingIdAllocationKind, copy.ToolingIdAllocationKind);
 
         var astNodeSource = CSharpSyntaxTree.ParseText(
             File.ReadAllText(Path.Combine(
@@ -270,7 +274,8 @@ public class ArchitectureTests
             .Select(access => access.Name.Identifier.ValueText)
             .OrderBy(name => name, StringComparer.Ordinal);
         var mutableMetadata = typeof(AstNode)
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .GetProperties(BindingFlags.Public | BindingFlags.NonPublic |
+                BindingFlags.Instance | BindingFlags.DeclaredOnly)
             .Where(property => property.SetMethod != null)
             .Select(property => property.Name)
             .OrderBy(name => name, StringComparer.Ordinal);
@@ -282,22 +287,22 @@ public class ArchitectureTests
     {
         var first = ParseModule(
             """
-            §M{First}
-              §F{Run:pub} () -> void
-                §E{cw}
-                §L{i:1:3:1}
-                  §IF (== (% i 2) 0)
-                    §P "even"
-                  §EL
-                    §P i
+            module First
+              func Run public () → void
+                ! cw
+                for i from 1 to 3 step 1
+                  if i % 2 == 0
+                    System.Console.WriteLine("even")
+                  else
+                    System.Console.WriteLine(i)
             """);
         var second = ParseModule(
             """
-            §M{Second}
-              §F{Run:pub} () -> int
-                §E{}
-                §B{value:int} 42
-                §R value
+            module Second
+              func Run public () → int
+                !
+                let int:value = 42
+                return value
             """);
 
         var reusedCSharp = new CSharpEmitter();
