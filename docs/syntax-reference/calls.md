@@ -91,6 +91,21 @@ Literal-overload selection compares conversions argument by argument; a better
 conversion for one argument cannot cancel a worse conversion for another.
 General constant-expression evaluation is not implemented here.
 
+## Unknown receiver types
+
+An inferred local whose type is unknown is not a declared `object`. Calls on
+such author-written locals report `Calor0270` at each receiver and remain
+unresolved for analyses. Explicit `object` and `System.Object` inputs are known
+types; an incompatible native overload reports `Calor0208`. An inferred match
+capture retains the matched value's known reference type and nullable annotation.
+
+Native member calls use the selected metadata method. For example,
+`assembly.GetTypes()` retains its `System.Type[]` result for `each` inference.
+A type parameter named `@String` does not acquire the .NET string indexer.
+For effects, a matching manifest name alone cannot authorize an unselected
+computed member call. Strict checking still requires a resolved callee and its
+effect contract; raw C# and CLR conversions do not provide that contract.
+
 ## By-reference arguments
 
 Declare parameters as `ref T:name`, `out T:name`, or `in T:name`. Mark the
