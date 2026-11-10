@@ -8264,25 +8264,31 @@ public sealed class Binder
         return Array.Empty<Symbol>();
     }
 
-    private IReadOnlyList<Symbol> ResolveReadableInstanceProperties(ClassDefinitionNode owner, string memberName)
+    private IReadOnlyList<Symbol> ResolveReadableInstanceProperties(ClassDefinitionNode receiverClass, string memberName)
     {
-        var members = ResolveAccessibleMembers(owner, memberName);
+        var members = ResolveAccessibleMembers(receiverClass, memberName);
         return members.All(member => member is VariableSymbol { IsProperty: true, IsStatic: false } property
-                && HasAccessiblePropertyGetter(property))
+                && HasAccessiblePropertyGetter(property, receiverClass))
             ? members : Array.Empty<Symbol>();
     }
 
-    private bool HasAccessiblePropertyGetter(VariableSymbol member)
+    private bool HasAccessiblePropertyGetter(VariableSymbol member, ClassDefinitionNode receiverClass)
     {
         if (member.DeclaringTypeName == null
-            || !_classesByQualifiedName.TryGetValue(member.DeclaringTypeName, out var owner))
+            || !_classesByQualifiedName.TryGetValue(member.DeclaringTypeName, out var declaringClass))
             return false;
 
-        var declarations = EnumerateProperties(owner)
+        var declarations = EnumerateProperties(declaringClass)
             .Where(property => property.Name == member.Name && property.IdentifierSpan == member.DeclarationSpan)
             .ToArray();
-        return declarations is [{ Getter: { } getter } property]
-            && IsMemberAccessible(getter.Visibility ?? property.Visibility, member.DeclaringTypeName);
+        if (declarations is not [{ Getter: { } getter } property])
+            return false;
+
+        var visibility = getter.Visibility ?? property.Visibility;
+        return IsMemberAccessible(visibility, member.DeclaringTypeName)
+            && (visibility is not (Visibility.Protected or Visibility.PrivateProtected)
+                || _currentClass != null
+                    && IsSameOrDerivedClass(receiverClass, _qualifiedClassNames[_currentClass]));
     }
 
     private bool IsMemberAccessible(VariableSymbol member) =>

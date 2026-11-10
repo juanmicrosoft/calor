@@ -1300,6 +1300,128 @@ public sealed class CanonicalOperatorIndexerTests
     }
 
     [Theory]
+    [InlineData("protected", "Owner", "Derived", false)]
+    [InlineData("protected", "Derived", "Derived", true)]
+    [InlineData("private protected", "Owner", "Derived", false)]
+    [InlineData("private protected", "Derived", "Derived", true)]
+    [InlineData("private", "Owner", "Owner", true)]
+    public void NamedInstanceGetter_RespectsProtectedQualifierAndPrivateContext(
+        string visibility, string receiverType, string contextType, bool valid)
+    {
+        var inheritedGetter = visibility == "private protected";
+        var readMethod = $$"""
+            func Read public ({{receiverType}}:other) → Sink
+              ! alloc
+              return new Sink(other . Value)
+            """;
+        var body = "    " + readMethod.Replace("\n", "\n    ");
+        var source = $$"""
+            module QualifierAuthority
+              class Owner
+                property long:Value {{(inheritedGetter ? visibility : "public")}}
+                  get {{(inheritedGetter ? "" : visibility)}}
+                    return 7
+                  set
+                    return
+            {{(contextType == "Owner" ? body : "")}}
+              class Derived
+                extends Owner
+            {{(contextType == "Derived" ? body : "")}}
+              class Sink
+                property long:Observed public
+                  get
+                ctor (long:value)
+                  set Observed value
+            """;
+        var csharpRead = $"public Sink Read({receiverType} other) {{ return new Sink(other.Value); }}";
+        var oracle = $$"""
+            public class Owner {
+              {{(inheritedGetter ? visibility : "public")}} long Value {
+                {{(inheritedGetter ? "" : visibility)}} get { return 7; } set { }
+              }
+              {{(contextType == "Owner" ? csharpRead : "")}}
+            }
+            public class Derived : Owner {
+              {{(contextType == "Derived" ? csharpRead : "")}}
+            }
+            public class Sink { public long Observed { get; } public Sink(long value) { Observed = value; } }
+            """;
+        var compilation = CSharpCompilation.Create("QualifierOracle", [CSharpSyntaxTree.ParseText(oracle)],
+            ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
+                .Select(path => MetadataReference.CreateFromFile(path)),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var errors = compilation.GetDiagnostics()
+            .Where(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).ToArray();
+        if (valid)
+            Assert.Empty(errors);
+        else
+            Assert.Equal("CS1540", Assert.Single(errors).Id);
+
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var module = Parse(candidate);
+            var property = Assert.Single(module.Classes.Single(cls => cls.Name == "Owner").Properties);
+            var expectedVisibility = visibility switch
+            {
+                "protected" => Visibility.Protected,
+                "private protected" => Visibility.PrivateProtected,
+                "private" => Visibility.Private,
+                _ => throw new ArgumentOutOfRangeException(nameof(visibility)),
+            };
+            Assert.Equal(expectedVisibility, property.Getter!.Visibility ?? property.Visibility);
+            Assert.Equal(inheritedGetter, property.Getter.Visibility == null);
+            var method = Assert.Single(module.Classes.Single(cls => cls.Name == contextType).Methods);
+            var creationNode = Assert.IsType<NewExpressionNode>(
+                Assert.IsType<ReturnStatementNode>(Assert.Single(method.Body)).Expression);
+            var memberNode = Assert.IsType<FieldAccessNode>(Assert.Single(creationNode.Arguments));
+            Assert.Equal("other", Assert.IsType<ReferenceNode>(memberNode.Target).Name);
+            var diagnostics = new DiagnosticBag();
+            var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(module);
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+            var creation = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundNewExpression>());
+            var member = Assert.IsType<BoundFieldAccessExpression>(Assert.Single(creation.Arguments));
+            var receiver = Assert.IsType<BoundVariableExpression>(member.Target);
+            var read = Assert.Single(bound.Functions.Where(function => function.Symbol.Name == $"{contextType}.Read"));
+            Assert.Same(Assert.Single(read.Symbol.Parameters), receiver.Variable);
+            Assert.Equal(receiverType, receiver.Variable.TypeName);
+            var compiled = Program.Compile(candidate);
+            if (valid)
+            {
+                Assert.Equal("LONG", TypeIdentity.Canonicalize(member.Type.DisplayString));
+                var selected = Assert.Single(member.ResolvedFields);
+                Assert.True(selected.IsProperty);
+                Assert.Equal("Owner", selected.DeclaringTypeName);
+                Assert.Same(selected, member.ResolvedField);
+                Assert.Same(Assert.Single(creation.ResolvedConstructors), creation.ResolvedConstructor);
+                Assert.Equal("LONG", TypeIdentity.Canonicalize(
+                    Assert.Single(creation.ResolvedConstructor!.Parameters).TypeName));
+                Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+                Assert.Equal(7, Execute(oracle, ReadGetter));
+                Assert.Equal(Execute(oracle, ReadGetter), Execute(compiled.GeneratedCode, ReadGetter));
+            }
+            else
+            {
+                Assert.Equal("OBJECT", member.Type.DisplayString);
+                Assert.Empty(member.ResolvedFields);
+                Assert.Null(member.ResolvedField);
+                Assert.Empty(creation.ResolvedConstructors);
+                Assert.Null(creation.ResolvedConstructor);
+                var error = Assert.Single(compiled.Diagnostics.Where(diagnostic => diagnostic.IsError));
+                Assert.Equal(DiagnosticCode.CodeGenCompilationError, error.Code);
+                Assert.Contains("(CS1540)", error.Message);
+            }
+        }
+
+        long ReadGetter(Assembly assembly)
+        {
+            var caller = assembly.GetType(contextType, throwOnError: true)!;
+            var receiver = Activator.CreateInstance(assembly.GetType(receiverType, throwOnError: true)!);
+            var sink = caller.GetMethod("Read")!.Invoke(Activator.CreateInstance(caller), [receiver])!;
+            return (long)sink.GetType().GetProperty("Observed")!.GetValue(sink)!;
+        }
+    }
+
+    [Theory]
     [InlineData("this(int:i) → int")]
     [InlineData("this[int:i]")]
     [InlineData("this[] → int")]

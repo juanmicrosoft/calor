@@ -111,6 +111,11 @@ static-through-instance reads retain no such authority. All conditional
 alternatives must be readable; filtering out an unreadable branch cannot grant
 authority to the remaining branch. Public get-only and
 generic getters remain usable, including a public getter with a private setter.
+Protected and private-protected reads from a derived class require a receiver
+whose static type is that derived class or a subtype, not its base class.
+Same-class private getters remain readable through named instances. The
+private-protected control uses declaration visibility inherited by its getter;
+it does not claim support for compound restricted-accessor syntax.
 The generic getter control proves binding and independently compiled emitted C#,
 not the separate closed-generic getter effect-closure boundary.
 Struct storage-path handling and existing `this`/`base` policies stay separate.
