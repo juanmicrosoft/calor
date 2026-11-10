@@ -196,15 +196,21 @@ public sealed class MultiDimArrayCreationNode : ExpressionNode
     public int Rank { get; }
 
     /// <summary>
-    /// Size expressions for each dimension. Empty if using initializer.
+    /// Written size expressions for each dimension. Empty when sizes are inferred.
     /// </summary>
     public IReadOnlyList<ExpressionNode> DimensionSizes { get; }
 
     /// <summary>
-    /// For initializer form: list of rows, each row is a list of expressions.
-    /// Empty if using dimension sizes.
+    /// Innermost initializer rows in source order. Braces and empty levels are
+    /// recorded separately in InitializerNesting.
     /// </summary>
     public IReadOnlyList<IReadOnlyList<ExpressionNode>> Initializer { get; }
+
+    /// <summary>
+    /// Child counts for initializer braces in preorder, including empty braces.
+    /// Null for nodes using the older flat-row representation.
+    /// </summary>
+    public IReadOnlyList<int>? InitializerNesting { get; }
 
     public MultiDimArrayCreationNode(
         TextSpan span,
@@ -214,7 +220,8 @@ public sealed class MultiDimArrayCreationNode : ExpressionNode
         int rank,
         IReadOnlyList<ExpressionNode> dimensionSizes,
         IReadOnlyList<IReadOnlyList<ExpressionNode>> initializer,
-        TextSpan? elementTypeSpan = null)
+        TextSpan? elementTypeSpan = null,
+        IReadOnlyList<int>? initializerNesting = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -224,6 +231,7 @@ public sealed class MultiDimArrayCreationNode : ExpressionNode
         Rank = rank;
         DimensionSizes = dimensionSizes ?? Array.Empty<ExpressionNode>();
         Initializer = initializer ?? Array.Empty<IReadOnlyList<ExpressionNode>>();
+        InitializerNesting = initializerNesting;
     }
 
 

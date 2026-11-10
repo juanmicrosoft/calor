@@ -16825,10 +16825,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     // --- Multidimensional array conversions ---
 
     private ExpressionNode ConvertMultiDimArrayCreation(ArrayCreationExpressionSyntax arrayCreation, int rank)
-        => ConvertMultiDimArray(arrayCreation.Type, arrayCreation.Initializer, GetTextSpan(arrayCreation), rank);
+        => ConvertMultiDimArray(arrayCreation.Type, arrayCreation.Initializer, GetTextSpan(arrayCreation), rank,
+            hasWrittenSizes: true);
 
     private ExpressionNode ConvertMultiDimArray(
-        ArrayTypeSyntax arrayType, InitializerExpressionSyntax? arrayInitializer, TextSpan span, int rank)
+        ArrayTypeSyntax arrayType, InitializerExpressionSyntax? arrayInitializer, TextSpan span, int rank,
+        bool hasWrittenSizes = false)
     {
         _context.RecordFeatureUsage("multidim-array");
         var id = _context.GenerateId("arr2d");
@@ -16839,26 +16841,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         var dimensionSizes = new List<ExpressionNode>();
         var initializer = new List<IReadOnlyList<ExpressionNode>>();
+        List<int>? nesting = null;
 
         if (arrayInitializer != null)
         {
-            // #1132 (F5-ARRAY-05): flatten the nested braces into the innermost vectors
-            // (row-major) and record the shape. Rank 2 without written sizes keeps the
-            // plain §ROW form; rank 3+ or written sizes use the sized form with rows
-            // (the sizes of an initialized C# array are constants equal to this shape).
-            var shape = new int[rank];
+            nesting = [];
             void Flatten(InitializerExpressionSyntax init, int level)
             {
-                shape[level] = init.Expressions.Count;
-                if (level == rank - 2)
+                nesting.Add(init.Expressions.Count);
+                if (level == rank - 1)
                 {
-                    foreach (var rowExpr in init.Expressions)
-                    {
-                        if (rowExpr is not InitializerExpressionSyntax rowInit)
-                            throw new NotSupportedException("Multi-dimensional array initializer is not rectangular");
-                        shape[rank - 1] = rowInit.Expressions.Count;
-                        initializer.Add(rowInit.Expressions.Select(element => ConvertArrayElement(element, rectangular: true)).ToList());
-                    }
+                    if (init.Expressions.Any(element => element is InitializerExpressionSyntax))
+                        throw new NotSupportedException("Multi-dimensional array initializer has excess nesting");
+                    initializer.Add(init.Expressions.Select(element => ConvertArrayElement(element, rectangular: true)).ToList());
                     return;
                 }
                 foreach (var inner in init.Expressions)
@@ -16869,23 +16864,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
             }
             Flatten(arrayInitializer, 0);
-            var sized = arrayType.RankSpecifiers[0].Sizes.Any(size => size is not OmittedArraySizeExpressionSyntax);
-            // An empty level hides the sizes below it (`new int[0, 3] {}`) and leaves no
-            // elements: the creation is just its sizes, the written ones when present
-            // (C# requires them to be constants matching the braces).
-            if (shape.Contains(0))
-            {
-                initializer.Clear();
-                dimensionSizes.AddRange(sized
-                    ? arrayType.RankSpecifiers[0].Sizes.Select(ConvertExpression)
-                    : shape.Select(length => (ExpressionNode)new IntLiteralNode(span, length)));
-            }
-            else if (rank > 2 || sized)
-                dimensionSizes.AddRange(shape.Select(length => (ExpressionNode)new IntLiteralNode(span, length)));
         }
-        else if (arrayType.RankSpecifiers.Count > 0)
+        if (hasWrittenSizes && arrayType.RankSpecifiers.Count > 0)
         {
             var rankSpec = arrayType.RankSpecifiers[0];
+            if (rankSpec.Sizes.Any(size => size is not OmittedArraySizeExpressionSyntax)
+                && rankSpec.Sizes.Any(size => size is OmittedArraySizeExpressionSyntax))
+                throw new NotSupportedException("Multi-dimensional array creation has incomplete dimension sizes");
             foreach (var sizeExpr in rankSpec.Sizes)
             {
                 if (sizeExpr is not OmittedArraySizeExpressionSyntax)
@@ -16893,7 +16878,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        return new MultiDimArrayCreationNode(span, id, name, elementType, rank, dimensionSizes, initializer);
+        return new MultiDimArrayCreationNode(span, id, name, elementType, rank, dimensionSizes, initializer,
+            initializerNesting: nesting);
     }
 
     private static MethodModifiers GetMethodModifiers(SyntaxTokenList modifiers)

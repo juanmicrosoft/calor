@@ -127,6 +127,13 @@ module ArrayTypes
 `Main()` returns `6`. Array creation requires the `alloc` effect. The
 declaration retains the explicit `int[]` type in generated C#.
 
+Rectangular initializers keep one brace level per dimension. For example,
+`new int[2, 1, 2] { { { 1, 2 } }, { { 3, 4 } } }` creates a rank-three
+array. Omit the sizes with `new int[,,]` to infer them from the braces.
+Written sizes, empty braces and row boundaries are preserved; mismatched
+sizes or ragged rows are rejected rather than padded, flattened or resized.
+Initializer expressions still require their own effects in addition to `alloc`.
+
 ## Nullable types
 
 Write `T?`, with a suffix question mark. `string?` and a resolved `User?`

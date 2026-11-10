@@ -5154,7 +5154,30 @@ public sealed class Binder
 
     private BoundExpression BindMultiDimArrayCreation(MultiDimArrayCreationNode array)
     {
-        var dimensions = BindExpressions(array.DimensionSizes);
+        IReadOnlyList<BoundExpression> dimensions = BindExpressions(array.DimensionSizes);
+        if (dimensions.Count == 0 && array.InitializerNesting is { } nesting)
+        {
+            var lengths = Enumerable.Repeat(-1, array.Rank).ToArray();
+            var position = 0;
+            if (ReadLevel(0) && position == nesting.Count)
+                dimensions = lengths.Select(length => (BoundExpression)new BoundIntLiteral(
+                    array.Span, Math.Max(length, 0))).ToArray();
+
+            bool ReadLevel(int level)
+            {
+                if (position >= nesting.Count)
+                    return false;
+                var count = nesting[position++];
+                if (count < 0 || lengths[level] >= 0 && lengths[level] != count)
+                    return false;
+                lengths[level] = count;
+                if (level < array.Rank - 1)
+                    for (var index = 0; index < count; index++)
+                        if (!ReadLevel(level + 1))
+                            return false;
+                return true;
+            }
+        }
         var rows = array.Initializer
             .Select(row => (IReadOnlyList<BoundExpression>)BindExpressions(row))
             .ToArray();

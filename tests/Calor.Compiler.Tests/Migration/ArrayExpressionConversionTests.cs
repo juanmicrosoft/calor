@@ -2090,6 +2090,234 @@ public class ArrayExpressionConversionTests
         Assert.Contains("xs[0].V", compilation.GeneratedCode);
     }
 
+    private const string RectangularArrayCaller = """
+        public static class Probe
+        {
+            public static string Run()
+            {
+                var value = (System.Array)P.Make();
+                string dimensions = "", elements = "";
+                for (int i = 0; i < value.Rank; i++)
+                    dimensions += (i == 0 ? "" : ",") + value.GetLength(i);
+                foreach (var element in value)
+                {
+                    if (elements != "") elements += ",";
+                    if (element is System.Array inner)
+                        foreach (var item in inner) elements += item + ";";
+                    else
+                        elements += element;
+                }
+                return dimensions + "|" + elements;
+            }
+        }
+        """;
+
+    [Theory]
+    [InlineData("new int[2, 1, 2] { { { 1, 2 } }, { { 3, 4 } } }", "2,1,2|1,2,3,4")]
+    [InlineData("new int[,,] { { { 1, 2 } }, { { 3, 4 } } }", "2,1,2|1,2,3,4")]
+    [InlineData("new int[2, 1, 1, 2] { { { { 1, 2 } } }, { { { 3, 4 } } } }", "2,1,1,2|1,2,3,4")]
+    [InlineData("new int[,,] {}", "0,0,0|")]
+    [InlineData("new int[0, 3] {}", "0,3|")]
+    [InlineData("new int[1, 0, 3] { {} }", "1,0,3|")]
+    [InlineData("new int[1 + 1, 1, 2] { { { 1, 2 } }, { { 3, 4 } } }", "2,1,2|1,2,3,4")]
+    [InlineData("new int[,,] { { { 1, 2, }, }, { { 3, 4, }, }, }", "2,1,2|1,2,3,4")]
+    [InlineData("new int[1, 1, 2][] { { { new int[] {1, 2}, new int[] {3} } } }", "1,1,2|1;2;,3;")]
+    public void NativeRectangularInitializers_PreserveNestingAndRuntime(string expression, string expected)
+    {
+        var original = "public static class P { public static object Make() => " + expression + "; }";
+        Assert.Equal(expected, Run(original, RectangularArrayCaller));
+        var authored = $$"""
+            module RectangularInitializer
+              module P
+                func Make public () → object
+                  ! alloc
+                  return {{expression}}
+            """;
+        var converted = new CSharpToCalorConverter().Convert(original);
+        Assert.True(converted.Success, string.Join(Environment.NewLine, converted.Issues));
+        Assert.Empty(converted.Losses);
+        RawFrameAssertions.AssertFramed(converted.CalorSource!, present: false);
+        foreach (var source in new[] { authored, converted.CalorSource! })
+        {
+            var diagnostics = new DiagnosticBag();
+            var module = new Parsing.Parser(
+                new Parsing.Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+            Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+            foreach (var calor in new[] { source, new CalorEmitter().Emit(module) })
+            {
+                var result = Program.Compile(calor, "rectangular-initializer.calr",
+                    new CompilationOptions { StatusWriter = TextWriter.Null });
+                Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+                Assert.Equal(expected, Run(result.GeneratedCode, RectangularArrayCaller));
+                var pure = Program.Compile(calor.Replace("! alloc", "!", StringComparison.Ordinal),
+                    "pure-rectangular-initializer.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+                Assert.Contains(pure.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
+                    && error.Message.Contains("'alloc'", StringComparison.Ordinal));
+            }
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(SurfacesOnly))]
+    public async Task NativeRectangularInitializers_ConvertOnEverySurface(Surface surface)
+    {
+        const string original = """
+            public static class Probe
+            {
+                public static string Run()
+                {
+                    var values = new int[2, 1, 2] { { { 1, 2 } }, { { 3, 4 } } };
+                    return values.GetLength(0) + "," + values.GetLength(1) + "," + values.GetLength(2)
+                        + "|" + values[0, 0, 0] + values[0, 0, 1] + values[1, 0, 0] + values[1, 0, 1];
+                }
+            }
+            """;
+        Assert.Equal("2,1,2|1234", Run(original));
+        var (calor, losses) = await ConvertAsync(original, surface);
+        Assert.Empty(losses);
+        RawFrameAssertions.AssertFramed(calor, present: false);
+        var result = Program.Compile(calor, "surface-rectangular-initializer.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        Assert.Equal("2,1,2|1234", Run(result.GeneratedCode));
+    }
+
+    [Theory]
+    [InlineData("new[,] { { 1, 2 }, { 3, 4 } }", "2,2|1,2,3,4")]
+    [InlineData("new[,,] { { { 1, 2 } }, { { 3, 4 } } }", "2,1,2|1,2,3,4")]
+    public void NativeRectangularInitializers_ConvertInferredElementTypes(string expression, string expected)
+    {
+        var original = "public static class P { public static object Make() => " + expression + "; }";
+        Assert.Equal(expected, Run(original, RectangularArrayCaller));
+        var converted = new CSharpToCalorConverter().Convert(original);
+        Assert.True(converted.Success, string.Join(Environment.NewLine, converted.Issues));
+        Assert.Empty(converted.Losses);
+        RawFrameAssertions.AssertFramed(converted.CalorSource!, present: false);
+        var result = Program.Compile(converted.CalorSource!, "inferred-rectangular-initializer.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        Assert.Equal(expected, Run(result.GeneratedCode, RectangularArrayCaller));
+    }
+
+    [Theory]
+    [InlineData("new int[,] { { 1, 2 }, { 3, 4 } }", new long[] { 2, 2 })]
+    [InlineData("new int[,,] { { { 1, 2 } }, { { 3, 4 } } }", new long[] { 2, 1, 2 })]
+    [InlineData("new int[,,] {}", new long[] { 0, 0, 0 })]
+    [InlineData("new int[,,] { {}, {} }", new long[] { 2, 0, 0 })]
+    public void NativeRectangularInitializers_RetainInferredBoundDimensions(string expression, long[] expected)
+    {
+        var source = $$"""
+            module InferredBoundDimensions
+              module P
+                func Make public () → object
+                  ! alloc
+                  return {{expression}}
+            """;
+        var result = Program.Compile(source, "inferred-bound-dimensions.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        var bound = new Calor.Compiler.Binding.Binder(new DiagnosticBag()).Bind(result.Ast!);
+        var creation = Assert.Single(BoundDescendants(bound).OfType<BoundMultiDimArrayCreation>());
+        Assert.Equal(expected, creation.DimensionSizes.Select(size => Assert.IsType<BoundIntLiteral>(size).Value));
+    }
+
+    [Theory]
+    [InlineData(false, "1234|1234")]
+    [InlineData(true, "throw|123")]
+    public void NativeRectangularInitializers_PreserveElementOrderAndExceptions(bool fail, string expected)
+    {
+        var original = $$"""
+            public static class P
+            {
+                public static string State = "";
+                public static int Next(int value)
+                {
+                    State += value;
+                    if ({{(fail ? "true" : "false")}} && value == 3)
+                        throw new System.InvalidOperationException();
+                    return value;
+                }
+                public static object Make() => new int[2, 1, 2]
+                    { { { Next(1), Next(2) } }, { { Next(3), Next(4) } } };
+            }
+            """;
+        const string caller = """
+            public static class Probe
+            {
+                public static string Run()
+                {
+                    try
+                    {
+                        var values = (int[,,])P.Make();
+                        return "" + values[0, 0, 0] + values[0, 0, 1]
+                            + values[1, 0, 0] + values[1, 0, 1] + "|" + P.State;
+                    }
+                    catch (System.InvalidOperationException) { return "throw|" + P.State; }
+                }
+            }
+            """;
+        Assert.Equal(expected, Run(original, caller));
+        var converted = new CSharpToCalorConverter().Convert(original);
+        Assert.True(converted.Success, string.Join(Environment.NewLine, converted.Issues));
+        Assert.Empty(converted.Losses);
+        RawFrameAssertions.AssertFramed(converted.CalorSource!, present: false);
+        var result = Program.Compile(converted.CalorSource!, "rectangular-element-order.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        Assert.Equal(expected, Run(result.GeneratedCode, caller));
+    }
+
+    [Theory]
+    [InlineData("new int[2, 2] {}")]
+    [InlineData("new int[1, 1, 1] {}")]
+    [InlineData("new int[0,] {}")]
+    [InlineData("new int[0, 0,] {}")]
+    [InlineData("new int[3, 1, 2] { { { 1, 2 } }, { { 3, 4 } } }")]
+    [InlineData("new int[2, 1, 2] { { { 1 } }, { { 2, 3, 4 } } }")]
+    [InlineData("new int[,,] { { {1} }, { {2}, {3}, {4} }, { {5}, {6} } }")]
+    public void NativeRectangularInitializers_DoNotNormalizeInvalidShapes(string expression)
+    {
+        var original = "public static class P { public static object Make() => " + expression + "; }";
+        var csharp = CSharpCompilation.Create("InvalidRectangularInitializer",
+            [CSharpSyntaxTree.ParseText(original)], GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.Contains(csharp.GetDiagnostics(), diagnostic =>
+            diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        var source = $$"""
+            module InvalidRectangularInitializer
+              module P
+                func Make public () → object
+                  ! alloc
+                  return {{expression}}
+            """;
+        var result = Program.Compile(source, "invalid-rectangular-initializer.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.True(result.HasErrors);
+        var converted = new CSharpToCalorConverter().Convert(original);
+        if (converted.Success)
+            Assert.True(Program.Compile(converted.CalorSource!, "invalid-converted-rectangular-initializer.calr",
+                new CompilationOptions { StatusWriter = TextWriter.Null }).HasErrors);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NativeRectangularInitializers_ChargeDeepElementEffects(bool declaresRead)
+    {
+        var source = $$"""
+            module RectangularInitializerEffects
+              module P
+                func Make public () → object
+                  ! alloc{{(declaresRead ? ", cr" : "")}}
+                  return new string?[1, 1, 1] { { { System.Console.ReadLine() } } }
+            """;
+        var result = Program.Compile(source, "rectangular-element-effects.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Equal(!declaresRead, result.HasErrors);
+        Assert.All(result.Diagnostics.Errors, error => Assert.True(error.Code == DiagnosticCode.ForbiddenEffect
+            && error.Message.Contains("'cr'", StringComparison.Ordinal), error.ToString()));
+    }
+
     [Theory]
     [InlineData("§ARR2D{i32:2:1:2} §ROW 1 2 §ROW 3 4 §/ARR2D", "i32[,,]", "new int[2, 1, 2] { { { 1, 2 } }, { { 3, 4 } } }", true)]
     [InlineData("§ARR2D{i32:2:2} §ROW 1 2 §ROW 3 4 §/ARR2D", "i32[,]", "new int[2, 2] { { 1, 2 }, { 3, 4 } }", true)]

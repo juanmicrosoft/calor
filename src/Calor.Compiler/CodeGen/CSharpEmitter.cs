@@ -9738,6 +9738,36 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         var (elementType, elementRanks) = SplitArrayRanks(mappedElementType);
 
+        if (node.InitializerNesting is { } nesting)
+        {
+            var position = 0;
+            var rowIndex = 0;
+            var initializer = EmitLevel(0);
+            if (position != nesting.Count || rowIndex != node.Initializer.Count)
+                throw new InvalidOperationException("Array initializer nesting does not match its rows.");
+            var dimensions = node.DimensionSizes.Count > 0
+                ? string.Join(", ", node.DimensionSizes.Select(emitExpression))
+                : new string(',', node.Rank - 1);
+            return $"new {elementType}[{dimensions}]{elementRanks} {initializer}";
+
+            string EmitLevel(int level)
+            {
+                if (position >= nesting.Count || nesting[position] < 0)
+                    throw new InvalidOperationException("Array initializer nesting is incomplete.");
+                var count = nesting[position++];
+                if (level == node.Rank - 1)
+                {
+                    if (rowIndex >= node.Initializer.Count || node.Initializer[rowIndex].Count != count)
+                        throw new InvalidOperationException("Array initializer nesting does not match its row.");
+                    return "{ " + string.Join(", ", node.Initializer[rowIndex++].Select(emitExpression)) + " }";
+                }
+                var children = new List<string>(count);
+                for (var index = 0; index < count; index++)
+                    children.Add(EmitLevel(level + 1));
+                return "{ " + string.Join(", ", children) + " }";
+            }
+        }
+
         if (node.DimensionSizes.Count > 0 && node.Initializer.Count > 0)
         {
             // #1132: sized form with §ROW lines (rank 3+, or sizes written with the

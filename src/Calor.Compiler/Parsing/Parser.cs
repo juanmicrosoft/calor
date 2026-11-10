@@ -10868,6 +10868,9 @@ public sealed class Parser
                 sizes.Add(ParseExpression());
                 if (!Match(TokenKind.Comma))
                     break;
+                if (Check(TokenKind.CloseBracket))
+                    _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                        "A sized array creation requires a size after every comma.");
             }
             Expect(TokenKind.CloseBracket);
             var elementType = new System.Text.StringBuilder(type);
@@ -10997,33 +11000,22 @@ public sealed class Parser
     {
         var elements = new List<ExpressionNode>();
         var rows = new List<IReadOnlyList<ExpressionNode>>();
+        var nesting = new List<int>();
         var hasInitializer = Match(TokenKind.OpenBrace);
         if (hasInitializer)
         {
-            if (rank > 2)
-                _diagnostics.ReportError(start.Span, DiagnosticCode.UnexpectedToken,
-                    "Native array initializers of rank greater than two are not yet supported.");
-            while (!IsAtEnd && !Check(TokenKind.CloseBrace))
+            if (rank > 1)
+                ParseLevel(0);
+            else
             {
-                if (rank == 1)
-                    elements.Add(ParseExpression());
-                else
+                while (!IsAtEnd && !Check(TokenKind.CloseBrace))
                 {
-                    Expect(TokenKind.OpenBrace);
-                    var row = new List<ExpressionNode>();
-                    while (!IsAtEnd && !Check(TokenKind.CloseBrace))
-                    {
-                        row.Add(ParseExpression());
-                        if (!Match(TokenKind.Comma))
-                            break;
-                    }
-                    Expect(TokenKind.CloseBrace);
-                    rows.Add(row);
+                    elements.Add(ParseExpression());
+                    if (!Match(TokenKind.Comma))
+                        break;
                 }
-                if (!Match(TokenKind.Comma))
-                    break;
+                Expect(TokenKind.CloseBrace);
             }
-            Expect(TokenKind.CloseBrace);
         }
         else if (sizes.Count == 0)
             _diagnostics.ReportError(start.Span.Union(typeSpan), DiagnosticCode.UnexpectedToken,
@@ -11033,7 +11025,31 @@ public sealed class Parser
         return rank == 1
             ? new ArrayCreationNode(span, id, "", elementType, sizes.FirstOrDefault(), elements,
                 new AttributeCollection(), typeSpan)
-            : new MultiDimArrayCreationNode(span, id, "", elementType, rank, sizes, rows, typeSpan);
+            : new MultiDimArrayCreationNode(span, id, "", elementType, rank, sizes, rows, typeSpan,
+                hasInitializer ? nesting : null);
+
+        void ParseLevel(int level)
+        {
+            var position = nesting.Count;
+            nesting.Add(0);
+            var row = new List<ExpressionNode>();
+            while (!IsAtEnd && !Check(TokenKind.CloseBrace))
+            {
+                if (level == rank - 1)
+                    row.Add(ParseExpression());
+                else
+                {
+                    Expect(TokenKind.OpenBrace);
+                    ParseLevel(level + 1);
+                }
+                nesting[position]++;
+                if (!Match(TokenKind.Comma))
+                    break;
+            }
+            Expect(TokenKind.CloseBrace);
+            if (level == rank - 1)
+                rows.Add(row);
+        }
     }
 
     private ExpressionNode ParseLegacyNewExpression()
