@@ -12,6 +12,10 @@ calor fix [file-or-root] --apply [options]
 `--apply` applies deterministic safe diagnostic patches, then rechecks the
 result. The path defaults to the current directory. It does not apply fuzzy
 name suggestions, choose effect contracts or guess ambiguous indentation.
+
+Known missing effects can offer a native `!` row edit for manual review.
+These edits change a declaration's contract, so safe repair never applies them.
+Unknown call effects offer no row edit: resolve the call's effect contract first.
 Those suggestions remain available in structured diagnostics.
 
 ```bash

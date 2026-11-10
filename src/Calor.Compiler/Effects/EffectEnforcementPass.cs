@@ -803,39 +803,35 @@ public sealed class EffectEnforcementPass
                     ? DiagnosticSeverity.Warning
                     : DiagnosticSeverity.Error;
 
-            // Compute the full correct effect set for the fix
-            var correctEffects = declaredEffects.Union(computedEffects);
-            // §E{} syntax uses comma-separated codes without spaces
-            var correctEffectStr = correctEffects.ToDisplayString().Replace(", ", ",");
             var fixSpan = function.Effects?.Span ?? function.Span;
             var filePath = _diagnostics.CurrentFilePath ?? "unknown";
 
-            // Generate fix: replace existing §E{...} line or insert new one
             SuggestedFix? fix = null;
-            if (function.Effects != null)
+            if (!computedEffects.IsUnknown)
             {
-                // Replace the entire §E{...} line to avoid span-length issues
-                // §E{...} always occupies its own line with leading whitespace
-                var effectLine = function.Effects.Span.Line;
-                fix = new SuggestedFix(
-                    $"Update effect declaration to §E{{{correctEffectStr}}}",
-                    TextEdit.Replace(filePath,
-                        effectLine, 1,
-                        effectLine + 1, 1,
-                        $"  §E{{{correctEffectStr}}}\n"));
-            }
-            else
-            {
-                // Insert §E{...} after the last §O or §I line
-                var insertLine = function.Span.Line + 1; // Default: after function declaration
-                if (function.Output != null)
-                    insertLine = function.Output.Span.Line + 1;
-                else if (function.Parameters.Count > 0)
-                    insertLine = function.Parameters[^1].Span.Line + 1;
+                var missingEffects = EffectSet.FromInternal(forbidden).ToDisplayString();
+                if (function.Effects is { } effects)
+                {
+                    var separator = effects.Effects.Count > 0 || effects.EffectVariables.Count > 0 ? "," : "";
+                    fix = new SuggestedFix(
+                        $"Add {missingEffects} to the effect declaration",
+                        TextEdit.Insert(filePath, effects.Span.Line,
+                            effects.Span.Column + effects.Span.Length, $" {missingEffects}{separator}"));
+                }
+                else
+                {
+                    var firstContent = function.Preconditions.Select(condition => condition.Span)
+                        .Concat(function.Postconditions.Select(condition => condition.Span))
+                        .Concat(function.Body.Select(statement => statement.Span))
+                        .OrderBy(span => span.Start).FirstOrDefault();
+                    var insertLine = firstContent.Line > function.Span.Line
+                        ? firstContent.Line : function.Span.Line + 1;
+                    var indentation = new string(' ', function.Span.Column + 1);
 
-                fix = new SuggestedFix(
-                    $"Add effect declaration §E{{{correctEffectStr}}}",
-                    TextEdit.Insert(filePath, insertLine, 1, $"  §E{{{correctEffectStr}}}\n"));
+                    fix = new SuggestedFix(
+                        $"Add effect declaration ! {missingEffects}",
+                        TextEdit.Insert(filePath, insertLine, 1, $"{indentation}! {missingEffects}\n"));
+                }
             }
 
             foreach (var (kind, value) in forbidden)
@@ -859,6 +855,8 @@ public sealed class EffectEnforcementPass
                         : "";
 
                 var message = $"Function '{function.Name}' uses effect '{surface}' but does not declare it{rowStr}{chainStr}";
+                if (kind == EffectKind.Unknown)
+                    message += "\n  Resolve the unknown call through an authoritative source declaration or effect contract; unknown is not a declarable effect.";
 
                 if (fix != null)
                 {

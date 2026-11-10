@@ -13,6 +13,10 @@ batch, up to three batches, and reports remaining diagnostics with a nonzero exi
 when errors remain. It does not choose types, effect contracts, fuzzy name matches
 or ambiguous control flow for you.
 
+Known missing effects can offer a native `!` row edit for manual review.
+These edits change a declaration's contract, so safe repair never applies them.
+Unknown call effects offer no row edit: resolve the call's effect contract first.
+
 ```bash
 calor fix --apply
 calor fix src/Broken.calr --apply --dry-run --format json
