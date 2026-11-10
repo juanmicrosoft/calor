@@ -416,113 +416,110 @@ public sealed class CallableMutationFlowTests
     {
         var requiredType = shape switch
         {
-            "string" => "str",
-            "array" => "[str]",
+            "string" => "string",
+            "array" => "string[]",
             "nominal" => "Foo",
             _ => throw new ArgumentOutOfRangeException(nameof(shape))
         };
-        var nullableType = "?" + requiredType;
+        var nullableType = requiredType + "?";
         var sink = safe
-            ? "§IF (!= value null)\n  §C{Take} §A value §/C"
-            : "§C{Take} §A value §/C";
+            ? "if value != null\n  Take(value)"
+            : "Take(value)";
         var body = scenario switch
         {
             "elseif-else" => $$"""
-                §IF flag
-                  §C{Noop} §/C
-                §EI §C{setter} §/C
-                  §C{Noop} §/C
-                §EL
-                  §C{later} §/C
+                if flag
+                  Noop()
+                else if setter()
+                  Noop()
+                else
+                  later()
                 {{Indent(sink, 2)}}
                 """,
             "elseif-condition" => $$"""
-                §IF flag
-                  §C{Noop} §/C
-                §EI §C{setter} §/C
-                  §C{Noop} §/C
-                §EI §C{testLater} §/C
-                  §C{Noop} §/C
-                §EL
-                {{Indent(sink, 2)}}
+                if flag
+                  Noop()
+                else if setter()
+                  Noop()
+                else if testLater()
+                  Noop()
+                {{(safe ? "else if value != null\n  Take(value)" : "else\n  Take(value)")}}
                 """,
             "elseif-exit" => $$"""
-                §IF flag
-                  §C{Noop} §/C
-                §EI §C{setter} §/C
-                  §C{Noop} §/C
-                §C{later} §/C
+                if flag
+                  Noop()
+                else if setter()
+                  Noop()
+                later()
                 {{sink}}
                 """,
             "match-exit" => $$"""
-                §ASSIGN later mutator
-                §W flag
-                  §K true
-                    §ASSIGN later noopAction
-                  §K _
-                    {{(safe ? "§ASSIGN later noopAction" : "§C{Noop} §/C")}}
-                §C{later} §/C
-                §C{Take} §A value §/C
+                set later mutator
+                match flag
+                  case true
+                    set later noopAction
+                  case _
+                    {{(safe ? "set later noopAction" : "Noop()")}}
+                later()
+                Take(value)
                 """,
             "match-arm" => $$"""
-                §ASSIGN later mutator
-                §W flag
-                  §K true
-                    §ASSIGN later noopAction
-                  §K _
-                    §C{later} §/C
+                set later mutator
+                match flag
+                  case true
+                    set later noopAction
+                  case _
+                    later()
                 {{Indent(sink, 4)}}
                 """,
             "match-guard" => $$"""
-                §W flag
-                  §K true §WHEN §C{setter} §/C
-                    §C{Noop} §/C
-                  §K _
-                    §C{later} §/C
+                match flag
+                  case true when setter()
+                    Noop()
+                  case _
+                    later()
                 {{Indent(sink, 4)}}
                 """,
             "match-next-guard" => $$"""
-                §W flag
-                  §K true §WHEN §C{setter} §/C
-                    §C{Noop} §/C
-                  §K true §WHEN §C{testLater} §/C
-                    §C{Noop} §/C
-                  §K _
+                match flag
+                  case true when setter()
+                    Noop()
+                  case true when testLater()
+                    Noop()
+                  case _
                 {{Indent(sink, 4)}}
                 """,
             "match-no-default" => $$"""
-                §ASSIGN later mutator
-                §W flag
-                  §K true
-                    §ASSIGN later noopAction
-                {{(safe ? "  §K _\n    §ASSIGN later noopAction" : "")}}
-                §C{later} §/C
-                §C{Take} §A value §/C
+                set later mutator
+                match flag
+                  case true
+                    set later noopAction
+                {{(safe ? "  case _\n    set later noopAction" : "")}}
+                later()
+                Take(value)
                 """,
             _ => throw new ArgumentOutOfRangeException(nameof(scenario))
         };
         var source = $$"""
-            §M{BranchFallthrough}
-            {{(shape == "nominal" ? "  §CL{Foo:pub}\n    §MT{Marker:pub} () -> i32\n      §R 0" : "")}}
-              §F{Noop:pub} () -> void
-                §E{}
-              §F{Mutate:pub} ({{nullableType}}:value:{{modifier}}) -> void
-                §ASSIGN value null
-              §F{Take:pub} ({{requiredType}}:value) -> void
-                §E{}
-              §F{Probe:pub} ({{nullableType}}:value, bool:flag) -> void
-                §IF (!= value null)
-                  §B{noopAction:Action} §LAM{} §C{Noop} §/C §/LAM
-                  §B{mutator:Action} §LAM{} §C{Mutate} §A{ {{modifier}} } value §/C §/LAM
-                  §B{~later:Action} noopAction
-                  §B{setter:Func<bool>} §LAM{}
-                    §ASSIGN later mutator
-                    §R false
-                  §/LAM
-                  §B{testLater:Func<bool>} §LAM{}
-                    §C{later} §/C
-                    §R false
-                  §/LAM
+            module BranchFallthrough
+            {{(shape == "nominal" ? "  class Foo\n    func Marker () → int\n      return 0" : "")}}
+              func Noop public () → void
+                !
+              func Mutate public ({{modifier}} {{nullableType}}:value) → void
+                set value null
+              func Take public ({{requiredType}}:value) → void
+                !
+              func Probe public ({{nullableType}}:value, bool:flag) → void
+                if value != null
+                  let Action:noopAction = () => Noop()
+                  let Action:mutator = () => Mutate({{modifier}} value)
+                  var Action:later = noopAction
+                  let Func<bool>:setter = () =>
+                    set later mutator
+                    return false
+                  let Func<bool>:testLater = () =>
+                    later()
+                    return false
             {{Indent(body, 6)}}
             """;
         var result = CompileInMode(source, mode);
@@ -887,42 +884,42 @@ public sealed class CallableMutationFlowTests
     {
         var type = shape switch
         {
-            "string" => "str",
-            "array" => "[str]",
+            "string" => "string",
+            "array" => "string[]",
             _ => "Foo"
         };
-        var call = control == "no-mutation" ? "§C{Noop} §/C" : "§C{mutator} §/C";
+        var call = control == "no-mutation" ? "Noop()" : "mutator()";
         var body = join switch
         {
-            "if" => "§IF flag\n" + Indent(call, 2),
-            "match" => "§W flag\n  §K true\n" + Indent(call, 4)
-                + "\n  §K _\n    §C{Noop} §/C",
-            "try" => "§TR\n" + Indent(call, 2)
-                + "\n§CA{Exception:ex}\n  §C{Noop} §/C",
-            "finally" => "§TR\n" + Indent(call, 2)
-                + "\n§FI\n  §C{Noop} §/C",
+            "if" => "if flag\n" + Indent(call, 2),
+            "match" => "match flag\n  case true\n" + Indent(call, 4)
+                + "\n  case _\n    Noop()",
+            "try" => "try\n" + Indent(call, 2)
+                + "\ncatch Exception:ex\n  Noop()",
+            "finally" => "try\n" + Indent(call, 2)
+                + "\nfinally\n  Noop()",
             _ => throw new ArgumentOutOfRangeException(nameof(join))
         };
         var source = $$"""
-            §M{ShadowedCapture}
-            {{(shape == "nominal" ? "  §CL{Foo:pub}\n    §MT{Marker:pub} () -> i32\n      §R 0" : "")}}
-              §CL{Holder:pub}
-                §FLD{?{{type}}:value:pub}
-                §FLD{?{{type}}:otherValue:pub}
-                §MT{Noop:pub} () -> void
-                  §E{}
-                §MT{Mutate:pub} (?{{type}}:target:{{modifier}}) -> void
-                  §ASSIGN target null
-                §MT{Take:pub} ({{type}}:target) -> void
-                  §E{}
-                §MT{Probe:pub} (bool:flag) -> void
-                  §E{mut}
-                  §IF (!= value null)
-                    §B{mutator:Action} §LAM{} §C{Mutate} §A{ {{modifier}} } {{(control == "other-storage" ? "otherValue" : "value")}} §/C §/LAM
-                    §W flag
-                      §K §VAR{ {{(control == "renamed" ? "other" : "value")}} }
+            module ShadowedCapture
+            {{(shape == "nominal" ? "  class Foo\n    func Marker () → int\n      return 0" : "")}}
+              class Holder
+                field {{type}}?:value public
+                field {{type}}?:otherValue public
+                func Noop public () → void
+                  !
+                func Mutate public ({{modifier}} {{type}}?:target) → void
+                  set target null
+                func Take public ({{type}}:target) → void
+                  !
+                func Probe public (bool:flag) → void
+                  ! mut
+                  if value != null
+                    let Action:mutator = () => Mutate({{modifier}} {{(control == "other-storage" ? "otherValue" : "value")}})
+                    match flag
+                      case var {{(control == "renamed" ? "other" : "value")}}
             {{Indent(body, 12)}}
-            {{(control == "fresh" ? "        §IF (!= value null)\n          §C{Take} §A value §/C" : "        §C{Take} §A value §/C")}}
+            {{(control == "fresh" ? "        if value != null\n          Take(value)" : "        Take(value)")}}
             """;
         var result = CompileInMode(source, mode);
         if (control is "fresh" or "no-mutation" or "other-storage")
