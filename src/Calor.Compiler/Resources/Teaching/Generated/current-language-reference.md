@@ -816,7 +816,7 @@ Complete example: [Event declaration; subscription statements are not yet native
 
 ## operator overload
 
-Declares an operator overload or conversion with an indented body. Preserve operator token, parameter order, result type, effects and C# signature requirements. Conversion operators use implicit or explicit after op.
+Declares an operator overload or conversion with an indented body. Conversion operators use implicit or explicit after op. An optional standalone ! effect row precedes contracts and body statements, as for functions. An explicit row is enforced and does not hide effects from callers. Without a row, only intrinsic mutation and allocation are allowed; I/O, throwing and unknown calls remain rejected. The converter synthesizes explicit rows from the emitted native body. Operator effects are checked in every preprocessor configuration, up to eight condition symbols; larger conditional images fail effect checking rather than assuming purity. Preserve parameter order, result type and C# signature requirements.
 
 Syntax: `op + (type:left, type:right) → resultType; op implicit (type:value) → resultType`
 

@@ -12498,6 +12498,7 @@ public sealed class Parser
         if (canonical && output == null)
             _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnexpectedToken,
                 "An operator requires a return type after '→'.");
+        EffectsNode? effects = null;
         var body = new List<StatementNode>();
 
         var bodyHadContent = false;
@@ -12511,6 +12512,17 @@ public sealed class Parser
             else if (Check(TokenKind.Out))
             {
                 output = ParseOutput();
+                bodyHadContent = true;
+            }
+            else if (Check(TokenKind.Effects) || Check(TokenKind.Exclamation))
+            {
+                if (body.Count != 0)
+                    _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                        "Effect clauses must precede the first operator body statement.");
+                if (effects != null)
+                    _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                        "An operator may declare only one effect row.");
+                effects = ParseEffects();
                 bodyHadContent = true;
             }
             else if (Check(TokenKind.Requires))
@@ -12550,7 +12562,7 @@ public sealed class Parser
 
         var span = startToken.Span.Union(endToken.Span);
         return WithDocumentation(new OperatorOverloadNode(span, id, operatorToken, kind, visibility, parameters, output,
-            preconditions, postconditions, body, new AttributeCollection(), csharpAttrs), startToken);
+            preconditions, postconditions, body, new AttributeCollection(), csharpAttrs) { Effects = effects }, startToken);
     }
 
     /// <summary>

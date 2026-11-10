@@ -4137,7 +4137,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             postconditions: Array.Empty<EnsuresNode>(),
             body,
             new AttributeCollection(),
-            csharpAttrs);
+            csharpAttrs)
+        {
+            Effects = new EffectsNode(GetTextSpan(node), new Dictionary<string, string>())
+        };
     }
 
     private OperatorOverloadNode ConvertConversionOperatorOverload(ConversionOperatorDeclarationSyntax node)
@@ -4171,7 +4174,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             postconditions: Array.Empty<EnsuresNode>(),
             body,
             new AttributeCollection(),
-            csharpAttrs);
+            csharpAttrs)
+        {
+            Effects = new EffectsNode(GetTextSpan(node), new Dictionary<string, string>())
+        };
     }
 
     private IReadOnlyList<ClassFieldNode> ConvertFields(FieldDeclarationSyntax node)

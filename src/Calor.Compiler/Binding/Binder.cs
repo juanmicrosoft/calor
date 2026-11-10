@@ -10077,8 +10077,9 @@ public sealed class Binder
         using var _returnCtx = PushReturnTypeContext(returnType);
         var contracts = BindContracts(op.Preconditions, op.Postconditions, returnType);
         var boundBody = BindStatements(op.Body);
-        // OperatorOverloadNode has no Effects field — mark as unknown
-        var declaredEffects = new List<string> { "*:*" };
+        var declaredEffects = op.Effects is null
+            ? new[] { "*:*" }
+            : ExtractMethodEffects(op.Effects);
         return new BoundFunction(op.Span, functionSymbol, boundBody, functionScope,
             declaredEffects, BoundMemberKind.OperatorOverload, className) { ContractConditions = contracts };
     }

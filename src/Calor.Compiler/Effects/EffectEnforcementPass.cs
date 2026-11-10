@@ -265,6 +265,8 @@ public sealed class EffectEnforcementPass
 
         // Phase 1: Build function map and call graph (includes functions and methods)
         _callGraphAnalysis = CallGraphAnalysis.Build(module, CrossModuleFunctionModules, contractInheritance);
+        foreach (var failure in _callGraphAnalysis.OperatorBindingFailures)
+            _diagnostics.Report(module.Span, DiagnosticCode.ForbiddenEffect, failure, DiagnosticSeverity.Error);
 
         // Phase 1b: index module shape for delegate detection, static-receiver
         // resolution and variance checks. All enumerations include §PP-wrapped
@@ -325,8 +327,9 @@ public sealed class EffectEnforcementPass
             {
                 var id = $"{cls.Name}.{op.Id}";
                 _ownerClassByFunctionId[id] = cls;
-                _implicitAccessorsByFunctionId[id] =
-                    new ImplicitAccessorDeclaration(cls.Name, $"op_{op.Kind}", "operator", op);
+                if (op.Effects is null)
+                    _implicitAccessorsByFunctionId[id] =
+                        new ImplicitAccessorDeclaration(cls.Name, $"op_{op.Kind}", "operator", op);
             }
             foreach (var indexer in CallGraphAnalysis.EnumerateIndexers(cls))
             {
@@ -1066,6 +1069,12 @@ public sealed class EffectEnforcementPass
                     method.Effects,
                     row => method.Effects = row,
                     method.Span);
+            }
+            foreach (var op in CallGraphAnalysis.EnumerateOperators(cls))
+            {
+                if (op.Effects != null)
+                    changed |= WidenToInferredRow(
+                        $"{cls.Name}.{op.Id}", op.Effects, row => op.Effects = row, op.Span);
             }
         }
 
@@ -3404,6 +3413,12 @@ public sealed class EffectEnforcementPass
         }
 
         private EffectSet InferFromStatement(StatementNode statement)
+        {
+            return InferStatementCore(statement)
+                .Union(InferOperatorEffects(statement));
+        }
+
+        private EffectSet InferStatementCore(StatementNode statement)
         {
             // D-W2.6: this switch is exhaustive over the statement kinds the pass
             // understands. Anything else falls into the final arm, which routes to
@@ -5830,6 +5845,7 @@ public sealed class EffectEnforcementPass
         private EffectSet InferFromRowCheckedValue(ExpressionNode expression) =>
             expression is ReferenceNode reference && !reference.Name.Contains('.')
                 ? InferFromReference(reference, chargeMethodGroup: false)
+                    .Union(InferOperatorEffects(expression))
                 : InferFromExpression(expression);
 
         private EffectSet? InferBoundArrayLength(TextSpan receiver, TextSpan diagnostic)
@@ -6063,6 +6079,25 @@ public sealed class EffectEnforcementPass
         }
 
         private EffectSet InferFromExpression(ExpressionNode expr)
+        {
+            return InferExpressionCore(expr)
+                .Union(InferOperatorEffects(expr));
+        }
+
+        private EffectSet InferOperatorEffects(AstNode node)
+        {
+            var effects = InferFromInternalFunctions(_context.CallGraph.OperatorCalls(node));
+            foreach (var key in _context.CallGraph.ExternalOperatorCalls(node))
+            {
+                var resolution = _context.Resolver.Resolve(key);
+                effects = effects.Union(resolution.Status == EffectResolutionStatus.Unknown
+                    ? UnknownResolvedOperation($"{key.DeclaringType}.{key.MemberName}", node.Span)
+                    : resolution.Effects);
+            }
+            return effects;
+        }
+
+        private EffectSet InferExpressionCore(ExpressionNode expr)
         {
             // D-W2.6: exhaustive over the expression kinds the pass understands;
             // the final arm routes unrecognized constructs to the Assumed channel

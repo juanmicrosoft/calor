@@ -1452,8 +1452,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
             ?? throw new InvalidOperationException("Canonical operator parameters require an inline signature.");
         var output = node.Output
             ?? throw new InvalidOperationException("Canonical operators require a return type.");
-        AppendLine($"op {node.OperatorToken}{attrs} ({inlineFmt}) → {TypeMapper.ToSurfaceType(output.TypeName)}{FormatEffectRow(output.Row)}");
+        AppendEffectRowDeclaration(node, $"op {node.OperatorToken}{attrs} ({inlineFmt}) → {TypeMapper.ToSurfaceType(output.TypeName)}{FormatEffectRow(output.Row)}");
         Indent();
+        EmitEffects(node.Effects);
 
         // Emit preconditions
         foreach (var pre in node.Preconditions)

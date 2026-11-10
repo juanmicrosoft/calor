@@ -1,6 +1,12 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
+using Calor.Compiler.CodeGen;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace Calor.Compiler.Analysis;
 
@@ -36,6 +42,213 @@ public sealed class ResolvedSymbolCallGraph
 /// </summary>
 public sealed class CallGraphAnalysis
 {
+    internal sealed class OperatorBindings
+    {
+        internal Dictionary<AstNode, HashSet<string>> SourceCalls { get; } = new(ReferenceEqualityComparer.Instance);
+        internal Dictionary<AstNode, HashSet<EffectResolverKey>> ExternalCalls { get; } = new(ReferenceEqualityComparer.Instance);
+        internal Dictionary<ExpressionNode, string> ResultTypes { get; } = new(ReferenceEqualityComparer.Instance);
+        internal List<string> Failures { get; } = [];
+    }
+
+    private OperatorBindings _operatorBindings = new();
+    internal IReadOnlyList<string> OperatorBindingFailures => _operatorBindings.Failures;
+    internal IReadOnlyCollection<string> OperatorCalls(AstNode expression) =>
+        _operatorBindings.SourceCalls.TryGetValue(expression, out var calls) ? calls : Array.Empty<string>();
+    internal IReadOnlyCollection<EffectResolverKey> ExternalOperatorCalls(AstNode node) =>
+        _operatorBindings.ExternalCalls.TryGetValue(node, out var calls) ? calls : Array.Empty<EffectResolverKey>();
+
+    internal static OperatorBindings ResolveOperatorCalls(ModuleNode module)
+    {
+        var bindings = new OperatorBindings();
+        var types = bindings.ResultTypes;
+        var bindingFailures = bindings.Failures;
+        var calls = bindings.SourceCalls;
+        var conflictingTypes = new HashSet<ExpressionNode>(ReferenceEqualityComparer.Instance);
+        var operators = EnumerateClasses(module)
+            .SelectMany(owner => EnumerateOperators(owner).Select(op => (Node: op, Id: $"{owner.Name}.{op.Id}")))
+            .ToArray();
+        if (operators.Length == 0)
+            return bindings;
+
+        // Bind the emitted expressions, not operator names or approximate operand
+        // types. This also sees implicit receiving conversions and lifted operators.
+        var markerIdentity = Guid.NewGuid().ToString("N");
+        var expressionPrefix = $"calor-expression-{markerIdentity}:";
+        var expressionEndPrefix = $"calor-expression-end-{markerIdentity}:";
+        var operatorPrefix = $"calor-operator-{markerIdentity}:";
+        var expressions = new List<AstNode>();
+        var operatorIds = operators.ToDictionary(pair => pair.Node, pair => pair.Id);
+        var emittedOperators = new List<string>();
+        var emitter = new CSharpEmitter
+        {
+            AnnotateSource = (expression, text) =>
+            {
+                var index = expressions.Count;
+                expressions.Add(expression);
+                return $"/*{expressionPrefix}{index}*/{text}/*{expressionEndPrefix}{index}*/";
+            },
+            OperatorOrigin = op =>
+            {
+                var index = emittedOperators.Count;
+                emittedOperators.Add(operatorIds[op]);
+                return $"/*{operatorPrefix}{index}*/";
+            }
+        };
+        var source = emitter.Emit(module);
+        var options = new CSharpParseOptions(LanguageVersion.Preview);
+        var initial = CSharpSyntaxTree.ParseText(source, options);
+        var symbols = initial.GetRoot().DescendantTrivia(descendIntoTrivia: true)
+            .Select(trivia => trivia.GetStructure()).OfType<DirectiveTriviaSyntax>()
+            .Select(directive => directive switch
+            {
+                IfDirectiveTriviaSyntax conditional => conditional.Condition,
+                ElifDirectiveTriviaSyntax conditional => conditional.Condition,
+                _ => null
+            })
+            .OfType<ExpressionSyntax>()
+            .SelectMany(condition => condition.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
+            .Select(identifier => identifier.Identifier.ValueText)
+            .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        // Match the converter's exhaustive conditional-analysis bound. An image
+        // we cannot exhaust is an explicit failure, never proof of a pure caller.
+        const int exhaustiveSymbolLimit = 8;
+        if (symbols.Length > exhaustiveSymbolLimit)
+        {
+            bindingFailures.Add($"Source operator binding requires at most {exhaustiveSymbolLimit} preprocessor condition symbols; found {symbols.Length}.");
+            return bindings;
+        }
+        for (var mask = 0; mask < 1 << symbols.Length; mask++)
+        {
+            var defined = symbols.Where((_, index) => (mask & 1 << index) != 0);
+            BindTree(CSharpSyntaxTree.ParseText(source, options.WithPreprocessorSymbols(defined)));
+        }
+        return bindings;
+
+        void BindTree(SyntaxTree tree)
+        {
+            var compilation = CSharpCompilation.Create("CalorOperatorBindings", [tree],
+                GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true));
+            var model = compilation.GetSemanticModel(tree);
+            var root = tree.GetRoot();
+            var methods = new Dictionary<ISymbol, string>(SymbolEqualityComparer.Default);
+            foreach (var declaration in root.DescendantNodes().OfType<BaseMethodDeclarationSyntax>())
+            {
+                foreach (var trivia in declaration.GetLeadingTrivia())
+                {
+                    if (TryReadMarker(trivia, operatorPrefix, out var index)
+                        && model.GetDeclaredSymbol(declaration) is { } method)
+                        methods[method] = emittedOperators[index];
+                }
+            }
+
+            var starts = new Dictionary<int, int>();
+            var ranges = new List<(int Start, int End, AstNode Node)>();
+            foreach (var trivia in root.DescendantTrivia())
+            {
+                if (TryReadMarker(trivia, expressionPrefix, out var startIndex))
+                    starts[startIndex] = trivia.Span.End;
+                else if (TryReadMarker(trivia, expressionEndPrefix, out var endIndex))
+                    ranges.Add((starts[endIndex], trivia.SpanStart, expressions[endIndex]));
+            }
+            ranges.Sort((left, right) => (left.End - left.Start).CompareTo(right.End - right.Start));
+
+            foreach (var declaration in root.DescendantNodes().Where(node =>
+                         node is BaseMethodDeclarationSyntax or AccessorDeclarationSyntax
+                             or EqualsValueClauseSyntax or ArrowExpressionClauseSyntax))
+            {
+                if (model.GetOperation(declaration) is not { } body)
+                    continue;
+                var pending = new Stack<IOperation>();
+                pending.Push(body);
+                while (pending.TryPop(out var operation))
+                {
+                    foreach (var child in operation.ChildOperations)
+                        pending.Push(child);
+                    var method = operation switch
+                    {
+                        IConversionOperation conversion => conversion.OperatorMethod,
+                        IBinaryOperation binary => binary.OperatorMethod,
+                        IUnaryOperation unary => unary.OperatorMethod,
+                        ICompoundAssignmentOperation assignment => assignment.OperatorMethod,
+                        IIncrementOrDecrementOperation increment => increment.OperatorMethod,
+                        _ => null
+                    };
+                    AddMethod(operation, method);
+                    if (operation is ICompoundAssignmentOperation compound)
+                    {
+                        AddMethod(operation, compound.InConversion.MethodSymbol);
+                        AddMethod(operation, compound.OutConversion.MethodSymbol);
+                    }
+                    if (operation is IBinaryOperation
+                        {
+                            OperatorKind: BinaryOperatorKind.ConditionalAnd or BinaryOperatorKind.ConditionalOr,
+                            OperatorMethod: { } logical
+                        } conditional
+                        && logical.Parameters[0].Type is INamedTypeSymbol operand)
+                    {
+                        var truthName = conditional.OperatorKind == BinaryOperatorKind.ConditionalAnd
+                            ? "op_False" : "op_True";
+                        foreach (var truth in operand.GetMembers(truthName).OfType<IMethodSymbol>().Where(truth =>
+                                     truth.Parameters.Length == 1
+                                     && SymbolEqualityComparer.Default.Equals(truth.Parameters[0].Type, operand)))
+                            AddMethod(operation, truth);
+                    }
+                }
+            }
+
+            void AddMethod(IOperation operation, IMethodSymbol? method)
+            {
+                if (method is null)
+                    return;
+                var syntax = operation.Syntax.Span;
+                var origin = ranges.FirstOrDefault(range =>
+                    range.Start <= syntax.Start && range.End >= syntax.End).Node;
+                if (origin is null)
+                {
+                    bindingFailures.Add($"A selected source operator '{method}' has no Calor expression origin.");
+                    return;
+                }
+                if (methods.TryGetValue(method.OriginalDefinition, out var callee))
+                {
+                    if (!calls.TryGetValue(origin, out var targets))
+                        calls[origin] = targets = new HashSet<string>(StringComparer.Ordinal);
+                    targets.Add(callee);
+                }
+                else
+                {
+                    if (!bindings.ExternalCalls.TryGetValue(origin, out var targets))
+                        bindings.ExternalCalls[origin] = targets = [];
+                    targets.Add(EffectResolverKey.FromBoundReceiver(
+                        Binding.Metadata.MetadataBinderResult.ToBoundType(method.ContainingType),
+                        method.MetadataName, method.Parameters.Select(parameter => parameter.Type.ToDisplayString()).ToArray()));
+                }
+                if (origin is ExpressionNode expression && operation is IBinaryOperation or IUnaryOperation
+                    && operation.Type is { } resultType)
+                {
+                    var type = resultType.ToDisplayString();
+                    if (types.TryGetValue(expression, out var existing) && existing != type)
+                    {
+                        conflictingTypes.Add(expression);
+                        types.Remove(expression);
+                    }
+                    else if (!conflictingTypes.Contains(expression))
+                        types[expression] = type;
+                }
+            }
+        }
+    }
+
+    private static bool TryReadMarker(SyntaxTrivia trivia, string prefix, out int index)
+    {
+        var text = trivia.ToString();
+        var marker = "/*" + prefix;
+        index = 0;
+        return text.StartsWith(marker, StringComparison.Ordinal) && text.EndsWith("*/", StringComparison.Ordinal)
+            && int.TryParse(text.AsSpan(marker.Length, text.Length - marker.Length - 2),
+                System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out index);
+    }
+
     private readonly record struct AstCallKey(
         string CallerId,
         string Target,
@@ -688,7 +901,7 @@ public sealed class CallGraphAnalysis
             foreach (var op in EnumerateOperators(cls))
             {
                 var wrapped = new FunctionNode(op.Span, $"{cls.Name}.{op.Id}", $"{cls.Name}.op_{op.Kind}",
-                    op.Visibility, op.Parameters, op.Output, effects: null,
+                    op.Visibility, op.Parameters, op.Output, op.Effects,
                     op.Preconditions, op.Postconditions, op.Body, op.Attributes);
                 functions[wrapped.Id] = wrapped;
                 calleeToCallers[wrapped.Id] = [];
@@ -783,6 +996,29 @@ public sealed class CallGraphAnalysis
             }
         }
 
+        var operatorBindings = ResolveOperatorCalls(ast);
+        var operatorCalls = operatorBindings.SourceCalls;
+        foreach (var function in functions.Values)
+        {
+            var pending = new Stack<AstNode>();
+            pending.Push(function);
+            while (pending.TryPop(out var node))
+            {
+                foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+                    pending.Push(child);
+                if (!operatorCalls.TryGetValue(node, out var targets))
+                    continue;
+                foreach (var callee in targets)
+                {
+                    callerToCallees[function.Id].Add((callee, node.Span));
+                    calleeToCallers[callee].Add(function.Id);
+                    var key = new AstCallKey(function.Id, callee, node.Span.Start, node.Span.End);
+                    resolvedCallIds[key] = [callee];
+                    boundCallSites.Add(key);
+                }
+            }
+        }
+
         // Compute SCCs
         var sccs = ComputeSccs(
             functions,
@@ -808,6 +1044,7 @@ public sealed class CallGraphAnalysis
         analysis._declaredReturnFunctionTypes = declaredReturnTypes;
         analysis._declaredFieldFunctionTypes = declaredFieldTypes;
         analysis._boundValues = boundValues;
+        analysis._operatorBindings = operatorBindings;
         analysis.ContractInheritance = contractInheritance;
         return analysis;
     }

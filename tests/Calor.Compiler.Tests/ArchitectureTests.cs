@@ -556,6 +556,10 @@ public class ArchitectureTests
             ["Analysis/Dataflow/BoundNodeHelpers.cs:IsLiteralZero"] =
                 ("Literal classifier, not traversal; non-literals explicitly return false.",
                     "_ => false"),
+            ["Binding/Binder.cs:TryGetSignedIntegerLiteral"] =
+                ("Value-sensitive overload applicability recognizes only integer literals and " +
+                    "their signed unary forms; other expressions explicitly return false.",
+                    "return false"),
             ["Analysis/Security/TaintAnalysis.cs:GetExpressionName"] =
                 ("Display-only classifier; unsupported expressions explicitly return null.",
                     "_ => null"),

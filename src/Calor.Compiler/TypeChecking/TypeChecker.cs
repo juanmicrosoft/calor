@@ -14,6 +14,7 @@ public sealed class TypeChecker
     private readonly IReadOnlyDictionary<AwaitExpressionNode, Binding.BoundStructuralExpression>? _boundAwaits;
     private readonly IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? _boundSourceEnumConstants;
     private ModuleNode? _module;
+    private Dictionary<ExpressionNode, string>? _operatorResultTypes;
     private readonly Dictionary<IsPatternNode, CalorType> _patternBindingTypes = new();
     private readonly Dictionary<MatchStatementNode, CalorType> _matchTargetTypes = new();
     private readonly HashSet<string> _moduleDeclaredValueTypes = new(StringComparer.OrdinalIgnoreCase);
@@ -108,6 +109,7 @@ public sealed class TypeChecker
     public void Check(ModuleNode module)
     {
         _module = module;
+        _operatorResultTypes = null;
         Verification.ContractVerifier.VerifyNamedRefinementPredicates(module, _diagnostics);
         _hasNamedRefinements = module.RefinementTypes.Count > 0;
         _patternBindingTypes.Clear();
@@ -4818,6 +4820,14 @@ public sealed class TypeChecker
         }
         else
             rightType = InferExpressionType(binOp.Right);
+
+        if (_module is not null)
+        {
+            if (_operatorResultTypes is null)
+                _operatorResultTypes = Analysis.CallGraphAnalysis.ResolveOperatorCalls(_module).ResultTypes;
+            if (_operatorResultTypes.TryGetValue(binOp, out var operatorResult))
+                return ResolveTypeName(operatorResult, binOp.Span);
+        }
 
         // Operators see a named refinement (§RTYPE) as its base type, as they already see an
         // inline-refined parameter. The result is the base type, never the refinement: `NatInt -

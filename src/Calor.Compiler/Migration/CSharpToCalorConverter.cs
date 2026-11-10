@@ -1280,6 +1280,8 @@ public sealed class CSharpToCalorConverter
         {
             foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))
                 yield return (method, method.Effects, row => method.Effects = row);
+            foreach (var op in CallGraphAnalysis.EnumerateOperators(cls))
+                yield return (op, op.Effects, row => op.Effects = row);
         }
 
         foreach (var iface in CallGraphAnalysis.EnumerateInterfaces(module))

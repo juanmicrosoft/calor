@@ -23,7 +23,7 @@
     {
       "name": "Analysis",
       "path": "Analysis",
-      "allowedDependencies": ["Ast", "Binding", "Migration", "Parsing", "Verification"]
+      "allowedDependencies": ["Ast", "Binding", "CodeGen", "Migration", "Parsing", "Verification"]
     },
     {
       "name": "Migration",
@@ -33,7 +33,7 @@
     {
       "name": "CodeGen",
       "path": "CodeGen",
-      "allowedDependencies": ["Analysis", "Ast", "Migration", "Parsing", "Verification"]
+      "allowedDependencies": ["Analysis", "Ast", "Binding", "Migration", "Parsing", "Verification"]
     },
     {
       "name": "Verification",

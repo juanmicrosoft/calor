@@ -918,6 +918,7 @@ public sealed class OperatorOverloadNode : AstNode
     public IReadOnlyList<CalorAttributeNode> CSharpAttributes { get; }
 
     public bool IsConversion => Kind == OperatorOverloadKind.Implicit || Kind == OperatorOverloadKind.Explicit;
+    public EffectsNode? Effects { get; set; }
     public bool IsUnary => Kind is OperatorOverloadKind.UnaryPlus or OperatorOverloadKind.UnaryNegate
         or OperatorOverloadKind.LogicalNot or OperatorOverloadKind.BitwiseNot
         or OperatorOverloadKind.Increment or OperatorOverloadKind.Decrement

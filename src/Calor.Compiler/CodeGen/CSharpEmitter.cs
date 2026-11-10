@@ -88,7 +88,7 @@ public sealed record CrossModuleFunctionTarget(
 /// <summary>
 /// Emits C# source code from an Calor AST.
 /// </summary>
-public sealed class CSharpEmitter : IAstVisitor<string>
+public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<string>
 {
     private readonly record struct UsingDirectiveKey(
         string Namespace,
@@ -756,6 +756,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     /// source mapping entirely.
     /// </summary>
     public string? LineDirectiveFilePath { get; set; }
+
+    internal Func<AstNode, string, string>? AnnotateSource { get; init; }
+    internal Func<OperatorOverloadNode, string>? OperatorOrigin { get; init; }
+
+    string IAstResultObserver<string>.Observe(AstNode node, string result) =>
+        node is ExpressionNode or StatementNode && result.Length > 0 && AnnotateSource is { } annotate
+            ? annotate(node, result)
+            : result;
 
     // Escaped form of LineDirectiveFilePath, computed once per Emit call.
     private string? _lineDirectiveFile;
@@ -1651,8 +1659,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             _refinementTypes[refinementType.Name] = refinementType;
         }
-        _inferredRefinements =
-            TypeChecking.TypeChecker.InferUnannotatedRefinements(node);
+        // The annotated binding image must not re-enter the type checker that
+        // requested it. Refinement guards do not select user-defined operators.
+        _inferredRefinements = AnnotateSource is null
+            ? TypeChecking.TypeChecker.InferUnannotatedRefinements(node)
+            : new Dictionary<AstNode, string>(ReferenceEqualityComparer.Instance);
 
         var userUsings = node.Usings.ToList();
         foreach (var usingDirective in userUsings)
@@ -6971,6 +6982,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         ResetDeclScopes(node.Parameters, node);
 
+        if (OperatorOrigin is { } origin)
+            AppendLine(origin(node));
         EmitCSharpAttributes(node.CSharpAttributes);
 
         var returnTypeName = node.Output?.TypeName ?? "void";

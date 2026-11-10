@@ -1,7 +1,10 @@
 using System.Reflection;
 using System.Runtime.Loader;
+using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
@@ -12,6 +15,526 @@ namespace Calor.Compiler.Tests;
 
 public sealed class CanonicalOperatorIndexerTests
 {
+    [Theory]
+    [InlineData("! cw", false)]
+    [InlineData("!", true)]
+    [InlineData("", true)]
+    public void OperatorRows_EnforceDeclaredEffectsWithoutWeakeningTheMissingHeaderContract(
+        string row, bool invalid)
+    {
+        var source = $$"""
+            module OperatorRows
+              class Box
+                op implicit (Box:value) → int
+                  {{row}}
+                  System.Console.WriteLine("operator")
+                  return 1
+            """;
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var compiled = Program.Compile(candidate);
+            Assert.Equal(invalid, compiled.HasErrors);
+            if (invalid)
+                Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == (row.Length == 0
+                    ? DiagnosticCode.AccessorEffectContractUnavailable : DiagnosticCode.ForbiddenEffect));
+            else
+            {
+                var module = Parse(candidate);
+                var diagnostics = new DiagnosticBag();
+                var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(module);
+                var op = Assert.Single(bound.Functions);
+                Assert.Equal(BoundMemberKind.OperatorOverload, op.MemberKind);
+                Assert.Contains("io:console_write", op.DeclaredEffects);
+                var pass = new EffectEnforcementPass(diagnostics);
+                pass.Enforce(module);
+                Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+                var fact = Assert.Single(pass.DeclarationFacts).Value;
+                Assert.True(fact.HasDeclaration);
+                Assert.Equal("io:console_write", fact.InferredRow.ToDisplayString());
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("! alloc, throw", false)]
+    [InlineData("! alloc", true)]
+    [InlineData("! throw", true)]
+    [InlineData("!", true)]
+    [InlineData("", true)]
+    public void OperatorRows_KeepAllocationAndThrowCharges(string row, bool invalid)
+    {
+        var source = $$"""
+            module ThrowingOperator
+              class Box
+                op implicit (Box:value) → int
+                  {{row}}
+                  throw new System.InvalidOperationException("original")
+            """;
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var compiled = Program.Compile(candidate);
+            Assert.Equal(invalid, compiled.HasErrors);
+            if (invalid)
+                Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == (row.Length == 0
+                    ? DiagnosticCode.AccessorEffectContractUnavailable : DiagnosticCode.ForbiddenEffect));
+            else
+                Assert.Equal(42, Execute(compiled.GeneratedCode, assembly =>
+                {
+                    var type = assembly.GetType("Box", throwOnError: true)!;
+                    var exception = Assert.Throws<TargetInvocationException>(() =>
+                        type.GetMethod("op_Implicit")!.Invoke(null, [Activator.CreateInstance(type)]));
+                    Assert.Equal("original", Assert.IsType<InvalidOperationException>(exception.InnerException).Message);
+                    return 42;
+                }));
+        }
+    }
+
+    [Theory]
+    [InlineData("! cw", false)]
+    [InlineData("!", true)]
+    public void OperatorRows_StillChargeTheActualCaller(string callerRow, bool invalid)
+    {
+        var source = $$"""
+            module OperatorCaller
+              class Box
+                op explicit (Box:value) → int
+                  ! cw
+                  System.Console.WriteLine("operator")
+                  return 1
+              func Run public (Box:value) → int
+                {{callerRow}}
+                return (int)value
+            """;
+        var compiled = Program.Compile(source);
+        Assert.Equal(invalid, compiled.HasErrors);
+        if (invalid)
+            Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("Run", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("return value")]
+    [InlineData("let int:converted = value\n    return converted")]
+    [InlineData("var int:converted = 0\n    set converted value\n    return converted")]
+    [InlineData("return new int[] { value }[0]")]
+    [InlineData("return true ? value : 0")]
+    [InlineData("return new Receiver() { Value = value }.Value")]
+    public void OperatorRows_ChargeImplicitReceivingConversions(string body)
+    {
+        foreach (var row in new[] { "!", "! cw" })
+        {
+            var source = $$"""
+                module ImplicitOperatorCaller
+                  class Box
+                    op implicit (Box:value) → int
+                      ! cw
+                      System.Console.WriteLine("operator")
+                      return 7
+                  class Receiver
+                    field int:Value public
+                    ctor ()
+                    ctor (int:value)
+                      set this.Value value
+                  func Take public (int:value) → int
+                    !
+                    return value
+                  func Run public (Box:value) → int
+                    {{(row == "!" ? "! alloc, mut" : "! cw, alloc, mut")}}
+                    {{body}}
+                """;
+            var compiled = Program.Compile(source);
+            Assert.True((row == "!") == compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            if (row == "!")
+                Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                    && diagnostic.Message.Contains("Run", StringComparison.Ordinal));
+            else
+                Assert.Equal(7, Execute(compiled.GeneratedCode, assembly =>
+                {
+                    var box = Activator.CreateInstance(assembly.GetType("Box", throwOnError: true)!);
+                    return Convert.ToInt64(Assert.Single(assembly.GetTypes(), type => type.GetMethod("Run") != null)
+                        .GetMethod("Run")!.Invoke(null, [box]));
+                }));
+        }
+    }
+
+    [Theory]
+    [InlineData("value + 1", "int", "7")]
+    [InlineData("value + 2147483648", "long", "8")]
+    [InlineData("-value", "int", "9")]
+    public void OperatorRows_ChargeOnlyTheSelectedOverload(string expression, string resultType, string expected)
+    {
+        var source = $$"""
+            module SelectedOperatorCaller
+              class Box
+                op + (Box:value, int:other) → int
+                  !
+                  return 7
+                op + (Box:value, long:other) → long
+                  ! cw
+                  System.Console.WriteLine("long")
+                  return 8L
+                op - (Box:value) → int
+                  ! cw
+                  System.Console.WriteLine("negate")
+                  return 9
+              func Run public (Box:value) → {{resultType}}
+                !
+                return {{expression}}
+            """;
+        var compiled = Program.Compile(source);
+        Assert.True((expected != "7") == compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        if (expected == "7")
+            Assert.Equal(7, Execute(compiled.GeneratedCode, assembly =>
+            {
+                var box = Activator.CreateInstance(assembly.GetType("Box", throwOnError: true)!);
+                return Convert.ToInt64(Assert.Single(assembly.GetTypes(), type => type.GetMethod("Run") != null)
+                    .GetMethod("Run")!.Invoke(null, [box]));
+            }));
+        else
+        {
+            Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+            var accepted = Program.Compile(
+                source.Replace("    !\n    return", "    ! cw\n    return", StringComparison.Ordinal));
+            Assert.False(accepted.HasErrors, string.Join("\n", accepted.Diagnostics));
+        }
+    }
+
+    [Theory]
+    [InlineData("&&", "&")]
+    [InlineData("||", "|")]
+    public void OperatorRows_ChargeShortCircuitTruthOperators(string logical, string bitwise)
+    {
+        var source = $$"""
+            module TruthOperatorCaller
+              class Box
+                op true (Box:value) → bool
+                  ! cw
+                  System.Console.WriteLine("true")
+                  return true
+                op false (Box:value) → bool
+                  ! cw
+                  System.Console.WriteLine("false")
+                  return false
+                op {{bitwise}} (Box:left, Box:right) → Box
+                  !
+                  return left
+              func Run public (Box:left, Box:right) → Box
+                !
+                return left {{logical}} right
+            """;
+        var denied = Program.Compile(source);
+        Assert.Contains(denied.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("Run", StringComparison.Ordinal));
+        var accepted = Program.Compile(
+            source.Replace("    !\n    return left", "    ! cw\n    return left", StringComparison.Ordinal));
+        Assert.False(accepted.HasErrors, string.Join("\n", accepted.Diagnostics));
+    }
+
+    [Theory]
+    [InlineData("FEATURE")]
+    [InlineData("!FEATURE")]
+    public void OperatorRows_ChargeConversionsInEveryConditionalBranch(string condition)
+    {
+        var source = $$"""
+            module ConditionalOperatorCaller
+              class Box
+                op explicit (Box:value) → int
+                  ! cw
+                  System.Console.WriteLine("operator")
+                  return 7
+              class Calls
+                pp {{condition}}
+                  func Run public static (Box:value) → int
+                    !
+                    return (int)value
+            """;
+        var denied = Program.Compile(source);
+        Assert.Contains(denied.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("Run", StringComparison.Ordinal));
+        var accepted = Program.Compile(
+            source.Replace("        !\n", "        ! cw\n", StringComparison.Ordinal));
+        Assert.False(accepted.HasErrors, string.Join("\n", accepted.Diagnostics));
+    }
+
+    [Fact]
+    public void OperatorRows_ConditionalDeclarationsRetainBothSelectedIdentities()
+    {
+        var source = """
+            module ConditionalOperatorDeclarations
+              class Box
+                pp FEATURE
+                  op explicit (Box:value) → int
+                    ! cw
+                    System.Console.WriteLine("feature")
+                    return 7
+                pp else
+                  op explicit (Box:value) → int
+                    ! cw
+                    System.Console.WriteLine("other")
+                    return 8
+              func Run public (Box:value) → int
+                !
+                return (int)value
+            """;
+        var module = Parse(source);
+        var graph = CallGraphAnalysis.Build(module);
+        var run = Assert.Single(module.Functions);
+        var cast = Assert.IsType<ReturnStatementNode>(Assert.Single(run.Body)).Expression!;
+        var expected = CallGraphAnalysis.EnumerateOperators(Assert.Single(module.Classes))
+            .Select(op => $"Box.{op.Id}").Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal(2, expected.Length);
+        Assert.Equal(expected, graph.OperatorCalls(cast).Order(StringComparer.Ordinal));
+        var denied = Program.Compile(source);
+        Assert.Contains(denied.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+        var accepted = Program.Compile(
+            source.Replace("    !\n    return", "    ! cw\n    return", StringComparison.Ordinal));
+        Assert.False(accepted.HasErrors, string.Join("\n", accepted.Diagnostics));
+    }
+
+    [Fact]
+    public void OperatorRows_UnexhaustedConditionalAnalysisFailsExplicitly()
+    {
+        var compiled = Program.Compile("""
+            module ConditionalOperatorBound
+              class Box
+                op explicit (Box:value) → int
+                  !
+                  return 7
+              class Calls
+                pp A || B || C || D || E || F || G || H || I
+                  func Run public static (Box:value) → int
+                    !
+                    return (int)value
+            """);
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("preprocessor condition symbols", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(UnaryOperator.PostIncrement)]
+    [InlineData(UnaryOperator.PreIncrement)]
+    public void OperatorRows_ChargeSdkIncrementNodes(UnaryOperator update)
+    {
+        const string source = """
+            module IncrementOperatorCaller
+              class Box
+                op ++ (Box:value) → Box
+                  ! cw
+                  System.Console.WriteLine("increment")
+                  return value
+              func Run public (Box:value) → Box
+                !
+                System.GC.KeepAlive(value)
+                return value
+            """;
+        foreach (var candidate in new[] { source, source.Replace("    !\n", "    ! cw, mut\n", StringComparison.Ordinal) })
+        {
+            var parsed = Parse(candidate);
+            var run = Assert.Single(parsed.Functions);
+            var returned = Assert.IsType<ReturnStatementNode>(run.Body[1]);
+            var updateSpan = run.Body[0].Span;
+            var body = new StatementNode[]
+            {
+                new ExpressionStatementNode(updateSpan,
+                    new UnaryOperationNode(updateSpan, update, new ReferenceNode(updateSpan, "value"))),
+                returned
+            };
+            var module = ReplaceRunBody(parsed, body);
+            var diagnostics = new DiagnosticBag();
+            _ = new Calor.Compiler.Binding.Binder(diagnostics).Bind(module);
+            new EffectEnforcementPass(diagnostics).Enforce(module);
+            if (candidate == source)
+                Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                    && diagnostic.Message.Contains("Run", StringComparison.Ordinal));
+            else
+                Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OperatorRows_ChargeAssignmentOutputConversions(bool sdkCompound)
+    {
+        var source = """
+            module CompoundOperatorCaller
+              class Box
+                op + (Box:value, int:other) → Result
+                  ! alloc
+                  return new Result()
+              class Result
+                op implicit (Result:value) → Box
+                  ! cw
+                  System.Console.WriteLine("output")
+                  return null
+              func Run public (Box:value) → Box
+                ! alloc, mut
+                set value value + 1
+                return value
+            """;
+        foreach (var candidate in new[] { source,
+                     source.Replace("    ! alloc, mut", "    ! alloc, mut, cw", StringComparison.Ordinal) })
+        {
+            var module = Parse(candidate);
+            if (sdkCompound)
+            {
+                var run = Assert.Single(module.Functions);
+                var assignment = Assert.IsType<AssignmentStatementNode>(run.Body[0]);
+                var addition = Assert.IsType<BinaryOperationNode>(assignment.Value);
+                module = ReplaceRunBody(module,
+                [
+                    new CompoundAssignmentStatementNode(assignment.Span, assignment.Target,
+                        CompoundAssignmentOperator.Add, addition.Right),
+                    run.Body[1]
+                ]);
+            }
+            var diagnostics = new DiagnosticBag();
+            new EffectEnforcementPass(diagnostics).Enforce(module);
+            if (candidate == source)
+                Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                    && diagnostic.Message.Contains("Run", StringComparison.Ordinal));
+            else
+                Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        }
+    }
+
+    private static ModuleNode ReplaceRunBody(ModuleNode parsed, IReadOnlyList<StatementNode> body)
+    {
+        var run = Assert.Single(parsed.Functions);
+        var function = run.CopyMetadataTo(new FunctionNode(run.Span, run.Id, run.Name, run.Visibility, run.Parameters,
+            run.Output, run.Effects, run.Preconditions, run.Postconditions, body, run.Attributes));
+        return parsed.With(module =>
+        {
+            module.Functions = [function];
+            module.Items = parsed.Items.Select(item => ReferenceEquals(item, run) ? function : item).ToArray();
+        });
+    }
+
+    [Theory]
+    [InlineData("return 1\n      ! cw")]
+    [InlineData("! cw\n      ! alloc\n      return 1")]
+    public void OperatorRows_RejectLateAndDuplicateHeaders(string body)
+    {
+        var diagnostics = new DiagnosticBag();
+        _ = new Parser(new Lexer($"module InvalidRows\n  class Box\n    op implicit (Box:value) → int\n      {body}",
+            diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnexpectedToken);
+    }
+
+    [Fact]
+    public void OperatorRows_DoNotAuthorizeUnknownCalls()
+    {
+        var compiled = Program.Compile("""
+            module UnknownOperator
+              class Box
+                op implicit (Box:value) → object
+                  ! alloc, mut, cw, throw
+                  return System.Globalization.CultureInfo.InvariantCulture
+            """);
+        Assert.True(compiled.HasErrors);
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
+    [Theory]
+    [InlineData("System.DateTime", "System.TimeSpan", true)]
+    [InlineData("System.Data.SqlTypes.SqlInt32", "System.Data.SqlTypes.SqlInt32", false)]
+    public void OperatorRows_MetadataOperatorsRequireExistingContracts(string leftType, string rightType, bool known)
+    {
+        var source = $$"""
+            module MetadataOperatorBody
+              class Box
+                field {{leftType}}:Left public
+                field {{rightType}}:Right public
+                op implicit (Box:value) → {{leftType}}
+                  ! alloc, mut, cw, throw
+                  return value.Left + value.Right
+            """;
+        var compiled = Program.Compile(source);
+        var module = Parse(source);
+        var op = Assert.Single(Assert.Single(module.Classes).OperatorOverloads);
+        var expression = Assert.IsType<ReturnStatementNode>(Assert.Single(op.Body)).Expression!;
+        var key = Assert.Single(CallGraphAnalysis.Build(module).ExternalOperatorCalls(expression));
+        Assert.False(key.FromStringFallback);
+        Assert.Equal("op_Addition", key.MemberName);
+        Assert.Equal(!known, new EffectResolver().Resolve(key).Status == EffectResolutionStatus.Unknown);
+        if (known)
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        else
+        {
+            Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("op_Addition", StringComparison.Ordinal));
+            Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+        }
+    }
+
+    [Fact]
+    public void OperatorRows_BuiltinDecimalOperationsDoNotInventMetadataCalls()
+    {
+        var compiled = Program.Compile("""
+            module DecimalOperatorBody
+              class Box
+                op implicit (Box:value) → decimal
+                  !
+                  return 1m + 2m
+            """);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+    }
+
+    [Fact]
+    public void OperatorRows_SynthesisDoesNotInventHeadersForUserDeclarations()
+    {
+        var module = Parse("""
+            module MissingOperatorHeader
+              class Box
+                op implicit (Box:value) → int
+                  System.Console.WriteLine("operator")
+                  return 1
+            """);
+        Assert.True(EffectEnforcementPass.SynthesizeDeclaredRows(module));
+        Assert.Null(Assert.Single(module.Classes.Single().OperatorOverloads).Effects);
+        var diagnostics = new DiagnosticBag();
+        new EffectEnforcementPass(diagnostics).Enforce(module);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.AccessorEffectContractUnavailable);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OperatorRows_ConverterCorrelatesDistinctOverloadedRows(bool nested)
+    {
+        const string declaration = """
+            public class Box
+            {
+                public static int operator +(Box value, int other)
+                {
+                    System.Console.WriteLine("original");
+                    return other;
+                }
+                public static int operator +(Box value, long other)
+                {
+                    throw new System.InvalidOperationException("original");
+                }
+            }
+            """;
+        var original = nested ? "public class Outer {\n" + declaration + "\n}" : declaration;
+        var converted = new CSharpToCalorConverter().Convert(original);
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        Assert.Empty(converted.Losses);
+        RawFrameAssertions.AssertFramed(converted.CalorSource!, present: false);
+        foreach (var candidate in new[] { converted.CalorSource!, new CalorEmitter().Emit(Parse(converted.CalorSource!)) })
+        {
+            var module = Parse(candidate);
+            var operators = CallGraphAnalysis.EnumerateClasses(module).SelectMany(CallGraphAnalysis.EnumerateOperators)
+                .ToArray();
+            Assert.Equal(2, operators.Length);
+            Assert.Contains("console_write", operators[0].Effects!.Effects["io"]);
+            Assert.DoesNotContain("io", operators[1].Effects!.Effects.Keys);
+            var compiled = Program.Compile(candidate);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        }
+    }
+
     private const string Money = """
         module Operators
           class Money

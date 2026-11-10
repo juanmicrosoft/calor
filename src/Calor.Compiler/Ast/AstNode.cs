@@ -63,7 +63,16 @@ public abstract class AstNode
     }
 
     public virtual void Accept(IAstVisitor visitor) => AstVisitorDispatch.Visit(visitor, this);
-    public virtual T Accept<T>(IAstVisitor<T> visitor) => AstVisitorDispatch.Visit(visitor, this);
+    public virtual T Accept<T>(IAstVisitor<T> visitor)
+    {
+        var result = AstVisitorDispatch.Visit(visitor, this);
+        return visitor is IAstResultObserver<T> observer ? observer.Observe(this, result) : result;
+    }
+}
+
+internal interface IAstResultObserver<T>
+{
+    T Observe(AstNode node, T result);
 }
 
 // <generated-ast-infrastructure>
