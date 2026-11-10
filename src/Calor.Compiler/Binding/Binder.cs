@@ -2837,7 +2837,9 @@ public sealed class Binder
             elseBody = BindIsolatedFlowBranch(
                 fallthrough,
                 branches,
-                setup: null,
+                () => DeclareFailedConditionPatterns(
+                    ifStmt.ElseIfClauses.LastOrDefault()?.Condition ?? ifStmt.Condition,
+                    elseIfClauses.LastOrDefault()?.Condition ?? condition),
                 () => BindStatements(ifStmt.ElseBody));
         }
 
@@ -4760,6 +4762,28 @@ public sealed class Binder
 
     private void DeclareFailedConditionPatterns(ExpressionNode condition, BoundExpression boundCondition)
     {
+        var arguments = condition switch
+        {
+            CallExpressionNode call => call.Arguments,
+            ExpressionCallNode call => call.Arguments,
+            _ => null
+        };
+        if (arguments is [ReferenceNode referenceArgument]
+            && boundCondition is BoundCallExpression
+            {
+                Arguments: [BoundVariableExpression variableArgument],
+                ResolvedMetadataMethod:
+                {
+                    IsStatic: true,
+                    Name: nameof(string.IsNullOrEmpty) or nameof(string.IsNullOrWhiteSpace),
+                    ContainingType.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String,
+                    ReturnType.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_Boolean,
+                    Parameters: [{ Type.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String }]
+                }
+            })
+        {
+            DeclareNarrowedNonNullVariable(referenceArgument, variableArgument.Variable);
+        }
         if (condition is StringOperationNode
             {
                 Operation: StringOp.IsNullOrEmpty or StringOp.IsNullOrWhiteSpace,

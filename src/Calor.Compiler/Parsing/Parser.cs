@@ -8702,11 +8702,18 @@ public sealed class Parser
         RejectLegacyLoopHeader(startToken, "each item in collection or each key, value in collection");
         var attrs = new AttributeCollection();
         var id = GenerateParserAutoId("each");
-        var variable = Expect(TokenKind.Identifier);
         var variableType = "var";
-        if (Match(TokenKind.Colon))
+        Token variable;
+        if (Check(TokenKind.Identifier)
+            && (Peek(1).Kind == TokenKind.Colon
+                || Peek(1).Kind == TokenKind.Question && Peek(2).Kind == TokenKind.Colon))
         {
-            variableType = variable.Text;
+            variableType = ReadInlineTypeToken();
+            Expect(TokenKind.Colon);
+            variable = Expect(TokenKind.Identifier);
+        }
+        else
+        {
             variable = Expect(TokenKind.Identifier);
         }
         Token? secondVariable = null;

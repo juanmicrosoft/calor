@@ -116,7 +116,7 @@
       "open": "each item in collection; each Type:item in collection; each key, value in collection",
       "close": "(none)",
       "tag": "each",
-      "description": "Iterates synchronously over a collection with an indented body. An explicit type precedes the item name. Two names deconstruct each element without tuple parentheses; collection evaluation remains once.",
+      "description": "Iterates synchronously over a collection with an indented body. An explicit type precedes the item name; string?:item retains a nullable string type. Two names deconstruct each element without tuple parentheses; collection evaluation remains once.",
       "csharpEquivalent": "foreach (var item in items) { ... }\nforeach (var (key, value) in dictionary) { ... }"
     },
     {
@@ -137,14 +137,14 @@
       "open": "if condition; else if condition; else",
       "close": "(none)",
       "tag": "if",
-      "description": "Conditional branches have indented bodies. else if and else align with if. Only the selected branch runs.",
+      "description": "Conditional branches have indented bodies. else if and else align with if. Only the selected branch runs. Resolved System.String.IsNullOrEmpty and IsNullOrWhiteSpace calls prove a string non-null when false, including continuation after a returning true branch. Same-named user methods provide no such proof.",
       "csharpEquivalent": "if (x > 0) { return true; }\nif (x > 0) { a(); } else { b(); }\nif (x > 0) { } else if (x < 0) { } else { }"
     },
     {
       "open": "if condition; else if condition; else",
       "close": "(none)",
       "tag": "else",
-      "description": "Conditional branches have indented bodies. else if and else align with if. Only the selected branch runs.",
+      "description": "Conditional branches have indented bodies. else if and else align with if. Only the selected branch runs. Resolved System.String.IsNullOrEmpty and IsNullOrWhiteSpace calls prove a string non-null when false, including continuation after a returning true branch. Same-named user methods provide no such proof.",
       "csharpEquivalent": "if (x > 0) { return true; }\nif (x > 0) { a(); } else { b(); }\nif (x > 0) { } else if (x < 0) { } else { }"
     },
     {

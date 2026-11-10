@@ -193,7 +193,7 @@ Complete example: [Collection allocation, loop mutation and count](#example-copi
 
 ## foreach loop
 
-Iterates synchronously over a collection with an indented body. An explicit type precedes the item name. Two names deconstruct each element without tuple parentheses; collection evaluation remains once.
+Iterates synchronously over a collection with an indented body. An explicit type precedes the item name; string?:item retains a nullable string type. Two names deconstruct each element without tuple parentheses; collection evaluation remains once.
 
 Syntax: `each item in collection; each Type:item in collection; each key, value in collection`
 
@@ -225,7 +225,7 @@ Complete example: [Countdown](#example-task_12).
 
 ## if statement
 
-Conditional branches have indented bodies. else if and else align with if. Only the selected branch runs.
+Conditional branches have indented bodies. else if and else align with if. Only the selected branch runs. Resolved System.String.IsNullOrEmpty and IsNullOrWhiteSpace calls prove a string non-null when false, including continuation after a returning true branch. Same-named user methods provide no such proof.
 
 Syntax: `if condition; else if condition; else`
 

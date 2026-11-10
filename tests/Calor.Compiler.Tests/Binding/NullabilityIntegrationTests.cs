@@ -9,14 +9,14 @@ using Xunit;
 namespace Calor.Compiler.Tests;
 
 /// <summary>
-/// v0.14 §S3b integration tests (nullability workstream / issue #875).
-/// Exercise the full lex→parse→bind pipeline against Calor source that mixes
-/// BCL calls and §B bindings. Verifies:
+/// Nullability integration tests (workstream / issue #875).
+/// Exercise the full lex→parse→bind pipeline against native source that mixes
+/// BCL calls and local bindings. Verifies:
 ///   (a) BCL-shaped calls carry MetadataBinder-resolved NullableAnnotation
 ///       on their BoundCallExpression.Type
-///   (b) Calor0272 fires for §B{x:string} = &lt;possibly-null-source&gt;
-///   (c) Calor0272 does NOT fire for :?string targets
-///   (d) Calor0272 does NOT fire for Calor-local bindings (no BCL involvement)
+///   (b) Calor0272 fires for non-null targets receiving possibly-null strings
+///   (c) Calor0272 does NOT fire for string? targets
+///   (d) Calor0272 does NOT fire for provably non-null local values
 /// </summary>
 public class NullabilityIntegrationTests
 {
@@ -28,21 +28,26 @@ public class NullabilityIntegrationTests
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
         var bound = new Binder(diagnostics).Bind(module);
         return (bound, diagnostics);
     }
+
+    private static BoundCallExpression Invocation(BoundStatement statement)
+        => Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundExpressionStatement>(statement).Expression);
 
     [Fact]
     public void LiteralNull_TriggersAllScalarReceivingDiagnostics()
     {
         const string source = """
-            §M{LiteralNull}
-              §F{Take:pub} (string:value) -> void
-                §E{}
-              §F{Probe:pub} () -> string
-                §B{required:string} null
-                §C{Take} §A null §/C
-                §R null
+            module LiteralNull
+              func Take public (string:value) → void
+                !
+              func Probe public () → string
+                let string:required = null
+                Take(null)
+                return null
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -60,13 +65,13 @@ public class NullabilityIntegrationTests
     public void ConditionalNullStringJoins_TriggerAllScalarReceivingDiagnostics()
     {
         const string source = """
-            §M{ConditionalNull}
-              §F{Take:pub} (string:value) -> void
-                §E{}
-              §F{Probe:pub} (bool:flag) -> string
-                §B{required:string} (? flag null STR:"safe")
-                §C{Take} §A (? flag STR:"safe" null) §/C
-                §R (? flag null STR:"safe")
+            module ConditionalNull
+              func Take public (string:value) → void
+                !
+              func Probe public (bool:flag) → string
+                let string:required = flag ? null : "safe"
+                Take(flag ? "safe" : null)
+                return flag ? null : "safe"
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -82,9 +87,9 @@ public class NullabilityIntegrationTests
     public void ConditionalNullWithUnrelatedArm_DoesNotTriggerScalarNullability()
     {
         const string source = """
-            §M{UnrelatedConditionalNull}
-              §F{Probe:pub} (bool:flag) -> void
-                §B{required:string} (? flag null INT:1)
+            module UnrelatedConditionalNull
+              func Probe public (bool:flag) → void
+                let string:required = flag ? null : 1
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -97,18 +102,18 @@ public class NullabilityIntegrationTests
 
     [Theory]
     [InlineData("Foo")]
-    [InlineData("[str]")]
-    [InlineData("List<str>")]
+    [InlineData("string[]")]
+    [InlineData("System.Collections.Generic.List<string>")]
     public void LiteralNull_RemainsApplicableToNonScalarReferenceParameters(
         string parameterType)
     {
         var source = $$"""
-            §M{NullReferenceApplicability}
-              §CL{Foo:pub}
-                §MT{Take:pub:static} ({{parameterType}}:value) -> void
-                  §E{}
-                §MT{Probe:pub:static} () -> void
-                  §C{Foo.Take} §A null §/C
+            module NullReferenceApplicability
+              class Foo public
+                func Take public static ({{parameterType}}:value) → void
+                  !
+                func Probe public static () → void
+                  Foo.Take(null)
             """;
 
         var (bound, diagnostics) = BindSource(source);
@@ -118,7 +123,7 @@ public class NullabilityIntegrationTests
                 or DiagnosticCode.NullableArgumentToNonNullableParameter);
         var probe = bound.Functions.Single(function =>
             function.Symbol.Name.EndsWith(".Probe", StringComparison.Ordinal));
-        var call = Assert.IsType<BoundCallStatement>(Assert.Single(probe.Body));
+        var call = Invocation(Assert.Single(probe.Body));
         Assert.NotNull(call.ResolvedSymbol);
         Assert.Equal(parameterType, call.ResolvedSymbol.Parameters.Single().TypeName);
     }
@@ -127,14 +132,14 @@ public class NullabilityIntegrationTests
     public void LiteralNull_DoesNotPreferScalarStringOverUnrelatedReferenceOverload()
     {
         const string source = """
-            §M{NullOverloadIdentity}
-              §CL{Foo:pub}
-                §MT{Take:pub:static} (str:value) -> i32
-                  §R 1
-                §MT{Take:pub:static} (Foo:value) -> i32
-                  §R 2
-                §MT{Probe:pub:static} () -> i32
-                  §R §C{Foo.Take} §A null §/C
+            module NullOverloadIdentity
+              class Foo public
+                func Take public static (string:value) → int
+                  return 1
+                func Take public static (Foo:value) → int
+                  return 2
+                func Probe public static () → int
+                  return Foo.Take(null)
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -149,13 +154,13 @@ public class NullabilityIntegrationTests
     public void LiteralNull_PrefersScalarStringOverObject_ThenReportsCalor0274()
     {
         const string source = """
-            §M{NullOverloadSpecificity}
-              §F{Take:pub} (str:value) -> i32
-                §R 1
-              §F{Take:pub} (object:value) -> i32
-                §R 2
-              §F{Probe:pub} () -> i32
-                §R §C{Take} §A null §/C
+            module NullOverloadSpecificity
+              func Take public (string:value) → int
+                return 1
+              func Take public (object:value) → int
+                return 2
+              func Probe public () → int
+                return Take(null)
             """;
 
         var (bound, diagnostics) = BindSource(source);
@@ -168,23 +173,23 @@ public class NullabilityIntegrationTests
         var probe = bound.Functions.Single(function => function.Symbol.Name == "Probe");
         var call = Assert.IsType<BoundCallExpression>(
             Assert.IsType<BoundReturnStatement>(Assert.Single(probe.Body)).Expression);
-        Assert.Equal("str", call.ResolvedSymbol!.Parameters.Single().TypeName);
+        Assert.Equal("string", call.ResolvedSymbol!.Parameters.Single().TypeName);
     }
 
     [Fact]
     public void LiteralNull_PrefersDerivedReferenceParameter()
     {
         const string source = """
-            §M{NullDerivedSpecificity}
-              §CL{Parent:pub}
-              §CL{Child:pub}
-                §EXT{Parent}
-                §MT{Take:pub:static} (Parent:value) -> i32
-                  §R 1
-                §MT{Take:pub:static} (Child:value) -> i32
-                  §R 2
-                §MT{Probe:pub:static} () -> i32
-                  §R §C{Child.Take} §A null §/C
+            module NullDerivedSpecificity
+              class Parent public
+              class Child public
+                extends Parent
+                func Take public static (Parent:value) → int
+                  return 1
+                func Take public static (Child:value) → int
+                  return 2
+                func Probe public static () → int
+                  return Child.Take(null)
             """;
 
         var (bound, diagnostics) = BindSource(source);
@@ -206,15 +211,15 @@ public class NullabilityIntegrationTests
         string modifier)
     {
         var source = $$"""
-            §M{RefFlow}
-              §F{Mutate:pub} (?str:value:{{modifier}}) -> void
-                §E{}
-              §F{Take:pub} (str:value) -> void
-                §E{}
-              §F{Probe:pub} (?str:value) -> void
-                §IF (is value str)
-                  §C{Mutate} §A{{{modifier}}} value §/C
-                  §C{Take} §A value §/C
+            module RefFlow
+              func Mutate public ({{modifier}} string?:value) → void
+                !
+              func Take public (string:value) → void
+                !
+              func Probe public (string?:value) → void
+                if value is string
+                  Mutate({{modifier}} value)
+                  Take(value)
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -230,13 +235,13 @@ public class NullabilityIntegrationTests
     public void MetadataRefCall_InvalidatesFlowNarrowingBeforeNextScalarBoundary()
     {
         const string source = """
-            §M{MetadataRefFlow}
-              §F{Take:pub} (str:value) -> void
-                §E{}
-              §F{Probe:pub} (?str:value, str:replacement) -> void
-                §IF (is value str)
-                  §C{System.Threading.Interlocked.Exchange} §A{ref} value §A replacement §/C
-                  §C{Take} §A value §/C
+            module MetadataRefFlow
+              func Take public (string:value) → void
+                !
+              func Probe public (string?:value, string:replacement) → void
+                if value is string
+                  System.Threading.Interlocked.Exchange(ref value, replacement)
+                  Take(value)
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -250,18 +255,18 @@ public class NullabilityIntegrationTests
     public void IfBranchMutation_DoesNotLeakIntoSibling_ButInvalidatesPostIfState()
     {
         const string source = """
-            §M{BranchFlow}
-              §F{Take:pub} (str:value) -> void
-                §E{}
-              §F{Probe:pub} (?str:value, ?str:replacement, bool:flag) -> void
-                §B{~candidate} value
-                §IF (isempty candidate)
-                  §R
-                §IF flag
-                  §ASSIGN candidate replacement
-                §EL
-                  §C{Take} §A candidate §/C
-                §C{Take} §A candidate §/C
+            module BranchFlow
+              func Take public (string:value) → void
+                !
+              func Probe public (string?:value, string?:replacement, bool:flag) → void
+                var candidate = value
+                if string.IsNullOrEmpty(candidate)
+                  return
+                if flag
+                  set candidate replacement
+                else
+                  Take(candidate)
+                Take(candidate)
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -273,18 +278,159 @@ public class NullabilityIntegrationTests
         Assert.Equal(BindingReceivingShape.ScalarString, diagnostic.BindingContext!.Shape);
     }
 
+    [Theory]
+    [InlineData("string.IsNullOrEmpty")]
+    [InlineData("System.String.IsNullOrEmpty")]
+    [InlineData("Text.IsNullOrEmpty")]
+    [InlineData("string.IsNullOrWhiteSpace")]
+    [InlineData("System.String.IsNullOrWhiteSpace")]
+    [InlineData("Text.IsNullOrWhiteSpace")]
+    public void NativeStringGuard_UsesSelectedClrMethodToNarrowContinuation(string target)
+    {
+        var source = $$"""
+            module StringGuard
+              using Text = System.String
+              func Take public (string:value) → void
+                !
+              func Probe public (string?:value) → string
+                if {{target}}(value)
+                  return "fallback"
+                let string:copy = value
+                Take(value)
+                return value
+            """;
+
+        var (bound, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, BindingDiagnosticPolicy.IsCompilationError);
+        var probe = bound.Functions.Single(function => function.Symbol.Name == "Probe");
+        var guard = Assert.IsType<BoundIfStatement>(probe.Body[0]);
+        var call = Assert.IsType<BoundCallExpression>(guard.Condition);
+        Assert.Equal(Microsoft.CodeAnalysis.SpecialType.System_String,
+            call.ResolvedMetadataMethod?.ContainingType.SpecialType);
+        Assert.Equal(target.Split('.').Last(), call.ResolvedMetadataMethod?.Name);
+    }
+
+    [Theory]
+    [InlineData("IsNullOrEmpty", false)]
+    [InlineData("IsNullOrEmpty", true)]
+    [InlineData("IsNullOrWhiteSpace", false)]
+    [InlineData("IsNullOrWhiteSpace", true)]
+    public void NativeStringGuard_SameNamedSourceMethodDoesNotProveNonnull(string method, bool alias)
+    {
+        var target = alias ? "Text" : "Pretender";
+        var source = $$"""
+            module SourceGuard
+              using Text = System.String
+              class Pretender public
+                func {{method}} public {{(alias ? "" : "static ")}}(string?:value) → bool
+                  return false
+              func Take public (string:value) → void
+                !
+              func Probe public (string?:value) → string
+                {{(alias ? "let Text = new Pretender()" : "")}}
+                if {{target}}.{{method}}(value)
+                  return "fallback"
+                let string:copy = value
+                Take(value)
+                return value
+            """;
+
+        var (bound, diagnostics) = BindSource(source);
+
+        AssertScalarNullabilityDiagnostics(diagnostics,
+            DiagnosticCode.NullableToNonNullableBinding,
+            DiagnosticCode.NullableArgumentToNonNullableParameter,
+            DiagnosticCode.NullableReturnFromNonNullable);
+        var probe = bound.Functions.Single(function => function.Symbol.Name == "Probe");
+        var guard = Assert.Single(probe.Body.OfType<BoundIfStatement>());
+        var call = Assert.IsType<BoundCallExpression>(guard.Condition);
+        if (call.ResolvedSymbol is { } sourceMethod)
+        {
+            Assert.EndsWith("Pretender." + method, sourceMethod.Name);
+        }
+        else
+        {
+            var selected = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.IMethodSymbol>(
+                call.ResolvedMetadataMethod);
+            Assert.Equal("Pretender", selected.ContainingType.ToDisplayString());
+            Assert.Equal(method, selected.Name);
+            Assert.Equal(Microsoft.CodeAnalysis.SpecialType.None, selected.ContainingType.SpecialType);
+        }
+    }
+
+    [Fact]
+    public void NativeStringGuard_TrueBranchAndJoinedContinuationRemainNullable()
+    {
+        const string source = """
+            module GuardBranches
+              func Take public (string:value) → void
+                !
+              func Probe public (string?:value) → void
+                if string.IsNullOrEmpty(value)
+                  Take(value)
+                else
+                  Take(value)
+                Take(value)
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        var findings = diagnostics.Where(diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter).ToArray();
+        Assert.Equal(new[]
+        {
+            source.IndexOf("Take(value)", StringComparison.Ordinal) + "Take(".Length,
+            source.LastIndexOf("Take(value)", StringComparison.Ordinal) + "Take(".Length
+        }, findings.Select(diagnostic => diagnostic.Span.Start));
+        Assert.All(findings, diagnostic =>
+            Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NativeStringGuard_ElseIfUsesTheLastExecutedCondition(bool clrGuard)
+    {
+        var condition = clrGuard ? "string.IsNullOrEmpty(value)" : "Mutate(ref value)";
+        var source = $$"""
+            module GuardChain
+              func Take public (string:value) → void
+                !
+              func Mutate public (ref string?:value) → bool
+                set value null
+                return false
+              func Probe public (string?:value, bool:flag) → void
+                if string.IsNullOrEmpty(value)
+                  return
+                else if {{condition}}
+                  return
+                else
+                  Take(value)
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        var findings = diagnostics.Where(diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter).ToArray();
+        Assert.Equal(clrGuard ? 0 : 1, findings.Length);
+        Assert.All(findings, diagnostic =>
+            Assert.Equal(source.LastIndexOf("value", StringComparison.Ordinal), diagnostic.Span.Start));
+    }
+
     [Fact]
     public void DirectFunctionTypeInvocation_ActivatesOnlyNonnullScalarStringParameters()
     {
         const string source = """
-            §M{DirectDelegate}
-              §CL{Foo:pub}
-                §MT{Probe:pub:static} (Func<str,void>:takeString, Func<[str],void>:takeArray, Func<Option<str>,void>:takeOption, Func<Foo,void>:takeFoo, ?str:value) -> void
-                  §C{takeString} §A value §/C
-                  §C{takeString} §A null §/C
-                  §C{takeArray} §A null §/C
-                  §C{takeOption} §A null §/C
-                  §C{takeFoo} §A null §/C
+            module DirectDelegate
+              class Envelope<T> public
+              class Foo public
+                func Probe public static (Action<string>:takeString, Action<string[]>:takeArray, Action<Envelope<string>>:takeEnvelope, Action<Foo>:takeFoo, string?:value) → void
+                  takeString(value)
+                  takeString(null)
+                  takeArray(null)
+                  takeEnvelope(null)
+                  takeFoo(null)
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -302,23 +448,23 @@ public class NullabilityIntegrationTests
     }
 
     [Theory]
-    [InlineData("§ASSIGN candidate replacement")]
-    [InlineData("§B{~candidate} replacement")]
+    [InlineData("set candidate replacement")]
+    [InlineData("var candidate = replacement")]
     public void TerminatingIsNullOrEmptyNarrowing_IsInvalidatedByMutableMutation(
         string mutation)
     {
         var source = $$"""
-            §M{FlowRebind}
-              §F{Take:pub} (string:value) -> void
-                §E{}
-              §F{Probe:pub} (?string:value, ?string:replacement) -> string
-                §B{~candidate} value
-                §IF (isempty candidate)
-                  §R STR:"fallback"
+            module FlowRebind
+              func Take public (string:value) → void
+                !
+              func Probe public (string?:value, string?:replacement) → string
+                var candidate = value
+                if string.IsNullOrEmpty(candidate)
+                  return "fallback"
                 {{mutation}}
-                §B{required:string} candidate
-                §C{Take} §A candidate §/C
-                §R candidate
+                let string:required = candidate
+                Take(candidate)
+                return candidate
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -331,23 +477,23 @@ public class NullabilityIntegrationTests
     }
 
     [Theory]
-    [InlineData("§ASSIGN candidate replacement")]
-    [InlineData("§B{~candidate} replacement")]
+    [InlineData("set candidate replacement")]
+    [InlineData("var candidate = replacement")]
     public void NestedChildMutation_InvalidatesParentNarrowingAfterJoin(string mutation)
     {
         var source = $$"""
-            §M{NestedJoinMutation}
-              §F{Take:pub} (string:value) -> void
-                §E{}
-              §F{Probe:pub} (?string:value, ?string:replacement, bool:flag) -> string
-                §B{~candidate} value
-                §IF (is candidate string)
-                  §IF flag
+            module NestedJoinMutation
+              func Take public (string:value) → void
+                !
+              func Probe public (string?:value, string?:replacement, bool:flag) → string
+                var candidate = value
+                if candidate is string
+                  if flag
                     {{mutation}}
-                  §B{required:string} candidate
-                  §C{Take} §A candidate §/C
-                  §R candidate
-                §R STR:"fallback"
+                  let string:required = candidate
+                  Take(candidate)
+                  return candidate
+                return "fallback"
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -360,22 +506,22 @@ public class NullabilityIntegrationTests
     }
 
     [Theory]
-    [InlineData("§ASSIGN candidate replacement")]
-    [InlineData("§B{~candidate} replacement")]
+    [InlineData("set candidate replacement")]
+    [InlineData("var candidate = replacement")]
     public void TypedCheckNarrowing_IsInvalidatedByMutableMutation(string mutation)
     {
         var source = $$"""
-            §M{FlowAssignment}
-              §F{Take:pub} (string:value) -> void
-                §E{}
-              §F{Probe:pub} (?string:value, ?string:replacement) -> string
-                §B{~candidate} value
-                §IF (is candidate string)
+            module FlowAssignment
+              func Take public (string:value) → void
+                !
+              func Probe public (string?:value, string?:replacement) → string
+                var candidate = value
+                if candidate is string
                   {{mutation}}
-                  §B{required:string} candidate
-                  §C{Take} §A candidate §/C
-                  §R candidate
-                §R STR:"fallback"
+                  let string:required = candidate
+                  Take(candidate)
+                  return candidate
+                return "fallback"
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -388,25 +534,25 @@ public class NullabilityIntegrationTests
     }
 
     [Theory]
-    [InlineData("§ASSIGN candidate replacement")]
-    [InlineData("§B{~candidate} replacement")]
+    [InlineData("set candidate replacement")]
+    [InlineData("var candidate = replacement")]
     public void NestedTypedCheckNarrowing_UnwindsToOriginalSymbolBeforeMutableMutation(
         string mutation)
     {
         var source = $$"""
-            §M{NestedFlowMutation}
-              §F{Take:pub} (string:value) -> void
-                §E{}
-              §F{Probe:pub} (?string:value, ?string:replacement) -> string
-                §B{~candidate} value
-                §IF (is candidate string)
-                  §IF (is candidate string)
+            module NestedFlowMutation
+              func Take public (string:value) → void
+                !
+              func Probe public (string?:value, string?:replacement) → string
+                var candidate = value
+                if candidate is string
+                  if candidate is string
                     {{mutation}}
-                    §B{required:string} candidate
-                    §C{Take} §A candidate §/C
-                    §R candidate
-                  §R STR:"fallback"
-                §R STR:"fallback"
+                    let string:required = candidate
+                    Take(candidate)
+                    return candidate
+                  return "fallback"
+                return "fallback"
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -422,15 +568,15 @@ public class NullabilityIntegrationTests
     public void YieldReturnGuard_DoesNotNarrowContinuation()
     {
         const string source = """
-            §M{YieldFlow}
-              §F{Take:pub} (string:value) -> void
-                §E{}
-              §F{Probe:pub} (?string:value) -> string
-                §IF (isempty value)
-                  §YIELD STR:"fallback"
-                §B{required:string} value
-                §C{Take} §A value §/C
-                §YIELD value
+            module YieldFlow
+              func Take public (string:value) → void
+                !
+              func Probe public (string?:value) → string
+                if string.IsNullOrEmpty(value)
+                  yield "fallback"
+                let string:required = value
+                Take(value)
+                yield value
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -445,22 +591,19 @@ public class NullabilityIntegrationTests
     public void NestedDelegateReturnNullability_UsesQualifiedLexicalDeclaration()
     {
         const string source = """
-            §M{NestedDelegates}
-              §CL{NullableOwner:pub}
-                §DEL{Handler:pub}
-                  §O{?string}
-                §MT{Probe:pub} (Handler:handler) -> string
-                  §R §C{handler} §/C
-              §CL{NonNullOwner:pub}
-                §DEL{Handler:pub}
-                  §O{string}
-                §MT{Probe:pub} (Handler:handler) -> string
-                  §R §C{handler} §/C
-              §CL{UniqueOwner:pub}
-                §DEL{NullableReader:pub}
-                  §O{?string}
-                §MT{Probe:pub} (UniqueOwner.NullableReader:reader) -> string
-                  §R §C{reader} §/C
+            module NestedDelegates
+              class NullableOwner public
+                delegate Handler public () → string?
+                func Probe public (Handler:handler) → string
+                  return handler()
+              class NonNullOwner public
+                delegate Handler public () → string
+                func Probe public (Handler:handler) → string
+                  return handler()
+              class UniqueOwner public
+                delegate NullableReader public () → string?
+                func Probe public (UniqueOwner.NullableReader:reader) → string
+                  return reader()
             """;
 
         var (bound, diagnostics) = BindSource(source);
@@ -497,16 +640,17 @@ public class NullabilityIntegrationTests
             Assert.Equal(BindingReceivingShape.ScalarString, diagnostic.BindingContext!.Shape);
             Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
         });
-        Assert.DoesNotContain(findings, diagnostic => diagnostic.Span.Line == 11);
+        var nonNullReturn = Assert.IsType<BoundReturnStatement>(Assert.Single(nonNullOwner.Body));
+        Assert.DoesNotContain(findings, diagnostic => diagnostic.Span == nonNullReturn.Span);
     }
 
     [Fact]
     public void DelegateInvoke_UsesNullableReturnSignature()
     {
         const string source = """
-            §M{DelegateInvoke}
-              §F{Probe:pub} (Func<?str>:read) -> str
-                §R §C{read.Invoke} §/C
+            module DelegateInvoke
+              func Probe public (Func<string?>:read) → string
+                return read.Invoke()
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -521,17 +665,17 @@ public class NullabilityIntegrationTests
     public void RefOverloadApplicability_UsesDeclaredStorageNullability()
     {
         const string source = """
-            §M{RefStorage}
-              §F{Mutate:pub} (str:value:ref) -> i32
-                §E{}
-                §R 1
-              §F{Mutate:pub} (?str:value:ref) -> i32
-                §E{}
-                §R 2
-              §F{Probe:pub} (?str:value) -> i32
-                §IF (is value str)
-                  §R §C{Mutate} §A{ref} value §/C
-                §R 0
+            module RefStorage
+              func Mutate public (ref string:value) → int
+                !
+                return 1
+              func Mutate public (ref string?:value) → int
+                !
+                return 2
+              func Probe public (string?:value) → int
+                if value is string
+                  return Mutate(ref value)
+                return 0
             """;
 
         var (bound, diagnostics) = BindSource(source);
@@ -543,7 +687,7 @@ public class NullabilityIntegrationTests
         var branch = Assert.IsType<BoundIfStatement>(probe.Body[0]);
         var call = Assert.IsType<BoundCallExpression>(
             Assert.IsType<BoundReturnStatement>(branch.ThenBody[0]).Expression);
-        Assert.Equal("?str", call.ResolvedSymbol!.Parameters.Single().TypeName);
+        Assert.Equal("string?", call.ResolvedSymbol!.Parameters.Single().TypeName);
     }
 
     private static void AssertScalarNullabilityDiagnostics(
@@ -576,15 +720,15 @@ public class NullabilityIntegrationTests
     {
         var first = nullableToRequired ? "sure" : "maybe";
         var second = nullableToRequired ? "maybe" : "sure";
-        var call = $"§C{{this.Take}} §A[optional] {first} §A[required] {second} §/C";
+        var call = $"this.Take(optional: {first}, required: {second})";
         var source = $$"""
-            §M{NativeMapping}
-              §CL{Bar:pub}
-                §MT{Take:pub} (Bar:required, ?Bar:optional) -> i32
-                  §R 1
-                §MT{Caller:pub} (?Bar:maybe, Bar:sure) -> i32
-                  {{(expression ? "§R " : "")}}{{call}}
-                  {{(expression ? "" : "§R 0")}}
+            module NativeMapping
+              class Bar public
+                func Take public (Bar:required, Bar?:optional) → int
+                  return 1
+                func Caller public (Bar?:maybe, Bar:sure) → int
+                  {{(expression ? "return " : "")}}{{call}}
+                  {{(expression ? "" : "return 0")}}
             """;
 
         var (bound, diagnostics) = BindSource(source);
@@ -593,7 +737,7 @@ public class NullabilityIntegrationTests
         var caller = bound.Functions.Single(f => f.Symbol.Name.EndsWith(".Caller", StringComparison.Ordinal));
         var resolved = expression
             ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(caller.Body[0]).Expression).ResolvedSymbol
-            : Assert.IsType<BoundCallStatement>(caller.Body[0]).ResolvedSymbol;
+            : Invocation(caller.Body[0]).ResolvedSymbol;
         Assert.NotNull(resolved);
         Assert.EndsWith(".Take", resolved.Name);
 
@@ -619,12 +763,12 @@ public class NullabilityIntegrationTests
     [InlineData(true)]
     public void N3_BclNamedArguments_CheckActualSuppliedParameter(bool expression)
     {
-        const string call = "§C{System.IO.Path.Combine} §A[path2] STR:\"safe\" §A[path1] maybe §/C";
+        const string call = "System.IO.Path.Combine(path2: \"safe\", path1: maybe)";
         var source = $$"""
-            §M{BclMapping}
-              §F{Caller:pub} (?string:maybe) -> string
-                {{(expression ? "§R " : "")}}{{call}}
-                {{(expression ? "" : "§R STR:\"done\"")}}
+            module BclMapping
+              func Caller public (string?:maybe) → string
+                {{(expression ? "return " : "")}}{{call}}
+                {{(expression ? "" : "return \"done\"")}}
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -650,16 +794,16 @@ public class NullabilityIntegrationTests
     {
         var args = form switch
         {
-            "array" => "§A §C{System.Environment.GetCommandLineArgs} §/C",
-            "named-array" => "§A[paths] §C{System.Environment.GetCommandLineArgs} §/C",
-            "expanded" => "§A STR:\"a\" §A STR:\"b\" §A STR:\"c\" §A STR:\"d\" §A maybe",
+            "array" => "System.Environment.GetCommandLineArgs()",
+            "named-array" => "paths: System.Environment.GetCommandLineArgs()",
+            "expanded" => "\"a\", \"b\", \"c\", \"d\", maybe",
             _ => ""
         };
         var source = $$"""
-            §M{BclParams}
-              §F{Caller:pub} (?string:maybe) -> string
-                {{(expression ? "§R " : "")}}§C{System.IO.Path.Combine} {{args}} §/C
-                {{(expression ? "" : "§R STR:\"done\"")}}
+            module BclParams
+              func Caller public (string?:maybe) → string
+                {{(expression ? "return " : "")}}System.IO.Path.Combine({{args}})
+                {{(expression ? "" : "return \"done\"")}}
             """;
         var (bound, diagnostics) = BindSource(source);
         var findings = diagnostics.Where(d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter).ToArray();
@@ -667,7 +811,7 @@ public class NullabilityIntegrationTests
         var body = bound.Functions.Single().Body;
         var parameterTypes = expression
             ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(body[0]).Expression).ResolvedParameterTypes
-            : Assert.IsType<BoundCallStatement>(body[0]).ResolvedParameterTypes;
+            : Invocation(body[0]).ResolvedParameterTypes;
         Assert.Single(parameterTypes!);
         Assert.Contains("System.String", parameterTypes![0]);
         if (expected != 0)
@@ -726,7 +870,7 @@ public class NullabilityIntegrationTests
         var caller = bound.Functions.Single(f => f.Symbol.Name.EndsWith(".Caller", StringComparison.Ordinal));
         var selected = expression
             ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(caller.Body[0]).Expression).ResolvedSymbol
-            : Assert.IsType<BoundCallStatement>(caller.Body[0]).ResolvedSymbol;
+            : Invocation(caller.Body[0]).ResolvedSymbol;
         Assert.NotNull(selected);
         Assert.EndsWith(".Take", selected.Name);
         var findings = diagnostics.Where(d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter).ToArray();
@@ -754,14 +898,14 @@ public class NullabilityIntegrationTests
     public void N3_RejectedNativeOverloads_RemainResolutionErrors(bool expression, bool ambiguous)
     {
         var source = $$"""
-            §M{RejectedMappings}
-              §F{Pick:pub} (i64:required) -> i32
-                §R 1
-              §F{Pick:pub} (f64:required) -> i32
-                §R 2
-              §F{Caller:pub} () -> i32
-                {{(expression ? "§R " : "")}}§C{Pick} §A[required] {{(ambiguous ? "INT:1" : "BOOL:true")}} §/C
-                {{(expression ? "" : "§R 0")}}
+            module RejectedMappings
+              func Pick public (float:required) → int
+                return 1
+              func Pick public (decimal:required) → int
+                return 2
+              func Caller public () → int
+                {{(expression ? "return " : "")}}Pick(required: {{(ambiguous ? "1" : "true")}})
+                {{(expression ? "" : "return 0")}}
             """;
         var (_, diagnostics) = BindSource(source);
         var expected = ambiguous ? DiagnosticCode.AmbiguousOverload : DiagnosticCode.NoMatchingOverload;
@@ -841,7 +985,7 @@ public class NullabilityIntegrationTests
         var caller = bound.Functions.Single(f => f.Symbol.Name.EndsWith(".Caller", StringComparison.Ordinal));
         var matches = expression
             ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(caller.Body[0]).Expression).SelectedOverloadMatches
-            : Assert.IsType<BoundCallStatement>(caller.Body[0]).SelectedOverloadMatches;
+            : Invocation(caller.Body[0]).SelectedOverloadMatches;
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NoMatchingOverload);
         var match = Assert.Single(matches);
         Assert.Equal(new[] { 0, 1, 2 }, match.Arguments.Select(a => a.ArgumentIndex));
@@ -871,17 +1015,17 @@ public class NullabilityIntegrationTests
     [InlineData(true)]
     public void N3_NamedBclNominalInput_PreservesResolvedReferenceIdentity(bool expression)
     {
-        const string call = "§C{System.IO.FileSystemAclExtensions.GetAccessControl} §A[directoryInfo] §C{System.IO.Directory.GetParent} §A STR:\"/\" §/C §/C";
+        const string call = "System.IO.FileSystemAclExtensions.GetAccessControl(directoryInfo: System.IO.Directory.GetParent(\"/\"))";
         var source = $$"""
-            §M{NominalMapping}
-              §F{Probe:pub} () -> void
-                {{(expression ? "§B{permissions} " : "")}}{{call}}
+            module NominalMapping
+              func Probe public () → void
+                {{(expression ? "let permissions = " : "")}}{{call}}
             """;
         var (bound, diagnostics) = BindSource(source);
         var statement = Assert.Single(Assert.Single(bound.Functions).Body);
         var argument = expression
             ? Assert.Single(Assert.IsType<BoundCallExpression>(Assert.IsType<BoundBindStatement>(statement).Initializer).Arguments)
-            : Assert.Single(Assert.IsType<BoundCallStatement>(statement).Arguments);
+            : Assert.Single(Invocation(statement).Arguments);
         var sourceType = Assert.IsType<NominalBoundType>(argument.Type);
         Assert.Equal("DirectoryInfo", sourceType.RoslynSymbol?.Name);
         var finding = Assert.Single(diagnostics.Where(d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
@@ -900,19 +1044,19 @@ public class NullabilityIntegrationTests
     public void N3_NamedNativeInput_ResolvesFormalInSelectedCalleeNamespace(bool expression)
     {
         const string producer = """
-            §M{LexicalMapping}
-              §CL{Foo:pub}
-                §MT{Get:pub:static} () -> ?Foo
-                  §R §NEW{Foo}
-                §MT{Take:pub:static} (Foo:required, ?Foo:optional) -> i32
-                  §R 1
+            module LexicalMapping A
+              class Foo public
+                func Get public static () → Foo?
+                  return new Foo()
+                func Take public static (Foo:required, Foo?:optional) → int
+                  return 1
             """;
         var consumer = $$"""
-            §M{LexicalMapping}
-              §CL{Foo:pub}
-                §MT{Probe:pub:static} () -> i32
-                  {{(expression ? "§R " : "")}}§C{A.Foo.Take} §A[optional] §C{A.Foo.Get} §/C §A[required] §C{A.Foo.Get} §/C §/C
-                  {{(expression ? "" : "§R 0")}}
+            module LexicalMapping B
+              class Foo public
+                func Probe public static () → int
+                  {{(expression ? "return " : "")}}A.Foo.Take(optional: A.Foo.Get(), required: A.Foo.Get())
+                  {{(expression ? "" : "return 0")}}
             """;
         var parsing = new DiagnosticBag();
         var a = new Parser(new Lexer(producer, parsing).TokenizeAllForParser(), parsing).Parse();
@@ -920,8 +1064,12 @@ public class NullabilityIntegrationTests
         Assert.False(parsing.HasErrors, string.Join("\n", parsing));
         var classA = Assert.Single(a.Classes);
         var classB = Assert.Single(b.Classes);
-        classA.NamespaceIdentity = "A";
-        classB.NamespaceIdentity = "B";
+        foreach (var declaration in new[] { classA, classB })
+        {
+            declaration.NamespaceScopeId = null;
+            foreach (var method in declaration.Methods)
+                method.NamespaceScopeId = null;
+        }
         var module = new ModuleNode(a.Span, a.Id, a.Name,
             a.Usings, a.Interfaces, [classA, classB], a.Functions, a.Attributes);
         var diagnostics = new DiagnosticBag();
@@ -929,7 +1077,7 @@ public class NullabilityIntegrationTests
         var caller = bound.Functions.Single(f => f.Symbol.Name.EndsWith(".Probe", StringComparison.Ordinal));
         var arguments = expression
             ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(caller.Body[0]).Expression).Arguments
-            : Assert.IsType<BoundCallStatement>(caller.Body[0]).Arguments;
+            : Invocation(caller.Body[0]).Arguments;
         Assert.All(arguments, argument =>
         {
             var type = Assert.IsType<NominalBoundType>(argument.Type);
@@ -959,17 +1107,17 @@ public class NullabilityIntegrationTests
     {
         var producer = nullable ? "GetParent" : "CreateDirectory";
         var call = bcl
-            ? "§C{System.IO.FileSystemAclExtensions.GetAccessControl} §A[directoryInfo] second §/C"
-            : "§C{Take} §A[safe] safe §A[required] second §/C";
+            ? "System.IO.FileSystemAclExtensions.GetAccessControl(directoryInfo: second)"
+            : "Take(safe: safe, required: second)";
         var source = $$"""
-            §M{LocalMapping}
-              §F{Take:pub} (System.IO.DirectoryInfo:required, System.IO.DirectoryInfo:safe) -> i32
-                §R 1
-              §F{Probe:pub} () -> void
-                §B{first} §C{System.IO.Directory.{{producer}}} §A STR:"/" §/C
-                §B{second} first
-                §B{safe} §C{System.IO.Directory.CreateDirectory} §A STR:"/" §/C
-                {{(expression ? "§B{result} " : "")}}{{call}}
+            module LocalMapping
+              func Take public (System.IO.DirectoryInfo:required, System.IO.DirectoryInfo:safe) → int
+                return 1
+              func Probe public () → void
+                let first = System.IO.Directory.{{producer}}("/")
+                let second = first
+                let safe = System.IO.Directory.CreateDirectory("/")
+                {{(expression ? "let result = " : "")}}{{call}}
             """;
         var (bound, diagnostics) = BindSource(source);
         var probe = bound.Functions.Single(f => f.Symbol.Name == "Probe");
@@ -977,7 +1125,7 @@ public class NullabilityIntegrationTests
         var callExpression = expression
             ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundBindStatement>(statement).Initializer)
             : null;
-        var callStatement = expression ? null : Assert.IsType<BoundCallStatement>(statement);
+        var callStatement = expression ? null : Invocation(statement);
         var arguments = callExpression?.Arguments ?? callStatement!.Arguments;
         var argument = arguments[bcl ? 0 : 1];
         var type = Assert.IsType<NominalBoundType>(argument.Type);
@@ -1026,10 +1174,10 @@ public class NullabilityIntegrationTests
     public void Calor0272_FiresFor_EnvironmentGetVariable_AssignedToNonNullString()
     {
         const string source = """
-            §M{D3Repro}
-              §F{Bad:pub} () -> void
-                §E{env}
-                §B{bad:string} §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+            module D3Repro
+              func Bad public () → void
+                ! env
+                let string:bad = System.Environment.GetEnvironmentVariable("MISSING")
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1047,10 +1195,10 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_When_TargetIs_NullableString()
     {
         const string source = """
-            §M{Nullable}
-              §F{Ok:pub} () -> void
-                §E{env}
-                §B{ok:?string} §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+            module Nullable
+              func Ok public () → void
+                ! env
+                let string?:ok = System.Environment.GetEnvironmentVariable("MISSING")
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1070,9 +1218,9 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_CalorNative_StringLiteral_Bound_To_NonNullString()
     {
         const string source = """
-            §M{LocalLiteral}
-              §F{Ok:pub} () -> void
-                §B{greeting:string} STR:"hello"
+            module LocalLiteral
+              func Ok public () → void
+                let string:greeting = "hello"
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1090,10 +1238,10 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_InterpolatedString_Bound_To_NonNullString()
     {
         const string source = """
-            §M{Interp}
-              §F{Ok:pub} () -> void
-                §B{name:string} STR:"world"
-                §B{greeting:string} §INTERP "hello, " §EXP name §/INTERP
+            module Interp
+              func Ok public () → void
+                let string:name = "world"
+                let string:greeting = "hello, ${name}"
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1113,11 +1261,11 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_StringConcatenation_Bound_To_NonNullString()
     {
         const string source = """
-            §M{Concat}
-              §F{Ok:pub} () -> void
-                §B{a:string} STR:"hello"
-                §B{b:string} STR:"world"
-                §B{joined:string} (+ a b)
+            module Concat
+              func Ok public () → void
+                let string:a = "hello"
+                let string:b = "world"
+                let string:joined = a + b
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1135,10 +1283,10 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_NameOf_Bound_To_NonNullString()
     {
         const string source = """
-            §M{NameOf}
-              §F{Ok:pub} () -> void
-                §B{a:string} STR:"hello"
-                §B{name:string} (nameof a)
+            module NameOf
+              func Ok public () → void
+                let string:a = "hello"
+                let string:name = nameof(a)
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1228,10 +1376,10 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_StringOperation_Trim_Bound_To_NonNullString()
     {
         const string source = """
-            §M{Trim}
-              §F{Ok:pub} () -> void
-                §B{a:string} STR:"  hello  "
-                §B{trimmed:string} (trim a)
+            module Trim
+              func Ok public () → void
+                let string:a = "  hello  "
+                let string:trimmed = a.Trim()
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1244,10 +1392,10 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_StringOperation_Substr_Bound_To_NonNullString()
     {
         const string source = """
-            §M{Substr}
-              §F{Ok:pub} () -> void
-                §B{a:string} STR:"hello"
-                §B{sub:string} (substr a INT:0 INT:3)
+            module Substr
+              func Ok public () → void
+                let string:a = "hello"
+                let string:sub = a.Substring(0, 3)
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1272,9 +1420,9 @@ public class NullabilityIntegrationTests
     {
         // (str x) is StringOp.ToString — the BCL object.ToString() shape.
         const string source = """
-            §M{ToStr}
-              §F{Bad:pub} (object:n) -> void
-                §B{s:string} (str n)
+            module ToStr
+              func Bad public (object:n) → void
+                let string:s = n.ToString()
             """;
 
         var (bound, diagnostics) = BindSource(source);
@@ -1285,7 +1433,7 @@ public class NullabilityIntegrationTests
         var initializer = bound.Functions.Single().Body.OfType<BoundBindStatement>()
             .Last().Initializer!;
         var initType = Assert.IsType<NominalBoundType>(initializer.Type);
-        Assert.Equal("STRING", initType.QualifiedName);
+        Assert.Equal("string?", initType.QualifiedName);
         Assert.Equal(NullableAnnotation.Annotated, initType.NullableAnnotation);
 
         Assert.Contains(diagnostics, d =>
@@ -1298,9 +1446,9 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_NonNullString_ToString()
     {
         const string source = """
-            §M{ToStr}
-              §F{Ok:pub} (string:value) -> void
-                §B{s:string} (str value)
+            module ToStr
+              func Ok public (string:value) → void
+                let string:s = value.ToString()
             """;
 
         var (bound, diagnostics) = BindSource(source);
@@ -1322,9 +1470,9 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_Ternary_BothBranches_NotAnnotated_String()
     {
         const string source = """
-            §M{Tern}
-              §F{Ok:pub} () -> void
-                §B{picked:string} (? BOOL:true STR:"yes" STR:"no")
+            module Tern
+              func Ok public () → void
+                let string:picked = true ? "yes" : "no"
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1524,10 +1672,10 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_When_NonNullStringVariable_BoundToNonNullString()
     {
         const string source = """
-            §M{VarFlow}
-              §F{Ok:pub} () -> void
-                §B{a:string} STR:"x"
-                §B{b:string} a
+            module VarFlow
+              func Ok public () → void
+                let string:a = "x"
+                let string:b = a
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1547,10 +1695,10 @@ public class NullabilityIntegrationTests
     public void Calor0272_Fires_When_NullableStringVariable_BoundToNonNullString()
     {
         const string source = """
-            §M{NullableVar}
-              §F{Bad:pub} () -> void
-                §B{a:?string} STR:"x"
-                §B{b:string} a
+            module NullableVar
+              func Bad public () → void
+                let string?:a = "x"
+                let string:b = a
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1573,10 +1721,10 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_Ternary_VariableBranch_NonNullString()
     {
         const string source = """
-            §M{TernVar}
-              §F{Ok:pub} () -> void
-                §B{a:string} STR:"x"
-                §B{r:string} (? BOOL:true a STR:"safe")
+            module TernVar
+              func Ok public () → void
+                let string:a = "x"
+                let string:r = true ? a : "safe"
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1681,10 +1829,10 @@ public class NullabilityIntegrationTests
     public void Calor0273_FiresFor_ReturningBcl_NullableString_FromNonNullReturn()
     {
         const string source = """
-            §M{S4Repro}
-              §F{GetEnv:pub} () -> string
-                §E{env}
-                §R §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+            module S4Repro
+              func GetEnv public () → string
+                ! env
+                return System.Environment.GetEnvironmentVariable("MISSING")
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1703,10 +1851,10 @@ public class NullabilityIntegrationTests
     public void Calor0273_DoesNotFire_When_ReturnType_IsNullableString()
     {
         const string source = """
-            §M{S4Ok}
-              §F{GetEnv:pub} () -> ?string
-                §E{env}
-                §R §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+            module S4Ok
+              func GetEnv public () → string?
+                ! env
+                return System.Environment.GetEnvironmentVariable("MISSING")
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1725,9 +1873,9 @@ public class NullabilityIntegrationTests
     public void Calor0273_DoesNotFire_For_ProvablyNonNull_StringLiteral()
     {
         const string source = """
-            §M{S4Literal}
-              §F{Hi:pub} () -> string
-                §R STR:"hello"
+            module S4Literal
+              func Hi public () → string
+                return "hello"
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1746,9 +1894,9 @@ public class NullabilityIntegrationTests
     public void Calor0273_DoesNotFire_For_NonString_Return()
     {
         const string source = """
-            §M{S4Int}
-              §F{Answer:pub} () -> int
-                §R INT:42
+            module S4Int
+              func Answer public () → int
+                return 42
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1767,10 +1915,10 @@ public class NullabilityIntegrationTests
     public void Calor0273_Diagnostic_Message_MentionsSourceAnnotation()
     {
         const string source = """
-            §M{S4Msg}
-              §F{GetEnv:pub} () -> string
-                §E{env}
-                §R §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+            module S4Msg
+              func GetEnv public () → string
+                ! env
+                return System.Environment.GetEnvironmentVariable("MISSING")
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1793,11 +1941,11 @@ public class NullabilityIntegrationTests
     public void Calor0273_FiresFor_ReturningBcl_NullableString_FromMethod()
     {
         const string source = """
-            §M{S4Method}
-              §CL{Bad:pub}
-                §MT{GetEnv:pub} () -> string
-                  §E{env}
-                  §R §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+            module S4Method
+              class Bad public
+                func GetEnv public () → string
+                  ! env
+                  return System.Environment.GetEnvironmentVariable("MISSING")
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1834,10 +1982,10 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_InferredType_StringLocal_FromLiteral()
     {
         const string source = """
-            §M{InferredOk}
-              §F{Ok:pub} () -> void
-                §B{a} STR:"hi"
-                §B{b:string} a
+            module InferredOk
+              func Ok public () → void
+                let a = "hi"
+                let string:b = a
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1856,11 +2004,11 @@ public class NullabilityIntegrationTests
     public void Calor0272_Fires_For_PostfixNullableString_Bound_To_NonNullString()
     {
         const string source = """
-            §M{PostfixNullable}
-              §F{Bad:pub} () -> void
-                §E{env}
-                §B{a:string?} §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
-                §B{b:string} a
+            module PostfixNullable
+              func Bad public () → void
+                ! env
+                let string?:a = System.Environment.GetEnvironmentVariable("MISSING")
+                let string:b = a
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1898,9 +2046,9 @@ public class NullabilityIntegrationTests
     public void Calor0274_FiresFor_PassingNullableBclString_To_NonNullableParameter()
     {
         const string source = """
-            §M{S4Repro}
-              §F{Bad:pub} () -> void
-                §B{contents:string} §C{System.IO.File.ReadAllText} §A §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C §/C
+            module S4Repro
+              func Bad public () → void
+                let string:contents = System.IO.File.ReadAllText(System.Environment.GetEnvironmentVariable("PATH"))
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1919,11 +2067,11 @@ public class NullabilityIntegrationTests
     public void Calor0274_DoesNotFire_When_Parameter_IsNullableString()
     {
         const string source = """
-            §M{S4NullableParam}
-              §F{Ok:pub} () -> void
-                §E{env}
-                §B{path:?string} §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C
-                §B{name:?string} §C{System.IO.Path.GetFileName} §A path §/C
+            module S4NullableParam
+              func Ok public () → void
+                ! env
+                let string?:path = System.Environment.GetEnvironmentVariable("PATH")
+                let string?:name = System.IO.Path.GetFileName(path)
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1941,10 +2089,10 @@ public class NullabilityIntegrationTests
     public void Calor0274_DoesNotFire_For_ProvablyNonNull_Literal_Argument()
     {
         const string source = """
-            §M{S4LiteralOk}
-              §F{Ok:pub} () -> void
-                §E{io}
-                §C{System.IO.File.WriteAllText} §A STR:"path.txt" §A STR:"contents" §/C
+            module S4LiteralOk
+              func Ok public () → void
+                ! fs:w
+                System.IO.File.WriteAllText("path.txt", "contents")
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1962,9 +2110,9 @@ public class NullabilityIntegrationTests
     public void Calor0274_DoesNotFire_For_NonString_Parameter()
     {
         const string source = """
-            §M{S4IntParam}
-              §F{Ok:pub} () -> void
-                §B{v:int} §C{System.Math.Abs} §A INT:-3 §/C
+            module S4IntParam
+              func Ok public () → void
+                let int:v = System.Math.Abs(-3)
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -1982,9 +2130,9 @@ public class NullabilityIntegrationTests
     public void Calor0274_Message_NamesParameter_And_SourceAnnotation()
     {
         const string source = """
-            §M{S4Message}
-              §F{Bad:pub} () -> void
-                §B{contents:string} §C{System.IO.File.ReadAllText} §A §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C §/C
+            module S4Message
+              func Bad public () → void
+                let string:contents = System.IO.File.ReadAllText(System.Environment.GetEnvironmentVariable("PATH"))
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -2013,11 +2161,11 @@ public class NullabilityIntegrationTests
         // Wrap the ReadAllText call in a §B initializer so it routes
         // through BindCallExpression (where the Calor0274 emitter lives).
         const string source = """
-            §M{S4NullableArg}
-              §F{Bad:pub} () -> void
-                §E{env}
-                §B{path:?string} §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C
-                §B{contents:string} §C{System.IO.File.ReadAllText} §A path §/C
+            module S4NullableArg
+              func Bad public () → void
+                ! env
+                let string?:path = System.Environment.GetEnvironmentVariable("PATH")
+                let string:contents = System.IO.File.ReadAllText(path)
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -2050,9 +2198,9 @@ public class NullabilityIntegrationTests
     public void Calor0272_DoesNotFire_For_NonNullStringParameter_Bound_To_NonNullString()
     {
         const string source = """
-            §M{ParamOk}
-              §F{Ok:pub} (STRING:name) -> void
-                §B{copy:string} name
+            module ParamOk
+              func Ok public (string:name) → void
+                let string:copy = name
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -2071,9 +2219,9 @@ public class NullabilityIntegrationTests
     public void Calor0272_Fires_For_NullableStringParameter_Bound_To_NonNullString()
     {
         const string source = """
-            §M{ParamBad}
-              §F{Bad:pub} (?string:name) -> void
-                §B{copy:string} name
+            module ParamBad
+              func Bad public (string?:name) → void
+                let string:copy = name
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -2093,9 +2241,9 @@ public class NullabilityIntegrationTests
     public void FieldSymbol_Inherits_NotAnnotated_From_NonNullStringField()
     {
         const string source = """
-            §M{FieldOk}
-              §CL{Holder:pub}
-                §FLD{string:Name:pub}
+            module FieldOk
+              class Holder public
+                field string:Name public
             """;
 
         var (module, _) = BindSource(source);
@@ -2111,9 +2259,9 @@ public class NullabilityIntegrationTests
     public void FieldSymbol_Inherits_Annotated_From_NullableStringField()
     {
         const string source = """
-            §M{FieldNullable}
-              §CL{Holder:pub}
-                §FLD{?string:Name:pub}
+            module FieldNullable
+              class Holder public
+                field string?:Name public
             """;
 
         var (module, _) = BindSource(source);
@@ -2129,9 +2277,11 @@ public class NullabilityIntegrationTests
     public void PropertySymbol_Inherits_NotAnnotated_From_NonNullStringProperty()
     {
         const string source = """
-            §M{PropOk}
-              §CL{Holder:pub}
-                §PROP{Name:string:pub:get,set}
+            module PropOk
+              class Holder public
+                property string:Name public
+                  get
+                  set
             """;
 
         var (module, _) = BindSource(source);
@@ -2147,9 +2297,11 @@ public class NullabilityIntegrationTests
     public void PropertySymbol_Inherits_Annotated_From_NullableStringProperty()
     {
         const string source = """
-            §M{PropNullable}
-              §CL{Holder:pub}
-                §PROP{Name:?string:pub:get,set}
+            module PropNullable
+              class Holder public
+                property string?:Name public
+                  get
+                  set
             """;
 
         var (module, _) = BindSource(source);
@@ -2166,9 +2318,9 @@ public class NullabilityIntegrationTests
     public void LambdaParameter_Inherits_NotAnnotated_From_NonNullStringParameter()
     {
         const string source = """
-            §M{LamOk}
-              §F{Use:pub} () -> void
-                §B{f} §LAM{name:string} name §/LAM
+            module LamOk
+              func Use public () → void
+                let f = (string:name) => name
             """;
 
         var (module, _) = BindSource(source);
@@ -2184,9 +2336,9 @@ public class NullabilityIntegrationTests
     public void LambdaParameter_Inherits_Annotated_From_NullableStringParameter()
     {
         const string source = """
-            §M{LamNullable}
-              §F{Use:pub} () -> void
-                §B{f} §LAM{name:?string} name §/LAM
+            module LamNullable
+              func Use public () → void
+                let f = (string?:name) => name
             """;
 
         var (module, _) = BindSource(source);
@@ -2251,11 +2403,10 @@ public class NullabilityIntegrationTests
     public void ForeachLoopVariable_BinderPath_Inherits_NotAnnotated_From_NonNullString()
     {
         const string source = """
-            §M{ForeachStr}
-              §F{Use:pub} () -> void
-                §EACH{s:string} STR:"unused"
-                  §P s
-                §/EACH
+            module ForeachStr
+              func Use public (string[]:items) → void
+                each string:s in items
+                  System.Console.WriteLine(s)
             """;
 
         var (module, _) = BindSource(source);
@@ -2271,16 +2422,44 @@ public class NullabilityIntegrationTests
     public void ForeachLoopVariable_BinderPath_Inherits_Annotated_From_NullableString()
     {
         const string source = """
-            §M{ForeachNullStr}
-              §F{Use:pub} () -> void
-                §EACH{s:?string} STR:"unused"
-                  §P s
-                §/EACH
+            module ForeachNullStr
+              func Use public (string?[]:items) → void
+                each string?:s in items
+                  System.Console.WriteLine(s)
             """;
 
         var (module, _) = BindSource(source);
         var loopVar = FindFirstForeachLoopVariable(module);
         Assert.Equal(NullableAnnotation.Annotated, loopVar.NullableAnnotation);
+    }
+
+    [Theory]
+    [InlineData("string?")]
+    [InlineData("System.String?")]
+    public void NullableForeachHeader_RetainsExplicitTypeThroughNativeReparse(string typeName)
+    {
+        var source = $$"""
+            module NullableLoop
+              func Probe public ({{typeName}}[]:items) → void
+                each {{typeName}}:item in items
+                  let {{typeName}}:copy = item
+            """;
+        var parsing = new DiagnosticBag();
+        var syntax = new Parser(new Lexer(source, parsing).TokenizeAllForParser(), parsing).Parse();
+        Assert.False(parsing.HasErrors, string.Join(Environment.NewLine, parsing));
+        var emitted = new Calor.Compiler.Migration.CalorEmitter().Emit(syntax);
+
+        foreach (var candidate in new[] { source, emitted })
+        {
+            var (bound, diagnostics) = BindSource(candidate);
+            Assert.DoesNotContain(diagnostics, BindingDiagnosticPolicy.IsCompilationError);
+            var loop = Assert.IsType<BoundForeachStatement>(Assert.Single(bound.Functions.Single().Body));
+            Assert.Equal(candidate == source ? typeName : "string?", loop.LoopVariable.TypeName);
+            Assert.Equal(NullableAnnotation.Annotated, loop.LoopVariable.NullableAnnotation);
+            var copy = Assert.IsType<BoundBindStatement>(Assert.Single(loop.Body));
+            Assert.Equal(NullableAnnotation.Annotated,
+                NullabilityChecker.GetAnnotation(copy.Initializer!.Type));
+        }
     }
 
     /// <summary>
@@ -2292,9 +2471,9 @@ public class NullabilityIntegrationTests
     public void ParameterSymbol_NonString_Keeps_Oblivious()
     {
         const string source = """
-            §M{IntParam}
-              §F{Ok:pub} (INT:n) -> void
-                §B{~x} n
+            module IntParam
+              func Ok public (int:n) → void
+                var x = n
             """;
 
         var (module, _) = BindSource(source);
@@ -2422,10 +2601,10 @@ public class NullabilityIntegrationTests
             "This test only exercises the S5 Error branch; if Major reverts below 2 the assertion below is invalid.");
 
         const string source = """
-            §M{S5Bind}
-              §F{Bad:pub} () -> void
-                §E{env}
-                §B{bad:string} §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+            module S5Bind
+              func Bad public () → void
+                ! env
+                let string:bad = System.Environment.GetEnvironmentVariable("MISSING")
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -2446,10 +2625,10 @@ public class NullabilityIntegrationTests
             "This test only exercises the S5 Error branch; if Major reverts below 2 the assertion below is invalid.");
 
         const string source = """
-            §M{S5Return}
-              §F{GetEnv:pub} () -> string
-                §E{env}
-                §R §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+            module S5Return
+              func GetEnv public () → string
+                ! env
+                return System.Environment.GetEnvironmentVariable("MISSING")
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -2470,9 +2649,9 @@ public class NullabilityIntegrationTests
             "This test only exercises the S5 Error branch; if Major reverts below 2 the assertion below is invalid.");
 
         const string source = """
-            §M{S5Call}
-              §F{Bad:pub} () -> void
-                §B{contents:string} §C{System.IO.File.ReadAllText} §A §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C §/C
+            module S5Call
+              func Bad public () → void
+                let string:contents = System.IO.File.ReadAllText(System.Environment.GetEnvironmentVariable("PATH"))
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -2494,21 +2673,21 @@ public class NullabilityIntegrationTests
     public void S5_AllThreeCodes_ShareSameGatedSeverity()
     {
         const string bindSource = """
-            §M{S5Bind}
-              §F{Bad:pub} () -> void
-                §E{env}
-                §B{bad:string} §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+            module S5Bind
+              func Bad public () → void
+                ! env
+                let string:bad = System.Environment.GetEnvironmentVariable("MISSING")
             """;
         const string returnSource = """
-            §M{S5Return}
-              §F{GetEnv:pub} () -> string
-                §E{env}
-                §R §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+            module S5Return
+              func GetEnv public () → string
+                ! env
+                return System.Environment.GetEnvironmentVariable("MISSING")
             """;
         const string callSource = """
-            §M{S5Call}
-              §F{Bad:pub} () -> void
-                §B{contents:string} §C{System.IO.File.ReadAllText} §A §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C §/C
+            module S5Call
+              func Bad public () → void
+                let string:contents = System.IO.File.ReadAllText(System.Environment.GetEnvironmentVariable("PATH"))
             """;
 
         var (_, bindDiags) = BindSource(bindSource);
@@ -2846,10 +3025,10 @@ public class NullabilityIntegrationTests
     public void S8_Calor0272_Fires_When_NullableUserClass_Bound_To_NonNullUserClass()
     {
         const string source = """
-            §M{S8Bind}
-              §CL{Foo:pub}
-                §MT{Use:pub} (?Foo:a) -> void
-                  §B{b:Foo} a
+            module S8Bind
+              class Foo public
+                func Use public (Foo?:a) → void
+                  let Foo:b = a
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -2869,10 +3048,10 @@ public class NullabilityIntegrationTests
     public void S8_Calor0272_DoesNotFire_For_NonNullUserClass_Roundtrip()
     {
         const string source = """
-            §M{S8Roundtrip}
-              §CL{Foo:pub}
-                §MT{Use:pub} (Foo:a) -> void
-                  §B{b:Foo} a
+            module S8Roundtrip
+              class Foo public
+                func Use public (Foo:a) → void
+                  let Foo:b = a
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -2891,10 +3070,10 @@ public class NullabilityIntegrationTests
     public void S8_Calor0273_Fires_For_NullableUserClass_Return_Into_NonNullDeclared()
     {
         const string source = """
-            §M{S8Return}
-              §CL{Foo:pub}
-                §MT{Get:pub} (?Foo:a) -> Foo
-                  §R a
+            module S8Return
+              class Foo public
+                func Get public (Foo?:a) → Foo
+                  return a
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -3025,14 +3204,14 @@ public class NullabilityIntegrationTests
     public void F3A_Calor0274_Replaces_ScopeBlocked_NullableStringArgument(bool expression)
     {
         var source = $$"""
-            §M{F3ANativeBlocked}
-              §F{Take:pub} (string:name) -> i32
-                §E{env}
-                §R 1
-              §F{Caller:pub} () -> i32
-                §E{env}
-                {{(expression ? "§R " : "")}}§C{Take} §A §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C §/C
-                {{(expression ? "" : "§R 0")}}
+            module F3ANativeBlocked
+              func Take public (string:name) → int
+                ! env
+                return 1
+              func Caller public () → int
+                ! env
+                {{(expression ? "return " : "")}}Take(System.Environment.GetEnvironmentVariable("PATH"))
+                {{(expression ? "" : "return 0")}}
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -3058,12 +3237,12 @@ public class NullabilityIntegrationTests
     public void F3A_Calor0274_DoesNotFire_For_NonNullArg_To_NonNullable_CalorParameter()
     {
         const string source = """
-            §M{F3AUserRefOk}
-              §CL{Bar:pub}
-                §MT{Take:pub} (Bar:a) -> Bar
-                  §R a
-                §MT{Caller:pub} (Bar:x) -> Bar
-                  §R §C{this.Take} §A x §/C
+            module F3AUserRefOk
+              class Bar public
+                func Take public (Bar:a) → Bar
+                  return a
+                func Caller public (Bar:x) → Bar
+                  return this.Take(x)
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -3085,12 +3264,12 @@ public class NullabilityIntegrationTests
     public void F3A_Calor0274_DoesNotFire_When_TargetParameter_IsNullable()
     {
         const string source = """
-            §M{F3AUserRefNullableParam}
-              §CL{Bar:pub}
-                §MT{Take:pub} (?Bar:a) -> Bar
-                  §R a
-                §MT{Caller:pub} (?Bar:x) -> Bar
-                  §R §C{this.Take} §A x §/C
+            module F3AUserRefNullableParam
+              class Bar public
+                func Take public (Bar?:a) → Bar
+                  return a
+                func Caller public (Bar?:x) → Bar
+                  return this.Take(x)
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -3120,12 +3299,12 @@ public class NullabilityIntegrationTests
     public void F3A_Calor0274_Fires_For_NullableUserRefArg_To_NonNullable_CalorParameter()
     {
         const string source = """
-            §M{F3AUserRef}
-              §CL{Bar:pub}
-                §MT{Take:pub} (Bar:a) -> Bar
-                  §R a
-                §MT{Caller:pub} (?Bar:x) -> Bar
-                  §R §C{this.Take} §A x §/C
+            module F3AUserRef
+              class Bar public
+                func Take public (Bar:a) → Bar
+                  return a
+                func Caller public (Bar?:x) → Bar
+                  return this.Take(x)
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -3158,11 +3337,11 @@ public class NullabilityIntegrationTests
     public void F3B_BoundCall_Type_Inherits_Declared_ReturnAnnotation_ForCalorFunction()
     {
         const string source = """
-            §M{F3BNullableStringReturn}
-              §F{GetFoo:pub} () -> ?string
-                §R STR:"hi"
-              §F{Use:pub} () -> void
-                §B{tmp:?string} §C{GetFoo} §/C
+            module F3BNullableStringReturn
+              func GetFoo public () → string?
+                return "hi"
+              func Use public () → void
+                let string?:tmp = GetFoo()
             """;
 
         var (bound, _) = BindSource(source);
@@ -3174,7 +3353,7 @@ public class NullabilityIntegrationTests
         // refactor that swaps in TryBuildStringTarget's canonicalized
         // target ("STRING") flips this test red — downstream consumers
         // read .Type.DisplayString for overload keying, ID scanning, etc.
-        Assert.Equal("?string", nominal.QualifiedName);
+        Assert.Equal("string?", nominal.QualifiedName);
         Assert.Equal(NullableAnnotation.Annotated, nominal.NullableAnnotation);
     }
 
@@ -3190,11 +3369,11 @@ public class NullabilityIntegrationTests
     public void F3B_BoundCall_Type_Inherits_NotAnnotated_For_NonNullableCalorReturn()
     {
         const string source = """
-            §M{F3BNonNullStringReturn}
-              §F{GetFoo:pub} () -> string
-                §R STR:"hi"
-              §F{Use:pub} () -> void
-                §B{tmp:string} §C{GetFoo} §/C
+            module F3BNonNullStringReturn
+              func GetFoo public () → string
+                return "hi"
+              func Use public () → void
+                let string:tmp = GetFoo()
             """;
 
         var (bound, _) = BindSource(source);
@@ -3225,12 +3404,12 @@ public class NullabilityIntegrationTests
         // sibling §MT methods. Static Foo.GetFoo call from Use exercises
         // the same user-ref channel §S8's target-side gate already handles.
         const string source = """
-            §M{F3BNullableUserClassReturn}
-              §CL{Foo:pub}
-                §MT{GetFoo:pub:static} (?Foo:x) -> ?Foo
-                  §R x
-                §MT{Use:pub:static} (?Foo:y) -> void
-                  §B{tmp:?Foo} §C{Foo.GetFoo} §A y §/C
+            module F3BNullableUserClassReturn
+              class Foo public
+                func GetFoo public static (Foo?:x) → Foo?
+                  return x
+                func Use public static (Foo?:y) → void
+                  let Foo?:tmp = Foo.GetFoo(y)
             """;
 
         var (bound, diagnostics) = BindSource(source);
@@ -3259,12 +3438,12 @@ public class NullabilityIntegrationTests
     public void F3B_BoundCall_Type_Inherits_NotAnnotated_For_NonNullableUserClassReturn()
     {
         const string source = """
-            §M{F3BNonNullUserClassReturn}
-              §CL{Foo:pub}
-                §MT{GetFoo:pub:static} (Foo:x) -> Foo
-                  §R x
-                §MT{Use:pub:static} (Foo:y) -> void
-                  §B{tmp:Foo} §C{Foo.GetFoo} §A y §/C
+            module F3BNonNullUserClassReturn
+              class Foo public
+                func GetFoo public static (Foo:x) → Foo
+                  return x
+                func Use public static (Foo:y) → void
+                  let Foo:tmp = Foo.GetFoo(y)
             """;
 
         var (bound, diagnostics) = BindSource(source);
@@ -3303,10 +3482,10 @@ public class NullabilityIntegrationTests
     public void New_Expression_Has_NotAnnotated_Type()
     {
         const string source = """
-            §M{NewNoArgs}
-              §CL{Foo:pub}
-                §MT{Make:pub:static} () -> Foo
-                  §R §NEW{Foo}
+            module NewNoArgs
+              class Foo public
+                func Make public static () → Foo
+                  return new Foo()
             """;
 
         var (bound, _) = BindSource(source);
@@ -3327,11 +3506,11 @@ public class NullabilityIntegrationTests
     public void New_Expression_With_Args_Has_NotAnnotated_Type()
     {
         const string source = """
-            §M{NewWithArgs}
-              §CL{Foo:pub}
-                §CTOR{pub} (i32:x)
-                §MT{Make:pub:static} () -> Foo
-                  §R §NEW{Foo} §A INT:1 §/C
+            module NewWithArgs
+              class Foo public
+                ctor public (int:x)
+                func Make public static () → Foo
+                  return new Foo(1)
             """;
 
         var (bound, _) = BindSource(source);
@@ -3353,10 +3532,10 @@ public class NullabilityIntegrationTests
     public void New_Expression_Result_Assigned_To_NonNull_UserRef_DoesNotFire_Calor0272()
     {
         const string source = """
-            §M{NewIntoNonNull}
-              §CL{Foo:pub}
-                §MT{Make:pub:static} () -> void
-                  §B{b:Foo} §NEW{Foo}
+            module NewIntoNonNull
+              class Foo public
+                func Make public static () → void
+                  let Foo:b = new Foo()
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -3366,19 +3545,19 @@ public class NullabilityIntegrationTests
     }
 
     [Theory]
-    [InlineData("§B{copy:[str]} value", "§F{Probe:pub} (?[str]:value) -> void",
+    [InlineData("let string[]:copy = value", "func Probe public (string[]?:value) → void",
         DiagnosticCode.NullableToNonNullableBinding)]
-    [InlineData("§R value", "§F{Probe:pub} (?[str]:value) -> [str]",
+    [InlineData("return value", "func Probe public (string[]?:value) → string[]",
         DiagnosticCode.NullableReturnFromNonNullable)]
-    [InlineData("§B{copy:[str]} value", "§F{Probe:pub} ([?str]:value) -> void",
+    [InlineData("let string[]:copy = value", "func Probe public (string?[]:value) → void",
         DiagnosticCode.NullableToNonNullableBinding)]
-    [InlineData("§R value", "§F{Probe:pub} ([?str]:value) -> [str]",
+    [InlineData("return value", "func Probe public (string?[]:value) → string[]",
         DiagnosticCode.NullableReturnFromNonNullable)]
     public void StageB_ArrayVariablesAreCheckedOutsideMethodArguments(
         string statement, string signature, string expectedCode)
     {
         var source = $$"""
-            §M{ArrayBoundary}
+            module ArrayBoundary
               {{signature}}
                 {{statement}}
             """;
@@ -3387,19 +3566,19 @@ public class NullabilityIntegrationTests
     }
 
     [Theory]
-    [InlineData("§R value", "§F{Probe:pub} (IEnumerable<?str>:value) -> IEnumerable<str>",
+    [InlineData("return value", "func Probe public (IEnumerable<string?>:value) → IEnumerable<string>",
         DiagnosticCode.NullableReturnFromNonNullable)]
-    [InlineData("§R §C{Take} §A value §/C",
-        "§F{Probe:pub} (IEnumerable<?str>:value) -> IEnumerable<str>",
+    [InlineData("return Take(value)",
+        "func Probe public (IEnumerable<string?>:value) → IEnumerable<string>",
         DiagnosticCode.NullableArgumentToNonNullableParameter)]
     public void StageB_GenericVariablePayloadNullabilitySurvivesReferences(
         string statement, string signature, string expectedCode)
     {
         var helper = expectedCode == DiagnosticCode.NullableArgumentToNonNullableParameter
-            ? "§F{Take:pub} (IEnumerable<str>:value) -> IEnumerable<str>\n    §R value"
+            ? "func Take public (IEnumerable<string>:value) → IEnumerable<string>\n    return value"
             : "";
         var source = $$"""
-            §M{GenericBoundary}
+            module GenericBoundary
               {{helper}}
               {{signature}}
                 {{statement}}
@@ -3412,7 +3591,7 @@ public class NullabilityIntegrationTests
                     Assert.Single(bound.Functions.Single(function => function.Symbol.Name == "Probe").Body))
                 .Expression);
             Assert.Single(call.SelectedOverloadMatches);
-            Assert.Equal("IEnumerable<str>",
+            Assert.Equal("IEnumerable<string>",
                 Assert.Single(call.SelectedOverloadMatches).Function.Parameters[0].TypeName);
             var argument = Assert.IsType<BoundVariableExpression>(Assert.Single(call.Arguments));
             var generic = argument.Variable.GenericNullabilityType;
@@ -3423,24 +3602,24 @@ public class NullabilityIntegrationTests
     }
 
     [Theory]
-    [InlineData("§B{copy:IEnumerable<str>} §C{Give} §/C",
+    [InlineData("let IEnumerable<string>:copy = Give()",
         DiagnosticCode.NullableToNonNullableBinding)]
-    [InlineData("§R §C{Give} §/C",
+    [InlineData("return Give()",
         DiagnosticCode.NullableReturnFromNonNullable)]
-    [InlineData("§C{Take} §A §C{Give} §/C §/C",
+    [InlineData("Take(Give())",
         DiagnosticCode.NullableArgumentToNonNullableParameter)]
     public void StageB_GenericCallResultPayloadNullabilitySurvivesBoundaries(
         string statement, string expectedCode)
     {
         var source = $$"""
-            §M{GenericCallResult}
-              §F{Give:pub} () -> IEnumerable<?str>
-                §TH null
-              §F{Take:pub} (IEnumerable<str>:value) -> void
-                §E{}
-              §F{Probe:pub} () -> IEnumerable<str>
+            module GenericCallResult
+              func Give public () → IEnumerable<string?>
+                throw null
+              func Take public (IEnumerable<string>:value) → void
+                !
+              func Probe public () → IEnumerable<string>
                 {{statement}}
-                §TH null
+                throw null
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -3478,15 +3657,15 @@ public class NullabilityIntegrationTests
     public void StageB_NestedGenericPayloadDifferenceDoesNotSelectOverload()
     {
         var source = """
-            §M{NestedGeneric}
-              §F{Take:pub} (List<List<str>>:value) -> void
-                §E{}
-              §F{Probe:pub} (List<List<?str>>:value) -> void
-                §C{Take} §A value §/C
+            module NestedGeneric
+              func Take public (List<List<string>>:value) → void
+                !
+              func Probe public (List<List<string?>>:value) → void
+                Take(value)
             """;
 
         var (bound, diagnostics) = BindSource(source);
-        var call = Assert.IsType<BoundCallStatement>(
+        var call = Invocation(
             Assert.Single(bound.Functions.Single(function => function.Symbol.Name == "Probe").Body));
 
         Assert.Empty(call.SelectedOverloadMatches);
@@ -3495,16 +3674,16 @@ public class NullabilityIntegrationTests
     }
 
     [Theory]
-    [InlineData("?List<?str>")]
-    [InlineData("List<?str>?")]
+    [InlineData("System.Collections.Generic.List<string?>?")]
+    [InlineData("List<string?>?")]
     public void StageB_NullableGenericContainerGuardPreservesPayloadNullability(string sourceType)
     {
         var source = $$"""
-            §M{NullableGenericContainer}
-              §F{Probe:pub} ({{sourceType}}:value) -> List<str>
-                §IF (!= value null)
-                  §R value
-                §TH null
+            module NullableGenericContainer
+              func Probe public ({{sourceType}}:value) → List<string>
+                if value != null
+                  return value
+                throw null
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -3514,16 +3693,16 @@ public class NullabilityIntegrationTests
     }
 
     [Theory]
-    [InlineData("?List<?str>")]
-    [InlineData("List<?str>?")]
+    [InlineData("System.Collections.Generic.List<string?>?")]
+    [InlineData("List<string?>?")]
     public void StageB_NullableGenericCallResultPreservesPayloadNullability(string returnType)
     {
         var source = $$"""
-            §M{NullableGenericCall}
-              §F{Give:pub} () -> {{returnType}}
-                §TH null
-              §F{Probe:pub} () -> List<str>
-                §R §C{Give} §/C
+            module NullableGenericCall
+              func Give public () → {{returnType}}
+                throw null
+              func Probe public () → List<string>
+                return Give()
             """;
 
         var (_, diagnostics) = BindSource(source);
@@ -3533,17 +3712,17 @@ public class NullabilityIntegrationTests
     }
 
     [Theory]
-    [InlineData("?List<str>", "?List<?str>")]
-    [InlineData("List<str>?", "List<?str>?")]
+    [InlineData("System.Collections.Generic.List<string>?", "System.Collections.Generic.List<string?>?")]
+    [InlineData("List<string>?", "List<string?>?")]
     public void StageB_NullableGenericArgumentStillChecksPayload(
         string targetType, string sourceType)
     {
         var source = $$"""
-            §M{NullableGenericArgument}
-              §F{Take:pub} ({{targetType}}:value) -> void
-                §E{}
-              §F{Probe:pub} ({{sourceType}}:value) -> void
-                §C{Take} §A value §/C
+            module NullableGenericArgument
+              func Take public ({{targetType}}:value) → void
+                !
+              func Probe public ({{sourceType}}:value) → void
+                Take(value)
             """;
 
         var (_, diagnostics) = BindSource(source);
