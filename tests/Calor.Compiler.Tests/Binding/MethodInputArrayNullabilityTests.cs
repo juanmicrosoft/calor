@@ -32,30 +32,30 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
         var targetType = ArraySpelling(targetShape);
         var supplied = locals ? "second" : "values";
         var source = $$"""
-            §M{ArrayInputs}
-              §F{Take:pub} ({{targetType}}:items) -> i32
-                §E{}
-                §R 1
-              §F{Caller:pub} ({{sourceType}}:values) -> i32
-                §E{}
-                {{(locals ? "§B{first} values\n    §B{second} first" : "")}}
-                {{(expression ? "§R " : "")}}§C{Take} §A[items] {{supplied}} §/C
-                {{(expression ? "" : "§R 0")}}
+            module ArrayInputs
+              func Take public ({{targetType}}:items) → int
+                !
+                return 1
+              func Caller public ({{sourceType}}:values) → int
+                !
+                {{(locals ? "let first = values\n    let second = first" : "")}}
+                {{(expression ? "return " : "")}}Take(items: {{supplied}})
+                {{(expression ? "" : "return 0")}}
             """;
         var (module, diagnostics) = Bind(source);
         var caller = module.Functions.Single(f => f.Symbol.Name == "Caller");
-        var callExpression = expression
+        var call = expression
             ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(caller.Body[^1]).Expression)
-            : null;
-        var callStatement = expression ? null : Assert.Single(caller.Body.OfType<BoundCallStatement>());
-        var argument = Assert.Single(callExpression?.Arguments ?? callStatement!.Arguments);
+            : Assert.IsType<BoundCallExpression>(
+                Assert.Single(caller.Body.OfType<BoundExpressionStatement>()).Expression);
+        var argument = Assert.Single(call.Arguments);
         var array = Assert.IsType<ArrayBoundType>(NullabilityChecker.GetMethodInputArrayType(argument));
         Assert.Equal(1, array.Rank);
         Assert.Equal((sourceShape & 1) != 0 ? NullableAnnotation.Annotated : NullableAnnotation.NotAnnotated,
             array.NullableAnnotation);
         Assert.Equal((sourceShape & 2) != 0 ? NullableAnnotation.Annotated : NullableAnnotation.NotAnnotated,
             Assert.IsType<NominalBoundType>(array.ElementType).NullableAnnotation);
-        var match = Assert.Single(callExpression?.SelectedOverloadMatches ?? callStatement!.SelectedOverloadMatches);
+        var match = Assert.Single(call.SelectedOverloadMatches);
         Assert.Equal("Take", match.Function.Name);
         var mapping = Assert.Single(match.Arguments);
         Assert.Equal(0, mapping.ArgumentIndex);
@@ -96,18 +96,20 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     }
 
     [Theory]
-    [InlineData("?[str]", false)]
-    [InlineData("?[?str]", true)]
+    [InlineData("string[]?", false)]
+    [InlineData("string?[]?", true)]
     public void StageB_NullGuardNarrowsOnlyArrayContainer(string sourceType, bool elementMismatch)
     {
         var source = $$"""
-            §M{GuardedArray}
-              §F{Take:pub} ([str]:items) -> i32
-                §R 1
-              §F{Probe:pub} ({{sourceType}}:items) -> i32
-                §IF (!= items null)
-                  §R §C{Take} §A items §/C
-                §R 0
+            module GuardedArray
+              func Take public (string[]:items) → int
+                !
+                return 1
+              func Probe public ({{sourceType}}:items) → int
+                !
+                if items != null
+                  return Take(items)
+                return 0
             """;
         var (_, diagnostics) = Bind(source);
         Assert.Equal(elementMismatch, diagnostics.Any(d =>
@@ -126,18 +128,20 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
         string modifier, bool nested)
     {
         var condition = nested
-            ? $"(&& (&& (!= value null) (!= other null)) §C{{Mutate}} §A{{{modifier}}} value §/C)"
-            : $"(&& (!= value null) §C{{Mutate}} §A{{{modifier}}} value §/C)";
+            ? $"(value != null && other != null) && Mutate({modifier} value)"
+            : $"value != null && Mutate({modifier} value)";
         var source = $$"""
-            §M{InvalidatedArrayGuard}
-              §F{Mutate:pub} (?[str]:value:{{modifier}}) -> bool
-                §ASSIGN value null
-                §R true
-              §F{Take:pub} ([str]:value) -> void
-                §E{}
-              §F{Probe:pub} (?[str]:value, ?[str]:other) -> void
-                §IF {{condition}}
-                  {{(nested ? "§C{Take} §A other §/C\n      " : "")}}§C{Take} §A value §/C
+            module InvalidatedArrayGuard
+              func Mutate public ({{modifier}} string[]?:value) → bool
+                ! mut
+                set value null
+                return true
+              func Take public (string[]:value) → void
+                !
+              func Probe public (string[]?:value, string[]?:other) → void
+                ! mut
+                if {{condition}}
+                  {{(nested ? "Take(other)\n      " : "")}}Take(value)
             """;
         var result = Program.Compile(source, "invalidated-array-guard.calr");
         Assert.True(result.HasErrors);
@@ -155,22 +159,16 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     public void StageB_OpaqueMutatingConjunctionInvalidatesEveryExplicitByRefArgument(
         string modifier, bool wrapped)
     {
-        var interop = modifier == "ref"
-            ? "§CSHARP{public bool MutateBoth(ref string[]? first, ref string[]? second) { first = null; second = null; return true; }}§/CSHARP"
-            : "§CSHARP{public bool MutateBoth(out string[]? first, out string[]? second) { first = null; second = null; return true; }}§/CSHARP";
-        var argument = modifier == "ref" ? "§A{ref}" : "§A{out}";
-        var mutation = $"§C{{MutateBoth}} {argument} first {argument} second §/C";
-        var right = wrapped ? $"(== {mutation} true)" : mutation;
-        var source = $$"""
-            §M{OpaqueInvalidation}
-              §CL{Holder:pub}
-                {{interop}}
-                §MT{Take:pub} ([str]:value) -> void
-                  §E{}
-                §MT{Probe:pub} (?[str]:first, ?[str]:second) -> void
-                  §IF (&& (&& (!= first null) (!= second null)) {{right}})
-                    §C{Take} §A first §/C
-                    §C{Take} §A second §/C
+        var mutation = $"MutateBoth({modifier} first, {modifier} second)";
+        var right = wrapped ? $"({mutation} == true)" : mutation;
+        var source = ConvertOpaqueMutator(modifier, twoArguments: true) + "\n" + $$"""
+                func Take public (string[]:value) → void
+                  !
+                func Probe public (string[]?:first, string[]?:second) → void
+                  ! mut
+                  if (first != null && second != null) && {{right}}
+                    Take(first)
+                    Take(second)
             """;
         var bindingDiagnostics = new DiagnosticBag();
         var tokens = new Lexer(source, bindingDiagnostics).TokenizeAllForParser();
@@ -204,20 +202,14 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     [InlineData("out")]
     public void StageB_OpaqueMutationInsideGuardedBodyInvalidatesNarrowing(string modifier)
     {
-        var interop = modifier == "ref"
-            ? "§CSHARP{public void Mutate(ref string[]? value) { value = null; }}§/CSHARP"
-            : "§CSHARP{public void Mutate(out string[]? value) { value = null; }}§/CSHARP";
-        var argument = modifier == "ref" ? "§A{ref}" : "§A{out}";
-        var source = $$"""
-            §M{GuardedOpaqueInvalidation}
-              §CL{Holder:pub}
-                {{interop}}
-                §MT{Take:pub} ([str]:value) -> void
-                  §E{}
-                §MT{Probe:pub} (?[str]:value) -> void
-                  §IF (!= value null)
-                    §C{Mutate} {{argument}} value §/C
-                    §C{Take} §A value §/C
+        var source = ConvertOpaqueMutator(modifier, twoArguments: false) + "\n" + $$"""
+                func Take public (string[]:value) → void
+                  !
+                func Probe public (string[]?:value) → void
+                  ! mut
+                  if value != null
+                    Mutate({{modifier}} value)
+                    Take(value)
             """;
         var result = Program.Compile(source, "guarded-opaque-invalidation.calr");
         Assert.Contains(result.Diagnostics, diagnostic =>
@@ -226,23 +218,52 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     }
 
     [Theory]
+    [InlineData("ref", false)]
+    [InlineData("out", false)]
+    [InlineData("ref", true)]
+    [InlineData("out", true)]
+    public void StageB_BindingCleanOpaqueMutationStillRejectsUnknownEffects(
+        string modifier, bool twoArguments)
+    {
+        var parameters = twoArguments ? "string[]?:first, string[]?:second" : "string[]?:value";
+        var mutation = twoArguments
+            ? $"MutateBoth({modifier} first, {modifier} second)"
+            : $"Mutate({modifier} value)";
+        var source = ConvertOpaqueMutator(modifier, twoArguments) + "\n" + $$"""
+                func Probe public ({{parameters}}) → void
+                  ! mut
+                  {{mutation}}
+            """;
+
+        var result = Program.Compile(source, "opaque-mutation-effects.calr");
+
+        Assert.True(result.HasErrors);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+        Assert.Contains(result.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("unknown", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Theory]
     [InlineData("ref")]
     [InlineData("out")]
     public void StageB_NestedConjunctionMutationInvalidatesEnclosingArrayGuard(string modifier)
     {
-        var argument = modifier == "ref" ? "§A{ref}" : "§A{out}";
         var source = $$"""
-            §M{EnclosingGuardInvalidation}
-              §F{Mutate:pub} (?[str]:value:{{modifier}}) -> bool
-                §ASSIGN value null
-                §R true
-              §F{Take:pub} ([str]:value) -> void
-                §E{}
-              §F{Probe:pub} (?[str]:value) -> void
-                §IF (!= value null)
-                  §IF (&& (!= value null) §C{Mutate} {{argument}} value §/C)
-                    §P "mutated"
-                  §C{Take} §A value §/C
+            module EnclosingGuardInvalidation
+              func Mutate public ({{modifier}} string[]?:value) → bool
+                ! mut
+                set value null
+                return true
+              func Take public (string[]:value) → void
+                !
+              func Probe public (string[]?:value) → void
+                ! mut,cw
+                if value != null
+                  if value != null && Mutate({{modifier}} value)
+                    System.Console.WriteLine("mutated")
+                  Take(value)
             """;
 
         var result = Program.Compile(source, "enclosing-array-guard-invalidation.calr");
@@ -253,83 +274,111 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     }
 
     [Theory]
-    [InlineData("ref", "?[str]", "[str]")]
-    [InlineData("out", "?[str]", "[str]")]
-    [InlineData("ref", "?str", "str")]
-    [InlineData("out", "?str", "str")]
+    [InlineData("ref", "string[]?", "string[]")]
+    [InlineData("out", "string[]?", "string[]")]
+    [InlineData("ref", "string?", "string")]
+    [InlineData("out", "string?", "string")]
     public void StageB_UninvokedLambdaMutationDoesNotInvalidateOuterGuard(
         string modifier, string nullableType, string nonNullableType)
     {
-        var argument = modifier == "ref" ? "§A{ref}" : "§A{out}";
         var source = $$"""
-            §M{DeferredMutation}
-              §F{Mutate:pub} ({{nullableType}}:value:{{modifier}}) -> void
-                §ASSIGN value null
-              §F{Take:pub} ({{nonNullableType}}:value) -> void
-                §E{}
-              §F{Probe:pub} ({{nullableType}}:value) -> void
-                §IF (!= value null)
-                  §B{later:Action} §LAM{} §C{Mutate} {{argument}} value §/C §/LAM
-                  §C{Take} §A value §/C
+            module DeferredMutation
+              func Mutate public ({{modifier}} {{nullableType}}:value) → void
+                ! mut
+                set value null
+              func Take public ({{nonNullableType}}:value) → void
+                !
+              func Probe public ({{nullableType}}:value) → void
+                ! mut
+                if value != null
+                  let System.Action:later ! mut = () ! mut => Mutate({{modifier}} value)
+                  Take(value)
             """;
 
         var result = Program.Compile(source, "deferred-mutation.calr");
 
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
         Assert.DoesNotContain(result.Diagnostics, diagnostic =>
             diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
             && BindingDiagnosticPolicy.IsCompilationError(diagnostic));
     }
 
     [Theory]
-    [InlineData("ref", "?[str]", "[str]")]
-    [InlineData("out", "?[str]", "[str]")]
-    [InlineData("ref", "?str", "str")]
-    [InlineData("out", "?str", "str")]
+    [InlineData("ref", "string[]?", "string[]")]
+    [InlineData("out", "string[]?", "string[]")]
+    [InlineData("ref", "string?", "string")]
+    [InlineData("out", "string?", "string")]
     public void StageB_DeferredLambdaInConjunctionDoesNotInvalidateGuard(
         string modifier, string nullableType, string nonNullableType)
     {
-        var argument = modifier == "ref" ? "§A{ref}" : "§A{out}";
         var source = $$"""
-            §M{DeferredConjunction}
-              §F{Mutate:pub} ({{nullableType}}:value:{{modifier}}) -> bool
-                §ASSIGN value null
-                §R true
-              §F{Ignore:pub} (Action:action) -> bool
-                §R true
-              §F{Take:pub} ({{nonNullableType}}:value) -> void
-                §E{}
-              §F{Probe:pub} ({{nullableType}}:value) -> void
-                §IF (&& (!= value null) §C{Ignore} §A §LAM{} §C{Mutate} {{argument}} value §/C §/LAM §/C)
-                  §C{Take} §A value §/C
+            module DeferredConjunction
+              delegate DeferredCallback () → void
+                ! mut
+              func Mutate public ({{modifier}} {{nullableType}}:value) → bool
+                ! mut
+                set value null
+                return true
+              func Ignore public (DeferredCallback:action ! mut) → bool
+                !
+                return true
+              func Take public ({{nonNullableType}}:value) → void
+                !
+              func Probe public ({{nullableType}}:value) → void
+                ! mut
+                if value != null && Ignore(() ! mut =>
+                  Mutate({{modifier}} value)
+                )
+                  Take(value)
             """;
 
         var result = Program.Compile(source, "deferred-conjunction.calr");
 
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
         Assert.DoesNotContain(result.Diagnostics, diagnostic =>
             diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
             && BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+
+        var (bound, diagnostics) = Bind(source);
+        Assert.DoesNotContain(diagnostics, BindingDiagnosticPolicy.IsCompilationError);
+        var probe = Assert.Single(bound.Functions.Where(function => function.Symbol.Name == "Probe"));
+        var condition = Assert.IsType<BoundBinaryExpression>(
+            Assert.IsType<BoundIfStatement>(Assert.Single(probe.Body)).Condition);
+        var ignored = Assert.IsType<BoundCallExpression>(condition.Right);
+        Assert.Equal("Ignore", ignored.Target);
+        var callback = Assert.IsType<BoundLambdaExpression>(Assert.Single(ignored.Arguments));
+        Assert.Equal("VOID", callback.ReturnTypeName);
+        var mutation = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundExpressionStatement>(Assert.Single(callback.StatementBody!)).Expression);
+        Assert.Equal(new[] { modifier }, mutation.ArgumentModifiers);
+        using var context = MetadataContext.Create();
+        var generated = context.HostCompilationForBinder.AddSyntaxTrees(
+            CSharpSyntaxTree.ParseText(result.GeneratedCode));
+        Assert.DoesNotContain(generated.GetDiagnostics(),
+            diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
     }
 
     [Theory]
-    [InlineData("ref", "?[str]", "[str]")]
-    [InlineData("out", "?[str]", "[str]")]
-    [InlineData("ref", "?str", "str")]
-    [InlineData("out", "?str", "str")]
+    [InlineData("ref", "string[]?", "string[]")]
+    [InlineData("out", "string[]?", "string[]")]
+    [InlineData("ref", "string?", "string")]
+    [InlineData("out", "string?", "string")]
     public void StageB_InvokedCapturedLambdaInvalidatesGuard(
         string modifier, string nullableType, string nonNullableType)
     {
-        var argument = modifier == "ref" ? "§A{ref}" : "§A{out}";
         var source = $$"""
-            §M{InvokedDeferredMutation}
-              §F{Mutate:pub} ({{nullableType}}:value:{{modifier}}) -> void
-                §ASSIGN value null
-              §F{Take:pub} ({{nonNullableType}}:value) -> void
-                §E{}
-              §F{Probe:pub} ({{nullableType}}:value) -> void
-                §IF (!= value null)
-                  §B{later:Action} §LAM{} §C{Mutate} {{argument}} value §/C §/LAM
-                  §C{later} §/C
-                  §C{Take} §A value §/C
+            module InvokedDeferredMutation
+              func Mutate public ({{modifier}} {{nullableType}}:value) → void
+                ! mut
+                set value null
+              func Take public ({{nonNullableType}}:value) → void
+                !
+              func Probe public ({{nullableType}}:value) → void
+                ! mut
+                if value != null
+                  let System.Action:later ! mut = () ! mut => Mutate({{modifier}} value)
+                  later()
+                  Take(value)
             """;
 
         var result = Program.Compile(source, "invoked-deferred-mutation.calr");
@@ -354,13 +403,14 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
         var sourceType = ArraySpelling((nullableContainer ? 1 : 0) | (nullableElements ? 2 : 0));
         var supplied = locals ? "second" : "values";
         var source = $$"""
-            §M{ArrayBcl}
-              §F{Caller:pub} ({{sourceType}}:values) -> void
-                {{(locals ? "§B{first} values\n    §B{second} first" : "")}}
-                §C{System.IO.File.WriteAllLines} §A[contents] {{supplied}} §A[path] STR:"not-executed.txt" §/C
+            module ArrayBcl
+              func Caller public ({{sourceType}}:values) → void
+                {{(locals ? "let first = values\n    let second = first" : "")}}
+                System.IO.File.WriteAllLines(contents: {{supplied}}, path: "not-executed.txt")
             """;
         var (module, diagnostics) = Bind(source);
-        var call = Assert.Single(Assert.Single(module.Functions).Body.OfType<BoundCallStatement>());
+        var call = Assert.IsType<BoundCallExpression>(
+            Assert.Single(Assert.Single(module.Functions).Body.OfType<BoundExpressionStatement>()).Expression);
         Assert.Equal([1, 0], call.ArgumentParameterIndices);
         var array = Assert.IsType<ArrayBoundType>(NullabilityChecker.GetMethodInputArrayType(call.Arguments[0]));
         Assert.Equal(nullableContainer ? NullableAnnotation.Annotated : NullableAnnotation.NotAnnotated,
@@ -458,13 +508,11 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
         var (module, diagnostics) = Bind(converted.CalorSource!);
         var caller = module.Functions.Single(f => f.Symbol.Name.EndsWith(".Caller", StringComparison.Ordinal));
         var call = expression
-            ? (BoundNode)Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(caller.Body[^1]).Expression)
-            : Assert.Single(caller.Body.OfType<BoundCallStatement>());
-        var argument = call is BoundCallExpression expr ? Assert.Single(expr.Arguments)
-            : Assert.Single(((BoundCallStatement)call).Arguments);
-        var matches = call is BoundCallExpression expr2 ? expr2.SelectedOverloadMatches
-            : ((BoundCallStatement)call).SelectedOverloadMatches;
-        var mapping = Assert.Single(Assert.Single(matches).Arguments);
+            ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(caller.Body[^1]).Expression)
+            : Assert.IsType<BoundCallExpression>(
+                Assert.Single(caller.Body.OfType<BoundExpressionStatement>()).Expression);
+        var argument = Assert.Single(call.Arguments);
+        var mapping = Assert.Single(Assert.Single(call.SelectedOverloadMatches).Arguments);
         Assert.False(mapping.IsExpandedParams);
         var array = Assert.IsType<ArrayBoundType>(NullabilityChecker.GetMethodInputArrayType(argument));
         Assert.Equal(NullableAnnotation.NotAnnotated, array.NullableAnnotation);
@@ -479,8 +527,7 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
             Assert.Equal(BindingReceivingShape.Array, finding.BindingContext?.Shape);
             Assert.Contains("elements", finding.Message);
         }
-        Assert.Equal(nullable,
-            diagnostics.Any(d => d.Code == DiagnosticCode.NullableToNonNullableBinding));
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NullableToNonNullableBinding);
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NullableReturnFromNonNullable);
         Assert.Equal(nullable, diagnostics.Any(BindingDiagnosticPolicy.IsCompilationError));
         var compiled = Program.Compile(converted.CalorSource!, "a4-created.calr");
@@ -492,12 +539,38 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void A4_ConvertedArrayCreation_ExplicitBindingRetainsElementRejection(bool nullable)
+    {
+        var converted = new CSharpToCalorConverter(
+            new() { ValidateRoundTripCSharp = false }).Convert($$"""
+            #nullable enable
+            public static class ExplicitArrayLocal {
+                public static void Probe(string{{(nullable ? "?" : "")}} later) {
+                    string[] values = new[] { "first", later };
+                }
+            }
+            """, "a4-explicit-array-local.cs");
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        Assert.NotNull(converted.CalorSource);
+        var (_, diagnostics) = Bind(converted.CalorSource!);
+        Assert.Equal(nullable, diagnostics.Any(d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding
+            && BindingDiagnosticPolicy.IsCompilationError(d)));
+        Assert.DoesNotContain(diagnostics, d => d.Code is DiagnosticCode.NullableArgumentToNonNullableParameter
+            or DiagnosticCode.NullableReturnFromNonNullable);
+        var compiled = Program.Compile(converted.CalorSource!, "a4-explicit-array-local.calr");
+        Assert.Equal(nullable, compiled.HasErrors);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void A4_RealBclExpandedLaterScalar_IsNotAnArrayReceivingShape(bool nullable)
     {
         var source = $$"""
-            §M{ExpandedArrays}
-              §F{Caller:pub} ({{(nullable ? "?str" : "str")}}:later) -> str
-                §R §C{System.IO.Path.Combine} §A "a" §A "b" §A "c" §A "d" §A later §/C
+            module ExpandedArrays
+              func Caller public ({{(nullable ? "string?" : "string")}}:later) → string
+                return System.IO.Path.Combine("a", "b", "c", "d", later)
             """;
         var (module, diagnostics) = Bind(source);
         var call = Assert.IsType<BoundCallExpression>(
@@ -520,16 +593,16 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     public void A4_RealBclGenericArrayReturn_PreservesElementsAcrossActiveBoundaries(bool nullable)
     {
         var source = $$"""
-            §M{GenericArrayProducer}
-              §F{Take:pub} ([str]:items) -> i32
-                §R 1
-              §F{Caller:pub} ({{ArraySpelling(nullable ? 2 : 0)}}:values) -> i32
-                §B{legacy:[str]} §C{System.Linq.Enumerable.ToArray} §A values §/C
-                §B{first} §C{System.Linq.Enumerable.ToArray} §A values §/C
-                §B{second} first
-                §R §C{Take} §A second §/C
-              §F{LegacyReturn:pub} ({{ArraySpelling(nullable ? 2 : 0)}}:values) -> [str]
-                §R §C{System.Linq.Enumerable.ToArray} §A values §/C
+            module GenericArrayProducer
+              func Take public (string[]:items) → int
+                return 1
+              func Caller public ({{ArraySpelling(nullable ? 2 : 0)}}:values) → int
+                let string[]:legacy = System.Linq.Enumerable.ToArray(values)
+                let first = System.Linq.Enumerable.ToArray(values)
+                let second = first
+                return Take(second)
+              func LegacyReturn public ({{ArraySpelling(nullable ? 2 : 0)}}:values) → string[]
+                return System.Linq.Enumerable.ToArray(values)
             """;
         var (module, diagnostics) = Bind(source);
         var caller = module.Functions.Single(f => f.Symbol.Name == "Caller");
@@ -554,14 +627,16 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     public void A4_ValueArrayContainer_IsAReferenceButItsElementsStayValues(bool nullable, bool bcl)
     {
         var source = $$"""
-            §M{ValueArrays}
-              §F{Take:pub} (i32[]:items) -> void
-                §E{}
-              §F{Caller:pub} (i32[]{{(nullable ? "?" : "")}}:values) -> void
-                §C{{{(bcl ? "System.Array.Sort" : "Take")}}} §A values §/C
+            module ValueArrays
+              func Take public (int[]:items) → void
+                !
+              func Caller public (int[]{{(nullable ? "?" : "")}}:values) → void
+                {{(bcl ? "! mut" : "!")}}
+                {{(bcl ? "System.Array.Sort" : "Take")}}(values)
             """;
         var (module, diagnostics) = Bind(source);
-        var call = Assert.Single(module.Functions.Single(f => f.Symbol.Name == "Caller").Body.OfType<BoundCallStatement>());
+        var call = Assert.IsType<BoundCallExpression>(Assert.Single(
+            module.Functions.Single(f => f.Symbol.Name == "Caller").Body.OfType<BoundExpressionStatement>()).Expression);
         if (bcl) Assert.Equal([0], call.ArgumentParameterIndices);
         else Assert.Single(call.SelectedOverloadMatches);
         var finding = diagnostics.Where(d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter).ToArray();
@@ -615,13 +690,13 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     public void A4_ArrayAndRankIdentity_AreNotErasedByNativeClassConversion(string sourceType, string targetType)
     {
         var source = $$"""
-            §M{ArrayRanks}
-              §CL{Foo:pub}
-                §FLD{i32:Value:pub}
-              §F{Take:pub} ({{targetType}}:items) -> i32
-                §R 1
-              §F{Caller:pub} ({{sourceType}}:value) -> i32
-                §R §C{Take} §A value §/C
+            module ArrayRanks
+              class Foo public
+                field int:Value public
+              func Take public ({{targetType}}:items) → int
+                return 1
+              func Caller public ({{sourceType}}:value) → int
+                return Take(value)
             """;
         var (module, diagnostics) = Bind(source);
         var call = Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(
@@ -632,21 +707,21 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     }
 
     [Theory]
-    [InlineData("Option<str[]>", "str[]")]
-    [InlineData("str[]", "Option<str[]>")]
-    [InlineData("i32?[]", "i32[]")]
-    [InlineData("i32[]", "str[]")]
-    [InlineData("str[,]", "str[]")]
-    [InlineData("List<str>", "str[]")]
-    [InlineData("Missing[]", "str[]")]
+    [InlineData("Option<string[]>", "string[]")]
+    [InlineData("string[]", "Option<string[]>")]
+    [InlineData("int?[]", "int[]")]
+    [InlineData("int[]", "string[]")]
+    [InlineData("string[,]", "string[]")]
+    [InlineData("List<string>", "string[]")]
+    [InlineData("Missing[]", "string[]")]
     public void A4_IncompatibleOrUnsupportedInputs_DoNotAcquireAnArrayMatch(string sourceType, string targetType)
     {
         var source = $$"""
-            §M{ArrayBoundaries}
-              §F{Take:pub} ({{targetType}}:items) -> i32
-                §R 1
-              §F{Caller:pub} ({{sourceType}}:value) -> i32
-                §R §C{Take} §A value §/C
+            module ArrayBoundaries
+              func Take public ({{targetType}}:items) → int
+                return 1
+              func Caller public ({{sourceType}}:value) → int
+                return Take(value)
             """;
         var (module, diagnostics) = Bind(source);
         var call = Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(
@@ -819,6 +894,34 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
         public override BoundType Type => type;
     }
 
+    private static string ConvertOpaqueMutator(string modifier, bool twoArguments)
+    {
+        var signature = twoArguments
+            ? $"bool MutateBoth({modifier} string[]? first, {modifier} string[]? second)"
+            : $"void Mutate({modifier} string[]? value)";
+        var mutation = twoArguments ? "first = null; second = null; return true;" : "value = null;";
+        var source = $$"""
+            #nullable enable
+            public class Holder {
+                public {{signature}} {
+                    static void KeepOpaque() { }
+                    {{mutation}}
+                }
+            }
+            """;
+        var converted = new CSharpToCalorConverter(
+            new() { ValidateRoundTripCSharp = false }).Convert(source, "opaque-array-mutator.cs");
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        var holder = Assert.Single(Assert.IsType<Ast.ModuleNode>(converted.Ast).Classes);
+        var preserved = Assert.Single(holder.InteropBlocks);
+        Assert.Equal(Ast.InteropMemberKind.Method, preserved.MemberKind);
+        Assert.Equal("method", preserved.FeatureName);
+        var originalMethod = Assert.Single(CSharpSyntaxTree.ParseText(source).GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>());
+        Assert.Equal(originalMethod.ToFullString(), preserved.CSharpCode);
+        return Assert.IsType<string>(converted.CalorSource);
+    }
+
     private static IArrayTypeSymbol AssertEmittedArrayParameter(string generated, string method, int rank)
     {
         var tree = CSharpSyntaxTree.ParseText(generated);
@@ -834,7 +937,7 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     }
 
     private static string ArraySpelling(int shape) =>
-        $"{((shape & 1) != 0 ? "?" : "")}[{((shape & 2) != 0 ? "?" : "")}str]";
+        $"string{((shape & 2) != 0 ? "?" : "")}[]{((shape & 1) != 0 ? "?" : "")}";
 
     private static (BoundModule Module, DiagnosticBag Diagnostics) Bind(string source)
     {
