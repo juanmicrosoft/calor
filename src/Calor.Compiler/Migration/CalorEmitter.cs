@@ -1821,8 +1821,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     /// <summary>
-    /// Emits a MatchExpressionNode as the initializer of a §B binding. The §B header
-    /// and §W{...:expr} target sit on the same line; case arms are emitted via
+    /// Emits a match expression after the native binding's equals sign.
+    /// The binding and match target sit on the same line; case arms are emitted via
     /// AppendLine + Indent so their indentation respects the current binding's
     /// indent (rather than the multi-line hardcoded indent produced by
     /// Visit(MatchExpressionNode), which is only correct in pure expression contexts).
@@ -1831,7 +1831,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var target = node.Target.Accept(this);
 
-        AppendLine($"{bindHeader} match {target}");
+        AppendLine($"{bindHeader} = match {target}");
         Indent();
 
         foreach (var matchCase in node.Cases)
