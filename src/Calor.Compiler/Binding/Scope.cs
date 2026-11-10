@@ -1880,7 +1880,9 @@ public sealed class Scope
         Func<string, string, int?>? implicitConversionCost,
         bool allowNullableStringCompatibility,
         Func<string, string, bool>? isBetterNullConversionTarget = null,
-        Func<FunctionSymbol, string, string>? resolveParameterType = null)
+        Func<FunctionSymbol, string, string>? resolveParameterType = null,
+        Func<int, string, string, int?>? argumentConversionCost = null,
+        Func<int, string, string, bool>? isBetterArgumentConversionTarget = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(argumentTypes);
@@ -1898,7 +1900,9 @@ public sealed class Scope
                     implicitConversionCost,
                     allowNullableStringCompatibility,
                     isBetterNullConversionTarget,
-                    resolveParameterType)
+                    resolveParameterType,
+                    argumentConversionCost,
+                    isBetterArgumentConversionTarget)
                 ?? OverloadResolutionResult.NotFound();
         }
 
@@ -1914,6 +1918,7 @@ public sealed class Scope
                     implicitConversionCost,
                     allowNullableStringCompatibility,
                     resolveParameterType,
+                    argumentConversionCost,
                     out var resolvedReturnType,
                     out var score,
                     out var usesNullableStringCompatibility,
@@ -1936,22 +1941,31 @@ public sealed class Scope
             return OverloadResolutionResult.NoMatch(overloads);
 
         var bestScore = applicable.Min(item => item.Score);
-        var best = applicable.Where(item => item.Score == bestScore).ToArray();
+        var usesArgumentValueConversion = argumentConversionCost != null && implicitConversionCost != null
+            && applicable.Any(candidate => candidate.Arguments.Any(argument =>
+                implicitConversionCost(argument.ParameterType, argumentTypes[argument.ArgumentIndex]) is null
+                && argumentConversionCost(
+                    argument.ArgumentIndex, argument.ParameterType, argumentTypes[argument.ArgumentIndex]) is not null));
+        // A new literal conversion can introduce crossed preferences that a summed score hides.
+        var best = usesArgumentValueConversion
+            ? applicable.ToArray()
+            : applicable.Where(item => item.Score == bestScore).ToArray();
         if (best.Length == 1)
             return OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType, best[0].Arguments);
 
-        if (isBetterNullConversionTarget != null
+        if (isBetterArgumentConversionTarget != null
+            || isBetterNullConversionTarget != null
             && argumentTypes.Any(type => string.Equals(
                 TypeIdentity.Canonicalize(type), "NULL", StringComparison.Ordinal)))
         {
             var undominated = best
                 .Where(candidate => !best.Any(other =>
                     !ReferenceEquals(candidate.Function, other.Function)
-                    && IsBetterNullConversionCandidate(
+                    && IsBetterConversionCandidate(
                         other,
                         candidate,
-                        argumentTypes,
-                        isBetterNullConversionTarget)))
+                        argumentTypes.Count,
+                        IsBetterArgumentTarget)))
                 .ToArray();
             if (undominated.Length != 0 && undominated.Length < best.Length)
             {
@@ -1964,6 +1978,16 @@ public sealed class Scope
                         best[0].Arguments);
                 }
             }
+        }
+
+        if (usesArgumentValueConversion)
+        {
+            best = best.Where(candidate => !best.Any(other => other.Score < candidate.Score
+                && candidate.Arguments.Select(argument => TypeIdentity.Canonicalize(argument.ParameterType))
+                    .SequenceEqual(other.Arguments.Select(argument =>
+                        TypeIdentity.Canonicalize(argument.ParameterType))))).ToArray();
+            if (best.Length == 1)
+                return OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType, best[0].Arguments);
         }
 
         best = best.Where(candidate => candidate.Function.GenericArity == 0
@@ -2042,6 +2066,21 @@ public sealed class Scope
         }
 
         return OverloadResolutionResult.Ambiguous(bestFunctions);
+
+        bool IsBetterArgumentTarget(int index, string candidateType, string otherType)
+        {
+            if (TypeIdentity.Canonicalize(argumentTypes[index]) == "NULL")
+                return isBetterNullConversionTarget?.Invoke(candidateType, otherType) == true;
+            if (isBetterArgumentConversionTarget?.Invoke(index, candidateType, otherType) == true)
+                return true;
+            if (!usesArgumentValueConversion
+                || isBetterArgumentConversionTarget?.Invoke(index, otherType, candidateType) == true)
+                return false;
+
+            var candidateCost = argumentConversionCost?.Invoke(index, candidateType, argumentTypes[index]);
+            var otherCost = argumentConversionCost?.Invoke(index, otherType, argumentTypes[index]);
+            return candidateCost is { } cost && otherCost is { } alternativeCost && cost < alternativeCost;
+        }
     }
 
     private sealed record ApplicableOverload(
@@ -2074,36 +2113,23 @@ public sealed class Scope
                 StringComparison.Ordinal));
     }
 
-    private static bool IsBetterNullConversionCandidate(
+    private static bool IsBetterConversionCandidate(
         ApplicableOverload candidate,
         ApplicableOverload other,
-        IReadOnlyList<string> argumentTypes,
-        Func<string, string, bool> isBetterNullConversionTarget)
+        int argumentCount,
+        Func<int, string, string, bool> isBetterConversionTarget)
     {
         var strictlyBetter = false;
-        for (var argumentIndex = 0; argumentIndex < argumentTypes.Count; argumentIndex++)
+        for (var argumentIndex = 0; argumentIndex < argumentCount; argumentIndex++)
         {
             var candidateType = candidate.Arguments[argumentIndex].ParameterType;
             var otherType = other.Arguments[argumentIndex].ParameterType;
-            if (!string.Equals(
-                    TypeIdentity.Canonicalize(argumentTypes[argumentIndex]),
-                    "NULL",
-                    StringComparison.Ordinal))
-            {
-                if (!string.Equals(
-                        TypeIdentity.Canonicalize(candidateType),
-                        TypeIdentity.Canonicalize(otherType),
-                        StringComparison.Ordinal))
-                    return false;
-                continue;
-            }
-
             if (string.Equals(
                     TypeIdentity.Canonicalize(candidateType),
                     TypeIdentity.Canonicalize(otherType),
                     StringComparison.Ordinal))
                 continue;
-            if (!isBetterNullConversionTarget(candidateType, otherType))
+            if (!isBetterConversionTarget(argumentIndex, candidateType, otherType))
                 return false;
             strictlyBetter = true;
         }
@@ -2211,6 +2237,7 @@ public sealed class Scope
         Func<string, string, int?>? implicitConversionCost,
         bool allowNullableStringCompatibility,
         Func<FunctionSymbol, string, string>? resolveParameterType,
+        Func<int, string, string, int?>? argumentConversionCost,
         out string resolvedReturnType,
         out int score,
         out bool usesNullableStringCompatibility,
@@ -2287,9 +2314,10 @@ public sealed class Scope
                 var resolvedParameterType = substitutions.Count == 0
                     ? parameterType
                     : TypeIdentity.Substitute(parameterType, substitutions);
-                var conversionCost = implicitConversionCost?.Invoke(
-                    resolvedParameterType,
-                    argumentTypes[argumentIndex]);
+                var conversionCost = argumentConversionCost != null
+                    && (parameter.Modifier & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In)) == 0
+                        ? argumentConversionCost(argumentIndex, resolvedParameterType, argumentTypes[argumentIndex])
+                        : implicitConversionCost?.Invoke(resolvedParameterType, argumentTypes[argumentIndex]);
                 if (conversionCost == null)
                 {
                     matches = false;

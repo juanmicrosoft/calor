@@ -84,6 +84,13 @@ This is bounded receiving-boundary enforcement, not whole-program null safety.
 It does not implicitly unwrap library generic types or enforce constructor
 inputs. See [Nullability and .NET Interop](https://calor.dev/docs/guides/nullability-and-dotnet-interop/#calor0274-method-input).
 
+Source-method lookup retains integer literal values, including unary minus.
+A `byte` value parameter accepts `255` but rejects `256`. This does not turn an
+immutable `int` local into a constant or permit conversions of `ref`/`out` storage.
+Literal-overload selection compares conversions argument by argument; a better
+conversion for one argument cannot cancel a worse conversion for another.
+General constant-expression evaluation is not implemented here.
+
 ## By-reference arguments
 
 Declare parameters as `ref T:name`, `out T:name`, or `in T:name`. Mark the

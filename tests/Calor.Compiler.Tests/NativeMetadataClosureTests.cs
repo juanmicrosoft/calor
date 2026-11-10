@@ -16,6 +16,305 @@ namespace Calor.Compiler.Tests;
 public sealed class NativeMetadataClosureTests
 {
     [Theory]
+    [InlineData("sbyte", "byte")]
+    [InlineData("byte", "long")]
+    [InlineData("short", "ushort")]
+    [InlineData("short", "byte")]
+    [InlineData("uint", "long")]
+    [InlineData("long", "ulong")]
+    [InlineData("byte", "ushort")]
+    [InlineData("byte", "char")]
+    [InlineData("byte", "int")]
+    public void NativeIntegerLiteralOverloads_SelectTheOriginalCSharpWinner(string first, string second)
+    {
+        foreach (var reverse in new[] { false, true })
+        {
+            var a = reverse ? second : first;
+            var b = reverse ? first : second;
+            var source = $$"""
+                public static class Probe
+                {
+                    private static string Pick({{a}} value) => "{{a}}";
+                    private static string Pick({{b}} value) => "{{b}}";
+                    public static string Run() => Pick(1);
+                }
+                """;
+            var expected = CompileAssembly(source).GetType("Probe")!.GetMethod("Run")!.Invoke(null, null);
+            var converted = new CSharpToCalorConverter().Convert(source);
+            Assert.True(converted.Success, string.Join("\n", converted.Issues));
+            Assert.Empty(converted.Losses);
+            RawFrameAssertions.AssertFramed(converted.CalorSource!, present: false);
+            AssertSelectedLiteralOverload(converted.CalorSource!, Assert.IsType<string>(expected));
+            var compiled = Compile(converted.CalorSource!);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+            var actual = CompileAssembly(compiled.GeneratedCode).GetType("Probe")!.GetMethod("Run")!.Invoke(null, null);
+            Assert.Equal(expected, actual);
+        }
+    }
+
+    [Theory]
+    [InlineData("byte value, int ignored = 0", "long value")]
+    [InlineData("byte value", "params int[] values")]
+    [InlineData("params byte[] values", "long value")]
+    [InlineData("byte value", "byte value, int ignored = 0")]
+    [InlineData("byte value", "params byte[] values")]
+    [InlineData("byte value, long later = 0", "long value, byte later = 0")]
+    public void NativeIntegerLiteralOverloads_CompareTargetsBeforeOptionalAndParamsPenalties(
+        string first, string second)
+    {
+        foreach (var reverse in new[] { false, true })
+        {
+            var a = reverse ? second : first;
+            var b = reverse ? first : second;
+            var original = $$"""
+                public static class Probe
+                {
+                    private static string Pick({{a}}) => "first";
+                    private static string Pick({{b}}) => "second";
+                    public static string Run() => Pick(1);
+                }
+                """;
+            var expected = Assert.IsType<string>(
+                CompileAssembly(original).GetType("Probe")!.GetMethod("Run")!.Invoke(null, null));
+            var converted = new CSharpToCalorConverter().Convert(original);
+            Assert.True(converted.Success, string.Join("\n", converted.Issues));
+            Assert.Empty(converted.Losses);
+            RawFrameAssertions.AssertFramed(converted.CalorSource!, present: false);
+            AssertSelectedLiteralOverload(converted.CalorSource!, expected);
+            var compiled = Compile(converted.CalorSource!);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+            Assert.Equal(expected, CompileAssembly(compiled.GeneratedCode).GetType("Probe")!
+                .GetMethod("Run")!.Invoke(null, null));
+        }
+    }
+
+    [Theory]
+    [InlineData("small: 255, big: 65535", false)]
+    [InlineData("big: 65535, small: 255", false)]
+    [InlineData("small: 256, big: 1", true)]
+    [InlineData("big: 1, small: 256", true)]
+    public void NativeIntegerLiteralArguments_UseArgumentPositionsAfterNamedMapping(string arguments, bool invalid)
+    {
+        var source = $$"""
+            module NamedConstants
+              func Pick (byte:small, ushort:big) → int
+                return small + big
+              func Run public () → int
+                return Pick({{arguments}})
+            """;
+        var compiled = Compile(source);
+        Assert.Equal(invalid, compiled.HasErrors);
+        if (invalid)
+            Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+        else
+            Assert.Equal(65790, CompileAssembly(compiled.GeneratedCode).GetTypes()
+                .SelectMany(type => type.GetMethods()).Single(method => method.Name == "Run").Invoke(null, null));
+    }
+
+    [Fact]
+    public void NativeIntegerLiteralArguments_KeepReferenceStorageAndByteNarrowing()
+    {
+        const string source = """
+            public static class Probe
+            {
+                private static byte Update(ref byte value, byte later)
+                {
+                    value += later;
+                    return value;
+                }
+                public static string Run()
+                {
+                    byte value = 255;
+                    byte seen = Update(ref value, 1);
+                    return seen + ":" + value;
+                }
+            }
+            """;
+        var converted = new CSharpToCalorConverter().Convert(source);
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        Assert.Empty(converted.Losses);
+        RawFrameAssertions.AssertFramed(converted.CalorSource!, present: false);
+        var compiled = Compile(converted.CalorSource!);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        Assert.Equal("0:0", CompileAssembly(source).GetType("Probe")!.GetMethod("Run")!.Invoke(null, null));
+        Assert.Equal("0:0", CompileAssembly(compiled.GeneratedCode).GetType("Probe")!.GetMethod("Run")!.Invoke(null, null));
+    }
+
+    [Theory]
+    [InlineData(255, true)]
+    [InlineData(256, false)]
+    public void NativeIntegerLiteralArguments_RetainSourceEnumExtensionReceiverMapping(int value, bool valid)
+    {
+        const string original = """
+            public enum Mode { First = 1 }
+            public static class Extensions
+            {
+                public static int Read(this Mode mode, byte delta) => delta;
+            }
+            public static class Probe
+            {
+                public static int Run() => Mode.First.Read(255);
+            }
+            """;
+        var converted = new CSharpToCalorConverter().Convert(original);
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        Assert.Empty(converted.Losses);
+        RawFrameAssertions.AssertFramed(converted.CalorSource!, present: false);
+        Assert.Contains("Read(255)", converted.CalorSource!);
+        var source = converted.CalorSource!.Replace("Read(255)", $"Read({value})", StringComparison.Ordinal);
+        var compiled = Compile(source);
+        Assert.Equal(!valid, compiled.HasErrors);
+        if (valid)
+        {
+            var diagnostics = new DiagnosticBag();
+            var bound = new Binder(diagnostics).Bind(Parse(source));
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+            var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+            Assert.Equal("Extensions.Read", call.ResolvedSymbol?.Name);
+            Assert.Equal(CompileAssembly(original).GetType("Probe")!.GetMethod("Run")!.Invoke(null, null),
+                CompileAssembly(compiled.GeneratedCode).GetType("Probe")!.GetMethod("Run")!.Invoke(null, null));
+        }
+        else
+            Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+    }
+
+    [Theory]
+    [InlineData("sbyte", "-128", true)]
+    [InlineData("sbyte", "-129", false)]
+    [InlineData("byte", "255", true)]
+    [InlineData("byte", "256", false)]
+    [InlineData("short", "-32768", true)]
+    [InlineData("short", "-32769", false)]
+    [InlineData("ushort", "65535", true)]
+    [InlineData("ushort", "65536", false)]
+    [InlineData("ulong", "1L", true)]
+    public void NativeIntegerLiteralArguments_CheckParsedValuesIncludingUnaryMinus(
+        string type, string argument, bool valid)
+    {
+        var source = $$"""
+            module ConstantRange
+              func Pick ({{type}}:value) → int
+                return 1
+              func Run public () → int
+                return Pick({{argument}})
+            """;
+        var compiled = Compile(source);
+        Assert.Equal(!valid, compiled.HasErrors);
+        if (valid)
+            Assert.Equal(1, CompileAssembly(compiled.GeneratedCode).GetTypes()
+                .SelectMany(owner => owner.GetMethods()).Single(method => method.Name == "Run").Invoke(null, null));
+        else
+            Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+    }
+
+    [Theory]
+    [InlineData("ref")]
+    [InlineData("out")]
+    [InlineData("in")]
+    public void NativeIntegerLiteralArguments_DoNotAuthorizeByReferenceConversions(string modifier)
+    {
+        var body = modifier == "out" ? "! mut\n    set value 0" : "return";
+        var source = $$"""
+            module RefConstants
+              func Pick ({{modifier}} byte:value) → void
+                {{body}}
+              func Run () → void
+                ! mut
+                Pick({{modifier}} 1)
+            """;
+        Parse(source);
+        var compiled = Compile(source);
+        Assert.True(compiled.HasErrors);
+        Assert.Contains(compiled.Diagnostics, diagnostic =>
+            diagnostic.Code is DiagnosticCode.NoMatchingOverload or DiagnosticCode.InvalidByReferenceOperand);
+    }
+
+    [Theory]
+    [InlineData("byte", "ushort", "ushort", "byte")]
+    [InlineData("byte", "long", "long", "int")]
+    public void NativeIntegerLiteralOverloads_RetainAmbiguityWhenDifferentArgumentsPreferDifferentTargets(
+        string firstA, string secondA, string firstB, string secondB)
+    {
+        var source = $$"""
+            module AmbiguousConstants
+              func Pick ({{firstA}}:first, {{secondA}}:second) → int
+                return 1
+              func Pick ({{firstB}}:first, {{secondB}}:second) → int
+                return 2
+              func Run () → int
+                return Pick(1, 1)
+            """;
+        var compiled = Compile(source);
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.AmbiguousOverload);
+    }
+
+    [Theory]
+    [InlineData("byte", "ushort", false)]
+    [InlineData("ushort", "byte", true)]
+    public void NativeIntegerLiteralOverloads_CombineNullAndLiteralTargetPreferences(
+        string stringValueType, string objectValueType, bool ambiguous)
+    {
+        var original = $$"""
+            public static class Probe
+            {
+                private static string Pick(string? text, {{stringValueType}} value) => "string";
+                private static string Pick(object? text, {{objectValueType}} value) => "object";
+                public static string Run() => Pick(null, 1);
+            }
+            """;
+        var source = $$"""
+            module MixedConstants
+              func Pick (string?:text, {{stringValueType}}:value) → string
+                return "string"
+              func Pick (object?:text, {{objectValueType}}:value) → string
+                return "object"
+              func Run public () → string
+                return Pick(null, 1)
+            """;
+        var compiled = Compile(source);
+        if (ambiguous)
+        {
+            var oracle = CSharpCompilation.Create("AmbiguousConstants",
+                [CSharpSyntaxTree.ParseText(original)], GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            Assert.Contains(oracle.GetDiagnostics(), diagnostic => diagnostic.Id == "CS0121");
+            Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.AmbiguousOverload);
+        }
+        else
+        {
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+            var expected = CompileAssembly(original).GetType("Probe")!.GetMethod("Run")!.Invoke(null, null);
+            AssertSelectedLiteralOverload(source, Assert.IsType<string>(expected));
+            var actual = CompileAssembly(compiled.GeneratedCode).GetTypes()
+                .SelectMany(owner => owner.GetMethods()).Single(method => method.Name == "Run").Invoke(null, null);
+            Assert.Equal(expected, actual);
+        }
+    }
+
+    [Theory]
+    [InlineData("1", true)]
+    [InlineData("255", true)]
+    [InlineData("256", false)]
+    public void NativeIntegerLiteralArguments_RespectExplicitGenericSubstitution(string argument, bool valid)
+    {
+        var source = $$"""
+            module GenericConstants
+              func Pick<T> (T:value) → T
+                return value
+              func Run public () → int
+                return Pick<byte>({{argument}})
+            """;
+        var compiled = Compile(source);
+        Assert.Equal(!valid, compiled.HasErrors);
+        if (valid)
+            Assert.Equal(int.Parse(argument, System.Globalization.CultureInfo.InvariantCulture),
+                CompileAssembly(compiled.GeneratedCode).GetTypes()
+                    .SelectMany(owner => owner.GetMethods()).Single(method => method.Name == "Run").Invoke(null, null));
+        else
+            Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+    }
+
+    [Theory]
     [InlineData("new int[3]", 3)]
     [InlineData("new int[] { 1, 2 }", 2)]
     [InlineData("new int[2, 3]", 6)]
@@ -2205,6 +2504,18 @@ public sealed class NativeMetadataClosureTests
         Assert.Equal(8, type.GetProperty("Y")!.GetValue(clone));
         var pure = Compile(source.Replace("! alloc, mut", "!", StringComparison.Ordinal));
         Assert.Contains(pure.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
+    private static void AssertSelectedLiteralOverload(string source, string expected)
+    {
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.NotNull(call.ResolvedSymbol);
+        var selected = bound.Functions.Single(function => function.Symbol.Id == call.ResolvedSymbol.Id);
+        var statement = Assert.IsType<BoundReturnStatement>(Assert.Single(selected.Body));
+        Assert.Equal(expected, Assert.IsType<BoundStringLiteral>(statement.Expression).Value);
     }
 
     private static CompilationResult Compile(string source) => Program.Compile(source, "native-metadata.calr",

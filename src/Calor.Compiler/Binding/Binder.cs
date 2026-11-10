@@ -7020,7 +7020,8 @@ public sealed class Binder
             GetOverloadArgumentType(argument, argumentModifiers?.ElementAtOrDefault(index))).ToArray();
         var resolution = ResolveAccessibleOverload(methodName, argumentTypes,
             argumentNames, argumentModifiers, GetOverloadTypeArguments(call.TypeArguments),
-            allowNullableStringCompatibility: true, requireStatic: true, candidateOverrides: candidates);
+            allowNullableStringCompatibility: true, requireStatic: true, candidateOverrides: candidates,
+            arguments: arguments);
         if (resolution.Kind == OverloadResolutionKind.NoMatch)
             _diagnostics.ReportError(call.Span, DiagnosticCode.NoMatchingOverload,
                 $"No source extension overload '{methodName}' matches {FormatCallSignature(argumentTypes, argumentModifiers, call.TypeArguments)}.");
@@ -7405,7 +7406,8 @@ public sealed class Binder
                 allowNullableStringCompatibility,
                 requireStatic,
                 requireInstance: computedReceiver is not null and not BoundTypeReferenceExpression,
-                candidateOverrides: interfaceCandidates);
+                candidateOverrides: interfaceCandidates,
+                arguments: arguments);
             if (resolution.Kind == OverloadResolutionKind.NotFound)
                 continue;
 
@@ -7446,7 +7448,8 @@ public sealed class Binder
                     lookupName, argumentTypes, argumentNames, argumentModifiers, overloadTypeArguments,
                     requireStatic: requireStatic,
                     requireInstance: computedReceiver is not null and not BoundTypeReferenceExpression,
-                    candidateOverrides: interfaceCandidates);
+                    candidateOverrides: interfaceCandidates,
+                    arguments: arguments);
                 if (previous.Kind is OverloadResolutionKind.NoMatch or OverloadResolutionKind.Ambiguous)
                     resolution = resolution.WithReplacedNativeOverloadError();
             }
@@ -7563,7 +7566,8 @@ public sealed class Binder
         bool allowNullableStringCompatibility = false,
         bool requireStatic = false,
         bool requireInstance = false,
-        IReadOnlyList<FunctionSymbol>? candidateOverrides = null)
+        IReadOnlyList<FunctionSymbol>? candidateOverrides = null,
+        IReadOnlyList<BoundExpression>? arguments = null)
     {
         var candidates = (candidateOverrides ?? _scope.GetOverloads(lookupName))
             .ToArray();
@@ -7600,7 +7604,12 @@ public sealed class Binder
             GetImplicitConversionCost,
             allowNullableStringCompatibility,
             IsBetterNullConversionTarget,
-            ResolveEnumParameterType);
+            ResolveEnumParameterType,
+            arguments is null ? null : (index, parameterType, argumentType) =>
+                GetImplicitArgumentConversionCost(parameterType, argumentType, arguments[index]),
+            arguments is null ? null : (index, candidateType, otherType) =>
+                IsBetterIntegerLiteralConversionTarget(
+                    arguments[index], argumentTypes[index], candidateType, otherType));
         return resolved.Function is { } winner && duplicates.TryGetValue(winner, out var ambiguous)
             ? OverloadResolutionResult.Ambiguous(ambiguous) : resolved;
     }
@@ -7672,6 +7681,72 @@ public sealed class Binder
 
         return GetImplicitConversionCost(other, candidate) is not null
             && GetImplicitConversionCost(candidate, other) is null;
+    }
+
+    private int? GetImplicitArgumentConversionCost(
+        string parameterType, string argumentType, BoundExpression argument)
+    {
+        var ordinaryCost = GetImplicitConversionCost(parameterType, argumentType);
+        if (ordinaryCost is not null)
+            return ordinaryCost;
+        if (!TryGetSignedIntegerLiteral(argument, out var value))
+            return null;
+
+        return (TypeIdentity.Canonicalize(argumentType), TypeIdentity.Canonicalize(parameterType)) switch
+        {
+            ("INT", "INT[bits=8][signed=true]") when value is >= sbyte.MinValue and <= sbyte.MaxValue => 10,
+            ("INT", "INT[bits=8][signed=false]") when value is >= byte.MinValue and <= byte.MaxValue => 10,
+            ("INT", "INT[bits=16][signed=true]") when value is >= short.MinValue and <= short.MaxValue => 10,
+            ("INT", "INT[bits=16][signed=false]") when value is >= ushort.MinValue and <= ushort.MaxValue => 10,
+            ("INT", "UINT") when value is >= uint.MinValue and <= uint.MaxValue => 10,
+            ("INT", "ULONG") when value >= 0 => 10,
+            ("LONG", "ULONG") when value >= 0 => 10,
+            _ => null
+        };
+    }
+
+    private static bool TryGetSignedIntegerLiteral(BoundExpression expression, out long value)
+    {
+        switch (expression)
+        {
+            case BoundIntLiteral { IsUnsigned: false } literal:
+                value = literal.Value;
+                return true;
+            case BoundUnaryExpression { Operator: UnaryOperator.Negate } unary
+                when TryGetSignedIntegerLiteral(unary.Operand, out var operand) && operand != long.MinValue:
+                value = -operand;
+                return true;
+            default:
+                value = 0;
+                return false;
+        }
+    }
+
+    private static bool IsBetterIntegerLiteralConversionTarget(
+        BoundExpression argument, string argumentType, string candidateType, string otherType)
+    {
+        if (!TryGetSignedIntegerLiteral(argument, out _))
+            return false;
+        var candidate = TypeIdentity.Canonicalize(candidateType);
+        var other = TypeIdentity.Canonicalize(otherType);
+        var source = TypeIdentity.Canonicalize(argumentType);
+        if (candidate == source)
+            return true;
+        if (other == source)
+            return false;
+        if (IsImplicitNumericConversion(candidate, other)
+            && !IsImplicitNumericConversion(other, candidate))
+            return true;
+        // C# also prefers these signed targets when neither target converts to the other.
+        return (candidate, other) switch
+        {
+            ("INT[bits=8][signed=true]", "INT[bits=8][signed=false]"
+                or "INT[bits=16][signed=false]" or "UINT" or "ULONG") => true,
+            ("INT[bits=16][signed=true]", "INT[bits=16][signed=false]" or "UINT" or "ULONG") => true,
+            ("INT", "UINT" or "ULONG") => true,
+            ("LONG", "ULONG") => true,
+            _ => false
+        };
     }
 
     /// <summary>
