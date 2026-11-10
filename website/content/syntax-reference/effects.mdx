@@ -69,9 +69,31 @@ The `! cw` beside `transform` belongs to the callback type. The `! cw` on
 its own line belongs to `Apply`. Calling `transform` charges its `cw` effect to
 `Apply`, so both rows are required here.
 
+For a delegate value, `transform.Invoke(value)` charges the same row as
+`transform(value)`. The compiler uses the delegate's declaration, not just the
+method name `Invoke`. A missing callback row still follows the unknown-effect
+rules; `.Invoke()` does not make it pure.
+
 Rows are part of the type. `Func<int,int> !` and
 `Func<int,int> ! cw` have the same inputs and output, but different effect
 permissions.
+
+For callback parameters, returned callbacks and delegate declarations, an
+**omitted row means Unknown**. Write `! unknown` to state Unknown explicitly,
+or an empty `!` to promise Pure. Unknown is not a wildcard permission:
+invoking an Unknown callback fails strict effect checking, even if the caller
+declares every known effect. Merely accepting an unused Unknown callback does
+not invoke it. Passing or returning one can still produce `Calor0425` when the
+compiler cannot prove that the source row fits the destination.
+
+The marker is case-sensitive and stands alone. It is not an effect code, so
+do not combine it with `cw` or use it as a function's own declaration, a binding
+row, a field row, a property row or a lambda row. An existing effect placeholder
+named `unknown` keeps its normal binding identity; it is not the marker.
+These callback defaults do not change callable declaration contracts or the
+intrinsic mutation/allocation contracts of constructors and rowless operators.
+An omitted binding or lambda row can retain a known row inferred from its
+initializer or body; it does not automatically mean Pure.
 
 ### Where a row can appear
 
@@ -167,12 +189,22 @@ Unresolved cases fail closed: the caller is charged `unknown`, and an
 under-declared caller fails the build. These boundaries are never silently
 treated as verified. Permissive effects explicitly waive that fail-closed
 behavior for unknown calls. Async rows remain limited; consult the diagnostics
-and the [project index](/docs/cli/query/) before relying on a higher-order
+and the [project index](https://calor.dev/docs/cli/query/) before relying on a higher-order
 boundary.
 
 ---
 
 ## Effect Codes
+
+Metadata property reads charge the getter's effect row whether the receiver is
+fully qualified, imported, or aliased. Reading
+`System.Environment.CurrentDirectory`, for example, requires `env:r`; spelling
+the type's full name does not make the read pure.
+
+An array's `.Length` read is pure when the binder has established an array
+receiver, including an inferred local or its alias. Creating the array still
+requires `alloc`. Other getters named `Length` keep their own effect rows:
+`System.IO.FileInfo.Length`, for example, requires `fs:r`.
 
 | Code | Effect | Description | C# Examples |
 |:-----|:-------|:------------|:------------|
@@ -181,12 +213,29 @@ boundary.
 | `fs:r` | Filesystem read | Read from filesystem | `File.ReadAllText()` |
 | `fs:w` | Filesystem write | Write to filesystem | `File.WriteAllText()` |
 | `fs:rw` | Filesystem read/write | Read and write filesystem | `File.Copy()` |
+| `net` | Network | Unspecified network access | Socket operations |
 | `net:r` | Network read | HTTP GET, etc. | `HttpClient.GetStringAsync()` |
 | `net:w` | Network write | HTTP POST, etc. | `HttpClient.PostAsync()` |
 | `net:rw` | Network read/write | HTTP operations | `HttpClient.SendAsync()` |
+| `db` | Database | Unspecified database access | Connection setup |
 | `db:r` | Database read | Database queries | `SELECT` queries |
 | `db:w` | Database write | Database mutations | `INSERT/UPDATE/DELETE` |
 | `db:rw` | Database read/write | Database operations | ORM calls |
+| `env` | Environment | Unspecified environment access | Environment operations |
+| `env:r` | Environment read | Read environment variables | `Environment.GetEnvironmentVariable()` |
+| `env:w` | Environment write | Write environment variables | `Environment.SetEnvironmentVariable()` |
+| `env:rw` | Environment read/write | Read and write environment | Read-modify-write of environment variables |
+| `proc` | Process | Spawn or control processes | `Process.Start()` |
+| `mut` | Mutation | Write shared or caller-owned state | Fields, collections, `ref`/`out` parameters |
+| `mut:col` | Collection mutation | Mutate a collection | Indexed dictionary update |
+| `alloc` | Allocation | Allocate an object or buffer | `new`, array allocation |
+| `unsafe` | Unsafe memory | Use unsafe memory operations | Pointer and fixed operations |
+| `time` | Time | Read a nondeterministic clock | `DateTime.Now` |
+| `rand` | Randomness | Generate random values | `Random.Next()` |
+| `throw` | Exception | Intentionally throw an exception | `throw` statements |
+
+Writing a `ref` or `out` parameter requires `mut` because it changes the caller's
+storage. Reassigning an ordinary value parameter or a local does not.
 
 ---
 
@@ -335,6 +384,19 @@ cannot look up is never quietly treated as harmless.
 Collection mutators such as `Add`, `Remove`, `Clear`, `Insert`, `Sort`, and
 `CopyTo` are not on the known-pure list.
 
+### Asking the index
+
+`calor query effects Name` reports a callable's declared row, inferred body
+row and verdict: `fits`, `does not fit`, or `cannot tell`. The index reads the
+same analysis used by compilation; it does not independently infer a more
+optimistic answer. Assumed effects disclose their reasons. Use `--json` for
+structured results.
+
+`calor query impact Log --effects --row fs:w` asks which direct and transitive
+callers would no longer fit if `Log` acquired that row. Omit `--row` to use
+the current row, or use `--row ""` to ask about a pure replacement. A query
+does not edit a declaration or discharge an unknown call.
+
 ### What the Compiler Reports
 
 | Code | Level | What it means |
@@ -411,13 +473,13 @@ What it never waives — these stay errors under every flag:
 Waiving "we cannot tell" is honest; waiving "we know this is wrong" is not.
 
 Because unknown calls are counted as doing nothing, permissive mode gives up
-the effect guarantee. [Review packets](/docs/cli/review-packet/) disclose that
+the effect guarantee. [Review packets](https://calor.dev/docs/cli/review-packet/) disclose that
 waiver on their first line.
 
 ---
 
 ## Next
 
-- [Effect manifests and package import](/docs/guides/effect-manifests-dotnet-ecosystem/) - External call coverage
-- [calor query](/docs/cli/query/) - Ask what a function declares, what it really does, and what a change would break
-- [Adoption Playbook](/docs/guides/adoption-playbook/) - Applying effects in an existing solution
+- [Effect manifests and package import](/guides/effect-manifests/) - External call coverage
+- [calor query](https://calor.dev/docs/cli/query/) - Ask what a function declares, what it really does, and what a change would break
+- [Adoption Playbook](/guides/adoption-playbook/) - Applying effects in an existing solution

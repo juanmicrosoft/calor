@@ -4393,6 +4393,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     /// </summary>
     private static string FormatEffectsTag(EffectsNode effects)
     {
+        if (effects.IsUnknown)
+            return "! unknown";
         var effectCodes = effects.Effects
             .SelectMany(kvp => kvp.Value.Split(',').Select(v => EffectCodes.ToCompact(kvp.Key, v.Trim())))
             .Distinct()

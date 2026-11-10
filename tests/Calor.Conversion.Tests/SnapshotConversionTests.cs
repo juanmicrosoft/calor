@@ -39,6 +39,29 @@ public class SnapshotConversionTests
             .Order(StringComparer.Ordinal).Select(path => new object[] { path });
 
     [Theory]
+    [InlineData("07-04", 7)]
+    [InlineData("13-03", 7)]
+    public void CallbackContracts_RetainNativeMethodsAndConversionCounts(string id, int nativeCount)
+    {
+        var snippet = ConversionCatalog.SupportedSnippets.Single(snippet => snippet.Id == id);
+        var result = TestHelpers.ConvertCSharp(snippet.CSharpSource, $"Test_{id.Replace("-", "_")}");
+        Assert.True(result.Success);
+        Assert.Equal(nativeCount, result.NativeConversionCount);
+        Assert.Equal(0, result.InteropPreservationCount);
+        Assert.Equal(0, result.LossySubstitutionCount);
+        Assert.Equal(0, result.DropCount);
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(result.CalorSource!, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var methods = Assert.Single(module.Classes).Methods;
+        Assert.Equal(2, methods.Count);
+        if (id == "07-04")
+            Assert.Null(methods.Single(method => method.Name == "Handle").Parameters[1].Row);
+        else
+            Assert.Null(methods.Single(method => method.Name == "GetComparer").Output!.Row);
+    }
+
+    [Theory]
     [MemberData(nameof(CurrentSnapshotData))]
     public void CurrentSnapshot_PreservesOriginalCurrentCompilerProjection(string original)
     {

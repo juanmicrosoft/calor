@@ -80,6 +80,23 @@ Rows are part of the type. `Func<int,int> !` and
 `Func<int,int> ! cw` have the same inputs and output, but different effect
 permissions.
 
+For callback parameters, returned callbacks and delegate declarations, an
+**omitted row means Unknown**. Write `! unknown` to state Unknown explicitly,
+or an empty `!` to promise Pure. Unknown is not a wildcard permission:
+invoking an Unknown callback fails strict effect checking, even if the caller
+declares every known effect. Merely accepting an unused Unknown callback does
+not invoke it. Passing or returning one can still produce `Calor0425` when the
+compiler cannot prove that the source row fits the destination.
+
+The marker is case-sensitive and stands alone. It is not an effect code, so
+do not combine it with `cw` or use it as a function's own declaration, a binding
+row, a field row, a property row or a lambda row. An existing effect placeholder
+named `unknown` keeps its normal binding identity; it is not the marker.
+These callback defaults do not change callable declaration contracts or the
+intrinsic mutation/allocation contracts of constructors and rowless operators.
+An omitted binding or lambda row can retain a known row inferred from its
+initializer or body; it does not automatically mean Pure.
+
 ### Where a row can appear
 
 ```calor

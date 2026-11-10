@@ -2258,6 +2258,18 @@ public sealed class Parser
         if (canonical)
             ReadNativeEffectAttributes(startToken, attrs, position);
 
+        // A scoped variable named unknown retains its binder identity.
+        if (attrs["_pos0"] == "unknown"
+            && attrs.All().All(attribute => attribute.Key is "_pos0" or "_posCount")
+            && !IsEffectVariableInScope("unknown"))
+        {
+            if (position is not (EffectRowPosition.Parameter or EffectRowPosition.Return or EffectRowPosition.Delegate))
+                _diagnostics.ReportError(startToken.Span, DiagnosticCode.EffectRowMisplaced,
+                    "! unknown is permitted only on callback parameter, return and delegate contracts. "
+                    + "A callable's own declaration requires known effects, or ! for pure.");
+            return new EffectsNode(startToken.Span, new Dictionary<string, string> { ["unknown"] = "*" });
+        }
+
         var variables = new List<string>();
 
         // Interpret positional attributes

@@ -89,17 +89,17 @@ public sealed class RowEscapeTableTests
     // that the only thing varying between rows is the ARGUMENT SHAPE.
     // ---------------------------------------------------------------------
     private const string Preamble = """
-        §M{RowTable}
-          §F{RunTwice:pub}<eff e> (Func<i32>:g §E{e}) -> i32
-            §E{e}
-            §B{first:i32} §C{g}
-            §B{second:i32} §C{g}
-            §R (+ first second)
+        module RowTable
+          func RunTwice <! e> (Func<int>:g ! e) → int
+            ! e
+            let int:first = g()
+            let int:second = g()
+            return first + second
 
-          §F{Beat:pub} () -> i32
-            §E{cw}
-            §P "beat"
-            §R INT:1
+          func Beat () → int
+            ! cw
+            Console.WriteLine("beat")
+            return 1
         """;
 
     private static string Src(string body) => Preamble + "\n\n" + body;
@@ -116,122 +116,123 @@ public sealed class RowEscapeTableTests
         // ---- CHARGED on v0.15.0 — the seven controls ----
 
         data.Add(new Shape(1, "module function by simple name (module scope)", Frozen.Charged, Src("""
-          §F{Twice:pub} () -> i32
-            §E{}
-            §R §C{RunTwice} §A Beat §/C
+          func Twice () → int
+            !
+            return RunTwice(Beat)
         """)));
 
         data.Add(new Shape(2, "module function module-qualified (module scope)", Frozen.Charged, Src("""
-          §F{Twice:pub} () -> i32
-            §E{}
-            §R §C{RunTwice} §A RowTableModule.Beat §/C
+          func Twice () → int
+            !
+            return RunTwice(RowTableModule.Beat)
         """)));
 
         data.Add(new Shape(3, "own rowed §FLD by simple name", Frozen.Charged, Src("""
-          §CL{Holder:pub}
-            §FLD{Func<i32>:stage:priv} §E{cw}
-            §CTOR{pub} ()
-              §ASSIGN stage RowTableModule.Beat
-            §MT{Twice:pub} () -> i32
-              §E{}
-              §R §C{RunTwice} §A stage §/C
+          class Holder
+            field Func<int>:stage private ! cw
+            ctor ()
+              set stage RowTableModule.Beat
+            func Twice () → int
+              !
+              return RunTwice(stage)
         """)));
 
         data.Add(new Shape(4, "static rowed §FLD by simple name", Frozen.Charged, Src("""
-          §CL{Holder:pub}
-            §FLD{Func<i32>:stage:priv:stat} §E{cw}
-            §CTOR{pub} ()
-              §ASSIGN stage RowTableModule.Beat
-            §MT{Twice:pub} () -> i32
-              §E{}
-              §R §C{RunTwice} §A stage §/C
+          class Holder
+            field Func<int>:stage private static ! cw
+            ctor ()
+              set stage RowTableModule.Beat
+            func Twice () → int
+              !
+              return RunTwice(stage)
         """)));
 
         data.Add(new Shape(5, "local bound from such a field", Frozen.Charged, Src("""
-          §CL{Holder:pub}
-            §FLD{Func<i32>:stage:priv} §E{cw}
-            §CTOR{pub} ()
-              §ASSIGN stage RowTableModule.Beat
-            §MT{Twice:pub} () -> i32
-              §E{}
-              §B{s:Func<i32>} stage
-              §R §C{RunTwice} §A s §/C
+          class Holder
+            field Func<int>:stage private ! cw
+            ctor ()
+              set stage RowTableModule.Beat
+            func Twice () → int
+              !
+              let Func<int>:s = stage
+              return RunTwice(s)
         """), FrozenFixture: "W-001-middleware-stage/seeded/unregistered-resolvable-alias-control-b"));
 
         data.Add(new Shape(6, "§B-bound §LAM with its row omitted", Frozen.Charged, Src("""
-          §F{Twice:pub} () -> i32
-            §E{}
-            §B{report:Func<i32>} §LAM{}
-              §P "beat"
-              §R INT:1
-            §/LAM
-            §R §C{RunTwice} §A report §/C
+          func Twice () → int
+            !
+            let Func<int>:report = () =>
+              Console.WriteLine("beat")
+              return 1
+            return RunTwice(report)
         """), FrozenFixture: "W-002-map-and-report/seeded/unregistered-rowless-lambda-control-b"));
 
         data.Add(new Shape(7, "direct invocation of a this.-qualified field", Frozen.Charged, Src("""
-          §CL{Holder:pub}
-            §FLD{Func<i32>:stage:priv} §E{cw}
-            §CTOR{pub} ()
-              §ASSIGN stage RowTableModule.Beat
-            §MT{Twice:pub} () -> i32
-              §E{}
-              §R §C{this.stage} §/C
+          class Holder
+            field Func<int>:stage private ! cw
+            ctor ()
+              set stage RowTableModule.Beat
+            func Twice () → int
+              !
+              return this.stage()
         """), FrozenFixture: "W-004-counter-peek/seeded/unregistered-this-qualified-escape-b"));
 
         // ---- ESCAPED on v0.15.0 — the five S1 had to close ----
 
         data.Add(new Shape(8, "own §FLD via this.", Frozen.Escaped, Src("""
-          §CL{Holder:pub}
-            §FLD{Func<i32>:stage:priv} §E{cw}
-            §CTOR{pub} ()
-              §ASSIGN stage RowTableModule.Beat
-            §MT{Twice:pub} () -> i32
-              §E{}
-              §R §C{RunTwice} §A this.stage §/C
+          class Holder
+            field Func<int>:stage private ! cw
+            ctor ()
+              set stage RowTableModule.Beat
+            func Twice () → int
+              !
+              return RunTwice(this.stage)
         """), FrozenFixture: "W-001-middleware-stage/seeded/unregistered-this-qualified-escape-b"));
 
         data.Add(new Shape(9, "§PROP by simple name — no receiver at all", Frozen.Escaped, Src("""
-          §CL{Holder:pub}
-            §PROP{Stage:Func<i32>:pub:get,set}
-            §CTOR{pub} ()
-              §ASSIGN Stage RowTableModule.Beat
-            §MT{Twice:pub} () -> i32
-              §E{}
-              §R §C{RunTwice} §A Stage §/C
+          class Holder
+            property Func<int>:Stage
+              get
+              set
+            ctor ()
+              set Stage RowTableModule.Beat
+            func Twice () → int
+              !
+              return RunTwice(Stage)
         """), FrozenFixture: "W-001-middleware-stage/seeded/unregistered-property-backed-escape-b"));
 
         data.Add(new Shape(10, "own §FLD via a local alias of this", Frozen.Escaped, Src("""
-          §CL{Holder:pub}
-            §FLD{Func<i32>:stage:priv} §E{cw}
-            §CTOR{pub} ()
-              §ASSIGN stage RowTableModule.Beat
-            §MT{Twice:pub} () -> i32
-              §E{}
-              §B{me:Holder} this
-              §R §C{RunTwice} §A me.stage §/C
+          class Holder
+            field Func<int>:stage private ! cw
+            ctor ()
+              set stage RowTableModule.Beat
+            func Twice () → int
+              !
+              let Holder:me = this
+              return RunTwice(me.stage)
         """)));
 
         data.Add(new Shape(11, "§FLD on another instance of the same class", Frozen.Escaped, Src("""
-          §CL{Holder:pub}
-            §FLD{Func<i32>:stage:priv} §E{cw}
-            §CTOR{pub} ()
-              §ASSIGN stage RowTableModule.Beat
-            §MT{TwiceOf:pub} (Holder:other) -> i32
-              §E{}
-              §R §C{RunTwice} §A other.stage §/C
+          class Holder
+            field Func<int>:stage private ! cw
+            ctor ()
+              set stage RowTableModule.Beat
+            func TwiceOf (Holder:other) → int
+              !
+              return RunTwice(other.stage)
         """), FrozenFixture: "W-001-middleware-stage/seeded/unregistered-other-receiver-escape-b"));
 
         data.Add(new Shape(12, "instance method group with a parameter receiver", Frozen.Escaped, Src("""
-          §CL{Ticker:pub}
-            §MT{Beat:pub} () -> i32
-              §E{cw}
-              §P "beat"
-              §R INT:1
+          class Ticker
+            func Beat () → int
+              ! cw
+              Console.WriteLine("beat")
+              return 1
 
-          §CL{Holder:pub}
-            §MT{TwiceOf:pub} (Ticker:ticker) -> i32
-              §E{}
-              §R §C{RunTwice} §A ticker.Beat §/C
+          class Holder
+            func TwiceOf (Ticker:ticker) → int
+              !
+              return RunTwice(ticker.Beat)
         """), FrozenFixture: "W-001-middleware-stage/seeded/unregistered-method-group-receiver-escape-b"));
 
         return data;
@@ -328,24 +329,23 @@ public sealed class RowEscapeTableTests
     {
         // Disclosure 1 — inherited field, unqualified. Blocked end-to-end pre-#1137.
         var inheritedField = TestHarness.Compile(Src("""
-          §CL{Base:pub}
-            §FLD{Func<i32>:stage:prot} §E{cw}
+          class Base
+            field Func<int>:stage protected ! cw
 
-          §CL{Holder:pub}
-            §EXT{Base}
-            §MT{Twice:pub} () -> i32
-              §E{}
-              §R §C{RunTwice} §A stage §/C
+          class Holder extends Base
+            func Twice () → int
+              !
+              return RunTwice(stage)
         """));
 
         // Disclosure 2 — module function module-qualified, from inside a class body.
         // Charged in module scope (shape 2); from a class body it additionally drew
         // a Calor0425.
         var moduleQualifiedInClass = TestHarness.Compile(Src("""
-          §CL{Holder:pub}
-            §MT{Twice:pub} () -> i32
-              §E{}
-              §R §C{RunTwice} §A RowTableModule.Beat §/C
+          class Holder
+            func Twice () → int
+              !
+              return RunTwice(RowTableModule.Beat)
         """));
 
         // Their CHARGE VERDICT is deliberately not asserted — that is what "never

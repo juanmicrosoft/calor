@@ -48,6 +48,8 @@ public sealed class EffectsNode : AstNode
 {
     public IReadOnlyDictionary<string, string> Effects { get; }
 
+    public bool IsUnknown => Effects.TryGetValue("unknown", out var value) && value == "*";
+
     /// <summary>
     /// Bare-identifier effect variables written inside this row — <c>§E{cw, e}</c>
     /// carries concrete code <c>cw</c> in <see cref="Effects"/> and variable

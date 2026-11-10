@@ -2098,7 +2098,7 @@ public sealed class EffectEnforcementPass
             // instantiate to the caller's own variable instead of to Unknown.
             foreach (var parameter in _function.Parameters)
             {
-                if (IsParameterFunctionTyped(_function, parameter))
+                if (parameter.Row != null || IsParameterFunctionTyped(_function, parameter))
                 {
                     _scope[parameter.Name] = PolyRow.From(parameter.Row);
                     _memberNames.Remove(parameter.Name);
@@ -2188,11 +2188,11 @@ public sealed class EffectEnforcementPass
         {
             _memberNames.Remove(bind.Name);
             var declaresRow = bind.Row != null;
-            var functionTyped = declaresRow || IsBindingFunctionTyped(bind);
+            var source = SourceRow(bind.Initializer);
+            var functionTyped = declaresRow || IsBindingFunctionTyped(bind) || source != null;
             if (!functionTyped)
                 return;
 
-            var source = SourceRow(bind.Initializer);
             if (source == null)
             {
                 // No nameable function value on the right. §3.5: a row-less §B
@@ -2376,7 +2376,8 @@ public sealed class EffectEnforcementPass
                     destinationName: $"'{parameter.Name}'",
                     destinationIsPosition: parameter.Row == null,
                     positionDescription: $"Parameter '{parameter.Name}' of '{callee.Name}'",
-                    owner: callee.Name);
+                    owner: callee.Name,
+                    destinationExplicitlyUnknown: parameter.Row?.IsUnknown == true);
             }
 
             if (binderCount > 0)
@@ -2527,7 +2528,8 @@ public sealed class EffectEnforcementPass
             var output = _function.Output;
             if (output == null)
                 return;
-            if (output.Row == null && !IsReturnFunctionTyped(_function, output))
+            if (output.Row == null && !IsReturnFunctionTyped(_function, output)
+                && !IsMetadataFunctionValue(returned))
                 return;
 
             var source = SourceRow(returned);
@@ -2543,7 +2545,8 @@ public sealed class EffectEnforcementPass
                 destinationName: "the return type",
                 destinationIsPosition: output.Row == null,
                 positionDescription: $"The return of '{_function.Name}'",
-                owner: _function.Name);
+                owner: _function.Name,
+                destinationExplicitlyUnknown: output.Row?.IsUnknown == true);
         }
 
         // ===== The shared verdict =====
@@ -2557,7 +2560,8 @@ public sealed class EffectEnforcementPass
             string destinationName,
             bool destinationIsPosition,
             string positionDescription,
-            string owner)
+            string owner,
+            bool destinationExplicitlyUnknown = false)
         {
             switch (PolyRow.Fits(source, destination))
             {
@@ -2580,13 +2584,16 @@ public sealed class EffectEnforcementPass
                     break;
                 }
 
-                case Binding.BoundTypes.EffectFit.CannotTell when destinationIsPosition && destination.Row.IsUnknown:
-                    // §6.4's second sample: the destination POSITION carries no row
-                    // at all, so nothing is known about what may be passed.
+                case Binding.BoundTypes.EffectFit.CannotTell when
+                    (destinationIsPosition || destinationExplicitlyUnknown) && destination.Row.IsUnknown:
+                    var contract = destinationExplicitlyUnknown
+                        ? "explicitly declares Unknown effects. State a known ! row on the same line "
+                            + "as the type to state what callers may pass, "
+                        : "is function-typed with no effect row, so its effects are "
+                            + "Unknown. Add ! on the same line as the type to state what callers may pass, ";
                     _pass.ReportRowUnknown(
                         span,
-                        $"{positionDescription} is function-typed with no effect row, so its effects are "
-                        + "Unknown. Add §E{…} on the same line as the type to state what callers may pass, "
+                        $"{positionDescription} {contract}"
                         + "or compile with --permissive-effects. Invoking a value whose row is Unknown "
                         + $"charges Unknown to '{owner}'.");
                     break;
@@ -2672,6 +2679,10 @@ public sealed class EffectEnforcementPass
                     if (_scope.TryGetValue(reference.Name, out var inScope))
                         return new RowSource(inScope, $"'{reference.Name}'");
 
+                    // Closed metadata aliases need not look like Func/Action.
+                    if (IsMetadataFunctionValue(reference))
+                        return new RowSource(PolyRow.Unknown, $"'{reference.Name}'");
+
                     // A method group naming an in-module callable: its row is its
                     // DECLARED §E — and Assumed, with the reasons, when the effect
                     // pass could only assume that declaration (§4.5's composition:
@@ -2733,6 +2744,10 @@ public sealed class EffectEnforcementPass
         private bool IsReturnFunctionTyped(FunctionNode owner, OutputNode output) =>
             _pass.BoundReturnFunctionType(owner.Id) != null
             || IsFunctionTyped(output.TypeName);
+
+        private bool IsMetadataFunctionValue(ExpressionNode expression) =>
+            _pass._callGraphAnalysis.MetadataValueType(_function.Id, expression.Span)?.TypeKind
+                == Microsoft.CodeAnalysis.TypeKind.Delegate;
 
         private bool IsFunctionTyped(string? typeName) =>
             TypeIdentity.IsFunctionTypeName(typeName, _pass._delegateTypeNames.Contains);
@@ -3978,7 +3993,9 @@ public sealed class EffectEnforcementPass
                 if (parameter != null)
                 {
                     if (parameter.Row != null)
-                        return (PolyRow.From(parameter.Row), string.Empty);
+                        return (PolyRow.From(parameter.Row), parameter.Row.IsUnknown
+                            ? $"parameter '{name}' of '{ownerName}' (type '{parameter.TypeName}') explicitly declares Unknown effects"
+                            : string.Empty);
 
                     var functionTyped =
                         _context.CallGraph.DeclaredFunctionTypes(_context.CurrentFunctionId)
@@ -4109,7 +4126,9 @@ public sealed class EffectEnforcementPass
                     {
                         if (parameter.Name.Equals(name, StringComparison.Ordinal))
                             return parameter.Row != null
-                                ? (PolyRow.From(parameter.Row), string.Empty)
+                                ? (PolyRow.From(parameter.Row), parameter.Row.IsUnknown
+                                    ? $"parameter '{name}' of '{function.Name}' explicitly declares Unknown effects"
+                                    : string.Empty)
                                 : null;
                     }
                 }
@@ -4152,7 +4171,9 @@ public sealed class EffectEnforcementPass
                 return (PolyRow.Unknown, $"{subject}is not visible to the effect pass");
 
             if (callee.Output?.Row != null)
-                return (PolyRow.From(callee.Output.Row), string.Empty);
+                return (PolyRow.From(callee.Output.Row), callee.Output.Row.IsUnknown
+                    ? $"{subject}explicitly declares Unknown effects on its returned function"
+                    : string.Empty);
 
             return (PolyRow.Unknown, $"{subject}returns a function type with no effect row");
         }
@@ -4221,7 +4242,7 @@ public sealed class EffectEnforcementPass
                     functionId,
                     span,
                     $"Invocation of {description} in '{owner}' cannot be charged: its effect row is "
-                    + $"Unknown ({why}). Add §E{{…}} on the same line as the type to state what "
+                    + $"Unknown ({why}). Add ! on the same line as the type to state what "
                     + $"{description} may do, or compile with --permissive-effects. '{owner}' is "
                     + "charged Unknown.");
                 return _context.Policy == UnknownCallPolicy.Permissive

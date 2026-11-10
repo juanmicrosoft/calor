@@ -10663,7 +10663,7 @@ public sealed class Binder
         EffectsNode? row,
         IReadOnlyList<EffectParameterInfo>? binders)
     {
-        if (row == null) return BoundTypes.EffectRow.Unknown;
+        if (row == null || row.IsUnknown) return BoundTypes.EffectRow.Unknown;
 
         var mentionsVariable = false;
         foreach (var variable in row.EffectVariables)

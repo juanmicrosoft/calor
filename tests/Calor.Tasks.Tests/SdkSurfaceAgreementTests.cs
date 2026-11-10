@@ -47,6 +47,81 @@ public sealed class SdkSurfaceAgreementTests : IDisposable
         Assert.Contains("|Calor1012|error|", Assert.Single(sdk));
     }
 
+    public static IEnumerable<object[]> NativeCallbackCases()
+    {
+        foreach (var suffix in new[] { "", " ! unknown", " !", " ! cw" })
+        foreach (var permissive in new[] { false, true })
+        foreach (var usage in new[] { "unused", "transport", "invoke", "alias" })
+            yield return [suffix, permissive, usage];
+    }
+
+    [Theory]
+    [MemberData(nameof(NativeCallbackCases))]
+    public void NativeUnknownCallbackContracts_MatchApiSdkAndCli(
+        string suffix, bool permissive, string usage)
+    {
+        var workspace = CreateTempDir();
+        var path = Path.Combine(workspace, "Contracts.calr");
+        var output = usage == "transport" ? $"Func<int>{suffix}" : "int";
+        var body = usage switch
+        {
+            "unused" => "return 1",
+            "transport" => "return callback",
+            "invoke" => "return callback()",
+            "alias" => """
+                let Func<int>:first = callback
+                    let Func<int>:second = first
+                    let Func<int>:third = second
+                    return third()
+                """,
+            _ => throw new ArgumentOutOfRangeException(nameof(usage))
+        };
+        var source = $$"""
+            module Contracts
+              func Run (Func<int>:callback{{suffix}}) → {{output}}
+                !
+                {{body}}
+            """;
+        File.WriteAllText(path, source);
+        var options = new Calor.Compiler.CompilationOptions
+        {
+            UnknownCallPolicy = permissive
+                ? Calor.Compiler.Effects.UnknownCallPolicy.Permissive
+                : Calor.Compiler.Effects.UnknownCallPolicy.Strict,
+            StatusWriter = TextWriter.Null
+        };
+        var api = Calor.Compiler.Program.Compile(source, path, options);
+        var invokes = usage is "invoke" or "alias";
+        // Existing inference loses known rows beyond one binding hop.
+        var invokesUnknown = suffix is "" or " ! unknown" || usage == "alias";
+        var expectedFailure = invokes
+            && (usage != "alias" && suffix == " ! cw" || !permissive && invokesUnknown);
+        Assert.Equal(expectedFailure, api.HasErrors);
+        if (usage == "alias")
+            Assert.Equal(!permissive, api.Diagnostics.Any(d => d.Code == "Calor0425"));
+
+        var engine = new CapturingBuildEngine();
+        var task = new CompileCalor
+        {
+            BuildEngine = engine,
+            SourceFiles = [new TaskItem(path)],
+            OutputDirectory = Path.Combine(workspace, "obj", "calor-sdk"),
+            ProjectDirectory = workspace,
+            ImplicitUsings = "enable",
+            PermissiveEffects = permissive
+        };
+        Assert.Equal(!expectedFailure, task.Execute());
+        var sdk = engine.Diagnostics.Select(d => string.Join("|", d.Code, d.Severity,
+            d.Line, d.Column, d.Message)).Order(StringComparer.Ordinal).ToArray();
+        var expected = api.Diagnostics.Select(d => string.Join("|", d.Code,
+            d.Severity.ToString().ToLowerInvariant(), d.Span.Line, d.Span.Column, d.Message))
+            .Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal(expected, sdk);
+
+        var cli = CompileThroughCliProcess(workspace, [path], "effects-on", permissive);
+        Assert.Equal(expected.Select(d => "Contracts.calr|" + d), cli);
+    }
+
     private readonly List<string> _tempDirs = [];
 
     public void Dispose()
@@ -226,7 +301,8 @@ public sealed class SdkSurfaceAgreementTests : IDisposable
 
     // --- the CLI path -------------------------------------------------------
 
-    private static IReadOnlyList<string> CompileThroughCliProcess(string workspace, string[] sources, string profile)
+    private static IReadOnlyList<string> CompileThroughCliProcess(
+        string workspace, string[] sources, string profile, bool permissive = false)
     {
         var psi = new ProcessStartInfo
         {
@@ -250,6 +326,8 @@ public sealed class SdkSurfaceAgreementTests : IDisposable
             psi.ArgumentList.Add("--no-enforce-effects");
         if (profile == "docs-required")
             psi.ArgumentList.Add("--require-docs");
+        if (permissive)
+            psi.ArgumentList.Add("--permissive-effects");
 
         using var process = Process.Start(psi)
             ?? throw new InvalidOperationException("Failed to start the calor CLI process.");
