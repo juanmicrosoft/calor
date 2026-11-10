@@ -74,6 +74,11 @@ For a delegate value, `transform.Invoke(value)` charges the same row as
 method name `Invoke`. A missing callback row still follows the unknown-effect
 rules; `.Invoke()` does not make it pure.
 
+A callback parameter or local binding shadows a same-named module function.
+Its invocation charges the callback's row, not the module function's row.
+Argument expressions still contribute their own effects. An ordinary class
+method named `Invoke` remains a method call with its selected declaration's row.
+
 Rows are part of the type. `Func<int,int> !` and
 `Func<int,int> ! cw` have the same inputs and output, but different effect
 permissions.

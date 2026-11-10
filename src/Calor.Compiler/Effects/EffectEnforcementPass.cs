@@ -6280,15 +6280,27 @@ public sealed class EffectEnforcementPass
             if (call.TargetExpression is FieldAccessNode member)
             {
                 var bound = _context.CallGraph.ComputedMemberCall(_context.CurrentFunctionId, call.Span);
+                var ids = _context.CallGraph.ResolveCallSites(
+                    _context.CurrentFunctionId, "<expression-call>", call.Span);
                 if (member.FieldName == "Invoke"
+                    && ids.Count == 0
                     && bound?.Receiver is { } delegateReceiver
-                    && (IsFunctionBoundType(delegateReceiver.Type)
+                    && (bound.ResolvedMetadataMethod?.MethodKind == Microsoft.CodeAnalysis.MethodKind.DelegateInvoke
+                        || IsFunctionBoundType(delegateReceiver.Type)
                         || delegateReceiver.Type is Binding.BoundTypes.NominalBoundType { Declaration: null } nominal
                         && (nominal.RoslynSymbol?.TypeKind == Microsoft.CodeAnalysis.TypeKind.Delegate
                             || nominal.RoslynSymbol is null
                             && member.Target is ReferenceNode reference
                             && IsFunctionValued(reference.Name, nominal.DisplayString))))
                 {
+                    if (member.Target is ReferenceNode invoked)
+                    {
+                        // The synthetic bare call has no bound call-site key;
+                        // resolving it by name can select a shadowed function.
+                        return InferFromBareNameTarget(invoked.Name, call.Span, invoked.Span)
+                            .Union(InferFromCallArguments(
+                                "<expression-call>", call.Arguments, call.ArgumentModifiers));
+                    }
                     return InferFromExpressionCall(new ExpressionCallNode(
                         call.Span, member.Target, call.Arguments,
                         call.ArgumentNames, call.ArgumentModifiers, call.TypeArguments));
@@ -6301,8 +6313,6 @@ public sealed class EffectEnforcementPass
                     : InferFromExpression(member.Target);
                 var evaluated = receiverEffects
                     .Union(InferFromCallArguments($"<expression>.{member.FieldName}", call.Arguments, call.ArgumentModifiers));
-                var ids = _context.CallGraph.ResolveCallSites(
-                    _context.CurrentFunctionId, "<expression-call>", call.Span);
                 if (ids.Count > 0)
                     return evaluated.Union(InferFromInternalFunctions(ids));
                 if (bound?.ResolvedMetadataMethod is { } method && bound.Receiver is { } receiver)

@@ -2646,7 +2646,7 @@ public sealed class Parser
         else if (Check(TokenKind.Func))
         {
             _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
-                "Local §F declarations are removed. Use a §B binding with §LAM instead.");
+                "Local func declarations are removed. Use a let binding with a lambda instead.");
             var enclosingIf = _lastIfToken;
             ParseFunction();
             _lastIfToken = enclosingIf;
