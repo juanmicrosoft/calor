@@ -19,26 +19,29 @@ An editing tool must find the intended declaration, locate its scope, and avoid
 changing similar code nearby. The historical representation measured here used
 two signals:
 
-- explicit structural markers such as `§F`, `§L`, and `§IF`;
+- explicit function, loop and conditional markers;
 - source IDs that distinguished otherwise similar structural targets.
 
-The following excerpt quotes that earlier syntax. Current Calor keeps declaration
-identity in `.calor/ids.json`; these historical heuristic scores have not been
-remeasured for the sidecar representation.
+The following native illustration keeps the two original loop ranges and
+conditions. Current Calor keeps declaration identity in `.calor/ids.json`; these
+historical heuristic scores have not been remeasured for the sidecar representation.
 
 ```calor
-§L{for1:i:1:100:1}
-  §IF{if1} (> i 50)
-    §P i
-
-§L{for2:j:1:50:1}
-  §IF{if2} (< j 25)
-    §P j
+module EditTargets
+  func Main () → void
+    ! cw
+    for i from 1 to 100 step 1
+      if i > 50
+        System.Console.WriteLine(i)
+    for j from 1 to 50 step 1
+      if j < 25
+        System.Console.WriteLine(j)
 ```
 
-“Change `for1` to start at 0” has a direct syntactic target. In C#, an
-instruction such as “change the first loop” depends on location and surrounding
-context.
+The archived instruction “Change `for1` to start at 0” relied on a source ID.
+No such ID is written in the native loop above. Current targeting must use the
+available project identity or source-location tools; this illustration does
+not establish automatic loop-ID preservation or an edit-success rate.
 
 ---
 
@@ -64,9 +67,8 @@ The structural Calor score starts at 0.50 and adds:
 | Indented body present | 0.10 |
 | Legacy variable-tag pattern present | 0.10 |
 
-{/* drift:ignore */}
-Current bindings use `§B`, not the legacy `§V` detector. That detector is a known
-limitation: current source does not earn the legacy-variable bonus. Current
+The calculator's legacy variable-marker detector is a known limitation:
+native `let` and `var` bindings do not earn that bonus. Current
 ID-free declarations also do not earn the calculator's explicit-source-ID bonus.
 Do not insert IDs into active source to change that score.
 
@@ -96,10 +98,10 @@ from this static metric.
 ## Historical Simulated Targeting Operations
 
 ```text
-Delete function f002  -> remove its §F opener and indented body
+Delete function f002  -> remove its historical function opener and indented body
 Rename function f001  -> change the name while preserving the explicit ID
 Move loop for1        -> move its opener and indented body together
-Add contract to f003  -> insert §Q in the function's contract section
+Add contract to f003  -> insert its historical precondition marker
 ```
 
 C# has strong IDE and Roslyn refactoring support, which this source-pattern

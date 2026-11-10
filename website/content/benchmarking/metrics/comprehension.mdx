@@ -28,7 +28,9 @@ When an AI agent reads code, it needs to answer:
 - What side effects are possible?
 - What constraints must hold?
 
-Traditional languages require parsing and inference. Calor makes these explicit.
+Both languages require parsing and name resolution. Calor gives effects and
+contracts declaration syntax; this metric counts surface signals rather than
+testing whether an agent understands them.
 
 ---
 
@@ -36,21 +38,22 @@ Traditional languages require parsing and inference. Calor makes these explicit.
 
 ### Archived Calor Clarity Factors
 
-These are the historical calculator's literal checks against its recorded corpus.
-The removed tags in this table are not current authoring instructions.
+These are named descriptions of the historical marker checks against the
+recorded corpus, not current authoring instructions. Exact detector spellings
+belong to the recorded calculator source, not native examples.
 
 | Factor | Points | Check |
 |:-------|:-------|:------|
-| Module declaration | 0.15 | Contains `§M{` |
-| Function declaration | 0.15 | Contains `§F{` |
-| Input parameters | 0.10 | Contains `§I{` |
-| Output type | 0.10 | Contains `§O{` |
-| Return statement | 0.10 | Contains `§R` |
-| Effect declaration | 0.15 | Contains `§E{` |
-| Requires contract | 0.15 | Contains `§Q` |
-| Ensures contract | 0.10 | Contains `§S` |
+| Module declaration | 0.15 | Recorded module marker |
+| Function declaration | 0.15 | Recorded function marker |
+| Input parameters | 0.10 | Recorded input marker |
+| Output type | 0.10 | Recorded output marker |
+| Return statement | 0.10 | Recorded return marker |
+| Effect declaration | 0.15 | Recorded effect marker |
+| Requires contract | 0.15 | Recorded precondition marker |
+| Ensures contract | 0.10 | Recorded postcondition marker |
 | Indented body line (proportional) | up to 0.10 | Matches `^[ \t]+\S` |
-| Indent-form completeness | 0.05 | At least one indented body line per `§F{` opener |
+| Indent-form completeness | 0.05 | At least one indented body line per recorded function opener |
 
 ### Archived C# Clarity Factors
 
@@ -81,15 +84,15 @@ module Calculator
 ```
 
 **Archived score calculation, not a score for the native illustration above:**
-- `§M{`: +0.15
-- `§F{`: +0.15
-- `§I{`: +0.10
-- `§O{`: +0.10
-- `§R`: +0.10
-- `§Q`: +0.15
-- `§S`: +0.10
+- Module marker: +0.15
+- Function marker: +0.15
+- Input marker: +0.10
+- Output marker: +0.10
+- Return marker: +0.10
+- Precondition marker: +0.15
+- Postcondition marker: +0.10
 - Indented body lines: +0.10 (proportional)
-- Indent-form completeness (every `§F{` has an indented body): +0.05
+- Indent-form completeness (every recorded function has an indented body): +0.05
 
 **Total: 1.00**
 
@@ -194,7 +197,9 @@ The historical aggregate is 1.84x. Under this calculator, Calor source exposes m
 of the structural signals being counted. That measures the calculator's
 defined signals; it is not a direct measurement of human comprehension.
 
-This doesn't mean C# is hard to understand—it means Calor makes structure *more explicit*, which benefits automated analysis.
+This does not show that C# is hard to understand or that an agent benefits by
+the reported ratio. The literal-marker heuristic is not a native-syntax parser;
+its archived scores must not be presented as scores for the current examples.
 
 ---
 

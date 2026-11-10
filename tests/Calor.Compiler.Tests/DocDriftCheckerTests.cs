@@ -19,6 +19,19 @@ public class DocDriftCheckerTests
     private const string ValidTeachingProgram = "module Good\n  func Value () → int\n    return 1\n";
 
     [Fact]
+    public void PublicWebsite_HasNoDocumentationDriftUnderProductionChecks()
+    {
+        var loadErrors = new List<Diagnostic>();
+        var inputs = DocDriftChecker.LoadFromRepository(CliTestHarness.FindRepoRoot(), loadErrors);
+        Assert.Empty(loadErrors);
+        Assert.NotEmpty(inputs.WebsiteDocs);
+        var diagnostics = DocDriftChecker.Check(inputs)
+            .Where(diagnostic => diagnostic.FilePath?.Replace('\\', '/')
+                .StartsWith("website/", StringComparison.Ordinal) == true);
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
     public void ConverterPreservationHelp_UsesOwnedFramesWithoutAnUnconditionalParseGuarantee()
     {
         var option = Commands.ConvertCommand.Create().Options.Single(option => option.HasAlias("--passthrough"));
@@ -169,6 +182,13 @@ public class DocDriftCheckerTests
     [InlineData("benchmarking/metrics/task-completion.mdx", 2, 0,
         new[] { "TaskSafeDivide", "TaskNormalizeScore" }, new[] { "3", "75" },
         new[] { "GlobalModule.SafeDivide(6, 2)", "GlobalModule.NormalizeScore(75, 100)" })]
+    [InlineData("benchmarking/metrics/generation-accuracy.mdx", 3, 1,
+        new[] { "FamiliarAdd", "GeneratedAdd" }, new[] { "42", "42" },
+        new[] { "GlobalModule.Add(20, 22)", "GlobalModule.Add(20, 22)" })]
+    [InlineData("benchmarking/metrics/comprehension.mdx", 1, 0,
+        new[] { "Calculator" }, new[] { "4" }, new[] { "GlobalModule.Divide(9, 2)" })]
+    [InlineData("benchmarking/metrics/safety.mdx", 1, 0,
+        new[] { "Math" }, new[] { "5" }, new[] { "GlobalModule.SafeDivide(10, 2)" })]
     [InlineData("philosophy/index.mdx", 2, 0,
         new[] { "DivisionObligations", "Calculator" }, new[] { "4", "42" },
         new[] { "GlobalModule.Divide(9, 2)", "GlobalModule.Add(20, 22)" })]
@@ -931,9 +951,85 @@ public class DocDriftCheckerTests
                 public static object? Run() => GlobalModule.Divide(6, 2);
             }
             """));
+    }
 
-        static string Observe(string source, string operation) =>
-            InteropScope.RefOutImplementationTests.Run("global using System;\n" + source + $$"""
+    [Theory]
+    [InlineData("information-density", "FizzBuzz", 2, 100)]
+    [InlineData("edit-precision", "EditTargets", 1, 74)]
+    public void PublicBenchmarkLoops_PreserveOriginalRangesAndConsoleTraces(
+        string page, string moduleName, int programCount, int lineCount)
+    {
+        var path = $"website/content/benchmarking/metrics/{page}.mdx";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)).Replace("\r\n", "\n");
+        Assert.DoesNotContain("§", content);
+        var coverage = new WebsiteExampleChecker.Coverage();
+        Assert.Empty(WebsiteExampleChecker.Check([new DocFile(path, content)], coverage));
+        Assert.Equal(programCount, coverage.CompletePrograms);
+        Assert.Equal(0, coverage.NegativePrograms);
+        var programs = ExemplarCompileChecker.ExtractCompletePrograms(content);
+        Assert.Equal(programCount, programs.Count);
+        var compiled = programs.Select(program => Program.Compile(program.Source, path)).ToArray();
+        Assert.All(compiled, result => Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics)));
+        var selected = Assert.Single(compiled.Where(result =>
+            Assert.IsType<Ast.ModuleNode>(result.Ast).Name == moduleName));
+        var actual = Observe(selected.GeneratedCode, "GlobalModule.Main()");
+        Assert.Equal(lineCount, actual.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length);
+
+        if (page == "information-density")
+        {
+            var original = System.Text.RegularExpressions.Regex.Matches(content,
+                @"```csharp\n(?<body>.*?)\n```", System.Text.RegularExpressions.RegexOptions.Singleline)[1];
+            var expected = Observe("public static class Original { public static void Run() {\n"
+                + original.Groups["body"].Value + "\n} }", "Original.Run()");
+            Assert.Equal(expected, actual);
+            Assert.Equal("42", InteropScope.RefOutImplementationTests.Run(compiled[0].GeneratedCode + """
+
+                public static class Probe
+                {
+                    public static object? Run() => GlobalModule.Add(20, 22);
+                }
+                """));
+        }
+        else
+        {
+            var expected = string.Join("\n", Enumerable.Range(51, 50).Concat(Enumerable.Range(1, 24))) + "\n";
+            Assert.Equal(expected, actual);
+        }
+    }
+
+    [Theory]
+    [InlineData("comprehension", "GlobalModule.Divide(9, 2)", "4", "4")]
+    [InlineData("comprehension", "GlobalModule.Divide(9, 0)", "!ContractViolationException", "!DivideByZeroException")]
+    [InlineData("comprehension", "GlobalModule.Divide(-9, 2)", "!ContractViolationException", "-4")]
+    [InlineData("comprehension", "GlobalModule.Divide(9, -2)", "!ContractViolationException", "-4")]
+    [InlineData("comprehension", "GlobalModule.Divide(int.MinValue, -1)", "!OverflowException", "!OverflowException")]
+    [InlineData("safety", "GlobalModule.SafeDivide(10, 2)", "5", "5")]
+    [InlineData("safety", "GlobalModule.SafeDivide(0, 5)", "0", "0")]
+    [InlineData("safety", "GlobalModule.SafeDivide(10, 0)", "!ContractViolationException", "!DivideByZeroException")]
+    [InlineData("safety", "GlobalModule.SafeDivide(int.MinValue, -1)", "!OverflowException", "!OverflowException")]
+    public void PublicBenchmarkContracts_DistinguishGuardsFromArithmeticAndWaivers(
+        string page, string expression, string enabled, string disabled)
+    {
+        var path = $"website/content/benchmarking/metrics/{page}.mdx";
+        var source = Assert.Single(ExemplarCompileChecker.ExtractCompletePrograms(
+            File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))).Source;
+        foreach (var mode in new[] { ContractMode.Debug, ContractMode.Release, ContractMode.Off })
+        {
+            var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = mode });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run() => {{expression}};
+                }
+                """);
+            Assert.Equal(mode == ContractMode.Off ? disabled : enabled, observed);
+        }
+    }
+
+    private static string Observe(string source, string operation) =>
+        InteropScope.RefOutImplementationTests.Run("global using System;\n" + source + $$"""
 
                 public static class Probe
                 {
@@ -951,8 +1047,7 @@ public class DocDriftCheckerTests
                         finally { Console.SetOut(previous); }
                     }
                 }
-                """);
-    }
+            """);
 
     [Theory]
     [InlineData("DivisionSignals", "GlobalModule.Divide(9, 0)", "!ContractViolationException", "!DivideByZeroException")]

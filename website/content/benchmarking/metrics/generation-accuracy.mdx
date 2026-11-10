@@ -4,7 +4,7 @@ section: "benchmarking"
 order: 6
 ---
 
-> **Syntax and measurement:** Source illustrations use current ID-free headers. The published numerical results and archived output remain historical; these illustrations are not a remeasurement of those results.
+> **Syntax and measurement:** Illustrations use current native syntax. The 1.02x result remains historical; compiling these examples does not rerun its 217 source pairs.
 
 **Category:** Generation Accuracy
 **Historical dashboard result:** Calor narrowly wins (1.02x across 217 programs)
@@ -16,7 +16,9 @@ See [snapshot provenance and limits](/docs/benchmarking/results/#read-the-result
 
 ## Overview
 
-The Generation Accuracy metric measures how correctly AI agents can generate valid code in each language.
+This deterministic metric scores compilation and AST structure in supplied
+source pairs. It does not ask an AI agent to generate code or measure an agent's
+generation success rate.
 
 ---
 
@@ -34,6 +36,8 @@ Languages with familiar patterns and extensive training data have an advantage.
 ## How It's Measured
 
 ### Composite Score
+
+The test runner's `GenerationAccuracyCalculator` uses:
 
 ```
 Score = (CompilationSuccess × 0.5) + (StructureScore × 0.3) + (NoErrors × 0.2)
@@ -55,9 +59,14 @@ Score = (CompilationSuccess × 0.5) + (StructureScore × 0.3) + (NoErrors × 0.2
 |:--------|:-------|:------|
 | Module name | 0.20 | Module has a name |
 | Has functions | 0.30 | At least one function |
-| Function name | 0.10 | Functions have names |
-| Function output | 0.10 | Functions have output types |
-| Function body | 0.10 | Functions have bodies |
+| Function name | 0.20 | First function has a name |
+| Function output | 0.20 | First function has an output type |
+| Function body | 0.10 | First function has a nonempty body |
+
+These are the current test runner's checks, capped at 1.0 and applied only after
+successful compilation. The previous table assigned 0.10 to the name and output
+checks; that table did not match the implementation. This correction does not
+reconstruct the unrecorded historical measurement binary or change its result.
 
 ### C# Structure Score
 
@@ -72,17 +81,15 @@ Score = (CompilationSuccess × 0.5) + (StructureScore × 0.3) + (NoErrors × 0.2
 
 ## Why the Result Is Close
 
-The current static compilation-and-structure calculator gives Calor a small
-1.02x lead. That is close enough that the following C# familiarity advantages
-still matter when interpreting actual LLM generation, which this metric does
-not directly measure.
+The historical snapshot reports a 1.02x Calor/C# ratio. That is a small difference
+under its compilation-and-structure rubric, not a result about present-day LLM
+generation.
 
 ### 1. Training Data Advantage
 
-LLMs have seen vastly more C# code than Calor code. This creates:
-- Better pattern recognition
-- Fewer syntax errors
-- More accurate boilerplate generation
+C# is more widely published than Calor. A model's actual training mix and the
+effect on its syntax errors are not measured here. Familiarity is a hypothesis
+for an agent experiment, not an explanation established by this calculator.
 
 ### 2. Familiar Patterns
 
@@ -95,12 +102,10 @@ public static int Add(int a, int b)
 ```
 
 ```calor
-// Calor: Novel syntax, less exposure
-§F{Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
+module FamiliarAdd
+  func Add public (int:a, int:b) → int
+    !
+    return a + b
 ```
 
 ### 3. Error Recovery
@@ -120,42 +125,38 @@ Calor errors may be less familiar:
 
 ### Agent Task: "Write a function that adds two integers"
 
-**C# generation (typical):**
+**C# source illustration, not observed agent output:**
 ```csharp
 public static int Add(int a, int b)
 {
     return a + b;
 }
 ```
-- Compiles: Yes
-- Structure: Complete
-- Errors: 0
-- Score: 1.0
+This is a method fragment. A class, namespace and imports are not shown; do not
+assign it a complete-program structure score without its compilation context.
 
-**Calor generation (typical):**
+**Complete native Calor illustration, not observed agent output:**
 ```calor
-§F{Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
+module GeneratedAdd
+  func Add public (int:a, int:b) → int
+    !
+    return a + b
 ```
-- Compiles: Yes
-- Structure: Complete
-- Errors: 0
-- Score: 1.0
 
-**Calor generation (common error):**
-```calor
-§F{Add:pub}
-§I{i32:a}
-§I{i32:b}
-§O{i32}
-§R (+ a b)
+The example compiles under normal enforcement and `Add(20, 22)` returns 42.
+That is a bounded compiler/runtime check, not a new generation-accuracy score.
+
+**Intentional indentation error, not a measured error frequency:**
+```calor expect=Calor0100
+module InvalidGeneration
+  func Add public (int:a, int:b) → int
+  return a + b
 ```
-- Compiles: No
-- Error: Function body is not indented
-- Score: 0.0
+
+The return is aligned with the function rather than nested in it. Parsing rejects
+the program with `Calor0100`. Under the test runner's rubric, failed compilation
+also gives a zero structure score; this is not evidence that agents commonly
+make this particular error.
 
 ---
 
@@ -165,10 +166,10 @@ public static int Add(int a, int b)
 
 | Error | Cause | Example |
 |:------|:------|:--------|
-| Misindented body | Body not indented under opener | `§F{f001}` followed by unindented statements |
-| Missing block body | Forgot statements inside a block | `§L{for1}` with no indented body |
-| Wrong nesting | Dedented or indented at the wrong level | `§IF` body aligned with parent |
-| Missing module wrapper | No enclosing `§M{}` block | Function outside module |
+| Misindented body | Body not indented under its declaration | `return` aligned with `func` |
+| Missing block body | Forgot statements inside a block | A counted `for` header with no body |
+| Wrong nesting | Dedented or indented at the wrong level | An `if` body aligned with its parent |
+| Missing module wrapper | No enclosing module declaration | Function outside `module Name` |
 
 ### Common C# Errors
 
@@ -231,8 +232,15 @@ Actual model-generated code may behave differently because:
 - C# patterns are more familiar to LLMs
 - C# tooling provides better error feedback
 
-Treat the result as near parity on the measured compilation and structural
+Treat the result as near parity on the recorded compilation and structural
 signals, not as proof that an LLM generates either language more reliably.
+The rubric also rewards wrappers such as C# namespaces and imports; valid source
+can omit them. These checks are scoring choices, not language requirements.
+
+The test-runner calculator lives in
+`tests/Calor.Evaluation/Metrics/GenerationAccuracyCalculator.cs`. The compiler's
+embedded evaluation calculator is a different implementation. Do not mix their
+scores or use a native illustration to overwrite the archived dashboard.
 
 ---
 

@@ -38,18 +38,18 @@ Languages that pack more meaning into fewer tokens use context windows more effi
 
 **Archived Calor calculator elements:**
 
-These literal tag checks describe the recorded calculator and its old inputs,
+These named marker checks describe the recorded calculator and its old inputs,
 not the syntax agents should write now.
 | Element | What it represents |
 |:--------|:-------------------|
-| Modules (`§M{`) | Namespace/module |
-| Functions (`§F{`) | Function definition |
-| Variables (`§B{`) | Variable binding |
-| Type annotations (`§I{`, `§O{`) | Type information |
-| Contracts (`§Q`, `§S`) | Preconditions/postconditions |
-| Effects (`§E{`) | Side effect declarations |
-| Control flow (`§IF`, `§L`) | Branches and loops |
-| Expressions (`§C{`, operators) | Computations |
+| Module markers | Namespace/module signals in the archived representation |
+| Function markers | Function definition |
+| Binding markers | Variable binding |
+| Input/output markers | Type information |
+| Precondition/postcondition markers | Contracts |
+| Effect markers | Side effect declarations |
+| Branch/loop markers | Control flow |
+| Call markers and operators | Computations |
 
 **C# elements (via Roslyn):**
 | Element | What it represents |
@@ -112,7 +112,7 @@ C# closing braces (`}`) carry minimal semantic weight but are still counted as t
 
 Calor's effect declarations add semantic content that C# doesn't have:
 
-```calor
+```calor-fragment
 ! cw,fs:r,net:rw
 ```
 
