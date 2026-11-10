@@ -2196,9 +2196,10 @@ public sealed class CSharpToCalorConverter
         // Fall back to file name
         if (!string.IsNullOrEmpty(sourceFile))
         {
-            // Sanitize characters that are not valid in Calor module names
-            // (e.g., '#' from Verify snapshot filenames like "TestName#HintName.verified.cs")
-            return Path.GetFileNameWithoutExtension(sourceFile).Replace('#', '_');
+            // This is a file label, not a CLR namespace or static container.
+            var fileLabel = Path.GetFileNameWithoutExtension(sourceFile)
+                .Replace('#', '_').Replace(':', '_');
+            return CSharpEmitter.SanitizeIdentifier(fileLabel);
         }
 
         return "ConvertedModule";

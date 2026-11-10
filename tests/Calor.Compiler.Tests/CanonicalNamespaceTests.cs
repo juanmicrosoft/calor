@@ -94,6 +94,43 @@ public sealed class CanonicalNamespaceTests
     }
 
     [Theory]
+    [InlineData("UsualFile.cs", "UsualFile")]
+    [InlineData("a4-created.cs", "a4created")]
+    [InlineData("123-array-input.cs", "_123arrayinput")]
+    [InlineData("space label.cs", "spacelabel")]
+    [InlineData("snapshot#1.verified.cs", "snapshot_1.verified")]
+    [InlineData("global::Source.cs", "global__Source")]
+    [InlineData("---.cs", "_")]
+    [InlineData("class.cs", "class")]
+    [InlineData("module.cs", "module")]
+    [InlineData("café Δ.cs", "caféΔ")]
+    public void FileDerivedLabelsAreNativeIdentifiersWithoutChangingClrIdentity(
+        string sourceFile, string expectedLabel)
+    {
+        const string source = "public static class Functions { public static int Read() => 42; }";
+        var conversion = new CSharpToCalorConverter().Convert(source, sourceFile);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.Equal(0, conversion.LossySubstitutionCount);
+        Assert.Equal(0, conversion.DropCount);
+        var module = Parse(conversion.CalorSource!);
+        Assert.Equal(expectedLabel, module.Name);
+        Assert.True(Assert.Single(module.NamespaceScopes).IsGlobal);
+        var original = Compile(source);
+        var generated = Compile(new CSharpEmitter().Emit(module));
+        var originalType = Assert.IsAssignableFrom<INamedTypeSymbol>(
+            original.GetTypeByMetadataName("Functions"));
+        var generatedType = Assert.IsAssignableFrom<INamedTypeSymbol>(
+            generated.GetTypeByMetadataName("Functions"));
+        Assert.Equal(originalType.ToDisplayString(), generatedType.ToDisplayString());
+        Assert.Equal(originalType.DeclaredAccessibility, generatedType.DeclaredAccessibility);
+        Assert.Equal(SpecialType.System_Int32,
+            Assert.IsAssignableFrom<IMethodSymbol>(Assert.Single(generatedType.GetMembers("Read")))
+                .ReturnType.SpecialType);
+        Assert.Equal(["Functions"], generated.Assembly.GlobalNamespace.GetTypeMembers().Select(type => type.Name));
+    }
+
+    [Theory]
     [InlineData("namespace A { class C {} } namespace A { class D {} }")]
     [InlineData("namespace A { namespace B { class C {} } }")]
     [InlineData("namespace A { using System; class C {} }")]

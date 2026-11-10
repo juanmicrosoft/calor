@@ -30,6 +30,10 @@ UTF-16/UTF-32 inputs therefore do **not** retain their original encoding or byte
 Exact-byte controls cover preserved UTF-8 sources, including BOMs, CRLF, and EOF comments.
 Malformed input encodings fail explicitly rather than using replacement text.
 
+When no C# namespace supplies a module label, the converter derives one from the
+filename and normalizes it to a valid Calor name. This file label does not change
+CLR namespaces, type names, or static containers.
+
 ### Compilation context
 
 Conversion and generated-output validation default to an implicit `System`
