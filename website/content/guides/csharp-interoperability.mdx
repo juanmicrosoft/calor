@@ -192,7 +192,7 @@ Writing the same
 call by hand in Calor has rules of its own, such as error `Calor0212` for an operand C#
 cannot pass by reference. See [By-reference arguments](/docs/syntax-reference/calls/#by-reference-arguments-ref-out-in).
 
-**Changed since 0.24:** `out var` inside `?:` used to become an inline `§CS{...}`; it is
+**Changed since 0.24:** `out var` inside `?:` used to become an inline C# escape; it is
 now a native binding. Passing an element field of a struct array used to pass a copy.
 Writes through `ref` and `out` are now charged as effects (`mut` for an element or field).
 
@@ -263,7 +263,7 @@ fractional part (`1.5`, not `1e-7` or `0.0000001`); dotted member access; `nameo
 whose positional arguments are of those kinds or such calls, except `null` and a member
 access whose receiver is not a name (`Pad(typeof(T).Name, 8)` keeps its hole as C#). Any
 other hole keeps its C#
-text as `§CS{...}` inside the hole: for example `{items[i]}`, `{customer?.Name}`, a
+text as a converter-owned expression inside the hole: for example `{items[i]}`, `{customer?.Name}`, a
 `decimal`, `long` or whole-number `double` literal (`{4.0}`), or an operator with a call
 operand (`{Next() + 1}`). A verbatim or raw interpolated string (`$@"..."`, `$"""..."""`)
 whose format clause contains a backslash keeps its whole statement as C#. It is counted as interop, and its effects are assumed
@@ -478,7 +478,7 @@ iterator method and return its result from the getter; see
 [Iterator Properties and Indexers](/docs/cli/convert/#iterator-properties-and-indexers).
 Iterators in ordinary methods already convert to `yield`.
 
-**Changed since 0.24:** the converter wrote `§YIELD` inside the getter. That fails with
+**Changed since 0.24:** the converter wrote a yield statement inside the getter. That fails with
 `Calor0209`; only the CLI's rescue hid it, and MCP `calor_convert` returned Calor that did
 not compile.
 
@@ -490,13 +490,13 @@ not compile.
 |:-------------|:-------------|:-----------------|
 | `out var` in a loop header, a lambda or a hole | That expression, statement or member kept as C# | varies, for example `conditional-expression-hoisting` |
 | Ref locals, ref returns, `scoped`/`ref readonly`, generic `out T` | Member preserved | `method`, with a warning naming the shape |
-| An `in` argument passed without `in`; a by-reference operand that runs code | Statement kept as `§RAW` (whole member in an expression-bodied member) | the parameter's kind, such as `in-parameter` (`method`) |
+| An `in` argument passed without `in`; a by-reference operand that runs code | Statement kept as converter-owned C# (whole member in an expression-bodied member) | the parameter's kind, such as `in-parameter` (`method`) |
 | Interpolated-string handler targets, hole-free `FormattableString` | Statement or member preserved | `string-interpolation-handler`, `string-interpolation-formattable-constant` |
-| Unsupported interpolation holes | The hole keeps its C# text (`§CS{...}`) | `string-interpolation-hole` |
+| Unsupported interpolation holes | The hole keeps its C# text, not native-expression credit | `string-interpolation-hole` |
 | Capturing, generic, async or iterator local functions | Member preserved | `method` with a `local-function` warning |
 | A collection-initializer array element, or a multi-line element in a rectangular array row | Statement preserved | `array-element-block` |
 | An assignment used as an array element, index or size | Statement or member preserved | `conditional-expression-hoisting` |
-| An initializer with no exact Calor form: `P = { ... }`, `["k"] = v`, a custom `Add` collection, a value that must run after the constructor, an initializer used as a method argument or inside a tuple | The creation keeps its C# text (`§CS{...}`) | `initializer-interop` |
+| An initializer with no exact Calor form: `P = { ... }`, `["k"] = v`, a custom `Add` collection, a value that must run after the constructor, an initializer used as a method argument or inside a tuple | The creation keeps its C# text | `initializer-interop` |
 | An event field with an initializer: `event Action E = Make();` | Member preserved | `initializer-interop` |
 | `yield` in a property or indexer getter; partial properties | Member preserved | `iterator-accessor`, `partial-property` |
 

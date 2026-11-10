@@ -22,7 +22,8 @@ Adding Calor to an existing project is a gradual process:
 5. **Convert one C# file** - Validate and review the result
 6. **Inspect project impact** - Query a converted method and its callers
 
-You don't need to convert everything at once. Calor and C# coexist seamlessly.
+You don't need to convert everything at once. Calor generates C# for the same
+project; check namespace identities, references and the mixed build in the pilot.
 
 ---
 
@@ -83,15 +84,14 @@ Top 10 Files for Migration:
 Create a new `.calr` file alongside your existing code:
 
 ```calor
-§M{Calculator}
-
-  §F{Add:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (+ a b)
-
+module Calculator
+  func Add public (int:a, int:b) → int
+    !
+    return a + b
 ```
+
+The file label is not a static class or namespace. Build tools maintain declaration
+identities in `.calor/ids.json`; commit that sidecar with the Calor source.
 
 ---
 
@@ -135,15 +135,15 @@ Conversion is not an all-or-nothing claim. The command above returns JSON;
 without `--format json`, inspect the equivalent text loss report. Review:
 
 - `losses[]` in JSON output or the text loss report,
-- every `§CSHARP` block that preserves source the converter could not express
+- every converter-owned raw C# frame that preserves source the converter could not express
   natively,
 - validation diagnostics,
 - the generated C# and existing tests.
 
 When a member cannot be converted safely, `calor convert` can preserve the
-original C# inside `§CSHARP` rather than discarding the whole file. That is a
-useful migration boundary, not completed conversion. `--no-fallback` asks the
-command to fail instead.
+original C# rather than discarding the whole file. That is a useful migration
+boundary, not completed native conversion. `--no-fallback` disables lossy TODO
+substitution; it does not prohibit faithful C# preservation.
 
 To tell a fully native file from a partly preserved one, read
 `data.conversionPaths.outcome` in the JSON output: `native`, `preserved`,
@@ -151,33 +151,34 @@ To tell a fully native file from a partly preserved one, read
 converter has no Calor form for the construct), `rescue` (its Calor failed to
 parse or to compile back to C#, so the original C# of the type was kept), or
 `passthrough` (kept only because you asked). `calor convert` rescues by
-default. `calor migrate` and the MCP tools do not rescue a round-trip failure
-by default, so the same file can be refused there; see
+default. Migration and MCP surfaces also preserve by default, using their
+project-validation boundaries. A file can still be refused or remain
+unverified when its original context is missing; see
 [Which mechanism kept the C#](/docs/guides/csharp-interoperability/#which-mechanism-kept-the-c).
 
 ### Common C# Features in a Pilot File
 
-The 0.25 converter, not yet released, handles these as follows. The
+The development converter handles these as follows. The
 [C# interoperability guide](/docs/guides/csharp-interoperability/) shows each
 one with real converter output.
 
-| C# feature | Native in 0.25 | Stays C# |
+| C# feature | Native output when supported | Stays C# |
 |:-----------|:---------------|:---------|
-| `ref`, `out`, `in` arguments | `TryParse`/`TryGetValue` with a declared variable, `out _`, `out var` in a declaration, `return` or `if` condition; `ref`/`in` on locals, fields and array elements | `out var` in a call statement or loop header, ref locals and returns, generic `out T`; `[NotNullWhen]` is kept but does not narrow |
-| Interpolated strings | `string`/`object` targets; `FormattableString`/`IFormattable` targets with holes (explicit cast) | Handler targets such as `StringBuilder.Append($"...")`; holes outside the native subset stay `§CS{...}` |
-| Local functions | Non-capturing, non-generic, synchronous helpers declared in a method body | Capturing, generic, `async` and iterator local functions (the whole member) |
+| `ref`, `out`, `in` arguments | `TryParse`/`TryGetValue` with a declared variable, `out _`, `out var` in a statement, declaration, `return` or direct `if` condition; `ref`/`in` on supported storage operands | `out var` in loop headers, ref locals and returns, generic `out T`; `[NotNullWhen]` is kept but does not narrow |
+| Interpolated strings | `string`/`object` targets; `FormattableString`/`IFormattable` targets with holes (explicit cast) | Handler targets such as `StringBuilder.Append($"...")`; unsupported holes preserve their C# |
+| Local functions | Bounded non-capturing, non-generic, synchronous helpers become typed static-lambda bindings | Capturing, generic, `async` and iterator local functions (the whole member) |
 | Arrays in expressions | 1-D, jagged and rectangular arrays in returns, arguments and `?:` branches | Collection-initializer elements, multi-line elements in rectangular rows, assignments used as elements |
-| Iterator properties and indexers | — | Always: the member stays `§CSHARP` |
+| Iterator properties and indexers | — | The member stays converter-owned C# |
 
 In 0.24, more of these stayed C#, often the whole type, through the CLI's
-automatic rescue. Converted output often also needs effect declarations (`§E{...}`)
-before it compiles with default options; until then, compile it with
-`--permissive-effects` (see below).
+automatic rescue. Converted output can still need native effect declarations
+such as `! cw` before it compiles with default options. Resolve those contracts
+before claiming normal enforcement; the migration waiver below is not acceptance.
 
 The converter is continuously exercised against MediatR, Serilog, and
-FluentValidation. All 364 converted modules currently parse, but parse success
-does not mean every member is native Calor or that every call binds. The loss
-report and interop blocks remain the source of truth for each file.
+FluentValidation. A corpus parse count does not establish that every member is
+native Calor or that every call binds. Read the current loss report and preserved
+boundaries for each file, then build it with its actual references.
 
 ### Use a Migration Waiver Deliberately
 

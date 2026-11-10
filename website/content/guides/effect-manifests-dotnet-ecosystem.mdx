@@ -12,17 +12,20 @@ When Calor code calls into .NET libraries, the compiler needs to know what side 
 
 ## The Problem
 
-Calor enforces that every function declares its effects:
+An explicit effect row bounds the effects allowed in a function. This standalone
+example uses the built-in console contract:
 
 ```calor
-§F{SaveUser:pub}
-  §O{void}
-  §E{db:w,cw}
-  §C{DbContext.SaveChanges} §/C
-  §C{ILogger.LogInformation} §A STR:"User saved" §/C
+module VisibleManifest
+  func LogSaved () → void
+    ! cw
+    System.Console.WriteLine("User saved")
 ```
 
-But how does the compiler know that `DbContext.SaveChanges` has effect `db:w` and `ILogger.LogInformation` has effect `cw`? Without this knowledge, every external call would be flagged as `Unknown`.
+The manifest supplies `cw` for the selected console call. Framework policies
+also include database writes and logging, but an entry's presence does not
+establish that a particular project call binds to it. Missing references,
+unresolved overloads and unknown receivers still need resolution.
 
 ## What's Covered
 
@@ -45,10 +48,11 @@ Core .NET types the compiler has always known about, plus recent additions:
 | `bcl-concurrent` | ConcurrentDictionary, Channel, BlockingCollection | `ConcurrentDictionary.TryAdd → mut` |
 | `bcl-crypto` | SHA256, RSA, Aes, RandomNumberGenerator | `SHA256.HashData → pure`, `RandomNumberGenerator.GetBytes → rand` |
 | `bcl-framework-interfaces` | ILogger, DbContext, IConfiguration, IHost, ControllerBase | See below |
+| `calor-runtime` | Calor.Runtime.Unit | Existing runtime helper methods have an empty row |
 
 ### Framework Interfaces (Tier B)
 
-The most commonly used .NET framework types — these are the calls AI agents generate most often:
+Examples of framework policy entries:
 
 | Type | Method | Effect | Why |
 |------|--------|--------|-----|
@@ -66,7 +70,7 @@ The most commonly used .NET framework types — these are the calls AI agents ge
 
 ### Ecosystem Libraries (4 manifests)
 
-Popular NuGet packages that AI agents commonly generate code for:
+The four ecosystem manifest files include these library policies:
 
 | Library | Key types | Effects |
 |---------|-----------|---------|
@@ -78,16 +82,22 @@ Popular NuGet packages that AI agents commonly generate code for:
 | **FluentValidation** | `IValidator.Validate` | pure |
 | **Polly** | `Policy.Execute` | pure (wraps delegate) |
 
+Here **pure** means the manifest assigns an empty effect row. It does not prove
+that a MediatR handler, mapper callback, validator or Polly delegate is free of
+effects. Review the policy against the implementations your project executes.
+Do not treat policy coverage as complete behavioral verification.
+
 ## How Resolution Works
 
-When the compiler encounters `§C{DbContext.SaveChanges}`, it:
+For a resolved call, binding supplies the selected owner, overload and argument
+facts. The effect resolver then looks for the applicable method, accessor,
+constructor or fallback policy. The console example selects
+`System.Console.WriteLine(string)` and receives `cw`.
 
-1. Parses the target: type = `DbContext`, method = `SaveChanges`
-2. Maps the short name: `DbContext` → `Microsoft.EntityFrameworkCore.DbContext`
-3. Looks up the manifest: finds `bcl-framework-interfaces.calor-effects.json`
-4. Returns the effect: `db:w`
-
-For instance calls like `§C{client.GetAsync}` (from converted C# code), the compiler also checks variable declarations — if `§B{client} §NEW{HttpClient}`, it resolves `client` → `System.Net.Http.HttpClient` → `net:rw`.
+Instance receivers also require valid bindings. Writing a familiar short type
+name is not proof of its CLR identity. A call such as `client.GetAsync(...)`
+must retain its actual receiver and selected method; unresolved calls do not
+become native coverage merely because a similarly named manifest entry exists.
 
 ### Resolution Priority
 
@@ -219,13 +229,18 @@ With IL analysis enabled, the compiler can trace `UserRepository.Save()` → `Db
 | Approach | Best for | Coverage |
 |----------|----------|----------|
 | **Built-in manifests** | .NET types (DbCommand, HttpClient, ILogger) | Curated embedded coverage |
-| **Custom manifests** | Ecosystem libraries, interface-heavy patterns | Precise, reviewed |
+| **Custom manifests** | Ecosystem libraries, interface-heavy patterns | Project policy that requires review |
 | **IL analysis** | Your own assemblies with concrete call chains | Automatic, best-effort |
 
 See the [IL analysis guide](/docs/guides/il-analysis/) for details.
 
 ## Architecture: Why Manifests?
 
-Calor is designed for AI agents as primary code authors. When an agent generates Calor code that calls `DbContext.SaveChanges()`, the compiler needs to verify the function declares `§E{db:w}`. Without manifests, every external call would be Unknown — defeating the purpose of effect enforcement.
+When a selected external call has the declared database-write policy, the
+enclosing function needs a row that admits `db:w`. Native declaration rows use
+`! db:w`, not a separate call-tag syntax.
 
-Manifests are the primary resolution mechanism because they're curated, precise, and cover the interface-heavy patterns (ILogger, IConfiguration) where IL analysis has a 0% resolution rate. IL analysis complements manifests by handling concrete call chains in user code — the gap between "framework types covered by manifests" and "Unknown."
+Manifests provide explicit policy for framework and interface-heavy APIs.
+IL analysis can propagate those seeds through concrete implementation chains;
+its limits and leaf assumptions still apply. Neither mechanism alone proves
+that every external behavior has been modeled.

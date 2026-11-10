@@ -178,6 +178,13 @@ public class DocDriftCheckerTests
         new[] { "SquareBoundaries", "FunctionCallBoundary", "FloatingProofBoundary" },
         new[] { "2147395600", "1", "4" },
         new[] { "GlobalModule.Square(46340)", "GlobalModule.Identity(1)", "GlobalModule.Square(2.0)" })]
+    [InlineData("guides/adding-calor-to-existing-projects.mdx", 1, 0,
+        new[] { "Calculator" }, new[] { "42" }, new[] { "GlobalModule.Add(20, 22)" })]
+    [InlineData("guides/adoption-playbook.mdx", 1, 0,
+        new[] { "Pricing" }, new[] { "5" }, new[] { "GlobalModule.ClampToCap(9, 5)" })]
+    [InlineData("guides/effect-manifests-dotnet-ecosystem.mdx", 1, 0,
+        new[] { "VisibleManifest" }, new[] { "True" },
+        new[] { "((System.Func<bool>)(() => { GlobalModule.LogSaved(); return true; }))()" })]
     [InlineData("philosophy/stable-identifiers.mdx", 1, 0,
         new[] { "Calculator" }, new[] { "42" }, new[] { "GlobalModule.Calculate(21)" })]
     [InlineData("philosophy/effects-contracts-enforcement.mdx", 4, 1,
@@ -725,6 +732,28 @@ public class DocDriftCheckerTests
                 """);
             Assert.Equal(mode == ContractMode.Off ? disabled : enabled, observed);
         }
+    }
+
+    [Theory]
+    [InlineData(9, 5, "5")]
+    [InlineData(-2, 5, "-2")]
+    [InlineData(0, 0, "0")]
+    [InlineData(9, -1, "!ContractViolationException")]
+    public void PublicAdoptionPilot_RetainsExactClampAndContractBehavior(int amount, int cap, string expected)
+    {
+        const string path = "website/content/guides/adoption-playbook.mdx";
+        var source = Assert.Single(ExemplarCompileChecker.ExtractCompletePrograms(
+            File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))).Source;
+        var compiled = Program.Compile(source, path);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+            public static class Probe
+            {
+                public static object? Run() => GlobalModule.ClampToCap({{amount}}, {{cap}});
+            }
+            """);
+        Assert.Equal(expected, observed);
     }
 
     [Theory]
