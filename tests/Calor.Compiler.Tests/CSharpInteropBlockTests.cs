@@ -299,11 +299,11 @@ public class CSharpInteropBlockTests
     [InlineData("#if NEVER\r\n\"\"\" unmatched { }\r\n#endif\r\n// no final newline")]
     public void RawFraming_LineEndingNormalizationPreservesExactFrames(string payload)
     {
-        var source = $"§M{{RawTest}}\r\n  raw delegate {System.Text.Encoding.UTF8.GetByteCount(payload)}\r\n{payload}\r\n" +
-            "  §F{Next:pub} () -> i32\r\n    §E{}\r\n    §R 1\r\n";
+        var source = $"module RawTest\r\n  raw delegate {System.Text.Encoding.UTF8.GetByteCount(payload)}\r\n{payload}\r\n" +
+            "  func Next public () → int\r\n    !\r\n    return 1\r\n";
         var normalized = RawCSharpFrame.NormalizeLineEndings(source);
-        Assert.Equal($"§M{{RawTest}}\n  raw delegate {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n" +
-            "  §F{Next:pub} () -> i32\n    §E{}\n    §R 1\n", normalized);
+        Assert.Equal($"module RawTest\n  raw delegate {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n" +
+            "  func Next public () → int\n    !\n    return 1\n", normalized);
         var parsed = ParseRawModule(normalized);
         Assert.Equal(payload, Assert.Single(parsed.InteropBlocks).CSharpCode);
         Assert.Equal("Next", Assert.Single(parsed.Functions).Name);
@@ -368,7 +368,7 @@ public class CSharpInteropBlockTests
     public void RawFraming_PreservesExactBytesAndFollowingLayout(string payload)
     {
         var length = System.Text.Encoding.UTF8.GetByteCount(payload);
-        var source = $"§M{{RawTest}}\n  raw delegate {length}\n{payload}\n  §CL{{Next:pub}}\n    raw member 0\n\n";
+        var source = $"module RawTest\n  raw delegate {length}\n{payload}\n  class Next\n    raw member 0\n\n";
         var diagnostics = new DiagnosticBag();
         var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
         var module = new Parser(tokens, diagnostics).Parse();
@@ -380,7 +380,7 @@ public class CSharpInteropBlockTests
         Assert.Equal("Next", Assert.Single(module.Classes).Name);
         Assert.Equal("", Assert.Single(module.Classes[0].InteropBlocks).CSharpCode);
         var next = Assert.Single(tokens.Where(t => t.Kind == TokenKind.Class));
-        Assert.Equal(source.IndexOf("§CL", StringComparison.Ordinal), next.Span.Start);
+        Assert.Equal(source.IndexOf("class Next", StringComparison.Ordinal), next.Span.Start);
         Assert.Equal(source[..next.Span.Start].Count(c => c == '\n') + 1, next.Span.Line);
         Assert.Equal(3, next.Span.Column);
         var emitted = new CalorEmitter().Emit(module);
@@ -395,8 +395,8 @@ public class CSharpInteropBlockTests
     public void RawFraming_PayloadFinalNewlineCanBeTheLayoutBoundary(string newline)
     {
         var payload = "  // \u03c0" + newline;
-        var source = $"§M{{RawTest}}{newline}  raw member {System.Text.Encoding.UTF8.GetByteCount(payload)}{newline}" +
-            payload + "  §CL{Next:pub}" + newline;
+        var source = $"module RawTest{newline}  raw member {System.Text.Encoding.UTF8.GetByteCount(payload)}{newline}" +
+            payload + "  class Next" + newline;
         var module = ParseRawModule(source);
         Assert.Equal(payload, Assert.Single(module.InteropBlocks).CSharpCode);
         Assert.Equal("Next", Assert.Single(module.Classes).Name);
@@ -409,8 +409,8 @@ public class CSharpInteropBlockTests
     public void RawFraming_RecordHeaderAfterPayloadRetainsNativeDeclaration(string newline)
     {
         var payload = "// opaque" + newline;
-        var source = $"§M{{RawTest}}{newline}  raw member {System.Text.Encoding.UTF8.GetByteCount(payload)}{newline}" +
-            payload + "  record Next:pub (int:X)" + newline;
+        var source = $"module RawTest{newline}  raw member {System.Text.Encoding.UTF8.GetByteCount(payload)}{newline}" +
+            payload + "  record Next (int:X)" + newline;
         var module = ParseRawModule(source);
         Assert.Equal(payload, Assert.Single(module.InteropBlocks).CSharpCode);
         var record = Assert.Single(module.Classes);
@@ -421,14 +421,14 @@ public class CSharpInteropBlockTests
     [Fact]
     public void RawFraming_AssertionsRequireActualCanonicalTokens()
     {
-        RawFrameAssertions.AssertFramed("§M{Test}\n  raw member 3\nx;\n");
-        RawFrameAssertions.AssertFramed("§M{Test}\n", present: false);
+        RawFrameAssertions.AssertFramed("module Test\n  raw member 3\nx;\n");
+        RawFrameAssertions.AssertFramed("module Test\n", present: false);
         Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
-            RawFrameAssertions.AssertFramed("§M{Test}\n"));
+            RawFrameAssertions.AssertFramed("module Test\n"));
         Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
-            RawFrameAssertions.AssertFramed("§M{Test}\n  §CSHARP{public class Keep { }}§/CSHARP\n"));
+            RawFrameAssertions.AssertFramed("module Test\n  §CSHARP{public class Keep { }}§/CSHARP\n"));
         Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
-            RawFrameAssertions.GetFrames("§M{Test}\n  raw member 20\nabc\n"));
+            RawFrameAssertions.GetFrames("module Test\n  raw member 20\nabc\n"));
     }
 
     [Theory]
@@ -495,7 +495,7 @@ public class CSharpInteropBlockTests
     public void RawFraming_StatementAndSourceToolsDoNotRewritePayload()
     {
         var payload = "  // §/M\r\n// §/NEW{x}\r\n// commas ,,, \u03c0 \r\n";
-        var source = $"§M{{RawTest}}\n  §F{{Run:pub}} () -> void\n    raw statement {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
+        var source = $"module RawTest\n  func Run public () → void\n    raw statement {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
         var module = ParseRawModule(source);
         Assert.Equal(payload, Assert.IsType<RawCSharpNode>(Assert.Single(module.Functions[0].Body)).CSharpCode);
         var emitted = new CalorEmitter().Emit(module);
@@ -539,18 +539,18 @@ public class CSharpInteropBlockTests
     public void RawFraming_LambdaCaptureAndHoistingPreservePayload()
     {
         const string payload = "// \u03c0\r\n  // §/LAM\r\n";
-        var source = $"§M{{RawTest}}\n  §F{{Run:pub}} () -> void\n" +
-            "    §B{action} §LAM{}\n" +
-            $"      raw statement {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n" +
-            "    §/LAM\n";
+        var source = $"module RawTest\n  func Run public () → void\n" +
+            "    let Action:action = () =>\n" +
+            $"      raw statement {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
         var module = ParseRawModule(source);
+        Assert.Single(MarkerNodes(module).OfType<LambdaExpressionNode>());
         var emitted = new CalorEmitter().Emit(module);
         var diagnostics = new DiagnosticBag();
         var frames = new Lexer(emitted, diagnostics).TokenizeAll()
             .Where(t => t.Value is RawCSharpFrame).ToList();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         Assert.Equal(payload, Assert.IsType<RawCSharpFrame>(Assert.Single(frames).Value).Code);
-        ParseRawModule(emitted);
+        Assert.Single(MarkerNodes(ParseRawModule(emitted)).OfType<LambdaExpressionNode>());
     }
 
     [Theory]
@@ -559,7 +559,7 @@ public class CSharpInteropBlockTests
     public void RawFraming_StatementReasonIsPreservedInItsActualScope(string reason)
     {
         const string payload = "// exact\r\n";
-        var source = $"§M{{RawTest}}\n  §CL{{C:pub}}\n    §MT{{Run:pub}}\n" +
+        var source = $"module RawTest\n  class C\n    func Run public () → void\n" +
             $"      raw {reason} {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
         var original = ParseRawModule(source);
         var raw = Assert.IsType<RawCSharpNode>(Assert.Single(original.Classes[0].Methods[0].Body));
@@ -606,9 +606,9 @@ public class CSharpInteropBlockTests
     public void RawFraming_HealerDiagnosticsRetainOriginalLineNumbers()
     {
         const string payload = "// one\r\n// two\r\n";
-        var source = "§M{T}\n  §F{Main:pub} () -> void\n" +
+        var source = "module T\n  func Main public () → void\n" +
             $"    raw statement {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n" +
-            "    §IF (== 1 1)\n      §P \"a\"\n      §EI (== 1 2)\n      §P \"b\"";
+            "    if 1 == 1\n      Console.WriteLine(\"a\")\n      else if 1 == 2\n      Console.WriteLine(\"b\")";
         var healer = new Calor.Compiler.Formatting.SourceHealer();
         var healed = healer.Heal(source);
         var ambiguity = Assert.Single(healer.Ambiguities);
@@ -617,6 +617,7 @@ public class CSharpInteropBlockTests
         var tokens = new Lexer(healed, new DiagnosticBag()).TokenizeAll();
         Assert.Equal(payload, Assert.IsType<RawCSharpFrame>(
             Assert.Single(tokens.Where(t => t.Value is RawCSharpFrame)).Value).Code);
+        ParseRawModule(healed);
     }
 
     private static ModuleNode ParseRawModule(string source)
@@ -697,28 +698,18 @@ public class CSharpInteropBlockTests
     public void Lexer_CSharpInteropBlock_TokenizesCorrectly()
     {
         var source = "§CSHARP{public void Foo() { }}§/CSHARP";
-        var diag = new DiagnosticBag();
-        var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
-
-        Assert.Empty(diag);
-        Assert.Equal(2, tokens.Count); // CSharpInterop + Eof
-        Assert.Equal(TokenKind.CSharpInterop, tokens[0].Kind);
-        Assert.Equal("public void Foo() { }", tokens[0].Value as string);
+        AssertRetiredInterop(source);
+        Assert.Equal("public void Foo() { }", LexRawMember("public void Foo() { }").Code);
     }
 
     [Fact]
     public void Lexer_CSharpInteropBlock_MultilineContent()
     {
         var source = "§CSHARP{\npublic int X { get; set; }\npublic int Y { get; set; }\n}§/CSHARP";
-        var diag = new DiagnosticBag();
-        var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
-
-        Assert.Empty(diag);
-        Assert.Equal(TokenKind.CSharpInterop, tokens[0].Kind);
-        var content = tokens[0].Value as string;
-        Assert.NotNull(content);
+        AssertRetiredInterop(source);
+        const string payload = "\npublic int X { get; set; }\npublic int Y { get; set; }\n";
+        var content = LexRawMember(payload).Code;
+        Assert.Equal(payload, content);
         Assert.Contains("public int X", content);
         Assert.Contains("public int Y", content);
     }
@@ -727,40 +718,68 @@ public class CSharpInteropBlockTests
     public void Lexer_CSharpInteropBlock_Unterminated_ReportsError()
     {
         var source = "§CSHARP{public void Foo() { }";
+        AssertRetiredInterop(source);
         var diag = new DiagnosticBag();
-        var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        const string payload = "public void Foo() { }";
+        new Lexer($"raw member {System.Text.Encoding.UTF8.GetByteCount(payload) + 1}\n{payload}", diag)
+            .TokenizeAll();
 
         Assert.NotEmpty(diag);
-        Assert.Contains(diag, d => d.Code == DiagnosticCode.UnterminatedCSharpInteropBlock);
+        Assert.Contains(diag, d => d.Code == DiagnosticCode.InvalidRawFrame
+            && d.Message.Contains("Truncated", StringComparison.Ordinal));
     }
 
     [Fact]
     public void Lexer_CSharpInteropBlock_MissingOpenBrace_ReportsError()
     {
         var source = "§CSHARP public void Foo() }§/CSHARP";
+        AssertRetiredInterop(source);
         var diag = new DiagnosticBag();
-        var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        new Lexer("raw member\npublic void Foo() }", diag).TokenizeAll();
 
         Assert.NotEmpty(diag);
-        Assert.Contains(diag, d => d.Code == DiagnosticCode.UnterminatedCSharpInteropBlock);
+        Assert.Contains(diag, d => d.Code == DiagnosticCode.InvalidRawFrame);
     }
 
     [Fact]
     public void Lexer_CSharpInteropBlock_EmbeddedCloseBrace_DoesNotTerminateEarly()
     {
-        // A } followed by something other than §/CSHARP should not terminate the block
         var source = "§CSHARP{if (x) { return; } else { break; }}§/CSHARP";
-        var diag = new DiagnosticBag();
-        var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
-
-        Assert.Empty(diag);
-        Assert.Equal(TokenKind.CSharpInterop, tokens[0].Kind);
-        var content = tokens[0].Value as string;
-        Assert.NotNull(content);
+        AssertRetiredInterop(source);
+        const string payload = "if (x) { return; } else { break; }";
+        var content = LexRawMember(payload).Code;
+        Assert.Equal(payload, content);
         Assert.Contains("if (x) { return; } else { break; }", content);
+    }
+
+    // Framing fixtures do not establish converter origin or satisfy production reason validation.
+    private static string RawMember(string payload)
+        => $"raw member {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
+
+    private static RawCSharpFrame LexRawMember(string payload)
+    {
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(RawMember(payload), diagnostics).TokenizeAll();
+        Assert.Empty(diagnostics);
+        Assert.Equal(2, tokens.Count);
+        Assert.Equal(TokenKind.CSharpInterop, tokens[0].Kind);
+        Assert.Equal(TokenKind.Eof, tokens[1].Kind);
+        return Assert.IsType<RawCSharpFrame>(tokens[0].Value);
+    }
+
+    private static void AssertRetiredInterop(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(source, diagnostics).TokenizeAll();
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownSectionMarker
+            && diagnostic.Message.Contains("'§CSHARP'", StringComparison.Ordinal)
+            && source.Substring(diagnostic.Span.Start, diagnostic.Span.Length) == "§CSHARP");
+        Assert.DoesNotContain(tokens, token => token.Value is RawCSharpFrame);
+        var rejected = Program.Compile("module Retired\n  " + source);
+        Assert.True(rejected.HasErrors);
+        Assert.Contains(rejected.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownSectionMarker
+            && diagnostic.Message.Contains("'§CSHARP'", StringComparison.Ordinal));
+        Assert.Empty(rejected.GeneratedCode);
     }
 
     #endregion
@@ -770,10 +789,9 @@ public class CSharpInteropBlockTests
     [Fact]
     public void Parser_ModuleWithInteropBlock_ParsesCorrectly()
     {
-        var source = """
-            §M{TestModule}
-              §CSHARP{public static void Helper() { Console.WriteLine("hi"); }}§/CSHARP
-            """;
+        const string payload = """public static void Helper() { Console.WriteLine("hi"); }""";
+        var source = "module TestModule\n  " +
+            RawMember(payload);
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
         var parser = new Parser(lexer.TokenizeAllForParser(), diag);
@@ -781,6 +799,7 @@ public class CSharpInteropBlockTests
 
         Assert.Empty(diag);
         Assert.Single(module.InteropBlocks);
+        Assert.Equal(payload, module.InteropBlocks[0].CSharpCode);
         Assert.Contains("Helper", module.InteropBlocks[0].CSharpCode);
     }
 
@@ -791,11 +810,9 @@ public class CSharpInteropBlockTests
     [Fact]
     public void Parser_ClassWithInteropBlock_ParsesCorrectly()
     {
-        var source = """
-            §M{TestModule}
-              §CL{MyClass:pub}
-                §CSHARP{public T GetAll<T>() where T : class => default!;}§/CSHARP
-            """;
+        const string payload = "public T GetAll<T>() where T : class => default!;";
+        var source = "module TestModule\n  class MyClass\n    " +
+            RawMember(payload);
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
         var parser = new Parser(lexer.TokenizeAllForParser(), diag);
@@ -804,6 +821,7 @@ public class CSharpInteropBlockTests
         Assert.Empty(diag);
         Assert.Single(module.Classes);
         Assert.Single(module.Classes[0].InteropBlocks);
+        Assert.Equal(payload, module.Classes[0].InteropBlocks[0].CSharpCode);
         Assert.Contains("GetAll<T>", module.Classes[0].InteropBlocks[0].CSharpCode);
     }
 
@@ -814,11 +832,9 @@ public class CSharpInteropBlockTests
     [Fact]
     public void CalorEmitter_RoundTrips_CSharpInteropBlock()
     {
-        var source = """
-            §M{TestModule}
-              §CL{MyClass:pub}
-                §CSHARP{public T GetAll<T>() => default!;}§/CSHARP
-            """;
+        const string payload = "public T GetAll<T>() => default!;";
+        var source = "module TestModule\n  class MyClass\n    " +
+            RawMember(payload);
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
         var parser = new Parser(lexer.TokenizeAllForParser(), diag);
@@ -831,6 +847,8 @@ public class CSharpInteropBlockTests
         Assert.Contains("raw member ", emitted);
         Assert.DoesNotContain("}§/CSHARP", emitted);
         Assert.Contains("GetAll<T>", emitted);
+        var reparsed = ParseRawModule(emitted);
+        Assert.Equal(payload, Assert.Single(Assert.Single(reparsed.Classes).InteropBlocks).CSharpCode);
     }
 
     #endregion
