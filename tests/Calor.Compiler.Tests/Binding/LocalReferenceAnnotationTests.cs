@@ -28,44 +28,44 @@ public class LocalReferenceAnnotationTests
         var annotation = nullable ? NullableAnnotation.Annotated : NullableAnnotation.NotAnnotated;
         var expression = producer switch
         {
-            "new" => "§NEW{Foo}",
-            "native" or "native-nullable" => "§C{Foo.Get} §A input §/C",
-            "bcl" => "§C{System.IO.Directory.CreateDirectory} §A STR:\"/\" §/C",
-            "bcl-nullable" => "§C{System.IO.Directory.GetParent} §A STR:\"/\" §/C",
+            "new" => "new Foo()",
+            "native" or "native-nullable" => "Foo.Get(input)",
+            "bcl" => "System.IO.Directory.CreateDirectory(\"/\")",
+            "bcl-nullable" => "System.IO.Directory.GetParent(\"/\")",
             _ => throw new ArgumentOutOfRangeException(nameof(producer))
         };
         var statements = new List<string>();
         for (var i = 0; i < depth; i++)
         {
-            statements.Add($"§B{{local{i}}} {expression}");
+            statements.Add($"let local{i} = {expression}");
             expression = $"local{i}";
         }
         statements.Add(boundary switch
         {
-            "binding" => $"§B{{result:{receivingType}}} {expression}",
-            "return" => $"§R {expression}",
-            "argument" => $"§R §C{{{(isBcl ? "System.IO.FileSystemAclExtensions.GetAccessControl" : "Foo.Consume")}}} §A {expression} §/C",
+            "binding" => $"let {receivingType}:result = {expression}",
+            "return" => $"return {expression}",
+            "argument" => $"return {(isBcl ? "System.IO.FileSystemAclExtensions.GetAccessControl" : "Foo.Consume")}({expression})",
             _ => throw new ArgumentOutOfRangeException(nameof(boundary))
         });
         var body = string.Join("\n      ", statements);
         var output = boundary == "return" ? receivingType
-            : boundary == "argument" ? isBcl ? "System.Security.AccessControl.DirectorySecurity" : "i32"
+            : boundary == "argument" ? isBcl ? "System.Security.AccessControl.DirectorySecurity" : "int"
             : "void";
         var source = $$"""
-            §M{LocalReferences}
-              §CL{Foo:pub}
-                §MT{Get:pub:static} ({{(nullable ? "?Foo" : "Foo")}}:input) -> {{(nullable ? "?Foo" : "Foo")}}
-                  §R input
-                §MT{Consume:pub:static} ({{receivingType}}:value) -> i32
-                  §R 0
-                §MT{Probe:pub:static} ({{(nullable ? "?Foo" : "Foo")}}:input) -> {{output}}
+            module LocalReferences
+              class Foo public
+                func Get public static ({{(nullable ? "Foo?" : "Foo")}}:input) → {{(nullable ? "Foo?" : "Foo")}}
+                  return input
+                func Consume public static ({{receivingType}}:value) → int
+                  return 0
+                func Probe public static ({{(nullable ? "Foo?" : "Foo")}}:input) → {{output}}
                   {{body}}
             """;
         var (module, diagnostics) = Bind(source);
         var probe = Probe(module);
         foreach (var local in probe.Body.Take(depth).Cast<BoundBindStatement>())
             Assert.Equal(annotation, local.Variable.NullableAnnotation);
-        var consumed = ConsumerValue(probe.Body.Last(), boundary);
+        var consumed = ConsumerValue(probe.Body.Last(), boundary, isBcl);
         Assert.Equal(annotation, Assert.IsType<NominalBoundType>(consumed.Type).NullableAnnotation);
         if (consumed is BoundNewExpression constructed)
             Assert.NotNull(constructed.ResolvedType);
@@ -98,31 +98,31 @@ public class LocalReferenceAnnotationTests
 
     [Theory]
     [InlineData("field", "Foo", false)]
-    [InlineData("field", "?Foo", true)]
+    [InlineData("field", "Foo?", true)]
     [InlineData("property", "Foo", false)]
-    [InlineData("property", "?Foo", true)]
+    [InlineData("property", "Foo?", true)]
     [InlineData("field", "string", false)]
-    [InlineData("field", "?string", true)]
+    [InlineData("field", "string?", true)]
     [InlineData("property", "string", false)]
-    [InlineData("property", "?string", true)]
+    [InlineData("property", "string?", true)]
     public void NativeMember_BareThisAndBaseKeepTheSameResolvedAnnotation(
         string kind, string typeName, bool nullable)
     {
         var member = kind == "field"
-            ? $"§FLD{{{typeName}:Value:pub}}"
-            : $"§PROP{{Value:{typeName}:pub:get,set}}";
-        var receivingType = typeName.TrimStart('?');
+            ? $"field {typeName}:Value public"
+            : $"property {typeName}:Value public\n      get\n      set";
+        var receivingType = typeName.TrimEnd('?');
         var source = $$"""
-            §M{NativeMemberAnnotations}
-              §CL{Foo:pub}
-              §CL{Parent:pub}
+            module NativeMemberAnnotations
+              class Foo public
+              class Parent public
                 {{member}}
-              §CL{Child:pub}
-                §EXT{Parent}
-                §MT{Probe:pub} () -> void
-                  §B{bare:{{receivingType}}} Value
-                  §B{viaThis:{{receivingType}}} §THIS.Value
-                  §B{viaBase:{{receivingType}}} §BASE.Value
+              class Child public
+                extends Parent
+                func Probe public () → void
+                  let {{receivingType}}:bare = Value
+                  let {{receivingType}}:viaThis = this.Value
+                  let {{receivingType}}:viaBase = base.Value
             """;
         var (module, diagnostics) = Bind(source);
         var statements = Probe(module).Body.Cast<BoundBindStatement>().ToArray();
@@ -153,30 +153,40 @@ public class LocalReferenceAnnotationTests
         string receivingType, bool nullable, bool expectedFinding)
     {
         var sourceA = $$"""
-            §M{Namespaces}
-              §CL{Foo:pub}
-                §MT{Get:pub:static} () -> {{(nullable ? "?Foo" : "Foo")}}
-                  §R §NEW{Foo}
+            module Namespaces A
+              class Foo public
+                func Get public static () → {{(nullable ? "Foo?" : "Foo")}}
+                  return new Foo()
             """;
         var sourceB = $$"""
-            §M{Namespaces}
-              §CL{Foo:pub}
-                §MT{Probe:pub:static} () -> void
-                  §B{first} §C{A.Foo.Get} §/C
-                  §B{second} first
-                  §B{result:{{receivingType}}} second
+            module Namespaces B
+              class Foo public
+                func Probe public static () → void
+                  let first = A.Foo.Get()
+                  let second = first
+                  let {{receivingType}}:result = second
             """;
         var parsedA = Parse(sourceA);
         var parsedB = Parse(sourceB);
         var classA = Assert.Single(parsedA.Classes);
         var classB = Assert.Single(parsedB.Classes);
-        classA.NamespaceIdentity = "A";
-        classB.NamespaceIdentity = "B";
+        Assert.Equal("A", classA.NamespaceIdentity);
+        Assert.Equal("B", classB.NamespaceIdentity);
+        // This composed AST retains namespace identities, not the separate files' lexical scope tables.
+        classA.NamespaceScopeId = null;
+        classB.NamespaceScopeId = null;
+        classA.Methods.Single().NamespaceScopeId = null;
+        classB.Methods.Single().NamespaceScopeId = null;
         var parsed = new ModuleNode(parsedA.Span, parsedA.Id, parsedA.Name,
             parsedA.Usings, parsedA.Interfaces, [classA, classB], parsedA.Functions, parsedA.Attributes);
         var diagnostics = new DiagnosticBag();
         var bound = new Binder(diagnostics).Bind(parsed);
         var probe = Probe(bound);
+        var producerCall = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundBindStatement>(probe.Body[0]).Initializer);
+        Assert.NotNull(producerCall.ResolvedSymbol);
+        Assert.Equal("A.Foo",
+            Assert.IsType<NominalBoundType>(producerCall.Type).Declaration?.QualifiedName);
         foreach (var local in probe.Body.Take(2).Cast<BoundBindStatement>())
             Assert.Equal("A.Foo", local.Variable.InferredReferenceType?.Declaration?.QualifiedName);
         var consumed = Assert.IsType<BoundVariableExpression>(
@@ -192,17 +202,17 @@ public class LocalReferenceAnnotationTests
 
     [Theory]
     [InlineData("Foo", NullableAnnotation.NotAnnotated)]
-    [InlineData("?Foo", NullableAnnotation.Annotated)]
+    [InlineData("Foo?", NullableAnnotation.Annotated)]
     public void ExplicitTargetAnnotation_IsNotReplacedByInitializerAnnotation(
         string declaredType, NullableAnnotation expected)
     {
         var source = $$"""
-            §M{DeclaredReferences}
-              §CL{Foo:pub}
-                §MT{Probe:pub:static} () -> void
-                  §B{first:{{declaredType}}} §NEW{Foo}
-                  §B{second} first
-                  §B{third} second
+            module DeclaredReferences
+              class Foo public
+                func Probe public static () → void
+                  let {{declaredType}}:first = new Foo()
+                  let second = first
+                  let third = second
             """;
         var (module, _) = Bind(source);
         var bindings = Probe(module).Body.Cast<BoundBindStatement>().ToArray();
@@ -214,16 +224,16 @@ public class LocalReferenceAnnotationTests
 
     [Theory]
     [InlineData("Foo", NullableAnnotation.NotAnnotated)]
-    [InlineData("?Foo", NullableAnnotation.Annotated)]
+    [InlineData("Foo?", NullableAnnotation.Annotated)]
     public void ModeledNominalConditional_RetainsBranchAnnotationAndIdentity(
         string rightType, NullableAnnotation expected)
     {
         var source = $$"""
-            §M{ConditionalLimit}
-              §CL{Foo:pub}
-                §MT{Probe:pub:static} (bool:choose, Foo:left, {{rightType}}:right) -> void
-                  §B{first} (? choose left right)
-                  §B{second} first
+            module ConditionalLimit
+              class Foo public
+                func Probe public static (bool:choose, Foo:left, {{rightType}}:right) → void
+                  let first = choose ? left : right
+                  let second = first
             """;
         var (module, _) = Bind(source);
         var bindings = Probe(module).Body.Cast<BoundBindStatement>().ToArray();
@@ -238,17 +248,17 @@ public class LocalReferenceAnnotationTests
     }
 
     [Theory]
-    [InlineData("INT:1")]
-    [InlineData("§C{System.Guid.NewGuid} §/C")]
-    [InlineData("§C{Unknown.Get} §/C")]
+    [InlineData("1")]
+    [InlineData("System.Guid.NewGuid()")]
+    [InlineData("Unknown.Get()")]
     public void ValueAndUnresolvedSources_DoNotAcquireReferenceIdentity(string expression)
     {
         var source = $$"""
-            §M{ExcludedSources}
-              §CL{Holder:pub}
-                §MT{Probe:pub:static} () -> void
-                  §B{first} {{expression}}
-                  §B{second} first
+            module ExcludedSources
+              class Holder public
+                func Probe public static () → void
+                  let first = {{expression}}
+                  let second = first
             """;
         var (module, _) = Bind(source);
         foreach (var binding in Probe(module).Body.Cast<BoundBindStatement>())
@@ -264,15 +274,15 @@ public class LocalReferenceAnnotationTests
     public void ResolvedBclString_LocalChainKeepsItsExactAnnotation(bool nullable)
     {
         var call = nullable
-            ? "§C{System.Environment.GetEnvironmentVariable} §A STR:\"CALOR_N0_UNSET\" §/C"
-            : "§C{System.IO.Directory.GetCurrentDirectory} §/C";
+            ? "System.Environment.GetEnvironmentVariable(\"CALOR_N0_UNSET\")"
+            : "System.IO.Directory.GetCurrentDirectory()";
         var source = $$"""
-            §M{StringLocalRegression}
-              §CL{Holder:pub}
-                §MT{Probe:pub:static} () -> string
-                  §B{first} {{call}}
-                  §B{second} first
-                  §R second
+            module StringLocalRegression
+              class Holder public
+                func Probe public static () → string
+                  let first = {{call}}
+                  let second = first
+                  return second
             """;
         var (module, diagnostics) = Bind(source);
         var probe = Probe(module);
@@ -298,14 +308,14 @@ public class LocalReferenceAnnotationTests
         // nullable-interface field reads. The local interface makes resolution
         // explicit; the original per-file corpus still has an unresolved interface.
         var source = $$"""
-            §M{EnricherFieldReduction}
-              §IFACE{ILogEventEnricher:pub}
-              §CL{Holder:pub}
-                §FLD{ {{(nullable ? "?ILogEventEnricher" : "ILogEventEnricher")}}:{{memberName}}:priv}
-                §MT{Probe:pub} () -> ILogEventEnricher
-                  §B{first} §THIS.{{memberName}}
-                  §B{second} first
-                  §R second
+            module EnricherFieldReduction
+              interface ILogEventEnricher public
+              class Holder public
+                field {{(nullable ? "ILogEventEnricher?" : "ILogEventEnricher")}}:{{memberName}} private
+                func Probe public () → ILogEventEnricher
+                  let first = this.{{memberName}}
+                  let second = first
+                  return second
             """;
         var (module, diagnostics) = Bind(source);
         var probe = Probe(module);
@@ -329,22 +339,22 @@ public class LocalReferenceAnnotationTests
     [InlineData(2, false)]
     public void BclToNativeInputs_RetainApplicabilityAndStageBActivation(int depth, bool nullable)
     {
-        var value = $"§C{{System.IO.Directory.{(nullable ? "GetParent" : "CreateDirectory")}}} §A STR:\"/\" §/C";
+        var value = $"System.IO.Directory.{(nullable ? "GetParent" : "CreateDirectory")}(\"/\")";
         var statements = new List<string>();
         for (var i = 0; i < depth; i++)
         {
-            statements.Add($"§B{{local{i}}} {value}");
+            statements.Add($"let local{i} = {value}");
             value = $"local{i}";
         }
-        statements.Add($"§R §C{{Holder.Consume}} §A {value} §/C");
+        statements.Add($"return Holder.Consume({value})");
         var source = $$"""
-            §M{RetainedNativeInputLimit}
-              §CL{Holder:pub}
-                §MT{Consume:pub:static} (System.IO.DirectoryInfo:value) -> i32
-                  §E{}
-                  §R 0
-                §MT{Probe:pub:static} () -> i32
-                  §E{fs:{{(nullable ? "r" : "w")}}}
+            module RetainedNativeInputLimit
+              class Holder public
+                func Consume public static (System.IO.DirectoryInfo:value) → int
+                  !
+                  return 0
+                func Probe public static () → int
+                  ! fs:{{(nullable ? "r" : "w")}}
                   {{string.Join("\n      ", statements)}}
             """;
         var (module, diagnostics) = Bind(source);
@@ -372,7 +382,7 @@ public class LocalReferenceAnnotationTests
     public static IEnumerable<object[]> StringMemberAliases()
     {
         foreach (var kind in new[] { "field", "property" })
-        foreach (var typeName in new[] { "string", "str", "?string", "?str", "string?", "str?" })
+        foreach (var typeName in new[] { "string", "System.String", "global::System.String?", "Text?", "string?", "System.String?" })
             yield return [kind, typeName];
     }
 
@@ -383,24 +393,25 @@ public class LocalReferenceAnnotationTests
     {
         var nullable = typeName.Contains('?');
         var member = kind == "field"
-            ? $"§FLD{{{typeName}:Value:pub}}"
-            : $"§PROP{{Value:{typeName}:pub:get,set}}";
+            ? $"field {typeName}:Value public"
+            : $"property {typeName}:Value public\n      get\n      set";
         var source = $$"""
-            §M{StringMemberInference}
-              §CL{Parent:pub}
+            module StringMemberInference
+              using Text = System.String
+              class Parent public
                 {{member}}
-              §CL{Child:pub}
-                §EXT{Parent}
-                §MT{Probe:pub} () -> void
-                  §B{bareFirst} Value
-                  §B{bareSecond} bareFirst
-                  §B{bareResult:string} bareSecond
-                  §B{thisFirst} §THIS.Value
-                  §B{thisSecond} thisFirst
-                  §B{thisResult:string} thisSecond
-                  §B{baseFirst} §BASE.Value
-                  §B{baseSecond} baseFirst
-                  §B{baseResult:string} baseSecond
+              class Child public
+                extends Parent
+                func Probe public () → void
+                  let bareFirst = Value
+                  let bareSecond = bareFirst
+                  let string:bareResult = bareSecond
+                  let thisFirst = this.Value
+                  let thisSecond = thisFirst
+                  let string:thisResult = thisSecond
+                  let baseFirst = base.Value
+                  let baseSecond = baseFirst
+                  let string:baseResult = baseSecond
             """;
         var (module, diagnostics) = Bind(source);
         var bindings = Probe(module).Body.Cast<BoundBindStatement>().ToArray();
@@ -419,7 +430,7 @@ public class LocalReferenceAnnotationTests
     public static IEnumerable<object[]> StringSourceAliases()
     {
         foreach (var returned in new[] { false, true })
-        foreach (var typeName in new[] { "string", "str", "?string", "?str", "string?", "str?" })
+        foreach (var typeName in new[] { "string", "System.String", "global::System.String?", "Text?", "string?", "System.String?" })
             yield return [returned, typeName];
     }
 
@@ -429,14 +440,15 @@ public class LocalReferenceAnnotationTests
         bool returned, string typeName)
     {
         var source = $$"""
-            §M{StringSourceInference}
-              §CL{Holder:pub}
-                §MT{Get:pub:static} ({{typeName}}:input) -> {{typeName}}
-                  §R input
-                §MT{Probe:pub:static} ({{typeName}}:input) -> void
-                  §B{first} {{(returned ? "§C{Holder.Get} §A input §/C" : "input")}}
-                  §B{second} first
-                  §B{result:string} second
+            module StringSourceInference
+              using Text = System.String
+              class Holder public
+                func Get public static ({{typeName}}:input) → {{typeName}}
+                  return input
+                func Probe public static ({{typeName}}:input) → void
+                  let first = {{(returned ? "Holder.Get(input)" : "input")}}
+                  let second = first
+                  let string:result = second
             """;
         var (module, diagnostics) = Bind(source);
         var nullable = typeName.Contains('?');
@@ -458,12 +470,12 @@ public class LocalReferenceAnnotationTests
     public void NullableReference_InferredChainRetainsNullableAnnotation()
     {
         const string source = """
-            §M{OptionInference}
-              §CL{Holder:pub}
-                §MT{Probe:pub:static} () -> void
-                  §B{first:?str} null
-                  §B{second} first
-                  §B{result:string} second
+            module OptionInference
+              class Holder public
+                func Probe public static () → void
+                  let string?:first = null
+                  let second = first
+                  let string:result = second
             """;
         var (module, diagnostics) = Bind(source);
         foreach (var binding in Probe(module).Body.Take(2).Cast<BoundBindStatement>())
@@ -473,7 +485,7 @@ public class LocalReferenceAnnotationTests
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.NullableToNonNullableBinding);
     }
 
-    private static BoundExpression ConsumerValue(BoundStatement statement, string boundary)
+    private static BoundExpression ConsumerValue(BoundStatement statement, string boundary, bool isBcl)
     {
         var expression = statement switch
         {
@@ -485,8 +497,12 @@ public class LocalReferenceAnnotationTests
         if (boundary != "argument")
             return expression;
         var consumer = Assert.IsType<BoundCallExpression>(expression);
-        if (consumer.Target == "System.IO.FileSystemAclExtensions.GetAccessControl")
+        if (isBcl)
+        {
+            Assert.Equal("System.IO.FileSystemAclExtensions", consumer.ResolvedTypeName);
+            Assert.Equal("GetAccessControl", consumer.ResolvedMethodName);
             Assert.Equal("DirectorySecurity", Assert.IsType<NominalBoundType>(consumer.Type).RoslynSymbol?.Name);
+        }
         else
             Assert.NotNull(consumer.ResolvedSymbol);
         return Assert.Single(consumer.Arguments);

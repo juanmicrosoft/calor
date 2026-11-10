@@ -20,8 +20,8 @@ public sealed class ArrayAllocationAnnotationTests
             "tests", "Calor.RoundTrip.Synthetic", "SyntheticLib", "FizzBuzz.cs");
         var conversion = new CSharpToCalorConverter().Convert(File.ReadAllText(path), "FizzBuzz.cs");
         Assert.NotNull(conversion.CalorSource);
-        Assert.Contains("§ARR{", conversion.CalorSource);
-        Assert.Contains("§PUT{", conversion.CalorSource);
+        Assert.Contains("new string[", conversion.CalorSource);
+        Assert.Contains("set results[", conversion.CalorSource);
         var result = Program.Compile(conversion.CalorSource, "FizzBuzz.calr");
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
         Assert.True(conversion.Success);
@@ -99,22 +99,22 @@ public sealed class ArrayAllocationAnnotationTests
     public void NativeAllocation_PreservesStaticShape(
         bool nullableElements, bool inferred, string size, string boundary)
     {
-        var element = nullableElements ? "?str" : "str";
-        var binding = inferred ? "values" : $"values:[{element}]";
+        var element = nullableElements ? "string?" : "string";
+        var binding = inferred ? "values" : $"{element}[]:values";
         var sink = boundary switch
         {
-            "binding" => "§B{required:[str]} values",
-            "return" => "§R values",
-            "input" => "§C{Take} §A values §/C",
+            "binding" => "let string[]:required = values",
+            "return" => "return values",
+            "input" => "Take(values)",
             _ => throw new ArgumentOutOfRangeException(nameof(boundary))
         };
         var source = $$"""
-            §M{AllocatedArray}
-              §F{Take:pub} ([str]:value) -> void
-                §E{}
-              §F{Probe:pub} (i32:count) -> {{(boundary == "return" ? "[str]" : "void")}}
-                §E{alloc}
-                §B{ {{binding}} } §ARR{ {{element}} :{{size}} }
+            module AllocatedArray
+              func Take public (string[]:value) → void
+                !
+              func Probe public (int:count) → {{(boundary == "return" ? "string[]" : "void")}}
+                ! alloc
+                let {{binding}} = new {{element}}[{{size}}]
                 {{sink}}
             """;
         var diagnostics = new DiagnosticBag();
@@ -151,22 +151,22 @@ public sealed class ArrayAllocationAnnotationTests
     }
 
     [Theory]
-    [InlineData("?[str]", "binding")]
-    [InlineData("?[str]", "return")]
-    [InlineData("?[str]", "input")]
-    [InlineData("[?str]", "binding")]
-    [InlineData("[?str]", "return")]
-    [InlineData("[?str]", "input")]
+    [InlineData("string[]?", "binding")]
+    [InlineData("string[]?", "return")]
+    [InlineData("string[]?", "input")]
+    [InlineData("string?[]", "binding")]
+    [InlineData("string?[]", "return")]
+    [InlineData("string?[]", "input")]
     public void NullableParameterArray_RemainsRejected(string type, string boundary)
         => AssertNullableArrayRejected(type, boundary, initializedLocal: false);
 
     [Theory]
-    [InlineData("?[str]", "binding")]
-    [InlineData("?[str]", "return")]
-    [InlineData("?[str]", "input")]
-    [InlineData("[?str]", "binding")]
-    [InlineData("[?str]", "return")]
-    [InlineData("[?str]", "input")]
+    [InlineData("string[]?", "binding")]
+    [InlineData("string[]?", "return")]
+    [InlineData("string[]?", "input")]
+    [InlineData("string?[]", "binding")]
+    [InlineData("string?[]", "return")]
+    [InlineData("string?[]", "input")]
     public void ExplicitNullableLocalAnnotation_RemainsRejected(string type, string boundary)
         => AssertNullableArrayRejected(type, boundary, initializedLocal: true);
 
@@ -174,17 +174,17 @@ public sealed class ArrayAllocationAnnotationTests
     {
         var sink = boundary switch
         {
-            "binding" => "§B{required:[str]} values",
-            "return" => "§R values",
-            _ => "§C{Take} §A values §/C"
+            "binding" => "let string[]:required = values",
+            "return" => "return values",
+            _ => "Take(values)"
         };
         var source = $$"""
-            §M{NullableArray}
-              §F{Take:pub} ([str]:value) -> void
-                §E{}
-              §F{Probe:pub} ({{(initializedLocal ? "" : $"{type}:values")}}) -> {{(boundary == "return" ? "[str]" : "void")}}
-                §E{alloc}
-            {{(initializedLocal ? $"    §B{{values:{type}}} §ARR{{values:3}}" : "")}}
+            module NullableArray
+              func Take public (string[]:value) → void
+                !
+              func Probe public ({{(initializedLocal ? "" : $"{type}:values")}}) → {{(boundary == "return" ? "string[]" : "void")}}
+                ! alloc
+            {{(initializedLocal ? $"    let {type}:values = new string[3]" : "")}}
                 {{sink}}
             """;
         var result = Program.Compile(source, "nullable-array.calr");
