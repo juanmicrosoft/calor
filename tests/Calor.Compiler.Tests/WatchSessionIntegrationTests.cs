@@ -81,20 +81,18 @@ public sealed class WatchSessionIntegrationTests : IDisposable
     // cross-module map that CompilationDriver builds even for warm caches.
     private static string ModuleSource(string moduleName, int answer)
     {
-        // Written with string concatenation because C#'s raw-string interpolation
-        // and Calor's own '§X{...}' brace syntax fight each other unpleasantly.
-        return "§M{" + moduleName + "}\n"
-            + "  §F{answer:pub}\n"
-            + "    §O{i32}\n"
-            + "    §R INT:" + answer.ToString(System.Globalization.CultureInfo.InvariantCulture) + "\n";
+        return "module " + moduleName + "\n"
+            + "  module " + moduleName + "\n"
+            + "    func answer public () → int\n"
+            + "      return " + answer.ToString(System.Globalization.CultureInfo.InvariantCulture) + "\n";
     }
 
     private static string TransitionalNullableAssignmentViolation() => """
-        §M{N0}
-          §F{Probe:pub} () -> void
-            §E{}
-            §B{x:?str} null
-            §B{y:str} x
+        module N0
+          func Probe public () → void
+            !
+            let string?:x = null
+            let string:y = x
         """;
 
     private void WriteAllModules()
@@ -387,7 +385,7 @@ public sealed class WatchSessionIntegrationTests : IDisposable
         var results = await RunScriptAsync(rebuildCount: 3, drive: (session, step) =>
         {
             File.WriteAllText(source, step == 1
-                ? safe + "  §F{answer:pub} () -> i32\n    §R 2\n"
+                ? safe + "    func answer public () → int\n      return 2\n"
                 : safe);
             session.InjectChange(source);
         });
