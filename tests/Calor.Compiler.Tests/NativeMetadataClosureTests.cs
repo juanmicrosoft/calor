@@ -320,6 +320,8 @@ public sealed class NativeMetadataClosureTests
         var signature = Assert.IsType<Calor.Compiler.Binding.BoundTypes.FunctionBoundType>(cast.Type);
         Assert.Equal(Calor.Compiler.Binding.BoundTypes.NullableAnnotation.Oblivious,
             Assert.IsType<Calor.Compiler.Binding.BoundTypes.NominalBoundType>(signature.ReturnType).NullableAnnotation);
+        Assert.Contains(Compile(source).Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
     }
 
     [Theory]
@@ -504,6 +506,7 @@ public sealed class NativeMetadataClosureTests
     [InlineData("Func<int>", "int")]
     [InlineData("System.Func<int>", "int")]
     [InlineData("Func<object>", "object")]
+    [InlineData("Func<System.Object>", "object")]
     public void NativeCastLambdaInvocation_RetainsTheAuthoredDelegateReturnOverload(string type, string expected)
     {
         var authored = $$"""
@@ -524,6 +527,96 @@ public sealed class NativeMetadataClosureTests
                 .Single(method => method.Name == "Probe");
             Assert.Equal(expected, method.Invoke(null, null));
         }
+    }
+
+    [Theory]
+    [InlineData("Func<object?>", "9")]
+    [InlineData("Func<object?>", "null")]
+    [InlineData("System.Func<object?>", "9")]
+    [InlineData("System.Func<object?>", "null")]
+    [InlineData("Func<System.Object?>", "null")]
+    public void NativeCastLambdaInvocation_RetainsAuthoredNullableObjectReturn(string type, string value)
+    {
+        var authored = $$"""
+            module NullableDelegateReturn
+              func Pick (object:value) → int
+                return 1
+              func Probe () → int
+                return Pick((({{type}})(() => {{value}}))())
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var result = Compile(source);
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+        }
+    }
+
+    [Theory]
+    [InlineData("9")]
+    [InlineData("\"value\"")]
+    [InlineData("new System.Collections.Generic.List<int>()")]
+    [InlineData("new int[0]")]
+    public void NativeCastLambdaInvocation_ObjectResultUsesTheBoundNonNullBody(string value)
+    {
+        var authored = $$"""
+            module NonNullDelegateResult
+              func Pick (object:value) → int
+                return 7
+              func Probe () → int
+                ! alloc
+                return Pick(((Func<object>)(() => {{value}}))())
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var result = Compile(source);
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+            var method = CompileAssembly(result.GeneratedCode).GetTypes()
+                .SelectMany(type => type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                .Single(method => method.Name == "Probe");
+            Assert.Equal(7, method.Invoke(null, null));
+        }
+    }
+
+    [Theory]
+    [InlineData("object", false)]
+    [InlineData("object?", true)]
+    [InlineData("string?", true)]
+    [InlineData("int?", true)]
+    public void NativeCastLambdaInvocation_ObjectResultPreservesBoundBodyNullability(string type, bool nullable)
+    {
+        var authored = $$"""
+            module PossiblyNullDelegateResult
+              func Pick (object:value) → int
+                return 7
+              func Probe ({{type}}:input) → int
+                return Pick(((Func<object>)(() => input))())
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var result = Compile(source);
+            if (nullable)
+                Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+            else
+                Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+        }
+    }
+
+    [Fact]
+    public void NativeCastLambdaInvocation_DoesNotSuppressUnknownObjectConstructor()
+    {
+        var result = Compile("""
+            module UnknownObjectConstructor
+              func Pick (object:value) → int
+                return 7
+              func Probe () → int
+                return Pick(((Func<object>)(() => new object()))())
+            """);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0411");
+        Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+        Assert.DoesNotContain(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
     }
 
     [Theory]

@@ -1,0 +1,26 @@
+{
+  "surfaces": [
+    "LibraryDefault",
+    "CliDefault",
+    "CliPassthrough",
+    "McpDefault",
+    "McpPassthroughOnError",
+    "McpPassthroughOnErrorModuleName",
+    "ProjectMigrate",
+    "ProjectMigratePassthrough"
+  ],
+  "rows": {
+    "round2": {
+      "recordedUnknownEffects": true,
+      "strictCompileSuccess": true,
+      "trace": "2,0,42|112|True|1002,3",
+      "getLengthCalls": 3
+    },
+    "round3": {
+      "recordedUnknownEffects": true,
+      "strictCompileSuccess": true,
+      "trace": "3,10,123,1118|scsc|sctc",
+      "getLengthCalls": 1
+    }
+  }
+}

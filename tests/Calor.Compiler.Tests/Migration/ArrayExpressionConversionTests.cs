@@ -3,6 +3,8 @@ using System.Runtime.Loader;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Calor.Compiler.CodeGen;
+using Calor.Compiler.Binding;
+using Calor.Compiler.Binding.BoundTypes;
 using Calor.Compiler.Commands;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Mcp.Tools;
@@ -21,9 +23,9 @@ namespace Calor.Compiler.Tests;
 /// converted on every surface, compiled, run, and compared with the original C#. The
 /// witnesses log every side effect, so a reordered, duplicated, skipped or eagerly
 /// evaluated subexpression changes the result. Nothing may be preserved as C# (no rescue,
-/// no raw preservation) on a native row. Narrowed (PR 2): array members are unknown calls, as on main,
-/// so a row that calls one compiles only with effects relaxed; with default options it
-/// reports Calor0410 for the effect 'unknown' and nothing else.
+/// no raw preservation) on a native row. Rows retain the original unknown-effect observations.
+/// Separate current observations require enforced compilation and exact metadata binding for
+/// the repaired round2/round3 rows. Unresolved rows still report Calor0410 for 'unknown'.
 /// </summary>
 public class ArrayExpressionConversionTests
 {
@@ -43,6 +45,96 @@ public class ArrayExpressionConversionTests
 
     public static IEnumerable<object[]> SizedArraySurfaces() =>
         Enum.GetValues<Surface>().Select(surface => new object[] { surface });
+
+    [Theory]
+    [InlineData("object[]", "new object[2]", false)]
+    [InlineData("object[]", "new object[2]", true)]
+    [InlineData("object?[]", "new object[2]", false)]
+    [InlineData("object?[]", "new object[2]", true)]
+    [InlineData("object[,]", "new object[2, 3]", false)]
+    [InlineData("object[,]", "new object[2, 3]", true)]
+    [InlineData("object?[,]", "new object[2, 3]", false)]
+    [InlineData("object?[,]", "new object[2, 3]", true)]
+    [InlineData("object[][]", "new object[2][]", false)]
+    [InlineData("object[][]", "new object[2][]", true)]
+    [InlineData("object?[][]", "new object[2][]", false)]
+    [InlineData("object?[][]", "new object[2][]", true)]
+    public void PredefinedObjectArrays_KeepClrIdentityAcrossNamespaces(
+        string type, string allocation, bool namespaced)
+    {
+        var source = $$"""
+            module PredefinedObjectArrays{{(namespaced ? " Custom" : "")}}
+              class @object
+              module P
+                func Read public ({{type}}:values) → int
+                  !
+                  return values.GetLength(0)
+            """;
+        var compiled = Program.Compile(source, "predefined-object-arrays.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compiled.HasErrors, string.Join(Environment.NewLine, compiled.Diagnostics.Errors));
+        var bound = new Calor.Compiler.Binding.Binder(new DiagnosticBag()).Bind(compiled.Ast!);
+        var call = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundReturnStatement>(Assert.Single(Assert.Single(bound.Functions).Body)).Expression);
+        Assert.Equal(SpecialType.System_Array, call.ResolvedMetadataMethod?.ContainingType.SpecialType);
+        var array = Assert.IsType<ArrayBoundType>(call.Receiver!.MethodInputArrayType);
+        while (array.ElementType is ArrayBoundType nested)
+            array = nested;
+        var element = Assert.IsType<NominalBoundType>(array.ElementType);
+        Assert.Equal(SpecialType.System_Object, element.RoslynSymbol?.SpecialType);
+        Assert.Null(element.Declaration);
+        Assert.Equal(type.StartsWith("object?", StringComparison.Ordinal)
+                ? Calor.Compiler.Binding.BoundTypes.NullableAnnotation.Annotated
+                : Calor.Compiler.Binding.BoundTypes.NullableAnnotation.NotAnnotated,
+            element.NullableAnnotation);
+        var caller = "public static class Probe { public static string Run() => "
+            + (namespaced ? "Custom." : "") + "P.Read(" + allocation + ").ToString(); }";
+        Assert.Equal("2", Run(compiled.GeneratedCode, caller));
+    }
+
+    [Theory]
+    [InlineData("values.GetLength(0)")]
+    [InlineData("(values).GetLength(0)")]
+    public void PredefinedObjectArrays_DoNotTreatSourceInstancesAsArrays(string expression)
+    {
+        var source = $$"""
+            module SourceObject
+              class @object
+                func GetLength public (int:dimension) → int
+                  ! cw
+                  System.Console.WriteLine("read")
+                  return dimension
+              module P
+                func Read public (@object:values) → int
+                  !
+                  return {{expression}}
+            """;
+        var result = Program.Compile(source, "source-object.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Contains(result.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
+            && error.Message.Contains("Function 'Read'", StringComparison.Ordinal)
+            && error.Message.Contains("'unknown'", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PredefinedObjectArrays_AreNotShadowedByVerbatimTypeParameters(bool namespaced)
+    {
+        var source = $$"""
+            module GenericObjectArrays{{(namespaced ? " Custom" : "")}}
+              module P
+                func Read<@object> public (object[]:values) → int
+                  !
+                  return values.GetLength(0)
+            """;
+        var result = Program.Compile(source, "generic-object-arrays.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        var caller = "public static class Probe { public static string Run() => "
+            + (namespaced ? "Custom." : "") + "P.Read<int>(new object[2]).ToString(); }";
+        Assert.Equal("2", Run(result.GeneratedCode, caller));
+    }
 
     [Theory]
     [InlineData(false, false, false)]
@@ -1158,8 +1250,7 @@ public class ArrayExpressionConversionTests
         }
         """;
 
-    // The last value: whether the row calls an array member (or sets a field through an
-    // object initializer), which is an unknown effect with default options.
+    // The last value records the original default-options unknown-effect observation.
     // PR 2 Codex round 1: a local read before an array argument that writes the local
     // (by ref), when a later argument is hoisted. The read was left in place and ran
     // after the hoisted array (11, not 1).
@@ -1231,7 +1322,37 @@ public class ArrayExpressionConversionTests
 
         var strict = Program.Compile(calor, row + ".calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
-        Assert.True(strict.HasErrors == unknownEffects,
+        var currentUnknownEffects = unknownEffects;
+        if (row is "round2" or "round3")
+        {
+            using var current = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+                CliTestHarness.FindRepoRoot(), "tests/TestData/InteropScope/R0/array-current-results.json")));
+            var root = current.RootElement;
+            Assert.Equal(Enum.GetNames<Surface>(),
+                root.GetProperty("surfaces").EnumerateArray().Select(value => value.GetString()));
+            Assert.Equal(new[] { "round2", "round3" },
+                root.GetProperty("rows").EnumerateObject().Select(value => value.Name));
+            var observation = root.GetProperty("rows").GetProperty(row);
+            Assert.Equal(unknownEffects, observation.GetProperty("recordedUnknownEffects").GetBoolean());
+            Assert.Equal(expected, observation.GetProperty("trace").GetString());
+            Assert.True(observation.GetProperty("strictCompileSuccess").GetBoolean());
+            currentUnknownEffects = false;
+            var bound = new Calor.Compiler.Binding.Binder(new DiagnosticBag()).Bind(strict.Ast!);
+            var calls = BoundDescendants(bound).OfType<BoundCallExpression>()
+                .Where(call => call.ResolvedMethodName == "GetLength").ToArray();
+            Assert.Equal(observation.GetProperty("getLengthCalls").GetInt32(), calls.Length);
+            Assert.All(calls, call =>
+            {
+                var method = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+                Assert.Equal(SpecialType.System_Array, method.ContainingType.SpecialType);
+                Assert.Equal("GetLength", method.Name);
+                Assert.False(method.IsStatic);
+                Assert.False(method.IsGenericMethod);
+                Assert.Equal(SpecialType.System_Int32, Assert.Single(method.Parameters).Type.SpecialType);
+                Assert.Equal(SpecialType.System_Int32, method.ReturnType.SpecialType);
+            });
+        }
+        Assert.True(strict.HasErrors == currentUnknownEffects,
             string.Join(Environment.NewLine, strict.Diagnostics.Errors) + "\n" + calor);
         Assert.All(strict.Diagnostics.Errors, error =>
             Assert.True(error.Code == "Calor0410" && error.Message.Contains("'unknown'", StringComparison.Ordinal), error.ToString()));
@@ -1240,6 +1361,11 @@ public class ArrayExpressionConversionTests
         Assert.False(compilation.HasErrors,
             string.Join(Environment.NewLine, compilation.Diagnostics.Errors) + "\n" + calor);
         Assert.Equal(expected, Run(compilation.GeneratedCode));
+        if (row is "round2" or "round3")
+        {
+            Assert.Equal(compilation.GeneratedCode, strict.GeneratedCode);
+            Assert.Equal(expected, Run(strict.GeneratedCode));
+        }
     }
 
     [Fact]
@@ -2164,6 +2290,14 @@ public class ArrayExpressionConversionTests
             Assert.True(result.Success, string.Join(Environment.NewLine, result.Issues));
             return (result.CalorSource!, result.Losses.Select(loss => loss.Feature).ToList());
         }
+    }
+
+    private static IEnumerable<BoundNode> BoundDescendants(BoundNode node)
+    {
+        yield return node;
+        foreach (var child in node.ChildNodes)
+            foreach (var descendant in BoundDescendants(child))
+                yield return descendant;
     }
 
     private static string Run(string csharp, string? additionalSource = null)

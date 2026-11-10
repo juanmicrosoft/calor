@@ -266,8 +266,10 @@ public sealed class Binder
 
         var binder = GetOrCreateMetadataBinder();
         if (binder is null) return null;
-        if (computedReceiver?.Type is BoundTypes.NominalBoundType { Declaration: not null }
-            || computedReceiver is not null && ResolveClass(computedReceiver.Type.DisplayString) is not null)
+        if (computedReceiver is not null
+            && NullabilityChecker.GetMethodInputArrayType(computedReceiver) is null
+            && (computedReceiver.Type is BoundTypes.NominalBoundType { Declaration: not null }
+                || ResolveClass(computedReceiver.Type.DisplayString) is not null))
             return null;
         if (computedReceiver?.Type is BoundTypes.UnresolvedBoundType
             || computedReceiver is BoundCallExpression { ResolvedSymbol: null, ResolvedMetadataMethod: null,
@@ -3324,6 +3326,12 @@ public sealed class Binder
         var annotated = Parsing.AttributeHelper.TryUnwrapNullableAnnotation(referent, out var inner);
         if (annotated)
             referent = inner.Trim();
+        if (referent == "object")
+            return allowObject && GetOrCreateMetadataBinder()?.Context.TryResolveType("System.Object") is { } objectType
+                ? new BoundTypes.NominalBoundType(referent,
+                    annotated ? BoundTypes.NullableAnnotation.Annotated : BoundTypes.NullableAnnotation.NotAnnotated,
+                    roslynSymbol: objectType)
+                : null;
         var lookupReferent = string.Join(".", referent.Split('.').Select(part => part.TrimStart('@')));
         if (referent.Length == 0 || referent.IndexOfAny(['[', ']', '<', '>', '`', '*', '&', '(', ')']) >= 0
             || typeParameters?.Contains(lookupReferent, StringComparer.Ordinal) == true)
@@ -4508,6 +4516,32 @@ public sealed class Binder
                 Metadata.MetadataBinderResult.ToBoundType(invoke.ReturnType),
                 displayOverride: typeOp.TargetType, row: BoundTypes.EffectRow.Unknown);
         var operand = BindExpression(typeOp.Operand, callable);
+        // Keep the delegate's return identity and nullable contract; only a bound
+        // non-null body can refine an otherwise oblivious object result.
+        if (callable?.ReturnType is BoundTypes.NominalBoundType
+            {
+                RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_Object,
+                NullableAnnotation: BoundTypes.NullableAnnotation.Oblivious
+            } objectResult
+            && operand is BoundLambdaExpression { IsAsync: false, ExpressionBody: { } body }
+            && (IsDefinitelyNonNullScalar(body)
+                || NullabilityChecker.GetMethodInputArrayType(body)?.NullableAnnotation
+                    == BoundTypes.NullableAnnotation.NotAnnotated
+                || NullabilityChecker.GetAnnotation(body.Type) == BoundTypes.NullableAnnotation.NotAnnotated
+                    && (body.Type switch
+                    {
+                        BoundTypes.NominalBoundType nominal =>
+                            nominal.RoslynSymbol?.IsReferenceType == true || nominal.IsKnownReferenceType,
+                        BoundTypes.ArrayBoundType => true,
+                        BoundTypes.GenericInstantiationBoundType generic =>
+                            generic.RoslynSymbol?.IsReferenceType == true
+                            || generic.Definition.Declaration?.IsReferenceType == true,
+                        _ => false
+                    })))
+            callable = new BoundTypes.FunctionBoundType(callable.ParameterTypes,
+                new BoundTypes.NominalBoundType(objectResult.QualifiedName,
+                    BoundTypes.NullableAnnotation.NotAnnotated, objectResult.Declaration, objectResult.RoslynSymbol),
+                callable.DisplayString, callable.Row, callable.ParameterRows);
         var annotation = typeOp.Operation switch
         {
             TypeOp.Cast when operand is BoundNullLiteral =>
@@ -5887,7 +5921,7 @@ public sealed class Binder
         //     return null. Stamp Annotated so downstream flow requires
         //     an explicit null-check before non-null uses.
         var stringAnnotation = operation.Operation == StringOp.ToString
-            && (arguments.Count == 0 || !IsDefinitelyNonNullToStringInput(arguments[0]))
+            && (arguments.Count == 0 || !IsDefinitelyNonNullScalar(arguments[0]))
                 ? BoundTypes.NullableAnnotation.Annotated
                 : BoundTypes.NullableAnnotation.NotAnnotated;
         return Structural(
@@ -5904,7 +5938,7 @@ public sealed class Binder
                 : BoundTypes.NullableAnnotation.Oblivious);
     }
 
-    private static bool IsDefinitelyNonNullToStringInput(BoundExpression argument)
+    private static bool IsDefinitelyNonNullScalar(BoundExpression argument)
     {
         if (IsBuiltInValueTypeName(TypeIdentity.Canonicalize(argument.Type.DisplayString)))
             return true;

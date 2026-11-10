@@ -29,6 +29,10 @@ receiving types.
 | `object` | .NET object reference | An appropriate reference or boxed value |
 | `void` | No returned value | Return types only |
 
+The keyword `object` always names `System.Object`, including as an array
+element type. A source declaration or type parameter named `@object` does
+not shadow that keyword.
+
 Qualified .NET names such as `System.String` can also be used. Calor's former
 aliases, including `i32`, `f64`, and `str`, are not native source spellings.
 The parser reports `Calor0100` for a retired alias:
