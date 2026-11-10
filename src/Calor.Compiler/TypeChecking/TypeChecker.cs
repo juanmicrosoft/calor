@@ -699,6 +699,9 @@ public sealed class TypeChecker
             case CallStatementNode call:
                 CheckCallStatement(call);
                 break;
+            case ExpressionStatementNode expression:
+                _ = InferExpressionType(expression.Expression);
+                break;
             case LocalFunctionStatementNode local:
                 CheckFunction(local.Function);
                 break;
@@ -2759,7 +2762,7 @@ public sealed class TypeChecker
     }
 
     private ControlFlowResult AnalyzeRethrowControlFlow(
-        RethrowStatementNode rethrow,
+        StatementNode rethrow,
         bool insideCatch)
     {
         if (!insideCatch)
@@ -2784,6 +2787,8 @@ public sealed class TypeChecker
         {
             ReturnStatementNode
                 => LocalFlow(ControlFlowOutcome.Return),
+            ThrowStatementNode { Exception: null } rethrow
+                => AnalyzeRethrowControlFlow(rethrow, insideCatch),
             ThrowStatementNode
                 => LocalFlow(ControlFlowOutcome.Throw),
             RethrowStatementNode rethrow => AnalyzeRethrowControlFlow(
@@ -5158,34 +5163,9 @@ public sealed class TypeChecker
                 _module, _diagnostics, ProjectionContractMode);
             if (_sourceBindings.ParameterTypes.TryGetValue(parameter, out var type))
             {
-                if (type is Microsoft.CodeAnalysis.INamedTypeSymbol { DelegateInvokeMethod: { } invoke } named)
+                if (type is Microsoft.CodeAnalysis.INamedTypeSymbol { DelegateInvokeMethod: not null })
                 {
-                    var name = named.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat);
-                    // Keep native refinement annotations, which erase in the C# binding image.
-                    if (named.Locations.Any(location => location.IsInSource)
-                        && _env.LookupType(name.Replace("global::", "", StringComparison.Ordinal)) is FunctionType native)
-                        return native;
-                    // Preserve the existing structural representation only for the actual
-                    // core-library Action/Func declarations, never same-named source types.
-                    var standardDelegate = named.Name is "Action" or "Func"
-                        && Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(
-                            named.OriginalDefinition,
-                            named.BaseType?.ContainingAssembly.GetTypeByMetadataName($"System.{named.MetadataName}"));
-                    return new FunctionType(
-                        invoke.Parameters.Select(item => ResolveTypeName(
-                            item.Type.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat),
-                            parameter.Span)).ToArray(),
-                        ResolveTypeName(invoke.ReturnType.ToDisplayString(
-                            Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat), parameter.Span),
-                        invoke.Parameters.Select(item => item.Name).ToArray(),
-                        invoke.Parameters.Select(item => item.RefKind switch
-                        {
-                            Microsoft.CodeAnalysis.RefKind.Ref => ParameterModifier.Ref,
-                            Microsoft.CodeAnalysis.RefKind.Out => ParameterModifier.Out,
-                            Microsoft.CodeAnalysis.RefKind.In => ParameterModifier.In,
-                            _ => ParameterModifier.None
-                        }).ToArray(),
-                        standardDelegate ? null : $"{named.ContainingAssembly.Identity}:{name}");
+                    return ResolveBoundSignatureType(type, parameter.Span);
                 }
                 var resolved = ResolveTypeName(parameter.TypeName, parameter.Span);
                 // A lookalike or shadowing declaration is not the standard CLR delegate.
@@ -5195,6 +5175,42 @@ public sealed class TypeChecker
             }
         }
         return ResolveTypeName(parameter.TypeName, parameter.Span);
+    }
+
+    private CalorType ResolveBoundSignatureType(
+        Microsoft.CodeAnalysis.ITypeSymbol type,
+        Parsing.TextSpan span)
+    {
+        var name = type.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat);
+        if (type is not Microsoft.CodeAnalysis.INamedTypeSymbol { DelegateInvokeMethod: { } invoke } named)
+            return ResolveTypeName(name, span);
+
+        // Keep native refinement annotations, which erase in the C# binding image.
+        if (named.Locations.Any(location => location.IsInSource)
+            && _env.LookupType(name.Replace("global::", "", StringComparison.Ordinal)) is FunctionType native)
+            return native;
+        // Only actual core-library delegates get structural variance, including nested signatures.
+        var standardDelegate = named.Name is "Action" or "Func"
+            && Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(
+                named.OriginalDefinition,
+                named.BaseType?.ContainingAssembly.GetTypeByMetadataName($"System.{named.MetadataName}"));
+        CalorType ResolveComponent(Microsoft.CodeAnalysis.ITypeSymbol component)
+            => standardDelegate
+                ? ResolveBoundSignatureType(component, span)
+                : ResolveTypeName(component.ToDisplayString(
+                    Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat), span);
+        return new FunctionType(
+            invoke.Parameters.Select(item => ResolveComponent(item.Type)).ToArray(),
+            ResolveComponent(invoke.ReturnType),
+            invoke.Parameters.Select(item => item.Name).ToArray(),
+            invoke.Parameters.Select(item => item.RefKind switch
+            {
+                Microsoft.CodeAnalysis.RefKind.Ref => ParameterModifier.Ref,
+                Microsoft.CodeAnalysis.RefKind.Out => ParameterModifier.Out,
+                Microsoft.CodeAnalysis.RefKind.In => ParameterModifier.In,
+                _ => ParameterModifier.None
+            }).ToArray(),
+            standardDelegate ? null : $"{named.ContainingAssembly.Identity}:{name}");
     }
 
     private CalorType ResolveTypeName(string typeName, Parsing.TextSpan span)
