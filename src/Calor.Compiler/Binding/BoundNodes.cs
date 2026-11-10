@@ -1762,6 +1762,7 @@ public sealed class BoundFieldAccessExpression : BoundExpression
 {
     internal bool IsTupleElementRead { get; init; }
     internal bool IsAnonymousPropertyRead { get; init; }
+    internal ClassDefinitionNode? SourceStaticFieldOwner { get; init; }
     internal Microsoft.CodeAnalysis.ISymbol? ResolvedMetadataMember { get; init; }
     /// <summary>#943: a metadata member whose read is unsupported here (the result stays unresolved).</summary>
     internal Microsoft.CodeAnalysis.ISymbol? UnsupportedMetadataMember { get; init; }

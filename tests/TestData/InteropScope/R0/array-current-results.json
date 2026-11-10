@@ -10,17 +10,26 @@
     "ProjectMigratePassthrough"
   ],
   "rows": {
+    "F5-ARRAY-05": {
+      "recordedUnknownEffects": true,
+      "strictCompileSuccess": true,
+      "trace": "3|4|3|9|b|6",
+      "getLengthCalls": 0,
+      "arrayProperties": ["Rank"]
+    },
     "round2": {
       "recordedUnknownEffects": true,
       "strictCompileSuccess": true,
       "trace": "2,0,42|112|True|1002,3",
-      "getLengthCalls": 3
+      "getLengthCalls": 3,
+      "arrayProperties": []
     },
     "round3": {
       "recordedUnknownEffects": true,
       "strictCompileSuccess": true,
       "trace": "3,10,123,1118|scsc|sctc",
-      "getLengthCalls": 1
+      "getLengthCalls": 1,
+      "arrayProperties": []
     }
   }
 }

@@ -96,6 +96,8 @@ public sealed class CallGraphAnalysis
         internal HashSet<(string CallerId, int Start, int End)> TupleElementReads { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), BoundFieldAccessExpression>
             AnonymousPropertyReads { get; } = new();
+        internal Dictionary<(string CallerId, int Start, int End), BoundFieldAccessExpression>
+            SourceStaticFieldAccesses { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), Binding.BoundTypes.ArrayBoundType>
             ArrayTypes { get; } = new();
         /// <summary>(callerId, reference start, reference end) → the resolved
@@ -151,6 +153,9 @@ public sealed class CallGraphAnalysis
 
     internal BoundFieldAccessExpression? AnonymousPropertyRead(string callerId, TextSpan span) =>
         _boundValues.AnonymousPropertyReads.GetValueOrDefault((callerId, span.Start, span.End));
+
+    internal BoundFieldAccessExpression? SourceStaticFieldAccess(string callerId, TextSpan span) =>
+        _boundValues.SourceStaticFieldAccesses.GetValueOrDefault((callerId, span.Start, span.End));
 
     /// <summary>The declaration span of the variable the binder resolved a bare
     /// value reference (a call target or a <c>ReferenceNode</c>) to, or
@@ -763,6 +768,21 @@ public sealed class CallGraphAnalysis
             }
         }
 
+        foreach (var (site, field) in boundValues.SourceStaticFieldAccesses)
+        {
+            foreach (var constructor in field.SourceStaticFieldOwner!.Constructors.Where(constructor => constructor.IsStatic))
+            {
+                var id = $"{field.SourceStaticFieldOwner.Name}.{constructor.Id}";
+                if (!functions.TryGetValue(id, out var initializer))
+                    continue;
+                callerToCallees[site.CallerId].Add((initializer.Name, field.Span));
+                calleeToCallers[id].Add(site.CallerId);
+                var key = new AstCallKey(site.CallerId, initializer.Name, field.Span.Start, field.Span.End);
+                resolvedCallIds[key] = [id];
+                boundCallSites.Add(key);
+            }
+        }
+
         // Compute SCCs
         var sccs = ComputeSccs(
             functions,
@@ -982,6 +1002,9 @@ public sealed class CallGraphAnalysis
                     if (node is BoundFieldAccessExpression { IsAnonymousPropertyRead: true } anonymousProperty)
                         boundValues.AnonymousPropertyReads.TryAdd(
                             (callerId, node.Span.Start, node.Span.End), anonymousProperty);
+                    if (node is BoundFieldAccessExpression { SourceStaticFieldOwner: not null } sourceField)
+                        boundValues.SourceStaticFieldAccesses.TryAdd(
+                            (callerId, node.Span.Start, node.Span.End), sourceField);
                     if (node is BoundFieldAccessExpression
                         {
                             Target: BoundTypeReferenceExpression,
@@ -993,6 +1016,14 @@ public sealed class CallGraphAnalysis
                         { Target.Type: Binding.BoundTypes.NominalBoundType { RoslynSymbol: not null } memberReceiver })
                         boundValues.MetadataMemberReceiverTypes.TryAdd(
                             (callerId, node.Span.Start, node.Span.End), memberReceiver);
+                    if (node is BoundFieldAccessExpression
+                        {
+                            Target.MethodInputArrayType: not null,
+                            ResolvedMetadataMember: Microsoft.CodeAnalysis.IPropertySymbol arrayProperty
+                        })
+                        boundValues.MetadataMemberReceiverTypes.TryAdd(
+                            (callerId, node.Span.Start, node.Span.End),
+                            Binding.Metadata.MetadataBinderResult.ToNominalBoundType(arrayProperty.ContainingType));
                     if (node is BoundExpression
                         { Type: Binding.BoundTypes.NominalBoundType { RoslynSymbol: { } metadataValueType } })
                         boundValues.MetadataValueTypes.TryAdd(

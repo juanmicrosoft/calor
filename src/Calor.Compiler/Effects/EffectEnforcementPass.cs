@@ -5559,7 +5559,10 @@ public sealed class EffectEnforcementPass
         }
 
         private string InferFieldAccessType(FieldAccessNode field)
-            => InferMemberType(field.Target, field.FieldName);
+            => _context.CallGraph.SourceStaticFieldAccess(_context.CurrentFunctionId, field.Span)
+                is { ResolvedField: { } sourceField }
+                ? EffectResolver.NormalizeParameterType(sourceField.TypeName)
+                : InferMemberType(field.Target, field.FieldName);
 
         private string InferMemberType(ExpressionNode target, string memberName)
         {
@@ -5586,6 +5589,9 @@ public sealed class EffectEnforcementPass
         {
             if (_context.CallGraph.IsResolvedEnumConstant(_context.CurrentFunctionId, span))
                 return EffectSet.Empty;
+            if (_context.CallGraph.SourceStaticFieldAccess(_context.CurrentFunctionId, span)
+                is { SourceStaticFieldOwner: { } owner })
+                return InferStaticFieldInitialization(owner, span);
             var effects = InferFromExpression(target);
             if (_context.CallGraph.IsTupleElementRead(_context.CurrentFunctionId, span))
                 return effects;
@@ -5621,6 +5627,55 @@ public sealed class EffectEnforcementPass
                     span))
                 : effects.Union(resolution.Effects);
         }
+
+        private EffectSet InferStaticFieldInitialization(ClassDefinitionNode owner, TextSpan span)
+        {
+            if (_context.CurrentConstructor is { Constructor.IsStatic: true } current
+                && ReferenceEquals(current.Owner, owner))
+                return EffectSet.Empty;
+            // A read may initialize the entire declaring type, not just this field.
+            // Until initializers have bound callable identities, only self-contained
+            // primitive expressions can prove that no hidden invocation is omitted.
+            if (owner.IsPartial || owner.InteropBlocks.Count != 0 || owner.PreprocessorBlocks.Count != 0)
+                return UnknownResolvedOperation($"{owner.Name}..cctor", span);
+            var initializers = owner.Fields.Where(field => field.IsStatic && field.DefaultValue != null)
+                .Select(field => (field.TypeName, Value: field.DefaultValue!))
+                .Concat(owner.Properties.Where(property => property.IsStatic && property.DefaultValue != null)
+                    .Select(property => (property.TypeName, Value: property.DefaultValue!))).ToArray();
+            if (initializers.Any(initializer => !IsIntrinsicInitializerType(initializer.TypeName)
+                    || !IsIntrinsicInitializer(initializer.Value)))
+                return UnknownResolvedOperation($"{owner.Name}..cctor", span);
+            return InferFromMany(initializers.Select(initializer => initializer.Value).ToArray())
+                .Union(InferFromInternalFunctions(owner.Constructors.Where(constructor => constructor.IsStatic)
+                    .Select(constructor => $"{owner.Name}.{constructor.Id}").ToArray()));
+        }
+
+        private static bool IsIntrinsicInitializerType(string type)
+        {
+            var rank = type.IndexOf('[');
+            var element = (rank < 0 ? type : type[..rank]).TrimEnd('?');
+            return element is "bool" or "BOOL" or "byte" or "sbyte" or "short" or "ushort"
+                or "int" or "INT" or "uint" or "long" or "ulong" or "float" or "double" or "FLOAT"
+                or "decimal" or "DECIMAL" or "char" or "CHAR" or "string" or "STRING";
+        }
+
+        private static bool IsIntrinsicInitializer(ExpressionNode expression) => expression switch
+        {
+            IntLiteralNode or FloatLiteralNode or DecimalLiteralNode or BoolLiteralNode
+                or StringLiteralNode => true,
+            ReferenceNode { IsNullLiteral: true } => true,
+            UnaryOperationNode unary => IsIntrinsicInitializer(unary.Operand),
+            BinaryOperationNode binary => IsIntrinsicInitializer(binary.Left) && IsIntrinsicInitializer(binary.Right),
+            ConditionalExpressionNode conditional => IsIntrinsicInitializer(conditional.Condition)
+                && IsIntrinsicInitializer(conditional.WhenTrue) && IsIntrinsicInitializer(conditional.WhenFalse),
+            ArrayCreationNode array => IsIntrinsicInitializerType(array.ElementType)
+                && (array.Size == null || IsIntrinsicInitializer(array.Size))
+                && array.Initializer.All(IsIntrinsicInitializer),
+            MultiDimArrayCreationNode array => IsIntrinsicInitializerType(array.ElementType)
+                && array.DimensionSizes.All(IsIntrinsicInitializer)
+                && array.Initializer.SelectMany(row => row).All(IsIntrinsicInitializer),
+            _ => false
+        };
 
         private EffectSet InferSetterEffects(FieldAccessNode field)
         {
@@ -5663,24 +5718,33 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromReference(ReferenceNode reference, bool chargeMethodGroup = true)
         {
+            if (_context.CallGraph.SourceStaticFieldAccess(_context.CurrentFunctionId, reference.Span)
+                is { SourceStaticFieldOwner: { } sourceOwner })
+                return InferStaticFieldInitialization(sourceOwner, reference.Span);
             if (_context.CallGraph.AnonymousPropertyRead(_context.CurrentFunctionId, reference.Span) is not null)
                 return EffectSet.Empty;
             if (_context.CallGraph.IsTupleElementRead(_context.CurrentFunctionId, reference.Span))
                 return EffectSet.Empty;
             if (_context.CallGraph.IsResolvedEnumConstant(_context.CurrentFunctionId, reference.Span))
                 return EffectSet.Empty;
+            var separator = reference.Name.LastIndexOf('.');
+            var receiverSpan = new TextSpan(reference.Span.Start, Math.Max(0, separator),
+                reference.Span.Line, reference.Span.Column);
+            var initialization = _context.CallGraph.SourceStaticFieldAccess(_context.CurrentFunctionId, receiverSpan)
+                is { SourceStaticFieldOwner: { } receiverOwner }
+                ? InferStaticFieldInitialization(receiverOwner, reference.Span) : EffectSet.Empty;
             if (_context.CallGraph.MetadataMemberReceiverType(_context.CurrentFunctionId, reference.Span) is { } metadata)
             {
                 var metadataMember = reference.Name[(reference.Name.LastIndexOf('.') + 1)..];
                 var resolution = _context.Resolver.Resolve(EffectResolverKey.FromBoundReceiver(
                     metadata, metadataMember, null, EffectMemberKind.Getter));
-                return resolution.Status == EffectResolutionStatus.Unknown
+                return initialization.Union(resolution.Status == EffectResolutionStatus.Unknown
                     ? UnknownResolvedOperation($"{metadata.DisplayString}.get_{metadataMember}", reference.Span)
-                    : resolution.Effects;
+                    : resolution.Effects);
             }
-            var separator = reference.Name.LastIndexOf('.');
-            var receiverSpan = new TextSpan(reference.Span.Start, Math.Max(0, separator),
-                reference.Span.Line, reference.Span.Column);
+            if (separator > 0 && reference.Name[(separator + 1)..] == "Length"
+                && InferBoundArrayLength(receiverSpan, reference.Span) is { } lengthEffects)
+                return initialization.Union(lengthEffects);
             if (separator > 0
                 && _context.CallGraph.AnonymousPropertyRead(_context.CurrentFunctionId, receiverSpan)
                     is { } anonymousReceiver)
@@ -5727,17 +5791,12 @@ public sealed class EffectEnforcementPass
                 ? _context.OwnerClass?.Name
                 : ResolveLocalValueType(receiver);
             receiverType ??= _context.ClassesByName.ContainsKey(receiver) ? receiver : null;
-            if (member == "Length"
-                && InferBoundArrayLength(new TextSpan(
-                    reference.Span.Start, receiver.Length, reference.Span.Line, reference.Span.Column),
-                    reference.Span) is { } arrayEffects)
-                return arrayEffects;
             if (chargeMethodGroup && receiverType != null && TryResolveClass(receiverType, out var cls))
-                return InferGetterEffects(receiverType, member, reference.Span, receiver)
+                return initialization.Union(InferGetterEffects(receiverType, member, reference.Span, receiver))
                     .Union(MethodGroupEffects(cls, member) ?? EffectSet.Empty);
-            return receiverType == null
+            return initialization.Union(receiverType == null
                 ? EffectSet.Empty
-                : InferGetterEffects(receiverType, member, reference.Span, receiver);
+                : InferGetterEffects(receiverType, member, reference.Span, receiver));
         }
 
         private EffectSet? MethodGroupEffects(ClassDefinitionNode cls, string name)
@@ -5955,6 +6014,9 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromAssignmentTarget(ExpressionNode target, bool readValue)
         {
+            if (_context.CallGraph.SourceStaticFieldAccess(_context.CurrentFunctionId, target.Span)
+                is { SourceStaticFieldOwner: { } sourceOwner })
+                return EffectSet.From("mut").Union(InferStaticFieldInitialization(sourceOwner, target.Span));
             if (target is FieldAccessNode field)
             {
                 var effects = readValue

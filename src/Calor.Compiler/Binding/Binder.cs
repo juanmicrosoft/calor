@@ -580,6 +580,21 @@ public sealed class Binder
                 ? property : null;
     }
 
+    private Microsoft.CodeAnalysis.IPropertySymbol? ResolveMetadataScalarArrayProperty(
+        BoundExpression receiver, string memberName)
+    {
+        return receiver is not BoundTypeReferenceExpression
+            && ResolveMetadataArrayReceiver(receiver) is Microsoft.CodeAnalysis.IArrayTypeSymbol { BaseType: { } arrayBase }
+            && GetOrCreateMetadataBinder()?.ResolveMemberRead(arrayBase, memberName, false, out _)
+                is Microsoft.CodeAnalysis.IPropertySymbol
+                {
+                    IsStatic: false, Parameters.Length: 0,
+                    Type.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_Int32
+                        or Microsoft.CodeAnalysis.SpecialType.System_Int64
+                        or Microsoft.CodeAnalysis.SpecialType.System_Boolean
+                } property ? property : null;
+    }
+
     private static bool IsArrayReceiver(BoundExpression receiver)
     {
         var typeName = receiver.Type.DisplayString;
@@ -4142,12 +4157,13 @@ public sealed class Binder
     {
         var target = boundTarget
             ?? TryBindSourceEnumTypeReceiver(fieldAccess.Target)
+            ?? TryBindSourceStaticFieldReceiver(fieldAccess)
             ?? TryBindMetadataTypeReceiver(fieldAccess.Target)
             ?? BindExpression(fieldAccess.Target);
         if (target is BoundTypeReferenceExpression { ResolvedType: { IsEnum: true } enumType })
         {
             var members = _enumMembers[enumType.Id].Where(member => member.Name == fieldAccess.FieldName).ToArray();
-            if (members is [var member] && IsSourceEnumAccessible(enumType))
+            if (members is [var member] && IsSourceTypeAccessible(enumType))
                 return new BoundFieldAccessExpression(fieldAccess.Span, target, fieldAccess.FieldName,
                     enumType.QualifiedName, member, fieldAccess.FieldNameSpan,
                     resolvedType: new BoundTypes.NominalBoundType(enumType.QualifiedName, declaration: enumType));
@@ -4162,6 +4178,14 @@ public sealed class Binder
         }
         if (fieldAccess.FieldName == "Length" && IsArrayReceiver(target))
             return new BoundArrayLength(fieldAccess.Span, target);
+        if (ResolveMetadataScalarArrayProperty(target, fieldAccess.FieldName) is { } scalarArrayProperty)
+            return new BoundFieldAccessExpression(
+                fieldAccess.Span, target, fieldAccess.FieldName, typeName: null,
+                fieldNameSpan: fieldAccess.FieldNameSpan,
+                resolvedType: Metadata.MetadataBinderResult.ToNominalBoundType(scalarArrayProperty.Type))
+            {
+                ResolvedMetadataMember = scalarArrayProperty
+            };
         if (target.AnonymousObjectMembers is { } anonymousMembers
             && anonymousMembers.Where(member => member.Name == fieldAccess.FieldName).ToArray() is [var anonymousMember])
         {
@@ -4192,6 +4216,10 @@ public sealed class Binder
             };
         var resolvedFields = fieldAccess.Target switch
         {
+            _ when target is BoundTypeReferenceExpression { ResolvedType: { } sourceType }
+                && _classesByQualifiedName.TryGetValue(sourceType.QualifiedName, out var sourceOwner) =>
+                ResolveAccessibleMembers(sourceOwner, fieldAccess.FieldName)
+                    .OfType<VariableSymbol>().Where(member => member.IsField && member.IsStatic).Cast<Symbol>().ToArray(),
             ThisExpressionNode => ResolveAccessibleMembers(_currentClass, fieldAccess.FieldName),
             BaseExpressionNode => ResolveAccessibleMembers(
                 ResolveBaseClass(_currentClass),
@@ -4303,6 +4331,10 @@ public sealed class Binder
             fields,
             resolvedType)
         {
+            SourceStaticFieldOwner = target is BoundTypeReferenceExpression
+                && fields is [{ IsField: true, IsStatic: true, DeclaringTypeName: { } declaringType }]
+                ? _classesByQualifiedName.GetValueOrDefault(declaringType) : null,
+            MethodInputArrayType = fields is [var arrayField] ? arrayField.MethodInputArrayType : null,
             HasUnknownInferredType = fieldTypes.Length != 1
                 || fields.Any(field => field.HasUnknownInferredType)
         };
@@ -4363,6 +4395,23 @@ public sealed class Binder
             ? new BoundTypeReferenceExpression(expression.Span, name,
                 new BoundTypes.NominalBoundType(owner.QualifiedName, declaration: owner), owner)
             : null;
+    }
+
+    private BoundTypeReferenceExpression? TryBindSourceStaticFieldReceiver(FieldAccessNode expression)
+    {
+        var name = DottedReferenceName(expression.Target);
+        if (name is null
+            || !name.StartsWith("global::", StringComparison.Ordinal)
+                && IsTypeReceiverHeadShadowed(name.Split('.')[0], allowDeclaredTypes: true))
+            return null;
+        var type = ResolveSourceType(name, _currentClassName, _currentNamespaceIdentity, _currentNamespaceScopeId).Type;
+        if (type is null || !IsSourceTypeAccessible(type)
+            || !_classesByQualifiedName.TryGetValue(type.QualifiedName, out var owner)
+            || ResolveAccessibleMembers(owner, expression.FieldName).OfType<VariableSymbol>().ToArray()
+                is not [{ IsField: true, IsStatic: true }])
+            return null;
+        return new BoundTypeReferenceExpression(expression.Target.Span, name,
+            new BoundTypes.NominalBoundType(type.QualifiedName, declaration: type), type);
     }
 
     private (bool Handled, TypeSymbol? Type) ResolveSourceType(
@@ -4427,7 +4476,7 @@ public sealed class Binder
         return (true, imported is [var importedType] ? importedType : null);
     }
 
-    private bool IsSourceEnumAccessible(TypeSymbol type)
+    private bool IsSourceTypeAccessible(TypeSymbol type)
     {
         while (true)
         {
@@ -6141,6 +6190,9 @@ public sealed class Binder
         if (refNode.IsNullLiteral)
             return new BoundNullLiteral(refNode.Span);
 
+        if (TryBindSourceStaticFieldReference(refNode) is { } sourceField)
+            return sourceField;
+
         var symbols = _scope.LookupAll(refNode.Name);
         if (symbols.Count == 0 || symbols.All(symbol => symbol is TypeSymbol))
         {
@@ -6162,7 +6214,8 @@ public sealed class Binder
                     refNode.Span.Start, lastDot, refNode.Span.Line, refNode.Span.Column);
                 var receiverNode = new ReferenceNode(receiverSpan, receiverName, refNode.IsVerbatim);
                 BoundExpression? receiver = TryBindSourceEnumTypeReceiver(receiverNode)
-                    ?? TryBindMetadataTypeReceiver(receiverNode);
+                    ?? TryBindMetadataTypeReceiver(receiverNode)
+                    ?? TryBindSourceStaticFieldReference(receiverNode);
                 if (receiver is null && (_scope.Lookup(receiverName) is VariableSymbol
                     || _scope.Lookup(receiverName.Split('.')[0]) is VariableSymbol { AnonymousObjectMembers: not null }))
                     receiver = BindReferenceExpression(receiverNode);
@@ -6175,6 +6228,7 @@ public sealed class Binder
                     || receiver?.AnonymousObjectMembers is not null
                     || receiver is BoundFieldAccessExpression { IsAnonymousPropertyRead: true }
                     || receiver is not null && ResolveMetadataArrayProperty(receiver, refNode.Name[(lastDot + 1)..]) is not null
+                    || receiver is not null && ResolveMetadataScalarArrayProperty(receiver, refNode.Name[(lastDot + 1)..]) is not null
                     || refNode.Name[(lastDot + 1)..] == "Length"
                         && receiver is not null && (IsArrayReceiver(receiver)
                             || receiver is BoundVariableExpression { Variable.MetadataArrayResultType: not null }))
@@ -6268,6 +6322,24 @@ public sealed class Binder
         return new BoundVariableExpression(
             refNode.Span,
             CreateUnresolvedVariable(refNode));
+    }
+
+    private BoundExpression? TryBindSourceStaticFieldReference(ReferenceNode refNode)
+    {
+        var sourceFieldDot = refNode.Name.LastIndexOf('.');
+        if (sourceFieldDot > 0)
+        {
+            var receiver = new ReferenceNode(new Parsing.TextSpan(
+                refNode.Span.Start, sourceFieldDot, refNode.Span.Line, refNode.Span.Column),
+                refNode.Name[..sourceFieldDot], refNode.IsVerbatim);
+            var member = new FieldAccessNode(refNode.Span, receiver, refNode.Name[(sourceFieldDot + 1)..],
+                new Parsing.TextSpan(refNode.Span.Start + sourceFieldDot + 1,
+                    refNode.Name.Length - sourceFieldDot - 1, refNode.Span.Line, refNode.Span.Column + sourceFieldDot + 1));
+            if (TryBindSourceStaticFieldReceiver(member) is { } sourceReceiver)
+                return BindFieldAccess(member, sourceReceiver);
+        }
+
+        return null;
     }
 
     private BoundBinaryExpression BindBinaryOperation(BinaryOperationNode binOp)

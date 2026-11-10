@@ -25,7 +25,7 @@ namespace Calor.Compiler.Tests;
 /// evaluated subexpression changes the result. Nothing may be preserved as C# (no rescue,
 /// no raw preservation) on a native row. Rows retain the original unknown-effect observations.
 /// Separate current observations require enforced compilation and exact metadata binding for
-/// the repaired round2/round3 rows. Unresolved rows still report Calor0410 for 'unknown'.
+/// the repaired F5-ARRAY-05/round2/round3 rows. Unresolved rows still report Calor0410 for 'unknown'.
 /// </summary>
 public class ArrayExpressionConversionTests
 {
@@ -1323,14 +1323,15 @@ public class ArrayExpressionConversionTests
         var strict = Program.Compile(calor, row + ".calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         var currentUnknownEffects = unknownEffects;
-        if (row is "round2" or "round3")
+        var hasCurrentResults = row is "F5-ARRAY-05" or "round2" or "round3";
+        if (hasCurrentResults)
         {
             using var current = JsonDocument.Parse(File.ReadAllText(Path.Combine(
                 CliTestHarness.FindRepoRoot(), "tests/TestData/InteropScope/R0/array-current-results.json")));
             var root = current.RootElement;
             Assert.Equal(Enum.GetNames<Surface>(),
                 root.GetProperty("surfaces").EnumerateArray().Select(value => value.GetString()));
-            Assert.Equal(new[] { "round2", "round3" },
+            Assert.Equal(new[] { "F5-ARRAY-05", "round2", "round3" },
                 root.GetProperty("rows").EnumerateObject().Select(value => value.Name));
             var observation = root.GetProperty("rows").GetProperty(row);
             Assert.Equal(unknownEffects, observation.GetProperty("recordedUnknownEffects").GetBoolean());
@@ -1351,6 +1352,18 @@ public class ArrayExpressionConversionTests
                 Assert.Equal(SpecialType.System_Int32, Assert.Single(method.Parameters).Type.SpecialType);
                 Assert.Equal(SpecialType.System_Int32, method.ReturnType.SpecialType);
             });
+            var properties = BoundDescendants(bound).OfType<BoundFieldAccessExpression>()
+                .Select(field => field.ResolvedMetadataMember).OfType<IPropertySymbol>()
+                .Where(property => property.ContainingType.SpecialType == SpecialType.System_Array).ToArray();
+            Assert.Equal(observation.GetProperty("arrayProperties").EnumerateArray().Select(value => value.GetString()),
+                properties.Select(property => property.Name));
+            Assert.All(properties, property =>
+            {
+                Assert.False(property.IsStatic);
+                Assert.Empty(property.Parameters);
+                Assert.NotNull(property.GetMethod);
+                Assert.Equal(SpecialType.System_Int32, property.Type.SpecialType);
+            });
         }
         Assert.True(strict.HasErrors == currentUnknownEffects,
             string.Join(Environment.NewLine, strict.Diagnostics.Errors) + "\n" + calor);
@@ -1361,7 +1374,7 @@ public class ArrayExpressionConversionTests
         Assert.False(compilation.HasErrors,
             string.Join(Environment.NewLine, compilation.Diagnostics.Errors) + "\n" + calor);
         Assert.Equal(expected, Run(compilation.GeneratedCode));
-        if (row is "round2" or "round3")
+        if (hasCurrentResults)
         {
             Assert.Equal(compilation.GeneratedCode, strict.GeneratedCode);
             Assert.Equal(expected, Run(strict.GeneratedCode));
@@ -2088,6 +2101,298 @@ public class ArrayExpressionConversionTests
         Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
         Assert.Contains("g[0, 1].V", compilation.GeneratedCode);
         Assert.Contains("xs[0].V", compilation.GeneratedCode);
+    }
+
+    [Theory]
+    [InlineData("Holder")]
+    [InlineData("Derived")]
+    [InlineData("Proof.Holder")]
+    [InlineData("Alias")]
+    public void SourceStaticArrayFields_RetainDeclarationShapeAndInitializationEffects(string receiver)
+    {
+        var source = $$"""
+            module StaticFields Proof
+              using Alias = Proof.Holder
+              class Holder
+                field int[,]:Grid public static = new int[,] { { 1, 2 }, { 3, 4 } }
+              class Derived
+                extends Holder
+              module Probe
+                func Run public () → string
+                  ! alloc
+                  return "" + {{receiver}}.Grid.GetLength(0) + "," + {{receiver}}.Grid[1, 0]
+            """;
+        var parsed = Program.Compile(source, "source-static-array.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(parsed.HasErrors, string.Join(Environment.NewLine, parsed.Diagnostics.Errors));
+        foreach (var calor in new[] { source, new CalorEmitter().Emit(parsed.Ast!) })
+        {
+            var result = Program.Compile(calor, "source-static-array.calr",
+                new CompilationOptions { StatusWriter = TextWriter.Null });
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+            Assert.Equal("2,3", Run(result.GeneratedCode));
+            var diagnostics = new DiagnosticBag();
+            var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(result.Ast!);
+            Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+            var fields = BoundDescendants(bound).OfType<BoundFieldAccessExpression>()
+                .Where(field => field.FieldName == "Grid").ToArray();
+            Assert.Equal(2, fields.Length);
+            Assert.All(fields, field =>
+            {
+                Assert.Equal("Proof.Holder", field.ResolvedField!.DeclaringTypeName);
+                Assert.True(field.ResolvedField.IsStatic);
+                Assert.Equal("Holder", field.SourceStaticFieldOwner!.Name);
+                Assert.Equal(2, field.MethodInputArrayType!.Rank);
+                Assert.Equal(Calor.Compiler.Binding.BoundTypes.NullableAnnotation.NotAnnotated,
+                    field.MethodInputArrayType.NullableAnnotation);
+                Assert.NotNull(Assert.IsType<BoundTypeReferenceExpression>(field.Target).ResolvedType);
+            });
+            var call = Assert.Single(BoundDescendants(bound).OfType<BoundCallExpression>());
+            Assert.Equal(SpecialType.System_Array, call.ResolvedMetadataMethod!.ContainingType.SpecialType);
+            var pure = Program.Compile(calor.Replace("! alloc", "!", StringComparison.Ordinal),
+                "pure-static-array.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+            Assert.Contains(pure.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
+                && error.Message.Contains("'alloc'", StringComparison.Ordinal));
+        }
+    }
+
+    [Theory]
+    [InlineData("field int[]:Other public static = new int[1]")]
+    [InlineData("property int[]:Other static = new int[1]\n      get public")]
+    public void SourceStaticArrayFields_ChargeOtherInitializersInTheDeclaringType(string other)
+    {
+        var source = $$"""
+            module StaticFields
+              class Holder
+                field int:Value public static = 9
+                {{other}}
+              module Probe
+                func Run public () → string
+                  ! alloc
+                  return "" + Holder.Value
+            """;
+        var result = Program.Compile(source, "other-static-initializer.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        Assert.Equal("9", Run(result.GeneratedCode));
+        var pure = Program.Compile(source.Replace("! alloc", "!", StringComparison.Ordinal),
+            "pure-other-static-initializer.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Contains(pure.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
+            && error.Message.Contains("'alloc'", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("GetLength(0)", "2")]
+    [InlineData("Length", "4")]
+    [InlineData("LongLength", "4")]
+    [InlineData("Rank", "2")]
+    public void SourceStaticArrayFields_ArrayMembersChargeReceiverInitialization(string member, string expected)
+    {
+        var source = $$"""
+            module StaticFields
+              class Holder
+                field int[,]:Grid public static = new int[2, 2]
+              module Probe
+                func Run public () → string
+                  ! alloc
+                  return "" + Holder.Grid.{{member}}
+            """;
+        var result = Program.Compile(source, "static-array-member.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        Assert.Equal(expected, Run(result.GeneratedCode));
+        var pure = Program.Compile(source.Replace("! alloc", "!", StringComparison.Ordinal),
+            "pure-static-array-member.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Contains(pure.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
+            && error.Message.Contains("'alloc'", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("field string:Other public static = System.Environment.CurrentDirectory")]
+    [InlineData("property string:Other static = System.Environment.CurrentDirectory\n      get public")]
+    [InlineData("field object:Other public static = new object()")]
+    [InlineData("field int[]:Other public static = Make()")]
+    [InlineData("field int:Other public static = @null")]
+    public void SourceStaticArrayFields_DoNotHideUnboundInitialization(string other)
+    {
+        var source = $$"""
+            module StaticFields
+              class Holder
+                field int:Value public static = 9
+                field int:@null public static = 1
+                {{other}}
+                func Make public static () → int[]
+                  ! alloc
+                  return new int[1]
+              func Read () → int
+                !
+                return Holder.Value
+            """;
+        var result = Program.Compile(source, "unbound-static-initializer.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics, error => error.Code == DiagnosticCode.UnknownExternalCall
+            && error.Message.Contains("Holder..cctor", StringComparison.Ordinal));
+        Assert.Contains(result.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
+            && error.Message.Contains("'unknown'", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("Holder:Holder", "field int:Grid public")]
+    [InlineData("", "field int:Grid private static = 2")]
+    [InlineData("", "field int:Grid public = 2")]
+    [InlineData("", "property int:Grid static\n      get public\n        return System.Environment.TickCount")]
+    public void SourceStaticArrayFields_DoNotInventStaticFieldIdentity(string parameters, string member)
+    {
+        var source = $$"""
+            module StaticFields
+              class Holder
+                {{member}}
+              func Read ({{parameters}}) → int
+                !
+                return Holder.Grid
+            """;
+        var result = Program.Compile(source, "unresolved-static-field.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        if (parameters.Length == 0)
+            Assert.True(result.HasErrors);
+        var bound = new Calor.Compiler.Binding.Binder(new DiagnosticBag()).Bind(result.Ast!);
+        Assert.All(BoundDescendants(bound).OfType<BoundFieldAccessExpression>()
+            .Where(field => field.FieldName == "Grid"), field => Assert.Null(field.SourceStaticFieldOwner));
+    }
+
+    [Fact]
+    public void SourceStaticArrayFields_ShadowedReceiversRetainActualGetterEffects()
+    {
+        const string source = """
+            module StaticFields
+              class Holder
+                field int:Grid public static = 9
+              class Other
+                property int:Grid
+                  get public
+                    return System.Console.Read()
+              func Read (Other:Holder) → int
+                !
+                return (Holder).Grid
+            """;
+        var result = Program.Compile(source, "shadowed-static-field.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Contains(result.Diagnostics.Errors,
+            error => error.Code == DiagnosticCode.AccessorEffectContractUnavailable);
+        Assert.Contains(result.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
+            && error.Message.Contains("'cr'", StringComparison.Ordinal));
+        var bound = new Calor.Compiler.Binding.Binder(new DiagnosticBag()).Bind(result.Ast!);
+        var field = Assert.Single(BoundDescendants(bound).OfType<BoundFieldAccessExpression>()
+            .Where(field => field.FieldName == "Grid"));
+        Assert.Null(field.SourceStaticFieldOwner);
+        var target = Assert.IsType<BoundVariableExpression>(field.Target);
+        Assert.True(target.Variable.IsParameter);
+        Assert.Equal("Other", target.Variable.TypeName);
+    }
+
+    [Fact]
+    public void SourceStaticArrayFields_RetainNoHeaderStaticConstructorEnforcement()
+    {
+        const string original = """
+            public class Holder
+            {
+                public static int Value = 9;
+                static Holder() { System.Console.WriteLine("initialize"); }
+            }
+            public static class Probe { public static int Read() => Holder.Value; }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(original);
+        Assert.True(conversion.Success, string.Join(Environment.NewLine, conversion.Issues));
+        Assert.Empty(conversion.Losses);
+        var result = Program.Compile(conversion.CalorSource!, "static-constructor-field.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Contains(result.Diagnostics.Errors,
+            error => error.Code == DiagnosticCode.ConstructorEffectContractUnavailable);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SourceStaticArrayFields_IncludeStaticConstructorEffectsRegardlessOfDeclarationOrder(bool callerFirst)
+    {
+        const string holder = """
+            class Holder
+              field int:Value public static
+              ctor stat ()
+                set Value 1
+            """;
+        const string read = """
+            func Read public () → int
+              !
+              return Holder.Value
+            """;
+        var source = "module StaticFields\n" + string.Join("\n",
+            (callerFirst ? read + "\n" + holder : holder + "\n" + read)
+                .Split('\n').Select(line => "  " + line));
+        var result = Program.Compile(source, "ordered-static-constructor.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Contains(result.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
+            && error.Message.Contains("'mut'", StringComparison.Ordinal));
+        var allowed = Program.Compile(source.Replace("    !\n", "    ! mut\n", StringComparison.Ordinal),
+            "allowed-static-constructor.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(allowed.HasErrors, string.Join(Environment.NewLine, allowed.Diagnostics.Errors));
+        Assert.Equal("1", Run(allowed.GeneratedCode,
+            "public static class Probe { public static string Run() => GlobalModule.Read().ToString(); }"));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("?")]
+    public void SourceStaticArrayFields_PreserveDeclaredArrayNullability(string nullable)
+    {
+        var source = $$"""
+            module StaticFields
+              class Holder
+                field int[,]{{nullable}}:Grid public static
+              module Probe
+                func Run public () → string
+                  !
+                  return "" + (Holder.Grid == null)
+            """;
+        var result = Program.Compile(source, "nullable-static-array.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        Assert.Equal("True", Run(result.GeneratedCode));
+        var bound = new Calor.Compiler.Binding.Binder(new DiagnosticBag()).Bind(result.Ast!);
+        var field = Assert.Single(BoundDescendants(bound).OfType<BoundFieldAccessExpression>());
+        Assert.Equal(nullable.Length == 0
+                ? Calor.Compiler.Binding.BoundTypes.NullableAnnotation.NotAnnotated
+                : Calor.Compiler.Binding.BoundTypes.NullableAnnotation.Annotated,
+            field.MethodInputArrayType!.NullableAnnotation);
+    }
+
+    [Fact]
+    public void SourceStaticArrayFields_WritesChargeMutationAndTypeInitialization()
+    {
+        const string source = """
+            module StaticFields
+              class Holder
+                field int:Value public static
+                field int[]:Other public static = new int[1]
+              module Writer
+                func Write public () → string
+                  ! alloc, mut
+                  set Holder.Value 2
+                  return "done"
+            """;
+        var result = Program.Compile(source, "write-static-field.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        Assert.Equal("done|2", Run(result.GeneratedCode,
+            """public static class Probe { public static string Run() => Writer.Write() + "|" + Holder.Value; }"""));
+        foreach (var (header, missing) in new[] { ("! mut", "alloc"), ("! alloc", "mut") })
+        {
+            var forbidden = Program.Compile(source.Replace("! alloc, mut", header, StringComparison.Ordinal),
+                "forbidden-static-write.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+            Assert.Contains(forbidden.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
+                && error.Message.Contains($"'{missing}'", StringComparison.Ordinal));
+        }
     }
 
     private const string RectangularArrayCaller = """

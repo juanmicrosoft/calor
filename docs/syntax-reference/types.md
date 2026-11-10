@@ -134,6 +134,14 @@ Written sizes, empty braces and row boundaries are preserved; mismatched
 sizes or ragged rows are rejected rather than padded, flattened or resized.
 Initializer expressions still require their own effects in addition to `alloc`.
 
+Reading a source static array field through its type retains the declared rank,
+including inherited fields. Effect checking accounts for all static field and
+property initializers on the declaring type, not just the field being read.
+This path currently supports self-contained primitive and primitive-array
+initializers. Other initializer forms remain unresolved; an enforced read
+cannot silently treat them as pure. Explicit static constructors retain their
+constructor-effect checks.
+
 ## Nullable types
 
 Write `T?`, with a suffix question mark. `string?` and a resolved `User?`
