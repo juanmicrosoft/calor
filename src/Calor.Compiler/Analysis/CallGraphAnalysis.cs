@@ -266,6 +266,10 @@ public sealed class CallGraphAnalysis
                 pending.Push(body);
                 while (pending.TryPop(out var operation))
                 {
+                    // Opaque C# has no native expression/effect authority. Its callers
+                    // still pass through the normal Unknown-call enforcement.
+                    if (Origin(operation) is CSharpInteropBlockNode or RawCSharpNode or RawCSharpExpressionNode)
+                        continue;
                     foreach (var child in operation.ChildOperations)
                         pending.Push(child);
                     if (operation is IInvocationOperation invocation)

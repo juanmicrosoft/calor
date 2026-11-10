@@ -1633,8 +1633,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
             GetWholeCompilationUnitInterop(node);
         if (compilationUnitInterop != null)
         {
-            _emissionContext.Writer.Append(
-                compilationUnitInterop.CSharpCode);
+            var code = compilationUnitInterop.CSharpCode;
+            _emissionContext.Writer.Append(AnnotateSource is { } annotate
+                ? annotate(compilationUnitInterop, "\n" + code + "\n")
+                : code);
             return _emissionContext.Writer.ToString();
         }
 
@@ -2852,7 +2854,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
             {
                 case CSharpInteropBlockNode interop
                     when IsNamespaceWrappedInterop(interop):
-                    AppendRawCSharp(interop.CSharpCode);
+                    AppendRawCSharp(interop.CSharpCode, interop);
                     _compilationUnitInteropStarts.Add(interop.Span.Start);
                     break;
                 case TypePreprocessorBlockNode block:
@@ -2882,7 +2884,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
                 if (item is CSharpInteropBlockNode interop
                     && IsNamespaceWrappedInterop(interop))
                 {
-                    AppendRawCSharp(interop.CSharpCode);
+                    AppendRawCSharp(interop.CSharpCode, interop);
                     _compilationUnitInteropStarts.Add(interop.Span.Start);
                 }
                 else if (item is TypePreprocessorBlockNode nested)
@@ -9166,7 +9168,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
     public string Visit(RawCSharpNode node)
     {
         RegisterOpaqueCSharpDependencies();
-        AppendRawCSharp(node.CSharpCode);
+        AppendRawCSharp(node.CSharpCode, node);
         return "";
     }
 
@@ -9458,12 +9460,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
     public string Visit(CSharpInteropBlockNode node)
     {
         RegisterOpaqueCSharpDependencies();
-        AppendRawCSharp(node.CSharpCode);
+        AppendRawCSharp(node.CSharpCode, node);
         return "";
     }
 
-    private void AppendRawCSharp(string code)
+    private void AppendRawCSharp(string code, AstNode? origin = null)
     {
+        if (origin != null && AnnotateSource is { } annotate)
+            code = annotate(origin, "\n" + code + "\n");
         _emissionContext.Writer.Append(code);
         if (code.Length == 0 || code[^1] is not '\r' and not '\n')
             _emissionContext.Writer.AppendLine();

@@ -1,11 +1,11 @@
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Commands;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Migration;
@@ -264,8 +264,7 @@ public class LocalFunctionConversionTests
         var converted = new CSharpToCalorConverter().Convert(source);
         Assert.True(converted.Success, string.Join("\n", converted.Issues) + "\n" + converted.CalorSource);
         Assert.Empty(converted.Losses);
-        Assert.DoesNotContain("§CS", converted.CalorSource);
-        RawFrameAssertions.AssertFramed(converted.CalorSource, Calor.Compiler.Parsing.TokenKind.RawCSharp, present: false);
+        AssertNativeLambdas(ParseCalor(converted.CalorSource!), 1);
         var originalBody = Assert.Single(converted.Ast!.Classes).Methods.Single(method => method.Name == "Run").Body;
         var binding = Assert.IsType<BindStatementNode>(originalBody[0]);
         Assert.True(binding.IsMutable);
@@ -329,14 +328,14 @@ public class LocalFunctionConversionTests
         var assignment = Assert.IsType<AssignmentStatementNode>(body[2]);
         Assert.Equal(self.Name, Assert.IsType<ReferenceNode>(assignment.Target).Name);
         Assert.False(Assert.IsType<LambdaExpressionNode>(assignment.Value).IsStatic);
-        Assert.DoesNotContain(RecursiveAstWalker.DescendantsAndSelf(converted.Ast),
+        Assert.DoesNotContain(AllNodes(converted.Ast),
             node => node is LocalFunctionStatementNode or CSharpInteropBlockNode or RawCSharpExpressionNode);
 
         var compiled = Program.Compile(converted.CalorSource!, "recursive-arithmetic.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics) + "\n" + converted.CalorSource);
         Assert.Equal(expectedResult, Run(compiled.GeneratedCode, false, input));
-        var parsedSelf = RecursiveAstWalker.DescendantsAndSelf(compiled.Ast!)
+        var parsedSelf = AllNodes(compiled.Ast!)
             .OfType<BindStatementNode>().Single(bind => bind.Name == "Factorial");
         Assert.Empty(Assert.IsType<EffectsNode>(parsedSelf.Row).Effects);
 
@@ -368,7 +367,10 @@ public class LocalFunctionConversionTests
         Assert.False(context.HasErrors, string.Join("\n", context.Issues));
         Assert.Empty(context.Losses);
         var calor = new CalorEmitter().Emit(ast);
-        Assert.Contains("overflow=checked", calor);
+        Assert.True(ast.ShouldCheckIntegerOverflow());
+        var parsed = ParseCalor(calor);
+        Assert.True(parsed.ShouldCheckIntegerOverflow());
+        AssertNativeLambdas(parsed, 1);
         var compiled = Program.Compile(calor, "checked-recursion.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics) + "\n" + calor);
@@ -462,10 +464,28 @@ public class LocalFunctionConversionTests
         Assert.Contains(converted.Issues, issue => issue.Feature == "local-function");
         Assert.Contains(converted.Losses, loss => loss.Feature == "method"
             && loss.Kind == ConversionLossKind.InteropPreserved);
+        var parsed = ParseCalor(converted.CalorSource!);
+        AssertPreservedMembers(parsed, 1, 0);
+        var strict = Program.Compile(converted.CalorSource!, "strict-preserved-recursion.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.True(strict.HasErrors);
+        Assert.Contains(strict.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+            && diagnostic.Message.Contains("M", StringComparison.Ordinal));
+        Assert.DoesNotContain(strict.Diagnostics, diagnostic =>
+            diagnostic.Message.Contains("no Calor expression origin", StringComparison.Ordinal));
         var compiled = Program.Compile(converted.CalorSource!, "preserved-recursion.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null, UnknownCallPolicy = UnknownCallPolicy.Permissive });
         Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics) + "\n" + converted.CalorSource);
         Assert.Equal(expected, Run(compiled.GeneratedCode));
+
+        if (body.Contains("new Tag()", StringComparison.Ordinal))
+        {
+            var bindings = CallGraphAnalysis.ResolveOperatorCalls(parsed);
+            Assert.Empty(bindings.Failures);
+            Assert.Empty(bindings.SourceCalls);
+            Assert.Empty(bindings.ExternalCalls);
+            AssertNativeOperatorEffectsRemainEnforced(parsed);
+        }
     }
 
     [Fact]
@@ -491,7 +511,7 @@ public class LocalFunctionConversionTests
         Assert.Contains(context.Issues, issue => issue.Feature == "local-function");
         Assert.Contains(context.Losses, loss => loss.Feature == "method"
             && loss.Kind == ConversionLossKind.InteropPreserved);
-        Assert.DoesNotContain(RecursiveAstWalker.DescendantsAndSelf(ast), node => node is LambdaExpressionNode);
+        Assert.DoesNotContain(AllNodes(ast), node => node is LambdaExpressionNode);
     }
 
     [Theory]
@@ -519,9 +539,15 @@ public class LocalFunctionConversionTests
         Assert.Equal(expected, Run(source));
         var (calor, losses) = await ConvertAsync(source, surface);
         Assert.Equal(["initializer-interop"], losses);
-        RawFrameAssertions.AssertFramed(calor, present: false);
-        Assert.Contains("§CS{", calor);
-        Assert.Contains("§LAM{", calor);
+        // The active grammar preserves this containing method, not a raw expression in a lambda.
+        var parsed = ParseCalor(calor);
+        AssertPreservedMembers(parsed, 1, 0);
+        var preserved = Assert.Single(AllNodes(parsed).OfType<CSharpInteropBlockNode>());
+        Assert.Equal("initializer-interop", preserved.FeatureName);
+        Assert.Equal(InteropMemberKind.Method, preserved.MemberKind);
+        var originalMethod = CSharpSyntaxTree.ParseText(source).GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Run");
+        Assert.Equal(originalMethod.ToString().Trim(), preserved.CSharpCode.Trim());
         var compilation = Program.Compile(calor, "initializer-lambda.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compilation.HasErrors,
@@ -548,10 +574,17 @@ public class LocalFunctionConversionTests
 
         var (calor, losses) = await ConvertAsync(source, surface);
 
-        RawFrameAssertions.AssertFramed(calor, present: false);
-        Assert.DoesNotContain("§CS{", calor);
         Assert.Empty(losses);
-        Assert.Contains("§LAM{", calor);
+        var lambdaCount = row switch
+        {
+            "F3-LOCAL-02" => 1,
+            "same-point" => 5,
+            "invocation-timing" => 2,
+            "F3-LOCAL-01" => 2,
+            "official-074" => 3,
+            _ => throw new ArgumentOutOfRangeException(nameof(row), row, "Unregistered native row")
+        };
+        AssertNativeLambdas(ParseCalor(calor), lambdaCount);
 
         // Default compile: effects enforced, no --permissive-effects.
         var compilation = Program.Compile(calor, row + ".calr",
@@ -559,8 +592,7 @@ public class LocalFunctionConversionTests
         Assert.False(compilation.HasErrors,
             string.Join(Environment.NewLine, compilation.Diagnostics.Errors) + "\n" + calor);
         Assert.Contains("static (", compilation.GeneratedCode);
-        Assert.DoesNotContain(RecursiveAstWalker.DescendantsAndSelf(compilation.Ast!),
-            node => node is LocalFunctionStatementNode);
+        AssertNativeLambdas(compilation.Ast!, lambdaCount);
         Assert.Equal(expected, row == "official-074"
             ? RunOfficialScorecard(compilation.GeneratedCode) : Run(compilation.GeneratedCode));
     }
@@ -601,6 +633,8 @@ public class LocalFunctionConversionTests
         Assert.Equal(preservedMembers, RawFrameAssertions.GetFrames(calor).Length);
         Assert.Equal(preservedMembers, losses.Count(feature => feature == "method"));
         Assert.DoesNotContain("post-validation-fallback", losses);
+        var nativeLambdas = row switch { "F3-LOCAL-03" or "more-shapes" => 2, "edge-shapes" => 3, _ => 0 };
+        AssertPreservedMembers(ParseCalor(calor), preservedMembers, nativeLambdas);
 
         // The callers of preserved members charge assumed effects (R0 baseline),
         // so behaviour is compared under --permissive-effects, as at R0.
@@ -611,7 +645,7 @@ public class LocalFunctionConversionTests
         });
         Assert.False(compilation.HasErrors,
             string.Join(Environment.NewLine, compilation.Diagnostics.Errors) + "\n" + calor);
-        Assert.DoesNotContain(RecursiveAstWalker.DescendantsAndSelf(compilation.Ast!),
+        Assert.DoesNotContain(AllNodes(compilation.Ast!),
             node => node is LocalFunctionStatementNode);
         Assert.Equal(expected, Run(compilation.GeneratedCode));
     }
@@ -672,7 +706,7 @@ public class LocalFunctionConversionTests
         Assert.True(result.Success, string.Join("\n", result.Issues));
         Assert.Contains(result.Issues, issue => issue.Feature == "local-function");
         RawFrameAssertions.AssertFramed(result.CalorSource);
-        Assert.DoesNotMatch(@"\n {6,}§F\{", result.CalorSource!);
+        AssertPreservedMembers(ParseCalor(result.CalorSource!), 1, 0);
     }
 
     [Theory]
@@ -690,17 +724,22 @@ public class LocalFunctionConversionTests
         var result = new CSharpToCalorConverter().Convert(source);
         Assert.True(result.Success, string.Join("\n", result.Issues));
         Assert.DoesNotContain(result.Issues, issue => issue.Feature == "local-function");
-        RawFrameAssertions.AssertFramed(result.CalorSource, present: false);
-        Assert.Contains("§LAM{", result.CalorSource!);
-        Assert.DoesNotMatch(@"\n {6,}§F\{f\d+:L\}", result.CalorSource!);
+        var parsed = ParseCalor(result.CalorSource!);
         if (!compile)
         {
-            Assert.Contains(result.Losses, loss =>
-                loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "initializer-interop");
-            Assert.Contains("§CS{", result.CalorSource);
+            var loss = Assert.Single(result.Losses);
+            Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+            Assert.Equal("initializer-interop", loss.Feature);
+            AssertPreservedMembers(parsed, 1, 0);
+            var preserved = Assert.Single(AllNodes(parsed).OfType<CSharpInteropBlockNode>());
+            Assert.Equal(InteropMemberKind.Method, preserved.MemberKind);
+            var originalMethod = CSharpSyntaxTree.ParseText(source).GetRoot().DescendantNodes()
+                .OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "M");
+            Assert.Equal(originalMethod.ToString().Trim(), preserved.CSharpCode.Trim());
             return;
         }
         Assert.Empty(result.Losses);
+        AssertNativeLambdas(parsed, 1);
         var compilation = Program.Compile(result.CalorSource!, "shape.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compilation.HasErrors,
@@ -739,7 +778,8 @@ public class LocalFunctionConversionTests
         var info = FeatureSupport.GetFeatureInfo("local-function")!;
         Assert.Equal(SupportLevel.Partial, info.Support);
         Assert.Contains("non-capturing", info.Description);
-        Assert.Contains("§CSHARP", info.Description);
+        Assert.Contains("typed lambda binding", info.Description);
+        Assert.Contains("preserve the containing member as converter-owned C# interop", info.Description);
     }
 
     // ---- Codex review round 1 regression (converter) ----
@@ -751,10 +791,77 @@ public class LocalFunctionConversionTests
         var result = new CSharpToCalorConverter().Convert(
             "public partial class C { public int M() { int L() => _f; return L(); } }");
         Assert.Contains(result.Issues, issue => issue.Feature == "local-function");
-        Assert.DoesNotMatch(@"\n {6,}§F\{", result.CalorSource ?? "");
+        AssertPreservedMembers(ParseCalor(result.CalorSource!), 1, 0);
     }
 
     // ---- harness ----
+
+    private static ModuleNode ParseCalor(string calor)
+    {
+        var parsed = CalorSourceHelper.Parse(calor, "local-function-shape.calr");
+        Assert.True(parsed.IsSuccess, string.Join("\n", parsed.Errors) + "\n" + calor);
+        return parsed.Ast!;
+    }
+
+    private static void AssertNativeLambdas(ModuleNode module, int count)
+    {
+        AssertPreservedMembers(module, 0, count);
+    }
+
+    private static void AssertPreservedMembers(ModuleNode module, int members, int lambdas)
+    {
+        var nodes = AllNodes(module).ToArray();
+        Assert.Equal(members, nodes.OfType<CSharpInteropBlockNode>().Count());
+        Assert.Equal(lambdas, nodes.OfType<LambdaExpressionNode>().Count());
+        Assert.DoesNotContain(nodes,
+            node => node is LocalFunctionStatementNode or RawCSharpNode or RawCSharpExpressionNode);
+    }
+
+    private static IEnumerable<AstNode> AllNodes(AstNode root)
+    {
+        var seen = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+        var pending = new Stack<AstNode>();
+        pending.Push(root);
+        while (pending.TryPop(out var node))
+        {
+            if (!seen.Add(node))
+                continue;
+            yield return node;
+            foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+                pending.Push(child);
+        }
+    }
+
+    private static void AssertNativeOperatorEffectsRemainEnforced(ModuleNode module)
+    {
+        const string caller = """
+            module NativeOperatorCaller
+              func Native public (int:value, C.Tag:tag) → int
+                !
+                return value + tag
+            """;
+        var native = Assert.Single(ParseCalor(caller).Functions);
+        var mixed = module.With(update =>
+        {
+            update.Functions = [native];
+            update.Items = [.. module.Items, native];
+        });
+        var bindings = CallGraphAnalysis.ResolveOperatorCalls(mixed);
+        Assert.Empty(bindings.Failures);
+        var selected = Assert.Single(bindings.SourceCalls);
+        Assert.IsType<BinaryOperationNode>(selected.Key);
+        var op = Assert.Single(AllNodes(module).OfType<OperatorOverloadNode>());
+        Assert.Equal("Tag." + op.Id, Assert.Single(selected.Value));
+        var calor = new CalorEmitter().Emit(mixed);
+        foreach (var policy in new[] { UnknownCallPolicy.Strict, UnknownCallPolicy.Permissive })
+        {
+            var compiled = Program.Compile(calor, "native-operator-effects.calr",
+                new CompilationOptions { StatusWriter = TextWriter.Null, UnknownCallPolicy = policy });
+            Assert.Contains(compiled.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("Native", StringComparison.Ordinal)
+                && diagnostic.Message.Contains("'mut'", StringComparison.Ordinal));
+        }
+    }
 
     private static ConversionOptions NoFallbackOptions() => ConvertCommand.BuildCSharpToCalorOptions(
         benchmark: false, verbose: false, explain: false, noFallback: true,
