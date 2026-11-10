@@ -59,11 +59,12 @@ public static class TestCommand
         format.FromAmong("text", "json");
         var timeout = new Option<int>("--timeout", () => 600, "Timeout per build/test process in seconds");
         var solverTimeout = new Option<int>("--verification-timeout", () => 5000, "Solver timeout per contract in milliseconds");
+        var noImplicitSystem = new Option<bool>("--no-implicit-system", "Validate without the implicit System project import");
         foreach (var option in new[] { timeout, solverTimeout })
             option.AddValidator(r => { if (r.GetValueOrDefault<int>() <= 0) r.ErrorMessage = "Timeout must be positive."; });
         var command = new Command("check", "Build, test and verify one source snapshot; return only failures")
         {
-            path, format, timeout, solverTimeout
+            path, format, timeout, solverTimeout, noImplicitSystem
         };
         command.SetHandler(async (InvocationContext context) =>
         {
@@ -73,7 +74,8 @@ public static class TestCommand
                     context.ParseResult.GetValueForArgument(path),
                     context.ParseResult.GetValueForOption(timeout),
                     context.ParseResult.GetValueForOption(solverTimeout),
-                    context.GetCancellationToken());
+                    context.GetCancellationToken(),
+                    !context.ParseResult.GetValueForOption(noImplicitSystem));
                 Console.WriteLine(context.ParseResult.GetValueForOption(format) == "json"
                     ? JsonSerializer.Serialize(result, LoopJsonOptions)
                     : result.ToText());
@@ -125,7 +127,8 @@ public static class TestCommand
     // No original source, project file or test is written or repaired.
     internal static async Task<LoopResult> RunLoopAsync(
         string path, int timeoutSeconds = 600, int verificationTimeoutMs = 5000,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool includeImplicitSystemUsing = true)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var output = new LoopResult();
@@ -172,6 +175,7 @@ public static class TestCommand
                 cancellationToken.ThrowIfCancellationRequested();
                 var settings = new CompilationOptions
                 {
+                    IncludeImplicitSystemUsing = includeImplicitSystemUsing,
                     EnforceEffects = true,
                     UnknownCallPolicy = UnknownCallPolicy.Strict,
                     VerifyContracts = true,
@@ -219,7 +223,8 @@ public static class TestCommand
             var dotnet = ExecutionWorkspace.FindDotnet();
             if (dotnet == null)
                 throw new InvalidOperationException(ExecutionWorkspace.DotnetMissingMessage);
-            var project = ExecutionWorkspace.WriteProject(Path.Combine(workspace, "src"), "CalorSrc", false, units);
+            var project = ExecutionWorkspace.WriteProject(Path.Combine(workspace, "src"), "CalorSrc", false, units,
+                includeImplicitSystemUsing);
             var build = await ExecutionWorkspace.CaptureProcessAsync(dotnet,
                 ["build", testProject ?? project, "--nologo", "-v", "quiet", "-clp:ErrorsOnly;NoSummary"],
                 workspace, TimeSpan.FromSeconds(timeoutSeconds), cancellationToken);
@@ -354,7 +359,8 @@ public static class TestCommand
         try
         {
             var srcProjectPath = ExecutionWorkspace.WriteProject(
-                Path.Combine(workspace, "src"), "CalorSrc", executable: false, prepared.Units);
+                Path.Combine(workspace, "src"), "CalorSrc", executable: false, prepared.Units,
+                settings.IncludeImplicitSystemUsing);
 
             if (testFiles.Count == 0)
             {

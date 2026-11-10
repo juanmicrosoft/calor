@@ -429,6 +429,13 @@ internal static class CompilationDriver
             priorFiles = null;
         }
 
+        var compilationOptions = sources.ToDictionary(
+            file => file.FullName, optionsFactory, BuildStateCache.GetPathComparer());
+        var systemProfiles = compilationOptions.Values
+            .Select(options => options.IncludeImplicitSystemUsing).Distinct().ToList();
+        if (systemProfiles.Count > 1)
+            throw new ArgumentException("Files in one compilation must use the same implicit System context.");
+
         foreach (var file in sources)
         {
             // --- Warm path: skip unchanged files, reusing the cached effect summary ---
@@ -468,7 +475,7 @@ internal static class CompilationDriver
                 }
             }
 
-            var options = optionsFactory(file);
+            var options = compilationOptions[file.FullName];
             options.CrossModuleFunctionModules = crossModuleMap;
             options.CrossModuleTypes = crossModuleTypes;
             options.DeferGeneratedOutputValidation = true;
@@ -590,11 +597,17 @@ internal static class CompilationDriver
                     .Concat(skippedGeneratedSources),
                 owned,
                 out cascadeSuppressed);
-            var references = pending
-                .SelectMany(item => item.Options.ReferencedAssemblyPaths ?? [])
+            var references = compilationOptions.Values
+                .SelectMany(options => options.ReferencedAssemblyPaths ?? [])
                 .Distinct(BuildStateCache.GetPathComparer());
             var validation = generatedSources.Count > 0
-                ? GeneratedCSharpCompiler.Validate(generatedSources, references)
+                ? GeneratedCSharpCompiler.Validate(generatedSources,
+                    new GeneratedCSharpCompilationContext
+                    {
+                        ReferencePaths = references,
+                        IncludeImplicitSystemUsing = systemProfiles.Single(),
+                        AllowUnsafe = compilationOptions.Values.All(options => options.AllowUnsafeCode)
+                    })
                 : null;
             if (validation != null && !validation.CompilationSuccess)
             {

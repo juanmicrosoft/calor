@@ -105,6 +105,11 @@ public sealed class ConvertTool : McpToolBase
                     "items": { "type": "string" },
                     "description": "Conditional-compilation symbols supplied to Roslyn"
                 },
+                "implicitSystem": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Apply the System-only project import to original and generated C#. False selects standalone validation."
+                },
                 "configuration": {
                     "type": "string",
                     "description": "Configuration recorded in conversion metadata"
@@ -230,6 +235,7 @@ public sealed class ConvertTool : McpToolBase
         {
             var options = new ConversionOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", defaultValue: true),
                 ModuleName = moduleName,
                 PreserveDocumentationComments = true,
                 AutoGenerateIds = true,
@@ -473,6 +479,7 @@ public sealed class ConvertTool : McpToolBase
             // Stage 1: Convert
             var options = new ConversionOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", defaultValue: true),
                 ModuleName = moduleName,
                 PreserveDocumentationComments = true,
                 AutoGenerateIds = true,
@@ -560,6 +567,7 @@ public sealed class ConvertTool : McpToolBase
             {
                 var compileOptions = new CompilationOptions
                 {
+                    IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                     EnforceEffects = false,
                     UnknownCallPolicy = UnknownCallPolicy.Permissive,
                     DeferGeneratedOutputValidation = true,
@@ -738,6 +746,7 @@ public sealed class ConvertTool : McpToolBase
         {
             var options = new ConversionOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", defaultValue: true),
                 ModuleName = moduleName,
                 PreserveDocumentationComments = true,
                 AutoGenerateIds = true,
@@ -783,6 +792,7 @@ public sealed class ConvertTool : McpToolBase
             {
                 var compileOptions = new CompilationOptions
                 {
+                    IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", defaultValue: true),
                     ContractMode = ContractMode.Off,
                     UnknownCallPolicy = UnknownCallPolicy.Permissive,
                     CancellationToken = cancellationToken
@@ -881,7 +891,7 @@ public sealed class ConvertTool : McpToolBase
             cancellationToken.ThrowIfCancellationRequested();
             var result = quick
                 ? analyzer.AnalyzeQuick(source)
-                : analyzer.Analyze(source);
+                : analyzer.Analyze(source, includeImplicitSystemUsing: GetBool(arguments, "implicitSystem", true));
 
             var blockers = result.Blockers.Select(b => new AssessBlocker
             {
@@ -1057,6 +1067,7 @@ public sealed class ConvertTool : McpToolBase
             : Microsoft.CodeAnalysis.SourceCodeKind.Regular;
         return new GeneratedCSharpCompilationContext
         {
+            IncludeImplicitSystemUsing = metadata.IncludeImplicitSystemUsing,
             LanguageVersion = languageVersion,
             DocumentationMode = documentationMode,
             SourceCodeKind = sourceCodeKind,

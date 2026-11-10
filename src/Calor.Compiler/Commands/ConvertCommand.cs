@@ -63,6 +63,10 @@ public static class ConvertCommand
             aliases: new[] { "--validate" },
             description: "Parse the generated Calor output and report any errors before writing");
 
+        var noImplicitSystemOption = new Option<bool>(
+            "--no-implicit-system",
+            "Use standalone C# validation without the default System-only project import");
+
         var passthroughOption = new Option<bool>(
             aliases: new[] { "--passthrough" },
             description: "Request member-level C# preservation on conversion errors (C# → Calor). Default lossless rescue also preserves unsupported code in converter-owned raw frames.");
@@ -130,6 +134,7 @@ public static class ConvertCommand
             explainOption,
             noFallbackOption,
             validateOption,
+            noImplicitSystemOption,
             passthroughOption,
             defineOption,
             configurationOption,
@@ -172,7 +177,8 @@ public static class ConvertCommand
                 passthrough, definedSymbols, configuration,
                 targetFramework, languageVersion, timeoutSeconds,
                 documentationMode, sourceKind, features,
-                references, explicitCallClosers, format);
+                references, explicitCallClosers, format,
+                !ctx.ParseResult.GetValueForOption(noImplicitSystemOption));
         });
 
         return command;
@@ -186,7 +192,7 @@ public static class ConvertCommand
         int timeoutSeconds, string documentationMode, string sourceKind,
         IReadOnlyCollection<string> features,
         IReadOnlyCollection<string> references,
-        bool explicitCallClosers, string format)
+        bool explicitCallClosers, string format, bool includeImplicitSystemUsing)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("convert");
@@ -245,7 +251,7 @@ public static class ConvertCommand
                     definedSymbols, configuration, targetFramework,
                     languageVersion, documentationMode, sourceKind,
                     features, references, timeoutSeconds, explicitCallClosers,
-                    envelope);
+                    envelope, includeImplicitSystemUsing);
             }
             else
             {
@@ -255,7 +261,7 @@ public static class ConvertCommand
                     // §CSHARP preservation fallback). Say so rather than silently ignoring it.
                     Console.Error.WriteLine("Note: --passthrough has no effect converting Calor → C#; it is ignored.");
                 }
-                exitCode = await ConvertCalorToCSharpAsync(input.FullName, outputPath, verbose, envelope);
+                exitCode = await ConvertCalorToCSharpAsync(input.FullName, outputPath, verbose, envelope, includeImplicitSystemUsing);
             }
 
             if (conversionResult != null && telemetry != null)
@@ -337,8 +343,10 @@ public static class ConvertCommand
         string documentationMode = "parse",
         string sourceKind = "regular",
         IReadOnlyCollection<string>? features = null,
-        IReadOnlyCollection<string>? references = null) => new()
+        IReadOnlyCollection<string>? references = null,
+        bool includeImplicitSystemUsing = true) => new()
     {
+        IncludeImplicitSystemUsing = includeImplicitSystemUsing,
         Fidelity = lossy || selectActivePreprocessorBranchLossy
             ? ConversionFidelity.Lossy
             : ConversionFidelity.Lossless,
@@ -457,7 +465,8 @@ public static class ConvertCommand
         string documentationMode, string sourceKind,
         IReadOnlyCollection<string> features,
         IReadOnlyCollection<string> references,
-        int timeoutSeconds, bool explicitCallClosers, ConvertEnvelope? envelope)
+        int timeoutSeconds, bool explicitCallClosers, ConvertEnvelope? envelope,
+        bool includeImplicitSystemUsing)
     {
         var statusOut = envelope != null ? Console.Error : Console.Out;
 
@@ -465,7 +474,8 @@ public static class ConvertCommand
             benchmark, verbose, explain, noFallback, passthrough,
             explicitCallClosers, definedSymbols: definedSymbols,
             configuration: configuration, targetFramework: targetFramework, languageVersion: languageVersion,
-            documentationMode: documentationMode, sourceKind: sourceKind, features: features, references: references);
+            documentationMode: documentationMode, sourceKind: sourceKind, features: features, references: references,
+            includeImplicitSystemUsing: includeImplicitSystemUsing);
         // Envelope mode: the converter's --verbose progress lines go to stderr
         // with the rest of the human-readable report, so stdout stays one
         // JSON document. Text mode keeps them on stdout.
@@ -515,6 +525,7 @@ public static class ConvertCommand
             envelope.Data.LanguageVersion = result.Metadata.LanguageVersion;
             envelope.Data.DocumentationMode = result.Metadata.DocumentationMode;
             envelope.Data.SourceCodeKind = result.Metadata.SourceCodeKind;
+            envelope.Data.ImplicitSystem = result.Metadata.IncludeImplicitSystemUsing;
             envelope.Data.Features = result.Metadata.Features;
             envelope.Data.DefinedSymbols = result.Metadata.DefinedSymbols;
             var explanation = result.Context.GetExplanation();
@@ -728,15 +739,20 @@ public static class ConvertCommand
         return (unverified ? UnverifiedExitCode : 0, result);
     }
 
-    private static async Task<int> ConvertCalorToCSharpAsync(string inputPath, string outputPath, bool verbose, ConvertEnvelope? envelope)
+    private static async Task<int> ConvertCalorToCSharpAsync(string inputPath, string outputPath, bool verbose, ConvertEnvelope? envelope, bool includeImplicitSystemUsing)
     {
         var statusOut = envelope != null ? Console.Error : Console.Out;
+        if (envelope != null)
+            envelope.Data.ImplicitSystem = includeImplicitSystemUsing;
 
         var source = await File.ReadAllTextAsync(inputPath);
         // In envelope mode verbose phase messages must not pollute stdout.
-        var result = envelope != null
-            ? Program.Compile(source, inputPath, new CompilationOptions { Verbose = verbose, StatusWriter = Console.Error })
-            : Program.Compile(source, inputPath, verbose);
+        var result = Program.Compile(source, inputPath, new CompilationOptions
+        {
+            Verbose = verbose,
+            StatusWriter = envelope != null ? Console.Error : null,
+            IncludeImplicitSystemUsing = includeImplicitSystemUsing
+        });
 
         // The compiler's own diagnostics (with their real codes) flow into the
         // envelope directly.
@@ -941,6 +957,7 @@ public static class ConvertCommand
         public string? OutputPath { get; set; }
         public bool Success { get; set; }
         public string? Fidelity { get; set; }
+        public bool? ImplicitSystem { get; set; }
         public string? Configuration { get; set; }
         public string? TargetFramework { get; set; }
         public string? LanguageVersion { get; set; }

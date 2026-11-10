@@ -7,6 +7,53 @@ This document specifies how the .NET backend must implement Calor semantics. The
 The production path calls `CSharpEmitter.Emit(ast)` after AST analyses. It does
 not consume CNF; `normal-form.md` describes separate, unintegrated lowering work.
 
+## Compilation-context imports
+
+User-facing compilation, conversion, execution, migration, MCP compilation and
+LSP/editor diagnostics default to an implicit **`System` only** import. This is
+a compilation input, not a rewrite of emitted or preserved source. It does not
+import `System.Threading.Tasks`, LINQ, IO, or every SDK namespace. Existing
+explicit imports and namespace-local scopes remain unchanged.
+
+Low-level `CompilationOptions`, `ConversionOptions` and
+`GeneratedCSharpCompilationContext` default to **standalone**, with neither
+implicit-import switch enabled. The original conversion scorecard keeps this
+profile. Its results cannot be relabeled using project-context success.
+`IncludeImplicitSystemUsing` selects the System-only profile;
+`IncludeImplicitGlobalUsings` remains the separate opt-in full-SDK compatibility
+profile.
+
+CLI compile, convert, watch, run, test, check, verify, migrate,
+analyze-convertibility and `fix --apply`
+accept `--no-implicit-system`. SDK projects use
+`<CalorImplicitSystemUsing>false</CalorImplicitSystemUsing>`. SDK/init-generated
+projects add a real MSBuild `Using` item so downstream C# compilation receives
+the same import as validation. To test a genuine no-import project, also disable
+the SDK's independent `<ImplicitUsings>` and remove any explicit global System
+import. An emitted `.g.cs` validated with System still needs that context when
+compiled outside the Calor project; the CLI does not prepend an import to it.
+
+Original C# and emitted C# must use the same selected references, global imports,
+nullable settings, conditional symbols and project inputs. Evaluated projects
+use their actual generated global-usings source, including aliases and static
+imports, rather than a guessed SDK preamble. Project resolution requires restored
+references and an explicit framework when selecting among multiple targets.
+
+LSP initialization accepts `implicitSystem` (default `true`) and, optionally,
+`projectPath`, `configuration` and `targetFramework`. Supply `projectPath` to use
+evaluated project references and settings; without it the editor uses the shared
+platform-reference context. Both published generated-C# diagnostics and rename
+preflight use this selected context. MCP compile uses `options.implicitSystem`;
+conversion, checking, verification, analysis, repair, batch and migration use
+top-level `implicitSystem`. Set it to `false` for standalone validation.
+
+The import can introduce short-name ambiguity, reported by authoritative C#
+binding as `CS0104`. Resolve it with a source alias or a fully qualified name,
+such as `global::System.Action`. Imports do not prove unknown calls pure, relax
+effect checks, or make raw C# native. Original case081 and its exact preserved
+output both fail standalone with `CS0103` and both compile in the System-project
+profile; their preserved/native classification is unchanged.
+
 ---
 
 ## Why This Document Exists

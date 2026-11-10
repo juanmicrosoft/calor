@@ -67,6 +67,8 @@ public static class MigrateCommand
             description: "Legacy compatibility option; current native calls use parentheses and never emit closer tags.",
             getDefaultValue: () => false);
 
+        var noImplicitSystemOption = new Option<bool>(
+            "--no-implicit-system", "Validate without the implicit System project import");
         var defineOption = new Option<string[]>(
             aliases: new[] { "--define" },
             description: "Additional conditional-compilation symbol. Repeat for multiple symbols.")
@@ -108,6 +110,7 @@ public static class MigrateCommand
             skipVerifyOption,
             verificationTimeoutOption,
             explicitCallClosersOption,
+            noImplicitSystemOption,
             defineOption,
             configurationOption,
             targetFrameworkOption,
@@ -142,7 +145,8 @@ public static class MigrateCommand
                 reportPath, verbose, skipAnalyze, skipVerify, (uint)verificationTimeout,
                 explicitCallClosers, definedSymbols,
                 configuration, targetFramework, languageVersion,
-                documentationMode, parseFeatures);
+                documentationMode, parseFeatures,
+                !ctx.ParseResult.GetValueForOption(noImplicitSystemOption));
         });
 
         return command;
@@ -165,7 +169,8 @@ public static class MigrateCommand
         string? targetFramework,
         string? languageVersion,
         string documentationMode,
-        IReadOnlyCollection<string> parseFeatures)
+        IReadOnlyCollection<string> parseFeatures,
+        bool includeImplicitSystemUsing)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("migrate");
@@ -192,6 +197,7 @@ public static class MigrateCommand
 
         var options = new MigrationPlanOptions
         {
+            IncludeImplicitSystemUsing = includeImplicitSystemUsing,
             Parallel = parallel,
             IncludeBenchmark = benchmark,
             SkipAnalyze = skipAnalyze,

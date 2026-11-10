@@ -460,6 +460,7 @@ public sealed class ProjectMigrator
     {
         var conversionOptions = new ConversionOptions
         {
+            IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
             IncludeBenchmark = _options.IncludeBenchmark,
             Fidelity = _options.Fidelity,
             PreprocessorMode = _options.PreprocessorMode,
@@ -498,6 +499,8 @@ public sealed class ProjectMigrator
         }
         if (projectInput != null)
         {
+            conversionOptions.IncludeImplicitSystemUsing =
+                _options.IncludeImplicitSystemUsing && projectInput.IncludeImplicitSystemUsing;
             conversionOptions.ParseOptions =
                 new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
                     _options.LanguageVersion ?? projectInput.LanguageVersion,
@@ -837,6 +840,7 @@ public sealed class ProjectMigrator
                 Features = _options.ParseFeatures,
                 PreprocessorSymbols = EffectivePreprocessorSymbols(inputs),
                 IncludeImplicitGlobalUsings = inputs.IncludeImplicitGlobalUsings,
+                IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing && inputs.IncludeImplicitSystemUsing,
                 AnalyzerPaths = inputs.AnalyzerPaths,
                 AdditionalFilePaths = inputs.AdditionalFilePaths,
                 NullableContextOptions = inputs.NullableContextOptions,
@@ -1167,6 +1171,7 @@ public sealed class ProjectMigrator
                             _options.LanguageVersion ?? inputs.LanguageVersion,
                         PreprocessorSymbols = EffectivePreprocessorSymbols(inputs),
                         IncludeImplicitGlobalUsings = inputs.IncludeImplicitGlobalUsings,
+                        IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing && inputs.IncludeImplicitSystemUsing,
                         AnalyzerPaths = inputs.AnalyzerPaths,
                         AdditionalFilePaths = inputs.AdditionalFilePaths,
                         NullableContextOptions = inputs.NullableContextOptions,
@@ -1362,17 +1367,10 @@ public sealed class ProjectMigrator
                 parseOptions,
                 path))
             .ToList();
-        if (inputs.IncludeImplicitGlobalUsings)
-        {
-            trees.Insert(
-                0,
-                Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
-                    GeneratedCSharpCompiler.GlobalUsingsPreamble,
-                    parseOptions,
-                    path: "<implicit-global-usings>"));
-        }
-
-        return trees;
+        return GeneratedCSharpCompiler.AddImplicitUsings(
+            trees,
+            _options.IncludeImplicitSystemUsing && inputs.IncludeImplicitSystemUsing,
+            inputs.IncludeImplicitGlobalUsings);
     }
 
 
@@ -1391,7 +1389,8 @@ public sealed class ProjectMigrator
         IReadOnlyList<string> AdditionalFilePaths,
         Microsoft.CodeAnalysis.NullableContextOptions NullableContextOptions,
         bool TreatWarningsAsErrors,
-        string? AnalyzerConfigPath);
+        string? AnalyzerConfigPath,
+        bool IncludeImplicitSystemUsing = true);
 
     internal static async Task<IReadOnlyList<ProjectCompilationInputs>> ResolveProjectCompilationInputsAsync(
         string projectPath,
@@ -1408,7 +1407,7 @@ public sealed class ProjectMigrator
                 [], [], true,
                 Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary,
                 Microsoft.CodeAnalysis.CSharp.LanguageVersion.Default,
-                [], true, [], [],
+                [], false, [], [],
                 Microsoft.CodeAnalysis.NullableContextOptions.Disable,
                 false, null)];
         }
@@ -1458,11 +1457,11 @@ public sealed class ProjectMigrator
         startInfo.ArgumentList.Add("msbuild");
         startInfo.ArgumentList.Add(projectFile);
         startInfo.ArgumentList.Add(
-            "-t:ResolveAssemblyReferences;GenerateMSBuildEditorConfigFile");
+            "-t:ResolveAssemblyReferences;GenerateGlobalUsings;GenerateMSBuildEditorConfigFile");
         startInfo.ArgumentList.Add(
             "-getItem:ReferencePath,Compile,CalorCompile,Analyzer,AdditionalFiles");
         startInfo.ArgumentList.Add(
-            "-getProperty:AllowUnsafeBlocks,OutputType,DefineConstants,LangVersion,ImplicitUsings,Nullable,TreatWarningsAsErrors,GeneratedMSBuildEditorConfigFile");
+            "-getProperty:AllowUnsafeBlocks,OutputType,DefineConstants,LangVersion,ImplicitUsings,CalorImplicitSystemUsing,Nullable,TreatWarningsAsErrors,GeneratedMSBuildEditorConfigFile");
         if (!string.IsNullOrWhiteSpace(targetFramework))
         {
             startInfo.ArgumentList.Add($"-property:TargetFramework={targetFramework}");
@@ -1532,7 +1531,6 @@ public sealed class ProjectMigrator
         var allowUnsafeText = GetProperty(properties, "AllowUnsafeBlocks");
         var outputType = GetProperty(properties, "OutputType");
         var languageVersionText = GetProperty(properties, "LangVersion");
-        var implicitUsings = GetProperty(properties, "ImplicitUsings");
         var languageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersionFacts.TryParse(
             languageVersionText, out var parsedLanguageVersion)
             ? parsedLanguageVersion
@@ -1554,8 +1552,7 @@ public sealed class ProjectMigrator
             GetProperty(properties, "DefineConstants").Split(
                 [';', ','],
                 StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
-            implicitUsings.Equals("enable", StringComparison.OrdinalIgnoreCase) ||
-                implicitUsings.Equals("true", StringComparison.OrdinalIgnoreCase),
+            false,
             ResolveItems(items, "Analyzer", projectDirectory),
             ResolveItems(items, "AdditionalFiles", projectDirectory),
             ParseNullableContextOptions(GetProperty(properties, "Nullable")),
@@ -1563,7 +1560,9 @@ public sealed class ProjectMigrator
                 .Equals("true", StringComparison.OrdinalIgnoreCase),
             ResolveOptionalPath(
                 GetProperty(properties, "GeneratedMSBuildEditorConfigFile"),
-                projectDirectory));
+                projectDirectory),
+            !GetProperty(properties, "CalorImplicitSystemUsing")
+                .Equals("false", StringComparison.OrdinalIgnoreCase));
 
         static string GetProperty(System.Text.Json.JsonElement properties, string name)
             => properties.TryGetProperty(name, out var property)

@@ -29,6 +29,7 @@ public sealed class AnalyzeTool : McpToolBase
         {
             "type": "object",
             "properties": {
+                "implicitSystem": { "type": "boolean", "default": true, "description": "System-only compilation context; false selects standalone validation." },
                 "action": {
                     "type": "string",
                     "enum": ["security", "assess", "minimize"],
@@ -146,6 +147,7 @@ public sealed class AnalyzeTool : McpToolBase
 
             var compileOptions = new CompilationOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                 EnableVerificationAnalyses = true,
                 VerificationAnalysisOptions = analysisOptions,
                 VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
@@ -252,6 +254,7 @@ public sealed class AnalyzeTool : McpToolBase
 
                 var compileOptions = new CompilationOptions
                 {
+                    IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                     EnableVerificationAnalyses = true,
                     VerificationAnalysisOptions = analysisOptions,
                     VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },

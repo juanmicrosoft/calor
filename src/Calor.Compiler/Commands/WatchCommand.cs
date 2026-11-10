@@ -36,6 +36,7 @@ public static class WatchCommand
 
         var verboseOption = new Option<bool>(["--verbose", "-v"], "Enable verbose output");
         var noCacheOption = new Option<bool>(["--no-cache"], "Disable the incremental build cache (every rebuild recompiles all files)");
+        var noImplicitSystemOption = new Option<bool>("--no-implicit-system", "Validate standalone without the default System-only project import");
         var clearCacheOption = new Option<bool>(["--clear-cache"], "Clear .calor-build-state.json before the initial compile");
         var strictApiOption = new Option<bool>(["--strict-api"], "Enable strict API mode");
         var requireDocsOption = new Option<bool>(["--require-docs"], "Require documentation on public functions and types");
@@ -59,6 +60,7 @@ public static class WatchCommand
             formatOption,
             verboseOption,
             noCacheOption,
+            noImplicitSystemOption,
             clearCacheOption,
             strictApiOption,
             requireDocsOption,
@@ -84,7 +86,8 @@ public static class WatchCommand
                 StrictEffects: ctx.ParseResult.GetValueForOption(strictEffectsOption),
                 PermissiveEffects: ctx.ParseResult.GetValueForOption(permissiveEffectsOption),
                 ContractMode: ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug",
-                DebounceMs: ctx.ParseResult.GetValueForOption(debounceOption));
+                DebounceMs: ctx.ParseResult.GetValueForOption(debounceOption),
+                IncludeImplicitSystemUsing: !ctx.ParseResult.GetValueForOption(noImplicitSystemOption));
 
             var paths = ctx.ParseResult.GetValueForArgument(pathsArgument);
             ctx.ExitCode = await ExecuteAsync(paths, settings);
@@ -133,7 +136,8 @@ internal sealed class WatchSession
         bool StrictEffects,
         bool PermissiveEffects,
         string ContractMode,
-        int DebounceMs);
+        int DebounceMs,
+        bool IncludeImplicitSystemUsing = true);
 
     internal sealed record RebuildResult(int Compiled, int Skipped, bool AnyErrors, long ElapsedMs);
 
@@ -318,7 +322,8 @@ internal sealed class WatchSession
                     _settings.EnforceEffects, enableTypeChecking,
                     _settings.StrictEffects, _settings.PermissiveEffects,
                     _settings.ContractMode, verify: false, verificationTimeout: 0, analyze: false,
-                    allFindings: false, strictBindInference: true, experimentalFlags: null),
+                    allFindings: false, strictBindInference: true, experimentalFlags: null,
+                    includeImplicitSystemUsing: _settings.IncludeImplicitSystemUsing),
                 ClearFirst: _clearCachePending,
                 OutputPathFor: file => Path.ChangeExtension(file.FullName, ".g.cs"));
             _clearCachePending = false;
@@ -333,6 +338,7 @@ internal sealed class WatchSession
                 file => new CompilationOptions
                 {
                     Verbose = _settings.Verbose,
+                    IncludeImplicitSystemUsing = _settings.IncludeImplicitSystemUsing,
                     StatusWriter = _status,
                     StrictApi = _settings.StrictApi,
                     RequireDocs = _settings.RequireDocs,

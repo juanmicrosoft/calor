@@ -10432,6 +10432,8 @@ public sealed record GeneratedCSharpCompilationContext
         Microsoft.CodeAnalysis.SourceCodeKind.Regular;
     public IEnumerable<KeyValuePair<string, string>>? Features { get; init; }
     public IEnumerable<string>? PreprocessorSymbols { get; init; }
+    /// <summary>Import only System in the compilation context, without changing source text.</summary>
+    public bool IncludeImplicitSystemUsing { get; init; }
     public bool IncludeImplicitGlobalUsings { get; init; }
     public IEnumerable<string>? AnalyzerPaths { get; init; }
     public IEnumerable<string>? AdditionalFilePaths { get; init; }
@@ -10454,6 +10456,62 @@ public sealed record GeneratedCSharpCompilationContext
 /// </summary>
 public static class GeneratedCSharpCompiler
 {
+    public const string SystemUsingPreamble = "global using System;\n";
+
+    /// <summary>Resolve the same evaluated project inputs used by project migration.</summary>
+    public static async Task<GeneratedCSharpCompilationContext> ResolveProjectContextAsync(
+        string projectPath,
+        bool includeImplicitSystemUsing = true,
+        string configuration = "Debug",
+        string? targetFramework = null,
+        CancellationToken cancellationToken = default)
+    {
+        var inputs = await Migration.Project.ProjectMigrator.ResolveProjectCompilationInputsAsync(
+            projectPath, configuration, targetFramework, cancellationToken).ConfigureAwait(false);
+        if (inputs.Count != 1)
+            throw new InvalidOperationException("Select one target framework for C# project validation.");
+        var input = inputs[0];
+        return new GeneratedCSharpCompilationContext
+        {
+            IncludeImplicitSystemUsing = includeImplicitSystemUsing && input.IncludeImplicitSystemUsing,
+            IncludeImplicitGlobalUsings = input.IncludeImplicitGlobalUsings,
+            References = input.ReferencePaths.Select(path => new GeneratedCSharpReference(
+                path, input.ReferenceAliases.TryGetValue(path, out var aliases) ? aliases : [])),
+            AdditionalSources = input.SourcePaths.Select(path => new GeneratedCSharpSource(File.ReadAllText(path), path)),
+            AllowUnsafe = input.AllowUnsafe,
+            OutputKind = input.OutputKind,
+            LanguageVersion = input.LanguageVersion,
+            PreprocessorSymbols = input.PreprocessorSymbols,
+            NullableContextOptions = input.NullableContextOptions,
+            TreatWarningsAsErrors = input.TreatWarningsAsErrors,
+            AnalyzerPaths = input.AnalyzerPaths,
+            AdditionalFilePaths = input.AdditionalFilePaths,
+            AnalyzerConfigPath = input.AnalyzerConfigPath
+        };
+    }
+
+    /// <summary>
+    /// Adds context imports as a separate tree. The low-level API defaults to
+    /// standalone; project surfaces select System independently of SDK imports.
+    /// </summary>
+    public static IReadOnlyList<Microsoft.CodeAnalysis.SyntaxTree> AddImplicitUsings(
+        IEnumerable<Microsoft.CodeAnalysis.SyntaxTree> sources,
+        bool includeSystem,
+        bool includeSdk = false)
+    {
+        var trees = sources.ToList();
+        if ((includeSystem || includeSdk)
+            && trees.FirstOrDefault()?.Options is Microsoft.CodeAnalysis.CSharp.CSharpParseOptions
+                { Kind: Microsoft.CodeAnalysis.SourceCodeKind.Regular } parseOptions)
+        {
+            trees.Insert(0, Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+                includeSdk ? GlobalUsingsPreamble : SystemUsingPreamble,
+                parseOptions,
+                path: "__CalorImplicitUsings.g.cs"));
+        }
+        return trees;
+    }
+
     // Built once — enumerating the trusted-platform-assembly set is not free and
     // the reference set is constant for the process lifetime. Lazy<T> makes the
     // one-time build thread-safe under xUnit's parallel test classes.
@@ -10571,13 +10629,10 @@ public static class GeneratedCSharpCompiler
             .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
             .ToList();
 
-        var trees = new List<Microsoft.CodeAnalysis.SyntaxTree>();
-        if (context.IncludeImplicitGlobalUsings)
-        {
-            trees.Add(Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
-                GlobalUsingsPreamble, parseOptions));
-        }
-        trees.AddRange(sourceTrees);
+        var trees = AddImplicitUsings(
+            sourceTrees,
+            context.IncludeImplicitSystemUsing,
+            context.IncludeImplicitGlobalUsings);
 
         var baseDirectory = sourceList
             .Select(source => Path.GetDirectoryName(
@@ -10600,7 +10655,13 @@ public static class GeneratedCSharpCompiler
                     ? Microsoft.CodeAnalysis.ReportDiagnostic.Error
                     : Microsoft.CodeAnalysis.ReportDiagnostic.Default,
                 metadataReferenceResolver: metadataResolver,
-                sourceReferenceResolver: sourceResolver);
+                sourceReferenceResolver: sourceResolver,
+                usings: context.SourceCodeKind == Microsoft.CodeAnalysis.SourceCodeKind.Script
+                    ? context.IncludeImplicitGlobalUsings
+                        ? ["System", "System.Collections.Generic", "System.IO", "System.Linq",
+                            "System.Net.Http", "System.Threading", "System.Threading.Tasks"]
+                        : context.IncludeImplicitSystemUsing ? ["System"] : []
+                    : []);
         Microsoft.CodeAnalysis.Compilation compilation =
             context.SourceCodeKind == Microsoft.CodeAnalysis.SourceCodeKind.Script
                 ? Microsoft.CodeAnalysis.CSharp.CSharpCompilation

@@ -15,10 +15,16 @@
     <!-- Type checking: default true, matching CompilationOptions.EnableTypeChecking (v0.12) -->
     <CalorTypeCheck Condition="'$(CalorTypeCheck)' == ''">true</CalorTypeCheck>
     <CalorTranspileOnly Condition="'$(CalorTranspileOnly)' == ''">false</CalorTranspileOnly>
+    <CalorImplicitSystemUsing Condition="'$(CalorImplicitSystemUsing)' == ''">true</CalorImplicitSystemUsing>
     <!-- Proof-based guard elision: default true (v0.15), matching CompilationOptions.ElideProvenGuards.
          Set false to keep every runtime contract guard even on a Proven verdict. Only matters with CalorVerify=true. -->
     <CalorElideProvenGuards Condition="'$(CalorElideProvenGuards)' == ''">true</CalorElideProvenGuards>
   </PropertyGroup>
+
+  <ItemGroup Condition="'$(CalorImplicitSystemUsing)' == 'true'">
+    <!-- The real C# compiler and Calor validation must receive the same import. -->
+    <Using Include="System" />
+  </ItemGroup>
 
   <!-- When consumed from the Calor.Sdk package, the bundled Calor.Runtime.dll
        sits in the tasks closure; inject a compile-time reference so generated
@@ -50,7 +56,7 @@
   </Target>
 
   <PropertyGroup>
-    <_CalorCompileCalorDependsOn>ResolveAssemblyReferences;GenerateMSBuildEditorConfigFile</_CalorCompileCalorDependsOn>
+    <_CalorCompileCalorDependsOn>ResolveAssemblyReferences;GenerateGlobalUsings;GenerateMSBuildEditorConfigFile</_CalorCompileCalorDependsOn>
   </PropertyGroup>
 
   <!-- Validate CalorCompilerOverride (runs unconditionally, not subject to incremental build skip) -->
@@ -88,7 +94,7 @@
         ProjectOutputType="$(OutputType)"
         DefineConstants="$(DefineConstants)"
         LanguageVersion="$(LangVersion)"
-        ImplicitUsings="$(ImplicitUsings)"
+        ImplicitSystem="$(CalorImplicitSystemUsing)"
         Nullable="$(Nullable)"
         TreatWarningsAsErrors="$(TreatWarningsAsErrors)"
         AnalyzerConfigPath="$(GeneratedMSBuildEditorConfigFile)"

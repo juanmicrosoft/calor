@@ -1,8 +1,10 @@
 using Calor.LanguageServer.Handlers;
 using Calor.LanguageServer.State;
+using Calor.Compiler.CodeGen;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Server;
+using Newtonsoft.Json.Linq;
 
 namespace Calor.LanguageServer;
 
@@ -39,6 +41,18 @@ public static class Program
                 {
                     var workspace =
                         server.Services.GetRequiredService<WorkspaceState>();
+                    var initialization = request.InitializationOptions == null
+                        ? null : JToken.FromObject(request.InitializationOptions);
+                    var implicitSystem = initialization?["implicitSystem"]?.Value<bool>() ?? true;
+                    var projectPath = initialization?["projectPath"]?.Value<string>();
+                    var compilationContext = string.IsNullOrEmpty(projectPath)
+                        ? new GeneratedCSharpCompilationContext { IncludeImplicitSystemUsing = implicitSystem }
+                        : await GeneratedCSharpCompiler.ResolveProjectContextAsync(
+                            projectPath, implicitSystem,
+                            initialization?["configuration"]?.Value<string>() ?? "Debug",
+                            initialization?["targetFramework"]?.Value<string>(),
+                            token).ConfigureAwait(false);
+                    workspace.ConfigureCompilationContext(compilationContext);
                     var workspaceFolders = request.WorkspaceFolders?
                         .Select(folder => folder.Uri.ToUri())
                         .ToArray();

@@ -11,6 +11,37 @@ This page describes the production C# emitter and its intended conformance
 rules. Current native examples use C# type spellings. CNF is a separate partial
 prototype, not a production emitter input.
 
+## Compilation-context imports
+
+CLI compilation and conversion, Calor projects, MCP compilation, and editor
+diagnostics import **`System` only** by default. This is a compilation setting,
+not a change to preserved source. It does not import Tasks, LINQ or IO. Original
+and generated C# use the same selected context; raw C# remains non-native.
+
+Use `--no-implicit-system` on compilation-backed CLI commands, or
+`CalorImplicitSystemUsing=false` in a project. Calor SDK/init projects supply a
+real MSBuild `Using` item for downstream C# compilation. A genuine standalone
+project must also disable the SDK's independent `ImplicitUsings` and any explicit
+global System import. A `.g.cs` compiled elsewhere needs the same project context.
+
+Low-level compilation/conversion/validation APIs remain standalone by default;
+set `IncludeImplicitSystemUsing=true` to select this context. The separate
+`IncludeImplicitGlobalUsings` switch still enables the full SDK compatibility
+profile. The original conversion scorecard remains standalone.
+
+LSP initialization accepts `implicitSystem` (default `true`), `projectPath`,
+`configuration` and `targetFramework`. Select a restored project explicitly for
+its references, global aliases, nullable settings and conditional symbols.
+Otherwise the editor uses platform references. Published generated-C# diagnostics
+and rename preflight use the same selected context. MCP compile places the switch
+in `options.implicitSystem`; other compilation-backed tools use `implicitSystem`.
+
+C# binding reports ambiguous short names as `CS0104`. Use aliases or fully
+qualified names such as `global::System.Action`. Imports do not prove unknown
+calls pure or relax effect safety. Case081 and its exact preserved output both
+fail standalone with `CS0103`; both compile with the System-project context.
+That is a context change, not a standalone score improvement.
+
 ---
 
 ## Why This Document Exists

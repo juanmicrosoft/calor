@@ -179,12 +179,14 @@ public sealed class WorkspaceState
     private long _workspaceFileReadCount;
     private long _renameValidationCompilationCount;
     private WorkspaceSymbolIndex? _symbolIndex;
+    private GeneratedCSharpCompilationContext _compilationContext =
+        new() { IncludeImplicitSystemUsing = true };
+    private WorkspaceIndexSnapshot? _validationSnapshot;
+    private IReadOnlyList<Calor.Compiler.Diagnostics.Diagnostic> _generatedDiagnostics = [];
     private readonly ILogger _logger;
     private readonly Func<string, CancellationToken, Task<string>> _workspaceFileReader;
     private readonly Func<string, IEnumerable<string>> _workspaceFileEnumerator;
     private readonly Func<Task>? _beforeWorkspaceScanApply;
-    private static readonly Lazy<IReadOnlyList<MetadataReference>> PlatformReferences =
-        new(CreatePlatformReferences);
     // Validation is exhaustive through five relevant symbols (2^5 configurations).
     // Larger relevant condition sets fail closed instead of using an unsound sample.
     private const int MaxRenamePreprocessorSymbols = 5;
@@ -193,6 +195,18 @@ public sealed class WorkspaceState
     internal long WorkspaceFileReadCount => Interlocked.Read(ref _workspaceFileReadCount);
     internal long RenameValidationCompilationCount =>
         Interlocked.Read(ref _renameValidationCompilationCount);
+
+    public void ConfigureCompilationContext(GeneratedCSharpCompilationContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        lock (_indexGate)
+        {
+            _compilationContext = context;
+            _validationSnapshot = null;
+            _symbolIndex = null;
+            _workspaceGeneration++;
+        }
+    }
 
     public WorkspaceState(
         string? workspaceRootPath = null,
@@ -1014,9 +1028,11 @@ public sealed class WorkspaceState
 
             var baselineErrors = GetCompilationErrors(
                 baselineTrees,
+                configuration,
                 cancellationToken);
             var candidateErrors = GetCompilationErrors(
                 candidateTrees,
+                configuration,
                 cancellationToken);
             if (HasNewErrors(baselineErrors, candidateErrors))
                 return false;
@@ -1635,9 +1651,55 @@ public sealed class WorkspaceState
     {
         var index = GetIndex(workspace);
         var uri = DocumentUri.From(document.Document.Uri);
-        return index.InheritanceDiagnostics.TryGetValue(uri, out var inheritance)
+        var diagnostics = index.InheritanceDiagnostics.TryGetValue(uri, out var inheritance)
             ? document.Analysis.Diagnostics.Concat(inheritance).ToArray()
-            : document.Analysis.Diagnostics;
+            : document.Analysis.Diagnostics.ToArray();
+        return diagnostics.Concat(GetGeneratedDiagnostics(workspace)
+            .Where(diagnostic => diagnostic.FilePath == (document.Document.Uri.IsFile
+                ? document.Document.Uri.LocalPath : document.Document.Uri.ToString()))).ToArray();
+    }
+
+    private IReadOnlyList<Calor.Compiler.Diagnostics.Diagnostic> GetGeneratedDiagnostics(
+        WorkspaceIndexSnapshot workspace)
+    {
+        lock (_indexGate)
+        {
+            if (ReferenceEquals(_validationSnapshot?.Index, workspace.Index))
+                return _generatedDiagnostics;
+            var clean = workspace.Documents.Where(document =>
+                document.Analysis.Ast != null && !document.Analysis.HasErrors).ToArray();
+            var modules = clean.Select(document => document.Analysis.Ast!).ToArray();
+            var map = CompilationDriver.BuildCrossModuleFunctionMap(modules);
+            var bag = new Calor.Compiler.Diagnostics.DiagnosticBag();
+            var sources = new List<GeneratedCSharpSource>();
+            foreach (var document in clean)
+            {
+                var path = document.Document.Uri.IsFile ? document.Document.Uri.LocalPath : document.Document.Uri.ToString();
+                try
+                {
+                    sources.Add(new GeneratedCSharpSource(new CSharpEmitter
+                    {
+                        CrossModuleFunctionModules = map,
+                        LineDirectiveFilePath = document.Document.Uri.IsFile ? path : null
+                    }.Emit(document.Analysis.Ast!), path));
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "LSP generated C# emission failed for {DocumentUri}.", document.Document.Uri);
+                    bag.Add(new Calor.Compiler.Diagnostics.Diagnostic(
+                        "Calor9999", $"Internal code generation error ({exception.GetType().Name}).",
+                        document.Analysis.Ast!.Span, Calor.Compiler.Diagnostics.DiagnosticSeverity.Error, path));
+                }
+            }
+            if (sources.Count > 0)
+            {
+                var validation = GeneratedCSharpCompiler.Validate(sources, _compilationContext);
+                Calor.Compiler.Program.AddGeneratedOutputDiagnostics(validation, bag, sources[0].Path);
+            }
+            _generatedDiagnostics = bag.ToArray();
+            _validationSnapshot = workspace;
+            return _generatedDiagnostics;
+        }
     }
 
     internal bool TryPublishDiagnostics(
@@ -3169,16 +3231,20 @@ public sealed class WorkspaceState
 
     private IReadOnlyList<CompilationError> GetCompilationErrors(
         IReadOnlyList<SyntaxTree> trees,
+        IReadOnlyList<string> configuration,
         CancellationToken cancellationToken)
     {
         Interlocked.Increment(ref _renameValidationCompilationCount);
-        var compilation = CSharpCompilation.Create(
-            "CalorRenamePreflight",
-            trees,
-            PlatformReferences.Value,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        return compilation.GetDiagnostics(cancellationToken)
-            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+        cancellationToken.ThrowIfCancellationRequested();
+        var validation = GeneratedCSharpCompiler.Validate(trees.Select(tree =>
+                new GeneratedCSharpSource(tree.GetText(cancellationToken).ToString(), tree.FilePath)),
+            _compilationContext with
+            {
+                PreprocessorSymbols = (_compilationContext.PreprocessorSymbols ?? [])
+                    .Concat(configuration)
+                    .Distinct(StringComparer.Ordinal)
+            });
+        return validation.CompilationErrors
             .Select(diagnostic =>
             {
                 var lineSpan = diagnostic.Location.GetLineSpan();
@@ -3219,18 +3285,6 @@ public sealed class WorkspaceState
                 .Where((_, index) => (mask & (1 << index)) != 0)
                 .ToArray();
         }
-    }
-
-    private static IReadOnlyList<MetadataReference> CreatePlatformReferences()
-    {
-        var trustedAssemblies =
-            (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
-        return string.IsNullOrEmpty(trustedAssemblies)
-            ? Array.Empty<MetadataReference>()
-            : trustedAssemblies
-                .Split(Path.PathSeparator)
-                .Select(path => MetadataReference.CreateFromFile(path))
-                .ToArray();
     }
 
     private static bool ShouldIndexPath(string path)

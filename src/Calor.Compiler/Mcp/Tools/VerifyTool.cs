@@ -24,6 +24,7 @@ public sealed class VerifyTool : McpToolBase
         {
             "type": "object",
             "properties": {
+                "implicitSystem": { "type": "boolean", "default": true, "description": "System-only compilation context; false selects standalone validation." },
                 "source": {
                     "type": "string",
                     "description": "Calor source code to verify"
@@ -58,6 +59,7 @@ public sealed class VerifyTool : McpToolBase
             var diagnostics = new DiagnosticBag();
             var options = new CompilationOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                 VerifyContracts = true,
                 VerificationTimeoutMs = (uint)timeout,
                 VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },

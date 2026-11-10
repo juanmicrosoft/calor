@@ -42,7 +42,8 @@ internal sealed record CompileCalorCacheInputs(
     IReadOnlyList<string> ResolvedImplementationAssemblies,
     string RuntimeDirectory,
     string NuGetPackageRoot,
-    string DepsFile)
+    string DepsFile,
+    bool IncludeImplicitSystemUsing = true)
 {
     internal string Serialize()
     {
@@ -60,6 +61,7 @@ internal sealed record CompileCalorCacheInputs(
         Append(builder, "defineConstants", DefineConstants);
         Append(builder, "languageVersion", LanguageVersion);
         Append(builder, "implicitUsings", ImplicitUsings);
+        Append(builder, "implicitSystem", IncludeImplicitSystemUsing ? "true" : "false");
         Append(builder, "nullable", Nullable);
         Append(builder, "treatWarningsAsErrors", TreatWarningsAsErrors ? "true" : "false");
         Append(builder, "verifyContracts", VerifyContracts ? "true" : "false");
@@ -193,8 +195,12 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
     /// <summary>The consuming project's C# language version.</summary>
     public string LanguageVersion { get; set; } = string.Empty;
 
-    /// <summary>The consuming project's MSBuild ImplicitUsings setting.</summary>
+    /// <summary>Explicit full-SDK compatibility imports for direct task callers.
+    /// SDK projects pass their actual global-usings source in ProjectSourceFiles.</summary>
     public string ImplicitUsings { get; set; } = string.Empty;
+
+    /// <summary>System-only project import, independent of the SDK namespace set.</summary>
+    public bool ImplicitSystem { get; set; } = true;
 
     /// <summary>The consuming project's nullable context setting.</summary>
     public string Nullable { get; set; } = string.Empty;
@@ -292,7 +298,8 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 : "unused",
             EnableILAnalysis
                 ? DescribePath(DepsFilePath, includeContent: true)
-                : "unused");
+                : "unused",
+            ImplicitSystem);
     }
 
     private Compiler.Effects.IL.ILAnalysisOptions CreateILAnalysisOptions()
@@ -913,6 +920,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                     OutputKind = ParseOutputKind(ProjectOutputType),
                     LanguageVersion = ParseLanguageVersion(LanguageVersion),
                     IncludeImplicitGlobalUsings = IsImplicitUsingsEnabled(ImplicitUsings),
+                    IncludeImplicitSystemUsing = ImplicitSystem,
                     AnalyzerPaths = AnalyzerAssemblies
                         .Select(item => item.GetMetadata("FullPath") is { Length: > 0 } fullPath
                             ? fullPath

@@ -66,6 +66,8 @@ public static class VerifyCommand
         var clearCacheOption = new Option<bool>(
             aliases: ["--clear-cache"],
             description: "Clear verification cache before verifying");
+        var noImplicitSystemOption = new Option<bool>(
+            "--no-implicit-system", "Validate without the implicit System project import");
 
         var weakeningOption = new Option<string?>(
             aliases: ["--weakening-check"],
@@ -82,6 +84,7 @@ public static class VerifyCommand
             timeoutOption,
             noCacheOption,
             clearCacheOption,
+            noImplicitSystemOption,
             weakeningOption
         };
 
@@ -106,7 +109,8 @@ public static class VerifyCommand
                 ctx.ParseResult.GetValueForOption(verboseOption),
                 ctx.ParseResult.GetValueForOption(timeoutOption),
                 ctx.ParseResult.GetValueForOption(noCacheOption),
-                ctx.ParseResult.GetValueForOption(clearCacheOption));
+                ctx.ParseResult.GetValueForOption(clearCacheOption),
+                !ctx.ParseResult.GetValueForOption(noImplicitSystemOption));
         });
 
         return command;
@@ -119,7 +123,8 @@ public static class VerifyCommand
         bool verbose,
         int timeout,
         bool noCache,
-        bool clearCache)
+        bool clearCache,
+        bool includeImplicitSystemUsing)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("verify");
@@ -196,7 +201,7 @@ public static class VerifyCommand
 
             try
             {
-                var result = await VerifyFileAsync(file, verbose, timeout, noCache, clearCache, declarationIds, statusWriter);
+                var result = await VerifyFileAsync(file, verbose, timeout, noCache, clearCache, declarationIds, statusWriter, includeImplicitSystemUsing);
                 results.Add(result);
                 aggregatedDiagnostics.AddRange(result.Diagnostics);
 
@@ -261,7 +266,8 @@ public static class VerifyCommand
         bool noCache,
         bool clearCache,
         DeclarationIdResolver declarationIds,
-        TextWriter? statusWriter)
+        TextWriter? statusWriter,
+        bool includeImplicitSystemUsing)
     {
         var source = await File.ReadAllTextAsync(file.FullName);
         var cacheOptions = new VerificationCacheOptions
@@ -273,6 +279,7 @@ public static class VerifyCommand
 
         var options = new CompilationOptions
         {
+            IncludeImplicitSystemUsing = includeImplicitSystemUsing,
             Verbose = verbose,
             StatusWriter = statusWriter,
             VerifyContracts = true,

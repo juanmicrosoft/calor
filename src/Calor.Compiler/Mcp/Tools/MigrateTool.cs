@@ -32,6 +32,7 @@ public sealed class MigrateTool : McpToolBase
         {
             "type": "object",
             "properties": {
+                "implicitSystem": { "type": "boolean", "default": true, "description": "System-only compilation context; false selects standalone validation." },
                 "projectPath": {
                     "type": "string",
                     "description": "Path to .csproj file or directory containing C# files"
@@ -85,6 +86,7 @@ public sealed class MigrateTool : McpToolBase
             && !requestedFidelity.Equals("lossless", StringComparison.OrdinalIgnoreCase))
             return McpToolResult.Error("Only lossless migration is supported; unsupported C# is preserved, not dropped.");
         var fidelity = ConversionFidelity.Lossless;
+        var implicitSystem = GetBool(arguments, "implicitSystem", true);
 
         // Resolve directory from .csproj or directory path
         var directory = ResolveDirectory(projectPath);
@@ -93,13 +95,23 @@ public sealed class MigrateTool : McpToolBase
 
         try
         {
+            if (phase is "compile" or "fix" or "full")
+            {
+                var inputs = await ProjectMigrator.ResolveProjectCompilationInputsAsync(
+                    projectPath, "Debug", null, cancellationToken);
+                var profiles = inputs.Select(input => implicitSystem && input.IncludeImplicitSystemUsing)
+                    .Distinct().ToArray();
+                if (profiles.Length != 1)
+                    return McpToolResult.Error("Project target frameworks select different implicit System contexts; select implicitSystem=false to opt out consistently.");
+                implicitSystem = profiles[0];
+            }
             return phase switch
             {
                 "assess" => RunAssess(directory, maxFiles, cancellationToken),
-                "convert" => await RunConvertAsync(directory, projectPath, maxFiles, explicitCallClosers, fidelity, cancellationToken),
-                "compile" => RunCompile(directory, maxFiles, cancellationToken),
-                "fix" => await RunFixAsync(directory, maxFiles, cancellationToken),
-                "full" => await RunFullAsync(directory, projectPath, maxFiles, autoFix, explicitCallClosers, fidelity, cancellationToken),
+                "convert" => await RunConvertAsync(directory, projectPath, maxFiles, explicitCallClosers, fidelity, cancellationToken, implicitSystem),
+                "compile" => RunCompile(directory, maxFiles, cancellationToken, implicitSystem),
+                "fix" => await RunFixAsync(directory, maxFiles, cancellationToken, implicitSystem),
+                "full" => await RunFullAsync(directory, projectPath, maxFiles, autoFix, explicitCallClosers, fidelity, cancellationToken, implicitSystem),
                 _ => McpToolResult.Error($"Unknown phase: '{phase}'. Must be 'assess', 'convert', 'compile', 'fix', or 'full'.")
             };
         }
@@ -165,10 +177,11 @@ public sealed class MigrateTool : McpToolBase
 
     // ── Phase: convert ──────────────────────────────────────────────
 
-    internal async Task<McpToolResult> RunConvertAsync(string directory, string projectPath, int maxFiles, bool explicitCallClosers, ConversionFidelity fidelity, CancellationToken ct)
+    internal async Task<McpToolResult> RunConvertAsync(string directory, string projectPath, int maxFiles, bool explicitCallClosers, ConversionFidelity fidelity, CancellationToken ct, bool implicitSystem = true)
     {
         var options = new MigrationPlanOptions
         {
+            IncludeImplicitSystemUsing = implicitSystem,
             IncludeTests = true,
             MaxFiles = maxFiles,
             Fidelity = fidelity,
@@ -224,7 +237,7 @@ public sealed class MigrateTool : McpToolBase
 
     // ── Phase: compile ──────────────────────────────────────────────
 
-    internal McpToolResult RunCompile(string directory, int maxFiles, CancellationToken ct)
+    internal McpToolResult RunCompile(string directory, int maxFiles, CancellationToken ct, bool implicitSystem = true)
     {
         var calrFiles = DiscoverCalrFiles(directory, maxFiles);
         if (calrFiles.Count == 0)
@@ -252,6 +265,7 @@ public sealed class MigrateTool : McpToolBase
                 var source = File.ReadAllText(path);
                 var compileOptions = new CompilationOptions
                 {
+                    IncludeImplicitSystemUsing = implicitSystem,
                     ContractMode = ContractMode.Off,
                     UnknownCallPolicy = UnknownCallPolicy.Permissive,
                     VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
@@ -288,7 +302,7 @@ public sealed class MigrateTool : McpToolBase
 
     // ── Phase: fix ──────────────────────────────────────────────────
 
-    internal async Task<McpToolResult> RunFixAsync(string directory, int maxFiles, CancellationToken ct)
+    internal async Task<McpToolResult> RunFixAsync(string directory, int maxFiles, CancellationToken ct, bool implicitSystem = true)
     {
         var calrFiles = DiscoverCalrFiles(directory, maxFiles);
         if (calrFiles.Count == 0)
@@ -305,6 +319,7 @@ public sealed class MigrateTool : McpToolBase
                 var fixedFinal = DiagnosticFixes.Repair(source, path,
                     new CompilationOptions
                     {
+                        IncludeImplicitSystemUsing = implicitSystem,
                         ContractMode = ContractMode.Off,
                         UnknownCallPolicy = UnknownCallPolicy.Permissive,
                         VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
@@ -354,7 +369,7 @@ public sealed class MigrateTool : McpToolBase
 
     internal async Task<McpToolResult> RunFullAsync(
         string directory, string projectPath, int maxFiles, bool autoFix, bool explicitCallClosers,
-        ConversionFidelity fidelity, CancellationToken ct)
+        ConversionFidelity fidelity, CancellationToken ct, bool implicitSystem = true)
     {
         var sw = Stopwatch.StartNew();
         var allPerFile = new Dictionary<string, MigrateFileResult>(StringComparer.OrdinalIgnoreCase);
@@ -393,6 +408,7 @@ public sealed class MigrateTool : McpToolBase
         // Step 2: Convert
         var options = new MigrationPlanOptions
         {
+            IncludeImplicitSystemUsing = implicitSystem,
             IncludeTests = true,
             MaxFiles = maxFiles,
             Fidelity = fidelity,
@@ -459,6 +475,7 @@ public sealed class MigrateTool : McpToolBase
                 var source = File.ReadAllText(path);
                 var compileOptions = new CompilationOptions
                 {
+                    IncludeImplicitSystemUsing = implicitSystem,
                     ContractMode = ContractMode.Off,
                     UnknownCallPolicy = UnknownCallPolicy.Permissive,
                     VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
@@ -547,6 +564,7 @@ public sealed class MigrateTool : McpToolBase
                     var fixedFinal = DiagnosticFixes.Repair(source, path,
                         new CompilationOptions
                         {
+                            IncludeImplicitSystemUsing = implicitSystem,
                             ContractMode = ContractMode.Off,
                             UnknownCallPolicy = UnknownCallPolicy.Permissive,
                             VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },

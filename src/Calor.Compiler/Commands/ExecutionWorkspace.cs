@@ -42,7 +42,8 @@ internal static class ExecutionWorkspace
         bool Verify,
         bool KeepProvenGuards,
         string ContractMode,
-        int TimeoutSeconds)
+        int TimeoutSeconds,
+        bool IncludeImplicitSystemUsing = true)
     {
         public TimeSpan Timeout => TimeSpan.FromSeconds(TimeoutSeconds);
     }
@@ -106,6 +107,8 @@ internal static class ExecutionWorkspace
         command.AddOption(keepProvenGuardsOption);
         command.AddOption(contractModeOption);
         command.AddOption(timeoutOption);
+        var noImplicitSystemOption = new Option<bool>("--no-implicit-system", "Validate standalone without the default System-only project import");
+        command.AddOption(noImplicitSystemOption);
 
         return ctx => new ExecutionSettings(
             Permissive: ctx.ParseResult.GetValueForOption(permissiveOption),
@@ -115,7 +118,8 @@ internal static class ExecutionWorkspace
             Verify: ctx.ParseResult.GetValueForOption(verifyOption),
             KeepProvenGuards: ctx.ParseResult.GetValueForOption(keepProvenGuardsOption),
             ContractMode: ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug",
-            TimeoutSeconds: ctx.ParseResult.GetValueForOption(timeoutOption));
+            TimeoutSeconds: ctx.ParseResult.GetValueForOption(timeoutOption),
+            IncludeImplicitSystemUsing: !ctx.ParseResult.GetValueForOption(noImplicitSystemOption));
     }
 
     internal sealed record PreparedExecution(string Dotnet, List<CompiledUnit> Units);
@@ -243,6 +247,7 @@ internal static class ExecutionWorkspace
             file => new CompilationOptions
             {
                 Verbose = settings.Verbose,
+                IncludeImplicitSystemUsing = settings.IncludeImplicitSystemUsing,
                 EnforceEffects = settings.EnforceEffects,
                 UnknownCallPolicy = policy,
                 VerifyContracts = settings.Verify,
@@ -287,7 +292,8 @@ internal static class ExecutionWorkspace
     /// compiler (works both for repo dev builds, where the ProjectReference copies it
     /// to the compiler output, and for the installed global tool).
     /// </summary>
-    internal static string WriteProject(string projectDir, string projectName, bool executable, IReadOnlyList<CompiledUnit> units)
+    internal static string WriteProject(string projectDir, string projectName, bool executable, IReadOnlyList<CompiledUnit> units,
+        bool includeImplicitSystemUsing = true)
     {
         Directory.CreateDirectory(projectDir);
         foreach (var unit in units)
@@ -313,11 +319,12 @@ internal static class ExecutionWorkspace
               <PropertyGroup>
                 <OutputType>{(executable ? "Exe" : "Library")}</OutputType>
                 <TargetFramework>net10.0</TargetFramework>
-                <ImplicitUsings>enable</ImplicitUsings>
+                <ImplicitUsings>disable</ImplicitUsings>
                 <Nullable>enable</Nullable>
                 <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
                 <AssemblyName>{projectName}</AssemblyName>
               </PropertyGroup>
+              {(includeImplicitSystemUsing ? "<ItemGroup><Using Include=\"System\" /></ItemGroup>" : "")}
 
             {runtimeReference}
 

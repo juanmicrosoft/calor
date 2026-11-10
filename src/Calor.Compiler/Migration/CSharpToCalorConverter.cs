@@ -208,6 +208,12 @@ public sealed class ConversionOptions
     public OutputKind OutputKind { get; set; } = OutputKind.DynamicallyLinkedLibrary;
 
     /// <summary>
+    /// Apply the System-only project import to original and generated C# equally.
+    /// False selects standalone validation; preserved source is never rewritten.
+    /// </summary>
+    public bool IncludeImplicitSystemUsing { get; set; }
+
+    /// <summary>
     /// Evaluated project nullable context used by semantic conversion. Per-file
     /// <c>#nullable</c> directives continue to override this compilation default.
     /// </summary>
@@ -427,6 +433,7 @@ public sealed class CSharpToCalorConverter
                 [new GeneratedCSharpSource(source, sourceFile ?? "original.cs")],
                 new GeneratedCSharpCompilationContext
                 {
+                    IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
                     LanguageVersion = parseOptions.LanguageVersion,
                     DocumentationMode = parseOptions.DocumentationMode,
                     SourceCodeKind = parseOptions.Kind,
@@ -451,7 +458,7 @@ public sealed class CSharpToCalorConverter
                 or "CS8795" or "CS0759"
                 || (error.Id == "CS5001" && !_options.ReferencesAreComplete));
             if (originalErrors.Any(error => error.Id is
-                    "CS0006" or "CS1504" or "CS8915"
+                    "CS0006" or "CS1504" or "CS8915" or "CS0104"
                     || HasIntrinsicConversionError(error))
                 || (originalErrors.Count > 0 && !incompleteContext))
                 foreach (var error in originalErrors)
@@ -518,6 +525,7 @@ public sealed class CSharpToCalorConverter
             context.Metadata = new ConversionMetadata
             {
                 PreprocessorMode = _options.PreprocessorMode,
+                IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
                 Configuration = _options.Configuration,
                 TargetFramework = _options.TargetFramework,
                 LanguageVersion = parseOptions.LanguageVersion.ToString(),
@@ -702,7 +710,8 @@ public sealed class CSharpToCalorConverter
                     .Concat(_options.AdditionalSemanticSyntaxTrees.Where(tree =>
                         !IsSameSyntaxTree(tree, syntaxTree)));
                 var compilation = CSharpCompilation.Create("ConversionAnalysis",
-                    semanticTrees,
+                    GeneratedCSharpCompiler.AddImplicitUsings(
+                        semanticTrees, _options.IncludeImplicitSystemUsing),
                     GetSemanticMetadataReferences(),
                     new CSharpCompilationOptions(effectiveOutputKind)
                         .WithNullableContextOptions(
@@ -1686,6 +1695,7 @@ public sealed class CSharpToCalorConverter
                     context.SourceFile ?? "converted-output.g.cs")],
                 new GeneratedCSharpCompilationContext
                 {
+                    IncludeImplicitSystemUsing = context.Metadata.IncludeImplicitSystemUsing,
                     LanguageVersion = parseOptions.LanguageVersion,
                     DocumentationMode = parseOptions.DocumentationMode,
                     SourceCodeKind = parseOptions.Kind,
@@ -2057,6 +2067,7 @@ public sealed class CSharpToCalorConverter
                     context.SourceFile ?? "converted-output.g.cs")],
                 new GeneratedCSharpCompilationContext
                 {
+                    IncludeImplicitSystemUsing = context.Metadata.IncludeImplicitSystemUsing,
                     LanguageVersion = parseOptions.LanguageVersion,
                     DocumentationMode = parseOptions.DocumentationMode,
                     SourceCodeKind = parseOptions.Kind,

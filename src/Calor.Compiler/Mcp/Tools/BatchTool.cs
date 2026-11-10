@@ -44,6 +44,7 @@ public sealed class BatchTool : McpToolBase
         {
             "type": "object",
             "properties": {
+                "implicitSystem": { "type": "boolean", "default": true, "description": "System-only compilation context; false selects standalone validation." },
                 "action": {
                     "type": "string",
                     "enum": ["convert", "analyze", "compile"],
@@ -184,6 +185,7 @@ public sealed class BatchTool : McpToolBase
         {
             var options = new MigrationPlanOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                 IncludeTests = includeTests,
                 Parallel = parallel,
                 MaxFiles = maxFiles,
@@ -466,7 +468,7 @@ public sealed class BatchTool : McpToolBase
                 var source = File.ReadAllText(file);
                 var result = quick
                     ? analyzer.AnalyzeQuick(source, file)
-                    : analyzer.Analyze(source, file);
+                    : analyzer.Analyze(source, file, GetBool(arguments, "implicitSystem", true));
 
                 var relativePath = Path.GetRelativePath(directory, file);
                 fileResults.Add(new AnalyzeFileResult
@@ -709,6 +711,7 @@ public sealed class BatchTool : McpToolBase
                 var source = File.ReadAllText(path);
                 var compileOptions = new CompilationOptions
                 {
+                    IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                     ContractMode = ContractMode.Off,
                     UnknownCallPolicy = UnknownCallPolicy.Permissive,
                     VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },

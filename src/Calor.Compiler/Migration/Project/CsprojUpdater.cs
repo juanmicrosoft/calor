@@ -125,6 +125,13 @@ public sealed class CsprojUpdater
 
                   <!-- Calor Compilation Configuration -->
                   <PropertyGroup>
+                    <CalorImplicitSystemUsing Condition="'$(CalorImplicitSystemUsing)' == ''">true</CalorImplicitSystemUsing>
+                    <_CalorSystemContextOption Condition="'$(CalorImplicitSystemUsing)' != 'true'">--no-implicit-system</_CalorSystemContextOption>
+                  </PropertyGroup>
+                  <ItemGroup Condition="'$(CalorImplicitSystemUsing)' == 'true'">
+                    <Using Include="System" />
+                  </ItemGroup>
+                  <PropertyGroup>
                     <CalorOutputDirectory Condition="'$(CalorOutputDirectory)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\calor\</CalorOutputDirectory>
                     <CalorCompilerPath Condition="'$(CalorCompilerOverride)' != '' and '$(CalorCompilerPath)' == ''">$(CalorCompilerOverride)</CalorCompilerPath>
                     <CalorCompilerPath Condition="'$(CalorCompilerPath)' == ''">calor</CalorCompilerPath>
@@ -151,7 +158,7 @@ public sealed class CsprojUpdater
                           Outputs="@(CalorCompile->'$(CalorOutputDirectory)%(RecursiveDir)%(Filename).g.cs')"
                           Condition="'@(CalorCompile)' != ''">
                     <MakeDir Directories="$(CalorOutputDirectory)" />
-                    <Exec Command="&quot;$(CalorCompilerPath)&quot; --input &quot;%(CalorCompile.FullPath)&quot; --output &quot;$(CalorOutputDirectory)%(CalorCompile.RecursiveDir)%(CalorCompile.Filename).g.cs&quot;" />
+                    <Exec Command="&quot;$(CalorCompilerPath)&quot; --input &quot;%(CalorCompile.FullPath)&quot; --output &quot;$(CalorOutputDirectory)%(CalorCompile.RecursiveDir)%(CalorCompile.Filename).g.cs&quot; $(_CalorSystemContextOption)" />
                   </Target>
 
                   <!-- Include generated files in compilation -->
@@ -232,6 +239,7 @@ public sealed class CsprojUpdater
     private static void AddCalorCompileTargets(XDocument doc)
     {
         var root = doc.Root!;
+        Init.CsprojInitializer.AddImplicitSystemConfiguration(root);
 
         // Add comment
         root.Add(new XComment(" Calor Compilation Configuration "));
@@ -283,7 +291,7 @@ public sealed class CsprojUpdater
                 new XAttribute("Directories", "$(CalorOutputDirectory)")),
             new XElement("Exec",
                 new XAttribute("Command",
-                    @"""$(CalorCompilerPath)"" --input ""%(CalorCompile.FullPath)"" --output ""$(CalorOutputDirectory)%(CalorCompile.RecursiveDir)%(CalorCompile.Filename).g.cs""")));
+                    @"""$(CalorCompilerPath)"" --input ""%(CalorCompile.FullPath)"" --output ""$(CalorOutputDirectory)%(CalorCompile.RecursiveDir)%(CalorCompile.Filename).g.cs"" $(_CalorSystemContextOption)")));
 
         root.Add(compileTarget);
 

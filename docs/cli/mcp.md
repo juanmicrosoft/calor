@@ -60,6 +60,21 @@ Older one-purpose tool names are not aliases. For example, use
 
 ## Compile, diagnose and repair
 
+Compilation-backed tools default to the System-only project context, not the
+full SDK namespace set. `calor_compile` accepts
+`"options": {"implicitSystem": false}` for standalone validation.
+`calor_convert`, `calor_check`, `calor_verify`, `calor_analyze`, `calor_refine`,
+`calor_fix`, `calor_batch` and `calor_migrate` accept top-level
+`"implicitSystem": false`. Conversion uses the same choice for original C#
+binding and emitted C# validation. Parse-only navigation/preview operations do
+not perform downstream C# validation.
+
+This setting never rewrites preserved text or relaxes effect checks.
+`CS0104` reports ambiguous short names; aliases and fully qualified names remain
+escape hatches. A saved C# output needs the same context in its real project.
+See [compilation-context imports](../semantics/dotnet-backend.md#compilation-context-imports)
+for project, CLI, low-level API and LSP/editor policy.
+
 Requests use current native Calor: lowercase declarations, ordinary constructor
 calls, infix expressions and indentation. Declaration IDs belong in
 `.calor/ids.json`, not source.

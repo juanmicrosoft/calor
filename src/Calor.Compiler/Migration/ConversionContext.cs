@@ -268,6 +268,7 @@ public sealed record ConversionMetadata
     public string SourceCodeKind { get; init; } = "";
     public string OutputKind { get; init; } = "";
     public string NullableContextOptions { get; init; } = "";
+    public bool IncludeImplicitSystemUsing { get; init; }
     public bool ReferencesAreComplete { get; init; }
     public IReadOnlyList<string> DefinedSymbols { get; init; } = Array.Empty<string>();
     public IReadOnlyDictionary<string, string> Features { get; init; } =

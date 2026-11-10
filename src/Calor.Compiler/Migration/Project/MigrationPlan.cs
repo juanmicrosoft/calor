@@ -131,6 +131,9 @@ public sealed class MigrationPlanOptions
     /// <summary>Conversion fidelity. Lossless is the safe default.</summary>
     public ConversionFidelity Fidelity { get; set; } = ConversionFidelity.Lossless;
 
+    /// <summary>System-only context; evaluated project opt-out takes precedence.</summary>
+    public bool IncludeImplicitSystemUsing { get; set; } = true;
+
     /// <summary>Conditional-compilation handling. Preserving every branch is the default.</summary>
     public PreprocessorConversionMode PreprocessorMode { get; set; } =
         PreprocessorConversionMode.PreserveAllBranches;

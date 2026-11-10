@@ -45,7 +45,8 @@ public static class RunCommand
         try
         {
             var projectPath = ExecutionWorkspace.WriteProject(
-                Path.Combine(workspace, "app"), "CalorApp", executable: true, prepared.Units);
+                Path.Combine(workspace, "app"), "CalorApp", executable: true, prepared.Units,
+                settings.IncludeImplicitSystemUsing);
 
             var outDir = Path.Combine(workspace, "out");
             var buildExit = ExecutionWorkspace.RunProcessCaptured(prepared.Dotnet,

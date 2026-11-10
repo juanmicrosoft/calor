@@ -24,6 +24,14 @@ the process.
 
 ## The Tool Surface
 
+Compilation-backed tools default to a System-only import. For standalone
+validation, pass `options.implicitSystem=false` to `calor_compile`, or top-level
+`implicitSystem=false` to convert, check, verify, analyze, refine, fix, batch and
+migrate. Original and emitted C# use the same context without rewriting raw
+payloads. Ambiguous names report `CS0104`; use aliases or fully qualified names.
+Saved output needs that context in its actual C# project. Parse-only tools do
+not perform downstream C# validation.
+
 The server registers 19 tools. Several older one-purpose names were folded
 into action-based tools; clients should discover the live tool list rather than
 assuming names from pre-consolidation documentation.

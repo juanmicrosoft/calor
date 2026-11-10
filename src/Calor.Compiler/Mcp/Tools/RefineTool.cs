@@ -25,6 +25,7 @@ public sealed class RefineTool : McpToolBase
         {
             "type": "object",
             "properties": {
+                "implicitSystem": { "type": "boolean", "default": true, "description": "System-only compilation context; false selects standalone validation." },
                 "action": {
                     "type": "string",
                     "enum": ["obligations", "bounds", "diagnose", "guards", "fixes", "types"],
@@ -99,6 +100,7 @@ public sealed class RefineTool : McpToolBase
         {
             var options = new CompilationOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                 VerifyRefinements = true,
                 VerificationTimeoutMs = timeout,
                 EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
@@ -184,6 +186,7 @@ public sealed class RefineTool : McpToolBase
         {
             var options = new CompilationOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                 VerifyRefinements = true,
                 EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
@@ -248,6 +251,7 @@ public sealed class RefineTool : McpToolBase
         {
             var options = new CompilationOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                 VerifyRefinements = true,
                 EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
@@ -356,6 +360,7 @@ public sealed class RefineTool : McpToolBase
         {
             var options = new CompilationOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                 VerifyRefinements = true,
                 EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
@@ -425,6 +430,7 @@ public sealed class RefineTool : McpToolBase
         {
             var options = new CompilationOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                 VerifyRefinements = true,
                 EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken

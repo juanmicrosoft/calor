@@ -27,6 +27,14 @@ UTF-16/UTF-32 inputs do **not** retain their original encoding or bytes.
 Exact-byte controls cover preserved UTF-8 sources with BOMs, CRLF, and EOF comments.
 Malformed input encodings fail explicitly.
 
+Conversion defaults to a System-only compilation-context import for both original
+and emitted C#. Use `--no-implicit-system` for standalone validation; JSON records
+the choice as `data.implicitSystem`. Preserved text and local imports stay exact.
+The real downstream C# project must supply the same context. Calor SDK/init
+projects do so; an independently compiled `.g.cs` does not inherit CLI settings.
+See [compilation-context imports](/docs/semantics/dotnet-backend#compilation-context-imports)
+for ambiguity, project opt-out and editor settings.
+
 ---
 
 ## Quick Start
@@ -54,6 +62,7 @@ calor convert MyService.cs --benchmark
 | `--output` | `-o` | Auto-detected | Output file path |
 | `--benchmark` | `-b` | `false` | Include benchmark metrics comparison |
 | `--verbose` | `-v` | `false` | Enable verbose output |
+| `--no-implicit-system` | — | `false` | Validate original and generated C# without the System context import |
 | `--explain` | `-e` | `false` | Explain unsupported features in detail |
 | `--no-fallback` | — | `false` | Disable TODO substitution; default faithful C# preservation still applies |
 | `--validate` | — | `false` | Request validation reporting; generated Calor is always parse-validated before writing |

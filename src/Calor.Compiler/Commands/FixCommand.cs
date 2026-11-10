@@ -35,6 +35,7 @@ public static class FixCommand
         };
 
         var applyOption = new Option<bool>("--apply", "Apply deterministic safe diagnostic patches");
+        var noImplicitSystemOption = new Option<bool>("--no-implicit-system", "Validate without the implicit System project import");
         var elideCallClosersOption = new Option<bool>(
             aliases: ["--elide-call-closers"],
             description: "Archived migration: elide §/C on zero-arg + one-arg same-line calls (v0.6.x); not current-grammar conversion");
@@ -64,6 +65,7 @@ public static class FixCommand
         {
             rootArgument,
             applyOption,
+            noImplicitSystemOption,
             elideCallClosersOption,
             healClosersOption,
             revertOption,
@@ -89,7 +91,8 @@ public static class FixCommand
                 }
                 context.ExitCode = await ApplyDiagnosticsAsync(
                     parse.GetValueForArgument(rootArgument),
-                    parse.GetValueForOption(dryRunOption), json);
+                    parse.GetValueForOption(dryRunOption), json,
+                    !parse.GetValueForOption(noImplicitSystemOption));
                 return;
             }
             context.ExitCode = await ExecuteAsync(
@@ -163,7 +166,8 @@ public static class FixCommand
             : await HealClosersAsync(root, log, dryRun, json);
     }
 
-    private static async Task<int> ApplyDiagnosticsAsync(string target, bool dryRun, bool json)
+    private static async Task<int> ApplyDiagnosticsAsync(string target, bool dryRun, bool json,
+        bool includeImplicitSystemUsing)
     {
         var diagnostics = new DiagnosticBag();
         var changedFiles = 0;
@@ -187,7 +191,8 @@ public static class FixCommand
                 {
                     var snapshot = await SourceFileSnapshot.ReadAsync(path);
                     var fixedSource = DiagnosticFixes.Repair(snapshot.Text, snapshot.Path,
-                        new CompilationOptions(), out var result, out var applied);
+                        new CompilationOptions { IncludeImplicitSystemUsing = includeImplicitSystemUsing },
+                        out var result, out var applied);
                     if (fixedSource != snapshot.Text)
                     {
                         if (!dryRun)

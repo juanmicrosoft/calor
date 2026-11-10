@@ -18,6 +18,7 @@ public sealed class FixTool : McpToolBase
         {
             "type": "object",
             "properties": {
+                "implicitSystem": { "type": "boolean", "default": true, "description": "System-only compilation context; false selects standalone validation." },
                 "source": {
                     "type": "string",
                     "description": "Calor source code to fix"
@@ -70,7 +71,11 @@ public sealed class FixTool : McpToolBase
         {
             var descriptions = new List<string>();
             var current = DiagnosticFixes.Repair(source, filePath ?? "mcp-fix.calr",
-                new CompilationOptions { CancellationToken = cancellationToken },
+                new CompilationOptions
+                {
+                    IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
+                    CancellationToken = cancellationToken
+                },
                 out var result, out var editsApplied, descriptions);
             return McpToolResult.Json(new FixToolOutput
             {

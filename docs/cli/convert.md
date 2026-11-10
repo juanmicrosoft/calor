@@ -30,6 +30,20 @@ UTF-16/UTF-32 inputs therefore do **not** retain their original encoding or byte
 Exact-byte controls cover preserved UTF-8 sources, including BOMs, CRLF, and EOF comments.
 Malformed input encodings fail explicitly rather than using replacement text.
 
+### Compilation context
+
+Conversion and generated-output validation default to an implicit `System`
+import, applied equally to original and emitted C#. Use `--no-implicit-system`
+for standalone validation. JSON output records the choice as `data.implicitSystem`.
+No other SDK namespace is implied. Preserved text and namespace-local imports
+are not rewritten, and preserved code remains non-native.
+
+The downstream C# project must supply the same context. Calor SDK/init projects
+add the real `Using` item; compiling a saved `.g.cs` elsewhere does not inherit
+the CLI's validation context. Short-name ambiguity reports `CS0104`; use an alias
+or a fully qualified name. See [compilation-context imports](../semantics/dotnet-backend.md#compilation-context-imports)
+for API defaults, project opt-out and editor settings.
+
 ### Generated output and refresh
 
 C#→Calor conversion saves an adjacent `<output>.conversion.json` receipt containing
@@ -83,6 +97,7 @@ calor convert MyService.cs --benchmark
 | `--output` | `-o` | Auto-detected | Output file path |
 | `--benchmark` | `-b` | `false` | Include benchmark metrics comparison |
 | `--verbose` | `-v` | `false` | Enable verbose output |
+| `--no-implicit-system` | — | `false` | Disable the System-only context import for original and generated C#. |
 | `--define` | — | — | Add a conditional-compilation symbol. Repeat or provide multiple values. |
 | `--configuration` | — | — | Configuration recorded in conversion metadata. |
 | `--framework` | — | — | Target framework recorded in conversion metadata. |

@@ -30,6 +30,11 @@ public sealed class CompileTool : McpToolBase
         {
             "type": "object",
             "properties": {
+                "implicitSystem": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "System-only project import. Set false for standalone C# validation."
+                },
                 "source": {
                     "type": "string",
                     "description": "Calor source code to compile (single file mode)"
@@ -188,6 +193,7 @@ public sealed class CompileTool : McpToolBase
         {
             var compileOptions = new CompilationOptions
             {
+                IncludeImplicitSystemUsing = GetBool(options, "implicitSystem", defaultValue: true),
                 ContractMode = contractMode,
                 UnknownCallPolicy = unknownCallPolicy,
                 StrictEffects = strictEffects,
@@ -392,6 +398,7 @@ public sealed class CompileTool : McpToolBase
                 var source = File.ReadAllText(path);
                 var compileOptions = new CompilationOptions
                 {
+                    IncludeImplicitSystemUsing = GetBool(GetOptions(arguments), "implicitSystem", defaultValue: true),
                     ContractMode = ContractMode.Off,
                     UnknownCallPolicy = UnknownCallPolicy.Permissive,
                     VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
@@ -485,6 +492,7 @@ public sealed class CompileTool : McpToolBase
                 sources,
                 file => new CompilationOptions
                 {
+                    IncludeImplicitSystemUsing = GetBool(options, "implicitSystem", defaultValue: true),
                     ContractMode = contractMode,
                     UnknownCallPolicy = policy,
                     StrictEffects = strictEffects,

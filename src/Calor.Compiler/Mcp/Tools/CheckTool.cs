@@ -29,6 +29,7 @@ public sealed class CheckTool : McpToolBase
         {
             "type": "object",
             "properties": {
+                "implicitSystem": { "type": "boolean", "default": true, "description": "System-only compilation context; false selects standalone validation." },
                 "action": {
                     "type": "string",
                     "enum": ["diagnose", "lint", "typecheck", "validate", "loop"],
@@ -151,7 +152,8 @@ public sealed class CheckTool : McpToolBase
         if (GetBool(arguments, "apply"))
             return McpToolResult.Error("loop does not apply fixes; use diagnose with apply explicitly.");
         var result = await TestCommand.RunLoopAsync(path, GetInt(arguments, "timeoutSeconds", 600),
-            GetInt(arguments, "verificationTimeoutMs", 5000), cancellationToken);
+            GetInt(arguments, "verificationTimeoutMs", 5000), cancellationToken,
+            GetBool(arguments, "implicitSystem", true));
         return McpToolResult.Json(result, isError: !result.Success);
     }
 
@@ -173,6 +175,7 @@ public sealed class CheckTool : McpToolBase
         {
             var compileOptions = new CompilationOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                 StrictApi = strictApi,
                 RequireDocs = requireDocs,
                 CancellationToken = cancellationToken
@@ -497,6 +500,7 @@ public sealed class CheckTool : McpToolBase
         {
             var options = new CompilationOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                 EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
             };

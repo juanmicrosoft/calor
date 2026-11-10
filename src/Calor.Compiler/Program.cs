@@ -72,6 +72,10 @@ public class Program
             description: "UNSAFE: emit C# without type checking or Roslyn validation; no validated-success claim or incremental cache entry is produced",
             getDefaultValue: () => false);
 
+        var noImplicitSystemOption = new Option<bool>(
+            "--no-implicit-system",
+            "Validate standalone, without the default System-only project import");
+
         var strictEffectsOption = new Option<bool>(
             aliases: ["--strict-effects"],
             description: "Promote unknown external call warnings (Calor0411) to errors",
@@ -176,6 +180,7 @@ public class Program
             noEnforceEffectsOption,
             noTypeCheckOption,
             transpileOnlyOption,
+            noImplicitSystemOption,
             strictEffectsOption,
             permissiveEffectsOption,
             contractModeOption,
@@ -269,7 +274,7 @@ public class Program
 
             try
             {
-                ctx.ExitCode = await CompileAsync(input, output, references, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, transpileOnly, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference, format, elideProvenGuards, elisionFlagGiven);
+                ctx.ExitCode = await CompileAsync(input, output, references, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, transpileOnly, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference, format, elideProvenGuards, elisionFlagGiven, !ctx.ParseResult.GetValueForOption(noImplicitSystemOption));
             }
             catch (Exception ex)
             {
@@ -348,10 +353,10 @@ public class Program
         return result;
     }
 
-    private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, FileInfo[] references, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool transpileOnly, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true, string format = "text", bool elideProvenGuards = true, string? elisionFlagGiven = null)
-        => Task.FromResult(CompileCore(input, output, references, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, transpileOnly, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference, format, elideProvenGuards, elisionFlagGiven));
+    private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, FileInfo[] references, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool transpileOnly, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true, string format = "text", bool elideProvenGuards = true, string? elisionFlagGiven = null, bool includeImplicitSystemUsing = true)
+        => Task.FromResult(CompileCore(input, output, references, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, transpileOnly, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference, format, elideProvenGuards, elisionFlagGiven, includeImplicitSystemUsing));
 
-    private static int CompileCore(FileInfo[]? input, FileInfo? output, FileInfo[] references, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool transpileOnly, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings, string[]? experimentalFlags, bool strictBindInference, string format = "text", bool elideProvenGuards = true, string? elisionFlagGiven = null)
+    private static int CompileCore(FileInfo[]? input, FileInfo? output, FileInfo[] references, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool transpileOnly, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings, string[]? experimentalFlags, bool strictBindInference, string format = "text", bool elideProvenGuards = true, string? elisionFlagGiven = null, bool includeImplicitSystemUsing = true)
     {
         // Structured diagnostic output (--format json|sarif): diagnostics are
         // aggregated across files and serialized once through the shared
@@ -470,7 +475,8 @@ public class Program
                             allFindings, strictBindInference, experimentalFlags,
                             elideProvenGuards,
                             references.Select(reference =>
-                                $"{reference.FullName}:{Incremental.BuildStateCache.ComputeFileHash(reference.FullName)}")),
+                                $"{reference.FullName}:{Incremental.BuildStateCache.ComputeFileHash(reference.FullName)}"),
+                            includeImplicitSystemUsing),
                         ClearFirst: clearCache,
                         OutputPathFor: file => Path.ChangeExtension(file.FullName, ".g.cs"));
                 }
@@ -502,6 +508,7 @@ public class Program
                         EnforceEffects = enforceEffects,
                         EnableTypeChecking = enableTypeChecking,
                         UnsafeTranspileOnly = transpileOnly,
+                        IncludeImplicitSystemUsing = includeImplicitSystemUsing,
                         ReferencedAssemblyPaths = references
                             .Select(reference => reference.FullName)
                             .ToList(),
@@ -643,7 +650,8 @@ public class Program
         int verificationTimeout, bool analyze, bool allFindings, bool strictBindInference,
         string[]? experimentalFlags,
         bool elideProvenGuards = true,
-        IEnumerable<string>? referenceDescriptors = null)
+        IEnumerable<string>? referenceDescriptors = null,
+        bool includeImplicitSystemUsing = true)
     {
         var experimental = experimentalFlags == null
             ? ""
@@ -653,6 +661,7 @@ public class Program
             : string.Join(",", referenceDescriptors.Order(StringComparer.Ordinal));
         return $"strictApi:{strictApi}|requireDocs:{requireDocs}|enforceEffects:{enforceEffects}" +
                $"|enableTypeChecking:{enableTypeChecking}" +
+               $"|implicitSystem:{includeImplicitSystemUsing}" +
                $"|strictEffects:{strictEffects}|permissiveEffects:{permissiveEffects}" +
                $"|contractMode:{contractMode.ToLowerInvariant()}|verify:{verify}" +
                $"|elideProvenGuards:{elideProvenGuards}" +
@@ -1167,6 +1176,7 @@ public class Program
                 new GeneratedCSharpCompilationContext
                 {
                     ReferencePaths = options.ReferencedAssemblyPaths,
+                    IncludeImplicitSystemUsing = options.IncludeImplicitSystemUsing,
                     AllowUnsafe = options.AllowUnsafeCode
                 });
             AddGeneratedOutputDiagnostics(validation, diagnostics, generatedPath);
@@ -1347,6 +1357,12 @@ public sealed class CompilationOptions
     /// defaults to true; project surfaces override this with the project's setting.
     /// </summary>
     public bool AllowUnsafeCode { get; init; } = true;
+
+    /// <summary>
+    /// Import System during generated-C# validation. Low-level callers default to
+    /// standalone; project-facing commands explicitly enable this context.
+    /// </summary>
+    public bool IncludeImplicitSystemUsing { get; init; }
 
     /// <summary>
     /// Explicitly emit C# without Roslyn validation. This mode is unsafe and must
