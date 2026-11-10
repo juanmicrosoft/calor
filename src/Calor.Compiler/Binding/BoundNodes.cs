@@ -647,7 +647,8 @@ public sealed class BoundStringLiteral : BoundExpression
         TextSpan span,
         string value,
         bool isMultiline,
-        bool isUtf8)
+        bool isUtf8,
+        Microsoft.CodeAnalysis.INamedTypeSymbol? stringType = null)
         : base(span)
     {
         Value = value ?? throw new ArgumentNullException(nameof(value));
@@ -665,7 +666,8 @@ public sealed class BoundStringLiteral : BoundExpression
         // equally non-null.
         Type = new NominalBoundType(
             isUtf8 ? "ReadOnlySpan<BYTE>" : "STRING",
-            NullableAnnotation.NotAnnotated);
+            NullableAnnotation.NotAnnotated,
+            roslynSymbol: isUtf8 ? null : stringType);
     }
 }
 
@@ -1951,22 +1953,32 @@ internal static class ExpressionResultTypes
     internal static bool IsNever(BoundType type) =>
         type is NominalBoundType { QualifiedName: "NEVER" };
 
-    internal static BoundType Join(string resultName, IEnumerable<BoundType> alternatives)
+    internal static BoundType Join(string resultName, IEnumerable<BoundExpression> alternatives)
     {
-        var returning = alternatives.Where(type => !IsNever(type)).ToArray();
+        var returning = alternatives.Where(expression => !IsNever(expression.Type)).ToArray();
         if (returning.Length == 0)
             return new NominalBoundType("NEVER", NullableAnnotation.NotAnnotated);
 
-        var annotations = returning.Select(NullabilityChecker.GetAnnotation).ToArray();
+        var annotations = returning.Select(expression => NullabilityChecker.GetAnnotation(expression.Type)).ToArray();
         var annotation = annotations.Contains(NullableAnnotation.Annotated)
             ? NullableAnnotation.Annotated
             : annotations.All(value => value == NullableAnnotation.NotAnnotated)
                 ? NullableAnnotation.NotAnnotated
                 : NullableAnnotation.Oblivious;
-        return PreserveIdentity(resultName, annotation, returning);
+        return PreserveIdentity(resultName, annotation,
+            returning.Where(expression => expression is not BoundNullLiteral).Select(expression => expression.Type).ToArray());
     }
 
-    internal static BoundType Coalesce(string resultName, BoundType left, BoundType right)
+    internal static BoundType Coalesce(string resultName, BoundExpression left, BoundExpression right) =>
+        Coalesce(resultName, left.Type, right.Type,
+            new[] { left, right }.Where(expression => expression is not BoundNullLiteral)
+                .Select(expression => expression.Type).ToArray());
+
+    internal static BoundType Coalesce(string resultName, BoundType left, BoundType right) =>
+        Coalesce(resultName, left, right, [left, right]);
+
+    private static BoundType Coalesce(
+        string resultName, BoundType left, BoundType right, IReadOnlyList<BoundType> alternatives)
     {
         if (IsNever(left))
             return left;
@@ -1974,18 +1986,23 @@ internal static class ExpressionResultTypes
             || NullabilityChecker.GetAnnotation(left) == NullableAnnotation.NotAnnotated
                 ? NullableAnnotation.NotAnnotated
                 : NullabilityChecker.GetAnnotation(right) ?? NullableAnnotation.Oblivious;
-        return PreserveIdentity(resultName, annotation, [left, right]);
+        return PreserveIdentity(resultName, annotation, alternatives);
     }
 
     private static BoundType PreserveIdentity(
         string resultName, NullableAnnotation annotation, IReadOnlyList<BoundType> alternatives)
     {
-        var identity = alternatives.OfType<NominalBoundType>()
-            .Where(type => type.QualifiedName == resultName)
-            .OrderByDescending(type => type.IsKnownReferenceType)
-            .FirstOrDefault();
+        var candidates = alternatives.Where(type => !IsNever(type)).OfType<NominalBoundType>().ToArray();
+        var identity = candidates.FirstOrDefault(type => type.IsKnownReferenceType);
+        if (identity is not null && (candidates.Length != alternatives.Count(type => !IsNever(type))
+            || candidates.Any(type => !identity.HasSameUnderlyingReferenceType(type))
+            || ReferenceName(identity.QualifiedName) != ReferenceName(resultName)))
+            identity = null;
         return new NominalBoundType(resultName, annotation, identity?.Declaration, identity?.RoslynSymbol);
     }
+
+    private static string ReferenceName(string name) =>
+        TypeIdentity.Canonicalize(Parsing.AttributeHelper.TryUnwrapNullableAnnotation(name, out var inner) ? inner : name);
 }
 
 /// <summary>
@@ -2032,7 +2049,7 @@ public sealed class BoundConditionalExpression : BoundExpression
         WhenFalse = whenFalse ?? throw new ArgumentNullException(nameof(whenFalse));
         if (resultType is null) throw new ArgumentNullException(nameof(resultType));
         var shape = NullabilityResultTypes.Join([whenTrue, whenFalse]);
-        Type = shape ?? ExpressionResultTypes.Join(resultType, [whenTrue.Type, whenFalse.Type]);
+        Type = shape ?? ExpressionResultTypes.Join(resultType, [whenTrue, whenFalse]);
         HasUnknownInferredType = whenTrue.HasUnknownInferredType || whenFalse.HasUnknownInferredType;
         MethodInputArrayType = shape as ArrayBoundType;
         GenericNullabilityType = shape as GenericInstantiationBoundType;
@@ -2424,7 +2441,7 @@ public sealed class BoundMatchExpression : BoundExpression
         var shape = NullabilityResultTypes.Join(
             cases.Where(matchCase => matchCase.Result != null).Select(matchCase => matchCase.Result!));
         Type = shape ?? ExpressionResultTypes.Join(resultType,
-            cases.Where(matchCase => matchCase.Result != null).Select(matchCase => matchCase.Result!.Type));
+            cases.Where(matchCase => matchCase.Result != null).Select(matchCase => matchCase.Result!));
         HasUnknownInferredType = cases.Any(matchCase => matchCase.Result?.HasUnknownInferredType == true);
         MethodInputArrayType = shape as ArrayBoundType;
         GenericNullabilityType = shape as GenericInstantiationBoundType;

@@ -54,7 +54,8 @@ public sealed class Binder
             [typeof(MatchExpressionNode)] = static (binder, expression) => binder.BindMatchExpression((MatchExpressionNode)expression),
             [typeof(MultiDimArrayAccessNode)] = static (binder, expression) => binder.BindMultiDimArrayAccess((MultiDimArrayAccessNode)expression),
             [typeof(MultiDimArrayCreationNode)] = static (binder, expression) => binder.BindMultiDimArrayCreation((MultiDimArrayCreationNode)expression),
-            [typeof(NameOfExpressionNode)] = static (_, expression) => new BoundStringLiteral(expression.Span, ((NameOfExpressionNode)expression).Name),
+            [typeof(NameOfExpressionNode)] = static (binder, expression) => binder.BindStringLiteral(
+                new StringLiteralNode(expression.Span, ((NameOfExpressionNode)expression).Name)),
             [typeof(NewExpressionNode)] = static (binder, expression) => binder.BindNewExpression((NewExpressionNode)expression),
             [typeof(NullCoalesceNode)] = static (binder, expression) => binder.BindNullCoalesce((NullCoalesceNode)expression),
             [typeof(NullConditionalNode)] = static (binder, expression) => binder.BindNullConditional((NullConditionalNode)expression),
@@ -3299,40 +3300,41 @@ public sealed class Binder
         var annotated = Parsing.AttributeHelper.TryUnwrapNullableAnnotation(referent, out var inner);
         if (annotated)
             referent = inner.Trim();
+        var lookupReferent = string.Join(".", referent.Split('.').Select(part => part.TrimStart('@')));
         if (referent.Length == 0 || referent.IndexOfAny(['[', ']', '<', '>', '`', '*', '&', '(', ')']) >= 0
-            || typeParameters?.Contains(referent, StringComparer.Ordinal) == true)
+            || typeParameters?.Contains(lookupReferent, StringComparer.Ordinal) == true)
             return null;
         var canonical = TypeIdentity.Canonicalize(referent);
-        if (TypeIdentity.IsBuiltinCanonicalName(canonical) && canonical != "OBJECT"
+        if (TypeIdentity.IsBuiltinCanonicalName(canonical) && canonical is not ("OBJECT" or "STRING")
             || TypeIdentity.IsKnownValueMetadataName(referent))
             return null;
         if (canonical == "OBJECT" && !allowObject)
             return null;
         if (containingTypeName is not null
             && _classesByQualifiedName.TryGetValue(containingTypeName, out var containingClass)
-            && containingClass.TypeParameters.Any(parameter => parameter.Name == referent))
+            && containingClass.TypeParameters.Any(parameter => parameter.Name == lookupReferent))
             return null;
 
         var annotation = annotated
             ? BoundTypes.NullableAnnotation.Annotated
             : BoundTypes.NullableAnnotation.NotAnnotated;
-        var lookupNames = ReferenceLookupNames(referent, containingTypeName ?? namespaceIdentity).ToArray();
-        foreach (var lookupName in lookupNames)
-        {
-            var declarations = _symbolsById.Values.OfType<TypeSymbol>()
-                .Where(symbol => symbol.QualifiedName == lookupName)
-                .Take(2).ToArray();
-            if (declarations.Length != 0)
-                return declarations is [var declaration] && declaration.IsReferenceType
-                    ? new BoundTypes.NominalBoundType(referent, annotation, declaration)
-                    : null;
-        }
-
-        var metadataName = TypeIdentity.MapShortTypeNameToFullName(lookupNames[^1]);
-        var metadata = GetOrCreateMetadataBinder();
+        // Predefined string spellings name the CLR special type, not a lexical type alias.
+        if (referent is "STRING" or "string" or "str")
+            return GetOrCreateMetadataBinder()?.Context.TryResolveType("System.String") is { } stringType
+                ? new BoundTypes.NominalBoundType(referent, annotation, roslynSymbol: stringType)
+                : null;
         var lexicalScope = containingTypeName is not null
             && _classesByQualifiedName.TryGetValue(containingTypeName, out var declaringClass)
                 ? declaringClass.NamespaceScopeId : _currentNamespaceScopeId;
+        var source = ResolveSourceType(referent, containingTypeName, namespaceIdentity, lexicalScope);
+        if (source.Handled)
+            return source.Type is { IsReferenceType: true } declaration
+                ? new BoundTypes.NominalBoundType(referent, annotation, declaration)
+                : null;
+
+        var lookupNames = ReferenceLookupNames(lookupReferent, containingTypeName ?? namespaceIdentity).ToArray();
+        var metadataName = TypeIdentity.MapShortTypeNameToFullName(lookupNames[^1]);
+        var metadata = GetOrCreateMetadataBinder();
         var scoped = metadata is not null
             ? ResolveScopedMetadataType(metadata.Context, referent, 0, lexicalScope, namespaceIdentity)
             : default;
@@ -4070,7 +4072,8 @@ public sealed class Binder
             literal.Span,
             literal.Value,
             literal.IsMultiline,
-            literal.IsUtf8);
+            literal.IsUtf8,
+            literal.IsUtf8 ? null : GetOrCreateMetadataBinder()?.Context.TryResolveType("System.String"));
 
     private BoundExpression BindThisExpression(ThisExpressionNode expression)
     {
@@ -4140,14 +4143,6 @@ public sealed class Binder
             {
                 IsTupleElementRead = true
             };
-        if (fieldAccess.FieldName == "Length" && target is BoundStringLiteral
-            && GetOrCreateMetadataBinder() is { } stringMetadata
-            && stringMetadata.Context.TryResolveType("System.String") is { } stringType
-            && stringMetadata.ResolveMemberRead(stringType, "Length", false, out _)
-                is Microsoft.CodeAnalysis.IPropertySymbol
-                    { IsStatic: false, Type.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_Int32 } length)
-            return new BoundFieldAccessExpression(fieldAccess.Span, target, "Length", "INT",
-                fieldNameSpan: fieldAccess.FieldNameSpan) { ResolvedMetadataMember = length };
         var resolvedFields = fieldAccess.Target switch
         {
             ThisExpressionNode => ResolveAccessibleMembers(_currentClass, fieldAccess.FieldName),
@@ -4219,19 +4214,25 @@ public sealed class Binder
             };
             if (memberType is Microsoft.CodeAnalysis.INamedTypeSymbol namedMemberType
                 && (namedMemberType is { IsReferenceType: true, IsGenericType: false }
+                    || IsBuiltInValueTypeName(namedMemberType.ToDisplayString())
                     || member is Microsoft.CodeAnalysis.IFieldSymbol { IsConst: true, Type.TypeKind: Microsoft.CodeAnalysis.TypeKind.Enum }
                         && Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(namedMemberType, receiverType)))
             {
                 return new BoundFieldAccessExpression(
                     fieldAccess.Span, target, fieldAccess.FieldName, typeName: null,
                     fieldNameSpan: fieldAccess.FieldNameSpan,
-                    resolvedType: Metadata.MetadataBinderResult.ToNominalBoundType(memberType))
+                    resolvedType: namedMemberType.IsValueType
+                        ? new BoundTypes.NominalBoundType(
+                            NormalizeTypeName(namedMemberType.ToDisplayString()),
+                            Metadata.MetadataBinderResult.MapAnnotation(memberType.NullableAnnotation),
+                            roslynSymbol: namedMemberType)
+                        : Metadata.MetadataBinderResult.ToNominalBoundType(memberType))
                 {
                     ResolvedMetadataMember = member
                 };
             }
 
-            reason ??= "The member result is outside supported scalar reference reads.";
+            reason ??= "The member result is outside supported scalar reads.";
             _diagnostics.ReportInfo(fieldAccess.Span, DiagnosticCode.SignatureUnresolved,
                 $"Metadata member resolution incomplete: {reason}");
             return new BoundFieldAccessExpression(
@@ -4320,8 +4321,6 @@ public sealed class Binder
     private (bool Handled, TypeSymbol? Type) ResolveSourceType(
         string name, string? containingTypeName, string? namespaceIdentity, string? scopeId)
     {
-        if (_enumMembers.Count == 0)
-            return default;
         var global = name.StartsWith("global::", StringComparison.Ordinal);
         var spelling = global ? name["global::".Length..] : name;
         spelling = string.Join(".", spelling.Split('.').Select(part => part.TrimStart('@')));
@@ -4359,7 +4358,8 @@ public sealed class Binder
         }
         if (aliases is [var alias])
         {
-            var target = alias.Namespace.Replace("global::", "", StringComparison.Ordinal)
+            var target = string.Join(".", alias.Namespace.Replace("global::", "", StringComparison.Ordinal)
+                    .Split('.').Select(part => part.TrimStart('@')))
                 + spelling[head.Length..];
             var matches = types.Where(type => type.QualifiedName == target).Take(2).ToArray();
             return matches.Length == 0 ? default : (true, matches is [var match] ? match : null);
@@ -5297,7 +5297,7 @@ public sealed class Binder
             metadata: null,
             deferredChildren: [right],
             typeAnnotation: BoundTypes.NullableAnnotation.Oblivious,
-            resultType: shape ?? ExpressionResultTypes.Coalesce(resultName, left.Type, right.Type))
+            resultType: shape ?? ExpressionResultTypes.Coalesce(resultName, left, right))
         {
             MethodInputArrayType = shape as BoundTypes.ArrayBoundType,
             GenericNullabilityType = shape as BoundTypes.GenericInstantiationBoundType,

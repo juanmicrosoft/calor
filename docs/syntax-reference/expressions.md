@@ -86,6 +86,21 @@ comparisons are parenthesized when required.
 
 Calor uses Lisp-style prefix notation for all operations. This eliminates operator precedence ambiguity.
 
+## Native computed member reads
+
+Native syntax supports scalar metadata property reads on computed receivers
+whose type identity is resolved. For example, `(value ?? "none").Length`
+selects the actual `System.String.Length` property when `value` is declared
+`string?`. Conditional receivers and resolved string-returning calls retain
+their identity too.
+
+The receiver runs once. A coalescing fallback runs only when its left operand
+is null; a conditional evaluates only its selected branch. Effect enforcement
+still checks all potentially evaluated receiver and fallback operations.
+Nullable fallbacks retain nullable result annotations. Unknown types, opaque
+calls, type parameters and unsupported generic member shapes do not gain
+string metadata or getter purity merely from a matching name.
+
 ## Expression-valued allocation sizes
 
 Array and stack-allocation dimensions accept quoted embedded expressions:
