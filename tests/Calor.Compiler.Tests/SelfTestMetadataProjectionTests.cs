@@ -16,7 +16,7 @@ public class SelfTestMetadataProjectionTests
     [InlineData("03_contracts", 3)]
     [InlineData("07_quantifiers", 5)]
     [InlineData("08_contract_inheritance_z3", 4)]
-    public void EmbeddedContractGolden_PreservesFrozenBodiesAndParsedNativeMetadata(string name, int count)
+    public void EmbeddedContractGolden_ChangesOnlyParsedOwnerAndLocation(string name, int count)
     {
         var root = CliTestHarness.FindRepoRoot();
         var baseline = File.ReadAllText(Path.Combine(root, "tests", "TestData", "self-test-metadata", name + ".g.cs.txt"));
@@ -75,11 +75,10 @@ public class SelfTestMetadataProjectionTests
 
         var projected = SourceText.From(baseline).WithChanges(changes).ToString();
         var normalizer = new NativeGroupingNormalizer();
-        Assert.Equal(
-            normalizer.Visit(CSharpSyntaxTree.ParseText(projected).GetRoot())!.DescendantTokens()
-                .Select(token => (token.RawKind, token.Text)),
-            normalizer.Visit(CSharpSyntaxTree.ParseText(result.ActualOutput!).GetRoot())!.DescendantTokens()
-                .Select(token => (token.RawKind, token.Text)));
+        Assert.True(SyntaxFactory.AreEquivalent(
+            normalizer.Visit(CSharpSyntaxTree.ParseText(projected).GetRoot()),
+            normalizer.Visit(CSharpSyntaxTree.ParseText(result.ActualOutput!).GetRoot())),
+            "Native grouping normalization must preserve the frozen C# syntax tree, not just its token order.");
         Assert.Equal(scenario.ExpectedOutput, File.ReadAllText(Path.Combine(root, "tests", "E2E", "scenarios", name, "output.g.cs")));
     }
 
@@ -88,10 +87,47 @@ public class SelfTestMetadataProjectionTests
             .OfType<ObjectCreationExpressionSyntax>()
             .Where(node => node.Type.ToString() == "Calor.Runtime.ContractViolationException").ToList();
 
+    [Fact]
+    public void NativeGroupingNormalization_DoesNotHideChangedOperatorPrecedence()
+    {
+        var normalizer = new NativeGroupingNormalizer();
+        var original = normalizer.Visit(SyntaxFactory.ParseExpression("(a + b) * c"));
+        var redundantGrouping = normalizer.Visit(SyntaxFactory.ParseExpression("((a + b)) * (c)"));
+        var changedGrouping = normalizer.Visit(SyntaxFactory.ParseExpression("a + (b * c)"));
+        Assert.True(SyntaxFactory.AreEquivalent(original, redundantGrouping));
+        Assert.False(SyntaxFactory.AreEquivalent(original, changedGrouping));
+        Assert.True(SyntaxFactory.AreEquivalent(
+            normalizer.Visit(SyntaxFactory.ParseExpression("(i >= 0 && i < n) && (j >= 0 && j < m)")),
+            normalizer.Visit(SyntaxFactory.ParseExpression("i >= 0 && i < n && j >= 0 && j < m"))));
+        Assert.False(SyntaxFactory.AreEquivalent(
+            normalizer.Visit(SyntaxFactory.ParseExpression("i >= 0 && i < n")),
+            normalizer.Visit(SyntaxFactory.ParseExpression("i < n && i >= 0"))));
+    }
+
     private sealed class NativeGroupingNormalizer : CSharpSyntaxRewriter
     {
         public override SyntaxNode? VisitParenthesizedExpression(ParenthesizedExpressionSyntax node) =>
             Visit(node.Expression);
+
+        public override SyntaxNode? VisitBinaryExpression(BinaryExpressionSyntax node)
+        {
+            var visited = (BinaryExpressionSyntax)base.VisitBinaryExpression(node)!;
+            if (!visited.IsKind(SyntaxKind.LogicalAndExpression))
+                return visited;
+            // Native quantifiers group these integer range checks by dimension.
+            var operands = Conjuncts(visited).ToArray();
+            if (operands.Any(operand => operand is not BinaryExpressionSyntax comparison
+                || !comparison.IsKind(SyntaxKind.GreaterThanOrEqualExpression)
+                    && !comparison.IsKind(SyntaxKind.LessThanExpression)))
+                return visited;
+            return operands.Aggregate((left, right) =>
+                SyntaxFactory.BinaryExpression(SyntaxKind.LogicalAndExpression, left, right));
+        }
+
+        private static IEnumerable<ExpressionSyntax> Conjuncts(ExpressionSyntax expression) =>
+            expression is BinaryExpressionSyntax binary && binary.IsKind(SyntaxKind.LogicalAndExpression)
+                ? Conjuncts(binary.Left).Concat(Conjuncts(binary.Right))
+                : [expression];
 
         public override SyntaxNode? VisitArgument(ArgumentSyntax node)
         {
