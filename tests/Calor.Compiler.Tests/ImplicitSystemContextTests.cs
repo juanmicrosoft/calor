@@ -228,6 +228,16 @@ public sealed class ImplicitSystemContextTests(ITestOutputHelper output)
         Assert.Equal(implicitSystem, result.RootElement.GetProperty("success").GetBoolean());
     }
 
+    [Fact]
+    public void McpCompileSchema_AdvertisesTheNestedRuntimeContextOption()
+    {
+        var properties = new CompileTool().GetInputSchema().GetProperty("properties");
+        Assert.False(properties.TryGetProperty("implicitSystem", out _));
+        var option = properties.GetProperty("options").GetProperty("properties").GetProperty("implicitSystem");
+        Assert.Equal("boolean", option.GetProperty("type").GetString());
+        Assert.True(option.GetProperty("default").GetBoolean());
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

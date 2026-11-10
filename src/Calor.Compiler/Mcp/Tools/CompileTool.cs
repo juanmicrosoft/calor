@@ -30,11 +30,6 @@ public sealed class CompileTool : McpToolBase
         {
             "type": "object",
             "properties": {
-                "implicitSystem": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "System-only project import. Set false for standalone C# validation."
-                },
                 "source": {
                     "type": "string",
                     "description": "Calor source code to compile (single file mode)"
@@ -55,6 +50,11 @@ public sealed class CompileTool : McpToolBase
                 "options": {
                     "type": "object",
                     "properties": {
+                        "implicitSystem": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "System-only project import. Set false for standalone C# validation."
+                        },
                         "verify": {
                             "type": "boolean",
                             "default": false,
