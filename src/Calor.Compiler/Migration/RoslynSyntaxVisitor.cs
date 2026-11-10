@@ -7713,7 +7713,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var fixedVariable = target switch
         {
             Microsoft.CodeAnalysis.Operations.ILocalReferenceOperation local => local.Local.RefKind == RefKind.None,
-            Microsoft.CodeAnalysis.Operations.IParameterReferenceOperation parameter => parameter.Parameter.RefKind == RefKind.None,
+            Microsoft.CodeAnalysis.Operations.IParameterReferenceOperation parameter =>
+                parameter.Parameter.RefKind is RefKind.None or RefKind.Ref or RefKind.Out,
             Microsoft.CodeAnalysis.Operations.IFieldReferenceOperation field => field.Field.IsStatic
                 || field.Field.ContainingType.IsReferenceType
                     && field.Instance is Microsoft.CodeAnalysis.Operations.IInstanceReferenceOperation

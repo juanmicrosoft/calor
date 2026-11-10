@@ -92,11 +92,12 @@ argument with the corresponding modifier: `Bump(ref count)`,
 name before the modifier: `TryParse(text, result: out number)`.
 
 The callee receives the caller's storage, not a copy. Writes through `ref` or
-`out` are visible after the call.
+`out` are visible after the call and require the callee to declare `mut`.
 
 ```calor
 module RefOutDemo
   func Bump (ref int:x) → void
+    ! mut
     set x x + 1
 
   func Twice (in int:x) → int
@@ -112,6 +113,7 @@ module RefOutDemo
     return System.Int32.TryParse(text, out _)
 
   func Main () → int
+    ! mut
     var int:count = 1
     Bump(ref count)
     return count + ParseOr("40", 0)
@@ -152,9 +154,11 @@ This example reports `Calor0212`: `v + 1` is a value, not writable storage.
 ```calor expect=Calor0212
 module RefOutRejected
   func Bump (ref int:x) → void
+    ! mut
     set x x + 1
 
   func Main () → int
+    ! mut
     var int:v = 1
     Bump(ref (v + 1))
     return v

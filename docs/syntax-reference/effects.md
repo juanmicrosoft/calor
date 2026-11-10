@@ -211,13 +211,16 @@ requires `alloc`. Other getters named `Length` keep their own effect rows:
 | `env:w` | Environment write | Write environment variables | `Environment.SetEnvironmentVariable()` |
 | `env:rw` | Environment read/write | Read and write environment | Read-modify-write of environment variables |
 | `proc` | Process | Spawn or control processes | `Process.Start()` |
-| `mut` | Mutation | Write heap state | Fields, collection mutations |
+| `mut` | Mutation | Write shared or caller-owned state | Fields, collections, `ref`/`out` parameters |
 | `mut:col` | Collection mutation | Mutate a collection | Indexed dictionary update |
 | `alloc` | Allocation | Allocate an object or buffer | `new`, array allocation |
 | `unsafe` | Unsafe memory | Use unsafe memory operations | Pointer and fixed operations |
 | `time` | Time | Read a nondeterministic clock | `DateTime.Now` |
 | `rand` | Randomness | Generate random values | `Random.Next()` |
 | `throw` | Exception | Intentionally throw an exception | `throw` statements |
+
+Writing a `ref` or `out` parameter requires `mut` because it changes the caller's
+storage. Reassigning an ordinary value parameter or a local does not.
 
 ---
 

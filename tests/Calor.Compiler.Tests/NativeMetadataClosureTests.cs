@@ -1781,12 +1781,14 @@ public sealed class NativeMetadataClosureTests
                   return int.TryParse(text, out _)
 
                 func Bump (ref int:x) → void
+                  ! mut
                   set x (x + 1)
 
                 func Twice (in int:x) → int
                   return x * 2
 
                 func Run () → int
+                  ! mut
                   var int:total = 1
                   Bump(ref total)
                   return Twice(in total) + ParseOr("40", 0)

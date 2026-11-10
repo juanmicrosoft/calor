@@ -675,6 +675,126 @@ public class ArrayExpressionConversionTests
     }
 
     [Theory]
+    [InlineData("int", "+=", "3", "4", "7")]
+    [InlineData("int", "-=", "3", "4", "-1")]
+    [InlineData("int", "*=", "3", "4", "12")]
+    [InlineData("int", "/=", "12", "4", "3")]
+    [InlineData("int", "%=", "17", "4", "1")]
+    [InlineData("int", "&=", "6", "3", "2")]
+    [InlineData("int", "|=", "6", "3", "7")]
+    [InlineData("int", "^=", "6", "3", "5")]
+    [InlineData("int", "<<=", "3", "2", "12")]
+    [InlineData("int", ">>=", "12", "2", "3")]
+    [InlineData("byte", "+=", "255", "1", "0")]
+    [InlineData("string", "+=", "\"a\"", "\"b\"", "ab")]
+    public void RefParameterCompoundUpdates_AreNativeAndPreserveMutation(
+        string type, string operation, string initial, string later, string expected)
+    {
+        var source = $$"""
+            public static class Probe
+            {
+                private static {{type}} Update(ref {{type}} value, {{type}} later)
+                {
+                    value {{operation}} later;
+                    return value;
+                }
+                public static string Run()
+                {
+                    {{type}} value = {{initial}};
+                    {{type}} later = {{later}};
+                    {{type}} seen = Update(ref value, later);
+                    return seen + ":" + value;
+                }
+            }
+            """;
+        var converted = new CSharpToCalorConverter().Convert(source);
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        Assert.Empty(converted.Losses);
+        RawFrameAssertions.AssertFramed(converted.CalorSource!, present: false);
+        Assert.Equal(expected + ":" + expected, Run(source));
+        var parsed = Program.Compile(converted.CalorSource!, "ref-update.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(parsed.HasErrors, string.Join("\n", parsed.Diagnostics.Errors));
+        Assert.Equal(Run(source), Run(parsed.GeneratedCode));
+        var roundTrip = Program.Compile(new CalorEmitter().Emit(parsed.Ast!), "ref-update.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(roundTrip.HasErrors, string.Join("\n", roundTrip.Diagnostics.Errors));
+        Assert.Equal(parsed.GeneratedCode, roundTrip.GeneratedCode);
+    }
+
+    [Theory]
+    [InlineData("", false)]
+    [InlineData("ref ", true)]
+    [InlineData("out ", true)]
+    public void ParameterWrites_RequireMutationOnlyForCallerStorage(string modifier, bool requiresMutation)
+    {
+        var source = $$"""
+            module ParameterWrites
+              func Write ({{modifier}}int:value) → int
+                !
+                set value 4
+                return value
+            """;
+        var pure = Program.Compile(source, "parameter-write.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Equal(requiresMutation, pure.HasErrors);
+        if (requiresMutation)
+            Assert.All(pure.Diagnostics.Errors, diagnostic =>
+                Assert.True(diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                    && diagnostic.Message.Contains("'mut'", StringComparison.Ordinal), diagnostic.ToString()));
+        var declared = Program.Compile(source.Replace("\n    !\n", "\n    ! mut\n", StringComparison.Ordinal),
+            "parameter-write.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(declared.HasErrors, string.Join("\n", declared.Diagnostics.Errors));
+    }
+
+    [Theory]
+    [InlineData(false, "7:7")]
+    [InlineData(true, "7")]
+    public void RefParameterCompoundUpdates_KeepAliasedReadsAndInitializedOutWrites(bool output, string expected)
+    {
+        var source = output ? """
+            public static class Probe
+            {
+                private static void Update(out int value)
+                {
+                    value = 3;
+                    value += 4;
+                }
+                public static string Run()
+                {
+                    int value = 0;
+                    Update(out value);
+                    return "" + value;
+                }
+            }
+            """ : """
+            public static class Probe
+            {
+                private static int Update(ref int left, ref int right)
+                {
+                    left += ++right;
+                    return left;
+                }
+                public static string Run()
+                {
+                    int value = 3;
+                    int seen = Update(ref value, ref value);
+                    return seen + ":" + value;
+                }
+            }
+            """;
+        Assert.Equal(expected, Run(source));
+        var converted = new CSharpToCalorConverter().Convert(source);
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        Assert.Empty(converted.Losses);
+        RawFrameAssertions.AssertFramed(converted.CalorSource!, present: false);
+        var compiled = Program.Compile(converted.CalorSource!, "aliased-ref-update.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        Assert.Equal(expected, Run(compiled.GeneratedCode));
+    }
+
+    [Theory]
     [MemberData(nameof(EagerArrayAddressArguments))]
     public async Task EagerArrayAddresses_AreValidatedBeforeLaterArgumentEffects(
         string modifier, string scenario, Surface surface)

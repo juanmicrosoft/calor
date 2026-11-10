@@ -6033,7 +6033,7 @@ public sealed class EffectEnforcementPass
                 return effects.Union(EffectSet.From("mut"))
                     .Union(InferSetterEffects(receiver, member, reference.Span));
             }
-            if (target is ReferenceNode bare && IsBareFieldReference(bare))
+            if (target is ReferenceNode bare && IsBareMutationTarget(bare))
                 return EffectSet.From("mut");
 
             var targetEffects = InferFromExpression(target);
@@ -6042,10 +6042,11 @@ public sealed class EffectEnforcementPass
                 : targetEffects;
         }
 
-        private bool IsBareFieldReference(ReferenceNode reference)
+        private bool IsBareMutationTarget(ReferenceNode reference)
         {
             if (_context.CallGraph.BoundVariable(_context.CurrentFunctionId, reference.Span) is { } variable)
-                return variable.IsField;
+                return variable.IsField || variable.IsParameter
+                    && (variable.Modifier & (ParameterModifier.Ref | ParameterModifier.Out)) != 0;
 
             // AST-only inference has no lexical identity. Never let a possible
             // shadow make a state write silently pure when binding is unavailable.

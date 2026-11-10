@@ -132,12 +132,14 @@ module Inventory overflow unchecked
       return int.TryParse(text, out _)
 
     func Bump (ref int:x)
+      ! mut
       set x (x + 1)
 
     func Twice (in int:x) → int
       return (x * 2)
 
     func Run () → int
+      ! mut
       var int:total = 1
       Bump(ref total)
       return (Twice(in total) + ParseOr("40", 0))
