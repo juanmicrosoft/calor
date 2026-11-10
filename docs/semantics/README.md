@@ -72,16 +72,16 @@ The backend spec (`dotnet-backend.md`) defines exactly how Calor semantics map t
 
 - When direct emission is safe (C# matches Calor)
 - When additional code is required (checked arithmetic, temporaries)
-- Type mappings (Calor `i32` → C# `int`)
+- Type mappings (native Calor `int` → C# `int`)
 - Exception types and their contents
 
 ### 3. Stable Versioning
 
-Agents will be trained and prompted against specific rules. The versioning spec (`versioning.md`) ensures:
+Agents can be prompted against specific rules. The versioning spec (`versioning.md`) describes:
 
 - **Semantic Versioning**: MAJOR.MINOR.PATCH with clear upgrade rules
-- **Module Declaration**: Code declares which semantics version it targets
-- **Compatibility Checking**: Compiler warns/errors on version mismatches
+- **Current native source**: Uses the installed compiler; no source-version declaration is implemented
+- **Compatibility helpers**: Classify supplied versions, not an admitted native source-version gate
 - **Migration Path**: Clear guidance for upgrading between versions
 
 ---
@@ -128,7 +128,7 @@ and verification suites. This table is not an exhaustive coverage inventory:
 | S7 | `IntegerOverflow_Traps` | Overflow throws `OverflowException` |
 | S8 | `NumericConversion_IntToFloat` | Implicit widening works |
 | S10 | `RequiresFails_ThrowsContractViolation` | Contracts throw with function ID |
-| S11 | `SemanticsVersionMismatch_EmitsDiagnostic` | Version checking works |
+| S11 | `SemanticsVersionMismatch_EmitsDiagnostic` | Historical declaration check; not a native source-version gate |
 
 ---
 
@@ -149,7 +149,7 @@ and verification suites. This table is not an exhaustive coverage inventory:
 If you're building agents that generate Calor code:
 
 1. **Train on the spec, not the output**: Use `core.md` as the source of truth
-2. **Version your prompts**: Include `§SEMVER{2.0.0}` in generated modules (the current semantics major; `§SEMVER{1.0.0}` files are refused with `Calor0701`)
+2. **Version your prompts and tools**: Pin the compiler package and record its semantics version; do not invent a native source-version declaration
 3. **Test against semantics tests**: Your generated code should pass the same tests
 4. **Don't assume C# behavior**: If it's not in the Calor spec, don't rely on it
 

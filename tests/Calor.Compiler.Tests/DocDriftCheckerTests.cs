@@ -777,6 +777,32 @@ public class DocDriftCheckerTests
     }
 
     [Theory]
+    [InlineData("41", "42")]
+    [InlineData("int.MaxValue", "!OverflowException")]
+    public void MarkdownSemanticsVersioning_UsesInstalledRulesWithoutInventingASourceGate(
+        string input, string expected)
+    {
+        const string path = "docs/semantics/versioning.md";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path));
+        Assert.DoesNotContain("§SEMVER", content);
+        var source = Assert.Single(ExemplarCompileChecker.ExtractCompletePrograms(content)).Source;
+        foreach (var mode in new[] { ContractMode.Debug, ContractMode.Off })
+        {
+            var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = mode });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Assert.Null(Assert.IsType<Ast.ModuleNode>(compiled.Ast).DeclaredSemanticsVersion);
+            var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run() => GlobalModule.Next({{input}});
+                }
+                """);
+            Assert.Equal(expected, observed);
+        }
+    }
+
+    [Theory]
     [InlineData("FunctionCallBoundary", "Identity")]
     [InlineData("FloatingProofBoundary", "Square")]
     public async Task PublicStaticVerification_ReportsUnsupportedForExactPublishedBoundaries(
