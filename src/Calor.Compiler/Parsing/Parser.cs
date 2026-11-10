@@ -2313,10 +2313,15 @@ public sealed class Parser
     {
         var index = 0;
         while (!IsAtEnd && Current.Span.Line == startToken.Span.Line
-               && (Check(TokenKind.Identifier) || Current.IsKeyword || Check(TokenKind.Star)))
+               && (Check(TokenKind.Identifier) || Current.IsKeyword || Check(TokenKind.Star)
+                   || Check(TokenKind.Exclamation)))
         {
             var effect = Advance();
             var code = effect.Text;
+            if (effect.Kind == TokenKind.Exclamation && effect.Span.End == Current.Span.Start
+                && Current.Span.Line == startToken.Span.Line
+                && (Check(TokenKind.Identifier) || Current.IsKeyword))
+                code += Advance().Text;
             while (Current.Span.Line == startToken.Span.Line && Check(TokenKind.Colon))
             {
                 var colon = Advance();

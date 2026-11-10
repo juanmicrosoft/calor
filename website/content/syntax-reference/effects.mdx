@@ -37,6 +37,9 @@ Now an agent knows immediately what side effects to expect.
 ```
 
 Place the effect declaration on its own indented line after the signature.
+One `!` starts the row; separate effect codes with commas. A second bang
+on the same row, as in `! !cw` or `! alloc, !e`, reports `Calor0403`
+(unknown effect). It cannot start another row.
 This is a template, not a complete function:
 
 ```calor
