@@ -1,33 +1,34 @@
-§M{Transliterator}
-  §U{System}
-  §U{System.Collections.Generic}
-  §U{System.Text}
+module Transliterator Transliterator block
+  using System
+  using System.Collections.Generic
+  using System.Text
 
-  §CL{TransliteratorBase:pub:abs}
-    §PROP{Name:str:pub:abs:get}
+  class TransliteratorBase abstract
+    property string:Name abstract
+      get
 
+  class CyrillicToLatin
+    extends TransliteratorBase
 
-  §CL{CyrillicToLatin:pub}
-    §EXT{TransliteratorBase}
+    field string:_mappings private
 
-    §FLD{str:_mappings:priv}
+    property string:Name override
+      get
 
-    §PROP{Name:str:pub:over:get}
+    ctor (string:name)
+      set this._mappings name
 
-    §CTOR{pub} (str:name)
-      §ASSIGN this._mappings name
-
-    §MT{Transliterate:pub} (str:input) -> str
-      §E{cw,cr,mut,alloc}
-      §B{~dict} §NEW{Dictionary<char,str>} §/NEW
-      §B{[char]:buf} §ARR{char:256}
-      §B{~sb} §NEW{StringBuilder} §/NEW
-      §B{ConsoleKeyInfo:keyPressed} §C{Console.ReadKey} §/C
-      §L{i:0:(len input):1}
-        §B{char:ch} §IDX{input} i
-        §IF (== ch (char-lit "Y"))
-          §C{sb.Append} §A "Y" §/C
-        §EL
-          §C{sb.Append} §A ch §/C
-      §C{Console.WriteLine} §A "{0} {1}" §A §NEW{StringBuilder} §/NEW §A §NEW{StringBuilder} §/NEW §/C
-      §R §C{sb.ToString} §/C
+    func Transliterate (string:input) → string
+      ! cw, cr, mut, alloc
+      var dict = new Dictionary<char,string>()
+      let char[]:buf = new char[256]
+      var sb = new StringBuilder()
+      let ConsoleKeyInfo:keyPressed = Console.ReadKey()
+      for i from 0 to input.Length step 1
+        let char:ch = input[i]
+        if ch == 'Y'
+          sb.Append("Y")
+        else
+          sb.Append(ch)
+      Console.WriteLine("{0} {1}", new StringBuilder(), new StringBuilder())
+      return sb.ToString()

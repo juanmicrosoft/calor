@@ -1,30 +1,31 @@
-§M{TypeSystem}
-  §F{Main:pub} () -> void
-    §E{cw,alloc,throw}
-    §C{Console.WriteLine} "Testing nullable values and exceptions..."
-    §C{TestPresent}
-    §C{TestMissing}
-    §C{TestSuccess}
-    §C{TestFailure}
+module TypeSystem TypeSystem block
+  module TypeSystemModule
+    func Main () → void
+      ! cw, alloc, throw
+      Console.WriteLine("Testing nullable values and exceptions...")
+      TestPresent()
+      TestMissing()
+      TestSuccess()
+      TestFailure()
 
-  §F{TestPresent:priv} () -> void
-    §E{cw}
-    §B{value:?i32} 42
-    §C{Console.WriteLine} (?? value 0)
+    func TestPresent private () → void
+      ! cw
+      let int?:value = 42
+      Console.WriteLine(value ?? 0)
 
-  §F{TestMissing:priv} () -> void
-    §E{cw}
-    §B{value:?i32} null
-    §C{Console.WriteLine} (?? value -1)
+    func TestMissing private () → void
+      ! cw
+      let int?:value = null
+      Console.WriteLine(value ?? -1)
 
-  §F{TestSuccess:priv} () -> void
-    §E{cw}
-    §B{value:i32} 100
-    §C{Console.WriteLine} value
+    func TestSuccess private () → void
+      ! cw
+      let int:value = 100
+      Console.WriteLine(value)
 
-  §F{TestFailure:priv} () -> void
-    §E{cw,alloc,throw}
-    §TR
-      §TH §NEW{InvalidOperationException} §A "Something went wrong" §/NEW
-    §CA{InvalidOperationException:error}
-      §C{Console.WriteLine} error.Message
+    func TestFailure private () → void
+      ! cw, alloc, throw
+      try
+        throw new InvalidOperationException("Something went wrong")
+      catch InvalidOperationException:error
+        Console.WriteLine(error.Message)

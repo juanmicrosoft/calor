@@ -1,14 +1,18 @@
-§M{Contracts}
-  §F{Main:pub} () -> void
-    §E{cw}
-    §C{Console.WriteLine} §A "Testing contracts..." §/C
+module Contracts Contracts block
+  module ContractsModule
+    func Main () → void
+      ! cw
+      Console.WriteLine("Testing contracts...")
 
-  §F{Square:pub} (i32:x) -> i32
-    §Q (>= x 0)
-    §S (>= result 0)
-    §R (* x x)
+    func Square (int:x) → int
+      !
+      requires x >= 0
+      => result >= 0
+      return x * x
 
-  §F{Divide:pub} (i32:a, i32:b) -> i32
-    §Q{"divisor must not be zero"} (!= b 0)
-    §R (/ a b)
-
+    // Residual compatibility carrier: no canonical custom-message spelling
+    // is selected, and CalorEmitter cannot round-trip this contract yet.
+    func Divide (int:a, int:b) → int
+      !
+      requires{"divisor must not be zero"} b != 0
+      return a / b

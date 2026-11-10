@@ -22,11 +22,16 @@ public static class SelfTestCommand
             verboseOption
         };
 
-        command.SetHandler(Execute, scenarioOption, verboseOption);
+        command.SetHandler(context =>
+        {
+            context.ExitCode = Execute(
+                context.ParseResult.GetValueForOption(scenarioOption),
+                context.ParseResult.GetValueForOption(verboseOption));
+        });
         return command;
     }
 
-    private static void Execute(string? scenarioFilter, bool verbose)
+    private static int Execute(string? scenarioFilter, bool verbose)
     {
         var scenarios = SelfTestRunner.LoadScenarios();
 
@@ -41,8 +46,7 @@ public static class SelfTestCommand
                 var available = string.Join(", ", SelfTestRunner.LoadScenarios().Select(s => s.Name));
                 Console.Error.WriteLine($"Unknown scenario: '{scenarioFilter}'");
                 Console.Error.WriteLine($"Available scenarios: {available}");
-                Environment.ExitCode = 1;
-                return;
+                return 1;
             }
         }
 
@@ -94,7 +98,7 @@ public static class SelfTestCommand
         else
         {
             Console.WriteLine($"Results: {passed}/{results.Count} passed, {failed} failed");
-            Environment.ExitCode = 1;
         }
+        return failed == 0 ? 0 : 1;
     }
 }

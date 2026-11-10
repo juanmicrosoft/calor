@@ -1,0 +1,72 @@
+{
+  "Version": 1,
+  "Files": [
+    "input.calr"
+  ],
+  "Declarations": [
+    {
+      "Id": "m_7qv6gvvwa2hp",
+      "File": "input.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "Transliterator",
+      "Signature": ""
+    },
+    {
+      "Id": "c_vsr04g3rcwy9",
+      "File": "input.calr",
+      "Container": "Transliterator",
+      "Kind": 2,
+      "Name": "CyrillicToLatin",
+      "Signature": "0"
+    },
+    {
+      "Id": "c_yrrfa9j9e9k4",
+      "File": "input.calr",
+      "Container": "Transliterator",
+      "Kind": 2,
+      "Name": "TransliteratorBase",
+      "Signature": "0"
+    },
+    {
+      "Id": "ctor_s1qb348myrfn",
+      "File": "input.calr",
+      "Container": "Transliterator.CyrillicToLatin\u00600",
+      "Kind": 6,
+      "Name": ".ctor",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022str\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022void\u0022}"
+    },
+    {
+      "Id": "fld_jazbp60z1r3j",
+      "File": "input.calr",
+      "Container": "Transliterator.CyrillicToLatin\u00600",
+      "Kind": 18,
+      "Name": "_mappings",
+      "Signature": "str"
+    },
+    {
+      "Id": "mt_6sfaj25gh02a",
+      "File": "input.calr",
+      "Container": "Transliterator.CyrillicToLatin\u00600",
+      "Kind": 5,
+      "Name": "Transliterate",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022str\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022str\u0022}"
+    },
+    {
+      "Id": "p_jqctj22mqbcb",
+      "File": "input.calr",
+      "Container": "Transliterator.CyrillicToLatin\u00600",
+      "Kind": 4,
+      "Name": "Name",
+      "Signature": "str"
+    },
+    {
+      "Id": "p_gmt8zc2g7pzg",
+      "File": "input.calr",
+      "Container": "Transliterator.TransliteratorBase\u00600",
+      "Kind": 4,
+      "Name": "Name",
+      "Signature": "str"
+    }
+  ]
+}

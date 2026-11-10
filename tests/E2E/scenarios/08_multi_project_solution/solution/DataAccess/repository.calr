@@ -1,10 +1,12 @@
-§M{Repository}
-  §F{GetById:pub} (i32:id) -> i32
-    §Q (> id 0)
-    §S (>= result 0)
-    §R (* id 10)
+module Repository Repository block
+  module RepositoryModule
+    func GetById (int:id) → int
+      !
+      requires id > 0
+      => result >= 0
+      return id * 10
 
-  §F{Count:pub} () -> i32
-    §S (>= result 0)
-    §R 42
-
+    func Count () → int
+      !
+      => result >= 0
+      return 42

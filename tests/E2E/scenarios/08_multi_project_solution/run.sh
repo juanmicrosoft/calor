@@ -15,8 +15,9 @@ WORK_DIR=$(mktemp -d)
 # Copy solution template to work dir
 cp -r "$SOLUTION_TEMPLATE"/* "$WORK_DIR/"
 
-# Run calor init on the solution
-"$COMPILER" init --solution "$WORK_DIR/MultiProject.sln" --ai claude || {
+# Keep initializer user-level MCP configuration inside the disposable fixture.
+mkdir "$WORK_DIR/.home"
+HOME="$WORK_DIR/.home" "$COMPILER" init --solution "$WORK_DIR/MultiProject.sln" --ai claude || {
     echo "calor init failed"
     exit 1
 }

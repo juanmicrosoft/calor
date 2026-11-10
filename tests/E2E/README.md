@@ -2,6 +2,40 @@
 
 End-to-end tests verifying Calor compilation and generated C# correctness.
 
+The ten paired scenarios are also embedded in `calor self-test`. Canonical
+inputs and goldens live in `scenarios/`; synchronize embedded copies explicitly
+with `python3 scripts/sync-self-test-resources.py` and check parity with
+`python3 scripts/sync-self-test-resources.py --check`. Builds do not rewrite them.
+The multi-project solution is an additional physical E2E scenario, not an
+eleventh embedded self-test.
+Its initializer uses a disposable `HOME` so per-project MCP configuration
+does not modify the developer's user configuration. Verification checks the
+managed teaching section, current hooks and isolated stdio MCP registration;
+retired slash skills are not expected.
+
+The inputs use native syntax, with one recorded compatibility limitation:
+the custom message in `03_contracts` retains the parser's existing attribute
+carrier. No canonical message spelling has been selected, and `CalorEmitter`
+cannot round-trip that contract. All three original contracts still parse and
+retain their runtime exception metadata and contract-off behavior. This is
+not evidence of complete canonical contract-message support.
+
+Scenario `04_option_result` retains its historical file name but exercises
+nullable values and exceptions, not retired Option/Result wrappers.
+`09_codegen_bugfixes` is a compilation/shape fixture: its original method
+reads an interactive key and has an inclusive indexing upper bound. Passing
+its self-test does not establish a successful transliteration.
+
+`NativeSelfTestScenarioTests`, `SelfTestRunnerTests`, and
+`SelfTestMetadataProjectionTests` cover runtime output, exception observations,
+current parsed owners/locations, frozen C# body equivalence after native
+parenthesis normalization, resource parity, and actual CLI exit status.
+The three frozen `tests/TestData/self-test-metadata/*.g.cs.txt` files are
+independent original oracles, not regenerated goldens.
+The POSIX runner compiles paired scenarios to disposable output directories;
+it never replaces canonical goldens with sidecar IDs or checkout-specific
+`#line` paths. Its `--clean` mode also retains canonical `output.g.cs` files.
+
 ## Running Tests
 
 ### Mac/Linux

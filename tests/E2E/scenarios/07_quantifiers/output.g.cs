@@ -15,32 +15,34 @@ namespace QuantifierDemo
     {
         public static bool AllNonNegative(int n)
         {
-            if (!(Calor.Runtime.ContractQuantifier.Range(0, n).All(i => ((!(i >= 0 && i < n) || (i >= 0)))))) throw new Calor.Runtime.ContractViolationException("Precondition failed: Calor.Runtime.ContractQuantifier.Range(0, n).All(i => ((!(i >= 0 && i < n) || (i >= 0))))", "f_auto2", Calor.Runtime.ContractKind.Requires, startOffset: 64, length: 57, sourceFile: null, line: 3, column: 5, condition: "Calor.Runtime.ContractQuantifier.Range(0, n).All(i => ((!(i >= 0 && i < n) || (i >= 0))))");
+            if (!(Calor.Runtime.ContractQuantifier.Range(0, n).All(i => ((!(i >= 0 && i < n) || (i >= 0)))))) throw new Calor.Runtime.ContractViolationException("Precondition failed: Calor.Runtime.ContractQuantifier.Range(0, n).All(i => ((!(i >= 0 && i < n) || (i >= 0))))", "mt_auto4", Calor.Runtime.ContractKind.Requires, startOffset: 126, length: 38, sourceFile: null, line: 5, column: 7, condition: "Calor.Runtime.ContractQuantifier.Range(0, n).All(i => ((!(i >= 0 && i < n) || (i >= 0))))");
             return true;
         }
 
         public static bool ExistsTarget(int target)
         {
-            if (!(Calor.Runtime.ContractQuantifier.Range(0, 10).Any(i => (i >= 0 && i < 10 && i == target)))) throw new Calor.Runtime.ContractViolationException("Precondition failed: Calor.Runtime.ContractQuantifier.Range(0, 10).Any(i => (i >= 0 && i < 10 && i == target))", "f_auto3", Calor.Runtime.ContractKind.Requires, startOffset: 183, length: 63, sourceFile: null, line: 7, column: 5, condition: "Calor.Runtime.ContractQuantifier.Range(0, 10).Any(i => (i >= 0 && i < 10 && i == target))");
+            if (!(Calor.Runtime.ContractQuantifier.Range(0, 10).Any(i => (i >= 0 && i < 10 && i == target)))) throw new Calor.Runtime.ContractViolationException("Precondition failed: Calor.Runtime.ContractQuantifier.Range(0, 10).Any(i => (i >= 0 && i < 10 && i == target))", "mt_auto5", Calor.Runtime.ContractKind.Requires, startOffset: 240, length: 44, sourceFile: null, line: 10, column: 7, condition: "Calor.Runtime.ContractQuantifier.Range(0, 10).Any(i => (i >= 0 && i < 10 && i == target))");
             bool __calorPostconditionResult0;
             __calorPostconditionResult0 = true;
             goto __calorPostconditionExit0;
             __calorPostconditionExit0:
-            if (!(__calorPostconditionResult0 == true)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __calorPostconditionResult0 == true", "f_auto3", Calor.Runtime.ContractKind.Ensures, startOffset: 251, length: 19, sourceFile: null, line: 8, column: 5, condition: "__calorPostconditionResult0 == true");
+            if (!(__calorPostconditionResult0 == true)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __calorPostconditionResult0 == true", "mt_auto5", Calor.Runtime.ContractKind.Ensures, startOffset: 291, length: 17, sourceFile: null, line: 11, column: 7, condition: "__calorPostconditionResult0 == true");
             return __calorPostconditionResult0;
         }
 
         public static bool ImplicationTest(int x)
         {
-            if (!((!(x > 0) || (x >= 0)))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (!(x > 0) || (x >= 0))", "f_auto4", Calor.Runtime.ContractKind.Requires, startOffset: 330, length: 24, sourceFile: null, line: 12, column: 5, condition: "(!(x > 0) || (x >= 0))");
+            if (!(!(x > 0) || x >= 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: !(x > 0) || x >= 0", "mt_auto6", Calor.Runtime.ContractKind.Requires, startOffset: 382, length: 27, sourceFile: null, line: 16, column: 7, condition: "!(x > 0) || x >= 0");
             return true;
         }
 
         public static bool MatrixSymmetry(int n, int m)
         {
-            if (!(Calor.Runtime.ContractQuantifier.Range(0, n).All(i => (Calor.Runtime.ContractQuantifier.Range(0, m).All(j => ((!(i >= 0 && i < n && j >= 0 && j < m) || (i >= 0)))))))) throw new Calor.Runtime.ContractViolationException("Precondition failed: Calor.Runtime.ContractQuantifier.Range(0, n).All(i => (Calor.Runtime.ContractQuantifier.Range(0, m).All(j => ((!(i >= 0 && i < n && j >= 0 && j < m) || (i >= 0))))))", "f_auto5", Calor.Runtime.ContractKind.Requires, startOffset: 420, length: 92, sourceFile: null, line: 16, column: 5, condition: "Calor.Runtime.ContractQuantifier.Range(0, n).All(i => (Calor.Runtime.ContractQuantifier.Range(0, m).All(j => ((!(i >= 0 && i < n && j >= 0 && j < m) || (i >= 0))))))");
+            if (!(Calor.Runtime.ContractQuantifier.Range(0, n).All(i => (Calor.Runtime.ContractQuantifier.Range(0, m).All(j => ((!(i >= 0 && i < n && (j >= 0 && j < m)) || (i >= 0)))))))) throw new Calor.Runtime.ContractViolationException("Precondition failed: Calor.Runtime.ContractQuantifier.Range(0, n).All(i => (Calor.Runtime.ContractQuantifier.Range(0, m).All(j => ((!(i >= 0 && i < n && (j >= 0 && j < m)) || (i >= 0))))))", "mt_auto7", Calor.Runtime.ContractKind.Requires, startOffset: 489, length: 53, sourceFile: null, line: 21, column: 7, condition: "Calor.Runtime.ContractQuantifier.Range(0, n).All(i => (Calor.Runtime.ContractQuantifier.Range(0, m).All(j => ((!(i >= 0 && i < n && (j >= 0 && j < m)) || (i >= 0))))))");
             return true;
         }
 
     }
+
 }
+

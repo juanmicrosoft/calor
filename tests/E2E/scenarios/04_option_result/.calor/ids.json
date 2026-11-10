@@ -1,0 +1,64 @@
+{
+  "Version": 1,
+  "Files": [
+    "input.calr"
+  ],
+  "Declarations": [
+    {
+      "Id": "m_92c7g5xwtpsk",
+      "File": "input.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "TypeSystem",
+      "Signature": ""
+    },
+    {
+      "Id": "m_ezwqqwvy4czh",
+      "File": "input.calr",
+      "Container": "TypeSystem",
+      "Kind": 0,
+      "Name": "TypeSystemModule",
+      "Signature": "0"
+    },
+    {
+      "Id": "mt_jb7x2r1phvc9",
+      "File": "input.calr",
+      "Container": "TypeSystem.TypeSystemModule\u00600",
+      "Kind": 5,
+      "Name": "Main",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    },
+    {
+      "Id": "mt_t7vqa5mahcg2",
+      "File": "input.calr",
+      "Container": "TypeSystem.TypeSystemModule\u00600",
+      "Kind": 5,
+      "Name": "TestFailure",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    },
+    {
+      "Id": "mt_84y549dcrxj7",
+      "File": "input.calr",
+      "Container": "TypeSystem.TypeSystemModule\u00600",
+      "Kind": 5,
+      "Name": "TestMissing",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    },
+    {
+      "Id": "mt_jj2xez7yfksz",
+      "File": "input.calr",
+      "Container": "TypeSystem.TypeSystemModule\u00600",
+      "Kind": 5,
+      "Name": "TestPresent",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    },
+    {
+      "Id": "mt_y3mcre7amwrx",
+      "File": "input.calr",
+      "Container": "TypeSystem.TypeSystemModule\u00600",
+      "Kind": 5,
+      "Name": "TestSuccess",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    }
+  ]
+}

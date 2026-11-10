@@ -14,28 +14,36 @@ namespace TypeSystem
         public static void Main()
         {
             Console.WriteLine("Testing nullable values and exceptions...");
+
             TestPresent();
+
             TestMissing();
+
             TestSuccess();
+
             TestFailure();
+
         }
 
         private static void TestPresent()
         {
             int? value = 42;
             Console.WriteLine(value ?? 0);
+
         }
 
         private static void TestMissing()
         {
             int? value = null;
             Console.WriteLine(value ?? -1);
+
         }
 
         private static void TestSuccess()
         {
             int value = 100;
             Console.WriteLine(value);
+
         }
 
         private static void TestFailure()
@@ -47,9 +55,12 @@ namespace TypeSystem
             catch (InvalidOperationException error)
             {
                 Console.WriteLine(error.Message);
+
             }
 
         }
 
     }
+
 }
+

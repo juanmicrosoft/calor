@@ -1,0 +1,96 @@
+{
+  "Version": 1,
+  "Files": [
+    "input.calr"
+  ],
+  "Declarations": [
+    {
+      "Id": "m_bynk00wskpr1",
+      "File": "input.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "SkillSyntax",
+      "Signature": ""
+    },
+    {
+      "Id": "m_npkbczqm957k",
+      "File": "input.calr",
+      "Container": "SkillSyntax",
+      "Kind": 0,
+      "Name": "SkillSyntaxModule",
+      "Signature": "0"
+    },
+    {
+      "Id": "mt_gw2h10prd3dp",
+      "File": "input.calr",
+      "Container": "SkillSyntax.SkillSyntaxModule\u00600",
+      "Kind": 5,
+      "Name": "Add",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022},{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "mt_kv0h7njt03eg",
+      "File": "input.calr",
+      "Container": "SkillSyntax.SkillSyntaxModule\u00600",
+      "Kind": 5,
+      "Name": "IsPositive",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022bool\u0022}"
+    },
+    {
+      "Id": "mt_prjeqpstseyy",
+      "File": "input.calr",
+      "Container": "SkillSyntax.SkillSyntaxModule\u00600",
+      "Kind": 5,
+      "Name": "IsZero",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022bool\u0022}"
+    },
+    {
+      "Id": "mt_kqywwavcrbx8",
+      "File": "input.calr",
+      "Container": "SkillSyntax.SkillSyntaxModule\u00600",
+      "Kind": 5,
+      "Name": "Main",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    },
+    {
+      "Id": "mt_kw95rve1701f",
+      "File": "input.calr",
+      "Container": "SkillSyntax.SkillSyntaxModule\u00600",
+      "Kind": 5,
+      "Name": "Multiply",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022},{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "mt_0st7mfcxzanb",
+      "File": "input.calr",
+      "Container": "SkillSyntax.SkillSyntaxModule\u00600",
+      "Kind": 5,
+      "Name": "Subtract",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022},{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "mt_0f2cajnk9bk0",
+      "File": "input.calr",
+      "Container": "SkillSyntax.SkillSyntaxModule\u00600",
+      "Kind": 5,
+      "Name": "TestArithmetic",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    },
+    {
+      "Id": "mt_n31dgc9x1141",
+      "File": "input.calr",
+      "Container": "SkillSyntax.SkillSyntaxModule\u00600",
+      "Kind": 5,
+      "Name": "TestComparison",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    },
+    {
+      "Id": "mt_ct4r4480wzrs",
+      "File": "input.calr",
+      "Container": "SkillSyntax.SkillSyntaxModule\u00600",
+      "Kind": 5,
+      "Name": "TestControlFlow",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    }
+  ]
+}

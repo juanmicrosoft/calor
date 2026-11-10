@@ -3,6 +3,7 @@ using System.Text.Json;
 using Calor.Enforcement.Tests;
 using Calor.Compiler.Mcp;
 using Calor.Compiler.Mcp.Tools;
+using Calor.Compiler.Migration;
 using Calor.Compiler.SelfTest;
 using Xunit;
 
@@ -17,8 +18,18 @@ public class SelfTestRunnerTests
     [Fact]
     public void SelfTestRunner_Run_PreservesRawCrLfBeforeCompilation()
     {
-        const string payload = "public delegate int Pick(\r\n    int value);";
-        var input = $"§M{{SelfTestRaw}}\r\n  raw delegate {System.Text.Encoding.UTF8.GetByteCount(payload)}\r\n{payload}\r\n";
+        const string original = "public class Kept {\r\n    ~Kept()\r\n    {\r\n    }\r\n}";
+        var converted = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossless,
+            ValidateRoundTripCSharp = false
+        }).Convert(original);
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        var input = converted.CalorSource!;
+        var payload = Assert.IsType<Calor.Compiler.Parsing.RawCSharpFrame>(
+            Assert.Single(RawFrameAssertions.GetFrames(input)).Value).Code;
+        Assert.Contains("\r\n", payload);
+        Assert.Contains(payload, original);
         var compiled = Program.Compile(input, "SelfTestRaw.calr", new CompilationOptions
         {
             EnforceEffects = true,
@@ -38,7 +49,7 @@ public class SelfTestRunnerTests
     {
         var scenarios = SelfTestRunner.LoadScenarios();
 
-        Assert.True(scenarios.Count >= 9, $"Expected at least 9 scenarios, got {scenarios.Count}");
+        Assert.Equal(10, scenarios.Count);
         Assert.Contains(scenarios, s => s.Name == "01_hello_world");
         Assert.Contains(scenarios, s => s.Name == "02_fizzbuzz");
         Assert.Contains(scenarios, s => s.Name == "03_contracts");
@@ -48,6 +59,7 @@ public class SelfTestRunnerTests
         Assert.Contains(scenarios, s => s.Name == "07_collections");
         Assert.Contains(scenarios, s => s.Name == "07_quantifiers");
         Assert.Contains(scenarios, s => s.Name == "08_contract_inheritance_z3");
+        Assert.Contains(scenarios, s => s.Name == "09_codegen_bugfixes");
     }
 
     [Fact]

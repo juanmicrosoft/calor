@@ -66,19 +66,23 @@ namespace Transliterator
                     if (ch == 'Y')
                     {
                         sb.Append("Y");
+
                     }
                     else
                     {
                         sb.Append(ch);
+
                     }
 
                 }
             }
 
             Console.WriteLine("{0} {1}", new StringBuilder(), new StringBuilder());
+
             return sb.ToString();
         }
 
     }
 
 }
+
