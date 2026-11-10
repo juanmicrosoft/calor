@@ -1307,7 +1307,7 @@ public static class FeatureSupport
         new HashSet<string>(StringComparer.Ordinal)
         {
             "alias-qualified-value", "array-element-block", "async-return-signature", "attributes",
-            "checked-block", "class", "collection-expression", "compilation-unit-attribute",
+            "checked-block", "class", "class-unresolved-base-kind", "collection-expression", "compilation-unit-attribute",
             "compilation-unit-using-ordering", "compiler-directive-placement",
             "complex-declaration", "complex-is-pattern", "complex-recursive-pattern",
             "compound-assignment-narrowing", "compound-assignment-order",

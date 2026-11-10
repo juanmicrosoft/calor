@@ -63,6 +63,11 @@ Inside a class, `ctor stat ()` declares its static constructor. It has no
 visibility or parameters. Conversion preserves the constructor and leaves
 its initialization order and exception behavior to the CLR.
 
+C# conversion uses resolved types to distinguish a base class from implemented
+interfaces, including qualified names and aliases. It does not infer that
+distinction from an `I` prefix. An unresolved base kind keeps the declaration
+as preserved C#, without claiming native constructor-effect analysis.
+
 ### Numeric and character literals
 
 C# migration resolves a primitive `default` literal from its contextual type

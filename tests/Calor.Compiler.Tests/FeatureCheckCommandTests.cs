@@ -898,6 +898,7 @@ public class FeatureCheckCommandTests
     [InlineData("dictionary-initializer")]
     [InlineData("explicit-interface")]
     [InlineData("record-unresolved-base-kind")]
+    [InlineData("class-unresolved-base-kind")]
     [InlineData("preprocessor-disabled")]
     [InlineData("preprocessor-member")]
     [InlineData("preprocessor-ownership-fallback")]

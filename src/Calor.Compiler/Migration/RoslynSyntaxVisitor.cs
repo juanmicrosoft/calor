@@ -2782,23 +2782,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             foreach (var baseType in node.BaseList.Types)
             {
                 var typeName = baseType.Type.ToString();
-                // First non-interface base type is the base class
-                if (baseClass == null && (!typeName.StartsWith("I") || !char.IsUpper(typeName.ElementAtOrDefault(1))))
-                {
-                    // Simple heuristic: interfaces typically start with 'I'
-                    if (typeName.StartsWith("I") && typeName.Length > 1 && char.IsUpper(typeName[1]))
-                    {
-                        interfaces.Add(typeName);
-                    }
-                    else
-                    {
-                        baseClass = typeName;
-                    }
-                }
-                else
-                {
+                var symbol = _semanticModel?.GetTypeInfo(baseType.Type).Type;
+                if (symbol?.TypeKind == TypeKind.Interface)
                     interfaces.Add(typeName);
-                }
+                else if (symbol?.TypeKind == TypeKind.Class && baseClass == null)
+                    baseClass = typeName;
+                else
+                    throw EscalateExpression(node, "class-unresolved-base-kind");
             }
         }
 

@@ -13,6 +13,84 @@ namespace Calor.Compiler.Tests;
 public sealed class CanonicalClassPolicyTests
 {
     [Theory]
+    [InlineData("System.IDisposable", true)]
+    [InlineData("Contract", true)]
+    [InlineData("IActuallyClass", false)]
+    [InlineData("Alias", true)]
+    public void ConvertedInheritanceUsesResolvedBaseKindInsteadOfNaming(string baseType, bool isInterface)
+    {
+        var source = $$"""
+            using Alias = System.IDisposable;
+            public interface Contract {}
+            public class IActuallyClass { public IActuallyClass() {} }
+            public class Owner : {{baseType}}
+            {
+                public Owner() {}
+                public void Dispose() {}
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        var owner = conversion.Ast!.Classes.Single(type => type.Name == "Owner");
+        Assert.Empty(owner.InteropBlocks);
+        Assert.Equal(isInterface ? null : baseType, owner.BaseClass);
+        Assert.Equal(isInterface ? new[] { baseType } : [], owner.ImplementedInterfaces);
+        var compiled = Program.Compile(conversion.CalorSource!);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var actual = Compile(compiled.GeneratedCode).GetTypeByMetadataName("Owner")!;
+        Assert.Equal(isInterface ? "Object" : "IActuallyClass", actual.BaseType!.Name);
+        Assert.Equal(isInterface ? 1 : 0, actual.Interfaces.Length);
+    }
+
+    [Fact]
+    public void ConvertedBaseClassNamedLikeAnInterfaceStillChargesItsConstructorEffects()
+    {
+        var conversion = new CSharpToCalorConverter().Convert("""
+            public class IActuallyClass
+            {
+                public IActuallyClass() { System.Console.WriteLine("base"); }
+            }
+            public class Owner : IActuallyClass
+            {
+                public Owner() {}
+            }
+            """);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        var compiled = Program.Compile(conversion.CalorSource!);
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ConstructorEffectContractUnavailable
+            && diagnostic.Message.Contains("'Owner.", StringComparison.Ordinal)
+            && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("MissingBase")]
+    [InlineData("IMissingBase")]
+    [InlineData("System.DayOfWeek")]
+    public void ConvertedUnresolvedOrInvalidBaseKindRemainsPreserved(string baseType)
+    {
+        var source = $"public class Owner : {baseType} {{}}";
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.Equal(baseType != "System.DayOfWeek", conversion.Success);
+        Assert.Empty(conversion.Ast!.Classes);
+        Assert.Equal(source, Assert.Single(conversion.Ast.InteropBlocks).CSharpCode);
+        Assert.Contains(conversion.Issues, issue => issue.Feature == "class-unresolved-base-kind");
+        if (baseType == "System.DayOfWeek")
+            Assert.Contains(conversion.Issues, issue => issue.Severity == ConversionIssueSeverity.Error
+                && issue.Feature == "original-csharp-validation");
+    }
+
+    [Fact]
+    public void SyntaxOnlyConversionDoesNotGuessInheritanceKind()
+    {
+        const string source = "public class Owner : System.IDisposable { public void Dispose() {} }";
+        var context = new ConversionContext();
+        var module = new RoslynSyntaxVisitor(context).Convert(
+            CSharpSyntaxTree.ParseText(source).GetCompilationUnitRoot(), "SyntaxOnly");
+        Assert.Empty(module.Classes);
+        Assert.Equal(source, Assert.Single(module.InteropBlocks).CSharpCode);
+    }
+
+    [Theory]
     [InlineData(false, "Serializable")]
     [InlineData(true, "Serializable")]
     [InlineData(false, "System.Serializable")]
