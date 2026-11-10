@@ -1,3 +1,4 @@
+using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
@@ -25,23 +26,23 @@ public sealed class StructuralNullabilityJoinTests
         string container, bool qualifiedSource, bool coalesce, string boundary)
     {
         var qualified = $"System.Collections.Generic.{container}";
-        var sourceType = $"{(qualifiedSource ? qualified : container)}<?str>";
-        var targetType = $"{(qualifiedSource ? container : qualified)}<str>";
-        var expression = coalesce ? "(?? value fallback)" : "(? flag value fallback)";
+        var sourceType = $"{(qualifiedSource ? qualified : container)}<string?>";
+        var targetType = $"{(qualifiedSource ? container : qualified)}<string>";
+        var expression = coalesce ? "value ?? fallback" : "flag ? value : fallback";
         var statement = boundary switch
         {
-            "initializer" => $"§B{{required:{targetType}}} joined",
-            "return" => "§R joined",
-            _ => "§C{Take} §A joined §/C"
+            "initializer" => $"let {targetType}:required = joined",
+            "return" => "return joined",
+            _ => "Take(joined)"
         };
         var source = $$"""
-            §M{QualifiedJoins}
-              §F{Take:pub} ({{targetType}}:value) -> void
-                §E{}
-              §F{Probe:pub} ({{sourceType}}:value, {{targetType}}:fallback, bool:flag) -> {{targetType}}
-                §B{joined} {{expression}}
+            module QualifiedJoins
+              func Take public ({{targetType}}:value) → void
+                !
+              func Probe public ({{sourceType}}:value, {{targetType}}:fallback, bool:flag) → {{targetType}}
+                let joined = {{expression}}
                 {{statement}}
-                §TH null
+                throw null
             """;
         var code = boundary switch
         {
@@ -50,12 +51,14 @@ public sealed class StructuralNullabilityJoinTests
             _ => DiagnosticCode.NullableArgumentToNonNullableParameter
         };
         var options = new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null };
+        Parse(source);
         var rejected = Program.Compile(source, "qualified-join.calr", options);
         Assert.True(rejected.HasErrors);
         Assert.Contains(rejected.Diagnostics, diagnostic => diagnostic.Code == code);
         Assert.Empty(rejected.GeneratedCode);
-        var safe = Program.Compile(
-            source.Replace("<?str>", "<str>", StringComparison.Ordinal), "qualified-join.calr", options);
+        var safeSource = source.Replace("<string?>", "<string>", StringComparison.Ordinal);
+        Parse(safeSource);
+        var safe = Program.Compile(safeSource, "qualified-join.calr", options);
         Assert.False(safe.HasErrors, string.Join(Environment.NewLine, safe.Diagnostics));
     }
 
@@ -95,12 +98,12 @@ public sealed class StructuralNullabilityJoinTests
     public void DifferentAnnotationArmsKeepPayloadAfterInference(
         string sourceType, string targetType, bool coalesce)
     {
-        var expression = coalesce ? "(?? value fallback)" : "(? flag value fallback)";
+        var expression = coalesce ? "value ?? fallback" : "flag ? value : fallback";
         var diagnostics = Bind($$"""
-            §M{MixedAnnotationJoin}
-              §F{Probe:pub} ({{sourceType}}:value, {{targetType}}:fallback, bool:flag) -> {{targetType}}
-                §B{joined} {{expression}}
-                §R joined
+            module MixedAnnotationJoin
+              func Probe public ({{NativeType(sourceType)}}:value, {{NativeType(targetType)}}:fallback, bool:flag) → {{NativeType(targetType)}}
+                let joined = {{expression}}
+                return joined
             """);
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.NullableReturnFromNonNullable);
     }
@@ -111,21 +114,23 @@ public sealed class StructuralNullabilityJoinTests
         string expression, string sourceType, string targetType,
         bool unsafeValue, string boundary, bool local)
     {
-        var value = local ? "joined" : expression;
+        var nativeExpression = NativeExpression(expression);
+        var nativeTarget = NativeType(targetType);
+        var value = local ? "joined" : nativeExpression;
         var statement = boundary switch
         {
-            "initializer" => $"§B{{required:{targetType}}} {value}",
-            "return" => $"§R {value}",
-            _ => $"§C{{Take}} §A {value} §/C"
+            "initializer" => $"let {nativeTarget}:required = {value}",
+            "return" => $"return {value}",
+            _ => $"Take({value})"
         };
         var source = $$"""
-            §M{StructuralJoins}
-              §F{Take:pub} ({{targetType}}:value) -> void
-                §E{}
-              §F{Probe:pub} ({{sourceType}}:value, bool:flag) -> {{targetType}}
-                {{(local ? $"§B{{joined}} {expression}" : "")}}
+            module StructuralJoins
+              func Take public ({{nativeTarget}}:value) → void
+                !
+              func Probe public ({{NativeType(sourceType)}}:value, bool:flag) → {{nativeTarget}}
+                {{(local ? $"let joined = {nativeExpression}" : "")}}
                 {{statement}}
-                §TH null
+                throw null
             """;
         var diagnostics = Bind(source);
         var code = boundary switch
@@ -153,9 +158,9 @@ public sealed class StructuralNullabilityJoinTests
     public void ArrayContainerJoinDistinguishesNullFromFallback(string expression, bool unsafeValue)
     {
         var diagnostics = Bind($$"""
-            §M{ContainerJoins}
-              §F{Probe:pub} (?[str]:value, [str]:fallback, bool:flag) -> [str]
-                §R {{expression}}
+            module ContainerJoins
+              func Probe public (string[]?:value, string[]:fallback, bool:flag) → string[]
+                return {{NativeExpression(expression)}}
             """);
         Assert.Equal(unsafeValue, diagnostics.Any(d =>
             d.Code == DiagnosticCode.NullableReturnFromNonNullable));
@@ -169,18 +174,52 @@ public sealed class StructuralNullabilityJoinTests
         string expression, bool unsafeValue)
     {
         var diagnostics = Bind($$"""
-            §M{ElementJoins}
-              §F{Probe:pub} (?[?str]:value, [str]:fallback, bool:flag) -> [str]
-                §R {{expression}}
+            module ElementJoins
+              func Probe public (string?[]?:value, string[]:fallback, bool:flag) → string[]
+                return {{NativeExpression(expression)}}
             """);
         Assert.Equal(unsafeValue, diagnostics.Any(d =>
             d.Code == DiagnosticCode.NullableReturnFromNonNullable));
     }
 
-    private static DiagnosticBag Bind(string source)
+    // Keep historical theory labels stable without admitting retired syntax to the frontend.
+    private static string NativeType(string label) => label switch
+    {
+        "[?str]" => "string?[]",
+        "?[str]" => "string[]?",
+        "[str]" => "string[]",
+        "List<?str>" => "List<string?>",
+        "List<str>" => "List<string>",
+        _ => throw new ArgumentOutOfRangeException(nameof(label), label, "Unknown structural type label")
+    };
+
+    private static string NativeExpression(string label) => label switch
+    {
+        "(? flag value value)" => "flag ? value : value",
+        "(?? value value)" => "value ?? value",
+        "(? flag value fallback)" => "flag ? value : fallback",
+        "(?? value fallback)" => "value ?? fallback",
+        "(?? value null)" => "value ?? null",
+        "(? flag value null)" => "flag ? value : null",
+        "(?? null fallback)" => "null ?? fallback",
+        "(?? fallback value)" => "fallback ?? value",
+        _ => throw new ArgumentOutOfRangeException(nameof(label), label, "Unknown structural expression label")
+    };
+
+    private static ModuleNode Parse(string source)
     {
         var diagnostics = new DiagnosticBag();
-        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
+        Assert.False(diagnostics.HasErrors, $"{source}{Environment.NewLine}{string.Join(Environment.NewLine, diagnostics)}");
+        var module = new Parser(tokens, diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, $"{source}{Environment.NewLine}{string.Join(Environment.NewLine, diagnostics)}");
+        return module;
+    }
+
+    private static DiagnosticBag Bind(string source)
+    {
+        var module = Parse(source);
+        var diagnostics = new DiagnosticBag();
         new Binder(diagnostics).Bind(module);
         return diagnostics;
     }
