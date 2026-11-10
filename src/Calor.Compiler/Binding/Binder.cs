@@ -1689,8 +1689,8 @@ public sealed class Binder
                 nullableAnnotation: TryReadDeclaredStringAnnotation(parameter.TypeName),
                 // v0.15 E2 slice b — position 4/5's row (§3.3). Null unless the
                 // parameter both carries a §E and spells a function type.
-                functionType: TryBuildFunctionType(
-                    parameter.TypeName, parameter.Row, effectParameters,
+                functionType: TryBuildParameterFunctionType(
+                    parameter, effectParameters,
                     containingTypeName ?? lexicalTypeContext)))
             .ToArray();
         var symbol = new FunctionSymbol(
@@ -5625,6 +5625,17 @@ public sealed class Binder
     private BoundExpression BindLambdaExpression(
         LambdaExpressionNode lambda, BoundTypes.FunctionBoundType? targetType = null)
     {
+        if (targetType is null && ResolveSourceCallConversions && _asyncTypeModule is not null)
+        {
+            _sourceCallConversions ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(_asyncTypeModule);
+            if (_sourceCallConversions.LambdaTargets.TryGetValue(lambda, out var target)
+                && target.DelegateInvokeMethod is { } invoke)
+                targetType = new BoundTypes.FunctionBoundType(
+                    System.Collections.Immutable.ImmutableArray.CreateRange(
+                        invoke.Parameters.Select(parameter => Metadata.MetadataBinderResult.ToBoundType(parameter.Type))),
+                    Metadata.MetadataBinderResult.ToBoundType(invoke.ReturnType),
+                    row: BoundTypes.EffectRow.Unknown);
+        }
         var outerBindings = _scope.CaptureVisibleVariableBindings();
         var mutableArrayResults = outerBindings.Select(binding => binding.Symbol.StorageIdentity)
             .Distinct()
@@ -7489,10 +7500,11 @@ public sealed class Binder
             // meet in one module. Extending the existing `<unresolved>`
             // suppression is the honest reading; the alternative is emitting an
             // error whose premise the compiler has not established.
-            var hasUnresolvedArguments = argumentTypes.Any(type =>
+            var hasUnresolvedArguments = argumentTypes.Where((type, index) =>
                 string.Equals(type, "<unresolved>", StringComparison.Ordinal)
                 || !string.Equals(type, "NULL", StringComparison.Ordinal)
-                    && IsNominalTypeInvisibleToThisModule(type));
+                    && arguments[index] is not BoundLambdaExpression
+                    && IsNominalTypeInvisibleToThisModule(type)).Any();
             if (allowNullableStringCompatibility && !hasUnresolvedArguments
                 && resolution.Kind == OverloadResolutionKind.Resolved
                 && resolution.Matches.Any(match => match.Arguments.Any(mapping =>
@@ -7647,7 +7659,7 @@ public sealed class Binder
             if (_sourceCallConversions.AmbiguousCalls.Contains(site))
                 return OverloadResolutionResult.Ambiguous(accessibleCandidates);
             if (_sourceCallConversions.SelectedCalls.TryGetValue(site, out var selected)
-                && selected.UsesUserDefinedConversion
+                && (selected.UsesUserDefinedConversion || selected.UsesAnonymousFunctionConversion)
                 && selected.IncludesExtensionReceiver == includesExtensionReceiver
                 && selected.Arguments.Count == argumentTypes.Count
                 && _functionSymbols.TryGetValue(selected.Declaration, out var selectedFunction)
@@ -10456,6 +10468,25 @@ public sealed class Binder
             typeName,
             BindRow(row, binders),
             lexicalTypeContext ?? _currentClassName ?? _currentNamespaceIdentity);
+    }
+
+    private BoundTypes.FunctionBoundType? TryBuildParameterFunctionType(
+        ParameterNode parameter, IReadOnlyList<EffectParameterInfo>? binders, string? lexicalTypeContext)
+    {
+        if (ResolveSourceCallConversions && _asyncTypeModule is not null)
+        {
+            _sourceCallConversions ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(_asyncTypeModule);
+            if (_sourceCallConversions.ParameterTypes.TryGetValue(parameter, out var type))
+                return type is Microsoft.CodeAnalysis.INamedTypeSymbol { DelegateInvokeMethod: { } invoke }
+                    ? new BoundTypes.FunctionBoundType(
+                        System.Collections.Immutable.ImmutableArray.CreateRange(
+                            invoke.Parameters.Select(item => Metadata.MetadataBinderResult.ToBoundType(item.Type))),
+                        Metadata.MetadataBinderResult.ToBoundType(invoke.ReturnType),
+                        displayOverride: parameter.TypeName,
+                        row: BindRow(parameter.Row, binders))
+                    : null;
+        }
+        return TryBuildFunctionType(parameter.TypeName, parameter.Row, binders, lexicalTypeContext);
     }
 
     /// <summary>

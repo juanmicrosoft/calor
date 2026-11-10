@@ -14,7 +14,7 @@ public sealed class TypeChecker
     private readonly IReadOnlyDictionary<AwaitExpressionNode, Binding.BoundStructuralExpression>? _boundAwaits;
     private readonly IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? _boundSourceEnumConstants;
     private ModuleNode? _module;
-    private Dictionary<ExpressionNode, string>? _operatorResultTypes;
+    private Analysis.CallGraphAnalysis.OperatorBindings? _sourceBindings;
     private readonly Dictionary<IsPatternNode, CalorType> _patternBindingTypes = new();
     private readonly Dictionary<MatchStatementNode, CalorType> _matchTargetTypes = new();
     private readonly HashSet<string> _moduleDeclaredValueTypes = new(StringComparer.OrdinalIgnoreCase);
@@ -109,7 +109,7 @@ public sealed class TypeChecker
     public void Check(ModuleNode module)
     {
         _module = module;
-        _operatorResultTypes = null;
+        _sourceBindings = null;
         Verification.ContractVerifier.VerifyNamedRefinementPredicates(module, _diagnostics);
         _hasNamedRefinements = module.RefinementTypes.Count > 0;
         _patternBindingTypes.Clear();
@@ -404,7 +404,7 @@ public sealed class TypeChecker
         var paramTypes = new List<CalorType>();
         foreach (var param in parameters)
         {
-            var paramType = ResolveTypeName(param.TypeName, param.Span);
+            var paramType = ResolveParameterType(param);
             paramTypes.Add(paramType);
         }
 
@@ -499,7 +499,7 @@ public sealed class TypeChecker
         defineExtraVariables?.Invoke();
         foreach (var param in parameters)
         {
-            var paramType = ResolveTypeName(param.TypeName, param.Span);
+            var paramType = ResolveParameterType(param);
             _env.DefineVariable(param.Name, paramType);
             if (param.InlineRefinement != null)
                 _inlineRefinedParameters.Add(param.Name);
@@ -970,6 +970,15 @@ public sealed class TypeChecker
 
     private void CheckReturnStatement(ReturnStatementNode ret)
     {
+        if (ret.Expression is null && _lambdaBodyDepth > 0 && _validateReturnAssignments
+            && _currentReturnType is { } expected && !expected.Equals(PrimitiveType.Void)
+            && !ContainsInferencePlaceholder(expected))
+        {
+            _lambdaReturnInvalid = true;
+            if (!_suppressContextualDiagnostics)
+                _diagnostics.ReportError(ret.Span, DiagnosticCode.TypeMismatch,
+                    $"A lambda targeting {expected.SurfaceName} must return a value.");
+        }
         if (ret.Expression != null)
         {
             var returnType = InferExpressionType(ret.Expression, _currentReturnType);
@@ -2339,6 +2348,14 @@ public sealed class TypeChecker
                         $"Lambda parameter type {declaredType.SurfaceName} does not match target type "
                         + expectedFunction.ParameterTypes[index].SurfaceName);
                 }
+                signatureValid = false;
+            }
+            if (expectedFunction?.ParameterModifiers is { } modifiers && index < modifiers.Count
+                && (modifiers[index] & (ParameterModifier.Ref | ParameterModifier.Out)) != 0)
+            {
+                if (!_suppressContextualDiagnostics)
+                    _diagnostics.ReportError(parameter.Span, DiagnosticCode.TypeMismatch,
+                        "A lambda parameter without a modifier cannot implement a ref or out delegate parameter.");
                 signatureValid = false;
             }
             // #1529 review: a parameter typed by the target delegate carries its refinement
@@ -4823,9 +4840,8 @@ public sealed class TypeChecker
 
         if (_module is not null)
         {
-            if (_operatorResultTypes is null)
-                _operatorResultTypes = Analysis.CallGraphAnalysis.ResolveOperatorCalls(_module).ResultTypes;
-            if (_operatorResultTypes.TryGetValue(binOp, out var operatorResult))
+            _sourceBindings ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(_module);
+            if (_sourceBindings.ResultTypes.TryGetValue(binOp, out var operatorResult))
                 return ResolveTypeName(operatorResult, binOp.Span);
         }
 
@@ -5122,6 +5138,52 @@ public sealed class TypeChecker
                 $"Match expression branches have incompatible types: {left.SurfaceName} and {right.SurfaceName}");
         }
         return ErrorType.Instance;
+    }
+
+    private CalorType ResolveParameterType(ParameterNode parameter)
+    {
+        if (_module is not null)
+        {
+            _sourceBindings ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(_module);
+            if (_sourceBindings.ParameterTypes.TryGetValue(parameter, out var type))
+            {
+                if (type is Microsoft.CodeAnalysis.INamedTypeSymbol { DelegateInvokeMethod: { } invoke } named)
+                {
+                    var name = named.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat);
+                    // Keep native refinement annotations, which erase in the C# binding image.
+                    if (named.Locations.Any(location => location.IsInSource)
+                        && _env.LookupType(name.Replace("global::", "", StringComparison.Ordinal)) is FunctionType native)
+                        return native;
+                    // Preserve the existing structural representation only for the actual
+                    // core-library Action/Func declarations, never same-named source types.
+                    var standardDelegate = named.Name is "Action" or "Func"
+                        && Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(
+                            named.OriginalDefinition,
+                            named.BaseType?.ContainingAssembly.GetTypeByMetadataName($"System.{named.MetadataName}"));
+                    return new FunctionType(
+                        invoke.Parameters.Select(item => ResolveTypeName(
+                            item.Type.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat),
+                            parameter.Span)).ToArray(),
+                        ResolveTypeName(invoke.ReturnType.ToDisplayString(
+                            Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat), parameter.Span),
+                        invoke.Parameters.Select(item => item.Name).ToArray(),
+                        invoke.Parameters.Select(item => item.RefKind switch
+                        {
+                            Microsoft.CodeAnalysis.RefKind.Ref => ParameterModifier.Ref,
+                            Microsoft.CodeAnalysis.RefKind.Out => ParameterModifier.Out,
+                            Microsoft.CodeAnalysis.RefKind.In => ParameterModifier.In,
+                            _ => ParameterModifier.None
+                        }).ToArray(),
+                        standardDelegate ? null : $"{named.ContainingAssembly.Identity}:{name}");
+                }
+                var resolved = ResolveTypeName(parameter.TypeName, parameter.Span);
+                // A lookalike or shadowing declaration is not the standard CLR delegate.
+                return resolved is FunctionType
+                    || resolved is GenericInstanceType generic && TryGetDelegateFunctionType(generic, out _)
+                    ? new ExternalType(parameter.TypeName) : resolved;
+            }
+        }
+        return ResolveTypeName(parameter.TypeName, parameter.Span);
     }
 
     private CalorType ResolveTypeName(string typeName, Parsing.TextSpan span)

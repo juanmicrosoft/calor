@@ -47,6 +47,7 @@ public sealed class CallGraphAnalysis
         string ReturnType,
         IReadOnlyList<ResolvedArgumentMapping> Arguments,
         bool UsesUserDefinedConversion,
+        bool UsesAnonymousFunctionConversion,
         bool IncludesExtensionReceiver);
 
     internal sealed class OperatorBindings
@@ -57,6 +58,8 @@ public sealed class CallGraphAnalysis
         internal List<string> Failures { get; } = [];
         internal Dictionary<TextSpan, SourceCallSelection> SelectedCalls { get; } = [];
         internal HashSet<TextSpan> AmbiguousCalls { get; } = [];
+        internal Dictionary<ParameterNode, ITypeSymbol> ParameterTypes { get; } = new(ReferenceEqualityComparer.Instance);
+        internal Dictionary<LambdaExpressionNode, INamedTypeSymbol> LambdaTargets { get; } = new(ReferenceEqualityComparer.Instance);
     }
 
     private OperatorBindings _operatorBindings = new();
@@ -75,10 +78,9 @@ public sealed class CallGraphAnalysis
         var operators = EnumerateClasses(module)
             .SelectMany(owner => EnumerateOperators(owner).Select(op => (Node: op, Id: $"{owner.Name}.{op.Id}")))
             .ToArray();
-        if (operators.Length == 0)
-            return bindings;
-
         var conflictingTypes = new HashSet<ExpressionNode>(ReferenceEqualityComparer.Instance);
+        var conflictingParameters = new HashSet<ParameterNode>(ReferenceEqualityComparer.Instance);
+        var conflictingLambdas = new HashSet<LambdaExpressionNode>(ReferenceEqualityComparer.Instance);
         var conflictingCalls = new HashSet<TextSpan>();
         var argumentOwners = new Dictionary<AstNode, (TextSpan Call, int Index)>(ReferenceEqualityComparer.Instance);
         var ambiguousArguments = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
@@ -112,6 +114,9 @@ public sealed class CallGraphAnalysis
             for (var index = 0; index < arguments.Count; index++)
                 RegisterArgument(arguments[index], (node.Span, index));
         }
+        if (operators.Length == 0 && !visited.OfType<LambdaExpressionNode>().Any())
+            return bindings;
+
         void RegisterArgument(AstNode argument, (TextSpan Call, int Index) owner)
         {
             if (ambiguousArguments.Contains(argument))
@@ -193,8 +198,34 @@ public sealed class CallGraphAnalysis
                 foreach (var trivia in declaration.GetLeadingTrivia())
                 {
                     if (TryReadMarker(trivia, callablePrefix, out var index)
-                        && model.GetDeclaredSymbol(declaration) is { } method)
-                        methods[method] = emittedCallables[index];
+                        && model.GetDeclaredSymbol(declaration) is IMethodSymbol method)
+                    {
+                        var origin = emittedCallables[index];
+                        methods[method] = origin;
+                        IReadOnlyList<ParameterNode> parameters = origin switch
+                        {
+                            FunctionNode function => function.Parameters,
+                            MethodNode member => member.Parameters,
+                            ConstructorNode constructor => constructor.Parameters,
+                            OperatorOverloadNode op => op.Parameters,
+                            _ => []
+                        };
+                        if (parameters.Count != method.Parameters.Length)
+                            continue;
+                        for (var i = 0; i < parameters.Count; i++)
+                        {
+                            var parameter = parameters[i];
+                            var type = method.Parameters[i].Type;
+                            if (bindings.ParameterTypes.TryGetValue(parameter, out var previous)
+                                && !SameType(previous, type))
+                            {
+                                conflictingParameters.Add(parameter);
+                                bindings.ParameterTypes.Remove(parameter);
+                            }
+                            else if (!conflictingParameters.Contains(parameter))
+                                bindings.ParameterTypes[parameter] = type;
+                        }
+                    }
                 }
             }
 
@@ -226,6 +257,24 @@ public sealed class CallGraphAnalysis
                         AddCall(invocation, invocation.TargetMethod, invocation.Arguments);
                     else if (operation is IObjectCreationOperation { Constructor: { } constructor } creation)
                         AddCall(creation, constructor, creation.Arguments);
+                    if (operation is IDelegateCreationOperation
+                        {
+                            IsImplicit: true, Target: IAnonymousFunctionOperation,
+                            Type: INamedTypeSymbol { DelegateInvokeMethod: not null } target
+                        } delegateCreation
+                        && Origin(delegateCreation) is LambdaExpressionNode lambda
+                        && !model.GetDiagnostics(delegateCreation.Syntax.Span).Any(diagnostic =>
+                            diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+                    {
+                        if (bindings.LambdaTargets.TryGetValue(lambda, out var previous)
+                            && !SameType(previous, target))
+                        {
+                            conflictingLambdas.Add(lambda);
+                            bindings.LambdaTargets.Remove(lambda);
+                        }
+                        else if (!conflictingLambdas.Contains(lambda))
+                            bindings.LambdaTargets[lambda] = target;
+                    }
                     var method = operation switch
                     {
                         IConversionOperation conversion => conversion.OperatorMethod,
@@ -283,7 +332,8 @@ public sealed class CallGraphAnalysis
                          .Where(site => !selectedInTree.Contains(site)))
             {
                 conflictingCalls.Add(site);
-                if (bindings.SelectedCalls.TryGetValue(site, out var previous) && previous.UsesUserDefinedConversion)
+                if (bindings.SelectedCalls.TryGetValue(site, out var previous)
+                    && (previous.UsesUserDefinedConversion || previous.UsesAnonymousFunctionConversion))
                     bindingFailures.Add("An implicit-conversion source call could not be bound in every active preprocessor configuration.");
                 bindings.SelectedCalls.Remove(site);
             }
@@ -311,6 +361,7 @@ public sealed class CallGraphAnalysis
                 TextSpan? site = null;
                 var mappings = new List<ResolvedArgumentMapping>();
                 var usesUserConversion = false;
+                var usesAnonymousFunctionConversion = false;
                 var includesReceiver = false;
                 foreach (var argument in arguments)
                 {
@@ -354,6 +405,7 @@ public sealed class CallGraphAnalysis
                             ? array.ElementType : argument.Parameter.Type;
                         mappings.Add(new ResolvedArgumentMapping(owner.Index, argument.Parameter.Ordinal,
                             Binding.Metadata.MetadataBinderResult.ToBoundType(parameterType).DisplayString, expanded));
+                        usesAnonymousFunctionConversion |= HasAnonymousFunctionConversion(value);
                         for (var converted = value as IConversionOperation; converted is not null;
                              converted = converted.Operand as IConversionOperation)
                             usesUserConversion |= converted.IsImplicit && converted.OperatorMethod is not null;
@@ -379,7 +431,7 @@ public sealed class CallGraphAnalysis
                     mappings.OrderBy(mapping => mapping.ArgumentIndex)
                         .Select(mapping => includesReceiver
                             ? mapping with { ArgumentIndex = mapping.ArgumentIndex + 1 } : mapping).ToArray(),
-                    usesUserConversion, includesReceiver);
+                    usesUserConversion, usesAnonymousFunctionConversion, includesReceiver);
                 selectedInTree.Add(callSite);
                 if (bindings.SelectedCalls.TryGetValue(callSite, out var existing)
                     && (!ReferenceEquals(existing.Declaration, selection.Declaration)
@@ -387,7 +439,8 @@ public sealed class CallGraphAnalysis
                         || existing.IncludesExtensionReceiver != selection.IncludesExtensionReceiver
                         || !existing.Arguments.SequenceEqual(selection.Arguments)))
                 {
-                    if (usesUserConversion || existing.UsesUserDefinedConversion)
+                    if (usesUserConversion || existing.UsesUserDefinedConversion
+                        || usesAnonymousFunctionConversion || existing.UsesAnonymousFunctionConversion)
                         bindingFailures.Add($"The selected source call '{method}' has conflicting implicit-conversion callable identities across preprocessor configurations.");
                     conflictingCalls.Add(callSite);
                     bindings.SelectedCalls.Remove(callSite);
@@ -395,7 +448,9 @@ public sealed class CallGraphAnalysis
                 else
                     bindings.SelectedCalls[callSite] = selection with
                     {
-                        UsesUserDefinedConversion = usesUserConversion || existing?.UsesUserDefinedConversion == true
+                        UsesUserDefinedConversion = usesUserConversion || existing?.UsesUserDefinedConversion == true,
+                        UsesAnonymousFunctionConversion = usesAnonymousFunctionConversion
+                            || existing?.UsesAnonymousFunctionConversion == true
                     };
             }
 
@@ -405,6 +460,15 @@ public sealed class CallGraphAnalysis
                     || HasReceivingConversion(conversion.Operand),
                 IArrayCreationOperation { IsImplicit: true, Initializer: { } initializer } =>
                     initializer.ElementValues.Any(HasReceivingConversion),
+                _ => HasAnonymousFunctionConversion(value)
+            };
+
+            static bool HasAnonymousFunctionConversion(IOperation value) => value switch
+            {
+                IDelegateCreationOperation { IsImplicit: true, Target: IAnonymousFunctionOperation } => true,
+                IConversionOperation conversion => HasAnonymousFunctionConversion(conversion.Operand),
+                IArrayCreationOperation { IsImplicit: true, Initializer: { } initializer } =>
+                    initializer.ElementValues.Any(HasAnonymousFunctionConversion),
                 _ => false
             };
 
@@ -450,6 +514,23 @@ public sealed class CallGraphAnalysis
             }
         }
     }
+
+    private static bool SameType(ITypeSymbol left, ITypeSymbol right) =>
+        left.TypeKind == right.TypeKind
+        && Equals(left.ContainingAssembly?.Identity, right.ContainingAssembly?.Identity)
+        && left.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+            == right.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+        && (left is not INamedTypeSymbol { DelegateInvokeMethod: { } leftInvoke }
+            || right is INamedTypeSymbol { DelegateInvokeMethod: { } rightInvoke }
+                && leftInvoke.ReturnsByRef == rightInvoke.ReturnsByRef
+                && leftInvoke.ReturnsByRefReadonly == rightInvoke.ReturnsByRefReadonly
+                && leftInvoke.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                    == rightInvoke.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                && leftInvoke.Parameters.Length == rightInvoke.Parameters.Length
+                && leftInvoke.Parameters.Zip(rightInvoke.Parameters).All(pair =>
+                    pair.First.RefKind == pair.Second.RefKind
+                    && pair.First.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                        == pair.Second.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
 
     private static bool TryReadMarker(SyntaxTrivia trivia, string prefix, out int index)
     {
@@ -519,6 +600,9 @@ public sealed class CallGraphAnalysis
     /// </summary>
     public sealed class BoundValueIndex
     {
+        internal Dictionary<(string CallerId, int Start, int End), SourceArgumentSelection>
+            SourceArguments
+        { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), BoundCallExpression>
             ComputedMemberCalls
         { get; } = new();
@@ -569,6 +653,12 @@ public sealed class CallGraphAnalysis
 
     private BoundValueIndex _boundValues = new();
     internal Verification.ModuleInheritanceResult? ContractInheritance { get; private set; }
+
+    internal sealed record SourceArgumentSelection(
+        string CalleeId, IReadOnlyList<ResolvedArgumentMapping> Arguments);
+
+    internal SourceArgumentSelection? SourceArguments(string callerId, TextSpan span) =>
+        _boundValues.SourceArguments.GetValueOrDefault((callerId, span.Start, span.End));
 
     internal BoundCallExpression? ComputedMemberCall(string callerId, TextSpan span) =>
         _boundValues.ComputedMemberCalls.GetValueOrDefault((callerId, span.Start, span.End));
@@ -1387,14 +1477,14 @@ public sealed class CallGraphAnalysis
                 .ToLookup(symbol => (symbol.DefinitionSpan, symbol.DeclarationSpan));
             var callableDeclarations = boundModule.SymbolsById.Values.OfType<FunctionSymbol>()
                 .ToLookup(symbol => (symbol.ContainingTypeName, symbol.DefinitionSpan, symbol.DeclarationSpan));
-            // Abstract members have declaration symbols but no BoundFunction body.
+            // Abstract and empty members have declaration symbols but no BoundFunction body.
             foreach (var cls in EnumerateClasses(ast))
             {
                 var owners = typeDeclarations[(cls.Span, cls.IdentifierSpan)]
                     .Where(symbol => symbol.Name == cls.Name).Take(2).ToArray();
                 if (owners is not [var owner])
                     continue;
-                foreach (var method in EnumerateMethods(cls).Where(method => method.IsAbstract))
+                foreach (var method in EnumerateMethods(cls))
                 {
                     var declarations = callableDeclarations[(owner.QualifiedName, method.Span, method.IdentifierSpan)]
                         .Take(2).ToArray();
@@ -1430,6 +1520,19 @@ public sealed class CallGraphAnalysis
 
             foreach (var symbol in boundModule.SymbolsById.Values)
             {
+                if (symbol is FunctionSymbol callable && legacyIds.TryGetValue(callable.Id, out var callableId))
+                {
+                    if (callable.ReturnFunctionType is { } returnFunctionType)
+                        declaredReturns[callableId] = returnFunctionType;
+                    foreach (var parameter in callable.Parameters)
+                    {
+                        if (parameter.FunctionType is not { } parameterType)
+                            continue;
+                        if (!declaredTypes.TryGetValue(callableId, out var byName))
+                            declaredTypes[callableId] = byName = new(StringComparer.Ordinal);
+                        byName[parameter.Name] = parameterType;
+                    }
+                }
                 if (symbol is not Binding.VariableSymbol
                     {
                         IsField: true,
@@ -1446,21 +1549,6 @@ public sealed class CallGraphAnalysis
             {
                 if (!callerIds.TryGetValue(function.SymbolId, out var callerId))
                     continue;
-
-                var isLocalFunction = function.MemberKind == BoundMemberKind.LocalFunction;
-                if (!isLocalFunction && function.Symbol.ReturnFunctionType is { } returnType)
-                    declaredReturns[callerId] = returnType;
-                foreach (var parameter in isLocalFunction ? [] : function.Symbol.Parameters)
-                {
-                    if (parameter.FunctionType is not { } parameterType) continue;
-                    if (!declaredTypes.TryGetValue(callerId, out var byName))
-                    {
-                        byName = new Dictionary<string, Binding.BoundTypes.FunctionBoundType>(
-                            StringComparer.Ordinal);
-                        declaredTypes[callerId] = byName;
-                    }
-                    byName[parameter.Name] = parameterType;
-                }
 
                 foreach (var node in DescendantsAndSelf(function))
                 {
@@ -1607,6 +1695,15 @@ public sealed class CallGraphAnalysis
                         ?? Array.Empty<string>();
                     if (calleeLegacyIds.Length > 0)
                     {
+                        var matches = node switch
+                        {
+                            BoundCallExpression expression => expression.SelectedOverloadMatches,
+                            BoundCallStatement statement => statement.SelectedOverloadMatches,
+                            _ => []
+                        };
+                        if (matches is [var match] && legacyIds.TryGetValue(match.Function.Id, out var selectedId))
+                            boundValues.SourceArguments[(callerId, node.Span.Start, node.Span.End)] =
+                                new SourceArgumentSelection(selectedId, match.Arguments);
                         if (node is BoundNewExpression || target.EndsWith("..ctor", StringComparison.Ordinal))
                             boundValues.ConstructorCalls[(callerId, node.Span.Start, node.Span.End)] = calleeLegacyIds;
                         boundCallSites.Add(key);

@@ -97,6 +97,16 @@ intrinsic mutation/allocation contracts of constructors and rowless operators.
 An omitted binding or lambda row can retain a known row inferred from its
 initializer or body; it does not automatically mean Pure.
 
+Inline lambda arguments use the selected delegate's actual signature, including
+non-generic `Action` and `System.Action`. A void block lambda contains statements
+without returning a value. Named arguments keep their selected parameter mapping,
+and different named delegate types do not become interchangeable just because
+their signatures match. Aliases refer to the declaration they resolve to.
+
+CLR signature compatibility does not grant effect permissions. Passing a lambda
+to a Pure callback parameter still requires a Pure row, including for named
+arguments and overloaded source functions.
+
 ### Where a row can appear
 
 ```calor

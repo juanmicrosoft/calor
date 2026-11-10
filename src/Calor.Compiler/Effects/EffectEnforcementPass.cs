@@ -2176,6 +2176,12 @@ public sealed class EffectEnforcementPass
                 case CallExpressionNode call:
                     CheckArgumentSite(call.Target, call.Arguments, call.ArgumentNames, call.Span);
                     break;
+                case ExpressionCallNode { TargetExpression: FieldAccessNode member } call
+                    when _pass._callGraphAnalysis.ComputedMemberCall(_function.Id, call.Span) is { } boundCall:
+                    CheckArgumentSite(boundCall.Target,
+                        boundCall.IsSourceExtensionCall ? [member.Target, .. call.Arguments] : call.Arguments,
+                        call.ArgumentNames, call.Span);
+                    break;
             }
 
             foreach (var child in RecursiveAstWalker.GetAllChildren(node))
@@ -2305,12 +2311,14 @@ public sealed class EffectEnforcementPass
             IReadOnlyList<string?>? argumentNames,
             TextSpan callSpan)
         {
-            // Named arguments would need overload-accurate positional mapping,
-            // which this AST walk does not have. Declining is the honest answer.
-            if (argumentNames != null && argumentNames.Any(name => name != null))
+            var selected = _pass._callGraphAnalysis.SourceArguments(_function.Id, callSpan);
+            // Only the binder's selected declaration/map can authorize a named site.
+            if (selected is null && argumentNames != null && argumentNames.Any(name => name != null))
                 return;
 
-            var callee = ResolveInModuleCallee(target);
+            var callee = selected is not null
+                ? _pass._callGraphAnalysis.Functions.GetValueOrDefault(selected.CalleeId)
+                : ResolveInModuleCallee(target);
             if (callee == null)
                 return;
 
@@ -2328,9 +2336,18 @@ public sealed class EffectEnforcementPass
             var solutions = new PolyRow?[binderCount];
             var undetermined = new string?[binderCount];
 
-            for (var index = 0; index < arguments.Count && index < callee.Parameters.Count; index++)
+            var mappings = selected?.Arguments ?? Enumerable.Range(0,
+                    Math.Min(arguments.Count, callee.Parameters.Count))
+                .Select(index => new ResolvedArgumentMapping(index, index, callee.Parameters[index].TypeName, false))
+                .ToArray();
+            foreach (var mapping in mappings)
             {
-                var parameter = callee.Parameters[index];
+                var index = mapping.ArgumentIndex;
+                if (index < 0 || index >= arguments.Count
+                    || mapping.ParameterIndex < 0 || mapping.ParameterIndex >= callee.Parameters.Count)
+                    throw new InvalidOperationException(
+                        $"Selected argument map for '{callee.Name}' is inconsistent with its source declaration.");
+                var parameter = callee.Parameters[mapping.ParameterIndex];
                 if (!IsParameterFunctionTyped(callee, parameter))
                     continue;
 
