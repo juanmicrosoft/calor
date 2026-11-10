@@ -409,6 +409,23 @@ public static class SymbolSourceIdentity
 /// </summary>
 public static class TypeIdentity
 {
+    internal static bool TrySplitNativeArray(string typeName, out string element, out int rank)
+    {
+        if (typeName.TrimEnd().EndsWith(']')
+            && Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseTypeName(typeName)
+            is Microsoft.CodeAnalysis.CSharp.Syntax.ArrayTypeSyntax { ContainsDiagnostics: false } array)
+        {
+            rank = array.RankSpecifiers[0].Rank;
+            element = array.RankSpecifiers.Count == 1
+                ? array.ElementType.ToString()
+                : array.WithRankSpecifiers(array.RankSpecifiers.RemoveAt(0)).ToString();
+            return true;
+        }
+        element = string.Empty;
+        rank = 0;
+        return false;
+    }
+
     /// <summary>
     /// Produces the metadata-style lookup identity used for declared generic
     /// types while preserving namespace and nested-type qualification.
@@ -1332,7 +1349,7 @@ public sealed class VariableSymbol : Symbol
     // Assignments cannot recover an unknown var type or erase a known object type.
     internal bool HasUnknownInferredType { get; set; }
     internal Microsoft.CodeAnalysis.IArrayTypeSymbol? MetadataArrayResultType { get; set; }
-    internal BoundTypes.ArrayBoundType? MethodInputArrayType { get; init; }
+    internal BoundTypes.ArrayBoundType? MethodInputArrayType { get; set; }
     internal BoundTypes.GenericInstantiationBoundType? GenericNullabilityType { get; init; }
     internal VariableSymbol StorageIdentity { get; set; }
 

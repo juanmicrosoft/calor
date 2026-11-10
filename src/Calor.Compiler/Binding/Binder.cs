@@ -284,8 +284,10 @@ public sealed class Binder
         // Member reads and their receiving calls must use the same actual reference set.
         var ctx = binder.Context;
         var receiverType = computedReceiver is null ? ctx.TryResolveType(receiverName)
-            : ResolveMetadataArrayReceiver(computedReceiver)
-                ?? ResolveComputedMetadataType(ctx, computedReceiver.Type.DisplayString);
+            : ResolveMetadataArrayReceiver(computedReceiver);
+        if (receiverType is null && computedReceiver is not null
+            && NullabilityChecker.GetMethodInputArrayType(computedReceiver) is null)
+            receiverType = ResolveComputedMetadataType(ctx, computedReceiver.Type.DisplayString);
         if (receiverType is null) return null;
 
         // Argument types: use each BoundExpression's Type.DisplayString to
@@ -541,8 +543,13 @@ public sealed class Binder
             : null;
     }
 
-    private Microsoft.CodeAnalysis.INamedTypeSymbol? ResolveMetadataArrayReceiver(BoundExpression receiver)
+    private Microsoft.CodeAnalysis.ITypeSymbol? ResolveMetadataArrayReceiver(BoundExpression receiver)
     {
+        if (NullabilityChecker.GetMethodInputArrayType(receiver) is { } array)
+        {
+            var context = GetOrCreateMetadataBinder()?.Context;
+            return context is null ? null : GetMetadataArrayInputType(context, array);
+        }
         if (receiver.Type is BoundTypes.NominalBoundType { RoslynSymbol: { } symbol })
             return symbol;
         if (receiver.Type is BoundTypes.GenericInstantiationBoundType { RoslynSymbol: { } constructed })
@@ -564,7 +571,7 @@ public sealed class Binder
     private Microsoft.CodeAnalysis.IPropertySymbol? ResolveMetadataArrayProperty(
         BoundExpression receiver, string memberName)
     {
-        return ResolveMetadataArrayReceiver(receiver) is { } receiverType
+        return ResolveMetadataArrayReceiver(receiver) is Microsoft.CodeAnalysis.INamedTypeSymbol receiverType
             && GetOrCreateMetadataBinder()?.ResolveMemberRead(
                 receiverType, memberName, receiver is BoundTypeReferenceExpression, out _)
                 is Microsoft.CodeAnalysis.IPropertySymbol { Type: Microsoft.CodeAnalysis.IArrayTypeSymbol } property
@@ -613,7 +620,7 @@ public sealed class Binder
                 ? context.HostCompilationForBinder.CreateArrayTypeSymbol(element, array.Rank, element.NullableAnnotation)
                 : null,
             BoundTypes.NominalBoundType { RoslynSymbol: { } nominalSymbol } => nominalSymbol,
-            BoundTypes.NominalBoundType nominal when TypeIdentity.Canonicalize(nominal.QualifiedName) == "STRING" =>
+            BoundTypes.NominalBoundType { Declaration: null, QualifiedName: "STRING" or "string" or "str" } =>
                 context.TryResolveType("System.String"),
             BoundTypes.PrimitiveBoundType primitive when IsBuiltInValueTypeName(primitive.Name) =>
                 context.TryResolveType(TypeIdentity.MapShortTypeNameToFullName(primitive.Name)),
@@ -2337,6 +2344,9 @@ public sealed class Binder
         for (var index = 0; index < symbols.Count; index++)
         {
             var symbol = symbols[index];
+            // Parameter registration precedes source type registration.
+            if (TryBuildMethodInputArrayType(symbol.TypeName, out var array))
+                symbol.MethodInputArrayType = array;
             if (!_scope.TryDeclare(symbol))
             {
                 var suggestedName = GenerateUniqueName(symbol.Name);
@@ -3146,17 +3156,16 @@ public sealed class Binder
         BoundTypes.BoundType element;
         if (TryBuildMethodInputArrayType(elementName, out var nested, declaringFunction))
             element = nested!;
-        else if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(elementName, out var nullableElement)
-            && TypeIdentity.Canonicalize(nullableElement) == "STRING")
-            element = new BoundTypes.NominalBoundType(
-                "STRING", BoundTypes.NullableAnnotation.Annotated);
         else if (IsBuiltInValueTypeName(TypeIdentity.Canonicalize(elementName))
             || IsBuiltInValueTypeName(elementName))
             element = new BoundTypes.PrimitiveBoundType(
                 IsBuiltInValueTypeName(TypeIdentity.Canonicalize(elementName))
                     ? TypeIdentity.Canonicalize(elementName) : elementName);
-        else if (TryBuildStringTarget(elementName, out var reference, declaringFunction)
-            && reference is BoundTypes.NominalBoundType)
+        else if ((declaringFunction is not null
+                ? TryBuildCallableReference(elementName, declaringFunction)
+                : TryBuildReferenceType(elementName, _currentClassName, _currentNamespaceIdentity,
+                    _currentMemberTypeParameters?.Select(parameter => parameter.Name)))
+            is { } reference)
             element = reference;
         else
             element = new BoundTypes.UnresolvedBoundType($"Unsupported declared array element '{elementName}'");
@@ -3186,6 +3195,9 @@ public sealed class Binder
         rank = 1;
         element = string.Empty;
         const string expanded = "ARRAY[element=";
+        if (TypeIdentity.TrySplitNativeArray(type, out element, out rank))
+            return true;
+        rank = 1;
         if (type.EndsWith(']') && type.LastIndexOf('[') is var open && open > 0
             && type[(open + 1)..^1].All(character => character == ','))
         {
@@ -4321,9 +4333,11 @@ public sealed class Binder
     private (bool Handled, TypeSymbol? Type) ResolveSourceType(
         string name, string? containingTypeName, string? namespaceIdentity, string? scopeId)
     {
+        static string LookupName(string value) =>
+            string.Join(".", value.Split('.').Select(part => part.TrimStart('@')));
         var global = name.StartsWith("global::", StringComparison.Ordinal);
         var spelling = global ? name["global::".Length..] : name;
-        spelling = string.Join(".", spelling.Split('.').Select(part => part.TrimStart('@')));
+        spelling = LookupName(spelling);
         var head = spelling.Split('.')[0];
         var visibleScopes = new HashSet<string>(StringComparer.Ordinal);
         for (var id = scopeId; id is not null;)
@@ -4341,7 +4355,7 @@ public sealed class Binder
         foreach (var lookup in ReferenceLookupNames(
             global ? "global::" + spelling : spelling, containingTypeName ?? namespaceIdentity))
         {
-            var matches = types.Where(type => type.QualifiedName == lookup).Take(2).ToArray();
+            var matches = types.Where(type => LookupName(type.QualifiedName) == LookupName(lookup)).Take(2).ToArray();
             if (matches.Length > 0)
                 return aliases.Length == 0 && matches is [var match] ? (true, match) : (true, null);
             var separator = lookup.Length - spelling.Length - 1;
@@ -4361,13 +4375,13 @@ public sealed class Binder
             var target = string.Join(".", alias.Namespace.Replace("global::", "", StringComparison.Ordinal)
                     .Split('.').Select(part => part.TrimStart('@')))
                 + spelling[head.Length..];
-            var matches = types.Where(type => type.QualifiedName == target).Take(2).ToArray();
+            var matches = types.Where(type => LookupName(type.QualifiedName) == target).Take(2).ToArray();
             return matches.Length == 0 ? default : (true, matches is [var match] ? match : null);
         }
         if (global)
             return default;
         var imported = imports.Where(import => import.Alias is null && !import.IsStatic)
-            .SelectMany(import => types.Where(type => type.QualifiedName == import.Namespace + "." + spelling))
+            .SelectMany(import => types.Where(type => LookupName(type.QualifiedName) == LookupName(import.Namespace) + "." + spelling))
             .Distinct().Take(2).ToArray();
         if (imported.Length == 0)
             return default;
@@ -6674,8 +6688,10 @@ public sealed class Binder
                 or Microsoft.CodeAnalysis.SpecialType.System_Single or Microsoft.CodeAnalysis.SpecialType.System_Double
                 or Microsoft.CodeAnalysis.SpecialType.System_Decimal or Microsoft.CodeAnalysis.SpecialType.System_IntPtr
                 or Microsoft.CodeAnalysis.SpecialType.System_UIntPtr;
-        // Named-call enrichment does not widen the staged nominal/array producer surface.
-        if (computedReceiver is null && metadataReceiver is not null && !metadataScalarReturn)
+        // Array enrichment shares the scalar-result boundary of named calls.
+        // In particular it must not admit previously unresolved mutating void calls.
+        if (metadataReceiver is not null && !metadataScalarReturn
+            && (computedReceiver is null || NullabilityChecker.GetMethodInputArrayType(metadataReceiver) is not null))
             bclResolution = null;
         var instanceArrayResolution = computedReceiver is null && resolution.Kind == OverloadResolutionKind.NotFound
             && !resolution.HasOpaqueOverloads

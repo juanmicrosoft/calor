@@ -206,23 +206,40 @@ public sealed class ExternalType : CalorType
 }
 
 /// <summary>
-/// An array, <c>T[]</c>. A distinct kind rather than a <see cref="GenericInstanceType"/> named
+/// An array, <c>T[]</c> or <c>T[,]</c>. A distinct kind rather than a <see cref="GenericInstanceType"/> named
 /// "Array" so diagnostics echo <c>i32[]</c> — a spelling the user can actually write — instead of
 /// <c>Array&lt;i32&gt;</c>, which is the #741 rule this file already applies to primitives.
 /// </summary>
 public sealed class ArrayType : CalorType
 {
     public CalorType ElementType { get; }
-    public override string Name => $"{ElementType.Name}[]";
-    public override string SurfaceName => $"{ElementType.SurfaceName}[]";
+    public int Rank { get; }
+    public override string Name => FormatName(surface: false);
+    public override string SurfaceName => FormatName(surface: true);
 
-    public ArrayType(CalorType elementType)
-        => ElementType = elementType ?? throw new ArgumentNullException(nameof(elementType));
+    public ArrayType(CalorType elementType, int rank = 1)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(rank, 1);
+        ElementType = elementType ?? throw new ArgumentNullException(nameof(elementType));
+        Rank = rank;
+    }
 
     public override bool Equals(CalorType? other)
-        => other is ArrayType at && at.ElementType.Equals(ElementType);
+        => other is ArrayType at && at.Rank == Rank && at.ElementType.Equals(ElementType);
 
-    public override int GetHashCode() => HashCode.Combine("[]", ElementType);
+    public override int GetHashCode() => HashCode.Combine(Rank, ElementType);
+
+    private string FormatName(bool surface)
+    {
+        var ranks = $"[{new string(',', Rank - 1)}]";
+        var element = ElementType;
+        while (element is ArrayType array)
+        {
+            ranks += $"[{new string(',', array.Rank - 1)}]";
+            element = array.ElementType;
+        }
+        return (surface ? element.SurfaceName : element.Name) + ranks;
+    }
 }
 
 /// <summary>

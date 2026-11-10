@@ -1874,6 +1874,7 @@ public sealed class TypeChecker
             CollectionContainsNode contains => InferCollectionContainsType(contains),
             CollectionCountNode count => InferCollectionCountType(count),
             ArrayAccessNode arrayAccess => InferArrayAccessType(arrayAccess),
+            MultiDimArrayAccessNode arrayAccess => InferMultiDimArrayAccessType(arrayAccess),
             TypeOperationNode typeOp => InferTypeOperationType(typeOp),
             IsPatternNode isPattern => InferIsPatternType(isPattern),
             _ => InferUnknownExpressionType(expr)
@@ -3804,7 +3805,8 @@ public sealed class TypeChecker
         {
             InferTypeArguments(parameterValue.UnderlyingType, argumentValue.UnderlyingType, substitutions);
         }
-        else if (parameter is ArrayType parameterArray && argument is ArrayType argumentArray)
+        else if (parameter is ArrayType parameterArray && argument is ArrayType argumentArray
+            && parameterArray.Rank == argumentArray.Rank)
         {
             InferTypeArguments(parameterArray.ElementType, argumentArray.ElementType, substitutions);
         }
@@ -4034,7 +4036,7 @@ public sealed class TypeChecker
             NullableValueType nullable => new NullableValueType(
                 SubstituteTypeParameters(nullable.UnderlyingType, substitutions)),
             ArrayType array => new ArrayType(
-                SubstituteTypeParameters(array.ElementType, substitutions)),
+                SubstituteTypeParameters(array.ElementType, substitutions), array.Rank),
             FunctionType function => new FunctionType(
                 function.ParameterTypes.Select(parameter => SubstituteTypeParameters(parameter, substitutions)).ToArray(),
                 SubstituteTypeParameters(function.ReturnType, substitutions),
@@ -4687,6 +4689,27 @@ public sealed class TypeChecker
         return ErrorType.Instance;
     }
 
+    private CalorType InferMultiDimArrayAccessType(MultiDimArrayAccessNode access)
+    {
+        var type = InferExpressionType(access.Array);
+        foreach (var index in access.Indices)
+        {
+            var indexType = InferExpressionType(index);
+            if (!IsNumeric(indexType) && indexType is not ErrorType)
+                _diagnostics.ReportError(index.Span, DiagnosticCode.TypeMismatch,
+                    $"Array index must be numeric, got {indexType.SurfaceName}");
+        }
+        if (type is not ArrayType array)
+            return ErrorType.Instance;
+        if (array.Rank != access.Indices.Count)
+        {
+            _diagnostics.ReportError(access.Span, DiagnosticCode.TypeMismatch,
+                $"Array of rank {array.Rank} requires {array.Rank} indices, got {access.Indices.Count}");
+            return ErrorType.Instance;
+        }
+        return array.ElementType;
+    }
+
     private CalorType InferTypeOperationType(TypeOperationNode typeOp)
     {
         var targetType = ResolveTypeName(typeOp.TargetType, typeOp.Span);
@@ -5111,7 +5134,7 @@ public sealed class TypeChecker
                 && Binding.TypeIdentity.ResolveNativeClass(_module, referentSurface) is { IsStruct: false })
                 supportedReference = ResolveTypeName(referentSurface, span);
             if (supportedReference is null
-                && (referentSurface.EndsWith("[]", StringComparison.Ordinal)
+                && (Binding.TypeIdentity.TrySplitNativeArray(referentSurface, out _, out _)
                     || referentSurface.Length > 2 && referentSurface[0] == '['
                         && referentSurface[^1] == ']' && !referentSurface.Contains(',')))
                 supportedReference = ResolveTypeName(referentSurface, span) as ArrayType;
@@ -5136,9 +5159,9 @@ public sealed class TypeChecker
         // §I/§O annotations emit; `[T]` is the collection-literal spelling in the syntax
         // reference. Neither resolved before, so `§I{[str]:args}` — a documented, working
         // declaration — reported "Unknown type '[str]'".
-        if (typeName.EndsWith("[]", StringComparison.Ordinal) && typeName.Length > 2)
+        if (Binding.TypeIdentity.TrySplitNativeArray(typeName, out var arrayElement, out var arrayRank))
         {
-            return new ArrayType(ResolveTypeName(typeName[..^2], span));
+            return new ArrayType(ResolveTypeName(arrayElement, span), arrayRank);
         }
         if (typeName.Length > 2 && typeName[0] == '[' && typeName[^1] == ']'
             && typeName.IndexOf(',') < 0)
@@ -5148,11 +5171,7 @@ public sealed class TypeChecker
 
         // Handle generic types with bracket syntax.
         var bracketIndex = typeName.IndexOf('[');
-        var rankStart = typeName.LastIndexOf('[');
-        var hasArrayRankSuffix = rankStart > 0 && typeName.EndsWith(']')
-            && typeName.AsSpan(rankStart + 1, typeName.Length - rankStart - 2).IndexOfAnyExcept(',') < 0;
         if (bracketIndex > 0 && typeName.EndsWith(']')
-            && !hasArrayRankSuffix
             && !typeName.AsSpan(bracketIndex + 1).Contains('='))
         {
             var baseName = typeName[..bracketIndex];
@@ -5455,6 +5474,8 @@ public sealed class TypeChecker
 
     private static bool HaveSameArrayRuntimeType(ArrayType target, ArrayType source)
     {
+        if (target.Rank != source.Rank)
+            return false;
         var targetElement = target.ElementType is NullableReferenceType targetNullable
             ? targetNullable.ReferentType
             : target.ElementType;

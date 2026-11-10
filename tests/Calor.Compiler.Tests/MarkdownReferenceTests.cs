@@ -12,11 +12,12 @@ public class MarkdownReferenceTests
         new[] { "GlobalModule.Main()", "GlobalModule.Main()" }, new[] { "150", "16" })]
     [InlineData("calls", 3, 1,
         new[] { "GlobalModule.Main()", "GlobalModule.Main()" }, new[] { "9", "42" })]
-    [InlineData("contracts", 7, 0,
+    [InlineData("contracts", 8, 0,
         new[] { "GlobalModule.Divide(9, 2)", "GlobalModule.Abs(-5)", "GlobalModule.Main()",
             "GlobalModule.First(new int[] { 42 })", "GlobalModule.Identity(1)",
+            "GlobalModule.CheckSymmetric(new int[,] { { 1, 2 }, { 2, 3 } }, 2)",
             "GlobalModule.ProcessArray(new int[] { 0, 3 }, 2)", "GlobalModule.Find(new int[] { 4, 9 }, 9)" },
-        new[] { "4", "5", "15", "42", "1", "True", "1" })]
+        new[] { "4", "5", "15", "42", "1", "True", "True", "1" })]
     [InlineData("control-flow", 11, 0,
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()",
             "GlobalModule.Main()",

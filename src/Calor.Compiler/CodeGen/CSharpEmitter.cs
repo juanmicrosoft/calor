@@ -4438,6 +4438,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             if (arrayType != null && IsArrayType(arrayType))
                 return GetPrimitiveExpressionKind(arrayType[..arrayType.LastIndexOf('[')]);
         }
+        if (expression is MultiDimArrayAccessNode { Array: ReferenceNode matrix } access)
+        {
+            var arrayType = GetKnownReferenceType(matrix.Name, types)?.TrimEnd('?');
+            if (arrayType is not null
+                && Binding.TypeIdentity.TrySplitNativeArray(arrayType, out var element, out var rank)
+                && rank == access.Indices.Count)
+                return GetPrimitiveExpressionKind(element);
+        }
         if (expression is ImplicationExpressionNode implication)
             return GetBuiltinExpressionKind(implication.Antecedent, types) == PrimitiveExpressionKind.Boolean
                 && GetBuiltinExpressionKind(implication.Consequent, types) == PrimitiveExpressionKind.Boolean

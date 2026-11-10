@@ -168,12 +168,28 @@ Multiple bindings are comma-separated; an inner bound may depend on an
 earlier variable. Express implication as `!condition || consequence`, not a
 special arrow operator. Quantifier variables are lexical bindings, not IDs.
 
-The matrix line demonstrates the quantified expression, not a complete
-matrix-symmetry API. The natural complete program must first check the
-matrix's dimensions. Under normal enforcement, `int[,].GetLength` currently
-reports unknown-call warnings (`Calor0411`) and the pure caller fails with
-`Calor0410`. Do not omit the dimension checks, invent a reference context or
-turn effects off to count that program as native coverage.
+### Matrix symmetry
+
+Check the matrix's dimensions before indexing it in the quantified predicate.
+`GetLength` uses the actual `System.Array` metadata method and its existing
+effect contract.
+
+```calor
+module MatrixSymmetry
+  func CheckSymmetric (int[,]:matrix, int:n) → bool
+    !
+    requires n >= 0
+    requires matrix.GetLength(0) == n && matrix.GetLength(1) == n
+    requires forall int:i in 0..n, int:j in 0..n : matrix[i,j] == matrix[j,i]
+    return true
+```
+
+`CheckSymmetric(new int[,] { { 1, 2 }, { 2, 3 } }, 2)` returns `true`.
+A non-square matrix or an asymmetric entry fails a precondition with guards
+enabled. An empty `0 × 0` matrix passes for `n = 0`. Contract mode `off` removes
+these checks; successful compilation is not a static proof of symmetry.
+The compiler reports `Calor0325`, an informational notice about the nested
+quantifier's quadratic runtime cost.
 
 ### All array elements non-negative
 

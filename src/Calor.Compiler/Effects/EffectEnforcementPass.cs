@@ -6135,8 +6135,12 @@ public sealed class EffectEnforcementPass
                     return evaluated.Union(InferFromInternalFunctions(ids));
                 if (bound?.ResolvedMetadataMethod is { } method && bound.Receiver is { } receiver)
                 {
+                    var effectReceiver = method.ContainingType.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_Array
+                        && Binding.NullabilityChecker.GetMethodInputArrayType(receiver) is not null
+                            ? Binding.Metadata.MetadataBinderResult.ToNominalBoundType(method.ContainingType)
+                            : receiver.Type;
                     var resolution = _context.Resolver.Resolve(EffectResolverKey.FromBoundReceiver(
-                        receiver.Type, method.Name, bound.ResolvedParameterTypes));
+                        effectReceiver, method.Name, bound.ResolvedParameterTypes));
                     if (resolution.Status != EffectResolutionStatus.Unknown)
                         return evaluated.Union(resolution.Effects);
                 }

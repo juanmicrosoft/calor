@@ -214,8 +214,14 @@ public sealed class ArrayBoundType : BoundType
         ElementType = elementType;
         Rank = rank;
         NullableAnnotation = nullableAnnotation;
-        var commas = new string(',', rank - 1);
-        DisplayString = $"{elementType.DisplayString}[{commas}]";
+        var ranks = $"[{new string(',', rank - 1)}]";
+        var element = elementType;
+        while (element is ArrayBoundType array)
+        {
+            ranks += $"[{new string(',', array.Rank - 1)}]";
+            element = array.ElementType;
+        }
+        DisplayString = element.DisplayString + ranks;
     }
 
     public override bool Equals(BoundType? other) =>
