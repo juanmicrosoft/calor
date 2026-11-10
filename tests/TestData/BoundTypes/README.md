@@ -83,3 +83,12 @@ display strings, with the disclosed native `i32`/`str` to `int`/`string` spellin
 change. The receiver side channel retains both authoritative `StringBuilder`
 and genuinely unresolved receiver types; a pure variant still fails effect
 enforcement.
+
+Structural field/property reads emit a spaced member separator, including
+verbatim value receivers such as `@int . Length`. Re-emission must retain a real
+member node rather than fuse it into a dotted identifier. Native class properties
+bind through their accessible non-static declarations, including their declared
+type and generic substitution; struct storage-path handling stays separate.
+The fixed Money converter control requires native operator/property conversion
+with zero interop, substitution, or drop, and preserves its original C# runtime
+oracle after a second native round trip.

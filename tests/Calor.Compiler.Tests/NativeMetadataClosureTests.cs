@@ -454,7 +454,12 @@ public sealed class NativeMetadataClosureTests
                 return @{{alias}}.Length
             """;
         var reemitted = new CalorEmitter().Emit(Parse(source));
-        Assert.Contains("@" + alias + ".Length", reemitted);
+        Assert.Contains("@" + alias + " . Length", reemitted);
+        var structural = Assert.IsType<FieldAccessNode>(
+            Assert.IsType<ReturnStatementNode>(Assert.Single(Parse(reemitted).Functions).Body[0]).Expression);
+        var reference = Assert.IsType<ReferenceNode>(structural.Target);
+        Assert.Equal(alias, reference.Name);
+        Assert.True(reference.IsVerbatim);
         var converted = ConvertPrimitiveReceiver($$"""
             public static class VerbatimPrimitiveReceiver
             {
@@ -463,7 +468,19 @@ public sealed class NativeMetadataClosureTests
             """);
         foreach (var candidate in new[] { source, reemitted, converted })
         {
-            var assembly = CompileAssembly(new CSharpEmitter().Emit(Parse(candidate)));
+            var module = Parse(candidate);
+            var diagnostics = new DiagnosticBag();
+            var bound = new Binder(diagnostics).Bind(module);
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+            var member = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundFieldAccessExpression>());
+            var receiver = Assert.IsType<BoundVariableExpression>(member.Target);
+            Assert.Same(Assert.Single(Assert.Single(bound.Functions).Symbol.Parameters), receiver.Variable);
+            Assert.Equal(alias, receiver.Variable.Name);
+            var property = Assert.IsAssignableFrom<IPropertySymbol>(member.ResolvedMetadataMember);
+            Assert.Equal("Length", property.Name);
+            Assert.Equal(SpecialType.System_String, property.ContainingType.SpecialType);
+            Assert.Equal(SpecialType.System_Int32, property.Type.SpecialType);
+            var assembly = CompileAssembly(new CSharpEmitter().Emit(module));
             var method = assembly.GetTypes().SelectMany(type => type.GetMethods()).Single(method => method.Name == "Probe");
             Assert.Equal(3, method.Invoke(null, ["abc"]));
         }

@@ -1124,9 +1124,30 @@ public sealed class CanonicalOperatorIndexerTests
         Assert.True(converted.Success, string.Join("\n", converted.Context.Issues));
         Assert.DoesNotContain("raw ", converted.CalorSource);
         Assert.DoesNotContain('§', converted.CalorSource!);
-        var result = Program.Compile(converted.CalorSource!);
-        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
-        Assert.Equal(Execute(source, AddMoney), Execute(result.GeneratedCode, AddMoney));
+        Assert.Equal(0, converted.InteropPreservationCount);
+        Assert.Equal(0, converted.LossySubstitutionCount);
+        Assert.Equal(0, converted.DropCount);
+        foreach (var candidate in new[] { converted.CalorSource!,
+            new CalorEmitter().Emit(Parse(converted.CalorSource!)) })
+        {
+            var diagnostics = new DiagnosticBag();
+            var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(Parse(candidate));
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+            var members = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundFieldAccessExpression>().ToArray();
+            Assert.Equal(2, members.Length);
+            Assert.All(members, member =>
+            {
+                Assert.Equal("Cents", member.FieldName);
+                Assert.Equal("LONG", member.Type.DisplayString);
+                var property = Assert.Single(member.ResolvedFields);
+                Assert.True(property.IsProperty);
+                Assert.Equal("Money", property.DeclaringTypeName);
+                Assert.IsType<BoundVariableExpression>(member.Target);
+            });
+            var result = Program.Compile(candidate);
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.Equal(Execute(source, AddMoney), Execute(result.GeneratedCode, AddMoney));
+        }
     }
 
     [Fact]

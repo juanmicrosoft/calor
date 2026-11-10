@@ -4249,10 +4249,16 @@ public sealed class Binder
             // one storage path; resolving it keeps the operand typed instead of OBJECT.
             _ when isPatternMember => ResolveAccessibleMembers(
                 ResolveClass(target.Type.DisplayString), fieldAccess.FieldName),
+            _ when ResolveClass(target.Type.DisplayString) is { IsStruct: false } instanceOwner =>
+                ResolveAccessibleMembers(instanceOwner, fieldAccess.FieldName)
+                    .OfType<VariableSymbol>()
+                    .Where(member => member.IsProperty && !member.IsStatic)
+                    .Cast<Symbol>().ToArray(),
             _ => ResolveStructFieldPath(target.Type.DisplayString, fieldAccess.FieldName),
         };
-        if (isPatternMember && _asyncTypeModule != null
+        if (_asyncTypeModule != null
             && resolvedFields.OfType<VariableSymbol>().ToArray() is [var nativeMember]
+            && (isPatternMember || nativeMember.IsProperty)
             && TypeIdentity.TryResolveNativeInstanceMemberType(
                 _asyncTypeModule, target.Type.DisplayString, fieldAccess.FieldName, out var nativeMemberType))
             return new BoundFieldAccessExpression(
