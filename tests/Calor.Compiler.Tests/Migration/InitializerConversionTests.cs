@@ -3,7 +3,9 @@ using System.Reflection;
 using System.Runtime.Loader;
 using System.Text;
 using Calor.Compiler.Analysis;
+using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Migration;
@@ -70,7 +72,11 @@ public class InitializerConversionTests
         var result = Convert(source);
         Assert.True(result.Success, result.CalorSource);
         Assert.Empty(result.Context.Losses);
-        AssertShape(result, 107, 7, 0, 6);
+        var parsed = AssertShape(result, 112, 7, 0, 6);
+        AssertFieldAccesses(parsed, "ref(Probe).Next", "ref(Probe).Next", "ref(Probe).Next",
+            "ref(holder).Field", "ref(holder).Field.Count", "ref(holder).Property",
+            "ref(holder).Property.Count", "ref(holder).Nested", "index(ref(holder).Nested,0).Count",
+            "ref(local).Count");
         var generated = Compile(result.CalorSource!, enforceEffects: false);
         Assert.False(generated.HasErrors, string.Join("\n", generated.Diagnostics.Errors));
         var expected = throws ? "1124:throw" : "112445:111:2";
@@ -102,7 +108,8 @@ public class InitializerConversionTests
         var result = Convert(source);
         Assert.True(result.Success, result.CalorSource);
         Assert.Empty(result.Context.Losses);
-        AssertShape(result, 31, 1, 0, 4);
+        var parsed = AssertShape(result, 34, 1, 0, 4);
+        AssertFieldAccesses(parsed, "ref(Probe).Log", "ref(Probe).Log", "ref(assigned).N");
         var generated = Compile(result.CalorSource!, enforceEffects: true);
         Assert.False(generated.HasErrors, string.Join("\n", generated.Diagnostics.Errors));
         Assert.Equal("before;ctor;7", Run(source));
@@ -133,12 +140,16 @@ public class InitializerConversionTests
         Assert.True(result.Success, result.CalorSource);
         if (baseType.Length == 0)
         {
-            AssertOriginalPayloads(AssertShape(result, 16, 0, 0, 3, "default-expression"), source);
+            var parsed = AssertShape(result, 18, 0, 0, 3, "default-expression");
+            AssertFieldAccesses(parsed, "ref(Probe).Log", "ref(Probe).Log");
+            AssertOriginalPayloads(parsed, source);
         }
         else
         {
-            var nodes = AllNodes(ParseCalor(result.CalorSource!)).ToArray();
-            Assert.Equal(27, nodes.Length);
+            var parsed = ParseCalor(result.CalorSource!);
+            AssertFieldAccesses(parsed, "ref(assigned).N");
+            var nodes = AllNodes(parsed).ToArray();
+            Assert.Equal(28, nodes.Length);
             Assert.Equal(4, nodes.Count(node => node is MethodNode or ClassFieldNode));
             Assert.Single(nodes.OfType<NewExpressionNode>());
             Assert.Empty(nodes.OfType<LambdaExpressionNode>());
@@ -347,7 +358,8 @@ public class InitializerConversionTests
         Assert.True(result.Success, string.Join("\n", result.Issues.Where(i => i.Severity == ConversionIssueSeverity.Error).Select(i => i.ToString())) + "\n" + result.CalorSource);
         var feature = reason is "dictionary-initializer" or "conditional-expression-hoisting"
             ? reason : "initializer-interop";
-        var parsed = AssertShape(result, 80, 3, 0, 14, "explicit-interface", feature);
+        var parsed = AssertShape(result, 81, 3, 0, 14, "explicit-interface", feature);
+        AssertFieldAccesses(parsed, "ref(_items).Add", "ref(_items).GetEnumerator", "ref(o).V");
         AssertOriginalPayloads(parsed, ShapeSource(member));
         var holder = Assert.Single(parsed.Classes, type => type.Name == "Holder");
         var preserved = Assert.Single(holder.InteropBlocks);
@@ -373,18 +385,22 @@ public class InitializerConversionTests
         Assert.True(result.Success, string.Join("\n", result.Issues.Where(i => i.Severity == ConversionIssueSeverity.Error).Select(i => i.ToString())) + "\n" + result.CalorSource);
         var shape = member switch
         {
-            "public Outer O = new Outer { V = 3, W = -V0 };" => (85, 4, 15),
-            "public HashSet<string> H = new HashSet<string> { \"a\", \"a\" };" => (87, 4, 15),
-            "public static List<List<int>> L = new List<List<int>> { new List<int> { 1 }, new List<int>() };" => (94, 6, 15),
-            "public int M() { var o = new Outer { V = Next(), W = Next() }; return o.V; }" => (89, 4, 15),
-            "public int M() { var l = new List<int> { Next(), Next() }; return l[1]; }" => (94, 4, 15),
-            "public Outer O = new Outer { V = Next() };" => (83, 4, 15),
-            "public int M() { return Take(Next(), new Outer { V = Next() }); }" => (92, 4, 15),
-            "public List<int> L = new List<int> { Next(), Take(Next(), null) };" => (89, 4, 15),
+            "public Outer O = new Outer { V = 3, W = -V0 };" => (86, 4, 15),
+            "public HashSet<string> H = new HashSet<string> { \"a\", \"a\" };" => (88, 4, 15),
+            "public static List<List<int>> L = new List<List<int>> { new List<int> { 1 }, new List<int>() };" => (95, 6, 15),
+            "public int M() { var o = new Outer { V = Next(), W = Next() }; return o.V; }" => (91, 4, 15),
+            "public int M() { var l = new List<int> { Next(), Next() }; return l[1]; }" => (95, 4, 15),
+            "public Outer O = new Outer { V = Next() };" => (84, 4, 15),
+            "public int M() { return Take(Next(), new Outer { V = Next() }); }" => (93, 4, 15),
+            "public List<int> L = new List<int> { Next(), Take(Next(), null) };" => (90, 4, 15),
             _ => throw new InvalidOperationException(member)
         };
         // The shared Bag scaffold alone retains its explicit-interface member.
         var parsed = AssertShape(result, shape.Item1, shape.Item2, 0, shape.Item3, "explicit-interface");
+        AssertFieldAccesses(parsed,
+            member == "public int M() { var o = new Outer { V = Next(), W = Next() }; return o.V; }"
+                ? ["ref(_items).Add", "ref(_items).GetEnumerator", "ref(o).V", "ref(o).V"]
+                : ["ref(_items).Add", "ref(_items).GetEnumerator", "ref(o).V"]);
         AssertOriginalPayloads(parsed, ShapeSource(member));
         Assert.Empty(Assert.Single(parsed.Classes, type => type.Name == "Holder").InteropBlocks);
     }
@@ -584,17 +600,31 @@ public class InitializerConversionTests
         Assert.Equal(expectsLoss, result.Context.Losses.Any(loss => loss.Kind == ConversionLossKind.InteropPreserved));
         var shape = name switch
         {
-            "ref-receiver" => (42, 2, 0, 5),
-            "index-conversion" => (18, 1, 0, 2),
-            "struct-this" or "parenthesized-this" => (35, 1, 0, 5),
-            "scorecard-092-delegate-this-argument" => (26, 1, 0, 2),
-            "struct-local-mutated-by-call" => (28, 0, 0, 5),
-            "constructor-replaces-receiver" => (36, 0, 2, 5),
+            "ref-receiver" => (44, 2, 0, 5),
+            "index-conversion" => (20, 1, 0, 2),
+            "struct-this" or "parenthesized-this" => (37, 1, 0, 5),
+            "scorecard-092-delegate-this-argument" => (27, 1, 0, 2),
+            "struct-local-mutated-by-call" => (32, 0, 0, 5),
+            "constructor-replaces-receiver" => (40, 0, 2, 5),
             "event-then-property" => (50, 2, 0, 7),
             _ => throw new InvalidOperationException(name)
         };
         var parsed = AssertShape(result, shape.Item1, shape.Item2, shape.Item3, shape.Item4,
             name == "scorecard-092-delegate-this-argument" ? "post-validation-fallback" : "initializer-interop");
+        AssertFieldAccesses(parsed, name switch
+        {
+            "ref-receiver" => ["ref(old).Items", "ref(Other).Items"],
+            "index-conversion" => ["ref(Probe).N", "ref(Probe).N"],
+            "struct-this" or "parenthesized-this" =>
+                ["ref(c).N", "ref(x).V", "new(Counter).Go", "call(new(Counter).Go).ToString"],
+            "scorecard-092-delegate-this-argument" =>
+                ["ref(publisher).Send", "ref(publisher).Send", "ref(publisher).Log"],
+            "struct-local-mutated-by-call" => ["ref(x).V", "ref(x).V.N", "ref(x).V", "ref(x).V.N"],
+            "constructor-replaces-receiver" => ["ref(Probe).Sink", "ref(Probe).Log", "ref(Probe).Log", "ref(n).Text"],
+            "event-then-property" =>
+                ["ref(Probe).Next", "new(Holder).P", "new(Holder).P.V", "new(Holder).P.V.ToString"],
+            _ => throw new InvalidOperationException(name)
+        });
         AssertOriginalPayloads(parsed, source);
         if (name == "scorecard-092-delegate-this-argument")
         {
@@ -644,12 +674,37 @@ public class InitializerConversionTests
             """;
         var result = Convert(source);
         Assert.True(result.Success, result.CalorSource);
-        var parsed = AssertShape(result, 74, 2, 2, 7);
+        var parsed = AssertShape(result, 80, 2, 2, 7);
+        AssertFieldAccesses(parsed, "ref(Probe).Sink", "ref(Probe).Sink", "ref(Probe).Log", "ref(Probe).Log",
+            "ref(notice).Text", "ref(notice).Text", "ref(object).ReferenceEquals",
+            "ref(Publisher).Send", "ref(Publisher).Send");
         var send = Assert.Single(Assert.Single(parsed.Classes, type => type.Name == "Publisher").Methods);
         Assert.Equal(3, send.Body.Count);
         var receiver = Assert.IsType<BindStatementNode>(send.Body[0]);
         Assert.Equal("receiver", receiver.Name);
-        Assert.Equal("Probe.Sink", Assert.IsType<ReferenceNode>(receiver.Initializer).Name);
+        var sink = Assert.IsType<FieldAccessNode>(receiver.Initializer);
+        Assert.Equal("Sink", sink.FieldName);
+        var owner = Assert.IsType<ReferenceNode>(sink.Target);
+        Assert.Equal("Probe", owner.Name);
+        Assert.False(owner.IsVerbatim);
+        var bound = new Calor.Compiler.Binding.Binder(new Calor.Compiler.Diagnostics.DiagnosticBag()).Bind(parsed);
+        var sinks = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundFieldAccessExpression>()
+            .Where(field => field.FieldName == "Sink").ToArray();
+        Assert.Equal(2, sinks.Length);
+        var selected = Assert.Single(sinks, field => field.Span == sink.Span).ResolvedField;
+        Assert.NotNull(selected);
+        Assert.Equal("Probe", selected.DeclaringTypeName);
+        Assert.Equal("Sink", selected.Name);
+        Assert.True(selected.IsStatic);
+        Assert.Same(bound.SymbolsById[selected.Id], selected);
+        Assert.All(sinks, field =>
+        {
+            Assert.Same(selected, field.ResolvedField);
+            Assert.Same(Assert.Single(parsed.Classes, type => type.Name == "Probe"), field.SourceStaticFieldOwner);
+            var target = Assert.IsType<BoundTypeReferenceExpression>(field.Target);
+            Assert.Equal("Probe", target.Name);
+            Assert.NotNull(target.ResolvedType);
+        });
         var notice = Assert.IsType<BindStatementNode>(send.Body[1]);
         Assert.Equal("notice", notice.Name);
         Assert.Equal("Text", Assert.Single(Assert.IsType<NewExpressionNode>(notice.Initializer).Initializers).PropertyName);
@@ -666,6 +721,56 @@ public class InitializerConversionTests
         Assert.False(generated.HasErrors, string.Join("\n", generated.Diagnostics.Errors));
         Assert.Equal("same:hi;second:there;", Run(source));
         Assert.Equal(Run(source), Run(generated.GeneratedCode));
+    }
+
+    [Fact]
+    public void NativeInitializer_VerbatimReceiverAndMember_RetainTheirIdentities()
+    {
+        const string source = """
+            public class Box { public int @true; }
+            public static class Probe
+            {
+                public static string Run()
+                {
+                    var @this = new Box { @true = 7 };
+                    var other = new Box { @true = 11 };
+                    return @this.@true + ":" + other.@true;
+                }
+            }
+            """;
+        var result = Convert(source);
+        Assert.True(result.Success, result.CalorSource);
+        var parsed = AssertShape(result, 23, 2, 0, 2);
+        Assert.Equal("7:11", Run(source));
+        foreach (var calor in new[] { result.CalorSource!, new CalorEmitter().Emit(parsed) })
+        {
+            var module = ParseCalor(calor);
+            AssertFieldAccesses(module, "verbatim(this).true", "ref(other).true");
+            var accesses = AllNodes(module).OfType<FieldAccessNode>().ToArray();
+            Assert.All(accesses, field =>
+                Assert.Equal("@true", calor.Substring(field.FieldNameSpan.Start, field.FieldNameSpan.Length)));
+            Assert.Empty(AllNodes(module).OfType<ThisExpressionNode>());
+            var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
+            var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(module);
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+            var nodes = BoundNodeHelpers.DescendantsAndSelf(bound).ToArray();
+            var locals = nodes.OfType<BoundBindStatement>().ToArray();
+            Assert.Equal(new[] { "other", "this" },
+                locals.Select(local => local.Variable.Name).OrderBy(name => name, StringComparer.Ordinal));
+            var fields = nodes.OfType<BoundFieldAccessExpression>().ToArray();
+            Assert.Equal(2, fields.Length);
+            Assert.All(fields, field =>
+            {
+                Assert.Equal("true", field.FieldName);
+                var receiver = Assert.IsType<BoundVariableExpression>(field.Target);
+                Assert.Equal("Box", receiver.Type.DisplayString);
+                Assert.Same(Assert.Single(locals, local => local.Variable.Name == receiver.Variable.Name).Variable,
+                    receiver.Variable);
+            });
+            var generated = Compile(calor, enforceEffects: false);
+            Assert.False(generated.HasErrors, string.Join("\n", generated.Diagnostics.Errors));
+            Assert.Equal(Run(source), Run(generated.GeneratedCode));
+        }
     }
 
     [Theory]
@@ -732,7 +837,8 @@ public class InitializerConversionTests
         var loss = Assert.Single(result.Context.Losses,
             loss => loss.Feature == "conditional-expression-hoisting");
         Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
-        var parsed = AssertShape(result, 46, 2, 0, 6, "conditional-expression-hoisting");
+        var parsed = AssertShape(result, 51, 2, 0, 6, "conditional-expression-hoisting");
+        AssertFieldAccesses(parsed, "ref(Probe).Log", "ref(Probe).Log", "ref(Probe).Log", "ref(Probe).Log", "ref(value).V");
         AssertOriginalPayloads(parsed, source);
         var probe = Assert.Single(parsed.Classes, type => type.Name == "Probe");
         Assert.Equal("Take", Assert.Single(probe.Methods).Name);
@@ -815,18 +921,20 @@ public class InitializerConversionTests
         Assert.True(result.Success, name + ": " + result.CalorSource);
         var shape = name switch
         {
-            "literal-user-conversion" => (35, 1, 6, new[] { "initializer-interop" }),
+            "literal-user-conversion" => (37, 1, 6, new[] { "initializer-interop" }),
             "instance-event-initializer" => (23, 0, 5, new[] { "initializer-interop", "initializer-interop" }),
             "partial-property-definition" => (23, 0, 5, new[] { "partial-property", "partial-property", "initializer-interop" }),
             "finalizer" => (23, 0, 5, new[] { "destructor", "initializer-interop" }),
-            "eventargs-symbol-spoof" => (29, 0, 6, new[] { "initializer-interop" }),
-            "static-constructor" => (28, 0, 6, new[] { "initializer-interop" }),
+            "eventargs-symbol-spoof" => (31, 0, 6, new[] { "initializer-interop" }),
+            "static-constructor" => (30, 0, 6, new[] { "initializer-interop" }),
             "static-field-initializer" => (23, 0, 5, new[] { "field", "initializer-interop" }),
             "recursive-initializer" => (25, 1, 6, new[] { "initializer-interop" }),
             "expanding-generic-initializer" => (29, 1, 6, new[] { "initializer-interop" }),
             _ => throw new InvalidOperationException(name)
         };
         var parsed = AssertShape(result, shape.Item1, shape.Item2, 0, shape.Item3, shape.Item4);
+        AssertFieldAccesses(parsed, name is "literal-user-conversion" or "eventargs-symbol-spoof" or "static-constructor"
+            ? ["ref(Probe).N", "ref(Probe).N"] : []);
         AssertOriginalPayloads(parsed, source);
         var publisher = Assert.Single(parsed.Classes, type => type.Name == "Publisher");
         Assert.Empty(publisher.Methods);
@@ -929,7 +1037,9 @@ public class InitializerConversionTests
     {
         var result = Convert(ReproProbe);
         Assert.True(result.Success, string.Join("\n", result.Issues.Where(i => i.Severity == ConversionIssueSeverity.Error).Select(i => i.ToString())) + "\n" + result.CalorSource);
-        AssertShape(result, 43, 3, 0, 4);
+        var parsed = AssertShape(result, 49, 3, 0, 4);
+        AssertFieldAccesses(parsed, "ref(h).Xs", "ref(h).Xs", "ref(h).Xs.Count",
+            "ref(string).Join", "ref(h).Sb", "ref(h).Sb.Capacity", "ref(h).After");
         var generated = Compile(result.CalorSource!, enforceEffects: false);
         Assert.False(generated.HasErrors, string.Join("\n", generated.Diagnostics.Errors.Select(e => e.Message)));
         Assert.Equal(Run(ReproProbe), Run(generated.GeneratedCode));
@@ -1032,6 +1142,24 @@ public class InitializerConversionTests
             }
             Assert.Equal(Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(block.CSharpCode));
         }
+    }
+
+    private static void AssertFieldAccesses(ModuleNode module, params string[] expected)
+    {
+        static string Identity(ExpressionNode expression) => expression switch
+        {
+            ReferenceNode reference => $"{(reference.IsVerbatim ? "verbatim" : "ref")}({reference.Name})",
+            FieldAccessNode field => $"{Identity(field.Target)}.{field.FieldName}",
+            ArrayAccessNode array => $"index({Identity(array.Array)},{Identity(array.Index)})",
+            IntLiteralNode literal => literal.Value.ToString(CultureInfo.InvariantCulture),
+            NewExpressionNode creation => $"new({creation.TypeName})",
+            ExpressionCallNode call => $"call({Identity(call.TargetExpression)})",
+            _ => throw new InvalidOperationException($"Unexpected receiver: {expression.GetType().Name}")
+        };
+
+        Assert.Equal(expected.OrderBy(identity => identity, StringComparer.Ordinal),
+            AllNodes(module).OfType<FieldAccessNode>().Select(Identity)
+                .OrderBy(identity => identity, StringComparer.Ordinal));
     }
 
     private static IEnumerable<AstNode> AllNodes(AstNode root)
