@@ -9,6 +9,16 @@
     "ProjectMigrate",
     "ProjectMigratePassthrough"
   ],
+  "preservations": {
+    "UnsupportedShapes": {
+      "recordedStatementCount": 5,
+      "currentMemberCount": 1,
+      "feature": "conditional-expression-hoisting",
+      "owner": "Probe",
+      "member": "Run",
+      "trace": "1,9,0,011,10,11|"
+    }
+  },
   "rows": {
     "F5-ARRAY-05": {
       "recordedUnknownEffects": true,

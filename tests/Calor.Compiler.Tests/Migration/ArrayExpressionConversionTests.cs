@@ -1605,8 +1605,7 @@ public class ArrayExpressionConversionTests
         Assert.Contains(run.Modifiers, modifier => modifier.IsKind(SyntaxKind.StaticKeyword));
     }
 
-    [Fact]
-    public void UnsupportedShapes_ArePreservedWithAReport_AndRunLikeTheOriginal()
+    private static string UnsupportedShapeSource()
     {
         // Negative controls: a size with a call in a ?: branch, and an assignment used as
         // an array element or an index, cannot be written in place natively; each is
@@ -1649,15 +1648,75 @@ public class ArrayExpressionConversionTests
                 }
             }
             """;
+        return source;
+    }
+
+    [Fact]
+    public void UnsupportedShapes_ArePreservedWithAReport_AndRunLikeTheOriginal()
+    {
+        var source = UnsupportedShapeSource();
+        using var current = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            CliTestHarness.FindRepoRoot(), "tests/TestData/InteropScope/R0/array-current-results.json")));
+        var observation = current.RootElement.GetProperty("preservations").GetProperty("UnsupportedShapes");
+        Assert.Equal(5, observation.GetProperty("recordedStatementCount").GetInt32());
         var result = new CSharpToCalorConverter().Convert(source);
         Assert.True(result.Success, string.Join("\n", result.Issues));
-        Assert.Equal(5, result.Losses.Count(loss => loss.Feature == "conditional-expression-hoisting"
-            && loss.Kind == ConversionLossKind.InteropPreserved));
+        Assert.Equal(observation.GetProperty("currentMemberCount").GetInt32(), result.Losses.Count);
+        Assert.All(result.Losses, loss =>
+        {
+            Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+            Assert.Equal(observation.GetProperty("feature").GetString(), loss.Feature);
+            Assert.Equal("interop", loss.Path);
+            Assert.Null(loss.Trigger);
+        });
         var compilation = Program.Compile(result.CalorSource!, "preserved.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
         Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
         Assert.Equal("1,9,0,011,10,11|", Run(source));
         Assert.Equal(Run(source), Run(compilation.GeneratedCode));
+    }
+
+    [Theory]
+    [MemberData(nameof(SurfacesOnly))]
+    public async Task UnsupportedShapes_CurrentMemberPreservation_RetainsExactOriginalBodyOnEverySurface(Surface surface)
+    {
+        var source = UnsupportedShapeSource();
+        using var current = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            CliTestHarness.FindRepoRoot(), "tests/TestData/InteropScope/R0/array-current-results.json")));
+        Assert.Equal(Enum.GetNames<Surface>(),
+            current.RootElement.GetProperty("surfaces").EnumerateArray().Select(value => value.GetString()));
+        var observation = current.RootElement.GetProperty("preservations").GetProperty("UnsupportedShapes");
+        Assert.Equal(5, observation.GetProperty("recordedStatementCount").GetInt32());
+        Assert.Equal(1, observation.GetProperty("currentMemberCount").GetInt32());
+        var originalMethod = Assert.Single(CSharpSyntaxTree.ParseText(source).GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>(),
+            method => method.Identifier.ValueText == observation.GetProperty("member").GetString());
+        var (calor, losses) = await ConvertAsync(source, surface);
+        Assert.Equal(new[] { observation.GetProperty("feature").GetString() }, losses);
+        RawFrameAssertions.AssertFramed(calor, present: true);
+        var strict = Program.Compile(calor, "preserved-shapes.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(strict.HasErrors, string.Join("\n", strict.Diagnostics.Errors));
+        var owner = Assert.Single(strict.Ast!.Classes,
+            type => type.Name == observation.GetProperty("owner").GetString());
+        var preserved = Assert.Single(owner.InteropBlocks);
+        Assert.Empty(owner.Methods);
+        Assert.Equal(Calor.Compiler.Ast.InteropMemberKind.Method, preserved.MemberKind);
+        Assert.Equal(observation.GetProperty("feature").GetString(), preserved.FeatureName);
+        Assert.Equal(originalMethod.ToString(), preserved.CSharpCode.Trim());
+        var helpers = Assert.Single(strict.Ast.Classes, type => type.Name == "L");
+        Assert.Empty(helpers.InteropBlocks);
+        Assert.Equal(new[] { "S", "Bump" }, helpers.Methods.Select(method => method.Name));
+        Assert.All(helpers.Methods, method =>
+            Assert.Empty(method.Body.OfType<Calor.Compiler.Ast.RawCSharpNode>()));
+        var permissive = Program.Compile(calor, "preserved-shapes.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
+        Assert.False(permissive.HasErrors, string.Join("\n", permissive.Diagnostics.Errors));
+        Assert.Equal(strict.GeneratedCode, permissive.GeneratedCode);
+        Assert.Equal("1,9,0,011,10,11|", observation.GetProperty("trace").GetString());
+        Assert.Equal(observation.GetProperty("trace").GetString(), Run(source));
+        Assert.Equal(Run(source), Run(strict.GeneratedCode));
+        Assert.Equal(Run(source), Run(permissive.GeneratedCode));
     }
 
     [Fact]
